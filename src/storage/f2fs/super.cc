@@ -27,7 +27,6 @@ void F2fs::PutSuper() {
   reader_.reset();
   ResetPsuedoVnodes();
   GetVCache().Reset();
-
   GetDirEntryCache().Reset();
 
   node_manager_->DestroyNodeManager();
@@ -97,7 +96,6 @@ void F2fs::SyncFs(bool bShutdown) {
         }
       }
       WritebackOperation op = {.to_write = kDefaultBlocksPerSegment};
-      // Checkpointing will flush all Pages that Writer is holding.
       op.if_vnode = [](fbl::RefPtr<VnodeF2fs> &vnode) {
         if (!vnode->IsDir()) {
           return ZX_OK;

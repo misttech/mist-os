@@ -259,7 +259,7 @@ zx_status_t F2fs::GetValidCheckpoint() {
   return ZX_OK;
 }
 
-pgoff_t F2fs::FlushDirtyDataPages(WritebackOperation &operation) {
+pgoff_t F2fs::FlushDirtyDataPages(WritebackOperation &operation, bool wait_writer) {
   pgoff_t total_nwritten = 0;
   GetVCache().ForDirtyVnodesIf(
       [&](fbl::RefPtr<VnodeF2fs> &vnode) {
@@ -276,6 +276,14 @@ pgoff_t F2fs::FlushDirtyDataPages(WritebackOperation &operation) {
         return ZX_OK;
       },
       std::move(operation.if_vnode));
+
+  if (wait_writer) {
+    // Wait until writers finish and release the ref of dirty vnodes.
+    sync_completion_t completion;
+    ScheduleWriter(&completion);
+    ZX_ASSERT_MSG(sync_completion_wait(&completion, zx::sec(kWriteTimeOut).get()) == ZX_OK,
+                  "FlushDirtyDataPages() timeout");
+  }
   return total_nwritten;
 }
 
@@ -283,37 +291,35 @@ pgoff_t F2fs::FlushDirtyDataPages(WritebackOperation &operation) {
 void F2fs::BlockOperations() __TA_NO_THREAD_SAFETY_ANALYSIS {
   SuperblockInfo &superblock_info = GetSuperblockInfo();
   while (true) {
-    // write out all the dirty dentry pages
-    WritebackOperation op = {.bSync = false};
+    // Write out all dirty dentry pages and remove orphans from dirty list.
+    WritebackOperation op;
     op.if_vnode = [](fbl::RefPtr<VnodeF2fs> &vnode) {
-      if (vnode->IsDir()) {
+      if (vnode->IsDir() || !vnode->IsValid()) {
         return ZX_OK;
       }
       return ZX_ERR_NEXT;
     };
-    FlushDirtyDataPages(op);
+    FlushDirtyDataPages(op, true);
 
     // Stop file operation
     superblock_info.mutex_lock_op(LockType::kFileOp);
-    if (superblock_info.GetPageCount(CountType::kDirtyDents)) {
-      superblock_info.mutex_unlock_op(LockType::kFileOp);
-    } else {
+    if (!superblock_info.GetPageCount(CountType::kDirtyDents)) {
       break;
     }
+    superblock_info.mutex_unlock_op(LockType::kFileOp);
   }
 
   // POR: we should ensure that there is no dirty node pages
   // until finishing nat/sit flush.
   while (true) {
-    WritebackOperation op = {.bSync = false};
+    WritebackOperation op;
     GetNodeManager().FlushDirtyNodePages(op);
 
     superblock_info.mutex_lock_op(LockType::kNodeOp);
-    if (superblock_info.GetPageCount(CountType::kDirtyNodes)) {
-      superblock_info.mutex_unlock_op(LockType::kNodeOp);
-    } else {
+    if (!superblock_info.GetPageCount(CountType::kDirtyNodes)) {
       break;
     }
+    superblock_info.mutex_unlock_op(LockType::kNodeOp);
   }
 }
 

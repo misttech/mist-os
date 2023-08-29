@@ -110,11 +110,11 @@ class VmoManager {
   zx_status_t UnlockVmo(pgoff_t index, bool evict) __TA_EXCLUDES(mutex_);
   void ZeroBlocks(fs::PagedVfs &vfs, pgoff_t start, pgoff_t end) __TA_EXCLUDES(mutex_);
   zx::result<> WritebackBegin(fs::PagedVfs &vfs, const size_t start = 0,
-                                    const size_t end = kMaxVmoSize) __TA_EXCLUDES(mutex_);
+                              const size_t end = kMaxVmoSize) __TA_EXCLUDES(mutex_);
   zx_status_t WritebackEnd(fs::PagedVfs &vfs, const size_t start = 0,
                            const size_t end = kMaxVmoSize) __TA_EXCLUDES(mutex_);
-  zx::result<> DirtyPages(fs::PagedVfs &vfs, const size_t start = 0,
-                                const size_t end = kMaxVmoSize) __TA_EXCLUDES(mutex_);
+  zx::result<> DirtyPages(fs::PagedVfs &vfs, const size_t start = 0, const size_t end = kMaxVmoSize)
+      __TA_EXCLUDES(mutex_);
   void AllowEviction(fs::PagedVfs &vfs, const size_t start = 0, const size_t end = kMaxVmoSize)
       __TA_EXCLUDES(mutex_);
 
@@ -131,10 +131,9 @@ class VmoManager {
 
  private:
   zx::result<> DirtyPagesUnsafe(fs::PagedVfs &vfs, const size_t start = 0,
-                                      const size_t end = kMaxVmoSize) __TA_REQUIRES_SHARED(mutex_);
+                                const size_t end = kMaxVmoSize) __TA_REQUIRES_SHARED(mutex_);
   zx::result<> WritebackBeginUnsafe(fs::PagedVfs &vfs, const size_t start = 0,
-                                          const size_t end = kMaxVmoSize)
-      __TA_REQUIRES_SHARED(mutex_);
+                                    const size_t end = kMaxVmoSize) __TA_REQUIRES_SHARED(mutex_);
   zx_status_t WritebackEndUnsafe(fs::PagedVfs &vfs, const size_t start = 0,
                                  const size_t end = kMaxVmoSize) __TA_REQUIRES_SHARED(mutex_);
 
@@ -188,11 +187,12 @@ class VmoCleaner final {
   VmoCleaner &operator=(const VmoCleaner &) = delete;
   VmoCleaner(VmoCleaner &&) = delete;
   VmoCleaner &operator=(VmoCleaner &&) = delete;
-  explicit VmoCleaner(bool bSync, VnodeF2fs &vnode, const pgoff_t start = 0, const pgoff_t end = kPgOffMax);
+  explicit VmoCleaner(bool bSync, fbl::RefPtr<VnodeF2fs> vnode, const pgoff_t start = 0,
+                      const pgoff_t end = kPgOffMax);
   ~VmoCleaner();
 
  private:
-  VnodeF2fs *vnode_;
+  fbl::RefPtr<VnodeF2fs> vnode_;
   bool sync_ = false;
   size_t offset_ = 0;
   size_t end_offset_ = 0;

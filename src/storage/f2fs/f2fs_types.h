@@ -67,7 +67,7 @@ constexpr uint32_t kBitsPerByte = 8;
 constexpr uint32_t kPageCacheShift = 12;
 constexpr uint32_t kF2fsSuperMagic = 0xF2F52010;
 constexpr uint32_t kCrcPolyLe = 0xedb88320;
-constexpr auto kWriteTimeOut = std::chrono::seconds(60);
+constexpr size_t kWriteTimeOut = 60;  // in seconds
 
 constexpr uint32_t kRead = 0x0;
 constexpr uint32_t kWrite = 0x1;

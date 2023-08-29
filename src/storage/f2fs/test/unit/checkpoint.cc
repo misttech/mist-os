@@ -935,7 +935,7 @@ TEST_F(CheckpointTest, CpError) {
   // which causes that f2fs sets the checkpoint error flag.
   auto hook = [](const block_fifo_request_t &_req, const zx::vmo *_vmo) {
     if (_req.command.opcode == BLOCK_OPCODE_WRITE) {
-      return ZX_ERR_IO;
+      return ZX_ERR_PEER_CLOSED;
     }
     return ZX_OK;
   };

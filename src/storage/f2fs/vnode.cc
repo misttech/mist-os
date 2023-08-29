@@ -356,9 +356,8 @@ void VnodeF2fs::RecycleNode() {
                   GetNameView().data(), GetKey(), open_count());
   }
   if (GetNlink()) {
-    // f2fs removes the last reference of |this| from the dirty vnode list
-    // when there is no dirty Page for the vnode at checkpoint time. So, it
-    // should not happen except when disk IOs fail.
+    // It should not happen since f2fs removes the last reference of dirty vnodes at checkpoint time
+    // during which any file operations are not allowed.
     if (GetDirtyPageCount()) {
       // It can happen only when CpFlag::kCpErrorFlag is set or with tests.
       FX_LOGS(WARNING) << "Vnode[" << GetNameView().data() << ":" << GetKey()
@@ -371,8 +370,8 @@ void VnodeF2fs::RecycleNode() {
     file_cache_->Reset();
     fs()->GetVCache().Downgrade(this);
   } else {
-    // If PagedVfs::Teardown() releases the refptr of orphan vnodes, purge it at the next
-    // mount time as f2fs object is not available anymore.
+    // During PagedVfs::Teardown, f2fs object is not available. In this case, we purge orphans at
+    // next mount time.
     if (!fs()->IsTearDown()) {
       EvictVnode();
     }

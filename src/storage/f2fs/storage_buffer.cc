@@ -66,7 +66,7 @@ zx::result<StorageOperations> StorageBuffer::MakeReadOperations(const std::vecto
         allocate_index = 0;
         // Wait until there is a room in |buffer_|.
         while (free_keys_.is_empty()) {
-          if (auto wait_result = cvar_.wait_for(mutex_, kWriteTimeOut);
+          if (auto wait_result = cvar_.wait_for(mutex_, std::chrono::seconds(kWriteTimeOut));
               wait_result == std::cv_status::timeout) {
             return zx::error(ZX_ERR_TIMED_OUT);
           }

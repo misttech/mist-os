@@ -526,7 +526,6 @@ zx_status_t Dir::Create(std::string_view name, uint32_t mode, fbl::RefPtr<fs::Vn
   if (!fs::IsValidName(name)) {
     return ZX_ERR_INVALID_ARGS;
   }
-  zx_status_t ret = ZX_OK;
   {
     std::lock_guard dir_lock(dir_mutex_);
     if (GetNlink() == 0)
@@ -536,17 +535,19 @@ zx_status_t Dir::Create(std::string_view name, uint32_t mode, fbl::RefPtr<fs::Vn
       return ZX_ERR_ALREADY_EXISTS;
     }
 
+    zx_status_t ret = ZX_OK;
     if (S_ISDIR(mode)) {
       ret = Mkdir(name, safemath::checked_cast<umode_t>(mode), out);
     } else {
       ret = DoCreate(name, safemath::checked_cast<umode_t>(mode), out);
     }
+    if (ret != ZX_OK) {
+      return ret;
+    }
   }
-  if (ret == ZX_OK) {
-    fs()->GetSegmentManager().BalanceFs();
-    ret = (*out)->OpenValidating(fs::VnodeConnectionOptions(), nullptr);
-  }
-  return ret;
+
+  fs()->GetSegmentManager().BalanceFs();
+  return (*out)->OpenValidating(fs::VnodeConnectionOptions(), nullptr);
 }
 
 zx_status_t Dir::Unlink(std::string_view name, bool must_be_dir) {

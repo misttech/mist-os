@@ -990,16 +990,13 @@ pgoff_t NodeManager::FlushDirtyNodePages(WritebackOperation &operation) {
   }
   if (zx_status_t status = fs_->GetVCache().ForDirtyVnodesIf(
           [](fbl::RefPtr<VnodeF2fs> &vnode) {
-            if (!vnode->IsValid()) {
-              ZX_ASSERT(vnode->ClearDirty());
-              return ZX_ERR_NEXT;
-            }
+            ZX_ASSERT(vnode->IsValid());
             vnode->UpdateInodePage();
             ZX_ASSERT(vnode->ClearDirty());
             return ZX_OK;
           },
           [](fbl::RefPtr<VnodeF2fs> &vnode) {
-            if (vnode->GetDirtyPageCount()) {
+            if (vnode->GetDirtyPageCount() || !vnode->IsValid()) {
               return ZX_ERR_NEXT;
             }
             return ZX_OK;

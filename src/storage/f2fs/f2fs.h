@@ -276,7 +276,7 @@ class F2fs final {
 
   void ScheduleWriteback(size_t num_pages = kDefaultBlocksPerSegment);
   zx::result<> WaitForWriteback() {
-    if (!writeback_flag_.try_acquire_for(kWriteTimeOut)) {
+    if (!writeback_flag_.try_acquire_for(std::chrono::seconds(kWriteTimeOut))) {
       return zx::error(ZX_ERR_TIMED_OUT);
     }
     writeback_flag_.release();
@@ -314,7 +314,7 @@ class F2fs final {
   // Flush all dirty meta Pages that meet |operation|.if_page.
   pgoff_t FlushDirtyMetaPages(WritebackOperation &operation);
   // Flush all dirty data Pages that meet |operation|.if_vnode and if_page.
-  pgoff_t FlushDirtyDataPages(WritebackOperation &operation);
+  pgoff_t FlushDirtyDataPages(WritebackOperation &operation, bool wait_writer = false);
 
   std::mutex checkpoint_mutex_;
   std::atomic_flag teardown_flag_ = ATOMIC_FLAG_INIT;

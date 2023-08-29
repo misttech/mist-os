@@ -366,8 +366,9 @@ zx_status_t VmoHolder::Write(const void *data, uint64_t offset, size_t len) {
   return manager_.Write(data, page_to_address(index_) + offset, len);
 }
 
-VmoCleaner::VmoCleaner(bool bSync, VnodeF2fs &vnode, const pgoff_t start, const pgoff_t end)
-    : vnode_(&vnode), sync_(bSync), offset_(page_to_address(start)) {
+VmoCleaner::VmoCleaner(bool bSync, fbl::RefPtr<VnodeF2fs> vnode, const pgoff_t start,
+                       const pgoff_t end)
+    : vnode_(std::move(vnode)), sync_(bSync), offset_(page_to_address(start)) {
   ZX_ASSERT(start < end);
   size_t end_offset = end;
   if (end < kPgOffMax) {
@@ -380,7 +381,7 @@ VmoCleaner::VmoCleaner(bool bSync, VnodeF2fs &vnode, const pgoff_t start, const 
   end_offset_ = end_offset;
   if (sync_) {
     ZX_ASSERT(
-        vnode.GetVmoManager().WritebackBegin(*vnode_->fs()->vfs(), offset_, end_offset_).is_ok());
+        vnode_->GetVmoManager().WritebackBegin(*vnode_->fs()->vfs(), offset_, end_offset_).is_ok());
   } else {
     auto wb_begin_task = fpromise::make_promise([vnode = vnode_, offset = offset_,
                                                  end_offset = end_offset_]() {

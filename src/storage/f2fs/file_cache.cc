@@ -747,14 +747,13 @@ pgoff_t FileCache::Writeback(WritebackOperation &operation) {
 }
 
 pgoff_t FileCache::WritebackFromDirtyList(const WritebackOperation &operation) {
-  // do ZX_PAGER_OP_WRITEBACK_BEGIN
-  VmoCleaner cleaner(operation.bSync, *vnode_);
-  // Fetche |size| of dirty pages from the fifo list.
+  // Notify kernel of ZX_PAGER_OP_WRITEBACK_BEGIN for pages in the fifo list.
+  VmoCleaner cleaner(operation.bSync, fbl::RefPtr<VnodeF2fs>(vnode_));
+  // Fetch |size| of dirty pages from the fifo list.
   // TODO(https://fxbug.dev/122292):
-  // |size| of pages can include ones newly dirtied after ZX_PAGER_OP_WRITEBACK_BEGIN of |cleaner|.
-  // In this case, kernel unnecessarily keeps the pages dirty after ZX_PAGER_OP_WRITEBACK_END of
-  // |cleaner| though they are actually flushed already. Such dirty pages get cleaned at the next
-  // flush time or in VnodeF2fs::RecycleNode().
+  // If new pages are dirtied after |cleaner|, kernel unnecessarily keeps them even after
+  // ZX_PAGER_OP_WRITEBACK_END, and the pages get free at the next flush time or in
+  // VnodeF2fs::RecycleNode().
   size_t merged_blocks = 0;
   size_t size = vnode_->GetDirtyPageList().Size();
   size_t nwritten = size;
