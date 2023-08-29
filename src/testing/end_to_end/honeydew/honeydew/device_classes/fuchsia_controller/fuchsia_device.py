@@ -10,9 +10,11 @@ from typing import Any, Dict, Optional
 
 import fidl.fuchsia_buildinfo as f_buildinfo
 import fidl.fuchsia_diagnostics as f_diagnostics
+import fidl.fuchsia_feedback as f_feedback
 import fidl.fuchsia_hardware_power_statecontrol as fhp_statecontrol
 import fidl.fuchsia_hwinfo as f_hwinfo
-import fuchsia_controller_py as fuchsia_controller
+import fidl.fuchsia_io as f_io
+import fuchsia_controller_py as fcp
 
 from honeydew import custom_types
 from honeydew import errors
@@ -40,6 +42,9 @@ _FC_PROXIES: Dict[str, custom_types.FidlEndpoint] = {
             "/core/build-info", "fuchsia.buildinfo.Provider"),
     "DeviceInfo":
         custom_types.FidlEndpoint("/core/hwinfo", "fuchsia.hwinfo.Device"),
+    "Feedback":
+        custom_types.FidlEndpoint(
+            "/core/feedback", "fuchsia.feedback.DataProvider"),
     "ProductInfo":
         custom_types.FidlEndpoint("/core/hwinfo", "fuchsia.hwinfo.Product"),
     "PowerAdmin":
@@ -185,7 +190,7 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
             build_info_resp = asyncio.run(
                 buildinfo_provider_proxy.get_build_info())
             return build_info_resp.build_info
-        except fuchsia_controller.ZxStatus as status:
+        except fcp.ZxStatus as status:
             raise errors.FuchsiaControllerError(
                 "Fuchsia Controller FIDL Error") from status
 
@@ -205,7 +210,7 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
                     _FC_PROXIES["DeviceInfo"]))
             device_info_resp = asyncio.run(hwinfo_device_proxy.get_info())
             return device_info_resp.info
-        except fuchsia_controller.ZxStatus as status:
+        except fcp.ZxStatus as status:
             raise errors.FuchsiaControllerError(
                 "Fuchsia Controller FIDL Error") from status
 
@@ -225,7 +230,7 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
                     _FC_PROXIES["ProductInfo"]))
             product_info_resp = asyncio.run(hwinfo_product_proxy.get_info())
             return product_info_resp.info
-        except fuchsia_controller.ZxStatus as status:
+        except fcp.ZxStatus as status:
             raise errors.FuchsiaControllerError(
                 "Fuchsia Controller FIDL Error") from status
 
@@ -246,7 +251,7 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
             asyncio.run(
                 self.fuchsia_controller.rcs_proxy.log_message(
                     tag=tag, message=message, severity=_LOG_SEVERITIES[level]))
-        except fuchsia_controller.ZxStatus as status:
+        except fcp.ZxStatus as status:
             raise errors.FuchsiaControllerError(
                 "Fuchsia Controller FIDL Error") from status
 
@@ -263,25 +268,85 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
             asyncio.run(
                 power_proxy.reboot(
                     reason=fhp_statecontrol.RebootReason.USER_REQUEST))
-        except fuchsia_controller.ZxStatus as status:
+        except fcp.ZxStatus as status:
             # ZX_ERR_PEER_CLOSED is expected in this instance because the device
             # powered off.
             zx_status: Optional[int] = \
                 status.args[0] if len(status.args) > 0 else None
-            if zx_status != fuchsia_controller.ZxStatus.ZX_ERR_PEER_CLOSED:
+            if zx_status != fcp.ZxStatus.ZX_ERR_PEER_CLOSED:
                 raise errors.FuchsiaControllerError(
                     "Fuchsia Controller FIDL Error") from status
+
+    def _read_snapshot_from_channel(self, channel_client: fcp.Channel) -> bytes:
+        """Read snapshot data from client end of the transfer channel.
+
+        Args:
+            channel_client: Client end of the snapshot data channel.
+
+        Raises:
+            errors.FuchsiaControllerError: On FIDL communication failure or on
+              data transfer verification failure.
+
+        Returns:
+            Bytes containing snapshot data as a zip archive.
+        """
+        # Snapshot is sent over the channel as |fuchsia.io.File|.
+        file_proxy = f_io.File.Client(channel_client)
+
+        # Get file size for verification later.
+        try:
+            attr_resp: f_io.Node1GetAttrResponse = asyncio.run(
+                file_proxy.get_attr())
+            if attr_resp.s != fcp.ZxStatus.ZX_OK:
+                raise errors.FuchsiaControllerError(
+                    f"get_attr() returned status: {attr_resp.s}")
+        except fcp.ZxStatus as status:
+            raise errors.FuchsiaControllerError("get_attr() failed") from status
+
+        # Read until channel is empty.
+        ret: bytearray = bytearray()
+        try:
+            while True:
+                result: f_io.Readable_Read_Result = asyncio.run(
+                    file_proxy.read(count=f_io.MAX_BUF))
+                if not result.response.data:
+                    break
+                ret.extend(result.response.data)
+        except fcp.ZxStatus as status:
+            raise errors.FuchsiaControllerError("read() failed") from status
+
+        # Verify transfer.
+        expected_size: int = attr_resp.attributes.content_size
+        if len(ret) != expected_size:
+            raise errors.FuchsiaControllerError(
+                f"Expected {expected_size} bytes, but read {len(ret)} bytes")
+
+        return bytes(ret)
 
     def _send_snapshot_command(self) -> bytes:
         """Send a device command to take a snapshot.
 
         Raises:
-            errors.FuchsiaControllerError: On FIDL communication failure.
+            errors.FuchsiaControllerError: On FIDL communication failure or on
+              data transfer verification failure.
 
         Returns:
             Bytes containing snapshot data as a zip archive.
         """
-        # TODO(b/286052015): Implement snapshot via `response_channel` field in
-        # `GetSnapshot`, and reading a `fuchsia.io.File` channel. See the
-        # implementation of the `ffx target snapshot` command.
-        raise NotImplementedError
+        channel_server, channel_client = fcp.Channel.create()
+        params = f_feedback.GetSnapshotParameters(
+            # Set timeout to 2 minutes in nanoseconds.
+            collection_timeout_per_data=2 * 60 * 10**9,
+            response_channel=channel_server.take())
+
+        try:
+            feedback_proxy = f_feedback.DataProvider.Client(
+                self.fuchsia_controller.connect_device_proxy(
+                    _FC_PROXIES["Feedback"]))
+            # The data channel isn't populated until get_snapshot() returns so
+            # there's no need to drain the channel in parallel.
+            asyncio.run(feedback_proxy.get_snapshot(params=params))
+        except fcp.ZxStatus as status:
+            raise errors.FuchsiaControllerError(
+                "get_snapshot() failed") from status
+        return self._read_snapshot_from_channel(channel_client)

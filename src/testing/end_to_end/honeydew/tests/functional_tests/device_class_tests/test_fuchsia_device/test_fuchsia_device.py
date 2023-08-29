@@ -112,12 +112,6 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_snapshot(self) -> None:
         """Test case for snapshot()"""
-        # TODO(b/286052015): Implement snapshot support.
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.snapshot(directory="/tmp",)
-            return
-
         with tempfile.TemporaryDirectory() as tmpdir:
             self.device.snapshot(directory=tmpdir, snapshot_file="snapshot.zip")
             exists: bool = os.path.exists(f"{tmpdir}/snapshot.zip")

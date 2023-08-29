@@ -11,8 +11,10 @@ from unittest import mock
 
 import fidl.fuchsia_buildinfo as f_buildinfo
 import fidl.fuchsia_developer_remotecontrol as fd_remotecontrol
+import fidl.fuchsia_feedback as f_feedback
 import fidl.fuchsia_hardware_power_statecontrol as fhp_statecontrol
 import fidl.fuchsia_hwinfo as f_hwinfo
+import fidl.fuchsia_io as f_io
 import fuchsia_controller_py as fuchsia_controller
 from parameterized import parameterized
 
@@ -61,6 +63,28 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
     test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_with_{test_label}"
+
+
+def _file_read_result(data: f_io.Transfer) -> f_io.Readable_Read_Result:
+    ret = f_io.Readable_Read_Result()
+    ret.response = f_io.Readable_Read_Response(data=data)
+    return ret
+
+
+def _file_attr_resp(
+        status: fuchsia_controller.ZxStatus,
+        size: int) -> f_io.Node1GetAttrResponse:
+    return f_io.Node1GetAttrResponse(
+        s=status,
+        attributes=f_io.NodeAttributes(
+            content_size=size,
+            # The args below are arbitrary.
+            mode=0,
+            id=0,
+            storage_size=0,
+            link_count=0,
+            creation_time=0,
+            modification_time=0))
 
 
 class FuchsiaDeviceFCTests(unittest.TestCase):
@@ -406,10 +430,144 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
 
         mock_admin_reboot.assert_called()
 
-    def test_send_snapshot_command(self) -> None:
+    @mock.patch.object(
+        f_feedback.DataProvider.Client,
+        "get_snapshot",
+        new_callable=mock.AsyncMock,
+    )
+    @mock.patch.object(
+        f_io.File.Client,
+        "get_attr",
+        new_callable=mock.AsyncMock,
+        return_value=_file_attr_resp(fuchsia_controller.ZxStatus.ZX_OK, 15))
+    @mock.patch.object(
+        f_io.File.Client,
+        "read",
+        new_callable=mock.AsyncMock,
+        side_effect=[
+            # Read 15 bytes over multiple responses.
+            _file_read_result([0] * 5),
+            _file_read_result([0] * 5),
+            _file_read_result([0] * 5),
+            # Send empty response to signal read completion.
+            _file_read_result([])
+        ])
+    def test_send_snapshot_command(self, *unused_args) -> None:
         """Testcase for FuchsiaDevice._send_snapshot_command()"""
-        with self.assertRaises(NotImplementedError):
-            # pylint: disable=protected-access
+        # pylint: disable=protected-access
+        data = self.fd_obj._send_snapshot_command()
+        self.assertEqual(len(data), 15)
+
+    @mock.patch.object(
+        f_feedback.DataProvider.Client,
+        "get_snapshot",
+        new_callable=mock.AsyncMock,
+        # Raise arbitrary failure.
+        side_effect=fuchsia_controller.ZxStatus(
+            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS),
+    )
+    def test_send_snapshot_command_get_snapshot_error(
+            self, *unused_args) -> None:
+        """Testcase for FuchsiaDevice._send_snapshot_command() when the
+        get_snapshot FIDL call raises an exception.
+        ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
+        # pylint: disable=protected-access
+        with self.assertRaises(errors.FuchsiaControllerError):
+            self.fd_obj._send_snapshot_command()
+
+    @mock.patch.object(
+        f_feedback.DataProvider.Client,
+        "get_snapshot",
+        new_callable=mock.AsyncMock,
+    )
+    @mock.patch.object(
+        f_io.File.Client,
+        "get_attr",
+        new_callable=mock.AsyncMock,
+        # Raise arbitrary failure.
+        side_effect=fuchsia_controller.ZxStatus(
+            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS),
+    )
+    def test_send_snapshot_command_get_attr_error(self, *unused_args) -> None:
+        """Testcase for FuchsiaDevice._send_snapshot_command() when the get_attr
+        FIDL call raises an exception.
+        ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
+        # pylint: disable=protected-access
+        with self.assertRaises(errors.FuchsiaControllerError):
+            self.fd_obj._send_snapshot_command()
+
+    @mock.patch.object(
+        f_feedback.DataProvider.Client,
+        "get_snapshot",
+        new_callable=mock.AsyncMock,
+    )
+    @mock.patch.object(
+        f_io.File.Client,
+        "get_attr",
+        new_callable=mock.AsyncMock,
+        return_value=_file_attr_resp(
+            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS, 0),
+    )
+    def test_send_snapshot_command_get_attr_status_not_ok(
+            self, *unused_args) -> None:
+        """Testcase for FuchsiaDevice._send_snapshot_command() when the get_attr
+        FIDL call returns a non-OK status code.
+        ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
+        # pylint: disable=protected-access
+        with self.assertRaises(errors.FuchsiaControllerError):
+            self.fd_obj._send_snapshot_command()
+
+    @mock.patch.object(
+        f_feedback.DataProvider.Client,
+        "get_snapshot",
+        new_callable=mock.AsyncMock,
+    )
+    @mock.patch.object(
+        f_io.File.Client,
+        "get_attr",
+        new_callable=mock.AsyncMock,
+        return_value=_file_attr_resp(fuchsia_controller.ZxStatus.ZX_OK, 15))
+    @mock.patch.object(
+        f_io.File.Client,
+        "read",
+        new_callable=mock.AsyncMock,
+        side_effect=fuchsia_controller.ZxStatus(
+            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS),
+    )
+    def test_send_snapshot_command_read_error(self, *unused_args) -> None:
+        """Testcase for FuchsiaDevice._send_snapshot_command() when the read
+        FIDL call raises an exception.
+        ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
+        # pylint: disable=protected-access
+        with self.assertRaises(errors.FuchsiaControllerError):
+            self.fd_obj._send_snapshot_command()
+
+    @mock.patch.object(
+        f_feedback.DataProvider.Client,
+        "get_snapshot",
+        new_callable=mock.AsyncMock,
+    )
+    @mock.patch.object(
+        f_io.File.Client,
+        "get_attr",
+        new_callable=mock.AsyncMock,
+        # File reports size of 15 bytes.
+        return_value=_file_attr_resp(fuchsia_controller.ZxStatus.ZX_OK, 15))
+    @mock.patch.object(
+        f_io.File.Client,
+        "read",
+        new_callable=mock.AsyncMock,
+        # Only 5 bytes are read.
+        side_effect=[
+            _file_read_result([0] * 5),
+            _file_read_result([]),
+        ],
+    )
+    def test_send_snapshot_command_size_mismatch(self, *unused_args) -> None:
+        """Testcase for FuchsiaDevice._send_snapshot_command() when the number
+        of bytes read from channel doesn't match the file's content size."""
+        # pylint: disable=protected-access
+        with self.assertRaises(errors.FuchsiaControllerError):
             self.fd_obj._send_snapshot_command()
 
 
