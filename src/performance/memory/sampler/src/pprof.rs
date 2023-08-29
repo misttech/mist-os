@@ -111,10 +111,10 @@ impl Mapping {
 
 /// Build a `pprof`-compatible profile from a program address mapping
 /// and its allocation/deallocation information.
-pub fn build_profile<'a>(
+pub fn build_profile<'a, 'b, 'c>(
     modules: impl Iterator<Item = &'a ModuleMap>,
-    live_allocations: Vec<LiveAllocation>,
-    dead_allocations: Vec<DeadAllocation>,
+    live_allocations: impl Iterator<Item = &'b LiveAllocation> + Clone,
+    dead_allocations: impl Iterator<Item = &'c DeadAllocation> + Clone,
 ) -> pproto::Profile {
     let mut st = StringTable::new();
     let mut pprof = pproto::Profile {
@@ -145,12 +145,12 @@ pub fn build_profile<'a>(
         pprof.mapping = mappings;
 
         let live_locations = live_allocations
-            .iter()
+            .clone()
             .flat_map(|LiveAllocation { stack_trace: ast, .. }| ast.stack_frames.iter().flatten());
-        let dead_locations = dead_allocations.iter().flat_map(
+        let dead_locations = dead_allocations.clone().flat_map(
             |DeadAllocation { allocation_stack_trace: ast, .. }| ast.stack_frames.iter().flatten(),
         );
-        let deallocations_locations = dead_allocations.iter().flat_map(
+        let deallocations_locations = dead_allocations.clone().flat_map(
             |DeadAllocation { deallocation_stack_trace: dst, .. }| {
                 dst.stack_frames.iter().flatten()
             },
@@ -168,20 +168,18 @@ pub fn build_profile<'a>(
 
     // Live allocations
     {
-        let samples =
-            live_allocations.into_iter().filter_map(|LiveAllocation { size, stack_trace: ast }| {
-                Some(pproto::Sample {
-                    value: vec![1, size, 1, size, 0, 0],
-                    location_id: ast.stack_frames?,
-                    ..Default::default()
-                })
-            });
+        let samples = live_allocations.filter_map(|LiveAllocation { size, stack_trace: ast }| {
+            Some(pproto::Sample {
+                value: vec![1, *size, 1, *size, 0, 0],
+                location_id: ast.stack_frames.clone()?,
+                ..Default::default()
+            })
+        });
         pprof.sample.extend(samples);
     }
     // Dead allocations and deallocations
     {
         let samples = dead_allocations
-            .into_iter()
             .filter_map(
                 |DeadAllocation {
                      size,
@@ -191,14 +189,14 @@ pub fn build_profile<'a>(
                     Some(vec![
                         // Dead allocation
                         pproto::Sample {
-                            value: vec![0, 0, 1, size, 0, 0],
-                            location_id: ast.stack_frames?,
+                            value: vec![0, 0, 1, *size, 0, 0],
+                            location_id: ast.stack_frames.clone()?,
                             ..Default::default()
                         },
                         // Deallocation
                         pproto::Sample {
-                            value: vec![0, 0, 0, 0, 1, size],
-                            location_id: dst.stack_frames?,
+                            value: vec![0, 0, 0, 0, 1, *size],
+                            location_id: dst.stack_frames.clone()?,
                             ..Default::default()
                         },
                     ])
@@ -449,7 +447,7 @@ mod test {
         }];
 
         let profile =
-            build_profile(modules.iter(), live_allocations.clone(), dead_allocations.clone());
+            build_profile(modules.iter(), live_allocations.iter(), dead_allocations.iter());
 
         // Check that the profile contains one mapping per segment.
         let segment_count: usize = modules

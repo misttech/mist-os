@@ -15,15 +15,25 @@ use fidl_fuchsia_memory_sampler::{
 };
 use fuchsia_async::Task;
 use fuchsia_component::server::ServiceFs;
-use futures::{channel::mpsc, prelude::*, TryFutureExt};
+use futures::{channel::mpsc, prelude::*};
 
-const MAX_CONCURRENT_REQUESTS: usize = 10_000;
+/// The threshold of recorded dead allocations to trigger a partial
+/// report. The overhead for each dead allocation is of the order of 1
+/// KiB; keeping this below 10 000 should keep the residual memory
+/// *for a single profiled process* roughly under ~10 MiB.
+const DEAD_ALLOCATIONS_PROFILE_THRESHOLD: usize = 10000;
 
-/// Accumulate profiling information in the builder.
-async fn process_sampler_request(
-    builder: &mut ProfileBuilder,
+/// Upper bound on the number of concurrent connections served.
+const MAX_CONCURRENT_REQUESTS: usize = 10;
+
+/// Accumulate profiling information in the builder. May send a
+/// partial profile depending on the amount of recorded data.
+async fn process_sampler_request<'a>(
+    builder: &'a mut ProfileBuilder,
+    tx: &'a mut mpsc::Sender<ProfileReport>,
     request: SamplerRequest,
-) -> Result<&mut ProfileBuilder, Error> {
+    index: usize,
+) -> Result<(&'a mut ProfileBuilder, &'a mut mpsc::Sender<ProfileReport>), Error> {
     match request {
         SamplerRequest::RecordAllocation { address, stack_trace, size, .. } => {
             builder.allocate(address, stack_trace, size);
@@ -36,38 +46,45 @@ async fn process_sampler_request(
             builder.set_process_info(process_name, module_map.into_iter().flatten());
         }
     };
-    Ok(builder)
+    if builder.get_dead_allocations_count() >= DEAD_ALLOCATIONS_PROFILE_THRESHOLD {
+        let (process_name, profile) = builder.build_partial_profile();
+        tx.send(ProfileReport::Partial { process_name, profile, iteration: index }).await?;
+    }
+    Ok((builder, tx))
 }
 
 /// Build a profile from a stream of profiling requests. Requests are
 /// processed sequentially, in order.
 async fn process_sampler_requests(
     stream: impl Stream<Item = Result<SamplerRequest, fidl::Error>>,
+    tx: &mut mpsc::Sender<ProfileReport>,
 ) -> Result<(String, pproto::Profile), Error> {
     let mut profile_builder = ProfileBuilder::default();
     stream
-        .map(|request| request.context("failed request"))
-        .try_fold(&mut profile_builder, process_sampler_request)
+        .enumerate()
+        .map(|(i, request)| request.context("failed request").map(|r| (i, r)))
+        .try_fold((&mut profile_builder, tx), |(builder, tx), (index, request)| {
+            process_sampler_request(builder, tx, request, index)
+        })
         .await?;
     Ok(profile_builder.build())
 }
 
 /// Serves the `Sampler` protocol for a given process. Once a client
 /// closes their connection, enqueues a `pprof`-compatible profile to
-/// the provided channel, for further processing.
+/// the provided channel, for further processing. May also regularly
+/// enqueue partial profiles, to offload the profiler's memory usage.
 ///
 /// Note: this function does not retry pushing profiles through the
 /// channel. Failure to handle profile reports in a timely manner will
 /// cause this component to shut down.
-///
-/// TODO(fxbug.dev/132410): Capture periodic snapshots while the
-/// instrumented process is running.
 async fn run_sampler_service(
     stream: SamplerRequestStream,
     mut tx: mpsc::Sender<ProfileReport>,
 ) -> Result<(), Error> {
-    let (process_name, profile) = process_sampler_requests(stream).await?;
-    tx.try_send(ProfileReport { process_name, profile })?;
+    let (process_name, profile) = process_sampler_requests(stream, &mut tx).await?;
+    tracing::debug!("Profiling for {} done, queuing final report", process_name);
+    tx.send(ProfileReport::Final { process_name, profile }).await?;
     Ok(())
 }
 
@@ -101,21 +118,28 @@ pub fn setup_sampler_service(
 #[cfg(test)]
 mod test {
     use anyhow::Error;
-    use fidl::endpoints::create_proxy_and_stream;
-    use fidl_fuchsia_memory_sampler::SamplerSetProcessInfoRequest;
-    use fidl_fuchsia_memory_sampler::{ExecutableSegment, ModuleMap, SamplerMarker, StackTrace};
-    use itertools::assert_equal;
-    use itertools::sorted;
+    use fidl::endpoints::{create_proxy_and_stream, RequestStream};
+    use fidl_fuchsia_memory_sampler::{
+        ExecutableSegment, ModuleMap, SamplerMarker, SamplerRequest, SamplerSetProcessInfoRequest,
+        StackTrace,
+    };
+    use futures::{channel::mpsc, join, StreamExt};
+    use itertools::{assert_equal, sorted};
 
-    use crate::sampler_service::{
-        pproto::{Location, Mapping},
-        process_sampler_requests,
+    use crate::{
+        crash_reporter::ProfileReport,
+        sampler_service::{
+            pproto::{Location, Mapping},
+            process_sampler_request, process_sampler_requests, ProfileBuilder,
+            DEAD_ALLOCATIONS_PROFILE_THRESHOLD,
+        },
     };
 
     #[fuchsia::test]
     async fn test_process_sampler_requests_full_profile() -> Result<(), Error> {
         let (client, request_stream) = create_proxy_and_stream::<SamplerMarker>()?;
-        let profile_future = process_sampler_requests(request_stream);
+        let (mut tx, _rx) = mpsc::channel(1);
+        let profile_future = process_sampler_requests(request_stream, &mut tx);
 
         let module_map = vec![
             ModuleMap {
@@ -173,9 +197,49 @@ mod test {
     }
 
     #[fuchsia::test]
+    async fn test_process_sampler_request_partial_profile() -> Result<(), Error> {
+        let (_client, request_stream) = create_proxy_and_stream::<SamplerMarker>()?;
+        let (mut tx, mut rx) = mpsc::channel(1);
+        const TEST_NAME: &str = "test process";
+        let mut builder = ProfileBuilder::default();
+        builder.set_process_info(Some(TEST_NAME.to_string()), vec![].into_iter());
+        let stack_trace = StackTrace { stack_frames: Some(vec![1000, 1500]), ..Default::default() };
+        (0..DEAD_ALLOCATIONS_PROFILE_THRESHOLD as u64).for_each(|i| {
+            builder.allocate(i, stack_trace.clone(), 10);
+            builder.deallocate(i, stack_trace.clone());
+        });
+        const TEST_INDEX: usize = 42;
+        let profile_future = process_sampler_request(
+            &mut builder,
+            &mut tx,
+            SamplerRequest::RecordAllocation {
+                address: DEAD_ALLOCATIONS_PROFILE_THRESHOLD as u64,
+                stack_trace,
+                size: 10,
+                control_handle: request_stream.control_handle(),
+            },
+            TEST_INDEX,
+        );
+        let (_, report) = join!(profile_future, rx.next());
+        let report = report.unwrap();
+        match report {
+            ProfileReport::Partial { process_name, profile, iteration } => {
+                assert_eq!(process_name, TEST_NAME.to_string());
+                assert_eq!(iteration, TEST_INDEX);
+                // This test assumes that every single allocation ends
+                // up as a sample in the produced profile.
+                assert!(profile.sample.len() > DEAD_ALLOCATIONS_PROFILE_THRESHOLD);
+            }
+            _ => assert!(false),
+        };
+        Ok(())
+    }
+
+    #[fuchsia::test]
     async fn test_process_sampler_requests_set_process_info() -> Result<(), Error> {
         let (client, request_stream) = create_proxy_and_stream::<SamplerMarker>()?;
-        let profile_future = process_sampler_requests(request_stream);
+        let (mut tx, _rx) = mpsc::channel(1);
+        let profile_future = process_sampler_requests(request_stream, &mut tx);
 
         let module_map = vec![
             ModuleMap {
@@ -226,7 +290,8 @@ mod test {
     #[fuchsia::test]
     async fn test_process_sampler_requests_multiple_set_process_info() -> Result<(), Error> {
         let (client, request_stream) = create_proxy_and_stream::<SamplerMarker>()?;
-        let profile_future = process_sampler_requests(request_stream);
+        let (mut tx, _rx) = mpsc::channel(1);
+        let profile_future = process_sampler_requests(request_stream, &mut tx);
 
         let module_map = vec![
             ModuleMap {
@@ -282,7 +347,8 @@ mod test {
     #[fuchsia::test]
     async fn test_process_sampler_requests_allocate() -> Result<(), Error> {
         let (client, request_stream) = create_proxy_and_stream::<SamplerMarker>()?;
-        let profile_future = process_sampler_requests(request_stream);
+        let (mut tx, _rx) = mpsc::channel(1);
+        let profile_future = process_sampler_requests(request_stream, &mut tx);
 
         let allocation_stack_trace =
             StackTrace { stack_frames: Some(vec![1000, 1500]), ..Default::default() };
@@ -301,7 +367,8 @@ mod test {
     #[fuchsia::test]
     async fn test_process_sampler_requests_deallocate() -> Result<(), Error> {
         let (client, request_stream) = create_proxy_and_stream::<SamplerMarker>()?;
-        let profile_future = process_sampler_requests(request_stream);
+        let (mut tx, _rx) = mpsc::channel(1);
+        let profile_future = process_sampler_requests(request_stream, &mut tx);
 
         let stack_trace = StackTrace { stack_frames: Some(vec![3000, 3001]), ..Default::default() };
 

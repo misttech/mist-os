@@ -67,14 +67,35 @@ impl ProfileBuilder {
         }
         self.module_map.extend(module_map);
     }
-    /// Finalize the profile.
+    /// Returns the total amount of dead allocations currently
+    /// recorded in this instance.
+    pub fn get_dead_allocations_count(&self) -> usize {
+        self.dead_allocations.len()
+    }
+    /// Finalize the profile. Consumes this builder.
     pub fn build(self) -> (String, pprof::pproto::Profile) {
         (
             self.process_name,
             pprof::build_profile(
                 self.module_map.iter(),
-                self.live_allocations.into_values().collect(),
-                self.dead_allocations,
+                self.live_allocations.values(),
+                self.dead_allocations.iter(),
+            ),
+        )
+    }
+    /// Produce a partial profile from a process that is still
+    /// live. Drop `dead_allocations` from `self`.
+    ///
+    /// Note: this lets one produce regular running profile from a
+    /// long-lived process, while clearing from memory the state that
+    /// will no longer be useful.
+    pub fn build_partial_profile(&mut self) -> (String, pprof::pproto::Profile) {
+        (
+            self.process_name.clone(),
+            pprof::build_profile(
+                self.module_map.iter(),
+                self.live_allocations.values(),
+                std::mem::replace(&mut self.dead_allocations, vec![]).iter(),
             ),
         )
     }
