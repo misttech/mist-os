@@ -144,7 +144,6 @@ void WlanInterface::Start(StartRequestView request, fdf::Arena& arena,
 
   NXPF_INFO("Starting wlan_fullmac interface");
   {
-    std::lock_guard lock(fullmac_ifc_mutex_);
     fullmac_ifc_ = std::make_unique<WlanFullmacIfc>(std::move(request->ifc));
   }
   is_up_ = true;
@@ -171,7 +170,6 @@ void WlanInterface::OnEapolResponse(wlan::drivers::components::Frame&& frame) {
     memcpy(eapol_ind.dst_addr, eth->h_dest, sizeof(eapol_ind.dst_addr));
     memcpy(eapol_ind.src_addr, eth->h_source, sizeof(eapol_ind.src_addr));
 
-    std::lock_guard lock(fullmac_ifc_mutex_);
     fullmac_ifc_->EapolInd(&eapol_ind);
   });
   if (status != ZX_OK) {
@@ -189,7 +187,6 @@ void WlanInterface::OnEapolTransmitted(zx_status_t status, const uint8_t* dst_ad
   // are locks in fullmac that could block this call if fullmac is calling into this driver and
   // causes something to wait for the mlan main process to run.
   status = async::PostTask(context_->device_->GetDispatcher(), [this, res = &response] {
-    std::lock_guard lock(fullmac_ifc_mutex_);
     fullmac_ifc_->EapolConf(res);
   });
   if (status != ZX_OK) {
@@ -343,12 +340,10 @@ void WlanInterface::StartScan(StartScanRequestView request, fdf::Arena& arena,
   std::lock_guard lock(mutex_);
 
   auto on_scan_result = [this](const wlan_fullmac_scan_result_t& result) {
-    std::lock_guard lock(fullmac_ifc_mutex_);
     fullmac_ifc_->OnScanResult(&result);
   };
 
   auto on_scan_end = [this](uint64_t txn_id, wlan_scan_result_t result) {
-    std::lock_guard lock(fullmac_ifc_mutex_);
     wlan_fullmac_scan_end_t end{.txn_id = txn_id, .code = result};
     fullmac_ifc_->OnScanEnd(&end);
   };
@@ -362,7 +357,6 @@ void WlanInterface::StartScan(StartScanRequestView request, fdf::Arena& arena,
     NXPF_ERR("Scan failed: %s", zx_status_get_string(status));
     wlan_fullmac_scan_end_t end{.txn_id = request->txn_id(),
                                 .code = WLAN_SCAN_RESULT_INTERNAL_ERROR};
-    std::lock_guard lock(fullmac_ifc_mutex_);
     fullmac_ifc_->OnScanEnd(&end);
     completer.buffer(arena).Reply();
     return;
@@ -443,7 +437,6 @@ void WlanInterface::DeauthReq(DeauthReqRequestView request, fdf::Arena& arena,
       // Deauth request failed, respond to SME anyway since there is no way to indicate status.
       wlan_fullmac_deauth_confirm_t resp{};
       memcpy(resp.peer_sta_address, request->req.peer_sta_address.data(), ETH_ALEN);
-      std::lock_guard lock(fullmac_ifc_mutex_);
       fullmac_ifc_->DeauthConf(&resp);
     }
     // If the request is successful, the notification should occur via the event handler.
@@ -533,7 +526,6 @@ void WlanInterface::StartReq(StartReqRequestView request, fdf::Arena& arena,
     return soft_ap_.Start(&request->req);
   }();
 
-  std::lock_guard lock(fullmac_ifc_mutex_);
   wlan_fullmac_start_confirm_t start_conf = {.result_code = result};
   fullmac_ifc_->StartConf(&start_conf);
   completer.buffer(arena).Reply();
@@ -552,7 +544,6 @@ void WlanInterface::StopReq(StopReqRequestView request, fdf::Arena& arena,
     return soft_ap_.Stop(&request->req);
   }();
 
-  std::lock_guard lock(fullmac_ifc_mutex_);
   wlan_fullmac_stop_confirm_t stop_conf = {.result_code = result};
   fullmac_ifc_->StopConf(&stop_conf);
   completer.buffer(arena).Reply();
@@ -592,7 +583,6 @@ void WlanInterface::EapolReq(EapolReqRequestView request, fdf::Arena& arena,
     wlan_fullmac_eapol_confirm_t response{
         .result_code = WLAN_EAPOL_RESULT_TRANSMISSION_FAILURE,
     };
-    std::lock_guard lock(fullmac_ifc_mutex_);
     fullmac_ifc_->EapolConf(&response);
     completer.buffer(arena).Reply();
     return;
@@ -677,7 +667,6 @@ void WlanInterface::SaeFrameTx(SaeFrameTxRequestView request, fdf::Arena& arena,
 
 void WlanInterface::WmmStatusReq(fdf::Arena& arena, WmmStatusReqCompleter::Sync& completer) {
   // TODO(https://fxbug.dev/110091): Implement support for this.
-  std::lock_guard lock(fullmac_ifc_mutex_);
 
   wlan_wmm_parameters_t wmm{};
   fullmac_ifc_->OnWmmStatusResp(ZX_OK, &wmm);
@@ -691,20 +680,17 @@ void WlanInterface::OnLinkStateChanged(OnLinkStateChangedRequestView request, fd
 }
 
 void WlanInterface::OnDisconnectEvent(uint16_t reason_code) {
-  std::lock_guard lock(fullmac_ifc_mutex_);
   wlan_fullmac_deauth_indication_t ind{.reason_code = reason_code};
   memcpy(ind.peer_sta_address, mac_address_, sizeof(mac_address_));
   fullmac_ifc_->DeauthInd(&ind);
 }
 
 void WlanInterface::SignalQualityIndication(int8_t rssi, int8_t snr) {
-  std::lock_guard lock(fullmac_ifc_mutex_);
   wlan_fullmac_signal_report_indication signal_ind = {.rssi_dbm = rssi, .snr_db = snr};
   fullmac_ifc_->SignalReport(&signal_ind);
 }
 
 void WlanInterface::InitiateSaeHandshake(const uint8_t* peer_mac) {
-  std::lock_guard lock(fullmac_ifc_mutex_);
   wlan_fullmac_sae_handshake_ind_t ind{};
   memcpy(ind.peer_sta_address, peer_mac, ETH_ALEN);
   fullmac_ifc_->SaeHandshakeInd(&ind);
@@ -712,7 +698,6 @@ void WlanInterface::InitiateSaeHandshake(const uint8_t* peer_mac) {
 
 void WlanInterface::OnAuthFrame(const uint8_t* peer_mac, const wlan::Authentication* frame,
                                 cpp20::span<const uint8_t> trailing_data) {
-  std::lock_guard lock(fullmac_ifc_mutex_);
   wlan_fullmac_sae_frame_t sae_frame{.status_code = frame->status_code,
                                      .seq_num = frame->auth_txn_seq_number};
   memcpy(sae_frame.peer_sta_address, peer_mac, ETH_ALEN);
@@ -725,7 +710,6 @@ void WlanInterface::OnAuthFrame(const uint8_t* peer_mac, const wlan::Authenticat
 // Handle STA connect event for SoftAP.
 void WlanInterface::OnStaConnectEvent(uint8_t* sta_mac_addr, uint8_t* ies, uint32_t ie_length) {
   // This is the only event from FW for STA connect. Indicate both auth and assoc to SME.
-  std::lock_guard lock(fullmac_ifc_mutex_);
   wlan_fullmac_auth_ind_t auth_ind_params = {};
   memcpy(auth_ind_params.peer_sta_address, sta_mac_addr, ETH_ALEN);
   // We always authenticate as an open system for WPA
@@ -746,7 +730,6 @@ void WlanInterface::OnStaConnectEvent(uint8_t* sta_mac_addr, uint8_t* ies, uint3
 void WlanInterface::OnStaDisconnectEvent(uint8_t* sta_mac_addr, uint16_t reason_code,
                                          bool locally_initiated) {
   // This is the only event from FW for STA disconnect. Indicate both deauth and disassoc to SME.
-  std::lock_guard lock(fullmac_ifc_mutex_);
   if (!locally_initiated) {
     NXPF_INFO("Disconnect Event, not locally initiated, send deauth and disassoc ind");
     wlan_fullmac_deauth_indication_t deauth_ind_params = {};
@@ -834,14 +817,12 @@ zx_status_t WlanInterface::SetMacAddressInFw() {
 void WlanInterface::ConfirmDeauth() {
   wlan_fullmac_deauth_confirm_t resp{};
   memcpy(resp.peer_sta_address, mac_address_, sizeof(mac_address_));
-  std::lock_guard lock(fullmac_ifc_mutex_);
   fullmac_ifc_->DeauthConf(&resp);
 }
 
 void WlanInterface::ConfirmDisassoc(zx_status_t status) {
   NXPF_ERR("%s called", __func__);
   wlan_fullmac_disassoc_confirm_t resp{.status = status};
-  std::lock_guard lock(fullmac_ifc_mutex_);
   fullmac_ifc_->DisassocConf(&resp);
 }
 
@@ -850,7 +831,6 @@ void WlanInterface::ConfirmConnectReq(ClientConnection::StatusCode status, const
   wlan_fullmac_connect_confirm_t result = {.result_code = static_cast<uint16_t>(status),
                                            .association_ies_list = ies,
                                            .association_ies_count = ies_len};
-  std::lock_guard lock(fullmac_ifc_mutex_);
   fullmac_ifc_->ConnectConf(&result);
 }
 

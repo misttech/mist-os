@@ -143,10 +143,10 @@ class WlanInterface : public WlanInterfaceDeviceType,
                          const uint8_t mac_address[ETH_ALEN], zx::channel&& mlme_channel);
 
   zx_status_t SetMacAddressInFw();
-  void ConfirmDeauth() __TA_EXCLUDES(fullmac_ifc_mutex_);
-  void ConfirmDisassoc(zx_status_t status) __TA_EXCLUDES(fullmac_ifc_mutex_);
+  void ConfirmDeauth();
+  void ConfirmDisassoc(zx_status_t status);
   void ConfirmConnectReq(ClientConnection::StatusCode status, const uint8_t* ies = nullptr,
-                         size_t ies_len = 0) __TA_EXCLUDES(fullmac_ifc_mutex_);
+                         size_t ies_len = 0);
 
   fuchsia_wlan_common::wire::WlanMacRole role_;
   uint32_t iface_index_;
@@ -161,8 +161,7 @@ class WlanInterface : public WlanInterfaceDeviceType,
   SoftAp soft_ap_ __TA_GUARDED(mutex_);
   DeviceContext* context_ = nullptr;
 
-  std::unique_ptr<wlan::WlanFullmacIfc> fullmac_ifc_ __TA_GUARDED(fullmac_ifc_mutex_);
-  std::mutex fullmac_ifc_mutex_;
+  std::unique_ptr<wlan::WlanFullmacIfc> fullmac_ifc_;
 
   // Serves fuchsia_wlan_fullmac::Service.
   fdf::OutgoingDirectory outgoing_dir_;
