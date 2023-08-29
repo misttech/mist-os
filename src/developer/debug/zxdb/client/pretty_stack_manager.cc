@@ -118,7 +118,7 @@ void PrettyStackManager::LoadDefaultMatchers() {
   // be best to hardcode this rust annotation scheme rather than try to express this with globs.
   matchers.push_back(StackGlob(
       "Rust library",
-      {PrettyFrameGlob::Func("__llvm_libc::__abort_impl__"),
+      {PrettyFrameGlob::Func("abort"),
        PrettyFrameGlob::Wildcard(0, 16),
        PrettyFrameGlob::Func("std::sys_common::backtrace::__rust_end_short_backtrace<*>")}));
 
