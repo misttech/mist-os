@@ -147,6 +147,11 @@ void platform_halt_cpu() {
   panic("sbi_hart_stop returned %ld\n", static_cast<long>(result.error));
 }
 
+zx::result<power_cpu_state> platform_get_cpu_state(cpu_num_t cpu_id) {
+  DEBUG_ASSERT(cpu_id < SMP_MAX_CPUS);
+  return power_get_cpu_state(arch_cpu_num_to_hart_id(cpu_id));
+}
+
 static void topology_cpu_init() {
   DEBUG_ASSERT(arch_max_num_cpus() > 0);
   lk_init_secondary_cpus(arch_max_num_cpus() - 1);
@@ -244,7 +249,7 @@ static zx::result<fbl::Array<zbi_topology_node_t>> sbi_detect_topology(size_t ma
     nodes[i] = {
       .entity = {
         .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
-        .processor = {          
+        .processor = {
           .architecture_info = {
             .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
             .riscv64 = {

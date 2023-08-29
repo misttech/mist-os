@@ -117,7 +117,9 @@ __END_CDECLS
 #ifdef __cplusplus
 
 #include <lib/arch/ticks.h>
+#include <lib/zx/result.h>
 
+#include <dev/power.h>
 #include <kernel/cpu.h>
 #include <ktl/string_view.h>
 
@@ -145,6 +147,9 @@ void platform_panic_start(PanicStartHaltOtherCpus option = PanicStartHaltOtherCp
 
 /* start the given cpu in a way the platform finds appropriate */
 zx_status_t platform_start_cpu(cpu_num_t cpu_id, uint64_t mpid);
+
+// Get the state of a CPU.
+zx::result<power_cpu_state> platform_get_cpu_state(cpu_num_t cpu_id);
 
 #endif  // __cplusplus
 

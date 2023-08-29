@@ -554,3 +554,7 @@ void platform_resume(void) {
   pc_resume_debug();
   pc_resume_timer();
 }
+
+zx::result<power_cpu_state> platform_get_cpu_state(cpu_num_t cpu_id) {
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
+}

@@ -161,6 +161,11 @@ zx_status_t platform_start_cpu(cpu_num_t cpu_id, uint64_t mpid) {
   return ZX_OK;
 }
 
+zx::result<power_cpu_state> platform_get_cpu_state(cpu_num_t cpu_id) {
+  DEBUG_ASSERT(cpu_id < SMP_MAX_CPUS);
+  return power_get_cpu_state(arch_cpu_num_to_mpidr(cpu_id));
+}
+
 static void topology_cpu_init(void) {
   for (auto* node : system_topology::GetSystemTopology().processors()) {
     if (node->entity.discriminant != ZBI_TOPOLOGY_ENTITY_PROCESSOR ||
