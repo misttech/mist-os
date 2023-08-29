@@ -425,6 +425,12 @@ sdk_molecule("core_deps") {
   }
 }
 
+sdk_molecule("core_packages") {
+  visibility = [ ":*" ]
+
+  deps = [ "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_sdk" ]
+}
+
 sdk_molecule("platform_fidls") {
   visibility = [ ":*" ]
   deps = [
@@ -489,7 +495,10 @@ sdk_collection("core") {
 
   filter_api_host_tools = !sdk_cross_compile_host_tools
 
-  deps = [ ":core_deps" ]
+  deps = [
+    ":core_deps",
+    ":core_packages",
+  ]
   if (!sdk_no_host_tools) {
     deps += [ ":host_tools" ]
   }
