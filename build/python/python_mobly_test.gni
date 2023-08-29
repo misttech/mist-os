@@ -82,7 +82,11 @@ import("//build/testing/host_test_data.gni")
 #
 #  local_config_source (optional)
 #    Path to the Mobly YAML config file to use for local execution.
-#    If not provided, Mobly test will not be executable in the local env.
+#    If not provided, Mobly test will generate a best-effort config based on the
+#    host environment. Note that config generation assumes connected Fuchsia
+#    devices are provisioned using the SSH credentials from Fuchsia.git
+#    workflows. If provisioned via other means (e.g. SDK, Sonic), users are
+#    advised to provide a local config instead.
 #    Type: string
 #
 #  params_source (optional)
@@ -207,6 +211,8 @@ template("python_mobly_test") {
     rebase_path("${_test_dir}/${_test_binary_name}", root_build_dir),
     "-test_data_path",
     rebase_path(_test_dir, root_build_dir),
+    "-ffx_path",
+    rebase_path("${_test_dir}/ffx", root_build_dir),
   ]
   if (defined(invoker.transport)) {
     _host_test_args += [

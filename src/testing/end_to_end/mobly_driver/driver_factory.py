@@ -26,14 +26,17 @@ class DriverFactory():
     def __init__(
             self,
             config_path: Optional[str] = None,
-            params_path: Optional[str] = None) -> None:
+            params_path: Optional[str] = None,
+            ffx_path: Optional[str] = None) -> None:
         """Initializes the instance.
         Args:
           config_path: absolute path to the Mobly test config file.
           params_path: absolute path to the Mobly testbed params file.
+          ffx_path: absolute path to the FFX binary.
         """
         self._config_path = config_path
         self._params_path = params_path
+        self._ffx_path = ffx_path
 
     def get_driver(self) -> base_mobly_driver.BaseDriver:
         """Returns an environment-specific Mobly Driver implementation.
@@ -49,8 +52,8 @@ class DriverFactory():
             return local_driver.LocalDriver(
                 config_path=self._config_path,
                 params_path=self._params_path,
+                ffx_path=self._ffx_path,
             )
-
         try:
             return infra_driver.InfraDriver(
                 tb_json_path=os.environ[api_infra.BOT_ENV_TESTBED_CONFIG],

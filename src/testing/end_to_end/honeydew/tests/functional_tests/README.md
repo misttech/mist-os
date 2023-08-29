@@ -76,10 +76,8 @@ detectable by FFX
     fuchsia-emulator*   <unknown>    core.qemu-x64    Product    [fe80::1a1c:ebd2:2db:6104%qemu]    Y
     ```
 
-2. Ensure the testbeds used by the test case (will be listed in
-"local_config_source" field in test case's BUILD.gn file) has correct device
-information listed (`name`, `ssh_private_key` etc. For more information
-about these fields, refer to
+2. Determine if your local testbed requires a manual local config to be provided
+or not. For more information, refer to
 [Lacewing Mobly Config YAML file](../../../README.md#Mobly-Config-YAML-File))
 
 

@@ -13,10 +13,8 @@ detectable by FFX
     ```
    If you need instructions to start an emulator, refer to [Fuchsia Emulator].
 
-2. Ensure the testbeds used by the test case (will be listed in
-"local_config_source" field in test case's BUILD.gn file) has correct device
-information listed (`name` and `ssh_private_key` fields. For more information
-about these fields, refer to
+2. Determine if your local testbed requires a manual local config to be provided
+or not. For more information, refer to
 [Lacewing Mobly Config YAML file](../README.md#Mobly-Config-YAML-File))
 
 ## Test execution in local mode

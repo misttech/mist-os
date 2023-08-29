@@ -64,7 +64,15 @@ generic E2E test framework features such as testbed specification, device
 initialization abstraction, assertions, and logging.
 
 Every Mobly test requires a testbed configuration file to be provided to specify
-the device(s) under test that the E2E test will need to interact with.
+the device(s) under test (DUTs) that the E2E test will need to interact with.
+
+The Lacewing framework defaults to generating a Mobly config based on the host
+environment. This is a best-effort algorithm that assumes that all detected
+Fuchsia device can be accessed using the `~/.ssh/fuchsia_ed25519` SSH private
+key (usually the case for devices paved/flashed/started in Fuchsia.git).
+
+If the above config generation does not fit your use-case, please read on to
+override the default behavior by providing a custom Mobly config.
 
 ```sh
 $ touch my_config.yaml

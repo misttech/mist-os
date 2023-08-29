@@ -60,7 +60,9 @@ def _execute_test(
 
     with NamedTemporaryFile(mode='w') as tmp_config:
         config = driver.generate_test_config(transport)
-        print(f'Mobly config content:\n{config}')
+        print('======== Mobly config content ========')
+        print(config)
+        print('======================================')
         tmp_config.write(config)
         tmp_config.flush()
 

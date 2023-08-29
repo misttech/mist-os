@@ -30,6 +30,7 @@ parser.add_argument(
     '-test_data_path',
     default=None,
     help='path to directory containing test-time data dependencies.')
+parser.add_argument('-ffx_path', default=None, help='path to FFX.')
 parser.add_argument(
     '-transport',
     default=None,
@@ -53,6 +54,7 @@ def main():
     factory = driver_factory.DriverFactory(
         config_path=args.config_yaml_path,
         params_path=args.params_yaml_path,
+        ffx_path=args.ffx_path,
     )
     driver = factory.get_driver()
 
