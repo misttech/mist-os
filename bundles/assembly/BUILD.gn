@@ -79,7 +79,6 @@ assembly_input_bundle("bootstrap") {
   bootfs_files_labels = [
     "//build/info:bootfs",
     "//src/bringup:bootfs",
-    "//src/sys/bootstrap:bootfs",
     "//src/sys/component_manager:bootfs",
     "//src/sys/root:bootfs",
 
@@ -105,6 +104,7 @@ assembly_input_bundle("bootstrap") {
     "//src/diagnostics/archivist:package",
     "//src/power/power-manager:package",
     "//src/power/shutdown-shim:package",
+    "//src/sys/bootstrap:package",
   ]
   kernel_cmdline = [ "blobfs.cache-eviction-policy=NEVER_EVICT" ]
 

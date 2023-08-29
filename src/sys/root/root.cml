@@ -5,7 +5,7 @@
     children: [
         {
             name: "bootstrap",
-            url: "fuchsia-boot:///#meta/bootstrap.cm",
+            url: "fuchsia-boot:///bootstrap#meta/bootstrap.cm",
             startup: "eager",
         },
         {
