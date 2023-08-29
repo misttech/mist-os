@@ -237,8 +237,7 @@ static void zxtest_clean_buffer(char** buffer) { free(*buffer); }
 #define LIB_ZXTEST_GEN_ASSERT_DESC(out_desc, desc, ...)                     \
   char* out_desc __attribute__((cleanup(zxtest_c_clean_buffer))) = NULL;    \
   do {                                                                      \
-    char tmp;                                                               \
-    size_t req_size = snprintf(&tmp, 1, " " __VA_ARGS__) + 1;               \
+    size_t req_size = snprintf(NULL, 0, " " __VA_ARGS__) + 1;               \
     out_desc = (char*)malloc(sizeof(char) * (req_size + strlen(desc) + 2)); \
     memset(out_desc, '\0', sizeof(char) * (req_size + strlen(desc) + 2));   \
     memcpy(out_desc, desc, strlen(desc));                                   \
