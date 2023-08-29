@@ -24,9 +24,6 @@
             rights: [ "r*" ],
             path: "/dev/class/power",
         },
-        {
-            protocol: [ "fuchsia.hardware.powersource.Source" ],
-        },
     ],
     expose: [
         {
