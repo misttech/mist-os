@@ -330,6 +330,22 @@
         "type": "uint32"
     },
     {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth.sys/BrEdrSecurityMode.MODE_4",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth.sys/BrEdrSecurityMode.SECURE_CONNECTIONS_ONLY",
+        "value": "2"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.bluetooth.sys/BrEdrSecurityMode",
+        "strictness": "strict",
+        "type": "uint32"
+    },
+    {
         "kind": "table/member",
         "name": "fuchsia.bluetooth.sys/BredrBondData.link_key",
         "ordinal": "3",
@@ -1042,6 +1058,12 @@
         "name": "fuchsia.bluetooth.sys/Settings.bredr_connectable_mode",
         "ordinal": "3",
         "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.sys/Settings.bredr_security_mode",
+        "ordinal": "5",
+        "type": "fuchsia.bluetooth.sys/BrEdrSecurityMode"
     },
     {
         "kind": "table/member",

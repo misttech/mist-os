@@ -191,6 +191,14 @@ closed protocol Host {
         enabled bool;
     });
 
+    /// Set the GAP BR/EDR Security Mode of the host. bt-host only supports encrypted,
+    /// connection-based security modes, i.e. Mode 4 and Secure Connections Only mode. If the
+    /// security mode is set to Secure Connections Only, any existing encrypted connections which
+    /// do not meet the security requirements of Secure Connections Only mode will be disconnected.
+    strict SetBrEdrSecurityMode(struct {
+        bredr_security_mode sys.BrEdrSecurityMode;
+    });
+
     /// Set the GAP LE Security Mode of the host. bt-host only supports encrypted, connection-based
     /// security modes, i.e. Mode 1 and Secure Connections Only mode. If the security mode is set
     /// to Secure Connections Only, any existing encrypted connections which do not meet the

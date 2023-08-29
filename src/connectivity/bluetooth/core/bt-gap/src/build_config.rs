@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_bluetooth_sys::{self as sys, LeSecurityMode};
+use fidl_fuchsia_bluetooth_sys::{self as sys, BrEdrSecurityMode, LeSecurityMode};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{cmp::PartialEq, convert::Into, fs::OpenOptions, path::Path};
@@ -43,6 +43,16 @@ pub struct LeConfig {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct BrEdrConfig {
     pub connectable: bool,
+    #[serde(rename = "security-mode")]
+    #[serde(with = "BrEdrSecurityModeDef")]
+    pub security_mode: BrEdrSecurityMode,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(remote = "BrEdrSecurityMode")]
+pub enum BrEdrSecurityModeDef {
+    Mode4 = 1,
+    SecureConnectionsOnly = 2,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -62,6 +72,8 @@ impl Config {
             new_settings.le_security_mode.unwrap_or(self.le.security_mode);
         new_config.bredr.connectable =
             new_settings.bredr_connectable_mode.unwrap_or(self.bredr.connectable);
+        new_config.bredr.security_mode =
+            new_settings.bredr_security_mode.unwrap_or(self.bredr.security_mode);
         new_config
     }
 }
@@ -73,6 +85,7 @@ impl Into<sys::Settings> for Config {
             le_background_scan: Some(self.le.background_scan_enabled),
             bredr_connectable_mode: Some(self.bredr.connectable),
             le_security_mode: Some(self.le.security_mode),
+            bredr_security_mode: Some(self.bredr.security_mode),
             ..Default::default()
         }
     }
@@ -109,7 +122,7 @@ mod tests {
             background_scan_enabled: true,
             security_mode: LeSecurityMode::Mode1,
         },
-        bredr: BrEdrConfig { connectable: true },
+        bredr: BrEdrConfig { connectable: true, security_mode: BrEdrSecurityMode::Mode4 },
     };
 
     #[test]
@@ -131,7 +144,10 @@ mod tests {
                 background_scan_enabled: false,
                 security_mode: LeSecurityMode::SecureConnectionsOnly,
             },
-            bredr: BrEdrConfig { connectable: false },
+            bredr: BrEdrConfig {
+                connectable: false,
+                security_mode: BrEdrSecurityMode::SecureConnectionsOnly,
+            },
         };
         let override_file = NamedTempFile::new().unwrap();
         serde_json::to_writer(&override_file, &override_config).unwrap();
@@ -154,7 +170,7 @@ mod tests {
                 background_scan_enabled: false,
                 security_mode: LeSecurityMode::Mode1,
             },
-            bredr: BrEdrConfig { connectable: false },
+            bredr: BrEdrConfig { connectable: false, security_mode: BrEdrSecurityMode::Mode4 },
         };
         let run_host = async {
             let mut expected_reqs = HashSet::<String>::new();
@@ -162,6 +178,7 @@ mod tests {
             let _ = expected_reqs.insert("enable_background_scan".into());
             let _ = expected_reqs.insert("set_connectable".into());
             let _ = expected_reqs.insert("set_le_security_mode".into());
+            let _ = expected_reqs.insert("set_bredr_security_mode".into());
             host_server
                 .try_for_each(|req| {
                     match req {
@@ -181,6 +198,10 @@ mod tests {
                         HostRequest::SetLeSecurityMode { le_security_mode, .. } => {
                             assert!(expected_reqs.remove("set_le_security_mode"));
                             assert_eq!(test_config.le.security_mode, le_security_mode);
+                        }
+                        HostRequest::SetBrEdrSecurityMode { bredr_security_mode, .. } => {
+                            assert!(expected_reqs.remove("set_bredr_security_mode"));
+                            assert_eq!(test_config.bredr.security_mode, bredr_security_mode);
                         }
                         _ => panic!("unexpected HostRequest!"),
                     };

@@ -3,6 +3,26 @@
 // found in the LICENSE file.
 library fuchsia.bluetooth.sys;
 
+/// The BR/EDR Security Mode of a BT device determines the possible security properties of the
+/// device. The security mode does not make specific guarantees about the current security
+/// properties of a device's connections; it sets restrictions on the allowable security
+/// properties. See Core Spec v5.4 Vol. 3, Part C 5.2.2 for more details.
+@available(added=14)
+type BrEdrSecurityMode = strict enum {
+    /// In BR/EDR Security Mode 4, communication will be authenticated and encrypted using the
+    /// lowest common denominator algorithm between the pairing devices. Note that this means key
+    /// generation, authentication, and encryption algorithms used may be weaker than Secure
+    /// Connections if SC is not supported.
+    MODE_4 = 1;
+
+    /// In Secure Connections Only mode, the device will reject connections that do not support
+    /// Secure Connections, and longer key lengths will be enforced.
+    ///
+    /// SC Only mode also attempts to enforce user confirmation of the expected peer. Devices that
+    /// do not have a display (e.g. headsets) do not typically support SC for this reason.
+    SECURE_CONNECTIONS_ONLY = 2;
+};
+
 /// The LE Security Mode of a BLE device determines the possible security properties of the device.
 /// The security mode does not make specific guarantees about the current security properties of a
 /// device's connections; it sets restrictions on the allowable security properties. See Core Spec

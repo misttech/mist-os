@@ -32,6 +32,13 @@ type Settings = table {
     /// present and set to Secure Connections Only mode, any active connections not meeting the
     /// requirements of Secure Connections Only mode are disconnected.
     4: le_security_mode LeSecurityMode;
+
+    /// If present then sets the BR/EDR Security mode of the Host Subsystem, if not present leaves
+    /// the current value unchanged. See BT Core Spec v5.2 Vol. 3 Part C 5.2.2 for more details. If
+    /// present and set to Secure Connections Only mode, any active connections not meeting the
+    /// requirements of Secure Connections Only mode are disconnected.
+    @available(added=14)
+    5: bredr_security_mode BrEdrSecurityMode;
 };
 
 /// Protocol to configure parameters and features for the core Bluetooth system. These settings

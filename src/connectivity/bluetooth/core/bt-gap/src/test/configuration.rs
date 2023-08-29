@@ -6,8 +6,8 @@ use {
     assert_matches::assert_matches,
     fidl_fuchsia_bluetooth_host::{HostRequest, HostRequestStream, HostSetConnectableResponder},
     fidl_fuchsia_bluetooth_sys::{
-        self as sys, ConfigurationMarker, ConfigurationProxy, ConfigurationRequestStream,
-        LeSecurityMode,
+        self as sys, BrEdrSecurityMode, ConfigurationMarker, ConfigurationProxy,
+        ConfigurationRequestStream, LeSecurityMode,
     },
     fuchsia_bluetooth::types::HostId,
     futures::{future, stream::TryStreamExt},
@@ -129,7 +129,39 @@ async fn disable_connectable_mode() {
 }
 
 #[fuchsia::test]
-async fn set_secure_connections_only() {
+async fn set_bredr_secure_connections_only() {
+    let (host_server, dispatcher, config_client, server) =
+        setup_configuration_test().await.unwrap();
+    let run_configuration = configuration::run(dispatcher, server);
+    let make_request = async move {
+        let response = config_client
+            .update(&sys::Settings {
+                bredr_security_mode: Some(BrEdrSecurityMode::SecureConnectionsOnly),
+                ..Default::default()
+            })
+            .await;
+        assert_matches!(
+            response,
+            Ok(sys::Settings {
+                bredr_security_mode: Some(BrEdrSecurityMode::SecureConnectionsOnly),
+                ..
+            })
+        );
+        Ok(())
+    };
+
+    let run_host = handle_host_req_fut!(
+        host_server,
+        SetBrEdrSecurityMode,
+        (|mode: BrEdrSecurityMode| assert_eq!(BrEdrSecurityMode::SecureConnectionsOnly, mode)),
+        bredr_security_mode
+    );
+
+    future::try_join3(make_request, run_host, run_configuration).await.unwrap();
+}
+
+#[fuchsia::test]
+async fn set_le_secure_connections_only() {
     let (host_server, dispatcher, config_client, server) =
         setup_configuration_test().await.unwrap();
     let run_configuration = configuration::run(dispatcher, server);

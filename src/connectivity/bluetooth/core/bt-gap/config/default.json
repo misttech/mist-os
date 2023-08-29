@@ -5,6 +5,7 @@
         "security-mode": "Mode1"
     },
     "bredr": {
-        "connectable": true
+        "connectable": true,
+        "security-mode": "Mode4"
     }
 }

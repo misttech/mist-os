@@ -223,6 +223,10 @@ impl HostDevice {
         self.0.proxy.enable_background_scan(enable).map_err(Error::from)
     }
 
+    pub fn set_bredr_security_mode(&self, mode: sys::BrEdrSecurityMode) -> types::Result<()> {
+        self.0.proxy.set_br_edr_security_mode(mode).map_err(Error::from)
+    }
+
     pub fn set_le_security_mode(&self, mode: sys::LeSecurityMode) -> types::Result<()> {
         self.0.proxy.set_le_security_mode(mode).map_err(Error::from)
     }
@@ -246,6 +250,10 @@ impl HostDevice {
         if let Ok(_) = error_occurred {
             error_occurred =
                 settings.le_background_scan.map(|en| self.enable_background_scan(en)).transpose()
+        }
+        if let Ok(_) = error_occurred {
+            error_occurred =
+                settings.bredr_security_mode.map(|m| self.set_bredr_security_mode(m)).transpose();
         }
         if let Ok(_) = error_occurred {
             error_occurred =
