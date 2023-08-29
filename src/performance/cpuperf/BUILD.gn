@@ -68,12 +68,13 @@ resource("cpuperf_resources") {
       "cpspec/intel/l2.cpspec",
       "cpspec/intel/l3.cpspec",
     ]
-  }
-  if (current_cpu == "arm64") {
+  } else if (current_cpu == "arm64") {
     sources = [
       "cpspec/arm64/cycle-counter.cpspec",
       "cpspec/arm64/l1.cpspec",
     ]
+  } else {
+    sources = []
   }
   outputs = [ "data/{{source_file_part}}" ]
 }
