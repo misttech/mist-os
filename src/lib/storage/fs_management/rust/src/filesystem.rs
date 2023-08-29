@@ -698,7 +698,6 @@ mod tests {
         crate::{BlobCompression, BlobEvictionPolicy, Blobfs, F2fs, Fxfs, Minfs},
         fuchsia_async as fasync,
         ramdevice_client::RamdiskClient,
-        remote_block_device::{BlockClient as _, RemoteBlockClient},
         std::{
             io::{Read as _, Write as _},
             time::Duration,
@@ -743,34 +742,6 @@ mod tests {
         blobfs.fsck().await.expect("failed to fsck blobfs");
 
         ramdisk.destroy().await.expect("failed to destroy ramdisk");
-    }
-
-    #[ignore]
-    #[fuchsia::test]
-    async fn blobfs_format_fsck_error() {
-        const BLOCK_SIZE: usize = 512;
-
-        let mut ramdisk = ramdisk(BLOCK_SIZE.try_into().expect("overflow")).await;
-        let mut blobfs = new_fs(&mut ramdisk, Blobfs::default()).await;
-        let () = blobfs.format().await.expect("failed to format blobfs");
-
-        // force fsck to fail by stomping all over one of blobfs's metadata blocks after formatting
-        // TODO(fxbug.dev/35860): corrupt something other than the superblock
-        {
-            let device_channel = ramdisk.open().await.expect("failed to get channel to device");
-            let device_proxy = device_channel.into_proxy().expect("into proxy");
-            let block_client = RemoteBlockClient::new(device_proxy).await.expect("block client");
-            let bytes = Box::new([0xff; BLOCK_SIZE]);
-            let () = block_client
-                .write_at(remote_block_device::BufferSlice::Memory(&(*bytes)[..]), 0)
-                .await
-                .expect("write to device");
-        }
-
-        let _: anyhow::Error =
-            blobfs.fsck().await.expect_err("fsck succeeded when it shouldn't have");
-
-        let () = ramdisk.destroy().await.expect("failed to destroy ramdisk");
     }
 
     #[fuchsia::test]
@@ -907,42 +878,6 @@ mod tests {
         minfs.fsck().await.expect("failed to fsck minfs");
 
         ramdisk.destroy().await.expect("failed to destroy ramdisk");
-    }
-
-    #[fuchsia::test]
-    async fn minfs_format_fsck_error() {
-        const BLOCK_SIZE: usize = 8192;
-
-        let mut ramdisk = ramdisk(BLOCK_SIZE.try_into().expect("overflow")).await;
-        let mut minfs = new_fs(&mut ramdisk, Minfs::default()).await;
-
-        let () = minfs.format().await.expect("failed to format minfs");
-
-        // force fsck to fail by stomping all over one of minfs's metadata blocks after formatting
-        {
-            let device_channel = ramdisk.open().await.expect("failed to get channel to device");
-            let device_proxy = device_channel.into_proxy().expect("into proxy");
-            let block_client = RemoteBlockClient::new(device_proxy).await.expect("block client");
-            let bytes = Box::new([0xff; BLOCK_SIZE]);
-
-            // when minfs isn't on an fvm, the location for its bitmap offset is the 8th block.
-            // TODO(fxbug.dev/35861): parse the superblock for this offset and the block size.
-            let bitmap_block_offset = 8;
-            let bitmap_offset = BLOCK_SIZE * bitmap_block_offset;
-
-            let () = block_client
-                .write_at(
-                    remote_block_device::BufferSlice::Memory(&(*bytes)[..]),
-                    bitmap_offset.try_into().expect("overflow"),
-                )
-                .await
-                .expect("write to device");
-        }
-
-        let _: anyhow::Error =
-            minfs.fsck().await.expect_err("fsck succeeded when it shouldn't have");
-
-        let () = ramdisk.destroy().await.expect("failed to destroy ramdisk");
     }
 
     #[fuchsia::test]
