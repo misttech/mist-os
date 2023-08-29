@@ -48,8 +48,9 @@ class BlockIterator {
   uint64_t blocks_left_ = 0;
 };
 
-// StreamBlocks is a utility function which reads up to |block_count| blocks, dumping continuous
-// blocks encountered from |iterator| to the callback function |stream|.
+// StreamBlocks is a utility function which reads exactly |block_count| blocks, dumping contiguous
+// blocks encountered from |iterator| to the callback function |stream|. This function will exit
+// with an error if |block_count| exceeds the amount of blocks that |iterator| points to.
 using StreamFn = fit::function<zx_status_t(uint64_t local_off, uint64_t dev_off, uint64_t length)>;
 zx_status_t StreamBlocks(BlockIterator* iterator, uint64_t block_count, StreamFn stream);
 
