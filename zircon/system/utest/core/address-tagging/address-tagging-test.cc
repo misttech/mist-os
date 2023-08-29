@@ -236,6 +236,7 @@ TEST(TopByteIgnoreTests, VmarTaggedAddress) {
 
   ASSERT_STATUS(vmar.unmap(AddTagIfNeeded(vmar_addr), kVmarSize), ZX_ERR_INVALID_ARGS);
   ASSERT_OK(vmar.unmap(vmar_addr, kVmarSize));
+  ASSERT_OK(vmar.destroy());
 }
 
 #ifdef __clang__
@@ -410,6 +411,8 @@ TEST(TopByteIgnoreTests, VmmPageFaultHandlerDataAbort) {
   // Do not do a regular dereference because ASan will right-shift the tag into the address bits
   // then complain that this address doesn't have a corresponding shadow.
   EXPECT_EQ(UnsanitizedLoad(reinterpret_cast<volatile uint8_t*>(mapping_addr)), 0);
+
+  ASSERT_OK(zx_vmar_destroy(decommit_vmar));
 }
 
 arch::ArmExceptionSyndromeRegister::ExceptionClass GetEC(uint64_t esr) {
