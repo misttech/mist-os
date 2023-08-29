@@ -41,7 +41,7 @@ impl Scrutiny {
 
 impl api::Scrutiny for Scrutiny {
     fn system(&self) -> Box<dyn api::System> {
-        todo!("TODO(fxbug.dev/111251): Integrate with production system API")
+        self.0.system.clone()
     }
 
     fn component_manager(&self) -> Box<dyn api::ComponentManager> {

@@ -68,6 +68,8 @@ fn run_smoke_test(args: Args) -> Result<()> {
     output_blobs(scrutiny.as_ref());
     output_packages(scrutiny.as_ref());
 
+    output_zbi_data(scrutiny.system().zbi().as_ref());
+
     if let (Some(depfile), Some(stamp)) = (depfile, stamp) {
         let depfile = File::create(depfile).context("creating depfile")?;
         write_depfile(depfile, &product_bundle, &stamp).context("writing depfile")?;
@@ -123,6 +125,12 @@ fn output_package(package: &dyn scrutiny::Package) {
     }
     for (path, content_blob) in package.content_blobs() {
         debug!("  Content blob at {:?}: {:?}", path.as_ref(), content_blob.hash());
+    }
+}
+
+fn output_zbi_data(zbi: &dyn scrutiny::Zbi) {
+    for (path, blob) in zbi.bootfs().expect("bootfs") {
+        debug!("Bootfs file: {:?} {:?}", path.as_ref(), blob.hash());
     }
 }
 

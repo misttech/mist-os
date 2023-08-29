@@ -116,7 +116,7 @@ pub enum ScrutinyPackagesError {
 }
 
 /// High-level metadata about the system inspected by a [`Scrutiny`] instance.
-pub trait System {
+pub trait System: DynClone {
     /// The kind of Fuchsia system under inspection.
     fn variant(&self) -> SystemVariant;
 
@@ -141,6 +141,8 @@ pub trait System {
     /// Accessor for the system's component manager configuration.
     fn component_manager_configuration(&self) -> Box<dyn ComponentManagerConfiguration>;
 }
+
+clone_trait_object!(System);
 
 /// The kind of Fuchsia system that should be inspected by a [`Scrutiny`] instance. The variant determines a
 /// variety of strategies used to locate system artifacts. For example, the location of the Zircon Boot Image
