@@ -150,6 +150,7 @@ fuchsia_component("component") {
 }
 
 group("production-component-and-config") {
+  testonly = true
   public_deps = [
     ":component",
     ":config_values_from_gn",
@@ -164,6 +165,7 @@ group("ignore-system-image-component-and-config") {
 }
 
 group("production-component-and-config-cpp-blobfs") {
+  testonly = true
   public_deps = [
     ":component",
     ":config_values_from_gn-cpp-blobfs",
@@ -171,6 +173,7 @@ group("production-component-and-config-cpp-blobfs") {
 }
 
 group("production-component-and-config-fxblob") {
+  testonly = true
   public_deps = [
     ":component",
     ":config_values_from_gn-fxblob",
@@ -178,7 +181,7 @@ group("production-component-and-config-fxblob") {
 }
 
 fuchsia_package("pkg-cache") {
-  deps = [ ":production-component-and-config" ]
+  deps = [ ":component" ]
 }
 
 fuchsia_component("pkg-cache-test") {

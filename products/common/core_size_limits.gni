@@ -171,7 +171,7 @@ size_checker_input = {
     {
       component = "Software Delivery"
       src = [
-        "packages/base/pkg-cache",
+        ".*pkg-cache.*",
         "packages/base/pkg-resolver",
         "packages/base/pkgctl",
         "packages/base/pkgfs",

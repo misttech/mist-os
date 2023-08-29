@@ -84,6 +84,13 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                 }
             }
 
+            // Inform pkg-cache when fxfs_blob should be used.
+            builder
+                .package("pkg-cache")
+                .component("meta/pkg-cache.cm")?
+                .field("use_fxblob", fxfs_blob)?
+                .field("use_system_image", true)?;
+
             let mut fshost_config_builder = builder.bootfs().component("meta/fshost.cm")?;
             fshost_config_builder
                 .field("blobfs", true)?
