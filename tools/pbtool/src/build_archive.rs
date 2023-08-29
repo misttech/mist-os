@@ -38,47 +38,58 @@ impl GenerateBuildArchive {
             ProductBundle::V2(pb) => pb,
         };
 
-        // Find the first assembly in the preferential order of A, B, then R.
-        let assembly = if let Some(a) = product_bundle.system_a {
-            a
-        } else if let Some(b) = product_bundle.system_b {
-            b
-        } else if let Some(r) = product_bundle.system_r {
-            r
-        } else {
-            bail!("The product bundle does not have any assembly systems");
-        };
-
         // Ensure the `out_dir` exists.
         std::fs::create_dir_all(&self.out_dir)
             .with_context(|| format!("Creating the out_dir: {}", &self.out_dir))?;
 
-        // Collect the Images with the final destinations to add to an images manifest later.
-        let mut images = vec![];
+        // Collect the Artifacts with the final destinations to add to an images manifest later.
+        let mut artifacts = vec![];
+
+        let mut add_image = |path: &Utf8PathBuf, name: &str, image: &Image| -> Result<()> {
+            // Copy the image to the out_dir.
+            let destination = self.out_dir.join(name);
+            std::fs::copy(&path, &destination)
+                .with_context(|| format!("Copying image {} to {}", path, destination))?;
+
+            // Create a new Image with the new path.
+            let mut new_image = image.clone();
+            new_image.set_source(destination);
+            artifacts.push(new_image);
+            Ok(())
+        };
 
         // Pull out the relevant files.
-        for image in assembly.iter() {
-            let entry = match &image {
-                Image::ZBI { path, signed: _ } => Some((path, "zircon-a.zbi")),
-                Image::FVM(path) => Some((path, "storage-full.blk")),
-                Image::QemuKernel(path) => Some((path, "qemu-kernel.kernel")),
-                _ => None,
-            };
-            if let Some((path, name)) = entry {
-                // Copy the image to the out_dir.
-                let destination = self.out_dir.join(name);
-                std::fs::copy(&path, &destination)
-                    .with_context(|| format!("Copying image {} to {}", path, destination))?;
+        if let Some(a) = product_bundle.system_a {
+            for image in a.iter() {
+                let entry = match &image {
+                    Image::ZBI { path, signed: _ } => Some((path, "zircon-a.zbi")),
+                    Image::VBMeta(path) => Some((path, "zircon-a.vbmeta")),
+                    Image::FVM(path) => Some((path, "storage-full.blk")),
+                    Image::QemuKernel(path) => Some((path, "qemu-kernel.kernel")),
+                    Image::FVMFastboot(path) => Some((path, "fvm.fastboot.blk")),
+                    _ => None,
+                };
+                if let Some((path, name)) = entry {
+                    add_image(path, name, image)?;
+                }
+            }
+        }
 
-                // Create a new Image with the new path.
-                let mut new_image = image.clone();
-                new_image.set_source(destination);
-                images.push(new_image);
+        if let Some(r) = product_bundle.system_r {
+            for image in r.iter() {
+                let entry = match &image {
+                    Image::ZBI { path, signed: _ } => Some((path, "zircon-r.zbi")),
+                    Image::VBMeta(path) => Some((path, "zircon-r.vbmeta")),
+                    _ => None,
+                };
+                if let Some((path, name)) = entry {
+                    add_image(path, name, image)?;
+                }
             }
         }
 
         // Write the images manifest with the rebased image paths.
-        let images_manifest = AssemblyManifest { images };
+        let images_manifest = AssemblyManifest { images: artifacts };
         let images_manifest_path = self.out_dir.join("images.json");
         images_manifest.write(images_manifest_path).context("Writing images manifest")?;
 
@@ -110,9 +121,13 @@ mod tests {
             write!(file, "{}", name).unwrap();
         };
 
-        create_temp_file("zbi");
-        create_temp_file("fvm");
+        create_temp_file("fuchsia.zbi");
+        create_temp_file("fuchsia.vbmeta");
+        create_temp_file("fvm.blk");
+        create_temp_file("fvm.fastboot.blk");
         create_temp_file("kernel");
+        create_temp_file("zedboot.zbi");
+        create_temp_file("zedboot.vbmeta");
 
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "".to_string(),
@@ -120,12 +135,17 @@ mod tests {
             partitions: PartitionsConfig::default(),
             sdk_version: "".to_string(),
             system_a: Some(vec![
-                Image::ZBI { path: tempdir.join("zbi"), signed: false },
-                Image::FVM(tempdir.join("fvm")),
+                Image::ZBI { path: tempdir.join("fuchsia.zbi"), signed: false },
+                Image::VBMeta(tempdir.join("fuchsia.vbmeta")),
+                Image::FVM(tempdir.join("fvm.blk")),
+                Image::FVMFastboot(tempdir.join("fvm.fastboot.blk")),
                 Image::QemuKernel(tempdir.join("kernel")),
             ]),
             system_b: None,
-            system_r: None,
+            system_r: Some(vec![
+                Image::ZBI { path: tempdir.join("zedboot.zbi"), signed: false },
+                Image::VBMeta(tempdir.join("zedboot.vbmeta")),
+            ]),
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
@@ -140,8 +160,12 @@ mod tests {
         cmd.generate().unwrap();
 
         assert!(ba_path.join("zircon-a.zbi").exists());
+        assert!(ba_path.join("zircon-a.vbmeta").exists());
+        assert!(ba_path.join("fvm.fastboot.blk").exists());
         assert!(ba_path.join("storage-full.blk").exists());
         assert!(ba_path.join("qemu-kernel.kernel").exists());
+        assert!(ba_path.join("zircon-r.zbi").exists());
+        assert!(ba_path.join("zircon-r.vbmeta").exists());
 
         let images_manifest_file = File::open(ba_path.join("images.json")).unwrap();
         let images_manifest: Value = serde_json::from_reader(images_manifest_file).unwrap();
@@ -157,14 +181,35 @@ mod tests {
                     "signed": false
                 },
                 {
+                    "name": "zircon-a",
+                    "type": "vbmeta",
+                    "path": "zircon-a.vbmeta"
+                },
+                {
                     "type": "blk",
                     "name": "storage-full",
                     "path": "storage-full.blk"
                 },
                 {
+                    "name" : "fvm.fastboot",
+                    "path" : "fvm.fastboot.blk",
+                    "type" : "blk"
+                },
+                {
                     "type": "kernel",
                     "name": "qemu-kernel",
                     "path": "qemu-kernel.kernel"
+                },
+                {
+                    "name": "zircon-a",
+                    "type": "zbi",
+                    "path": "zircon-r.zbi",
+                    "signed": false
+                },
+                {
+                    "name": "zircon-a",
+                    "type": "vbmeta",
+                    "path": "zircon-r.vbmeta"
                 }
             ]
             "#
