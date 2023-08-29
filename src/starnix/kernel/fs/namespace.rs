@@ -23,10 +23,7 @@ use std::{
     collections::{HashMap, HashSet},
     fmt,
     hash::{Hash, Hasher},
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc, Weak,
-    },
+    sync::{atomic::Ordering, Arc, Weak},
 };
 
 use super::*;
@@ -37,11 +34,18 @@ use super::*;
 #[derive(Debug)]
 pub struct Namespace {
     root_mount: MountHandle,
+
+    // Unique ID of this namespace.
+    pub id: u64,
 }
 
 impl Namespace {
     pub fn new(fs: FileSystemHandle) -> Arc<Namespace> {
-        Arc::new(Self { root_mount: Mount::new(WhatToMount::Fs(fs), MountFlags::empty()) })
+        let kernel = fs.kernel.upgrade().expect("can't create namespace without a kernel");
+        Arc::new(Self {
+            root_mount: Mount::new(WhatToMount::Fs(fs), MountFlags::empty()),
+            id: kernel.next_namespace_id.fetch_add(1, Ordering::Relaxed),
+        })
     }
 
     pub fn root(&self) -> NamespaceNode {
@@ -49,7 +53,12 @@ impl Namespace {
     }
 
     pub fn clone_namespace(&self) -> Arc<Namespace> {
-        Arc::new(Self { root_mount: self.root_mount.clone_mount_recursive() })
+        let kernel =
+            self.root_mount.fs.kernel.upgrade().expect("can't clone namespace without a kernel");
+        Arc::new(Self {
+            root_mount: self.root_mount.clone_mount_recursive(),
+            id: kernel.next_namespace_id.fetch_add(1, Ordering::Relaxed),
+        })
     }
 
     /// Assuming new_ns is a clone of the namespace that node is from, return the equivalent of
@@ -166,9 +175,6 @@ pub enum WhatToMount {
     Bind(NamespaceNode),
 }
 
-static NEXT_MOUNT_ID: AtomicU64 = AtomicU64::new(1);
-static NEXT_PEER_GROUP_ID: AtomicU64 = AtomicU64::new(1);
-
 impl Mount {
     fn new(what: WhatToMount, flags: MountFlags) -> MountHandle {
         match what {
@@ -188,8 +194,9 @@ impl Mount {
             flags - known_flags
         );
         let fs = root.node.fs();
+        let kernel = fs.kernel.upgrade().expect("can't create mount without kernel");
         Arc::new(Self {
-            id: NEXT_MOUNT_ID.fetch_add(1, Ordering::Relaxed),
+            id: kernel.next_mount_id.fetch_add(1, Ordering::Relaxed),
             flags: Mutex::new(flags),
             root,
             fs,
@@ -468,7 +475,11 @@ impl MountState<Base = Mount> {
         if self.is_shared() {
             return;
         }
-        self.set_peer_group(PeerGroup::new());
+        let kernel =
+            self.base.fs.kernel.upgrade().expect("can't create new peer group without kernel");
+        self.set_peer_group(PeerGroup::new(
+            kernel.next_peer_group_id.fetch_add(1, Ordering::Relaxed),
+        ));
     }
 
     /// Take the mount out of its peer group, also remove upstream if any. Implements MS_PRIVATE.
@@ -487,11 +498,8 @@ impl MountState<Base = Mount> {
 }
 
 impl PeerGroup {
-    fn new() -> Arc<Self> {
-        Arc::new(Self {
-            id: NEXT_PEER_GROUP_ID.fetch_add(1, Ordering::Relaxed),
-            state: Default::default(),
-        })
+    fn new(id: u64) -> Arc<Self> {
+        Arc::new(Self { id, state: Default::default() })
     }
 
     fn add(&self, mount: &Arc<Mount>) {

@@ -313,10 +313,10 @@ impl FsNodeOps for NsDirectory {
             })
         } else {
             // The name is {namespace}, link to the correct one of the current task.
+            let id = current_task.task.fs().namespace().id;
             Ok(node.fs().create_node(
                 CallbackSymlinkNode::new(move || {
-                    // For now, all namespace have the identifier 1.
-                    Ok(SymlinkTarget::Path(format!("{}:[1]", name).as_bytes().to_vec()))
+                    Ok(SymlinkTarget::Path(format!("{name}:[{id}]").as_bytes().to_vec()))
                 }),
                 FsNodeInfo::new_factory(mode!(IFLNK, 0o7777), task.as_fscred()),
             ))

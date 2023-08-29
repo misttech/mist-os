@@ -12,7 +12,10 @@ use once_cell::sync::OnceCell;
 use std::{
     collections::{BTreeMap, HashSet},
     iter::FromIterator,
-    sync::{atomic::AtomicU16, Arc, Weak},
+    sync::{
+        atomic::{AtomicU16, AtomicU64},
+        Arc, Weak,
+    },
 };
 
 use crate::{
@@ -169,6 +172,11 @@ pub struct Kernel {
 
     /// The manger for power subsystems including reboot and suspend.
     pub power_manager: PowerManager,
+
+    /// Unique IDs for new mounts and mount namespaces.
+    pub next_mount_id: AtomicU64,
+    pub next_peer_group_id: AtomicU64,
+    pub next_namespace_id: AtomicU64,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -262,6 +270,9 @@ impl Kernel {
             core_dumps,
             actions_logged: AtomicU16::new(0),
             power_manager: PowerManager::default(),
+            next_mount_id: AtomicU64::new(1),
+            next_peer_group_id: AtomicU64::new(1),
+            next_namespace_id: AtomicU64::new(1),
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle
