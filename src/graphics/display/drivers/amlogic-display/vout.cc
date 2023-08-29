@@ -137,11 +137,6 @@ zx::result<> Vout::InitHdmi(zx_device_t* parent,
   return zx::ok();
 }
 
-zx::result<> Vout::RestartDisplay() {
-  zxlogf(INFO, "restarting display");
-  return PowerOn();
-}
-
 void Vout::PopulateAddedDisplayArgs(
     added_display_args_t* args, display::DisplayId display_id,
     cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> pixel_formats) {

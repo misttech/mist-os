@@ -111,34 +111,43 @@ zx_status_t AmlogicDisplay::DisplayClampRgbImplSetMinimumRgb(uint8_t minimum_rgb
   return ZX_ERR_INTERNAL;
 }
 
-zx_status_t AmlogicDisplay::RestartDisplay() {
-  if (!fully_initialized()) {
-    return ZX_ERR_INTERNAL;
+zx::result<> AmlogicDisplay::ResetDisplayEngine() {
+  ZX_DEBUG_ASSERT(!fully_initialized());
+  zxlogf(TRACE, "Display engine reset started.");
+
+  zx::result<> result = vout_->PowerOff();
+  if (!result.is_ok()) {
+    zxlogf(ERROR, "Failed to power off Vout before VPU reset: %s", result.status_string());
   }
+
   vpu_->PowerOff();
   vpu_->PowerOn();
   const ColorSpaceConversionMode color_conversion_mode = GetColorSpaceConversionMode(vout_->type());
   vpu_->SetupPostProcessorColorConversion(color_conversion_mode);
-  // Need to call this function since VPU/VPP registers were reset
+  // All the VPU registers are now reset. We need to claim the hardware
+  // ownership again.
   vpu_->CheckAndClaimHardwareOwnership();
 
-  return vout_->RestartDisplay().status_value();
+  result = vout_->PowerOn();
+  if (!result.is_ok()) {
+    zxlogf(ERROR, "Failed to power on Vout after VPU reset: %s", result.status_string());
+    return result.take_error();
+  }
+
+  zxlogf(TRACE, "Display engine reset finished successfully.");
+  return zx::ok();
 }
 
 zx_status_t AmlogicDisplay::DisplayInit() {
   ZX_ASSERT(!fully_initialized());
 
-  // Determine whether it's first time boot or not
-  const bool skip_disp_init = vpu_->CheckAndClaimHardwareOwnership();
-  if (skip_disp_init) {
-    zxlogf(INFO, "First time driver load. Skip display initialization");
-    // Make sure AFBC engine is on. Since bootloader does not use AFBC, it might not have powered
-    // on AFBC engine.
-    vpu_->AfbcPower(true);
-  } else {
-    zxlogf(INFO, "Display driver reloaded. Initialize display system");
-    RestartDisplay();
-  }
+  // It's possible that the AFBC engine is not yet turned on by the previous
+  // driver when the driver takes it over, so we should ensure it's enabled.
+  //
+  // TODO(fxbug.dev/132904): Instead of enable it ad-hoc here, we should
+  // make `Vpu::PowerOn()` idempotent and always call it when initialize the
+  // driver.
+  vpu_->AfbcPower(true);
 
   // The "osd" node must be created because these metric paths are load-bearing
   // for some triage workflows.
@@ -1414,6 +1423,20 @@ zx_status_t AmlogicDisplay::Bind() {
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to initialize VPU object: %s", zx_status_get_string(status));
     return status;
+  }
+
+  // If the display engine was previously owned by a different driver, we
+  // attempt to complete a seamless takeover. If we previously owned the
+  // hardware, our driver must have been unloaded and reloaded.
+  // We currently do a full hardware reset in that case.
+  const bool reset_display_engine = !vpu_->CheckAndClaimHardwareOwnership();
+  if (reset_display_engine) {
+    fbl::AutoLock lock(&display_mutex_);
+    zx::result<> reset_result = ResetDisplayEngine();
+    if (!reset_result.is_ok()) {
+      zxlogf(ERROR, "Failed to reset the display engine: %s", reset_result.status_string());
+      return reset_result.status_value();
+    }
   }
 
   status = InitializeSysmemAllocator();

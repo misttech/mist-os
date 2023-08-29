@@ -236,10 +236,15 @@ class AmlogicDisplay
   // unexpected pixels to be visible on the screen.
   zx_status_t DisplayInit() TA_REQ(display_mutex_);
 
-  // Power cycle the device and bring up clocks. Only needed when resuming the
-  // driver, as the bootloader will initialize the display when the machine is
-  // powered on.
-  zx_status_t RestartDisplay() TA_REQ(display_mutex_);
+  // Power cycles the display engine, resets all configurations and re-brings up
+  // the video output module. This will cause all the previous display hardware
+  // state to be lost.
+  //
+  // Must only be called during `AmlogicDisplay` initialization, after `vpu_`
+  // and `vout_` are initialized, but before any IRQ handler thread starts
+  // running, as access to display resources (registers, IRQs) after powering
+  // off the display engine will cause the system to crash.
+  zx::result<> ResetDisplayEngine() TA_REQ(display_mutex_);
 
   bool fully_initialized() const { return full_init_done_.load(std::memory_order_relaxed); }
   void set_fully_initialized() { full_init_done_.store(true, std::memory_order_release); }

@@ -29,8 +29,6 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
   // Sets only the display size, feature bits and panel settings for testing.
   zx::result<> InitDsiForTesting(uint32_t panel_type, uint32_t width, uint32_t height);
 
-  zx::result<> RestartDisplay();
-
   void PopulateAddedDisplayArgs(
       added_display_args_t* args, display::DisplayId display_id,
       cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> pixel_formats);
