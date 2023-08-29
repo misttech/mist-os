@@ -127,7 +127,7 @@ class TestEvents(unittest.IsolatedAsyncioTestCase):
                     "other-test": 0,
                 },
                 group_matches=[],
-                threshold=0.8,
+                fuzzy_distance_threshold=3,
             )
         )
         test_group_id = recorder.emit_test_group(1)

@@ -157,14 +157,14 @@ class TestSelectionPayload:
     for this command invocation.
     """
 
-    # Map of selected test names to their score that was above the threshold.
-    selected: typing.Dict[str, float]
+    # Map of selected test names to their score that was below the threshold.
+    selected: typing.Dict[str, int]
 
-    # Map of not selected test names to their score that was below the threshold.
-    not_selected: typing.Dict[str, float]
+    # Map of not selected test names to their score that was above the threshold.
+    not_selected: typing.Dict[str, int]
 
-    # The threshold this selection run was configured with. Range is [0.0, 1.0].
-    threshold: float
+    # The distance threshold this selection run was configured with.
+    fuzzy_distance_threshold: int
 
 
 @dataparse
@@ -872,7 +872,9 @@ class EventRecorder:
                 self._get_timestamp(),
                 payload=EventPayloadUnion(
                     test_selections=TestSelectionPayload(
-                        selected_scores, not_selected_scores, selections.threshold
+                        selected_scores,
+                        not_selected_scores,
+                        selections.fuzzy_distance_threshold,
                     )
                 ),
             )

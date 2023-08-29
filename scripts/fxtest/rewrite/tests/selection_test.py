@@ -212,14 +212,17 @@ class SelectTestsTest(unittest.TestCase):
 
         self.assertEqual(len(selected.selected), 2)
         for score in selected.best_score.values():
-            self.assertAlmostEqual(score, 1)
+            self.assertEqual(score, selection.PERFECT_MATCH_DISTANCE)
         self.assertTrue(selected.has_device_test())
 
         host_selected = selection.select_tests(tests, [], selection.SelectionMode.HOST)
         self.assertEqual(len(host_selected.selected), 1)
-        self.assertAlmostEqual(host_selected.best_score["host_x64/baz"], 1.0)
-        self.assertAlmostEqual(
-            host_selected.best_score["fuchsia-pkg://fuchsia.com/foo#meta/bar.cm"], 0.0
+        self.assertEqual(
+            host_selected.best_score["host_x64/baz"], selection.PERFECT_MATCH_DISTANCE
+        )
+        self.assertEqual(
+            host_selected.best_score["fuchsia-pkg://fuchsia.com/foo#meta/bar.cm"],
+            selection.NO_MATCH_DISTANCE,
         )
         self.assertFalse(host_selected.has_device_test())
 
@@ -227,10 +230,13 @@ class SelectTestsTest(unittest.TestCase):
             tests, [], selection.SelectionMode.DEVICE
         )
         self.assertEqual(len(device_selected.selected), 1)
-        self.assertAlmostEqual(
-            device_selected.best_score["fuchsia-pkg://fuchsia.com/foo#meta/bar.cm"], 1.0
+        self.assertEqual(
+            device_selected.best_score["fuchsia-pkg://fuchsia.com/foo#meta/bar.cm"],
+            selection.PERFECT_MATCH_DISTANCE,
         )
-        self.assertAlmostEqual(device_selected.best_score["host_x64/baz"], 0.0)
+        self.assertAlmostEqual(
+            device_selected.best_score["host_x64/baz"], selection.NO_MATCH_DISTANCE
+        )
         self.assertTrue(device_selected.has_device_test())
 
     def test_prefix_matches(self):
@@ -280,4 +286,5 @@ class SelectTestsTest(unittest.TestCase):
         self.assertEqual(
             [s.info.name for s in host_fuzzy.selected], ["host_x64/binary_test"]
         )
-        self.assertNotAlmostEqual(host_fuzzy.best_score["host_x64/binary_test"], 1)
+        self.assertEqual(host_fuzzy.best_score["host_x64/binary_test"], 1)
+        self.assertEqual(host_fuzzy.fuzzy_distance_threshold, 3)

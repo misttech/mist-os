@@ -25,6 +25,7 @@ class Flags:
     host: bool
     device: bool
     selection: typing.List[str]
+    fuzzy: int
 
     parallel: int
     random: bool
@@ -143,6 +144,12 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
         help="Add requirements to the preceding filter",
     )
     selection.add_argument("selection", action=arg_option.SelectionAction, nargs="*")
+    selection.add_argument(
+        "--fuzzy",
+        type=int,
+        default=3,
+        help="The Damerau–Levenshtein distance threshold for fuzzy matching tests",
+    )
 
     execution = parser.add_argument_group("Execution Options")
     execution.add_argument(

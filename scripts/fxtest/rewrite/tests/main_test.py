@@ -156,6 +156,25 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         selection_event = selection_events[0]
         self.assertEqual(len(selection_event.selected), self.TOTAL_TESTS_IN_INPUT)
 
+    async def test_fuzzy_dry_run(self):
+        """Test a dry run of the command for fuzzy matching"""
+        recorder = event.EventRecorder()
+        ret = await main.async_main_wrapper(
+            args.parse_args(["--simple", "--dry", "--fuzzy=1", "foo_test"]),
+            recorder=recorder,
+        )
+        self.assertEqual(ret, 0)
+
+        selection_events: typing.List[event.TestSelectionPayload] = [
+            e.payload.test_selections
+            async for e in recorder.iter()
+            if e.payload is not None and e.payload.test_selections is not None
+        ]
+
+        self.assertEqual(len(selection_events), 1)
+        selection_event = selection_events[0]
+        self.assertEqual(len(selection_event.selected), 1)
+
     @parameterized.expand(
         [("--host", HOST_TESTS_IN_INPUT), ("--device", DEVICE_TESTS_IN_INPUT)]
     )
