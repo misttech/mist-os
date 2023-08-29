@@ -1,0 +1,52 @@
+# Copyright 2020 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_library.gni")
+
+rustc_library("cutex") {
+  name = "cutex"
+  edition = "2021"
+  with_unit_tests = true
+  deps = [
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:parking_lot",
+    "//third_party/rust_crates:pin-project",
+    "//third_party/rust_crates:slab",
+    "//third_party/rust_crates:static_assertions",
+  ]
+
+  test_deps = [
+    "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:assert_matches",
+  ]
+
+  sources = [
+    "src/constants.rs",
+    "src/cutex.rs",
+    "src/lib.rs",
+    "src/list.rs",
+    "src/ticket.rs",
+  ]
+
+  # TODO(fxbug.dev/106676): Fix soundness issues and consider unrestricting
+  # visibility.
+  visibility = [
+    ":*",
+    "//src/connectivity/overnet/lib/core:*",
+  ]
+}
+
+fuchsia_unittest_package("cutex-tests") {
+  deps = [ ":cutex_test" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+    ":cutex-tests",
+    ":cutex_test($host_toolchain)",
+  ]
+}
