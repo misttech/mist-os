@@ -95,8 +95,8 @@ may omit the version bits from the options parameter and simply pass nullptr for
 ## Return value
 
 On success, returns **ZX_OK** along with a new clock object via the *out*
-handle. Handles to newly created clock objects will have the **ZX_RIGHT_READ**
-and **ZX_RIGHT_WRITE** rights assigned to them.
+handle. Handles to newly created clock objects will have the **ZX_RIGHT_READ**,
+**ZX_RIGHT_WRITE** and **ZX_RIGHT_SIGNAL** rights assigned to them.
 
 ## Errors
 
