@@ -121,6 +121,11 @@ async fn main() -> Result<(), Error> {
     // we need to kill those in addition to the process which panicked.
     kill_job_on_panic::install_hook("\n\n\n\nSTARNIX KERNEL PANIC\n\n\n\n");
 
+    let _inspect_server_task = inspect_runtime::publish(
+        fuchsia_inspect::component::inspector(),
+        inspect_runtime::PublishOptions::default(),
+    );
+
     fuchsia_trace_provider::trace_provider_create_with_fdio();
     trace_instant!(
         trace_category_starnix!(),
@@ -145,7 +150,6 @@ async fn main() -> Result<(), Error> {
             format!("{:?}", *extended_pstate::x86_64::PREFERRED_STRATEGY),
         );
     }
-    inspect_runtime::serve(fuchsia_inspect::component::inspector(), &mut fs)?;
 
     // Wait for the UTC clock to start up before we start accepting requests since so many Linux
     // APIs need a running UTC clock to function.
@@ -157,6 +161,7 @@ async fn main() -> Result<(), Error> {
 
     log_debug!("Serving kernel services on outgoing directory handle.");
     fs.take_and_serve_directory_handle()?;
+
     fs.for_each_concurrent(None, |request: KernelServices| async {
         match request {
             KernelServices::ContainerRunner(stream) => {
