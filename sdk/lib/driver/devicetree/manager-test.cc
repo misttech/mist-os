@@ -8,6 +8,9 @@
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/driver/devicetree/visitor.h>
+#include <lib/driver/devicetree/visitors/default.h>
+#include <lib/driver/devicetree/visitors/driver-visitor.h>
 #include <lib/driver/legacy-bind-constants/legacy-bind-constants.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
@@ -22,8 +25,6 @@
 #include <gtest/gtest.h>
 
 #include "sdk/lib/driver/devicetree/test-data/basic-properties.h"
-#include "sdk/lib/driver/devicetree/visitor.h"
-#include "sdk/lib/driver/devicetree/visitors/default.h"
 
 namespace fdf_devicetree {
 namespace {
@@ -359,6 +360,27 @@ TEST_F(ManagerTest, TestBtiProperty) {
   ASSERT_EQ(1lu, bti->size());
   ASSERT_EQ((uint32_t)TEST_IOMMU_PHANDLE, *(*bti)[0].iommu_index());
   ASSERT_EQ((uint32_t)TEST_BTI_ID, *(*bti)[0].bti_id());
+}
+
+TEST_F(ManagerTest, DriverVisitorTest) {
+  Manager manager(LoadTestBlob("/pkg/test-data/basic-properties.dtb"));
+
+  class TestDriverVisitor final : public DriverVisitor {
+   public:
+    TestDriverVisitor() : DriverVisitor("fuchsia,sample-device") {}
+
+    zx::result<> DriverVisit(Node& node, const devicetree::PropertyDecoder& decoder) override {
+      visited = true;
+      return zx::ok();
+    }
+    bool visited = false;
+  };
+
+  TestDriverVisitor visitor;
+  ASSERT_EQ(ZX_OK, manager.Walk(visitor).status_value());
+
+  DoPublish(manager);
+  ASSERT_TRUE(visitor.visited);
 }
 
 }  // namespace

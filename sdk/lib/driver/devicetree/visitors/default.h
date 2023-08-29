@@ -6,8 +6,6 @@
 #ifndef LIB_DRIVER_DEVICETREE_VISITORS_DEFAULT_H_
 #define LIB_DRIVER_DEVICETREE_VISITORS_DEFAULT_H_
 
-#include <lib/driver/logging/cpp/logger.h>
-
 #include "sdk/lib/driver/devicetree/node.h"
 #include "sdk/lib/driver/devicetree/visitor.h"
 #include "sdk/lib/driver/devicetree/visitors/bind-property.h"

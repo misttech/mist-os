@@ -10,7 +10,6 @@
 #include <lib/devicetree/devicetree.h>
 
 #include <string_view>
-#include <utility>
 
 namespace fdf_devicetree {
 

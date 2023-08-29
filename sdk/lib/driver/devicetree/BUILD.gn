@@ -14,35 +14,44 @@ group("tests") {
   ]
 }
 
-source_set("devicetree") {
-  deps = [
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
-    "//sdk/lib/driver/component/cpp:cpp",
-    "//sdk/lib/driver/legacy-bind-constants",
-    "//src/devices/bind/fuchsia.devicetree:fuchsia.devicetree_cpp",
-    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
+source_set("headers") {
+  public = [
+    "manager.h",
+    "node.h",
+    "visitor.h",
   ]
 
   public_deps = [
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
-    "//sdk/lib/zbi-format",
+    "//sdk/lib/driver/incoming/cpp",
     "//zircon/kernel/lib/devicetree",
     "//zircon/system/ulib/zx",
   ]
+}
 
+source_set("devicetree") {
   sources = [
     "manager.cc",
     "node.cc",
-    "visitors/bind-property.cc",
-    "visitors/bti.cc",
-    "visitors/mmio.cc",
   ]
+
+  deps = [
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/legacy-bind-constants",
+    "//sdk/lib/zbi-format",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
+  ]
+
+  public_deps = [ ":headers" ]
 }
 
 test("devicetree-manager-test") {
   deps = [
     ":devicetree",
+    "visitors:default-visitors",
+    "visitors:driver-visitor",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/legacy-bind-constants",
     "//sdk/lib/driver/logging/cpp",
