@@ -354,6 +354,28 @@ impl SrpServerService {
         unsafe { otSrpServerServiceIsSubType(self.as_ot_ptr()) }
     }
 
+    /// Optionally returns the subtype label for this service.
+    pub fn subtype_label(&self) -> Result<Option<CString>, Error> {
+        if self.is_subtype() {
+            let mut bytes = [0 as c_char; 256];
+
+            // SAFETY: We are passing in valid pointers with a length one less than the array size.
+            Error::from(unsafe {
+                otSrpServerServiceGetServiceSubTypeLabel(
+                    self.as_ot_ptr(),
+                    (&mut bytes) as *mut c_char,
+                    255,
+                )
+            })
+            .into_result()?;
+
+            // SAFETY: `bytes` is guaranteed to be zero terminated because of the size of the array.
+            Ok(Some(unsafe { CStr::from_ptr(&bytes as *const c_char) }.to_owned()))
+        } else {
+            Ok(None)
+        }
+    }
+
     /// Functional equivalent of
     /// [`otsys::otSrpServerServiceGetServiceName`](crate::otsys::otSrpServerServiceGetServiceName).
     pub fn service_name_cstr(&self) -> &CStr {

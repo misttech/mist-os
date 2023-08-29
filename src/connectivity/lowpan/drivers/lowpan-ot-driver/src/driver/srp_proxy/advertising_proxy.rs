@@ -9,7 +9,7 @@ use fidl_fuchsia_net_mdns::*;
 use fuchsia_async::Task;
 use fuchsia_component::client::connect_to_protocol;
 use parking_lot::Mutex;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ffi::{CStr, CString};
 use std::sync::Arc;
 
@@ -47,6 +47,7 @@ pub struct AdvertisingProxyServiceInfo {
     port: u16,
     priority: u16,
     weight: u16,
+    subtypes: HashSet<String>,
 }
 
 impl AdvertisingProxyServiceInfo {
@@ -56,11 +57,24 @@ impl AdvertisingProxyServiceInfo {
             port: srp_service.port(),
             priority: srp_service.priority(),
             weight: srp_service.weight(),
+            subtypes: HashSet::new(),
         }
     }
 
     fn is_up_to_date(&self, srp_service: &ot::SrpServerService) -> bool {
         !srp_service.is_deleted() && self == &AdvertisingProxyServiceInfo::new(srp_service)
+    }
+
+    fn has_subtype(&self, subtype: &str) -> bool {
+        self.subtypes.contains(subtype)
+    }
+
+    fn add_subtype(&mut self, subtype: &str) {
+        self.subtypes.insert(subtype.to_string());
+    }
+
+    fn remove_subtype(&mut self, subtype: &str) {
+        self.subtypes.remove(subtype);
     }
 
     fn into_service_instance_publication(self) -> ServiceInstancePublication {
@@ -92,6 +106,14 @@ impl AdvertisingProxyService {
     fn update(&self, info: AdvertisingProxyServiceInfo) -> Result<(), anyhow::Error> {
         *self.info.lock() = info;
         Ok(self.control_handle.send_reannounce()?)
+    }
+
+    fn add_subtype(&self, subtype: &str) {
+        self.info.lock().add_subtype(subtype);
+    }
+
+    fn remove_subtype(&self, subtype: &str) {
+        self.info.lock().remove_subtype(subtype);
     }
 }
 
@@ -340,6 +362,7 @@ impl AdvertisingProxyInner {
 
         let services = &mut host.services;
 
+        // Handle adding/removing whole services
         for srp_service in srp_host.find_services::<&CStr, &CStr>(
             ot::SrpServerServiceFlags::BASE_TYPE_SERVICE_ONLY,
             None,
@@ -481,20 +504,42 @@ impl AdvertisingProxyInner {
             let publish_responder_future = pub_responder_stream.map_err(Into::into).try_for_each(
                 move |ServiceInstancePublicationResponder_Request::OnPublication {
                           responder,
+                          subtype,
                           publication_cause,
                           ..
                       }| {
                     let service_info = service_info_clone.lock().clone();
-
                     debug!(
                         tag = "srp_advertising_proxy",
-                        "publish_responder_future: {:?} publication {:?}",
+                        "publish_responder_future: {:?} publication {:?} subtype {subtype:?}",
                         publication_cause,
                         service_info
                     );
 
+                    let should_skip = if let Some(subtype) = subtype {
+                        if !service_info.has_subtype(&subtype) {
+                            // We don't have this subtype, we are going to skip.
+                            true
+                        } else {
+                            // We have the subtype, so we don't skip.
+                            false
+                        }
+                    } else {
+                        // No specific subtype is being requested, so we don't skip.
+                        false
+                    };
+
                     let info = service_info.into_service_instance_publication();
-                    async move { responder.send(Ok(&info)).map_err(Into::into) }
+
+                    async move {
+                        let result = if should_skip {
+                            Err(OnPublicationError::DoNotRespond)
+                        } else {
+                            Ok(&info)
+                        };
+
+                        responder.send(result).map_err(Into::into)
+                    }
                 },
             );
 
@@ -509,6 +554,40 @@ impl AdvertisingProxyInner {
                     task: fuchsia_async::Task::spawn(future),
                 },
             );
+        }
+
+        // Handle subtypes
+        for srp_service in srp_host.find_services::<&CStr, &CStr>(
+            ot::SrpServerServiceFlags::SUB_TYPE_SERVICE_ONLY,
+            None,
+            None,
+        ) {
+            let subtype = match srp_service.subtype_label() {
+                Ok(Some(x)) => x,
+                Ok(None) => continue,
+                Err(e) => {
+                    warn!(tag = "srp_advertising_proxy", "Error getting subtype label: {e:?}");
+                    continue;
+                }
+            };
+
+            let subtype_str = match subtype.to_str() {
+                Ok(x) => x,
+                Err(e) => {
+                    warn!(tag = "srp_advertising_proxy", "Unacceptable subtype {subtype:?}: {e:?}");
+                    continue;
+                }
+            };
+
+            let service_name = srp_service.full_name_cstr().to_owned();
+
+            if let Some(service) = services.get(&service_name) {
+                if srp_service.is_deleted() {
+                    service.remove_subtype(subtype_str);
+                } else {
+                    service.add_subtype(subtype_str);
+                }
+            }
         }
 
         Ok(())
