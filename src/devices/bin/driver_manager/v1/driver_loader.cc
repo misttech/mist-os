@@ -74,15 +74,15 @@ void DriverLoader::WaitForBaseDrivers(fit::callback<void()> callback) {
 }
 
 const Driver* DriverLoader::LoadDriverUrl(const std::string& manifest_url,
-                                          bool use_universe_resolver) {
+                                          bool use_full_resolver) {
   // Check if we've already loaded this driver. If we have then return it.
   if (const Driver* driver = UrlToDriver(manifest_url); driver != nullptr) {
     return driver;
   }
   // Pick the correct package resolver to use.
   internal::PackageResolverInterface* resolver = base_resolver_;
-  if (use_universe_resolver && universe_resolver_) {
-    resolver = universe_resolver_;
+  if (use_full_resolver && full_resolver_) {
+    resolver = full_resolver_;
   }
 
   // We've never seen the driver before so add it, then return it.

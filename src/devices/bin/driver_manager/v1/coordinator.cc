@@ -611,7 +611,12 @@ zx_status_t Coordinator::AttemptBind(const MatchedDriverInfo matched_driver,
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  const Driver* driver_ptr = driver_loader_.LoadDriverUrl(matched_driver.component_url);
+  const bool use_full_resolver =
+      matched_driver.package_type == fuchsia_driver_index::DriverPackageType::kCached ||
+      matched_driver.package_type == fuchsia_driver_index::DriverPackageType::kUniverse;
+
+  const Driver* driver_ptr =
+      driver_loader_.LoadDriverUrl(matched_driver.component_url, use_full_resolver);
   if (!driver_ptr) {
     LOGF(ERROR, "Failed to load %s", matched_driver.component_url.c_str());
     return ZX_ERR_INTERNAL;

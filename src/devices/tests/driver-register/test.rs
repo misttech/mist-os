@@ -125,3 +125,32 @@ async fn test_register_driver() -> Result<()> {
 
     Ok(())
 }
+
+#[fasync::run_singlethreaded(test)]
+async fn test_register_driver_dfv1() -> Result<()> {
+    let (_instance, driver_dev, driver_registrar) = set_up_test_driver_realm(false).await?;
+    let driver_infos = get_driver_info(&driver_dev, &[]).await?;
+
+    // Before register we should have 3 drivers, the ones in bootfs.
+    assert_eq!(driver_infos.len(), 3);
+    assert_contains_driver_url(&driver_infos, SAMPLE_DRIVER_URL);
+    assert_contains_driver_url(&driver_infos, PARENT_DRIVER_URL);
+    assert_contains_driver_url(&driver_infos, FAKE_DRIVER_URL);
+
+    // Register the driver through a package url.
+    driver_registrar
+        .register(&fpkg::PackageUrl { url: EPHEMERAL_FAKE_DRIVER_URL.to_string() })
+        .await
+        .map_err(|e| anyhow!("Failed to call register driver: {}", e))?
+        .map_err(|e| anyhow!("Failed to register driver with err: {}", e))?;
+
+    // Now we should have 4 drivers, the original 3, plus the new ephemeral one.
+    let driver_infos = get_driver_info(&driver_dev, &[]).await?;
+    assert_eq!(driver_infos.len(), 4);
+    assert_contains_driver_url(&driver_infos, SAMPLE_DRIVER_URL);
+    assert_contains_driver_url(&driver_infos, PARENT_DRIVER_URL);
+    assert_contains_driver_url(&driver_infos, FAKE_DRIVER_URL);
+    assert_contains_driver_url(&driver_infos, EPHEMERAL_FAKE_DRIVER_URL);
+
+    Ok(())
+}
