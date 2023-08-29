@@ -177,6 +177,11 @@ def main():
         "--goma-dir",
         help="Optional goma directory path, only used with --use-goma.")
     parser.add_argument(
+        "--compress-debuginfo",
+        help=
+        "Optional value to select compression of debug sections in ELF binaries."
+    )
+    parser.add_argument(
         "--host-tag", help="Fuchsia host os/cpu tag used to find prebuilts.")
     parser.add_argument(
         "--clean", action="store_true", help="Force clean build.")
@@ -283,6 +288,9 @@ def main():
             args_gn_content += f'goma_dir = "{args.goma_dir}"\n'
         if args.sdk_id:
             args_gn_content += f'sdk_id = "{args.sdk_id}"\n'
+
+        if args.compress_debuginfo:
+            args_gn_content += f'compress_debuginfo = "{args.compress_debuginfo}"\n'
 
         # Only build host tools in the x64 sub-build, to save
         # considerable time.
