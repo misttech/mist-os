@@ -49,14 +49,16 @@ impl DomainConfigPackage {
                 ..cml::Expose::new_from(cml::OneOrMany::One(cml::ExposeFromRef::Framework))
             });
 
-            // Add an empty file to the directory to ensure the directory gets created.
-            let empty_file_name = "_ensure_directory_creation";
-            let empty_file_path = outdir.join(empty_file_name);
-            let destination = Utf8PathBuf::from(&directory).join(empty_file_name);
-            std::fs::write(&empty_file_path, "").context("writing empty file")?;
-            builder
-                .add_file_as_blob(destination, &empty_file_path)
-                .with_context(|| format!("adding empty file {empty_file_path}"))?;
+            if directory_config.entries.is_empty() {
+                // Add an empty file to the directory to ensure the directory gets created.
+                let empty_file_name = "_ensure_directory_creation";
+                let empty_file_path = outdir.join(empty_file_name);
+                let destination = Utf8PathBuf::from(&directory).join(empty_file_name);
+                std::fs::write(&empty_file_path, "").context("writing empty file")?;
+                builder
+                    .add_file_as_blob(destination, &empty_file_path)
+                    .with_context(|| format!("adding empty file {empty_file_path}"))?;
+            }
 
             // Add the necessary config files to the directory.
             for (_, FileEntry { source, destination }) in directory_config.entries {
@@ -67,19 +69,21 @@ impl DomainConfigPackage {
             }
         }
 
-        let cml = cml::Document { expose: Some(exposes), ..Default::default() };
-        let out_data = cml::compile(&cml, cml::CompileOptions::default())
-            .with_context(|| format!("compiling domain config routes"))?;
-        let cm_name = format!("{}.cm", &self.config.name);
-        let cm_path = outdir.join(&cm_name);
-        let mut cm_file = std::fs::File::create(&cm_path)
-            .with_context(|| format!("creating domain config routes: {cm_path}"))?;
-        cm_file
-            .write_all(&persist(&out_data)?)
-            .with_context(|| format!("writing domain config routes: {cm_path}"))?;
-        builder
-            .add_file_to_far(format!("meta/{cm_name}"), &cm_path)
-            .with_context(|| format!("adding file to domain config package: {cm_path}"))?;
+        if self.config.expose_directories {
+            let cml = cml::Document { expose: Some(exposes), ..Default::default() };
+            let out_data = cml::compile(&cml, cml::CompileOptions::default())
+                .with_context(|| format!("compiling domain config routes"))?;
+            let cm_name = format!("{}.cm", &self.config.name);
+            let cm_path = outdir.join(&cm_name);
+            let mut cm_file = std::fs::File::create(&cm_path)
+                .with_context(|| format!("creating domain config routes: {cm_path}"))?;
+            cm_file
+                .write_all(&persist(&out_data)?)
+                .with_context(|| format!("writing domain config routes: {cm_path}"))?;
+            builder
+                .add_file_to_far(format!("meta/{cm_name}"), &cm_path)
+                .with_context(|| format!("adding file to domain config package: {cm_path}"))?;
+        }
 
         let manifest = builder
             .build(&outdir, metafar_path)
@@ -124,6 +128,7 @@ mod tests {
         let config = DomainConfig {
             name: "my-package".into(),
             directories: [("config-dir".into(), DomainConfigDirectory { entries })].into(),
+            expose_directories: true,
         };
 
         let package = DomainConfigPackage::new(config);
@@ -135,12 +140,9 @@ mod tests {
         assert_eq!(manifest, loaded_manifest);
         assert_eq!(manifest.name(), &PackageName::from_str("my-package").unwrap());
         let blobs = manifest.into_blobs();
-        assert_eq!(blobs.len(), 3);
+        assert_eq!(blobs.len(), 2);
         let blob = blobs.iter().find(|&b| &b.path == "meta/").unwrap();
         assert_eq!(blob.source_path, outdir.join("meta.far").to_string());
-        let blob =
-            blobs.iter().find(|&b| &b.path == "config-dir/_ensure_directory_creation").unwrap();
-        assert_eq!(blob.source_path, outdir.join("_ensure_directory_creation").to_string());
         let blob = blobs.iter().find(|&b| &b.path == "config-dir/config.json").unwrap();
         assert_eq!(blob.source_path, config_source.to_string());
         assert_eq!(
@@ -175,7 +177,62 @@ mod tests {
         let contents = far_reader.read_file("meta/contents").unwrap();
         let contents = std::str::from_utf8(&contents).unwrap();
         let expected_contents = "\
-            config-dir/_ensure_directory_creation=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
+            config-dir/config.json=ba2747adb0a7126408af2ea0071fa8ae85d70ee2ab171aa0d0073f28b3ebcfcb\n\
+        "
+        .to_string();
+        assert_eq!(expected_contents, contents);
+    }
+
+    #[test]
+    fn build_no_routing() {
+        let tmp = tempdir().unwrap();
+        let outdir = Utf8Path::from_path(tmp.path()).unwrap();
+
+        // Prepare the domain config input.
+        let config_source = outdir.join("config_source.json");
+        std::fs::write(&config_source, "bleep bloop").unwrap();
+        let mut entries = NamedMap::<FileEntry>::new("config files");
+        entries
+            .try_insert_unique(
+                "config.json".to_string(),
+                FileEntry { source: config_source.clone(), destination: "config.json".into() },
+            )
+            .unwrap();
+        let config = DomainConfig {
+            name: "my-package".into(),
+            directories: [("config-dir".into(), DomainConfigDirectory { entries })].into(),
+            expose_directories: false,
+        };
+
+        let package = DomainConfigPackage::new(config);
+        let (path, manifest) = package.build(&outdir).unwrap();
+
+        // Assert the manifest is correct.
+        assert_eq!(path, outdir.join("package_manifest.json"));
+        let loaded_manifest = PackageManifest::try_load_from(path).unwrap();
+        assert_eq!(manifest, loaded_manifest);
+        assert_eq!(manifest.name(), &PackageName::from_str("my-package").unwrap());
+        let blobs = manifest.into_blobs();
+        assert_eq!(blobs.len(), 2);
+        let blob = blobs.iter().find(|&b| &b.path == "meta/").unwrap();
+        assert_eq!(blob.source_path, outdir.join("meta.far").to_string());
+        let blob = blobs.iter().find(|&b| &b.path == "config-dir/config.json").unwrap();
+        assert_eq!(blob.source_path, config_source.to_string());
+        assert_eq!(
+            blob.merkle,
+            Hash::from_str("ba2747adb0a7126408af2ea0071fa8ae85d70ee2ab171aa0d0073f28b3ebcfcb")
+                .unwrap()
+        );
+        assert_eq!(blob.size, 11);
+
+        // Assert the contents of the package are correct.
+        let far_path = outdir.join("meta.far");
+        let mut far_reader = Utf8Reader::new(File::open(&far_path).unwrap()).unwrap();
+        let package = far_reader.read_file("meta/package").unwrap();
+        assert_eq!(package, br#"{"name":"my-package","version":"0"}"#);
+        let contents = far_reader.read_file("meta/contents").unwrap();
+        let contents = std::str::from_utf8(&contents).unwrap();
+        let expected_contents = "\
             config-dir/config.json=ba2747adb0a7126408af2ea0071fa8ae85d70ee2ab171aa0d0073f28b3ebcfcb\n\
         "
         .to_string();
@@ -188,8 +245,11 @@ mod tests {
         let outdir = Utf8Path::from_path(tmp.path()).unwrap();
 
         // Prepare the domain config input.
-        let config =
-            DomainConfig { name: "my-package".into(), directories: NamedMap::new("directories") };
+        let config = DomainConfig {
+            name: "my-package".into(),
+            directories: NamedMap::new("directories"),
+            expose_directories: true,
+        };
         let package = DomainConfigPackage::new(config);
         let (path, manifest) = package.build(&outdir).unwrap();
 
@@ -230,6 +290,7 @@ mod tests {
         let config = DomainConfig {
             name: "my-package".into(),
             directories: [("config-dir".into(), DomainConfigDirectory { entries })].into(),
+            expose_directories: true,
         };
 
         let package = DomainConfigPackage::new(config);

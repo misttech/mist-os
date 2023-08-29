@@ -168,6 +168,9 @@ pub(crate) trait PackageConfigBuilder {
 pub(crate) trait DomainConfigBuilder {
     /// Add a directory to the domain config which can hold config resources.
     fn directory(&mut self, name: &str) -> &mut dyn DomainConfigDirectoryBuilder;
+
+    /// Avoid exposing the directory via capability routing.
+    fn skip_expose(&mut self) -> &mut dyn DomainConfigBuilder;
 }
 
 /// The interface for specifying the config files to add to a domain config package directory.
@@ -339,6 +342,7 @@ impl Default for ComponentConfiguration {
 pub struct DomainConfig {
     pub directories: NamedMap<DomainConfigDirectory>,
     pub name: String,
+    pub expose_directories: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -394,6 +398,7 @@ impl ConfigurationBuilder for ConfigurationBuilderImpl {
         self.domain_configs.entry(name.to_string()).or_insert_with_key(|name| DomainConfig {
             directories: NamedMap::new("directories"),
             name: name.to_owned(),
+            expose_directories: true,
         })
     }
 
@@ -415,6 +420,11 @@ impl DomainConfigBuilder for DomainConfig {
         self.directories
             .entry(name.to_string())
             .or_insert_with(|| DomainConfigDirectory { entries: NamedMap::new("domain configs") })
+    }
+
+    fn skip_expose(&mut self) -> &mut dyn DomainConfigBuilder {
+        self.expose_directories = false;
+        self
     }
 }
 
