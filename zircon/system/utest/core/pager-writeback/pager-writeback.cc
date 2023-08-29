@@ -1974,6 +1974,7 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(DirtyAfterMapProtect, 0) {
   zx_vaddr_t base_addr;
   ASSERT_OK(zx::vmar::root_self()->allocate(ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE, 0,
                                             zx_system_get_page_size(), &vmar, &base_addr));
+  auto destroy = fit::defer([&vmar]() { vmar.destroy(); });
 
   Vmo* vmo;
   ASSERT_TRUE(pager.CreateVmoWithOptions(1, create_option, &vmo));
@@ -1986,11 +1987,6 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(DirtyAfterMapProtect, 0) {
   zx_vaddr_t ptr;
   // Map the vmo read-only first so that the protect step below is not a no-op.
   ASSERT_OK(vmar.map(ZX_VM_PERM_READ, 0, vmo->vmo(), 0, zx_system_get_page_size(), &ptr));
-
-  auto unmap = fit::defer([&]() {
-    // Cleanup the mapping we created.
-    vmar.unmap(ptr, zx_system_get_page_size());
-  });
 
   // Read the VMO through the mapping so that the hardware mapping is created.
   uint8_t data = *reinterpret_cast<uint8_t*>(ptr);
