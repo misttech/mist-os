@@ -12,6 +12,12 @@
             protocol: [ "fuchsia.wlan.wlanix.Wlanix" ],
         },
     ],
+    use: [
+        {
+            protocol: [ "fuchsia.wlan.device.service.DeviceMonitor" ],
+            from: "parent",
+        },
+    ],
     expose: [
         {
             protocol: [ "fuchsia.wlan.wlanix.Wlanix" ],

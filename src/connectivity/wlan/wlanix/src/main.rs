@@ -7,7 +7,7 @@ use {
     fidl_fuchsia_wlan_wlanix as fidl_wlanix, fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_zircon as zx,
-    futures::{select, StreamExt},
+    futures::StreamExt,
     netlink_packet_core::{NetlinkDeserializable, NetlinkHeader, NetlinkSerializable},
     netlink_packet_generic::GenlMessage,
     parking_lot::Mutex,
@@ -17,8 +17,12 @@ use {
 
 #[allow(unused)]
 mod nl80211;
+mod service;
 
-use nl80211::{Nl80211, Nl80211Attr, Nl80211BandAttr, Nl80211Cmd, Nl80211FrequencyAttr};
+use {
+    nl80211::{Nl80211, Nl80211Attr, Nl80211BandAttr, Nl80211Cmd, Nl80211FrequencyAttr},
+    service::WlanixService,
+};
 
 const FAKE_CHIP_ID: u32 = 1;
 const IFACE_NAME: &str = "sta-iface-name";
@@ -133,6 +137,7 @@ async fn serve_wifi_chip(_chip_id: u32, reqs: fidl_wlanix::WifiChipRequestStream
 struct WifiState {
     started: bool,
     callbacks: Vec<fidl_wlanix::WifiEventCallbackProxy>,
+    scan_multicast_proxy: Option<fidl_wlanix::Nl80211MulticastProxy>,
 }
 
 impl WifiState {
@@ -262,10 +267,11 @@ fn build_nl80211_done() -> fidl_wlanix::Nl80211Message {
     }
 }
 
-fn handle_nl80211_message(
+async fn handle_nl80211_message<S: WlanixService>(
     netlink_message: fidl_wlanix::Nl80211Message,
     responder: fidl_wlanix::Nl80211MessageResponder,
-    scan_sender: Option<&fidl_wlanix::Nl80211MulticastProxy>,
+    state: Arc<Mutex<WifiState>>,
+    service: &S,
 ) -> Result<(), Error> {
     let payload = match netlink_message {
         fidl_wlanix::Nl80211Message {
@@ -289,10 +295,17 @@ fn handle_nl80211_message(
                         // Phy ID
                         Nl80211Attr::Wiphy(0),
                         // Supported bands
-                        Nl80211Attr::WiphyBands(vec![vec![Nl80211BandAttr::Frequencies(vec![
-                            vec![Nl80211FrequencyAttr::Frequency(2412)],
-                            vec![Nl80211FrequencyAttr::Frequency(2417)],
-                        ])]]),
+                        Nl80211Attr::WiphyBands(vec![vec![Nl80211BandAttr::Frequencies({
+                            // Hardcode US non-DFS frequencies for now.
+                            vec![
+                                2412, 2417, 2422, 2427, 2432, 2437, 2442, 2447, 2452, 2457, 2462,
+                                2467, 2472, 2484, 5180, 5190, 5200, 5210, 5220, 5230, 5240, 5745,
+                                5755, 5765, 5775, 5785, 5795, 5805, 5825,
+                            ]
+                            .into_iter()
+                            .map(|freq| vec![Nl80211FrequencyAttr::Frequency(freq)])
+                            .collect()
+                        })]]),
                         // Scan capabilities
                         Nl80211Attr::MaxScanSsids(32),
                         Nl80211Attr::MaxScheduledScanSsids(32),
@@ -328,26 +341,11 @@ fn handle_nl80211_message(
         }
         Nl80211Cmd::TriggerScan => {
             info!("Nl80211Cmd::TriggerScan");
-            responder
-                .send(Ok(nl80211_message_resp(vec![build_nl80211_ack()])))
-                .context("Failed to ack TriggerScan")?;
-            if let Some(proxy) = scan_sender {
-                proxy
-                    .message(fidl_wlanix::Nl80211MulticastMessageRequest {
-                        message: Some(build_nl80211_message(
-                            Nl80211Cmd::NewScanResults,
-                            vec![Nl80211Attr::IfaceIndex(0)],
-                        )),
-                        ..Default::default()
-                    })
-                    .context("Failed to send NewScanResults")?;
-            }
+            service.trigger_nl80211_scan(responder, state).await?;
         }
         Nl80211Cmd::GetScan => {
             info!("Nl80211Cmd::GetScan");
-            responder
-                .send(Ok(nl80211_message_resp(vec![build_nl80211_done()])))
-                .context("Failed to send scan results")?;
+            service.get_nl80211_scan(responder)?;
         }
         _ => {
             warn!("Dropping nl80211 message: {:?}", message);
@@ -359,42 +357,55 @@ fn handle_nl80211_message(
     Ok(())
 }
 
-async fn serve_nl80211(mut reqs: fidl_wlanix::Nl80211RequestStream) {
-    let mut scan_multicast_sender = None;
+async fn serve_nl80211<S: WlanixService>(
+    mut reqs: fidl_wlanix::Nl80211RequestStream,
+    state: Arc<Mutex<WifiState>>,
+    service: &S,
+) {
     loop {
-        select! {
-            req = reqs.select_next_some() => match req {
-                Ok(fidl_wlanix::Nl80211Request::Message { payload, responder, ..}) => {
-                    if let Some(message) = payload.message {
-                        if let Err(e) = handle_nl80211_message(message, responder, scan_multicast_sender.as_ref()) {
-                            error!("Failed to handle Nl80211 message: {}", e);
-                        }
+        match reqs.select_next_some().await {
+            Ok(fidl_wlanix::Nl80211Request::Message { payload, responder, .. }) => {
+                if let Some(message) = payload.message {
+                    if let Err(e) =
+                        handle_nl80211_message(message, responder, Arc::clone(&state), service)
+                            .await
+                    {
+                        error!("Failed to handle Nl80211 message: {}", e);
                     }
                 }
-                Ok(fidl_wlanix::Nl80211Request::GetMulticast { payload, .. }) => {
-                    if let Some(multicast) = payload.multicast {
-                        if payload.group == Some("scan".to_string())  {
-                            scan_multicast_sender.replace(multicast.into_proxy().expect("Failed to create multicast proxy"));
-                        } else {
-                            warn!("Dropping channel for unsupported multicast group {:?}", payload.group);
+            }
+            Ok(fidl_wlanix::Nl80211Request::GetMulticast { payload, .. }) => {
+                if let Some(multicast) = payload.multicast {
+                    if payload.group == Some("scan".to_string()) {
+                        match multicast.into_proxy() {
+                            Ok(proxy) => {
+                                state.lock().scan_multicast_proxy.replace(proxy);
+                            }
+                            Err(e) => error!("Failed to create multicast proxy: {}", e),
                         }
+                    } else {
+                        warn!(
+                            "Dropping channel for unsupported multicast group {:?}",
+                            payload.group
+                        );
                     }
                 }
-                Ok(fidl_wlanix::Nl80211Request::_UnknownMethod { ordinal, .. }) => {
-                    warn!("Unknown Nl80211Request ordinal: {}", ordinal);
-                }
-                Err(e) => {
-                    error!("Nl80211 request stream failed: {}", e);
-                    return;
-                }
+            }
+            Ok(fidl_wlanix::Nl80211Request::_UnknownMethod { ordinal, .. }) => {
+                warn!("Unknown Nl80211Request ordinal: {}", ordinal);
+            }
+            Err(e) => {
+                error!("Nl80211 request stream failed: {}", e);
+                return;
             }
         }
     }
 }
 
-async fn handle_wlanix_request(
+async fn handle_wlanix_request<S: WlanixService>(
     req: fidl_wlanix::WlanixRequest,
     state: Arc<Mutex<WifiState>>,
+    service: &S,
 ) -> Result<(), Error> {
     match req {
         fidl_wlanix::WlanixRequest::GetWifi { payload, .. } => {
@@ -408,7 +419,7 @@ async fn handle_wlanix_request(
             info!("fidl_wlanix::WlanixRequest::GetNl80211");
             if let Some(nl80211) = payload.nl80211 {
                 let nl80211_stream = nl80211.into_stream().context("create Nl80211 stream")?;
-                serve_nl80211(nl80211_stream).await;
+                serve_nl80211(nl80211_stream, Arc::clone(&state), service).await;
             }
         }
         fidl_wlanix::WlanixRequest::_UnknownMethod { ordinal, .. } => {
@@ -418,11 +429,15 @@ async fn handle_wlanix_request(
     Ok(())
 }
 
-async fn serve_wlanix(reqs: fidl_wlanix::WlanixRequestStream, state: Arc<Mutex<WifiState>>) {
+async fn serve_wlanix<S: WlanixService>(
+    reqs: fidl_wlanix::WlanixRequestStream,
+    state: Arc<Mutex<WifiState>>,
+    service: Arc<S>,
+) {
     reqs.for_each_concurrent(None, |req| async {
         match req {
             Ok(req) => {
-                if let Err(e) = handle_wlanix_request(req, Arc::clone(&state)).await {
+                if let Err(e) = handle_wlanix_request(req, Arc::clone(&state), &*service).await {
                     warn!("Failed to handle WlanixRequest: {}", e);
                 }
             }
@@ -434,10 +449,12 @@ async fn serve_wlanix(reqs: fidl_wlanix::WlanixRequestStream, state: Arc<Mutex<W
     .await;
 }
 
-async fn serve_fidl() -> Result<(), Error> {
+async fn serve_fidl<S: WlanixService>(service: Arc<S>) -> Result<(), Error> {
     let mut fs = ServiceFs::new();
     let state = Arc::new(Mutex::new(WifiState::default()));
-    let _ = fs.dir("svc").add_fidl_service(move |reqs| serve_wlanix(reqs, Arc::clone(&state)));
+    let _ = fs
+        .dir("svc")
+        .add_fidl_service(move |reqs| serve_wlanix(reqs, Arc::clone(&state), Arc::clone(&service)));
     fs.take_and_serve_directory_handle()?;
     fs.for_each_concurrent(None, |t| async { t.await }).await;
     Ok(())
@@ -452,7 +469,8 @@ async fn main() {
     )
     .expect("Failed to initialize wlanix logs");
     info!("Starting Wlanix");
-    match serve_fidl().await {
+    let service = service::sme::SmeService::new().expect("Failed to connect Wlanix to SME");
+    match serve_fidl(Arc::new(service)).await {
         Ok(()) => info!("Wlanix exiting cleanly"),
         Err(e) => error!("Wlanix exiting with error: {}", e),
     }
@@ -467,6 +485,13 @@ mod tests {
         std::pin::Pin,
         wlan_common::assert_variant,
     };
+
+    struct TestService {}
+    impl WlanixService for TestService {}
+
+    fn test_service() -> TestService {
+        TestService {}
+    }
 
     #[test]
     fn test_wifi_get_state_is_started_false_at_beginning() {
@@ -664,7 +689,8 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut create_sta_iface_fut), Poll::Pending);
 
         let state = Arc::new(Mutex::new(WifiState::default()));
-        let test_fut = serve_wlanix(wlanix_stream, state);
+        let service = Arc::new(test_service());
+        let test_fut = serve_wlanix(wlanix_stream, state, service);
         let mut test_fut = Box::pin(test_fut);
         assert_eq!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
@@ -687,7 +713,8 @@ mod tests {
         let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::WlanixMarker>()
             .expect("Failed to get proxy and req stream");
         let state = Arc::new(Mutex::new(WifiState::default()));
-        let wlanix_fut = serve_wlanix(stream, state);
+        let service = Arc::new(test_service());
+        let wlanix_fut = serve_wlanix(stream, state, service);
         pin_mut!(wlanix_fut);
         let (nl_proxy, nl_server) =
             create_proxy::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
@@ -707,7 +734,9 @@ mod tests {
         let (proxy, stream) =
             create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
 
-        let nl80211_fut = serve_nl80211(stream);
+        let state = Arc::new(Mutex::new(WifiState::default()));
+        let service = test_service();
+        let nl80211_fut = serve_nl80211(stream, state, &service);
         pin_mut!(nl80211_fut);
 
         let (mcast_client, mut mcast_stream) =
@@ -734,7 +763,9 @@ mod tests {
         let (proxy, stream) =
             create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
 
-        let nl80211_fut = serve_nl80211(stream);
+        let state = Arc::new(Mutex::new(WifiState::default()));
+        let service = test_service();
+        let nl80211_fut = serve_nl80211(stream, state, &service);
         pin_mut!(nl80211_fut);
 
         let (mcast_client, mut mcast_stream) =

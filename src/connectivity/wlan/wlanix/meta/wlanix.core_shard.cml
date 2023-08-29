@@ -16,5 +16,10 @@
             from: "parent",
             to: [ "#wlanix" ],
         },
+        {
+            protocol: [ "fuchsia.wlan.device.service.DeviceMonitor" ],
+            from: "#wlandevicemonitor",
+            to: "#wlanix",
+        },
     ],
 }

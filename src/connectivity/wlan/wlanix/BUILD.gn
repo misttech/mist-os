@@ -21,12 +21,17 @@ rustc_binary("wlanix_bin") {
 
   deps = [
     ":fuchsia.wlan.wlanix_rust",
+    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_rust",
+    "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service_rust",
+    "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_rust",
+    "//src/connectivity/wlan/lib/common/rust:wlan-common",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:netlink-packet-core",
     "//third_party/rust_crates:netlink-packet-generic",
@@ -36,7 +41,7 @@ rustc_binary("wlanix_bin") {
   ]
 
   test_deps = [
-    "//src/connectivity/wlan/lib/common/rust:wlan-common",
+    "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_rust",
     "//src/lib/fidl/rust/fidl",
     "//third_party/rust_crates:test-case",
   ]
@@ -50,6 +55,8 @@ rustc_binary("wlanix_bin") {
     "src/nl80211/constants.rs",
     "src/nl80211/mod.rs",
     "src/nl80211/nested.rs",
+    "src/service/mod.rs",
+    "src/service/sme.rs",
   ]
 }
 
