@@ -10,6 +10,7 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
+#include <dev/power.h>
 #include <kernel/cpu.h>
 #include <kernel/mp.h>
 #include <kernel/thread.h>
@@ -43,6 +44,25 @@ static unsigned get_num_cpus_online() {
     ++count;
   }
   return count;
+}
+
+static zx_status_t wait_for_cpu_offline(cpu_num_t i, Deadline deadline) {
+  while (current_time() < deadline.when()) {
+    zx::result<power_cpu_state> res = platform_get_cpu_state(i);
+    if (res.is_error()) {
+      if (res.error_value() == ZX_ERR_NOT_SUPPORTED) {
+        // x86 does not implement platform_get_cpu_state, so return OK if the call returns
+        // ZX_ERR_NOT_SUPPORTED.
+        return ZX_OK;
+      }
+      return res.error_value();
+    } else if (res.value() == power_cpu_state::OFF || res.value() == power_cpu_state::STOPPED) {
+      return ZX_OK;
+    }
+    Thread::Current::SleepRelative(ZX_MSEC(10));
+  }
+  printf("timed out waiting for cpu-%u to go offline\n", i);
+  return ZX_ERR_TIMED_OUT;
 }
 
 static zx_status_t wait_for_cpu_active(cpu_num_t i, Deadline deadline) {
@@ -80,6 +100,9 @@ static zx_status_t wait_for_cpu_active(cpu_num_t i, Deadline deadline) {
     if (i == BOOT_CPU_ID) {
       continue;
     }
+    // Wait until this core is fully offline.
+    ASSERT_OK(wait_for_cpu_offline(i, Deadline::after(ZX_SEC(5))),
+              "waiting for core to go offline failed");
     // Hotplug this core.
     ASSERT_OK(hotplug_core(i), "hotplugging core failed");
     // Wait until the core is active.
