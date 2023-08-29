@@ -510,9 +510,10 @@ async fn main() {
         // so that fragmentation is not needed (NS3 doesn't currently support
         // fragmentation c.f. https://fxbug.dev/128588).
         for message_size in [1, 100, 1 << 10] {
-            // NB: These message counts match those in the loopback socket
-            // benchmark to facilitate comparison of results.
-            for message_count in [1, 10, 50] {
+            // NB: The 1, 10, and 50 message counts match those in the loopback socket
+            // benchmark to facilitate comparison of results, and 250 is as large as
+            // reasonably possible to stay within Infra runtime limits.
+            for message_count in [1, 10, 50, 250] {
                 metrics.push(
                     bench_udp::<net_types::ip::Ipv4>(
                         test_suite,
