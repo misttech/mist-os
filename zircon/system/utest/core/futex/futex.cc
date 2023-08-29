@@ -8,6 +8,8 @@
 #include <lib/zx/clock.h>
 #include <lib/zx/suspend_token.h>
 #include <lib/zx/thread.h>
+#include <lib/zx/vmar.h>
+#include <lib/zx/vmo.h>
 #include <sched.h>
 #include <threads.h>
 #include <unistd.h>
@@ -612,6 +614,47 @@ TEST(FutexTest, EventSignaling) {
   log("signal_thread 2 joined\n");
   thrd_join(thread3, nullptr);
   log("signal_thread 3 joined\n");
+}
+
+// Regression test for fxbug.dev/132757.
+//
+// Verify that concurrently calling zx_futex_wait with an exiting thread as the new owner does not
+// create a use-after-free.
+TEST(FutexTest, WaitExitRace) {
+  // The larger the value, the more likely we are to trigger an interesting race.  The smaller the
+  // value, the faster this test will complete.
+  constexpr size_t kIterations = 100;
+  for (size_t i = 0; i < kIterations; ++i) {
+    // We're going to create a thread (t2) that simply waits to be signaled and then exits.  In a
+    // different thread, we'll call zx_futex_wait with t2 as the new owner.  Our goal is to race
+    // zx_futex_wait with zx_thread_exit.
+    std::atomic<bool> ready{false};
+    auto wait_then_exit = [&]() {
+      while (!ready.load()) {
+      };
+    };
+
+    // In order to create more opportunity for a race, place the futex in an uncommitted page that
+    // will need to be faulted in during zx_futex_wait.
+    const size_t size = zx_system_get_page_size();
+    zx::vmo vmo;
+    ASSERT_OK(zx::vmo::create(size, 0, &vmo));
+    zx_vaddr_t addr;
+    ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0 /* vmar_offset */,
+                                         vmo, 0 /* vmo_offset */, size, &addr));
+    auto unmap = fit::defer([&]() { zx::vmar::root_self()->unmap(addr, size); });
+    ASSERT_OK(vmo.op_range(ZX_VMO_OP_DECOMMIT, 0, size, nullptr, 0));
+    auto* v = reinterpret_cast<zx_futex_t*>(addr);
+
+    std::thread t2(wait_then_exit);
+
+    const zx_time_t deadline = zx_deadline_after(ZX_USEC(100));
+    const zx_handle_t new_futex_owner = thrd_get_zx_handle(t2.native_handle());
+
+    ready.store(true);
+    zx_futex_wait(v, 0, new_futex_owner, deadline);
+    t2.join();
+  }
 }
 
 }  // namespace

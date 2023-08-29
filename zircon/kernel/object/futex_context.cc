@@ -305,20 +305,20 @@ zx_status_t FutexContext::FutexWait(user_in_ptr<const zx_futex_t> value_ptr,
   if (futex_owner_thread) {
     Guard<CriticalMutex> futex_owner_guard{futex_owner_thread->get_lock()};
     return FutexWaitInternal<Guard<CriticalMutex>>(
-        value_ptr, current_value, futex_owner_thread.get(), futex_owner_thread->core_thread_,
-        futex_owner_guard.take(), owner_validator_status, deadline);
+        value_ptr, current_value, futex_owner_thread.get(), futex_owner_guard.take(),
+        owner_validator_status, deadline);
   } else {
     fbl::NullLock null_lock;
     NullGuard null_guard{&null_lock};
-    return FutexWaitInternal<NullGuard>(value_ptr, current_value, nullptr, nullptr,
-                                        ktl::move(null_guard), owner_validator_status, deadline);
+    return FutexWaitInternal<NullGuard>(value_ptr, current_value, nullptr, ktl::move(null_guard),
+                                        owner_validator_status, deadline);
   }
 }
 
 template <typename GuardType>
 zx_status_t FutexContext::FutexWaitInternal(user_in_ptr<const zx_futex_t> value_ptr,
                                             zx_futex_t current_value,
-                                            ThreadDispatcher* futex_owner_thread, Thread* new_owner,
+                                            ThreadDispatcher* futex_owner_thread,
                                             GuardType&& adopt_new_owner_guard,
                                             zx_status_t validator_status,
                                             const Deadline& deadline) {
@@ -396,6 +396,7 @@ zx_status_t FutexContext::FutexWaitInternal(user_in_ptr<const zx_futex_t> value_
         return validator_status;
       }
 
+      Thread* new_owner = nullptr;
       if (futex_owner_thread != nullptr) {
         // When attempting to wait, the new owner of the futex (if any) may not be
         // the thread which is attempting to wait.
@@ -407,6 +408,17 @@ zx_status_t FutexContext::FutexWaitInternal(user_in_ptr<const zx_futex_t> value_
         // waiting on the target futex.
         if (futex_owner_thread->blocking_futex_id_ == futex_id) {
           return ZX_ERR_INVALID_ARGS;
+        }
+
+        // We need to resolve |futex_owner_thread|'s Thread*.  First, we must revalidate that
+        // |futex_owner_thread| is not dead or dying as it may have changed state during the
+        // |SoftFault| call above.
+        //
+        // Once we've verified it's not dead or dying, we must ensure the Thread* remains valid. See
+        // related comment below just after |new_owner_guard| is released.
+        AssertHeld(*futex_owner_thread->get_lock());
+        if (!futex_owner_thread->IsDyingOrDeadLocked()) {
+          new_owner = futex_owner_thread->core_thread_;
         }
       }
 
@@ -423,6 +435,13 @@ zx_status_t FutexContext::FutexWaitInternal(user_in_ptr<const zx_futex_t> value_
         ThreadDispatcher::AutoBlocked by(ThreadDispatcher::Blocked::FUTEX);
         guard.Release(MutexPolicy::ThreadLockHeld);
         new_owner_guard.Release(MutexPolicy::ThreadLockHeld);
+
+        // We have just released |futex_owner_thread|'s lock (|new_owner_guard|).  At this point,
+        // |futex_owner_thread| is free to begin exiting.  However, we are currently holding the
+        // global thread lock so even though it can begin to exit, it cannot complete the operation
+        // and, more importantly, cannot destroy its Thread (|new_owner|) until we release the
+        // thread lock.  It's critical that it cannot destroy its thread while we hold the global
+        // thread lock.  Otherwise, |new_owner| could become a dangling pointer.
 
         wait_tracer.FutexWait(futex_id, new_owner);
 
@@ -612,13 +631,12 @@ zx_status_t FutexContext::FutexRequeue(user_in_ptr<const zx_futex_t> wake_ptr, u
     Guard<CriticalMutex> requeue_owner_guard{requeue_owner_thread->get_lock()};
     return FutexRequeueInternal<Guard<CriticalMutex>>(
         wake_ptr, wake_count, current_value, owner_action, requeue_ptr, requeue_count,
-        requeue_owner_thread.get(), requeue_owner_thread->core_thread_, requeue_owner_guard.take(),
-        owner_validator_status);
+        requeue_owner_thread.get(), requeue_owner_guard.take(), owner_validator_status);
   } else {
     fbl::NullLock null_lock;
     NullGuard null_guard{&null_lock};
     return FutexRequeueInternal<NullGuard>(wake_ptr, wake_count, current_value, owner_action,
-                                           requeue_ptr, requeue_count, nullptr, nullptr,
+                                           requeue_ptr, requeue_count, nullptr,
                                            ktl::move(null_guard), owner_validator_status);
   }
 }
@@ -627,8 +645,8 @@ template <typename GuardType>
 zx_status_t FutexContext::FutexRequeueInternal(
     user_in_ptr<const zx_futex_t> wake_ptr, uint32_t wake_count, zx_futex_t current_value,
     OwnerAction owner_action, user_in_ptr<const zx_futex_t> requeue_ptr, uint32_t requeue_count,
-    ThreadDispatcher* requeue_owner_thread, Thread* new_requeue_owner,
-    GuardType&& adopt_new_owner_guard, zx_status_t validator_status) {
+    ThreadDispatcher* requeue_owner_thread, GuardType&& adopt_new_owner_guard,
+    zx_status_t validator_status) {
   GuardType new_owner_guard{AdoptLock, ktl::move(adopt_new_owner_guard)};
   zx_status_t result;
   KTracer tracer;
@@ -702,12 +720,26 @@ zx_status_t FutexContext::FutexRequeueInternal(
       return validator_status;
     }
 
-    // Verify that the thread we are attempting to make the requeue target's
-    // owner (if any) is not waiting on either the wake futex or the requeue
-    // futex.
-    if (requeue_owner_thread && ((requeue_owner_thread->blocking_futex_id_ == wake_id) ||
-                                 (requeue_owner_thread->blocking_futex_id_ == requeue_id))) {
-      return ZX_ERR_INVALID_ARGS;
+    Thread* new_requeue_owner = nullptr;
+    if (requeue_owner_thread) {
+      // Verify that the thread we are attempting to make the requeue target's
+      // owner (if any) is not waiting on either the wake futex or the requeue
+      // futex.
+      if ((requeue_owner_thread->blocking_futex_id_ == wake_id) ||
+          (requeue_owner_thread->blocking_futex_id_ == requeue_id)) {
+        return ZX_ERR_INVALID_ARGS;
+      }
+
+      // We need to resolve |requeue_owner_thread|'s Thread*.  First, we must revalidate that
+      // |requeue_owner_thread| is not dead or dying as it may have changed state during the
+      // |SoftFault| call above.
+      //
+      // Once we've verified it's not dead or dying, we must ensure the Thread* remains valid.  See
+      // related comment below just after |new_owner_guard| is released.
+      AssertHeld(*requeue_owner_thread->get_lock());
+      if (!requeue_owner_thread->IsDyingOrDeadLocked()) {
+        new_requeue_owner = requeue_owner_thread->core_thread_;
+      }
     }
 
     // Now that all of our sanity checks are complete, it is time to do the
@@ -717,6 +749,13 @@ zx_status_t FutexContext::FutexRequeueInternal(
       // Exchange ThreadDispatcher's object lock for the global ThreadLock.
       Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
       new_owner_guard.Release(MutexPolicy::ThreadLockHeld);
+
+      // We have just released |requeue_owner_thread|'s lock (|new_owner_guard|).  At this point,
+      // |requeue_owner_thread| is free to begin exiting.  However, we are currently holding the
+      // global thread lock so even though it can begin to exit, it cannot complete the operation
+      // and, more importantly, cannot destroy its Thread (|new_requeue_owner|) until we release the
+      // thread lock.  It's critical that it cannot destroy its thread while we hold the global
+      // thread lock.  Otherwise, |new_requeue_owner| could become a dangling pointer.
 
       using Action = OwnedWaitQueue::Hook::Action;
       auto wake_hook = (owner_action == OwnerAction::RELEASE)
