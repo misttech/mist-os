@@ -6,40 +6,24 @@ import("//build/toolchain/zircon/user_basic_redirect.gni")
 import("//build/zircon/embedded_blob.gni")
 import("//build/zircon/hermetic_code_blob.gni")
 
-user_basic_redirect("write_to_stack.basic") {
-  visibility = [ "//src/zircon/tests/restricted-mode-shared:bin" ]
+user_basic_redirect("restricted-blob") {
+  visibility = [ "../*" ]
   testonly = true
 
-  public_deps = [ ":write_to_stack" ]
+  # The embedded blob is built in the user.basic environment too.  It doesn't
+  # really matter that it is, but it makes it easier to have it depend on the
+  # hermetic_code_blob() target that needs to be compiled in user.basic.
+  public_deps = [ ":write_to_stack.blob" ]
 }
 
-embedded_blob("write_to_stack") {
+hermetic_code_blob("write_to_stack") {
   visibility = [ ":*" ]
   testonly = true
-
-  sources = [ "$target_out_dir/write_to_stack.bin" ]
-  deps = [ ":write_to_stack.blob" ]
-  public_deps = [ ":write_to_stack.blob.public" ]
-}
-
-hermetic_code_blob("write_to_stack.blob") {
-  visibility = [ ":*" ]
-  testonly = true
-
-  output_name = "write_to_stack"
-  public_deps = [ "//zircon/system/public" ]
-
-  allow_rodata = true
 
   entrypoint = "write_to_stack"
-  sources = []
-  if (current_cpu == "x64") {
-    sources += [ "x64.S" ]
-  } else if (current_cpu == "arm64") {
-    sources += [ "arm64.S" ]
-  } else if (current_cpu == "riscv64") {
-    sources += [ "riscv64.S" ]
-  }
+
+  sources = [ "$current_cpu.S" ]
+  deps = [ "//zircon/kernel/lib/arch" ]
 
   # TODO(fxbug.dev/129545): LLD lets --no-pie trump the code generation
   # switches, but this needs to be compiled as PIC though linked differently.
@@ -47,4 +31,15 @@ hermetic_code_blob("write_to_stack.blob") {
       toolchain_variant.tags) {
     ldflags = [ "-Wl,-mllvm,-relocation-model=pic" ]
   }
+}
+
+# This is evaluated in the user.basic toolchain so that it can use
+# get_target_outputs.
+embedded_blob("write_to_stack.blob") {
+  visibility = [ ":*" ]
+  testonly = true
+
+  output_name = "write_to_stack"
+  deps = [ ":write_to_stack" ]
+  sources = get_target_outputs(deps[0])
 }

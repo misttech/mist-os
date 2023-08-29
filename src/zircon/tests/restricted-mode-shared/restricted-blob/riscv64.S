@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-.globl write_to_stack
-write_to_stack:
-  addi a0, zero, 0xaaaabbbbccccdddd
-  addi sp, sp, -16
+#include <lib/arch/asm.h>
+
+.function write_to_stack, global
+  li a0, 0xaaaabbbbccccdddd
+  add sp, sp, -16
   sd a0, 8(sp)
   ecall
+.end_function

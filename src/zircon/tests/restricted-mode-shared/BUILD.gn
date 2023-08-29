@@ -26,7 +26,7 @@ if (!is_asan) {
     }
 
     deps = [
-      "restricted-blob:write_to_stack.basic",
+      "restricted-blob",
       "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
       "//sdk/lib/component/incoming/cpp",
       "//zircon/system/ulib/zxtest",
