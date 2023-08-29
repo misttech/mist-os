@@ -108,7 +108,7 @@ mod test {
     use crate::{
         common::{
             cmd::{BootParams, Command},
-            IS_USERSPACE_VAR, LOCKED_VAR, MAX_DOWNLOAD_SIZE_VAR, REVISION_VAR,
+            vars::{IS_USERSPACE_VAR, LOCKED_VAR, MAX_DOWNLOAD_SIZE_VAR, REVISION_VAR},
         },
         test::{setup, TestResolver},
     };

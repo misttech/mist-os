@@ -37,7 +37,7 @@ pub async fn unlock<W: Write, F: FileResolver + Sync>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{common::LOCKED_VAR, file_resolver::resolvers::EmptyResolver, test::setup};
+    use crate::{common::vars::LOCKED_VAR, file_resolver::resolvers::EmptyResolver, test::setup};
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_unlocked_device_throws_err() -> Result<()> {

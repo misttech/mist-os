@@ -116,7 +116,7 @@ pub async fn bootloader_impl<W: Write>(
 mod test {
     use super::*;
     use ffx_bootloader_args::LockCommand;
-    use ffx_fastboot::{common::LOCKED_VAR, test::setup};
+    use ffx_fastboot::{common::vars::LOCKED_VAR, test::setup};
     use tempfile::NamedTempFile;
 
     #[fuchsia_async::run_singlethreaded(test)]

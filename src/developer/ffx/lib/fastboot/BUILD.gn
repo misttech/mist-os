@@ -61,6 +61,7 @@ if (is_host) {
       "src/common/crypto.rs",
       "src/common/find.rs",
       "src/common/mod.rs",
+      "src/common/vars.rs",
       "src/file_resolver/gcs.rs",
       "src/file_resolver/mod.rs",
       "src/file_resolver/resolvers.rs",

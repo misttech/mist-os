@@ -151,7 +151,7 @@ impl Boot for FlashManifest {
 mod test {
     use super::*;
     use crate::{
-        common::{IS_USERSPACE_VAR, LOCKED_VAR, MAX_DOWNLOAD_SIZE_VAR},
+        common::vars::{IS_USERSPACE_VAR, LOCKED_VAR, MAX_DOWNLOAD_SIZE_VAR},
         test::{setup, TestResolver},
     };
     use regex::Regex;

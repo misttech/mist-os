@@ -159,7 +159,7 @@ impl Boot for FlashManifest {
 mod test {
     use super::*;
     use crate::{
-        common::{IS_USERSPACE_VAR, MAX_DOWNLOAD_SIZE_VAR, REVISION_VAR},
+        common::vars::{IS_USERSPACE_VAR, MAX_DOWNLOAD_SIZE_VAR, REVISION_VAR},
         test::{setup, TestResolver},
     };
     use serde_json::{from_str, json};

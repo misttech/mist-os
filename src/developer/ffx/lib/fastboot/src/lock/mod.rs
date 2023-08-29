@@ -33,7 +33,7 @@ pub async fn lock<W: Write>(writer: &mut W, fastboot_proxy: &FastbootProxy) -> R
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{common::LOCKED_VAR, test::setup};
+    use crate::{common::vars::LOCKED_VAR, test::setup};
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_locked_device_throws_err() -> Result<()> {

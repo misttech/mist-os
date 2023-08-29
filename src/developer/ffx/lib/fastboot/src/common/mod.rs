@@ -4,6 +4,7 @@
 
 use crate::{
     common::cmd::{ManifestParams, OemFile},
+    common::vars::{IS_USERSPACE_VAR, LOCKED_VAR, MAX_DOWNLOAD_SIZE_VAR, REVISION_VAR},
     file_resolver::FileResolver,
     manifest::{from_in_tree, from_local_product_bundle, from_path, from_sdk},
 };
@@ -33,6 +34,7 @@ pub const MISSING_CREDENTIALS: &str =
 pub mod cmd;
 pub mod crypto;
 pub mod find;
+pub mod vars;
 
 pub trait Partition {
     fn name(&self) -> &str;
@@ -98,11 +100,6 @@ pub trait Boot {
 pub const MISSING_PRODUCT: &str = "Manifest does not contain product";
 
 const LARGE_FILE: &str = "large file, please wait... ";
-pub const REVISION_VAR: &str = "hw-revision";
-pub const IS_USERSPACE_VAR: &str = "is-userspace";
-pub const MAX_DOWNLOAD_SIZE_VAR: &str = "max-download-size";
-
-pub const LOCKED_VAR: &str = "vx-locked";
 const LOCK_COMMAND: &str = "vx-lock";
 
 pub const UNLOCK_ERR: &str = "The product requires the target to be unlocked. \
