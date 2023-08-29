@@ -70,6 +70,7 @@ group("minimal") {
     "//src/intl:tests",
     "//src/lib:tests",
     "//src/power:tests",
+    "//src/zircon:tests",
     "//zircon/system/ulib:tests",
     "//zircon/system/utest:tests",
   ]
