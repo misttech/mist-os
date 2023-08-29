@@ -195,6 +195,8 @@ TEST_F(GpioTest, ValidateGpioNameGeneration) {
 }
 
 TEST_F(GpioTest, Init) {
+  namespace fhgpio = fuchsia_hardware_gpio::wire;
+
   constexpr gpio_pin_t kGpioPins[] = {
       DECL_GPIO_PIN(1),
       DECL_GPIO_PIN(2),
@@ -209,84 +211,89 @@ TEST_F(GpioTest, Init) {
 
   fidl::Arena arena;
 
-  fuchsia_hardware_gpio::wire::InitMetadata metadata;
-  metadata.steps = fidl::VectorView<fuchsia_hardware_gpio::wire::InitStep>(arena, 10);
+  fhgpio::InitMetadata metadata;
+  metadata.steps = fidl::VectorView<fhgpio::InitStep>(arena, 18);
 
   metadata.steps[0].index = 1;
-  metadata.steps[0].options = fuchsia_hardware_gpio::wire::InitOptions::Builder(arena)
-                                  .input_flags(fuchsia_hardware_gpio::GpioFlags::kPullDown)
-                                  .output_value(1)
-                                  .drive_strength_ua(4000)
-                                  .Build();
+  metadata.steps[0].call = fhgpio::InitCall::WithInputFlags(fhgpio::GpioFlags::kPullDown);
+
+  metadata.steps[1].index = 1;
+  metadata.steps[1].call = fhgpio::InitCall::WithOutputValue(1);
+
+  metadata.steps[2].index = 1;
+  metadata.steps[2].call = fhgpio::InitCall::WithDriveStrengthUa(arena, 4000);
+
   gpio.ExpectConfigIn(ZX_OK, 1, GPIO_PULL_DOWN)
       .ExpectConfigOut(ZX_OK, 1, 1)
       .ExpectSetDriveStrength(ZX_OK, 1, 4000, 4000);
 
-  metadata.steps[1].index = 2;
-  metadata.steps[1].options = fuchsia_hardware_gpio::wire::InitOptions::Builder(arena)
-                                  .input_flags(fuchsia_hardware_gpio::GpioFlags::kNoPull)
-                                  .alt_function(5)
-                                  .drive_strength_ua(2000)
-                                  .Build();
+  metadata.steps[3].index = 2;
+  metadata.steps[3].call = fhgpio::InitCall::WithInputFlags(fhgpio::GpioFlags::kNoPull);
+
+  metadata.steps[4].index = 2;
+  metadata.steps[4].call = fhgpio::InitCall::WithAltFunction(arena, 5);
+
+  metadata.steps[5].index = 2;
+  metadata.steps[5].call = fhgpio::InitCall::WithDriveStrengthUa(arena, 2000);
+
   gpio.ExpectConfigIn(ZX_OK, 2, GPIO_NO_PULL)
       .ExpectSetAltFunction(ZX_OK, 2, 5)
       .ExpectSetDriveStrength(ZX_OK, 2, 2000, 2000);
 
-  metadata.steps[2].index = 3;
-  metadata.steps[2].options =
-      fuchsia_hardware_gpio::wire::InitOptions::Builder(arena).output_value(0).Build();
+  metadata.steps[6].index = 3;
+  metadata.steps[6].call = fhgpio::InitCall::WithOutputValue(0);
   gpio.ExpectConfigOut(ZX_OK, 3, 0);
 
-  metadata.steps[3].index = 3;
-  metadata.steps[3].options =
-      fuchsia_hardware_gpio::wire::InitOptions::Builder(arena).output_value(1).Build();
+  metadata.steps[7].index = 3;
+  metadata.steps[7].call = fhgpio::InitCall::WithOutputValue(1);
   gpio.ExpectConfigOut(ZX_OK, 3, 1);
 
-  metadata.steps[4].index = 3;
-  metadata.steps[4].options = fuchsia_hardware_gpio::wire::InitOptions::Builder(arena)
-                                  .input_flags(fuchsia_hardware_gpio::GpioFlags::kPullUp)
-                                  .Build();
+  metadata.steps[8].index = 3;
+  metadata.steps[8].call = fhgpio::InitCall::WithInputFlags(fhgpio::GpioFlags::kPullUp);
   gpio.ExpectConfigIn(ZX_OK, 3, GPIO_PULL_UP);
 
-  metadata.steps[5].index = 2;
-  metadata.steps[5].options = fuchsia_hardware_gpio::wire::InitOptions::Builder(arena)
-                                  .alt_function(0)
-                                  .drive_strength_ua(1000)
-                                  .Build();
+  metadata.steps[9].index = 2;
+  metadata.steps[9].call = fhgpio::InitCall::WithAltFunction(arena, 0);
+
+  metadata.steps[10].index = 2;
+  metadata.steps[10].call = fhgpio::InitCall::WithDriveStrengthUa(arena, 1000);
+
   gpio.ExpectSetAltFunction(ZX_OK, 2, 0).ExpectSetDriveStrength(ZX_OK, 2, 1000, 1000);
 
-  metadata.steps[6].index = 2;
-  metadata.steps[6].options =
-      fuchsia_hardware_gpio::wire::InitOptions::Builder(arena).output_value(1).Build();
+  metadata.steps[11].index = 2;
+  metadata.steps[11].call = fhgpio::InitCall::WithOutputValue(1);
   gpio.ExpectConfigOut(ZX_OK, 2, 1);
 
-  metadata.steps[7].index = 1;
-  metadata.steps[7].options = fuchsia_hardware_gpio::wire::InitOptions::Builder(arena)
-                                  .input_flags(fuchsia_hardware_gpio::GpioFlags::kPullUp)
-                                  .alt_function(0)
-                                  .drive_strength_ua(4000)
-                                  .Build();
+  metadata.steps[12].index = 1;
+  metadata.steps[12].call = fhgpio::InitCall::WithInputFlags(fhgpio::GpioFlags::kPullUp);
+
+  metadata.steps[13].index = 1;
+  metadata.steps[13].call = fhgpio::InitCall::WithAltFunction(arena, 0);
+
+  metadata.steps[14].index = 1;
+  metadata.steps[14].call = fhgpio::InitCall::WithDriveStrengthUa(arena, 4000);
+
   gpio.ExpectConfigIn(ZX_OK, 1, GPIO_PULL_UP)
       .ExpectSetAltFunction(ZX_OK, 1, 0)
       .ExpectSetDriveStrength(ZX_OK, 1, 4000, 4000);
 
-  metadata.steps[8].index = 1;
-  metadata.steps[8].options =
-      fuchsia_hardware_gpio::wire::InitOptions::Builder(arena).output_value(1).Build();
+  metadata.steps[15].index = 1;
+  metadata.steps[15].call = fhgpio::InitCall::WithOutputValue(1);
   gpio.ExpectConfigOut(ZX_OK, 1, 1);
 
-  metadata.steps[9].index = 3;
-  metadata.steps[9].options = fuchsia_hardware_gpio::wire::InitOptions::Builder(arena)
-                                  .alt_function(3)
-                                  .drive_strength_ua(2000)
-                                  .Build();
+  metadata.steps[16].index = 3;
+  metadata.steps[16].call = fhgpio::InitCall::WithAltFunction(arena, 3);
+
+  metadata.steps[17].index = 3;
+  metadata.steps[17].call = fhgpio::InitCall::WithDriveStrengthUa(arena, 2000);
+
   gpio.ExpectSetAltFunction(ZX_OK, 3, 3).ExpectSetDriveStrength(ZX_OK, 3, 2000, 2000);
 
   fit::result encoded = fidl::Persist(metadata);
   ASSERT_TRUE(encoded.is_ok(), "%s", encoded.error_value().FormatDescription().c_str());
 
   std::vector<uint8_t>& message = encoded.value();
-  fake_root->SetMetadata(DEVICE_METADATA_GPIO_INIT_STEPS, message.data(), message.size());
+  fake_root->SetMetadata(DEVICE_METADATA_GPIO_INIT, message.data(), message.size());
   fake_root->SetMetadata(DEVICE_METADATA_GPIO_PINS, kGpioPins, sizeof(kGpioPins));
 
   EXPECT_OK(GpioDevice::Create(nullptr, fake_root.get()));
@@ -300,6 +307,8 @@ TEST_F(GpioTest, Init) {
 }
 
 TEST_F(GpioTest, InitErrorHandling) {
+  namespace fhgpio = fuchsia_hardware_gpio::wire;
+
   constexpr gpio_pin_t kGpioPins[] = {
       DECL_GPIO_PIN(1),
       DECL_GPIO_PIN(2),
@@ -315,47 +324,53 @@ TEST_F(GpioTest, InitErrorHandling) {
   fidl::Arena arena;
 
   fuchsia_hardware_gpio::wire::InitMetadata metadata;
-  metadata.steps = fidl::VectorView<fuchsia_hardware_gpio::wire::InitStep>(arena, 4);
+  metadata.steps = fidl::VectorView<fuchsia_hardware_gpio::wire::InitStep>(arena, 9);
 
   metadata.steps[0].index = 4;
-  metadata.steps[0].options = fuchsia_hardware_gpio::wire::InitOptions::Builder(arena)
-                                  .input_flags(fuchsia_hardware_gpio::GpioFlags::kPullDown)
-                                  .output_value(1)
-                                  .drive_strength_ua(4000)
-                                  .Build();
+  metadata.steps[0].call = fhgpio::InitCall::WithInputFlags(fhgpio::GpioFlags::kPullDown);
+
+  metadata.steps[1].index = 4;
+  metadata.steps[1].call = fhgpio::InitCall::WithOutputValue(1);
+
+  metadata.steps[2].index = 4;
+  metadata.steps[2].call = fhgpio::InitCall::WithDriveStrengthUa(arena, 4000);
+
   gpio.ExpectConfigIn(ZX_OK, 4, GPIO_PULL_DOWN)
       .ExpectConfigOut(ZX_OK, 4, 1)
       .ExpectSetDriveStrength(ZX_OK, 4, 4000, 4000);
 
-  metadata.steps[1].index = 2;
-  metadata.steps[1].options = fuchsia_hardware_gpio::wire::InitOptions::Builder(arena)
-                                  .input_flags(fuchsia_hardware_gpio::GpioFlags::kNoPull)
-                                  .alt_function(5)
-                                  .drive_strength_ua(2000)
-                                  .Build();
+  metadata.steps[3].index = 2;
+  metadata.steps[3].call = fhgpio::InitCall::WithInputFlags(fhgpio::GpioFlags::kNoPull);
+
+  metadata.steps[4].index = 2;
+  metadata.steps[4].call = fhgpio::InitCall::WithAltFunction(arena, 5);
+
+  metadata.steps[5].index = 2;
+  metadata.steps[5].call = fhgpio::InitCall::WithDriveStrengthUa(arena, 2000);
+
   gpio.ExpectConfigIn(ZX_OK, 2, GPIO_NO_PULL)
       .ExpectSetAltFunction(ZX_OK, 2, 5)
       .ExpectSetDriveStrength(ZX_OK, 2, 2000, 2000);
 
-  metadata.steps[2].index = 3;
-  metadata.steps[2].options =
-      fuchsia_hardware_gpio::wire::InitOptions::Builder(arena).output_value(0).Build();
+  metadata.steps[6].index = 3;
+  metadata.steps[6].call = fhgpio::InitCall::WithOutputValue(0);
   gpio.ExpectConfigOut(ZX_ERR_NOT_FOUND, 3, 0);
 
   // Processing should continue after the above error.
 
-  metadata.steps[3].index = 2;
-  metadata.steps[3].options = fuchsia_hardware_gpio::wire::InitOptions::Builder(arena)
-                                  .alt_function(0)
-                                  .drive_strength_ua(1000)
-                                  .Build();
+  metadata.steps[7].index = 2;
+  metadata.steps[7].call = fhgpio::InitCall::WithAltFunction(arena, 0);
+
+  metadata.steps[8].index = 2;
+  metadata.steps[8].call = fhgpio::InitCall::WithDriveStrengthUa(arena, 1000);
+
   gpio.ExpectSetAltFunction(ZX_OK, 2, 0).ExpectSetDriveStrength(ZX_OK, 2, 1000, 1000);
 
   fit::result encoded = fidl::Persist(metadata);
   ASSERT_TRUE(encoded.is_ok(), "%s", encoded.error_value().FormatDescription().c_str());
 
   std::vector<uint8_t>& message = encoded.value();
-  fake_root->SetMetadata(DEVICE_METADATA_GPIO_INIT_STEPS, message.data(), message.size());
+  fake_root->SetMetadata(DEVICE_METADATA_GPIO_INIT, message.data(), message.size());
   fake_root->SetMetadata(DEVICE_METADATA_GPIO_PINS, kGpioPins, sizeof(kGpioPins));
 
   EXPECT_OK(GpioDevice::Create(nullptr, fake_root.get()));
