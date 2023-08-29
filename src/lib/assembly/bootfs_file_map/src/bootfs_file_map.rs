@@ -11,7 +11,7 @@ use fuchsia_pkg::BlobInfo;
 use serde::Serialize;
 
 /// A paired source and optional merkle for a bootfs file.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, PartialEq)]
 pub struct SourceMerklePair {
     pub source: Utf8PathBuf,
     pub merkle: Option<Hash>,

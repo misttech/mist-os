@@ -5,6 +5,7 @@
 use anyhow::{Context, Result};
 use assembly_util::NamedMap;
 use camino::Utf8PathBuf;
+use fuchsia_merkle::Hash;
 use fuchsia_pkg::PackageManifest;
 use serde::Serialize;
 
@@ -32,6 +33,14 @@ impl PackageEntry {
     }
 }
 
+impl PartialEq for PackageEntry {
+    fn eq(&self, other: &Self) -> bool {
+        let self_blobs: Vec<Hash> = self.manifest.blobs().iter().map(|b| b.merkle).collect();
+        let other_blobs: Vec<Hash> = other.manifest.blobs().iter().map(|b| b.merkle).collect();
+        self_blobs == other_blobs && self.name() == other.name()
+    }
+}
+
 /// A named set of packages with their manifests parsed into memory, keyed by package name.
 #[derive(Debug, Serialize)]
 pub struct PackageSet {
@@ -49,6 +58,12 @@ impl PackageSet {
     /// PackageSet
     pub fn add_package(&mut self, entry: PackageEntry) -> Result<()> {
         self.map.try_insert_unique(entry.name().to_owned(), entry)
+    }
+
+    /// Add the package described by the ProductPackageSetEntry to the
+    /// PackageSet, and ignore exact duplicates.
+    pub fn add_package_ignore_duplicates(&mut self, entry: PackageEntry) -> Result<()> {
+        self.map.try_insert_unique_ignore_duplicates(entry.name().to_owned(), entry)
     }
 
     /// Parse the given path as a PackageManifest, and add it to the PackageSet.

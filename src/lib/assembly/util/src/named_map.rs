@@ -19,26 +19,56 @@ pub struct NamedMap<T> {
 
 impl<T> NamedMap<T>
 where
-    T: std::fmt::Debug,
+    T: std::fmt::Debug + std::cmp::PartialEq,
 {
     /// Create a new, named, map.
     pub fn new(name: &str) -> Self {
         Self { name: name.to_owned(), entries: BTreeMap::new() }
     }
 
-    /// Insert `value` into the map ensuring that `name` is unique.
-    pub fn try_insert_unique(&mut self, name: String, value: T) -> Result<()> {
+    /// Insert `value` into the map returning an error if the key exists and the value is
+    /// different.
+    ///
+    /// If the key is unique, return Ok(())
+    /// If the key is a duplicate, but the value is the same, return Err((true, anyhow::Error))
+    /// If the key is a duplicate, and the value is different, return Err((false, anyhow::Error))
+    fn try_insert_check_for_duplicate(
+        &mut self,
+        name: String,
+        value: T,
+    ) -> Result<(), (bool, anyhow::Error)> {
         let result = self.entries.try_insert_unique(MapEntry(name, value)).map_err(|e| {
-            format!(
-                "key: '{}'\n  existing value: {:#?}\n  new value: {:#?}",
-                e.key(),
-                e.previous_value(),
-                e.new_value()
+            // Indicate whether the error is due to a duplicate by adding a boolean to the return.
+            let duplicate = e.previous_value() == e.new_value();
+            (
+                duplicate,
+                format!(
+                    "key: '{}'\n  existing value: {:#?}\n  new value: {:#?}",
+                    e.key(),
+                    e.previous_value(),
+                    e.new_value()
+                ),
             )
         });
         // The error is mapped a second time to separate the borrow of entries
         // from the borrow of name.
-        result.map_err(|e| anyhow!("duplicate entry in {}:\n  {}", self.name, e))
+        result.map_err(|(d, e)| (d, anyhow!("duplicate entry in {}:\n  {}", self.name, e)))
+    }
+
+    /// Insert `value` into the map ensuring that `name` is unique.
+    pub fn try_insert_unique(&mut self, name: String, value: T) -> Result<()> {
+        // Ignore the returned 'duplicate' boolean. If there is an error, return it.
+        self.try_insert_check_for_duplicate(name, value).map_err(|(_, e)| e)
+    }
+
+    /// Insert `value` into the map ensuring that if `name` is found that the values are identical.
+    pub fn try_insert_unique_ignore_duplicates(&mut self, name: String, value: T) -> Result<()> {
+        match self.try_insert_check_for_duplicate(name, value) {
+            // If the key is unique or the value is a duplicate, return Ok(())
+            Ok(_) | Err((true, _)) => Ok(()),
+            // Otherwise, forward the error.
+            Err((false, e)) => Err(e),
+        }
     }
 }
 
@@ -87,5 +117,27 @@ impl<T, const N: usize> From<[(String, T); N]> for NamedMap<T> {
 impl<T> From<NamedMap<T>> for BTreeMap<String, T> {
     fn from(map: NamedMap<T>) -> Self {
         map.entries
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_try_insert_unique() {
+        let mut map = NamedMap::new("test");
+        map.try_insert_unique("a".into(), "alpha").unwrap();
+        map.try_insert_unique("b".into(), "beta").unwrap();
+        assert!(map.try_insert_unique("a".into(), "alpha").is_err());
+    }
+
+    #[test]
+    fn test_try_insert_unique_ignore_duplicates() {
+        let mut map = NamedMap::new("test");
+        map.try_insert_unique("a".into(), "alpha").unwrap();
+        map.try_insert_unique("b".into(), "beta").unwrap();
+        map.try_insert_unique_ignore_duplicates("a".into(), "alpha").unwrap();
+        assert!(map.try_insert_unique_ignore_duplicates("a".into(), "beta").is_err());
     }
 }
