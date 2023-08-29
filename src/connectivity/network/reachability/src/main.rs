@@ -29,7 +29,9 @@ pub fn main() {
     handler.publish_service(fs.dir("svc"));
 
     let inspector = component::inspector();
-    let () = inspect_runtime::serve(&inspector, &mut fs).expect("failed to serve inspect");
+    let _inspect_server_task =
+        inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default())
+            .expect("publish Inspect task");
 
     let fs = fs.take_and_serve_directory_handle().expect("failed to serve ServiceFS directory");
 

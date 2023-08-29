@@ -97,6 +97,10 @@ async fn main() -> Result<(), Error> {
     let Args { starting_value } = argh::from_env();
     let mut fs = ServiceFs::new();
     let inspector = fuchsia_inspect::component::inspector();
+    let _inspect_server_task =
+        inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default())
+            .context("publish Inspect task")?;
+
     let data = {
         let data = Arc::new(Mutex::new(CounterData { value: starting_value }));
         let data_clone = data.clone();
@@ -110,7 +114,6 @@ async fn main() -> Result<(), Error> {
         });
         data_clone
     };
-    let () = inspect_runtime::serve(inspector, &mut fs).context("error serving inspect")?;
 
     let _: &mut ServiceFsDir<'_, _> = fs.dir("svc").add_fidl_service(|s: CounterRequestStream| s);
     let _: &mut ServiceFs<_> =

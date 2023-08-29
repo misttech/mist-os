@@ -1478,9 +1478,10 @@ async fn inspect_ns3_sockets(name: &str) {
         .await
         .expect("create TCP socket");
 
-    let data = get_inspect_data(&realm, "netstack", "root", "fuchsia.inspect.Tree")
-        .await
-        .expect("inspect data should be present");
+    let data =
+        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
+            .await
+            .expect("inspect data should be present");
 
     // Debug print the tree to make debugging easier in case of failures.
     println!("Got inspect data: {:#?}", data);
@@ -1507,9 +1508,10 @@ async fn inspect_ns3_routes(name: &str) {
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("failed to connect to fuchsia.net.interfaces/State");
 
-    let data = get_inspect_data(&realm, "netstack", "root", "fuchsia.inspect.Tree")
-        .await
-        .expect("inspect data should be present");
+    let data =
+        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
+            .await
+            .expect("inspect data should be present");
 
     // Debug print the tree to make debugging easier in case of failures.
     println!("Got inspect data: {:#?}", data);
@@ -1566,9 +1568,10 @@ async fn inspect_ns3_devices(name: &str) {
         .await
         .expect("configure address");
 
-    let data = get_inspect_data(&realm, "netstack", "root", "fuchsia.inspect.Tree")
-        .await
-        .expect("inspect data should be present");
+    let data =
+        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
+            .await
+            .expect("inspect data should be present");
 
     // Debug print the tree to make debugging easier in case of failures.
     println!("Got inspect data: {:#?}", data);

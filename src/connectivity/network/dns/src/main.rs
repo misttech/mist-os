@@ -1164,7 +1164,9 @@ pub async fn main() -> Result<(), Error> {
     let inspector = fuchsia_inspect::component::inspector();
     let _state_inspect_node = add_config_state_inspect(inspector.root(), config_state.clone());
     let _query_stats_inspect_node = add_query_stats_inspect(inspector.root(), stats.clone());
-    let () = inspect_runtime::serve(inspector, &mut fs)?;
+    let _inspect_server_task =
+        inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default())
+            .context("publish Inspect task")?;
 
     let routes = fuchsia_component::client::connect_to_protocol::<fnet_routes::StateMarker>()
         .context("failed to connect to fuchsia.net.routes/State")?;

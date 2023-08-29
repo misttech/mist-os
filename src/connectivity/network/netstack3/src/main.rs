@@ -55,7 +55,10 @@ pub fn main() {
     let seed = NetstackSeed::default();
 
     let inspector = fuchsia_inspect::component::inspector();
-    inspect_runtime::serve(inspector, &mut fs).expect("failed to serve inspect");
+    let _inspect_server_task =
+        inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default())
+            .expect("publish Inspect task");
+
     let _: &mut ServiceFs<_> = fs.take_and_serve_directory_handle().expect("directory handle");
 
     executor.run(seed.serve(fs, inspector))
