@@ -30,7 +30,9 @@ const char kCategoriesArg[] = "--categories=cpu:fixed:cycle_counter,cpu:tally";
 const char kCategoryName[] = "cpu:perf";
 const char kTestEventName[] = "cycle_counter";
 #else
-#error "unsupported architecture"
+const char kCategoriesArg[] = "";
+const char kCategoryName[] = "";
+const char kTestEventName[] = "";
 #endif
 
 TEST(CpuperfProvider, IntegrationTest) {
