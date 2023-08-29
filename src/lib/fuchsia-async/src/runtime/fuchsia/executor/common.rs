@@ -21,6 +21,7 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     fmt,
+    future::Future,
     panic::Location,
     sync::atomic::{AtomicBool, AtomicI64, AtomicU16, AtomicU64, AtomicUsize, Ordering},
     sync::{Arc, Weak},
@@ -610,6 +611,25 @@ impl EHandle {
         with_local_timer_heap(|timer_heap| {
             timer_heap.add_timer(time, handle);
         });
+    }
+
+    /// Spawn a new task to be run on this executor.
+    ///
+    /// Tasks spawned using this method must be thread-safe (implement the `Send` trait), as they
+    /// may be run on either a singlethreaded or multithreaded executor.
+    #[cfg_attr(trace_level_logging, track_caller)]
+    pub fn spawn_detached(&self, future: impl Future<Output = ()> + Send + 'static) {
+        self.inner.spawn(FutureObj::new(Box::new(future)))
+    }
+
+    /// Spawn a new task to be run on this executor.
+    ///
+    /// This is similar to the `spawn_detached` method, but tasks spawned using this method do not
+    /// have to be threads-safe (implement the `Send` trait). In return, this method requires that
+    /// this executor is a LocalExecutor.
+    #[cfg_attr(trace_level_logging, track_caller)]
+    pub fn spawn_local_detached(&self, future: impl Future<Output = ()> + 'static) {
+        self.inner.spawn_local(LocalFutureObj::new(Box::new(future)))
     }
 }
 

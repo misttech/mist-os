@@ -376,7 +376,7 @@ fn with_data<R>(f: impl Fn(&mut UntilStalledData) -> R) -> R {
 
 #[cfg(test)]
 mod tests {
-    use super::{super::spawn, *};
+    use super::*;
     use crate::{handle::on_signals::OnSignals, Interval, Timer};
     use assert_matches::assert_matches;
     use fuchsia_zircon::{self as zx, AsHandleRef, DurationNum};
@@ -387,6 +387,10 @@ mod tests {
         sync::atomic::{AtomicBool, Ordering},
         task::{Context, Poll, Waker},
     };
+
+    fn spawn(future: impl Future<Output = ()> + Send + 'static) {
+        crate::EHandle::local().spawn_detached(future);
+    }
 
     // Runs a future that suspends and returns after being resumed.
     #[test]

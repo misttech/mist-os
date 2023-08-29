@@ -18,7 +18,6 @@ use fidl::{
     HandleBased,
 };
 use fidl_fuchsia_io as fio;
-use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use std::sync::Arc;
 use vfs::{attributes, directory, execution_scope, file, path, ToObjectRequest};
@@ -46,7 +45,7 @@ pub fn serve_file_at(
     //                 `current_task`. Do we need to retain these credentials?
     let system_task = kernel.kthreads.weak_system_task();
     let starnix_file = StarnixNodeConnection::new(system_task, file);
-    fasync::Task::spawn_on(&kernel.kthreads.ehandle, async move {
+    kernel.kthreads.ehandle.spawn_detached(async move {
         let scope = execution_scope::ExecutionScope::new();
         directory::entry::DirectoryEntry::open(
             starnix_file,
@@ -56,8 +55,7 @@ pub fn serve_file_at(
             server_end,
         );
         scope.wait().await;
-    })
-    .detach();
+    });
     Ok(())
 }
 
@@ -640,6 +638,7 @@ impl directory::entry::DirectoryEntry for StarnixNodeConnection {
 mod tests {
     use super::*;
     use crate::{fs::tmpfs::TmpFs, testing::*};
+    use fuchsia_async as fasync;
     use std::collections::HashSet;
     use syncio::Zxio;
 

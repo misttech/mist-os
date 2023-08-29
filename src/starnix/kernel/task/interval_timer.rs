@@ -95,7 +95,7 @@ impl IntervalTimer {
 
         // TODO(fxb/123084): check on clock_id to see if the clock supports creating a timer.
 
-        fasync::Task::spawn_on(executor, async move {
+        executor.spawn_detached(async move {
             loop {
                 loop {
                     // We may have to issue multiple sleeps if the target time in the timer is
@@ -138,8 +138,7 @@ impl IntervalTimer {
                     break;
                 }
             }
-        })
-        .detach();
+        });
     }
 
     pub fn disarm(&self) {

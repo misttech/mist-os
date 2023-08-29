@@ -360,11 +360,10 @@ impl FxVolume {
     /// Spawns a short term task for the volume that includes a guard that will prevent termination.
     pub fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) {
         let guard = self.scope().active_guard();
-        fasync::Task::spawn_on(&self.executor, async move {
+        self.executor.spawn_detached(async move {
             task.await;
             std::mem::drop(guard);
-        })
-        .detach();
+        });
     }
 }
 

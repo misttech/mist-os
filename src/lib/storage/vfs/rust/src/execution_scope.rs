@@ -152,11 +152,10 @@ impl ExecutionScope {
         // down the executor before the task has been dropped which would deny it the opportunity to
         // correctly spawn a task in its drop function.
         self.executor.inner.lock().unwrap().active_count += 1;
-        fuchsia_async::Task::spawn(TaskRunner {
+        fuchsia_async::EHandle::local().spawn_detached(TaskRunner {
             task,
             task_state: TaskState { executor: self.executor.clone(), task_id: usize::MAX },
-        })
-        .detach();
+        });
     }
 
     pub fn token_registry(&self) -> &TokenRegistry {

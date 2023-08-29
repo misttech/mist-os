@@ -24,7 +24,7 @@ pub struct KernelThreads {
 
     /// A handle to the async executor running in `starnix_process`.
     ///
-    /// You can spawn tasks on this executor using `fasync::Task::spawn_on`.
+    /// You can spawn tasks on this executor using `fasync::EHandle::spawn_detached`.
     /// However, those task must not block. If you need to block, you can dispatch to
     /// a worker thread using `thread_pool`.
     pub ehandle: fasync::EHandle,
