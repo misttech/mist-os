@@ -108,9 +108,7 @@ impl PublishOptions {
 /// Spawns a server handling `fuchsia.inspect.Tree` requests and a handle
 /// to the `fuchsia.inspect.Tree` is published using `fuchsia.inspect.InspectSink`.
 ///
-/// The returned `fuchsia_async::Task` must be polled to handle incoming Tree
-/// requests. Whenever the client wishes to stop publishing Inspect, the Task may
-/// be dropped.
+/// Whenever the client wishes to stop publishing Inspect, the Task may be dropped.
 ///
 /// `None` will be returned on FIDL failures. This includes:
 /// * Failing to convert a FIDL endpoint for `fuchsia.inspect.Tree`'s `TreeMarker` into a stream
