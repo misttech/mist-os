@@ -4,7 +4,7 @@
 
 use anyhow::{Context, Result};
 use assembly_config_schema::FileEntry;
-use assembly_platform_configuration::DomainConfig;
+use assembly_platform_configuration::{DomainConfig, FileOrContents};
 use camino::{Utf8Path, Utf8PathBuf};
 use fidl::persist;
 use fuchsia_pkg::{PackageBuilder, PackageManifest, RelativeTo};
@@ -61,11 +61,20 @@ impl DomainConfigPackage {
             }
 
             // Add the necessary config files to the directory.
-            for (_, FileEntry { source, destination }) in directory_config.entries {
+            for (destination, entry) in directory_config.entries {
                 let destination = Utf8PathBuf::from(&directory).join(destination);
-                builder
-                    .add_file_as_blob(destination, &source)
-                    .with_context(|| format!("adding config {source}"))?;
+                match entry {
+                    FileOrContents::File(FileEntry { source, .. }) => {
+                        builder
+                            .add_file_as_blob(destination, &source)
+                            .with_context(|| format!("adding config {source}"))?;
+                    }
+                    FileOrContents::Contents(contents) => {
+                        builder
+                            .add_contents_as_blob(&destination, &contents, &outdir)
+                            .with_context(|| format!("adding config to {destination}"))?;
+                    }
+                }
             }
         }
 
@@ -118,11 +127,14 @@ mod tests {
         // Prepare the domain config input.
         let config_source = outdir.join("config_source.json");
         std::fs::write(&config_source, "bleep bloop").unwrap();
-        let mut entries = NamedMap::<FileEntry>::new("config files");
+        let mut entries = NamedMap::<FileOrContents>::new("config files");
         entries
             .try_insert_unique(
                 "config.json".to_string(),
-                FileEntry { source: config_source.clone(), destination: "config.json".into() },
+                FileOrContents::File(FileEntry {
+                    source: config_source.clone(),
+                    destination: "config.json".into(),
+                }),
             )
             .unwrap();
         let config = DomainConfig {
@@ -191,11 +203,14 @@ mod tests {
         // Prepare the domain config input.
         let config_source = outdir.join("config_source.json");
         std::fs::write(&config_source, "bleep bloop").unwrap();
-        let mut entries = NamedMap::<FileEntry>::new("config files");
+        let mut entries = NamedMap::<FileOrContents>::new("config files");
         entries
             .try_insert_unique(
                 "config.json".to_string(),
-                FileEntry { source: config_source.clone(), destination: "config.json".into() },
+                FileOrContents::File(FileEntry {
+                    source: config_source.clone(),
+                    destination: "config.json".into(),
+                }),
             )
             .unwrap();
         let config = DomainConfig {
@@ -286,7 +301,7 @@ mod tests {
         let outdir = Utf8Path::from_path(tmp.path()).unwrap();
 
         // Prepare the domain config input.
-        let entries = NamedMap::<FileEntry>::new("config files");
+        let entries = NamedMap::<FileOrContents>::new("config files");
         let config = DomainConfig {
             name: "my-package".into(),
             directories: [("config-dir".into(), DomainConfigDirectory { entries })].into(),

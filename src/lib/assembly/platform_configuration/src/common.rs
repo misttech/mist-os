@@ -175,7 +175,15 @@ pub(crate) trait DomainConfigBuilder {
 
 /// The interface for specifying the config files to add to a domain config package directory.
 pub(crate) trait DomainConfigDirectoryBuilder {
+    /// Add a file to the directory.
     fn entry(&mut self, file_entry: FileEntry) -> Result<&mut dyn DomainConfigDirectoryBuilder>;
+
+    /// Add a file to the directory using the contents provided.
+    fn entry_from_contents(
+        &mut self,
+        destination: &str,
+        contents: &str,
+    ) -> Result<&mut dyn DomainConfigDirectoryBuilder>;
 }
 
 /// The interface for specifying the configuration to provide for a component.
@@ -346,8 +354,14 @@ pub struct DomainConfig {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
+pub enum FileOrContents {
+    File(FileEntry),
+    Contents(String),
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct DomainConfigDirectory {
-    pub entries: NamedMap<FileEntry>,
+    pub entries: NamedMap<FileOrContents>,
 }
 
 trait ICUMapExt<'a> {
@@ -431,7 +445,21 @@ impl DomainConfigBuilder for DomainConfig {
 impl DomainConfigDirectoryBuilder for DomainConfigDirectory {
     fn entry(&mut self, file_entry: FileEntry) -> Result<&mut dyn DomainConfigDirectoryBuilder> {
         self.entries
-            .try_insert_unique(file_entry.destination.clone(), file_entry)
+            .try_insert_unique(file_entry.destination.clone(), FileOrContents::File(file_entry))
+            .context("A config destination can only be set once for a domain config")?;
+        Ok(self)
+    }
+
+    fn entry_from_contents(
+        &mut self,
+        destination: &str,
+        contents: &str,
+    ) -> Result<&mut dyn DomainConfigDirectoryBuilder> {
+        self.entries
+            .try_insert_unique(
+                destination.to_string(),
+                FileOrContents::Contents(contents.to_string()),
+            )
             .context("A config destination can only be set once for a domain config")?;
         Ok(self)
     }
