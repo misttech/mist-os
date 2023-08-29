@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from api.proxy import log_pb2
+from api.log import log_pb2
 from api.stats import stats_pb2
 
 import upload_reproxy_logs
