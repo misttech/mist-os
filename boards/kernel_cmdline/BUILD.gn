@@ -157,14 +157,6 @@ kernel_cmdline("vim3") {
   ]
 }
 
-kernel_cmdline("chromebook-x64") {
-  deps = [ ":pmm-checker-from-board" ]
-  args = [
-    # Depthcharge will fill this in.
-    "zvb.boot-partition-uuid=%U",
-  ]
-}
-
 # Copy from vim3
 kernel_cmdline("av400") {
   deps = [ ":pmm-checker-from-board" ]
