@@ -920,6 +920,7 @@
             reboot_on_terminate: [
                 "/bootstrap/driver_index",
                 "/bootstrap/fshost",
+                "/bootstrap/pkg-cache",
                 "/core",
                 "/core/audio_core",
                 "/core/network/netstack",

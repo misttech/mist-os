@@ -130,6 +130,7 @@
             name: "pkg-cache",
             url: "fuchsia-pkg://fuchsia.com/pkg-cache#meta/pkg-cache.cm",
             environment: "#base-resolver-env",
+            on_terminate: "reboot",
         },
     ],
     collections: [
