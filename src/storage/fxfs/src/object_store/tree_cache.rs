@@ -5,7 +5,6 @@
 use {
     super::object_record::{ChildValue, ObjectKey, ObjectKeyData, ObjectValue},
     crate::lsm_tree::cache::{ObjectCache, ObjectCachePlaceholder, ObjectCacheResult},
-    async_trait::async_trait,
     linked_hash_map::{Entry, LinkedHashMap},
     std::{
         boxed::Box,
@@ -96,9 +95,8 @@ impl TreeCache {
     }
 }
 
-#[async_trait]
 impl ObjectCache<ObjectKey, ObjectValue> for TreeCache {
-    async fn lookup_or_reserve(&self, key: &ObjectKey) -> ObjectCacheResult<'_, ObjectValue> {
+    fn lookup_or_reserve(&self, key: &ObjectKey) -> ObjectCacheResult<'_, ObjectValue> {
         if !filter(key) {
             return ObjectCacheResult::NoCache;
         }
@@ -145,13 +143,13 @@ mod tests {
         let key = ObjectKey::child(1, "apple");
         let value = ObjectValue::child(1, ObjectDescriptor::File);
 
-        let placeholder = match cache.lookup_or_reserve(&key).await {
+        let placeholder = match cache.lookup_or_reserve(&key) {
             ObjectCacheResult::Placeholder(placeholder) => placeholder,
             _ => panic!("Expected cache miss with placeholder returned."),
         };
         placeholder.complete(Some(&value));
 
-        let result = match cache.lookup_or_reserve(&key).await {
+        let result = match cache.lookup_or_reserve(&key) {
             ObjectCacheResult::Value(value) => value,
             _ => panic!("Expected to find item."),
         };
@@ -159,7 +157,7 @@ mod tests {
 
         cache.invalidate(&key);
 
-        match cache.lookup_or_reserve(&key).await {
+        match cache.lookup_or_reserve(&key) {
             ObjectCacheResult::Placeholder(placeholder) => placeholder.complete(None),
             _ => panic!("Expected cache miss with placeholder returned."),
         };
@@ -170,7 +168,7 @@ mod tests {
         let cache = TreeCache::new();
         let key = ObjectKey::extent(1, 1, 1..2);
 
-        assert!(matches!(cache.lookup_or_reserve(&key).await, ObjectCacheResult::NoCache));
+        assert!(matches!(cache.lookup_or_reserve(&key), ObjectCacheResult::NoCache));
     }
 
     // Two clients looking for the same key don't interfere with each other. Prevents priority
@@ -182,19 +180,19 @@ mod tests {
         let value1 = ObjectValue::child(1, ObjectDescriptor::File);
         let value2 = ObjectValue::child(2, ObjectDescriptor::File);
 
-        let placeholder1 = match cache.lookup_or_reserve(&key).await {
+        let placeholder1 = match cache.lookup_or_reserve(&key) {
             ObjectCacheResult::Placeholder(placeholder) => placeholder,
             _ => panic!("Expected cache miss with placeholder returned."),
         };
 
         // Another search should not get a placeholder, as one is already held.
-        assert!(matches!(cache.lookup_or_reserve(&key).await, ObjectCacheResult::NoCache));
+        assert!(matches!(cache.lookup_or_reserve(&key), ObjectCacheResult::NoCache));
 
         // Invalidate the current placeholder.
         cache.invalidate(&key);
 
         // Get a new placeholder
-        let placeholder2 = match cache.lookup_or_reserve(&key).await {
+        let placeholder2 = match cache.lookup_or_reserve(&key) {
             ObjectCacheResult::Placeholder(placeholder) => placeholder,
             _ => panic!("Expected cache miss with placeholder returned."),
         };
@@ -204,7 +202,7 @@ mod tests {
         placeholder1.complete(Some(&value1));
 
         // Result should be from the second placeholder, as the first was invalidated.
-        let result = match cache.lookup_or_reserve(&key).await {
+        let result = match cache.lookup_or_reserve(&key) {
             ObjectCacheResult::Value(value) => value,
             _ => panic!("Expected to find item."),
         };

@@ -4,7 +4,6 @@
 
 use {
     super::types::{Key, Value},
-    async_trait::async_trait,
     std::{boxed::Box, fmt},
 };
 
@@ -41,10 +40,9 @@ impl<'a, V: Value> fmt::Debug for ObjectCacheResult<'a, V> {
     }
 }
 
-#[async_trait]
 pub trait ObjectCache<K: Key, V: Value>: Send + Sync {
     /// Looks up a key in the cache and may return a cached value for it. See `ObjectCacheResult`.
-    async fn lookup_or_reserve<'a>(&'a self, key: &K) -> ObjectCacheResult<'_, V>;
+    fn lookup_or_reserve<'a>(&'a self, key: &K) -> ObjectCacheResult<'_, V>;
 
     /// Removes key from cache if present. Invalidates the results of placeholders that have not
     /// been resolved.
@@ -54,9 +52,8 @@ pub trait ObjectCache<K: Key, V: Value>: Send + Sync {
 /// A cache that will always return NoCache in lookups, and does no actual work.
 pub struct NullCache {}
 
-#[async_trait]
 impl<K: Key, V: Value> ObjectCache<K, V> for NullCache {
-    async fn lookup_or_reserve(&self, _key: &K) -> ObjectCacheResult<'_, V> {
+    fn lookup_or_reserve(&self, _key: &K) -> ObjectCacheResult<'_, V> {
         ObjectCacheResult::NoCache
     }
 

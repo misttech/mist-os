@@ -252,7 +252,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
         // It is important that the cache lookup is done prior to fetching the layer set as the
         // placeholder returned acts as a sort of lock for the validity of the item that may be
         // inserted later via that placeholder.
-        let token = match self.cache.lookup_or_reserve(search_key).await {
+        let token = match self.cache.lookup_or_reserve(search_key) {
             ObjectCacheResult::Value(value) => {
                 return Ok(Some(Item::new(search_key.clone(), value)))
             }
@@ -670,9 +670,8 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl<K: Key + std::cmp::PartialEq, V: Value> ObjectCache<K, V> for AuditCache<'_, V> {
-        async fn lookup_or_reserve(&self, _key: &K) -> ObjectCacheResult<'_, V> {
+        fn lookup_or_reserve(&self, _key: &K) -> ObjectCacheResult<'_, V> {
             {
                 let mut inner = self.inner.lock().unwrap();
                 inner.lookups += 1;
