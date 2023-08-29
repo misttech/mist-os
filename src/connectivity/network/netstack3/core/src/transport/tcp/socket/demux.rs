@@ -26,8 +26,9 @@ use thiserror::Error;
 use crate::{
     ip::{
         socket::{DefaultSendOptions, DeviceIpSocketHandler, MmsError},
+        types::{Destination, NextHop},
         BufferIpTransportContext, BufferTransportIpContext, EitherDeviceId, IpLayerIpExt,
-        TransportReceiveError,
+        IpStateContext, TransportReceiveError,
     },
     socket::{
         address::{AddrVecIter, ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr},
@@ -44,7 +45,7 @@ use crate::{
             ListenerSharingState, MaybeListener, NonSyncContext, SocketId, SocketState, Sockets,
             SyncContext, TcpIpTransportContext, TimerId,
         },
-        state::{BufferProvider, Closed, Initial, State, TimeWait},
+        state::{BufferProvider, Closed, DataAcked, Initial, State, TimeWait},
         BufferSizes, ConnectionError, Control, Mss, SocketOptions,
     },
 };
@@ -159,7 +160,9 @@ fn handle_incoming_packet<I, B, C, SC>(
             ActiveOpen = <C as NonSyncContext>::ListenerNotifierOrProvidedBuffers,
             PassiveOpen = <C as NonSyncContext>::ReturnedBuffers,
         >,
-    SC: BufferTransportIpContext<I, C, EmptyBuf> + DeviceIpSocketHandler<I, C>,
+    SC: BufferTransportIpContext<I, C, EmptyBuf>
+        + DeviceIpSocketHandler<I, C>
+        + IpStateContext<I, C>,
 {
     trace_duration!(ctx, "tcp::handle_incoming_packet");
 
@@ -298,7 +301,9 @@ where
             ActiveOpen = <C as NonSyncContext>::ListenerNotifierOrProvidedBuffers,
             PassiveOpen = <C as NonSyncContext>::ReturnedBuffers,
         >,
-    SC: BufferTransportIpContext<I, C, EmptyBuf> + DeviceIpSocketHandler<I, C>,
+    SC: BufferTransportIpContext<I, C, EmptyBuf>
+        + DeviceIpSocketHandler<I, C>
+        + IpStateContext<I, C>,
 {
     let (conn, _, addr) = assert_matches!(
         sockets.socket_state.get_mut(conn_id.into()),
@@ -343,7 +348,30 @@ where
     }
 
     // Send the reply to the segment immediately.
-    let (reply, passive_open) = state.on_segment::<_, C>(incoming, now, socket_options, *defunct);
+    let (reply, passive_open, data_acked) =
+        state.on_segment::<_, C>(incoming, now, socket_options, *defunct);
+
+    let mut confirm_reachable = || {
+        let remote_ip = *ip_sock.remote_ip();
+        let device =
+            ip_sock.device().and_then(|weak| ip_transport_ctx.upgrade_weak_device_id(weak));
+        if let Some(Destination { next_hop, device }) =
+            ip_transport_ctx.with_ip_routing_table(|sync_ctx, routes| {
+                routes.lookup(sync_ctx, device.as_ref(), *remote_ip)
+            })
+        {
+            let neighbor = match next_hop {
+                NextHop::RemoteAsNeighbor => remote_ip,
+                NextHop::Gateway(gateway) => gateway,
+            };
+            ip_transport_ctx.confirm_reachable(ctx, &device, neighbor);
+        }
+    };
+
+    match data_acked {
+        DataAcked::Yes => confirm_reachable(),
+        DataAcked::No => {}
+    }
 
     match state {
         State::Listen(_) => {
@@ -359,8 +387,11 @@ where
         | State::CloseWait(_)
         | State::LastAck(_)
         | State::TimeWait(_) => {
-            handshake_status
-                .update_if_pending(HandshakeStatus::Completed { reported: acceptor.is_some() });
+            if handshake_status
+                .update_if_pending(HandshakeStatus::Completed { reported: acceptor.is_some() })
+            {
+                confirm_reachable();
+            }
         }
         State::Closed(Closed { reason }) => {
             if *defunct {
@@ -376,7 +407,7 @@ where
                 let _: Option<_> = ctx.cancel_timer(TimerId::new::<I>(conn_id));
                 return ConnectionIncomingSegmentDisposition::FoundSocket;
             }
-            handshake_status.update_if_pending(match reason {
+            let _: bool = handshake_status.update_if_pending(match reason {
                 None => HandshakeStatus::Completed { reported: acceptor.is_some() },
                 Some(_err) => HandshakeStatus::Aborted,
             });
@@ -545,7 +576,7 @@ where
     ));
     let reply = assert_matches!(
         state.on_segment::<_, C>(incoming, now, &SocketOptions::default(), false /* defunct */),
-        (reply, None) => reply
+        (reply, None, /* data_acked */ _) => reply
     );
     if let Some(seg) = reply {
         let body = tcp_serialize_segment(seg, incoming_addrs);

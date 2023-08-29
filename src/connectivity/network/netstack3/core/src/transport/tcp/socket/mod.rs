@@ -63,7 +63,8 @@ use crate::{
             BufferIpSocketHandler as _, DefaultSendOptions, DeviceIpSocketHandler, IpSock,
             IpSockCreationError, IpSocketHandler as _, Mms,
         },
-        BufferTransportIpContext, EitherDeviceId, IpExt, IpLayerIpExt, TransportIpContext as _,
+        BufferTransportIpContext, EitherDeviceId, IpExt, IpLayerIpExt, IpStateContext,
+        TransportIpContext as _,
     },
     socket::{
         address::{ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr},
@@ -169,7 +170,8 @@ pub(crate) trait SyncContext<I: IpLayerIpExt, C: NonSyncContext>:
             EmptyBuf,
             DeviceId = Self::DeviceId,
             WeakDeviceId = Self::WeakDeviceId,
-        > + DeviceIpSocketHandler<I, C>;
+        > + DeviceIpSocketHandler<I, C>
+        + IpStateContext<I, C>;
 
     /// Calls the function with a `Self::IpTransportCtx`, immutable reference to
     /// an initial sequence number generator and a mutable reference to TCP
@@ -1036,9 +1038,12 @@ pub enum HandshakeStatus {
 }
 
 impl HandshakeStatus {
-    fn update_if_pending(&mut self, new_status: Self) {
+    fn update_if_pending(&mut self, new_status: Self) -> bool {
         if *self == HandshakeStatus::Pending {
             *self = new_status;
+            true
+        } else {
+            false
         }
     }
 }
@@ -1920,7 +1925,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
 
             if let State::Closed(Closed { reason }) = state {
                 tracing::info!("handshake_status: {handshake_status:?}");
-                handshake_status.update_if_pending(HandshakeStatus::Aborted);
+                let _: bool = handshake_status.update_if_pending(HandshakeStatus::Aborted);
                 match *acceptor {
                     Some(acceptor) => match acceptor {
                         Acceptor::Pending(listener_id) | Acceptor::Ready(listener_id) => {
@@ -2987,7 +2992,7 @@ impl<I: Ip> EntryKey for ConnectionId<I> {
 
 #[cfg(test)]
 mod tests {
-    use core::{cell::RefCell, fmt::Debug, time::Duration};
+    use core::{cell::RefCell, fmt::Debug, num::NonZeroU8, time::Duration};
     use fakealloc::{rc::Rc, vec};
 
     use const_unwrap::const_unwrap_option;
@@ -3020,12 +3025,15 @@ mod tests {
                 IpDeviceState, IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4AddressEntry,
                 Ipv6AddrConfig, Ipv6AddressEntry, Ipv6DadState,
             },
+            forwarding::{ForwardingTable, IpForwardingDeviceContext},
             icmp::{IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode},
             socket::{
                 testutil::{FakeDeviceConfig, FakeIpSocketCtx},
                 MmsError, SendOptions,
             },
-            BufferIpTransportContext as _, IpTransportContext, SendIpPacketMeta,
+            types::RawMetric,
+            AddressStatus, BufferIpTransportContext as _, IpDeviceStateContext, IpTransportContext,
+            SendIpPacketMeta,
         },
         testutil::{new_rng, run_with_many_seeds, set_logger_for_test, FakeCryptoRng, TestIpExt},
         transport::tcp::{
@@ -3169,13 +3177,98 @@ mod tests {
         }
     }
 
+    pub(crate) struct FakeIpDeviceCtx<D> {
+        _marker: PhantomData<D>,
+    }
+
+    impl<I: TcpTestIpExt, D: FakeStrongDeviceId> IpStateContext<I, FakeNonSyncCtx<TimerId, (), ()>>
+        for FakeBufferIpTransportCtx<I, D>
+    {
+        type IpDeviceIdCtx<'a> = FakeIpDeviceCtx<D>;
+
+        fn with_ip_routing_table<
+            O,
+            F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &ForwardingTable<I, Self::DeviceId>) -> O,
+        >(
+            &mut self,
+            cb: F,
+        ) -> O {
+            cb(&mut FakeIpDeviceCtx { _marker: PhantomData }, &self.get_ref().table)
+        }
+
+        fn with_ip_routing_table_mut<
+            O,
+            F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &mut ForwardingTable<I, Self::DeviceId>) -> O,
+        >(
+            &mut self,
+            cb: F,
+        ) -> O {
+            cb(&mut FakeIpDeviceCtx { _marker: PhantomData }, &mut self.get_mut().table)
+        }
+    }
+
+    impl<D: FakeStrongDeviceId> DeviceIdContext<AnyDevice> for FakeIpDeviceCtx<D> {
+        type DeviceId = D;
+        type WeakDeviceId = FakeWeakDeviceId<D>;
+
+        fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
+            FakeWeakDeviceId(device_id.clone())
+        }
+
+        fn is_device_installed(&self, _device_id: &Self::DeviceId) -> bool {
+            true
+        }
+
+        fn upgrade_weak_device_id(
+            &self,
+            weak_device_id: &Self::WeakDeviceId,
+        ) -> Option<Self::DeviceId> {
+            let FakeWeakDeviceId(id) = weak_device_id;
+            Some(id.clone())
+        }
+    }
+
+    impl<I: TcpTestIpExt, D: FakeStrongDeviceId>
+        IpDeviceStateContext<I, FakeNonSyncCtx<TimerId, (), ()>> for FakeIpDeviceCtx<D>
+    {
+        fn get_local_addr_for_remote(
+            &mut self,
+            _device_id: &Self::DeviceId,
+            _remote: Option<SpecifiedAddr<I::Addr>>,
+        ) -> Option<SpecifiedAddr<I::Addr>> {
+            unimplemented!()
+        }
+
+        fn get_hop_limit(&mut self, _device_id: &Self::DeviceId) -> NonZeroU8 {
+            unimplemented!()
+        }
+
+        fn address_status_for_device(
+            &mut self,
+            _addr: SpecifiedAddr<I::Addr>,
+            _device_id: &Self::DeviceId,
+        ) -> AddressStatus<I::AddressStatus> {
+            unimplemented!()
+        }
+    }
+
+    impl<I: TcpTestIpExt, D: FakeStrongDeviceId> IpForwardingDeviceContext<I> for FakeIpDeviceCtx<D> {
+        fn get_routing_metric(&mut self, _device_id: &Self::DeviceId) -> RawMetric {
+            unimplemented!()
+        }
+
+        fn is_ip_device_enabled(&mut self, _device_id: &Self::DeviceId) -> bool {
+            true
+        }
+    }
+
     impl<I: TcpTestIpExt, D: FakeStrongDeviceId> SyncContext<I, TcpNonSyncCtx> for TcpSyncCtx<I, D> {
         type IpTransportCtx<'a> = FakeBufferIpTransportCtx<I, D>;
 
         fn with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut<
             O,
             F: FnOnce(
-                &mut FakeBufferIpTransportCtx<I, D>,
+                &mut Self::IpTransportCtx<'_>,
                 &IsnGenerator<FakeInstant>,
                 &mut Sockets<I, FakeWeakDeviceId<D>, TcpNonSyncCtx>,
             ) -> O,

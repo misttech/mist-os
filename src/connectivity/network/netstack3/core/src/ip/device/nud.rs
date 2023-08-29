@@ -1664,8 +1664,7 @@ impl<
 
 /// Confirm upper-layer forward reachability to the specified neighbor through
 /// the specified device.
-#[cfg(test)]
-fn confirm_reachable<I, D, SC, C>(
+pub(crate) fn confirm_reachable<I, D, SC, C>(
     sync_ctx: &mut SC,
     ctx: &mut C,
     device_id: &SC::DeviceId,
@@ -1722,6 +1721,7 @@ fn confirm_reachable<I, D, SC, C>(
 #[cfg(test)]
 mod tests {
     use alloc::{vec, vec::Vec};
+    use core::num::{NonZeroU16, NonZeroUsize};
 
     use ip_test_macro::ip_test;
     use lock_order::Locked;
@@ -1750,8 +1750,9 @@ mod tests {
     use crate::{
         context::{
             testutil::{
-                handle_timer_helper_with_sc_ref_mut, FakeCtxWithSyncCtx, FakeInstant,
-                FakeNonSyncCtx, FakeSyncCtx, FakeTimerCtxExt as _, WrappedFakeSyncCtx,
+                handle_timer_helper_with_sc_ref_mut, FakeCtxWithSyncCtx, FakeInstant, FakeNetwork,
+                FakeNetworkLinks, FakeNonSyncCtx, FakeSyncCtx, FakeTimerCtxExt as _,
+                WrappedFakeSyncCtx,
             },
             InstantContext, SendFrameContext as _,
         },
@@ -1760,7 +1761,7 @@ mod tests {
             link::testutil::{FakeLinkAddress, FakeLinkDevice, FakeLinkDeviceId},
             ndp::testutil::{neighbor_advertisement_ip_packet, neighbor_solicitation_ip_packet},
             testutil::FakeWeakDeviceId,
-            update_ipv6_configuration, EthernetDeviceId,
+            update_ipv6_configuration, EthernetDeviceId, EthernetWeakDeviceId,
         },
         ip::{
             device::{
@@ -1772,9 +1773,10 @@ mod tests {
             receive_ip_packet, FrameDestination,
         },
         testutil::{
-            FakeEventDispatcherConfig, TestIpExt as _, DEFAULT_INTERFACE_METRIC,
+            self, FakeEventDispatcherConfig, TestIpExt as _, DEFAULT_INTERFACE_METRIC,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
+        transport::tcp,
         NonSyncContext, SyncCtx,
     };
 
@@ -3557,8 +3559,7 @@ mod tests {
             subnet: _,
         } = Ipv6::FAKE_CONFIG;
 
-        let crate::testutil::FakeCtx { sync_ctx, mut non_sync_ctx } =
-            crate::testutil::FakeCtx::default();
+        let testutil::FakeCtx { sync_ctx, mut non_sync_ctx } = testutil::FakeCtx::default();
         let sync_ctx = &sync_ctx;
         let device_id = crate::device::add_ethernet_device(
             sync_ctx,
@@ -3646,8 +3647,7 @@ mod tests {
             subnet: _,
         } = Ipv6::FAKE_CONFIG;
 
-        let crate::testutil::FakeCtx { sync_ctx, mut non_sync_ctx } =
-            crate::testutil::FakeCtx::default();
+        let testutil::FakeCtx { sync_ctx, mut non_sync_ctx } = testutil::FakeCtx::default();
         let sync_ctx = &sync_ctx;
         let link_device_id = crate::device::add_ethernet_device(
             sync_ctx,
@@ -3772,8 +3772,7 @@ mod tests {
             subnet: _,
         } = Ipv6::FAKE_CONFIG;
 
-        let crate::testutil::FakeCtx { sync_ctx, mut non_sync_ctx } =
-            crate::testutil::FakeCtx::default();
+        let testutil::FakeCtx { sync_ctx, mut non_sync_ctx } = testutil::FakeCtx::default();
         let sync_ctx = &sync_ctx;
         let eth_device_id = crate::device::add_ethernet_device(
             sync_ctx,
@@ -3916,5 +3915,242 @@ mod tests {
         Ipv6::set_ip_device_enabled(sync_ctx, &mut non_sync_ctx, &device_id, false, true);
         assert_neighbors::<Ipv6, _>(&sync_ctx, &link_device_id, HashMap::new());
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
+    }
+
+    type FakeNudNetwork<L> = FakeNetwork<
+        &'static str,
+        EthernetDeviceId<testutil::FakeNonSyncCtx>,
+        testutil::Ctx<testutil::FakeNonSyncCtx>,
+        L,
+    >;
+
+    fn new_test_net<I: Ip + testutil::TestIpExt>() -> (
+        FakeNudNetwork<
+            impl FakeNetworkLinks<
+                EthernetWeakDeviceId<testutil::FakeNonSyncCtx>,
+                EthernetDeviceId<testutil::FakeNonSyncCtx>,
+                &'static str,
+            >,
+        >,
+        EthernetDeviceId<testutil::FakeNonSyncCtx>,
+        EthernetDeviceId<testutil::FakeNonSyncCtx>,
+    ) {
+        let build_ctx = |config: FakeEventDispatcherConfig<I::Addr>| {
+            let mut builder = testutil::FakeEventDispatcherBuilder::default();
+            let device =
+                builder.add_device_with_ip(config.local_mac, config.local_ip.get(), config.subnet);
+            let (ctx, device_ids) = builder.build();
+            (ctx, device_ids[device].clone())
+        };
+
+        let (local, local_device) = build_ctx(I::FAKE_CONFIG);
+        let (remote, remote_device) = build_ctx(I::FAKE_CONFIG.swap());
+        let net = crate::context::testutil::new_simple_fake_network(
+            "local",
+            local,
+            local_device.downgrade(),
+            "remote",
+            remote,
+            remote_device.downgrade(),
+        );
+        (net, local_device, remote_device)
+    }
+
+    fn bind_and_connect_sockets<
+        I: Ip + testutil::TestIpExt,
+        L: FakeNetworkLinks<
+            EthernetWeakDeviceId<testutil::FakeNonSyncCtx>,
+            EthernetDeviceId<testutil::FakeNonSyncCtx>,
+            &'static str,
+        >,
+    >(
+        net: &mut FakeNudNetwork<L>,
+        local_buffers: tcp::buffer::testutil::ProvidedBuffers,
+    ) -> tcp::socket::SocketId<I> {
+        const REMOTE_PORT: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(33333));
+
+        net.with_context("remote", |testutil::FakeCtx { sync_ctx, non_sync_ctx }| {
+            let socket = tcp::socket::create_socket::<I, _>(
+                sync_ctx,
+                non_sync_ctx,
+                tcp::buffer::testutil::ProvidedBuffers::default(),
+            );
+            let bound = tcp::socket::bind(
+                sync_ctx,
+                non_sync_ctx,
+                socket,
+                Some(net_types::ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
+                Some(REMOTE_PORT),
+            )
+            .unwrap();
+            let _listener =
+                tcp::socket::listen(sync_ctx, bound, NonZeroUsize::new(1).unwrap()).unwrap();
+        });
+
+        net.with_context("local", |testutil::FakeCtx { sync_ctx, non_sync_ctx }| {
+            let socket = tcp::socket::create_socket::<I, _>(sync_ctx, non_sync_ctx, local_buffers);
+            tcp::socket::connect(
+                sync_ctx,
+                non_sync_ctx,
+                socket,
+                tcp::socket::SocketAddr {
+                    ip: net_types::ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip),
+                    port: REMOTE_PORT,
+                },
+            )
+            .unwrap()
+        })
+    }
+
+    #[ip_test]
+    fn upper_layer_confirmation_tcp_handshake<I: Ip + testutil::TestIpExt>()
+    where
+        for<'a> Locked<&'a SyncCtx<testutil::FakeNonSyncCtx>, lock_order::Unlocked>:
+            DeviceIdContext<
+                    EthernetLinkDevice,
+                    DeviceId = EthernetDeviceId<testutil::FakeNonSyncCtx>,
+                > + NudContext<I, EthernetLinkDevice, testutil::FakeNonSyncCtx>
+                + BufferNudContext<Buf<Vec<u8>>, I, EthernetLinkDevice, testutil::FakeNonSyncCtx>,
+        testutil::FakeNonSyncCtx: TimerContext<
+            NudTimerId<I, EthernetLinkDevice, EthernetDeviceId<testutil::FakeNonSyncCtx>>,
+        >,
+    {
+        let (mut net, local_device, remote_device) = new_test_net::<I>();
+
+        let FakeEventDispatcherConfig { local_ip, local_mac, remote_mac, remote_ip, .. } =
+            I::FAKE_CONFIG;
+
+        // Insert a STALE neighbor in each node's neighbor table so that they don't
+        // initiate neighbor resolution before performing the TCP handshake.
+        for (ctx, device, neighbor, link_addr) in [
+            ("local", local_device.clone(), remote_ip, remote_mac),
+            ("remote", remote_device.clone(), local_ip, local_mac),
+        ] {
+            net.with_context(ctx, |testutil::FakeCtx { sync_ctx, non_sync_ctx }| {
+                NudHandler::handle_neighbor_update(
+                    &mut Locked::new(sync_ctx),
+                    non_sync_ctx,
+                    &device,
+                    neighbor,
+                    link_addr.get(),
+                    DynamicNeighborUpdateSource::Probe,
+                );
+                super::testutil::assert_dynamic_neighbor_state(
+                    &mut Locked::new(sync_ctx),
+                    device.clone(),
+                    neighbor,
+                    DynamicNeighborState::Stale(Stale { link_address: link_addr.get() }),
+                );
+            });
+        }
+
+        // Initiate a TCP connection and make sure the SYN and resulting SYN/ACK are
+        // received by each context.
+        let _: tcp::socket::SocketId<I> = bind_and_connect_sockets::<I, _>(
+            &mut net,
+            tcp::buffer::testutil::ProvidedBuffers::default(),
+        );
+        for _ in 0..2 {
+            assert_eq!(
+                net.step(crate::device::testutil::receive_frame, testutil::handle_timer)
+                    .frames_sent,
+                1
+            );
+        }
+
+        // The three-way handshake should now be complete, and the neighbor should have
+        // transitioned to REACHABLE.
+        net.with_context("local", |testutil::FakeCtx { sync_ctx, non_sync_ctx }| {
+            super::testutil::assert_dynamic_neighbor_state(
+                &mut Locked::new(sync_ctx),
+                local_device.clone(),
+                remote_ip,
+                DynamicNeighborState::Reachable(Reachable {
+                    link_address: remote_mac.get(),
+                    last_confirmed_at: non_sync_ctx.now(),
+                }),
+            );
+        });
+
+        // Remove the devices so that existing NUD timers get cleaned up; otherwise,
+        // they would hold dangling references to the devices when the `SyncCtx`s are
+        // dropped at the end of the test.
+        for (ctx, device) in [("local", local_device), ("remote", remote_device)] {
+            net.with_context(ctx, |testutil::FakeCtx { sync_ctx, non_sync_ctx }| {
+                crate::device::remove_ethernet_device(sync_ctx, non_sync_ctx, device);
+            });
+        }
+    }
+
+    #[ip_test]
+    fn upper_layer_confirmation_tcp_ack<I: Ip + testutil::TestIpExt>()
+    where
+        for<'a> Locked<&'a SyncCtx<testutil::FakeNonSyncCtx>, lock_order::Unlocked>:
+            DeviceIdContext<
+                    EthernetLinkDevice,
+                    DeviceId = EthernetDeviceId<testutil::FakeNonSyncCtx>,
+                > + NudContext<I, EthernetLinkDevice, testutil::FakeNonSyncCtx>,
+        testutil::FakeNonSyncCtx: TimerContext<
+            NudTimerId<I, EthernetLinkDevice, EthernetDeviceId<testutil::FakeNonSyncCtx>>,
+        >,
+    {
+        let (mut net, local_device, remote_device) = new_test_net::<I>();
+
+        let FakeEventDispatcherConfig { remote_mac, remote_ip, .. } = I::FAKE_CONFIG;
+
+        // Initiate a TCP connection, allow the handshake to complete, and wait until
+        // the neighbor entry goes STALE due to lack of traffic on the connection.
+        let client_ends = tcp::buffer::testutil::WriteBackClientBuffers::default();
+        let local_socket = bind_and_connect_sockets::<I, _>(
+            &mut net,
+            tcp::buffer::testutil::ProvidedBuffers::Buffers(client_ends.clone()),
+        );
+        net.run_until_idle(crate::device::testutil::receive_frame, testutil::handle_timer);
+        net.with_context("local", |testutil::FakeCtx { sync_ctx, non_sync_ctx: _ }| {
+            super::testutil::assert_dynamic_neighbor_state(
+                &mut Locked::new(sync_ctx),
+                local_device.clone(),
+                remote_ip,
+                DynamicNeighborState::Stale(Stale { link_address: remote_mac.get() }),
+            );
+        });
+
+        // Send some data on the local socket and wait for it to be ACKed by the peer.
+        let tcp::buffer::testutil::ClientBuffers { send, receive: _ } =
+            client_ends.0.as_ref().borrow_mut().take().unwrap();
+        send.borrow_mut().extend_from_slice(b"hello");
+        net.with_context("local", |testutil::FakeCtx { sync_ctx, non_sync_ctx }| {
+            tcp::socket::do_send(sync_ctx, non_sync_ctx, local_socket);
+        });
+        for _ in 0..2 {
+            assert_eq!(
+                net.step(crate::device::testutil::receive_frame, testutil::handle_timer)
+                    .frames_sent,
+                1
+            );
+        }
+
+        // The ACK should have been processed, and the neighbor should have transitioned
+        // to REACHABLE.
+        net.with_context("local", |testutil::FakeCtx { sync_ctx, non_sync_ctx }| {
+            super::testutil::assert_dynamic_neighbor_state(
+                &mut Locked::new(sync_ctx),
+                local_device.clone(),
+                remote_ip,
+                DynamicNeighborState::Reachable(Reachable {
+                    link_address: remote_mac.get(),
+                    last_confirmed_at: non_sync_ctx.now(),
+                }),
+            );
+        });
+
+        // Remove the devices so that existing NUD timers get cleaned up; otherwise,
+        // they would hold dangling references to the devices when the `SyncCtx`s are
+        // dropped at the end of the test.
+        for (ctx, device) in [("local", local_device), ("remote", remote_device)] {
+            net.with_context(ctx, |testutil::FakeCtx { sync_ctx, non_sync_ctx }| {
+                crate::device::remove_ethernet_device(sync_ctx, non_sync_ctx, device);
+            });
+        }
     }
 }

@@ -888,6 +888,14 @@ pub(crate) struct Established<I, R, S> {
     rcv: Recv<I, R>,
 }
 
+/// Indicates whether at least one byte of data was acknowledged by the remote
+/// in an incoming segment.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum DataAcked {
+    Yes,
+    No,
+}
+
 impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
     /// Returns true if the connection should still be alive per the send state.
     fn timed_out(&self, now: I, keep_alive: &KeepAlive) -> bool {
@@ -1146,6 +1154,8 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         Some(seg)
     }
 
+    /// Processes an incoming ACK and returns a segment if one needs to be sent,
+    /// along with whether at least one byte of data was ACKed.
     fn process_ack(
         &mut self,
         seg_seq: SeqNum,
@@ -1156,7 +1166,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         rcv_wnd: WindowSize,
         now: I,
         keep_alive: &KeepAlive,
-    ) -> Option<Segment<()>> {
+    ) -> (Option<Segment<()>>, DataAcked) {
         let Self {
             nxt: snd_nxt,
             max: snd_max,
@@ -1203,7 +1213,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             //   If the ACK acks something not yet sent (SEG.ACK >
             //   SND.NXT) then send an ACK, drop the segment, and
             //   return.
-            Some(Segment::ack(*snd_nxt, rcv_nxt, rcv_wnd >> *wnd_scale))
+            (Some(Segment::ack(*snd_nxt, rcv_nxt, rcv_wnd >> *wnd_scale)), DataAcked::No)
         } else if seg_ack.after(*snd_una) {
             // The unwrap is safe because the result must be positive.
             let acked = u32::try_from(seg_ack - *snd_una)
@@ -1264,7 +1274,8 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 }
             }
             congestion_control.on_ack(acked, now, rtt_estimator.rto());
-            None
+            // At least one byte of data was ACKed by the peer.
+            (None, DataAcked::Yes)
         } else {
             // Per RFC 5681 (https://www.rfc-editor.org/rfc/rfc5681#section-2):
             //   DUPLICATE ACKNOWLEDGMENT: An acknowledgment is considered a
@@ -1287,7 +1298,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-72):
             //   If the ACK is a duplicate (SEG.ACK < SND.UNA), it can be
             //   ignored.
-            None
+            (None, DataAcked::No)
         }
     }
 
@@ -1572,7 +1583,8 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
     ///
     /// Returns a segment if one needs to be sent; if a passive open connection
     /// is newly established, the corresponding object that our client needs
-    /// will be returned.
+    /// will be returned. Also returns whether an at least one byte of data was
+    /// ACKed by the incoming segment.
     pub(crate) fn on_segment<P: Payload, BP: BufferProvider<R, S, ActiveOpen = ActiveOpen>>(
         &mut self,
         incoming: Segment<P>,
@@ -1586,12 +1598,13 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
             max_syn_retries: _,
         }: &SocketOptions,
         defunct: bool,
-    ) -> (Option<Segment<()>>, Option<BP::PassiveOpen>)
+    ) -> (Option<Segment<()>>, Option<BP::PassiveOpen>, DataAcked)
     where
         BP::PassiveOpen: Debug,
         ActiveOpen: IntoBuffers<R, S>,
     {
         let mut passive_open = None;
+        let mut data_acked = DataAcked::No;
         let seg = (|| {
             let (mut rcv_nxt, rcv_wnd, rcv_wnd_scale, snd_nxt) = match self {
                 State::Closed(closed) => return closed.on_segment(incoming),
@@ -1840,18 +1853,22 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                     }
                     State::Established(Established { snd, rcv: _ })
                     | State::CloseWait(CloseWait { snd, last_ack: _, last_wnd: _ }) => {
-                        if let Some(ack) = snd.process_ack(
+                        let (ack, segment_acked_data) = snd.process_ack(
                             seg_seq, seg_ack, seg_wnd, pure_ack, rcv_nxt, rcv_wnd, now, keep_alive,
-                        ) {
+                        );
+                        data_acked = segment_acked_data;
+                        if let Some(ack) = ack {
                             return Some(ack);
                         }
                     }
                     State::LastAck(LastAck { snd, last_ack: _, last_wnd: _ }) => {
                         let BufferLimits { len, capacity: _ } = snd.buffer.limits();
                         let fin_seq = snd.una + len + 1;
-                        if let Some(ack) = snd.process_ack(
+                        let (ack, segment_acked_data) = snd.process_ack(
                             seg_seq, seg_ack, seg_wnd, pure_ack, rcv_nxt, rcv_wnd, now, keep_alive,
-                        ) {
+                        );
+                        data_acked = segment_acked_data;
+                        if let Some(ack) = ack {
                             return Some(ack);
                         } else if seg_ack == fin_seq {
                             *self = State::Closed(Closed { reason: None });
@@ -1861,9 +1878,11 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                     State::FinWait1(FinWait1 { snd, rcv }) => {
                         let BufferLimits { len, capacity: _ } = snd.buffer.limits();
                         let fin_seq = snd.una + len + 1;
-                        if let Some(ack) = snd.process_ack(
+                        let (ack, segment_acked_data) = snd.process_ack(
                             seg_seq, seg_ack, seg_wnd, pure_ack, rcv_nxt, rcv_wnd, now, keep_alive,
-                        ) {
+                        );
+                        data_acked = segment_acked_data;
+                        if let Some(ack) = ack {
                             return Some(ack);
                         } else if seg_ack == fin_seq {
                             // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-73):
@@ -1886,9 +1905,12 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                     State::Closing(Closing { snd, last_ack, last_wnd, last_wnd_scale }) => {
                         let BufferLimits { len, capacity: _ } = snd.buffer.limits();
                         let fin_seq = snd.una + len + 1;
-                        if let Some(ack) = snd.process_ack(
+                        let (ack, segment_acked_data) = snd.process_ack(
                             seg_seq, seg_ack, seg_wnd, pure_ack, rcv_nxt, rcv_wnd, now, keep_alive,
-                        ) {
+                        );
+                        data_acked = segment_acked_data;
+                        if let Some(ack) = ack {
+                            data_acked = segment_acked_data;
                             return Some(ack);
                         } else if seg_ack == fin_seq {
                             // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-73):
@@ -2089,7 +2111,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
             // of ACKs, the ACK generated to text (if any) can be safely overridden.
             ack_to_fin.or(ack_to_text)
         })();
-        (seg, passive_open)
+        (seg, passive_open, data_acked)
     }
 
     /// Polls if there are any bytes available to send in the buffer.
@@ -2864,12 +2886,13 @@ mod test {
             S: Default,
         {
             // In testing, it is convenient to disable delayed ack by default.
-            self.on_segment::<P, BP>(
+            let (segment, passive_open, _data_acked) = self.on_segment::<P, BP>(
                 incoming,
                 now,
                 &SocketOptions::default(),
                 false, /* defunct */
-            )
+            );
+            (segment, passive_open)
         }
     }
 
@@ -4931,7 +4954,7 @@ mod test {
                 socket_options,
                 false, /* defunct */
             ),
-            (None, None),
+            (None, None, DataAcked::No)
         );
         // the timer is reset to fire in 2 hours.
         assert_eq!(state.poll_send_at(), Some(clock.now().add(keep_alive.idle.into())),);
@@ -5484,7 +5507,7 @@ mod test {
                 &socket_options,
                 false, /* defunct */
             ),
-            (None, None)
+            (None, None, DataAcked::No)
         );
         assert_eq!(state.poll_send_at(), Some(clock.now().add(ACK_DELAY_THRESHOLD)));
         clock.sleep(ACK_DELAY_THRESHOLD);
@@ -5514,7 +5537,7 @@ mod test {
                 &socket_options,
                 false, /* defunct */
             ),
-            (None, None)
+            (None, None, DataAcked::No)
         );
         // ... but just a timer.
         assert_eq!(state.poll_send_at(), Some(clock.now().add(ACK_DELAY_THRESHOLD)));
@@ -5538,7 +5561,8 @@ mod test {
                     ISS_2 + 1 + TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE),
                     UnscaledWindowSize::from(0),
                 )),
-                None
+                None,
+                DataAcked::No,
             )
         );
         assert_eq!(state.poll_send_at(), None);
@@ -5599,7 +5623,8 @@ mod test {
                     ISS_2 + 1,
                     UnscaledWindowSize::from(u16::try_from(TEST_BYTES.len() + 1).unwrap())
                 )),
-                None
+                None,
+                DataAcked::No,
             )
         );
         assert_eq!(state.poll_send_at(), None);
@@ -5623,7 +5648,8 @@ mod test {
                     ISS_2 + 1 + TEST_BYTES.len(),
                     UnscaledWindowSize::from(1),
                 )),
-                None
+                None,
+                DataAcked::No,
             )
         );
         assert_eq!(state.poll_send_at(), None);
@@ -5645,7 +5671,8 @@ mod test {
                     ISS_2 + 1 + TEST_BYTES.len() + 1,
                     UnscaledWindowSize::from(0),
                 )),
-                None
+                None,
+                DataAcked::No,
             )
         );
         assert_eq!(state.poll_send_at(), None);
@@ -6013,7 +6040,7 @@ mod test {
                 clock.now(),
                 &KeepAlive::default(),
             ),
-            None
+            (None, DataAcked::Yes)
         );
 
         // Now that we received a zero window, we should start probing for the
@@ -6070,7 +6097,7 @@ mod test {
                 clock.now(),
                 &KeepAlive::default(),
             ),
-            None
+            (None, DataAcked::Yes)
         );
 
         // We would then transition into SWS avoidance.

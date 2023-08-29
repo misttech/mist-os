@@ -38,7 +38,7 @@ use crate::{
             del_ipv6_addr_with_config, get_ipv6_hop_limit, is_ip_device_enabled,
             is_ip_forwarding_enabled, join_ip_multicast_with_config,
             leave_ip_multicast_with_config,
-            nud::{ConfirmationFlags, NudIpHandler},
+            nud::{self, ConfirmationFlags, NudIpHandler},
             route_discovery::{
                 Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext, Ipv6RouteDiscoveryContext,
                 Ipv6RouteDiscoveryState,
@@ -69,6 +69,7 @@ use crate::{
         AddressStatus, IpLayerIpExt, Ipv4PresentAddressStatus, Ipv6PresentAddressStatus,
         NonSyncContext, SyncCtx, DEFAULT_TTL,
     },
+    DeviceId,
 };
 
 pub(crate) struct SlaacAddrs<'a, C: NonSyncContext> {
@@ -386,6 +387,20 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguratio
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
         device::IpDeviceConfigurationContext::<Ipv4, _>::get_mtu(self, device_id)
     }
+
+    fn confirm_reachable(
+        &mut self,
+        ctx: &mut C,
+        device: &Self::DeviceId,
+        neighbor: SpecifiedAddr<<Ipv4 as Ip>::Addr>,
+    ) {
+        match device {
+            DeviceId::Ethernet(id) => {
+                nud::confirm_reachable::<Ipv4, _, _, _>(self, ctx, id, neighbor)
+            }
+            DeviceId::Loopback(_) => {}
+        }
+    }
 }
 
 impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
@@ -464,6 +479,20 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguratio
 
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
         device::IpDeviceConfigurationContext::<Ipv6, _>::get_mtu(self, device_id)
+    }
+
+    fn confirm_reachable(
+        &mut self,
+        ctx: &mut C,
+        device: &Self::DeviceId,
+        neighbor: SpecifiedAddr<<Ipv6 as Ip>::Addr>,
+    ) {
+        match device {
+            DeviceId::Ethernet(id) => {
+                nud::confirm_reachable::<Ipv6, _, _, _>(self, ctx, id, neighbor)
+            }
+            DeviceId::Loopback(_) => {}
+        }
     }
 }
 

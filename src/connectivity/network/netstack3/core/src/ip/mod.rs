@@ -272,6 +272,15 @@ pub(crate) trait TransportIpContext<I: IpExt, C>:
     /// If `device` is not `None` and exists, its hop limits will be returned.
     /// Otherwise the system defaults are returned.
     fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits;
+
+    /// Confirm transport-layer forward reachability to the specified neighbor
+    /// through the specified device.
+    fn confirm_reachable(
+        &mut self,
+        ctx: &mut C,
+        device: &Self::DeviceId,
+        neighbor: SpecifiedAddr<I::Addr>,
+    );
 }
 
 /// Abstraction over the ability to join and leave multicast groups.
@@ -354,6 +363,15 @@ impl<C, SC: IpDeviceContext<Ipv4, C> + IpSocketHandler<Ipv4, C> + NonTestCtxMark
             None => DEFAULT_HOP_LIMITS,
         }
     }
+
+    fn confirm_reachable(
+        &mut self,
+        ctx: &mut C,
+        device: &Self::DeviceId,
+        neighbor: SpecifiedAddr<<Ipv4 as Ip>::Addr>,
+    ) {
+        self.confirm_reachable(ctx, device, neighbor);
+    }
 }
 
 impl<C, SC: IpDeviceContext<Ipv6, C> + IpSocketHandler<Ipv6, C> + NonTestCtxMarker>
@@ -380,6 +398,15 @@ impl<C, SC: IpDeviceContext<Ipv6, C> + IpSocketHandler<Ipv6, C> + NonTestCtxMark
             },
             None => DEFAULT_HOP_LIMITS,
         }
+    }
+
+    fn confirm_reachable(
+        &mut self,
+        ctx: &mut C,
+        device: &Self::DeviceId,
+        neighbor: SpecifiedAddr<<Ipv6 as Ip>::Addr>,
+    ) {
+        self.confirm_reachable(ctx, device, neighbor);
     }
 }
 
@@ -577,6 +604,15 @@ pub(crate) trait IpDeviceContext<I: IpLayerIpExt, C>: IpDeviceStateContext<I, C>
 
     /// Returns the MTU of the device.
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu;
+
+    /// Confirm transport-layer forward reachability to the specified neighbor
+    /// through the specified device.
+    fn confirm_reachable(
+        &mut self,
+        ctx: &mut C,
+        device: &Self::DeviceId,
+        neighbor: SpecifiedAddr<I::Addr>,
+    );
 }
 
 /// Events observed at the IP layer.

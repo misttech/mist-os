@@ -968,6 +968,14 @@ pub(crate) mod testutil {
         ) -> Self::DevicesWithAddrIter<'_> {
             Box::new(self.find_devices_with_addr(addr))
         }
+
+        fn confirm_reachable(
+            &mut self,
+            _ctx: &mut C,
+            _device: &Self::DeviceId,
+            _neighbor: SpecifiedAddr<I::Addr>,
+        ) {
+        }
     }
 
     impl<I: IpDeviceStateIpExt, DeviceId: FakeStrongDeviceId> DeviceIdContext<AnyDevice>
@@ -1244,6 +1252,15 @@ pub(crate) mod testutil {
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
             TransportIpContext::<I, C>::get_default_hop_limits(self.get_mut(), device)
         }
+
+        fn confirm_reachable(
+            &mut self,
+            ctx: &mut C,
+            device: &Self::DeviceId,
+            neighbor: SpecifiedAddr<I::Addr>,
+        ) {
+            TransportIpContext::<I, C>::confirm_reachable(self.get_mut(), ctx, device, neighbor)
+        }
     }
 
     #[derive(Derivative)]
@@ -1477,6 +1494,15 @@ pub(crate) mod testutil {
             addr: SpecifiedAddr<<I>::Addr>,
         ) -> Self::DevicesWithAddrIter<'_> {
             Box::new(self.find_devices_with_addr::<I>(addr))
+        }
+
+        fn confirm_reachable(
+            &mut self,
+            _ctx: &mut C,
+            _device: &Self::DeviceId,
+            _neighbor: SpecifiedAddr<I::Addr>,
+        ) {
+            unimplemented!()
         }
     }
 

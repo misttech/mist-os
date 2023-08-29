@@ -73,7 +73,7 @@ use crate::{
                 testutil::{ClientBuffers, ProvidedBuffers, TestSendBuffer},
                 RingBuffer,
             },
-            socket::{ListenerNotifier, NonSyncContext},
+            socket::NonSyncContext,
             BufferSizes,
         },
         udp,
@@ -421,10 +421,6 @@ impl TracingContext for FakeNonSyncCtx {
     type DurationScope = ();
 
     fn duration(&self, _: &'static CStr) {}
-}
-
-impl ListenerNotifier for () {
-    fn new_incoming_connections(&mut self, _count: usize) {}
 }
 
 impl NonSyncContext for FakeNonSyncCtx {
