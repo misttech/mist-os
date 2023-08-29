@@ -925,6 +925,27 @@ Targets that will be built as verisilicon vulkan ICDS.
 
 From //src/graphics/lib/magma/gnbuild/magma.gni:37
 
+### build_only_labels
+
+These labels are added as dependencies of '//:default', but not as a
+dependency of anything else, and so are "build only".
+
+**Current value for `target_cpu = "arm64"`:** `[]`
+
+From //out/not-default/args.gn:18
+
+**Overridden from the default:** `[]`
+
+From //build/input/BUILD.gn:9
+
+**Current value for `target_cpu = "x64"`:** `[]`
+
+From //out/not-default/args.gn:18
+
+**Overridden from the default:** `[]`
+
+From //build/input/BUILD.gn:9
+
 ### build_pb_v1
 
 Whether to build product bundle version 1 related tools and artifacts.
@@ -1582,7 +1603,19 @@ A developer-only argument that is used to add tests to the build without
 going through the test-type validate that the above sets of tests are.
 These are always a dependency of the main product assembly.
 
-**Current value (from the default):** `[]`
+**Current value for `target_cpu = "arm64"`:** `[]`
+
+From //out/not-default/args.gn:28
+
+**Overridden from the default:** `[]`
+
+From //BUILD.gn:114
+
+**Current value for `target_cpu = "x64"`:** `[]`
+
+From //out/not-default/args.gn:28
+
+**Overridden from the default:** `[]`
 
 From //BUILD.gn:114
 
@@ -2601,7 +2634,19 @@ From //build/config/compiler.gni:66
 Host-driven, "end-to-end" tests that run on a Fuchsia image (either real
 hardware or emulated).
 
-**Current value (from the default):** `[]`
+**Current value for `target_cpu = "arm64"`:** `[]`
+
+From //out/not-default/args.gn:24
+
+**Overridden from the default:** `[]`
+
+From //BUILD.gn:105
+
+**Current value for `target_cpu = "x64"`:** `[]`
+
+From //out/not-default/args.gn:24
+
+**Overridden from the default:** `[]`
 
 From //BUILD.gn:105
 
@@ -3608,7 +3653,19 @@ From //src/graphics/lib/magma/gnbuild/magma.gni:32
 
 Fully hermetic tests (both by packaging and at runtime)
 
-**Current value (from the default):** `[]`
+**Current value for `target_cpu = "arm64"`:** `[]`
+
+From //out/not-default/args.gn:21
+
+**Overridden from the default:** `[]`
+
+From //BUILD.gn:92
+
+**Current value for `target_cpu = "x64"`:** `[]`
+
+From //out/not-default/args.gn:21
+
+**Overridden from the default:** `[]`
 
 From //BUILD.gn:92
 
@@ -3653,7 +3710,19 @@ From //BUILD.gn:119
 Host-only tests.  These cannot have any dependency on an assembled platform
 image, or the compiled OS itself, not even for their host_test_data().
 
-**Current value (from the default):** `[]`
+**Current value for `target_cpu = "arm64"`:** `[]`
+
+From //out/not-default/args.gn:25
+
+**Overridden from the default:** `[]`
+
+From //BUILD.gn:109
+
+**Current value for `target_cpu = "x64"`:** `[]`
+
+From //out/not-default/args.gn:25
+
+**Overridden from the default:** `[]`
 
 From //BUILD.gn:109
 
@@ -6423,7 +6492,7 @@ From //third_party/pigweed/src/third_party/boringssl/boringssl.gni:25
 
 ### pw_third_party_emboss_CONFIG
 
-**Current value (from the default):** `"//third_party/pigweed/src/third_party/emboss:default_config"`
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/emboss:default_overrides"`
 
 From //third_party/pigweed/src/third_party/emboss/emboss.gni:24
 
@@ -7911,7 +7980,19 @@ From //BUILD.gn:126
 Non-hermetic tests (at runtime).  Non-test packages found in this group will
 be flagged as an error by the build.
 
-**Current value (from the default):** `[]`
+**Current value for `target_cpu = "arm64"`:** `[]`
+
+From //out/not-default/args.gn:22
+
+**Overridden from the default:** `[]`
+
+From //BUILD.gn:96
+
+**Current value for `target_cpu = "x64"`:** `[]`
+
+From //out/not-default/args.gn:22
+
+**Overridden from the default:** `[]`
 
 From //BUILD.gn:96
 
@@ -7939,7 +8020,19 @@ Used by Infra (or developers) to put test packages into the base package set
 instead of adding the '//bundles/buildbot/<product>:<test group>' to the
 'base_package_labels' GN argument.
 
-**Current value (from the default):** `false`
+**Current value for `target_cpu = "arm64"`:** `false`
+
+From //out/not-default/args.gn:23
+
+**Overridden from the default:** `false`
+
+From //BUILD.gn:101
+
+**Current value for `target_cpu = "x64"`:** `false`
+
+From //out/not-default/args.gn:23
+
+**Overridden from the default:** `false`
 
 From //BUILD.gn:101
 
