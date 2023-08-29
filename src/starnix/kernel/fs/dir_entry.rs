@@ -166,6 +166,10 @@ impl DirEntry {
         state.mount_count -= 1;
     }
 
+    pub fn mount_count(&self) -> u32 {
+        self.state.read().mount_count
+    }
+
     /// The name that this node's parent calls this node.
     ///
     /// If this node is mounted in a namespace, the parent of this node in that

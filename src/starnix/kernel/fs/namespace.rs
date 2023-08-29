@@ -254,6 +254,30 @@ impl Mount {
         self.write().add_submount_internal(dir, mount)
     }
 
+    fn remove_submount(
+        self: &MountHandle,
+        mount_hash_key: &ArcKey<DirEntry>,
+        mountpoint: &DirEntryHandle,
+        propagate: bool,
+    ) -> Result<Arc<Mount>, Errno> {
+        if propagate {
+            // create_submount explains why we need to make a copy of peers.
+            let peers = {
+                let state = self.state.read();
+                state.peer_group().map(|g| g.copy_propagation_targets()).unwrap_or_default()
+            };
+
+            for peer in peers {
+                if Arc::ptr_eq(self, &peer) {
+                    continue;
+                }
+                peer.write().remove_submount_internal(mount_hash_key, mountpoint);
+            }
+        }
+
+        self.write().remove_submount_internal(mount_hash_key, mountpoint).ok_or(errno!(EINVAL))
+    }
+
     /// Create a new mount with the same filesystem, flags, and peer group. Used to implement bind
     /// mounts.
     fn clone_mount(
@@ -409,6 +433,18 @@ impl MountState<Base = Mount> {
         }
     }
 
+    fn remove_submount_internal(
+        &mut self,
+        mount_hash_key: &ArcKey<DirEntry>,
+        mountpoint: &DirEntryHandle,
+    ) -> Option<Arc<Mount>> {
+        let removed = self.submounts.remove(mount_hash_key);
+        if removed.is_some() {
+            mountpoint.unregister_mount();
+        }
+        removed
+    }
+
     /// Set this mount's peer group.
     fn set_peer_group(&mut self, group: Arc<PeerGroup>) {
         self.take_from_peer_group();
@@ -499,9 +535,6 @@ impl PeerGroup {
 impl Drop for Mount {
     fn drop(&mut self) {
         let state = self.state.get_mut();
-        if let Some((_mount, node)) = &state.mountpoint {
-            node.unregister_mount()
-        }
         state.take_from_peer_group();
         state.take_from_upstream();
     }
@@ -1192,15 +1225,16 @@ impl NamespaceNode {
     pub fn unmount(&self) -> Result<(), Errno> {
         // Drop submount outside of this state lock to ensure it is not done while holding a lock.
         let _submount = {
-            // TODO(fxbug.dev/115333): Propagate unmounts the same way we propagate mounts
+            let propagate = {
+                if let Ok(mount) = self.mount_if_root() {
+                    mount.read().is_shared()
+                } else {
+                    false
+                }
+            };
             let mountpoint = self.enter_mount().mountpoint().ok_or_else(|| errno!(EINVAL))?;
             let mount = mountpoint.mount.as_ref().expect("a mountpoint must be part of a mount");
-            let mut mount_state = mount.state.write();
-            // TODO(tbodt): EBUSY
-            mount_state
-                .submounts
-                .remove(mountpoint.mount_hash_key())
-                .ok_or_else(|| errno!(EINVAL))?
+            mount.remove_submount(mountpoint.mount_hash_key(), &mountpoint.entry, propagate)?;
         };
         Ok(())
     }
