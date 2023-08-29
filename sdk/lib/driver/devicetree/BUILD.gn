@@ -66,7 +66,7 @@ test("devicetree-manager-test") {
 }
 
 devicetree_fragment("simple-include") {
-  sources = [ "test-data/simple.dtsi" ]
+  sources = [ "test-data/simple.dtsi.S" ]
 }
 
 devicetree("simple") {
@@ -82,7 +82,7 @@ resource("simple-dtb") {
 }
 
 devicetree("basic-properties") {
-  sources = [ "test-data/basic-properties.dts" ]
+  sources = [ "test-data/basic-properties.dts.S" ]
   golden = "test-data/basic-properties.golden.dts"
   outputs = [ "$target_out_dir/basic-properties.dtb" ]
   deps = [ "//zircon/system/ulib/ddk-platform-defs" ]

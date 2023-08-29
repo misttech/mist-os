@@ -2,7 +2,7 @@
 
 GN templates and scripts for compiling device tree source files and validating against golden files.
 
-## Examples
+## Usage
 * Define a "devicetree_fragment" to process dtsi files.
   ```
   import("//build/devicetree/devicetree.gni")
@@ -27,7 +27,7 @@ GN templates and scripts for compiling device tree source files and validating a
   to `$target_out_dir/board-x.dtb`. The output path can also be specified by defining `outputs`
   variable during invocation.
 
-* Use "dtb" to compile a `.dts` file into `.dtb`.
+* Use "dtb" to compile a `.dts/.dts.S` file into `.dtb`.
   ```
   dtb("test-dtb") {
     sources = [ "test.dts" ]
@@ -48,3 +48,18 @@ GN templates and scripts for compiling device tree source files and validating a
   during invocation.
 
 See  `devicetree.gni` file for more details.
+
+## Including C header files
+
+Including C header files strictly for substituting preprocessor directives in devicetree source file is supported.
+The devicetree source file should include `.S` extension in order to be preprocessed, i.e. `.dts.S` or `.dtsi.S`.
+
+Example `.dts.S` file -
+```
+/dts-v1/;
+#include "src/board/abc/board-properties.h"
+/ {
+   ...
+```
+If the included C header file contains other C constructs as well, it should use `#ifndef __ASSEMBLER__` around parts
+that are not preprocessor directives.

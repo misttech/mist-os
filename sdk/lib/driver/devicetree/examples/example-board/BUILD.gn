@@ -40,7 +40,7 @@ fuchsia_driver_component("example-board") {
 }
 
 devicetree("example-board-dt") {
-  sources = [ "../../test-data/basic-properties.dts" ]
+  sources = [ "../../test-data/basic-properties.dts.S" ]
   golden = "../../test-data/basic-properties.golden.dts"
   outputs = [ "$target_out_dir/basic-properties.dtb" ]
   deps = [ "//zircon/system/ulib/ddk-platform-defs" ]
