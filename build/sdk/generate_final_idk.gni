@@ -15,6 +15,16 @@ import("//sdk/config.gni")
 # The generated archive will go into
 # $root_build_dir/sdk/archive/{output_name}.tar.gz
 #
+# This template also creates two implicit targets which can be used
+# internally, or during local development:
+#
+# - ${target_name}.exported target that will only create the final export
+#   directory, under $root_build_dir/sdk/exported/{output_name}, without
+#   validating its content or creating a compressed archive.
+#
+# - ${target_name}.validation that will validate the exported directory
+#   content, without creating the compressed archive.
+#
 # Arguments:
 #    target_cpus: (optional)
 #      List of target cpu names. This must include the default target_cpu
@@ -24,6 +34,21 @@ import("//sdk/config.gni")
 #      List of labels to sdk_collection() GN targets that will be merged into
 #      the final archive. Each one will be built for several CPU architecture.
 #
+#    validation_target_labels: (optional)
+#      List of labels to non-sdk_collection() GN targets that will be built
+#      as well, but whose output will not go into the final archive. These
+#      targets can depend on any sdk_target_labels dependency, and will be
+#      built by the top-level build as well as each sub-build launched by
+#      the action that creates the final export directory.
+#
+#    final_validation_target_labels: (optional)
+#      List of labels to a targets used to validate the content of
+#      the final exported directory before the archive is created. Unlike
+#      targets listed in validation_target_labels, these are only built
+#      in the top-level build. These targets should only depend on
+#      the ${target_name}.exported target, not the main one which builds
+#      the compressed archive.
+#
 #    output_name: (optional)
 #      Name of the archive, without a .tar.gz suffix. Default is target_name
 #
@@ -31,13 +56,19 @@ import("//sdk/config.gni")
 #      Usual GN meaning.
 #
 template("generate_final_idk") {
+  _exported_dir_target = "${target_name}.exported"
+  _validation_target = "${target_name}.validation"
+
   if (sdk_inside_idk_sub_build) {
     # sdk_no_host_tools should only be defined in the sub-builds generated
     # by build_final_idk.py, If this happens, do not define anything here.
     group(target_name) {
     }
 
-    group("${target_name}.exported") {
+    group(_exported_dir_target) {
+    }
+
+    group(_validation_target) {
     }
 
     not_needed(invoker, "*")
@@ -62,7 +93,6 @@ template("generate_final_idk") {
     _output_archive = root_build_dir + "/sdk/archive/${_output_name}.tar.gz"
     _exported_dir = root_build_dir + "/sdk/exported/${_output_name}"
     _exported_dir_stamp = _exported_dir + ".stamp"
-    _exported_dir_target = "${target_name}.exported"
 
     # Compute sdk target labels to pass to the script
     _sdk_targets = []
@@ -70,6 +100,15 @@ template("generate_final_idk") {
       _dir = get_label_info(label, "dir")
       _name = get_label_info(label, "name")
       _sdk_targets += [ "${_dir}:${_name}" ]
+    }
+
+    _validation_targets = []
+    if (defined(invoker.validation_target_labels)) {
+      foreach(label, invoker.validation_target_labels) {
+        _dir = get_label_info(label, "dir")
+        _name = get_label_info(label, "name")
+        _validation_targets += [ "${_dir}:${_name}" ]
+      }
     }
 
     # Run the script to generate the exported directory.
@@ -95,6 +134,12 @@ template("generate_final_idk") {
                sdk_id,
                "--sdk-targets",
              ] + _sdk_targets
+
+      if (_validation_targets != []) {
+        # NOTE: The target labels passed to the script are only used
+        # when invoking the sub-builds.
+        args += [ "--validation-targets" ] + _validation_targets
+      }
 
       args += [
         "--base-build-dir",
@@ -150,6 +195,21 @@ template("generate_final_idk") {
       pool = "//:console"
     }
 
+    group(_validation_target) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+      deps = [ ":" + _exported_dir_target ]
+      if (defined(invoker.validation_target_labels)) {
+        deps += invoker.validation_target_labels
+      }
+      if (defined(invoker.final_validation_target_labels)) {
+        deps += invoker.final_validation_target_labels
+      }
+    }
+
     action(target_name) {
       script = "//scripts/sdk/merger/merge.py"
       outputs = [ _output_archive ]
@@ -164,7 +224,10 @@ template("generate_final_idk") {
         "--output-archive",
         rebase_path(outputs[0], root_build_dir),
       ]
-      deps = [ ":" + _exported_dir_target ]
+      deps = [
+        ":${_exported_dir_target}",
+        ":${_validation_target}",
+      ]
 
       hermetic_inputs_file = "$target_gen_dir/$target_name.hermetic_inputs"
 

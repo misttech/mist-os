@@ -23,6 +23,23 @@ _fuchsia_core_idk_deps = [
   ":e2e_testing",
 ]
 
+# A list of non-sdk_collection() targets that will be built with the
+# Fuchsia Core IDK archive, for validation purpose. Note that these
+# will also be built in the sub-builds launched by generate_final_idk().
+_fuchsia_core_idk_validation_deps = []
+
+# Another list of validation targets, these will only be built in the
+# top-level build, and should depend on //sdk:final_fuchsia_idk.exported
+# directly to validate its content.
+_fuchsia_core_idk_final_validation_deps = []
+if (host_os == "linux") {
+  _fuchsia_core_idk_final_validation_deps = [
+    # Run the Bazel SDK test suite against the final exported directory,
+    # TODO(fxbug.dev/124321): Make the Bazel SDK test suite runnable on MacOS!
+    "//build/bazel/bazel_sdk:bazel_sdk_tests_idk",
+  ]
+}
+
 # A list of sdk_collection() targets that correspond to all
 # IDK targets in the "public" and "partner" category. For now
 # this is only the Fuchsia Core IDK, with the exceptional addition
@@ -127,6 +144,8 @@ merged_sdk("merged") {
 generate_final_idk("final_fuchsia_idk") {
   output_name = "fuchsia_idk"
   sdk_target_labels = _fuchsia_core_idk_deps
+  validation_target_labels = _fuchsia_core_idk_validation_deps
+  final_validation_target_labels = _fuchsia_core_idk_final_validation_deps
   testonly = true
 }
 

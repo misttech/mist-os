@@ -135,7 +135,13 @@ def main():
         "--sdk-targets",
         nargs="+",
         required=True,
-        help="List of GN sdk() targets to build.",
+        help="List of GN sdk_collection() GN targets to build.",
+    )
+    parser.add_argument(
+        "--validation-targets",
+        nargs="+",
+        default=[],
+        help="List of extra GN target labels to build as well.",
     )
     parser.add_argument(
         "--base-build-dir",
@@ -236,7 +242,10 @@ def main():
         return build_dir / 'sdk' / 'exported' / target_name
 
     # Compute the list of Ninja targets to build in each sub-build.
-    ninja_targets = [sdk_label_to_ninja_target(l) for l in args.sdk_targets]
+    ninja_targets = [
+        sdk_label_to_ninja_target(l)
+        for l in args.sdk_targets + args.validation_targets
+    ]
     log('Ninja targets to build: %s' % ' '.join(sorted(ninja_targets)))
 
     # The list of all input directories for the final merge operation.
