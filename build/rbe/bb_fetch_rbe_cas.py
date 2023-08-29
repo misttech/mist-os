@@ -10,12 +10,13 @@ Note: permissions are not set, so the caller might need to set executable bits.
 """
 
 import argparse
-import hashlib
 import json
+import os
 import sys
 import tempfile
 
 import cl_utils
+import fuchsia
 import remotetool
 import reproxy_logs
 # This requires python pb2 in build/rbe/proto (generated).
@@ -26,7 +27,13 @@ from typing import Any, Dict, Optional, Sequence, Tuple
 _SCRIPT_BASENAME = Path(__file__).name
 _SCRIPT_DIR = Path(__file__).parent
 
+PROJECT_ROOT = fuchsia.project_root_dir()
+PROJECT_ROOT_REL = cl_utils.relpath(PROJECT_ROOT, start=os.curdir)
+
 _REPROXY_CFG = _SCRIPT_DIR / "fuchsia-reproxy.cfg"
+
+# default path to `bb` buildbucket tool
+_BB_TOOL = PROJECT_ROOT_REL / 'prebuilt' / 'tools' / 'buildbucket' / 'bb'
 
 def msg(text: str):
     print(f'[{_SCRIPT_BASENAME}] {text}')
@@ -40,7 +47,7 @@ def _main_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--bb",
         type=Path,
-        default=Path("bb"),  # look in $PATH
+        default=_BB_TOOL,
         help="Path to 'bb' CLI tool.",
         metavar='PATH',
     )
@@ -94,7 +101,7 @@ class BBError(RuntimeError):
 class BuildBucketTool(object):
 
     def __init__(self, bb: Path=None):
-        self.bb = bb or Path('bb')
+        self.bb = bb or _BB_TOOL
 
     def get_json_fields(self, bbid: str) -> Dict[str, Any]:
         bb_result = cl_utils.subprocess_call(
@@ -104,6 +111,8 @@ class BuildBucketTool(object):
             ],
             quiet=True)
         if bb_result.returncode != 0:
+            for line in bb_result.stderr:
+                print(line)
             raise BBError(f'bb failed to lookup id {bbid}.')
         return json.loads('\n'.join(bb_result.stdout) + '\n')
 
@@ -118,6 +127,8 @@ class BuildBucketTool(object):
             ],
             quiet=True)
         if rpl_log_result.returncode != 0:
+            for line in rpl_log_result.stderr:
+                print(line)
             raise BBError(f'Failed to fetch bb reproxy log {reproxy_log_name}.')
         return '\n'.join(rpl_log_result.stdout) + '\n'
 
@@ -135,7 +146,7 @@ class BuildBucketTool(object):
         else:
             if verbose:
                 msg(
-                    "Downloading reproxy log {reproxy_log_name} from buildbucket"
+                    f"Downloading reproxy log {reproxy_log_name} from buildbucket.  (This could take a few minutes.)"
                 )
             rpl_log_contents = self.download_reproxy_log(
                 build_id, reproxy_log_name)
@@ -247,7 +258,7 @@ def _main(bbpath: Path, bbid: str, artifact_path: Path, cfg: Path, output: Path=
         return exit_code
 
     msg(
-        f'Artifact {artifact_path} from build {rbe_build_id} downloaded to {output}.\n  digest: {digest}'
+        f"Artifact {artifact_path} from build {rbe_build_id} downloaded to {output}.\n  digest: {digest}"
     )
     return 0
 
