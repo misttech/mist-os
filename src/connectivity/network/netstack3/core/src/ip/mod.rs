@@ -3774,7 +3774,7 @@ mod tests {
             .expect("qerror setting routing enabled");
         }
         let (bob, bob_device_ids) = FakeEventDispatcherBuilder::from_config(fake_config).build();
-        let mut net = crate::context::testutil::new_legacy_simple_fake_network(
+        let mut net = crate::context::testutil::new_simple_fake_network(
             a,
             alice,
             alice_device_ids[0].downgrade(),

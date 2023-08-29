@@ -303,7 +303,7 @@ mod tests {
 
         let local_eth_device_id = local_device_ids[local_dev_idx].clone();
         let remote_eth_device_id = remote_device_ids[remote_dev_idx].clone();
-        let net = crate::context::testutil::new_legacy_simple_fake_network(
+        let net = crate::context::testutil::new_simple_fake_network(
             "local",
             local,
             local_eth_device_id.downgrade(),
@@ -451,7 +451,7 @@ mod tests {
 
         let (local, local_device_id) = make_ctx_and_dev();
         let (remote, remote_device_id) = make_ctx_and_dev();
-        let mut net = crate::context::testutil::new_legacy_simple_fake_network(
+        let mut net = crate::context::testutil::new_simple_fake_network(
             "local",
             local,
             local_device_id.downgrade(),

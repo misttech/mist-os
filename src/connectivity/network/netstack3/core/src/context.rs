@@ -1979,13 +1979,13 @@ where
     }
 }
 
-    /// Creates a new [`FakeNetwork`] of legacy [`Ctx`] contexts in a simple
-    /// two-host configuration.
+    /// Creates a new [`FakeNetwork`] of [`Ctx`]s in a simple two-host
+    /// configuration.
     ///
     /// Two hosts are created with the given names. Packets emitted by one
     /// arrive at the other and vice-versa.
     #[cfg(test)]
-    pub(crate) fn new_legacy_simple_fake_network<CtxId: Copy + Debug + Hash + Eq>(
+    pub(crate) fn new_simple_fake_network<CtxId: Copy + Debug + Hash + Eq>(
         a_id: CtxId,
         a: crate::testutil::FakeCtx,
         a_device_id: EthernetWeakDeviceId<crate::testutil::FakeNonSyncCtx>,

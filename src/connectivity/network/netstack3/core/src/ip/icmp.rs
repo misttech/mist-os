@@ -3729,7 +3729,7 @@ mod tests {
         const REMOTE_CTX_NAME: &str = "bob";
         let (local, local_device_ids) = I::FAKE_CONFIG.into_builder().build();
         let (remote, remove_device_ids) = I::FAKE_CONFIG.swap().into_builder().build();
-        let mut net = crate::context::testutil::new_legacy_simple_fake_network(
+        let mut net = crate::context::testutil::new_simple_fake_network(
             LOCAL_CTX_NAME,
             local,
             local_device_ids[0].downgrade(),

@@ -1317,7 +1317,7 @@ mod tests {
         set_logger_for_test();
         let (alice_ctx, alice_device_ids) = FAKE_CONFIG_V4.into_builder().build();
         let (bob_ctx, bob_device_ids) = FAKE_CONFIG_V4.swap().into_builder().build();
-        let mut net = crate::context::testutil::new_legacy_simple_fake_network(
+        let mut net = crate::context::testutil::new_simple_fake_network(
             "alice",
             alice_ctx,
             alice_device_ids[0].downgrade(),
@@ -1366,7 +1366,7 @@ mod tests {
         set_logger_for_test();
         let (ctx_1, device_ids_1) = FAKE_CONFIG_V4.into_builder().build();
         let (ctx_2, device_ids_2) = FAKE_CONFIG_V4.swap().into_builder().build();
-        let mut net = crate::context::testutil::new_legacy_simple_fake_network(
+        let mut net = crate::context::testutil::new_simple_fake_network(
             1,
             ctx_1,
             device_ids_1[0].downgrade(),
@@ -1442,7 +1442,7 @@ mod tests {
         set_logger_for_test();
         let (ctx_1, device_ids_1) = FAKE_CONFIG_V4.into_builder().build();
         let (ctx_2, device_ids_2) = FAKE_CONFIG_V4.swap().into_builder().build();
-        let mut net = crate::context::testutil::new_legacy_simple_fake_network(
+        let mut net = crate::context::testutil::new_simple_fake_network(
             1,
             ctx_1,
             device_ids_1[0].downgrade(),
