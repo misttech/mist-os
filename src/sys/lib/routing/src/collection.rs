@@ -5,8 +5,8 @@
 use {
     crate::{
         capability_source::{
-            CapabilitySource, CollectionAggregateCapabilityProvider,
-            OfferAggregateCapabilityProvider,
+            CapabilitySource, CollectionAggregateCapabilityProvider, ComponentCapability,
+            OfferAggregateCapabilityProvider, OfferAggregateCapabilityRouteData,
         },
         component_instance::{
             ComponentInstanceInterface, ResolvedInstanceInterface, WeakComponentInstanceInterface,
@@ -20,13 +20,15 @@ use {
         Never, RouteInfo,
     },
     async_trait::async_trait,
-    cm_rust::{ExposeDecl, ExposeDeclCommon, OfferDecl, OfferDeclCommon, OfferServiceDecl},
+    cm_rust::{
+        ExposeDecl, ExposeDeclCommon, NameMapping, OfferDecl, OfferDeclCommon, OfferServiceDecl,
+    },
     cm_types::Name,
     derivative::Derivative,
     from_enum::FromEnum,
     futures::future::BoxFuture,
     moniker::{ChildName, ChildNameBase},
-    std::sync::Arc,
+    std::{collections::HashSet, sync::Arc},
 };
 
 /// Provides capabilities exposed by children in a collection.
@@ -164,6 +166,98 @@ where
 }
 
 #[derive(Derivative)]
+#[derivative(Clone(bound = ""))]
+pub(super) struct OfferFilteredServiceProvider<C: ComponentInstanceInterface> {
+    /// Component that offered the filtered service
+    component: WeakComponentInstanceInterface<C>,
+    /// The service capability
+    capability: ComponentCapability,
+    /// The service offer that has a filter.
+    offer_decl: OfferServiceDecl,
+}
+
+impl<C> OfferFilteredServiceProvider<C>
+where
+    C: ComponentInstanceInterface + 'static,
+{
+    pub(super) fn new(
+        offer_decl: OfferServiceDecl,
+        component: WeakComponentInstanceInterface<C>,
+        capability: ComponentCapability,
+    ) -> Self {
+        Self { offer_decl, component, capability }
+    }
+}
+
+impl<C> OfferAggregateCapabilityProvider<C> for OfferFilteredServiceProvider<C>
+where
+    C: ComponentInstanceInterface + 'static,
+{
+    fn route_instances(
+        &self,
+    ) -> Vec<BoxFuture<'_, Result<OfferAggregateCapabilityRouteData<C>, RoutingError>>> {
+        let capability_source = CapabilitySource::Component {
+            capability: self.capability.clone(),
+            component: self.component.clone(),
+        };
+        let instance_filter = get_instance_filter(&self.offer_decl);
+        let fut = async move {
+            Ok(OfferAggregateCapabilityRouteData { capability_source, instance_filter })
+        };
+        // Without the explicit type, this does not compile
+        let mut out: Vec<
+            BoxFuture<'_, Result<OfferAggregateCapabilityRouteData<C>, RoutingError>>,
+        > = vec![];
+        out.push(Box::pin(fut));
+        out
+    }
+
+    fn clone_boxed(&self) -> Box<dyn OfferAggregateCapabilityProvider<C>> {
+        Box::new(self.clone())
+    }
+}
+
+fn get_instance_filter(offer_decl: &OfferServiceDecl) -> Vec<NameMapping> {
+    let renamed_instances = offer_decl.renamed_instances.as_ref().unwrap_or_else(|| {
+        static EMPTY_VEC: Vec<NameMapping> = vec![];
+        &EMPTY_VEC
+    });
+    if !renamed_instances.is_empty() {
+        let source_instance_filter: HashSet<_> = offer_decl
+            .source_instance_filter
+            .as_ref()
+            .unwrap_or_else(|| {
+                static EMPTY_VEC: Vec<String> = vec![];
+                &EMPTY_VEC
+            })
+            .iter()
+            .map(|s| s.as_str())
+            .collect();
+        renamed_instances
+            .clone()
+            .into_iter()
+            .filter_map(|m| {
+                if source_instance_filter.is_empty()
+                    || source_instance_filter.contains(&m.target_name.as_str())
+                {
+                    Some(NameMapping { source_name: m.source_name, target_name: m.target_name })
+                } else {
+                    None
+                }
+            })
+            .collect()
+    } else {
+        offer_decl
+            .source_instance_filter
+            .clone()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|n| NameMapping { source_name: n.clone(), target_name: n })
+            .collect()
+    }
+}
+
+#[derive(Derivative)]
 #[derivative(Clone(bound = "S: Clone, M: Clone, V: Clone"))]
 pub(super) struct OfferAggregateServiceProvider<C: ComponentInstanceInterface, O, E, S, M, V> {
     /// Component that offered the aggregate service
@@ -204,27 +298,14 @@ where
     M: DebugRouteMapper + Send + Sync + Clone + 'static,
 {
     pub(super) fn new(
-        offer_service_decls: Vec<OfferServiceDecl>,
+        offer_decls: Vec<OfferServiceDecl>,
         component: WeakComponentInstanceInterface<C>,
         sources: S,
         visitor: V,
         mapper: M,
     ) -> Self {
-        let single_instance_decls: Vec<OfferServiceDecl> = offer_service_decls
-            .iter()
-            .map(|o| {
-                o.source_instance_filter.iter().flatten().map(move |instance_name| {
-                    // Create a service decl for each filtered service instance so that when the aggregate
-                    // capability routes an instance each entry can ignore the component name.
-                    let mut single_instance_decl = o.clone();
-                    single_instance_decl.source_instance_filter = Some(vec![instance_name.clone()]);
-                    single_instance_decl
-                })
-            })
-            .flatten()
-            .collect();
         Self {
-            offer_decls: single_instance_decls,
+            offer_decls,
             phantom_expose: std::marker::PhantomData::<E> {},
             phantom_offer: std::marker::PhantomData::<O> {},
             sources,
@@ -261,20 +342,23 @@ where
 {
     fn route_instances(
         &self,
-    ) -> Vec<BoxFuture<'_, Result<(CapabilitySource<C>, Vec<String>), RoutingError>>> {
+    ) -> Vec<BoxFuture<'_, Result<OfferAggregateCapabilityRouteData<C>, RoutingError>>> {
         // Without the explicit type, this does not compile
-        let mut out: Vec<BoxFuture<'_, Result<(CapabilitySource<C>, Vec<String>), RoutingError>>> =
-            vec![];
+        let mut out: Vec<
+            BoxFuture<'_, Result<OfferAggregateCapabilityRouteData<C>, RoutingError>>,
+        > = vec![];
         for offer_decl in &self.offer_decls {
-            let filter =
-                offer_decl.source_instance_filter.as_ref().map(Clone::clone).unwrap_or_default();
-            if filter.is_empty() {
+            let instance_filter = get_instance_filter(offer_decl);
+            if instance_filter.is_empty() {
                 continue;
             }
             // The visitor which we inherited from the router is parameterized on the generic
             // type `O`. This construction with from_enum is a roundabout way of
             // converting from the concrete variant type to the generic.
-            let offer_decl = OfferDecl::Service(offer_decl.clone());
+            let mut offer_decl = offer_decl.clone();
+            offer_decl.source_instance_filter = None;
+            offer_decl.renamed_instances = None;
+            let offer_decl = OfferDecl::Service(offer_decl);
             let offer_decl = O::from_enum(&offer_decl).unwrap().clone();
             let fut = async {
                 let component = self.component.upgrade().map_err(|e| {
@@ -292,7 +376,7 @@ where
                     &mut vec![],
                 )
                 .await?;
-                Ok((capability_source, filter))
+                Ok(OfferAggregateCapabilityRouteData { capability_source, instance_filter })
             };
             out.push(Box::pin(fut));
         }
@@ -301,5 +385,51 @@ where
 
     fn clone_boxed(&self) -> Box<dyn OfferAggregateCapabilityProvider<C>> {
         Box::new(self.clone())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cm_rust::{Availability, ChildRef, OfferSource, OfferTarget};
+
+    #[test]
+    fn test_get_instance_filter() {
+        fn get_instance_filter(
+            source_instance_filter: Option<Vec<String>>,
+            renamed_instances: Option<Vec<NameMapping>>,
+        ) -> Vec<NameMapping> {
+            super::get_instance_filter(&OfferServiceDecl {
+                source: OfferSource::Parent,
+                source_name: "foo".parse().unwrap(),
+                target: OfferTarget::Child(ChildRef { name: "a".into(), collection: None }),
+                target_name: "bar".parse().unwrap(),
+                source_instance_filter,
+                renamed_instances,
+                availability: Availability::Required,
+            })
+        }
+
+        assert_eq!(get_instance_filter(None, None), vec![]);
+        assert_eq!(get_instance_filter(Some(vec![]), Some(vec![])), vec![]);
+        let same_name_map = vec![
+            NameMapping { source_name: "a".into(), target_name: "a".into() },
+            NameMapping { source_name: "b".into(), target_name: "b".into() },
+        ];
+        assert_eq!(get_instance_filter(Some(vec!["a".into(), "b".into()]), None), same_name_map);
+        assert_eq!(
+            get_instance_filter(Some(vec!["a".into(), "b".into()]), Some(vec![])),
+            same_name_map
+        );
+        let renamed_map = vec![
+            NameMapping { source_name: "one".into(), target_name: "a".into() },
+            NameMapping { source_name: "two".into(), target_name: "b".into() },
+        ];
+        assert_eq!(get_instance_filter(None, Some(renamed_map.clone())), renamed_map);
+        assert_eq!(get_instance_filter(Some(vec![]), Some(renamed_map.clone())), renamed_map);
+        assert_eq!(
+            get_instance_filter(Some(vec!["b".into()]), Some(renamed_map.clone())),
+            vec![NameMapping { source_name: "two".into(), target_name: "b".into() }]
+        );
     }
 }

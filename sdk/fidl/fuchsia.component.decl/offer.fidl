@@ -114,13 +114,14 @@ type OfferService = table {
     /// (Optional) The list of allowlisted instances to be offered, with
     /// renames.
     ///
-    /// If this is provided, the set of instances in the target service will be
-    /// restricted to the instances in this list, renaming `source_name` to
-    /// `target_name`.
+    /// If this is set and nonempty, the set of instances in the target service
+    /// will be restricted to the instances in this list, renaming `source_name`
+    /// to `target_name`.
     ///
-    /// If set, `source_instance_filter`, will further restrict the set of
-    /// instances to those whose `target_name` appears in that list. There is
-    /// generally no reason to set both, but we support it for compatibility.
+    /// If it is set and nonempty, `source_instance_filter` will further
+    /// restrict the set of instances to those whose `target_name` appears in
+    /// that list. There is generally no reason to set both, but we support it
+    /// for compatibility.
     6: renamed_instances vector<NameMapping>:MAX;
 
     /// (Optional, defaults to `REQUIRED`) The availability of this capability.

@@ -23,7 +23,10 @@ use {
         capability_source::{
             AggregateCapability, CapabilitySource, ComponentCapability, InternalCapability,
         },
-        collection::{CollectionAggregateServiceProvider, OfferAggregateServiceProvider},
+        collection::{
+            CollectionAggregateServiceProvider, OfferAggregateServiceProvider,
+            OfferFilteredServiceProvider,
+        },
         component_instance::{
             ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
             TopInstanceInterface,
@@ -33,16 +36,15 @@ use {
         RegistrationDecl, RouteInfo,
     },
     cm_rust::{
-        name_mappings_to_map, Availability, CapabilityDecl, CapabilityDeclCommon, ExposeDecl,
-        ExposeDeclCommon, ExposeSource, ExposeTarget, OfferDecl, OfferDeclCommon, OfferServiceDecl,
-        OfferSource, OfferTarget, RegistrationDeclCommon, RegistrationSource, UseDecl,
-        UseDeclCommon, UseSource,
+        Availability, CapabilityDecl, CapabilityDeclCommon, ExposeDecl, ExposeDeclCommon,
+        ExposeSource, ExposeTarget, OfferDecl, OfferDeclCommon, OfferServiceDecl, OfferSource,
+        OfferTarget, RegistrationDeclCommon, RegistrationSource, UseDecl, UseDeclCommon, UseSource,
     },
     cm_types::Name,
     derivative::Derivative,
     from_enum::FromEnum,
     moniker::{ChildName, ChildNameBase, Moniker},
-    std::collections::{HashMap, HashSet},
+    std::collections::HashSet,
     std::{fmt, slice},
     std::{marker::PhantomData, sync::Arc},
 };
@@ -218,15 +220,16 @@ where
                     // TODO(https://fxbug.dev/97147) support collection sources as well.
                     if let CapabilitySource::Component { capability, component } = capability_source
                     {
-                        return Ok(CapabilitySource::<C>::FilteredService {
+                        let source_name = offer_service_decl.source_name.clone();
+                        let capability_provider = Box::new(OfferFilteredServiceProvider::new(
+                            offer_service_decl,
+                            component.clone(),
                             capability,
+                        ));
+                        return Ok(CapabilitySource::<C>::OfferAggregate {
+                            capability: AggregateCapability::Service(source_name),
                             component,
-                            source_instance_filter: offer_service_decl
-                                .source_instance_filter
-                                .unwrap_or(vec![]),
-                            instance_name_source_to_target: offer_service_decl
-                                .renamed_instances
-                                .map_or(HashMap::new(), name_mappings_to_map),
+                            capability_provider,
                         });
                     }
                 }
@@ -1066,7 +1069,7 @@ where
         route: &mut Vec<RouteInfo<C, O, E>>,
     ) -> Result<OfferResult<C, O>, RoutingError>
     where
-        C: ComponentInstanceInterface,
+        C: ComponentInstanceInterface + 'static,
         S: Sources,
         V: OfferVisitor<OfferDecl = O>,
         V: CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
@@ -1132,7 +1135,7 @@ where
         mapper: &mut M,
     ) -> Result<OfferSegment<C, O>, RoutingError>
     where
-        C: ComponentInstanceInterface,
+        C: ComponentInstanceInterface + 'static,
         S: Sources,
         V: OfferVisitor<OfferDecl = O>,
         V: CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
@@ -1144,39 +1147,41 @@ where
             }
             OfferSource::Self_ => {
                 let target_capabilities = target.lock_resolved_state().await?.capabilities();
-                let component_capability = sources.find_component_source(
+                let capability = sources.find_component_source(
                     offer.source_name(),
                     target.moniker(),
                     &target_capabilities,
                     visitor,
                     mapper,
                 )?;
-                // if offerdecl is for a filtered service return the associated filterd source.
+                // if offerdecl is for a filtered service return the associated filtered source.
+                let component = target.as_weak();
                 let res = match offer.into() {
                     OfferDecl::Service(offer_service_decl) => {
                         if offer_service_decl.source_instance_filter.is_some()
                             || offer_service_decl.renamed_instances.is_some()
                         {
-                            OfferResult::Source(CapabilitySource::<C>::FilteredService {
-                                capability: component_capability,
-                                component: target.as_weak(),
-                                source_instance_filter: offer_service_decl
-                                    .source_instance_filter
-                                    .unwrap_or(vec![]),
-                                instance_name_source_to_target: offer_service_decl
-                                    .renamed_instances
-                                    .map_or(HashMap::new(), name_mappings_to_map),
+                            let source_name = offer_service_decl.source_name.clone();
+                            let capability_provider = Box::new(OfferFilteredServiceProvider::new(
+                                offer_service_decl,
+                                component.clone(),
+                                capability,
+                            ));
+                            OfferResult::Source(CapabilitySource::<C>::OfferAggregate {
+                                capability: AggregateCapability::Service(source_name),
+                                component,
+                                capability_provider,
                             })
                         } else {
                             OfferResult::Source(CapabilitySource::<C>::Component {
-                                capability: component_capability,
-                                component: target.as_weak(),
+                                capability,
+                                component,
                             })
                         }
                     }
                     _ => OfferResult::Source(CapabilitySource::<C>::Component {
-                        capability: component_capability,
-                        component: target.as_weak(),
+                        capability,
+                        component,
                     }),
                 };
                 OfferSegment::Done(res)

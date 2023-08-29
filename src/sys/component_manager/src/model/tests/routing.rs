@@ -3431,7 +3431,7 @@ async fn use_filtered_service_from_sibling() {
                 .offer(OfferDecl::Service(OfferServiceDecl {
                     source: OfferSource::static_child("b".to_string()),
                     source_name: "my.service.Service".parse().unwrap(),
-                    source_instance_filter: None, //Some(vec!["variantinstance".to_string()]),
+                    source_instance_filter: None,
                     renamed_instances: Some(vec![NameMapping {
                         source_name: "default".to_string(),
                         target_name: "renamed_default".to_string(),
@@ -3562,6 +3562,133 @@ async fn use_filtered_service_from_sibling() {
     .await;
     test.check_use(
         vec!["d"].try_into().unwrap(),
+        CheckUse::Service {
+            path: "/svc/my.service.Service".parse().unwrap(),
+            instance: ServiceInstance::Named("renamed_default".to_string()),
+            member: "echo".to_string(),
+            expected_res: ExpectedResult::Ok,
+        },
+    )
+    .await;
+}
+
+#[fuchsia::test]
+async fn use_aggregate_service_from_sibling() {
+    let components = vec![
+        (
+            "a",
+            ComponentDeclBuilder::new()
+                .offer(OfferDecl::Service(OfferServiceDecl {
+                    source: OfferSource::static_child("b".to_string()),
+                    source_name: "my.service.Service".parse().unwrap(),
+                    source_instance_filter: Some(vec!["variantinstance".to_string()]),
+                    renamed_instances: None,
+                    target: OfferTarget::static_child("c".to_string()),
+                    target_name: "my.service.Service".parse().unwrap(),
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Service(OfferServiceDecl {
+                    source: OfferSource::static_child("b".to_string()),
+                    source_name: "my.service.Service".parse().unwrap(),
+                    source_instance_filter: Some(vec!["renamed_default".to_string()]),
+                    renamed_instances: Some(vec![NameMapping {
+                        source_name: "default".to_string(),
+                        target_name: "renamed_default".to_string(),
+                    }]),
+                    target: OfferTarget::static_child("c".to_string()),
+                    target_name: "my.service.Service".parse().unwrap(),
+                    availability: Availability::Required,
+                }))
+                .add_child(ChildDeclBuilder::new_lazy_child("b"))
+                .add_child(ChildDeclBuilder::new_lazy_child("c"))
+                .build(),
+        ),
+        (
+            "b",
+            ComponentDeclBuilder::new()
+                .expose(ExposeDecl::Service(ExposeServiceDecl {
+                    source: ExposeSource::Self_,
+                    source_name: "my.service.Service".parse().unwrap(),
+                    target_name: "my.service.Service".parse().unwrap(),
+                    target: ExposeTarget::Parent,
+                    availability: cm_rust::Availability::Required,
+                }))
+                .service(ServiceDecl {
+                    name: "my.service.Service".parse().unwrap(),
+                    source_path: Some("/svc/my.service.Service".parse().unwrap()),
+                })
+                .build(),
+        ),
+        (
+            "c",
+            ComponentDeclBuilder::new()
+                .use_(UseDecl::Service(UseServiceDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Parent,
+                    source_name: "my.service.Service".parse().unwrap(),
+                    target_path: "/svc/my.service.Service".parse().unwrap(),
+                    availability: Availability::Required,
+                }))
+                .build(),
+        ),
+    ];
+
+    let (directory_entry, mut receiver) = create_service_directory_entry::<echo::EchoMarker>();
+    let instance_dir = pseudo_directory! {
+        "echo" => directory_entry,
+    };
+    let test = RoutingTestBuilder::new("a", components)
+        .add_outgoing_path(
+            "b",
+            "/svc/my.service.Service/default".parse().unwrap(),
+            instance_dir.clone(),
+        )
+        .add_outgoing_path(
+            "b",
+            "/svc/my.service.Service/variantinstance".parse().unwrap(),
+            instance_dir,
+        )
+        .build()
+        .await;
+
+    // Check that instance c only has access to the filtered service instance.
+    let namespace_c = test.bind_and_get_namespace(vec!["c"].try_into().unwrap()).await;
+    let dir_c = capability_util::take_dir_from_namespace(&namespace_c, "/svc").await;
+    let service_dir_c = fuchsia_fs::directory::open_directory(
+        &dir_c,
+        "my.service.Service",
+        fuchsia_fs::OpenFlags::empty(),
+    )
+    .await
+    .expect("failed to open service");
+    let entries: HashSet<String> = fuchsia_fs::directory::readdir(&service_dir_c)
+        .await
+        .expect("failed to read entries")
+        .into_iter()
+        .map(|d| d.name)
+        .collect();
+    assert_eq!(entries.len(), 2);
+    assert!(entries.contains("variantinstance"));
+    assert!(entries.contains("renamed_default"));
+    capability_util::add_dir_to_namespace(&namespace_c, "/svc", dir_c).await;
+
+    let _server_handle = fasync::Task::spawn(async move {
+        while let Some(echo::EchoRequest::EchoString { value, responder }) = receiver.next().await {
+            responder.send(value.as_ref().map(|v| v.as_str())).expect("failed to send reply");
+        }
+    });
+    test.check_use(
+        vec!["c"].try_into().unwrap(),
+        CheckUse::Service {
+            path: "/svc/my.service.Service".parse().unwrap(),
+            instance: ServiceInstance::Named("variantinstance".to_string()),
+            member: "echo".to_string(),
+            expected_res: ExpectedResult::Ok,
+        },
+    )
+    .await;
+    test.check_use(
+        vec!["c"].try_into().unwrap(),
         CheckUse::Service {
             path: "/svc/my.service.Service".parse().unwrap(),
             instance: ServiceInstance::Named("renamed_default".to_string()),
