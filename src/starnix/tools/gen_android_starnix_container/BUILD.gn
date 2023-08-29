@@ -26,12 +26,15 @@ if (is_host) {
     deps = [ ":gen_android_starnix_container_bin" ]
     _bin_src = rebase_path("${root_out_dir}/gen-android-starnix-container",
                            root_build_dir)
+
     contents = [
-      "[{",
-      "  \"source\": \"${_bin_src}\",",
-      "  \"destination\": \"gen-android-starnix-container\"",
-      "}]",
+      {
+        source = _bin_src
+        destination = "gen-android-starnix-container"
+      },
     ]
+    output_conversion = "json"
+
     outputs = [
       "${target_out_dir}/gen_android_starnix_container_assembly_inputs.json",
     ]
