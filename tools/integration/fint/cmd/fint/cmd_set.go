@@ -47,7 +47,7 @@ flags:
 
 func (c *SetCommand) SetFlags(f *flag.FlagSet) {
 	c.BaseCommand.SetFlags(f)
-	f.BoolVar(&c.skipLocalArgs, "skip-local-args", false, "skip inclusion of $CHECKOUT_DIR/local/args.gn")
+	f.BoolVar(&c.skipLocalArgs, "skip-local-args", true, "skip inclusion of $CHECKOUT_DIR/local/args.gn")
 }
 
 func (c *SetCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
