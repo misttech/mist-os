@@ -74,6 +74,7 @@ impl Injection {
         }
     }
 
+    #[tracing::instrument(skip(env_context))]
     pub async fn initialize_overnet(
         env_context: EnvironmentContext,
         hoist_cache_dir: &Path,
@@ -86,12 +87,15 @@ impl Injection {
         // hoist() unset for ffx but I'm leaving the last couple uses of it in place for the sake of
         // avoiding complicated merge conflicts with isolation. Once we're ready for that, this should be
         // `let Hoist = hoist::Hoist::new()...`
+        tracing::debug!("Initializing Hoist");
         let hoist = hoist::init_hoist_with(Hoist::with_cache_dir_maybe_router(
             hoist_cache_dir,
             router_interval,
         )?)
         .bug_context("Failed to initialize overnet")?;
+        tracing::debug!("Getting target");
         let target = ffx_target::maybe_inline_target(target, &env_context).await;
+        tracing::debug!("Building Injection");
         Ok(Injection::new(env_context, daemon_check, hoist.clone(), format, target))
     }
 

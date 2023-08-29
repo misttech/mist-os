@@ -120,6 +120,7 @@ async fn run_legacy_subcommand(
         app.global.target().await?,
     )
     .await?;
+    tracing::debug!("Overnet initialized, creating injector");
     let injector: Arc<dyn ffx_core::Injector> = Arc::new(injector);
     ffx_lib_suite::ffx_plugin_impl(&injector, subcommand).await
 }
