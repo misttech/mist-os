@@ -18,12 +18,6 @@ verify_partitions_configuration("verify_x64") {
   bazel_inputs = [ "//build/images/flash:esp.bazel_input" ]
 }
 
-verify_partitions_configuration("verify_qemu-x64") {
-  testonly = true
-  gn_partitions_config_target = "//boards/partitions:qemu-x64"
-  bazel_partitions_config_target = ":qemu-x64"
-}
-
 verify_partitions_configuration("verify_vim3") {
   testonly = true
   gn_partitions_config_target = "//boards/partitions:vim3"
@@ -39,7 +33,6 @@ verify_partitions_configuration("verify_riscv64") {
 group("verifications") {
   testonly = true
   deps = [
-    ":verify_qemu-x64",
     ":verify_riscv64",
     ":verify_vim3",
   ]

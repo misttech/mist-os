@@ -117,7 +117,20 @@ fuchsia_partitions_configuration(
 
 fuchsia_partitions_configuration(
     name = "qemu-x64",
+    bootloader_partitions = [
+        ":fuchsia_esp",
+    ],
     hardware_revision = "qemu-x64",
+    partitions = [
+        ":zircon-a",
+        ":zircon-b",
+        ":zircon-r",
+        ":vbmeta_a",
+        ":vbmeta_b",
+        ":vbmeta_r",
+        ":fvm",
+        ":fxfs",
+    ],
 )
 
 fuchsia_bootloader_partition(

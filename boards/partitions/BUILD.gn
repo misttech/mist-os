@@ -58,6 +58,26 @@ generated_partitions_config("x64") {
   fxfs = "fvm"
 }
 
+# TODO(b/293640613): This should stay the same as :x64 until we can delete
+# qemu-x64 entirely.
+generated_partitions_config("qemu-x64") {
+  forward_variables_from(_gigaboot, "*")
+  hw_revision = "qemu-x64"
+
+  # TODO: Investigate if we can change these to the standard names.
+  zbi_a = "zircon-a"
+  zbi_b = "zircon-b"
+  zbi_r = "zircon-r"
+  vbmeta_a = "vbmeta_a"
+  vbmeta_b = "vbmeta_b"
+  vbmeta_r = "vbmeta_r"
+
+  # At most one of either a fvm of fxfs will be generated, but the board
+  # supports either configuration.
+  fvm = "fvm"
+  fxfs = "fvm"
+}
+
 generated_partitions_config("arm64") {
   forward_variables_from(_gigaboot, "*")
   forward_variables_from(_standard_names, "*")
@@ -66,10 +86,6 @@ generated_partitions_config("arm64") {
 
 generated_partitions_config("riscv64") {
   hw_revision = "riscv64"
-}
-
-generated_partitions_config("qemu-x64") {
-  hw_revision = "qemu-x64"
 }
 
 # NOTE: if you touch this target, please add this line to your commit

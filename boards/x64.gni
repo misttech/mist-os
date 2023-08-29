@@ -11,10 +11,6 @@ board_configuration_label = "//boards/x64"
 board_name = "x64"
 board_description = "A generic x64 device"
 
-blobfs_capacity = 10485760000  # 10000 MiB
-max_blob_contents_size =
-    5216665600  # 4975 MiB. Leaves 50 MiB for the update package.
-
 _bootfs_deps = [
   # Drivers
   "//src/connectivity/ethernet/drivers/gvnic",
@@ -42,37 +38,7 @@ board_provided_drivers += [
   },
 ]
 
-# Some users leave a USB key (containing zedboot) plugged into their
-# device at all times. To avoid unintentionally breaking remote workflows,
-# we permit multiple GPT devices.
-board_fshost_config.gpt_all = true
-board_zedboot_fshost_config.gpt_all = true
-
-use_vbmeta = true
-build_uefi_disk = true
-use_gigaboot = true
-avb_key =
-    "//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"
-avb_atx_metadata =
-    "//third_party/android/platform/external/avb/test/data/atx_metadata.bin"
-
-assembly_generate_fvm_fastboot = true
-
-zircon_a_partition = "zircon-a"
-zircon_b_partition = "zircon-b"
-zircon_r_partition = "zircon-r"
-vbmeta_a_partition = "vbmeta_a"
-vbmeta_b_partition = "vbmeta_b"
-vbmeta_r_partition = "vbmeta_r"
-fvm_partition = "fvm"
-fxfs_partition = "fvm"
-active_partition = "a"
-fastboot_product = "gigaboot"
-
 # Supports both physical and virtual devices.
 board_is_emu = true
-
-partitions_config_label = "//boards/partitions:x64"
-partitions_config_contents += [ "$root_build_dir/fuchsia.esp.blk" ]
 
 bazel_product_bundle_board = "x64"
