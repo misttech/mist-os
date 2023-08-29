@@ -126,7 +126,7 @@ size_t _zxtest_print_hex(const void* val, size_t size, char* buffer, size_t buff
   }
 
   if (val == nullptr) {
-    snprintf(buffer, 9, "<nullptr>");
+    snprintf(buffer, 10, "<nullptr>");
   }
 
   for (size_t curr = 0; curr < size; ++curr) {
