@@ -48,7 +48,7 @@ zx::result<> Vim3::ButtonsInit() {
       fuchsia_input_report::ConsumerControlButton::kFunction};
   auto func_adc_config =
       fuchsia_buttons::AdcButtonConfig().channel_idx(2).release_threshold(1'000).press_threshold(
-          100);
+          70);
   auto func_config = fuchsia_buttons::ButtonConfig::WithAdc(std::move(func_adc_config));
   auto func_button =
       fuchsia_buttons::Button().types(std::move(func_types)).button_config(std::move(func_config));
