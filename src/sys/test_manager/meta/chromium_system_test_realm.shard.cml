@@ -28,7 +28,6 @@
         // These system capabilities are offered for use by the chromium tests.
         {
             protocol: [
-                "fuchsia.accessibility.semantics.SemanticsManager",
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.device.NameProvider",
                 "fuchsia.feedback.ComponentDataRegister",
@@ -37,13 +36,11 @@
                 "fuchsia.hwinfo.Board",
                 "fuchsia.hwinfo.Device",
                 "fuchsia.hwinfo.Product",
-                "fuchsia.input.virtualkeyboard.ControllerCreator",
                 "fuchsia.intl.PropertyProvider",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.media.Audio",
                 "fuchsia.media.AudioDeviceEnumerator",
                 "fuchsia.media.ProfileProvider",
-                "fuchsia.media.SessionAudioConsumerFactory",
                 "fuchsia.mediacodec.CodecFactory",
                 "fuchsia.memorypressure.Provider",
                 "fuchsia.net.http.Loader",
@@ -52,26 +49,16 @@
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.settings.Display",
-                "fuchsia.stash.SecureStore",
 
                 // Tests of the media system change their behavior based on
                 // board.
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
-                "fuchsia.ui.composition.Allocator",
-                "fuchsia.ui.composition.Flatland",
-                "fuchsia.ui.input3.Keyboard",
                 "fuchsia.vulkan.loader.Loader",
                 "fuchsia.web.ContextProvider",
             ],
             from: "parent",
             to: "#chromium-system-tests",
-        },
-        {
-            protocol: [ "fuchsia.ui.scenic.Scenic" ],
-            from: "parent",
-            to: "#chromium-system-tests",
-            availability: "same_as_target",
         },
         {
             protocol: [
@@ -81,6 +68,26 @@
             from: "parent",
             to: "#chromium-system-tests",
             availability: "optional",
+        },
+
+        // These protocols are optional because they may not exist on all products that
+        // include test_manager. They are routed with `same_as_target` because they
+        // are required by Chromium tests. The tests run only on products where the
+        // protocols are available.
+        {
+            protocol: [
+                "fuchsia.accessibility.semantics.SemanticsManager",
+                "fuchsia.input.virtualkeyboard.ControllerCreator",
+                "fuchsia.media.SessionAudioConsumerFactory",
+                "fuchsia.stash.SecureStore",
+                "fuchsia.ui.composition.Allocator",
+                "fuchsia.ui.composition.Flatland",
+                "fuchsia.ui.input3.Keyboard",
+                "fuchsia.ui.scenic.Scenic",
+            ],
+            from: "parent",
+            to: "#chromium-system-tests",
+            availability: "same_as_target",
         },
         {
             protocol: [
