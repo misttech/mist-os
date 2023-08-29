@@ -8,7 +8,8 @@ mod signals;
 mod socket;
 
 use super::stream::{Frame, StreamReaderBinder, StreamWriter};
-use crate::peer::{FramedStreamReader, PeerConnRef};
+use crate::coding;
+use crate::peer::{FramedStreamReader, MessageStats, PeerConnRef};
 use crate::router::Router;
 use anyhow::{bail, format_err, Error};
 use fidl::Signals;
@@ -80,8 +81,10 @@ pub(crate) trait Serializer: Send {
         msg: &mut Self::Message,
         bytes: &mut Vec<u8>,
         conn: PeerConnRef<'_>,
+        stats: &Arc<MessageStats>,
         router: &mut RouterHolder<'_>,
         fut_ctx: &mut Context<'_>,
+        coding_context: coding::Context,
     ) -> Poll<Result<(), Error>>;
 }
 
@@ -134,6 +137,7 @@ pub(crate) trait IntoProxied {
 pub(crate) struct ProxyableHandle<Hdl: Proxyable> {
     hdl: Hdl,
     router: Weak<Router>,
+    stats: Arc<MessageStats>,
 }
 
 impl<Hdl: Proxyable> std::fmt::Debug for ProxyableHandle<Hdl> {
@@ -143,8 +147,8 @@ impl<Hdl: Proxyable> std::fmt::Debug for ProxyableHandle<Hdl> {
 }
 
 impl<Hdl: Proxyable> ProxyableHandle<Hdl> {
-    pub(crate) fn new(hdl: Hdl, router: Weak<Router>) -> Self {
-        Self { hdl, router }
+    pub(crate) fn new(hdl: Hdl, router: Weak<Router>, stats: Arc<MessageStats>) -> Self {
+        Self { hdl, router, stats }
     }
 
     #[cfg(not(target_os = "fuchsia"))]
@@ -183,6 +187,10 @@ impl<Hdl: Proxyable> ProxyableHandle<Hdl> {
 
     pub(crate) fn router(&self) -> &Weak<Router> {
         &self.router
+    }
+
+    pub(crate) fn stats(&self) -> &Arc<MessageStats> {
+        &self.stats
     }
 
     /// Given a signal update from the wire, apply it to the underlying handle (signalling

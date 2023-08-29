@@ -9,22 +9,23 @@ use super::super::{
     Proxy, ProxyTransferInitiationReceiver,
 };
 use crate::handle_info::WithRights;
-use crate::peer::{FramedStreamReader, FramedStreamWriter, PeerConnRef};
+use crate::peer::{FramedStreamReader, FramedStreamWriter, MessageStats, PeerConnRef};
 use crate::router::{FoundTransfer, OpenedTransfer, Router};
 use anyhow::{format_err, Error};
 use fidl_fuchsia_overnet_protocol::{StreamId, StreamRef, TransferInitiator, TransferWaiter};
 use std::future::Future;
-use std::sync::Weak;
+use std::sync::{Arc, Weak};
 
 pub(crate) async fn send<Hdl: 'static + for<'a> ProxyableRW<'a>>(
     hdl: Hdl,
     initiate_transfer: ProxyTransferInitiationReceiver,
     stream_writer: FramedStreamWriter,
     stream_reader: FramedStreamReader,
+    stats: Arc<MessageStats>,
     router: Weak<Router>,
 ) -> Result<(), Error> {
     super::main::run_main_loop(
-        Proxy::new(hdl, router),
+        Proxy::new(hdl, router, stats),
         initiate_transfer,
         stream_writer,
         None,
@@ -41,6 +42,7 @@ pub(crate) async fn recv<Hdl, CreateType>(
     initiate_transfer: ProxyTransferInitiationReceiver,
     stream_ref: StreamRef,
     conn: PeerConnRef<'_>,
+    stats: Arc<MessageStats>,
     router: Weak<Router>,
 ) -> Result<(fidl::Handle, Option<impl Send + Future<Output = Result<(), Error>>>), Error>
 where
@@ -56,7 +58,7 @@ where
             (
                 app_chan.into_handle(),
                 Some(super::main::run_main_loop(
-                    Proxy::new(overnet_chan, router),
+                    Proxy::new(overnet_chan, router, stats),
                     initiate_transfer,
                     stream_writer,
                     None,
@@ -85,7 +87,7 @@ where
                 OpenedTransfer::Fused => {
                     let app_chan = app_chan.into_proxied()?;
                     (
-                        ProxyableHandle::new(app_chan, router)
+                        ProxyableHandle::new(app_chan, router, stats)
                             .drain_stream_to_handle(initial_stream_reader)
                             .await?,
                         None,
@@ -94,7 +96,7 @@ where
                 OpenedTransfer::Remote(stream_writer, stream_reader, overnet_chan) => (
                     app_chan.into_handle(),
                     Some(super::main::run_main_loop(
-                        Proxy::new(Hdl::from_fidl_handle(overnet_chan)?, router),
+                        Proxy::new(Hdl::from_fidl_handle(overnet_chan)?, router, stats),
                         initiate_transfer,
                         stream_writer,
                         Some(initial_stream_reader),
@@ -117,7 +119,7 @@ where
                 FoundTransfer::Fused(handle) => {
                     let handle = Hdl::from_fidl_handle(handle)?;
                     (
-                        ProxyableHandle::new(handle, router)
+                        ProxyableHandle::new(handle, router, stats)
                             .drain_stream_to_handle(initial_stream_reader)
                             .await?,
                         None,
@@ -128,7 +130,7 @@ where
                     (
                         app_chan.with_rights(rights)?.into_handle(),
                         Some(super::main::run_main_loop(
-                            Proxy::new(overnet_chan.into_proxied()?, router),
+                            Proxy::new(overnet_chan.into_proxied()?, router, stats),
                             initiate_transfer,
                             stream_writer,
                             Some(initial_stream_reader),

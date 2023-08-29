@@ -6,10 +6,12 @@ use super::{
     signals::Collector, IntoProxied, Message, Proxyable, ProxyableRW, ReadValue, RouterHolder,
     Serializer, IO,
 };
-use crate::peer::PeerConnRef;
+use crate::coding;
+use crate::peer::{MessageStats, PeerConnRef};
 use anyhow::{format_err, Error};
 use fidl::{AsHandleRef, HandleBased, Peered, Signals};
 use fuchsia_zircon_status as zx_status;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 pub(crate) struct EventPair {
@@ -112,8 +114,10 @@ impl Serializer for EventPairSerializer {
         _: &mut Self::Message,
         _: &mut Vec<u8>,
         _: PeerConnRef<'_>,
+        _: &Arc<MessageStats>,
         _: &mut RouterHolder<'_>,
         _: &mut Context<'_>,
+        _: coding::Context,
     ) -> Poll<Result<(), Error>> {
         // Reading from the event pair is always pending, therefore we can never serialize a message
         unreachable!()
@@ -133,8 +137,10 @@ impl Serializer for EventPairParser {
         _: &mut Self::Message,
         _: &mut Vec<u8>,
         _: PeerConnRef<'_>,
+        _: &Arc<MessageStats>,
         _: &mut RouterHolder<'_>,
         _: &mut Context<'_>,
+        _: coding::Context,
     ) -> Poll<Result<(), Error>> {
         Poll::Ready(Err(format_err!("Event pairs do not exchange message payloads")))
     }

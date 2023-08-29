@@ -10,26 +10,37 @@ rustc_test("fidl") {
   edition = "2021"
   deps = [
     "//sdk/fidl/fuchsia.overnet:fuchsia.overnet_rust",
-    "//src/connectivity/overnet/lib/circuit",
     "//src/connectivity/overnet/lib/core",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fidl/rust/handle_tests:fidl_handle_tests",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]
+  if (is_host) {
+    deps += [ "//src/connectivity/overnet/lib/core:test_certs" ]
+  }
 
   sources = [
     "src/channel.rs",
     "src/lib.rs",
     "src/socket.rs",
   ]
+  inputs = [
+    "//third_party/rust_crates/mirrors/quiche/quiche/examples/cert.crt",
+    "//third_party/rust_crates/mirrors/quiche/quiche/examples/cert.key",
+    "//third_party/rust_crates/mirrors/quiche/quiche/examples/rootca.crt",
+  ]
 }
 
 fuchsia_unittest_package("overnet-fidl-tests") {
-  deps = [ ":fidl" ]
+  deps = [
+    ":fidl",
+    "//src/connectivity/overnet:certificates",
+  ]
 }
 
 group("tests") {

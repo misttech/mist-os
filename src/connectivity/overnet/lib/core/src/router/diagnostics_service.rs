@@ -128,7 +128,7 @@ async fn handle_diagnostic_requests(
                         connecting_link_count: if_probe_has_bit(
                             selector,
                             ProbeSelector::CONNECTING_LINK_COUNT,
-                            async { 0 },
+                            futures::future::ready(get_router()?.connecting_link_count()),
                         )
                         .await,
                         ..Default::default()

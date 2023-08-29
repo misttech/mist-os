@@ -9,7 +9,7 @@ mod stream;
 use self::handle::{ProxyableHandle, ReadValue};
 use self::stream::StreamWriter;
 use crate::labels::{NodeId, TransferKey};
-use crate::peer::FramedStreamWriter;
+use crate::peer::{FramedStreamWriter, MessageStats};
 use crate::router::Router;
 use anyhow::{format_err, Error};
 use fidl_fuchsia_overnet_protocol::{
@@ -125,8 +125,8 @@ pub(crate) struct Proxy<Hdl: Proxyable + 'static> {
 }
 
 impl<Hdl: 'static + Proxyable> Proxy<Hdl> {
-    fn new(hdl: Hdl, router: Weak<Router>) -> Arc<Self> {
-        Arc::new(Self { hdl: Some(ProxyableHandle::new(hdl, router)) })
+    fn new(hdl: Hdl, router: Weak<Router>, stats: Arc<MessageStats>) -> Arc<Self> {
+        Arc::new(Self { hdl: Some(ProxyableHandle::new(hdl, router, stats)) })
     }
 
     fn hdl(&self) -> &ProxyableHandle<Hdl> {
