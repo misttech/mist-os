@@ -16,8 +16,8 @@ use {
         FutureExt, SinkExt, TryStreamExt,
     },
     std::borrow::BorrowMut,
-    std::collections::hash_map::Entry,
-    std::collections::HashMap,
+    std::collections::btree_map::Entry,
+    std::collections::BTreeMap,
     std::fmt::Debug,
     thiserror::Error,
     vfs::{
@@ -37,7 +37,7 @@ pub type Key = String;
 /// A capability that represents a dictionary of capabilities.
 #[derive(Capability, Debug)]
 pub struct Dict {
-    pub entries: HashMap<Key, AnyCapability>,
+    pub entries: BTreeMap<Key, AnyCapability>,
 
     /// When an external request tries to access a non-existent entry,
     /// the name of the entry will be sent using `not_found`.
@@ -47,13 +47,13 @@ pub struct Dict {
 impl Dict {
     /// Creates an empty dictionary.
     pub fn new() -> Self {
-        Dict { entries: HashMap::new(), not_found: unbounded().0 }
+        Dict { entries: BTreeMap::new(), not_found: unbounded().0 }
     }
 
     /// Creates an empty dictionary. When an external request tries to access a non-existent entry,
     /// the name of the entry will be sent using `not_found`.
     pub fn new_with_not_found(not_found: UnboundedSender<Key>) -> Self {
-        Dict { entries: HashMap::new(), not_found }
+        Dict { entries: BTreeMap::new(), not_found }
     }
 
     /// Serve the `fuchsia.component.Dict` protocol for this `Dict`.
@@ -62,7 +62,7 @@ impl Dict {
         mut stream: fsandbox::DictRequestStream,
     ) -> Result<(), Error> {
         // Tasks that serve the zx handles for entries removed from this dict.
-        let mut entry_tasks = vec![];
+        let mut entry_tasks = fasync::TaskGroup::new();
 
         while let Some(request) =
             stream.try_next().await.context("failed to read request from stream")?
@@ -87,7 +87,7 @@ impl Dict {
                         Some(cap) => {
                             let (handle, fut) = Box::new(cap).to_zx_handle();
                             if let Some(fut) = fut {
-                                entry_tasks.push(fasync::Task::spawn(fut));
+                                entry_tasks.spawn(fut);
                             }
                             Ok(handle)
                         }
@@ -98,6 +98,30 @@ impl Dict {
                             Err(fsandbox::DictError::NotFound)
                         }
                     };
+                    responder.send(result).context("failed to send response")?;
+                }
+                fsandbox::DictRequest::Read { responder } => {
+                    let result = (|| {
+                        let items = self
+                            .entries
+                            .iter()
+                            .map(|(key, value)| {
+                                let (handle, fut) = value.try_clone()?.to_zx_handle();
+                                Ok((fsandbox::DictItem { key: key.clone(), value: handle }, fut))
+                            })
+                            .collect::<Result<Vec<_>, ()>>()
+                            .map_err(|_| fsandbox::DictError::NotCloneable)?;
+                        let items: Vec<_> = items
+                            .into_iter()
+                            .map(|(item, fut)| {
+                                if let Some(fut) = fut {
+                                    entry_tasks.spawn(fut)
+                                }
+                                item
+                            })
+                            .collect();
+                        Ok(items)
+                    })();
                     responder.send(result).context("failed to send response")?;
                 }
             }
@@ -175,7 +199,7 @@ pub enum TryIntoOpenError {
 
 impl TryClone for Dict {
     fn try_clone(&self) -> Result<Self, ()> {
-        let entries: HashMap<Key, AnyCapability> = self
+        let entries: BTreeMap<Key, AnyCapability> = self
             .entries
             .iter()
             .map(|(key, value)| Ok((key.clone(), value.try_clone()?)))
@@ -378,6 +402,52 @@ mod tests {
         };
 
         try_join!(client, server).map(|_| ())
+    }
+
+    #[fuchsia::test]
+    async fn serve_read() -> Result<(), Error> {
+        let mut dict = Dict::new();
+
+        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictMarker>()?;
+        let _server = fasync::Task::spawn(async move { dict.serve_dict(dict_stream).await });
+
+        // Create two events and get the koids.
+        let mut events: Vec<_> = (0..2).map(|_| zx::Event::create()).collect();
+        let mut expected_koids: Vec<_> = (0..2).map(|i| events[i].get_koid()).collect();
+
+        // Add the events to the dict.
+        dict_proxy
+            .insert("cap1", events.remove(0).into_handle())
+            .await
+            .context("failed to call Insert")?
+            .map_err(|err| anyhow!("failed to insert: {:?}", err))?;
+        dict_proxy
+            .insert("cap2", events.remove(0).into_handle())
+            .await
+            .context("failed to call Insert")?
+            .map_err(|err| anyhow!("failed to insert: {:?}", err))?;
+
+        // Now read the entries back.
+        let mut items = dict_proxy.read().await.unwrap().unwrap();
+        assert_eq!(items.len(), 2);
+        assert_matches!(
+            items.remove(0),
+            fsandbox::DictItem {
+                key,
+                value,
+            }
+            if key == "cap1" && value.get_koid() == expected_koids.remove(0)
+        );
+        assert_matches!(
+            items.remove(0),
+            fsandbox::DictItem {
+                key,
+                value,
+            }
+            if key == "cap2" && value.get_koid() == expected_koids.remove(0)
+        );
+
+        Ok(())
     }
 
     /// Tests that a Dict can be cloned after a client inserts a cloneable handle.

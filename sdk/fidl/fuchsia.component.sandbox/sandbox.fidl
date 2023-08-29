@@ -27,6 +27,9 @@ type DictError = flexible enum {
 
     /// The `Capability` handle was invalid.
     BAD_HANDLE = 3;
+
+    /// A capability could not be cloned.
+    NOT_CLONEABLE = 4;
 };
 
 closed protocol Dict {
@@ -43,6 +46,16 @@ closed protocol Dict {
         key DictKey;
     }) -> (resource struct {
         capability Capability;
+    }) error DictError;
+
+    /// Returns all items in this dict. Requires that all capabilities in the dict
+    /// are cloneable. This will clone each capability in the dict and return handles
+    /// to the cloned capabilities.
+    ///
+    /// * error `DictError.NOT_CLONEABLE` if any of the capabilities in the dict
+    /// could not be cloned.
+    strict Read() -> (resource struct {
+        items vector<DictItem>:MAX;
     }) error DictError;
 };
 
