@@ -12,6 +12,7 @@ driver_deps = [
   "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
   "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
   "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
+  "//sdk/fidl/fuchsia.space:fuchsia.space_rust",
   "//src/lib/fidl/rust/fidl",
   "//src/lib/fuchsia",
   "//src/lib/fuchsia-component-test",
@@ -54,7 +55,7 @@ fuchsia_component("component") {
   deps = [
     ":driver",
     "//src/storage/testing:storage_driver_test_realm",
-    "//src/sys/base-resolver:production-component-and-config",
+    "//src/sys/pkg/bin/pkg-cache:production-component-and-config",
     "//src/sys/pkg/bin/pm:pm_bin",
   ]
 }
@@ -65,7 +66,7 @@ fuchsia_component("component_fxblob") {
   deps = [
     ":driver_fxblob",
     "//src/storage/testing:storage_driver_test_realm",
-    "//src/sys/base-resolver:production-component-and-config",
+    "//src/sys/pkg/bin/pkg-cache:production-component-and-config",
     "//src/sys/pkg/bin/pm:pm_bin",
   ]
 }

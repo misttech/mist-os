@@ -12,7 +12,7 @@
         "trace/use.shard.cml",
     ],
     program: {
-        binary: "bin/pkg_cache_lib_test",
+        binary: "bin/pkg_cache_bin_test",
     },
     use: [
         {

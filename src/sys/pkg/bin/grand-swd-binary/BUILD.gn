@@ -13,7 +13,6 @@ rustc_binary("grand-swd-binary") {
 
   deps = [
     "//src/sys/pkg/bin/omaha-client:lib",
-    "//src/sys/pkg/bin/pkg-cache:lib",
     "//src/sys/pkg/bin/pkg-resolver:lib",
     "//src/sys/pkg/bin/system-update-committer:lib",
     "//src/sys/pkg/bin/system-update-configurator:lib",

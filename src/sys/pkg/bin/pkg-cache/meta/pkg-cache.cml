@@ -13,10 +13,16 @@
     capabilities: [
         {
             protocol: [
+                "fuchsia.component.resolution.Resolver",
                 "fuchsia.pkg.PackageCache",
+                "fuchsia.pkg.PackageResolver",
                 "fuchsia.pkg.RetainedPackages",
                 "fuchsia.space.Manager",
             ],
+        },
+        {
+            resolver: "base_resolver",
+            path: "/svc/fuchsia.component.resolution.Resolver",
         },
         {
             directory: "pkgfs",
@@ -47,6 +53,11 @@
             directory: "build-info",
             rights: [ "r*" ],
             path: "/pkgfs/packages/build-info/0/data",
+        },
+        {
+            directory: "shell-commands-bin",
+            rights: [ "rx*" ],
+            path: "/shell-commands-bin",
         },
     ],
     use: [
@@ -81,8 +92,14 @@
     ],
     expose: [
         {
+            resolver: "base_resolver",
+            from: "self",
+        },
+        {
             protocol: [
+                "fuchsia.component.resolution.Resolver",
                 "fuchsia.pkg.PackageCache",
+                "fuchsia.pkg.PackageResolver",
                 "fuchsia.pkg.RetainedPackages",
                 "fuchsia.space.Manager",
             ],
@@ -95,6 +112,7 @@
                 "pkgfs",
                 "pkgfs-packages",
                 "root-ssl-certificates",
+                "shell-commands-bin",
                 "system",
             ],
             from: "self",
@@ -102,8 +120,8 @@
     ],
     config: {
         // If true, then pkg-cache will use the fuchsia.fxfs.BlobCreator capability from its
-        // environment to write blobs.
-        // Otherwise, pkg-cache will use the /blob directory to write blobs.
+        // environment to write blobs and the BlobReader to read and execute blobs.
+        // Otherwise, pkg-cache will use the /blob directory to read and write blobs.
         use_fxblob: { type: "bool" },
 
         // If true, pkg-cache will load the system_image package and use the settings contained

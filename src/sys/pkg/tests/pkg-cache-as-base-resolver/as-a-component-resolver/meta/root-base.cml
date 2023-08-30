@@ -5,8 +5,8 @@
     include: [ "inspect/offer.shard.cml" ],
     children: [
         {
-            name: "base_resolver",
-            url: "#meta/base-resolver.cm",
+            name: "pkg-cache",
+            url: "#meta/pkg-cache.cm",
         },
         {
             name: "integration_test",
@@ -27,12 +27,17 @@
         {
             directory: "blob-exec",
             from: "#fake_dependencies",
-            to: "#base_resolver",
+            to: "#pkg-cache",
         },
         {
             protocol: "fuchsia.boot.Arguments",
             from: "#fake_dependencies",
-            to: "#base_resolver",
+            to: "#pkg-cache",
+        },
+        {
+            protocol: "fuchsia.metrics.MetricEventLoggerFactory",
+            from: "#fake_dependencies",
+            to: "#pkg-cache",
         },
         {
             storage: "tmp",
@@ -48,15 +53,15 @@
             protocol: "fuchsia.logger.LogSink",
             from: "parent",
             to: [
-                "#base_resolver",
                 "#fake_dependencies",
                 "#integration_test",
+                "#pkg-cache",
                 "#subpackage_exposer",
             ],
         },
         {
             resolver: "base_resolver",
-            from: "#base_resolver",
+            from: "#pkg-cache",
             to: "#integration_test",
         },
     ],

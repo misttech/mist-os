@@ -18,7 +18,7 @@ const SAMPLE_UTF8_READONLY_FILE: &str = "/boot/config/build_info/minimum_utc_sta
 const SAMPLE_REQUIRED_DIRECTORY: &str = "/boot/lib";
 const KERNEL_VDSO_DIRECTORY: &str = "/boot/kernel/vdso";
 const BOOTFS_READONLY_FILES: &[&str] =
-    &["/boot/config/component_manager", "/boot/meta/base-resolver.cm"];
+    &["/boot/config/component_manager", "/boot/meta/pkg-cache.cm"];
 const BOOTFS_DATA_DIRECTORY: &str = "/boot/data";
 const BOOTFS_EXECUTABLE_LIB_FILES: &[&str] = &["ld.so.1", "libdriver_runtime.so"];
 const BOOTFS_EXECUTABLE_NON_LIB_FILES: &[&str] = &["/boot/bin/component_manager"];

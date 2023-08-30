@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/sys/base-resolver/tests/as-a-component-resolver/meta/root-base.cml",
+        "//src/sys/pkg/tests/pkg-cache-as-base-resolver/as-a-component-resolver/meta/root-base.cml",
         "inspect/offer.shard.cml",
     ],
     children: [
@@ -16,17 +16,17 @@
         {
             protocol: "fuchsia.fxfs.BlobCreator",
             from: "#fake_dependencies",
-            to: "#base_resolver",
+            to: "#pkg-cache",
         },
         {
             protocol: "fuchsia.fxfs.BlobReader",
             from: "#fake_dependencies",
-            to: "#base_resolver",
+            to: "#pkg-cache",
         },
         {
             protocol: "fuchsia.kernel.VmexResource",
             from: "parent",
-            to: "#base_resolver",
+            to: "#pkg-cache",
         },
     ],
 }

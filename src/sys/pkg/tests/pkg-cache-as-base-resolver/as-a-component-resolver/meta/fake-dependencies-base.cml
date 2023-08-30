@@ -11,9 +11,13 @@
     ],
     capabilities: [
         { protocol: "fuchsia.boot.Arguments" },
+        { protocol: "fuchsia.metrics.MetricEventLoggerFactory" },
         {
             directory: "blob-exec",
-            rights: [ "rx*" ],
+            rights: [
+                "execute",
+                "rw*",
+            ],
             path: "/blob",
         },
     ],
@@ -29,6 +33,10 @@
     expose: [
         {
             protocol: "fuchsia.boot.Arguments",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.metrics.MetricEventLoggerFactory",
             from: "self",
         },
         {

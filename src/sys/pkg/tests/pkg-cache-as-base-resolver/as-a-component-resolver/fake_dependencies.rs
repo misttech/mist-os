@@ -4,8 +4,10 @@
 
 use {
     fidl::endpoints::DiscoverableProtocolMarker as _,
-    fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio,
+    fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics,
     futures::stream::TryStreamExt as _,
+    mock_metrics::MockMetricEventLoggerFactory,
+    std::sync::Arc,
     tracing::info,
     vfs::directory::{entry::DirectoryEntry as _, helper::DirectlyMutable as _},
 };
@@ -54,6 +56,10 @@ async fn main() {
             fboot::ArgumentsMarker::PROTOCOL_NAME =>
                 vfs::service::host(move |stream: fboot::ArgumentsRequestStream| {
                     serve_boot_args(stream, system_image_hash)
+                }),
+            fmetrics::MetricEventLoggerFactoryMarker::PROTOCOL_NAME =>
+                vfs::service::host(move |stream| {
+                    Arc::new(MockMetricEventLoggerFactory::new()).run_logger_factory(stream)
                 }),
         },
         "blob" =>

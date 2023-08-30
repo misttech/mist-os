@@ -9,6 +9,7 @@ group("tests") {
     "isolated-ota:tests",
     "omaha-client:tests",
     "pkg-cache:tests",
+    "pkg-cache-as-base-resolver:tests",
     "pkg-resolver:tests",
     "pkgctl:tests",
     "pkgdir:tests",

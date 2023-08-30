@@ -104,11 +104,12 @@
             url: "fuchsia-boot:///#meta/cr50_agent.cm",
         },
         {
-            // base_resolver is present on all product configurations except
+            // pkg-cache is present on all product configurations except
             // bringup builds, as its dependency pkgfs is not available on
             // bringup builds either.
-            name: "base_resolver",
-            url: "fuchsia-boot:///#meta/base-resolver.cm",
+            name: "pkg-cache",
+            url: "fuchsia-boot:///#meta/pkg-cache.cm",
+            on_terminate: "reboot",
         },
         {
             name: "power_manager",
@@ -125,12 +126,6 @@
             name: "full_resolver",
             url: "fuchsia-pkg://fuchsia.com/full-resolver#meta/full-resolver.cm",
             environment: "#base-resolver-env",
-        },
-        {
-            name: "pkg-cache",
-            url: "fuchsia-pkg://fuchsia.com/pkg-cache#meta/pkg-cache.cm",
-            environment: "#base-resolver-env",
-            on_terminate: "reboot",
         },
     ],
     collections: [
@@ -305,14 +300,14 @@
         },
         {
             protocol: "fuchsia.component.resolution.Resolver",
-            from: "#base_resolver",
+            from: "#pkg-cache",
             as: "fuchsia.component.resolution.Resolver-base",
             to: [
                 "#driver_index",
                 "#driver_manager",
             ],
 
-            // base_resolver depends on fshost for blobfs and fshost depends transitively on
+            // pkg-cache depends on fshost for blobfs and fshost depends transitively on
             // driver_index and driver_manager, but driver_index and driver_manager don't need base
             // packages to provide fshost's (transitive) dependencies.
             dependency: "weak",
@@ -539,7 +534,6 @@
             protocol: [ "fuchsia.kernel.VmexResource" ],
             from: "parent",
             to: [
-                "#base_resolver",
                 "#fshost",
                 "#pkg-cache",
             ],
@@ -764,7 +758,7 @@
         },
         {
             directory: "shell-commands-bin",
-            from: "#base_resolver",
+            from: "#pkg-cache",
             as: "bin",
             to: "#console-launcher",
         },
@@ -919,7 +913,6 @@
             ],
             from: "#archivist",
             to: [
-                "#base_resolver",
                 "#boot-drivers",
                 "#console",
                 "#console-launcher",
@@ -1043,20 +1036,12 @@
         {
             protocol: "fuchsia.boot.Arguments",
             from: "parent",
-            to: "#base_resolver",
+            to: "#pkg-cache",
         },
         {
             directory: "blob-exec",
             from: "#fshost",
-            to: [
-                "#base_resolver",
-                "#pkg-cache",
-            ],
-        },
-        {
-            protocol: "fuchsia.boot.Arguments",
-            from: "parent",
-            to: "#pkg-cache",
+            to: [ "#pkg-cache" ],
         },
         {
             protocol: "fuchsia.fxfs.BlobCreator",
@@ -1067,10 +1052,7 @@
         {
             protocol: "fuchsia.fxfs.BlobReader",
             from: "#fshost",
-            to: [
-                "#base_resolver",
-                "#pkg-cache",
-            ],
+            to: [ "#pkg-cache" ],
             availability: "optional",
         },
         {
@@ -1123,7 +1105,7 @@
         },
         {
             directory: "shell-commands-bin",
-            from: "#base_resolver",
+            from: "#pkg-cache",
             as: "bin",
         },
         {
@@ -1145,12 +1127,12 @@
         },
         {
             protocol: "fuchsia.pkg.PackageResolver",
-            from: "#base_resolver",
+            from: "#pkg-cache",
             as: "fuchsia.pkg.PackageResolver-base",
         },
         {
             protocol: "fuchsia.component.resolution.Resolver",
-            from: "#base_resolver",
+            from: "#pkg-cache",
             as: "fuchsia.component.resolution.Resolver-base",
         },
         {
@@ -1250,7 +1232,7 @@
         },
         {
             resolver: "base_resolver",
-            from: "#base_resolver",
+            from: "#pkg-cache",
         },
         {
             protocol: [
@@ -1268,7 +1250,7 @@
             resolvers: [
                 {
                     resolver: "base_resolver",
-                    from: "#base_resolver",
+                    from: "#pkg-cache",
                     scheme: "fuchsia-pkg",
                 },
             ],
@@ -1338,7 +1320,7 @@
                 },
                 {
                     resolver: "base_resolver",
-                    from: "#base_resolver",
+                    from: "#pkg-cache",
                     scheme: "fuchsia-pkg",
                 },
             ],

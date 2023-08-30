@@ -13,26 +13,30 @@ use {
 
 pub(crate) async fn serve_request_stream(
     mut stream: fpkg::PackageResolverRequestStream,
-    base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
+    base_packages: HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
     authenticator: crate::context_authenticator::ContextAuthenticator,
-    blobfs: &blobfs::Client,
+    blobfs: blobfs::Client,
 ) -> anyhow::Result<()> {
     while let Some(request) =
         stream.try_next().await.context("failed to read request from FIDL stream")?
     {
         match request {
             fpkg::PackageResolverRequest::Resolve { package_url, dir, responder } => {
-                match resolve(&package_url, dir, base_packages, authenticator.clone(), blobfs)
-                        .await
-                    {
-                        Ok(context) => responder.send(Ok(&context)),
-                        Err(e) => {
-                            let fidl_error = (&e).into();
-                            error!("failed to resolve package {}: {:#}", package_url, anyhow::anyhow!(e));
-                            responder.send(Err(fidl_error))
-                        }
+                match resolve(&package_url, dir, &base_packages, authenticator.clone(), &blobfs)
+                    .await
+                {
+                    Ok(context) => responder.send(Ok(&context)),
+                    Err(e) => {
+                        let fidl_error = (&e).into();
+                        error!(
+                            "failed to resolve package {}: {:#}",
+                            package_url,
+                            anyhow::anyhow!(e)
+                        );
+                        responder.send(Err(fidl_error))
                     }
-                    .context("sending fuchsia.pkg/PackageResolver.Resolve response")?;
+                }
+                .context("sending fuchsia.pkg/PackageResolver.Resolve response")?;
             }
             fpkg::PackageResolverRequest::ResolveWithContext {
                 package_url,
@@ -44,9 +48,9 @@ pub(crate) async fn serve_request_stream(
                     &package_url,
                     context,
                     dir,
-                    base_packages,
+                    &base_packages,
                     authenticator.clone(),
-                    blobfs,
+                    &blobfs,
                 )
                 .await
                 {

@@ -301,7 +301,6 @@
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/fshost/blobfs",
-                    "/bootstrap/base_resolver",
                     "/bootstrap/pkg-cache",
 
                     // TODO(fxbug.dev/122055): Remove once merkle verification happens
@@ -429,7 +428,6 @@
                     "/bootstrap/fshost",
                     "/bootstrap/fshost/blobfs",
                     "/bootstrap/pkg-cache",
-                    "/bootstrap/base_resolver",
                 ],
             },
             {
@@ -508,7 +506,7 @@
             {
                 // We restrict access to PackageResolver because it gives direct access to
                 // executable package handles.
-                source_moniker: "/bootstrap/base_resolver",
+                source_moniker: "/bootstrap/pkg-cache",
                 source: "component",
                 source_name: "fuchsia.pkg.PackageResolver",
                 capability: "protocol",
@@ -519,7 +517,7 @@
             {
                 // We restrict access to component.resolution.Resolver because it gives direct
                 // access to executable package handles.
-                source_moniker: "/bootstrap/base_resolver",
+                source_moniker: "/bootstrap/pkg-cache",
                 source: "component",
                 source_name: "fuchsia.component.resolution.Resolver",
                 capability: "protocol",

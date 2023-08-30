@@ -901,20 +901,20 @@ mod tests {
                 json!({
                     "children": [
                         {
-                            "name": "base_resolver",
+                            "name": "pkg-cache",
                             // A declared but undefined child component, so its capabilities cannot
                             // be analyzed.
-                            "url": "fuchsia-boot:///#meta/base-resolver.cm",
+                            "url": "fuchsia-boot:///#meta/pkg-cache.cm",
                         },
                     ],
                     "expose": [
                         {
                             "protocol": "fuchsia.component.resolution.Resolver",
-                            "from": "#base_resolver",
+                            "from": "#pkg-cache",
                         },
                         {
                             "resolver": "base_resolver",
-                            "from": "#base_resolver",
+                            "from": "#pkg-cache",
                         },
                     ],
                 }),
@@ -967,11 +967,11 @@ mod tests {
                     ]
                 }),
             ),
-            // Don't provide a definition of the base-resolver component
+            // Don't provide a definition of the pkg-cache component
             // to ensure the walker ignores invalid resolver configurations
             /*
             (
-                "fuchsia-boot:///#meta/base-resolver.cm",
+                "fuchsia-boot:///#meta/pkg-cache.cm",
                 json!({
                     "program": {
                         "runner": "elf",

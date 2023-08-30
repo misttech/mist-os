@@ -57,7 +57,7 @@ digraph {
                     .system_image_deps
                     zircon/kernel
                     :${labels.fshost_config}
-                    src/sys/base-resolver:bootfs
+                    src/sys/pkg/bin/pkg-cache:bootfs
                     :${driver_manager_base_config_label}"
                 ]
 

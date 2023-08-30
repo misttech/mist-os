@@ -16,9 +16,9 @@ use {
 
 pub(crate) async fn serve_request_stream(
     mut stream: fcomponent_resolution::ResolverRequestStream,
-    base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
+    base_packages: HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
     authenticator: crate::context_authenticator::ContextAuthenticator,
-    blobfs: &blobfs::Client,
+    blobfs: blobfs::Client,
 ) -> anyhow::Result<()> {
     while let Some(request) =
         stream.try_next().await.context("failed to read request from FIDL stream")?
@@ -27,7 +27,7 @@ pub(crate) async fn serve_request_stream(
             fcomponent_resolution::ResolverRequest::Resolve { component_url, responder } => {
                 let () = responder
                     .send(
-                        resolve(&component_url, base_packages, authenticator.clone(), blobfs)
+                        resolve(&component_url, &base_packages, authenticator.clone(), &blobfs)
                             .await
                             .map_err(|e| {
                                 let fidl_err = (&e).into();
@@ -51,9 +51,9 @@ pub(crate) async fn serve_request_stream(
                         resolve_with_context(
                             &component_url,
                             context,
-                            base_packages,
+                            &base_packages,
                             authenticator.clone(),
-                            blobfs,
+                            &blobfs,
                         )
                         .await
                         .map_err(|e| {

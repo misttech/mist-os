@@ -47,26 +47,30 @@ fuchsia_test_component("root_fxblob") {
   test_type = "system"
 }
 
+fake_dependencies_deps = [
+  "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
+  "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+  "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
+  "//src/lib/fidl/rust/fidl",
+  "//src/lib/fuchsia",
+  "//src/lib/fuchsia-runtime",
+  "//src/lib/storage/vfs/rust:vfs",
+  "//src/sys/pkg/lib/fuchsia-hash",
+  "//src/sys/pkg/lib/fuchsia-pkg-testing",
+  "//src/sys/pkg/lib/system-image",
+  "//src/sys/pkg/testing/blobfs-ramdisk",
+  "//src/sys/pkg/testing/mock-metrics",
+  "//third_party/rust_crates:futures",
+  "//third_party/rust_crates:tracing",
+]
+
 rustc_binary("fake_dependencies_fxblob_bin") {
   edition = "2021"
   testonly = true
   name = "base_resolver_fake_dependencies_fxblob_bin"
   source_root = "fake_dependencies.rs"
-  deps = [
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia",
-    "//src/lib/fuchsia-runtime",
-    "//src/lib/storage/vfs/rust:vfs",
-    "//src/storage/fxfs:fxfs_component",
-    "//src/sys/pkg/lib/fuchsia-hash",
-    "//src/sys/pkg/lib/fuchsia-pkg-testing",
-    "//src/sys/pkg/lib/system-image",
-    "//src/sys/pkg/testing/blobfs-ramdisk",
-    "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
-  ]
+  deps = fake_dependencies_deps
+  deps += [ "//src/storage/fxfs:fxfs_component" ]
   features = [ "use_fxblob" ]
   sources = [ "fake_dependencies.rs" ]
 }
@@ -86,20 +90,7 @@ rustc_binary("fake_dependencies_bin") {
   testonly = true
   name = "base_resolver_fake_dependencies_bin"
   source_root = "fake_dependencies.rs"
-  deps = [
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia",
-    "//src/lib/fuchsia-runtime",
-    "//src/lib/storage/vfs/rust:vfs",
-    "//src/sys/pkg/lib/fuchsia-hash",
-    "//src/sys/pkg/lib/fuchsia-pkg-testing",
-    "//src/sys/pkg/lib/system-image",
-    "//src/sys/pkg/testing/blobfs-ramdisk",
-    "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
-  ]
+  deps = fake_dependencies_deps
   sources = [ "fake_dependencies.rs" ]
 }
 
@@ -190,12 +181,17 @@ fidl("test.ping") {
 
 fuchsia_test_package("base-resolver-as-a-component-resolver-tests") {
   test_components = [ ":root" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
   deps = [
     ":fake-dependencies",
     ":integration-test",
     ":mock-component",
     ":mock-superpackage-component",
-    "//src/sys/base-resolver:component-and-config-cpp-blobfs",
+    "//src/sys/pkg/bin/pkg-cache:production-component-and-config-cpp-blobfs",
   ]
 
   subpackages = [ ":subpackaged-component" ]
@@ -203,12 +199,17 @@ fuchsia_test_package("base-resolver-as-a-component-resolver-tests") {
 
 fuchsia_test_package("base-resolver-as-a-component-resolver-tests-fxblob") {
   test_components = [ ":root_fxblob" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
   deps = [
     ":fake-dependencies-fxblob",
     ":integration-test",
     ":mock-component",
     ":mock-superpackage-component",
-    "//src/sys/base-resolver:component-and-config-fxblob",
+    "//src/sys/pkg/bin/pkg-cache:production-component-and-config-fxblob",
   ]
 
   subpackages = [ ":subpackaged-component" ]

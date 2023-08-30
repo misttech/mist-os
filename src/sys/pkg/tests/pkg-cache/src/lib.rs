@@ -11,10 +11,11 @@ use {
     assert_matches::assert_matches,
     blobfs_ramdisk::BlobfsRamdisk,
     fidl::endpoints::DiscoverableProtocolMarker as _,
-    fidl_fuchsia_boot as fboot, fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio,
-    fidl_fuchsia_metrics as fmetrics, fidl_fuchsia_pkg as fpkg, fidl_fuchsia_pkg_ext as fpkg_ext,
-    fidl_fuchsia_space as fspace, fidl_fuchsia_update as fupdate,
-    fidl_fuchsia_update_verify as fupdate_verify, fuchsia_async as fasync,
+    fidl_fuchsia_boot as fboot, fidl_fuchsia_component_resolution as fcomponent_resolution,
+    fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics,
+    fidl_fuchsia_pkg as fpkg, fidl_fuchsia_pkg_ext as fpkg_ext, fidl_fuchsia_space as fspace,
+    fidl_fuchsia_update as fupdate, fidl_fuchsia_update_verify as fupdate_verify,
+    fuchsia_async as fasync,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     fuchsia_inspect::{reader::DiagnosticsHierarchy, testing::TreeAssertion},
     fuchsia_merkle::Hash,
@@ -40,6 +41,8 @@ mod pkgfs;
 mod retained_packages;
 mod space;
 mod sync;
+
+static SHELL_COMMANDS_BIN_PATH: &'static str = "shell-commands-bin";
 
 #[derive(Debug)]
 enum WriteBlobError {
@@ -663,6 +666,9 @@ where
                     .capability(Capability::protocol::<fpkg::PackageCacheMarker>())
                     .capability(Capability::protocol::<fpkg::RetainedPackagesMarker>())
                     .capability(Capability::protocol::<fspace::ManagerMarker>())
+                    .capability(Capability::protocol::<fpkg::PackageResolverMarker>())
+                    .capability(Capability::protocol::<fcomponent_resolution::ResolverMarker>())
+                    .capability(Capability::directory(SHELL_COMMANDS_BIN_PATH))
                     .capability(Capability::directory("pkgfs"))
                     .capability(Capability::directory("system"))
                     .capability(Capability::directory("pkgfs-packages"))

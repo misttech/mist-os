@@ -8,7 +8,7 @@ use {
     fidl::endpoints::DiscoverableProtocolMarker as _,
     fidl_fuchsia_boot as fboot, fidl_fuchsia_component_decl as fcomponent_decl,
     fidl_fuchsia_component_resolution as fcomponent_resolution, fidl_fuchsia_io as fio,
-    fidl_fuchsia_pkg as fpkg,
+    fidl_fuchsia_pkg as fpkg, fidl_fuchsia_space as fspace,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     futures::{
         future::{BoxFuture, FutureExt as _},
@@ -74,8 +74,8 @@ impl TestEnvBuilder {
 
         let builder = RealmBuilder::new().await.unwrap();
 
-        let resolver = builder
-            .add_child("resolver", "#meta/base-resolver.cm", ChildOptions::new())
+        let pkg_cache = builder
+            .add_child("pkg_cache", "#meta/pkg-cache.cm", ChildOptions::new())
             .await
             .unwrap();
 
@@ -110,10 +110,10 @@ impl TestEnvBuilder {
             .await
             .unwrap();
 
-        builder.init_mutable_config_from_package(&resolver).await.unwrap();
+        builder.init_mutable_config_from_package(&pkg_cache).await.unwrap();
         match BLOB_IMPLEMENTATION {
             blobfs_ramdisk::Implementation::Fxblob => {
-                builder.set_config_value_bool(&resolver, "use_fxblob", true).await.unwrap();
+                builder.set_config_value_bool(&pkg_cache, "use_fxblob", true).await.unwrap();
 
                 let svc_dir = vfs::remote::remote_dir(blobfs.svc_dir().unwrap().unwrap());
                 let service_reflector = builder
@@ -147,6 +147,13 @@ impl TestEnvBuilder {
                     .add_route(
                         Route::new()
                             .capability(
+                                Capability::protocol::<fidl_fuchsia_fxfs::BlobCreatorMarker>()
+                                    .path(format!(
+                                        "/blob-svc/{}",
+                                        fidl_fuchsia_fxfs::BlobCreatorMarker::PROTOCOL_NAME
+                                    )),
+                            )
+                            .capability(
                                 Capability::protocol::<fidl_fuchsia_fxfs::BlobReaderMarker>().path(
                                     format!(
                                         "/blob-svc/{}",
@@ -155,13 +162,13 @@ impl TestEnvBuilder {
                                 ),
                             )
                             .from(&service_reflector)
-                            .to(&resolver),
+                            .to(&pkg_cache),
                     )
                     .await
                     .unwrap();
             }
             blobfs_ramdisk::Implementation::CppBlobfs => {
-                builder.set_config_value_bool(&resolver, "use_fxblob", false).await.unwrap();
+                builder.set_config_value_bool(&pkg_cache, "use_fxblob", false).await.unwrap();
             }
         }
 
@@ -169,11 +176,13 @@ impl TestEnvBuilder {
             .add_route(
                 Route::new()
                     .capability(
-                        Capability::directory("blob-exec").path("/blob").rights(fio::RX_STAR_DIR),
+                        Capability::directory("blob-exec")
+                            .path("/blob")
+                            .rights(fio::RW_STAR_DIR | fio::Operations::EXECUTE),
                     )
                     .capability(Capability::protocol::<fboot::ArgumentsMarker>())
                     .from(&local_mocks)
-                    .to(&resolver),
+                    .to(&pkg_cache),
             )
             .await
             .unwrap();
@@ -183,7 +192,7 @@ impl TestEnvBuilder {
                 Route::new()
                     .capability(Capability::protocol::<fidl_fuchsia_logger::LogSinkMarker>())
                     .from(Ref::parent())
-                    .to(&resolver),
+                    .to(&pkg_cache),
             )
             .await
             .unwrap();
@@ -191,10 +200,16 @@ impl TestEnvBuilder {
         builder
             .add_route(
                 Route::new()
+                    .capability(Capability::protocol::<fpkg::PackageCacheMarker>())
+                    .capability(Capability::protocol::<fpkg::RetainedPackagesMarker>())
+                    .capability(Capability::protocol::<fspace::ManagerMarker>())
                     .capability(Capability::protocol::<fpkg::PackageResolverMarker>())
                     .capability(Capability::protocol::<fcomponent_resolution::ResolverMarker>())
                     .capability(Capability::directory(SHELL_COMMANDS_BIN_PATH))
-                    .from(&resolver)
+                    .capability(Capability::directory("pkgfs"))
+                    .capability(Capability::directory("system"))
+                    .capability(Capability::directory("pkgfs-packages"))
+                    .from(&pkg_cache)
                     .to(Ref::parent()),
             )
             .await
