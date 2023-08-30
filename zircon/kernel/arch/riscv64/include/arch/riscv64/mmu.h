@@ -88,6 +88,27 @@ constexpr pte_t riscv64_pte_pa_to_pte(paddr_t pa) {
   return (pa >> PAGE_SIZE_SHIFT) << RISCV64_PTE_PPN_SHIFT;
 }
 
+// Helper routines for flushing the paging related TLBs on the local cpu
+// From RISC-V privileged spec 1.12, section 4.2.1 - Supervisor Memory-Management Fence Instruction
+
+// Flush the TLB completely, including global pages
+inline void riscv64_tlb_flush_all() { __asm__("sfence.vma  zero, zero" ::: "memory"); }
+
+// Flush all non global pages from this ASID
+inline void riscv64_tlb_flush_asid(uint16_t asid) {
+  __asm__ __volatile__("sfence.vma  zero, %0" ::"r"(asid) : "memory");
+}
+
+// Flush all pages with this address from all ASIDs, including global pages
+inline void riscv64_tlb_flush_address_all_asids(vaddr_t va) {
+  __asm__ __volatile__("sfence.vma  %0, zero" ::"r"(va) : "memory");
+}
+
+// Flush all pages with this address from one ASID, not including global pages
+inline void riscv64_tlb_flush_address_one_asid(vaddr_t va, uint16_t asid) {
+  __asm__ __volatile__("sfence.vma  %0, %1" ::"r"(va), "r"(asid) : "memory");
+}
+
 #endif  // __ASSEMBLER__
 
 #endif  // ZIRCON_KERNEL_ARCH_RISCV64_INCLUDE_ARCH_RISCV64_MMU_H_

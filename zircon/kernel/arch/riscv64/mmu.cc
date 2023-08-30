@@ -72,12 +72,13 @@ alignas(PAGE_SIZE) pte_t
 
 uint64_t riscv_asid_mask;
 
-KCOUNTER(cm_flush_all, "mmu.consistency_manager.flush_all")
-KCOUNTER(cm_flush_all_replacing, "mmu.consistency_manager.flush_all_replacing")
-KCOUNTER(cm_single_tlb_invalidates, "mmu.consistency_manager.single_tlb_invalidate")
-KCOUNTER(cm_flush, "mmu.consistency_manager.flush")
+KCOUNTER(cm_flush_call, "mmu.consistency_manager.flush_call")
+KCOUNTER(cm_asid_invalidate, "mmu.consistency_manager.asid_invalidate")
+KCOUNTER(cm_global_invalidate, "mmu.consistency_manager.global_invalidate")
+KCOUNTER(cm_page_run_invalidate, "mmu.consistency_manager.page_run_invalidate")
+KCOUNTER(cm_single_page_invalidate, "mmu.consistency_manager.single_page_invalidate")
 
-AsidAllocator asid;
+AsidAllocator asid_allocator;
 
 KCOUNTER(vm_mmu_protect_make_execute_calls, "vm.mmu.protect.make_execute_calls")
 KCOUNTER(vm_mmu_protect_make_execute_pages, "vm.mmu.protect.make_execute_pages")
@@ -106,7 +107,7 @@ constexpr uintptr_t page_size_per_level(uint level) {
 
 constexpr uintptr_t page_mask_per_level(uint level) { return page_size_per_level(level) - 1; }
 
-// Convert user level mmu flags to flags that go in L1 descriptors.
+// Convert user level mmu flags to flags that go in leaf descriptors.
 constexpr pte_t mmu_flags_to_pte_attr(uint flags, bool global) {
   pte_t attr = RISCV64_PTE_V;
   attr |= RISCV64_PTE_A | RISCV64_PTE_D;
@@ -117,6 +118,12 @@ constexpr pte_t mmu_flags_to_pte_attr(uint flags, bool global) {
   attr |= (global) ? RISCV64_PTE_G : 0;
 
   return attr;
+}
+
+// Construct a non leaf page table entry.
+// For all inner page tables for the entire kernel hierarchy, set the global bit.
+constexpr pte_t mmu_non_leaf_pte(paddr_t pa, bool global) {
+  return riscv64_pte_pa_to_pte(pa) | (global ? RISCV64_PTE_G : 0) | RISCV64_PTE_V;
 }
 
 void update_pte(volatile pte_t* pte, pte_t newval) { *pte = newval; }
@@ -145,7 +152,7 @@ bool page_table_is_clear(const volatile pte_t* page_table) {
   return clear;
 }
 
-Riscv64AspaceType AspaceTypeFromFlags(uint mmu_flags) {
+constexpr Riscv64AspaceType AspaceTypeFromFlags(uint mmu_flags) {
   // Kernel/Guest flags are mutually exclusive. Ensure at most 1 is set.
   DEBUG_ASSERT(((mmu_flags & ARCH_ASPACE_FLAG_KERNEL) != 0) +
                    ((mmu_flags & ARCH_ASPACE_FLAG_GUEST) != 0) <=
@@ -159,7 +166,7 @@ Riscv64AspaceType AspaceTypeFromFlags(uint mmu_flags) {
   return Riscv64AspaceType::kUser;
 }
 
-ktl::string_view Riscv64AspaceTypeName(Riscv64AspaceType type) {
+constexpr ktl::string_view Riscv64AspaceTypeName(Riscv64AspaceType type) {
   switch (type) {
     case Riscv64AspaceType::kKernel:
       return "kernel";
@@ -167,8 +174,6 @@ ktl::string_view Riscv64AspaceTypeName(Riscv64AspaceType type) {
       return "user";
     case Riscv64AspaceType::kGuest:
       return "guest";
-    case Riscv64AspaceType::kHypervisor:
-      return "hypervisor";
   }
   __UNREACHABLE;
 }
@@ -228,55 +233,83 @@ class Riscv64ArchVmAspace::ConsistencyManager {
   // Queue a TLB entry for flushing. This may get turned into a complete ASID flush.
   void FlushEntry(vaddr_t va, bool terminal) {
     AssertHeld(aspace_.lock_);
-    // Check we have queued too many entries already.
-    if (num_pending_tlbs_ >= kMaxPendingTlbs) {
-      // Most of the time we will now prefer to invalidate the entire ASID, the exception is if
-      // this aspace is using the global ASID.
-      if (aspace_.asid_ != MMU_RISCV64_GLOBAL_ASID) {
-        // Keep counting entries so that we can track how many TLB invalidates we saved by grouping.
-        num_pending_tlbs_++;
-        return;
-      }
-      // Flush what pages we've cached up until now and reset counter to zero.
-      Flush();
-    }
 
-    // va must be page aligned so we can safely throw away the bottom bit.
+    LTRACEF("va %#lx, asid %#x, terminal %u\n", va, aspace_.asid_, terminal);
+
     DEBUG_ASSERT(IS_PAGE_ALIGNED(va));
     DEBUG_ASSERT(aspace_.IsValidVaddr(va));
 
-    pending_tlbs_[num_pending_tlbs_].terminal = terminal;
-    pending_tlbs_[num_pending_tlbs_].va_shifted = va >> 1;
-    num_pending_tlbs_++;
+    if (full_flush_) {
+      // If we've already decided to do a full flush, nothing more to track here.
+      return;
+    }
+
+    // If we're asked to flush a non terminal entry, we're going to need to dump the entire ASID
+    // so skip tracking this VA and exit now.
+    if (!terminal) {
+      full_flush_ = true;
+      return;
+    }
+
+    // Check we have queued too many entries already.
+    if (num_pending_tlb_runs_ >= kMaxPendingTlbRuns) {
+      // Most of the time we will now prefer to invalidate the entire ASID, the exception is if
+      // this aspace is for the kernel, in which all pages are global and we need to flush
+      // them one at a time.
+      if (!aspace_.IsKernel()) {
+        full_flush_ = true;
+        return;
+      }
+
+      // Kernel case: Flush what pages we've cached up until now and reset counter to zero.
+      Flush();
+    }
+
+    if (num_pending_tlb_runs_ > 0) {
+      // See if this entry completes the previous run or is the start of the previous run.
+      // The latter catches a fairly common case of multiple flushes of the same page in a row.
+      auto& run = pending_tlbs_[num_pending_tlb_runs_ - 1];
+      if ((run.va + run.count * PAGE_SIZE == va)) {
+        run.count++;
+        return;
+      }
+      if (run.va == va) {
+        return;
+      }
+    }
+
+    // Start a new run of entries to track
+    pending_tlbs_[num_pending_tlb_runs_].va = va;
+    pending_tlbs_[num_pending_tlb_runs_].count = 1;
+    num_pending_tlb_runs_++;
   }
 
   // Performs any pending synchronization of TLBs and page table walkers. Includes the MB to ensure
   // TLB flushes have completed prior to returning to user.
   void Flush() TA_REQ(aspace_.lock_) {
-    cm_flush.Add(1);
-    if (num_pending_tlbs_ == 0) {
+    kcounter_add(cm_flush_call, 1);
+    if (!full_flush_ && num_pending_tlb_runs_ == 0) {
       return;
     }
     // Need a mb to synchronize any page table updates prior to flushing the TLBs.
     mb();
 
     // Check if we should just be performing a full ASID invalidation.
-    if (num_pending_tlbs_ > kMaxPendingTlbs) {
-      cm_flush_all.Add(1);
-      cm_flush_all_replacing.Add(num_pending_tlbs_);
+    if (full_flush_) {
       aspace_.FlushAsid();
     } else {
-      for (size_t i = 0; i < num_pending_tlbs_; i++) {
-        const vaddr_t va = pending_tlbs_[i].va_shifted << 1;
-        DEBUG_ASSERT(aspace_.IsValidVaddr(va));
-        aspace_.FlushTLBEntry(va, pending_tlbs_[i].terminal);
+      for (size_t i = 0; i < num_pending_tlb_runs_; i++) {
+        const vaddr_t va = pending_tlbs_[i].va;
+        const size_t count = pending_tlbs_[i].count;
+
+        aspace_.FlushTLBEntryRun(va, count);
       }
-      cm_single_tlb_invalidates.Add(num_pending_tlbs_);
     }
 
     // mb to ensure TLB flushes happen prior to returning to user.
     mb();
-    num_pending_tlbs_ = 0;
+    num_pending_tlb_runs_ = 0;
+    full_flush_ = false;
   }
 
   // Queue a page for freeing that is dependent on TLB flushing. This is for pages that were
@@ -286,21 +319,29 @@ class Riscv64ArchVmAspace::ConsistencyManager {
 
  private:
   // Maximum number of TLB entries we will queue before switching to ASID invalidation.
-  static constexpr size_t kMaxPendingTlbs = 8;
-
-  // Pending TLBs to flush are stored as 63 bits, with the bottom bit stolen to store the terminal
-  // flag. 63 bits is more than enough as these entries are page aligned at the minimum.
-  struct {
-    bool terminal : 1;
-    uint64_t va_shifted : 63;
-  } pending_tlbs_[kMaxPendingTlbs];
-  size_t num_pending_tlbs_ = 0;
+  static constexpr uint32_t kMaxPendingTlbRuns = 8;
 
   // vm_page_t's to release to the PMM after the TLB invalidation occurs.
   list_node to_free_ = LIST_INITIAL_VALUE(to_free_);
 
   // The aspace we are invalidating TLBs for.
   const Riscv64ArchVmAspace& aspace_;
+
+  // Perform a full flush of the entire ASID (or all ASIDs if a kernel aspace) in these cases:
+  // 1) We've accumulated more than kMaxPendingTlbRuns run of pages, which are expensive to perform
+  // because of cross cpu TLB shootdowns.
+  // 2) If we've been asked to flush a non terminal page, which according to the RISC-V
+  // privileged spec should involve clearing the entire ASID.
+  bool full_flush_ = false;
+
+  // Pending TLBs to flush are stored as a virtual address + a count of pages to flush in a run.
+  uint32_t num_pending_tlb_runs_ = 0;
+
+  // A run of pages to flush.
+  struct {
+    uint64_t va;
+    size_t count;
+  } pending_tlbs_[kMaxPendingTlbRuns];
 };
 
 uint Riscv64ArchVmAspace::MmuFlagsFromPte(pte_t pte) {
@@ -434,7 +475,7 @@ zx_status_t Riscv64ArchVmAspace::SplitLargePage(vaddr_t vaddr, uint level, vaddr
   // Ensure all zeroing becomes visible prior to page table installation.
   wmb();
 
-  update_pte(&page_table[pt_index], riscv64_pte_pa_to_pte(paddr) | RISCV64_PTE_V);
+  update_pte(&page_table[pt_index], mmu_non_leaf_pte(paddr, IsKernel()));
   LTRACEF("pte %p[%#" PRIxPTR "] = %#" PRIx64 "\n", page_table, pt_index, page_table[pt_index]);
 
   // no need to update the page table count here since we're replacing a block entry with a table
@@ -445,25 +486,53 @@ zx_status_t Riscv64ArchVmAspace::SplitLargePage(vaddr_t vaddr, uint level, vaddr
   return ZX_OK;
 }
 
-// use the appropriate TLB flush instruction to globally flush the modified entry
-// terminal is set when flushing at the final level of the page table.
-void Riscv64ArchVmAspace::FlushTLBEntry(vaddr_t vaddr, bool terminal) const {
-  LTRACEF("vaddr %#lx asid %#hx terminal %u\n", vaddr, asid_, terminal);
-  cpu_mask_t cpu_mask = mask_all_but_one(arch_curr_cpu_num());
-  if (terminal) {
-    __asm__ __volatile__("sfence.vma  %0, %1" ::"r"(vaddr), "r"(asid_) : "memory");
-    sbi_remote_sfence_vma_asid(cpu_mask, vaddr, PAGE_SIZE, asid_);
+// Use the appropriate TLB flush instruction to globally flush the modified run of pages
+// in the appropriate ASID or global if kernel.
+void Riscv64ArchVmAspace::FlushTLBEntryRun(vaddr_t vaddr, size_t count) const {
+  LTRACEF("vaddr %#lx, count %#lx, asid %#hx, kernel %u\n", vaddr, count, asid_, IsKernel());
+
+  kcounter_add(cm_page_run_invalidate, 1);
+  kcounter_add(cm_single_page_invalidate, static_cast<int64_t>(count));
+
+  const cpu_mask_t cpu_mask = mask_all_but_one(arch_curr_cpu_num());
+  if (IsKernel()) {
+    // Flush all ASIDs with this address
+    for (size_t i = 0; i < count; i++) {
+      riscv64_tlb_flush_address_all_asids(vaddr);
+      vaddr += PAGE_SIZE;
+    }
+    sbi_remote_sfence_vma(cpu_mask, vaddr, count * PAGE_SIZE);
+  } else if (IsUser()) {
+    // Flush just the aspace's asid
+    const uint16_t asid = asid_;
+    for (size_t i = 0; i < count; i++) {
+      riscv64_tlb_flush_address_one_asid(vaddr, asid);
+      vaddr += PAGE_SIZE;
+    }
+    sbi_remote_sfence_vma_asid(cpu_mask, vaddr, count * PAGE_SIZE, asid_);
   } else {
-    __asm("sfence.vma  zero, %0" ::"r"(asid_) : "memory");
-    sbi_remote_sfence_vma_asid(cpu_mask, 0, -1, asid_);
+    PANIC_UNIMPLEMENTED;
   }
 }
 
+// Flush an entire ASID on all cpus.
 void Riscv64ArchVmAspace::FlushAsid() const {
-  LTRACEF("asid %#hx\n", asid_);
-  __asm("sfence.vma  zero, %0" ::"r"(asid_) : "memory");
-  cpu_mask_t cpu_mask = mask_all_but_one(arch_curr_cpu_num());
-  sbi_remote_sfence_vma_asid(cpu_mask, 0, -1, asid_);
+  LTRACEF("asid %#hx, kernel %u\n", asid_, IsKernel());
+
+  const cpu_mask_t cpu_mask = mask_all_but_one(arch_curr_cpu_num());
+  if (IsKernel()) {
+    // Perform a full flush of all cpus across all ASIDs
+    riscv64_tlb_flush_all();
+
+    sbi_remote_sfence_vma(cpu_mask, 0, -1);
+    kcounter_add(cm_global_invalidate, 1);
+  } else {
+    // Perform a full flush of all cpus of a single ASID
+    riscv64_tlb_flush_asid(asid_);
+
+    sbi_remote_sfence_vma_asid(cpu_mask, 0, -1, asid_);
+    kcounter_add(cm_asid_invalidate, 1);
+  }
 }
 
 ssize_t Riscv64ArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, size_t size,
@@ -604,7 +673,7 @@ ssize_t Riscv64ArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in
         // do this prior to writing the pte we cannot defer it using the consistency manager.
         mb();
 
-        pte = riscv64_pte_pa_to_pte(page_table_paddr) | RISCV64_PTE_V;
+        pte = mmu_non_leaf_pte(page_table_paddr, IsKernel());
         update_pte(&page_table[index], pte);
         // We do not need to sync the walker, despite writing a new entry, as this is a
         // non-terminal entry and so is irrelevant to the walker anyway.
@@ -865,7 +934,7 @@ zx_status_t Riscv64ArchVmAspace::ProtectPages(vaddr_t vaddr, size_t size, pte_t 
 
 void Riscv64ArchVmAspace::MmuParamsFromFlags(uint mmu_flags, pte_t* attrs) {
   if (attrs) {
-    *attrs = mmu_flags_to_pte_attr(mmu_flags, asid_ == MMU_RISCV64_GLOBAL_ASID);
+    *attrs = mmu_flags_to_pte_attr(mmu_flags, IsKernel());
   }
 }
 
@@ -1171,7 +1240,7 @@ zx_status_t Riscv64ArchVmAspace::Init() {
         return ZX_ERR_INVALID_ARGS;
       }
 
-      auto status = asid.Alloc();
+      auto status = asid_allocator.Alloc();
       if (status.is_error()) {
         printf("RISC-V: out of ASIDs!\n");
         return status.status_value();
@@ -1234,7 +1303,7 @@ zx_status_t Riscv64ArchVmAspace::Destroy() {
   FlushAsid();
 
   // Free any ASID.
-  auto status = asid.Free(asid_);
+  auto status = asid_allocator.Free(asid_);
   ASSERT(status.is_ok());
   asid_ = MMU_RISCV64_UNUSED_ASID;
 
@@ -1325,7 +1394,7 @@ void riscv64_mmu_early_init() {
 
       LTRACEF("RISCV: MMU allocating top level page table for slot %zu, pa %#lx\n", i, pt_paddr);
 
-      pte_t pte = riscv64_pte_pa_to_pte(pt_paddr) | RISCV64_PTE_V;
+      pte_t pte = mmu_non_leaf_pte(pt_paddr, true);
       update_pte(&riscv64_kernel_bootstrap_translation_table[i], pte);
     }
   }
@@ -1345,7 +1414,7 @@ void riscv64_mmu_early_init_percpu() {
   riscv64_csr_write(RISCV64_CSR_SATP, satp);
 
   // Globally TLB flush.
-  asm("sfence.vma  zero, zero" ::: "memory");
+  riscv64_tlb_flush_all();
 }
 
 void riscv64_mmu_init() {

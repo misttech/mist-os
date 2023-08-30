@@ -15,10 +15,9 @@
 #include <vm/arch_vm_aspace.h>
 
 enum class Riscv64AspaceType {
-  kUser,        // Userspace address space.
-  kKernel,      // Kernel address space.
-  kGuest,       // Second-stage address space.
-  kHypervisor,  // Hypervisor address space.
+  kUser,    // Userspace address space.
+  kKernel,  // Kernel address space.
+  kGuest,   // Second-stage address space.
 };
 
 class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
@@ -75,6 +74,10 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
     return ((va >> page_pt_shift) + 1) << page_pt_shift;
   }
 
+  Riscv64AspaceType type() const { return type_; }
+  bool IsKernel() const { return type_ == Riscv64AspaceType::kKernel; }
+  bool IsUser() const { return type_ == Riscv64AspaceType::kUser; }
+
  private:
   class ConsistencyManager;
   inline bool IsValidVaddr(vaddr_t vaddr) const {
@@ -128,7 +131,7 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
   zx_status_t ProtectPages(vaddr_t vaddr, size_t size, pte_t attrs) TA_REQ(lock_);
   zx_status_t QueryLocked(vaddr_t vaddr, paddr_t* paddr, uint* mmu_flags) TA_REQ(lock_);
 
-  void FlushTLBEntry(vaddr_t vaddr, bool terminal) const TA_REQ(lock_);
+  void FlushTLBEntryRun(vaddr_t vaddr, size_t page_count) const TA_REQ(lock_);
 
   void FlushAsid() const TA_REQ(lock_);
 
