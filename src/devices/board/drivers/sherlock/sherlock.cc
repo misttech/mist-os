@@ -133,6 +133,16 @@ int Sherlock::Thread() {
     return -1;
   }
 
+  if (EmmcInit() != ZX_OK) {
+    zxlogf(ERROR, "EmmcInit() failed");
+  }
+
+  if (SdioInit() != ZX_OK) {
+    zxlogf(ERROR, "SdioInit() failed");
+  }
+
+  // GpioInit() must be called after other subsystems that bind to GPIO have had a chance to add
+  // their init steps.
   if (GpioInit() != ZX_OK) {
     zxlogf(ERROR, "GpioInit() failed");
     return -1;
@@ -193,14 +203,6 @@ int Sherlock::Thread() {
   // Then the platform device drivers.
   if (UsbInit() != ZX_OK) {
     zxlogf(ERROR, "UsbInit() failed");
-  }
-
-  if (EmmcInit() != ZX_OK) {
-    zxlogf(ERROR, "EmmcInit() failed");
-  }
-
-  if (SdioInit() != ZX_OK) {
-    zxlogf(ERROR, "SdioInit() failed");
   }
 
   if (BluetoothInit() != ZX_OK) {

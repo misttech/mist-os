@@ -56,6 +56,12 @@ int Astro::Thread() {
     return status;
   }
 
+  if ((status = SdioInit()) != ZX_OK) {
+    zxlogf(ERROR, "SdioInit failed: %d", status);
+  }
+
+  // GpioInit() must be called after other subsystems that bind to GPIO have had a chance to add
+  // their init steps.
   if ((status = GpioInit()) != ZX_OK) {
     zxlogf(ERROR, "%s: GpioInit() failed: %d", __func__, status);
     return status;
@@ -147,10 +153,6 @@ int Astro::Thread() {
 
   if ((status = RawNandInit()) != ZX_OK) {
     zxlogf(ERROR, "RawNandInit failed: %d", status);
-  }
-
-  if ((status = SdioInit()) != ZX_OK) {
-    zxlogf(ERROR, "SdioInit failed: %d", status);
   }
 
   if ((status = LightInit()) != ZX_OK) {

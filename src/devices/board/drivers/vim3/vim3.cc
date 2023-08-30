@@ -73,6 +73,23 @@ int Vim3::Thread() {
     init_txn_->Reply(ZX_ERR_INTERNAL);
     return status;
   }
+  if ((status = EmmcInit()) != ZX_OK) {
+    zxlogf(ERROR, "EmmcInit() failed: %d\n", status);
+    init_txn_->Reply(ZX_ERR_INTERNAL);
+    return status;
+  }
+  if ((status = SdInit()) != ZX_OK) {
+    zxlogf(ERROR, "SdInit() failed: %d\n", status);
+    init_txn_->Reply(ZX_ERR_INTERNAL);
+    return status;
+  }
+  if ((status = SdioInit()) != ZX_OK) {
+    zxlogf(ERROR, "SdioInit() failed: %d\n", status);
+    init_txn_->Reply(ZX_ERR_INTERNAL);
+    return status;
+  }
+  // GpioInit() must be called after other subsystems that bind to GPIO have had a chance to add
+  // their init steps.
   if ((status = GpioInit()) != ZX_OK) {
     zxlogf(ERROR, "GpioInit() failed: %d", status);
     init_txn_->Reply(ZX_ERR_INTERNAL);
@@ -95,21 +112,6 @@ int Vim3::Thread() {
   }
   if ((status = EthInit()) != ZX_OK) {
     zxlogf(ERROR, "EthInit() failed: %d", status);
-    init_txn_->Reply(ZX_ERR_INTERNAL);
-    return status;
-  }
-  if ((status = EmmcInit()) != ZX_OK) {
-    zxlogf(ERROR, "EmmcInit() failed: %d\n", status);
-    init_txn_->Reply(ZX_ERR_INTERNAL);
-    return status;
-  }
-  if ((status = SdInit()) != ZX_OK) {
-    zxlogf(ERROR, "SdInit() failed: %d\n", status);
-    init_txn_->Reply(ZX_ERR_INTERNAL);
-    return status;
-  }
-  if ((status = SdioInit()) != ZX_OK) {
-    zxlogf(ERROR, "SdioInit() failed: %d\n", status);
     init_txn_->Reply(ZX_ERR_INTERNAL);
     return status;
   }

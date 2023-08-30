@@ -26,3 +26,7 @@ node "gpio-wifi-power-on" {
 node "pwm" {
   fuchsia.BIND_INIT_STEP == fuchsia.hardware.pwm.BIND_INIT_STEP.PWM;
 }
+
+node "gpio-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+}

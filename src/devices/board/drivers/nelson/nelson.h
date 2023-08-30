@@ -160,6 +160,7 @@ class Nelson : public NelsonType {
   ddk::IommuProtocolClient iommu_;
   ddk::GpioImplProtocolClient gpio_impl_;
   ddk::ClockImplProtocolClient clk_impl_;
+  fidl::Arena<> gpio_init_arena_;
   std::vector<fuchsia_hardware_gpio::wire::InitStep> gpio_init_steps_;
 
   thrd_t thread_;

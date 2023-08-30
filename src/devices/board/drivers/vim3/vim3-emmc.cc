@@ -79,21 +79,26 @@ zx_status_t Vim3::EmmcInit() {
   emmc_dev.metadata() = emmc_metadata;
   emmc_dev.boot_metadata() = emmc_boot_metadata;
 
-  // set alternate functions to enable EMMC
-  gpio_impl_.SetAltFunction(A311D_GPIOBOOT(0), A311D_GPIOBOOT_0_EMMC_D0_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOBOOT(1), A311D_GPIOBOOT_1_EMMC_D1_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOBOOT(2), A311D_GPIOBOOT_2_EMMC_D2_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOBOOT(3), A311D_GPIOBOOT_3_EMMC_D3_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOBOOT(4), A311D_GPIOBOOT_4_EMMC_D4_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOBOOT(5), A311D_GPIOBOOT_5_EMMC_D5_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOBOOT(6), A311D_GPIOBOOT_6_EMMC_D6_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOBOOT(7), A311D_GPIOBOOT_7_EMMC_D7_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOBOOT(8), A311D_GPIOBOOT_8_EMMC_CLK_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOBOOT(10), A311D_GPIOBOOT_10_EMMC_CMD_FN);
-  // gpio_impl_.SetAltFunction(A311D_GPIOBOOT(12), 1);
-  gpio_impl_.SetAltFunction(A311D_GPIOBOOT(13), A311D_GPIOBOOT_13_EMMC_DS_FN);
+  auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
+    return fuchsia_hardware_gpio::wire::InitCall::WithAltFunction(arena, alt_function);
+  };
 
-  gpio_impl_.ConfigOut(A311D_GPIOBOOT(14), 1);
+  // set alternate functions to enable EMMC
+  gpio_init_steps_.push_back({A311D_GPIOBOOT(0), set_alt_function(A311D_GPIOBOOT_0_EMMC_D0_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOBOOT(1), set_alt_function(A311D_GPIOBOOT_1_EMMC_D1_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOBOOT(2), set_alt_function(A311D_GPIOBOOT_2_EMMC_D2_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOBOOT(3), set_alt_function(A311D_GPIOBOOT_3_EMMC_D3_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOBOOT(4), set_alt_function(A311D_GPIOBOOT_4_EMMC_D4_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOBOOT(5), set_alt_function(A311D_GPIOBOOT_5_EMMC_D5_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOBOOT(6), set_alt_function(A311D_GPIOBOOT_6_EMMC_D6_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOBOOT(7), set_alt_function(A311D_GPIOBOOT_7_EMMC_D7_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOBOOT(8), set_alt_function(A311D_GPIOBOOT_8_EMMC_CLK_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOBOOT(10), set_alt_function(A311D_GPIOBOOT_10_EMMC_CMD_FN)});
+  // gpio_init_steps_.push_back({A311D_GPIOBOOT(12), set_alt_function(1)});
+  gpio_init_steps_.push_back({A311D_GPIOBOOT(13), set_alt_function(A311D_GPIOBOOT_13_EMMC_DS_FN)});
+
+  gpio_init_steps_.push_back(
+      {A311D_GPIOBOOT(14), fuchsia_hardware_gpio::wire::InitCall::WithOutputValue(1)});
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('EMMC');

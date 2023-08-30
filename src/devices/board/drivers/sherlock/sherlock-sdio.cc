@@ -143,15 +143,17 @@ static const fpbus::Node sdio_dev = []() {
 zx_status_t Sherlock::SdioInit() {
   zx_status_t status;
 
+  auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
+    return fuchsia_hardware_gpio::wire::InitCall::WithAltFunction(arena, alt_function);
+  };
+
   // Configure eMMC-SD soc pads.
-  if (((status = gpio_impl_.SetAltFunction(T931_SDIO_D0, T931_SDIO_D0_FN)) != ZX_OK) ||
-      ((status = gpio_impl_.SetAltFunction(T931_SDIO_D1, T931_SDIO_D1_FN)) != ZX_OK) ||
-      ((status = gpio_impl_.SetAltFunction(T931_SDIO_D2, T931_SDIO_D2_FN)) != ZX_OK) ||
-      ((status = gpio_impl_.SetAltFunction(T931_SDIO_D3, T931_SDIO_D3_FN)) != ZX_OK) ||
-      ((status = gpio_impl_.SetAltFunction(T931_SDIO_CLK, T931_SDIO_CLK_FN)) != ZX_OK) ||
-      ((status = gpio_impl_.SetAltFunction(T931_SDIO_CMD, T931_SDIO_CMD_FN)) != ZX_OK)) {
-    return status;
-  }
+  gpio_init_steps_.push_back({T931_SDIO_D0, set_alt_function(T931_SDIO_D0_FN)});
+  gpio_init_steps_.push_back({T931_SDIO_D1, set_alt_function(T931_SDIO_D1_FN)});
+  gpio_init_steps_.push_back({T931_SDIO_D2, set_alt_function(T931_SDIO_D2_FN)});
+  gpio_init_steps_.push_back({T931_SDIO_D3, set_alt_function(T931_SDIO_D3_FN)});
+  gpio_init_steps_.push_back({T931_SDIO_CLK, set_alt_function(T931_SDIO_CLK_FN)});
+  gpio_init_steps_.push_back({T931_SDIO_CMD, set_alt_function(T931_SDIO_CMD_FN)});
 
   zx::unowned_resource res(get_root_resource(parent()));
   zx::vmo vmo;
@@ -178,15 +180,8 @@ zx_status_t Sherlock::SdioInit() {
       .set_gpiox_5_select(PadDsReg2A::kDriveStrengthMax)
       .WriteTo(&(*buf));
 
-  status = gpio_impl_.SetAltFunction(T931_WIFI_REG_ON, T931_WIFI_REG_ON_FN);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  status = gpio_impl_.SetAltFunction(T931_WIFI_HOST_WAKE, T931_WIFI_HOST_WAKE_FN);
-  if (status != ZX_OK) {
-    return status;
-  }
+  gpio_init_steps_.push_back({T931_WIFI_REG_ON, set_alt_function(T931_WIFI_REG_ON_FN)});
+  gpio_init_steps_.push_back({T931_WIFI_HOST_WAKE, set_alt_function(T931_WIFI_HOST_WAKE_FN)});
 
   fidl::Arena<> fidl_arena;
   fdf::Arena sdio_arena('SDIO');

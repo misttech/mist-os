@@ -130,20 +130,28 @@ static const fpbus::Node sd_emmc_dev = []() {
 // Composite binding rules for SDIO.
 
 zx_status_t Nelson::SdioInit() {
-  gpio_impl_.SetAltFunction(S905D3_WIFI_SDIO_D0, S905D3_WIFI_SDIO_D0_FN);
-  gpio_impl_.SetAltFunction(S905D3_WIFI_SDIO_D1, S905D3_WIFI_SDIO_D1_FN);
-  gpio_impl_.SetAltFunction(S905D3_WIFI_SDIO_D2, S905D3_WIFI_SDIO_D2_FN);
-  gpio_impl_.SetAltFunction(S905D3_WIFI_SDIO_D3, S905D3_WIFI_SDIO_D3_FN);
-  gpio_impl_.SetAltFunction(S905D3_WIFI_SDIO_CLK, S905D3_WIFI_SDIO_CLK_FN);
-  gpio_impl_.SetAltFunction(S905D3_WIFI_SDIO_CMD, S905D3_WIFI_SDIO_CMD_FN);
-  gpio_impl_.SetAltFunction(S905D3_WIFI_SDIO_WAKE_HOST, 0);
+  auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
+    return fuchsia_hardware_gpio::wire::InitCall::WithAltFunction(arena, alt_function);
+  };
 
-  gpio_impl_.SetDriveStrength(GPIO_SOC_WIFI_SDIO_D0, 4000, nullptr);
-  gpio_impl_.SetDriveStrength(GPIO_SOC_WIFI_SDIO_D1, 4000, nullptr);
-  gpio_impl_.SetDriveStrength(GPIO_SOC_WIFI_SDIO_D2, 4000, nullptr);
-  gpio_impl_.SetDriveStrength(GPIO_SOC_WIFI_SDIO_D3, 4000, nullptr);
-  gpio_impl_.SetDriveStrength(GPIO_SOC_WIFI_SDIO_CLK, 4000, nullptr);
-  gpio_impl_.SetDriveStrength(GPIO_SOC_WIFI_SDIO_CMD, 4000, nullptr);
+  auto set_drive_strength = [&arena = gpio_init_arena_](uint64_t drive_strength_ua) {
+    return fuchsia_hardware_gpio::wire::InitCall::WithDriveStrengthUa(arena, drive_strength_ua);
+  };
+
+  gpio_init_steps_.push_back({S905D3_WIFI_SDIO_D0, set_alt_function(S905D3_WIFI_SDIO_D0_FN)});
+  gpio_init_steps_.push_back({S905D3_WIFI_SDIO_D1, set_alt_function(S905D3_WIFI_SDIO_D1_FN)});
+  gpio_init_steps_.push_back({S905D3_WIFI_SDIO_D2, set_alt_function(S905D3_WIFI_SDIO_D2_FN)});
+  gpio_init_steps_.push_back({S905D3_WIFI_SDIO_D3, set_alt_function(S905D3_WIFI_SDIO_D3_FN)});
+  gpio_init_steps_.push_back({S905D3_WIFI_SDIO_CLK, set_alt_function(S905D3_WIFI_SDIO_CLK_FN)});
+  gpio_init_steps_.push_back({S905D3_WIFI_SDIO_CMD, set_alt_function(S905D3_WIFI_SDIO_CMD_FN)});
+  gpio_init_steps_.push_back({S905D3_WIFI_SDIO_WAKE_HOST, set_alt_function(0)});
+
+  gpio_init_steps_.push_back({GPIO_SOC_WIFI_SDIO_D0, set_drive_strength(4000)});
+  gpio_init_steps_.push_back({GPIO_SOC_WIFI_SDIO_D1, set_drive_strength(4000)});
+  gpio_init_steps_.push_back({GPIO_SOC_WIFI_SDIO_D2, set_drive_strength(4000)});
+  gpio_init_steps_.push_back({GPIO_SOC_WIFI_SDIO_D3, set_drive_strength(4000)});
+  gpio_init_steps_.push_back({GPIO_SOC_WIFI_SDIO_CLK, set_drive_strength(4000)});
+  gpio_init_steps_.push_back({GPIO_SOC_WIFI_SDIO_CMD, set_drive_strength(4000)});
 
   fidl::Arena<> fidl_arena;
   fdf::Arena sdio_arena('SDIO');
