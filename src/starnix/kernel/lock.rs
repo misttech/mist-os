@@ -7,25 +7,13 @@ use fuchsia_sync as _;
 use lock_api as _;
 use parking_lot as _;
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-// In release, either use parking_lot::Mutex or fuchsia_sync::Mutex depending on use_fuchsia_mutex
-//
-#[cfg(all(not(any(test, debug_assertions)), use_fuchsia_mutex))]
+#[cfg(not(any(test, debug_assertions)))]
 pub type Mutex<T> = fuchsia_sync::Mutex<T>;
-#[cfg(all(not(any(test, debug_assertions)), use_fuchsia_mutex))]
+#[cfg(not(any(test, debug_assertions)))]
 pub type MutexGuard<'a, T> = fuchsia_sync::MutexGuard<'a, T>;
 #[allow(unused)]
-#[cfg(all(not(any(test, debug_assertions)), use_fuchsia_mutex))]
+#[cfg(not(any(test, debug_assertions)))]
 pub type MappedMutexGuard<'a, T> = fuchsia_sync::MappedMutexGuard<'a, T>;
-#[cfg(all(not(any(test, debug_assertions)), not(use_fuchsia_mutex)))]
-pub type Mutex<T> = parking_lot::Mutex<T>;
-#[cfg(all(not(any(test, debug_assertions)), not(use_fuchsia_mutex)))]
-pub type MutexGuard<'a, T> = parking_lot::MutexGuard<'a, T>;
-#[cfg(all(not(any(test, debug_assertions)), not(use_fuchsia_mutex)))]
-#[allow(unused)]
-pub type MappedMutexGuard<'a, T> = parking_lot::MappedMutexGuard<'a, T>;
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(not(any(test, debug_assertions)))]
 pub type RwLock<T> = fuchsia_sync::RwLock<T>;

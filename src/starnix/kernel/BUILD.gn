@@ -15,9 +15,6 @@ declare_args() {
   # Whether or not tracing is disabled globally.
   # NOTE(https://fxbug.dev/124980) this slows down some microbenchmarks.
   starnix_disable_tracing = false
-
-  # Wheher to use fuchsia_sync::Mutex instead of parking_lot::Mutex.
-  starnix_use_fuchsia_mutex = true
 }
 
 group("kernel") {
@@ -396,9 +393,6 @@ rustc_binary("starnix_kernel_bin") {
   }
   if (starnix_disable_tracing) {
     features += [ "disable_tracing" ]
-  }
-  if (starnix_use_fuchsia_mutex) {
-    features += [ "use_fuchsia_mutex" ]
   }
 
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
