@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"go.fuchsia.dev/fuchsia/tools/bootserver"
@@ -324,12 +325,13 @@ func (f *FFXInstance) GetImageFromPB(ctx context.Context, pbPath string, slot st
 
 	err := f.Run(ctx, "product", "get-image-path", pbPath, "-r", "--slot", slot, "--image-type", imageType)
 	f.stdout = oldStdout
-
 	if err != nil {
 		return nil, err
 	}
-	imagePath := filepath.Join(pbPath, stdout.String())
-	buildImg := build.Image{Path: imagePath}
+
+	relImagePath := strings.TrimSpace(stdout.String())
+	imagePath := filepath.Join(pbPath, relImagePath)
+	buildImg := build.Image{Name: relImagePath, Path: imagePath}
 
 	reader, err := os.Open(imagePath)
 	if err != nil {

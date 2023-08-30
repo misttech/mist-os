@@ -57,6 +57,9 @@ const (
 
 	// Minimum number of bytes of entropy bits required for the kernel's PRNG.
 	minEntropyBytes uint = 32 // 256 bits
+
+	// The experiment level at which to enable `ffx emu`.
+	ffxEmuExperimentLevel = 1
 )
 
 // qemuTargetMapping maps the Fuchsia target name to the name recognized by QEMU.
@@ -248,6 +251,12 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 	}
 	qemuCmd.SetBinary(absQEMUSystemPath)
 
+	if t.UseFFXExperimental(ffxEmuExperimentLevel) && pbPath != "" {
+		if err := t.ffx.ConfigSet(ctx, "ffx_product_get_image_path", "true"); err != nil {
+			return err
+		}
+	}
+
 	// If a QEMU kernel override was specified, use that; else, unless we want
 	// to boot via a UEFI disk image (which does not require one), then we
 	// surely want a QEMU kernel, so use the default.
@@ -255,7 +264,7 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 	if t.imageOverrides.QEMUKernel != "" {
 		qemuKernel = getImage(images, t.imageOverrides.QEMUKernel, build.ImageTypeQEMUKernel)
 	} else if t.imageOverrides.EFIDisk == "" {
-		if pbPath == "" || !t.UseFFXExperimental(1) {
+		if pbPath == "" || !t.UseFFXExperimental(ffxEmuExperimentLevel) {
 			qemuKernel = getImageByNameAndCPU(images, "kernel_qemu-kernel", t.config.Target)
 		} else {
 			qemuKernel, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "qemu-kernel")
@@ -271,7 +280,7 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 	if t.imageOverrides.ZBI != "" {
 		zbi = getImage(images, t.imageOverrides.ZBI, build.ImageTypeZBI)
 	} else if t.imageOverrides.IsEmpty() {
-		if pbPath == "" || !t.UseFFXExperimental(1) {
+		if pbPath == "" || !t.UseFFXExperimental(ffxEmuExperimentLevel) {
 			zbi = getImageByName(images, "zbi_zircon-a")
 		} else {
 			zbi, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "zbi")
@@ -302,20 +311,22 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 	var fvmImage *bootserver.Image
 	var fxfsImage *bootserver.Image
 	if t.imageOverrides.IsEmpty() {
-		if pbPath == "" || !t.UseFFXExperimental(1) {
+		if pbPath == "" || !t.UseFFXExperimental(ffxEmuExperimentLevel) {
 			fvmImage = getImageByName(images, "blk_storage-full")
 		} else {
 			fvmImage, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "fvm")
 			if err != nil {
-				return fmt.Errorf("could not find fvm from Product Bundle: %q: %w", pbPath, err)
+				// The fvm image may not exist as part of the product bundle, which is ok.
+				fvmImage = nil
 			}
 		}
-		if pbPath == "" || !t.UseFFXExperimental(1) {
+		if pbPath == "" || !t.UseFFXExperimental(ffxEmuExperimentLevel) {
 			fxfsImage = getImageByName(images, "fxfs-blk_storage-full")
 		} else {
 			fxfsImage, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "fxfs")
 			if err != nil {
-				return fmt.Errorf("could not find fxfs from Product Bundle: %q: %w", pbPath, err)
+				// The fxfs image may not exist as part of the product bundle, which is ok.
+				fxfsImage = nil
 			}
 		}
 	} else if t.imageOverrides.FVM != "" {
@@ -359,7 +370,7 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 		if err := os.WriteFile(tmpFile, authorizedKeys, os.ModePerm); err != nil {
 			return fmt.Errorf("could not write authorized keys to file: %w", err)
 		}
-		if t.UseFFXExperimental(1) {
+		if t.UseFFXExperimental(ffxEmuExperimentLevel) {
 			t.ffx.ConfigSet(ctx, "ssh.pub", tmpFile)
 		}
 		if err := embedZBIWithKey(ctx, zbi, t.config.ZBITool, tmpFile); err != nil {
@@ -525,7 +536,7 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 	qemuCmd.SetFlag("-monitor", "none")
 
 	var cmd *exec.Cmd
-	if t.UseFFXExperimental(1) {
+	if t.UseFFXExperimental(ffxEmuExperimentLevel) {
 		config, err := qemuCmd.BuildConfig()
 		if err != nil {
 			return err
@@ -620,7 +631,7 @@ func rewriteSDKManifest(manifestPath, targetCPU string, isQEMU bool) error {
 
 // Stop stops the QEMU target.
 func (t *QEMU) Stop() error {
-	if t.UseFFXExperimental(1) {
+	if t.UseFFXExperimental(ffxEmuExperimentLevel) {
 		return t.ffx.EmuStop(context.Background())
 	}
 	if t.process == nil {
