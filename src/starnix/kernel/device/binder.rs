@@ -676,9 +676,6 @@ impl BinderProcess {
                 return Ok(());
             }
             Handle::Object { index } => {
-                // Requesting a death notification implies keeping a reference to the handle until the
-                // client is not interested in the notification anymore.
-                self.handle_refcount_operation(binder_driver_command_protocol_BC_INCREFS, handle)?;
                 self.lock().handles.get(index).ok_or_else(|| errno!(ENOENT))?
             }
         };
@@ -721,9 +718,6 @@ impl BinderProcess {
             }
         }
         self.enqueue_command(Command::ClearDeathNotificationDone(cookie));
-        // The client is not interested in the notification anymore, release the weak reference
-        // that was taken when registering the notification.
-        self.handle_refcount_operation(binder_driver_command_protocol_BC_DECREFS, handle)?;
         Ok(())
     }
 
