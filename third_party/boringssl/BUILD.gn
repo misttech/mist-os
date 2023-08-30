@@ -110,6 +110,7 @@ foreach(lib_type, lib_types) {
       ":internal_config",
       ":export_symbols",
     ]
+
     # For this and the crypto lib, do not export symbols if building a binary for the host if
     # building a static library. This prevents potential name conflicts if this is statically
     # included in a .so and the .so is then used via dlopen.
