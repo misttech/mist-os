@@ -107,6 +107,30 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(complete.stdout, "temp-file.txt\n")
             self.assertEqual(complete.return_code, 0)
 
+    async def test_basic_command_with_long_timeout(self):
+        """Test running a basic command and getting the output.
+
+        We create a file in a temporary directory and simply assert that `ls`
+        prints that file as output.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            with open(os.path.join(td, "temp-file.txt"), "w") as f:
+                f.write("hello world")
+
+            cmd = await command.AsyncCommand.create(
+                "ls", ".", env={"CWD": td}, timeout=3600
+            )
+            events = []
+            complete = await cmd.run_to_completion(lambda event: events.append(event))
+            self.assertEqual(len(events), 2, f"Events was actually {events}")
+
+            self.assertStdout(events[0], b"temp-file.txt\n")
+            self.assertTermination(events[1], 0)
+
+            self.assertEqual(complete.stdout, "temp-file.txt\n")
+            self.assertEqual(complete.return_code, 0)
+            self.assertFalse(complete.was_timeout)
+
     async def test_with_stderr(self):
         """Test running a command with stderr output.
 
@@ -241,6 +265,14 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
             await cmd.run_to_completion(lambda event: events.append(event))
             self.assertEqual(len(events), 1, f"Events was actually {events}")
             self.assertTermination(events[0], -9)
+
+    async def test_timeout(self):
+        """Test that commands timeout"""
+        cmd = await command.AsyncCommand.create("sleep", "100000", timeout=0.1)
+        task = asyncio.create_task(cmd.run_to_completion())
+        out: command.CommandOutput = await task
+        self.assertEqual(out.return_code, -15)
+        self.assertTrue(out.was_timeout)
 
     def test_invalid_program(self):
         """Test running a program that doesn't exist, and expect an error."""

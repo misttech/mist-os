@@ -634,19 +634,24 @@ async def run_all_tests(
             try:
                 command_line = " ".join(to_run.command_line())
                 recorder.emit_instruction_message(f"Command: {command_line}")
+
                 done, pending = await asyncio.wait(
                     [
-                        asyncio.create_task(to_run.run(recorder, flags, test_suite_id)),
+                        asyncio.create_task(
+                            to_run.run(
+                                recorder, flags, test_suite_id, timeout=flags.timeout
+                            )
+                        ),
                         asyncio.create_task(abort_all_tests_event.wait()),
                     ],
                     return_when=asyncio.FIRST_COMPLETED,
                 )
-                for r in done:
-                    # Re-throw exceptions.
-                    r.result()
                 for r in pending:
                     # Cancel pending tasks.
                     r.cancel()
+                for r in done:
+                    # Re-throw exceptions.
+                    r.result()
                 if pending:
                     # Propagate cancellations
                     await asyncio.wait(pending)
@@ -659,8 +664,11 @@ async def run_all_tests(
             except execution.TestCouldNotRun as e:
                 status = event.TestSuiteStatus.SKIPPED
                 message = str(e)
-            except execution.TestFailed as e:
-                status = event.TestSuiteStatus.FAILED
+            except (execution.TestTimeout, execution.TestFailed) as e:
+                if isinstance(e, execution.TestTimeout):
+                    status = event.TestSuiteStatus.TIMEOUT
+                else:
+                    status = event.TestSuiteStatus.FAILED
                 test_failure_observed = True
                 if flags.fail:
                     # Abort all other running tests, dropping through to the

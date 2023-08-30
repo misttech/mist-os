@@ -234,6 +234,9 @@ class TestSuiteStatus(enum.Enum):
     # The test suite execution was aborted due to some condition.
     ABORTED = "ABORTED"
 
+    # The test suite was aborted due to exceeding its timeout.
+    TIMEOUT = "TIMEOUT"
+
 
 @dataparse
 @dataclass

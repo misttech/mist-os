@@ -27,6 +27,10 @@ class TestFailed(TestExecutionError):
     """The test ran, but returned a failure error code."""
 
 
+class TestTimeout(TestExecutionError):
+    """The test timed out."""
+
+
 class TestExecution:
     """Represents a single execution for a specific test."""
 
@@ -147,6 +151,7 @@ class TestExecution:
         recorder: event.EventRecorder,
         flags: args.Flags,
         parent: event.Id,
+        timeout: float | None = None,
     ) -> command.CommandOutput:
         """Asynchronously execute this test.
 
@@ -154,9 +159,11 @@ class TestExecution:
             recorder (event.EventRecorder): Recorder for events.
             flags (args.Flags): Command flags to control output.
             parent (event.Id): Parent event to nest the execution under.
+            timeout (float, optional): If set, timeout after this number of seconds.
 
         Raises:
             TestFailed: If the test reported failure.
+            TestTimeout: If the test timed out.
 
         Returns:
             command.CommandOutput: The output of executing this command.
@@ -172,11 +179,12 @@ class TestExecution:
             print_verbatim=flags.output,
             symbolize=symbolize,
             env=env,
+            timeout=timeout,
         )
 
         if not output:
             raise TestFailed("Failed to run the test command")
-        elif output.return_code != 0:
+        elif output.return_code != 0 or output.was_timeout:
             if not flags.output:
                 # Test failed, print output now.
                 recorder.emit_info_message(
@@ -186,7 +194,12 @@ class TestExecution:
                     recorder.emit_verbatim_message(output.stdout)
                 if output.stderr:
                     recorder.emit_verbatim_message(output.stderr)
-            raise TestFailed("Test reported failure")
+                if not output.stderr and not output.stdout:
+                    recorder.emit_verbatim_message("<No command output>")
+            if output.was_timeout:
+                raise TestTimeout(f"Test exceeded runtime of {timeout} seconds")
+            else:
+                raise TestFailed("Test reported failure")
         return output
 
 
@@ -219,6 +232,7 @@ async def run_command(
     print_verbatim: bool = False,
     symbolize: bool = False,
     env: typing.Dict[str, str] | None = None,
+    timeout: float | None = None,
 ) -> typing.Optional[command.CommandOutput]:
     """Utility method to run a test command asynchronously.
 
@@ -233,8 +247,9 @@ async def run_command(
             output events for stdout and stderr. Defaults to False.
         symbolize (bool, optional): If true, pipe output through
             symbolizer. Defaults to False.
-        env (typing.Dict[str, str] | None):
+        env (typing.Dict[str, str], optional):
             Environment to pass to the command. Defaults to None.
+        timeout (float, optional): The number of seconds to wait before timing out.
 
     Returns:
         command.CommandOutput | None: The command output if it could
@@ -246,7 +261,11 @@ async def run_command(
     try:
         symbolizer_args = None if not symbolize else ["fx", "ffx", "debug", "symbolize"]
         started = await command.AsyncCommand.create(
-            name, *args, symbolizer_args=symbolizer_args, env=env
+            name,
+            *args,
+            symbolizer_args=symbolizer_args,
+            env=env,
+            timeout=timeout,
         )
 
         def handle_event(current_event: command.CommandEvent):

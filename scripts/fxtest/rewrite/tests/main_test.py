@@ -93,7 +93,9 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
 
     def _mock_run_command(self, return_code: int) -> mock.MagicMock:
         m = mock.AsyncMock(
-            return_value=mock.MagicMock(return_code=return_code, stdout="", stderr="")
+            return_value=mock.MagicMock(
+                return_code=return_code, stdout="", stderr="", was_timeout=False
+            )
         )
         patch = mock.patch("main.execution.run_command", m)
         patch.start()

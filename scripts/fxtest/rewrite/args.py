@@ -30,6 +30,7 @@ class Flags:
     parallel: int
     random: bool
     limit: int | None
+    timeout: float | None
     fail: bool
     use_package_hash: bool
     restrict_logs: bool
@@ -58,6 +59,8 @@ class Flags:
             raise FlagError("--device is incompatible with --host")
         if self.status_delay < 0.005:
             raise FlagError("--status-delay must be at least 0.005 (5ms)")
+        if self.timeout and self.timeout <= 0:
+            raise FlagError("--timeout must be greater than 0")
 
         if not termout.is_valid() and self.status:
             raise FlagError("Refusing to output interactive status to a non-TTY.")
@@ -173,6 +176,11 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
         action="store_true",
         help="Randomize test execution order",
         default=False,
+    )
+    execution.add_argument(
+        "--timeout",
+        type=float,
+        help="Terminate tests that take longer than this number of seconds to complete. Default is no timeout.",
     )
     execution.add_argument(
         "--limit", type=int, help="Stop execution after this many tests", default=None

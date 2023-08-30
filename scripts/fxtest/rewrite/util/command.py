@@ -70,6 +70,9 @@ class TerminationEvent:
     # The monotonic timestamp this program received the termination event.
     timestamp: float = field(default_factory=lambda: time.monotonic())
 
+    # If true, this command is terminating due to hitting its timeout.
+    was_timeout: bool = False
+
 
 class AsyncCommandError(Exception):
     """An error occurred starting or running a command asynchronously."""
@@ -95,6 +98,9 @@ class CommandOutput:
     # the return code of that wrapper.
     wrapper_return_code: int | None
 
+    # If True, this command was forced to terminate due to timeout.
+    was_timeout: bool = False
+
 
 CommandEvent = StdoutEvent | StderrEvent | TerminationEvent
 
@@ -111,6 +117,7 @@ class AsyncCommand:
         self,
         process: asyncio.subprocess.Process,
         wrapped_process: asyncio.subprocess.Process | None = None,
+        timeout: float | None = None,
     ):
         """Create an AsyncCommand that wraps a subprocess.
 
@@ -122,6 +129,7 @@ class AsyncCommand:
         Args:
             process (asyncio.subprocess.Process): The process to wrap.
             wrapped_process (asyncio.subprocess.Process): A secondary process to wrap, which must also be closed.
+            timeout (float, optional): Terminate the process after this number of seconds.
         """
         self._process = process
         self._wrapped_process = wrapped_process
@@ -129,6 +137,7 @@ class AsyncCommand:
         self._done_iterating = False
         self._start = time.time()
         self._runner_task = asyncio.create_task(self._task())
+        self._timeout = timeout
 
     @classmethod
     async def create(
@@ -137,6 +146,7 @@ class AsyncCommand:
         *args: str,
         symbolizer_args: typing.List[str] | None = None,
         env: typing.Dict[str, str] | None = None,
+        timeout: float | None = None,
     ):
         """Create a new AsyncCommand that runs the given program.
 
@@ -148,6 +158,7 @@ class AsyncCommand:
                 to populate the command's environment. Note that the
                 CWD environment variable is handled specially to ensure
                 that the command runs in the given working directory.
+            timeout (float, optional): Terminate the command after the given number of seconds.
 
         Returns:
             AsyncCommand: A new AsyncCommand executing the process.
@@ -196,7 +207,7 @@ class AsyncCommand:
             else:
                 command = await make_process(asyncio.subprocess.PIPE)
 
-            return AsyncCommand(command, base_command)
+            return AsyncCommand(command, base_command, timeout=timeout)
         except FileNotFoundError as e:
             raise AsyncCommandError(f"The program '{e.filename}' was not found.")
         except Exception as e:
@@ -233,10 +244,10 @@ class AsyncCommand:
         """Runs the program to completion, collecting the resulting outputs.
 
         Args:
-            callback (typing.Callable[[CommandEvent],
-            None] | None): If set, send all CommandEvents to
-                this callback function as they are produced. Defaults
-                to None.
+            callback (typing.Callable[[CommandEvent], None], optional): If set, send all
+                CommandEvents to this callback function as they are produced.
+                Defaults to None.
+            timeout (float, optional): Terminate the command after this many seconds.
 
         Raises:
             AsyncCommandError: If an internal error causes the task queue to be cancelled.
@@ -261,6 +272,7 @@ class AsyncCommand:
                         return_code=e.return_code,
                         wrapper_return_code=e.wrapper_return_code,
                         runtime=e.runtime,
+                        was_timeout=e.was_timeout,
                     )
 
         raise AsyncCommandError("Event stream unexpectedly stopped")
@@ -281,6 +293,31 @@ class AsyncCommand:
             async for line in input_stream:
                 await self._event_queue.put(event_type(text=line))
 
+        async def timeout_handler(timeout: float, timeout_signal: asyncio.Event):
+            """Handle timeouts.
+
+            We first send SIGTERM after the timeout, and if the program has
+            still not terminated after an additional delay we send SIGKILL.
+
+            Args:
+                timeout (float): The initial wait time before termination.
+                timeout_signal (asyncio.Event): An event to set on timeout.
+            """
+            await asyncio.sleep(timeout)
+            timeout_signal.set()
+            self.terminate()
+            # Give the process at most 5 seconds to terminate, or less
+            # if timeout is less than 5 seconds.
+            await asyncio.sleep(min(timeout, 5))
+            self.kill()
+
+        timeout_task: asyncio.Task | None = None
+        did_timeout = asyncio.Event()
+        if self._timeout is not None:
+            timeout_task = asyncio.create_task(
+                timeout_handler(self._timeout, did_timeout)
+            )
+
         # Read stdout and stderr in parallel, forwarding the appropriate events.
         assert self._process.stdout
         assert self._process.stderr
@@ -293,6 +330,9 @@ class AsyncCommand:
 
         # Wait for the process to exit and get its return code.
         return_code = await self._process.wait()
+        if timeout_task and not timeout_task.done():
+            # Cancel the timeout task so we do not try to send signals to a terminated process.
+            timeout_task.cancel()
         wrapper_return_code: int | None = None
         if self._wrapped_process:
             # Also ensure we wait for the wrapped process, and use it's return code as the canonical code.
@@ -301,11 +341,20 @@ class AsyncCommand:
 
         runtime = time.time() - self._start
 
+        if timeout_task is not None:
+            # Make sure the timeout task is cancelled and awaited
+            # so it is cleaned up.
+            timeout_task.cancel()
+            tasks.append(timeout_task)
+
         # Wait for all output to drain before termination event.
         await asyncio.wait(tasks)
         await self._event_queue.put(
             TerminationEvent(
-                return_code, runtime, wrapper_return_code=wrapper_return_code
+                return_code,
+                runtime,
+                wrapper_return_code=wrapper_return_code,
+                was_timeout=did_timeout.is_set(),
             )
         )
 

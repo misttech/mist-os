@@ -130,7 +130,9 @@ async def console_printer(
 
     if state.test_results:
         passed = len(state.test_results[event.TestSuiteStatus.PASSED])
-        failed = len(state.test_results[event.TestSuiteStatus.FAILED])
+        failed = len(state.test_results[event.TestSuiteStatus.FAILED]) + len(
+            state.test_results[event.TestSuiteStatus.TIMEOUT]
+        )
         skipped = len(state.test_results[event.TestSuiteStatus.SKIPPED])
         passed_text = pass_format(passed, flags.style)
         failed_text = fail_format(failed, flags.style)
@@ -225,7 +227,9 @@ def _create_status_lines_from_state(
     pass_fail = ""
     if state.test_results:
         passed = len(state.test_results[event.TestSuiteStatus.PASSED])
-        failed = len(state.test_results[event.TestSuiteStatus.FAILED])
+        failed = len(state.test_results[event.TestSuiteStatus.FAILED]) + len(
+            state.test_results[event.TestSuiteStatus.TIMEOUT]
+        )
         skipped = len(state.test_results[event.TestSuiteStatus.SKIPPED])
         passed_text = pass_format(passed, flags.style)
         failed_text = fail_format(failed, flags.style)
@@ -574,6 +578,8 @@ async def _console_event_loop(
                     label = statusinfo.highlight("SKIPPED", style=flags.style)
                 elif payload.status == event.TestSuiteStatus.ABORTED:
                     label = statusinfo.highlight("ABORTED", style=flags.style)
+                elif payload.status == event.TestSuiteStatus.TIMEOUT:
+                    label = statusinfo.error_highlight("TIMEOUT", style=flags.style)
                 else:
                     label = statusinfo.error_highlight(
                         "BUG: UNKNOWN", style=flags.style
