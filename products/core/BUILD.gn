@@ -4,6 +4,7 @@
 
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/assembly/sshd_config.gni")
+import("//build/info/info.gni")
 
 assert(
     is_fuchsia,
@@ -131,9 +132,11 @@ product_assembly_configuration("core") {
     forward_variables_from(_storage_default, "*")
   }
   product = {
+    build_info = default_product_build_info
   }
 
   base_driver_packages = _base_driver_packages
+  deps = [ "//build/info:latest-commit-date" ]
 }
 
 product_assembly_configuration("core_with_f2fs") {
@@ -143,9 +146,11 @@ product_assembly_configuration("core_with_f2fs") {
     forward_variables_from(_storage_f2fs, "*")
   }
   product = {
+    build_info = default_product_build_info
   }
 
   base_driver_packages = _base_driver_packages
+  deps = [ "//build/info:latest-commit-date" ]
 }
 
 product_assembly_configuration("core_with_minfs") {
@@ -155,9 +160,11 @@ product_assembly_configuration("core_with_minfs") {
     forward_variables_from(_storage_minfs, "*")
   }
   product = {
+    build_info = default_product_build_info
   }
 
   base_driver_packages = _base_driver_packages
+  deps = [ "//build/info:latest-commit-date" ]
 }
 
 product_assembly_configuration("core_with_fxfs") {
@@ -167,9 +174,11 @@ product_assembly_configuration("core_with_fxfs") {
     forward_variables_from(_storage_fxfs, "*")
   }
   product = {
+    build_info = default_product_build_info
   }
 
   base_driver_packages = _base_driver_packages
+  deps = [ "//build/info:latest-commit-date" ]
 }
 
 product_assembly_configuration("core_with_netstack3") {
@@ -185,7 +194,9 @@ product_assembly_configuration("core_with_netstack3") {
     }
   }
   product = {
+    build_info = default_product_build_info
   }
 
   base_driver_packages = _base_driver_packages
+  deps = [ "//build/info:latest-commit-date" ]
 }

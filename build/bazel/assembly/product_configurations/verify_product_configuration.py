@@ -142,6 +142,20 @@ def normalize_product(
 
     product = config["product"]
 
+    # These are product config items which are paths to files, but paths will
+    # be different between GN and Bazel, so they need to be replaced with the
+    # hash of the file to make sure that they're actually the same contents.
+    #
+    # This uses .append() instead of just setting it to a list so that if forces
+    # the python auto-formatter to put one entry on each line, to reduce the
+    # likelihood of merge conflicts.
+    files_to_normalize = []
+    files_to_normalize.append("build_info.version")
+    files_to_normalize.append("build_info.jiri_snapshot")
+    files_to_normalize.append("build_info.latest_commit_date")
+    files_to_normalize.append("build_info.minimum_utc_stamp")
+    normalize_files_in_config(product, files_to_normalize, root_dir)
+
     if "packages" in product:
         packages = product["packages"]
         for pkg_set in ["base", "cache"]:

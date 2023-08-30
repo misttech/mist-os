@@ -16,6 +16,7 @@ rustc_library("platform_configuration") {
     "src/lib.rs",
     "src/subsystems.rs",
     "src/subsystems/battery.rs",
+    "src/subsystems/build_info.rs",
     "src/subsystems/connectivity.rs",
     "src/subsystems/development.rs",
     "src/subsystems/diagnostics.rs",

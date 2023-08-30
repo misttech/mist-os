@@ -687,7 +687,8 @@ impl ImageAssemblyConfigBuilder {
             let (path, manifest) = package
                 .build(outdir)
                 .with_context(|| format!("building domain config package {package_name}"))?;
-            base.insert(package_name.to_owned(), PackageEntry { path, manifest });
+            base.add_package_ignore_duplicates(PackageEntry { path, manifest })
+                .with_context(|| format!("Adding domain config package: {}", package_name))?;
         }
 
         {

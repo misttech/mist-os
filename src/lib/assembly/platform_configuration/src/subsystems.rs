@@ -23,6 +23,7 @@ pub(crate) mod prelude {
 use prelude::*;
 
 mod battery;
+mod build_info;
 mod connectivity;
 mod development;
 mod diagnostics;
@@ -188,6 +189,13 @@ fn configure_subsystems(
         builder,
     )
     .context("Configuring the 'battery' subsystem")?;
+
+    build_info::BuildInfoSubsystem::define_configuration(
+        context,
+        &config.product.build_info,
+        builder,
+    )
+    .context("Configuring the 'build_info' subsystem")?;
 
     connectivity::ConnectivitySubsystemConfig::define_configuration(
         context,

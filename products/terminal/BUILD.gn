@@ -4,6 +4,7 @@
 
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/assembly/sshd_config.gni")
+import("//build/info/info.gni")
 
 assert(
     is_fuchsia,
@@ -73,5 +74,7 @@ product_assembly_configuration("terminal") {
   product = {
     session_url =
         "fuchsia-pkg://fuchsia.com/tiles-session#meta/tiles-session.cm"
+    build_info = default_product_build_info
   }
+  deps = [ "//build/info:latest-commit-date" ]
 }

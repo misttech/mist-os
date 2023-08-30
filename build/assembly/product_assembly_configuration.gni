@@ -411,13 +411,13 @@ template("product_assembly_configuration") {
   # of the newly-constructed ones, and then assigning the newly-constructed ones
   # to the appropriate variables in each of the nested scopes.
 
-  platform_config_file_potential_inputs = [
+  config_file_potential_inputs = [
     {
-      node_path = "ui"
+      node_path = "platform.ui"
       fields = [ "sensor_config" ]
     },
     {
-      node_path = "development_support"
+      node_path = "platform.development_support"
       fields = [
         "authorized_ssh_keys_path",
         "authorized_ssh_ca_certs_path",
@@ -427,82 +427,96 @@ template("product_assembly_configuration") {
       node_path = "platform.forensics.cobalt"
       fields = [ "registry" ]
     },
+    {
+      node_path = "product.build_info"
+      fields = [
+        "version",
+        "jiri_snapshot",
+        "latest_commit_date",
+        "minimum_utc_stamp",
+      ]
+    },
   ]
 
   # The assembly configuration
-  platform_config_inputs = []
+  config_inputs = []
 
-  if (defined(invoker.platform)) {
-    _p = invoker.platform
+  _config = {
+    if (defined(invoker.platform)) {
+      platform = invoker.platform
+    }
+    if (defined(invoker.product)) {
+      product = invoker.product
+    }
+  }
 
-    # Iterate over each item in the list above.
-    foreach(potential_input, platform_config_file_potential_inputs) {
-      _node = {
-      }
-      _node = _p
+  # Iterate over each item in the list above.
+  foreach(potential_input, config_file_potential_inputs) {
+    _node = {
+    }
+    _node = _config
 
-      # Since we can't use recursion, iteratively change `_node` to the next
-      # child in the path, e.g. 'foo', then 'bar'.  The `continue` var is used
-      # to signal that some node along the path has been omitted, and this will
-      # be a no-op for the rest of the iteration (since it can't exit early)
-      _continue = true
-      foreach(_node_name, string_split(potential_input.node_path, ".")) {
-        if (_continue && defined(_node[_node_name])) {
-          # because GN will not let you replace a non-empty scope, this does a
-          # little workaround to what would be the following, if it was allowed:
-          #
-          #  _node = _node[_node_name]
-          #
-          # Instead, we need to create a _next_node temporary to hold the next
-          # node, but even that temporary lives across iterations of the loop,
-          # and must be reset to an empty scope before re-assigning to it.
-          #
+    # Since we can't use recursion, iteratively change `_node` to the next
+    # child in the path, e.g. 'foo', then 'bar'.  The `continue` var is used
+    # to signal that some node along the path has been omitted, and this will
+    # be a no-op for the rest of the iteration (since it can't exit early)
+    _continue = true
+    foreach(_node_name, string_split(potential_input.node_path, ".")) {
+      if (_continue && defined(_node[_node_name])) {
+        # because GN will not let you replace a non-empty scope, this does a
+        # little workaround to what would be the following, if it was allowed:
+        #
+        #  _node = _node[_node_name]
+        #
+        # Instead, we need to create a _next_node temporary to hold the next
+        # node, but even that temporary lives across iterations of the loop,
+        # and must be reset to an empty scope before re-assigning to it.
+        #
 
-          # Clear the previous _next_node, and then cache the next node to look
-          # at in _next_node.
-          _next_node = {
-          }
-          _next_node = _node[_node_name]
-
-          # Clear the _node var, so that we can assign _next_node to it.
-          _node = {
-          }
-          _node = _next_node
-        } else {
-          # The node wasn't found, so do nothing for the rest of the iteration.
-          _continue = false
+        # Clear the previous _next_node, and then cache the next node to look
+        # at in _next_node.
+        _next_node = {
         }
+        _next_node = _node[_node_name]
+
+        # Clear the _node var, so that we can assign _next_node to it.
+        _node = {
+        }
+        _node = _next_node
+      } else {
+        # The node wasn't found, so do nothing for the rest of the iteration.
+        _continue = false
       }
+    }
 
-      # 'continue' will still be true if the all the nodes in the path were
-      # found.
-      if (_continue) {
-        foreach(_field_name, potential_input.fields) {
-          if (defined(_node[_field_name])) {
-            _file_path = _node[_field_name]
+    # 'continue' will still be true if the all the nodes in the path were
+    # found.
+    if (_continue) {
+      foreach(_field_name, potential_input.fields) {
+        if (defined(_node[_field_name])) {
+          _file_path = _node[_field_name]
 
-            # Here the rebased path is converted back in to an absolute GN
-            # file label, from the GN root dir `//`:
-            #
-            # ../../path/to/filename.json
-            #
-            # becomes:
-            #
-            # //path/to/filename.json
-            #
-            # and if a file in root_build_dir:
-            #
-            # path/to/filename.json
-            #
-            # it becomes (for `root_build_dir` == "//out/default"):
-            #
-            # //out/default/path/to/filename.json
-            #
-            # And the resultant (non-rebased) path can be used in the GN
-            # action's `inputs` list
-            _gn_path = "//" + rebase_path(_file_path, "//", root_build_dir)
-            platform_config_inputs += [ _gn_path ]
-          }
+          # Here the rebased path is converted back in to an absolute GN
+          # file label, from the GN root dir `//`:
+          #
+          # ../../path/to/filename.json
+          #
+          # becomes:
+          #
+          # //path/to/filename.json
+          #
+          # and if a file in root_build_dir:
+          #
+          # path/to/filename.json
+          #
+          # it becomes (for `root_build_dir` == "//out/default"):
+          #
+          # //out/default/path/to/filename.json
+          #
+          # And the resultant (non-rebased) path can be used in the GN
+          # action's `inputs` list
+          _gn_path = "//" + rebase_path(_file_path, "//", root_build_dir)
+          config_inputs += [ _gn_path ]
         }
       }
     }
@@ -630,10 +644,10 @@ template("product_assembly_configuration") {
       inputs = []
     }
 
-    # Add any inputs found by looking at the known platform config schema items
+    # Add any inputs found by looking at the known config schema items
     # that contain paths to files, so that they are guaranteed to be added to
     # the ninja deps for the product assembly configuration.
-    inputs += platform_config_inputs
+    inputs += config_inputs
 
     if (!defined(deps)) {
       deps = []

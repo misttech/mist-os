@@ -7,6 +7,7 @@ import("//build/bazel/bazel_inputs.gni")
 import("//build/bazel/bazel_workspace.gni")
 import("//build/bazel/legacy_ninja_build_outputs.gni")
 import("//build/images/vbmeta.gni")
+import("//build/info/info.gni")
 import("//build/product.gni")
 import("//build/toolchain/rbe.gni")
 import("//src/connectivity/network/netcfg/delegated_network_provisioning.gni")
@@ -205,6 +206,9 @@ generated_file(_build_args_bzl_target) {
   } else {
     contents += [ "delegated_network_provisioning = False" ]
   }
+
+  # Pass the product name to Bazel.
+  contents += [ "build_info_product = \"${build_info_product}\"" ]
 
   outputs = [ _build_args_bzl_output ]
 }

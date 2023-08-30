@@ -5,18 +5,14 @@
 load(
     "@fuchsia_sdk//fuchsia:assembly.bzl",
     "ARCH",
-    "PARTITION_TYPE",
-    "SLOT",
-    "fuchsia_bootloader_partition",
     "fuchsia_elf_sizes",
-    "fuchsia_partition",
-    "fuchsia_partitions_configuration",
     "fuchsia_prebuilt_package",
     "fuchsia_product_bundle",
     "fuchsia_product_configuration",
     "fuchsia_product_image",
     "fuchsia_virtual_device",
 )
+load("//build/info:info.bzl", "DEFAULT_PRODUCT_BUILD_INFO")
 load("//products/workbench:platform_config.bzl", "workbench_platform_config")
 
 package(default_visibility = [
@@ -124,6 +120,7 @@ fuchsia_product_configuration(
         "platform": workbench_platform_config,
         "product": {
             "session_url": "fuchsia-pkg://fuchsia.com/tiles-session#meta/tiles-session.cm",
+            "build_info": DEFAULT_PRODUCT_BUILD_INFO,
         },
     },
 )
