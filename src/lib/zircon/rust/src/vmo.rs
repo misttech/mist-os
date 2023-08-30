@@ -33,6 +33,10 @@ pub struct VmoInfo {
     pub flags: VmoInfoFlags,
     pub committed_bytes: u64,
     pub handle_rights: Rights,
+    // TODO(fxb/132912): Add cache_policy that is present in sys::zx_info_vmo_t
+    pub metadata_bytes: u64,
+    pub committed_change_events: u64,
+    pub populated_bytes: u64,
 }
 
 impl Default for VmoInfo {
@@ -53,6 +57,9 @@ impl From<sys::zx_info_vmo_t> for VmoInfo {
             flags: VmoInfoFlags::from_bits_truncate(info.flags),
             committed_bytes: info.committed_bytes,
             handle_rights: Rights::from_bits_truncate(info.handle_rights),
+            metadata_bytes: info.metadata_bytes,
+            committed_change_events: info.committed_change_events,
+            populated_bytes: info.populated_bytes,
         }
     }
 }

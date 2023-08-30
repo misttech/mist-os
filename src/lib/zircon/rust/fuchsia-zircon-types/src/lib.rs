@@ -1493,8 +1493,8 @@ multiconst!(zx_object_info_topic_t, [
     ZX_INFO_THREAD                     = 10; // zx_info_thread_t[1]
     ZX_INFO_THREAD_EXCEPTION_REPORT    = info_topic(11, 1); // zx_exception_report_t[1]
     ZX_INFO_TASK_STATS                 = 12; // zx_info_task_stats_t[1]
-    ZX_INFO_PROCESS_MAPS               = 13; // zx_info_maps_t[n]
-    ZX_INFO_PROCESS_VMOS               = info_topic(14, 1); // zx_info_vmo_t[n]
+    ZX_INFO_PROCESS_MAPS               = info_topic(13, 1); // zx_info_maps_t[n]
+    ZX_INFO_PROCESS_VMOS               = info_topic(14, 2); // zx_info_vmo_t[n]
     ZX_INFO_THREAD_STATS               = 15; // zx_info_thread_stats_t[1]
     ZX_INFO_CPU_STATS                  = 16; // zx_info_cpu_stats_t[n]
     ZX_INFO_KMEM_STATS                 = 17; // zx_info_kmem_stats_t[1]
@@ -1503,7 +1503,7 @@ multiconst!(zx_object_info_topic_t, [
     ZX_INFO_BTI                        = 20; // zx_info_bti_t[1]
     ZX_INFO_PROCESS_HANDLE_STATS       = 21; // zx_info_process_handle_stats_t[1]
     ZX_INFO_SOCKET                     = 22; // zx_info_socket_t[1]
-    ZX_INFO_VMO                        = info_topic(23, 1); // zx_info_vmo_t[1]
+    ZX_INFO_VMO                        = info_topic(23, 2); // zx_info_vmo_t[1]
     ZX_INFO_JOB                        = 24; // zx_info_job_t[1]
     ZX_INFO_TIMER                      = 25; // zx_info_timer_t[1]
     ZX_INFO_STREAM                     = 26; // zx_info_stream_t[1]
@@ -1670,6 +1670,7 @@ pub struct zx_info_vmo_t {
     pub cache_policy: u32,
     pub metadata_bytes: u64,
     pub committed_change_events: u64,
+    pub populated_bytes: u64,
 }
 
 struct_decl_macro! {
@@ -1806,6 +1807,7 @@ struct_decl_macro! {
         pub vmo_koid: zx_koid_t,
         pub vmo_offset: u64,
         pub committed_pages: usize,
+        pub populated_pages: usize,
     }
 }
 

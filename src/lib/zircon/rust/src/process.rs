@@ -115,9 +115,10 @@ impl From<sys::zx_info_maps_mapping_t> for MapsMappingInfo {
             vmo_koid,
             vmo_offset,
             committed_pages,
+            populated_pages,
         }: sys::zx_info_maps_mapping_t,
     ) -> Self {
-        Self { mmu_flags, padding1, vmo_koid, vmo_offset, committed_pages }
+        Self { mmu_flags, padding1, vmo_koid, vmo_offset, committed_pages, populated_pages }
     }
 }
 
