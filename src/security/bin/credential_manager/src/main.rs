@@ -78,8 +78,11 @@ async fn main() -> Result<(), Error> {
     let mut fs = ServiceFs::new();
     fs.dir("svc").add_fidl_service(Services::CredentialManager);
     fs.dir("svc").add_fidl_service(Services::Resetter);
-    inspect_runtime::serve(&INSPECTOR, &mut fs)?;
     fs.take_and_serve_directory_handle().context("serving directory handle")?;
+
+    let _inspect_server_task =
+        inspect_runtime::publish(&INSPECTOR, inspect_runtime::PublishOptions::default());
+
     // It is important that this remains `for_each` to create a sequential queue and prevent
     // subsequent requests being serviced before the first finishes.
     info!("Starting FIDL services");
@@ -94,5 +97,6 @@ async fn main() -> Result<(), Error> {
         }
     })
     .await;
+
     Ok(())
 }
