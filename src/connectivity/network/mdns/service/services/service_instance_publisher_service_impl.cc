@@ -165,6 +165,7 @@ void ServiceInstancePublisherServiceImpl::ResponderPublisher::GetPublicationNow(
       [this, callback = std::move(callback)](
           fuchsia::net::mdns::ServiceInstancePublicationResponder_OnPublication_Result result) {
         if (result.is_err()) {
+          OnGetPublicationComplete();
           return;
         }
 
