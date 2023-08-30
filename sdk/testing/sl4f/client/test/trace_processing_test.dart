@@ -824,6 +824,40 @@ void main(List<String> args) {
     expect(getAllEvents(model), isNotEmpty);
   });
 
+  test('Zero-length duration events', () async {
+    // This is a regression test for a bug (https://fxbug.dev/131863) where
+    // trace importing fails to correctly handle zero-length trace
+    // durations with the ph='X' type.
+    //
+    // The bug arises because the trace importer sorted the trace events
+    // using a non-stable sort (likely quicksort). We use an example input
+    // here with a moderate number of trace events (100) because the bug
+    // does not reproduce with a small number of trace events (such as 1 or
+    // 10) but does reproduce with a larger number (such as 20).
+    final Map<String, dynamic> traceJson = {
+      'displayTimeUnit': 'ns',
+      'traceEvents': [],
+      'systemTraceEvents': {
+        'events': [],
+        'type': 'fuchsia',
+      },
+    };
+    for (int idx = 0; idx < 100; ++idx) {
+      traceJson['traceEvents'].add({
+        'cat': 'some_category',
+        'name': 'some_event',
+        'ts': 1000 + idx,
+        'pid': 35204,
+        'tid': 323993,
+        'ph': 'X',
+        'dur': 0,
+      });
+    }
+    final model = createModelFromJson(traceJson);
+
+    expect(getAllEvents(model), isNotEmpty);
+  });
+
   test('Flow event binding points', () async {
     final model = await _modelFromPath('runtime_deps/flow_event_binding.json');
 

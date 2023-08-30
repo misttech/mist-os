@@ -6,6 +6,7 @@
 
 import 'dart:convert';
 import 'dart:io';
+import 'package:collection/collection.dart' show mergeSort;
 
 import 'time_delta.dart';
 import 'time_point.dart';
@@ -296,7 +297,16 @@ Model _createModelFromJson(Map<String, dynamic> rootObject) {
   // events in sorted order to compute things such as duration stacks and flow
   // sequences. Events without timestamps (e.g. Chrome's metadata events) are
   // sorted to the beginning.
-  extendedTraceEvents.sort((a, b) => (a['ts'] ?? 0).compareTo(b['ts'] ?? 0));
+  //
+  // We use mergeSort() here rather than List.sort() because we want
+  // the sorting to be stable, and List.sort() is not guaranteed to be
+  // stable (https://github.com/dart-lang/sdk/issues/433). If we use a
+  // non-stable sort, zero-length duration events of type ph='X' are
+  // not handled properly, because the 'fuchsia_synthetic_end' events
+  // can get sorted before their corresponding beginning events.
+  mergeSort(extendedTraceEvents,
+      compare: (dynamic a, dynamic b) =>
+          (a['ts'] ?? 0).compareTo(b['ts'] ?? 0));
 
   int droppedFlowEventCounter = 0;
   int droppedAsyncEventCounter = 0;
