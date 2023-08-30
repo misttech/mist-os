@@ -391,9 +391,7 @@ impl Validate for [Elf64ProgramHeader] {
 
                     // Virtual addresses should be at the same page offset as their offset in the
                     // file.
-                    if hdr.align != 0
-                        && (hdr.vaddr % hdr.align as usize) != (hdr.offset % hdr.align as usize)
-                    {
+                    if (hdr.vaddr % hdr.align as usize) != (hdr.offset % hdr.align as usize) {
                         return Err(ElfParseError::InvalidProgramHeader(
                             "Virtual address and offset in file are not at same offset in page",
                         ));
