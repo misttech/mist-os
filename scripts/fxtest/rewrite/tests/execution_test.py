@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import json
 import os
 import subprocess
 import tempfile
@@ -83,7 +84,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                 ),
             ),
             exec_env,
-            args.parse_args(flag_list),
+            args.parse_args(flag_list + ["--no-use-package-hash"]),
         )
 
         self.assertListEqual(
@@ -125,7 +126,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                 ),
             ),
             exec_env,
-            args.parse_args([]),
+            args.parse_args(["--no-use-package-hash"]),
         )
 
         self.assertListEqual(
@@ -192,3 +193,127 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
             assert output is not None
 
             self.assertFalse(any([e.error is not None async for e in recorder.iter()]))
+
+    async def test_test_execution_with_package_hash(self):
+        """Ensure that test execution respects --use-package-hash"""
+        with tempfile.TemporaryDirectory() as tmp:
+            with open(os.path.join(tmp, "package-repositories.json"), "w") as f:
+                json.dump(
+                    [
+                        {
+                            "targets": "targets.json",
+                        }
+                    ],
+                    f,
+                )
+            with open(os.path.join(tmp, "targets.json"), "w") as f:
+                json.dump(
+                    {
+                        "signed": {
+                            "targets": {
+                                "foo_test/0": {
+                                    "custom": {
+                                        "merkle": "f00",
+                                    }
+                                },
+                                "bar_test/0": {},
+                            }
+                        }
+                    },
+                    f,
+                )
+
+            def make_test(name: str) -> test_list_file.Test:
+                name = f"fuchsia-pkg://fuchsia.com/{name}#meta/test.cm"
+                return test_list_file.Test(
+                    tests_json_file.TestEntry(
+                        tests_json_file.TestSection(name, "//foo")
+                    ),
+                    test_list_file.TestListEntry(
+                        name, [], execution=test_list_file.TestListExecutionEntry(name)
+                    ),
+                )
+
+            def assertTestExecutionFailsUsingMerkleHash(
+                error_regex: str,
+                test: test_list_file.Test,
+                exec_env: environment.ExecutionEnvironment,
+            ):
+                self.assertRaisesRegex(
+                    execution.TestCouldNotRun,
+                    error_regex,
+                    lambda: execution.TestExecution(
+                        test, exec_env, args.parse_args([])
+                    ).command_line(),
+                )
+                self.assertIsNotNone(
+                    execution.TestExecution(
+                        test, exec_env, args.parse_args(["--no-use-package-hash"])
+                    ).command_line()
+                )
+
+            # This environment is missing a package-repository.json file, so attempts
+            # to match a merkle root will fail.
+            missing_exec_env = environment.ExecutionEnvironment(
+                "/fuchsia", "", "", "", ""
+            )
+
+            assertTestExecutionFailsUsingMerkleHash(
+                "Could not load a Merkle hash",
+                make_test("foo_test"),
+                missing_exec_env,
+            )
+
+            # This environment contains a package repository, so we need to
+            # ensure the merkle hash argument is respected.
+            exec_env = environment.ExecutionEnvironment(
+                "/fuchsia",
+                "",
+                "",
+                "",
+                "",
+                package_repositories_file=os.path.join(
+                    tmp, "package-repositories.json"
+                ),
+            )
+
+            # Hash is present only when use_merkle_hash is True, absent otherwise.
+            self.assertIn(
+                "fuchsia-pkg://fuchsia.com/foo_test?hash=f00#meta/test.cm",
+                execution.TestExecution(
+                    make_test("foo_test"), exec_env, args.parse_args([])
+                ).command_line(),
+            )
+            self.assertIn(
+                "fuchsia-pkg://fuchsia.com/foo_test#meta/test.cm",
+                execution.TestExecution(
+                    make_test("foo_test"),
+                    exec_env,
+                    args.parse_args(["--no-use-package-hash"]),
+                ).command_line(),
+            )
+
+            # Mangle the component URL such that a name cannot be extracted,
+            # and expect an error.
+            broken_test = make_test("foo_test")
+            assert broken_test.info is not None
+            assert broken_test.info.execution is not None
+            broken_test.info.execution.component_url = "foo_test"
+
+            assertTestExecutionFailsUsingMerkleHash(
+                "Failed to parse package name", broken_test, exec_env
+            )
+
+            # This test has an entry, but no merkle.
+            assertTestExecutionFailsUsingMerkleHash(
+                "Could not find a Merkle hash for this test",
+                make_test("bar_test"),
+                exec_env,
+            )
+
+            # This test has no entry.
+            assertTestExecutionFailsUsingMerkleHash(
+                "Could not find a Merkle hash for this test",
+                make_test("baz_test"),
+                exec_env,
+            )

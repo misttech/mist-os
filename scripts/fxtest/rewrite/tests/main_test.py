@@ -58,6 +58,12 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             os.path.isfile(os.path.join(self.test_data_path, "test-list.json")),
             f"path was {self.test_data_path} for {__file__}",
         )
+        self.assertTrue(
+            os.path.isfile(
+                os.path.join(self.test_data_path, "package-repositories.json")
+            ),
+            f"path was {self.test_data_path} for {__file__}",
+        )
 
         with open(os.path.join(self.fuchsia_dir.name, ".fx-build-dir"), "w") as f:
             f.write("out/default")
@@ -65,7 +71,12 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         self.out_dir = os.path.join(self.fuchsia_dir.name, "out/default")
         os.makedirs(self.out_dir)
 
-        for name in ["tests.json", "test-list.json"]:
+        for name in [
+            "tests.json",
+            "test-list.json",
+            "package-repositories.json",
+            "package-targets.json",
+        ]:
             shutil.copy(
                 os.path.join(self.test_data_path, name),
                 os.path.join(self.out_dir, name),
@@ -135,8 +146,12 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         self, subset: typing.Set[typing.Any], full: typing.Set[typing.Any]
     ):
         inter = full.intersection(subset)
-        msg_output = lambda: "\n ".join(map(lambda x: " ".join(x), sorted(full)))
-        self.assertEqual(inter, subset, f"Full set was\n {msg_output()}")
+        self.assertEqual(
+            inter, subset, f"Full set was\n {self.prettyFormatPrefixes(full)}"
+        )
+
+    def prettyFormatPrefixes(self, vals: typing.Set[typing.Any]) -> str:
+        return "\n ".join(map(lambda x: " ".join(x), sorted(vals)))
 
     async def test_dry_run(self):
         """Test a basic dry run of the command."""
@@ -196,6 +211,43 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(selection_events), 1)
         selection_event = selection_events[0]
         self.assertEqual(len(selection_event.selected), expected_count)
+
+    @parameterized.expand(
+        [("--use-package-hash", DEVICE_TESTS_IN_INPUT), ("--no-use-package-hash", 0)]
+    )
+    async def test_use_package_hash(self, flag_name: str, expected_hash_matches: int):
+        """Test ?hash= is used only when --use-package-hash is set"""
+
+        command_mock = self._mock_run_command(0)
+        self._mock_has_device_connected(True)
+        self._mock_has_tests_in_base(False)
+
+        ret = await main.async_main_wrapper(
+            args.parse_args(["--simple", "--no-build"] + [flag_name])
+        )
+        self.assertEqual(ret, 0)
+
+        call_prefixes = self._make_call_args_prefix_set(command_mock.call_args_list)
+
+        self.assertIsSubset(
+            {
+                ("fx", "ffx", "test", "run"),
+            },
+            call_prefixes,
+        )
+
+        hash_params_found: int = 0
+        for prefix_list in call_prefixes:
+            entry: str
+            for entry in prefix_list:
+                if "?hash=" in entry:
+                    hash_params_found += 1
+
+        self.assertEqual(
+            hash_params_found,
+            expected_hash_matches,
+            f"Prefixes were\n{self.prettyFormatPrefixes(call_prefixes)}",
+        )
 
     async def test_suggestions(self):
         """Test that targets are suggested when there are no test matches."""

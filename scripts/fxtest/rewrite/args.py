@@ -31,6 +31,7 @@ class Flags:
     random: bool
     limit: int | None
     fail: bool
+    use_package_hash: bool
     restrict_logs: bool
 
     output: bool
@@ -153,6 +154,13 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
     )
 
     execution = parser.add_argument_group("Execution Options")
+    execution.add_argument(
+        "--use-package-hash",
+        action=argparse.BooleanOptionalAction,
+        type=bool,
+        help="Use the package Merkle root hash from the build artifacts to ensure you are running the most recently built device test code.",
+        default=True,
+    )
     execution.add_argument(
         "--parallel",
         type=int,

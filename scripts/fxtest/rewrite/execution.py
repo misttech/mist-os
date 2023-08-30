@@ -3,11 +3,13 @@
 # found in the LICENSE file.
 
 import os
+import re
 import typing
 
 import args
 import environment
 import event
+import package_repository
 import statusinfo
 import test_list_file
 import util.command as command
@@ -72,6 +74,33 @@ class TestExecution:
         """
         if self._test.info.execution is not None:
             execution = self._test.info.execution
+
+            component_url = execution.component_url
+            if self._flags.use_package_hash:
+                try:
+                    package_repo = package_repository.PackageRepository.from_env(
+                        self._exec_env
+                    )
+
+                    name = extract_package_name_from_url(component_url)
+                    if name is None:
+                        raise TestCouldNotRun(
+                            "Failed to parse package name for Merkle root matching.\nTry running with --no-use-package-hash."
+                        )
+
+                    if name not in package_repo.name_to_merkle:
+                        raise TestCouldNotRun(
+                            "Could not find a Merkle hash for this test.\nTry running with --no-use-package-hash or rebuild your package repository."
+                        )
+
+                    suffix = f"?hash={package_repo.name_to_merkle[name]}"
+                    component_url = component_url.replace("#", f"{suffix}#", 1)
+
+                except package_repository.PackageRepositoryError as e:
+                    raise TestCouldNotRun(
+                        f"Could not load a Merkle hash for this test ({str(e)})\nTry running with --no-use-package-hash or rebuild your package repository."
+                    )
+
             extra_args = []
             if execution.realm:
                 extra_args += ["--realm", execution.realm]
@@ -83,7 +112,7 @@ class TestExecution:
             if self._test.build.test.parallel is not None:
                 extra_args += ["--parallel", str(self._test.build.test.parallel)]
 
-            return ["fx", "ffx", "test", "run"] + extra_args + [execution.component_url]
+            return ["fx", "ffx", "test", "run"] + extra_args + [component_url]
         elif self._test.build.test.path:
             return [os.path.join(self._exec_env.out_dir, self._test.build.test.path)]
         else:
@@ -159,6 +188,27 @@ class TestExecution:
                     recorder.emit_verbatim_message(output.stderr)
             raise TestFailed("Test reported failure")
         return output
+
+
+_PACKAGE_NAME_REGEX = re.compile(r"fuchsia-pkg://fuchsia\.com/([^/#]+)#")
+
+
+def extract_package_name_from_url(url: str) -> str | None:
+    """Given a fuchsia-pkg URL, extract and return the package name.
+
+    Example:
+      fuchsia-pkg://fuchsia.com/my-package#meta/my-component.cm -> my-package
+
+    Args:
+        url (str): A fuchsia-pkg:// URL.
+
+    Returns:
+        str | None: The package name from the URL, or None if parsing failed.
+    """
+    match = _PACKAGE_NAME_REGEX.match(url)
+    if match is None:
+        return None
+    return match.group(1)
 
 
 async def run_command(

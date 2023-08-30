@@ -21,6 +21,7 @@ class TestExecutionEnvironment(unittest.TestCase):
 
         open(os.path.join(out_dir, "tests.json"), "a").close()
         open(os.path.join(out_dir, "test-list.json"), "a").close()
+        open(os.path.join(out_dir, "package-repositories.json"), "a").close()
 
     def test_process_environment(self):
         """Test that we can load and use an environment."""
