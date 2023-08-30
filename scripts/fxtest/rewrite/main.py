@@ -567,13 +567,24 @@ async def run_all_tests(
     test_group = recorder.emit_test_group(len(tests.selected))
 
     @dataclass
+    class ExecEntry:
+        """Wrapper for test executions to share a signal for aborting by groups."""
+
+        # The test execution to run.
+        exec: execution.TestExecution
+
+        # Signal for aborting the execution of a specific group of tests,
+        # including this one.
+        abort_group: asyncio.Event
+
+    @dataclass
     class RunState:
         total_running: int = 0
         non_hermetic_running: int = 0
-        hermetic_test_queue: asyncio.Queue[execution.TestExecution] = field(
+        hermetic_test_queue: asyncio.Queue[ExecEntry] = field(
             default_factory=lambda: asyncio.Queue()
         )
-        non_hermetic_test_queue: asyncio.Queue[execution.TestExecution] = field(
+        non_hermetic_test_queue: asyncio.Queue[ExecEntry] = field(
             default_factory=lambda: asyncio.Queue()
         )
 
@@ -587,11 +598,26 @@ async def run_all_tests(
                 f"\nOnly running {flags.limit} tests out of {len(tests.selected)} due to --limit"
             )
             break
-        exec = execution.TestExecution(test, exec_env, flags)
-        if exec.is_hermetic():
-            run_state.hermetic_test_queue.put_nowait(exec)
-        else:
-            run_state.non_hermetic_test_queue.put_nowait(exec)
+
+        abort_group = asyncio.Event()
+
+        execs = [
+            execution.TestExecution(
+                test,
+                exec_env,
+                flags,
+                run_suffix=None if flags.count == 1 else i + 1,
+            )
+            for i in range(flags.count)
+        ]
+
+        for exec in execs:
+            if exec.is_hermetic():
+                run_state.hermetic_test_queue.put_nowait(ExecEntry(exec, abort_group))
+            else:
+                run_state.non_hermetic_test_queue.put_nowait(
+                    ExecEntry(exec, abort_group)
+                )
         limit_remaining -= 1
 
     tasks = []
@@ -601,16 +627,18 @@ async def run_all_tests(
 
     async def test_executor():
         nonlocal test_failure_observed
-        to_run: execution.TestExecution
+        to_run: ExecEntry
         was_non_hermetic: bool = False
 
         while True:
             async with run_condition:
-                if abort_all_tests_event.is_set():
-                    # If we should not execute any more tests, quit.
-                    return
+                # Wait until we are allowed to try to run a test.
                 while run_state.total_running == max_parallel:
                     await run_condition.wait()
+
+                # If we should not execute any more tests, quit.
+                if abort_all_tests_event.is_set():
+                    return
 
                 if (
                     run_state.non_hermetic_running == 0
@@ -627,38 +655,51 @@ async def run_all_tests(
                 run_state.total_running += 1
 
             test_suite_id = recorder.emit_test_suite_started(
-                to_run.name(), not was_non_hermetic, parent=test_group
+                to_run.exec.name(), not was_non_hermetic, parent=test_group
             )
             status: event.TestSuiteStatus
             message: typing.Optional[str] = None
             try:
-                command_line = " ".join(to_run.command_line())
-                recorder.emit_instruction_message(f"Command: {command_line}")
+                if not to_run.abort_group.is_set():
+                    # Only run if this group was not already aborted.
+                    command_line = " ".join(to_run.exec.command_line())
+                    recorder.emit_instruction_message(f"Command: {command_line}")
 
-                done, pending = await asyncio.wait(
-                    [
-                        asyncio.create_task(
-                            to_run.run(
-                                recorder, flags, test_suite_id, timeout=flags.timeout
-                            )
-                        ),
-                        asyncio.create_task(abort_all_tests_event.wait()),
-                    ],
-                    return_when=asyncio.FIRST_COMPLETED,
-                )
-                for r in pending:
-                    # Cancel pending tasks.
-                    r.cancel()
-                for r in done:
-                    # Re-throw exceptions.
-                    r.result()
-                if pending:
-                    # Propagate cancellations
-                    await asyncio.wait(pending)
+                    # Wait for the command completion and any other signal that
+                    # means we should stop running the test.
+                    done, pending = await asyncio.wait(
+                        [
+                            asyncio.create_task(
+                                to_run.exec.run(
+                                    recorder,
+                                    flags,
+                                    test_suite_id,
+                                    timeout=flags.timeout,
+                                )
+                            ),
+                            asyncio.create_task(abort_all_tests_event.wait()),
+                            asyncio.create_task(to_run.abort_group.wait()),
+                        ],
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
+                    for r in pending:
+                        # Cancel pending tasks.
+                        # This must happen before we throw exceptions to ensure
+                        # tasks are properly cleaned up.
+                        r.cancel()
+                    if pending:
+                        # Propagate cancellations
+                        await asyncio.wait(pending)
+                    for r in done:
+                        # Re-throw exceptions.
+                        r.result()
 
                 if abort_all_tests_event.is_set():
                     status = event.TestSuiteStatus.ABORTED
                     message = "Test suite aborted due to another failure"
+                elif to_run.abort_group.is_set():
+                    status = event.TestSuiteStatus.ABORTED
+                    message = "Aborted re-runs due to another failure"
                 else:
                     status = event.TestSuiteStatus.PASSED
             except execution.TestCouldNotRun as e:
@@ -667,6 +708,8 @@ async def run_all_tests(
             except (execution.TestTimeout, execution.TestFailed) as e:
                 if isinstance(e, execution.TestTimeout):
                     status = event.TestSuiteStatus.TIMEOUT
+                    # Abort other tests in this group.
+                    to_run.abort_group.set()
                 else:
                     status = event.TestSuiteStatus.FAILED
                 test_failure_observed = True

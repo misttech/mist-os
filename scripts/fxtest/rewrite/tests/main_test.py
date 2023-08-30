@@ -351,3 +351,83 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(any(["bar_test" in v[0] for v in call_prefixes]))
         self.assertFalse(any(["baz_test" in v[0] for v in call_prefixes]))
+
+    async def test_count(self):
+        """Test that we can re-run a test multiple times with --count"""
+
+        command_mock = self._mock_run_command(0)
+
+        self._mock_has_device_connected(True)
+        self._mock_has_tests_in_base(False)
+
+        # Run each test 3 times, no parallel to better match behavior of failure case test.
+        ret = await main.async_main_wrapper(
+            args.parse_args(["--simple", "--no-build", "--count=3", "--parallel=1"])
+        )
+        self.assertEqual(ret, 0)
+
+        self.assertEqual(
+            3,
+            sum(["bar_test" in v[0][0] for v in command_mock.call_args_list]),
+            command_mock.call_args_list,
+        )
+        self.assertEqual(
+            3,
+            sum(["baz_test" in v[0][0] for v in command_mock.call_args_list]),
+            command_mock.call_args_list,
+        )
+        self.assertEqual(
+            3,
+            sum(
+                [
+                    "foo-test?hash=" in " ".join(v[0])
+                    for v in command_mock.call_args_list
+                ]
+            ),
+            command_mock.call_args_list,
+        )
+
+    async def test_count_with_timeout(self):
+        """Test that we abort running the rest of the tests in a --count group if a timeout occurs."""
+
+        command_mock = self._mock_run_command(1)
+        command_mock.return_value = util.command.CommandOutput(
+            "", "", 1, 10, None, was_timeout=True
+        )
+
+        self._mock_has_device_connected(True)
+        self._mock_has_tests_in_base(False)
+
+        # Run each test 3 times, no parallel to better match behavior of failure case test.
+        ret = await main.async_main_wrapper(
+            args.parse_args(
+                [
+                    "--simple",
+                    "--no-build",
+                    "--count=3",
+                    "--parallel=1",
+                ]
+            )
+        )
+        self.assertEqual(ret, 1)
+
+        self.assertEqual(
+            1,
+            sum(["bar_test" in v[0][0] for v in command_mock.call_args_list]),
+            command_mock.call_args_list,
+        )
+        self.assertEqual(
+            1,
+            sum(["baz_test" in v[0][0] for v in command_mock.call_args_list]),
+            command_mock.call_args_list,
+        )
+        self.assertEqual(
+            1,
+            sum(
+                [
+                    "foo-test?hash=" in " ".join(v[0])
+                    for v in command_mock.call_args_list
+                ]
+            ),
+            command_mock.call_args_list,
+        )

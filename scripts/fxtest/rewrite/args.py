@@ -29,6 +29,7 @@ class Flags:
 
     parallel: int
     random: bool
+    count: int
     limit: int | None
     timeout: float | None
     fail: bool
@@ -61,6 +62,8 @@ class Flags:
             raise FlagError("--status-delay must be at least 0.005 (5ms)")
         if self.timeout and self.timeout <= 0:
             raise FlagError("--timeout must be greater than 0")
+        if self.count < 1:
+            raise FlagError("--count must be a positive number")
 
         if not termout.is_valid() and self.status:
             raise FlagError("Refusing to output interactive status to a non-TTY.")
@@ -181,6 +184,12 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
         "--timeout",
         type=float,
         help="Terminate tests that take longer than this number of seconds to complete. Default is no timeout.",
+    )
+    execution.add_argument(
+        "--count",
+        type=int,
+        help="Execute each test this many times. If any iteration of a test times out, no further iterations will be executed",
+        default=1,
     )
     execution.add_argument(
         "--limit", type=int, help="Stop execution after this many tests", default=None

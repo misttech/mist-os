@@ -39,6 +39,7 @@ class TestExecution:
         test: test_list_file.Test,
         exec_env: environment.ExecutionEnvironment,
         flags: args.Flags,
+        run_suffix: int | None = None,
     ):
         """Initialize the test execution wrapper.
 
@@ -46,10 +47,12 @@ class TestExecution:
             test (test_list_file.Test): Test to run.
             exec_env (environment.ExecutionEnvironment): Execution environment.
             flags (args.Flags): Command flags.
+            run_suffix (int, optional): If set, this is the unique index of a single run of the referenced test.
         """
         self._test = test
         self._exec_env = exec_env
         self._flags = flags
+        self._run_suffix = run_suffix
 
     def name(self) -> str:
         """Get the name of the test.
@@ -57,7 +60,9 @@ class TestExecution:
         Returns:
             str: Name of the test.
         """
-        return self._test.info.name
+        return self._test.info.name + (
+            f" (Run {self._run_suffix})" if self._run_suffix is not None else ""
+        )
 
     def is_hermetic(self) -> bool:
         """Determine if a test is hermetic.
