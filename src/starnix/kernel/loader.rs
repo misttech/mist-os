@@ -339,13 +339,9 @@ fn parse_interpreter_line(line: &[u8]) -> Result<Vec<CString>, Errno> {
     let end = line.iter().position(|&b| b == b'\n' || b == 0).ok_or_else(|| errno!(EINVAL))?;
     let line = &line[HASH_BANG.len()..end];
 
-    // Skip whitespace at the start.
-    let is_tab_or_space = |&b| b == b' ' || b == b'\t';
-    let begin = line.iter().position(|b| !is_tab_or_space(b)).unwrap_or(0);
-    let line = &line[begin..];
-
     // Split the byte string at the first whitespace character (or end of line). The first part
     // is the interpreter path.
+    let is_tab_or_space = |&b| b == b' ' || b == b'\t';
     let first_whitespace = line.iter().position(is_tab_or_space).unwrap_or(line.len());
     let (interpreter, rest) = line.split_at(first_whitespace);
     if interpreter.is_empty() {
@@ -665,14 +661,6 @@ mod tests {
         assert_eq!(
             parse_interpreter_line(b"#!/bin/bash\nfoobar"),
             Ok(vec![CString::new("/bin/bash").unwrap()])
-        );
-        assert_eq!(
-            parse_interpreter_line(b"#! /bin/bash -e  -x\t-l\n"),
-            Ok(vec![CString::new("/bin/bash").unwrap(), CString::new("-e  -x\t-l").unwrap(),])
-        );
-        assert_eq!(
-            parse_interpreter_line(b"#!\t/bin/bash \t-l\n"),
-            Ok(vec![CString::new("/bin/bash").unwrap(), CString::new("-l").unwrap(),])
         );
     }
 }
