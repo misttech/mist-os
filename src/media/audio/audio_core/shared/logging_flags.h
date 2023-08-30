@@ -25,12 +25,10 @@ inline constexpr bool kLogAudioRendererSetUsageCalls = false;
 inline constexpr bool kLogRendererPlayCalls = false;
 inline constexpr bool kLogRendererPauseCalls = false;
 
-// In "client-side underflows", we discard data because its start timestamp has already passed. For
-// each packet queue, we log the first underflow, plus subsequent occurrences depending on the
-// audio_core logging level. We throttle how frequently these are displayed. If log_level is set to
-// TRACE or DEBUG, all client-side underflows are logged (at log_level -1: VLOG TRACE), per the
-// kPacketQueueUnderflowTraceInterval. If set to INFO, we log less often (at log_level 1: INFO),
-// throttling by kPacketQueueUnderflowInfoInterval. If WARNING or higher, we log even less, per
+// In packet queue underflows, we discard data because its start timestamp has already passed. For
+// each packet queue, we log the first underflow, and subsequent instances depending on AudioCore's
+// logging level. If set to INFO, we log less often (at log_level 1: INFO), throttling by
+// kPacketQueueUnderflowInfoInterval. If WARNING or higher, we log even less, per
 // kPacketQueueUnderflowWarningInterval. By default, NDEBUG logs at WARNING, and DEBUG at INFO.
 //
 // We also log an underflow if its duration exceeds the previously-reported one by a set threshold.
@@ -38,21 +36,20 @@ inline constexpr bool kLogRendererPauseCalls = false;
 //
 // To disable all client-side underflow logging, set kLogPacketQueueUnderflow to false.
 inline constexpr bool kLogPacketQueueUnderflow = true;
-inline constexpr uint16_t kPacketQueueUnderflowTraceInterval = 1;
-inline constexpr uint16_t kPacketQueueUnderflowInfoInterval = 10;
 inline constexpr uint16_t kPacketQueueUnderflowWarningInterval = 100;
-inline constexpr zx::duration kPacketQueueUnderflowDurationIncreaseTraceThreshold = zx::msec(0);
-inline constexpr zx::duration kPacketQueueUnderflowDurationIncreaseInfoThreshold = zx::msec(50);
+inline constexpr uint16_t kPacketQueueUnderflowInfoInterval = 10;
+// If AudioCore's log level is TRACE or DEBUG, we log all packet queue underflows.
 inline constexpr zx::duration kPacketQueueUnderflowDurationIncreaseWarningThreshold = zx::msec(500);
+inline constexpr zx::duration kPacketQueueUnderflowDurationIncreaseInfoThreshold = zx::msec(50);
 
 // Capture-related logging
 //
-// In a "client-side overflow", data is discarded because no buffer space is available. For each
-// Capturer, we log the first overflow, plus subsequent occurrences depending on audio_core's
-// logging level. If log_level is set to TRACE or DEBUG, all client-side overflows are logged.
+// In a capture overflow, data is discarded because no buffer space is available. For each Capturer,
+// we log the first overflow, plus subsequent occurrences depending on audio_core's logging level.
 inline constexpr bool kLogCaptureOverflow = true;
-inline constexpr uint16_t kCaptureOverflowInfoInterval = 10;
-inline constexpr uint16_t kCaptureOverflowWarningInterval = 100;
+inline constexpr uint16_t kCaptureOverflowWarningInterval = 100;  // Log 1/100 instances.
+inline constexpr uint16_t kCaptureOverflowInfoInterval = 10;      // Log 1/10 instances.
+// If AudioCore's log level is TRACE or DEBUG, we log all capture overflows.
 
 // Relevant for both renderers and capturers
 inline constexpr bool kLogPresentationDelay = false;
@@ -70,7 +67,7 @@ inline constexpr bool kLogSetDeviceGainMuteActions = true;
 //
 inline constexpr bool kLogAudioDevice = false;
 inline constexpr bool kLogDevicePlugUnplug = true;
-inline constexpr bool kLogAddDevice = true;
+inline constexpr bool kLogAddRemoveDevice = true;
 
 // Values retrieved from the audio driver related to delay, and associated calculations.
 inline constexpr bool kLogDriverDelayProperties = false;
@@ -96,7 +93,7 @@ inline constexpr int kLogDestDiscontinuitiesStride = 997;  // Prime, to avoid mi
 inline constexpr bool kLogJamSyncs = true;
 inline constexpr uint16_t kJamSyncWarningInterval = 200;  // Log 1 of every 200 jam-syncs at WARNING
 inline constexpr uint16_t kJamSyncInfoInterval = 20;      // Log 1 of every 20 jam-syncs at INFO
-inline constexpr uint16_t kJamSyncTraceInterval = 1;      // Log all remaining jam-syncs at TRACE
+// If AudioCore's log level is TRACE or DEBUG, we log all jam-syncs.
 
 // Timing and position advance, in pipeline stages.
 #ifdef NDEBUG
@@ -118,6 +115,7 @@ inline constexpr bool kLogThermalEffectEnumeration = false;
 
 // Policy-related logging
 //
+inline constexpr bool kLogPolicyLoader = true;
 // Routing-related logging
 inline constexpr bool kLogRoutingChanges = false;
 // Logging related to idle power-conservation policy/mechanism.

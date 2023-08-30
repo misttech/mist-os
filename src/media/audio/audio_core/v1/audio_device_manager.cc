@@ -150,8 +150,8 @@ fpromise::promise<void, zx_status_t> AudioDeviceManager::UpdatePipelineConfig(
   // protects from devices being plugged or unplugged during update of the PipelineConfig,
   // as well as ensures only one update to the PipelineConfig will be processed at a time.
   if (!device->routable()) {
-    FX_LOGS(INFO) << "Device unroutable BAD_STATE (token_id " << dev->token_id << ", unique_id '"
-                  << device_id << "')";
+    FX_LOGS(WARNING) << "Device unroutable BAD_STATE (token_id " << dev->token_id << ", unique_id '"
+                     << device_id << "')";
     return fpromise::make_error_promise(ZX_ERR_BAD_STATE);
   }
 
@@ -262,8 +262,10 @@ void AudioDeviceManager::RemoveDevice(const std::shared_ptr<AudioDevice>& device
   TRACE_DURATION("audio", "AudioDeviceManager::RemoveDevice");
   FX_DCHECK(device != nullptr);
 
-  FX_LOGS(INFO) << "Removing " << (device->is_input() ? "input" : "output") << " '"
-                << device->name() << "'";
+  if constexpr (kLogAddRemoveDevice) {
+    FX_LOGS(INFO) << "Removing " << (device->is_input() ? "input" : "output") << " '"
+                  << device->name() << "'";
+  }
 
   // If device was active: reset the default (based on most-recently-plugged).
   OnPlugStateChanged(device, false, device->plug_time());
@@ -287,20 +289,22 @@ void AudioDeviceManager::OnPlugStateChanged(const std::shared_ptr<AudioDevice>& 
 
   // Update our bookkeeping for device's plug state. If no change, we're done.
   if (!device->UpdatePlugState(plugged, plug_time)) {
-    // TODO(fxbug.dev/73947): remove after debugging
-    FX_LOGS(INFO) << "Ignoring OnPlugStateChanged event (no change): "
-                  << (device->is_input() ? "input" : "output") << " '" << device->name()
-                  << "', plugged=" << plugged << ", t=" << plug_time.get();
+    if constexpr (kLogDevicePlugUnplug) {
+      FX_LOGS(INFO) << "Ignoring OnPlugStateChanged event (no change): "
+                    << (device->is_input() ? "input" : "output") << " '" << device->name()
+                    << "', plugged=" << plugged << ", t=" << plug_time.get();
+    }
     return;
   }
 
   // If the device is not yet activated, we should not be changing routes.
   bool activated = devices_.find(device->token()) != devices_.end();
   if (!activated) {
-    // TODO(fxbug.dev/73947): remove after debugging
-    FX_LOGS(INFO) << "Ignoring OnPlugStateChanged event (not activated): "
-                  << (device->is_input() ? "input" : "output") << " '" << device->name()
-                  << "', plugged=" << plugged << ", t=" << plug_time.get();
+    if constexpr (kLogDevicePlugUnplug) {
+      FX_LOGS(INFO) << "Ignoring OnPlugStateChanged event (not activated): "
+                    << (device->is_input() ? "input" : "output") << " '" << device->name()
+                    << "', plugged=" << plugged << ", t=" << plug_time.get();
+    }
     return;
   }
 
@@ -476,7 +480,7 @@ void AudioDeviceManager::AddDeviceByChannel(
     std::string device_name, bool is_input,
     fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig> stream_config) {
   TRACE_DURATION("audio", "AudioDeviceManager::AddDeviceByChannel");
-  if constexpr (kLogAddDevice) {
+  if constexpr (kLogAddRemoveDevice) {
     FX_LOGS(INFO) << __FUNCTION__ << (is_input ? ": Input '" : ": Output '") << device_name << "'";
   }
 
@@ -499,7 +503,7 @@ void AudioDeviceManager::AddDeviceByChannel(
     return;
   }
 
-  if constexpr (kLogAddDevice) {
+  if constexpr (kLogAddRemoveDevice) {
     FX_LOGS(INFO) << __FUNCTION__ << " instantiated audio " << (is_input ? "input '" : "output '")
                   << device_name << "': " << new_device.get();
   }

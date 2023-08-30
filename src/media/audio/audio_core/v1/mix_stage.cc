@@ -805,8 +805,8 @@ void MixStage::SyncSourcePositionFromClocks(ClockSynchronizer& clock_sync,
       FX_LOGS(WARNING) << complete_log_msg.str() << " (1/" << kJamSyncWarningInterval << ")";
     } else if (kJamSyncInfoInterval && (jam_sync_count_ % kJamSyncInfoInterval == 0)) {
       FX_LOGS(INFO) << complete_log_msg.str() << " (1/" << kJamSyncInfoInterval << ")";
-    } else if (kJamSyncTraceInterval && (jam_sync_count_ % kJamSyncTraceInterval == 0)) {
-      FX_LOGS(TRACE) << complete_log_msg.str() << " (1/" << kJamSyncTraceInterval << ")";
+    } else {
+      FX_LOGS(TRACE) << complete_log_msg.str() << " (1/1)";
     }
     ++jam_sync_count_;
   }

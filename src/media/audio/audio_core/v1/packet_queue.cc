@@ -207,7 +207,7 @@ void PacketQueue::ReportUnderflow(const fbl::RefPtr<Packet>& packet, Fixed under
     auto duration_change = duration - most_recent_underflow_duration_;
     most_recent_underflow_duration_ = duration;
 
-#define LOG_UNDERFLOW(where, interval)                                                   \
+#define LOG_PACKET_QUEUE_UNDERFLOW(where, interval)                                      \
   FX_LOGS(where) << "PACKET QUEUE UNDERFLOW #" << underflow_count_ << " (1/" << interval \
                  << "): packet [" << ffl::String::DecRational << packet->start() << ", " \
                  << packet->end() << "] arrived late by " << underflow_msec << " ms ("   \
@@ -216,18 +216,16 @@ void PacketQueue::ReportUnderflow(const fbl::RefPtr<Packet>& packet, Fixed under
     if ((kPacketQueueUnderflowWarningInterval > 0 &&
          (underflow_count_ - 1) % kPacketQueueUnderflowWarningInterval == 0) ||
         duration_change >= kPacketQueueUnderflowDurationIncreaseWarningThreshold) {
-      LOG_UNDERFLOW(WARNING, kPacketQueueUnderflowWarningInterval);
+      LOG_PACKET_QUEUE_UNDERFLOW(WARNING, kPacketQueueUnderflowWarningInterval);
 
     } else if ((kPacketQueueUnderflowInfoInterval > 0 &&
                 (underflow_count_ - 1) % kPacketQueueUnderflowInfoInterval == 0) ||
                duration_change >= kPacketQueueUnderflowDurationIncreaseInfoThreshold) {
-      LOG_UNDERFLOW(INFO, kPacketQueueUnderflowInfoInterval);
-
-    } else if ((kPacketQueueUnderflowTraceInterval > 0 &&
-                (underflow_count_ - 1) % kPacketQueueUnderflowTraceInterval == 0) ||
-               duration_change >= kPacketQueueUnderflowDurationIncreaseTraceThreshold) {
-      LOG_UNDERFLOW(TRACE, kPacketQueueUnderflowTraceInterval);
+      LOG_PACKET_QUEUE_UNDERFLOW(INFO, kPacketQueueUnderflowInfoInterval);
+    } else {
+      LOG_PACKET_QUEUE_UNDERFLOW(TRACE, 1);
     }
+#undef LOG_PACKET_QUEUE_UNDERFLOW
   }
 }
 

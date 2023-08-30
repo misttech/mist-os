@@ -19,6 +19,8 @@
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 
+#include "src/media/audio/audio_core/shared/logging_flags.h"
+
 #include "src/media/audio/audio_core/shared/schema/audio_policy_schema.inl"
 
 namespace media::audio {
@@ -195,7 +197,9 @@ fpromise::result<AudioPolicy> PolicyLoader::ParseConfig(const char* file_body) {
     return fpromise::error();
   }
 
-  FX_LOGS(INFO) << "Successfully loaded " << rules.size() << " rules, plus policy options";
+  if constexpr (kLogPolicyLoader) {
+    FX_LOGS(INFO) << "Successfully loaded " << rules.size() << " rules, plus policy options";
+  }
 
   return fpromise::ok(AudioPolicy{std::move(rules), options});
 }
@@ -203,7 +207,9 @@ fpromise::result<AudioPolicy> PolicyLoader::ParseConfig(const char* file_body) {
 bool PolicyLoader::ParseIdlePowerOptions(rapidjson::Document& doc,
                                          AudioPolicy::IdlePowerOptions& options) {
   if (!doc.HasMember(kIdleCountdownMsKey)) {
-    FX_LOGS(INFO) << "'" << kIdleCountdownMsKey << "' is missing; not enacting idle-power policy";
+    if constexpr (kLogPolicyLoader) {
+      FX_LOGS(INFO) << "'" << kIdleCountdownMsKey << "' is missing; not enacting idle-power policy";
+    }
     if (doc.HasMember(kStartupCountdownMsKey)) {
       FX_LOGS(WARNING) << "'" << kStartupCountdownMsKey << "' will be ignored";
     }
@@ -274,10 +280,14 @@ AudioPolicy PolicyLoader::LoadPolicy() {
   }
 
   if (result.error() == ZX_ERR_NOT_FOUND) {
-    FX_LOGS(INFO) << "No audio policy found; using default.";
+    if constexpr (kLogPolicyLoader) {
+      FX_LOGS(INFO) << "No audio policy found; using default.";
+    }
   } else if (result.error() == ZX_ERR_NOT_SUPPORTED) {
-    FX_LOGS(INFO) << "Audio policy '" << kPolicyPath
-                  << "' loaded but could not be parsed; using default.";
+    if constexpr (kLogPolicyLoader) {
+      FX_LOGS(INFO) << "Audio policy '" << kPolicyPath
+                    << "' loaded but could not be parsed; using default.";
+    }
   } else {
     FX_LOGS(WARNING) << "Audio policy '" << kPolicyPath << "' failed to load (err "
                      << result.error() << "); using default.";
