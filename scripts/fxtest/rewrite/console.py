@@ -528,7 +528,7 @@ async def _console_event_loop(
                 # Print a result to the user when tests are selected.
                 count = len(next_event.payload.test_selections.selected)
                 label = statusinfo.highlight(
-                    f"{count} test{'s' if count > 1 else ''}", style=flags.style
+                    f"{count} test{'s' if count != 1 else ''}", style=flags.style
                 )
                 lines_to_print.append(f"\nPlan to run {label}")
             elif next_event.payload.build_targets is not None:
