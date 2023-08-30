@@ -43,6 +43,7 @@ pub struct AdvertisingProxyHost {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AdvertisingProxyServiceInfo {
+    name: CString,
     txt: Vec<Vec<u8>>,
     port: u16,
     priority: u16,
@@ -53,6 +54,7 @@ pub struct AdvertisingProxyServiceInfo {
 impl AdvertisingProxyServiceInfo {
     fn new(srp_service: &ot::SrpServerService) -> Self {
         AdvertisingProxyServiceInfo {
+            name: srp_service.full_name_cstr().to_owned(),
             txt: srp_service.txt_entries().map(|x| x.unwrap().to_vec()).collect::<Vec<_>>(),
             port: srp_service.port(),
             priority: srp_service.priority(),
@@ -105,15 +107,37 @@ impl AdvertisingProxyService {
 
     fn update(&self, info: AdvertisingProxyServiceInfo) -> Result<(), anyhow::Error> {
         *self.info.lock() = info;
+        self.reannounce()
+    }
+
+    fn add_subtype(&self, subtype: &str) -> Result<(), anyhow::Error> {
+        let subtypes = {
+            let mut info = self.info.lock();
+            if info.has_subtype(subtype) {
+                return Ok(());
+            }
+            info.add_subtype(subtype);
+            info.subtypes.iter().map(String::clone).collect::<Vec<_>>()
+        };
+
+        self.control_handle.send_set_subtypes(&subtypes).map_err(Into::into)
+    }
+
+    fn remove_subtype(&self, subtype: &str) -> Result<(), anyhow::Error> {
+        let subtypes = {
+            let mut info = self.info.lock();
+            if !info.has_subtype(subtype) {
+                return Ok(());
+            }
+            info.remove_subtype(subtype);
+            info.subtypes.iter().map(String::clone).collect::<Vec<_>>()
+        };
+
+        self.control_handle.send_set_subtypes(&subtypes).map_err(Into::into)
+    }
+
+    fn reannounce(&self) -> Result<(), anyhow::Error> {
         Ok(self.control_handle.send_reannounce()?)
-    }
-
-    fn add_subtype(&self, subtype: &str) {
-        self.info.lock().add_subtype(subtype);
-    }
-
-    fn remove_subtype(&self, subtype: &str) {
-        self.info.lock().remove_subtype(subtype);
     }
 }
 
@@ -536,15 +560,10 @@ impl AdvertisingProxyInner {
                           ..
                       }| {
                     let service_info = service_info_clone.lock().clone();
-                    debug!(
-                        tag = "srp_advertising_proxy",
-                        "publish_responder_future: {:?} publication {:?} subtype {subtype:?}",
-                        publication_cause,
-                        service_info
-                    );
+                    let service_name = service_info.name.clone();
 
-                    let should_skip = if let Some(subtype) = subtype {
-                        if !service_info.has_subtype(&subtype) {
+                    let should_skip = if let Some(subtype) = subtype.as_ref() {
+                        if !service_info.has_subtype(subtype) {
                             // We don't have this subtype, we are going to skip.
                             true
                         } else {
@@ -558,15 +577,26 @@ impl AdvertisingProxyInner {
 
                     let info = service_info.into_service_instance_publication();
 
-                    async move {
-                        let result = if should_skip {
+                    let result =
+                        if should_skip {
+                            debug!(
+                                tag = "srp_advertising_proxy",
+                                "publish_responder_future: {:?}, {service_name:?}, returning DO_NOT_RESPOND, does not have subtype {subtype:?}",
+                                publication_cause
+                            );
+
                             Err(OnPublicationError::DoNotRespond)
                         } else {
+                            debug!(
+                                tag = "srp_advertising_proxy",
+                                "publish_responder_future: {:?}, {service_name:?}, subtype {subtype:?}",
+                                publication_cause
+                            );
+
                             Ok(&info)
                         };
 
-                        responder.send(result).map_err(Into::into)
-                    }
+                    futures::future::ready(responder.send(result).map_err(Into::into))
                 },
             );
 
@@ -610,9 +640,27 @@ impl AdvertisingProxyInner {
 
             if let Some(service) = services.get(&service_name) {
                 if srp_service.is_deleted() {
-                    service.remove_subtype(subtype_str);
+                    match service.remove_subtype(subtype_str) {
+                        Ok(()) => {}
+                        Err(e) => {
+                            warn!(
+                                tag = "srp_advertising_proxy",
+                                "Can't remove subtype {subtype:?}: {e:?}"
+                            );
+                            continue;
+                        }
+                    }
                 } else {
-                    service.add_subtype(subtype_str);
+                    match service.add_subtype(subtype_str) {
+                        Ok(()) => {}
+                        Err(e) => {
+                            warn!(
+                                tag = "srp_advertising_proxy",
+                                "Can't add subtype {subtype:?}: {e:?}"
+                            );
+                            continue;
+                        }
+                    }
                 }
             }
         }
