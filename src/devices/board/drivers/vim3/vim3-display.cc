@@ -19,7 +19,7 @@
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/amlogiccanvas/cpp/bind.h>
 #include <bind/fuchsia/hardware/dsi/cpp/bind.h>
-#include <bind/fuchsia/hardware/hdmi/cpp/bind.h>
+#include <bind/fuchsia/hdmi/cpp/bind.h>
 #include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <soc/aml-a311d/a311d-gpio.h>
 #include <soc/aml-a311d/a311d-hw.h>
@@ -136,12 +136,11 @@ zx_status_t Vim3::DisplayInit() {
 
   std::vector<fuchsia_driver_framework::BindRule> hdmi_bind_rules{
       fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_hardware_hdmi::BIND_FIDL_PROTOCOL_SERVICE),
+                              bind_fuchsia_hdmi::BIND_FIDL_PROTOCOL_SERVICE),
   };
 
   std::vector<fuchsia_driver_framework::NodeProperty> hdmi_properties{
-      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                        bind_fuchsia_hardware_hdmi::BIND_FIDL_PROTOCOL_SERVICE),
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_hdmi::BIND_FIDL_PROTOCOL_SERVICE),
   };
 
   std::vector<fuchsia_driver_framework::BindRule> gpio_lcd_reset_bind_rules{

@@ -16,7 +16,7 @@
 #include <cstring>
 
 #include <bind/fuchsia/cpp/bind.h>
-#include <bind/fuchsia/hardware/registers/cpp/bind.h>
+#include <bind/fuchsia/register/cpp/bind.h>
 #include <ddk/usb-peripheral-config.h>
 #include <ddktl/device.h>
 #include <soc/aml-common/aml-registers.h>
@@ -103,12 +103,12 @@ static const fpbus::Node usb_phy_dev = []() {
 
 const std::vector<fuchsia_driver_framework::BindRule> kResetRegisterRules = {
     fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                            bind_fuchsia_hardware_registers::BIND_FIDL_PROTOCOL_DEVICE),
+                            bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
     fdf::MakeAcceptBindRule(bind_fuchsia::REGISTER_ID, aml_registers::REGISTER_USB_PHY_V2_RESET)};
 
 const std::vector<fuchsia_driver_framework::NodeProperty> kResetRegisterProperties = {
     fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                      bind_fuchsia_hardware_registers::BIND_FIDL_PROTOCOL_DEVICE),
+                      bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
     fdf::MakeProperty(bind_fuchsia::REGISTER_ID, aml_registers::REGISTER_USB_PHY_V2_RESET)};
 
 const std::vector<fuchsia_driver_framework::ParentSpec> kUsbPhyDevParents = {

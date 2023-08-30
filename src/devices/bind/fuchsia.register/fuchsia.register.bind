@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-library fuchsia.hardware.registers;
+library fuchsia.register;
 
 extend uint fuchsia.BIND_PROTOCOL {
-  DEVICE = 152,
+  DEVICE = 0x98,
 };
 
 extend uint fuchsia.BIND_FIDL_PROTOCOL {
-  DEVICE = 18,
+  DEVICE = 0x12,
 };

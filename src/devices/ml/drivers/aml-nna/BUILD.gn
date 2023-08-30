@@ -17,8 +17,8 @@ driver_bind_rules("aml_nna_bind") {
   disable_fragment_gen = true
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.hardware.registers",
     "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.register",
   ]
 }
 

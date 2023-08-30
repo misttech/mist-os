@@ -8,7 +8,7 @@ using fuchsia.amlogic.platform;
 using fuchsia.arm.platform;
 using fuchsia.camerasensor2;
 using fuchsia.platform;
-using fuchsia.hardware.registers;
+using fuchsia.register;
 
 primary node "camera-sensor" {
   fuchsia.BIND_PROTOCOL == fuchsia.camerasensor2.BIND_PROTOCOL.DEVICE;
@@ -23,7 +23,7 @@ node "pdev" {
 }
 
 node "register-reset" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.registers.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.register.BIND_FIDL_PROTOCOL.DEVICE;
   fuchsia.BIND_REGISTER_ID == fuchsia.amlogic.platform.BIND_REGISTER_ID.ISP_RESET;
 }
 

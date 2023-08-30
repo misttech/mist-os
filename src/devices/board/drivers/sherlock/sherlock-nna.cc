@@ -11,7 +11,7 @@
 
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
-#include <bind/fuchsia/hardware/registers/cpp/bind.h>
+#include <bind/fuchsia/register/cpp/bind.h>
 #include <soc/aml-common/aml-registers.h>
 #include <soc/aml-t931/t931-hw.h>
 
@@ -90,7 +90,7 @@ zx_status_t Sherlock::NnaInit() {
       .bind_rules =
           {
               fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                      bind_fuchsia_hardware_registers::BIND_FIDL_PROTOCOL_DEVICE),
+                                      bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
               fdf::MakeAcceptBindRule(
                   bind_fuchsia::REGISTER_ID,
                   bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_NNA_RESET_LEVEL2),
@@ -98,7 +98,7 @@ zx_status_t Sherlock::NnaInit() {
       .properties =
           {
               fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                                bind_fuchsia_hardware_registers::BIND_FIDL_PROTOCOL_DEVICE),
+                                bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
               fdf::MakeProperty(bind_fuchsia::REGISTER_ID,
                                 bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_NNA_RESET_LEVEL2),
           },

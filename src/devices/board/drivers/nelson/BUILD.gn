@@ -159,8 +159,8 @@ driver_bind_rules("spi_0_bind") {
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
     "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.hardware.registers",
     "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.register",
   ]
 }
 
@@ -173,8 +173,8 @@ driver_bind_rules("spi_1_bind") {
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
     "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.hardware.registers",
     "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.register",
   ]
 }
 
@@ -358,8 +358,8 @@ fuchsia_driver("nelson-module-driver") {
     "//src/devices/bind/fuchsia.hardware.dsi:fuchsia.hardware.dsi_cpp",
     "//src/devices/bind/fuchsia.hardware.power.sensor:fuchsia.hardware.power.sensor_cpp",
     "//src/devices/bind/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp",
-    "//src/devices/bind/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
     "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
+    "//src/devices/bind/fuchsia.register:fuchsia.register_cpp",
     "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//src/devices/bind/fuchsia.ti.platform:fuchsia.ti.platform_cpp",
     "//src/devices/bus/lib/platform-bus-composites",

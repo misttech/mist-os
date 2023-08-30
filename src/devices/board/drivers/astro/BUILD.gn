@@ -124,8 +124,8 @@ driver_bind_rules("astro-aml-usb-phy-v2-bind") {
   tests = "bind-tests/astro-aml-usb-phy-v2-test.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.hardware.registers",
     "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.register",
   ]
 }
 
@@ -253,8 +253,8 @@ fuchsia_driver("astro-driver") {
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
     "//src/devices/bind/fuchsia.hardware.dsi:fuchsia.hardware.dsi_cpp",
     "//src/devices/bind/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp",
-    "//src/devices/bind/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
     "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
+    "//src/devices/bind/fuchsia.register:fuchsia.register_cpp",
     "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//src/devices/bind/fuchsia.ti.platform:fuchsia.ti.platform_cpp",
     "//src/devices/bus/lib/platform-bus-composites",

@@ -13,9 +13,9 @@ driver_bind_rules("vim3_usb_phy_bind") {
   tests = "test_bind.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.hardware.registers",
     "//src/devices/bind/fuchsia.khadas.platform",
     "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.register",
   ]
 }
 

@@ -21,8 +21,8 @@ driver_bind_rules("aml_gpu_bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.arm.platform",
-    "//src/devices/bind/fuchsia.hardware.registers",
     "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.register",
   ]
 }
 
