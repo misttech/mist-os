@@ -426,13 +426,21 @@ impl Kernel {
 
             let tasks_node = tg_node.create_child("tasks");
             for task in tg.tasks() {
-                let property = if task.id == thread_group.leader {
-                    "command".to_string()
-                } else {
-                    task.id.to_string()
+                let set_properties = |node: &fuchsia_inspect::Node| {
+                    node.record_string("command", task.command().to_str().unwrap_or("{err}"));
+
+                    let sched_policy = task.read().scheduler_policy;
+                    if !sched_policy.is_default() {
+                        node.record_string("sched_policy", format!("{sched_policy:?}"));
+                    }
                 };
-                let command = task.command();
-                tg_node.record_string(property, command.to_str().unwrap_or("{err}"));
+                if task.id == thread_group.leader {
+                    set_properties(&tg_node);
+                } else {
+                    tasks_node.record_child(task.id.to_string(), |task_node| {
+                        set_properties(task_node);
+                    });
+                };
             }
             tg_node.record(tasks_node);
             thread_groups.record(tg_node);

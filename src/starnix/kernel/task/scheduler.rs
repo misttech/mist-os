@@ -28,6 +28,10 @@ pub enum SchedulerPolicy {
 }
 
 impl SchedulerPolicy {
+    pub fn is_default(&self) -> bool {
+        matches!(self, Self::Normal)
+    }
+
     pub fn from_raw(policy: u32, params: sched_param, rlimit: u64) -> Result<Self, Errno> {
         let valid_priorities =
             min_priority_for_sched_policy(policy)?..=max_priority_for_sched_policy(policy)?;
