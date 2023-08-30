@@ -111,9 +111,14 @@ network_unified_binary("bin") {
   sources = common_sources
 
   if (!is_debug) {
-    # Allow cross-crate optimization since netstack3 is split between multiple
-    # crates.
-    bin_add_configs = [ "//build/config/rust:lto_thin" ]
+    bin_add_configs = [
+      # Allow cross-crate optimization since netstack3 is split between multiple
+      # crates.
+      "//build/config/rust:lto_thin",
+
+      # Always optimize speed, even if they increase size.
+      "//build/config:optimize_speed",
+    ]
 
     # Dynamic linking libstd is incompatible with LTO.
     bin_remove_configs =
