@@ -43,6 +43,11 @@ filegroup(
     name = "empty",
 )
 
+exports_files([
+    "bin/clang-format",
+    "bin/clang-tidy",
+])
+
 filegroup(
     name = "cc-compiler-prebuilts",
     srcs = [
