@@ -1063,6 +1063,7 @@ group("tool_paths.metadata") {
     "//prebuilt/third_party/goma/$host_platform/goma_ctl.py",
     "//prebuilt/third_party/ninja/$host_platform/ninja",
     "//prebuilt/third_party/python3/$host_platform/bin/python3",
+    "//prebuilt/tools/shac/shac",
     "//scripts/yapf",
     "//third_party/catapult/tracing/bin/trace2html",
   ]
