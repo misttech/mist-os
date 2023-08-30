@@ -7,7 +7,7 @@ use fidl_fuchsia_logger::{LogSinkMarker, LogSinkProxy};
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon::{self as zx};
-use std::{any::TypeId, collections::HashSet, fmt::Debug};
+use std::{collections::HashSet, fmt::Debug};
 use thiserror::Error;
 use tracing::{
     span::{Attributes, Id, Record},
@@ -354,13 +354,6 @@ impl Subscriber for Publisher {
     }
     fn current_span(&self) -> Current {
         self.inner.current_span()
-    }
-    unsafe fn downcast_raw(&self, id: TypeId) -> Option<*const ()> {
-        if id == TypeId::of::<Self>() {
-            Some(self as *const Self as *const ())
-        } else {
-            None
-        }
     }
 }
 
