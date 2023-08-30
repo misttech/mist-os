@@ -13,6 +13,7 @@
 
 #include <gtest/gtest.h>
 
+#include "driver_registry.h"
 #include "helper/test_device_helper.h"
 #include "magma_util/short_macros.h"
 #include "magma_vendor_queries.h"
@@ -21,6 +22,8 @@
 // unload the normal MSD to replace it with the test MSD so we can run those tests and query the
 // test results.
 TEST(UnitTests, UnitTests) {
+  RegisteredTestDriver test_driver;
+  ASSERT_NO_FATAL_FAILURE(test_driver.Init());
   fidl::ClientEnd parent_device =
       magma::TestDeviceBase::GetParentDeviceFromId(MAGMA_VENDOR_ID_MALI);
 

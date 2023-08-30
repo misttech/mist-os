@@ -202,17 +202,3 @@ fuchsia_driver_package("msd-arm-mali-dfv2") {
 fuchsia_driver_package("msd-arm-mali") {
   driver_components = [ ":msd_arm" ]
 }
-
-fuchsia_driver_package("msd-arm-mali-test") {
-  testonly = true
-  driver_components = [
-    ":msd_arm_test",
-    ":msd_arm_rebind",
-  ]
-  deps = [ "//src/graphics/lib/magma/tests/unit_tests:test_firmware" ]
-}
-
-group("test-driver") {
-  testonly = true
-  deps = [ ":msd-arm-mali-test" ]
-}

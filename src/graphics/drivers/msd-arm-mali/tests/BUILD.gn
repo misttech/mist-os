@@ -47,7 +47,12 @@ fuchsia_unittest_package("msd_arm_mali_dfv2_tests") {
 }
 
 fuchsia_unittest_package("msd-arm-mali-integration-tests") {
-  deps = [ "integration" ]
+  deps = [
+    "..:msd_arm_rebind",
+    "..:msd_arm_test",
+    "integration",
+    "//src/graphics/lib/magma/tests/unit_tests:test_firmware",
+  ]
   manifest = "meta/msd_arm_mali_integration_tests.cml"
   test_specs = {
     environments = arm_gpu_envs

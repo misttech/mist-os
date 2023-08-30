@@ -14,6 +14,7 @@ executable("msd_arm_mali_integration_tests") {
   testonly = true
 
   sources = [
+    "driver_registry.h",
     "mali_utils.cc",
     "mali_utils.h",
     "run_unit_tests.cc",
@@ -25,6 +26,7 @@ executable("msd_arm_mali_integration_tests") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
+    "//sdk/fidl/fuchsia.driver.registrar:fuchsia.driver.registrar_cpp_wire",
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
     "//sdk/lib/component/incoming/cpp",
     "//src/graphics/lib/magma/include:magma",

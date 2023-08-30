@@ -11,6 +11,7 @@
 
 #include <gtest/gtest.h>
 
+#include "driver_registry.h"
 #include "helper/test_device_helper.h"
 #include "magma_util/short_macros.h"
 #include "src/graphics/drivers/msd-arm-mali/include/magma_vendor_queries.h"
@@ -80,6 +81,8 @@ static void looper_thread_entry() {
 }
 
 static void test_shutdown(uint32_t iters) {
+  RegisteredTestDriver test_driver;
+  ASSERT_NO_FATAL_FAILURE(test_driver.Init());
   for (uint32_t i = 0; i < iters; i++) {
     complete_count = 0;
 

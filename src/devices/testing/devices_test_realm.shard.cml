@@ -37,6 +37,12 @@
             to: [ "#devices-tests" ],
         },
         {
+            // Used to ephemerally add drivers for tests.
+            protocol: [ "fuchsia.driver.registrar.DriverRegistrar" ],
+            from: "parent",
+            to: [ "#devices-tests" ],
+        },
+        {
             event_stream: [
                 "capability_requested",
                 "directory_ready",

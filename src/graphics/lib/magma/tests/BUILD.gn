@@ -52,7 +52,6 @@ group("tests") {
 group("test-drivers") {
   testonly = true
   deps = [
-    "//src/graphics/drivers/msd-arm-mali:test-driver",
     "//src/graphics/drivers/msd-intel-gen:test-driver",
     "//src/graphics/drivers/msd-vsi-vip:test-driver",
   ]

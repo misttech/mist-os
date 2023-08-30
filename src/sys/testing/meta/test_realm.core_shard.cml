@@ -227,7 +227,10 @@
             to: "#testing",
         },
         {
-            protocol: "fuchsia.driver.development.DriverDevelopment",
+            protocol: [
+                "fuchsia.driver.development.DriverDevelopment",
+                "fuchsia.driver.registrar.DriverRegistrar",
+            ],
             from: "parent",
             to: "#testing",
         },
