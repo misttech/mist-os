@@ -12,6 +12,9 @@ pub trait Nat64 {
     /// Sets the CIDR used when setting the source address of the outgoing translated IPv4 packets.
     fn nat64_set_ip4_cidr(&self, ip4_cidr: Ip4Cidr) -> Result;
 
+    /// Get CIDR from OpenThread
+    fn nat64_get_cidr(&self) -> Result<Ip4Cidr>;
+
     /// Registers a callback to provide received IPv4 datagrams.
     fn nat64_set_receive_fn<'a, F>(&'a self, f: Option<F>)
     where
@@ -29,6 +32,9 @@ pub trait Nat64 {
         infra_if_idx: ot::NetifIndex,
         ip6_prefix: openthread_sys::otIp6Prefix,
     );
+
+    /// Check the NAT64 translator staste in OpenThread
+    fn nat64_get_translator_state(&self) -> Nat64State;
 }
 
 impl<T: Nat64 + ot::Boxable> Nat64 for ot::Box<T> {
@@ -37,6 +43,9 @@ impl<T: Nat64 + ot::Boxable> Nat64 for ot::Box<T> {
     }
     fn nat64_set_ip4_cidr(&self, ip4_cidr: Ip4Cidr) -> Result {
         self.as_ref().nat64_set_ip4_cidr(ip4_cidr)
+    }
+    fn nat64_get_cidr(&self) -> Result<Ip4Cidr> {
+        self.as_ref().nat64_get_cidr()
     }
     fn nat64_set_receive_fn<'a, F>(&'a self, f: Option<F>)
     where
@@ -57,6 +66,9 @@ impl<T: Nat64 + ot::Boxable> Nat64 for ot::Box<T> {
     ) {
         self.as_ref().nat64_infra_if_prefix_discover_done(infra_if_idx, ip6_prefix);
     }
+    fn nat64_get_translator_state(&self) -> Nat64State {
+        self.as_ref().nat64_get_translator_state()
+    }
 }
 
 impl Nat64 for Instance {
@@ -65,6 +77,15 @@ impl Nat64 for Instance {
     }
     fn nat64_set_ip4_cidr(&self, ip4_cidr: Ip4Cidr) -> Result {
         Error::from(unsafe { otNat64SetIp4Cidr(self.as_ot_ptr(), ip4_cidr.as_ot_ptr()) }).into()
+    }
+    fn nat64_get_cidr(&self) -> Result<Ip4Cidr> {
+        let mut ip4_cidr: Ip4Cidr = Default::default();
+
+        let res: Result<(), Error> =
+            Error::from(unsafe { otNat64GetCidr(self.as_ot_ptr(), ip4_cidr.as_ot_mut_ptr()) })
+                .into();
+
+        res.map(|_: ()| ip4_cidr)
     }
     fn nat64_set_receive_fn<'a, F>(&'a self, f: Option<F>)
     where
@@ -141,5 +162,9 @@ impl Nat64 for Instance {
                 &ip6_prefix,
             )
         }
+    }
+
+    fn nat64_get_translator_state(&self) -> Nat64State {
+        unsafe { otNat64GetTranslatorState(self.as_ot_ptr()).into() }
     }
 }

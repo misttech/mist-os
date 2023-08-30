@@ -4,6 +4,7 @@
 
 use super::*;
 use crate::Platform;
+use openthread_sys::*;
 use std::sync::Mutex;
 use std::task::{Context, Poll};
 
@@ -20,12 +21,13 @@ impl Nat64Instance {
 impl PlatformBacking {
     fn on_nat64_prefix_request(&self, infra_if_idx: ot::NetifIndex) {
         #[no_mangle]
-        unsafe extern "C" fn otPlatInfraIfDiscoverNat64Prefix(infra_if_idx: u32) {
+        unsafe extern "C" fn otPlatInfraIfDiscoverNat64Prefix(infra_if_idx: u32) -> otError {
             PlatformBacking::on_nat64_prefix_request(
                 // SAFETY: Must only be called from OpenThread thread
                 PlatformBacking::as_ref(),
                 infra_if_idx,
-            )
+            );
+            ot::Error::None.into()
         }
 
         self.nat64

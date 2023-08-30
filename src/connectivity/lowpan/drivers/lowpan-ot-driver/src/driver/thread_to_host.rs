@@ -79,6 +79,10 @@ where
             self.update_border_agent_service().await;
         }
 
+        if flags.intersects(ot::ChangedFlags::NAT64_TRANSLATOR_STATE) {
+            self.on_nat64_translator_state_changed();
+        }
+
         Ok(())
     }
 
@@ -122,7 +126,9 @@ where
                     "HACK(b/235498515): Refusing to remove {:?} because it looks like an RLOC",
                     subnet.addr
                 );
-            } else if let Err(err) = self.net_if.remove_address(&subnet).ignore_not_found() {
+            } else if let Err(err) =
+                self.net_if.remove_address_from_spinel_subnet(&subnet).ignore_not_found()
+            {
                 warn!("Unable to remove address `{:?}` from interface: {:?}", subnet, err);
             }
         }

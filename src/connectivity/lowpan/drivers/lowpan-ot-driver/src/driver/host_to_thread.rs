@@ -150,7 +150,7 @@ where
                         netif_addr,
                         err
                     );
-                    self.net_if.remove_address(&subnet).ignore_not_found()
+                    self.net_if.remove_address_from_spinel_subnet(&subnet).ignore_not_found()
                 })
                 .context("on_netstack_added_address")?;
         }

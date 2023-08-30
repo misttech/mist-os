@@ -280,9 +280,6 @@ where
 
     driver.start_multicast_routing_manager();
 
-    // NAT64 support is currently disabled due to b/293514558.
-    // driver.init_nat64();
-
     let driver_ref = &driver;
 
     let lowpan_device_task = register_and_serve_driver(name, registry, driver_ref);

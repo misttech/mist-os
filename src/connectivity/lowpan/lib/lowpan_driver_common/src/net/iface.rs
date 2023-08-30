@@ -57,11 +57,17 @@ pub trait NetworkInterface: Send + Sync {
     //       `Driver::on_prop_value_is`, which is also synchronous.
     fn add_address(&self, addr: fidl_fuchsia_net::Subnet) -> Result<(), Error>;
 
+    /// Removes the given address of Spinel::Subnet type from this interface.
+    // TODO(fxbug.dev/64704): Consider making this method async. This method is
+    //       currently synchronous so that it can be used directly from
+    //       `Driver::on_prop_value_is`, which is also synchronous.
+    fn remove_address_from_spinel_subnet(&self, addr: &Subnet) -> Result<(), Error>;
+
     /// Removes the given address from this interface.
     // TODO(fxbug.dev/64704): Consider making this method async. This method is
     //       currently synchronous so that it can be used directly from
     //       `Driver::on_prop_value_is`, which is also synchronous.
-    fn remove_address(&self, addr: &Subnet) -> Result<(), Error>;
+    fn remove_address(&self, addr: fidl_fuchsia_net::Subnet) -> Result<(), Error>;
 
     /// Indicates to the net stack that this subnet is accessible through this interface.
     // TODO(fxbug.dev/64704): Consider making this method async. This method is
@@ -159,7 +165,12 @@ impl NetworkInterface for DummyNetworkInterface {
         Ok(())
     }
 
-    fn remove_address(&self, addr: &Subnet) -> Result<(), Error> {
+    fn remove_address_from_spinel_subnet(&self, addr: &Subnet) -> Result<(), Error> {
+        info!("Address Removed: {:?}", addr);
+        Ok(())
+    }
+
+    fn remove_address(&self, addr: fidl_fuchsia_net::Subnet) -> Result<(), Error> {
         info!("Address Removed: {:?}", addr);
         Ok(())
     }

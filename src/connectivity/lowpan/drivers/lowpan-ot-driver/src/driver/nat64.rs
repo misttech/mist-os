@@ -6,8 +6,8 @@ use super::*;
 
 use anyhow::Error;
 use fuchsia_component::client::connect_to_protocol;
-use openthread::ot::Ip4Cidr;
-use std::cell::RefCell;
+use openthread::ot::{Ip4Cidr, Nat64State};
+use std::cell::{Cell, RefCell};
 
 const NAT64_IP4CIDR_DEFAULT_SUBNET: [u8; 4] = [240, 16, 0, 0];
 const NAT64_IP4CIDR_DEFAULT_PREFIX_LEN: u8 = 24;
@@ -15,6 +15,7 @@ const NAT64_IP4CIDR_DEFAULT_PREFIX_LEN: u8 = 24;
 #[derive(Debug)]
 pub struct Nat64 {
     pub lowpan_nat_ctrl: RefCell<Option<fidl_fuchsia_net_masquerade::ControlProxy>>,
+    pub active_cidr_addr: Cell<Option<Ip4Cidr>>,
 }
 
 pub fn get_first_usable_addr_in_subnet(subnet: [u8; 4], prefix_len: u8) -> [u8; 4] {
@@ -31,25 +32,31 @@ pub fn get_first_usable_addr_in_subnet(subnet: [u8; 4], prefix_len: u8) -> [u8; 
     ((u32::from_be_bytes(subnet) & mask) + 1).to_be_bytes()
 }
 
+fn is_same_ip4_cidr(addr1: Option<Ip4Cidr>, addr2: Option<Ip4Cidr>) -> bool {
+    if addr1.is_none() || addr2.is_none() {
+        return false;
+    }
+    addr1.unwrap() == addr2.unwrap()
+}
+
 impl<OT, NI, BI> OtDriver<OT, NI, BI>
 where
-    OT: Send + ot::InstanceInterface + AsRef<ot::Instance>,
+    OT: Send + ot::InstanceInterface,
     NI: NetworkInterface,
     BI: BackboneInterface,
 {
-    /// Try initialize NAT64 at boot time.
     #[tracing::instrument(skip_all)]
-    #[allow(unused)]
-    pub fn init_nat64(&self) {
+    pub fn on_nat64_translator_state_changed(&self) {
         let driver_state = self.driver_state.lock();
 
         if let Some(wlan_client_nicid) = self.backbone_if.get_nicid() {
-            if let Err(e) = driver_state.nat64.try_init(
+            if let Err(e) = driver_state.nat64.on_nat64_translator_state_changed(
                 &driver_state.ot_instance,
                 &self.net_if,
                 wlan_client_nicid.into(),
             ) {
-                warn!("NAT64 failed to initialize: {:?}", e);
+                warn!("failed to process NAT64 changes: {:?}, disabling NAT64 in OpenThread", e);
+                driver_state.ot_instance.nat64_set_enabled(false);
             }
         }
     }
@@ -57,10 +64,10 @@ where
 
 impl Nat64 {
     pub fn new() -> Self {
-        Nat64 { lowpan_nat_ctrl: RefCell::new(None) }
+        Nat64 { lowpan_nat_ctrl: RefCell::new(None), active_cidr_addr: Cell::new(None) }
     }
 
-    pub fn try_init<OT, NI>(
+    pub fn on_nat64_translator_state_changed<OT, NI>(
         &self,
         ot_instance: &OT,
         net_if: &NI,
@@ -70,24 +77,68 @@ impl Nat64 {
         OT: Send + ot::InstanceInterface,
         NI: NetworkInterface,
     {
-        let lowpan_nicid: u64 = net_if.get_index();
-        // Set NAT64 Ipv4 CIDR
-        // TODO(b/278659448): use default one only if no NAT64 prefix is on the network.
-        let ip4_cidr = Ip4Cidr::new(NAT64_IP4CIDR_DEFAULT_SUBNET, NAT64_IP4CIDR_DEFAULT_PREFIX_LEN);
-        ot_instance.nat64_set_ip4_cidr(ip4_cidr)?;
+        let translator_cidr;
+        if let Ok(cidr) = ot_instance.nat64_get_cidr() {
+            translator_cidr = Some(cidr);
+        } else {
+            // Skip if NAT64 translator has not been configured with a CIDR
+            return Ok(());
+        }
 
-        // Enable Masquerade
+        let active_cidr = self.active_cidr_addr.get();
+        if !is_same_ip4_cidr(translator_cidr, active_cidr) {
+            // Someone sets a new CIDR for NAT64
+            if let Some(addr) = active_cidr {
+                self.delete_route(net_if, addr.get_address_bytes(), addr.get_length());
+            }
+            let _ = self.active_cidr_addr.set(translator_cidr);
+            info!("NAT64: CIDR updated to {:?}", self.active_cidr_addr.get());
+        }
+
+        let active_cidr = self.active_cidr_addr.get();
+        if ot_instance.nat64_get_translator_state() == Nat64State::Active {
+            if let Some(addr) = active_cidr {
+                let lowpan_nicid: u64 = net_if.get_index();
+                self.add_route(net_if, addr.get_address_bytes(), addr.get_length());
+                self.enable_masquerade(
+                    lowpan_nicid,
+                    wlan_client_nicid,
+                    addr.get_address_bytes(),
+                    addr.get_length(),
+                )?;
+                info!("NAT64: adding route for NAT64");
+            } else {
+                panic!("NAT64: no active CIDR recorded in lowpan");
+            }
+        } else {
+            if let Some(addr) = active_cidr {
+                self.delete_route(net_if, addr.get_address_bytes(), addr.get_length());
+                self.disable_masquerade();
+            }
+            info!("NAT64: deleting route for NAT64");
+        }
+
+        Ok(())
+    }
+
+    fn enable_masquerade(
+        &self,
+        lowpan_nicid: u64,
+        wlan_client_nicid: u64,
+        cidr_addr: [u8; 4],
+        cidr_addr_prefix_len: u8,
+    ) -> Result<(), Error> {
         let masquerade_proxy = connect_to_protocol::<fidl_fuchsia_net_masquerade::FactoryMarker>()
-            .expect("error connecting to masquerade factory");
+            .context("error connecting to masquerade factory")?;
         let config = fidl_fuchsia_net_masquerade::ControlConfig {
             /// The interface carrying the network to be masqueraded.[lowpan0]
             input_interface: lowpan_nicid,
             /// The network to be masqueraded.
             src_subnet: fidl_fuchsia_net::Subnet {
                 addr: fidl_fuchsia_net::IpAddress::Ipv4(fidl_fuchsia_net::Ipv4Address {
-                    addr: NAT64_IP4CIDR_DEFAULT_SUBNET,
+                    addr: cidr_addr,
                 }),
-                prefix_len: NAT64_IP4CIDR_DEFAULT_PREFIX_LEN,
+                prefix_len: cidr_addr_prefix_len,
             },
             /// The interface through which to masquerade.[Wlan Client]
             output_interface: wlan_client_nicid,
@@ -105,21 +156,52 @@ impl Nat64 {
 
         self.lowpan_nat_ctrl.replace(Some(control_proxy));
 
-        // Add Ipv4 route
+        info!("NAT64: masquerade configured with {:?}", config);
+
+        Ok(())
+    }
+
+    fn disable_masquerade(&self) {
+        self.lowpan_nat_ctrl.replace(None);
+        info!("NAT64: masquerade config disabled");
+    }
+
+    fn add_route<NI: NetworkInterface>(
+        &self,
+        net_if: &NI,
+        cidr_addr: [u8; 4],
+        cidr_addr_prefix_len: u8,
+    ) {
         let addr = fidl_fuchsia_net::Subnet {
             addr: fidl_fuchsia_net::IpAddress::Ipv4(fidl_fuchsia_net::Ipv4Address {
-                addr: get_first_usable_addr_in_subnet(
-                    NAT64_IP4CIDR_DEFAULT_SUBNET,
-                    NAT64_IP4CIDR_DEFAULT_PREFIX_LEN,
-                ),
+                addr: get_first_usable_addr_in_subnet(cidr_addr, cidr_addr_prefix_len),
             }),
-            prefix_len: NAT64_IP4CIDR_DEFAULT_PREFIX_LEN,
+            prefix_len: cidr_addr_prefix_len,
         };
         if let Err(err) = net_if.add_address(addr).ignore_already_exists() {
             warn!("Unable to add NAT64 route `{:?}` to lowpan interface: {:?}", addr, err);
         }
-        info!("NAT64: masquerade configured with {:?}", config);
-        Ok(())
+    }
+
+    fn delete_route<NI: NetworkInterface>(
+        &self,
+        net_if: &NI,
+        cidr_addr: [u8; 4],
+        cidr_addr_prefix_len: u8,
+    ) {
+        let addr = fidl_fuchsia_net::Subnet {
+            addr: fidl_fuchsia_net::IpAddress::Ipv4(fidl_fuchsia_net::Ipv4Address {
+                addr: get_first_usable_addr_in_subnet(cidr_addr, cidr_addr_prefix_len),
+            }),
+            prefix_len: cidr_addr_prefix_len,
+        };
+        if let Err(err) = net_if.remove_address(addr).ignore_not_found() {
+            warn!("Unable to delete NAT64 route `{:?}` to lowpan interface: {:?}", addr, err);
+        }
+    }
+
+    pub fn get_default_nat64_cidr() -> Ip4Cidr {
+        Ip4Cidr::new(NAT64_IP4CIDR_DEFAULT_SUBNET, NAT64_IP4CIDR_DEFAULT_PREFIX_LEN)
     }
 }
 

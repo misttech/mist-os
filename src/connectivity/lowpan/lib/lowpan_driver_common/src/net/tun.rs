@@ -234,7 +234,6 @@ impl NetworkInterface for TunNetworkInterface {
     }
 
     fn add_address_from_spinel_subnet(&self, addr: &Subnet) -> Result<(), Error> {
-        info!("TunNetworkInterface: Adding Address: {:?}", addr);
         let device_addr = fnet::Subnet {
             addr: fnetext::IpAddress(addr.addr.into()).into(),
             prefix_len: addr.prefix_len,
@@ -243,6 +242,7 @@ impl NetworkInterface for TunNetworkInterface {
     }
 
     fn add_address(&self, addr: fidl_fuchsia_net::Subnet) -> Result<(), Error> {
+        info!("TunNetworkInterface: Adding Address: {:?}", addr);
         let (address_state_provider, server_end) = fidl::endpoints::create_proxy::<
             fidl_fuchsia_net_interfaces_admin::AddressStateProviderMarker,
         >()
@@ -271,7 +271,7 @@ impl NetworkInterface for TunNetworkInterface {
                 self.stack_sync
                     .lock()
                     .add_forwarding_entry(&forwarding_entry, zx::Time::INFINITE)?
-                    .expect("add_forwarding_entry");
+                    .map_err(|e| anyhow::anyhow!("IPv4 add_forwarding_entry failed :{:?}", e))?;
             }
             fidl_fuchsia_net::IpAddress::Ipv6(fnet::Ipv6Address { addr }) => {
                 let mut routes = self.routes.lock();
@@ -299,13 +299,18 @@ impl NetworkInterface for TunNetworkInterface {
         Ok(())
     }
 
-    fn remove_address(&self, addr: &Subnet) -> Result<(), Error> {
-        info!("TunNetworkInterface: Removing Address: {:?}", addr);
-
+    fn remove_address_from_spinel_subnet(&self, addr: &Subnet) -> Result<(), Error> {
         let device_addr = fnet::Subnet {
             addr: fnetext::IpAddress(addr.addr.into()).into(),
             prefix_len: addr.prefix_len,
         };
+        self.add_address(device_addr)
+    }
+
+    fn remove_address(&self, addr: fidl_fuchsia_net::Subnet) -> Result<(), Error> {
+        info!("TunNetworkInterface: Removing Address: {:?}", addr);
+
+        let device_addr = addr;
 
         self.control_sync
             .lock()
@@ -316,13 +321,8 @@ impl NetworkInterface for TunNetworkInterface {
 
         info!("TunNetworkInterface: Successfully removed address {:?}", addr);
 
-        let mut routes = self.routes.lock();
-
-        if let Some(addresses) = routes.get_mut(&subnet) {
-            addresses.remove(&addr.addr);
-            if addresses.is_empty() {
-                routes.remove(&subnet);
-
+        match subnet.addr {
+            fidl_fuchsia_net::IpAddress::Ipv4(fnet::Ipv4Address { addr: _ }) => {
                 let forwarding_entry = fnetstack::ForwardingEntry {
                     subnet,
                     device_id: self.id,
@@ -332,9 +332,33 @@ impl NetworkInterface for TunNetworkInterface {
 
                 self.stack_sync
                     .lock()
-                    .del_forwarding_entry(&forwarding_entry, zx::Time::INFINITE)
-                    .squash_result()?;
-                info!("TunNetworkInterface: Successfully removed forwarding entry for {:?}", addr);
+                    .del_forwarding_entry(&forwarding_entry, zx::Time::INFINITE)?
+                    .map_err(|e| anyhow::anyhow!("IPv4 del_forwarding_entry failed :{:?}", e))?;
+            }
+            fidl_fuchsia_net::IpAddress::Ipv6(fnet::Ipv6Address { addr }) => {
+                let mut routes = self.routes.lock();
+                if let Some(addresses) = routes.get_mut(&subnet) {
+                    addresses.remove(&std::net::Ipv6Addr::from(addr));
+                    if addresses.is_empty() {
+                        routes.remove(&subnet);
+
+                        let forwarding_entry = fnetstack::ForwardingEntry {
+                            subnet,
+                            device_id: self.id,
+                            next_hop: None,
+                            metric: 0,
+                        };
+
+                        self.stack_sync
+                            .lock()
+                            .del_forwarding_entry(&forwarding_entry, zx::Time::INFINITE)
+                            .squash_result()?;
+                        info!(
+                            "TunNetworkInterface: Successfully removed forwarding entry for {:?}",
+                            addr
+                        );
+                    }
+                }
             }
         }
 
