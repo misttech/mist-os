@@ -29,16 +29,21 @@ class TestExecution:
     """Represents a single execution for a specific test."""
 
     def __init__(
-        self, test: test_list_file.Test, exec_env: environment.ExecutionEnvironment
+        self,
+        test: test_list_file.Test,
+        exec_env: environment.ExecutionEnvironment,
+        flags: args.Flags,
     ):
         """Initialize the test execution wrapper.
 
         Args:
             test (test_list_file.Test): Test to run.
             exec_env (environment.ExecutionEnvironment): Execution environment.
+            flags (args.Flags): Command flags.
         """
         self._test = test
         self._exec_env = exec_env
+        self._flags = flags
 
     def name(self) -> str:
         """Get the name of the test.
@@ -70,7 +75,7 @@ class TestExecution:
             extra_args = []
             if execution.realm:
                 extra_args += ["--realm", execution.realm]
-            if execution.max_severity_logs:
+            if execution.max_severity_logs and self._flags.restrict_logs:
                 extra_args += ["--max-severity-logs", execution.max_severity_logs]
             if execution.min_severity_logs:
                 extra_args += ["--min-severity-logs", execution.min_severity_logs]

@@ -7,6 +7,8 @@ import subprocess
 import tempfile
 import unittest
 
+from parameterized import parameterized
+
 import args
 import environment
 import event
@@ -56,7 +58,10 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(output)
         self.assertTrue(any([e.error is not None for e in events]))
 
-    async def test_test_execution_component(self):
+    @parameterized.expand(
+        [([], ["--max-severity-logs", "INFO"]), (["--no-restrict-logs"], [])]
+    )
+    async def test_test_execution_component(self, flag_list, expected_log_args):
         """Test the usage of the TestExecution wrapper on a component test"""
 
         exec_env = environment.ExecutionEnvironment(
@@ -78,19 +83,14 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                 ),
             ),
             exec_env,
+            args.parse_args(flag_list),
         )
 
         self.assertListEqual(
             test.command_line(),
-            [
-                "fx",
-                "ffx",
-                "test",
-                "run",
-                "--realm",
-                "foo_tests",
-                "--max-severity-logs",
-                "INFO",
+            ["fx", "ffx", "test", "run", "--realm", "foo_tests"]
+            + expected_log_args
+            + [
                 "--min-severity-logs",
                 "TRACE",
                 "fuchsia-pkg://fuchsia.com/foo#meta/foo_test.cm",
@@ -125,6 +125,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                 ),
             ),
             exec_env,
+            args.parse_args([]),
         )
 
         self.assertListEqual(
@@ -163,6 +164,8 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
 
             exec_env = environment.ExecutionEnvironment("/fuchsia", tmp, None, "", "")
 
+            flags = args.parse_args([])
+
             test = execution.TestExecution(
                 test_list_file.Test(
                     tests_json_file.TestEntry(
@@ -171,6 +174,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                     test_list_file.TestListEntry("foo", [], execution=None),
                 ),
                 exec_env,
+                flags,
             )
 
             self.assertFalse(test.is_hermetic())
@@ -181,8 +185,6 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
 
             recorder = event.EventRecorder()
             recorder.emit_init()
-
-            flags = args.parse_args([])
 
             output = await test.run(recorder, flags, event.GLOBAL_RUN_ID)
             recorder.emit_end()

@@ -587,7 +587,7 @@ async def run_all_tests(
                 f"\nOnly running {flags.limit} tests out of {len(tests.selected)} due to --limit"
             )
             break
-        exec = execution.TestExecution(test, exec_env)
+        exec = execution.TestExecution(test, exec_env, flags)
         if exec.is_hermetic():
             run_state.hermetic_test_queue.put_nowait(exec)
         else:
