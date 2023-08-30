@@ -108,16 +108,10 @@ where
                         None => 0,
                         Some(val) => val.into(),
                     };
-                    self.driver_state
-                        .lock()
-                        .ot_instance
-                        .as_ref()
-                        .platform_infra_if_on_state_changed(
-                            backbone_nic_id
-                                .try_into()
-                                .expect("NIC ID should be able to fit in u32"),
-                            is_running,
-                        );
+                    self.driver_state.lock().ot_instance.as_ref().plat_infra_if_on_state_changed(
+                        backbone_nic_id.try_into().expect("NIC ID should be able to fit in u32"),
+                        is_running,
+                    );
                     Result::<_, Error>::Ok(())
                 }
                 Err(x) => Err(x),

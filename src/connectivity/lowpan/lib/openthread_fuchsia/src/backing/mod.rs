@@ -27,7 +27,7 @@ mod udp;
 
 pub(crate) use alarm::*;
 pub(crate) use infra_if::InfraIfInstance;
-pub(crate) use nat64::Nat64Instance;
+pub(crate) use nat64::{Nat64Instance, Nat64PlatformInstance};
 use openthread::ot::NetifIdentifier;
 pub(crate) use reset::PlatformResetRequested;
 pub(crate) use udp::*;

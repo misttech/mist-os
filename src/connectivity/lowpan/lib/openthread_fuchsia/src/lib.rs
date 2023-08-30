@@ -86,7 +86,7 @@ impl PlatformBuilder {
 pub struct Platform {
     timer_receiver: fmpsc::Receiver<usize>,
     rcp_to_ot_frame_ready_receiver: fmpsc::Receiver<()>,
-    nat64_prefix_req_receiver: fmpsc::UnboundedReceiver<ot::NetifIndex>,
+    nat64_platform_instance: Nat64PlatformInstance,
     ot_to_rcp_task: fasync::Task<()>,
     rcp_to_ot_task: fasync::Task<()>,
 }
@@ -199,7 +199,7 @@ impl Platform {
             rcp_to_ot_frame_ready_receiver,
             ot_to_rcp_task,
             rcp_to_ot_task,
-            nat64_prefix_req_receiver,
+            nat64_platform_instance: Nat64PlatformInstance::new(nat64_prefix_req_receiver),
         }
     }
 }

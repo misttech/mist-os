@@ -11,6 +11,7 @@ rustc_library("openthread_fuchsia") {
   deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.mdns:fuchsia.net.mdns_rust",
+    "//sdk/fidl/fuchsia.net.name:fuchsia.net.name_rust",
     "//src/connectivity/lowpan/lib/lowpan_driver_common",
     "//src/connectivity/lowpan/lib/openthread_rust:openthread",
     "//src/connectivity/lowpan/lib/openthread_sys",
@@ -22,6 +23,7 @@ rustc_library("openthread_fuchsia") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:hex",
+    "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:socket2",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",

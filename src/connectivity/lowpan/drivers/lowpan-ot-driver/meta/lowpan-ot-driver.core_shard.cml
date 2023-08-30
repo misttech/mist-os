@@ -58,6 +58,7 @@
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.multicast.admin.Ipv6RoutingTableController",
+                "fuchsia.net.name.Lookup",
                 "fuchsia.net.stack.Stack",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.posix.socket.raw.Provider",
