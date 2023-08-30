@@ -49,7 +49,9 @@ fuchsia_unittest_package("msd_arm_mali_dfv2_tests") {
 fuchsia_unittest_package("msd-arm-mali-integration-tests") {
   deps = [
     "..:msd_arm_rebind",
+    "..:msd_arm_rebind_dfv2",
     "..:msd_arm_test",
+    "..:msd_arm_test_dfv2",
     "integration",
     "//src/graphics/lib/magma/tests/unit_tests:test_firmware",
   ]

@@ -95,9 +95,16 @@ static void test_shutdown(uint32_t iters) {
         // connections while the device is torn down, just so it's easier to test that device
         // creation is working.
         std::unique_lock lock(connection_create_mutex);
-        // TODO(fxbug.dev/124976): Unify rebind and production drivers.
-        const char* kRebindDriverPath = "libmsd_arm_rebind.cm";
-        magma::TestDeviceBase::RebindParentDeviceFromId(MAGMA_VENDOR_ID_MALI, kRebindDriverPath);
+        if (test_driver.is_dfv2()) {
+          auto parent_device = component::Connect<fuchsia_device::Controller>(
+              std::string(test_driver.GetParentTopologicalPath()) + "/device_controller");
+
+          EXPECT_EQ(ZX_OK, parent_device.status_value());
+          magma::TestDeviceBase::RebindDevice(*parent_device, test_driver.GetRebindDriverSuffix());
+        } else {
+          magma::TestDeviceBase::RebindParentDeviceFromId(MAGMA_VENDOR_ID_MALI,
+                                                          test_driver.GetRebindDriverSuffix());
+        }
         count += kRestartCount;
       }
       std::this_thread::yield();

@@ -109,9 +109,23 @@ dfv2_entry_deps = [
 
 source_set("msd_arm_entry_dfv2") {
   sources = [ "src/driver_entry_dfv2.cc" ]
+  deps = dfv2_entry_deps +
+         [ "//src/graphics/lib/magma/src/sys_driver:magma_driver_base" ]
+}
+
+source_set("msd_arm_test_entry_dfv2") {
+  testonly = true
+  sources = [
+    "src/driver_entry_dfv2.cc",
+    "src/driver_test_gtest.cc",
+  ]
+  defines = [ "MAGMA_TEST_DRIVER=1" ]
   deps = dfv2_entry_deps + [
-           ":msd_arm_bind",
+           "tests/unit_tests:tests_requiring_hardware",
            "//src/graphics/lib/magma/src/sys_driver:magma_driver_base",
+           "//src/graphics/lib/magma/tests/helper:platform_msd_device_helper",
+           "//src/graphics/lib/magma/tests/unit_tests:msd_conformance_tests_cc",
+           "//third_party/googletest:gtest",
          ]
 }
 
@@ -129,9 +143,50 @@ fuchsia_driver("msd_arm-dfv2-driver") {
 
 fuchsia_driver_component("msd_arm_dfv2") {
   component_name = "libmsd_arm_dfv2"
-  deps = [ ":msd_arm-dfv2-driver" ]
+  deps = [
+    ":msd_arm-dfv2-driver",
+    ":msd_arm_bind",
+  ]
   info = "msd_arm_dfv2-info.json"
   manifest = "meta/msd_arm_dfv2.cml"
+}
+
+# The driver framework can't use the initial composite bind rules when rebinding a driver, so the
+# "rebind" driver has different bind rules so it can be bound the second time.
+# TODO(fxbug.dev/124976): Unify rebind and production drivers.
+fuchsia_driver_component("msd_arm_rebind_dfv2") {
+  testonly = true
+  component_name = "libmsd_arm_rebind_dfv2"
+  deps = [
+    ":msd_arm-dfv2-driver",
+    ":msd_arm_rebind_bind",
+  ]
+  info = "msd_arm_dfv2-info.json"
+  manifest = "meta/msd_arm_rebind_dfv2.cml"
+}
+
+fuchsia_driver("msd_arm_test-dfv2-driver") {
+  testonly = true
+  output_name = "libmsd_arm_test_dfv2"
+  deps = [
+    ":msd_arm_test_entry_dfv2",
+    "src",
+  ]
+  assert_no_deps = [
+    "//src/devices/bin/driver_host:driver",
+    "//zircon/system/ulib/trace-engine:trace-engine-static",
+  ]
+}
+
+fuchsia_driver_component("msd_arm_test_dfv2") {
+  testonly = true
+  component_name = "libmsd_arm_test_dfv2"
+  deps = [
+    ":msd_arm_test-dfv2-driver",
+    ":msd_arm_test_bind",
+  ]
+  info = "msd_arm_test_dfv2-info.json"
+  manifest = "meta/msd_arm_test_dfv2.cml"
 }
 
 entry_deps = [

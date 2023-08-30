@@ -26,6 +26,7 @@ executable("msd_arm_mali_integration_tests") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
+    "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_cpp",
     "//sdk/fidl/fuchsia.driver.registrar:fuchsia.driver.registrar_cpp_wire",
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
     "//sdk/lib/component/incoming/cpp",

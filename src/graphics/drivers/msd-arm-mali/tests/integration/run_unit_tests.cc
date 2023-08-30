@@ -24,17 +24,21 @@
 TEST(UnitTests, UnitTests) {
   RegisteredTestDriver test_driver;
   ASSERT_NO_FATAL_FAILURE(test_driver.Init());
-  fidl::ClientEnd parent_device =
-      magma::TestDeviceBase::GetParentDeviceFromId(MAGMA_VENDOR_ID_MALI);
+  std::optional<fidl::ClientEnd<fuchsia_device::Controller>> parent_device;
+  if (test_driver.is_dfv2()) {
+    auto parent_device_result = component::Connect<fuchsia_device::Controller>(
+        std::string(test_driver.GetParentTopologicalPath()) + "/device_controller");
 
-  const char* kTestDriverPath = "libmsd_arm_test.cm";
+    EXPECT_EQ(ZX_OK, parent_device_result.status_value());
+    parent_device = std::move(*parent_device_result);
+  } else {
+    parent_device = magma::TestDeviceBase::GetParentDeviceFromId(MAGMA_VENDOR_ID_MALI);
+  }
   // The test driver will run unit tests on startup.
-  magma::TestDeviceBase::RebindDevice(parent_device, kTestDriverPath);
+  magma::TestDeviceBase::RebindDevice(*parent_device, test_driver.GetTestDriverSuffix());
   // Reload the production driver so later tests shouldn't be affected.
   auto cleanup = fit::defer([&]() {
-    // TODO(fxbug.dev/124976): Unify rebind and production drivers.
-    const char* kRebindDriverPath = "libmsd_arm_rebind.cm";
-    magma::TestDeviceBase::RebindDevice(parent_device, kRebindDriverPath);
+    magma::TestDeviceBase::RebindDevice(*parent_device, test_driver.GetRebindDriverSuffix());
   });
 
   magma::TestDeviceBase test_base(MAGMA_VENDOR_ID_MALI);

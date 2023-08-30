@@ -5,6 +5,6 @@
     include: [ "//src/graphics/drivers/msd-arm-mali/meta/msd_arm_dfv2.shard.cml" ],
     program: {
         binary: "driver/libmsd_arm_dfv2.so",
-        bind: "meta/bind/msd_arm_bind.bindbc",
+        bind: "meta/bind/msd_arm_rebind_bind.bindbc",
     },
 }

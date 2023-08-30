@@ -19,6 +19,9 @@
 
 #if MAGMA_TEST_DRIVER
 using MagmaDriverBaseType = msd::MagmaTestDriverBase;
+
+zx_status_t magma_indriver_test(ParentDevice* device);
+
 #else
 using MagmaDriverBaseType = msd::MagmaProductionDriverBase;
 #endif
@@ -49,7 +52,10 @@ class MaliDriver : public MagmaDriverBaseType {
       return zx::error(ZX_ERR_INTERNAL);
     }
 
-    // TODO(fxbug.dev/126333): Run in-driver tests.
+#if MAGMA_TEST_DRIVER
+    set_unit_test_status(magma_indriver_test(parent_device_.get()));
+#endif
+
     set_magma_system_device(msd::MagmaSystemDevice::Create(
         magma_driver(), magma_driver()->CreateDevice(parent_device_->ToDeviceHandle())));
     if (!magma_system_device()) {
