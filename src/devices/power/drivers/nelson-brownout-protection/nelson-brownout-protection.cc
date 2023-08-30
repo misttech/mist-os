@@ -75,6 +75,11 @@ zx_status_t CodecClientAgl::SetAgl(bool enable) {
 }
 
 zx_status_t NelsonBrownoutProtection::Create(void* ctx, zx_device_t* parent) {
+  return NelsonBrownoutProtection::Create(ctx, parent, kVoltagePollInterval);
+}
+
+zx_status_t NelsonBrownoutProtection::Create(void* ctx, zx_device_t* parent,
+                                             zx::duration voltage_poll_interval) {
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_end =
       DdkConnectFragmentFidlProtocol<fuchsia_hardware_audio::CodecService::Codec>(parent, "codec");
   if (codec_client_end.is_error()) {
@@ -110,8 +115,8 @@ zx_status_t NelsonBrownoutProtection::Create(void* ctx, zx_device_t* parent) {
     return status;
   }
 
-  auto dev = std::make_unique<NelsonBrownoutProtection>(parent, std::move(power_sensor_client),
-                                                        std::move(alert_interrupt));
+  auto dev = std::make_unique<NelsonBrownoutProtection>(
+      parent, std::move(power_sensor_client), std::move(alert_interrupt), voltage_poll_interval);
   if ((status = dev->Init(std::move(*codec_client_end))) != ZX_OK) {
     return status;
   }
@@ -168,7 +173,7 @@ int NelsonBrownoutProtection::Thread() {
     }
 
     while (run_thread_) {
-      zx::nanosleep(zx::deadline_after(kVoltagePollInterval));
+      zx::nanosleep(zx::deadline_after(voltage_poll_interval_));
       const auto result = power_sensor_->GetVoltageVolts();
       if (result.ok() && result->value()->voltage >= kVoltageUpwardThreshold) {
         break;

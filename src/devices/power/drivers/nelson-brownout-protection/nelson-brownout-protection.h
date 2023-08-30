@@ -35,13 +35,15 @@ class CodecClientAgl {
 class NelsonBrownoutProtection : public DeviceType {
  public:
   static zx_status_t Create(void* ctx, zx_device_t* parent);
+  static zx_status_t Create(void* ctx, zx_device_t* parent, zx::duration voltage_poll_interval);
 
   NelsonBrownoutProtection(zx_device_t* parent,
                            fidl::WireSyncClient<fuchsia_hardware_power_sensor::Device> power_sensor,
-                           zx::interrupt alert_interrupt)
+                           zx::interrupt alert_interrupt, zx::duration voltage_poll_interval)
       : DeviceType(parent),
         power_sensor_(std::move(power_sensor)),
-        alert_interrupt_(std::move(alert_interrupt)) {}
+        alert_interrupt_(std::move(alert_interrupt)),
+        voltage_poll_interval_(voltage_poll_interval) {}
   ~NelsonBrownoutProtection() {
     alert_interrupt_.destroy();
     run_thread_ = false;
@@ -60,6 +62,7 @@ class NelsonBrownoutProtection : public DeviceType {
   fidl::WireSyncClient<fuchsia_hardware_power_sensor::Device> power_sensor_;
   const zx::interrupt alert_interrupt_;
   std::atomic_bool run_thread_ = true;
+  const zx::duration voltage_poll_interval_;
 };
 
 }  // namespace brownout_protection

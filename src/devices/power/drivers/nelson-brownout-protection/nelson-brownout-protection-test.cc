@@ -180,7 +180,7 @@ TEST(NelsonBrownoutProtectionTest, Test) {
 
   fake_parent->AddProtocol(ZX_PROTOCOL_GPIO, alert_gpio.GetProto()->ops, alert_gpio.GetProto()->ctx,
                            "alert-gpio");
-  ASSERT_OK(NelsonBrownoutProtection::Create(nullptr, fake_parent.get()));
+  ASSERT_OK(NelsonBrownoutProtection::Create(nullptr, fake_parent.get(), zx::duration{0}));
   auto* child_dev2 = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev2);
   child_dev2->InitOp();
