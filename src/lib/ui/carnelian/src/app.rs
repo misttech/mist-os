@@ -399,6 +399,7 @@ pub struct App {
     assistant: AppAssistantPtr,
     messages: Vec<(ViewKey, Message)>,
     sender: InternalSender,
+    _inspect_server: Option<fasync::Task<()>>,
 }
 
 #[derive(Debug)]
@@ -436,7 +437,17 @@ pub type AssistantCreatorFunc = Box<dyn FnOnce(&AppSender) -> AssistantCreator<'
 
 impl App {
     fn new(sender: InternalSender, strategy: AppStrategyPtr, assistant: AppAssistantPtr) -> App {
-        App { strategy, view_controllers: BTreeMap::new(), assistant, messages: Vec::new(), sender }
+        App {
+            strategy,
+            view_controllers: BTreeMap::new(),
+            assistant,
+            messages: Vec::new(),
+            sender,
+            _inspect_server: inspect_runtime::publish(
+                fuchsia_inspect::component::inspector(),
+                inspect_runtime::PublishOptions::default(),
+            ),
+        }
     }
 
     fn load_and_filter_config(assistant: &mut AppAssistantPtr) -> Result<(), Error> {
@@ -779,9 +790,6 @@ impl App {
 
     fn start_services(self: &mut App) -> Result<(), Error> {
         let mut fs = component::server::ServiceFs::new_local();
-
-        inspect_runtime::serve(fuchsia_inspect::component::inspector(), &mut fs)
-            .unwrap_or_else(|e| println!("Unable to start inspect support: {}", e));
 
         self.strategy.start_services(self.sender.clone(), &mut fs)?;
 
