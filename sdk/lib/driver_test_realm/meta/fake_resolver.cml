@@ -38,6 +38,11 @@
             rights: [ "rx*" ],
             path: "/boot",
         },
+        {
+            directory: "pkg_drivers",
+            rights: [ "rx*" ],
+            path: "/pkg_drivers",
+        },
     ],
     expose: [
         {

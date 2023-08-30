@@ -28,11 +28,7 @@ class FakeComponentResolver final
   void Resolve(ResolveRequestView request, ResolveCompleter::Sync& completer) override {
     std::string_view kBootPrefix = "fuchsia-boot:///";
     std::string_view kPkgPrefix = "fuchsia-pkg://fuchsia.com/";
-    std::string_view kUnpackagedBootPrefix = "fuchsia-boot:///#";
     std::string_view relative_path = request->component_url.get();
-
-    std::string pkg_url;
-    bool is_unpackaged_boot = false;
 
     if (!cpp20::starts_with(relative_path, kBootPrefix) &&
         !cpp20::starts_with(relative_path, kPkgPrefix)) {
@@ -42,23 +38,14 @@ class FakeComponentResolver final
       return;
     }
 
-    if (cpp20::starts_with(relative_path, kUnpackagedBootPrefix)) {
-      is_unpackaged_boot = true;
-      relative_path.remove_prefix(kUnpackagedBootPrefix.size());
-      pkg_url = kBootPrefix;
-
-      // driver_host2 is supposed to be in a bootfs package, but it's actually in the same package
-      // as the driver test realm for test scenarios.
-      // TODO(http://fxbug.dev/126086): Include driver_host2 as a subpackage to avoid this hack.
-      std::string_view kDriverHostPrefix = "river_host2";
-      if (cpp20::starts_with(relative_path, kDriverHostPrefix)) {
-        relative_path.remove_prefix(kDriverHostPrefix.size() + 1);
-      }
-    } else {
-      size_t pos = relative_path.find('#');
-      std::string pkg_url = std::string(relative_path.substr(0, pos));
-      relative_path.remove_prefix(pos + 1);
-    }
+    // FakeComponentResolver looks at the prefix to determine which directory to look in (pkg or
+    // boot), then looks at the path following '#' to find the relative path within that directory.
+    // Note that subpackaging is ignored: it's assumed that the components can be found by the
+    // relative path.
+    bool is_boot = cpp20::starts_with(relative_path, kBootPrefix);
+    size_t pos = relative_path.find('#');
+    std::string pkg_url = std::string(relative_path.substr(0, pos));
+    relative_path.remove_prefix(pos + 1);
 
     auto file = fidl::CreateEndpoints<fuchsia_io::File>();
     if (file.is_error()) {
@@ -67,7 +54,7 @@ class FakeComponentResolver final
     }
 
     zx_handle_t dir = pkg_dir_.channel().get();
-    if (is_unpackaged_boot) {
+    if (is_boot) {
       dir = boot_dir_.channel().get();
     }
 
@@ -115,7 +102,7 @@ class FakeComponentResolver final
     abi_revision_file.close();
 
     zx::result<fidl::ClientEnd<fuchsia_io::Directory>> dir_clone_result;
-    if (is_unpackaged_boot) {
+    if (is_boot) {
       dir_clone_result = component::Clone(boot_dir_);
     } else {
       dir_clone_result = component::Clone(pkg_dir_);
@@ -190,7 +177,8 @@ int main() {
     return connect_boot_result.status_value();
   }
 
-  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> connect_pkg_result = ConnectDir("/pkg");
+  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> connect_pkg_result =
+      ConnectDir("/pkg_drivers");
   if (connect_pkg_result.is_error()) {
     return connect_pkg_result.status_value();
   }

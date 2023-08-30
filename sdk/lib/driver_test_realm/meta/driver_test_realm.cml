@@ -47,6 +47,11 @@
             rights: [ "rx*" ],
             path: "/boot",
         },
+        {
+            directory: "pkg_drivers",
+            rights: [ "rx*" ],
+            path: "/pkg_drivers",
+        },
     ],
     use: [
         // Provided by the parent when it wants to override the DTR
@@ -75,6 +80,11 @@
         },
         {
             directory: "boot",
+            from: "self",
+            to: "#realm_builder",
+        },
+        {
+            directory: "pkg_drivers",
             from: "self",
             to: "#realm_builder",
         },

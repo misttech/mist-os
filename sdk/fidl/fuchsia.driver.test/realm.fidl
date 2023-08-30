@@ -99,6 +99,29 @@ type RealmArgs = resource table {
     /// Default: empty
     @available(added=HEAD)
    12: exposes vector<Expose>:MAX;
+
+    /// The driver test realm can load drivers packaged with the test suite
+    /// through this directory. Note that this directory must be readable
+    /// and executable.
+    ///
+    /// This can be used if the test suite needs to use some drivers packaged
+    /// with the DriverTestRealm in addition to drivers packaged with the test
+    /// suite. In that case, the user can leave RealmArgs::boot unset and use
+    /// RealmArgs::pkg and RealmArgs::driver_urls.
+    ///
+    /// Drivers in this directory can be registered using the `driver_urls`
+    /// argument below.
+    ///
+    /// Default: DriverTestRealm's package directory.
+    @available(added=HEAD)
+   13: pkg client_end:fuchsia.io.Directory;
+
+    /// The driver URLs to be loaded from `pkg`.
+    /// These URLs should use the prefix fuchsia-pkg://fuchsia.com/
+    ///
+    /// Default: empty
+    @available(added=HEAD)
+   14: driver_urls vector<string:MAX>:MAX;
 };
 
 /// This protocol is for the DriverTestRealm. It is an integration test
