@@ -13,7 +13,7 @@ namespace {
 
 const char *kMagmaLayer = "VK_LAYER_FUCHSIA_imagepipe_swapchain_fb";
 
-const std::vector<const char *> s_required_physical_device_props = {
+const std::vector<const char *> s_required_physical_device_exts = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 #ifdef __Fuchsia__
     VK_FUCHSIA_EXTERNAL_MEMORY_EXTENSION_NAME,
@@ -23,9 +23,10 @@ const std::vector<const char *> s_required_physical_device_props = {
 #endif
 };
 
-bool ChooseDevice(const vk::PhysicalDevice &physical_device_in, const VkSurfaceKHR &surface,
-                  const vk::QueueFlags &queue_flags, vk::PhysicalDevice *physical_device_out) {
-  if (!FindRequiredProperties(s_required_physical_device_props, vkp::PHYS_DEVICE_EXT_PROP,
+bool ChoosePhysicalDevice(const vk::PhysicalDevice &physical_device_in, const VkSurfaceKHR &surface,
+                          const vk::QueueFlags &queue_flags,
+                          vk::PhysicalDevice *physical_device_out) {
+  if (!FindRequiredProperties(s_required_physical_device_exts, vkp::PHYS_DEVICE_EXT_PROP,
                               kMagmaLayer, physical_device_in)) {
     return false;
   }
@@ -49,8 +50,13 @@ bool ChooseDevice(const vk::PhysicalDevice &physical_device_in, const VkSurfaceK
 namespace vkp {
 
 PhysicalDevice::PhysicalDevice(std::shared_ptr<vk::Instance> instance, const VkSurfaceKHR &surface,
+                               std::optional<PhysicalDeviceProperties> properties,
                                const vk::QueueFlags &queue_flags)
-    : initialized_(false), instance_(instance), surface_(surface), queue_flags_(queue_flags) {}
+    : initialized_(false),
+      instance_(instance),
+      surface_(surface),
+      properties_(properties),
+      queue_flags_(queue_flags) {}
 
 bool PhysicalDevice::Init() {
   RTN_IF_MSG(false, initialized_, "PhysicalDevice already initialized.\n");
@@ -63,21 +69,43 @@ bool PhysicalDevice::Init() {
   }
 
   for (const auto &phys_device : phys_devices) {
-    if (ChooseDevice(phys_device, surface_, queue_flags_, &physical_device_)) {
+    // Conditionalize physical device selection based on any set properties.
+    if (properties_.has_value()) {
+      const char *fmt = "\tSkipping phys device: %s mismatch. Value: %d  Reqd: %d\n";
+      vk::PhysicalDeviceProperties p = phys_device.getProperties();
+      if (properties_->api_version_.has_value() &&
+          properties_->api_version_.value() != p.apiVersion) {
+        printf(fmt, "api version", static_cast<int>(p.apiVersion),
+               static_cast<int>(properties_->api_version_.value()));
+        continue;
+      }
+      if (properties_->device_id_.has_value() && properties_->device_id_.value() != p.deviceID) {
+        printf(fmt, "device ID", static_cast<int>(p.deviceID),
+               static_cast<int>(properties_->device_id_.value()));
+        continue;
+      }
+      if (properties_->device_type_.has_value() &&
+          properties_->device_type_.value() != p.deviceType) {
+        printf(fmt, "device type", static_cast<int>(p.deviceType),
+               static_cast<int>(properties_->device_type_.value()));
+        continue;
+      }
+    }
+    if (ChoosePhysicalDevice(phys_device, surface_, queue_flags_, &physical_device_)) {
       LogMemoryProperties(physical_device_);
       initialized_ = true;
       break;
     }
   }
 
-  RTN_IF_MSG(false, !initialized_, "Couldn't find graphics family device.\n");
+  RTN_IF_MSG(false, !initialized_, "Failed to find a matching physical device.\n");
 
   return initialized_;
 }
 
 void PhysicalDevice::AppendRequiredPhysDeviceExts(std::vector<const char *> *exts) {
-  exts->insert(exts->end(), s_required_physical_device_props.begin(),
-               s_required_physical_device_props.end());
+  exts->insert(exts->end(), s_required_physical_device_exts.begin(),
+               s_required_physical_device_exts.end());
 }
 
 const vk::PhysicalDevice &PhysicalDevice::get() const {
@@ -86,5 +114,9 @@ const vk::PhysicalDevice &PhysicalDevice::get() const {
   }
   return physical_device_;
 }
+
+PhysicalDeviceProperties::PhysicalDeviceProperties(uint32_t api_version, uint32_t device_id,
+                                                   vk::PhysicalDeviceType device_type)
+    : api_version_(api_version), device_id_(device_id), device_type_(device_type) {}
 
 }  // namespace vkp

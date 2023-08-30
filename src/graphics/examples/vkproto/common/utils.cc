@@ -87,7 +87,8 @@ bool FindRequiredProperties(const std::vector<const char *> &required_props, Sea
 
   // Match Vulkan properties.  "Vulkan properties" are those found when the
   // layer argument is set to null.
-  bool success = EnumerateProperties(search_prop, physical_device, nullptr, &enumerated_props_set);
+  bool success =
+      EnumerateProperties(search_prop, physical_device, nullptr /* layer */, &enumerated_props_set);
 
   if (!success) {
     if (missing_props_out) {
