@@ -450,6 +450,20 @@
             source_availability: "unknown",
         },
         {
+            protocol: [
+                "fuchsia.media.ActivityReporter",
+                "fuchsia.media.Audio",
+                "fuchsia.media.AudioCore",
+                "fuchsia.media.AudioDeviceEnumerator",
+                "fuchsia.media.UsageGainReporter",
+                "fuchsia.media.UsageReporter",
+                "fuchsia.ultrasound.Factory",
+            ],
+            from: "#audio_core",
+            to: "#sshd-host",
+            source_availability: "unknown",
+        },
+        {
             protocol: "fuchsia.media.sounds.Player",
             from: "#soundplayer",
             to: "#sshd-host",
