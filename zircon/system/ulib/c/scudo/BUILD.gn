@@ -116,7 +116,7 @@ libc_source_set("wrappers") {
 
   sources = [
     "wrappers_c.cpp",
-    # TODO(mcgrathr): maybe use this later
+    # TODO(fxbug.dev/132773): Disable c++ wrappers provided by Scudo.
     #"wrappers_cpp.cpp",
   ]
 
@@ -289,7 +289,7 @@ libc_test("wrapper-tests") {
 
   sources = [
     "tests/wrappers_c_test.cpp",
-    # TODO(mcgrathr): see src/wrappers_cpp.cpp inclusion above.
+    # TODO(fxbug.dev/132773): see src/wrappers_cpp.cpp inclusion above.
     #"tests/wrappers_cpp_test.cpp",
   ]
 }
