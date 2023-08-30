@@ -274,8 +274,6 @@ impl From<ParseError> for Error {
             }
             ParseError::TooLong => Self::internal("too long"),
             ParseError::Empty => Self::internal("empty"),
-            ParseError::NotAName => Self::internal("not a name"),
-            ParseError::NotAPath => Self::internal("not a path"),
         }
     }
 }

@@ -94,12 +94,6 @@ pub enum ParseError {
     /// The string was too long.
     #[error("too long")]
     TooLong,
-    /// A name was expected and the string was a path.
-    #[error("not a name")]
-    NotAName,
-    // A path was expected and the string was a name.
-    #[error("not a path")]
-    NotAPath,
 }
 
 pub const MAX_NAME_LENGTH: usize = 100;

@@ -99,7 +99,7 @@ fn check_identifier(
                     format!(r#""{prop}": {details}"#),
                 ));
             }
-            Err(ParseError::InvalidValue | ParseError::NotAName | ParseError::NotAPath) => {
+            Err(ParseError::InvalidValue) => {
                 errors.push(Error::invalid_field(decl_type, keyword));
             }
         }
