@@ -318,53 +318,61 @@ async def validate_test_selections(
             "See https://fuchsia.dev/fuchsia-src/development/testing/faq for more information."
         )
 
-        def suggestion_args(
-            arg: str, threshold: float | None = None
-        ) -> typing.List[str]:
-            name = "fx"
-            suggestion_args = ["search-tests", "--max-results=6", arg]
-            if threshold is not None:
-                suggestion_args += ["--threshold", str(threshold)]
-            if not flags.style:
-                suggestion_args += ["--no-color"]
-            return [name] + suggestion_args
+        if flags.show_suggestions:
 
-        arg_threshold_pairs = []
-        for group in missing_groups:
-            # Create pairs of a search string and threshold.
-            # Thresholds depend on the number of arguments joined.
-            # We have only a single search field, so we concatenate
-            # the names into one big group.  To correct for lower
-            # match thresholds due to this union, we adjust the
-            # threshold when there is more than a single value to
-            # match against.
-            all_args = group.names.union(group.components).union(group.packages)
-            arg_threshold_pairs.append(
-                (
-                    ",".join(list(all_args)),
-                    max(0.4, 0.9 - len(all_args) * 0.05) if len(all_args) > 1 else None,
-                ),
+            def suggestion_args(
+                arg: str, threshold: float | None = None
+            ) -> typing.List[str]:
+                name = "fx"
+                suggestion_args = [
+                    "search-tests",
+                    f"--max-results={flags.suggestion_count}",
+                    arg,
+                ]
+                if threshold is not None:
+                    suggestion_args += ["--threshold", str(threshold)]
+                if not flags.style:
+                    suggestion_args += ["--no-color"]
+                return [name] + suggestion_args
+
+            arg_threshold_pairs = []
+            for group in missing_groups:
+                # Create pairs of a search string and threshold.
+                # Thresholds depend on the number of arguments joined.
+                # We have only a single search field, so we concatenate
+                # the names into one big group.  To correct for lower
+                # match thresholds due to this union, we adjust the
+                # threshold when there is more than a single value to
+                # match against.
+                all_args = group.names.union(group.components).union(group.packages)
+                arg_threshold_pairs.append(
+                    (
+                        ",".join(list(all_args)),
+                        max(0.4, 0.9 - len(all_args) * 0.05)
+                        if len(all_args) > 1
+                        else None,
+                    ),
+                )
+
+            outputs = await run_commands_in_parallel(
+                [
+                    suggestion_args(arg_pair[0], arg_pair[1])
+                    for arg_pair in arg_threshold_pairs
+                ],
+                "Find suggestions",
+                recorder=recorder,
+                maximum_parallel=10,
             )
 
-        outputs = await run_commands_in_parallel(
-            [
-                suggestion_args(arg_pair[0], arg_pair[1])
-                for arg_pair in arg_threshold_pairs
-            ],
-            "Find suggestions",
-            recorder=recorder,
-            maximum_parallel=10,
-        )
+            if any([val is None for val in outputs]):
+                return False
 
-        if any([val is None for val in outputs]):
-            return False
-
-        for group, output in zip(missing_groups, outputs):
-            assert output is not None  # Checked above
-            recorder.emit_info_message(
-                f"\nFor `{group}`, did you mean any of the following?\n"
-            )
-            recorder.emit_verbatim_message(output.stdout)
+            for group, output in zip(missing_groups, outputs):
+                assert output is not None  # Checked above
+                recorder.emit_info_message(
+                    f"\nFor `{group}`, did you mean any of the following?\n"
+                )
+                recorder.emit_verbatim_message(output.stdout)
 
     return not missing_groups
 

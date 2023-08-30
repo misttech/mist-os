@@ -26,6 +26,8 @@ class Flags:
     device: bool
     selection: typing.List[str]
     fuzzy: int
+    show_suggestions: bool
+    suggestion_count: int
 
     parallel: int
     random: bool
@@ -64,6 +66,8 @@ class Flags:
             raise FlagError("--timeout must be greater than 0")
         if self.count < 1:
             raise FlagError("--count must be a positive number")
+        if self.suggestion_count < 0:
+            raise FlagError("--suggestion-count must be non-negative")
 
         if not termout.is_valid() and self.status:
             raise FlagError("Refusing to output interactive status to a non-TTY.")
@@ -157,6 +161,19 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
         type=int,
         default=3,
         help="The Damerau–Levenshtein distance threshold for fuzzy matching tests",
+    )
+    selection.add_argument(
+        "--show-suggestions",
+        action=argparse.BooleanOptionalAction,
+        type=bool,
+        help="If True and no tests match, suggest matching tests from the build directory. Default is True.",
+        default=True,
+    )
+    selection.add_argument(
+        "--suggestion-count",
+        type=int,
+        help="Show this number of suggestions if no tests match. Default is 6.",
+        default=6,
     )
 
     execution = parser.add_argument_group("Execution Options")

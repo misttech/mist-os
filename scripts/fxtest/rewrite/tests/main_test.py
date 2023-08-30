@@ -251,25 +251,39 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             f"Prefixes were\n{self.prettyFormatPrefixes(call_prefixes)}",
         )
 
-    async def test_suggestions(self):
+    @parameterized.expand(
+        [
+            ("default suggestions", [], 6),
+            ("custom suggestion count", ["--suggestion-count=10"], 10),
+            ("suppress suggestions", ["--no-show-suggestions"], 0),
+        ]
+    )
+    async def test_suggestions(
+        self, _unused_name, extra_flags, expected_suggestion_count
+    ):
         """Test that targets are suggested when there are no test matches."""
         mocked_commands = self._mock_run_commands_in_parallel("No matches")
         ret = await main.async_main_wrapper(
-            args.parse_args(["--simple", "non_existant_test_does_not_match"])
+            args.parse_args(
+                ["--simple", "non_existant_test_does_not_match"] + extra_flags
+            )
         )
         self.assertEqual(ret, 1)
-        self.assertListEqual(
-            mocked_commands.call_args[0][0],
-            [
+        if expected_suggestion_count > 0:
+            self.assertListEqual(
+                mocked_commands.call_args[0][0],
                 [
-                    "fx",
-                    "search-tests",
-                    "--max-results=6",
-                    "non_existant_test_does_not_match",
-                    "--no-color",
-                ]
-            ],
-        )
+                    [
+                        "fx",
+                        "search-tests",
+                        f"--max-results={expected_suggestion_count}",
+                        "non_existant_test_does_not_match",
+                        "--no-color",
+                    ]
+                ],
+            )
+        else:
+            self.assertListEqual(mocked_commands.call_args_list, [])
 
         # TODO(b/295340412): Test that suggestions are suppressed.
 
