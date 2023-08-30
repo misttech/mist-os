@@ -13,12 +13,4 @@
     program: {
         binary: "bin/fxfs_platform_lib_test",
     },
-    use: [
-        {
-            protocol: [
-                // This allows tests to launch BlobFS
-                "fuchsia.process.Launcher",
-            ],
-        },
-    ],
 }
