@@ -84,6 +84,7 @@ zx_status_t NandPartDevice::Create(void* ctx, zx_device_t* parent) {
   // Query parent for nand configuration info.
   auto nand_config = ddk::GetMetadata<nand_config_t>(parent, DEVICE_METADATA_PRIVATE);
   if (!nand_config.is_ok()) {
+    zxlogf(ERROR, "Failed to get metadata: %s", nand_config.status_string());
     return nand_config.error_value();
   }
   // Create a bad block instance.

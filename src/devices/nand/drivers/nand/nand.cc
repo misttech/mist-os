@@ -7,6 +7,7 @@
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/io-buffer.h>
+#include <lib/ddk/metadata.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/time.h>
 #include <zircon/assert.h>
@@ -414,8 +415,11 @@ zx_status_t NandDevice::Bind() {
       {BIND_NAND_CLASS, 0, NAND_CLASS_PARTMAP},
   };
 
-  return DdkAdd(
-      ddk::DeviceAddArgs("nand").set_props(props).set_inspect_vmo(inspect_.DuplicateVmo()));
+  return DdkAdd(ddk::DeviceAddArgs("nand")
+                    .set_props(props)
+                    .set_inspect_vmo(inspect_.DuplicateVmo())
+                    .forward_metadata(parent(), DEVICE_METADATA_PRIVATE)
+                    .forward_metadata(parent(), DEVICE_METADATA_PARTITION_MAP));
 }
 
 static constexpr zx_driver_ops_t nand_driver_ops = []() {

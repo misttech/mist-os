@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <lib/ddk/binding_driver.h>
+#include <lib/ddk/metadata.h>
 
 #include <algorithm>
 #include <memory>
@@ -1008,7 +1009,9 @@ zx_status_t AmlRawNand::Init() {
 }
 
 zx_status_t AmlRawNand::Bind() {
-  zx_status_t status = DdkAdd("aml-raw_nand");
+  zx_status_t status = DdkAdd(ddk::DeviceAddArgs("aml-raw_nand")
+                                  .forward_metadata(parent(), DEVICE_METADATA_PRIVATE)
+                                  .forward_metadata(parent(), DEVICE_METADATA_PARTITION_MAP));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: DdkAdd failed", __FILE__);
     CleanUpIrq();
