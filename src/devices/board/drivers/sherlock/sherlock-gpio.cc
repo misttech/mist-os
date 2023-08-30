@@ -173,28 +173,6 @@ static const gpio_pin_t gpio_pins[] = {
 };
 #endif  // FACTORY_BUILD
 
-static const std::vector<fpbus::Metadata> gpio_metadata{
-    {{
-        .type = DEVICE_METADATA_GPIO_PINS,
-        .data =
-            std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&gpio_pins),
-                                 reinterpret_cast<const uint8_t*>(&gpio_pins) + sizeof(gpio_pins)),
-    }},
-};
-
-static const fpbus::Node gpio_dev = []() {
-  fpbus::Node dev = {};
-  dev.name() = "gpio";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_AMLOGIC_T931;
-  dev.did() = PDEV_DID_AMLOGIC_GPIO;
-  dev.mmio() = gpio_mmios;
-  dev.irq() = gpio_irqs;
-  dev.metadata() = gpio_metadata;
-  dev.instance_id() = 0;
-  return dev;
-}();
-
 // Add a separate device for GPIO C pins to allow the GPIO driver to be colocated with SPI and
 // ot-radio. This eliminates two channel round-trips for each SPI transfer.
 static const gpio_pin_t gpio_c_pins[] = {
@@ -233,6 +211,40 @@ zx_status_t Sherlock::GpioInit() {
   static_assert(std::size(gpio_pins) + std::size(gpio_c_pins) == GPIO_PIN_COUNT,
                 "Incorrect pin count.");
 
+  fuchsia_hardware_gpio::wire::InitMetadata metadata;
+  metadata.steps = fidl::VectorView<fuchsia_hardware_gpio::wire::InitStep>::FromExternal(
+      gpio_init_steps_.data(), gpio_init_steps_.size());
+
+  const fit::result encoded_metadata = fidl::Persist(metadata);
+  if (!encoded_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to encode GPIO init metadata: %s",
+           encoded_metadata.error_value().FormatDescription().c_str());
+    return encoded_metadata.error_value().status();
+  }
+
+  const std::vector<fpbus::Metadata> gpio_metadata{
+      {{
+          .type = DEVICE_METADATA_GPIO_PINS,
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&gpio_pins),
+              reinterpret_cast<const uint8_t*>(&gpio_pins) + sizeof(gpio_pins)),
+      }},
+      {{
+          .type = DEVICE_METADATA_GPIO_INIT,
+          .data = encoded_metadata.value(),
+      }},
+  };
+
+  fpbus::Node gpio_dev;
+  gpio_dev.name() = "gpio";
+  gpio_dev.vid() = PDEV_VID_AMLOGIC;
+  gpio_dev.pid() = PDEV_PID_AMLOGIC_T931;
+  gpio_dev.did() = PDEV_DID_AMLOGIC_GPIO;
+  gpio_dev.mmio() = gpio_mmios;
+  gpio_dev.irq() = gpio_irqs;
+  gpio_dev.metadata() = gpio_metadata;
+  gpio_dev.instance_id() = 0;
+
   {
     fidl::Arena<> fidl_arena;
     fdf::Arena arena('GPIO');
@@ -250,6 +262,8 @@ zx_status_t Sherlock::GpioInit() {
     }
   }
 
+  // TODO(fxbug.dev/130993): Add the GPIO C device after all init steps have been executed to ensure
+  // that there are no simultaneous accesses to these banks.
   {
     fidl::Arena<> fidl_arena;
     fdf::Arena arena('GPIO');

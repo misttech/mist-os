@@ -10,6 +10,7 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
   static const char* kDevicePaths[] = {
       "sys/platform/pt/sherlock",
       "sys/platform/05:04:1/aml-gpio",
+      "sys/platform/05:04:1/aml-gpio/gpio-init",
       "sys/platform/05:00:14/clocks",
       "sys/platform/05:00:1c/aml_light",
       "sys/platform/05:00:2/aml-i2c",

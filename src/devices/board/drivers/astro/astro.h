@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_BOARD_DRIVERS_ASTRO_ASTRO_H_
 #define SRC_DEVICES_BOARD_DRIVERS_ASTRO_ASTRO_H_
 
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/markers.h>
 #include <fuchsia/hardware/clockimpl/cpp/banjo.h>
@@ -133,6 +134,7 @@ class Astro : public AstroType {
   ddk::IommuProtocolClient iommu_;
   ddk::GpioImplProtocolClient gpio_impl_;
   ddk::ClockImplProtocolClient clk_impl_;
+  std::vector<fuchsia_hardware_gpio::wire::InitStep> gpio_init_steps_;
 
   thrd_t thread_;
 };

@@ -165,27 +165,6 @@ static const gpio_pin_t gpio_pins[] = {
     DECL_GPIO_PIN(SOC_EMMC_DS),
 };
 
-static const std::vector<fpbus::Metadata> gpio_metadata{
-    {{
-        .type = DEVICE_METADATA_GPIO_PINS,
-        .data =
-            std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&gpio_pins),
-                                 reinterpret_cast<const uint8_t*>(&gpio_pins) + sizeof(gpio_pins)),
-    }},
-};
-
-static const fpbus::Node gpio_dev = []() {
-  fpbus::Node dev = {};
-  dev.name() = "gpio";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_AMLOGIC_S905D3;
-  dev.did() = PDEV_DID_AMLOGIC_GPIO;
-  dev.mmio() = gpio_mmios;
-  dev.irq() = gpio_irqs;
-  dev.metadata() = gpio_metadata;
-  return dev;
-}();
-
 // The GPIO H device won't be able to provide interrupts for the pins it exposes, so
 // GPIO_SOC_SELINA_IRQ_OUT must be be exposed by the main GPIO device (see the list of pins above)
 // instead of this one.
@@ -244,6 +223,39 @@ static const fpbus::Node gpio_c_dev = []() {
 }();
 
 zx_status_t Nelson::GpioInit() {
+  fuchsia_hardware_gpio::wire::InitMetadata metadata;
+  metadata.steps = fidl::VectorView<fuchsia_hardware_gpio::wire::InitStep>::FromExternal(
+      gpio_init_steps_.data(), gpio_init_steps_.size());
+
+  const fit::result encoded_metadata = fidl::Persist(metadata);
+  if (!encoded_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to encode GPIO init metadata: %s",
+           encoded_metadata.error_value().FormatDescription().c_str());
+    return encoded_metadata.error_value().status();
+  }
+
+  const std::vector<fpbus::Metadata> gpio_metadata{
+      {{
+          .type = DEVICE_METADATA_GPIO_PINS,
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&gpio_pins),
+              reinterpret_cast<const uint8_t*>(&gpio_pins) + sizeof(gpio_pins)),
+      }},
+      {{
+          .type = DEVICE_METADATA_GPIO_INIT,
+          .data = encoded_metadata.value(),
+      }},
+  };
+
+  fpbus::Node gpio_dev;
+  gpio_dev.name() = "gpio";
+  gpio_dev.vid() = PDEV_VID_AMLOGIC;
+  gpio_dev.pid() = PDEV_PID_AMLOGIC_S905D3;
+  gpio_dev.did() = PDEV_DID_AMLOGIC_GPIO;
+  gpio_dev.mmio() = gpio_mmios;
+  gpio_dev.irq() = gpio_irqs;
+  gpio_dev.metadata() = gpio_metadata;
+
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('GPIO');
   auto result = pbus_.buffer(arena)->ProtocolNodeAdd(ZX_PROTOCOL_GPIO_IMPL,
@@ -271,6 +283,8 @@ zx_status_t Nelson::GpioInit() {
     zxlogf(ERROR, "%s: ConfigOut failed: %d", __func__, status);
   }
 
+  // TODO(fxbug.dev/130993): Add GPIO H and GPIO C devices after all init steps have been executed
+  // to ensure that there are no simultaneous accesses to these banks.
   {
     auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, gpio_h_dev));
     if (!result.ok()) {

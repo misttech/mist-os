@@ -88,27 +88,6 @@ static const gpio_pin_t gpio_pins[] = {
     DECL_GPIO_PIN(VIM3_BT_EN),
 };
 
-static const std::vector<fpbus::Metadata> gpio_metadata{
-    {{
-        .type = DEVICE_METADATA_GPIO_PINS,
-        .data =
-            std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&gpio_pins),
-                                 reinterpret_cast<const uint8_t*>(&gpio_pins) + sizeof(gpio_pins)),
-    }},
-};
-
-static const fpbus::Node gpio_dev = []() {
-  fpbus::Node dev = {};
-  dev.name() = "gpio";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_AMLOGIC_A311D;
-  dev.did() = PDEV_DID_AMLOGIC_GPIO;
-  dev.mmio() = gpio_mmios;
-  dev.irq() = gpio_irqs;
-  dev.metadata() = gpio_metadata;
-  return dev;
-}();
-
 fuchsia_driver_framework::CompositeNodeSpec CreateGpioExpanderCompositeNodeSpec() {
   std::vector<fuchsia_driver_framework::BindRule> i2cRules = {
       fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
@@ -163,6 +142,39 @@ fpbus::Node CreateGpioExpanderPbusNode() {
 }
 
 zx_status_t Vim3::GpioInit() {
+  fuchsia_hardware_gpio::wire::InitMetadata metadata;
+  metadata.steps = fidl::VectorView<fuchsia_hardware_gpio::wire::InitStep>::FromExternal(
+      gpio_init_steps_.data(), gpio_init_steps_.size());
+
+  const fit::result encoded_metadata = fidl::Persist(metadata);
+  if (!encoded_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to encode GPIO init metadata: %s",
+           encoded_metadata.error_value().FormatDescription().c_str());
+    return encoded_metadata.error_value().status();
+  }
+
+  const std::vector<fpbus::Metadata> gpio_metadata{
+      {{
+          .type = DEVICE_METADATA_GPIO_PINS,
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&gpio_pins),
+              reinterpret_cast<const uint8_t*>(&gpio_pins) + sizeof(gpio_pins)),
+      }},
+      {{
+          .type = DEVICE_METADATA_GPIO_INIT,
+          .data = encoded_metadata.value(),
+      }},
+  };
+
+  fpbus::Node gpio_dev;
+  gpio_dev.name() = "gpio";
+  gpio_dev.vid() = PDEV_VID_AMLOGIC;
+  gpio_dev.pid() = PDEV_PID_AMLOGIC_A311D;
+  gpio_dev.did() = PDEV_DID_AMLOGIC_GPIO;
+  gpio_dev.mmio() = gpio_mmios;
+  gpio_dev.irq() = gpio_irqs;
+  gpio_dev.metadata() = gpio_metadata;
+
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('GPIO');
   auto result = pbus_.buffer(arena)->ProtocolNodeAdd(ZX_PROTOCOL_GPIO_IMPL,

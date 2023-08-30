@@ -13,6 +13,7 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/00:00:1e/dw-dsi",
 
       "sys/platform/05:06:1/aml-gpio",
+      "sys/platform/05:06:1/aml-gpio/gpio-init",
       "sys/platform/05:06:14/clocks",
       "sys/platform/05:00:2/aml-i2c",
       "sys/platform/05:00:2:2/aml-i2c",

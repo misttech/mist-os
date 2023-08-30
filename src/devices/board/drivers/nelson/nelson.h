@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_BOARD_DRIVERS_NELSON_NELSON_H_
 #define SRC_DEVICES_BOARD_DRIVERS_NELSON_NELSON_H_
 
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fuchsia/hardware/clockimpl/cpp/banjo.h>
 #include <fuchsia/hardware/gpioimpl/cpp/banjo.h>
@@ -159,6 +160,7 @@ class Nelson : public NelsonType {
   ddk::IommuProtocolClient iommu_;
   ddk::GpioImplProtocolClient gpio_impl_;
   ddk::ClockImplProtocolClient clk_impl_;
+  std::vector<fuchsia_hardware_gpio::wire::InitStep> gpio_init_steps_;
 
   thrd_t thread_;
   std::optional<uint32_t> board_rev_;
