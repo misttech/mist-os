@@ -580,8 +580,8 @@ fit::result<std::string> EnsureValidZirconPsOutput(std::string_view ps_output) {
   if (ps_output.find("virtual-console") == std::string::npos) {
     return fit::error("'virtual-console' cannot be found in 'ps' output");
   }
-  if (ps_output.find("base-resolver") == std::string::npos) {
-    return fit::error("'base-resolver' cannot be found in 'ps' output");
+  if (ps_output.find("pkg-cache") == std::string::npos) {
+    return fit::error("'pkg-cache' cannot be found in 'ps' output");
   }
   return fit::ok();
 }
