@@ -399,7 +399,7 @@ performed: ZN->GN migration aka "build unification".
 
 Prior to build unification, Fuchsia had two builds based on GN/Ninja,
 which were called in sequence. The ZN/Ninja build would go first and build
-some artifacts, then the GN/Ninja bould would go second and build
+some artifacts, then the GN/Ninja build would go second and build
 additional artifacts. You could use ZN outputs in GN but not the other way.
 
 The boundary between ZN and GN was drawn around artifacts like the ZBI contents.
