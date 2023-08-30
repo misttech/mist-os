@@ -4,11 +4,21 @@
 
 composite ti_ina231_mlb;
 
+using fuchsia.google.platform;
 using fuchsia.i2c;
+using fuchsia.platform;
 using fuchsia.ti.platform;
 
 primary node "i2c" {
   fuchsia.BIND_FIDL_PROTOCOL == fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE;
   fuchsia.BIND_I2C_BUS_ID == fuchsia.i2c.BIND_I2C_BUS_ID.I2C_3;
   fuchsia.BIND_I2C_ADDRESS == fuchsia.ti.platform.BIND_I2C_ADDRESS.INA231_MLB;
+}
+
+node "pdev" {
+  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.ti.platform.BIND_PLATFORM_DEV_VID.TI;
+  fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.google.platform.BIND_PLATFORM_DEV_PID.NELSON;
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.ti.platform.BIND_PLATFORM_DEV_DID.INA231_MLB;
+  fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID == 0;
 }

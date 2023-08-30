@@ -56,7 +56,9 @@ driver_bind_rules("ti_ina231_mlb_bind") {
   bind_output = "ti_ina231_mlb_bind.bc"
   tests = "bind-tests/ti_ina231_mlb-test.json"
   deps = [
+    "//src/devices/bind/fuchsia.google.platform",
     "//src/devices/bind/fuchsia.i2c",
+    "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.ti.platform",
   ]
 }
@@ -67,7 +69,9 @@ driver_bind_rules("ti_ina231_speakers_bind") {
   bind_output = "ti_ina231_speakers_bind.bc"
   tests = "bind-tests/ti_ina231_speakers-test.json"
   deps = [
+    "//src/devices/bind/fuchsia.google.platform",
     "//src/devices/bind/fuchsia.i2c",
+    "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.ti.platform",
   ]
 }

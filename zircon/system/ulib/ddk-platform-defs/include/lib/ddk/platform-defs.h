@@ -255,9 +255,11 @@
 #define PDEV_DID_TI_LED             0x05
 #define PDEV_DID_TI_TEMPERATURE     0x06
 #define PDEV_DID_TI_TAS5720         0x07
-#define PDEV_DID_TI_INA231          0x08
+// PDEV_DID_TI_INA231 was 0x08
 #define PDEV_DID_TI_TCA6408A        0x09
 #define PDEV_DID_TI_TAS5707         0x0A
+#define PDEV_DID_TI_INA231_MLB      0x0B
+#define PDEV_DID_TI_INA231_SPEAKERS 0x0C
 
 // Test
 #define PDEV_VID_TEST               0x11

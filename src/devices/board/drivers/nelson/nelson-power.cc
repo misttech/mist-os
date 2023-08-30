@@ -22,6 +22,7 @@
 #include "src/devices/board/drivers/nelson/ti_ina231_mlb_bind.h"
 #include "src/devices/board/drivers/nelson/ti_ina231_mlb_proto_bind.h"
 #include "src/devices/board/drivers/nelson/ti_ina231_speakers_bind.h"
+#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 #include "src/devices/power/drivers/ti-ina231/ti-ina231-metadata.h"
 namespace nelson {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -43,6 +44,15 @@ constexpr power_sensor::Ina231Metadata kMlbSensorMetadata = {
     .power_sensor_domain = kPowerSensorDomainMlb,
 };
 
+static const std::vector<fpbus::Metadata> kMlbMetadata{
+    {{
+        .type = DEVICE_METADATA_PRIVATE,
+        .data = std::vector<uint8_t>(
+            reinterpret_cast<const uint8_t*>(&kMlbSensorMetadata),
+            reinterpret_cast<const uint8_t*>(&kMlbSensorMetadata) + sizeof(kMlbSensorMetadata)),
+    }},
+};
+
 constexpr power_sensor::Ina231Metadata kAudioSensorMetadata = {
     .mode = power_sensor::Ina231Metadata::kModeShuntAndBusContinuous,
     .shunt_voltage_conversion_time = power_sensor::Ina231Metadata::kConversionTime332us,
@@ -54,60 +64,66 @@ constexpr power_sensor::Ina231Metadata kAudioSensorMetadata = {
     .power_sensor_domain = kPowerSensorDomainAudio,
 };
 
-constexpr device_metadata_t kMlbMetadata[] = {
-    {
+static const std::vector<fpbus::Metadata> kSpeakersMetadata{
+    {{
         .type = DEVICE_METADATA_PRIVATE,
-        .data = &kMlbSensorMetadata,
-        .length = sizeof(kMlbSensorMetadata),
-    },
-};
-
-constexpr device_metadata_t kAudioMetadata[] = {
-    {
-        .type = DEVICE_METADATA_PRIVATE,
-        .data = &kAudioSensorMetadata,
-        .length = sizeof(kAudioSensorMetadata),
-    },
-};
-
-constexpr zx_device_prop_t props[] = {
-    {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_TI},
-    {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_TI_INA231},
-};
-
-constexpr composite_device_desc_t mlb_power_sensor_dev = {
-    .props = props,
-    .props_count = std::size(props),
-    .fragments = ti_ina231_mlb_fragments,
-    .fragments_count = std::size(ti_ina231_mlb_fragments),
-    .primary_fragment = "i2c",
-    .spawn_colocated = false,
-    .metadata_list = kMlbMetadata,
-    .metadata_count = std::size(kMlbMetadata),
-};
-
-constexpr composite_device_desc_t speakers_power_sensor_dev = {
-    .props = props,
-    .props_count = std::size(props),
-    .fragments = ti_ina231_speakers_fragments,
-    .fragments_count = std::size(ti_ina231_speakers_fragments),
-    .primary_fragment = "i2c",
-    .spawn_colocated = false,
-    .metadata_list = kAudioMetadata,
-    .metadata_count = std::size(kAudioMetadata),
+        .data = std::vector<uint8_t>(
+            reinterpret_cast<const uint8_t*>(&kAudioSensorMetadata),
+            reinterpret_cast<const uint8_t*>(&kAudioSensorMetadata) + sizeof(kAudioSensorMetadata)),
+    }},
 };
 
 zx_status_t Nelson::PowerInit() {
-  zx_status_t status = DdkAddComposite("ti-ina231-mlb", &mlb_power_sensor_dev);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s DdkAddComposite failed %d", __FUNCTION__, status);
-    return status;
+  fpbus::Node mlb_dev;
+  mlb_dev.name() = "ti-ina231-mlb";
+  mlb_dev.vid() = PDEV_VID_TI;
+  mlb_dev.pid() = PDEV_PID_NELSON;
+  mlb_dev.did() = PDEV_DID_TI_INA231_MLB;
+  mlb_dev.metadata() = kMlbMetadata;
+
+  fidl::Arena<> fidl_arena;
+  fdf::Arena mlb_arena('TMLB');
+  fdf::WireUnownedResult result = pbus_.buffer(mlb_arena)->AddComposite(
+      fidl::ToWire(fidl_arena, mlb_dev),
+      platform_bus_composite::MakeFidlFragment(fidl_arena, ti_ina231_mlb_fragments,
+                                               std::size(ti_ina231_mlb_fragments)),
+      "i2c");
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send AddComposite request to platform bus: %s",
+           result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to add ti-ina231-mlb composite to platform device: %s",
+           zx_status_get_string(result->error_value()));
+    return result->error_value();
   }
 
-  if ((status = DdkAddComposite("ti-ina231-speakers", &speakers_power_sensor_dev)) != ZX_OK) {
-    zxlogf(ERROR, "%s DdkAddComposite failed %d", __FUNCTION__, status);
-    return status;
+  fpbus::Node speakers_dev;
+  speakers_dev.name() = "ti-ina231-speakers";
+  speakers_dev.vid() = PDEV_VID_TI;
+  speakers_dev.pid() = PDEV_PID_NELSON;
+  speakers_dev.did() = PDEV_DID_TI_INA231_SPEAKERS;
+  speakers_dev.metadata() = kSpeakersMetadata;
+
+  fdf::Arena speakers_arena('SPKR');
+  result = pbus_.buffer(speakers_arena)
+               ->AddComposite(fidl::ToWire(fidl_arena, speakers_dev),
+                              platform_bus_composite::MakeFidlFragment(
+                                  fidl_arena, ti_ina231_speakers_fragments,
+                                  std::size(ti_ina231_speakers_fragments)),
+                              "i2c");
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send AddComposite request to platform bus: %s",
+           result.status_string());
+    return result.status();
   }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to add ti-ina231-speakers composite to platform device: %s",
+           zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
+
   const ddk::BindRule kGpioRules[] = {
       ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
       ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
@@ -142,10 +158,10 @@ zx_status_t Nelson::PowerInit() {
                         bind_fuchsia_amlogic_platform_s905d3::BIND_POWER_SENSOR_DOMAIN_AUDIO),
   };
 
-  status = DdkAddCompositeNodeSpec("brownout_protection",
-                                   ddk::CompositeNodeSpec(kCodecRules, kCodecProperties)
-                                       .AddParentSpec(kGpioRules, kGpioProperties)
-                                       .AddParentSpec(kPowerSensorRules, kPowerSensorProperties));
+  zx_status_t status = DdkAddCompositeNodeSpec(
+      "brownout_protection", ddk::CompositeNodeSpec(kCodecRules, kCodecProperties)
+                                 .AddParentSpec(kGpioRules, kGpioProperties)
+                                 .AddParentSpec(kPowerSensorRules, kPowerSensorProperties));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s AddCompositeSpec (brownout-protection)  %d", __FUNCTION__, status);
     return status;
