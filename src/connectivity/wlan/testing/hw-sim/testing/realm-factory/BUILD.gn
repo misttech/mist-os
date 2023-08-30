@@ -34,8 +34,11 @@ fuchsia_component("wlan-hw-sim-component") {
   manifest = "meta/wlan-hw-sim.cml"
   deps = [
     "//sdk/lib/driver_test_realm",
+    "//src/connectivity/ethernet/drivers/ethernet/netdevice-migration",
     "//src/connectivity/location/regulatory_region:regulatory_region_component",
-    "//src/connectivity/wlan/testing:wlan_test_driver_deps",
+    "//src/connectivity/network/drivers/network-device",
+    "//src/connectivity/wlan/drivers/wlanphy:wlanphy_driver",
+    "//src/connectivity/wlan/drivers/wlansoftmac:wlansoftmac_driver",
     "//src/connectivity/wlan/wlancfg:service",
     "//src/devices/misc/drivers/test-parent",
     "//src/sys/stash:stash_secure_v2",

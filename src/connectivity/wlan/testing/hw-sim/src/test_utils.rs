@@ -94,9 +94,20 @@ impl TestRealmContext {
             .await
             .expect("Failed to connect to driver test realm");
 
+        let (pkg_client, pkg_server) = create_endpoints();
+        fuchsia_fs::directory::open_channel_in_namespace(
+            "/pkg",
+            fidl_fuchsia_io::OpenFlags::RIGHT_READABLE
+                | fidl_fuchsia_io::OpenFlags::RIGHT_EXECUTABLE,
+            pkg_server,
+        )
+        .expect("Could not open /pkg");
+
         driver_test_realm_proxy
             .start(fidl_driver_test::RealmArgs {
                 use_driver_framework_v2: Some(true),
+                pkg: Some(pkg_client),
+                driver_urls: Some(vec!["fuchsia-pkg://fuchsia.com/#meta/wlantap.cm".to_string()]),
                 ..Default::default()
             })
             .await

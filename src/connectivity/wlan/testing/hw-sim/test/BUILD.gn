@@ -39,7 +39,8 @@ template("_hw_sim_integration_test") {
     testonly = true
     component_name = "test-suite"
     manifest = invoker.manifest
-    deps = invoker.deps
+    deps = invoker.deps +
+           [ "//src/connectivity/wlan/testing/wlantap-driver:wlantap_driver" ]
   }
 
   fuchsia_package(test_suite_package_name) {
