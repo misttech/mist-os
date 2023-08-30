@@ -291,7 +291,7 @@ BtHciBroadcom::GetBdaddrFromBootloader() {
 fpromise::promise<> BtHciBroadcom::LogControllerFallbackBdaddr() {
   return SendCommand(&kReadBdaddrCmd, sizeof(kReadBdaddrCmd))
       .then([](fpromise::result<std::vector<uint8_t>, zx_status_t>& result) {
-        char fallback_addr[] = "<unknown>";
+        char fallback_addr[18] = "<unknown>";
 
         if (result.is_ok() && sizeof(ReadBdaddrCommandComplete) == result.value().size()) {
           ReadBdaddrCommandComplete event;
