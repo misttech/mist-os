@@ -11,6 +11,7 @@ mod kernel_threads;
 mod net;
 mod pid_table;
 mod process_group;
+mod scheduler;
 mod seccomp;
 mod session;
 #[allow(clippy::module_inception)]
@@ -28,6 +29,7 @@ pub use kernel_threads::*;
 pub use net::*;
 pub use pid_table::*;
 pub use process_group::*;
+pub use scheduler::*;
 pub use seccomp::*;
 pub use session::*;
 pub use task::*;
