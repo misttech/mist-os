@@ -32,7 +32,7 @@ zx_status_t ThermalCli::PrintTemperature() {
     fprintf(stderr, "GetTemperatureCelsius failed: %s\n", zx_status_get_string(status));
     return status;
   }
-  printf("Temperature: %0.03f\n", response.temp);
+  printf("Temperature: %0.03f°C\n", response.temp);
   return ZX_OK;
 }
 
