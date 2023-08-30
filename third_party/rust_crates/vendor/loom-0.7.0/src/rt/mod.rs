@@ -59,12 +59,12 @@ pub(crate) use self::vv::VersionVec;
 use tracing::trace;
 
 /// Maximum number of threads that can be included in a model.
-pub const MAX_THREADS: usize = 4;
+pub const MAX_THREADS: usize = 5;
 
 /// Maximum number of atomic store history to track per-cell.
 pub(crate) const MAX_ATOMIC_HISTORY: usize = 7;
 
-pub(crate) fn spawn<F>(f: F) -> crate::rt::thread::Id
+pub(crate) fn spawn<F>(stack_size: Option<usize>, f: F) -> crate::rt::thread::Id
 where
     F: FnOnce() + 'static,
 {
@@ -72,10 +72,13 @@ where
 
     trace!(thread = ?id, "spawn");
 
-    Scheduler::spawn(Box::new(move || {
-        f();
-        thread_done();
-    }));
+    Scheduler::spawn(
+        stack_size,
+        Box::new(move || {
+            f();
+            thread_done();
+        }),
+    );
 
     id
 }
@@ -189,9 +192,31 @@ pub fn thread_done() {
         execution.threads.active_mut().operation = None;
         execution.threads.active_mut().set_terminated();
         let switch = execution.schedule();
-
         trace!(?thread, ?switch, "thread_done: terminate");
-
-        switch
     });
+}
+
+/// Tells loom to explore possible concurrent executions starting at this point.
+pub fn explore() {
+    execution(|execution| {
+        execution.path.explore_state();
+    })
+}
+
+/// Tells loom to stop exploring possible concurrent executions starting at this
+/// point.
+///
+/// Exploration can be enabled again with `explore`.
+pub fn stop_exploring() {
+    execution(|execution| {
+        execution.path.critical();
+    })
+}
+
+/// Tells loom to stop exploring possible concurrent execution starting at this
+/// point.
+///
+/// Unlike `stop_exploring`, exploration cannot be restarted by `explore`.
+pub fn skip_branch() {
+    execution(|execution| execution.path.skip_branch())
 }

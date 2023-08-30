@@ -444,7 +444,7 @@ group("log") {
 }
 
 group("loom") {
-  public_deps = [ ":loom-v0_5_6" ]
+  public_deps = [ ":loom-v0_7_0" ]
   testonly = true
 }
 
@@ -4485,7 +4485,7 @@ rust_library("generator-v0_7_5") {
   ]
 
   visibility = []
-  visibility += [ ":loom-v0_5_6" ]
+  visibility += [ ":loom-v0_7_0" ]
   testonly = true
 }
 
@@ -5726,10 +5726,10 @@ rust_library("log-v0_4_20") {
   visibility = [ ":*" ]
 }
 
-rust_library("loom-v0_5_6") {
+rust_library("loom-v0_7_0") {
   crate_name = "loom"
-  crate_root = "//third_party/rust_crates/vendor/loom-0.5.6/src/lib.rs"
-  output_name = "loom-8008abaee09dc883"
+  crate_root = "//third_party/rust_crates/vendor/loom-0.7.0/src/lib.rs"
+  output_name = "loom-d2c193a75c1dc004"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -5744,8 +5744,8 @@ rust_library("loom-v0_5_6") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=8008abaee09dc883",
-    "-Cextra-filename=-8008abaee09dc883",
+    "-Cmetadata=d2c193a75c1dc004",
+    "-Cextra-filename=-d2c193a75c1dc004",
     "--cfg=feature=\"default\"",
   ]
 
@@ -9669,7 +9669,7 @@ rust_library("scoped-tls-v1_0_1") {
   ]
 
   visibility = []
-  visibility += [ ":loom-v0_5_6" ]
+  visibility += [ ":loom-v0_7_0" ]
   testonly = true
 }
 
