@@ -23,12 +23,14 @@ class TestFileTest(unittest.TestCase):
                 test=TestSection(
                     "my_test",
                     "//src:my_test",
+                    "linux",
                 )
             ).to_dict(),  # type:ignore
             TestEntry(
                 test=TestSection(
                     "my_test2",
                     "//src:my_test2",
+                    "linux",
                 )
             ).to_dict(),  # type:ignore
         ]
@@ -50,12 +52,14 @@ class TestFileTest(unittest.TestCase):
                 test=TestSection(
                     "my_test",
                     "//src:my_test",
+                    "linux",
                 )
             ).to_dict(),  # type:ignore
             TestEntry(
                 test=TestSection(
                     "my_test",
                     "//src:my_test2",
+                    "linux",
                 )
             ).to_dict(),  # type:ignore
         ]

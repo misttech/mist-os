@@ -41,8 +41,12 @@ class TestListFileJoiningTest(unittest.TestCase):
         """Test joining the contents of tests.json and test-list.json into Test objects."""
 
         tests_file = [
-            TestEntry(test=TestSection(name="my_test", label="//src/my_test")),
-            TestEntry(test=TestSection(name="my_test2", label="//src/my_test2")),
+            TestEntry(
+                test=TestSection(name="my_test", label="//src/my_test", os="linux")
+            ),
+            TestEntry(
+                test=TestSection(name="my_test2", label="//src/my_test2", os="linux")
+            ),
         ]
         test_list_file = {
             "my_test": TestListEntry("my_test", tags=[]),
@@ -73,7 +77,9 @@ class TestListFileJoiningTest(unittest.TestCase):
         """It is an error for tests.json to contain a test test-list.json omits."""
 
         tests_file = [
-            TestEntry(test=TestSection(name="my_test", label="//src/my_test")),
+            TestEntry(
+                test=TestSection(name="my_test", label="//src/my_test", os="linux")
+            ),
         ]
         test_list_file: typing.Dict[str, TestListEntry] = {}
 

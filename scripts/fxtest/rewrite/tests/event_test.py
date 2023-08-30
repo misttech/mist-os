@@ -104,10 +104,12 @@ class TestEvents(unittest.IsolatedAsyncioTestCase):
         recorder.emit_test_file_loaded(
             [
                 tests_json_file.TestEntry(
-                    tests_json_file.TestSection("my-test", "//src/my-test")
+                    tests_json_file.TestSection("my-test", "//src/my-test", "linux")
                 ),
                 tests_json_file.TestEntry(
-                    tests_json_file.TestSection("other-test", "//src/other-test")
+                    tests_json_file.TestSection(
+                        "other-test", "//src/other-test", "linux"
+                    )
                 ),
             ],
             "/home/tests.json",
@@ -117,7 +119,9 @@ class TestEvents(unittest.IsolatedAsyncioTestCase):
                 selected=[
                     test_list_file.Test(
                         tests_json_file.TestEntry(
-                            tests_json_file.TestSection("my-test", "//src/my-test")
+                            tests_json_file.TestSection(
+                                "my-test", "//src/my-test", "linux"
+                            )
                         ),
                         test_list_file.TestListEntry("my-test", []),
                     ),

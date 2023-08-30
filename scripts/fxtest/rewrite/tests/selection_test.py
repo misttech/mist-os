@@ -164,6 +164,7 @@ class SelectTestsTest(unittest.TestCase):
                 test=tests_json_file.TestSection(
                     name=f"fuchsia-pkg://fuchsia.com/{package}#meta/{component}.cm",
                     label=f"//{prefix}:{package}($toolchain)",
+                    os="fuchsia",
                     package_url=f"fuchsia-pkg://fuchsia.com/{package}#meta/{component}.cm",
                 )
             ),
@@ -192,6 +193,7 @@ class SelectTestsTest(unittest.TestCase):
                 test=tests_json_file.TestSection(
                     name=f"host_x64/{name}",
                     label=f"//{prefix}:{name}($toolchain)",
+                    os="linux",
                     path=f"host_x64/{name}",
                 )
             ),

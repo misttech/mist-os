@@ -119,7 +119,9 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
 
         test = execution.TestExecution(
             test_list_file.Test(
-                tests_json_file.TestEntry(tests_json_file.TestSection("foo", "//foo")),
+                tests_json_file.TestEntry(
+                    tests_json_file.TestSection("foo", "//foo", "fuchsia")
+                ),
                 test_list_file.TestListEntry(
                     "foo",
                     [],
@@ -166,7 +168,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
         test = execution.TestExecution(
             test_list_file.Test(
                 tests_json_file.TestEntry(
-                    tests_json_file.TestSection("foo", "//foo", parallel=1)
+                    tests_json_file.TestSection("foo", "//foo", "fuchsia", parallel=1)
                 ),
                 test_list_file.TestListEntry(
                     "foo",
@@ -224,7 +226,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
             test = execution.TestExecution(
                 test_list_file.Test(
                     tests_json_file.TestEntry(
-                        tests_json_file.TestSection("foo", "//foo", path="ls")
+                        tests_json_file.TestSection("foo", "//foo", "linux", path="ls")
                     ),
                     test_list_file.TestListEntry("foo", [], execution=None),
                 ),
@@ -281,7 +283,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                 name = f"fuchsia-pkg://fuchsia.com/{name}#meta/test.cm"
                 return test_list_file.Test(
                     tests_json_file.TestEntry(
-                        tests_json_file.TestSection(name, "//foo")
+                        tests_json_file.TestSection(name, "//foo", "linux")
                     ),
                     test_list_file.TestListEntry(
                         name, [], execution=test_list_file.TestListExecutionEntry(name)
