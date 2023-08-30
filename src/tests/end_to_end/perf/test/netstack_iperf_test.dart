@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:logging/logging.dart';
 import 'package:sl4f/sl4f.dart';
 import 'package:sl4f/trace_processing.dart' as trace;
 import 'package:test/test.dart';
@@ -24,6 +25,8 @@ class Stats {
   int lost_packets = 0;
   double jitter_weighted = 0;
 }
+
+final _log = Logger('NetstackIperfBenchmarks');
 
 String unit(String key) {
   switch (key) {
@@ -199,26 +202,33 @@ void main(List<String> args) {
     return results;
   }
 
-  Future<void> startIperfServer(PerfTestHelper helper, int port) async {
-    // Start iperf server on the target device.
-    await helper.sl4fDriver.ssh.start('iperf3 --server --port $port --json',
-        mode: ProcessStartMode.detached);
-
-    // Poll for the server to have started listening for client
-    // connection on the expected port.
+  // Poll for servers to have started listening for client connections on
+  // the expected ports.
+  Future<void> waitIperfServersListening(
+      PerfTestHelper helper, List<int> ports) async {
+    Set<int> portSet = Set.from(ports);
+    final portRegExp = RegExp(r':(\d+)$');
     for (var i = 0; i < 15; i++) {
       await Future.delayed(Duration(seconds: 1));
       final inspect = Inspect(helper.sl4fDriver);
-      final results = await inspect
-          .snapshot(['core/network/netstack:Socket\\ Info/*:LocalAddress']);
+      final results =
+          await inspect.snapshot(['core/network/netstack:Socket\\ Info']);
       if (results != null && results.isNotEmpty) {
         for (var j = 0; j < results.length; j++) {
           if (results[j]['payload'] != null &&
               results[j]['payload']['Socket Info'] != null) {
             for (final entry in results[j]['payload']['Socket Info'].entries) {
-              if (entry.value['LocalAddress'] != null &&
-                  entry.value['LocalAddress'].endsWith(':$port')) {
-                return;
+              if (entry.value['TransportProtocol'] == 'TCP' &&
+                  entry.value['State'] == 'LISTEN' &&
+                  entry.value['LocalAddress'] != null) {
+                final match =
+                    portRegExp.firstMatch(entry.value['LocalAddress']);
+                if (match != null) {
+                  portSet.remove(int.parse(match.group(1)!));
+                  if (portSet.isEmpty) {
+                    return;
+                  }
+                }
               }
             }
           }
@@ -298,13 +308,20 @@ void main(List<String> args) {
     for (var size in msgSizes) {
       var flowCounts = {1, 2, 4};
       for (var flows in flowCounts) {
+        List<String> serverOutputPaths = [];
+        List<int> ports = [];
+        for (int i = 0; i < flows; i++) {
+          final port = firstListenPort + i;
+          final serverOutputPath = '/tmp/iperf_server_$i.json';
+          await helper.sl4fDriver.ssh.start(
+              'iperf3 --server --port $port --json > $serverOutputPath',
+              mode: ProcessStartMode.detached);
+          serverOutputPaths.add(serverOutputPath);
+          ports.add(port);
+        }
+
         try {
-          List<Future<void>> startServerFutures = [];
-          for (int i = 0; i < flows; i++) {
-            startServerFutures
-                .add(startIperfServer(helper, firstListenPort + i));
-          }
-          await Future.wait(startServerFutures);
+          await waitIperfServersListening(helper, ports);
 
           // Start tracing.
           final performance = Performance(helper.sl4fDriver, Dump());
@@ -346,7 +363,7 @@ void main(List<String> args) {
             if (direction == Direction.loopback) {
               var args = cmdArgs.join(' ');
               clientFutures.add(Future(() async {
-                final resultsFile = '/tmp/iperf_results_$i.json';
+                final resultsFile = '/tmp/iperf_client_$i.json';
                 final result = await helper.sl4fDriver.ssh
                     .run('iperf3 $args > $resultsFile');
                 expect(result.exitCode, equals(0),
@@ -387,6 +404,13 @@ void main(List<String> args) {
           ));
         } finally {
           await helper.sl4fDriver.ssh.run('killall iperf3');
+
+          // Download server output files.
+          for (int i = 0; i < serverOutputPaths.length; i++) {
+            await helper.storage
+                .dumpFile(serverOutputPaths[i], 'iperf_server_$i', 'json');
+            await helper.storage.deleteFile(serverOutputPaths[i]);
+          }
         }
       }
     }
