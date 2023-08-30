@@ -123,9 +123,11 @@ SimpleCodecServerInternal<T>::SimpleCodecServerInternal() {
 template <class T>
 zx_status_t SimpleCodecServerInternal<T>::BindClient(zx::channel channel,
                                                      async_dispatcher_t* dispatcher) {
+  // Acquire the lock before creating the new instance in case OnUnbound is called before the
+  // instance has been added to the list.
+  fbl::AutoLock lock(&instances_lock_);
   auto instance = std::make_unique<SimpleCodecServerInstance<SimpleCodecServer>>(std::move(channel),
                                                                                  dispatcher, this);
-  fbl::AutoLock lock(&instances_lock_);
   instances_.push_back(std::move(instance));
   return ZX_OK;
 }
