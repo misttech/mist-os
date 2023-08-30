@@ -7782,14 +7782,6 @@ NOTE(https://fxbug.dev/124980) this slows down some microbenchmarks.
 
 From //src/starnix/kernel/BUILD.gn:17
 
-### starnix_use_fuchsia_mutex
-
-Wheher to use fuchsia_sync::Mutex instead of parking_lot::Mutex.
-
-**Current value (from the default):** `true`
-
-From //src/starnix/kernel/BUILD.gn:20
-
 ### target_cpu
 
 **Current value for `target_cpu = "arm64"`:** `"arm64"`
