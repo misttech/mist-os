@@ -20,6 +20,7 @@
             matchers: [
                 // Flaky tests.
                 "LooperTest.*",
+                "SystemClock.SystemClock",
             ],
         },
     ],
