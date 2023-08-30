@@ -461,7 +461,7 @@ macro_rules! impl_witness {
 a ", $adj, " address. Note that this guarantee is contingent on a correct
 implementation of the [`", stringify!($trait), "`] trait. Since that trait is
 not `unsafe`, `unsafe` code may NOT rely on this guarantee for its soundness."),
-            #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+            #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
             pub struct $type<A>(A);
         }
 

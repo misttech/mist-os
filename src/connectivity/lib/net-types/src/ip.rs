@@ -80,7 +80,7 @@ use crate::{
 
 /// An IP protocol version.
 #[allow(missing_docs)]
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash, PartialOrd, Ord)]
 pub enum IpVersion {
     V4,
     V6,
@@ -127,7 +127,7 @@ impl<I: Ip> Debug for IpVersionMarker<I> {
 /// `IpAddr<SpecifiedAddr<Ipv4Addr>, SpecifiedAddr<Ipv6Addr>>` and
 /// `SpecifiedAddr<IpAddr>`, and similarly for other witness types.
 #[allow(missing_docs)]
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash, PartialOrd, Ord)]
 pub enum IpAddr<V4 = Ipv4Addr, V6 = Ipv6Addr> {
     V4(V4),
     V6(V6),
@@ -715,6 +715,8 @@ pub trait IpAddress:
     Sized
     + Eq
     + PartialEq
+    + PartialOrd
+    + Ord
     + Hash
     + Copy
     + Display
@@ -1442,7 +1444,20 @@ impl Ipv4AddressClass {
 ///     gateway: Ipv4Addr,
 /// }
 /// ```
-#[derive(Copy, Clone, Default, PartialEq, Eq, Hash, FromZeroes, FromBytes, AsBytes, Unaligned)]
+#[derive(
+    Copy,
+    Clone,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    FromZeroes,
+    FromBytes,
+    AsBytes,
+    Unaligned,
+)]
 #[repr(transparent)]
 pub struct Ipv4Addr([u8; 4]);
 
@@ -1687,7 +1702,20 @@ impl Debug for Ipv4Addr {
 /// the same by `Ipv6Addr` as by `<std::net::Ipv6Addr as Display>::fmt`.
 ///
 /// [RFC 5952]: https://datatracker.ietf.org/doc/html/rfc5952
-#[derive(Copy, Clone, Default, PartialEq, Eq, Hash, FromZeroes, FromBytes, AsBytes, Unaligned)]
+#[derive(
+    Copy,
+    Clone,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    FromZeroes,
+    FromBytes,
+    AsBytes,
+    Unaligned,
+)]
 #[repr(transparent)]
 pub struct Ipv6Addr([u8; 16]);
 
