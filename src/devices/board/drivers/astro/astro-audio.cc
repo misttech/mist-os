@@ -31,14 +31,6 @@
 
 // Enables BT PCM audio.
 #define ENABLE_BT
-// Enable DAI mode for BT PCM audio.
-#define ENABLE_DAI_MODE
-
-#ifdef ENABLE_BT
-#ifndef ENABLE_DAI_MODE
-static const device_fragment_t tdm_pcm_fragments[] = {};
-#endif
-#endif
 
 #ifdef TAS2770_CONFIG_PATH
 #include TAS2770_CONFIG_PATH
@@ -73,23 +65,6 @@ static const std::vector<fpbus::Irq> toddr_b_irqs{
         .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
     }},
 };
-
-#ifdef ENABLE_BT
-#ifndef ENABLE_DAI_MODE
-static const std::vector<fpbus::Irq> frddr_a_irqs{
-    {{
-        .irq = S905D2_AUDIO_FRDDR_A,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
-    }},
-};
-static const std::vector<fpbus::Irq> toddr_a_irqs{
-    {{
-        .irq = S905D2_AUDIO_TODDR_A,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
-    }},
-};
-#endif
-#endif
 
 static const std::vector<fpbus::Bti> tdm_btis{
     {{
@@ -240,14 +215,12 @@ zx_status_t Astro::AudioInit() {
         }},
     };
 
-    // Add DAI or controller driver depending on ENABLE_DAI_MODE.
     fpbus::Node tdm_dev;
     tdm_dev.vid() = PDEV_VID_AMLOGIC;
     tdm_dev.pid() = PDEV_PID_AMLOGIC_S905D2;
     tdm_dev.mmio() = audio_mmios;
     tdm_dev.bti() = pcm_out_btis;
     tdm_dev.metadata() = tdm_metadata;
-#ifdef ENABLE_DAI_MODE
     tdm_dev.name() = "astro-pcm-dai-out";
     tdm_dev.did() = PDEV_DID_AMLOGIC_DAI_OUT;
     auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, tdm_dev));
@@ -260,30 +233,6 @@ zx_status_t Astro::AudioInit() {
              zx_status_get_string(result->error_value()));
       return result->error_value();
     }
-#else
-    tdm_dev.name() = "astro-pcm-audio-out";
-    tdm_dev.did() = PDEV_DID_AMLOGIC_TDM;
-    tdm_dev.instance_id() = tdm_instance_id++;
-    tdm_dev.irq() = frddr_a_irqs;
-
-    // TODO(fxb/84194): Migrate to the composite bind rules once dynamic bind rules are
-    // available.
-    auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
-        fidl::ToWire(fidl_arena, tdm_dev),
-        platform_bus_composite::MakeFidlFragment(fidl_arena, tdm_pcm_fragments,
-                                                 std::size(tdm_pcm_fragments)),
-        {});
-    if (!result.ok()) {
-      zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Audio(tdm_dev) request failed: %s",
-             __func__, result.FormatDescription().data());
-      return result.status();
-    }
-    if (result->is_error()) {
-      zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Audio(tdm_dev) failed: %s", __func__,
-             zx_status_get_string(result->error_value()));
-      return result->error_value();
-    }
-#endif
   }
 #endif
   // Add TDM OUT to the codec.
@@ -427,28 +376,15 @@ zx_status_t Astro::AudioInit() {
                 reinterpret_cast<const uint8_t*>(&metadata) + sizeof(metadata)),
         }},
     };
-    // Add DAI or controller driver depending on ENABLE_DAI_MODE.
     fpbus::Node tdm_dev;
     tdm_dev.vid() = PDEV_VID_AMLOGIC;
     tdm_dev.pid() = PDEV_PID_AMLOGIC_S905D2;
     tdm_dev.mmio() = audio_mmios;
     tdm_dev.bti() = pcm_in_btis;
     tdm_dev.metadata() = tdm_metadata;
-#ifdef ENABLE_DAI_MODE
     tdm_dev.name() = "astro-pcm-dai-in";
     tdm_dev.did() = PDEV_DID_AMLOGIC_DAI_IN;
     auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, tdm_dev));
-#else
-    tdm_dev.name() = "astro-pcm-audio-in";
-    tdm_dev.did() = PDEV_DID_AMLOGIC_TDM;
-    tdm_dev.instance_id() = tdm_instance_id++;
-    tdm_dev.irq() = toddr_a_irqs;
-    auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
-        fidl::ToWire(fidl_arena, tdm_dev),
-        platform_bus_composite::MakeFidlFragment(fidl_arena, tdm_pcm_fragments,
-                                                 std::size(tdm_pcm_fragments)),
-        nullptr);
-#endif
     if (!result.ok()) {
       zxlogf(ERROR, "%s: NodeAdd request failed: %s", __func__, result.FormatDescription().data());
       return result.status();
