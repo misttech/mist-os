@@ -265,8 +265,10 @@ closed protocol RealmQuery {
         iterator client_end:InstanceIterator;
     }) error GetAllInstancesError;
 
-    /// Constructs the namespace of an instance exactly as it would be given to the component's
-    /// runner.
+    /// Constructs the namespace of an instance as determined by its use declarations.
+    /// This is usually identical to what would be given to the component's runner on
+    /// component start time, unless overridden or extended by
+    /// `fuchsia.component/StartChildArgs.namespace_entries`.
     @available(added=11)
     strict ConstructNamespace(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
