@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import tempfile
+import typing
 import unittest
 
 from parameterized import parameterized
@@ -19,6 +20,22 @@ import tests_json_file
 
 
 class TestExecution(unittest.IsolatedAsyncioTestCase):
+    def assertContainsSublist(
+        self, target: typing.List[typing.Any], data: typing.List[typing.Any]
+    ):
+        """Helper method to assert that one list is contained in the other, in order.
+
+        Args:
+            target (typing.List[typing.Any]): The sublist to search for.
+            data (typing.List[typing.Any]): The list to search in.
+        """
+        self.assertNotEqual(len(target), 0, "Target list cannot be empty")
+        starts = [i for i, v in enumerate(data) if v == target[0]]
+        for start_index in starts:
+            if data[start_index : start_index + len(target)] == target:
+                return
+        self.assertTrue(False, f"List {target} is not a sublist of {data}")
+
     async def test_run_command(self):
         """Test that run_command works with and without events"""
         with tempfile.TemporaryDirectory() as tmp:
@@ -60,9 +77,40 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any([e.error is not None for e in events]))
 
     @parameterized.expand(
-        [([], ["--max-severity-logs", "INFO"]), (["--no-restrict-logs"], [])]
+        [
+            (
+                "with default log severity",
+                [],
+                [["--max-severity-logs", "INFO"]],
+                [],
+            ),
+            (
+                "without log restriction",
+                ["--no-restrict-logs"],
+                [],
+                ["--max-severity-logs"],
+            ),
+            (
+                "with default to not run disabled tests",
+                [],
+                [],
+                ["--run-disabled"],
+            ),
+            (
+                "with disabled tests running",
+                ["--also-run-disabled-tests"],
+                [["--run-disabled"]],
+                [],
+            ),
+        ]
     )
-    async def test_test_execution_component(self, flag_list, expected_log_args):
+    async def test_test_execution_component(
+        self,
+        _unused_name,
+        flag_list: typing.List[str],
+        expected_present_flag_lists: typing.List[typing.List[str]],
+        expected_not_present_flags: typing.List[str],
+    ):
         """Test the usage of the TestExecution wrapper on a component test"""
 
         exec_env = environment.ExecutionEnvironment(
@@ -87,16 +135,22 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
             args.parse_args(flag_list + ["--no-use-package-hash"]),
         )
 
-        self.assertListEqual(
-            test.command_line(),
-            ["fx", "ffx", "test", "run", "--realm", "foo_tests"]
-            + expected_log_args
-            + [
-                "--min-severity-logs",
-                "TRACE",
-                "fuchsia-pkg://fuchsia.com/foo#meta/foo_test.cm",
-            ],
+        command_line = test.command_line()
+        self.assertContainsSublist(
+            ["fx", "ffx", "test", "run", "--realm", "foo_tests"], command_line
         )
+        self.assertContainsSublist(["--min-severity-logs", "TRACE"], command_line)
+        self.assertContainsSublist(
+            ["fuchsia-pkg://fuchsia.com/foo#meta/foo_test.cm"], command_line
+        )
+
+        for expected_flag_list in expected_present_flag_lists:
+            self.assertContainsSublist(expected_flag_list, command_line)
+        for not_present_flag in expected_not_present_flags:
+            self.assertFalse(
+                not_present_flag in command_line,
+                f"Expected {not_present_flag} to not be in {command_line}",
+            )
 
         self.assertFalse(test.is_hermetic())
         self.assertIsNone(test.environment())

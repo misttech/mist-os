@@ -37,6 +37,7 @@ class Flags:
     fail: bool
     use_package_hash: bool
     restrict_logs: bool
+    also_run_disabled_tests: bool
 
     output: bool
     simple: bool
@@ -223,6 +224,12 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
         action=argparse.BooleanOptionalAction,
         help="If False, do not limit maximum log severity regardless of the test's configuration. Default is True.",
         default=True,
+    )
+    execution.add_argument(
+        "--also-run-disabled-tests",
+        action="store_true",
+        help="If True, also run tests that are disabled by the test author. This only affects test components. Default is False.",
+        default=False,
     )
 
     output = parser.add_argument_group("Output Options")
