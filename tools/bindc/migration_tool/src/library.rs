@@ -52,7 +52,7 @@ impl Library {
             Library::Amlogic => "//src/devices/bind/fuchsia.amlogic.platform",
             Library::Bluetooth => "//src/devices/bind/fuchsia.bluetooth",
             Library::Clock => "//src/devices/bind/fuchsia.hardware.clock",
-            Library::Dsi => "//src/devices/bind/fuchsia.hardware.dsi",
+            Library::Dsi => "//src/devices/bind/fuchsia.display.dsi",
             Library::Gpio => "//src/devices/bind/fuchsia.gpio",
             Library::I2c => "//src/devices/bind/fuchsia.i2c",
             Library::Pci => "//src/devices/bind/fuchsia.pci",
@@ -240,7 +240,7 @@ pub fn rename_and_add<'a>(libraries: &mut HashSet<Library>, original: &'a str) -
         }
         "ZX_PROTOCOL_DSI_IMPL" => {
             libraries.insert(Library::Dsi);
-            "fuchsia.hardware.dsi.BIND_PROTOCOL.IMPL"
+            "fuchsia.display.dsi.BIND_PROTOCOL.IMPL"
         }
         "ZX_PROTOCOL_SYSMEM" => {
             libraries.insert(Library::Sysmem);

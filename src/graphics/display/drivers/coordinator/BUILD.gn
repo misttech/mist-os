@@ -9,7 +9,7 @@ driver_bind_rules("coordinator_bind") {
   rules = "coordinator.bind"
   bind_output = "display-coordinator.bindbc"
   tests = "bind_tests.json"
-  deps = [ "//src/devices/bind/fuchsia.hardware.display" ]
+  deps = [ "//src/devices/bind/fuchsia.display" ]
 }
 
 fuchsia_driver("coordinator-driver") {

@@ -17,9 +17,9 @@
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/amlogic/platform/t931/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/display/dsi/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/amlogiccanvas/cpp/bind.h>
-#include <bind/fuchsia/hardware/dsi/cpp/bind.h>
 #include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <ddk/metadata/display.h>
 #include <soc/aml-t931/t931-gpio.h>
@@ -137,12 +137,11 @@ zx_status_t Sherlock::DisplayInit() {
   }();
 
   std::vector<fuchsia_driver_framework::BindRule> dsi_bind_rules{
-      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                              bind_fuchsia_hardware_dsi::BIND_PROTOCOL_IMPL),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_display_dsi::BIND_PROTOCOL_IMPL),
   };
 
   std::vector<fuchsia_driver_framework::NodeProperty> dsi_properties{
-      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_dsi::BIND_PROTOCOL_IMPL),
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_display_dsi::BIND_PROTOCOL_IMPL),
   };
 
   std::vector<fuchsia_driver_framework::BindRule> gpio_bind_rules{

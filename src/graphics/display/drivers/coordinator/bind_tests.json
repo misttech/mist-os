@@ -8,7 +8,7 @@
     },
     {
         "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.hardware.display.BIND_PROTOCOL.CONTROLLER_IMPL"
+            "fuchsia.BIND_PROTOCOL": "fuchsia.display.BIND_PROTOCOL.CONTROLLER_IMPL"
         },
         "expected": "match",
         "name": "Display"

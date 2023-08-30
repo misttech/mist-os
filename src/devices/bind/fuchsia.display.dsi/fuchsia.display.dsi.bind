@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-library fuchsia.hardware.dsi;
+library fuchsia.display.dsi;
 
 extend uint fuchsia.BIND_PROTOCOL {
-  IMPL = 109,
-  DEVICE = 148,
-  BASE = 150,
+  IMPL = 0x6D,
+  DEVICE = 0x94,
+  BASE = 0x96,
 };

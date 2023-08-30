@@ -5,7 +5,7 @@
 composite display;
 
 using fuchsia.hardware.amlogiccanvas;
-using fuchsia.hardware.dsi;
+using fuchsia.display.dsi;
 using fuchsia.hdmi;
 using fuchsia.gpio;
 using fuchsia.platform;
@@ -20,7 +20,7 @@ using fuchsia.amlogic.platform;
 // As a result, the driver implementing DsiImpl protocol has to be a "primary"
 // ancestor of amlogic-display and they must be colocated in the same devhost.
 primary node "dsi" {
-  fuchsia.BIND_PROTOCOL == fuchsia.hardware.dsi.BIND_PROTOCOL.IMPL;
+  fuchsia.BIND_PROTOCOL == fuchsia.display.dsi.BIND_PROTOCOL.IMPL;
 }
 
 node "pdev" {
