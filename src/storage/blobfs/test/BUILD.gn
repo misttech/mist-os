@@ -10,6 +10,7 @@ import("//src/storage/testing/decompressor_wrapper.gni")
 group("test") {
   testonly = true
   deps = [
+    ":blobfs-fuzzers",
     ":blobfs-unittest-package",
     ":blobfs_host($host_toolchain)",
     "integration:tests",
@@ -151,4 +152,24 @@ test("blobfs_host") {
     "//src/storage/blobfs",
     "//third_party/googletest:gtest",
   ]
+}
+
+fuchsia_library_fuzzer("blob-fuzzer") {
+  sources = [ "unit/blob_fuzzer.cc" ]
+  deps = [
+    ":test_utils",
+    "//src/lib/storage/block_client/cpp:fake_device",
+    "//src/storage/blobfs",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+  ]
+}
+
+fuchsia_fuzzer_component("blob-fuzzer-component") {
+  manifest = "meta/blob_fuzzer.cml"
+  deps = [ ":blob-fuzzer" ]
+}
+
+fuchsia_fuzzer_package("blobfs-fuzzers") {
+  cpp_fuzzer_components = [ ":blob-fuzzer-component" ]
 }
