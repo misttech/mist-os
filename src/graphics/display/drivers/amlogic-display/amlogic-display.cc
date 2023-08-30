@@ -13,6 +13,7 @@
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
+#include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fit/defer.h>
@@ -98,6 +99,45 @@ ColorSpaceConversionMode GetColorSpaceConversionMode(VoutType vout_type) {
       return ColorSpaceConversionMode::kRgbInternalYuvOut;
     default:
       ZX_ASSERT_MSG(false, "Invalid VoutType: %d", static_cast<int>(vout_type));
+  }
+}
+
+bool GetFullHardwareResetFromKernelCommandLine(zx_device_t* device) {
+  std::array<char, 8> option;
+  std::fill(option.begin(), option.end(), 0);
+  size_t actual_option_size = 0;
+
+  static const char kKernelCommandOption[] = "driver.amlogic_display.full_hardware_reset";
+  constexpr bool kDefaultValue = false;
+
+  zx_status_t status = device_get_variable(device, kKernelCommandOption, option.data(),
+                                           option.size(), &actual_option_size);
+  switch (status) {
+    case ZX_OK: {
+      std::string_view option_str(option.data(), strnlen(option.data(), actual_option_size));
+      zxlogf(TRACE, "Found kernel command option %s: %s", kKernelCommandOption, option_str.data());
+      // It's specified in "Zircon Kernel Command Line Options" documentation
+      // (//docs/reference/kernel/kernel_cmdline.md) that for boolean options,
+      // "0", "false" and "off" will disable the option and any other form will
+      // enable it.
+      //
+      // TODO(fxbug.dev/132908): Use a common library to check boolean values
+      // of a kernel command argument.
+      return option_str != "0" && option_str != "false" && option_str != "off";
+    }
+    case ZX_ERR_BUFFER_TOO_SMALL:
+      // The argument string is longer than 8 bytes, so it must contain a value
+      // that maps to true.
+      return true;
+    case ZX_ERR_NOT_FOUND: {
+      zxlogf(INFO, "Kernel command option %s not found. Fallback to default value (%d).",
+             kKernelCommandOption, kDefaultValue);
+      return kDefaultValue;
+    }
+    default:
+      zxlogf(ERROR, "Failed to read kernel command option %s: %s. Fallback to default value (%d).",
+             kKernelCommandOption, zx_status_get_string(status), kDefaultValue);
+      return kDefaultValue;
   }
 }
 
@@ -1429,8 +1469,9 @@ zx_status_t AmlogicDisplay::Bind() {
   // attempt to complete a seamless takeover. If we previously owned the
   // hardware, our driver must have been unloaded and reloaded.
   // We currently do a full hardware reset in that case.
-  const bool reset_display_engine = !vpu_->CheckAndClaimHardwareOwnership();
-  if (reset_display_engine) {
+  const bool performs_full_hardware_reset = GetFullHardwareResetFromKernelCommandLine(parent()) ||
+                                            !vpu_->CheckAndClaimHardwareOwnership();
+  if (performs_full_hardware_reset) {
     fbl::AutoLock lock(&display_mutex_);
     zx::result<> reset_result = ResetDisplayEngine();
     if (!reset_result.is_ok()) {

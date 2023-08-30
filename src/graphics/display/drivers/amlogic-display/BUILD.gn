@@ -6,6 +6,7 @@ import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
+import("//build/zbi/kernel_cmdline.gni")
 
 driver_bind_rules("amlogic_display_bind") {
   rules = "amlogic-display.bind"
@@ -160,4 +161,8 @@ fuchsia_unittest_package("amlogic-display-test-package") {
 fuchsia_unittest_package("amlogic-clock-test-package") {
   package_name = "amlogic-clock-test"
   deps = [ ":clock-test" ]
+}
+
+kernel_cmdline("full-hardware-reset") {
+  args = [ "driver.amlogic_display.full_hardware_reset=true" ]
 }

@@ -125,6 +125,16 @@ ZIRCON\_DRIVER macro. It is not, for example, the name of the device, which for
 some drivers is almost identical, except that the device may be named "foo-bar"
 whereas the driver name must use underscores, e.g., "foo_bar".
 
+## driver.amlogic_display.full_hardware_reset=\<bool>
+
+Most boot software performs basic display engine initialization, in order to
+show a splash screen or textual information. By default, Fuchsia display
+drivers seamlessly take over the display engine, avoiding display glitches
+and reducing boot time. When this option is true, the amlogic-display driver
+will perform a full hardware reset and reinitialize the hardware from scratch.
+This may eliminate display errors caused by bugs in the seamless takeover
+logic.
+
 ## driver.sysmem.protected_memory_size=\<num>
 
 Overrides the board-driver-specified size for sysmem's default protected memory
