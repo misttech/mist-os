@@ -17,40 +17,25 @@
 namespace scenic_impl {
 namespace gfx {
 
-void ObjectLinkerBase::Link::LinkInvalidated(bool on_destruction) {
+void ObjectLinkerBase::Link::LinkInvalidatedLocked(bool on_destruction) {
   if (link_invalidated_) {
-    auto link_invalidated_fn = std::move(link_invalidated_);
+    // link_invalidated_ will be reset to nullptr; this way we can avoid
+    // assignment operators to |link_validated_|.
+    auto link_invalidated = std::move(link_invalidated_);
     link_invalidated_ = [](auto) {};
-    // The `std::move(link_invalidated_fn)` is crucial to avoid a subtle race condition when objects
-    // can be destroyed on the wrong thread.  Without the `std::move`, the closure is copied.
-    // Rarely, this thread will be descheduled before the task runs on a different thread.
-    // In other words, `link_invalidated_fn` will outlive the version copied into the task closure.
-    // Then, when this thread next runs, `link_invalidated_fn` is destroyed, and if it contains any
-    // captured objects that were supposed to be destroyed on another thread (e.g. shared_ptr to
-    // whatever), then they are destroyed on this thread instead.  Oops!
-    ExecuteOrPostTaskOnDispatcher(
-        [link_invalidated = std::move(link_invalidated_fn), on_destruction]() {
-          // Doesn't need to be locked because the closure/argument are no longer owned by the Link.
-          link_invalidated(on_destruction);
-        });
+    link_invalidated(on_destruction);
   }
 }
 
-void ObjectLinkerBase::Link::LinkUnresolved() {
+void ObjectLinkerBase::Link::LinkUnresolvedLocked() {
   if (link_invalidated_) {
-    ExecuteOrPostTaskOnDispatcher([link_invalidated = link_invalidated_]() {
-      // Doesn't need to be locked because the closure/argument are no longer owned by the Link.
-      link_invalidated(false);
-    });
+    // It's janky that we need to copy the closure before invoking it, but if we don't then there is
+    // a crash when the mutable closure from `flatland::LinkSystem::CreateLinkToChild/Parent()` is
+    // run a second time.  For unknown reasons, this causes the `ChildView/ParentViewportWatcher` to
+    // be destroyed on the wrong dispatcher (as evidenced by a CHECK in the watcher's destructor).
+    auto link_invalidated = link_invalidated_;
+    link_invalidated(false);
   }
-}
-
-void ObjectLinkerBase::Link::ExecuteOrPostTaskOnDispatcher(fit::closure handler) {
-  if (dispatcher_holder_ && async_get_default_dispatcher() != dispatcher_holder_->dispatcher()) {
-    async::PostTask(dispatcher_holder_->dispatcher(), std::move(handler));
-    return;
-  }
-  handler();
 }
 
 size_t ObjectLinkerBase::UnresolvedExportCount() {
@@ -316,7 +301,7 @@ zx::handle ObjectLinkerBase::ReleaseToken(zx_koid_t endpoint_id, bool is_import)
   // Signal that the link is now unresolved, then re-create the peer death waiter to flag the
   // endpoint as unresolved.
   if (peer_endpoint_iter->second.link) {
-    peer_endpoint_iter->second.link->LinkUnresolved();
+    peer_endpoint_iter->second.link->LinkUnresolvedLocked();
   }
 
   peer_endpoint_iter->second.peer_death_waiter =

@@ -19,6 +19,7 @@
 
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/ui/scenic/lib/gfx/tests/error_reporting_test.h"
+#include "src/ui/scenic/lib/utils/dispatcher_holder.h"
 
 namespace scenic_impl {
 namespace gfx {
@@ -900,40 +901,22 @@ TEST_F(ObjectLinkerTest, CallbacksRunOnCorrectDispatcher) {
   {
     TestObjectLinker::ImportLink import_link = object_linker_->CreateImport(
         std::move(import_obj), std::move(import_token), error_reporter());
-    import_link.Initialize(
-        [&](TestExportObj obj) {
-          EXPECT_EQ(async_get_default_dispatcher(), import_loop.dispatcher());
-          ++export_linked;
-        },
-        [&](bool on_link_destruction) {
-          EXPECT_EQ(async_get_default_dispatcher(), import_loop.dispatcher());
-          ++import_disconnected;
-        },
-        std::make_shared<utils::UnownedDispatcherHolder>(import_loop.dispatcher()));
+    import_link.Initialize([&](TestExportObj obj) { ++export_linked; },
+                           [&](bool on_link_destruction) { ++import_disconnected; });
 
     TestObjectLinker::ExportLink export_link = object_linker_->CreateExport(
         std::move(export_obj), std::move(export_token), error_reporter());
     export_link.Initialize([&](TestImportObj obj) { ++import_linked; },
                            [&](bool on_link_destruction) { ++export_disconnected; });
 
-    // link_resolved callback should run immediately.
+    // Both link_resolved callbacks should run immediately.
     RunLoopUntilIdle();
-    EXPECT_EQ(1u, import_linked);
-    EXPECT_EQ(0u, export_linked);
-
-    // Run link_resolved callback on |import_loop|.
-    EXPECT_TRUE(import_loop.RunUntilIdle());
     EXPECT_EQ(1u, import_linked);
     EXPECT_EQ(1u, export_linked);
     EXPECT_EQ(0u, import_disconnected);
     EXPECT_EQ(0u, export_disconnected);
   }
-  // link_invalidated callback should run immediately.
-  EXPECT_EQ(0u, import_disconnected);
-  EXPECT_EQ(1u, export_disconnected);
-
-  // Run link_invalidated callbacks on |import_loop|.
-  EXPECT_TRUE(import_loop.RunUntilIdle());
+  // Both link_invalidated callbacks should run immediately.
   EXPECT_EQ(1u, import_disconnected);
   EXPECT_EQ(1u, export_disconnected);
 }
@@ -952,23 +935,19 @@ TEST_F(ObjectLinkerTest, LinkOnTwoThreads) {
   auto& import_loop = import_loop_holder->loop();
   auto status = import_loop.StartThread();
   EXPECT_EQ(status, ZX_OK);
-  status = async::PostTask(
-      import_loop.dispatcher(), [this, &import_link, &import_loop, import_loop_holder,
-                                 import_token = std::move(import_token), &export_linked]() mutable {
-        TestImportObj import_obj(kImportValue);
-        import_link = object_linker_->CreateImport(std::move(import_obj), std::move(import_token),
-                                                   error_reporter());
-        import_link.Initialize(
-            [&import_loop, &export_linked](TestExportObj obj) {
-              EXPECT_EQ(async_get_default_dispatcher(), import_loop.dispatcher());
-              ++export_linked;
-              import_loop.Quit();
-            },
-            [&import_loop](bool on_link_destruction) {
-              EXPECT_EQ(async_get_default_dispatcher(), import_loop.dispatcher());
-            },
-            import_loop_holder);
-      });
+  status = async::PostTask(import_loop.dispatcher(),
+                           [this, &import_link, &import_loop,
+                            import_token = std::move(import_token), &export_linked]() mutable {
+                             TestImportObj import_obj(kImportValue);
+                             import_link = object_linker_->CreateImport(
+                                 std::move(import_obj), std::move(import_token), error_reporter());
+                             import_link.Initialize(
+                                 [&import_loop, &export_linked](TestExportObj obj) {
+                                   ++export_linked;
+                                   import_loop.Quit();
+                                 },
+                                 [](bool on_link_destruction) {});
+                           });
   EXPECT_EQ(status, ZX_OK);
 
   // Start a new thread that initializes export link.
@@ -978,23 +957,19 @@ TEST_F(ObjectLinkerTest, LinkOnTwoThreads) {
   auto& export_loop = export_loop_holder->loop();
   status = export_loop.StartThread();
   EXPECT_EQ(status, ZX_OK);
-  status = async::PostTask(
-      export_loop.dispatcher(), [this, &export_link, &export_loop, export_loop_holder,
-                                 export_token = std::move(export_token), &import_linked]() mutable {
-        TestExportObj export_obj(kExportValue);
-        export_link = object_linker_->CreateExport(std::move(export_obj), std::move(export_token),
-                                                   error_reporter());
-        export_link.Initialize(
-            [&export_loop, &import_linked](TestImportObj obj) {
-              EXPECT_EQ(async_get_default_dispatcher(), export_loop.dispatcher());
-              ++import_linked;
-              export_loop.Quit();
-            },
-            [&export_loop](bool on_link_destruction) {
-              EXPECT_EQ(async_get_default_dispatcher(), export_loop.dispatcher());
-            },
-            export_loop_holder);
-      });
+  status = async::PostTask(export_loop.dispatcher(),
+                           [this, &export_link, &export_loop,
+                            export_token = std::move(export_token), &import_linked]() mutable {
+                             TestExportObj export_obj(kExportValue);
+                             export_link = object_linker_->CreateExport(
+                                 std::move(export_obj), std::move(export_token), error_reporter());
+                             export_link.Initialize(
+                                 [&export_loop, &import_linked](TestImportObj obj) {
+                                   ++import_linked;
+                                   export_loop.Quit();
+                                 },
+                                 [](bool on_link_destruction) {});
+                           });
   EXPECT_EQ(status, ZX_OK);
 
   // We should have a link after threads finish.
@@ -1020,16 +995,15 @@ TEST_F(ObjectLinkerTest, LinkAndThenDisconnectOnTwoThreads) {
   auto& import_loop = import_loop_holder->loop();
   auto status = import_loop.StartThread();
   EXPECT_EQ(status, ZX_OK);
-  status = async::PostTask(
-      import_loop.dispatcher(),
-      [this, &import_link, &import_loop, import_loop_holder, import_token = std::move(import_token),
-       &export_linked, &import_disconnected]() mutable {
+  status =
+      async::PostTask(import_loop.dispatcher(), [this, &import_link, &import_loop,
+                                                 import_token = std::move(import_token),
+                                                 &export_linked, &import_disconnected]() mutable {
         TestImportObj import_obj(kImportValue);
         import_link = object_linker_->CreateImport(std::move(import_obj), std::move(import_token),
                                                    error_reporter());
         import_link.Initialize(
             [&import_link, &import_loop, &export_linked](TestExportObj obj) {
-              EXPECT_EQ(async_get_default_dispatcher(), import_loop.dispatcher());
               ++export_linked;
               // Post a task after linking is completed to release token to cause disconnect.
               auto status = async::PostTask(import_loop.dispatcher(),
@@ -1037,11 +1011,9 @@ TEST_F(ObjectLinkerTest, LinkAndThenDisconnectOnTwoThreads) {
               EXPECT_EQ(status, ZX_OK);
             },
             [&import_loop, &import_disconnected](bool on_link_destruction) {
-              EXPECT_EQ(async_get_default_dispatcher(), import_loop.dispatcher());
               ++import_disconnected;
               import_loop.Quit();
-            },
-            import_loop_holder);
+            });
       });
   EXPECT_EQ(status, ZX_OK);
 
@@ -1052,25 +1024,19 @@ TEST_F(ObjectLinkerTest, LinkAndThenDisconnectOnTwoThreads) {
   auto& export_loop = export_loop_holder->loop();
   status = export_loop.StartThread();
   EXPECT_EQ(status, ZX_OK);
-  status = async::PostTask(
-      export_loop.dispatcher(),
-      [this, &export_link, &export_loop, export_loop_holder, export_token = std::move(export_token),
-       &import_linked, &export_disconnected]() mutable {
-        TestExportObj export_obj(kExportValue);
-        export_link = object_linker_->CreateExport(std::move(export_obj), std::move(export_token),
-                                                   error_reporter());
-        export_link.Initialize(
-            [&export_loop, &import_linked](TestImportObj obj) {
-              EXPECT_EQ(async_get_default_dispatcher(), export_loop.dispatcher());
-              ++import_linked;
-            },
-            [&export_loop, &export_disconnected](bool on_link_destruction) {
-              EXPECT_EQ(async_get_default_dispatcher(), export_loop.dispatcher());
-              ++export_disconnected;
-              export_loop.Quit();
-            },
-            export_loop_holder);
-      });
+  status = async::PostTask(export_loop.dispatcher(), [this, &export_link, export_loop_holder,
+                                                      export_token = std::move(export_token),
+                                                      &import_linked,
+                                                      &export_disconnected]() mutable {
+    TestExportObj export_obj(kExportValue);
+    export_link = object_linker_->CreateExport(std::move(export_obj), std::move(export_token),
+                                               error_reporter());
+    export_link.Initialize([&import_linked](TestImportObj obj) { ++import_linked; },
+                           [export_loop_holder, &export_disconnected](bool on_link_destruction) {
+                             ++export_disconnected;
+                             export_loop_holder->loop().Quit();
+                           });
+  });
   EXPECT_EQ(status, ZX_OK);
 
   // We should have linked and disconnected after threads execute.

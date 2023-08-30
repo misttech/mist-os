@@ -1534,7 +1534,7 @@ void Flatland::ReleaseViewport(
     FX_DCHECK(content_released);
   }
 
-  // Move the old child link into the delayed operation so that the ContentId is immeditely free
+  // Move the old child link into the delayed operation so that the ContentId is immediately free
   // for re-use, but it doesn't get deleted until after the new UberStruct is published.
   auto link_to_child = std::move(link_data);
   links_to_children_.erase(content_kv->second);

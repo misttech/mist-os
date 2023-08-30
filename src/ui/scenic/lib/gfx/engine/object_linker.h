@@ -21,7 +21,6 @@
 #include "src/lib/fxl/macros.h"
 #include "src/lib/fxl/memory/weak_ptr.h"
 #include "src/ui/scenic/lib/scenic/util/error_reporter.h"
-#include "src/ui/scenic/lib/utils/dispatcher_holder.h"
 
 namespace scenic_impl {
 namespace gfx {
@@ -60,16 +59,10 @@ class ObjectLinkerBase {
     // invalid and therefore allowing for the deletion of the |link_invalidated_| callback.
     // Unresolving a link means its peer's token was released and may be used again, so the callback
     // is called but not deleted.
-    void LinkInvalidated(bool on_destruction);
-    void LinkUnresolved();
-
-    // Helper method used for posting tasks on |dispatcher_holder_|, unless the method is already
-    // called on that dispatcher. Mainly used for multi-threaded ObjectLinker where there is no
-    // guarantee on which thread linking is completed.
-    void ExecuteOrPostTaskOnDispatcher(fit::closure handler);
+    void LinkInvalidatedLocked(bool on_destruction);
+    void LinkUnresolvedLocked();
 
     std::function<void(bool on_destruction)> link_invalidated_;
-    std::shared_ptr<utils::DispatcherHolder> dispatcher_holder_;
 
     friend class ObjectLinkerBase;
   };
@@ -264,11 +257,8 @@ class ObjectLinker : public ObjectLinkerBase,
     // The |link_invalidated| event is guaranteed to be called regardless of
     // whether or not the |link_resolved| callback is, including if this Link
     // is destroyed, in which case |on_destruction| will be true.
-    // If |dispatcher_holder| is given, these callbacks will be guaranteed to run on this
-    // dispatcher. Otherwise, it may be run on any dispatcher where the work is completed.
     void Initialize(std::function<void(PeerObj peer_object)> link_resolved = nullptr,
-                    std::function<void(bool on_destruction)> link_invalidated = nullptr,
-                    std::shared_ptr<utils::DispatcherHolder> dispatcher_holder = nullptr);
+                    std::function<void(bool on_destruction)> link_invalidated = nullptr);
 
     // Releases the zx::handle for this link, allowing the caller to establish a new link with it.
     //
@@ -365,7 +355,6 @@ auto ObjectLinker<Export, Import>::Link<is_import>::operator=(Link&& other) -> L
   // its endpoint when it dies.
   link_resolved_ = std::move(other.link_resolved_);
   link_invalidated_ = std::move(other.link_invalidated_);
-  dispatcher_holder_ = std::move(other.dispatcher_holder_);
   object_ = std::move(other.object_);
   linker_ = std::move(other.linker_);
   endpoint_id_ = std::move(other.endpoint_id_);
@@ -382,8 +371,7 @@ template <typename Export, typename Import>
 template <bool is_import>
 void ObjectLinker<Export, Import>::Link<is_import>::Initialize(
     std::function<void(PeerObj peer_object)> link_resolved,
-    std::function<void(bool on_destruction)> link_invalidated,
-    std::shared_ptr<utils::DispatcherHolder> dispatcher_holder) {
+    std::function<void(bool on_destruction)> link_invalidated) {
   auto access = GetLinkerScopedAccess();
   FX_DCHECK(valid());
   FX_DCHECK(!initialized());
@@ -391,7 +379,6 @@ void ObjectLinker<Export, Import>::Link<is_import>::Initialize(
 
   link_resolved_ = std::move(link_resolved);
   link_invalidated_ = std::move(link_invalidated);
-  dispatcher_holder_ = std::move(dispatcher_holder);
 
   linker_->InitializeEndpoint(this, endpoint_id_, is_import);
 }
@@ -419,7 +406,7 @@ void ObjectLinker<Export, Import>::Link<is_import>::Invalidate(bool on_destructi
   object_.reset();
   link_resolved_ = nullptr;
   endpoint_id_ = ZX_KOID_INVALID;
-  LinkInvalidated(on_destruction);
+  LinkInvalidatedLocked(on_destruction);
 }
 
 template <typename Export, typename Import>
@@ -430,12 +417,7 @@ void ObjectLinker<Export, Import>::Link<is_import>::LinkResolved(
   if (link_resolved_) {
     auto* typed_peer_link = static_cast<Link<!is_import>*>(peer_link);
     FX_DCHECK(typed_peer_link->object_.has_value());
-    ExecuteOrPostTaskOnDispatcher(
-        [link_resolved = link_resolved_, object = typed_peer_link->object_.value()]() mutable {
-          // Doesn't need to be locked because the closure/argument are no longer owned by the
-          // Link.
-          link_resolved(std::move(object));
-        });
+    link_resolved_(typed_peer_link->object_.value());
   }
 }
 
