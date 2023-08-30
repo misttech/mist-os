@@ -15,18 +15,14 @@
           {
             "projects": [
               "prebuilt/third_party/vpython",
-              "prebuilt/third_party/python3/linux-x64",
-              "prebuilt/third_party/python3.11/linux-x64"
+              "prebuilt/third_party/python3/linux-x64"
             ],
             "bug": "",
             "notes": ["Python is not shipped."]
           },
           {
             "projects": [
-              "prebuilt/third_party/dart/linux-x64",
-              "prebuilt/third_party/dart/linux-x64",
-              "prebuilt/third_party/dart_paused/linux-x64",
-              "prebuilt/third_party/dart_paused/linux-x64"
+              "prebuilt/third_party/dart/linux-x64"
             ],
             "bug": "",
             "notes": ["Dart linux is not shipped."]

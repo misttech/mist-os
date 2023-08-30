@@ -14,20 +14,6 @@
           },
           {
             "projects": [
-              "prebuilt/third_party/flutter"
-            ],
-            "bug": "",
-            "notes": []
-          },
-          {
-            "projects": [
-              "prebuilt/third_party/sky_engine"
-            ],
-            "bug": "",
-            "notes": []
-          },
-          {
-            "projects": [
               "src/security/bin/root_ssl_certificates/third_party/cert"
             ],
             "bug": "",
@@ -56,8 +42,7 @@
           },
           {
             "projects": [
-              "prebuilt/third_party/dart/linux-x64",
-              "prebuilt/third_party/dart_paused/linux-x64"
+              "prebuilt/third_party/dart/linux-x64"
             ],
             "bug": "",
             "notes": []

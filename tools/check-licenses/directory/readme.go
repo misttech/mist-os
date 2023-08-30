@@ -46,8 +46,7 @@ func readmeFileWillNeverExist(root string) bool {
 
 func isCustomDartPkgProject(path string) bool {
 	parent := filepath.Dir(path)
-	return parent == "third_party/dart-pkg/pub" ||
-		parent == "third_party/dart-pkg/git"
+	return parent == "third_party/dart-pkg/pub"
 }
 
 func isCustomRustCrateProject(path string) bool {
