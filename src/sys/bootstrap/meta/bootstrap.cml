@@ -108,7 +108,7 @@
             // bringup builds, as its dependency pkgfs is not available on
             // bringup builds either.
             name: "pkg-cache",
-            url: "fuchsia-boot:///#meta/pkg-cache.cm",
+            url: "fuchsia-boot:///pkg-cache#meta/pkg-cache.cm",
             on_terminate: "reboot",
         },
         {

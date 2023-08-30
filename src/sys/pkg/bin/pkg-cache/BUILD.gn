@@ -107,10 +107,6 @@ rustc_binary("bin") {
   ]
 }
 
-component_manifest_resources("root-manifest") {
-  sources = [ "meta/pkg-cache.cml" ]
-}
-
 fuchsia_component_manifest("manifest") {
   component_name = "pkg-cache"
   manifest = "meta/pkg-cache.cml"
@@ -240,12 +236,4 @@ fuchsia_system_package("disable-executability-restrictions") {
     "//build/validate:non_production_tag",
   ]
   visibility = [ "//src/sys/pkg:*" ]
-}
-
-bootfs_files_for_assembly("bootfs") {
-  deps = [
-    ":bin",
-    ":config_values_from_gn",
-    ":root-manifest",
-  ]
 }
