@@ -20,6 +20,7 @@ class MediaApp {
 
  private:
   void AcquireAudioRenderer(sys::ComponentContext* app_context);
+  void AcceptAudioRendererDefaultClock();
   void SetStreamType();
 
   zx_status_t CreateMemoryMapping();

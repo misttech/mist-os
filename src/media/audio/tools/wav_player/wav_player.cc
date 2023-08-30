@@ -101,10 +101,10 @@ void WavPlayer::AcquireRenderer(sys::ComponentContext* app_context) {
     sample_format_ = stream_type.sample_format;
   } else {
     // Audio interface is needed to create AudioRenderer and set routing policy.
-    fuchsia::media::AudioPtr audio;
-    app_context->svc()->Connect(audio.NewRequest());
+    fuchsia::media::AudioCorePtr audio_core;
+    app_context->svc()->Connect(audio_core.NewRequest());
 
-    audio->CreateAudioRenderer(audio_renderer_.NewRequest());
+    audio_core->CreateAudioRenderer(audio_renderer_.NewRequest());
   }
   audio_renderer_.set_error_handler([this](zx_status_t status) {
     CLI_CHECK(Shutdown(), "Client connection to fuchsia.media.AudioRenderer failed: " << status);

@@ -176,9 +176,10 @@ void WavRecorder::Run(sys::ComponentContext* app_context) {
         });
   } else {
     // Connect to the audio service and obtain AudioCapturer and Gain interfaces.
-    fuchsia::media::AudioPtr audio = app_context->svc()->Connect<fuchsia::media::Audio>();
+    fuchsia::media::AudioCorePtr audio_core =
+        app_context->svc()->Connect<fuchsia::media::AudioCore>();
 
-    audio->CreateAudioCapturer(audio_capturer_.NewRequest(), loopback_);
+    audio_core->CreateAudioCapturer(loopback_, audio_capturer_.NewRequest());
     audio_capturer_->BindGainControl(gain_control_.NewRequest());
     gain_control_.set_error_handler([this](zx_status_t status) {
       CLI_CHECK(Shutdown(),

@@ -88,7 +88,7 @@ class Barrier {
 
 class Capture {
  public:
-  Capture(fuchsia::media::AudioPtr& audio, bool is_loopback, const std::string& filename,
+  Capture(fuchsia::media::AudioCorePtr& audio, bool is_loopback, const std::string& filename,
           Barrier& barrier)
       : filename_(filename), format_(kCaptureFormat), barrier_(barrier), buffer_(format_, 0) {
     // Create the WAV file writer.
@@ -99,7 +99,7 @@ class Capture {
               "Could not create " << filename);
 
     // Create the capturer.
-    audio->CreateAudioCapturer(capturer_.NewRequest(), is_loopback);
+    audio->CreateAudioCapturer(is_loopback, capturer_.NewRequest());
     capturer_.set_error_handler([this](zx_status_t status) {
       printf("Capturer for %s failed with status %d.\n", filename_.c_str(), status);
       Shutdown();
@@ -272,8 +272,8 @@ class Capture {
   media::audio::AudioBuffer<ASF::FLOAT> buffer_;
 };
 
-void PlaySound(fuchsia::media::AudioPtr& audio, zx::clock reference_clock, zx::time reference_time,
-               media::audio::AudioBuffer<ASF::FLOAT> sound) {
+void PlaySound(fuchsia::media::AudioCorePtr& audio, zx::clock reference_clock,
+               zx::time reference_time, media::audio::AudioBuffer<ASF::FLOAT> sound) {
   // Create a renderer.
   // We wrap this in a shared_ptr so it can live until the sound is fully rendered.
   auto holder = std::make_shared<fuchsia::media::AudioRendererPtr>();
@@ -435,8 +435,6 @@ int main(int argc, const char** argv) {
     CLI_CHECK(duration_seconds > 0, "--duration_seconds must be positive");
   }
 
-  fuchsia::media::AudioPtr audio = ctx->svc()->Connect<fuchsia::media::Audio>();
-
   // Set the volume to 100%.
   fuchsia::media::AudioCorePtr audio_core = ctx->svc()->Connect<fuchsia::media::AudioCore>();
   fuchsia::media::audio::VolumeControlPtr volume_control;
@@ -472,15 +470,15 @@ int main(int argc, const char** argv) {
   std::vector<zx::time> play_times;
   for (auto k = 1; k < duration_seconds; k++) {
     auto t = global_start_time_mono + zx::sec(k);
-    PlaySound(audio, DupClock(), t, packet);
+    PlaySound(audio_core, DupClock(), t, packet);
     play_times.push_back(t + kImpulseRingInDuration);
   }
 
   // Start the capturers.
   // We use a barrier to align the start time of the output wav files.
   auto barrier = std::make_unique<Barrier>(2);
-  auto microphone = std::make_unique<Capture>(audio, false, "/tmp/microphone.wav", *barrier);
-  auto loopback = std::make_unique<Capture>(audio, true, "/tmp/loopback.wav", *barrier);
+  auto microphone = std::make_unique<Capture>(audio_core, false, "/tmp/microphone.wav", *barrier);
+  auto loopback = std::make_unique<Capture>(audio_core, true, "/tmp/loopback.wav", *barrier);
   loop->Run(zx::clock::get_monotonic() + zx::sec(duration_seconds));
 
   microphone->Stop();

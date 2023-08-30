@@ -7,7 +7,6 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
-#include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/clock.h>
 #include <math.h>
@@ -31,12 +30,13 @@ constexpr double kAmplitude = 0.125;
 namespace examples {
 
 MediaApp::MediaApp(fit::closure quit_callback) : quit_callback_(std::move(quit_callback)) {
-  FX_DCHECK(quit_callback_);
+  FX_CHECK(quit_callback_);
 }
 
 // Prepare for playback, submit initial data and start the presentation timeline.
 void MediaApp::Run(sys::ComponentContext* app_context) {
   AcquireAudioRenderer(app_context);
+  AcceptAudioRendererDefaultClock();
   SetStreamType();
 
   if (CreateMemoryMapping() != ZX_OK) {
@@ -49,12 +49,12 @@ void MediaApp::Run(sys::ComponentContext* app_context) {
     SendPacket(CreatePacket(payload_num));
   }
 
-  // By not explicitly setting timestamp values for reference clock or media clock, we indicate that
-  // we want to start playback, with default timing. I.e., at a system reference_time of "as soon as
-  // safely possible", we will present audio corresponding to an initial media_time (PTS) of zero.
-  //
-  // AudioRenderer defaults to unity gain, unmuted; we need not change our volume. (Although not
-  // shown here, we would do so via the GainControl interface.)
+  // AudioRenderer defaults to unity gain, unmuted; we need not change our loudness.
+  // (Although not shown here, we would do so via a GainControl, obtained from the AudioRenderer.)
+
+  // By not explicitly setting timestamp values (neither reference clock nor PTS), we indicate that
+  // we want to start playback, with default timing. This means we start at a reference_time of "as
+  // soon as safely possible", when we present audio corresponding to a media_time (PTS) of zero.
   audio_renderer_->PlayNoReply(fuchsia::media::NO_TIMESTAMP, fuchsia::media::NO_TIMESTAMP);
 }
 
@@ -69,15 +69,15 @@ void MediaApp::AcquireAudioRenderer(sys::ComponentContext* app_context) {
     std::cerr << "fuchsia::media::AudioRenderer connection lost: " << status << std::endl;
     Shutdown();
   });
+}
 
-  // Tell AudioRenderer we want to use its 'optimal' reference clock, not our own.
+// Tell AudioRenderer we want to use its 'optimal' reference clock, not our own.
+void MediaApp::AcceptAudioRendererDefaultClock() {
   audio_renderer_->SetReferenceClock(zx::clock(ZX_HANDLE_INVALID));
 }
 
 // Set the AudioRenderer's audio stream_type: mono 48kHz 32-bit float.
 void MediaApp::SetStreamType() {
-  FX_DCHECK(audio_renderer_);
-
   fuchsia::media::AudioStreamType stream_type;
 
   stream_type.sample_format = fuchsia::media::AudioSampleFormat::FLOAT;
@@ -87,8 +87,8 @@ void MediaApp::SetStreamType() {
   audio_renderer_->SetPcmStreamType(stream_type);
 }
 
-// Create a Virtual Memory Object, and map enough memory for audio buffers.
-// Send a reduced-rights handle to AudioRenderer to act as a shared buffer.
+// Create a Virtual Memory Object, and map enough memory for audio buffers. This will be our cross-
+// process shared buffer, so send a duplicate handle (with reduced-rights) to AudioRenderer.
 zx_status_t MediaApp::CreateMemoryMapping() {
   zx::vmo payload_vmo;
 
@@ -109,7 +109,7 @@ zx_status_t MediaApp::CreateMemoryMapping() {
   return ZX_OK;
 }
 
-// Write a sine wave into our buffer; we'll submit packets that point to it.
+// Write a sine wave into our buffer; we will submit packets that point to it.
 void MediaApp::WriteAudioIntoBuffer() {
   auto float_buffer = reinterpret_cast<float*>(payload_buffer_.start());
 
@@ -120,16 +120,17 @@ void MediaApp::WriteAudioIntoBuffer() {
   }
 }
 
-// We divide our cross-proc buffer into different zones, called payloads. Create a packet that
-// corresponds to this particular payload. By specifying NO_TIMESTAMP for each packet's presentation
-// timestamp, we rely on AudioRenderer to treat the sequence of packets as a contiguous unbroken
-// stream of audio. We just need to make sure we present packets early enough. For this example we
-// actually submit all packets before playback starts.
+// Create the packet that corresponds to the given number in the sequence.
+// We divide our cross-proc buffer into different zones, called payloads. Each packet sent to
+// AudioRenderer corresponds to a payload. By specifying NO_TIMESTAMP for each packet's presentation
+// timestamp, we rely on AudioRenderer to treat the sequence of payloads as a continuous unbroken
+// stream of audio (even if the payloads are not contiguous in memory). A client simply must present
+// packets early enough. For this example, we actually submit all packets before playback starts.
 fuchsia::media::StreamPacket MediaApp::CreatePacket(uint32_t packet_num) const {
   fuchsia::media::StreamPacket packet;
 
-  // leave packet.pts as the default (fuchsia::media::NO_TIMESTAMP)
-  // leave packet.payload_buffer_id as default (0): we only map a single buffer
+  // By default upon packet construction, .pts is fuchsia::media::NO_TIMESTAMP; leave this as-is.
+  // By default upon construction, .payload_buffer_id is 0; leave this (we only map one buffer).
   packet.payload_offset = (packet_num * payload_size_) % total_mapping_size_;
   packet.payload_size = payload_size_;
   return packet;
@@ -145,7 +146,7 @@ void MediaApp::SendPacket(fuchsia::media::StreamPacket packet) {
 
 void MediaApp::OnSendPacketComplete() {
   ++num_packets_completed_;
-  FX_DCHECK(num_packets_completed_ <= kNumPayloads);
+  FX_CHECK(num_packets_completed_ <= kNumPayloads);
 
   if (num_packets_sent_ < kNumPayloads) {
     SendPacket(CreatePacket(num_packets_sent_));
@@ -163,8 +164,6 @@ void MediaApp::Shutdown() {
 }  // namespace examples
 
 int main(int argc, const char** argv) {
-  fuchsia_logging::SetTags({"simple_sine"});
-
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   auto startup_context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
 
