@@ -12,9 +12,11 @@
 #include <zircon/types.h>
 
 #include "src/devices/bin/driver_manager/v1/driver.h"
-#include "src/lib/pkg_url/fuchsia_pkg_url.h"
 
 namespace internal {
+
+zx_status_t map_resolve_err_to_zx_status(
+    fuchsia_component_resolution::wire::ResolverError resolver_error);
 
 class PackageResolverInterface {
  public:
@@ -44,9 +46,6 @@ class PackageResolver : public PackageResolverInterface {
 
   // Return a resolved component for |component_url|.
   zx::result<fidl::WireSyncClient<fuchsia_io::Directory>> Resolve(const std::string& component_url);
-
-  zx::result<zx::vmo> LoadDriver(const fidl::WireSyncClient<fuchsia_io::Directory>& package_dir,
-                                 const component::FuchsiaPkgUrl& package_url);
 
   fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args_;
   fidl::WireSyncClient<fuchsia_component_resolution::Resolver> resolver_client_;

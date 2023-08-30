@@ -10,6 +10,7 @@
 
 #include "src/devices/bin/driver_manager/v1/manifest_parser.h"
 #include "src/devices/lib/log/log.h"
+#include "src/lib/pkg_url/fuchsia_pkg_url.h"
 #include "src/zircon/lib/zircon/include/zircon/status.h"
 
 namespace fio = fuchsia_io;
@@ -120,34 +121,6 @@ zx::result<fidl::WireSyncClient<fio::Directory>> BasePackageResolver::GetPackage
     return zx::error_result(status);
   }
   return zx::ok(fidl::WireSyncClient<fio::Directory>{std::move(client_end)});
-}
-
-static zx_status_t map_resolve_err_to_zx_status(
-    fuchsia_component_resolution::wire::ResolverError resolver_error) {
-  switch (resolver_error) {
-    case fuchsia_component_resolution::wire::ResolverError::kIo:
-      return ZX_ERR_IO;
-    case fuchsia_component_resolution::wire::ResolverError::kManifestNotFound:
-      return ZX_ERR_NOT_FOUND;
-    case fuchsia_component_resolution::wire::ResolverError::kPackageNotFound:
-      return ZX_ERR_NOT_FOUND;
-    case fuchsia_component_resolution::wire::ResolverError::kResourceUnavailable:
-      return ZX_ERR_UNAVAILABLE;
-    case fuchsia_component_resolution::wire::ResolverError::kInvalidManifest:
-      return ZX_ERR_INVALID_ARGS;
-    case fuchsia_component_resolution::wire::ResolverError::kInvalidArgs:
-      return ZX_ERR_INVALID_ARGS;
-    case fuchsia_component_resolution::wire::ResolverError::kInvalidAbiRevision:
-      return ZX_ERR_INVALID_ARGS;
-    case fuchsia_component_resolution::wire::ResolverError::kNoSpace:
-      return ZX_ERR_NO_SPACE;
-    case fuchsia_component_resolution::wire::ResolverError::kNotSupported:
-      return ZX_ERR_NOT_SUPPORTED;
-    case fuchsia_component_resolution::wire::ResolverError::kAbiRevisionNotFound:
-      return ZX_ERR_NOT_FOUND;
-    default:
-      return ZX_ERR_INTERNAL;
-  }
 }
 
 zx::result<fidl::WireSyncClient<fio::Directory>> BasePackageResolver::ResolveBaseUrl(

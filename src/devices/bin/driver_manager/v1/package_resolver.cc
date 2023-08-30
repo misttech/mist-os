@@ -13,11 +13,39 @@
 
 #include "src/devices/bin/driver_manager/v1/manifest_parser.h"
 #include "src/devices/lib/log/log.h"
-#include "src/lib/storage/vfs/cpp/vfs.h"
+#include "src/lib/pkg_url/fuchsia_pkg_url.h"
 
 namespace fio = fuchsia_io;
 
 namespace internal {
+
+zx_status_t map_resolve_err_to_zx_status(
+    fuchsia_component_resolution::wire::ResolverError resolver_error) {
+  switch (resolver_error) {
+    case fuchsia_component_resolution::wire::ResolverError::kIo:
+      return ZX_ERR_IO;
+    case fuchsia_component_resolution::wire::ResolverError::kManifestNotFound:
+      return ZX_ERR_NOT_FOUND;
+    case fuchsia_component_resolution::wire::ResolverError::kPackageNotFound:
+      return ZX_ERR_NOT_FOUND;
+    case fuchsia_component_resolution::wire::ResolverError::kResourceUnavailable:
+      return ZX_ERR_UNAVAILABLE;
+    case fuchsia_component_resolution::wire::ResolverError::kInvalidManifest:
+      return ZX_ERR_INVALID_ARGS;
+    case fuchsia_component_resolution::wire::ResolverError::kInvalidArgs:
+      return ZX_ERR_INVALID_ARGS;
+    case fuchsia_component_resolution::wire::ResolverError::kInvalidAbiRevision:
+      return ZX_ERR_INVALID_ARGS;
+    case fuchsia_component_resolution::wire::ResolverError::kNoSpace:
+      return ZX_ERR_NO_SPACE;
+    case fuchsia_component_resolution::wire::ResolverError::kNotSupported:
+      return ZX_ERR_NOT_SUPPORTED;
+    case fuchsia_component_resolution::wire::ResolverError::kAbiRevisionNotFound:
+      return ZX_ERR_NOT_FOUND;
+    default:
+      return ZX_ERR_INTERNAL;
+  }
+}
 
 zx::result<std::unique_ptr<Driver>> PackageResolver::FetchDriver(const std::string& manifest_url) {
   component::FuchsiaPkgUrl parsed_url;
@@ -47,13 +75,15 @@ zx::result<std::unique_ptr<Driver>> PackageResolver::FetchDriver(const std::stri
     return manifest.take_error();
   }
 
-  if (!parsed_url.Parse(std::string(manifest->driver_url))) {
-    LOGF(ERROR, "Failed to parse package url: %s", manifest->driver_url.data());
+  zx::result driver_resource_path_result = GetResourcePath(manifest->driver_url);
+  if (driver_resource_path_result.is_error()) {
+    LOGF(ERROR, "Failed to get resource path for url: '%s' %s", manifest->driver_url.c_str(),
+         driver_resource_path_result.status_string());
     return zx::error(ZX_ERR_INTERNAL);
   }
+  std::string driver_resource_path = driver_resource_path_result.value();
 
-  zx::result driver_vmo_result =
-      load_driver_vmo(package_dir_result.value(), parsed_url.resource_path());
+  zx::result driver_vmo_result = load_driver_vmo(package_dir_result.value(), driver_resource_path);
   if (driver_vmo_result.status_value()) {
     return driver_vmo_result.take_error();
   }
@@ -112,68 +142,10 @@ zx::result<fidl::WireSyncClient<fio::Directory>> PackageResolver::Resolve(
     LOGF(ERROR, "Failed to resolve package");
     if (!result.ok()) {
       return zx::error(ZX_ERR_INTERNAL);
-    } else {
-      switch (result->error_value()) {
-        case fuchsia_component_resolution::wire::ResolverError::kIo:
-          return zx::error(ZX_ERR_IO);
-        case fuchsia_component_resolution::wire::ResolverError::kManifestNotFound:
-          return zx::error(ZX_ERR_NOT_FOUND);
-        case fuchsia_component_resolution::wire::ResolverError::kPackageNotFound:
-          return zx::error(ZX_ERR_NOT_FOUND);
-        case fuchsia_component_resolution::wire::ResolverError::kResourceUnavailable:
-          return zx::error(ZX_ERR_UNAVAILABLE);
-        case fuchsia_component_resolution::wire::ResolverError::kInvalidManifest:
-          return zx::error(ZX_ERR_INVALID_ARGS);
-        case fuchsia_component_resolution::wire::ResolverError::kInvalidArgs:
-          return zx::error(ZX_ERR_INVALID_ARGS);
-        case fuchsia_component_resolution::wire::ResolverError::kInvalidAbiRevision:
-          return zx::error(ZX_ERR_INVALID_ARGS);
-        case fuchsia_component_resolution::wire::ResolverError::kNoSpace:
-          return zx::error(ZX_ERR_NO_SPACE);
-        case fuchsia_component_resolution::wire::ResolverError::kNotSupported:
-          return zx::error(ZX_ERR_NOT_SUPPORTED);
-        case fuchsia_component_resolution::wire::ResolverError::kAbiRevisionNotFound:
-          return zx::error(ZX_ERR_NOT_FOUND);
-        default:
-          return zx::error(ZX_ERR_INTERNAL);
-      }
     }
+    return zx::error(map_resolve_err_to_zx_status(result->error_value()));
   }
   return zx::ok(fidl::WireSyncClient(std::move(result.value()->component.package().directory())));
-}
-
-zx::result<zx::vmo> PackageResolver::LoadDriver(
-    const fidl::WireSyncClient<fuchsia_io::Directory>& package_dir,
-    const component::FuchsiaPkgUrl& package_url) {
-  const fio::wire::OpenFlags kFileRights =
-      fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightExecutable;
-  const fio::wire::VmoFlags kDriverVmoFlags =
-      fio::wire::VmoFlags::kRead | fio::wire::VmoFlags::kExecute;
-
-  // Open and duplicate the driver vmo.
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::File>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  fidl::OneWayStatus file_open_result = package_dir->Open(
-      kFileRights, {} /* mode */, fidl::StringView::FromExternal(package_url.resource_path()),
-      fidl::ServerEnd<fuchsia_io::Node>(endpoints->server.TakeChannel()));
-  if (!file_open_result.ok()) {
-    LOGF(ERROR, "Failed to open driver file: %s", package_url.resource_path().c_str());
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-
-  fidl::WireSyncClient file_client{std::move(endpoints->client)};
-  fidl::WireResult file_res = file_client->GetBackingMemory(kDriverVmoFlags);
-  if (!file_res.ok()) {
-    LOGF(ERROR, "Failed to get driver vmo: %s", file_res.FormatDescription().c_str());
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-  if (file_res->is_error()) {
-    LOGF(ERROR, "Failed to get driver vmo: %s", zx_status_get_string(file_res->error_value()));
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-  return zx::ok(std::move(file_res->value()->vmo));
 }
 
 }  // namespace internal

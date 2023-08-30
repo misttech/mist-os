@@ -316,10 +316,17 @@
             // This is only used when the #driver_index |enable_ephemeral_drivers| config
             // is set, which enables loading drivers ephemerally. This is intended for
             // eng builds only and is set through product assembly.
+            //
+            // The #driver_manager will only use this protocol in DFv1.
+            // In DFv2 resolution is done by the component framework since drivers
+            // are componenets in DFv2.
             protocol: "fuchsia.component.resolution.Resolver",
             from: "#full_resolver",
             as: "fuchsia.component.resolution.Resolver-full",
-            to: "#driver_index",
+            to: [
+                "#driver_index",
+                "#driver_manager",
+            ],
             dependency: "weak",
         },
         {
@@ -371,12 +378,6 @@
                 "fuchsia.process.Launcher",
             ],
             from: "parent",
-            to: "#driver_manager",
-        },
-        {
-            protocol: "fuchsia.component.resolution.Resolver",
-            from: "parent",
-            as: "fuchsia.component.resolution.Resolver-full",
             to: "#driver_manager",
         },
         {
