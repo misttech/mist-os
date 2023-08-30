@@ -2,9 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{
-        any::ErasedCapability, AnyCapability, AnyCast, Capability, Convert, Open, Remote, TryClone,
-    },
+    crate::{AnyCapability, AnyCast, Capability, Convert, Open, Remote, TryClone},
     anyhow::{Context, Error},
     fidl::endpoints::create_request_stream,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync,
@@ -15,7 +13,6 @@ use {
         future::BoxFuture,
         FutureExt, SinkExt, TryStreamExt,
     },
-    std::borrow::BorrowMut,
     std::collections::btree_map::Entry,
     std::collections::BTreeMap,
     std::fmt::Debug,
@@ -219,39 +216,6 @@ impl Convert for Dict {
             return Ok(Box::new(open));
         }
         Err(())
-    }
-}
-
-impl<'a> TryFrom<&'a dyn ErasedCapability> for &'a Dict {
-    type Error = ();
-
-    fn try_from(value: &dyn ErasedCapability) -> Result<&Dict, ()> {
-        value.as_any().downcast_ref::<Dict>().ok_or(())
-    }
-}
-
-impl<'a> TryFrom<&'a mut dyn ErasedCapability> for &'a mut Dict {
-    type Error = ();
-
-    fn try_from(value: &mut dyn ErasedCapability) -> Result<&mut Dict, ()> {
-        value.as_any_mut().downcast_mut::<Dict>().ok_or(())
-    }
-}
-
-impl<'a> TryFrom<&'a AnyCapability> for &'a Dict {
-    type Error = ();
-
-    fn try_from(value: &AnyCapability) -> Result<&Dict, ()> {
-        value.as_ref().try_into()
-    }
-}
-
-impl<'a> TryFrom<&'a mut AnyCapability> for &'a mut Dict {
-    type Error = ();
-
-    fn try_from(value: &mut AnyCapability) -> Result<&mut Dict, ()> {
-        let borrowed: &mut dyn ErasedCapability = value.borrow_mut();
-        borrowed.try_into()
     }
 }
 
@@ -656,49 +620,5 @@ mod tests {
         fdio::service_connect_at(&dir, &format!("{CAP_KEY}/{CAP_KEY}/bar"), server_end).unwrap();
         fasync::Channel::from_channel(client_end).unwrap().on_closed().await.unwrap();
         assert_eq!(OPEN_COUNT.get(), 1)
-    }
-
-    #[test]
-    fn try_from_any_ref() {
-        let dict = Dict::new();
-        let any: AnyCapability = Box::new(dict);
-
-        let from: &AnyCapability = &any;
-        let to: &Dict = from.try_into().unwrap();
-
-        assert!(to.entries.is_empty());
-    }
-
-    #[test]
-    fn try_from_any_mut_ref() {
-        let dict = Dict::new();
-        let mut any: AnyCapability = Box::new(dict);
-
-        let from: &mut AnyCapability = &mut any;
-        let to: &mut Dict = from.try_into().unwrap();
-
-        assert!(to.entries.is_empty());
-    }
-
-    #[test]
-    fn try_from_dyn_erased_ref() {
-        let dict = Dict::new();
-        let any: AnyCapability = Box::new(dict);
-
-        let from: &dyn ErasedCapability = any.as_ref();
-        let to: &Dict = from.try_into().unwrap();
-
-        assert!(to.entries.is_empty());
-    }
-
-    #[test]
-    fn try_from_dyn_erased_mut_ref() {
-        let dict = Dict::new();
-        let mut any: AnyCapability = Box::new(dict);
-
-        let from: &mut dyn ErasedCapability = any.borrow_mut();
-        let to: &mut Dict = from.try_into().unwrap();
-
-        assert!(to.entries.is_empty());
     }
 }

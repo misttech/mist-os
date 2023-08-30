@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{handle::Handle, Capability, Convert, Remote, TryClone},
+    crate::{Capability, Convert, Handle, Remote, TryClone},
     crate_local::{BoxConvert, BoxRemote, TryCloneAny},
     fuchsia_zircon as zx,
     futures::future::BoxFuture,

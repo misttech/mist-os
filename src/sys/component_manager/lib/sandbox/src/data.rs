@@ -1,9 +1,8 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{any::ErasedCapability, AnyCapability, AnyCast, Capability, Remote};
+use crate::{AnyCast, Capability, Remote};
 use fuchsia_zircon as zx;
-use std::borrow::BorrowMut;
 use std::fmt::Debug;
 
 #[derive(Capability, Debug, Clone, Default)]
@@ -24,49 +23,10 @@ impl<T: Debug + Clone + Send + Sync + 'static> Remote for Data<T> {
     }
 }
 
-impl<'a, T: Debug + Clone + Send + Sync + 'static> TryFrom<&'a dyn ErasedCapability>
-    for &'a Data<T>
-{
-    type Error = ();
-
-    fn try_from(value: &dyn ErasedCapability) -> Result<&Data<T>, ()> {
-        value.as_any().downcast_ref::<Data<T>>().ok_or(())
-    }
-}
-
-impl<'a, T: Debug + Clone + Send + Sync + 'static> TryFrom<&'a mut dyn ErasedCapability>
-    for &'a mut Data<T>
-{
-    type Error = ();
-
-    fn try_from(value: &mut dyn ErasedCapability) -> Result<&mut Data<T>, ()> {
-        value.as_any_mut().downcast_mut::<Data<T>>().ok_or(())
-    }
-}
-
-impl<'a, T: Debug + Clone + Send + Sync + 'static> TryFrom<&'a AnyCapability> for &'a Data<T> {
-    type Error = ();
-
-    fn try_from(value: &AnyCapability) -> Result<&Data<T>, ()> {
-        value.as_ref().try_into()
-    }
-}
-
-impl<'a, T: Debug + Clone + Send + Sync + 'static> TryFrom<&'a mut AnyCapability>
-    for &'a mut Data<T>
-{
-    type Error = ();
-
-    fn try_from(value: &mut AnyCapability) -> Result<&mut Data<T>, ()> {
-        let borrowed: &mut dyn ErasedCapability = value.borrow_mut();
-        borrowed.try_into()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::TryClone;
+    use crate::{AnyCapability, TryClone};
 
     #[test]
     fn try_from_any_into_self() {

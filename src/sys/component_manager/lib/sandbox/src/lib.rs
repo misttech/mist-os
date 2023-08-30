@@ -18,7 +18,7 @@ mod open;
 mod receiver;
 mod sender;
 
-pub use self::any::{AnyCapability, AnyCast};
+pub use self::any::{AnyCapability, AnyCast, ErasedCapability};
 pub use self::capability::{Capability, Convert, Remote, TryClone};
 pub use self::data::Data;
 pub use self::dict::{Dict, Key as DictKey};

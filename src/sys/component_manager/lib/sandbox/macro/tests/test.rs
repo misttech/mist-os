@@ -4,8 +4,9 @@
 
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::future::BoxFuture;
-use sandbox::{AnyCapability, Capability, Convert, Handle, Remote, TryClone};
+use sandbox::{AnyCapability, Capability, Convert, ErasedCapability, Handle, Remote, TryClone};
 use std::any::{Any, TypeId};
+use std::borrow::BorrowMut;
 use std::fmt::Debug;
 
 /// A test-only capability that derives [Capability].
@@ -101,4 +102,52 @@ fn test_convert_to_self_only_wrong_type() {
     let convert_result = cap.try_into_capability(TypeId::of::<TestHandle>());
     // TestCloneable can only be converted to itself, not to TestHandle.
     assert!(convert_result.is_err());
+}
+
+/// Tests the `TryFrom<&AnyCapability>` to reference downcast conversion.
+#[test]
+fn try_from_any_ref() {
+    let cap = TestHandle(zx::Handle::invalid());
+    let any: AnyCapability = Box::new(cap);
+
+    let from: &AnyCapability = &any;
+    let to: &TestHandle = from.try_into().unwrap();
+
+    assert!(to.0.is_invalid());
+}
+
+/// Tests the `TryFrom<&mut AnyCapability>` to mut reference downcast conversion.
+#[test]
+fn try_from_any_mut_ref() {
+    let cap = TestHandle(zx::Handle::invalid());
+    let mut any: AnyCapability = Box::new(cap);
+
+    let from: &mut AnyCapability = &mut any;
+    let to: &mut TestHandle = from.try_into().unwrap();
+
+    assert!(to.0.is_invalid());
+}
+
+/// Tests the `TryFrom<&dyn ErasedCapability>` to reference downcast conversion.
+#[test]
+fn try_from_dyn_erased_ref() {
+    let cap = TestHandle(zx::Handle::invalid());
+    let any: AnyCapability = Box::new(cap);
+
+    let from: &dyn ErasedCapability = any.as_ref();
+    let to: &TestHandle = from.try_into().unwrap();
+
+    assert!(to.0.is_invalid());
+}
+
+/// Tests the `TryFrom<&mut dyn ErasedCapability>` to mut reference downcast conversion.
+#[test]
+fn try_from_dyn_erased_mut_ref() {
+    let cap = TestHandle(zx::Handle::invalid());
+    let mut any: AnyCapability = Box::new(cap);
+
+    let from: &mut dyn ErasedCapability = any.borrow_mut();
+    let to: &mut TestHandle = from.try_into().unwrap();
+
+    assert!(to.0.is_invalid());
 }
