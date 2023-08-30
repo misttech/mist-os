@@ -800,7 +800,7 @@ impl Realm {
 fn new_decl_with_program_entries(entries: Vec<(String, String)>) -> cm_rust::ComponentDecl {
     cm_rust::ComponentDecl {
         program: Some(cm_rust::ProgramDecl {
-            runner: runner::RUNNER_NAME.parse().unwrap(),
+            runner: Some(runner::RUNNER_NAME.parse().unwrap()),
             info: fdata::Dictionary {
                 entries: Some(
                     entries
@@ -1760,7 +1760,9 @@ fn validate_program_modifications(
     old_decl: &cm_rust::ComponentDecl,
     new_decl: &cm_rust::ComponentDecl,
 ) -> Result<(), RealmBuilderError> {
-    if old_decl.program.as_ref().map(|p| &p.runner) == Some(&runner::RUNNER_NAME.parse().unwrap()) {
+    if old_decl.program.as_ref().and_then(|p| p.runner.as_ref())
+        == Some(&runner::RUNNER_NAME.parse().unwrap())
+    {
         let new_decl_program = match new_decl.program.as_ref() {
             Some(program) => program.clone(),
             None => {
@@ -2998,7 +3000,7 @@ mod tests {
     async fn add_child_from_decl() {
         let a_decl = cm_rust::ComponentDecl {
             program: Some(cm_rust::ProgramDecl {
-                runner: "hippo".parse().unwrap(),
+                runner: Some("hippo".parse().unwrap()),
                 info: fdata::Dictionary::default(),
             }),
             uses: vec![cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
@@ -3087,7 +3089,7 @@ mod tests {
     async fn add_route_does_not_mutate_children_added_from_decl() {
         let a_decl = cm_rust::ComponentDecl {
             program: Some(cm_rust::ProgramDecl {
-                runner: "hippo".parse().unwrap(),
+                runner: Some("hippo".parse().unwrap()),
                 info: fdata::Dictionary::default(),
             }),
             uses: vec![cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
@@ -3140,7 +3142,7 @@ mod tests {
         let tree_from_resolver = realm_and_builder_task.call_build_and_get_tree().await;
         let a_decl = cm_rust::ComponentDecl {
             program: Some(cm_rust::ProgramDecl {
-                runner: crate::runner::RUNNER_NAME.parse().unwrap(),
+                runner: Some(crate::runner::RUNNER_NAME.parse().unwrap()),
                 info: fdata::Dictionary {
                     entries: Some(vec![
                         fdata::DictionaryEntry {
@@ -3431,7 +3433,7 @@ mod tests {
         let tree_from_resolver = realm_and_builder_task.call_build_and_get_tree().await;
         let b_decl = cm_rust::ComponentDecl {
             program: Some(cm_rust::ProgramDecl {
-                runner: crate::runner::RUNNER_NAME.parse().unwrap(),
+                runner: Some(crate::runner::RUNNER_NAME.parse().unwrap()),
                 info: fdata::Dictionary {
                     entries: Some(vec![
                         fdata::DictionaryEntry {
@@ -3795,7 +3797,7 @@ mod tests {
                 ComponentTree {
                     decl: cm_rust::ComponentDecl {
                         program: Some(cm_rust::ProgramDecl {
-                            runner: crate::runner::RUNNER_NAME.parse().unwrap(),
+                            runner: Some(crate::runner::RUNNER_NAME.parse().unwrap()),
                             info: fdata::Dictionary {
                                 entries: Some(vec![
                                     fdata::DictionaryEntry {
@@ -4014,7 +4016,7 @@ mod tests {
                 ComponentTree {
                     decl: cm_rust::ComponentDecl {
                         program: Some(cm_rust::ProgramDecl {
-                            runner: crate::runner::RUNNER_NAME.parse().unwrap(),
+                            runner: Some(crate::runner::RUNNER_NAME.parse().unwrap()),
                             info: fdata::Dictionary {
                                 entries: Some(vec![
                                     fdata::DictionaryEntry {
@@ -4126,7 +4128,7 @@ mod tests {
             a_decl,
             cm_rust::ComponentDecl {
                 program: Some(cm_rust::ProgramDecl {
-                    runner: crate::runner::RUNNER_NAME.parse().unwrap(),
+                    runner: Some(crate::runner::RUNNER_NAME.parse().unwrap()),
                     info: fdata::Dictionary {
                         entries: Some(vec![
                             fdata::DictionaryEntry {
@@ -4304,7 +4306,7 @@ mod tests {
         let tree_from_resolver = realm_and_builder_task.call_build_and_get_tree().await;
         let b_decl = cm_rust::ComponentDecl {
             program: Some(cm_rust::ProgramDecl {
-                runner: crate::runner::RUNNER_NAME.parse().unwrap(),
+                runner: Some(crate::runner::RUNNER_NAME.parse().unwrap()),
                 info: fdata::Dictionary {
                     entries: Some(vec![
                         fdata::DictionaryEntry {
@@ -4526,7 +4528,7 @@ mod tests {
         let tree_from_resolver = realm_and_builder_task.call_build_and_get_tree().await;
         let read_only_dir_decl = cm_rust::ComponentDecl {
             program: Some(cm_rust::ProgramDecl {
-                runner: crate::runner::RUNNER_NAME.parse().unwrap(),
+                runner: Some(crate::runner::RUNNER_NAME.parse().unwrap()),
                 info: fdata::Dictionary {
                     entries: Some(vec![fdata::DictionaryEntry {
                         key: runner::LOCAL_COMPONENT_ID_KEY.to_string(),

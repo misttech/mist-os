@@ -154,7 +154,7 @@ pub struct ComponentDecl {
 impl ComponentDecl {
     /// Returns the runner used by this component, or `None` if this is a non-executable component.
     pub fn get_runner(&self) -> Option<&Name> {
-        self.program.as_ref().map(|p| &p.runner)
+        self.program.as_ref().and_then(|p| p.runner.as_ref())
     }
 
     /// Returns the `StorageDecl` corresponding to `storage_name`.
@@ -1415,8 +1415,14 @@ pub struct DebugProtocolRegistration {
 #[derive(FidlDecl, Debug, Clone, PartialEq)]
 #[fidl_decl(fidl_table = "fdecl::Program")]
 pub struct ProgramDecl {
-    pub runner: Name,
+    pub runner: Option<Name>,
     pub info: fdata::Dictionary,
+}
+
+impl Default for ProgramDecl {
+    fn default() -> Self {
+        Self { runner: None, info: fdata::Dictionary::default().clone() }
+    }
 }
 
 fidl_translations_identical!([u8; 32]);
@@ -2631,7 +2637,7 @@ mod tests {
             result = {
                 ComponentDecl {
                     program: Some(ProgramDecl {
-                        runner: "elf".parse().unwrap(),
+                        runner: Some("elf".parse().unwrap()),
                         info: fdata::Dictionary {
                             entries: Some(vec![
                                 fdata::DictionaryEntry {
@@ -3146,7 +3152,7 @@ mod tests {
             result = {
                 ComponentDecl {
                     program: Some(ProgramDecl {
-                        runner: "elf".parse().unwrap(),
+                        runner: Some("elf".parse().unwrap()),
                         info: fdata::Dictionary {
                             entries: Some(vec![]),
                             ..Default::default()

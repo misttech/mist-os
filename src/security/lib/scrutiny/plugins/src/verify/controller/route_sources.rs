@@ -795,7 +795,7 @@ mod tests {
         let data_model = data_model.unwrap_or(fake_data_model());
         let components = hashmap! {
             root_url.clone() => (ComponentDecl{
-                program: Some(ProgramDecl{ runner: "some_runner".parse().unwrap(), info: Default::default() }),
+                program: Some(ProgramDecl{ runner: Some("some_runner".parse().unwrap()), ..ProgramDecl::default()}),
                 capabilities: vec![
                     DirectoryDecl{
                         name: "root_dir".parse().unwrap(),
@@ -869,7 +869,7 @@ mod tests {
                 ..ComponentDecl::default()
             }, None),
             one_dir_provider_url => (ComponentDecl{
-                program: Some(ProgramDecl{ runner: "some_runner".parse().unwrap(), info: Default::default() }),
+                program: Some(ProgramDecl{ runner: Some("some_runner".parse().unwrap()), ..ProgramDecl::default()}),
                 capabilities: vec![
                     DirectoryDecl{
                         name: "provider_dir".parse().unwrap(),

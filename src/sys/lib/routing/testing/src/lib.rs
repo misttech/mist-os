@@ -75,7 +75,7 @@ pub fn default_component_decl() -> ComponentDecl {
 pub fn component_decl_with_test_runner() -> ComponentDecl {
     ComponentDecl {
         program: Some(ProgramDecl {
-            runner: TEST_RUNNER_NAME.parse().unwrap(),
+            runner: Some(TEST_RUNNER_NAME.parse().unwrap()),
             info: fdata::Dictionary { entries: Some(vec![]), ..Default::default() },
         }),
         ..Default::default()
@@ -86,7 +86,7 @@ pub fn component_decl_with_test_runner() -> ComponentDecl {
 pub fn component_decl_with_exposed_binder() -> ComponentDecl {
     ComponentDecl {
         program: Some(ProgramDecl {
-            runner: TEST_RUNNER_NAME.parse().unwrap(),
+            runner: Some(TEST_RUNNER_NAME.parse().unwrap()),
             info: fdata::Dictionary { entries: Some(vec![]), ..Default::default() },
         }),
         exposes: vec![ExposeDecl::Protocol(ExposeProtocolDecl {

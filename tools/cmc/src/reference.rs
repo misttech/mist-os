@@ -148,7 +148,9 @@ fn get_component_runner(component_manifest: &ComponentManifest) -> Option<String
         ComponentManifest::Cml(document) => {
             document.program.as_ref().and_then(|p| p.runner.as_ref().map(|s| s.as_str().to_owned()))
         }
-        ComponentManifest::Cm(decl) => decl.program.as_ref().map(|p| p.runner.to_string()),
+        ComponentManifest::Cm(decl) => {
+            decl.program.as_ref().and_then(|p| p.runner.as_ref().map(|n| n.to_string()))
+        }
     }
 }
 

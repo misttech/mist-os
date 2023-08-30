@@ -183,8 +183,14 @@ pub fn validate_component(
     // check for config
     if let Some(config_decl) = manifest.config {
         // make sure the component has a runner that will deliver config before finding values
-        let runner =
-            manifest.program.as_ref().ok_or(ValidationError::ProgramMissing)?.runner.as_str();
+        let runner = manifest
+            .program
+            .as_ref()
+            .ok_or(ValidationError::ProgramMissing)?
+            .runner
+            .as_ref()
+            .ok_or(ValidationError::RunnerMissing)?
+            .as_str();
         if !SUPPORTED_RUNNERS.contains(&runner) {
             return Err(ValidationError::UnsupportedRunner(runner.to_owned()));
         }
@@ -219,6 +225,8 @@ pub enum ValidationError {
     ResolveConfig(#[source] config_encoder::ResolutionError),
     #[error("Component manifest does not specify `program`.")]
     ProgramMissing,
+    #[error("Component manifest does not specify `program.runner`.")]
+    RunnerMissing,
     #[error("{:?} is not a supported runner. (allowed: {:?})", _0, SUPPORTED_RUNNERS)]
     UnsupportedRunner(String),
 }

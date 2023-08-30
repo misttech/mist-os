@@ -923,22 +923,26 @@ impl ComponentModelForAnalyzer {
         program_decl: &ProgramDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
     ) -> Option<VerifyRouteResult> {
-        let runner = &program_decl.runner;
-        let (result, route) =
-            Self::route_capability_sync(RouteRequest::Runner(runner.clone()), target);
-        match result {
-            Ok(_source) => Some(VerifyRouteResult {
-                using_node: target.node_path(),
-                capability: Some(runner.clone()),
-                error: None,
-                route,
-            }),
-            Err(err) => Some(VerifyRouteResult {
-                using_node: target.node_path(),
-                capability: Some(runner.clone()),
-                error: Some(err.into()),
-                route,
-            }),
+        match program_decl.runner {
+            Some(ref runner) => {
+                let (result, route) =
+                    Self::route_capability_sync(RouteRequest::Runner(runner.clone()), target);
+                match result {
+                    Ok(_source) => Some(VerifyRouteResult {
+                        using_node: target.node_path(),
+                        capability: Some(runner.clone()),
+                        error: None,
+                        route,
+                    }),
+                    Err(err) => Some(VerifyRouteResult {
+                        using_node: target.node_path(),
+                        capability: Some(runner.clone()),
+                        error: Some(err.into()),
+                        route,
+                    }),
+                }
+            }
+            None => None,
         }
     }
 
