@@ -66,10 +66,19 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
             (_, _, None) => Some(&NetworkingConfig::Standard),
         };
         if let Some(networking) = networking {
+            let maybe_gub_bundle = |bundle| {
+                if connectivity_config.network.use_unified_binary {
+                    format!("{bundle}_gub").into()
+                } else {
+                    std::borrow::Cow::Borrowed(bundle)
+                }
+            };
+
             // The 'core_realm_networking' and 'network_realm' bundles are
             // required if networking is enabled.
             builder.platform_bundle("core_realm_networking");
             builder.platform_bundle("network_realm");
+            builder.platform_bundle(maybe_gub_bundle("network_realm_packages").as_ref());
 
             // Which specific network package is selectable by the product.
             match networking {
@@ -78,6 +87,7 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                 }
                 NetworkingConfig::Basic => {
                     builder.platform_bundle("networking_basic");
+                    builder.platform_bundle(maybe_gub_bundle("networking_basic_packages").as_ref());
                 }
             }
 
@@ -95,11 +105,14 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                 connectivity_config.network.netstack_version,
             ) {
                 (true, _) | (false, NetstackVersion::Netstack3) => {
-                    builder.platform_bundle("netstack3")
+                    builder.platform_bundle("netstack3");
+                    builder.platform_bundle(maybe_gub_bundle("netstack3_packages").as_ref());
                 }
                 (false, NetstackVersion::Netstack2) => builder.platform_bundle("netstack2"),
                 (false, NetstackVersion::NetstackMigration) => {
-                    builder.platform_bundle("netstack-migration")
+                    builder.platform_bundle("netstack_migration");
+                    builder
+                        .platform_bundle(maybe_gub_bundle("netstack_migration_packages").as_ref());
                 }
             }
 

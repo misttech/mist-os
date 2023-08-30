@@ -74,8 +74,14 @@ USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "intl_services_small_with_timezone.icu_stable_{}".format(icu_flavors.stable_git_commit),
     "minimal_user",
     "netstack3",
+    "netstack3_packages",
+    "netstack3_packages_gub",
     "network_realm",
+    "network_realm_packages",
+    "network_realm_packages_gub",
     "networking_basic",
+    "networking_basic_packages",
+    "networking_basic_packages_gub",
     "networking_with_virtualization",
     "no_update_checker",
     "omaha_client",
@@ -111,7 +117,9 @@ USER_PLATFORM_AIB_NAMES_EXCLUDED_FROM_RISCV64 = [
     # The Go toolchain used for netstack2 does not support RISC-V.
     # netstack-migration contains netstack2, so equally no support on RISC-V.
     "netstack2",
-    "netstack-migration",
+    "netstack_migration",
+    "netstack_migration_packages",
+    "netstack_migration_packages_gub",
 
     # TODO(fxbug.dev/128554): Move to the list above once build errors are resolved.
     "starnix_support",

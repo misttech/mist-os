@@ -54,10 +54,10 @@ network_unified_binary("dhcp_client") {
   ]
 }
 
-fuchsia_component("component") {
+network_unified_binary_regular_and_gub_components("component") {
   component_name = "dhcp-client"
   manifest = "meta/dhcp-client.cml"
-  deps = [ ":dhcp_client" ]
+  gub_deps = [ ":dhcp_client" ]
 }
 
 fuchsia_test_component("dhcp-client-test") {
@@ -67,10 +67,6 @@ fuchsia_test_component("dhcp-client-test") {
     "//src/connectivity/network/netstack:component-debug",
     "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
   ]
-}
-
-fuchsia_package("dhcp-client") {
-  deps = [ ":component" ]
 }
 
 fuchsia_test_with_expectations_package("dhcp-client-tests") {

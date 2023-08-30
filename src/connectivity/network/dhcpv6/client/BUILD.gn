@@ -49,15 +49,15 @@ network_unified_binary("dhcpv6_client") {
   ]
 }
 
-fuchsia_component("component") {
+network_unified_binary_regular_and_gub_components("component") {
   component_name = "dhcpv6-client"
   manifest = "meta/dhcpv6-client.cml"
-  deps = [ ":dhcpv6_client" ]
+  gub_deps = [ ":dhcpv6_client" ]
 }
 
-fuchsia_package("package") {
+network_unified_binary_regular_and_gub_packages("package") {
   package_name = "dhcpv6-client"
-  deps = [ ":component" ]
+  gub_deps = [ ":component" ]
   visibility = [ "//bundles/assembly/*" ]
 }
 

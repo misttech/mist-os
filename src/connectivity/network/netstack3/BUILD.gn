@@ -109,6 +109,16 @@ network_unified_binary("bin") {
   test_deps = common_test_deps
 
   sources = common_sources
+
+  if (!is_debug) {
+    # Allow cross-crate optimization since netstack3 is split between multiple
+    # crates.
+    bin_add_configs = [ "//build/config/rust:lto_thin" ]
+
+    # Dynamic linking libstd is incompatible with LTO.
+    bin_remove_configs =
+        [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
+  }
 }
 
 rustc_binary("bin-instrumented") {
@@ -125,10 +135,10 @@ rustc_binary("bin-instrumented") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-fuchsia_component("component") {
+network_unified_binary_regular_and_gub_components("component") {
   component_name = "netstack3"
   manifest = "meta/netstack3.cml"
-  deps = [ ":bin" ]
+  gub_deps = [ ":bin" ]
 }
 
 # Component with debugging instrumentation enabled. This should be used for

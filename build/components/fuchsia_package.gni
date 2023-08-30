@@ -331,6 +331,8 @@ template("fuchsia_package") {
       _is_system_package = invoker.is_system_package
     }
 
+    _package_target_name = target_name
+
     # Build package
     package_tool_package_build(_package_build_target) {
       forward_variables_from(invoker,
@@ -404,7 +406,9 @@ template("fuchsia_package") {
       # this package_tool_package_build target is visible to the top-level
       # package.
       if (defined(visibility)) {
-        visibility += [ ":${invoker.target_name}" ]
+        visibility += [ ":${_package_target_name}" ]
+      } else {
+        not_needed([ "_package_target_name" ])
       }
 
       if (_is_shell_package) {

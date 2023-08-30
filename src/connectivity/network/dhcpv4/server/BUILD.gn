@@ -52,15 +52,15 @@ fuchsia_test_package("dhcpv4-server-tests") {
   deps = [ "//src/sys/stash:stash_secure_v2" ]
 }
 
-fuchsia_component("component") {
+network_unified_binary_regular_and_gub_components("component") {
   component_name = "dhcpv4_server"
   manifest = "meta/dhcpv4_server.cml"
-  deps = [ ":bin" ]
+  gub_deps = [ ":bin" ]
 }
 
-fuchsia_package("package") {
+network_unified_binary_regular_and_gub_packages("package") {
   package_name = "dhcpv4-server"
-  deps = [ ":component" ]
+  gub_deps = [ ":component" ]
   visibility = [ "//bundles/assembly/*" ]
 }
 

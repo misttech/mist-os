@@ -30,6 +30,15 @@ pub struct PlatformNetworkConfig {
 
     #[serde(default)]
     pub netcfg_config_path: Option<Utf8PathBuf>,
+
+    /// Controls whether the unified binary for networking should be used.
+    ///
+    /// The unified binary provides space savings for space-constrainted
+    /// products, trading off multiple small binaries for one large binary that
+    /// is smaller than the sum of its separate parts thanks to linking
+    /// optimizations.
+    #[serde(default)]
+    pub use_unified_binary: bool,
 }
 
 /// Network stack version to use.

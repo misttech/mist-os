@@ -51,12 +51,11 @@ rustc_test("netstack_proxy_test") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-fuchsia_component("component") {
+network_unified_binary_regular_and_gub_components("component") {
   component_name = "netstack-proxy"
   manifest = "meta/netstack-proxy.cml"
-  deps = [
+  gub_deps = [
     ":bin",
-    "//src/connectivity/network/netstack:bin",
     "//src/connectivity/network/netstack3:bin",
 
     # TODO(https://fxbug.dev/125773): Remove this once the DHCP client is
@@ -64,6 +63,8 @@ fuchsia_component("component") {
     # capability from there.
     "//src/connectivity/network/dhcpv4/client/bindings:component",
   ]
+
+  non_gub_deps = [ "//src/connectivity/network/netstack:bin" ]
 }
 
 fuchsia_test_component("component-test") {

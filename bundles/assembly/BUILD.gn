@@ -521,19 +521,12 @@ assembly_input_bundle("core_realm_networking") {
   ]
 }
 
-# network_realm
+# Network realm definition.
 #
-# This AIB is the base on which to build up networking support. It includes all
-# the packages that are common across all products that require networking.
+# This AIB defines the base network package, which lays out the network realm.
+# It must be used in conjunction with network_realm_packages or
+# network_realm_packages_gub.
 assembly_input_bundle("network_realm") {
-  base_packages = [
-    "//src/connectivity/network/dhcpv4/server:package",
-    "//src/connectivity/network/dhcpv6/client:package",
-    "//src/connectivity/network/dns:package",
-    "//src/connectivity/network/http-client:package",
-    "//src/connectivity/network/reachability:package",
-  ]
-
   compiled_packages = [
     {
       name = "network"
@@ -566,6 +559,42 @@ assembly_input_bundle("network_realm") {
   ]
 }
 
+# Network realm packages without unified binary.
+#
+# This AIB includes all the packages that are common across all products that
+# require networking. It provides the network realm using packages that utilize
+# separate, more-optimized, binaries, trading space for performance. This is
+# the default implementation used.
+#
+# It is mutually-exclusive with 'network_realm_packages_gub'.
+assembly_input_bundle("network_realm_packages") {
+  base_packages = [
+    "//src/connectivity/network/dhcpv4/server:package",
+    "//src/connectivity/network/dhcpv6/client:package",
+    "//src/connectivity/network/dns:package",
+    "//src/connectivity/network/http-client:package",
+    "//src/connectivity/network/reachability:package",
+  ]
+}
+
+# Network realm packages with unified binary.
+#
+# This AIB is equivalent to network_realm_packages. It provides the network
+# realm using packages that utilize a "grand unified binary" (GUB), saving space
+# at the cost of a minor loss in performance.  This is for space- constrained
+# devices that don't have the space for the non-GUB binaries.
+#
+# It is mutually-exclusive with 'network_realm_packages'.
+assembly_input_bundle("network_realm_packages_gub") {
+  base_packages = [
+    "//src/connectivity/network/dhcpv4/server:package_gub",
+    "//src/connectivity/network/dhcpv6/client:package_gub",
+    "//src/connectivity/network/dns:package_gub",
+    "//src/connectivity/network/http-client:package_gub",
+    "//src/connectivity/network/reachability:package_gub",
+  ]
+}
+
 # networking_with_virtualization
 #
 # This AIB adds the networking capabilities that include virtualization support.
@@ -588,13 +617,14 @@ assembly_input_bundle("networking_with_virtualization") {
   ]
 }
 
-# networking_basic
+# Basic networking.
 #
-# This AIB adds the basic networking capabilities.
-# It is mutually-exclusive with networking_with_virtualization.
+# This AIB adds the basic networking capabilities. It is mutually-exclusive with
+# networking_with_virtualization.
 #
+# It must be used in conjunction with either network_basic_packages or
+# network_basic_packages_gub.
 assembly_input_bundle("networking_basic") {
-  base_packages = [ "//src/connectivity/network/netcfg:package-basic" ]
   compiled_packages = [
     {
       name = "network"
@@ -608,6 +638,23 @@ assembly_input_bundle("networking_basic") {
       ]
     },
   ]
+}
+
+# Basic networking packages without unified binary.
+#
+# This AIB provides packages for the networking_basic configuration. It is
+# mutually exlucisve with networking_basic_packages_gub.
+assembly_input_bundle("networking_basic_packages") {
+  base_packages = [ "//src/connectivity/network/netcfg:package-basic" ]
+}
+
+# Basic networking packages with unified binary.
+#
+# This AIB provides space-saving equivalent packages for the networking_basic
+# configuration as found in networking_basic_packages. It is mutually exlucisve
+# with networking_basic_packages.
+assembly_input_bundle("networking_basic_packages_gub") {
+  base_packages = [ "//src/connectivity/network/netcfg:package-basic_gub" ]
 }
 
 # networking_test_collection
@@ -1767,13 +1814,14 @@ assembly_input_bundle("netstack2") {
   ]
 }
 
-# AIB to include Netstack3 as the netstack for use by base networking.
+# Netstack3 as the netstack for use by base networking.
 #
 # feature_set_levels: minimal
 # build-types: all
 #
+# To be used in conjunction with netstack3_packages or netstack3_packages_gub.
+#
 assembly_input_bundle("netstack3") {
-  base_packages = [ "//src/connectivity/network:netstack3" ]
   compiled_packages = [
     {
       name = "network"
@@ -1789,13 +1837,31 @@ assembly_input_bundle("netstack3") {
   ]
 }
 
-# AIB to include netstack-migration as the netstack for use by base networking.
+# Netstack3 packages without unified binary.
+#
+# This AIB provides packages for the netstack3 configuration. It is mutually
+# exclusive with netstack3_packages_gub.
+assembly_input_bundle("netstack3_packages") {
+  base_packages = [ "//src/connectivity/network:netstack3" ]
+}
+
+# Netstack3 packages without unified binary.
+#
+# This AIB provides space-saving equivalent packages for the netstack3
+# configuration as found in netstack3_packages. It is mutually exclusive with
+# netstack3_packages.
+assembly_input_bundle("netstack3_packages_gub") {
+  base_packages = [ "//src/connectivity/network:netstack3_gub" ]
+}
+
+# Netstack-migration as the netstack for use by base networking.
 #
 # feature_set_levels: minimal
 # build-types: all
 #
-assembly_input_bundle("netstack-migration") {
-  base_packages = [ "//src/connectivity/network:netstack-migration" ]
+# Must be used in conjunction with netstack_migration_packages or
+# netstack_migration_packages_gub.
+assembly_input_bundle("netstack_migration") {
   compiled_packages = [
     {
       name = "network"
@@ -1820,6 +1886,22 @@ assembly_input_bundle("netstack-migration") {
       ]
     },
   ]
+}
+
+# Netstack migration packages without unified binary.
+#
+# This AIB provides packages for the netstack_migration configuration. It is
+# mutually exclusive with netstack_migration_packages_gub.
+assembly_input_bundle("netstack_migration_packages") {
+  base_packages = [ "//src/connectivity/network:netstack-migration" ]
+}
+
+# Netstack migration packages with unified binary.
+#
+# This AIB provides packages for the netstack_migration configuration. It is
+# mutually exclusive with netstack_migration_packages.
+assembly_input_bundle("netstack_migration_packages_gub") {
+  base_packages = [ "//src/connectivity/network:netstack-migration_gub" ]
 }
 
 # WLAN base support
