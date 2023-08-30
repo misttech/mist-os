@@ -5,7 +5,7 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use ffx_daemon_target::FASTBOOT_CHECK_INTERVAL;
-use ffx_fastboot::common::find::find_serial_numbers;
+use ffx_fastboot::usb_discovery::find_serial_numbers;
 use ffx_stream_util::TryStreamUtilExt;
 use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_developer_ffx as ffx;

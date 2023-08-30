@@ -59,7 +59,6 @@ if (is_host) {
       "src/boot/mod.rs",
       "src/common/cmd.rs",
       "src/common/crypto.rs",
-      "src/common/find.rs",
       "src/common/mod.rs",
       "src/common/vars.rs",
       "src/file_resolver/gcs.rs",
@@ -74,6 +73,7 @@ if (is_host) {
       "src/manifest/v2.rs",
       "src/manifest/v3.rs",
       "src/unlock/mod.rs",
+      "src/usb_discovery/mod.rs",
     ]
   }
 

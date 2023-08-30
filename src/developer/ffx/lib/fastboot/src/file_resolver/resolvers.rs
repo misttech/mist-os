@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::file_resolver::FileResolver;
 use crate::common::done_time;
+use crate::file_resolver::FileResolver;
 use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use chrono::Utc;
@@ -18,7 +18,6 @@ use tar::Archive;
 use tempfile::{tempdir, TempDir};
 use walkdir::WalkDir;
 use zip::read::ZipArchive;
-
 
 pub struct EmptyResolver {
     fake: PathBuf,

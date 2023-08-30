@@ -33,7 +33,6 @@ pub const MISSING_CREDENTIALS: &str =
 
 pub mod cmd;
 pub mod crypto;
-pub mod find;
 pub mod vars;
 
 pub trait Partition {
