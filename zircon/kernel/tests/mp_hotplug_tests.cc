@@ -46,8 +46,9 @@ static unsigned get_num_cpus_online() {
   return count;
 }
 
-static zx_status_t wait_for_cpu_offline(cpu_num_t i, Deadline deadline) {
-  while (current_time() < deadline.when()) {
+static zx_status_t wait_for_cpu_offline(cpu_num_t i) {
+  zx_time_t print_time = zx_time_add_duration(current_time(), ZX_SEC(5));
+  while (true) {
     zx::result<power_cpu_state> res = platform_get_cpu_state(i);
     if (res.is_error()) {
       if (res.error_value() == ZX_ERR_NOT_SUPPORTED) {
@@ -59,21 +60,26 @@ static zx_status_t wait_for_cpu_offline(cpu_num_t i, Deadline deadline) {
     } else if (res.value() == power_cpu_state::OFF || res.value() == power_cpu_state::STOPPED) {
       return ZX_OK;
     }
-    Thread::Current::SleepRelative(ZX_MSEC(10));
-  }
-  printf("timed out waiting for cpu-%u to go offline\n", i);
-  return ZX_ERR_TIMED_OUT;
-}
-
-static zx_status_t wait_for_cpu_active(cpu_num_t i, Deadline deadline) {
-  while (current_time() < deadline.when()) {
-    if (mp_is_cpu_active(i)) {
-      return ZX_OK;
+    if (current_time() > print_time) {
+      print_time = zx_time_add_duration(current_time(), ZX_SEC(5));
+      printf("Still waiting for CPU %u to go offline, waiting 5 more seconds\n", i);
     }
     Thread::Current::SleepRelative(ZX_MSEC(10));
   }
-  printf("timed out waiting for cpu-%u to become active\n", i);
-  return ZX_ERR_TIMED_OUT;
+}
+
+static void wait_for_cpu_active(cpu_num_t i) {
+  zx_time_t print_time = zx_time_add_duration(current_time(), ZX_SEC(5));
+  while (true) {
+    if (mp_is_cpu_active(i)) {
+      return;
+    }
+    if (current_time() > print_time) {
+      print_time = zx_time_add_duration(current_time(), ZX_SEC(5));
+      printf("Still waiting for CPU %u to become active, waiting 5 more seconds\n", i);
+    }
+    Thread::Current::SleepRelative(ZX_MSEC(10));
+  }
 }
 
 // Unplug all cores (except for Boot core), then hotplug
@@ -101,13 +107,11 @@ static zx_status_t wait_for_cpu_active(cpu_num_t i, Deadline deadline) {
       continue;
     }
     // Wait until this core is fully offline.
-    ASSERT_OK(wait_for_cpu_offline(i, Deadline::after(ZX_SEC(5))),
-              "waiting for core to go offline failed");
+    ASSERT_OK(wait_for_cpu_offline(i), "waiting for core to go offline failed");
     // Hotplug this core.
     ASSERT_OK(hotplug_core(i), "hotplugging core failed");
     // Wait until the core is active.
-    ASSERT_OK(wait_for_cpu_active(i, Deadline::after(ZX_SEC(5))),
-              "waiting for core to come online failed");
+    wait_for_cpu_active(i);
     // Create a thread, affine it to the core just hotplugged
     // and make sure the thread does get scheduled there.
     cpu_num_t running_core;
