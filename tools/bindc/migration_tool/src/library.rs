@@ -51,7 +51,7 @@ impl Library {
             Library::Acpi => "//src/devices/bind/fuchsia.acpi",
             Library::Amlogic => "//src/devices/bind/fuchsia.amlogic.platform",
             Library::Bluetooth => "//src/devices/bind/fuchsia.bluetooth",
-            Library::Clock => "//src/devices/bind/fuchsia.hardware.clock",
+            Library::Clock => "//src/devices/bind/fuchsia.clock",
             Library::Dsi => "//src/devices/bind/fuchsia.display.dsi",
             Library::Gpio => "//src/devices/bind/fuchsia.gpio",
             Library::I2c => "//src/devices/bind/fuchsia.i2c",

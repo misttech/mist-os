@@ -9,7 +9,7 @@ driver_bind_rules("clock-bind") {
   rules = "clock.bind"
   bind_output = "clock.bindbc"
   tests = "bind-tests.json"
-  deps = [ "//src/devices/bind/fuchsia.clockimpl" ]
+  deps = [ "//src/devices/bind/fuchsia.clock" ]
 }
 
 fuchsia_driver("clock-driver") {

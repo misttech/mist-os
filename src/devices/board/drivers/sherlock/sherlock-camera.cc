@@ -18,12 +18,12 @@
 #include <bind/fuchsia/amlogic/platform/t931/cpp/bind.h>
 #include <bind/fuchsia/arm/platform/cpp/bind.h>
 #include <bind/fuchsia/camerasensor2/cpp/bind.h>
+#include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gdc/cpp/bind.h>
 #include <bind/fuchsia/ge2d/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/amlogiccanvas/cpp/bind.h>
-#include <bind/fuchsia/hardware/clock/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/isp/cpp/bind.h>
 #include <bind/fuchsia/mipicsi/cpp/bind.h>
@@ -332,7 +332,7 @@ zx_status_t Sherlock::CameraInit() {
       .bind_rules =
           {
               fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                      bind_fuchsia_hardware_clock::BIND_FIDL_PROTOCOL_SERVICE),
+                                      bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
               fdf::MakeAcceptBindRule(
                   bind_fuchsia::CLOCK_ID,
                   bind_fuchsia_amlogic_platform_meson::G12B_CLK_ID_CLK_CAM_INCK_24M),
@@ -340,9 +340,9 @@ zx_status_t Sherlock::CameraInit() {
       .properties =
           {
               fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                                bind_fuchsia_hardware_clock::BIND_FIDL_PROTOCOL_SERVICE),
-              fdf::MakeProperty(bind_fuchsia_hardware_clock::FUNCTION,
-                                bind_fuchsia_hardware_clock::FUNCTION_CAMERA_SENSOR),
+                                bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+              fdf::MakeProperty(bind_fuchsia_clock::FUNCTION,
+                                bind_fuchsia_clock::FUNCTION_CAMERA_SENSOR),
           },
   }};
 

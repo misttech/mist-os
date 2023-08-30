@@ -2,10 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-library fuchsia.hardware.clock;
+library fuchsia.clock;
+
+extend uint fuchsia.BIND_PROTOCOL {
+  IMPL = 0x5B,
+};
 
 extend uint fuchsia.BIND_FIDL_PROTOCOL {
-  SERVICE = 22,
+  SERVICE = 0x16,
 };
 
 enum FUNCTION {
