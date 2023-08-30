@@ -4,6 +4,7 @@
 #ifndef SRC_DEVICES_BUS_DRIVERS_PCI_TEST_FAKES_TEST_DEVICE_H_
 #define SRC_DEVICES_BUS_DRIVERS_PCI_TEST_FAKES_TEST_DEVICE_H_
 
+#include <fuchsia/hardware/pciroot/c/banjo.h>
 #include <lib/device-protocol/pci.h>
 
 #include <array>
@@ -341,21 +342,26 @@ constexpr size_t kFakeQuadroMsiXIrqCnt = 5;
 // BAR metadata for the fake Quadro. Refer to the BAR lines above for an
 // explanation.
 static constexpr struct test_bar_info_t {
-    pci_bar_type_t type;
+    pci_bar_type_t bar_type;
+    pci_address_space_t address_type;
     bool is_upper_half;
     uint16_t address;
     uint32_t size;
 } kTestDeviceBars[6] = {
-    { .type = PCI_BAR_TYPE_MMIO, .is_upper_half = false, .address = UINT16_MAX, .size = 16 * 1024 * 1024 },
-    { .type = PCI_BAR_TYPE_MMIO, .is_upper_half = false, .address = UINT16_MAX, .size = 256 * 1024 * 1024 },
-    { .type = PCI_BAR_TYPE_MMIO, .is_upper_half = false, .address = UINT16_MAX, .size = 1 * 1024 * 1024  },
-    { .type = PCI_BAR_TYPE_MMIO, .is_upper_half = false, .address = UINT16_MAX, .size = 32 * 1024 * 1024 },
-    { .type = PCI_BAR_TYPE_MMIO, .is_upper_half = true,  .address = UINT16_MAX, .size = 0 },
+    { .bar_type = PCI_BAR_TYPE_MMIO, .address_type = PCI_ADDRESS_SPACE_MEMORY, .is_upper_half = false, .address = UINT16_MAX, .size = 16 * 1024 * 1024 },
+    { .bar_type = PCI_BAR_TYPE_MMIO, .address_type = PCI_ADDRESS_SPACE_MEMORY, .is_upper_half = false, .address = UINT16_MAX, .size = 256 * 1024 * 1024 },
+    { .bar_type = PCI_BAR_TYPE_MMIO, .address_type = PCI_ADDRESS_SPACE_MEMORY, .is_upper_half = false, .address = UINT16_MAX, .size = 1 * 1024 * 1024  },
+    { .bar_type = PCI_BAR_TYPE_MMIO, .address_type = PCI_ADDRESS_SPACE_MEMORY, .is_upper_half = false, .address = UINT16_MAX, .size = 32 * 1024 * 1024 },
+    { .bar_type = PCI_BAR_TYPE_MMIO, .address_type = PCI_ADDRESS_SPACE_MEMORY, .is_upper_half = true,  .address = UINT16_MAX, .size = 0 },
 #ifdef __x86_64__
-    { .type = PCI_BAR_TYPE_IO, .is_upper_half = false, .address = 0x2000,     .size = 128 },
-#elif defined(__aarch64__)
-    { .type = PCI_BAR_TYPE_IO, .is_upper_half = false, .address = 0x2000,     .size = 4096 },
+    { .bar_type = PCI_BAR_TYPE_IO, .address_type = PCI_ADDRESS_SPACE_IO, .is_upper_half = false, .address = 0x2000,     .size = 128 },
+#elif defined(__aarch64__) || defined(__riscv)
+    { .bar_type = PCI_BAR_TYPE_IO, .address_type = PCI_ADDRESS_SPACE_MEMORY, .is_upper_half = false, .address = 0x2000,     .size = 4096 },
+#else
+    // Trigger an error on unsupported architectures.
+    { .address_type = PCI_ADDRESS_SPACE_NONE }
 #endif
+
 
 };
 

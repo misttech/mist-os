@@ -234,23 +234,17 @@ void PciProtocolTests::GetBarTestHelper(uint32_t bar_id) {
   fidl::Arena arena;
   fuchsia_hardware_pci::wire::Bar info = {};
   const test_bar_info_t& test_bar = kTestDeviceBars[bar_id];
+  // Quick check that the test BAR is valid.
+  ASSERT_NE(test_bar.address_type, PCI_ADDRESS_SPACE_NONE);
+  // Grab the BAR via the protoocol.
   ASSERT_OK(pci().GetBar(arena, bar_id, &info));
   EXPECT_EQ(info.bar_id, bar_id);
-  auto type = test_bar.type == PCI_BAR_TYPE_MMIO ? fpci::wire::BarResult::Tag::kVmo
-                                                 : fpci::wire::BarResult::Tag::kIo;
-  EXPECT_EQ(info.result.Which(), type);
+  // Check to make sure we got the right BAR result back for the given bar / architecture
+  auto type = (test_bar.address_type == PCI_ADDRESS_SPACE_MEMORY) ? fpci::wire::BarResult::Tag::kVmo
+                                                                  : fpci::wire::BarResult::Tag::kIo;
+  ASSERT_EQ(info.result.Which(), type);
 
-  pci_address_space_t io_type = PCI_ADDRESS_SPACE_NONE;
-#ifdef __x86_64__
-  io_type = PCI_ADDRESS_SPACE_IO;
-#elif defined(__aarch64__)
-  io_type = PCI_ADDRESS_SPACE_MEMORY;
-#endif
-  ASSERT_NE(io_type, PCI_ADDRESS_SPACE_NONE);
-  // ARM uses MMIO for both types of BARs
-  if (info.result.Which() == fpci::wire::BarResult::Tag::kVmo ||
-      (info.result.Which() == fpci::wire::BarResult::Tag::kIo &&
-       io_type == PCI_ADDRESS_SPACE_MEMORY)) {
+  if (info.result.Which() == fpci::wire::BarResult::Tag::kVmo) {
     size_t size = 0;
     zx::vmo vmo(std::move(info.result.vmo()));
     ASSERT_OK(vmo.get_size(&size));
