@@ -353,8 +353,8 @@ async fn does_not_crash_with_overlapping_subnet_route<
     let realms_and_interfaces =
         test_dhcp::<CLIENT::DhcpClient>(name, &sandbox, &mut netstack_configs, 1, false).await;
     let (client_realm, client_interfaces) = match &realms_and_interfaces[..] {
-        [(client_realm, client_interfaces), (_server_realm, _server_interfaces)] => {
-            (client_realm, client_interfaces)
+        [TestDhcpRealmAndInterfaces { realm, client_ifaces, _server_ifaces: _ }, TestDhcpRealmAndInterfaces { realm: _, client_ifaces: _, _server_ifaces: _ }] => {
+            (realm, client_ifaces)
         }
         _ => panic!("should have a client realm and a server realm: {:?}", &realms_and_interfaces),
     };
@@ -579,6 +579,13 @@ async fn acquire_with_dhcpd_bound_device_dup_addr<
     .await;
 }
 
+#[derive(Debug)]
+struct TestDhcpRealmAndInterfaces<'a> {
+    realm: netemul::TestRealm<'a>,
+    client_ifaces: Vec<netemul::TestInterface<'a>>,
+    _server_ifaces: Vec<netemul::TestInterface<'a>>,
+}
+
 /// test_dhcp provides a flexible way to test DHCP acquisition across various network topologies.
 ///
 /// This method will:
@@ -594,8 +601,7 @@ fn test_dhcp<'a, D: DhcpClient>(
     netstack_configs: &'a mut [TestNetstackRealmConfig<'a>],
     dhcp_loop_cycles: usize,
     expect_client_renews: bool,
-) -> impl futures::Future<Output = Vec<(netemul::TestRealm<'a>, Vec<netemul::TestInterface<'a>>)>> + 'a
-{
+) -> impl futures::Future<Output = Vec<TestDhcpRealmAndInterfaces<'a>>> + 'a {
     async move {
         let dhcp_objects = stream::iter(netstack_configs.into_iter())
             .enumerate()
@@ -738,9 +744,8 @@ fn test_dhcp<'a, D: DhcpClient>(
             .expect("failed to create DHCP domain objects");
 
         let mut realms = Vec::new();
-
         for (netstack_realm, servers, clients) in dhcp_objects {
-            let mut ifaces = Vec::new();
+            let mut client_ifaces = Vec::new();
             for (client, expected_acquired) in clients {
                 assert_client_acquires_addr::<D>(
                     &netstack_realm,
@@ -750,13 +755,18 @@ fn test_dhcp<'a, D: DhcpClient>(
                     expect_client_renews,
                 )
                 .await;
-                ifaces.push(client);
+                client_ifaces.push(client);
             }
-            for (server, mut server_ifaces) in servers {
+            let mut server_ifaces = Vec::new();
+            for (server, mut ifaces) in servers {
                 let () = server.stop_serving().await.expect("failed to stop server");
-                ifaces.append(&mut server_ifaces);
+                server_ifaces.append(&mut ifaces);
             }
-            realms.push((netstack_realm, ifaces));
+            realms.push(TestDhcpRealmAndInterfaces {
+                realm: netstack_realm,
+                client_ifaces,
+                _server_ifaces: server_ifaces,
+            });
         }
 
         realms
