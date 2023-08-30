@@ -38,20 +38,29 @@ fuchsia_hardware_nand::wire::RamNandInfo BuildConfig() {
 
 TEST(RamNandTest, TrivialLifetime) {
   NandParams params(kPageSize, kBlockSize, kNumBlocks, 6, 0);  // 6 bits of ECC, no OOB.
+  std::string device_names[2];
   {
     NandDevice device(params);
 
     auto device_name = device.Init();
     ASSERT_TRUE(device_name.is_ok());
-    EXPECT_STREQ("ram-nand-0", device_name->data());
+    device_names[0] = std::string(device_name->data());
   }
   {
     NandDevice device(params);
 
     auto device_name = device.Init();
     ASSERT_TRUE(device_name.is_ok());
-    EXPECT_STREQ("ram-nand-1", device_name->data());
+    device_names[1] = std::string(device_name->data());
   }
+  const std::string kPrefix = "ram-nand-";
+  ASSERT_STREQ(kPrefix, device_names[0].substr(0, kPrefix.size()));
+  ASSERT_STREQ(kPrefix, device_names[1].substr(0, kPrefix.size()));
+  std::string indexes[2] = {
+      device_names[0].substr(kPrefix.size()),
+      device_names[1].substr(kPrefix.size()),
+  };
+  EXPECT_LT(atoi(indexes[0].c_str()), atoi(indexes[1].c_str()));
 }
 
 TEST(RamNandTest, DdkLifetime) {

@@ -9,11 +9,5 @@
     ],
     program: {
         binary: "test/ram-nand-test",
-
-        // TODO(fxb/92564): Remove shuffle disable flag after fixing the test.
-        args: [
-            "--gtest_shuffle",
-            "false",
-        ],
     },
 }
