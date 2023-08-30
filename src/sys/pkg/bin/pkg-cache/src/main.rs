@@ -123,18 +123,6 @@ async fn main_inner() -> Result<(), Error> {
         .await
         .context("error opening blobfs")?;
 
-    let base_resolver_base_packages = if use_system_image {
-        determine_base_packages(
-            &blobfs,
-            &fuchsia_component::client::connect_to_protocol::<fidl_fuchsia_boot::ArgumentsMarker>()
-                .context("failed to connect to fuchsia.boot/Arguments")?,
-        )
-        .await
-        .context("determine base packages")?
-    } else {
-        HashMap::new()
-    };
-
     let authenticator = crate::context_authenticator::ContextAuthenticator::new();
 
     let (system_image, executability_restrictions, base_packages, cache_packages) =
@@ -179,7 +167,7 @@ async fn main_inner() -> Result<(), Error> {
     inspector
         .root()
         .record_string("executability-restrictions", format!("{executability_restrictions:?}"));
-
+    let base_resolver_base_packages = base_packages.root_package_urls_and_hashes().clone();
     let base_packages = Arc::new(base_packages);
     inspector.root().record_lazy_child("base-packages", base_packages.record_lazy_inspect());
     let package_index = Arc::new(async_lock::RwLock::new(package_index));
@@ -357,34 +345,6 @@ async fn main_inner() -> Result<(), Error> {
     cobalt_fut.await;
 
     Ok(())
-}
-
-/// Panics if a base package has a non-zero variant.
-/// The URLs in the returned map will not have a variant.
-async fn determine_base_packages(
-    blobfs: &blobfs::Client,
-    boot_args: &fidl_fuchsia_boot::ArgumentsProxy,
-) -> anyhow::Result<HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>> {
-    let system_image = system_image::SystemImage::new(blobfs.clone(), boot_args)
-        .await
-        .context("failed to load system_image package")?;
-    let static_packages =
-        system_image.static_packages().await.context("failed to determine static packages")?;
-    let base_repo = fuchsia_url::RepositoryUrl::parse_host("fuchsia.com".into())
-        .expect("valid repository hostname");
-    Ok(HashMap::from_iter(
-        static_packages
-            .into_contents()
-            .chain([(system_image::SystemImage::package_path(), *system_image.hash())])
-            .map(|(path, hash)| {
-                let (name, variant) = path.into_name_and_variant();
-                // TODO(fxbug.dev/53911) Remove variant checks when variant concept is deleted.
-                if !variant.is_zero() {
-                    panic!("base package variants must be zero: {name} {variant}");
-                }
-                (fuchsia_url::UnpinnedAbsolutePackageUrl::new(base_repo.clone(), name, None), hash)
-            }),
-    ))
 }
 
 async fn shell_commands_bin_dir(

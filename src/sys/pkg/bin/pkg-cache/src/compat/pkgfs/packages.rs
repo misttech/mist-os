@@ -45,12 +45,12 @@ impl PkgfsPackages {
     }
 
     async fn packages(&self) -> HashMap<PackageName, HashMap<PackageVariant, Hash>> {
-        let paths_and_hashes = self.base_packages.root_paths_and_hashes();
+        let paths_and_hashes = self.base_packages.root_package_urls_and_hashes().iter();
         let mut res: HashMap<PackageName, HashMap<PackageVariant, Hash>> =
             HashMap::with_capacity(paths_and_hashes.len());
         for (path, hash) in paths_and_hashes {
             let name = path.name().to_owned();
-            let variant = path.variant().to_owned();
+            let variant = path.variant().unwrap_or(&PackageVariant::zero()).to_owned();
             res.entry(name).or_default().insert(variant, *hash);
         }
         res
@@ -187,14 +187,15 @@ mod tests {
         super::*,
         crate::compat::pkgfs::testing::FakeSink,
         assert_matches::assert_matches,
-        fuchsia_pkg::PackagePath,
         fuchsia_pkg_testing::{blobfs::Fake as FakeBlobfs, PackageBuilder},
         maplit::{convert_args, hashmap},
         std::collections::HashSet,
     };
 
     impl PkgfsPackages {
-        pub fn new_test(base_packages: impl IntoIterator<Item = (PackagePath, Hash)>) -> Arc<Self> {
+        pub fn new_test(
+            base_packages: impl IntoIterator<Item = (fuchsia_url::UnpinnedAbsolutePackageUrl, Hash)>,
+        ) -> Arc<Self> {
             Arc::new(PkgfsPackages::new(
                 Arc::new(BasePackages::new_test_only(
                     // PkgfsPackages only uses the path-hash mapping, so tests do not need to
@@ -244,8 +245,13 @@ mod tests {
         Hash::from([n; 32])
     }
 
-    fn path(name: &str, variant: &str) -> PackagePath {
-        PackagePath::from_name_and_variant(name.parse().unwrap(), variant.parse().unwrap())
+    fn package_url(name: &str, variant: &str) -> fuchsia_url::UnpinnedAbsolutePackageUrl {
+        fuchsia_url::UnpinnedAbsolutePackageUrl::new(
+            fuchsia_url::RepositoryUrl::parse_host("fuchsia.com".into())
+                .expect("valid repository hostname"),
+            name.parse().unwrap(),
+            Some(variant.parse().unwrap()),
+        )
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -258,8 +264,8 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn packages_listing() {
         let pkgfs_packages = PkgfsPackages::new_test([
-            (path("static", "0"), hash(0)),
-            (path("static", "1"), hash(2)),
+            (package_url("static", "0"), hash(0)),
+            (package_url("static", "1"), hash(2)),
         ]);
 
         assert_eq!(
@@ -296,9 +302,9 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn readdir_nonempty() {
         let pkgfs_packages = PkgfsPackages::new_test([
-            (path("allowed", "0"), hash(0)),
-            (path("static", "0"), hash(1)),
-            (path("static", "1"), hash(2)),
+            (package_url("allowed", "0"), hash(0)),
+            (package_url("static", "0"), hash(1)),
+            (package_url("static", "1"), hash(2)),
         ]);
 
         let (pos, sealed) = Directory::read_dirents(
@@ -359,7 +365,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn open_opens_static_package_variants() {
-        let pkgfs_packages = PkgfsPackages::new_test([(path("static", "0"), hash(0))]);
+        let pkgfs_packages = PkgfsPackages::new_test([(package_url("static", "0"), hash(0))]);
 
         let proxy = pkgfs_packages.proxy(fio::OpenFlags::RIGHT_READABLE);
 
@@ -383,7 +389,7 @@ mod tests {
         let pkgfs_packages = Arc::new(PkgfsPackages::new(
             Arc::new(BasePackages::new_test_only(
                 HashSet::new(),
-                [("static/0".parse().unwrap(), *package.hash())],
+                [("fuchsia-pkg://fuchsia.com/static".parse().unwrap(), *package.hash())],
             )),
             blobfs_client,
         ));

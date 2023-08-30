@@ -64,7 +64,7 @@ async fn base_packages() {
         hierarchy,
         root: contains {
             "base-packages": {
-                "system_image/0": {
+                "fuchsia-pkg://fuchsia.com/system_image": {
                     "hash": AnyProperty
                 }
             }

@@ -659,7 +659,8 @@ async fn serve_base_package_index(
     stream: PackageIndexIteratorRequestStream,
 ) {
     let mut package_entries = base_packages
-        .root_paths_and_hashes()
+        .root_package_urls_and_hashes()
+        .iter()
         .map(|(path, hash)| PackageIndexEntry {
             package_url: fpkg::PackageUrl {
                 url: format!("fuchsia-pkg://{}/{}", package_host, path.name()),
@@ -2124,10 +2125,7 @@ mod get_handler_tests {
 
 #[cfg(test)]
 mod serve_base_package_index_tests {
-    use {
-        super::*, fidl_fuchsia_pkg::PackageIndexIteratorMarker, fuchsia_pkg::PackagePath,
-        std::collections::HashSet,
-    };
+    use {super::*, fidl_fuchsia_pkg::PackageIndexIteratorMarker, std::collections::HashSet};
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn base_packages_entries_converted_correctly() {
@@ -2135,16 +2133,20 @@ mod serve_base_package_index_tests {
             HashSet::new(),
             [
                 (
-                    PackagePath::from_name_and_variant(
+                    fuchsia_url::UnpinnedAbsolutePackageUrl::new(
+                        fuchsia_url::RepositoryUrl::parse_host("fuchsia.com".into())
+                            .expect("valid repository hostname"),
                         "name0".parse().unwrap(),
-                        "0".parse().unwrap(),
+                        Some("0".parse().unwrap()),
                     ),
                     Hash::from([0u8; 32]),
                 ),
                 (
-                    PackagePath::from_name_and_variant(
+                    fuchsia_url::UnpinnedAbsolutePackageUrl::new(
+                        fuchsia_url::RepositoryUrl::parse_host("fuchsia.com".into())
+                            .expect("valid repository hostname"),
                         "name1".parse().unwrap(),
-                        "1".parse().unwrap(),
+                        Some("1".parse().unwrap()),
                     ),
                     Hash::from([1u8; 32]),
                 ),

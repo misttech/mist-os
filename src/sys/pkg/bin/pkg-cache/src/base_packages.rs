@@ -6,7 +6,6 @@ use {
     anyhow::Context as _,
     fuchsia_inspect as finspect,
     fuchsia_merkle::Hash,
-    fuchsia_pkg::PackagePath,
     futures::{future::BoxFuture, FutureExt as _, StreamExt as _, TryStreamExt as _},
     std::{
         collections::{HashMap, HashSet},
@@ -23,8 +22,8 @@ pub struct BasePackages {
     /// The meta.fars and content blobs of the base packages (including subpackages).
     /// Equivalently, the contents of `base_packages` plus the content blobs.
     base_blobs: HashSet<Hash>,
-    /// The paths and hashes of the root base packages (i.e. not including subpackages).
-    root_paths_and_hashes: Vec<(PackagePath, Hash)>,
+    /// The package urls and hashes of the root base packages (i.e. not including subpackages).
+    root_package_urls_and_hashes: HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, Hash>,
 }
 
 impl BasePackages {
@@ -32,22 +31,29 @@ impl BasePackages {
         blobfs: &blobfs::Client,
         system_image: &system_image::SystemImage,
     ) -> Result<Self, anyhow::Error> {
-        let root_paths_and_hashes = system_image
+        let base_repo = fuchsia_url::RepositoryUrl::parse_host("fuchsia.com".into())
+            .expect("valid repository hostname");
+        let root_package_urls_and_hashes = system_image
             .static_packages()
             .await
-            .context("failed to load static packages from system image")?
+            .context("failed to determine static packages")?
             .into_contents()
-            .chain(std::iter::once((
-                system_image::SystemImage::package_path(),
-                *system_image.hash(),
-            )))
-            .collect::<Vec<_>>();
+            .chain([(system_image::SystemImage::package_path(), *system_image.hash())])
+            .map(|(path, hash)| {
+                let (name, variant) = path.into_name_and_variant();
+                // TODO(fxbug.dev/53911) Remove variant checks when variant concept is deleted.
+                if !variant.is_zero() {
+                    panic!("base package variants must be zero: {name} {variant}");
+                }
+                (fuchsia_url::UnpinnedAbsolutePackageUrl::new(base_repo.clone(), name, None), hash)
+            })
+            .collect::<HashMap<_, _>>();
 
         let (base_packages, base_blobs) =
-            Self::load_base_blobs(blobfs, root_paths_and_hashes.iter().map(|(_, h)| *h))
+            Self::load_base_blobs(blobfs, root_package_urls_and_hashes.iter().map(|(_, h)| *h))
                 .await
                 .context("Error determining base blobs")?;
-        Ok(Self { base_packages, base_blobs, root_paths_and_hashes })
+        Ok(Self { base_packages, base_blobs, root_package_urls_and_hashes })
     }
 
     /// Returns the base packages and base blobs (including the transitive closure of subpackages).
@@ -95,7 +101,7 @@ impl BasePackages {
         Self {
             base_packages: HashSet::new(),
             base_blobs: HashSet::new(),
-            root_paths_and_hashes: Vec::new(),
+            root_package_urls_and_hashes: HashMap::new(),
         }
     }
 
@@ -109,9 +115,11 @@ impl BasePackages {
         self.base_packages.contains(&pkg)
     }
 
-    /// Iterator over the root (i.e not including subpackages) base package paths and hashes.
-    pub fn root_paths_and_hashes(&self) -> impl ExactSizeIterator<Item = &(PackagePath, Hash)> {
-        self.root_paths_and_hashes.iter()
+    /// Hashmap mapping the root (i.e not including subpackages) base package urls to hashes.
+    pub fn root_package_urls_and_hashes(
+        &self,
+    ) -> &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, Hash> {
+        &self.root_package_urls_and_hashes
     }
 
     /// Returns a callback to be given to `finspect::Node::record_lazy_child`.
@@ -128,7 +136,7 @@ impl BasePackages {
                 let inspector = finspect::Inspector::default();
                 if let Some(this) = this.upgrade() {
                     let root = inspector.root();
-                    let () = this.root_paths_and_hashes.iter().for_each(|(path, hash)| {
+                    let () = this.root_package_urls_and_hashes.iter().for_each(|(path, hash)| {
                         // Packages are encoded as nodes instead of string properties because the
                         // privacy allowlist prefers to wildcard nodes instead of properties.
                         root.record_child(path.to_string(), |n| {
@@ -147,12 +155,14 @@ impl BasePackages {
     #[cfg(test)]
     pub(crate) fn new_test_only(
         base_blobs: HashSet<Hash>,
-        root_paths_and_hashes: impl IntoIterator<Item = (PackagePath, Hash)>,
+        root_package_urls_and_hashes: impl IntoIterator<
+            Item = (fuchsia_url::UnpinnedAbsolutePackageUrl, Hash),
+        >,
     ) -> Self {
         Self {
             base_packages: HashSet::new(),
             base_blobs,
-            root_paths_and_hashes: root_paths_and_hashes.into_iter().collect(),
+            root_package_urls_and_hashes: root_package_urls_and_hashes.into_iter().collect(),
         }
     }
 }
@@ -288,10 +298,10 @@ mod tests {
         // Note base-subpackage is not present.
         assert_data_tree!(env.inspector, root: {
             "base-packages": {
-                "a-base-package/0": {
+                "fuchsia-pkg://fuchsia.com/a-base-package": {
                     "hash": a_base_package.hash().to_string(),
                 },
-                "system_image/0": {
+                "fuchsia-pkg://fuchsia.com/system_image": {
                     "hash": env.system_image.hash().to_string(),
                 }
             }
@@ -310,12 +320,16 @@ mod tests {
 
         assert_eq!(
             base_packages
-                .root_paths_and_hashes()
+                .root_package_urls_and_hashes()
+                .iter()
                 .map(|(p, h)| (p.clone(), *h))
                 .collect::<HashSet<_>>(),
             HashSet::from_iter([
-                ("system_image/0".parse().unwrap(), *env.system_image.hash()),
-                ("a-base-package/0".parse().unwrap(), a_base_package_hash),
+                (
+                    "fuchsia-pkg://fuchsia.com/system_image".parse().unwrap(),
+                    *env.system_image.hash()
+                ),
+                ("fuchsia-pkg://fuchsia.com/a-base-package".parse().unwrap(), a_base_package_hash),
             ])
         );
     }
@@ -326,10 +340,14 @@ mod tests {
 
         assert_eq!(
             base_packages
-                .root_paths_and_hashes()
+                .root_package_urls_and_hashes()
+                .iter()
                 .map(|(p, h)| (p.clone(), *h))
                 .collect::<HashSet<_>>(),
-            HashSet::from_iter([("system_image/0".parse().unwrap(), *env.system_image.hash()),])
+            HashSet::from_iter([(
+                "fuchsia-pkg://fuchsia.com/system_image".parse().unwrap(),
+                *env.system_image.hash()
+            ),])
         );
     }
 
