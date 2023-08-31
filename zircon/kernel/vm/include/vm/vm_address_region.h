@@ -241,6 +241,21 @@ class VmAddressRegionOrMapping
   // the derived type to know how to apply and update the |memory_priority_| field.
   virtual zx_status_t SetMemoryPriorityLocked(MemoryPriority priority) TA_REQ(lock()) = 0;
 
+  // Performs any actions necessary to apply a high memory priority over the given range.
+  // This method is always safe to call as it will internally check the memory priority status and
+  // skip if necessary, so the caller does not need to worry about races with a different memory
+  // priority being applied.
+  // As this may need to acquire the lock even to check the memory priority, if the caller knows
+  // they have not caused this to become high priority (i.e. they have called
+  // SetMemoryPriorityLocked with MemoryPriority::DEFAULT), then calling this should be skipped for
+  // performance.
+  // Memory that needs to be committed for a high memory priority are user pager backed pages and
+  // any compressed or loaned pages. Anonymous pages and copy-on-write pages do not allocated /
+  // committed.
+  // This method has no return value as it is entirely best effort and no part of its operation is
+  // needed for correctness.
+  virtual void CommitHighMemoryPriority() TA_EXCL(lock()) = 0;
+
   // Transition from NOT_READY to READY, and add references to self to related
   // structures.
   virtual void Activate() TA_REQ(lock()) = 0;
@@ -712,6 +727,7 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
   zx_status_t EnumerateChildrenLocked(VmEnumerator* ve) TA_REQ(lock());
 
   zx_status_t SetMemoryPriorityLocked(MemoryPriority priority) override TA_REQ(lock());
+  void CommitHighMemoryPriority() override TA_EXCL(lock());
 
   friend class VmMapping;
   template <VmAddressRegionEnumeratorType>
@@ -963,8 +979,9 @@ class VmMapping final : public VmAddressRegionOrMapping,
 
   // Map in pages from the underlying vm object, optionally committing pages as it goes.
   // |ignore_existing| controls whether existing hardware mappings in the specified range should be
-  // ignored or treated as an error. Only VMAR internal usages of this function should set
-  // |ignore_existing| to anything other than false.
+  // ignored or treated as an error. |ignore_existing| should only be set to true for user mappings
+  // where populating mappings may already be racy with multiple threads, and where we are already
+  // tolerant of mappings being arbitrarily created and destroyed.
   zx_status_t MapRange(size_t offset, size_t len, bool commit, bool ignore_existing = false)
       TA_EXCL(lock());
 
@@ -1092,6 +1109,8 @@ class VmMapping final : public VmAddressRegionOrMapping,
 
   zx_status_t SetMemoryPriorityLocked(VmAddressRegion::MemoryPriority priority) override
       TA_REQ(lock());
+
+  void CommitHighMemoryPriority() override TA_EXCL(lock());
 
   void Activate() TA_REQ(lock()) override;
 

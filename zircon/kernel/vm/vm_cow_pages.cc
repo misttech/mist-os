@@ -3941,6 +3941,7 @@ void VmCowPages::PromoteRangeForReclamationLocked(uint64_t offset, uint64_t len)
 }
 
 void VmCowPages::ProtectRangeFromReclamationLocked(uint64_t offset, uint64_t len,
+                                                   bool set_always_need,
                                                    Guard<CriticalMutex>* guard) {
   canary_.Assert();
 
@@ -4007,9 +4008,11 @@ void VmCowPages::ProtectRangeFromReclamationLocked(uint64_t offset, uint64_t len
 
       if (status == ZX_OK) {
         DEBUG_ASSERT(!page->is_loaned());
-        page->object.always_need = 1;
-        // Nothing more to do beyond marking the page always_need true. The lookup must have already
-        // marked the page accessed, moving it to the head of the first page queue.
+        if (set_always_need) {
+          page->object.always_need = 1;
+          // Nothing more to do beyond marking the page always_need true. The lookup must have
+          // already marked the page accessed, moving it to the head of the first page queue.
+        }
         continue;
       }
     }
@@ -4044,6 +4047,51 @@ void VmCowPages::ProtectRangeFromReclamationLocked(uint64_t offset, uint64_t len
     // Getting here indicates an error was encountered for this page. Simply ignore it and move on
     // to the next page. Hints are best effort anyway.
   }
+}
+
+zx_status_t VmCowPages::DecompressInRangeLocked(uint64_t offset, uint64_t len,
+                                                Guard<CriticalMutex>* guard) {
+  canary_.Assert();
+
+  if (len == 0) {
+    return ZX_OK;
+  }
+
+  DEBUG_ASSERT(InRange(offset, len, size_));
+  uint64_t cur_offset = ROUNDDOWN(offset, PAGE_SIZE);
+  uint64_t end_offset = ROUNDUP(offset + len, PAGE_SIZE);
+
+  while (cur_offset < end_offset) {
+    VmPageOrMarkerRef ref;
+    uint64_t ref_offset = 0;
+    page_list_.ForEveryPageInRangeMutable(
+        [&](VmPageOrMarkerRef page_or_marker, uint64_t offset) {
+          if (page_or_marker->IsReference()) {
+            ref = page_or_marker;
+            ref_offset = offset;
+            return ZX_ERR_STOP;
+          }
+          return ZX_ERR_NEXT;
+        },
+        cur_offset, end_offset);
+    if (!ref) {
+      return ZX_OK;
+    }
+    LazyPageRequest page_request;
+    zx_status_t status = ReplaceReferenceWithPageLocked(ref, ref_offset, &page_request);
+    if (status == ZX_OK) {
+      cur_offset = ref_offset + PAGE_SIZE;
+    } else if (status == ZX_ERR_SHOULD_WAIT) {
+      guard->CallUnlocked([&page_request, &status]() { status = page_request->Wait(); });
+      // With the lock dropped it's possible that our cur/end_offset are no longer within the range
+      // of the VMO, but if this is the case we will immediately find no pages in the page_list_
+      // for this range and return.
+    }
+    if (status != ZX_OK) {
+      return status;
+    }
+  }
+  return ZX_OK;
 }
 
 int64_t VmCowPages::ChangeSingleHighPriorityCountLocked(int64_t delta) {
@@ -6829,8 +6877,7 @@ vm_page_t* VmCowPages::DebugGetPageLocked(uint64_t offset) const {
 bool VmCowPages::DebugIsHighMemoryPriority() const {
   canary_.Assert();
   Guard<CriticalMutex> guard{lock()};
-  DEBUG_ASSERT(high_priority_count_ >= 0);
-  return high_priority_count_ != 0;
+  return is_high_memory_priority_locked();
 }
 
 VmCowPages::DiscardablePageCounts VmCowPages::DebugGetDiscardablePageCounts() const {

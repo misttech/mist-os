@@ -167,7 +167,10 @@ zx_status_t vmar_map_common(zx_vm_option_t options, fbl::RefPtr<VmAddressRegionD
   auto cleanup_handler = fit::defer([&vm_mapping]() { vm_mapping->Destroy(); });
 
   if (do_map_range) {
-    status = vm_mapping->MapRange(0, len, false);
+    // Mappings may have already been created due to memory priority, so need to ignore existing.
+    // Ignoring existing mappings is safe here as we are always free to populate and destroy page
+    // table mappings for user addresses.
+    status = vm_mapping->MapRange(0, len, /*commit=*/false, /*ignore_existing=*/true);
     if (status != ZX_OK) {
       return status;
     }

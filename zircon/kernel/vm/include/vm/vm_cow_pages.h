@@ -167,6 +167,11 @@ class VmCowPages final : public VmHierarchyBase,
     cow->pager_stats_modified_ = true;
   }
 
+  bool is_high_memory_priority_locked() const TA_REQ(lock()) {
+    DEBUG_ASSERT(high_priority_count_ >= 0);
+    return high_priority_count_ != 0;
+  }
+
   // When attributing pages hidden nodes must be attributed to either their left or right
   // descendants. The attribution IDs of all involved determine where attribution goes. For
   // historical and practical reasons actual user ids are used, although any consistent naming
@@ -519,11 +524,18 @@ class VmCowPages final : public VmHierarchyBase,
   void PromoteRangeForReclamationLocked(uint64_t offset, uint64_t len) TA_REQ(lock());
 
   // Protect pages in the specified range from reclamation under memory pressure. |offset| will be
-  // rounded down to the page boundary, and |len| will be rounded up to the page boundary. Used to
-  // set the |always_need| hint for pages in pager-backed VMOs. Any absent pages in the range will
-  // be committed first, and the call will block on the fulfillment of the page request(s), dropping
-  // |guard| while waiting (multiple times if multiple pages need to be supplied).
-  void ProtectRangeFromReclamationLocked(uint64_t offset, uint64_t len, Guard<CriticalMutex>* guard)
+  // rounded down to the page boundary, and |len| will be rounded up to the page boundary. Any
+  // absent pages in the range will first be committed, and the call will block on the fulfillment
+  // of the page request(s), dropping |guard| while waiting (multiple times if multiple pages need
+  // to be supplied), and then, if |set_always_need| is true, the |always_need| flag in the pages
+  // will be set.
+  void ProtectRangeFromReclamationLocked(uint64_t offset, uint64_t len, bool set_always_need,
+                                         Guard<CriticalMutex>* guard) TA_REQ(lock());
+
+  // Ensures any pages in the specified range are not compressed, but does not otherwise commit any
+  // pages. In order to handle delayed memory allocations, |guard| may be dropped one or more times.
+  // TODO(fxb/101641, fxb/60238): Determine if this should act on pages supplied by the parent.
+  zx_status_t DecompressInRangeLocked(uint64_t offset, uint64_t len, Guard<CriticalMutex>* guard)
       TA_REQ(lock());
 
   // See VmObject::ChangeHighPriorityCountLocked

@@ -517,6 +517,20 @@ class VmObject : public VmHierarchyBase,
     // This does nothing by default.
   }
 
+  // Performs any page commits necessary for a VMO with high memory priority over the given range.
+  // This method is always safe to call as it will internally check the memory priority status and
+  // skip if necessary, so the caller does not need to worry about races with the VMO no longer
+  // being high priority.
+  // As this may need to acquire the lock even to check the memory priority, if the caller knows
+  // they have not caused this VMO to become high priority (i.e. they have not called
+  // ChangeHighPriorityCountLocked with a positive value), then calling this should be skipped for
+  // performance.
+  // This method has no return value as it is entirely best effort and no part of its operation is
+  // needed for correctness.
+  virtual void CommitHighPriorityPages(uint64_t offset, uint64_t len) TA_EXCL(lock()) {
+    // This does nothing by default.
+  }
+
   // The associated VmObjectDispatcher will set an observer to notify user mode.
   void SetChildObserver(VmObjectChildObserver* child_observer);
 

@@ -174,12 +174,39 @@ zx_status_t VmObjectPaged::HintRange(uint64_t offset, uint64_t len, EvictionHint
       break;
     }
     case EvictionHint::AlwaysNeed: {
-      cow_pages_locked()->ProtectRangeFromReclamationLocked(offset, len, &guard);
+      cow_pages_locked()->ProtectRangeFromReclamationLocked(offset, len, /*set_always_need=*/true,
+                                                            &guard);
       break;
     }
   }
 
   return ZX_OK;
+}
+
+void VmObjectPaged::CommitHighPriorityPages(uint64_t offset, uint64_t len) {
+  canary_.Assert();
+  uint64_t end_offset;
+  if (add_overflow(offset, len, &end_offset)) {
+    return;
+  }
+  if (can_block_on_page_requests()) {
+    lockdep::AssertNoLocksHeld();
+  }
+  Guard<CriticalMutex> guard{lock()};
+  if (!InRange(offset, len, size_locked())) {
+    return;
+  }
+  if (!cow_pages_locked()->is_high_memory_priority_locked()) {
+    return;
+  }
+
+  if (cow_pages_locked()->is_root_source_user_pager_backed_locked()) {
+    cow_pages_locked()->ProtectRangeFromReclamationLocked(offset, len, /*set_always_need=*/false,
+                                                          &guard);
+  } else {
+    // Committing high priority pages is best effort, so ignore any errors from decompressing.
+    cow_pages_locked()->DecompressInRangeLocked(offset, len, &guard);
+  }
 }
 
 bool VmObjectPaged::CanDedupZeroPagesLocked() {

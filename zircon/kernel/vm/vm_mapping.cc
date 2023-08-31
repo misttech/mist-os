@@ -1344,6 +1344,25 @@ zx_status_t VmMapping::SetMemoryPriorityLocked(VmAddressRegion::MemoryPriority p
   return ZX_OK;
 }
 
+void VmMapping::CommitHighMemoryPriority() {
+  fbl::RefPtr<VmObject> vmo;
+  uint64_t offset;
+  uint64_t len;
+  {
+    Guard<CriticalMutex> guard{lock()};
+    if (state_ != LifeCycleState::ALIVE || memory_priority_ != MemoryPriority::HIGH) {
+      return;
+    }
+    vmo = object_;
+    offset = object_offset_locked();
+    len = size_locked();
+  }
+  DEBUG_ASSERT(vmo);
+  vmo->CommitHighPriorityPages(offset, len);
+  // Ignore the return result of MapRange as this is just best effort.
+  MapRange(offset, len, false, true);
+}
+
 zx_status_t MappingProtectionRanges::EnumerateProtectionRanges(
     vaddr_t mapping_base, size_t mapping_size, vaddr_t base, size_t size,
     fit::inline_function<zx_status_t(vaddr_t region_base, size_t region_len, uint mmu_flags)>&&
