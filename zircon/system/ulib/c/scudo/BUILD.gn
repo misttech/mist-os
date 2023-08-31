@@ -54,6 +54,23 @@ libc_source_set("scudo-allocator") {
     "timing.cpp",
   ]
 
+  # TODO(fxbug.dev/132961) Remove soft-transition of rss_limit_checker.cpp.
+  if (submodules) {
+    scudo_git_link_path_list =
+        read_file("${scudo_common_vars.dir}/.git", "list lines")
+    scudo_git_link_path = scudo_git_link_path_list[0]
+    scudo_relative_git_dir_split = string_split(scudo_git_link_path)
+    scudo_relative_git_dir = scudo_relative_git_dir_split[1]
+    scudo_git_dir = "${scudo_common_vars.dir}/${scudo_relative_git_dir}"
+    scudo_git_revision = read_file("${scudo_git_dir}/HEAD", "list lines")
+  } else {
+    scudo_git_revision =
+        read_file("//third_party/scudo/src/.git/HEAD", "list lines")
+  }
+  if (scudo_git_revision != [ "b8bc661bffe33d0c6f61d65a7fc22bdef518d144" ]) {
+    sources -= [ "rss_limit_checker.cpp" ]
+  }
+
   # The code needs to be compiled separately for production and test use for
   # two reasons.
   #
