@@ -250,17 +250,17 @@ impl TestFixture {
         let _vmo = reader.get_vmo(&expected_blob_hash.into()).await.unwrap().unwrap();
     }
 
-    /// Check for the existence of a well-known test file in the data volume. This file is placed
-    /// by the disk builder if it formats the filesystem beforehand.
+    /// Check for the existence of a well-known set of test files in the data volume. These files
+    /// are placed by the disk builder if it formats the filesystem beforehand.
     pub async fn check_test_data_file(&self) {
         let (file, server) = create_proxy::<fio::NodeMarker>().unwrap();
         self.dir("data", fio::OpenFlags::RIGHT_READABLE)
-            .open(fio::OpenFlags::RIGHT_READABLE, fio::ModeType::empty(), "foo", server)
+            .open(fio::OpenFlags::RIGHT_READABLE, fio::ModeType::empty(), ".testdata", server)
             .expect("open failed");
         file.get_attr().await.expect("get_attr failed");
 
         let data = self.dir("data", fio::OpenFlags::RIGHT_READABLE);
-        fuchsia_fs::directory::open_file(&data, "foo", fio::OpenFlags::RIGHT_READABLE)
+        fuchsia_fs::directory::open_file(&data, ".testdata", fio::OpenFlags::RIGHT_READABLE)
             .await
             .unwrap();
 
@@ -285,6 +285,16 @@ impl TestFixture {
             &fuchsia_fs::file::read_to_string(&authorized_keys).await.unwrap(),
             "public key!"
         );
+    }
+
+    /// Checks for the absence of the .testdata marker file, indicating the data filesystem was
+    /// reformatted.
+    pub async fn check_test_data_file_absent(&self) {
+        let (file, server) = create_proxy::<fio::NodeMarker>().unwrap();
+        self.dir("data", fio::OpenFlags::RIGHT_READABLE)
+            .open(fio::OpenFlags::RIGHT_READABLE, fio::ModeType::empty(), ".testdata", server)
+            .expect("open failed");
+        file.get_attr().await.expect_err(".testdata should be absent");
     }
 
     pub fn ramdisk_vmo(&self) -> Option<&zx::Vmo> {

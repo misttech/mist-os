@@ -676,7 +676,7 @@ impl DiskBuilder {
 
     /// Create a small set of known files to test for presence. The test tree is
     ///  root
-    ///   |- foo (file, empty)
+    ///   |- .testdata (file, empty)
     ///   |- ssh (directory, non-empty)
     ///   |   |- authorized_keys (file, non-empty)
     ///   |   |- config (directory, empty)
@@ -684,7 +684,7 @@ impl DiskBuilder {
     async fn write_test_data(&self, root: &fio::DirectoryProxy) {
         fuchsia_fs::directory::open_file(
             root,
-            "foo",
+            ".testdata",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::CREATE,
         )
         .await

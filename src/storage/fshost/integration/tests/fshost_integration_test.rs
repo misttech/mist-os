@@ -188,6 +188,8 @@ async fn data_reformatted_when_corrupt() {
     let mut fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
+    fixture.check_test_data_file_absent().await;
+
     // Ensure blobs are not reformatted.
     fixture.check_fs_type("blob", blob_fs_type()).await;
     if DATA_FILESYSTEM_VARIANT == "fxblob" {
@@ -195,12 +197,6 @@ async fn data_reformatted_when_corrupt() {
     } else {
         fixture.check_test_blob().await;
     }
-    let (file, server) = create_proxy::<fio::NodeMarker>().unwrap();
-    fixture
-        .dir("data", fio::OpenFlags::RIGHT_READABLE)
-        .open(fio::OpenFlags::RIGHT_READABLE, fio::ModeType::empty(), "foo", server)
-        .expect("open failed");
-    file.get_attr().await.expect_err("foo shouldn't exist");
 
     fixture
         .wait_for_crash_reports(
