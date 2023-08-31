@@ -593,7 +593,12 @@ Model _createModelFromJson(Map<String, dynamic> rootObject) {
     }
   }
 
-  resultEvents.sort((a, b) => a.start.compareTo(b.start));
+  // We use mergeSort() here rather than List.sort() because we want the
+  // sorting to be stable, to preserve the ordering of events when they
+  // share the same start timestamp. Such events are more likely to occur
+  // on systems with a low timer resolution.
+  mergeSort(resultEvents,
+      compare: (Event a, Event b) => a.start.compareTo(b.start));
 
   final Map<int, Process> processes = {};
   for (final event in resultEvents) {

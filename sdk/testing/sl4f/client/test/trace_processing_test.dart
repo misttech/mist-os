@@ -858,6 +858,51 @@ void main(List<String> args) {
     expect(getAllEvents(model), isNotEmpty);
   });
 
+  test('Preserve ordering of events with the same start time', () async {
+    // Test that the ordering of duration events is preserved when the
+    // durations have the same start timestamp. The tests the case of
+    // separate begin and end records (ph='B' and ph='E') in the input.
+    //
+    // This is a regression test for a bug (https://fxbug.dev/131863). The
+    // bug arose because the trace importer sorted the trace events using a
+    // non-stable sort (likely quicksort). We use an example input here
+    // with a moderate number of trace events (100) because the bug does
+    // not reproduce with a small number of trace events (such as 1 or 10
+    // or 20) but does reproduce with a larger number (such as 50).
+    final Map<String, dynamic> traceJson = {
+      'displayTimeUnit': 'ns',
+      'traceEvents': [],
+      'systemTraceEvents': {
+        'events': [],
+        'type': 'fuchsia',
+      },
+    };
+    final List<String> expectedNames = [];
+    for (int idx = 0; idx < 100; ++idx) {
+      traceJson['traceEvents'].add({
+        'cat': 'some_category',
+        'name': 'event_$idx',
+        'ts': 1000,
+        'pid': 35204,
+        'tid': 323993,
+        'ph': 'B',
+      });
+      traceJson['traceEvents'].add({
+        'cat': 'some_category',
+        'name': 'event_$idx',
+        'ts': 1000,
+        'pid': 35204,
+        'tid': 323993,
+        'ph': 'E',
+      });
+      expectedNames.add('event_$idx');
+    }
+    final model = createModelFromJson(traceJson);
+
+    // Check that the events are imported with the expected ordering.
+    expect(getAllEvents(model).map((event) => event.name), expectedNames);
+  });
+
   test('Flow event binding points', () async {
     final model = await _modelFromPath('runtime_deps/flow_event_binding.json');
 
