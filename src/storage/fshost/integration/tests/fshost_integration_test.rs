@@ -1181,3 +1181,40 @@ async fn delivery_blob_support_enabled_fxblob() {
 
     fixture.tear_down().await;
 }
+
+#[fuchsia::test]
+async fn data_persists() {
+    let mut builder = new_builder();
+    builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
+    let fixture = builder.build().await;
+
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    let data_root =
+        fixture.dir("data", fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::RIGHT_READABLE);
+    let file = fuchsia_fs::directory::open_file(
+        &data_root,
+        "file",
+        fio::OpenFlags::RIGHT_WRITABLE
+            | fio::OpenFlags::RIGHT_READABLE
+            | fio::OpenFlags::CREATE
+            | fio::OpenFlags::CREATE_IF_ABSENT,
+    )
+    .await
+    .unwrap();
+    fuchsia_fs::file::write(&file, "file contents!").await.unwrap();
+
+    // Shut down fshost, which should propagate to the data filesystem too.
+    let vmo = fixture.into_vmo().await.unwrap();
+    let builder = new_builder().with_disk_from_vmo(vmo);
+    let fixture = builder.build().await;
+
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    let data_root = fixture.dir("data", fio::OpenFlags::RIGHT_READABLE);
+    let file = fuchsia_fs::directory::open_file(&data_root, "file", fio::OpenFlags::RIGHT_READABLE)
+        .await
+        .unwrap();
+    assert_eq!(&fuchsia_fs::file::read(&file).await.unwrap()[..], b"file contents!");
+}
