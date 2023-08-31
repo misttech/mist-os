@@ -484,16 +484,14 @@ zx_status_t VmAddressRegion::EnumerateChildrenInternalLocked(vaddr_t min_addr, v
     // Lock is held over the entire duration so we can treat this as a raw pointer, knowing it will
     // not go away.
     VmAddressRegionOrMapping* curr = result->region_or_mapping;
-    if (curr->is_mapping()) {
-      VmMapping* mapping = curr->as_vm_mapping().get();
-
+    if (VmMapping* mapping = curr->as_vm_mapping_ptr(); mapping) {
       DEBUG_ASSERT(mapping != nullptr);
       AssertHeld(mapping->lock_ref());
       if (!on_mapping(mapping, this, result->depth)) {
         return ZX_ERR_CANCELED;
       }
     } else {
-      VmAddressRegion* vmar = curr->as_vm_address_region().get();
+      VmAddressRegion* vmar = curr->as_vm_address_region_ptr();
       DEBUG_ASSERT(vmar != nullptr);
       AssertHeld(vmar->lock_ref());
       if (!on_vmar(vmar, result->depth)) {
@@ -805,8 +803,8 @@ zx_status_t VmAddressRegion::UnmapInternalLocked(vaddr_t base, size_t size,
       // The parent will keep living even if we destroy curr so can place that in the outer scope.
       up = curr->parent_;
 
-      if (curr->is_mapping()) {
-        AssertHeld(curr->as_vm_mapping()->lock_ref());
+      if (VmMapping* mapping = curr->as_vm_mapping_ptr(); mapping) {
+        AssertHeld(mapping->lock_ref());
         vaddr_t curr_end_byte = 0;
         DEBUG_ASSERT(curr->size_locked() > 1);
         overflowed = add_overflow(curr->base_locked(), curr->size_locked() - 1, &curr_end_byte);
@@ -831,7 +829,7 @@ zx_status_t VmAddressRegion::UnmapInternalLocked(vaddr_t base, size_t size,
           // TODO(teisenbe): Technically arch_mmu_unmap() itself can also
           // fail.  We need to rework the system so that is no longer
           // possible.
-          zx_status_t status = curr->as_vm_mapping()->UnmapLocked(unmap_base, unmap_size);
+          zx_status_t status = mapping->UnmapLocked(unmap_base, unmap_size);
           DEBUG_ASSERT(status == ZX_OK || curr == begin);
           if (status != ZX_OK) {
             return status;
@@ -845,7 +843,7 @@ zx_status_t VmAddressRegion::UnmapInternalLocked(vaddr_t base, size_t size,
         DEBUG_ASSERT(intersects);
         if (allow_partial_vmar) {
           // If partial VMARs are allowed, we descend into sub-VMARs.
-          fbl::RefPtr<VmAddressRegion> vmar = curr->as_vm_address_region();
+          VmAddressRegion* vmar = curr->as_vm_address_region_ptr();
           AssertHeld(vmar->lock_ref());
           if (!vmar->subregions_.IsEmpty()) {
             begin = vmar->subregions_.IncludeOrHigher(base);

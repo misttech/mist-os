@@ -75,9 +75,7 @@ class VmAddressRegionEnumerator {
       DEBUG_ASSERT(curr->IsAliveLocked());
       VmAddressRegion* up = curr->parent_;
 
-      if (curr->is_mapping()) {
-        VmMapping* mapping = curr->as_vm_mapping().get();
-
+      if (VmMapping* mapping = curr->as_vm_mapping_ptr(); mapping) {
         DEBUG_ASSERT(mapping != nullptr);
         AssertHeld(mapping->lock_ref());
         // If the mapping is entirely before |min_addr| or entirely after |max_addr| do not run
@@ -90,7 +88,7 @@ class VmAddressRegionEnumerator {
         }
         ret = NextResult{mapping, depth_};
       } else {
-        VmAddressRegion* vmar = curr->as_vm_address_region().get();
+        VmAddressRegion* vmar = curr->as_vm_address_region_ptr();
         DEBUG_ASSERT(vmar != nullptr);
         AssertHeld(vmar->lock_ref());
         if constexpr (Type == VmAddressRegionEnumeratorType::UnpausableVmarOrMapping) {
