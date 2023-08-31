@@ -47,14 +47,6 @@ group("tests_no_e2e") {
     "virtualization:tests",
     "zircon:tests",
   ]
-
-  # These targets should be removed when the tests are moved to //src.
-  deps += [
-    "//zircon/kernel:tests",
-    "//zircon/system/ulib:tests",
-    "//zircon/system/utest:tests",
-    "//zircon/tools:tests",
-  ]
 }
 
 group("e2e_tests") {

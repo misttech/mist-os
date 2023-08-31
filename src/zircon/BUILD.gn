@@ -8,5 +8,9 @@ group("tests") {
     "bin/hwstress:tests",
     "bin/vsock_service:vsock_service-tests",
     "tests",
+    "//zircon/kernel:tests",
+    "//zircon/system/ulib:tests",
+    "//zircon/system/utest:tests",
+    "//zircon/tools:tests",
   ]
 }

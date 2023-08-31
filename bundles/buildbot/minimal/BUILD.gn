@@ -77,8 +77,6 @@ group("minimal") {
     "//src/storage:tests",
     "//src/sys:tests",
     "//src/zircon:tests",
-    "//zircon/system/ulib:tests",
-    "//zircon/system/utest:tests",
   ]
 
   if (current_cpu == "riscv64") {
