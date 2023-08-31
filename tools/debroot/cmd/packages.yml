@@ -1,8 +1,7 @@
 dists:
-  - trusty
-  - trusty-backports
-  - trusty-security
-  - trusty-updates
+  - jessie
+  - jessie-backports
+  - jessie-updates
 architectures:
   - amd64
   - arm64
@@ -10,11 +9,11 @@ architectures:
   - i386
 components:
   - main
-  - universe
 sources:
-  - http://us.archive.ubuntu.com/ubuntu
-  - http://us.ports.ubuntu.com/ubuntu-ports
-keyring: ubuntu-archive-keyring.gpg
+  # http://http.us.debian.org/debian no longer contains arm64 packages
+  # for jessie so we instead use the last snapshot that still has them.
+  - https://snapshot.debian.org/archive/debian/20190324T093412Z
+keyring: debian-archive-keyring.gpg
 packages:
   - package: libasound2
   - package: libasound2-dev
