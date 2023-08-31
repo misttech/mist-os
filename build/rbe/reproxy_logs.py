@@ -8,7 +8,9 @@ This requires python protobufs for reproxy LogDump.
 """
 
 import argparse
+import dataclasses
 import hashlib
+import math
 import multiprocessing
 import os
 import shutil
@@ -26,6 +28,69 @@ _SCRIPT_BASENAME = Path(__file__).name
 
 def msg(text: str):
     print(f'[{_SCRIPT_BASENAME}] {text}')
+
+
+@dataclasses.dataclass
+class DownloadEvent(object):
+    bytes_downloaded: int
+    start_time: float
+    end_time: float
+
+    def distribute_over_intervals(
+            self,
+            interval_seconds: float) -> Iterable[Tuple[int, float, float]]:
+        """Distribute bytes_downloaded into indexed time intervals.
+
+        Args:
+          interval_seconds: scaling factor from time to interval index,
+            assuming indices start at 0.
+
+        Returns:
+          Series of (index, bytes_downloaded, duty_cycle) intervals:
+          'bytes_downloaded' distribution of bytes_downloaded per time interval.
+          'duty_cycle' represents the fraction of the interval spent trying
+            to download, i.e. counts towards number of concurrent downloads.
+            Values range in [0.0, 1.0].
+        """
+        lower_bound = self.start_time / interval_seconds
+        upper_bound = self.end_time / interval_seconds
+        duration_intervals = upper_bound - lower_bound
+        avg_rate = self.bytes_downloaded / duration_intervals
+        cursor = lower_bound
+        while cursor < upper_bound:
+            index = int(math.floor(cursor))
+            next_cursor = min(index + 1, upper_bound)
+            duty_cycle = next_cursor - cursor
+            bytes_downloaded = duty_cycle * avg_rate
+            yield index, bytes_downloaded, duty_cycle
+            cursor = next_cursor
+
+
+def distribute_bytes_downloaded_over_time(
+    total_time_seconds: float,
+    interval_seconds: float,
+    events: Iterable[DownloadEvent],
+) -> Sequence[Tuple[float, float]]:
+    """Distribute a series of download intervals over discrete time-partitions.
+
+    Returns:
+      Tuples: (indexed by time interval)
+        bytes_downloaded: total number of bytes downloaded per interval.
+        concurrent_downloads: number of concurrent downloads per interval.
+    """
+    num_intervals = math.ceil(total_time_seconds / interval_seconds) + 1
+    bytes_per_interval = [0.0] * num_intervals
+    concurrent_downloads_per_interval = [0.0] * num_intervals
+    for event in events:
+        for index, bytes, duty_cycle in event.distribute_over_intervals(
+                interval_seconds):
+            bytes_per_interval[index] += bytes
+            concurrent_downloads_per_interval[index] += duty_cycle
+    return list(zip(bytes_per_interval, concurrent_downloads_per_interval))
+
+
+def timestamp_pb_to_float(timestamp) -> float:
+    return timestamp.seconds + (timestamp.nanos / 1e9)
 
 
 class ReproxyLog(object):
@@ -116,6 +181,75 @@ class ReproxyLog(object):
                 total_upload_bytes += record.remote_metadata.real_bytes_uploaded
                 total_download_bytes += record.remote_metadata.real_bytes_downloaded
         return total_download_bytes, total_upload_bytes
+
+    def _min_max_event_times(self) -> Tuple[float, float]:
+        """Find the minimum and maximum event times in the reproxy log."""
+        min_time = None
+        max_time = None
+        for record in self.proto.records:
+            if record.HasField('remote_metadata'):
+                rmd = record.remote_metadata
+                for event, times in rmd.event_times.items():
+                    start_time = timestamp_pb_to_float(getattr(times, 'from'))
+                    end_time = timestamp_pb_to_float(getattr(times, 'to'))
+                    min_time = start_time if min_time is None else min(
+                        min_time, start_time)
+                    max_time = end_time if max_time is None else max(
+                        max_time, end_time)
+        return min_time, max_time
+
+    def _download_events(self,
+                         min_time: float = 0.0) -> Iterable[DownloadEvent]:
+        """Extract series of download events from reproxy log.
+
+        Args:
+          min_time: subtract this absolute time so resulting times
+            are relative to the start (or close) of a build.
+
+        Yields:
+          DownloadEvents
+        """
+        for record in self.proto.records:
+            if record.HasField('remote_metadata'):
+                rmd = record.remote_metadata
+                download_times = rmd.event_times.get("DownloadResults", None)
+                if download_times is not None:
+                    yield DownloadEvent(
+                        bytes_downloaded=rmd.real_bytes_downloaded,
+                        # 'from' is a Python keyword, so use getattr()
+                        start_time=timestamp_pb_to_float(
+                            getattr(download_times, 'from')) - min_time,
+                        end_time=timestamp_pb_to_float(
+                            getattr(download_times, 'to')) - min_time,
+                    )
+
+    def download_profile(
+            self,
+            interval_seconds: float) -> Sequence[Tuple[float, float, float]]:
+        """Plots download bandwidth at each point in time.
+
+        Assumes that for each DownloadResult event time entry in the
+        reproxy log, that downloading used a constant average rate.
+
+        Args:
+          interval_seconds: the time granularity at which to accumulate
+            download rates.
+
+        Returns:
+          time series of download bandwidth (time, bytes, duty_cycle)
+        """
+        min_time, max_time = self._min_max_event_times()
+        if min_time is None or max_time is None:
+            # no events were found
+            return []
+
+        return distribute_bytes_downloaded_over_time(
+            total_time_seconds=max_time - min_time,
+            interval_seconds=interval_seconds,
+            # Use min_time as a proxy for the actual build start time,
+            # which cannot be determined from the reproxy log alone.
+            events=self._download_events(min_time=min_time),
+        )
 
 
 def setup_logdir_for_logdump(path: Path, verbose: bool = False) -> Path:
@@ -297,6 +431,7 @@ def lookup_output_file_digest(log: Path, path: Path) -> Optional[str]:
     # lookup must succeed by construction, else would have failed above
     return digest
 
+
 def lookup_output_file_digest_command(args: argparse.Namespace) -> int:
     digest = lookup_output_file_digest(log=args.log, path=args.path)
 
@@ -316,6 +451,22 @@ def bandwidth_command(args: argparse.Namespace) -> int:
     download_bytes, upload_bytes = log.bandwidth_summary()
     print(f"total_download_bytes = {download_bytes}")
     print(f"total_upload_bytes   = {upload_bytes}")
+    return 0
+
+
+def plot_download_command(args: argparse.Namespace) -> int:
+    log = parse_log(
+        log_path=args.log,
+        reclient_bindir=fuchsia.RECLIENT_BINDIR,
+        verbose=False,
+    )
+    profile = log.download_profile(interval_seconds=args.interval)
+    # print csv to stdout
+    print("time,bytes,concurrent")
+    time = 0.0
+    for downloaded_bytes, concurrent_downloads in profile:
+        print(f"{time},{downloaded_bytes},{concurrent_downloads}")
+        time += args.interval
     return 0
 
 
@@ -348,7 +499,8 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         'output_file_digest',
         help='prints the digest of a remote action output file',
     )
-    output_file_digest_parser.set_defaults(func=lookup_output_file_digest_command)
+    output_file_digest_parser.set_defaults(
+        func=lookup_output_file_digest_command)
     output_file_digest_parser.add_argument(
         "--log",
         type=Path,
@@ -364,6 +516,7 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         required=True,
     )
 
+    # command: bandwidth
     bandwidth_parser = subparsers.add_parser(
         'bandwidth',
         help="prints total download and upload",
@@ -374,6 +527,25 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         type=Path,
         help="reproxy log",
         metavar="PATH",
+    )
+
+    # command: plot_download
+    plot_download_parser = subparsers.add_parser(
+        'plot_download',
+        help='plot download usage over time, prints csv to stdout')
+    plot_download_parser.set_defaults(func=plot_download_command)
+    plot_download_parser.add_argument(
+        "log",
+        type=Path,
+        help="reproxy log",
+        metavar="PATH",
+    )
+    plot_download_parser.add_argument(
+        "--interval",
+        help="time graularity to accumulate download bandwidth",
+        type=float,  # seconds
+        default=5.0,
+        metavar="SECONDS",
     )
 
     return parser

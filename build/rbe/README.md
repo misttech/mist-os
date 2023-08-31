@@ -56,6 +56,7 @@ More details can be found by running with `--help`.
     *   `diff`: report meaningful difference between two reproxy logs
     *   `output_file_digest`: lookup the digest of a remote built artifact
     *   `bandwidth`: report total download and upload bytes from reproxy log
+    *   `plot_download`: plot download demand over the course of a build
 
 All tools have more detailed usage with `--help`.
 
