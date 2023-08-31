@@ -37,85 +37,95 @@ constexpr aml_voltage_table_t kS905D2VoltageTable[] = {
 
 constexpr voltage_pwm_period_ns_t kS905d2PwmPeriodNs = 1250;
 
-static const std::vector<fpbus::Metadata> power_impl_metadata{
-    {{
-        .type = DEVICE_METADATA_AML_VOLTAGE_TABLE,
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(&kS905D2VoltageTable),
-            reinterpret_cast<const uint8_t*>(&kS905D2VoltageTable) + sizeof(kS905D2VoltageTable)),
-    }},
-    {{
-        .type = DEVICE_METADATA_AML_PWM_PERIOD_NS,
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(&kS905d2PwmPeriodNs),
-            reinterpret_cast<const uint8_t*>(&kS905d2PwmPeriodNs) + sizeof(kS905d2PwmPeriodNs)),
-    }},
-};
-
-zx_device_prop_t power_domain_arm_core_props[] = {
-    {BIND_POWER_DOMAIN_COMPOSITE, 0, PDEV_DID_POWER_DOMAIN_COMPOSITE},
-};
-
 constexpr power_domain_t domains[] = {
     {static_cast<uint32_t>(S905d2PowerDomains::kArmCore)},
 };
 
-constexpr device_metadata_t power_domain_arm_core_metadata[] = {
-    {
-        .type = DEVICE_METADATA_POWER_DOMAINS,
-        .data = &domains,
-        .length = sizeof(domains),
-    },
-};
-
-constexpr composite_device_desc_t power_domain_arm_core_desc = {
-    .props = power_domain_arm_core_props,
-    .props_count = std::size(power_domain_arm_core_props),
-    .fragments = power_domain_arm_core_fragments,
-    .fragments_count = std::size(power_domain_arm_core_fragments),
-    .primary_fragment = "power-impl",
-    .spawn_colocated = true,
-    .metadata_list = power_domain_arm_core_metadata,
-    .metadata_count = std::size(power_domain_arm_core_metadata),
-};
-
 }  // namespace
 
-static const fpbus::Node power_dev = []() {
-  fpbus::Node dev = {};
+zx_status_t AddPowerImpl(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
+  fpbus::Node dev;
   dev.name() = "aml-power-impl-composite";
   dev.vid() = PDEV_VID_GOOGLE;
   dev.pid() = PDEV_PID_ASTRO;
   dev.did() = PDEV_DID_AMLOGIC_POWER;
-  dev.metadata() = power_impl_metadata;
-  return dev;
-}();
-
-zx_status_t Astro::PowerInit() {
-  zx_status_t st;
+  dev.metadata() = std::vector<fpbus::Metadata>{
+      {{
+          .type = DEVICE_METADATA_AML_VOLTAGE_TABLE,
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&kS905D2VoltageTable),
+              reinterpret_cast<const uint8_t*>(&kS905D2VoltageTable) + sizeof(kS905D2VoltageTable)),
+      }},
+      {{
+          .type = DEVICE_METADATA_AML_PWM_PERIOD_NS,
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&kS905d2PwmPeriodNs),
+              reinterpret_cast<const uint8_t*>(&kS905d2PwmPeriodNs) + sizeof(kS905d2PwmPeriodNs)),
+      }},
+  };
 
   fidl::Arena<> fidl_arena;
-  fdf::Arena arena('POWE');
-  auto result = pbus_.buffer(arena)->AddComposite(
-      fidl::ToWire(fidl_arena, power_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, aml_power_impl_fragments,
-                                               std::size(aml_power_impl_fragments)),
-      "pdev");
+  fdf::Arena arena('POWR');
+  auto fragments = platform_bus_composite::MakeFidlFragment(fidl_arena, aml_power_impl_fragments,
+                                                            std::size(aml_power_impl_fragments));
+  fdf::WireUnownedResult result =
+      pbus.buffer(arena)->AddComposite(fidl::ToWire(fidl_arena, dev), fragments, "pdev");
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Power(power_dev) request failed: %s", __func__,
-           result.FormatDescription().data());
+    zxlogf(ERROR, "Failed to send AddComposite request: %s", result.status_string());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Power(power_dev) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
+    zxlogf(ERROR, "Failed to add composite: %s", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
 
-  st = DdkAddComposite("composite-pd-armcore", &power_domain_arm_core_desc);
-  if (st != ZX_OK) {
-    zxlogf(ERROR, "%s: DdkAddComposite for power domain ArmCore failed, st = %d", __FUNCTION__, st);
-    return st;
+  return ZX_OK;
+}
+
+zx_status_t AddPdArmcore(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
+  fpbus::Node dev;
+  dev.name() = "composite-pd-armcore";
+  dev.vid() = PDEV_VID_GENERIC;
+  dev.pid() = PDEV_PID_GENERIC;
+  dev.did() = PDEV_DID_POWER_CORE;
+  dev.metadata() = std::vector<fpbus::Metadata>{
+      {{
+          .type = DEVICE_METADATA_POWER_DOMAINS,
+          .data =
+              std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&domains),
+                                   reinterpret_cast<const uint8_t*>(&domains) + sizeof(domains)),
+      }},
+  };
+
+  fidl::Arena<> fidl_arena;
+  fdf::Arena arena('PDAC');
+  auto fragments = platform_bus_composite::MakeFidlFragment(
+      fidl_arena, power_domain_arm_core_fragments, std::size(power_domain_arm_core_fragments));
+  fdf::WireUnownedResult result =
+      pbus.buffer(arena)->AddComposite(fidl::ToWire(fidl_arena, dev), fragments, "power-impl");
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send AddComposite request: %s", result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to add composite: %s", zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
+
+  return ZX_OK;
+}
+
+zx_status_t Astro::PowerInit() {
+  zx_status_t status = AddPowerImpl(pbus_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to add power-impl composite device: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  status = AddPdArmcore(pbus_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to add pd-armcore composite device: %s", zx_status_get_string(status));
+    return status;
   }
 
   return ZX_OK;

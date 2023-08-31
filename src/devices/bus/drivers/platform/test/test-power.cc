@@ -25,7 +25,9 @@ constexpr device_fragment_part_t power_impl_fragment[] = {
     {std::size(power_impl_driver_match), power_impl_driver_match},
 };
 zx_device_prop_t props[] = {
-    {BIND_POWER_DOMAIN_COMPOSITE, 0, PDEV_DID_POWER_DOMAIN_COMPOSITE},
+    {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_GENERIC},
+    {BIND_PLATFORM_DEV_PID, 0, PDEV_PID_GENERIC},
+    {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_POWER_CORE},
 };
 
 constexpr device_fragment_t power_domain_1_fragments[] = {

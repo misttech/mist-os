@@ -100,7 +100,10 @@ driver_bind_rules("pd-armcore-bind") {
   header_output = "pd-armcore-bind.h"
   bind_output = "pd-armcore-bind.bc"
   tests = "bind-tests/pd-armcore-test.json"
-  deps = [ "//src/devices/bind/fuchsia.power" ]
+  deps = [
+    "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.power",
+  ]
 }
 
 driver_bind_rules("pwm-ao-d-bind") {

@@ -63,6 +63,7 @@ TEST(PbusTest, Enumeration) {
   EXPECT_OK(
       RecursiveWaitForFile(dirfd, "sys/platform/11:01:8:1/test-i2c/i2c/i2c-1-6").status_value());
   EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/11:01:f").status_value());
+  EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/11:01:f/composite-dev").status_value());
   EXPECT_OK(
       RecursiveWaitForFile(dirfd, "sys/platform/11:01:f/composite-dev/composite").status_value());
   EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/11:01:10").status_value());

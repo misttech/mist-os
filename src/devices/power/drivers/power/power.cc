@@ -353,6 +353,7 @@ zx_status_t PowerDevice::Serve(fidl::ServerEnd<fuchsia_io::Directory> server_end
 zx_status_t PowerDevice::Create(void* ctx, zx_device_t* parent) {
   auto power_domain = ddk::GetMetadata<power_domain_t>(parent, DEVICE_METADATA_POWER_DOMAINS);
   if (!power_domain.is_ok()) {
+    zxlogf(ERROR, "Failed to get metadata: %s", power_domain.status_string());
     return power_domain.error_value();
   }
 

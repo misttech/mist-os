@@ -2,35 +2,11 @@
     {
         "device": {
             "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_POWER_DOMAIN_COMPOSITE": "fuchsia.platform.BIND_PLATFORM_DEV_DID.POWER_DOMAIN_COMPOSITE"
-        },
-        "expected": "match",
-        "name": "Success"
-    },
-    {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
             "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC",
             "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC",
             "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.platform.BIND_PLATFORM_DEV_DID.POWER_CORE"
         },
         "expected": "match",
         "name": "Success"
-    },
-    {
-        "device": {
-            "fuchsia.BIND_POWER_DOMAIN_COMPOSITE": "fuchsia.platform.BIND_PLATFORM_DEV_DID.POWER_DOMAIN_COMPOSITE",
-            "fuchsia.BIND_PROTOCOL": "fuchsia.platform.BIND_PROTOCOL.BUS"
-        },
-        "expected": "abort",
-        "name": "WrongProtocol"
-    },
-    {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_POWER_DOMAIN_COMPOSITE": "fuchsia.platform.BIND_PLATFORM_DEV_DID.HID_BUTTONS"
-        },
-        "expected": "abort",
-        "name": "WrongPowerDomainComposite"
     }
 ]
