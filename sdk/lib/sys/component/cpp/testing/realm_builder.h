@@ -388,6 +388,14 @@ class RealmBuilder final {
   // generated string is used.
   RealmBuilder& SetRealmName(const std::string& name);
 
+#if __Fuchsia_API_level__ >= 14
+  // Sets whether or not the realm will be started when `Build` is called.
+  RealmBuilder& StartOnBuild(bool start_on_build) {
+    start_on_build_ = start_on_build;
+    return *this;
+  }
+#endif
+
   // Build the realm root prepared by the associated builder methods, e.g. |AddComponent|.
   // |dispatcher| must be non-null, or |async_get_default_dispatcher| must be
   // configured to return a non-null value
@@ -409,6 +417,7 @@ class RealmBuilder final {
       std::shared_ptr<sys::ServiceDirectory> svc = nullptr);
 
   bool realm_commited_ = false;
+  bool start_on_build_ = true;
   std::string realm_collection_ = kDefaultCollection;
   cpp17::optional<std::string> realm_name_ = cpp17::nullopt;
   std::shared_ptr<sys::ServiceDirectory> svc_;

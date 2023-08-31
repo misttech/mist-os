@@ -43,8 +43,11 @@ fidl::InterfaceHandle<fuchsia::io::Directory> OpenExposedDir(
   return exposed_dir;
 }
 
-void CreateChild(fuchsia::component::Realm_Sync* realm, std::string collection, std::string name,
-                 std::string url) {
+void CreateChild(fuchsia::component::Realm_Sync* realm,
+#if __Fuchsia_API_level__ >= 14
+                 fidl::InterfaceRequest<fuchsia::component::Controller> controller,
+#endif
+                 std::string collection, std::string name, std::string url) {
   ZX_SYS_ASSERT_NOT_NULL(realm);
   fuchsia::component::decl::CollectionRef collection_ref = {
       .name = collection,
@@ -54,10 +57,14 @@ void CreateChild(fuchsia::component::Realm_Sync* realm, std::string collection, 
   child_decl.set_url(url);
   child_decl.set_startup(fuchsia::component::decl::StartupMode::LAZY);
   fuchsia::component::Realm_CreateChild_Result result;
+  fuchsia::component::CreateChildArgs child_args{};
+#if __Fuchsia_API_level__ >= 14
+  child_args.set_controller(std::move(controller));
+#endif
   ZX_COMPONENT_ASSERT_STATUS_AND_RESULT_OK(
       "Realm/CreateChild",
-      realm->CreateChild(std::move(collection_ref), std::move(child_decl),
-                         fuchsia::component::CreateChildArgs{}, &result),
+      realm->CreateChild(std::move(collection_ref), std::move(child_decl), std::move(child_args),
+                         &result),
       result);
 }
 

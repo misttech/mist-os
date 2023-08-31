@@ -22,6 +22,7 @@ sdk_source_set("cpp_library") {
   include_base = "//sdk"
 
   sources = [
+    "execution_controller.h",
     "internal/convert.cc",
     "internal/convert.h",
     "internal/errors.cc",

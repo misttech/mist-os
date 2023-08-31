@@ -381,7 +381,9 @@ RealmRoot RealmBuilder::Build(async_dispatcher_t* dispatcher) {
           : ScopedChild::New(realm_collection_, result.response().root_component_url, svc_);
 
   // Connect to fuchsia.component.Binder to automatically start Realm.
-  scoped_child.ConnectSync<fuchsia::component::Binder>();
+  if (start_on_build_) {
+    scoped_child.ConnectSync<fuchsia::component::Binder>();
+  }
 
   return RealmRoot(std::move(local_component_runner), std::move(scoped_child), dispatcher);
 }

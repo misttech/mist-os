@@ -42,25 +42,47 @@ ScopedChild ScopedChild::New(fuchsia::component::RealmSyncPtr realm_proxy, std::
 
 ScopedChild ScopedChild::New(fuchsia::component::RealmSyncPtr realm_proxy, std::string collection,
                              std::string name, std::string url) {
+#if __Fuchsia_API_level__ >= 14
+  fuchsia::component::ControllerSyncPtr controller_proxy;
+  internal::CreateChild(realm_proxy.get(), controller_proxy.NewRequest(), collection, name,
+                        std::move(url));
+#else
   internal::CreateChild(realm_proxy.get(), collection, name, std::move(url));
+#endif
   fuchsia::component::decl::ChildRef child_ref{.name = std::move(name),
                                                .collection = std::move(collection)};
   fuchsia::io::DirectorySyncPtr exposed_dir;
   exposed_dir.Bind(internal::OpenExposedDir(realm_proxy.get(), child_ref));
   return ScopedChild(sys::ServiceDirectory::CreateFromNamespace(), std::move(child_ref),
-                     std::move(exposed_dir));
+                     std::move(exposed_dir)
+#if __Fuchsia_API_level__ >= 14
+                         ,
+                     std::move(controller_proxy)
+#endif
+  );
 }
 
 ScopedChild ScopedChild::New(std::string collection, std::string name, std::string url,
                              std::shared_ptr<sys::ServiceDirectory> svc) {
   fuchsia::component::RealmSyncPtr realm_proxy;
   svc->Connect(realm_proxy.NewRequest());
+#if __Fuchsia_API_level__ >= 14
+  fuchsia::component::ControllerSyncPtr controller_proxy;
+  internal::CreateChild(realm_proxy.get(), controller_proxy.NewRequest(), collection, name,
+                        std::move(url));
+#else
   internal::CreateChild(realm_proxy.get(), collection, name, std::move(url));
+#endif
   fuchsia::component::decl::ChildRef child_ref{.name = std::move(name),
                                                .collection = std::move(collection)};
   fuchsia::io::DirectorySyncPtr exposed_dir;
   exposed_dir.Bind(internal::OpenExposedDir(realm_proxy.get(), child_ref));
-  return ScopedChild(std::move(svc), std::move(child_ref), std::move(exposed_dir));
+  return ScopedChild(std::move(svc), std::move(child_ref), std::move(exposed_dir)
+#if __Fuchsia_API_level__ >= 14
+                                                               ,
+                     std::move(controller_proxy)
+#endif
+  );
 }
 
 ScopedChild ScopedChild::New(std::string collection, std::string url,
@@ -71,10 +93,21 @@ ScopedChild ScopedChild::New(std::string collection, std::string url,
 
 ScopedChild::ScopedChild(std::shared_ptr<sys::ServiceDirectory> svc,
                          fuchsia::component::decl::ChildRef child_ref,
-                         fuchsia::io::DirectorySyncPtr exposed_dir)
+                         fuchsia::io::DirectorySyncPtr exposed_dir
+#if __Fuchsia_API_level__ >= 14
+                         ,
+                         fuchsia::component::ControllerSyncPtr controller_proxy
+#endif
+                         )
     : svc_(std::move(svc)),
       child_ref_(std::move(child_ref)),
-      exposed_dir_(std::move(exposed_dir)) {}
+      exposed_dir_(std::move(exposed_dir))
+#if __Fuchsia_API_level__ >= 14
+      ,
+      controller_proxy_(std::move(controller_proxy))
+#endif
+{
+}
 
 ScopedChild::~ScopedChild() {
   if (svc_ == nullptr) {
@@ -137,5 +170,18 @@ zx_status_t ScopedChild::Connect(const std::string& interface_name, zx::channel 
 std::string ScopedChild::GetChildName() const { return child_ref_.name; }
 
 const fuchsia::io::DirectorySyncPtr& ScopedChild::exposed() const { return exposed_dir_; }
+
+#if __Fuchsia_API_level__ >= 14
+ExecutionController ScopedChild::Start(fuchsia::component::StartChildArgs start_args) const {
+  fuchsia::component::Controller_Start_Result result;
+  fuchsia::component::ExecutionControllerPtr execution_controller_proxy;
+  ZX_COMPONENT_ASSERT_STATUS_AND_RESULT_OK(
+      "Controller/Start",
+      controller_proxy_->Start(std::move(start_args), execution_controller_proxy.NewRequest(),
+                               &result),
+      result);
+  return ExecutionController(std::move(execution_controller_proxy));
+}
+#endif
 
 }  // namespace component_testing
