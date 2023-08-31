@@ -2675,6 +2675,43 @@ vm_page_t* VmCowPages::LookupCursor::MaybePage(bool will_write) {
   return page;
 }
 
+uint64_t VmCowPages::LookupCursor::SkipMissingPages() {
+  EstablishCursor();
+
+  // Check if the cursor is truly empty
+  if (!CursorIsEmpty() || CursorIsInIntervalZero()) {
+    return 0;
+  }
+
+  uint64_t possibly_empty = visible_end_ - offset_;
+  // Limit possibly_empty by the first page visible in the owner which, since our cursor is empty,
+  // would also be the root vmo.
+  if (possibly_empty > PAGE_SIZE) {
+    owner()->page_list_.ForEveryPageInRange(
+        [&](const VmPageOrMarker* p, uint64_t offset) {
+          // Content should have been empty initially, so should not find anything at the start
+          // offset.
+          DEBUG_ASSERT(offset > owner_offset_);
+          // If this is an interval sentinel, it can only be a start or slot, since we know we
+          // started in a true gap outside of an interval.
+          DEBUG_ASSERT(!p->IsInterval() || p->IsIntervalSlot() || p->IsIntervalStart());
+          const uint64_t new_size = offset - owner_offset_;
+          // Due to the limited range of the operation, the only way this callback ever fires is if
+          // the range is actually getting trimmed.
+          DEBUG_ASSERT(new_size < possibly_empty);
+          possibly_empty = new_size;
+          return ZX_ERR_STOP;
+        },
+        owner_offset_, owner_offset_ + possibly_empty);
+  }
+  // The cursor was empty, so we should have ended up with at least one page.
+  DEBUG_ASSERT(possibly_empty >= PAGE_SIZE);
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(possibly_empty));
+  DEBUG_ASSERT(possibly_empty + offset_ <= end_offset_);
+  IncrementOffsetAndInvalidateCursor(possibly_empty);
+  return possibly_empty / PAGE_SIZE;
+}
+
 uint VmCowPages::LookupCursor::IfExistPages(bool will_write, uint max_pages, paddr_t* paddrs) {
   // Ensure that the requested range is valid.
   DEBUG_ASSERT(offset_ + PAGE_SIZE * max_pages <= end_offset_);

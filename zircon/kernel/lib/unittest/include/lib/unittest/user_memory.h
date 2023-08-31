@@ -79,6 +79,12 @@ class UserMemory {
     return mapping_->MapRange(offset, size, true);
   }
 
+  // Map in any pages that are committed in the vmo. Ignores existing mappings allowing this to be
+  // called multiple times.
+  zx_status_t MapExisting(size_t size, uint64_t offset = 0) {
+    return mapping_->MapRange(offset, size, false, true);
+  }
+
   // Changes the mapping permissions to be a Read-Only Executable mapping.
   zx_status_t MakeRX() {
     return mapping_->Protect(

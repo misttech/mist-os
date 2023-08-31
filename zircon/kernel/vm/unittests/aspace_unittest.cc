@@ -1425,6 +1425,36 @@ static bool vm_mapping_attribution_merge_test() {
   END_TEST;
 }
 
+static bool vm_mapping_sparse_mapping_test() {
+  BEGIN_TEST;
+
+  AutoVmScannerDisable scanner_disable;
+
+  // Create a large memory mapping with an empty backing VMO. Although this is a large virtual
+  // address range, our later attempts to map it should be efficient.
+  const size_t kMemorySize = 16 * GB;
+  auto memory = testing::UserMemory::Create(kMemorySize);
+
+  // Memory backing the user memory is currently empty, so attempting to map in it should succeed,
+  // albeit with nothing populated.
+  EXPECT_OK(memory->MapExisting(kMemorySize));
+
+  // Commit a page in the middle, then re-map the whole thing and ensure the mapping is there.
+  uint64_t val = 42;
+  EXPECT_OK(memory->VmoWrite(&val, kMemorySize / 2, sizeof(val)));
+  EXPECT_OK(memory->MapExisting(kMemorySize));
+  EXPECT_EQ(val, memory->get<uint64_t>(kMemorySize / 2 / sizeof(uint64_t)));
+
+  // Do the same test, but this time with the pages at the start and end of the range.
+  EXPECT_OK(memory->VmoWrite(&val, 0, sizeof(val)));
+  EXPECT_OK(memory->VmoWrite(&val, kMemorySize - PAGE_SIZE, sizeof(val)));
+  EXPECT_OK(memory->MapExisting(kMemorySize));
+  EXPECT_EQ(val, memory->get<uint64_t>(0));
+  EXPECT_EQ(val, memory->get<uint64_t>((kMemorySize - PAGE_SIZE) / sizeof(uint64_t)));
+
+  END_TEST;
+}
+
 static bool arch_noncontiguous_map() {
   BEGIN_TEST;
 
@@ -2352,6 +2382,7 @@ VM_UNITTEST(vmaspace_priority_reference_test)
 VM_UNITTEST(vm_mapping_attribution_commit_decommit_test)
 VM_UNITTEST(vm_mapping_attribution_map_unmap_test)
 VM_UNITTEST(vm_mapping_attribution_merge_test)
+VM_UNITTEST(vm_mapping_sparse_mapping_test)
 VM_UNITTEST(arch_is_user_accessible_range)
 VM_UNITTEST(validate_user_address_range)
 VM_UNITTEST(arch_noncontiguous_map)

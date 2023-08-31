@@ -738,6 +738,16 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
               // Not committing so get a page if one exists. This increments the cursor, returning
               // nullptr if no page.
               page = cursor->MaybePage(writing);
+              // This page was not present and if we are in a run of absent pages we would like to
+              // efficiently skip them, instead of querying each virtual address individually. Due
+              // to the assumptions of the cursor, we cannot call SkipMissingPages if we had just
+              // requested the last page in the range of the cursor.
+              if (!page && off + PAGE_SIZE < len) {
+                // Increment |off| for the any pages we skip and let the original page from
+                // MaybePage get incremented on the way around the loop before the range gets
+                // checked.
+                off += cursor->SkipMissingPages() * PAGE_SIZE;
+              }
             }
             if (page) {
               zx_status_t status = coalescer.Append(base + off, page->paddr());

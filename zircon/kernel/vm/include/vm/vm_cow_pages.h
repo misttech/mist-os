@@ -1493,6 +1493,12 @@ class VmCowPages::LookupCursor {
   // The internal cursor is always incremented regardless of the return value.
   vm_page_t* MaybePage(bool will_write) TA_REQ(lock());
 
+  // Has similar properties of |MaybePage|, except it returns how many times in a row |MaybePage|
+  // would have returned a nullptr. Regardless of the return value of this method, it is not
+  // guaranteed that the next call to |MaybePage| will not be a nullptr. The cursor is incremented
+  // by the number of pages returned.
+  uint64_t SkipMissingPages() TA_REQ(lock());
+
   // Provides a list of pages that can be used to service any allocations. This is useful if you
   // know you will be looking up multiple absent pages and want to avoid repeatedly hitting the pmm
   // for single pages.
