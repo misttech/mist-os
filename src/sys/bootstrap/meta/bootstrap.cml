@@ -284,7 +284,6 @@
             protocol: [
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.diagnostics.FeedbackArchiveAccessor",
-                "fuchsia.diagnostics.host.ArchiveAccessor",
                 "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
             ],
             from: "#archivist",
@@ -1215,7 +1214,6 @@
             protocol: [
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.diagnostics.FeedbackArchiveAccessor",
-                "fuchsia.diagnostics.host.ArchiveAccessor",
                 "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
                 "fuchsia.diagnostics.LoWPANArchiveAccessor",
                 "fuchsia.inspect.InspectSink",
