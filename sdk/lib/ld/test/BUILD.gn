@@ -33,6 +33,12 @@ test("ld-unittests") {
 fuchsia_unittest_package("ld-tests") {
   deps = [ ":ld-unittests" ]
   manifest = "meta/ld-tests.cml"
+
+  # By default the packaging step will do checks that try to detect bugs in the
+  # build system by verifying that ELF files in a package match a bunch of
+  # hard-coded assumptions about the old dynamic linker and libc implementation
+  # that don't hold true for the test binaries here.
+  disable_elf_binaries_checks = true
 }
 
 # This collects the -DLD_STARTUP_TEST_LIB=... flag in the response file.

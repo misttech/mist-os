@@ -79,6 +79,10 @@ import("fuchsia_unittest_component.gni")
 #     but in some cases may offer faster test execution.
 #     Type: boolean
 #
+#   disable_elf_binaries_checks (optional)
+#     See fuchsia_package().
+#     Type: boolean
+#
 #   subpackages (optional)
 #     A list of `fuchsia_package` targets. See `fuchsia_package()` for more
 #     details.
@@ -132,6 +136,7 @@ template("fuchsia_unittest_package") {
     fuchsia_test_package(target_name) {
       forward_variables_from(invoker,
                              [
+                               "disable_elf_binaries_checks",
                                "package_name",
                                "visibility",
                                "subpackages",
