@@ -209,8 +209,7 @@ zx_status_t VmAddressRegion::CreateSubVmar(size_t offset, size_t size, uint8_t a
   if (status != ZX_OK) {
     return status;
   }
-  // TODO(teisenbe): optimize this
-  *out = res->as_vm_address_region();
+  *out = VmAddressRegionOrMapping::downcast_as_vm_address_region(&res);
   return ZX_OK;
 }
 
@@ -264,8 +263,7 @@ zx_status_t VmAddressRegion::CreateVmMapping(size_t mapping_offset, size_t size,
   if (status != ZX_OK) {
     return status;
   }
-  // TODO(teisenbe): optimize this
-  *out = res->as_vm_mapping();
+  *out = VmAddressRegionOrMapping::downcast_as_vm_mapping(&res);
   return ZX_OK;
 }
 

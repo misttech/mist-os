@@ -129,6 +129,10 @@ class VmAddressRegionOrMapping
   fbl::RefPtr<VmMapping> as_vm_mapping();
   VmAddressRegion* as_vm_address_region_ptr();
   VmMapping* as_vm_mapping_ptr();
+  static fbl::RefPtr<VmAddressRegion> downcast_as_vm_address_region(
+      fbl::RefPtr<VmAddressRegionOrMapping>* region_or_map);
+  static fbl::RefPtr<VmMapping> downcast_as_vm_mapping(
+      fbl::RefPtr<VmAddressRegionOrMapping>* region_or_map);
 
   // Page fault in an address within the region.  Recursively traverses
   // the regions to find the target mapping, if it exists.
@@ -1238,6 +1242,15 @@ inline VmAddressRegion* VmAddressRegionOrMapping::as_vm_address_region_ptr() {
   return static_cast<VmAddressRegion*>(this);
 }
 
+inline fbl::RefPtr<VmAddressRegion> VmAddressRegionOrMapping::downcast_as_vm_address_region(
+    fbl::RefPtr<VmAddressRegionOrMapping>* region_or_map) {
+  DEBUG_ASSERT(region_or_map);
+  if ((*region_or_map)->is_mapping()) {
+    return nullptr;
+  }
+  return fbl::RefPtr<VmAddressRegion>::Downcast(ktl::move(*region_or_map));
+}
+
 inline fbl::RefPtr<VmMapping> VmAddressRegionOrMapping::as_vm_mapping() {
   canary_.Assert();
   if (!is_mapping()) {
@@ -1252,6 +1265,15 @@ inline VmMapping* VmAddressRegionOrMapping::as_vm_mapping_ptr() {
     return nullptr;
   }
   return static_cast<VmMapping*>(this);
+}
+
+inline fbl::RefPtr<VmMapping> VmAddressRegionOrMapping::downcast_as_vm_mapping(
+    fbl::RefPtr<VmAddressRegionOrMapping>* region_or_map) {
+  DEBUG_ASSERT(region_or_map);
+  if (!(*region_or_map)->is_mapping()) {
+    return nullptr;
+  }
+  return fbl::RefPtr<VmMapping>::Downcast(ktl::move(*region_or_map));
 }
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_VM_ADDRESS_REGION_H_
