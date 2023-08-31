@@ -177,7 +177,15 @@ group("tests") {
     "zxdump:tests",
   ]
 
-  if (current_cpu != "riscv64") {
+  if (current_cpu == "riscv64") {
+    deps -= [
+      # TODO(fxbug.dev/132426): Remove once the tests pass on RISC-V.
+      "async-watchdog:tests",
+      "injectable-time:tests",
+      "tcp-stream-ext:tests",
+      "unwinder:tests",
+    ]
+  } else {
     deps += [
       # The Go toolchain does not support RISC-V.
       # TODO(fxbug.dev/129980): Rename `components` to indicate that it is

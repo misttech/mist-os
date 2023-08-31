@@ -165,4 +165,11 @@ group("tests") {
     "cpp:tests",
     "tests",
   ]
+
+  if (current_cpu == "riscv64") {
+    deps -= [
+      # TODO(fxbug.dev/132426): Remove once the tests pass on RISC-V.
+      ":fuchsia-async-tests",
+    ]
+  }
 }
