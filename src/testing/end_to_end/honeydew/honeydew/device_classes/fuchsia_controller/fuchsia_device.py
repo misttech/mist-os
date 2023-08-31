@@ -140,7 +140,10 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         Returns:
             tracing.Tracing object
         """
-        return tracing_fc.Tracing()
+        return tracing_fc.Tracing(
+            device_name=self.device_name,
+            fuchsia_controller=self.fuchsia_controller,
+            reboot_affordance=self)
 
     @properties.Affordance
     def user_input(self) -> user_input.UserInput:
