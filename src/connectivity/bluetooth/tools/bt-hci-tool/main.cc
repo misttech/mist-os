@@ -13,6 +13,7 @@
 #include <iostream>
 
 #include <fbl/unique_fd.h>
+#include <pw_async_fuchsia/dispatcher.h>
 
 #include "commands.h"
 #include "lib/fit/defer.h"
@@ -67,12 +68,13 @@ int main(int argc, char* argv[]) {
   }
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+  pw::async::fuchsia::FuchsiaDispatcher pw_dispatcher(loop.dispatcher());
 
   fuchsia::hardware::bluetooth::HciHandle hci_handle(std::move(local));
   auto controller =
       std::make_unique<bt::controllers::FidlController>(std::move(hci_handle), loop.dispatcher());
 
-  auto transport = std::make_unique<bt::hci::Transport>(std::move(controller));
+  auto transport = std::make_unique<bt::hci::Transport>(std::move(controller), pw_dispatcher);
   bool init_success = false;
   transport->Initialize([&init_success](bool success) { init_success = success; });
   if (!init_success) {
