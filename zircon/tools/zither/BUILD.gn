@@ -174,14 +174,19 @@ template("zither_golden_test") {
     zither = extra_backend_parameters
   }
 
-  if (support_rust) {
-    all_cases = invoker.cases
-  } else {
-    all_cases = []
-    foreach(case, invoker.cases) {
-      if (case.backend != "rust" && case.backend != "rust_syscall") {
-        all_cases += [ case ]
-      }
+  all_cases = []
+  foreach(case, invoker.cases) {
+    if (case.backend == "go" && current_cpu == "riscv64") {
+      # Go builds are not supported for RISC-V.
+      case = false
+    }
+    if (case != false && !support_rust &&
+        (case.backend == "rust" || case.backend == "rust_syscall")) {
+      # Skip Rust cases.
+      case = false
+    }
+    if (case != false) {
+      all_cases += [ case ]
     }
   }
 
