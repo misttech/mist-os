@@ -127,7 +127,7 @@
     },
     {
         "name": "OtherDrivers",
-        "process": "driver_host:.*|pwrbtn-monitor\\.cm",
+        "process": "driver_host.*|pwrbtn-monitor\\.cm",
         "vmo": "",
         "event_code": 48
     },
