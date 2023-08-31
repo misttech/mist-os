@@ -9,6 +9,7 @@ board_configuration("vim3") {
     "fuchsia::driver_framework_v2_support",
     "fuchsia::fan",
     "fuchsia::usb_peripheral_support",
+    "fuchsia::wlan_fullmac",
   ]
 
   filesystems = {

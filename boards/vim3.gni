@@ -71,7 +71,6 @@ board_driver_package_labels += [
   "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:brcmfmac-vim3",
   "//src/connectivity/wlan/drivers/wlanphy:wlanphy",
   "//src/devices/rtc/drivers/nxp:nxp-pkg",
-  "//bundles/packages/prod:wlan_fullmac_core_drivers",
   "//src/connectivity/bluetooth/hci/transport/uart",
   "//src/connectivity/bluetooth/hci/vendor/broadcom",
 ]
