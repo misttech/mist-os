@@ -69,6 +69,7 @@ template("fuchsia_test") {
       if (!defined(build_rule)) {
         build_rule = "fuchsia_test"
       }
+      component_label = invoker.component
       package_manifests = [ package_manifest ]
       package_url =
           "fuchsia-pkg://fuchsia.com/$package_name#meta/$manifest_name"
