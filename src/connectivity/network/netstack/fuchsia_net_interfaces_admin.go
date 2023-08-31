@@ -472,22 +472,7 @@ func (ci *adminControlImpl) RemoveAddress(_ fidl.Context, address net.Subnet) (a
 	if !ok {
 		panic(fmt.Sprintf("NIC %d not found when removing %s", ci.nicid, protocolAddr.AddressWithPrefix))
 	}
-	ifs := nicInfo.Context.(*ifState)
-
-	// If the address the caller requested to remove was assigned through DHCP,
-	// just stop DHCP since that will result in the removal of the address.
-	ifs.dhcpLock <- struct{}{}
-	ifs.mu.Lock()
-	defer func() {
-		ifs.mu.Unlock()
-		<-ifs.dhcpLock
-	}()
-	if info := ifs.mu.dhcp.Info(); info.Assigned.Address == protocolAddr.AddressWithPrefix.Address {
-		ifs.setDHCPStatusLocked(nicInfo.Name, false)
-		return admin.ControlRemoveAddressResultWithResponse(admin.ControlRemoveAddressResponse{DidRemove: true}), nil
-	}
-
-	switch zxErr := ifs.removeAddress(protocolAddr); zxErr {
+	switch zxErr := nicInfo.Context.(*ifState).removeAddress(protocolAddr); zxErr {
 	case zx.ErrOk:
 		return admin.ControlRemoveAddressResultWithResponse(admin.ControlRemoveAddressResponse{DidRemove: true}), nil
 	case zx.ErrNotFound:
