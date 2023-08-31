@@ -376,7 +376,6 @@
         <p>Examples:</p>
         <ul>
           <li><a href="https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.minfs/">fuchsia.minfs</a></li>
-          <li><a href="https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.blobfs/">fuchsia.blobfs</a></li>
         </ul>
       </li>
       <li>

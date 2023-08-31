@@ -18,7 +18,6 @@
 #include <storage/buffer/owned_vmoid.h>
 #include <storage/buffer/resizeable_vmo_buffer.h>
 
-#include "src/storage/blobfs/blob_corruption_notifier.h"
 #include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/blob_verifier.h"
 #include "src/storage/blobfs/blobfs_metrics.h"
@@ -56,8 +55,7 @@ class BlobLoader {
   //
   // This method does *NOT* immediately verify the integrity of the blob's data, this will be
   // lazily verified by the pager as chunks of the blob are loaded.
-  zx::result<LoaderInfo> LoadBlob(uint32_t node_index,
-                                  const BlobCorruptionNotifier* corruption_notifier);
+  zx::result<LoaderInfo> LoadBlob(uint32_t node_index);
 
  private:
   BlobLoader(TransactionManager* txn_manager, BlockIteratorProvider* block_iter_provider,
@@ -67,9 +65,9 @@ class BlobLoader {
 
   // Loads the merkle tree from disk and initializes a VMO mapping and BlobVerifier with the
   // contents.
-  zx::result<std::unique_ptr<BlobVerifier>> CreateBlobVerifier(
-      uint32_t node_index, const Inode& inode, const BlobLayout& blob_layout,
-      const BlobCorruptionNotifier* corruption_notifier);
+  zx::result<std::unique_ptr<BlobVerifier>> CreateBlobVerifier(uint32_t node_index,
+                                                               const Inode& inode,
+                                                               const BlobLayout& blob_layout);
 
   // Prepares |decompressor_out| to decompress the blob contents of |inode|.
   // If |inode| is not compressed, this is a NOP.

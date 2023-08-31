@@ -12,7 +12,6 @@
 #error Fuchsia-only Header
 #endif
 
-#include <fidl/fuchsia.blobfs/cpp/wire.h>
 #include <fidl/fuchsia.fs/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
@@ -187,12 +186,6 @@ class Blobfs : public TransactionManager, public BlockIteratorProvider {
 
   zx_status_t RunRequests(const std::vector<storage::BufferedOperation>& operations) override;
 
-  // Corruption notifier related.
-  const BlobCorruptionNotifier& blob_corruption_notifier() { return blob_corruption_notifier_; }
-  void SetCorruptBlobHandler(fidl::ClientEnd<fuchsia_blobfs::CorruptBlobHandler> blobfs_handler) {
-    blob_corruption_notifier_.set_corruption_handler(std::move(blobfs_handler));
-  }
-
   // Returns an optional overriden cache policy to apply for pager-backed blobs. If unset, the
   // default cache policy should be used.
   std::optional<CachePolicy> pager_backed_cache_policy() const {
@@ -225,7 +218,6 @@ class Blobfs : public TransactionManager, public BlockIteratorProvider {
 
  private:
   friend class BlobfsChecker;
-  FidlBlobCorruptionNotifier blob_corruption_notifier_;
 
   Blobfs(async_dispatcher_t* dispatcher, std::unique_ptr<BlockDevice> device, fs::PagedVfs* vfs,
          const Superblock* info, Writability writable,

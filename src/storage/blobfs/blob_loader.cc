@@ -94,8 +94,7 @@ zx::result<std::unique_ptr<BlobLoader>> BlobLoader::Create(
       std::move(sandbox_vmo), std::move(decompressor_client))));
 }
 
-zx::result<LoaderInfo> BlobLoader::LoadBlob(uint32_t node_index,
-                                            const BlobCorruptionNotifier* corruption_notifier) {
+zx::result<LoaderInfo> BlobLoader::LoadBlob(uint32_t node_index) {
   ZX_DEBUG_ASSERT(read_mapper_.vmo().is_valid());
   auto inode = node_finder_->GetNode(node_index);
   if (inode.is_error()) {
@@ -132,8 +131,7 @@ zx::result<LoaderInfo> BlobLoader::LoadBlob(uint32_t node_index,
 
   auto decommit_used = fit::defer([this] { Decommit(); });
 
-  auto verifier_or =
-      CreateBlobVerifier(node_index, *inode.value(), *result.layout, corruption_notifier);
+  auto verifier_or = CreateBlobVerifier(node_index, *inode.value(), *result.layout);
   if (verifier_or.is_error())
     return verifier_or.take_error();
   result.verifier = std::move(verifier_or.value());
@@ -148,11 +146,10 @@ zx::result<LoaderInfo> BlobLoader::LoadBlob(uint32_t node_index,
 }
 
 zx::result<std::unique_ptr<BlobVerifier>> BlobLoader::CreateBlobVerifier(
-    uint32_t node_index, const Inode& inode, const BlobLayout& blob_layout,
-    const BlobCorruptionNotifier* notifier) {
+    uint32_t node_index, const Inode& inode, const BlobLayout& blob_layout) {
   if (blob_layout.MerkleTreeSize() == 0) {
     return BlobVerifier::CreateWithoutTree(digest::Digest(inode.merkle_root_hash), metrics_,
-                                           inode.blob_size, notifier);
+                                           inode.blob_size);
   }
 
   std::unique_ptr<BlobVerifier> verifier;
@@ -164,7 +161,7 @@ zx::result<std::unique_ptr<BlobVerifier>> BlobLoader::CreateBlobVerifier(
     return blocks.take_error();
   } else {
     return BlobVerifier::Create(digest::Digest(inode.merkle_root_hash), metrics_, *blocks,
-                                blob_layout, notifier);
+                                blob_layout);
   }
 }
 

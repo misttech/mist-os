@@ -116,7 +116,6 @@ static_library("blobfs") {
       "allocator/allocator.cc",
       "blob.cc",
       "blob_cache.cc",
-      "blob_corruption_notifier.cc",
       "blob_data_producer.cc",
       "blob_data_producer.h",
       "blob_loader.cc",
@@ -150,8 +149,6 @@ static_library("blobfs") {
       "page_loader.h",
       "service/admin.cc",
       "service/admin.h",
-      "service/blobfs.cc",
-      "service/blobfs.h",
       "service/health_check.cc",
       "service/health_check.h",
       "service/lifecycle.cc",
@@ -165,7 +162,6 @@ static_library("blobfs") {
     public_deps += [
       ":fuchsia.blobfs.internal_cpp_wire",
       ":fuchsia.blobfs.internal_hlcpp",
-      "//sdk/fidl/fuchsia.blobfs:fuchsia.blobfs_cpp_wire",
       "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp_wire",
       "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp_wire",
       "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp_wire",
@@ -176,7 +172,6 @@ static_library("blobfs") {
       "//zircon/system/ulib/async-loop:async-loop-cpp",
     ]
     deps += [
-      "//sdk/fidl/fuchsia.blobfs:fuchsia.blobfs_cpp_wire",
       "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
       "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp_wire",
       "//sdk/lib/component/incoming/cpp",

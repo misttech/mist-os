@@ -270,7 +270,7 @@ TEST_P(BlobLoaderTest, NullBlobWithCorruptedMerkleRootFailsToLoad) {
 
 TEST_P(BlobLoaderTest, LoadBlobWithAnInvalidNodeIndexIsAnError) {
   uint32_t invalid_node_index = kMaxNodeId - 1;
-  auto result = loader().LoadBlob(invalid_node_index, nullptr);
+  auto result = loader().LoadBlob(invalid_node_index);
   ASSERT_TRUE(result.is_error());
   EXPECT_EQ(result.error_value(), ZX_ERR_INVALID_ARGS);
 }
@@ -287,7 +287,7 @@ TEST_P(BlobLoaderTest, LoadBlobWithACorruptNextNodeIndexIsAnError) {
   inode->header.next_node = invalid_node_index;
   inode->extent_count = 2;
 
-  auto result = loader().LoadBlob(node_index, nullptr);
+  auto result = loader().LoadBlob(node_index);
   ASSERT_TRUE(result.is_error());
   EXPECT_EQ(result.error_value(), ZX_ERR_IO_DATA_INTEGRITY);
 }

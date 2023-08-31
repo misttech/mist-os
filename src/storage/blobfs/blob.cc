@@ -29,8 +29,7 @@
 namespace blobfs {
 
 zx::result<> VerifyNullBlob(Blobfs& blobfs, const digest::Digest& digest) {
-  zx::result verifier = BlobVerifier::CreateWithoutTree(digest, blobfs.GetMetrics(), 0,
-                                                        &blobfs.blob_corruption_notifier());
+  zx::result verifier = BlobVerifier::CreateWithoutTree(digest, blobfs.GetMetrics(), 0);
   if (verifier.is_error()) {
     return verifier.take_error();
   }
@@ -214,8 +213,7 @@ zx_status_t Blob::LoadPagedVmosFromDisk() {
     set_overridden_cache_policy(*cache_policy);
   }
 
-  zx::result<LoaderInfo> load_info_or =
-      blobfs_.loader().LoadBlob(map_index_, &blobfs_.blob_corruption_notifier());
+  zx::result<LoaderInfo> load_info_or = blobfs_.loader().LoadBlob(map_index_);
   if (load_info_or.is_error())
     return load_info_or.error_value();
 

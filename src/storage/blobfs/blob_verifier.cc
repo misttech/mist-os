@@ -21,10 +21,8 @@ BlobVerifier::BlobVerifier(digest::Digest digest, std::shared_ptr<BlobfsMetrics>
 
 zx::result<std::unique_ptr<BlobVerifier>> BlobVerifier::Create(
     digest::Digest digest, std::shared_ptr<BlobfsMetrics> metrics,
-    cpp20::span<const uint8_t> merkle_data_blocks, const BlobLayout& layout,
-    const BlobCorruptionNotifier* notifier) {
+    cpp20::span<const uint8_t> merkle_data_blocks, const BlobLayout& layout) {
   std::unique_ptr<BlobVerifier> verifier(new BlobVerifier(std::move(digest), std::move(metrics)));
-  verifier->corruption_notifier_ = notifier;
   verifier->tree_verifier_.SetUseCompactFormat(ShouldUseCompactMerkleTreeFormat(layout.Format()));
 
   if (zx_status_t status = verifier->tree_verifier_.SetDataLength(layout.FileSize());
@@ -58,10 +56,8 @@ zx::result<std::unique_ptr<BlobVerifier>> BlobVerifier::Create(
 }
 
 zx::result<std::unique_ptr<BlobVerifier>> BlobVerifier::CreateWithoutTree(
-    digest::Digest digest, std::shared_ptr<BlobfsMetrics> metrics, size_t data_size,
-    const BlobCorruptionNotifier* notifier) {
+    digest::Digest digest, std::shared_ptr<BlobfsMetrics> metrics, size_t data_size) {
   std::unique_ptr<BlobVerifier> verifier(new BlobVerifier(std::move(digest), std::move(metrics)));
-  verifier->corruption_notifier_ = notifier;
 
   if (zx_status_t status = verifier->tree_verifier_.SetDataLength(data_size); status != ZX_OK) {
     FX_LOGS(ERROR) << "Failed to set merkle data length: " << zx_status_get_string(status);
@@ -131,10 +127,6 @@ zx_status_t BlobVerifier::Verify(const void* data, size_t data_size, size_t buff
   }
   metrics_->verification_metrics().Increment(data_size, tree_verifier_.GetTreeLength(),
                                              ticker.End());
-  if (status == ZX_ERR_IO_DATA_INTEGRITY && corruption_notifier_) {
-    // Notify the corruption handler server about the corrupted blob.
-    corruption_notifier_->NotifyCorruptBlob(digest_);
-  }
   return status;
 }
 
@@ -160,10 +152,6 @@ zx_status_t BlobVerifier::VerifyPartial(const void* data, size_t length, size_t 
   }
   metrics_->verification_metrics().Increment(length, tree_verifier_.GetTreeLength(), ticker.End());
 
-  if (status == ZX_ERR_IO_DATA_INTEGRITY && corruption_notifier_) {
-    // Notify the corruption handler server about the corrupted blob.
-    corruption_notifier_->NotifyCorruptBlob(digest_);
-  }
   return status;
 }
 

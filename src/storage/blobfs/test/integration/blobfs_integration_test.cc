@@ -5,11 +5,9 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <fidl/fuchsia.blobfs/cpp/wire.h>
 #include <fidl/fuchsia.fs/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.update.verify/cpp/wire.h>
-#include <fuchsia/blobfs/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/loop.h>
@@ -61,22 +59,6 @@ namespace {
 
 using BlobfsIntegrationTest = ParameterizedBlobfsTest;
 
-// Class emulating a corruption handler service.
-class CorruptBlobHandlerImpl final : public fuchsia::blobfs::CorruptBlobHandler {
- public:
-  void CorruptBlob(::std::vector<uint8_t> merkleroot) override {
-    sync_completion_signal(&notified_);
-  }
-
-  bool WasCalled() {
-    zx_status_t status = sync_completion_wait(&notified_, ZX_TIME_INFINITE);
-    return status == ZX_OK;
-  }
-
- private:
-  sync_completion_t notified_;
-};
-
 // Go over the parent device logic and test fixture.
 TEST_P(BlobfsIntegrationTest, Trivial) {}
 
@@ -104,88 +86,6 @@ TEST_P(BlobfsIntegrationTest, Basics) {
 
     ASSERT_EQ(unlink(info->path), 0);
   }
-}
-
-TEST_P(BlobfsIntegrationTest, CorruptBlobNotify) {
-  ssize_t device_block_size = fs().options().device_block_size;
-
-  // Create a small blob and add it to blobfs.
-  std::unique_ptr<BlobInfo> info = GenerateRandomBlob(fs().mount_path(), device_block_size);
-  fbl::unique_fd blob_fd;
-  ASSERT_NO_FATAL_FAILURE(MakeBlob(*info, &blob_fd));
-  blob_fd.reset();
-
-  // Unmount blobfs before corrupting the blob. Blobfs needs to be remounted to ensure that the
-  // uncorrupted blob wasn't cached.
-  ASSERT_EQ(fs().Unmount().status_value(), ZX_OK);
-
-  // Find the blob within the block device and corrupt it.
-  zx::result path = fs().DevicePath();
-  ASSERT_TRUE(path.is_ok()) << path.status_string();
-  zx::result device = component::Connect<fuchsia_hardware_block::Block>(path.value());
-  ASSERT_TRUE(device.is_ok()) << device.status_string();
-
-  // Read the superblock to find where the data blocks start.
-  Superblock superblock;
-  {
-    zx_status_t status =
-        block_client::SingleReadBytes(device.value(), &superblock, sizeof(superblock), 0);
-    ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
-  }
-  uint64_t data_start_block = DataStartBlock(superblock);
-  uint64_t data_block_count = DataBlocks(superblock);
-  auto data = std::make_unique<uint8_t[]>(device_block_size);
-  bool was_blob_corrupted = false;
-  // Loop through the data blocks looking for the blob. Blobs always start on a block boundary.
-  for (uint64_t block = 0; block < data_block_count; ++block) {
-    off_t device_offset =
-        safemath::checked_cast<off_t>((data_start_block + block) * kBlobfsBlockSize);
-
-    {
-      zx_status_t status = block_client::SingleReadBytes(device.value(), data.get(),
-                                                         device_block_size, device_offset);
-      ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
-    }
-
-    if (memcmp(info->data.get(), data.get(), device_block_size) == 0) {
-      // Corrupt the first byte by flipping all of the bits.
-      data[0] = ~data[0];
-      {
-        zx_status_t status = block_client::SingleWriteBytes(device.value(), data.get(),
-                                                            device_block_size, device_offset);
-        ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
-      }
-      was_blob_corrupted = true;
-      break;
-    }
-  }
-  ASSERT_TRUE(was_blob_corrupted) << "The blob didn't get corrupted";
-
-  ASSERT_EQ(fs().Mount().status_value(), ZX_OK);
-
-  // Start the corrupt blob handler server.
-  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  ASSERT_EQ(ZX_OK, loop.StartThread("corruption-dispatcher"));
-  CorruptBlobHandlerImpl corrupt_blob_handler;
-  fidl::Binding<fuchsia::blobfs::CorruptBlobHandler> binding(&corrupt_blob_handler);
-  auto client_end = fidl::ClientEnd<fuchsia_blobfs::CorruptBlobHandler>(
-      binding.NewBinding(loop.dispatcher()).TakeChannel());
-
-  // Pass the corrupt blob handler server to blobfs.
-  auto blobfs = component::ConnectAt<fuchsia_blobfs::Blobfs>(fs().ServiceDirectory());
-  ASSERT_EQ(blobfs.status_value(), ZX_OK);
-
-  ASSERT_EQ(fidl::WireCall(*blobfs)->SetCorruptBlobHandler(std::move(client_end)).status(), ZX_OK);
-
-  blob_fd.reset(open(info->path, O_RDONLY));
-  ASSERT_TRUE(blob_fd.is_valid());
-  EXPECT_EQ(pread(blob_fd.get(), data.get(), device_block_size, 0), -1);
-
-  EXPECT_TRUE(corrupt_blob_handler.WasCalled());
-
-  // Format blobfs to remove the corruption so the fsck that is run in the destructor will pass.
-  ASSERT_EQ(fs().Unmount().status_value(), ZX_OK);
-  EXPECT_EQ(fs().Format().status_value(), ZX_OK);
 }
 
 TEST_P(BlobfsIntegrationTest, UnallocatedBlob) {

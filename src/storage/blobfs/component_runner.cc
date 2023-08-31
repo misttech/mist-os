@@ -16,7 +16,6 @@
 #include "src/lib/storage/vfs/cpp/remote_dir.h"
 #include "src/storage/blobfs/mount.h"
 #include "src/storage/blobfs/service/admin.h"
-#include "src/storage/blobfs/service/blobfs.h"
 #include "src/storage/blobfs/service/health_check.h"
 #include "src/storage/blobfs/service/lifecycle.h"
 #include "src/storage/blobfs/service/startup.h"
@@ -246,8 +245,6 @@ zx::result<> ComponentRunner::Configure(std::unique_ptr<BlockDevice> device,
                           FX_LOGS(INFO) << "fs_admin shutdown received.";
                           this->Shutdown(std::move(cb));
                         }));
-  svc_dir->AddEntry(fidl::DiscoverableProtocolName<fuchsia_blobfs::Blobfs>,
-                    fbl::MakeRefCounted<BlobfsService>(loop_.dispatcher(), *blobfs_));
 
   status = ServeDirectory(std::move(svc_dir), std::move(svc_server_end_));
   if (status != ZX_OK) {

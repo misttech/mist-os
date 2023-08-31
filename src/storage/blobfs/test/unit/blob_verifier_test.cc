@@ -28,17 +28,6 @@ struct BlockMerkleTreeInfo {
   }
 };
 
-class TestCorruptionNotifier : public BlobCorruptionNotifier {
- public:
-  void NotifyCorruptBlob(const digest::Digest& digest) const override { last_corruption_ = digest; }
-
-  std::optional<digest::Digest>& last_corruption() { return last_corruption_; }
-  void ResetLastCorruption() { last_corruption_ = std::optional<digest::Digest>(); }
-
- private:
-  mutable std::optional<digest::Digest> last_corruption_;
-};
-
 class BlobVerifierTest : public testing::TestWithParam<BlobLayoutFormat> {
  public:
   std::shared_ptr<BlobfsMetrics> GetMetrics() { return metrics_; }
@@ -89,7 +78,7 @@ void FillWithRandom(uint8_t* buf, size_t len) {
 TEST_P(BlobVerifierTest, CreateAndVerify_NullBlob) {
   auto merkle_tree = GenerateTree(nullptr, 0);
 
-  auto verifier_or = BlobVerifier::CreateWithoutTree(merkle_tree->root, GetMetrics(), 0ul, nullptr);
+  auto verifier_or = BlobVerifier::CreateWithoutTree(merkle_tree->root, GetMetrics(), 0ul);
   ASSERT_TRUE(verifier_or.is_ok());
   BlobVerifier* verifier = verifier_or.value().get();
 
@@ -103,8 +92,7 @@ TEST_P(BlobVerifierTest, CreateAndVerify_SmallBlob) {
 
   auto merkle_tree = GenerateTree(buf, sizeof(buf));
 
-  auto verifier_or =
-      BlobVerifier::CreateWithoutTree(merkle_tree->root, GetMetrics(), sizeof(buf), nullptr);
+  auto verifier_or = BlobVerifier::CreateWithoutTree(merkle_tree->root, GetMetrics(), sizeof(buf));
   ASSERT_TRUE(verifier_or.is_ok());
   BlobVerifier* verifier = verifier_or.value().get();
 
@@ -122,8 +110,6 @@ TEST_P(BlobVerifierTest, CreateAndVerify_SmallBlob) {
 }
 
 TEST_P(BlobVerifierTest, CreateAndVerify_SmallBlob_DataCorrupted) {
-  TestCorruptionNotifier notifier;
-
   uint8_t buf[8192];
   FillWithRandom(buf, sizeof(buf));
 
@@ -132,21 +118,15 @@ TEST_P(BlobVerifierTest, CreateAndVerify_SmallBlob_DataCorrupted) {
   // Invert one character
   buf[42] = ~(buf[42]);
 
-  auto verifier_or =
-      BlobVerifier::CreateWithoutTree(merkle_tree->root, GetMetrics(), sizeof(buf), &notifier);
+  auto verifier_or = BlobVerifier::CreateWithoutTree(merkle_tree->root, GetMetrics(), sizeof(buf));
   ASSERT_TRUE(verifier_or.is_ok());
   BlobVerifier* verifier = verifier_or.value().get();
 
   EXPECT_EQ(verifier->Verify(buf, sizeof(buf), sizeof(buf)), ZX_ERR_IO_DATA_INTEGRITY);
   EXPECT_EQ(verifier->VerifyPartial(buf, 8192, 0, 8192), ZX_ERR_IO_DATA_INTEGRITY);
-
-  ASSERT_TRUE(notifier.last_corruption());
-  EXPECT_EQ(notifier.last_corruption(), merkle_tree->root);
 }
 
 TEST_P(BlobVerifierTest, CreateAndVerify_BigBlob) {
-  TestCorruptionNotifier notifier;
-
   size_t sz = 1 << 16;
   fbl::Array<uint8_t> buf(new uint8_t[sz], sz);
   FillWithRandom(buf.get(), sz);
@@ -155,7 +135,7 @@ TEST_P(BlobVerifierTest, CreateAndVerify_BigBlob) {
   BlockMerkleTreeInfo info = GenerateMerkleTreeBlocks(*layout, buf.get(), sz);
 
   auto verifier_or =
-      BlobVerifier::Create(info.root, GetMetrics(), info.GetMerkleDataBlocks(), *layout, &notifier);
+      BlobVerifier::Create(info.root, GetMetrics(), info.GetMerkleDataBlocks(), *layout);
   ASSERT_TRUE(verifier_or.is_ok());
   BlobVerifier* verifier = verifier_or.value().get();
 
@@ -174,14 +154,9 @@ TEST_P(BlobVerifierTest, CreateAndVerify_BigBlob) {
   EXPECT_EQ(verifier->VerifyPartial(buf.data() + (sz - 8192), static_cast<size_t>(2) * 8192,
                                     sz - 8192, static_cast<size_t>(2) * 8192),
             ZX_ERR_INVALID_ARGS);
-
-  // Should be no corruptions.
-  EXPECT_FALSE(notifier.last_corruption());
 }
 
 TEST_P(BlobVerifierTest, CreateAndVerify_BigBlob_DataCorrupted) {
-  TestCorruptionNotifier notifier;
-
   size_t sz = 1 << 16;
   fbl::Array<uint8_t> buf(new uint8_t[sz], sz);
   FillWithRandom(buf.get(), sz);
@@ -193,7 +168,7 @@ TEST_P(BlobVerifierTest, CreateAndVerify_BigBlob_DataCorrupted) {
   buf.get()[42] = ~(buf.get()[42]);
 
   auto verifier_or =
-      BlobVerifier::Create(info.root, GetMetrics(), info.GetMerkleDataBlocks(), *layout, &notifier);
+      BlobVerifier::Create(info.root, GetMetrics(), info.GetMerkleDataBlocks(), *layout);
   ASSERT_TRUE(verifier_or.is_ok());
   BlobVerifier* verifier = verifier_or.value().get();
 
@@ -205,21 +180,13 @@ TEST_P(BlobVerifierTest, CreateAndVerify_BigBlob_DataCorrupted) {
     zx_status_t status = verifier->VerifyPartial(buf.get() + i, 8192, i, 8192);
     if (i == 0) {
       EXPECT_EQ(status, ZX_ERR_IO_DATA_INTEGRITY);
-      ASSERT_TRUE(notifier.last_corruption());
-      EXPECT_EQ(notifier.last_corruption(), info.root);
-
-      // Reset so we can tell it's not called again.
-      notifier.ResetLastCorruption();
     } else {
       EXPECT_EQ(status, ZX_OK);
-      EXPECT_FALSE(notifier.last_corruption());
     }
   }
 }
 
 TEST_P(BlobVerifierTest, CreateAndVerify_BigBlob_MerkleCorrupted) {
-  TestCorruptionNotifier notifier;
-
   size_t sz = 1 << 16;
   fbl::Array<uint8_t> buf(new uint8_t[sz], sz);
   FillWithRandom(buf.get(), sz);
@@ -231,7 +198,7 @@ TEST_P(BlobVerifierTest, CreateAndVerify_BigBlob_MerkleCorrupted) {
   info.merkle_data[0] ^= 0xff;
 
   auto verifier_or =
-      BlobVerifier::Create(info.root, GetMetrics(), info.GetMerkleDataBlocks(), *layout, &notifier);
+      BlobVerifier::Create(info.root, GetMetrics(), info.GetMerkleDataBlocks(), *layout);
   ASSERT_TRUE(verifier_or.is_ok());
   BlobVerifier* verifier = verifier_or.value().get();
 
@@ -241,10 +208,6 @@ TEST_P(BlobVerifierTest, CreateAndVerify_BigBlob_MerkleCorrupted) {
   // Block-by-block -- everything fails
   for (size_t i = 0; i < sz; i += 8192) {
     EXPECT_EQ(verifier->VerifyPartial(buf.get() + i, 8192, i, 8192), ZX_ERR_IO_DATA_INTEGRITY);
-
-    ASSERT_TRUE(notifier.last_corruption());
-    EXPECT_EQ(*notifier.last_corruption(), info.root);
-    notifier.ResetLastCorruption();
   }
 }
 
@@ -257,8 +220,7 @@ TEST_P(BlobVerifierTest, NonZeroTailCausesVerifyToFail) {
 
   auto merkle_tree = GenerateTree(buf, kBlobSize);
 
-  auto verifier_or =
-      BlobVerifier::CreateWithoutTree(merkle_tree->root, GetMetrics(), kBlobSize, nullptr);
+  auto verifier_or = BlobVerifier::CreateWithoutTree(merkle_tree->root, GetMetrics(), kBlobSize);
   ASSERT_TRUE(verifier_or.is_ok());
   BlobVerifier* verifier = verifier_or.value().get();
 
@@ -277,7 +239,7 @@ TEST_P(BlobVerifierTest, NonZeroTailCausesVerifyPartialToFail) {
   BlockMerkleTreeInfo info = GenerateMerkleTreeBlocks(*layout, buf.data(), kBlobSize);
 
   auto verifier_or =
-      BlobVerifier::Create(info.root, GetMetrics(), info.GetMerkleDataBlocks(), *layout, nullptr);
+      BlobVerifier::Create(info.root, GetMetrics(), info.GetMerkleDataBlocks(), *layout);
   ASSERT_TRUE(verifier_or.is_ok());
   BlobVerifier* verifier = verifier_or.value().get();
 

@@ -15,7 +15,6 @@
 
 #include "src/lib/digest/digest.h"
 #include "src/lib/digest/merkle-tree.h"
-#include "src/storage/blobfs/blob_corruption_notifier.h"
 #include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/blobfs_metrics.h"
 
@@ -35,15 +34,13 @@ class BlobVerifier {
   // size for |data_size| bytes is bigger than |merkle_size|.
   [[nodiscard]] static zx::result<std::unique_ptr<BlobVerifier>> Create(
       digest::Digest digest, std::shared_ptr<BlobfsMetrics> metrics,
-      cpp20::span<const uint8_t> merkle_data_blocks, const BlobLayout& layout,
-      const BlobCorruptionNotifier* notifier);
+      cpp20::span<const uint8_t> merkle_data_blocks, const BlobLayout& layout);
 
   // Creates an instance of BlobVerifier for blobs named |digest|, which are small enough to not
   // have a stored merkle tree (i.e. MerkleTreeBytes(data_size) == 0). The passed-in BlobfsMetrics
   // will be updated when this class runs.
   [[nodiscard]] static zx::result<std::unique_ptr<BlobVerifier>> CreateWithoutTree(
-      digest::Digest digest, std::shared_ptr<BlobfsMetrics> metrics, size_t data_size,
-      const BlobCorruptionNotifier* notifier);
+      digest::Digest digest, std::shared_ptr<BlobfsMetrics> metrics, size_t data_size);
 
   // Verifies the entire contents of a blob. |buffer_size| is the total size of the buffer and the
   // buffer must be zeroed from |data_size| to |buffer_size|.
@@ -79,7 +76,6 @@ class BlobVerifier {
 
   std::unique_ptr<uint8_t[]> merkle_data_;
 
-  const BlobCorruptionNotifier* corruption_notifier_;
   const digest::Digest digest_;
 
   // The verification lock is to be used whenever calling Verify() on the |tree_verifier_| since
