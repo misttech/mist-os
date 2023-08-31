@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-
 """
 shac.star defines static analysis checks to run in infrastructure and local
 workflows using the SHAC tool.
