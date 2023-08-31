@@ -12,7 +12,6 @@ sampler_files = [
   "archivist.json",
   "avrcp.json",
   "driver_manager_all.json",
-  "file-usage-metrics.json",
   "fshost.json",
   "netstack.json",
   "setui.json",
