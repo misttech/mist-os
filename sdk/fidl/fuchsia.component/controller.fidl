@@ -40,8 +40,8 @@ type StartChildArgs = resource table {
     /// any namespace entries listed here before being given to the component's
     /// runner.
     ///
-    /// If there are any conflicting entries, the ones listed here will take
-    /// precedence.
+    /// If there are any conflicting entries, an error will occur when starting
+    /// the component.
     2: namespace_entries vector<NamespaceEntry>:MAX_NAMESPACE_COUNT;
 };
 
