@@ -15,7 +15,6 @@ pub mod forensics_config;
 pub mod graphics_config;
 pub mod icu_config;
 pub mod identity_config;
-pub mod input_config;
 pub mod intl_config;
 pub mod media_config;
 pub mod paravirtualization_config;
@@ -87,10 +86,6 @@ pub struct PlatformConfig {
     /// Platform configuration options for the identity area.
     #[serde(default)]
     pub identity: identity_config::PlatformIdentityConfig,
-
-    /// Platform configuration options for the input area.
-    #[serde(default)]
-    pub input: input_config::PlatformInputConfig,
 
     /// Platform configuration options for the media area.
     #[serde(default)]
