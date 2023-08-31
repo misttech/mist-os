@@ -5663,6 +5663,68 @@ Warning: This naming is transitional. Modifying this build argument WILL
 
 From //third_party/pigweed/src/pw_assert/backend.gni:25
 
+### pw_async_EXPERIMENTAL_MODULE_VISIBILITY
+
+To depend on pw_async, add targets to this list.
+
+WARNING: This is experimental and *not* guaranteed to work.
+
+**Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/backends/pw_async_fuchsia:*", "//third_party/pigweed:*"]`
+
+From //.gn:89
+
+**Overridden from the default:** `[]`
+
+From //third_party/pigweed/src/pw_async/async.gni:21
+
+**Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/backends/pw_async_fuchsia:*", "//third_party/pigweed:*"]`
+
+From //.gn:89
+
+**Overridden from the default:** `[]`
+
+From //third_party/pigweed/src/pw_async/async.gni:21
+
+### pw_async_FAKE_DISPATCHER_BACKEND
+
+Configures the backend to use for the //pw_async:fake_dispatcher facade.
+
+**Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_async_fuchsia:fake_dispatcher"`
+
+From //.gn:97
+
+**Overridden from the default:** `""`
+
+From //third_party/pigweed/src/pw_async/backend.gni:22
+
+**Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_async_fuchsia:fake_dispatcher"`
+
+From //.gn:97
+
+**Overridden from the default:** `""`
+
+From //third_party/pigweed/src/pw_async/backend.gni:22
+
+### pw_async_TASK_BACKEND
+
+Configures the backend to use for the //pw_async:task facade.
+
+**Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_async_fuchsia:task"`
+
+From //.gn:94
+
+**Overridden from the default:** `""`
+
+From //third_party/pigweed/src/pw_async/backend.gni:19
+
+**Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_async_fuchsia:task"`
+
+From //.gn:94
+
+**Overridden from the default:** `""`
+
+From //third_party/pigweed/src/pw_async/backend.gni:19
+
 ### pw_bloat_BLOATY_CONFIG
 
 Path to the Bloaty configuration file that defines the memory layout and
@@ -6227,7 +6289,7 @@ To override the protobuf compiler used set this to the path, relative to the roo
 
 **Current value for `target_cpu = "arm64"`:** `"host_x64/protoc"`
 
-From //.gn:99
+From //.gn:101
 
 **Overridden from the default:** `""`
 
@@ -6235,7 +6297,7 @@ From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:39
 
 **Current value for `target_cpu = "x64"`:** `"host_x64/protoc"`
 
-From //.gn:99
+From //.gn:101
 
 **Overridden from the default:** `""`
 
@@ -6247,7 +6309,7 @@ To override the protobuf compiler used set this to the GN target that builds the
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/protobuf:protoc"`
 
-From //.gn:98
+From //.gn:100
 
 **Overridden from the default:** `""`
 
@@ -6255,7 +6317,7 @@ From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:36
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/protobuf:protoc"`
 
-From //.gn:98
+From //.gn:100
 
 **Overridden from the default:** `""`
 
