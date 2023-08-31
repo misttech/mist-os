@@ -9,6 +9,7 @@ use futures::{channel::mpsc, StreamExt};
 use light_realm::{assert_fidl_light_group_eq, assert_lights_eq, HardwareLight, LightRealm};
 use std::collections::HashMap;
 use test_case::test_case;
+use tracing::info;
 
 const LIGHT_NAME_1: &str = "LED1";
 const LIGHT_NAME_2: &str = "LED2";
@@ -244,7 +245,21 @@ async fn test_light_set_single_light() {
     settings.sort_by_key(|group: &LightGroup| group.name.clone());
 
     let settings = light_proxy.watch_light_group(LIGHT_NAME_1).await.expect("watch completed");
-    assert_eq!(settings, expected_light_group);
+
+    // TODO(fxbug.dev/132310): Remove this second watch when the flake is fixed.
+    if settings != expected_light_group {
+        // Create a second watcher to get the value for debugging purposes.
+        let light_proxy2 = LightRealm::connect_to_light_marker(&realm);
+
+        let second_watch_settings =
+            light_proxy2.watch_light_group(LIGHT_NAME_1).await.expect("watch completed");
+        info!("Watch did not match expected value. second watch result: {second_watch_settings:?}");
+    }
+    assert_eq!(
+        settings, expected_light_group,
+        "First watch result: {:?}, expected {:?}",
+        settings, expected_light_group,
+    );
 
     let _ = realm.destroy().await;
 }
