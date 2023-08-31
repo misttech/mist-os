@@ -65,7 +65,7 @@ board_zedboot_bootfs_labels += _common_bootfs_deps
 board_recovery_bootfs_labels += _common_bootfs_deps
 
 board_driver_package_labels += [
-  "//src/graphics/drivers/msd-arm-mali:msd-system",
+  "//src/graphics/drivers/msd-arm-mali:msd-arm-mali-dfv2",
   "//src/graphics/drivers/msd-vsi-vip",
   "//src/media/drivers/amlogic_decoder",
   "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:brcmfmac-vim3",
