@@ -36,6 +36,8 @@ def command(args: argparse.Namespace):
              (...without results appearing the in the tests.json file)
     Example: fx search-tests my-component --debug
              (...with verbose debug timing information)
+    Example: fx search-tests //src/sys
+             (Finds all tests under //src/sys in the Fuchsia directory)
     """
     if args.threshold < 0 or args.threshold > 1:
         raise Exception("--threshold must be between 0 and 1")
@@ -158,6 +160,8 @@ class TimingTracker:
         TimingTracker._tracked_timing.append((self._operation_name, None))
 
     def __exit__(self, *args):
+        assert self._slot is not None
+        assert self._start is not None
         TimingTracker._tracked_timing[self._slot] = (
             self._operation_name,
             time.monotonic() - self._start,
@@ -477,7 +481,15 @@ class BuildFileMatcher:
         matches: typing.List[Suggestion] = []
 
         for name, targets in self._name_to_target.items():
-            similarity = matcher.match(name, search_term)
+            options = [name] + targets
+            similarity = max(
+                [
+                    score
+                    for option in options
+                    if (score := matcher.match(option, search_term)) is not None
+                ],
+                default=None,
+            )
             if similarity is not None:
                 for target in sorted(set(targets)):  # deduplicate targets
                     matches.append(Suggestion(name, similarity, f"--with {target}"))
@@ -491,7 +503,17 @@ class TestsFileMatcher:
     def __init__(self, tests_json_file: str):
         with open(tests_json_file, "r") as f:
             contents = json.load(f)
-            self.names: typing.List[str] = [val["test"]["name"] for val in contents]
+            self.names: typing.Dict[str, typing.List[str]] = dict()
+            TOOLCHAIN_REGEX = re.compile(r"\(//build/toolchain:[^\)]*\)$", re.MULTILINE)
+            for entry in contents:
+                labels: typing.List[str] = []
+                test: typing.Dict[str, typing.Any] = entry["test"]
+                for label_name in ["label", "component_label", "package_label"]:
+                    if label_name in test:
+                        # Filter out the toolchain suffix on paths
+                        # so they appear cleaner and match more easily.
+                        labels.append(TOOLCHAIN_REGEX.sub("", test[label_name]))
+                self.names[test["name"]] = labels
 
         # Match the name of Fuchsia packages.
         self._package_matcher = re.compile(r"fuchsia-pkg://fuchsia\.com/([^/#]+)#?")
@@ -514,7 +536,7 @@ class TestsFileMatcher:
             A list of Suggestions from the tests.json file.
         """
         matches: typing.List[Suggestion] = []
-        for name in self.names:
+        for name, labels in self.names.items():
             # Match on the entire package URL by default.
             options = [name]
 
@@ -532,6 +554,10 @@ class TestsFileMatcher:
                 else:
                     segment = segments[-1]
                 options.append(segment)
+
+            # If the target looks like a label, also match labels.
+            if target.startswith("//"):
+                options.extend(labels)
 
             # Get all scores above the matcher's threshold and their associated
             # name.

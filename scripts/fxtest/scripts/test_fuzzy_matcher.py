@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import contextlib
+import typing
 import fuzzy_matcher
 import io
 import json
@@ -87,10 +88,16 @@ class TestSearchLocations(PreserveEnvAndCaptureOutputTestCase):
 
 
 class TestTestsFileMatcher(unittest.TestCase):
-    def _write_names(self, dir, names) -> str:
+    def _write_names(
+        self, dir, names: typing.List[str | typing.Tuple[str, str]]
+    ) -> str:
         path = os.path.join(dir, "tests.json")
         with open(path, "w") as f:
-            l = [{"test": {"name": name}} for name in names]
+            l = []
+            if names and isinstance(names[0], str):
+                l = [{"test": {"name": name}} for name in names]
+            elif names and isinstance(names[0], tuple):
+                l = [{"test": {"name": value[0], "label": value[1]}} for value in names]
             json.dump(l, f)
         return path
 
@@ -132,6 +139,24 @@ class TestTestsFileMatcher(unittest.TestCase):
                     for val in tests_matcher.find_matches("my_host_test", matcher)
                 ],
                 ["my-host-test"],
+            )
+
+    def test_labels(self):
+       with tempfile.TemporaryDirectory() as dir:
+            path = self._write_names(
+                dir,
+                [
+                    ("fuchsia-pkg://fuchsia.com/my-package#meta/my-component.cm", "//src/sys:my_component"),
+                ],
+            )
+            tests_matcher = fuzzy_matcher.TestsFileMatcher(path)
+            matcher = fuzzy_matcher.Matcher(threshold=.7)
+            self.assertEqual(
+                [
+                    val.matched_name
+                    for val in tests_matcher.find_matches("//src/sys", matcher)
+                ],
+                ["//src/sys:my_component"],
             )
 
 
@@ -228,6 +253,36 @@ class TestBuildFileMatcher(unittest.TestCase):
                     )
                 ],
                 [("yet-another-real-name", "--with //src:yet-another-package")],
+            )
+
+    def test_simple_labels(self):
+        with tempfile.TemporaryDirectory() as dir:
+            os.makedirs(os.path.join(dir, "src"))
+            with open(os.path.join(dir, "src", "BUILD.gn"), "w") as f:
+                f.write(TEST_PACKAGE("my-test-package"))
+                f.write(
+                    TEST_PACKAGE_WITH_PACKAGE_NAME("other-package", "other-real-name")
+                )
+                f.write(
+                    TEST_PACKAGE_WITH_COMPONENT_NAME(
+                        "yet-another-package", "yet-another-real-name"
+                    )
+                )
+
+            build_matcher = fuzzy_matcher.BuildFileMatcher(dir)
+            matcher = fuzzy_matcher.Matcher(threshold=.4)
+
+            self.assertEqual(
+                [
+                    (val.matched_name, val.full_suggestion)
+                    for val in build_matcher.find_matches("//src", matcher)
+                ],
+                [
+                    ("my-test-package", "--with //src:my-test-package"),
+                    ("other-real-name", "--with //src:other-package"),
+                    ("yet-another-real-name", "--with //src:yet-another-package"),
+
+                ],
             )
 
     def test_packages_with_components(self):
@@ -375,7 +430,7 @@ kernel-tests (90.00% similar)
             """
 foo-test-component (67.41% similar)
     Build includes: fuchsia-pkg://fuchsia.com/foo-tests#meta/foo-test-component.cm
-kernel-tests (61.67% similar)
+kernel-tests (62.42% similar)
     --with //src:tests
 integration-tests (59.22% similar)
     --with //src:integration-tests
