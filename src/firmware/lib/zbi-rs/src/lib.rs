@@ -61,7 +61,7 @@ pub const ZBI_ALIGNMENT_USIZE: usize = ZBI_ALIGNMENT as usize;
 const ZBI_ARCH_KERNEL_TYPE: ZbiType = ZbiType::KernelArm64;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 const ZBI_ARCH_KERNEL_TYPE: ZbiType = ZbiType::KernelX64;
-#[cfg(target_arch = "riscv")]
+#[cfg(any(target_arch = "riscv", target_arch = "riscv64"))]
 const ZBI_ARCH_KERNEL_TYPE: ZbiType = ZbiType::KernelRiscv64;
 
 /// Aligns provided slice to [`ZBI_ALIGNMENT_USIZE`] bytes.
