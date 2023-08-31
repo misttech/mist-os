@@ -82,11 +82,14 @@ fuchsia_unittest_component("usb-desc-lib-test") {
 fuchsia_test_package("usb-lib-tests") {
   test_components = [
     ":usb-desc-lib-test",
+    ":usb-request-test",
     ":usb-wrapper-test",
   ]
 
-  # This test currently uses a syscall which doesn't contain riscv64 arch support yet.
-  if (target_cpu != "riscv64") {
-    test_components += [ ":usb-request-test" ]
+  if (current_cpu == "riscv64") {
+    test_components -= [
+      # TODO(fxbug.dev/124333): Remove when zx_cache_flush is supported on RISC-V.
+      ":usb-request-test",
+    ]
   }
 }
