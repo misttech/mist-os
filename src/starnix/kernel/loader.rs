@@ -176,7 +176,16 @@ impl elf_load::Mapper for Mapper<'_> {
         let vmo = Arc::new(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?);
         self.mm
             .map(
-                DesiredAddress::Fixed(self.mm.base_addr + vmar_offset),
+                DesiredAddress::Fixed(self.mm.base_addr.checked_add(vmar_offset).ok_or_else(
+                    || {
+                        log_error!(
+                            "in elf load, addition overflow attempting to map at {:?} + {:#x}",
+                            self.mm.base_addr,
+                            vmar_offset
+                        );
+                        zx::Status::INVALID_ARGS
+                    },
+                )?),
                 vmo,
                 vmo_offset,
                 length,

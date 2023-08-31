@@ -30,7 +30,7 @@ use crate::{
     lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
     logging::*,
     mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager},
-    signals::{types::*, SignalInfo},
+    signals::{send_signal, types::*, SignalInfo},
     syscalls::{decls::Syscall, SyscallResult},
     task::*,
     types::*,
@@ -1660,7 +1660,12 @@ impl CurrentTask {
 
         if let Err(err) = self.finish_exec(path, resolved_elf) {
             // TODO(tbodt): Replace this panic with a log and force a SIGSEGV.
-            panic!("{self:?} unrecoverable error in exec: {err:?}");
+            log_warn!("unrecoverable error in exec: {err:?}");
+            send_signal(
+                self,
+                SignalInfo { code: SI_KERNEL as i32, force: true, ..SignalInfo::default(SIGSEGV) },
+            );
+            return Err(err);
         }
 
         self.signal_vfork();
