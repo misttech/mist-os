@@ -1321,7 +1321,7 @@ impl BinderObjectRef {
         // This shouldn't be possible. We have it here as a debugging check.
         assert!(
             !deep_equal,
-            "Two different BinderObjects were found referring to the same underlying object"
+            "Two different BinderObjects were found referring to the same underlying object: {object:?} and {self:?}"
         );
 
         false
