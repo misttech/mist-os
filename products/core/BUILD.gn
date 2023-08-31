@@ -129,7 +129,7 @@ product_assembly_configuration("core") {
   }
 
   base_driver_packages = _base_driver_packages
-  deps = [ "//build/info:latest-commit-date" ]
+  deps = [ "//build/info:build_info_files" ]
 }
 
 product_assembly_configuration("core_with_f2fs") {
@@ -143,7 +143,7 @@ product_assembly_configuration("core_with_f2fs") {
   }
 
   base_driver_packages = _base_driver_packages
-  deps = [ "//build/info:latest-commit-date" ]
+  deps = [ "//build/info:build_info_files" ]
 }
 
 product_assembly_configuration("core_with_minfs") {
@@ -157,7 +157,7 @@ product_assembly_configuration("core_with_minfs") {
   }
 
   base_driver_packages = _base_driver_packages
-  deps = [ "//build/info:latest-commit-date" ]
+  deps = [ "//build/info:build_info_files" ]
 }
 
 product_assembly_configuration("core_with_fxfs") {
@@ -171,7 +171,7 @@ product_assembly_configuration("core_with_fxfs") {
   }
 
   base_driver_packages = _base_driver_packages
-  deps = [ "//build/info:latest-commit-date" ]
+  deps = [ "//build/info:build_info_files" ]
 }
 
 product_assembly_configuration("core_with_netstack3") {
@@ -191,5 +191,5 @@ product_assembly_configuration("core_with_netstack3") {
   }
 
   base_driver_packages = _base_driver_packages
-  deps = [ "//build/info:latest-commit-date" ]
+  deps = [ "//build/info:build_info_files" ]
 }

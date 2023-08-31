@@ -68,7 +68,7 @@ product_assembly_configuration("minimal") {
   product = {
     build_info = default_product_build_info
   }
-  deps = [ "//build/info:latest-commit-date" ]
+  deps = [ "//build/info:build_info_files" ]
 }
 
 # LINT.ThenChange(//products/minimal/BUILD.bazel)

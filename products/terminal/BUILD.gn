@@ -76,5 +76,5 @@ product_assembly_configuration("terminal") {
         "fuchsia-pkg://fuchsia.com/tiles-session#meta/tiles-session.cm"
     build_info = default_product_build_info
   }
-  deps = [ "//build/info:latest-commit-date" ]
+  deps = [ "//build/info:build_info_files" ]
 }

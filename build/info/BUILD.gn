@@ -67,11 +67,7 @@ if (current_toolchain == default_toolchain) {
       "latest-commit-date.txt",
       "minimum-utc-stamp.txt",
     ]
-    deps = [
-      ":latest-commit-date",
-      ":minimum_utc_stamp",
-      ":version",
-    ]
+    deps = [ ":build_info_files" ]
   }
 
   group("build_info_files") {
