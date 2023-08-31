@@ -5,8 +5,7 @@ Namespaces are the backbone of file access and service discovery in Fuchsia.
 ## Definition
 
 A namespace is a composite hierarchy of files, directories, sockets, services,
-devices, and other named objects provided to a component by its
-environment.
+devices, and other named objects provided to a component.
 
 Let's unpack that a little bit.
 
@@ -21,10 +20,6 @@ by convention.
 **Namespace per component**: Every component receives its own namespace
 tailored to meet its own needs.  It can also publish objects of its own
 to be included in other namespaces.
-
-**Constructed by the environment**: The environment, which instantiates a
-component, is responsible for constructing an appropriate namespace for that
-component within that scope.
 
 Namespaces can also be created and used independently from components although
 this document focuses on typical component-bound usage.
@@ -177,9 +172,8 @@ in file manipulation APIs such as `open()`, `stat()`, `unlink()`, etc.
 
 ## Namespace Transfer
 
-When a component is instantiated in an environment (e.g. its process is
-started), it receives a table that maps one or more namespace path prefixes
-to object handles.
+When a component is started (e.g. its process is started), it receives a
+table that maps one or more namespace path prefixes to object handles.
 
 The path prefixes in the table encode the intended significance of their
 associated objects by convention.  For example, the `pkg` prefix should
@@ -199,8 +193,8 @@ relation to other components, and rights. See [Sandboxing](sandboxing.md) for
 information about how namespaces are used to create sandboxes for components.
 
 _For more information about the namespace your component can expect to
-receive from its environment, please consult the documentation related to
-the component type you are implementing._
+receive, please consult the documentation related to the component type
+you are implementing._
 
 ### Typical Objects
 
@@ -275,7 +269,7 @@ see [service capabilities][service-capabilities].
 Components consume and extend namespaces.
 
 A component is an executable program object that has been instantiated
-within some environment and given a namespace.
+within some topology and given a namespace.
 
 A component participates in the Fuchsia namespace in two ways:
 
@@ -283,25 +277,6 @@ A component participates in the Fuchsia namespace in two ways:
     incoming protocols and services or its own package contents.
 2.  It can **publish** objects through its outgoing directory in the form of a
     namespace to other components.
-
-### Environments
-
-Environments construct namespaces.
-
-An environment is a container of components.  Each environment is responsible
-for _constructing_ the namespace for its components.
-
-The environment decides what objects a component may access and how the
-component's request for services by name will be bound to specific
-implementations.
-
-### Configuration
-
-Components may have different kinds of configuration data exposed to them
-depending on the features listed in their
-[component manifest](/docs/concepts/components/v2/component_manifests.md)
-which are exposed as files in the `/config` namespace entry. These are
-defined by the feature set of the component.
 
 [glossary.protocol]: /docs/glossary/README.md#protocol
 [glossary.service]: /docs/glossary/README.md#service
