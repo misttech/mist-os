@@ -134,6 +134,14 @@ fuchsia_test_package("cpuperf_provider_tests") {
     environments = basic_envs
   }
   subpackages = [ "//src/performance/trace_manager" ]
+
+  if (current_cpu == "riscv64") {
+    test_components -= [
+      # TODO(fxbug.dev/128614): Remove once CategoryTest.NeitherOsNorUser and
+      # CategoryTest.Timebase pass onr RISC-V.
+      ":cpuperf_provider_tests_component",
+    ]
+  }
 }
 
 group("tests") {
