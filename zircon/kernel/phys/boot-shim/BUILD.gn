@@ -14,12 +14,12 @@ import("//zircon/kernel/phys/test/turducken_zbi_test.gni")
 import("//zircon/kernel/phys/zbi_executable.gni")
 
 group("boot-shim") {
-  deps = [ ":zbi-boot-shim" ]
+  deps = [
+    ":zbi-boot-shim",
+    "//zircon/kernel/arch/$zircon_cpu/phys/boot-shim",
+  ]
   if (current_cpu != "riscv64") {  # TODO(mcgrathr): EFI not there yet
     deps += [ ":efi-boot-shim" ]
-  }
-  if (current_cpu == "x64") {
-    deps += [ "//zircon/kernel/arch/x86/phys/boot-shim" ]
   }
 }
 
@@ -128,11 +128,10 @@ efi_executable("efi-boot-shim") {
 group("tests") {
   testonly = true
 
-  deps = [ ":boot-shim" ]
-
-  if (current_cpu == "x64") {
-    deps += [ "//zircon/kernel/arch/x86/phys/boot-shim:tests" ]
-  }
+  deps = [
+    ":boot-shim",
+    "//zircon/kernel/arch/$zircon_cpu/phys/boot-shim:tests",
+  ]
 }
 
 group("boot_tests") {
@@ -142,11 +141,8 @@ group("boot_tests") {
     ":zbi-boot-shim-phys-unittests",
     ":zbi-debugdata-boot-shim-hello-world-test",
     ":zbi-debugdata-boot-shim-test",
+    "//zircon/kernel/arch/$zircon_cpu/phys/boot-shim:boot_tests",
   ]
-
-  if (current_cpu == "x64") {
-    deps += [ "//zircon/kernel/arch/x86/phys/boot-shim:boot_tests" ]
-  }
 
   if (have_devicetree) {
     deps += [

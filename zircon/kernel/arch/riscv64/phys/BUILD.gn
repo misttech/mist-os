@@ -99,9 +99,7 @@ hwreg_asm_header("arch-phys-info-asm") {
   deps = [ ":arch-phys-info" ]
 }
 
-if (current_cpu == "riscv64") {
-  group("tests") {
-    testonly = true
-    deps = [ "boot-shim:boot_tests" ]
-  }
+group("tests") {
+  testonly = true
+  deps = []
 }

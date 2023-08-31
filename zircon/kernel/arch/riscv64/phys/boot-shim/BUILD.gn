@@ -11,8 +11,10 @@ import("//zircon/kernel/phys/phys_executable.gni")
 import("//zircon/kernel/phys/qemu.gni")
 import("//zircon/kernel/phys/shim_executable.gni")
 
-# Just the one for now, but will be more later.
-legacy_shims = [ "riscv64-qemu-boot-shim" ]
+legacy_shims = [
+  "riscv64-qemu-boot-shim",
+  "linux-riscv64-boot-shim",
+]
 
 group("boot-shim") {
   deps = []

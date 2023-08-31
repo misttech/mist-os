@@ -7,6 +7,10 @@
 import("//zircon/kernel/phys/phys_executable.gni")
 import("//zircon/kernel/phys/qemu.gni")
 
+group("boot-shim") {
+  deps = [ ":linux-arm64-boot-shim" ]
+}
+
 phys_executable("linux-arm64-boot-shim") {
   sources = [ "linux-arm64-boot-shim.cc" ]
 
@@ -24,4 +28,14 @@ phys_executable("linux-arm64-boot-shim") {
     "//zircon/kernel/phys/boot-shim:devicetree",
     "//zircon/kernel/phys/lib/boot-shim",
   ]
+}
+
+group("tests") {
+  testonly = true
+  deps = []
+}
+
+group("boot_tests") {
+  testonly = true
+  deps = []
 }
