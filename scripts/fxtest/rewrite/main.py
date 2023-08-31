@@ -194,8 +194,10 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
         return 1
 
     # Check that the selected tests are valid.
-    if not await validate_test_selections(selections, recorder, flags):
-        recorder.emit_end("Test selections could not be validated.")
+    try:
+        await validate_test_selections(selections, recorder, flags)
+    except SelectionValidationError as e:
+        recorder.emit_end(str(e))
         return 1
 
     # If desired, we randomize the execution order of tests.
@@ -286,19 +288,26 @@ async def load_test_list(
         raise e
 
 
+class SelectionValidationError(Exception):
+    """A problem occurred when validating test selections.
+
+    The message contains a human-readable explanation of the problem.
+    """
+
+
 async def validate_test_selections(
     selections: selection.TestSelections,
     recorder: event.EventRecorder,
     flags: args.Flags,
-) -> bool:
+):
     """Validate the selections matched from tests.json.
 
     Args:
         selections (TestSelections): The selection output to validate.
         recorder (event.EventRecorder): An event recorder to write useful messages to.
 
-    Returns:
-        bool: True if the selections are valid, False if we should abort.
+    Raises:
+        SelectionValidationError: If the selections are invalid.
     """
 
     missing_groups: typing.List[selection.MatchGroup] = []
@@ -374,7 +383,11 @@ async def validate_test_selections(
                 )
                 recorder.emit_verbatim_message(output.stdout)
 
-    return not missing_groups
+    if missing_groups:
+        raise SelectionValidationError(
+            "No tests found for the following selections:\n "
+            + "\n ".join([str(m) for m in missing_groups])
+        )
 
 
 async def do_build(
