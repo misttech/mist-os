@@ -3,6 +3,7 @@
 ## require is_asan=false
 ## require is_lto=false
 ## require is_thinlto=false
+## require optimize=none
 ## set timeout 10
 
 # TODO(fxbug.dev/127384): attach shouldn't be necessary.

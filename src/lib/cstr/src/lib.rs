@@ -8,8 +8,8 @@
 
 // Re-export libc to be used from the c_char macro
 #[doc(hidden)]
-pub mod __libc_reexport {
-    pub use libc::*;
+pub mod __reexport {
+    pub use static_assertions::*;
 }
 
 /// Creates a `&'static CStr` from a string literal.
@@ -19,10 +19,14 @@ macro_rules! cstr {
         // `concat` macro always produces a static string literal.
         // It is always safe to create a CStr from a null-terminated string.
         // If there are interior null bytes, the string will just end early.
-        unsafe {
-            ::core::ffi::CStr::from_ptr::<'static>(
-                concat!($s, "\0").as_ptr() as *const $crate::__libc_reexport::c_char
-            )
+        {
+            const CSTR: Result<&'static ::core::ffi::CStr, ::core::ffi::FromBytesUntilNulError> =
+                ::core::ffi::CStr::from_bytes_until_nul(concat!($s, "\0").as_bytes());
+            $crate::__reexport::const_assert!(CSTR.is_ok());
+            // SAFETY: from_bytes_until_nul will only produce an error if there is no nul byte.
+            // Since we add one, unwrap should always be ok. We also assert at compile time just in
+            // case this assumption changes from under us.
+            unsafe { CSTR.unwrap_unchecked() }
         }
     };
 }
