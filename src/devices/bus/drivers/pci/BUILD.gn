@@ -162,12 +162,4 @@ group("tests") {
     "test:pci-driver-test",
     "test:pci-unit-test",
   ]
-
-  if (current_cpu == "riscv64") {
-    deps -= [
-      # TODO(fxbug.dev/132945): Remove when `LibFuzzerRunnerTest.MinimizeNewError`
-      # does not time out on RISC-V.
-      "test:pci-driver-test",
-    ]
-  }
 }
