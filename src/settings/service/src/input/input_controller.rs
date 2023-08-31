@@ -280,8 +280,6 @@ impl InputControllerInner {
         let device_types = input_info.input_device_state.device_types();
 
         let cam_state = self.get_cam_sw_state().ok();
-        // TODO(fxbug.dev/69639): Design a more generalized approach to detecting changes in
-        // specific areas of input state and pushing necessary changes to other components.
 
         for input_device in input_devices.iter() {
             if !device_types.contains(&input_device.device_type) {
