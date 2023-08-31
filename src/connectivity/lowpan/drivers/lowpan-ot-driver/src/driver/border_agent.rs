@@ -151,17 +151,18 @@ fn publish_border_agent_service(
     let publish_responder_future = server.into_stream().unwrap().map_err(Into::into).try_for_each(
         move |ServiceInstancePublicationResponder_Request::OnPublication {
                   publication_cause,
+                  subtype,
                   source_addresses,
                   responder,
-                  ..
               }| {
             debug!(
                 tag = "meshcop",
-                "publish_border_agent_service: publication_cause: {:?}", publication_cause
+                "publish_border_agent_service: publication_cause: {publication_cause:?}"
             );
+            debug!(tag = "meshcop", "publish_border_agent_service: publication_cause: {subtype:?}");
             debug!(
                 tag = "meshcop",
-                "publish_border_agent_service: source_addresses: {:?}", source_addresses
+                "publish_border_agent_service: source_addresses: {source_addresses:?}"
             );
             debug!(
                 tag = "meshcop",
@@ -173,8 +174,18 @@ fn publish_border_agent_service(
             // TODO(fxbug.dev/99755): Remove this line once fxbug.dev/99755 is fixed.
             let _ = publisher.clone();
 
+            let result = if subtype.is_some() {
+                debug!(
+                    tag = "meshcop",
+                    "publish_border_agent_service: Subtype specified, skipping advertisement."
+                );
+                Err(OnPublicationError::DoNotRespond)
+            } else {
+                Ok(&publication)
+            };
+
             futures::future::ready(
-                responder.send(Ok(&publication)).context("Unable to call publication responder"),
+                responder.send(result).context("Unable to call publication responder"),
             )
         },
     );
