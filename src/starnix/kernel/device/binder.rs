@@ -778,15 +778,18 @@ impl<'a> BinderProcessGuard<'a> {
         // in the sender's process. A new strong reference will be taken on `object`.
         let (actions, handle) =
             target_process.lock().handles.insert_for_transaction(object.clone());
-        for action in actions {
-            action.execute();
-        }
+        assert!(
+            actions.is_empty(),
+            "The actions should be for a second inc_strong(), so nothing should happen"
+        );
 
         // Now that the object is kept by the target process handle table, the initial strong
         // increment can be released.
-        for action in object.dec_strong() {
-            action.execute();
-        }
+        let actions = object.dec_strong();
+        assert!(
+            actions.is_empty(),
+            "The object should still have at least one strong ref, so nothing should happen"
+        );
         handle
     }
 
