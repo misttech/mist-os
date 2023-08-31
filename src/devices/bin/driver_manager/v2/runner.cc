@@ -29,6 +29,39 @@ zx::result<zx_koid_t> GetKoid(zx_handle_t handle) {
   return zx::ok(info.koid);
 }
 
+const char* GetErrorString(fcomponent::Error error) {
+  switch (error) {
+    case fcomponent::Error::kInternal:
+      return "INTERNAL";
+    case fcomponent::Error::kInvalidArguments:
+      return "INVALID_ARGUMENTS";
+    case fcomponent::Error::kUnsupported:
+      return "UNSUPPORTED";
+    case fcomponent::Error::kAccessDenied:
+      return "ACCESS_DENIED";
+    case fcomponent::Error::kInstanceNotFound:
+      return "INSTANCE_NOT_FOUND";
+    case fcomponent::Error::kInstanceAlreadyExists:
+      return "INSTANCE_ALREADY_EXISTS";
+    case fcomponent::Error::kInstanceCannotStart:
+      return "INSTANCE_CANNOT_START";
+    case fcomponent::Error::kInstanceCannotResolve:
+      return "INSTANCE_CANNOT_RESOLVE";
+    case fcomponent::Error::kCollectionNotFound:
+      return "COLLECTION_NOT_FOUND";
+    case fcomponent::Error::kResourceUnavailable:
+      return "RESOURCE_UNAVAILABLE";
+    case fcomponent::Error::kInstanceDied:
+      return "INSTANCE_DIED";
+    case fcomponent::Error::kResourceNotFound:
+      return "RESOURCE_NOT_FOUND";
+    case fcomponent::Error::kInstanceCannotUnresolve:
+      return "INSTANCE_CANNOT_UNRESOLVE";
+    case fcomponent::Error::kInstanceAlreadyStarted:
+      return "INSTANCE_ALREADY_STARTED";
+  }
+}
+
 }  // namespace
 
 namespace driver_manager {
@@ -72,21 +105,24 @@ void Runner::StartDriverComponent(std::string_view moniker, std::string_view url
     child_args_builder.dynamic_offers(offers);
   }
   auto create_callback =
-      [this, koid = koid.value()](
+      [this, child_moniker = std::string(moniker.data()), koid = koid.value()](
           fidl::WireUnownedResult<fcomponent::Realm::CreateChild>& result) mutable {
         bool is_error = false;
         if (!result.ok()) {
-          LOGF(ERROR, "Failed create child %s", result.FormatDescription().c_str());
+          LOGF(ERROR, "Failed to create child '%s': %s", child_moniker.c_str(),
+               result.FormatDescription().c_str());
           is_error = true;
         }
         if (result.value().is_error()) {
-          LOGF(ERROR, "Failed create child %d", result.value().error_value());
+          LOGF(ERROR, "Failed to create child '%s': %s", child_moniker.c_str(),
+               GetErrorString(result.value().error_value()));
           is_error = true;
         }
         if (is_error) {
           zx::result result = CallCallback(koid, zx::error(ZX_ERR_INTERNAL));
           if (result.is_error()) {
-            LOGF(ERROR, "Failed to find driver request: %s", result.status_string());
+            LOGF(ERROR, "Failed to find driver request for '%s': %s", child_moniker.c_str(),
+                 result.status_string());
           }
         }
       };
