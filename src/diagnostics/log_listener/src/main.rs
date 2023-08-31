@@ -8,12 +8,37 @@
 //! writes them to disk.
 
 use anyhow::{format_err, Error};
+use async_trait::async_trait;
 use chrono::TimeZone;
+use diagnostics_data::LogTextColor;
+use diagnostics_data::LogTextDisplayOptions;
+use diagnostics_data::LogTimeDisplayFormat;
+use diagnostics_data::Timestamp;
+use diagnostics_data::Timezone;
+use ffx_writer::Format;
+use ffx_writer::MachineWriter;
+use fidl_fuchsia_diagnostics::StreamParameters;
+use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
 use fuchsia_async as fasync;
+use fuchsia_component::client::connect_to_protocol;
 use fuchsia_syslog_listener as syslog_listener;
 use fuchsia_syslog_listener::LogProcessor;
 use fuchsia_zircon as zx;
 use lazy_static::lazy_static;
+use log_command as log_utils;
+use log_command::log_formatter;
+use log_formatter::dump_logs_from_socket as read_logs_from_socket;
+use log_formatter::DefaultLogFormatter;
+use log_formatter::DeviceOrLocalTimestamp;
+use log_formatter::LogEntry;
+use log_formatter::LogFormatterOptions;
+use log_formatter::Symbolize;
+use log_utils::filter::LogFilterCriteria;
+use log_utils::log_formatter::BootTimeAccessor;
+use log_utils::LogCommand;
+use log_utils::LogSubCommand;
+use log_utils::TimeFormat;
+use log_utils::WatchCommand;
 use regex::{Captures, Regex};
 use selectors::{self, VerboseError};
 use std::collections::hash_map::DefaultHasher;
@@ -35,6 +60,7 @@ use fidl_fuchsia_logger::{
 };
 
 const DEFAULT_FILE_CAPACITY: u64 = 64000;
+const ENABLE_REWRITE: bool = false;
 
 type Color = &'static str;
 static ANSI_RESET: &str = "\x1B[1;0m";
@@ -1001,6 +1027,138 @@ fn new_listener(local_options: LocalOptions) -> Result<Listener<Box<dyn Write + 
     Ok(Listener::new(writer, local_options.clone(), d))
 }
 
+/// Target-side symbolizer implementation.
+/// Does nothing as no symbols are available on the target.
+struct Symbolizer {}
+
+impl Symbolizer {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
+#[async_trait(?Send)]
+impl Symbolize for Symbolizer {
+    async fn symbolize(&self, entry: LogEntry) -> LogEntry {
+        entry
+    }
+}
+
+/// Main entrypoint for the log_listener rewrite
+async fn new_log_main() -> Result<(), Error> {
+    let cmd: LogCommand = argh::from_env();
+    let sub_command = cmd.sub_command.unwrap_or(LogSubCommand::Watch(WatchCommand {}));
+    let (sender, receiver) = fuchsia_zircon::Socket::create_stream();
+    let proxy = connect_to_protocol::<ArchiveAccessorMarker>().unwrap();
+    let is_json =
+        std::env::vars().any(|value| value == ("machine".to_string(), "json".to_string()));
+    let stream_mode = if matches!(sub_command, LogSubCommand::Dump(..)) {
+        fidl_fuchsia_diagnostics::StreamMode::Snapshot
+    } else {
+        cmd.since
+            .as_ref()
+            .map(|value| {
+                if value.is_now {
+                    fidl_fuchsia_diagnostics::StreamMode::Subscribe
+                } else {
+                    fidl_fuchsia_diagnostics::StreamMode::SnapshotThenSubscribe
+                }
+            })
+            .unwrap_or(fidl_fuchsia_diagnostics::StreamMode::SnapshotThenSubscribe)
+    };
+    proxy
+        .stream_diagnostics(
+            &StreamParameters {
+                data_type: Some(fidl_fuchsia_diagnostics::DataType::Logs),
+                stream_mode: Some(stream_mode),
+                format: Some(fidl_fuchsia_diagnostics::Format::Json),
+                client_selector_configuration: Some(
+                    fidl_fuchsia_diagnostics::ClientSelectorConfiguration::SelectAll(true),
+                ),
+                ..Default::default()
+            },
+            sender,
+        )
+        .await
+        .unwrap();
+    let boot_ts = fuchsia_runtime::utc_time() - zx::Time::get_monotonic();
+    let mut formatter = DefaultLogFormatter::new(
+        LogFilterCriteria::default(),
+        MachineWriter::new(if is_json { Some(Format::Json) } else { None }),
+        LogFormatterOptions {
+            raw: cmd.raw,
+            display: if is_json {
+                None
+            } else {
+                Some(LogTextDisplayOptions {
+                    show_tags: !cmd.hide_tags,
+                    show_file: !cmd.hide_file,
+                    color: if !cmd.no_color {
+                        LogTextColor::BySeverity
+                    } else {
+                        LogTextColor::None
+                    },
+                    time_format: match cmd.clock {
+                        TimeFormat::Monotonic => LogTimeDisplayFormat::Original,
+                        TimeFormat::Local => LogTimeDisplayFormat::WallTime {
+                            tz: Timezone::Local,
+
+                            // This will receive a correct value when logging actually starts,
+                            // see `set_boot_timestamp()` method on the log formatter.
+                            offset: 0,
+                        },
+                        TimeFormat::Utc => LogTimeDisplayFormat::WallTime {
+                            tz: Timezone::Utc,
+
+                            // This will receive a correct value when logging actually starts,
+                            // see `set_boot_timestamp()` method on the log formatter.
+                            offset: 0,
+                        },
+                    },
+                    show_metadata: cmd.show_metadata,
+                    show_full_moniker: cmd.show_full_moniker,
+                })
+            },
+            highlight_spam: false,
+            since: cmd
+                .since
+                .as_ref()
+                .map(|value| DeviceOrLocalTimestamp {
+                    timestamp: Timestamp::from(value.naive_utc().timestamp_nanos()),
+                    is_monotonic: false,
+                })
+                .or_else(|| {
+                    cmd.since_monotonic.map(|value| DeviceOrLocalTimestamp {
+                        timestamp: Timestamp::from(value.as_nanos() as i64),
+                        is_monotonic: true,
+                    })
+                }),
+            until: cmd
+                .until
+                .as_ref()
+                .map(|value| DeviceOrLocalTimestamp {
+                    timestamp: Timestamp::from(value.naive_utc().timestamp_nanos()),
+                    is_monotonic: false,
+                })
+                .or_else(|| {
+                    cmd.until_monotonic.map(|value| DeviceOrLocalTimestamp {
+                        timestamp: Timestamp::from(value.as_nanos() as i64),
+                        is_monotonic: true,
+                    })
+                }),
+        },
+    );
+    formatter.set_boot_timestamp(boot_ts.into_nanos());
+    let _ = read_logs_from_socket(
+        fuchsia_async::Socket::from_socket(receiver).unwrap(),
+        &mut formatter,
+        &Symbolizer::new(),
+    )
+    .await;
+    let _ = std::io::stdout().flush();
+    Ok(())
+}
+
 fn run_log_listener(options: Option<LogListenerOptions>) -> Result<(), Error> {
     let mut executor = fasync::LocalExecutor::new();
     let (filter_options, local_options, selectors) = match options {
@@ -1024,6 +1182,12 @@ fn fmt_regex_icase(capture_name: &str, search_key: &str) -> String {
 }
 
 fn main() -> Result<(), Error> {
+    // NOTE: This comparison is needed to workaround
+    // Rust's dead code detection.
+    if "".to_string() == "" && ENABLE_REWRITE {
+        let mut executor = fasync::LocalExecutor::new();
+        return executor.run_singlethreaded(new_log_main());
+    }
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 && (args[1] == "--help" || args[1] == "-h") {
         return Err(format_err!("{}\n", help(args[0].as_ref())));
