@@ -709,12 +709,10 @@ impl ImageAssemblyConfigBuilder {
             })?;
         }
 
-        // Build the config_data package
-        let mut config_data_builder = ConfigDataBuilder::default();
-        let mut found_config_data = false;
-        for (package_name, config) in &package_configs {
-            if !config.config_data.is_empty() {
-                found_config_data = true;
+        // Build the config_data package if we have any packages.
+        if !base.is_empty() || !cache.is_empty() || !system.is_empty() {
+            let mut config_data_builder = ConfigDataBuilder::default();
+            for (package_name, config) in &package_configs {
                 for (_, entry) in config.config_data.iter() {
                     config_data_builder.add_entry(
                         package_name,
@@ -723,8 +721,6 @@ impl ImageAssemblyConfigBuilder {
                     )?;
                 }
             }
-        }
-        if found_config_data {
             let manifest_path = config_data_builder
                 .build(outdir)
                 .context("writing the 'config_data' package metafar.")?;
@@ -970,7 +966,13 @@ mod tests {
         let result: assembly_config_schema::ImageAssemblyConfig =
             builder.build(&vars.outdir, &tools).unwrap();
 
-        assert_eq!(result.base, vec![vars.bundle_path.join("base_package0"),]);
+        assert_eq!(
+            result.base,
+            vec![
+                vars.bundle_path.join("base_package0"),
+                vars.outdir.join("config_data/package_manifest.json")
+            ]
+        );
         assert_eq!(result.cache, vec![vars.bundle_path.join("cache_package0")]);
         assert_eq!(result.system, vec![vars.bundle_path.join("sys_package0")]);
         assert_eq!(result.bootfs_packages, vec![vars.bundle_path.join("bootfs_package0")]);
@@ -1212,7 +1214,7 @@ mod tests {
             vars.outdir.join("shell-commands").join("package_manifest.json");
 
         // Validate that the base package set contains shell_commands.
-        assert_eq!(result.base.len(), 2);
+        assert_eq!(result.base.len(), 3);
         assert!(result.base.contains(&expected_manifest_path));
     }
 
@@ -1319,7 +1321,7 @@ mod tests {
 
         assert_eq!(
             result.base.iter().map(|p| p.to_owned()).sorted().collect::<Vec<_>>(),
-            ["driver1", "driver2", "platform_a", "platform_b"]
+            ["config_data/package_manifest.json", "driver1", "driver2", "platform_a", "platform_b"]
                 .iter()
                 .map(|p| outdir.join(p))
                 .sorted()
