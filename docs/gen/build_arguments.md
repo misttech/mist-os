@@ -7166,7 +7166,7 @@ Supported modes are:
   is possible to modify the blob through the hard link, which would result
   in the blob not matching the blob's merkle.
 
-**Current value (from the default):** `"copy"`
+**Current value (from the default):** `"hard-link"`
 
 From //src/sys/pkg/bin/package-tool/package-tool.gni:285
 
