@@ -20,6 +20,7 @@ rustc_library("ffx_profile_heapdump_common") {
     "//src/sys/lib/cm_rust",
     "//src/sys/lib/component_debug",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:prost",
   ]
 
@@ -27,6 +28,7 @@ rustc_library("ffx_profile_heapdump_common") {
     "//third_party/rust_crates:hex",
     "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:tempfile",
+    "//third_party/rust_crates:test-case",
   ]
 
   sources = [

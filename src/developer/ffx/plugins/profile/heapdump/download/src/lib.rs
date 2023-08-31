@@ -52,6 +52,7 @@ async fn download(remote_control: RemoteControlProxy, cmd: DownloadCommand) -> R
         &mut std::fs::File::create(&cmd.output_file).map_err(|err| {
             ffx_error!("Failed to create output file: {}: {}", cmd.output_file, err)
         })?,
+        cmd.with_tags,
     )?;
 
     Ok(())

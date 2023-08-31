@@ -83,11 +83,15 @@ async fn snapshot(remote_control: RemoteControlProxy, cmd: SnapshotCommand) -> R
         }
     }
 
+    // Always emit full metadata if the user requested the blocks' contents, as it serves as an
+    // index for the generated files.
+    let with_tags = cmd.with_tags || contents_dir.is_some();
     export_to_pprof(
         &snapshot,
         &mut std::fs::File::create(&cmd.output_file).map_err(|err| {
             ffx_error!("Failed to create output file: {}: {}", cmd.output_file, err)
         })?,
+        with_tags,
     )?;
 
     Ok(())

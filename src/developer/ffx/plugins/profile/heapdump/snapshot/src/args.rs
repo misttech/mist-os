@@ -16,6 +16,8 @@ pub struct SnapshotCommand {
     pub by_koid: Option<u64>,
     #[argh(option, description = "output protobuf file")]
     pub output_file: String,
+    #[argh(switch, description = "write per-block metadata (as tags) in the protobuf file")]
+    pub with_tags: bool,
     #[argh(option, description = "optional directory to dump each blocks' contents into")]
     pub output_contents_dir: Option<String>,
 }

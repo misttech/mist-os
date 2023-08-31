@@ -12,6 +12,8 @@ pub struct DownloadCommand {
     pub collector: Option<String>,
     #[argh(option, description = "snapshot ID to be downloaded")]
     pub snapshot_id: u32,
+    #[argh(switch, description = "write per-block metadata (as tags) in the protobuf file")]
+    pub with_tags: bool,
     #[argh(option, description = "output protobuf file")]
     pub output_file: String,
 }
