@@ -38,7 +38,7 @@ group("tests") {
       # TODO(fxbug.dev/128957): Remove after removing Go dependencies on RISC-V.
       "pkg:tests",
 
-      # TODO(fxbug.dev/122609): Remove after removing Go dependencies on RISC-V.
+      # TODO(fxbug.dev/298437881): Remove after removing Go dependencies on RISC-V.
       "time:tests",
     ]
   }

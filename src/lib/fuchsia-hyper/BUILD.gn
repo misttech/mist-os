@@ -77,7 +77,7 @@ fuchsia_test_package("fuchsia-hyper-tests") {
   test_components = [ ":fuchsia-hyper-lib-test" ]
   deps = [ "//src/connectivity/network/netstack:component" ]
   if (current_cpu == "riscv64") {
-    # TODO(fxbug.dev/122609): Make this target depend on netstack3 on RISC-V
+    # TODO(fxbug.dev/298437881): Make this target depend on netstack3 on RISC-V
     # and remove these lines.
     deps -= [ "//src/connectivity/network/netstack:component" ]
     test_specs = {
