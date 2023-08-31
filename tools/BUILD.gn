@@ -42,6 +42,7 @@ group("tools") {
     "//tools/testgen:host($host_toolchain)",
     "//tools/testing/batchtester($host_toolchain)",
     "//tools/update_crates($host_toolchain)",
+    "//tools/validate_test_type:install($host_toolchain)",
     "//tools/virtual_device:fvd($host_toolchain)",
     "//tools/zedmon/client:zedmon_client",
 
@@ -126,6 +127,7 @@ group("tests_no_e2e") {
     "//tools/testgen:tests",
     "//tools/testing:tests($host_toolchain)",
     "//tools/update_crates:tests($host_toolchain)",
+    "//tools/validate_test_type:tests",
     "//tools/virtual_device:tests($host_toolchain)",
     "//tools/zedmon:tests",
   ]
