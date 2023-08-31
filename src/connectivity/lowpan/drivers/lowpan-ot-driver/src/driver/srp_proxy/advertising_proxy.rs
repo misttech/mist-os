@@ -321,13 +321,16 @@ impl AdvertisingProxyInner {
                     bail!("Host {:?} is too long (max {} chars)", local_name, MAX_DNSSD_HOST_LEN);
                 }
 
-                // Make sure the hostname only contains legal characters.
+                // Warn if the hostname only contains legal characters.
                 if local_name.starts_with('-')
                     || local_name.contains(|ch: char| {
                         !(ch.is_ascii_alphanumeric() || ch == '-' || !ch.is_ascii())
                     })
                 {
-                    bail!("Host {local_name:?} contains forbidden characters");
+                    warn!(
+                        tag = "srp_advertising_proxy",
+                        "Host [PII]({local_name:?}) contains forbidden characters"
+                    );
                 }
 
                 let (client, server) = create_endpoints::<ServiceInstancePublisherMarker>();
