@@ -11,6 +11,7 @@
 #include <zircon/types.h>
 
 #include <ktl/array.h>
+#include <ktl/numeric.h>
 #include <ktl/span.h>
 #include <ktl/string_view.h>
 
@@ -39,13 +40,18 @@ inline VmoName DebugdataVmoName(ktl::string_view sink_name, ktl::string_view mod
                                 ktl::string_view suffix, bool is_static) {
   VmoName name = {};
   ktl::span<char> buffer(name);
-  ktl::string_view kDataType = is_static ? kStaticSubDir : kDynamicSubDir;
+  ktl::string_view data_type = is_static ? kStaticSubDir : kDynamicSubDir;
+  ktl::array path{kRootPath, sink_name, data_type, module_name};
 
-  // At least some part of the module name to fit in the name.
-  ZX_ASSERT(kRootPath.length() + sink_name.length() + kDataType.length() + module_name.length() +
-                4 <
-            ZX_MAX_NAME_LEN);
-  for (ktl::string_view component : {kRootPath, sink_name, kDataType, module_name}) {
+  // At least a few characters of the module name must fit in the name.
+  constexpr auto accumulate_size = [](size_t total, ktl::string_view str) {
+    return total + str.size();
+  };
+  size_t length = ktl::reduce(path.begin(), path.end(), size_t{}, accumulate_size);
+  ptrdiff_t overage = length - ZX_MAX_NAME_LEN;
+  ZX_ASSERT_MSG(overage <= 4, "VMO name would be %zu > %zu by %td", length, ZX_MAX_NAME_LEN,
+                overage);
+  for (ktl::string_view component : path) {
     buffer = buffer.subspan(component.copy(buffer.data(), buffer.size() - 1));
     if (buffer.empty()) {
       break;
