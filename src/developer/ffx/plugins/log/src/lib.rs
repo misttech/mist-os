@@ -225,13 +225,29 @@ where
     // handle reconnects manually.
     let mut prev_timestamp = None;
     loop {
-        let connection = connect_to_target(
-            &target_collection_proxy,
-            &target_query,
-            &mut stream_mode,
-            prev_timestamp,
-        )
-        .await?;
+        let connection;
+        // Linear backoff up to 10 seconds.
+        let mut backoff = 0;
+        loop {
+            let maybe_connection = connect_to_target(
+                &target_collection_proxy,
+                &target_query,
+                &mut stream_mode,
+                prev_timestamp,
+            )
+            .await;
+            if let Ok(connected) = maybe_connection {
+                connection = connected;
+                break;
+            }
+            backoff += 1;
+            if backoff > 10 {
+                backoff = 10;
+            }
+            eprintln!("Error connecting to device, retrying in {} seconds", backoff);
+            fuchsia_async::Timer::new(std::time::Duration::from_secs(backoff)).await;
+        }
+
         prev_timestamp = Some(connection.boot_timestamp);
         if !cmd.select.is_empty() {
             connection.log_settings_client.set_interest(&cmd.select).await?;

@@ -12,6 +12,7 @@ use serde::Deserialize;
 use std::{
     io::{BufRead, BufReader},
     process::{Command, Stdio},
+    sync::Mutex,
 };
 use tempfile::TempDir;
 use tracing::info;
@@ -23,7 +24,7 @@ const PRODUCT_BUNDLE_PATH: &str = env!("PRODUCT_BUNDLE_PATH");
 pub struct IsolatedEmulator {
     emu_name: String,
     ffx_isolate: Isolate,
-    system_logs_child: Option<std::process::Child>,
+    children: Mutex<Vec<std::process::Child>>,
 
     // We need to hold the below variables but not interact with them.
     _temp_dir: TempDir,
@@ -60,12 +61,12 @@ impl IsolatedEmulator {
             .await
             .context("creating ffx isolate")?;
 
-        let mut this = Self {
+        let this = Self {
             emu_name,
             ffx_isolate,
             _temp_dir: temp_dir,
             _test_env: test_env,
-            system_logs_child: None,
+            children: Mutex::new(vec![]),
         };
 
         // now we have our isolate and can call ffx commands to configure our env and start an emu
@@ -113,8 +114,10 @@ impl IsolatedEmulator {
         // ffx log prints lots of warnings about symbolization
         system_logs_command.stderr(std::process::Stdio::null());
 
-        this.system_logs_child =
-            Some(system_logs_command.spawn().context("spawning log streaming command")?);
+        this.children
+            .lock()
+            .unwrap()
+            .push(system_logs_command.spawn().context("spawning log streaming command")?);
 
         // serve packages by creating a repository and a server, then registering the server
         if let Some(amber_files_path) = amber_files_path {
@@ -234,8 +237,9 @@ impl IsolatedEmulator {
             .await
             .context("running ffx log")?;
 
-        let child = output.spawn()?;
-        let stdout = child.stdout.context("no stdout")?;
+        let mut child = output.spawn()?;
+        let stdout = child.stdout.take().context("no stdout")?;
+        self.children.lock().unwrap().push(child);
         let mut reader = BufReader::new(stdout);
         let (sender, receiver) = futures::channel::mpsc::unbounded();
         let reader_task = fuchsia_async::Task::local(fuchsia_async::unblock(move || {
@@ -282,10 +286,13 @@ impl IsolatedEmulator {
 
 impl Drop for IsolatedEmulator {
     fn drop(&mut self) {
-        if let Some(child) = self.system_logs_child.as_mut() {
-            // stream a few logs out before we exit
+        if !self.children.lock().unwrap().is_empty() {
+            // allow children to clean up, including streaming a few logs out
             std::thread::sleep(std::time::Duration::from_secs(1));
-            child.kill().ok();
+            let mut children = self.children.lock().unwrap();
+            for child in children.iter_mut() {
+                child.kill().ok();
+            }
         }
 
         info!(
