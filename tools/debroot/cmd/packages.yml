@@ -1,8 +1,8 @@
 dists:
-  - bionic
-  - bionic-backports
-  - bionic-security
-  - bionic-updates
+  - trusty
+  - trusty-backports
+  - trusty-security
+  - trusty-updates
 architectures:
   - amd64
   - arm64
@@ -20,13 +20,12 @@ packages:
   - package: libasound2-dev
   - package: libc6
   - package: libc6-dev
-  - package: libgl1
   - package: libgl1-mesa-dev
   - package: libglapi-mesa
   - package: libglu1-mesa
   - package: libglu1-mesa-dev
-  - package: libpython3.8
-  - package: libpython3.8-dev
+  - package: libpython3.4
+  - package: libpython3.4-dev
   - package: libx11-6
   - package: libx11-dev
   - package: libx11-xcb-dev
@@ -60,7 +59,6 @@ packages:
   - package: linux-libc-dev
   - package: mesa-common-dev
   - package: x11proto-core-dev
-  - package: x11proto-dev
   - package: x11proto-fixes-dev
   - package: x11proto-gl-dev
   - package: x11proto-input-dev
