@@ -14,6 +14,7 @@ import("//build/product.gni")
 import("//build/rust/config.gni")
 import("//build/security.gni")
 import("//build/testing/platforms.gni")
+import("//build/testing/validated_test_types_group.gni")
 import("//build/testing/zbi_test.gni")
 import("//build/toolchain/goma.gni")
 import("//build/toolchain/rbe.gni")
@@ -1601,13 +1602,10 @@ group("legacy_universe_packages") {
 #
 
 # Fully hermetic tests (both by packaging and at runtime)
-group("hermetic_test_packages") {
-  testonly = true
+validated_test_types_group("hermetic_test_packages") {
   visibility = [ ":*" ]
-  public_deps = hermetic_test_package_labels
-  assert(
-      hermetic_test_package_labels == [],
-      "hermetic_test_package_labels cannot be used before adding validation of test hermeticity.")
+  allowed_test_types = [ "hermetic" ]
+  deps = hermetic_test_package_labels
 }
 
 # Non-hermetic tests (at runtime).  Non-test packages found in this group will

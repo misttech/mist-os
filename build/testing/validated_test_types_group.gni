@@ -1,0 +1,132 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/compiled_action.gni")
+
+# Defines a group of tests that are validated to only be of a certain test type,
+# or to not contain any of a particular test type.
+#
+# Type types it can validate:
+#  - hermetic
+#
+# Parameters
+#
+#   deps (required)
+#     [list of labels]: The GN usual, these are GN labels of tests, or groups of
+#     tests.
+#
+#   allowed_test_types (required)
+#     [list of strings]: The allowed types of tests in this group.  Test types
+#     that can be validated for are:
+#       - 'hermetic'
+#       - (TODO) 'end_to_end'
+#       - (TODO) 'host_only'
+#
+#   assert_no_deps, visibility (optional)
+#     GN usual
+#
+template("validated_test_types_group") {
+  assert(defined(invoker.deps), "'deps' must be provided.")
+
+  assert(defined(invoker.allowed_test_types),
+         "'allowed_test_types' must be specified")
+
+  valid_values_in_allowed_test_types = [ "hermetic" ]
+  foreach(test_type, invoker.allowed_test_types) {
+    # This uses the fact that list addition is an append operation, but list
+    # removal removes all instances of those values from the list.  If the
+    # 'test_type' is in the valid values list, then the pair of adding and
+    # removing will remove it from the result, and it won't match.  If the value
+    # is not in the original list, then it's a no-op.  And so if it is still
+    # equal, we know that it's not an allowed value, and error out.
+    assert(valid_values_in_allowed_test_types + [ test_type ] - [ test_type ] !=
+               valid_values_in_allowed_test_types,
+           "'$test_type' is not a valid value for 'allowed_test_types'")
+  }
+
+  # These are explicitly not supported, so call that out instead of letting GN
+  # return the "unused before it went out of scope" error.
+  foreach(field,
+          [
+            "data_deps",
+            "public_deps",
+          ]) {
+    assert(!defined(invoker[field]),
+           "'validated_test_types_group() does not support setting '${field}'")
+  }
+  if (defined(invoker.testonly)) {
+    assert(
+        invoker.testonly,
+        "'testonly', if provided, must be true.  This always creates testonly=true targets.")
+  }
+
+  _labels = {
+    main_target = target_name
+    tests = "${target_name}.test.json"
+    test_components = "${target_name}.test_components.json"
+  }
+
+  _files = {
+    tests = "${target_gen_dir}/${target_name}/tests.json"
+    test_components = "${target_gen_dir}/${target_name}/test_components.json"
+    outdir = "${target_out_dir}/${target_name}"
+    validated = "${outdir}/validated.txt"
+  }
+
+  # The 'tests' metadata for this set of tests
+  generated_file(_labels.tests) {
+    testonly = true
+    data_keys = [ "tests" ]
+    walk_keys = [ "tests_barrier" ]
+    outputs = [ _files.tests ]
+    output_conversion = "json"
+    deps = invoker.deps
+    visibility = [ ":${_labels.main_target}" ]
+  }
+
+  # The 'test_components' metadata for this set of tests
+  generated_file(_labels.test_components) {
+    testonly = true
+    data_keys = [ "test_components" ]
+    walk_keys = [ "test_components_barrier" ]
+    outputs = [ _files.test_components ]
+    output_conversion = "json"
+    deps = invoker.deps
+    visibility = [ ":${_labels.main_target}" ]
+  }
+
+  # Perform the validation of the test-types as the main target for this action
+  compiled_action(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "assert_no_deps",
+                             "visibility",
+                           ])
+    testonly = true
+    tool = "//tools/validate_test_type"
+    deps = [
+      ":${_labels.test_components}",
+      ":${_labels.tests}",
+    ]
+    inputs = [
+      _files.tests,
+      _files.test_components,
+    ]
+    outputs = [ _files.validated ]
+
+    args = [
+             "--test-group-name",
+             get_label_info(":${target_name}", "label_no_toolchain"),
+             "--test_list",
+             rebase_path(_files.tests, root_build_dir),
+             "--test-components",
+             rebase_path(_files.test_components, root_build_dir),
+             "--build-dir",
+             rebase_path(root_build_dir, root_build_dir),
+             "--output",
+             rebase_path(_files.validated, root_build_dir),
+             "--validate",
+           ] + invoker.allowed_test_types
+  }
+}
