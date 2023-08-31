@@ -391,7 +391,6 @@ template("legacy_assembly_input_bundle") {
   }
 
   component_id_index_dep = []
-  component_id_index_config_data_dep = []
   include_component_index = defined(invoker.include_component_id_index) &&
                             invoker.include_component_id_index
   if (include_component_index) {
@@ -412,12 +411,6 @@ template("legacy_assembly_input_bundle") {
     }
 
     component_id_index_dep = [ ":${target_name}.component_id_index_config" ]
-
-    # TODO(fxbug.dev/130900): Remove this dep once possible
-    component_id_index_config_data_dep =
-        [ ":${target_name}.component_id_index_config-config-data" ]
-  } else {
-    not_needed([ "component_id_index_config_data_dep" ])
   }
 
   create_package_archive =
@@ -445,9 +438,8 @@ template("legacy_assembly_input_bundle") {
     }
 
     include_config_data = _include_config_data
-    config_data_packages =
-        invoker.base_packages + invoker.universe_packages +
-        invoker.cache_packages + component_id_index_config_data_dep
+    config_data_packages = invoker.base_packages + invoker.universe_packages +
+                           invoker.cache_packages
 
     boot_args = invoker.additional_boot_args
 
