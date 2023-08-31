@@ -28,7 +28,10 @@ pub use caching_object_handle::CachingObjectHandle;
 pub use data_object_handle::{DataObjectHandle, DirectWriter};
 pub use directory::Directory;
 pub use object_record::{ChildValue, ObjectDescriptor, PosixAttributes, Timestamp};
-pub use store_object_handle::{SetExtendedAttributeMode, StoreObjectHandle};
+pub use store_object_handle::{
+    SetExtendedAttributeMode, StoreObjectHandle, EXTENDED_ATTRIBUTE_RANGE_END,
+    EXTENDED_ATTRIBUTE_RANGE_START,
+};
 
 use {
     crate::{
@@ -1115,7 +1118,7 @@ impl ObjectStore {
                         }
                         round_up(*size, self.block_size).ok_or(FxfsError::Inconsistent)?
                     } else {
-                        // At time of writing, we should always see a size record here, but
+                        // At time of writing, we should always see a size record or None here, but
                         // asserting here would be brittle so just skip to the the next attribute
                         // instead.
                         return Ok(TrimResult::Done(Some(attribute_id + 1)));
@@ -1987,6 +1990,7 @@ fn layer_size_from_encrypted_mutations_size(size: u64) -> u64 {
 impl AssociatedObject for ObjectStore {}
 
 /// Argument to the trim_some method.
+#[derive(Debug)]
 pub enum TrimMode {
     /// Trim extents beyond the current size.
     UseSize,
@@ -1999,6 +2003,7 @@ pub enum TrimMode {
 }
 
 /// Result of the trim_some method.
+#[derive(Debug)]
 pub enum TrimResult {
     /// We reached the limit of the transaction and more extents might follow.
     Incomplete,

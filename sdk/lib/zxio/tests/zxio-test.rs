@@ -5,25 +5,18 @@
 use {
     assert_matches::assert_matches,
     async_trait::async_trait,
-    fidl::endpoints::{create_endpoints, ServerEnd},
+    fidl::endpoints::create_endpoints,
     fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_zircon::{self as zx, HandleBased, Status},
-    futures::lock::Mutex,
+    fuchsia_zircon::{self as zx, HandleBased},
     fxfs_testing::TestFixture,
-    std::{collections::HashMap, sync::Arc},
+    std::sync::Arc,
     syncio::{
         zxio, zxio_node_attr_has_t, zxio_node_attributes_t, OpenOptions, SeekOrigin, XattrSetMode,
         Zxio,
     },
     vfs::{
-        directory::entry::{DirectoryEntry, EntryInfo},
-        execution_scope::ExecutionScope,
-        file::{FidlIoConnection, File, FileIo, FileOptions, SyncMode},
-        node::Node,
-        path::Path,
-        pseudo_directory,
-        symlink::Symlink,
-        ToObjectRequest,
+        directory::entry::DirectoryEntry, execution_scope::ExecutionScope, node::Node, path::Path,
+        pseudo_directory, symlink::Symlink,
     },
 };
 
@@ -220,133 +213,6 @@ async fn test_xattr_dir_multiple_attributes() {
     fixture.close().await;
 }
 
-// TODO(fxbug.dev/122123): Once fxfs supports large attributes, point this test at the fixture
-// instead of using a fake file implementation.
-struct XattrFile {
-    extended_attributes: Mutex<HashMap<Vec<u8>, Vec<u8>>>,
-}
-
-impl XattrFile {
-    fn new() -> Arc<Self> {
-        Arc::new(XattrFile { extended_attributes: Mutex::new(HashMap::new()) })
-    }
-}
-
-impl DirectoryEntry for XattrFile {
-    fn open(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        _path: Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        flags.to_object_request(server_end).handle(|object_request| {
-            object_request.spawn_connection(
-                scope.clone(),
-                self.clone(),
-                flags,
-                FidlIoConnection::create,
-            )
-        });
-    }
-
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File)
-    }
-}
-
-#[async_trait]
-impl FileIo for XattrFile {
-    async fn read_at(&self, _offset: u64, _buffer: &mut [u8]) -> Result<u64, Status> {
-        unimplemented!()
-    }
-    async fn write_at(&self, _offset: u64, _content: &[u8]) -> Result<u64, Status> {
-        unimplemented!()
-    }
-    async fn append(&self, _content: &[u8]) -> Result<(u64, u64), Status> {
-        unimplemented!()
-    }
-}
-
-#[async_trait]
-impl vfs::node::Node for XattrFile {
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-        unimplemented!()
-    }
-
-    async fn get_attributes(
-        &self,
-        _query: fio::NodeAttributesQuery,
-    ) -> Result<fio::NodeAttributes2, Status> {
-        unimplemented!()
-    }
-}
-
-#[async_trait]
-impl File for XattrFile {
-    fn writable(&self) -> bool {
-        true
-    }
-    async fn open_file(&self, _options: &FileOptions) -> Result<(), Status> {
-        Ok(())
-    }
-    async fn truncate(&self, _length: u64) -> Result<(), Status> {
-        unimplemented!()
-    }
-    async fn get_backing_memory(&self, _flags: fio::VmoFlags) -> Result<zx::Vmo, Status> {
-        unimplemented!()
-    }
-    async fn get_size(&self) -> Result<u64, Status> {
-        unimplemented!()
-    }
-    async fn set_attrs(
-        &self,
-        _flags: fio::NodeAttributeFlags,
-        _attrs: fio::NodeAttributes,
-    ) -> Result<(), Status> {
-        unimplemented!()
-    }
-    async fn update_attributes(
-        &self,
-        _attributes: fio::MutableNodeAttributes,
-    ) -> Result<(), Status> {
-        unimplemented!()
-    }
-    async fn sync(&self, _mode: SyncMode) -> Result<(), Status> {
-        Ok(())
-    }
-    async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, Status> {
-        let map = self.extended_attributes.lock().await;
-        Ok(map.keys().map(|k| k.clone()).collect())
-    }
-    async fn get_extended_attribute(&self, name: Vec<u8>) -> Result<Vec<u8>, Status> {
-        let map = self.extended_attributes.lock().await;
-        map.get(&name).cloned().ok_or(zx::Status::NOT_FOUND)
-    }
-    async fn set_extended_attribute(
-        &self,
-        name: Vec<u8>,
-        value: Vec<u8>,
-        mode: fio::SetExtendedAttributeMode,
-    ) -> Result<(), Status> {
-        let mut map = self.extended_attributes.lock().await;
-        match mode {
-            fio::SetExtendedAttributeMode::Create if map.contains_key(&name) => {
-                return Err(Status::ALREADY_EXISTS)
-            }
-            fio::SetExtendedAttributeMode::Replace if !map.contains_key(&name) => {
-                return Err(Status::NOT_FOUND)
-            }
-            _ => (),
-        }
-        Ok(map.insert(name, value).map(|_| ()).unwrap_or(()))
-    }
-    async fn remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), Status> {
-        let mut map = self.extended_attributes.lock().await;
-        map.remove(&name).map(|_| ()).ok_or(zx::Status::NOT_FOUND)
-    }
-}
-
 #[fuchsia::test]
 async fn test_xattr_symlink() {
     let fixture = TestFixture::new().await;
@@ -391,24 +257,23 @@ async fn test_xattr_symlink() {
 
 #[fuchsia::test]
 async fn test_xattr_file_large_attribute() {
-    let dir = pseudo_directory! {
-        "foo" => XattrFile::new(),
-    };
-    let (dir_client, dir_server) = create_endpoints();
-    let scope = ExecutionScope::new();
-    dir.open(
-        scope,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
-        Path::dot(),
-        dir_server,
-    );
+    let fixture = TestFixture::new().await;
+
+    let (foo_client, foo_server) = zx::Channel::create();
+    fixture
+        .root()
+        .open(
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::CREATE,
+            fio::ModeType::empty(),
+            "foo",
+            foo_server.into(),
+        )
+        .expect("open failed");
 
     fasync::unblock(|| {
-        let dir_zxio =
-            Zxio::create(dir_client.into_channel().into_handle()).expect("create failed");
-        let foo_zxio = dir_zxio
-            .open(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE, "foo")
-            .expect("open failed");
+        let foo_zxio = Zxio::create(foo_client.into_handle()).expect("create failed");
 
         let value_len = fio::MAX_INLINE_ATTRIBUTE_VALUE as usize + 64;
         let value = std::iter::repeat(0xff).take(value_len).collect::<Vec<u8>>();
@@ -417,6 +282,8 @@ async fn test_xattr_file_large_attribute() {
         assert_eq!(foo_zxio.xattr_get(b"user.big_attribute").unwrap(), value);
     })
     .await;
+
+    fixture.close().await;
 }
 
 #[fuchsia::test]

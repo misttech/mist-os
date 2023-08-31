@@ -88,7 +88,6 @@ rustc_test("zxio_rust_test") {
     "//src/storage/fxfs/platform:fxfs-testing",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:async-trait",
-    "//third_party/rust_crates:futures",
   ]
 }
 

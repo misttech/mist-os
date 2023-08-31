@@ -19,6 +19,7 @@ use {
                 AttributeKey, ObjectAttributes, ObjectItem, ObjectKey, ObjectKeyData, ObjectKind,
                 ObjectValue, Timestamp,
             },
+            store_object_handle::NeedsTrim,
             transaction::{
                 self, AssocObj, AssociatedObject, LockKey, Mutation, ObjectStoreMutation, Options,
                 Transaction,
@@ -554,44 +555,9 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         transaction: &mut Transaction<'a>,
         size: u64,
     ) -> Result<NeedsTrim, Error> {
-        let store = self.store();
-        let needs_trim = matches!(
-            store
-                .trim_some(
-                    transaction,
-                    self.object_id(),
-                    self.attribute_id(),
-                    TrimMode::FromOffset(size),
-                )
-                .await?,
-            TrimResult::Incomplete
-        );
-        if needs_trim {
-            // Add the object to the graveyard in case the following transactions don't get
-            // replayed.
-            let graveyard_id = store.graveyard_directory_object_id();
-            match store
-                .tree
-                .find(&ObjectKey::graveyard_entry(graveyard_id, self.object_id()))
-                .await?
-            {
-                Some(ObjectItem { value: ObjectValue::Some, .. })
-                | Some(ObjectItem { value: ObjectValue::Trim, .. }) => {
-                    // This object is already in the graveyard so we don't need to do anything.
-                }
-                _ => {
-                    transaction.add(
-                        store.store_object_id,
-                        Mutation::replace_or_insert_object(
-                            ObjectKey::graveyard_entry(graveyard_id, self.object_id()),
-                            ObjectValue::Trim,
-                        ),
-                    );
-                }
-            }
-        }
+        let needs_trim = self.handle.shrink(transaction, self.attribute_id(), size).await?;
         transaction.add_with_object(
-            store.store_object_id,
+            self.store().store_object_id(),
             Mutation::replace_or_insert_object(
                 ObjectKey::attribute(
                     self.object_id(),
@@ -602,7 +568,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             ),
             AssocObj::Borrowed(self),
         );
-        Ok(NeedsTrim(needs_trim))
+        Ok(needs_trim)
     }
 
     pub async fn grow<'a>(
@@ -869,7 +835,9 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     pub async fn write_attr(&self, attribute_id: u64, data: &[u8]) -> Result<(), Error> {
         // Must be different attribute otherwise cached size gets out of date.
         assert_ne!(attribute_id, self.attribute_id());
-        self.handle.write_attr(attribute_id, data).await?;
+        let mut transaction = self.new_transaction().await?;
+        self.handle.write_attr(&mut transaction, attribute_id, data).await?;
+        transaction.commit().await?;
         Ok(())
     }
 
@@ -1144,12 +1112,6 @@ impl<'a, S: HandleOwner> WriteBytes for DirectWriter<'a, S> {
         Ok(())
     }
 }
-
-/// When truncating an object, sometimes it might not be possible to complete the transaction in a
-/// single transaction, in which case the caller needs to finish trimming the object in subsequent
-/// transactions (by calling ObjectStore::trim).
-#[must_use]
-pub struct NeedsTrim(pub bool);
 
 #[cfg(test)]
 mod tests {

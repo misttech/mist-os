@@ -1124,7 +1124,7 @@ async fn test_children_on_file() {
 }
 
 #[fuchsia::test]
-async fn test_attribute_on_directory() {
+async fn test_orphaned_extended_attribute_record() {
     let mut test = FsckTest::new().await;
 
     let store_id = {
@@ -1136,7 +1136,100 @@ async fn test_attribute_on_directory() {
             &fs,
             store.as_ref(),
             vec![Item::new(
-                ObjectKey::attribute(store.root_directory_object_id(), 1, AttributeKey::Attribute),
+                ObjectKey::extended_attribute(10, b"foo".to_vec()),
+                ObjectValue::inline_extended_attribute(b"value".to_vec()),
+            )],
+        )
+        .await;
+        store.store_object_id()
+    };
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
+        .await
+        .expect_err("Fsck should fail");
+    assert_matches!(
+        test.errors()[..],
+        [FsckIssue::Warning(FsckWarning::OrphanedExtendedAttributeRecord(..)), ..]
+    );
+}
+
+#[fuchsia::test]
+async fn test_orphaned_large_extended_attribute_record() {
+    let mut test = FsckTest::new().await;
+
+    let store_id = {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let store = root_volume.new_volume("vol", Some(test.get_crypt())).await.unwrap();
+
+        install_items_in_store(
+            &fs,
+            store.as_ref(),
+            vec![Item::new(
+                ObjectKey::extended_attribute(10, b"foo".to_vec()),
+                ObjectValue::extended_attribute(64),
+            )],
+        )
+        .await;
+        store.store_object_id()
+    };
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
+        .await
+        .expect_err("Fsck should fail");
+    assert_matches!(
+        test.errors()[..],
+        [FsckIssue::Warning(FsckWarning::OrphanedExtendedAttributeRecord(..)), ..]
+    );
+}
+
+#[fuchsia::test]
+async fn test_large_extended_attribute_nonexistent_attribute() {
+    let mut test = FsckTest::new().await;
+
+    let store_id = {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let store = root_volume.new_volume("vol", Some(test.get_crypt())).await.unwrap();
+
+        install_items_in_store(
+            &fs,
+            store.as_ref(),
+            vec![Item::new(
+                ObjectKey::extended_attribute(store.root_directory_object_id(), b"foo".to_vec()),
+                ObjectValue::extended_attribute(64),
+            )],
+        )
+        .await;
+        store.store_object_id()
+    };
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
+        .await
+        .expect_err("Fsck should fail");
+    assert_matches!(
+        test.errors()[..],
+        [FsckIssue::Error(FsckError::MissingAttributeForExtendedAttribute(..)), ..]
+    );
+}
+
+#[fuchsia::test]
+async fn test_orphaned_extended_attribute() {
+    let mut test = FsckTest::new().await;
+
+    let store_id = {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let store = root_volume.new_volume("vol", Some(test.get_crypt())).await.unwrap();
+
+        install_items_in_store(
+            &fs,
+            store.as_ref(),
+            vec![Item::new(
+                ObjectKey::attribute(store.root_directory_object_id(), 64, AttributeKey::Attribute),
                 ObjectValue::attribute(100),
             )],
         )
@@ -1148,7 +1241,10 @@ async fn test_attribute_on_directory() {
     test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
         .await
         .expect_err("Fsck should fail");
-    assert_matches!(test.errors()[..], [FsckIssue::Error(FsckError::AttributeNotOnFile(..)), ..]);
+    assert_matches!(
+        test.errors()[..],
+        [FsckIssue::Warning(FsckWarning::OrphanedExtendedAttribute(..)), ..]
+    );
 }
 
 #[fuchsia::test]
@@ -1487,7 +1583,7 @@ async fn test_spurious_extents() {
     let mut found = 0;
     for e in test.errors() {
         match e {
-            FsckIssue::Warning(FsckWarning::ExtentForDirectory(..)) => found |= 1,
+            FsckIssue::Warning(FsckWarning::ExtentForMissingAttribute(..)) => found |= 1,
             FsckIssue::Warning(FsckWarning::ExtentForNonexistentObject(..)) => found |= 2,
             _ => {}
         }

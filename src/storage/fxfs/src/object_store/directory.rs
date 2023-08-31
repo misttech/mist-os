@@ -704,6 +704,7 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
     timestamp: Timestamp,
 ) -> Result<ReplacedChild, Error> {
     let deleted_id_and_descriptor = dst.0.lookup(dst.1).await?;
+    let store_id = dst.0.store().store_object_id();
     let result = match deleted_id_and_descriptor {
         Some((old_id, ObjectDescriptor::File | ObjectDescriptor::Symlink)) => {
             let was_last_ref = dst.0.store().adjust_refs(transaction, old_id, -1).await?;
@@ -718,7 +719,8 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
             if dir.has_children().await? {
                 bail!(FxfsError::NotEmpty);
             }
-            remove(transaction, &dst.0.store(), old_id);
+            dst.0.store().add_to_graveyard(transaction, old_id);
+            dst.0.store().filesystem().graveyard().queue_tombstone(store_id, old_id);
             sub_dirs_delta -= 1;
             ReplacedChild::Directory(old_id)
         }
@@ -733,7 +735,6 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
             ReplacedChild::None
         }
     };
-    let store_id = dst.0.store().store_object_id();
     let new_value = match src {
         Some((id, descriptor)) => ObjectValue::child(id, descriptor),
         None => ObjectValue::None,
@@ -755,17 +756,11 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
     Ok(result)
 }
 
-fn remove(transaction: &mut Transaction<'_>, store: &ObjectStore, object_id: u64) {
-    transaction.add(
-        store.store_object_id(),
-        Mutation::merge_object(ObjectKey::object(object_id), ObjectValue::None),
-    );
-}
-
 #[cfg(test)]
 mod tests {
+    use crate::object_store::StoreObjectHandle;
+
     use {
-        super::remove,
         crate::{
             errors::FxfsError,
             filesystem::{Filesystem, FxFilesystem, JournalingObject, SyncOptions},
@@ -775,7 +770,7 @@ mod tests {
                 object_record::Timestamp,
                 transaction::{Options, TransactionHandler},
                 volume::root_volume,
-                HandleOptions, LockKey, ObjectDescriptor, ObjectStore,
+                HandleOptions, LockKey, ObjectDescriptor, ObjectStore, SetExtendedAttributeMode,
             },
         },
         assert_matches::assert_matches,
@@ -1530,18 +1525,6 @@ mod tests {
         // But finding "bar" should succeed.
         assert!(dir.lookup("bar").await.expect("lookup failed").is_some());
 
-        // Remove dir now.
-        transaction = fs
-            .clone()
-            .new_transaction(
-                &[LockKey::object(fs.root_store().store_object_id(), dir.object_id())],
-                Options::default(),
-            )
-            .await
-            .expect("new_transaction failed");
-        remove(&mut transaction, dir.store(), dir.object_id());
-        transaction.commit().await.expect("commit failed");
-
         // If we mark dir as deleted, any further operations should fail.
         dir.set_deleted();
 
@@ -1903,7 +1886,20 @@ mod tests {
                 .expect("create_child_dir failed");
             transaction.commit().await.expect("commit failed");
 
-            directory.handle.write_attr(1, b"bar").await.expect("write_attr failed");
+            let mut transaction = filesystem
+                .clone()
+                .new_transaction(
+                    &[LockKey::object(store.store_object_id(), directory.object_id())],
+                    Options::default(),
+                )
+                .await
+                .expect("new transaction failed");
+            directory
+                .handle
+                .write_attr(&mut transaction, 1, b"bar")
+                .await
+                .expect("write_attr failed");
+            transaction.commit().await.expect("commit failed");
         }
 
         filesystem.close().await.expect("Close failed");
@@ -1929,5 +1925,229 @@ mod tests {
         }
 
         filesystem.close().await.expect("Close failed");
+    }
+
+    #[fuchsia::test]
+    async fn directory_with_extended_attributes() {
+        let device = DeviceHolder::new(FakeDevice::new(16384, 512));
+        let filesystem = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let crypt = Arc::new(InsecureCrypt::new());
+
+        let root_volume = root_volume(filesystem.clone()).await.expect("root_volume failed");
+        let store =
+            root_volume.new_volume("vol", Some(crypt.clone())).await.expect("new_volume failed");
+        let directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+
+        let test_small_name = b"security.selinux".to_vec();
+        let test_small_value = b"foo".to_vec();
+        let test_large_name = b"large.attribute".to_vec();
+        let test_large_value = vec![1u8; 500];
+
+        directory
+            .set_extended_attribute(
+                test_small_name.clone(),
+                test_small_value.clone(),
+                SetExtendedAttributeMode::Set,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            directory.get_extended_attribute(test_small_name.clone()).await.unwrap(),
+            test_small_value
+        );
+
+        directory
+            .set_extended_attribute(
+                test_large_name.clone(),
+                test_large_value.clone(),
+                SetExtendedAttributeMode::Set,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            directory.get_extended_attribute(test_large_name.clone()).await.unwrap(),
+            test_large_value
+        );
+
+        crate::fsck::fsck(filesystem.clone()).await.unwrap();
+        crate::fsck::fsck_volume(filesystem.as_ref(), store.store_object_id(), Some(crypt.clone()))
+            .await
+            .unwrap();
+
+        directory.remove_extended_attribute(test_small_name.clone()).await.unwrap();
+        directory.remove_extended_attribute(test_large_name.clone()).await.unwrap();
+
+        filesystem.close().await.expect("close failed");
+    }
+
+    #[fuchsia::test]
+    async fn remove_directory_with_extended_attributes() {
+        let device = DeviceHolder::new(FakeDevice::new(16384, 512));
+        let filesystem = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let crypt = Arc::new(InsecureCrypt::new());
+
+        let root_volume = root_volume(filesystem.clone()).await.expect("root_volume failed");
+        let store =
+            root_volume.new_volume("vol", Some(crypt.clone())).await.expect("new_volume failed");
+        let mut transaction = filesystem
+            .clone()
+            .new_transaction(
+                &[LockKey::object(store.store_object_id(), store.root_directory_object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new transaction failed");
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+        let directory = root_directory
+            .create_child_dir(&mut transaction, "foo", None)
+            .await
+            .expect("create_child_dir failed");
+        transaction.commit().await.expect("commit failed");
+
+        crate::fsck::fsck(filesystem.clone()).await.unwrap();
+        crate::fsck::fsck_volume(filesystem.as_ref(), store.store_object_id(), Some(crypt.clone()))
+            .await
+            .unwrap();
+
+        let test_small_name = b"security.selinux".to_vec();
+        let test_small_value = b"foo".to_vec();
+        let test_large_name = b"large.attribute".to_vec();
+        let test_large_value = vec![1u8; 500];
+
+        directory
+            .set_extended_attribute(
+                test_small_name.clone(),
+                test_small_value.clone(),
+                SetExtendedAttributeMode::Set,
+            )
+            .await
+            .unwrap();
+        directory
+            .set_extended_attribute(
+                test_large_name.clone(),
+                test_large_value.clone(),
+                SetExtendedAttributeMode::Set,
+            )
+            .await
+            .unwrap();
+
+        crate::fsck::fsck(filesystem.clone()).await.unwrap();
+        crate::fsck::fsck_volume(filesystem.as_ref(), store.store_object_id(), Some(crypt.clone()))
+            .await
+            .unwrap();
+
+        let mut transaction = filesystem
+            .clone()
+            .new_transaction(
+                &[
+                    LockKey::object(store.store_object_id(), root_directory.object_id()),
+                    LockKey::object(store.store_object_id(), directory.object_id()),
+                ],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        replace_child(&mut transaction, None, (&root_directory, "foo"))
+            .await
+            .expect("replace_child failed");
+        transaction.commit().await.unwrap();
+
+        crate::fsck::fsck(filesystem.clone()).await.unwrap();
+        crate::fsck::fsck_volume(filesystem.as_ref(), store.store_object_id(), Some(crypt.clone()))
+            .await
+            .unwrap();
+
+        filesystem.close().await.expect("close failed");
+    }
+
+    #[fuchsia::test]
+    async fn remove_symlink_with_extended_attributes() {
+        let device = DeviceHolder::new(FakeDevice::new(16384, 512));
+        let filesystem = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let crypt = Arc::new(InsecureCrypt::new());
+
+        let root_volume = root_volume(filesystem.clone()).await.expect("root_volume failed");
+        let store =
+            root_volume.new_volume("vol", Some(crypt.clone())).await.expect("new_volume failed");
+        let mut transaction = filesystem
+            .clone()
+            .new_transaction(
+                &[LockKey::object(store.store_object_id(), store.root_directory_object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new transaction failed");
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+        let symlink_id = root_directory
+            .create_symlink(&mut transaction, b"somewhere/else", "foo")
+            .await
+            .expect("create_symlink failed");
+        transaction.commit().await.expect("commit failed");
+
+        let symlink = StoreObjectHandle::new(
+            store.clone(),
+            symlink_id,
+            false,
+            HandleOptions::default(),
+            false,
+        );
+
+        crate::fsck::fsck(filesystem.clone()).await.unwrap();
+        crate::fsck::fsck_volume(filesystem.as_ref(), store.store_object_id(), Some(crypt.clone()))
+            .await
+            .unwrap();
+
+        let test_small_name = b"security.selinux".to_vec();
+        let test_small_value = b"foo".to_vec();
+        let test_large_name = b"large.attribute".to_vec();
+        let test_large_value = vec![1u8; 500];
+
+        symlink
+            .set_extended_attribute(
+                test_small_name.clone(),
+                test_small_value.clone(),
+                SetExtendedAttributeMode::Set,
+            )
+            .await
+            .unwrap();
+        symlink
+            .set_extended_attribute(
+                test_large_name.clone(),
+                test_large_value.clone(),
+                SetExtendedAttributeMode::Set,
+            )
+            .await
+            .unwrap();
+
+        crate::fsck::fsck(filesystem.clone()).await.unwrap();
+        crate::fsck::fsck_volume(filesystem.as_ref(), store.store_object_id(), Some(crypt.clone()))
+            .await
+            .unwrap();
+
+        let mut transaction = filesystem
+            .clone()
+            .new_transaction(
+                &[
+                    LockKey::object(store.store_object_id(), root_directory.object_id()),
+                    LockKey::object(store.store_object_id(), symlink.object_id()),
+                ],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        replace_child(&mut transaction, None, (&root_directory, "foo"))
+            .await
+            .expect("replace_child failed");
+        transaction.commit().await.unwrap();
+
+        crate::fsck::fsck(filesystem.clone()).await.unwrap();
+        crate::fsck::fsck_volume(filesystem.as_ref(), store.store_object_id(), Some(crypt.clone()))
+            .await
+            .unwrap();
+
+        filesystem.close().await.expect("close failed");
     }
 }

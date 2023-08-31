@@ -496,7 +496,7 @@ pub enum ExtendedAttributeValue {
     /// certain size, it should be stored as an attribute with extents instead.
     Inline(Vec<u8>),
     /// The extended attribute value is stored as an attribute with extents. The attribute id
-    /// should be chosen to be within the range of 64-2048.
+    /// should be chosen to be within the range of 64-512.
     AttributeId(u64),
 }
 
@@ -723,6 +723,9 @@ impl ObjectValue {
     }
     pub fn inline_extended_attribute(value: impl Into<Vec<u8>>) -> ObjectValue {
         ObjectValue::ExtendedAttribute(ExtendedAttributeValue::Inline(value.into()))
+    }
+    pub fn extended_attribute(attribute_id: u64) -> ObjectValue {
+        ObjectValue::ExtendedAttribute(ExtendedAttributeValue::AttributeId(attribute_id))
     }
 }
 

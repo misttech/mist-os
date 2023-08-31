@@ -7,26 +7,27 @@ use {
         checksum::fletcher64,
         errors::FxfsError,
         log::*,
-        lsm_tree::types::{ItemRef, LayerIterator},
+        lsm_tree::types::{Item, ItemRef, LayerIterator},
         object_handle::ObjectHandle,
         object_store::{
             allocator::Allocator,
             extent_record::{Checksums, ExtentKey, ExtentValue},
             object_manager::ObjectManager,
             object_record::{
-                AttributeKey, EncryptionKeys, ExtendedAttributeValue, ObjectAttributes, ObjectKey,
-                ObjectKeyData, ObjectValue, PosixAttributes, Timestamp,
+                AttributeKey, EncryptionKeys, ExtendedAttributeValue, ObjectAttributes, ObjectItem,
+                ObjectKey, ObjectKeyData, ObjectValue, PosixAttributes, Timestamp,
             },
             transaction::{
                 AssocObj, AssociatedObject, LockKey, Mutation, ObjectStoreMutation, Options,
                 ReadGuard, Transaction,
             },
-            HandleOptions, HandleOwner, ObjectStore,
+            HandleOptions, HandleOwner, ObjectStore, TrimMode, TrimResult,
         },
         range::RangeExt,
         round::{round_down, round_up},
     },
     anyhow::{anyhow, bail, ensure, Context, Error},
+    assert_matches::assert_matches,
     fidl_fuchsia_io as fio,
     futures::{
         stream::{FuturesOrdered, FuturesUnordered},
@@ -44,6 +45,24 @@ use {
     },
     storage_device::buffer::{Buffer, BufferRef, MutableBufferRef},
 };
+
+/// Maximum size for an extended attribute name.
+pub const MAX_XATTR_NAME_SIZE: usize = 255;
+/// Maximum size an extended attribute can be before it's stored in an object attribute instead of
+/// inside the record directly.
+pub const MAX_INLINE_XATTR_SIZE: usize = 256;
+/// Maximum size for an extended attribute value. NB: the maximum size for an extended attribute is
+/// 64kB, which we rely on for correctness when deleting attributes, so ensure it's always
+/// enforced.
+pub const MAX_XATTR_VALUE_SIZE: usize = 64000;
+/// The range of fxfs attribute ids which are reserved for extended attribute values. Whenever a
+/// new attribute is needed, the first unused id will be chosen from this range. It's technically
+/// safe to change these values, but it has potential consequences - they are only used during id
+/// selection, so any existing extended attributes keep their ids, which means any past or present
+/// selected range here could potentially have used attributes unless they are explicitly migrated,
+/// which isn't currently done.
+pub const EXTENDED_ATTRIBUTE_RANGE_START: u64 = 64;
+pub const EXTENDED_ATTRIBUTE_RANGE_END: u64 = 512;
 
 /// The mode of operation when setting extended attributes. This is the same as the fidl definition
 /// but is replicated here so we don't have fuchsia.io structures in the api, so this can be used
@@ -483,6 +502,51 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         Ok((aligned, aligned_buf))
     }
 
+    /// Trim an attribute's extents, potentially adding a graveyard trim entry if more trimming is
+    /// needed, so the transaction can be committed without worrying about leaking data.
+    ///
+    /// This doesn't update the size stored in the attribute value - the caller is responsible for
+    /// doing that to keep the size up to date.
+    pub async fn shrink<'a>(
+        &'a self,
+        transaction: &mut Transaction<'a>,
+        attribute_id: u64,
+        size: u64,
+    ) -> Result<NeedsTrim, Error> {
+        let store = self.store();
+        let needs_trim = matches!(
+            store
+                .trim_some(transaction, self.object_id(), attribute_id, TrimMode::FromOffset(size))
+                .await?,
+            TrimResult::Incomplete
+        );
+        if needs_trim {
+            // Add the object to the graveyard in case the following transactions don't get
+            // replayed.
+            let graveyard_id = store.graveyard_directory_object_id();
+            match store
+                .tree
+                .find(&ObjectKey::graveyard_entry(graveyard_id, self.object_id()))
+                .await?
+            {
+                Some(ObjectItem { value: ObjectValue::Some, .. })
+                | Some(ObjectItem { value: ObjectValue::Trim, .. }) => {
+                    // This object is already in the graveyard so we don't need to do anything.
+                }
+                _ => {
+                    transaction.add(
+                        store.store_object_id,
+                        Mutation::replace_or_insert_object(
+                            ObjectKey::graveyard_entry(graveyard_id, self.object_id()),
+                            ObjectValue::Trim,
+                        ),
+                    );
+                }
+            }
+        }
+        Ok(NeedsTrim(needs_trim))
+    }
+
     pub async fn read_and_decrypt(
         &self,
         device_offset: u64,
@@ -622,6 +686,8 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let size = match item {
             Some(item) if item.key == key => match item.value {
                 ObjectValue::Attribute { size } => size,
+                // Attribute was deleted.
+                ObjectValue::None => return Ok(0),
                 _ => bail!(FxfsError::Inconsistent),
             },
             _ => return Ok(0),
@@ -774,6 +840,8 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                         *size as usize,
                     )
                 }
+                // Attribute was deleted.
+                ObjectValue::None => return Ok(None),
                 _ => bail!(FxfsError::Inconsistent),
             },
             _ => return Ok(None),
@@ -813,7 +881,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             }
         }
         buffer.as_mut_slice()[std::cmp::min(last_offset, size)..].fill(0);
-        Ok(Some(buffer.as_slice().into()))
+        Ok(Some(buffer.as_slice()[..size].into()))
     }
 
     /// Writes potentially unaligned data at `device_offset` and returns checksums if requested.
@@ -966,15 +1034,18 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
     }
 
     /// Writes an entire attribute.
-    pub async fn write_attr(&self, attribute_id: u64, data: &[u8]) -> Result<(), Error> {
+    pub async fn write_attr<'a>(
+        &'a self,
+        transaction: &mut Transaction<'a>,
+        attribute_id: u64,
+        data: &[u8],
+    ) -> Result<(), Error> {
         let rounded_len = round_up(data.len() as u64, self.block_size()).unwrap();
         let mut buffer = self.store().device.allocate_buffer(rounded_len as usize);
         let slice = buffer.as_mut_slice();
         slice[..data.len()].copy_from_slice(data);
         slice[data.len()..].fill(0);
-        let mut transaction = self.new_transaction(attribute_id).await?;
-        self.multi_write(&mut transaction, attribute_id, &[0..rounded_len], buffer.as_mut())
-            .await?;
+        self.multi_write(transaction, attribute_id, &[0..rounded_len], buffer.as_mut()).await?;
         transaction.add(
             self.store().store_object_id,
             Mutation::replace_or_insert_object(
@@ -982,7 +1053,6 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                 ObjectValue::attribute(data.len() as u64),
             ),
         );
-        transaction.commit().await?;
         Ok(())
     }
 
@@ -1024,9 +1094,9 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             .ok_or(FxfsError::NotFound)?;
         match item.value {
             ObjectValue::ExtendedAttribute(ExtendedAttributeValue::Inline(value)) => Ok(value),
-            // TODO(fxbug.dev/122123): support reading from an attribute for large values.
-            ObjectValue::ExtendedAttribute(ExtendedAttributeValue::AttributeId(_id)) => {
-                bail!(FxfsError::NotSupported)
+            ObjectValue::ExtendedAttribute(ExtendedAttributeValue::AttributeId(id)) => {
+                let data = self.read_attr(id).await?.ok_or(FxfsError::NotFound)?;
+                Ok(data.into_vec())
             }
             // If an extended attribute has a value of None, it means it was deleted but hasn't
             // been cleaned up yet.
@@ -1046,9 +1116,8 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         value: Vec<u8>,
         mode: SetExtendedAttributeMode,
     ) -> Result<(), Error> {
-        // TODO(fxbug.dev/122123): support large extended attributes that shouldn't be stored inline
-        ensure!(value.len() < 256, FxfsError::TooBig);
-
+        ensure!(name.len() <= MAX_XATTR_NAME_SIZE, FxfsError::TooBig);
+        ensure!(value.len() <= MAX_XATTR_VALUE_SIZE, FxfsError::TooBig);
         let store = self.store();
         let fs = store.filesystem();
         let tree = store.tree();
@@ -1059,13 +1128,21 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let keys = [LockKey::object(store.store_object_id(), self.object_id())];
         let mut transaction = fs.new_transaction(&keys, Options::default()).await?;
 
-        if mode != SetExtendedAttributeMode::Set {
-            let layer_set = tree.layer_set();
-            let mut merger = layer_set.merger();
-            let iter = merger.seek(Bound::Included(&object_key)).await?;
-            let found = match iter.get() {
-                Some(ItemRef { key, value: _, sequence: _ }) => key == &object_key,
-                _ => false,
+        let existing_attribute_id = {
+            let (found, existing_attribute_id) = match tree.find(&object_key).await? {
+                None => (false, None),
+                Some(Item { value, .. }) => (
+                    true,
+                    match value {
+                        ObjectValue::None => None,
+                        ObjectValue::ExtendedAttribute(ExtendedAttributeValue::Inline(..)) => None,
+                        ObjectValue::ExtendedAttribute(ExtendedAttributeValue::AttributeId(id)) => {
+                            Some(id)
+                        }
+                        _ => bail!(anyhow!(FxfsError::Inconsistent)
+                            .context("expected extended attribute value")),
+                    },
+                ),
             };
             match mode {
                 SetExtendedAttributeMode::Create if found => {
@@ -1076,22 +1153,85 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                 }
                 _ => (),
             }
+            existing_attribute_id
+        };
+
+        if let Some(attribute_id) = existing_attribute_id {
+            // If we already have an attribute id allocated for this extended attribute, we always
+            // use it, even if the value has shrunk enough to be stored inline.
+            self.write_attr(&mut transaction, attribute_id, &value).await?;
+        } else if value.len() <= MAX_INLINE_XATTR_SIZE {
+            transaction.add(
+                self.store().store_object_id(),
+                Mutation::replace_or_insert_object(
+                    object_key,
+                    ObjectValue::inline_extended_attribute(value),
+                ),
+            );
+        } else {
+            // If there isn't an existing attribute id and we are going to store the value in
+            // an attribute, find the next empty attribute id in the range. We search for fxfs
+            // attribute records specifically, instead of the extended attribute records, because
+            // even if the extended attribute record is removed the attribute may not be fully
+            // trimmed yet.
+            let mut attribute_id = EXTENDED_ATTRIBUTE_RANGE_START;
+            let layer_set = tree.layer_set();
+            let mut merger = layer_set.merger();
+            let key = ObjectKey::attribute(self.object_id(), attribute_id, AttributeKey::Attribute);
+            let mut iter = merger.seek(Bound::Included(&key)).await?;
+            loop {
+                match iter.get() {
+                    // None means the key passed to seek wasn't found. That means the first
+                    // attribute is available and we can just stop right away.
+                    None => break,
+                    Some(ItemRef {
+                        key: ObjectKey { object_id, data: ObjectKeyData::Attribute(attr_id, _) },
+                        value,
+                        ..
+                    }) if *object_id == self.object_id() => {
+                        if matches!(value, ObjectValue::None) {
+                            // This attribute was once used but is now deleted, so it's safe to use
+                            // again.
+                            break;
+                        }
+                        if attribute_id < *attr_id {
+                            // We found a gap - use it.
+                            break;
+                        } else if attribute_id == *attr_id {
+                            // This attribute id is in use, try the next one.
+                            attribute_id += 1;
+                            if attribute_id == EXTENDED_ATTRIBUTE_RANGE_END {
+                                bail!(FxfsError::NoSpace);
+                            }
+                        }
+                        // If we don't hit either of those cases, we are still moving through the
+                        // extent keys for the current attribute, so just keep advancing until the
+                        // attribute id changes.
+                    }
+                    // As we are working our way through the iterator, if we hit anything that
+                    // doesn't have our object id or attribute key data, we've gone past the end of
+                    // this section and can stop.
+                    _ => break,
+                }
+                iter.advance().await?;
+            }
+
+            self.write_attr(&mut transaction, attribute_id, &value).await?;
+            transaction.add(
+                self.store().store_object_id(),
+                Mutation::replace_or_insert_object(
+                    object_key,
+                    ObjectValue::extended_attribute(attribute_id),
+                ),
+            );
         }
 
-        transaction.add(
-            self.store().store_object_id(),
-            Mutation::replace_or_insert_object(
-                object_key,
-                ObjectValue::inline_extended_attribute(value),
-            ),
-        );
         transaction.commit().await?;
         Ok(())
     }
 
     pub async fn remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), Error> {
         let store = self.store();
-        let fs = store.filesystem();
         let tree = store.tree();
         let object_key = ObjectKey::extended_attribute(self.object_id(), name);
 
@@ -1100,34 +1240,51 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         // we take a lock and make a transaction before we do so we don't race with other
         // operations.
         let keys = [LockKey::object(store.store_object_id(), self.object_id())];
-        let mut transaction = fs.new_transaction(&keys, Options::default()).await?;
+        let mut transaction = store.filesystem().new_transaction(&keys, Options::default()).await?;
 
-        {
-            let layer_set = tree.layer_set();
-            let mut merger = layer_set.merger();
-            let iter = merger.seek(Bound::Included(&object_key)).await?;
-            let value = match iter.get() {
-                Some(ItemRef { key, value, sequence: _ }) if key == &object_key => value,
-                _ => bail!(FxfsError::NotFound),
-            };
-            match value {
-                // We don't care what kind of attribute value it is.
-                ObjectValue::ExtendedAttribute(_) => (),
-                // If an extended attribute has a value of None, it means it was deleted already,
-                // but hasn't been compacted away yet.
+        let attribute_to_delete =
+            match tree.find(&object_key).await?.ok_or(FxfsError::NotFound)?.value {
+                ObjectValue::ExtendedAttribute(ExtendedAttributeValue::AttributeId(id)) => Some(id),
+                ObjectValue::ExtendedAttribute(ExtendedAttributeValue::Inline(..)) => None,
                 ObjectValue::None => bail!(FxfsError::NotFound),
                 _ => {
                     bail!(anyhow!(FxfsError::Inconsistent)
                         .context("remove_extended_attribute: Expected ExtendedAttribute value"))
                 }
-            }
-        }
+            };
 
-        // TODO(fxbug.dev/122123): support trimming extents for large attributes.
         transaction.add(
             store.store_object_id(),
             Mutation::replace_or_insert_object(object_key, ObjectValue::None),
         );
+
+        // If the attribute wasn't stored inline, we need to deallocate all the extents too. This
+        // would normally need to interact with the graveyard for correctness - if there are too
+        // many extents to delete to fit in a single transaction then we could potentially have
+        // consistency issues. However, the maximum size of an extended attribute is small enough
+        // that it will never come close to that limit even in the worst case, so we just delete
+        // everything in one shot.
+        if let Some(attribute_id) = attribute_to_delete {
+            let trim_result = store
+                .trim_some(
+                    &mut transaction,
+                    self.object_id(),
+                    attribute_id,
+                    TrimMode::FromOffset(0),
+                )
+                .await?;
+            // In case you didn't read the comment above - this should not be used to delete
+            // arbitrary attributes!
+            assert_matches!(trim_result, TrimResult::Done(_));
+            transaction.add(
+                store.store_object_id(),
+                Mutation::replace_or_insert_object(
+                    ObjectKey::attribute(self.object_id, attribute_id, AttributeKey::Attribute),
+                    ObjectValue::None,
+                ),
+            );
+        }
+
         transaction.commit().await?;
         Ok(())
     }
@@ -1161,6 +1318,12 @@ impl<S: HandleOwner> Drop for StoreObjectHandle<S> {
     }
 }
 
+/// When truncating an object, sometimes it might not be possible to complete the transaction in a
+/// single transaction, in which case the caller needs to finish trimming the object in subsequent
+/// transactions (by calling ObjectStore::trim).
+#[must_use]
+pub struct NeedsTrim(pub bool);
+
 #[cfg(test)]
 mod tests {
     use {
@@ -1170,8 +1333,8 @@ mod tests {
             object_handle::ObjectHandle,
             object_store::{
                 transaction::{Options, TransactionHandler},
-                Directory, HandleOptions, LockKey, ObjectStore, SetExtendedAttributeMode,
-                StoreObjectHandle,
+                DataObjectHandle, Directory, HandleOptions, LockKey, ObjectStore,
+                SetExtendedAttributeMode, StoreObjectHandle,
             },
         },
         fuchsia_async as fasync,
@@ -1189,15 +1352,14 @@ mod tests {
     }
 
     async fn test_filesystem() -> OpenFxFilesystem {
-        let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
+        let device = DeviceHolder::new(FakeDevice::new(16384, TEST_DEVICE_BLOCK_SIZE));
         FxFilesystem::new_empty(device).await.expect("new_empty failed")
     }
 
-    async fn test_filesystem_and_empty_object(
-    ) -> (OpenFxFilesystem, Arc<StoreObjectHandle<ObjectStore>>) {
+    async fn test_filesystem_and_empty_object() -> (OpenFxFilesystem, DataObjectHandle<ObjectStore>)
+    {
         let fs = test_filesystem().await;
         let store = fs.root_store();
-        let object;
 
         let mut transaction = fs
             .clone()
@@ -1208,7 +1370,7 @@ mod tests {
             .await
             .expect("new_transaction failed");
 
-        object = ObjectStore::create_object(
+        let object = ObjectStore::create_object(
             &store,
             &mut transaction,
             HandleOptions::default(),
@@ -1227,16 +1389,7 @@ mod tests {
 
         transaction.commit().await.expect("commit failed");
 
-        (
-            fs,
-            Arc::new(StoreObjectHandle::new(
-                object.owner().clone(),
-                object.object_id(),
-                /* permanent_keys: */ false,
-                HandleOptions::default(),
-                false,
-            )),
-        )
+        (fs, object)
     }
 
     #[fuchsia::test(threads = 3)]
@@ -1245,7 +1398,14 @@ mod tests {
         // attribute that doesn't exist is an error, so we need to check before we remove, but if
         // we aren't careful, two parallel removes might both succeed in the check and then both
         // remove the value.
-        let (fs, basic) = test_filesystem_and_empty_object().await;
+        let (fs, object) = test_filesystem_and_empty_object().await;
+        let basic = Arc::new(StoreObjectHandle::new(
+            object.owner().clone(),
+            object.object_id(),
+            /* permanent_keys: */ false,
+            HandleOptions::default(),
+            false,
+        ));
         let basic_a = basic.clone();
         let basic_b = basic.clone();
 
@@ -1283,7 +1443,14 @@ mod tests {
         // similar to above. If the create mode is set, we need to check that the attribute isn't
         // already created, but if two parallel creates both succeed in that check, and we aren't
         // careful with locking, they will both succeed and one will overwrite the other.
-        let (fs, basic) = test_filesystem_and_empty_object().await;
+        let (fs, object) = test_filesystem_and_empty_object().await;
+        let basic = Arc::new(StoreObjectHandle::new(
+            object.owner().clone(),
+            object.object_id(),
+            /* permanent_keys: */ false,
+            HandleOptions::default(),
+            false,
+        ));
         let basic_a = basic.clone();
         let basic_b = basic.clone();
 
@@ -1334,5 +1501,446 @@ mod tests {
         }
 
         fs.close().await.expect("Close failed");
+    }
+
+    struct TestAttr {
+        name: Vec<u8>,
+        value: Vec<u8>,
+    }
+
+    impl TestAttr {
+        fn new(name: impl AsRef<[u8]>, value: impl AsRef<[u8]>) -> Self {
+            Self { name: name.as_ref().to_vec(), value: value.as_ref().to_vec() }
+        }
+        fn name(&self) -> Vec<u8> {
+            self.name.clone()
+        }
+        fn value(&self) -> Vec<u8> {
+            self.value.clone()
+        }
+    }
+
+    #[fuchsia::test]
+    async fn extended_attributes() {
+        let (fs, object) = test_filesystem_and_empty_object().await;
+        let handle = object.handle();
+
+        let test_attr = TestAttr::new(b"security.selinux", b"foo");
+
+        assert_eq!(handle.list_extended_attributes().await.unwrap(), Vec::<Vec<u8>>::new());
+        is_error(
+            handle.get_extended_attribute(test_attr.name()).await.unwrap_err(),
+            FxfsError::NotFound,
+        );
+
+        handle
+            .set_extended_attribute(
+                test_attr.name(),
+                test_attr.value(),
+                SetExtendedAttributeMode::Set,
+            )
+            .await
+            .unwrap();
+        assert_eq!(handle.list_extended_attributes().await.unwrap(), vec![test_attr.name()]);
+        assert_eq!(
+            handle.get_extended_attribute(test_attr.name()).await.unwrap(),
+            test_attr.value()
+        );
+
+        handle.remove_extended_attribute(test_attr.name()).await.unwrap();
+        assert_eq!(handle.list_extended_attributes().await.unwrap(), Vec::<Vec<u8>>::new());
+        is_error(
+            handle.get_extended_attribute(test_attr.name()).await.unwrap_err(),
+            FxfsError::NotFound,
+        );
+
+        // Make sure we can handle the same attribute being set again.
+        handle
+            .set_extended_attribute(
+                test_attr.name(),
+                test_attr.value(),
+                SetExtendedAttributeMode::Set,
+            )
+            .await
+            .unwrap();
+        assert_eq!(handle.list_extended_attributes().await.unwrap(), vec![test_attr.name()]);
+        assert_eq!(
+            handle.get_extended_attribute(test_attr.name()).await.unwrap(),
+            test_attr.value()
+        );
+
+        handle.remove_extended_attribute(test_attr.name()).await.unwrap();
+        assert_eq!(handle.list_extended_attributes().await.unwrap(), Vec::<Vec<u8>>::new());
+        is_error(
+            handle.get_extended_attribute(test_attr.name()).await.unwrap_err(),
+            FxfsError::NotFound,
+        );
+
+        fs.close().await.expect("close failed");
+    }
+
+    #[fuchsia::test]
+    async fn large_extended_attribute() {
+        let (fs, object) = test_filesystem_and_empty_object().await;
+        let handle = object.handle();
+
+        let test_attr = TestAttr::new(b"security.selinux", vec![3u8; 300]);
+
+        handle
+            .set_extended_attribute(
+                test_attr.name(),
+                test_attr.value(),
+                SetExtendedAttributeMode::Set,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            handle.get_extended_attribute(test_attr.name()).await.unwrap(),
+            test_attr.value()
+        );
+
+        // Probe the fxfs attributes to make sure it did the expected thing. This relies on inside
+        // knowledge of how the attribute id is chosen.
+        assert_eq!(
+            handle
+                .read_attr(64)
+                .await
+                .expect("read_attr failed")
+                .expect("read_attr returned none")
+                .into_vec(),
+            test_attr.value()
+        );
+
+        handle.remove_extended_attribute(test_attr.name()).await.unwrap();
+        is_error(
+            handle.get_extended_attribute(test_attr.name()).await.unwrap_err(),
+            FxfsError::NotFound,
+        );
+
+        // Make sure we can handle the same attribute being set again.
+        handle
+            .set_extended_attribute(
+                test_attr.name(),
+                test_attr.value(),
+                SetExtendedAttributeMode::Set,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            handle.get_extended_attribute(test_attr.name()).await.unwrap(),
+            test_attr.value()
+        );
+        handle.remove_extended_attribute(test_attr.name()).await.unwrap();
+        is_error(
+            handle.get_extended_attribute(test_attr.name()).await.unwrap_err(),
+            FxfsError::NotFound,
+        );
+
+        fs.close().await.expect("close failed");
+    }
+
+    #[fuchsia::test]
+    async fn multiple_extended_attributes() {
+        let (fs, object) = test_filesystem_and_empty_object().await;
+        let handle = object.handle();
+
+        let attrs = [
+            TestAttr::new(b"security.selinux", b"foo"),
+            TestAttr::new(b"large.attribute", vec![3u8; 300]),
+            TestAttr::new(b"an.attribute", b"asdf"),
+            TestAttr::new(b"user.big", vec![5u8; 288]),
+            TestAttr::new(b"user.tiny", b"smol"),
+            TestAttr::new(b"this string doesn't matter", b"the quick brown fox etc"),
+            TestAttr::new(b"also big", vec![7u8; 500]),
+            TestAttr::new(b"all.ones", vec![1u8; 11111]),
+        ];
+
+        for i in 0..attrs.len() {
+            handle
+                .set_extended_attribute(
+                    attrs[i].name(),
+                    attrs[i].value(),
+                    SetExtendedAttributeMode::Set,
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                handle.get_extended_attribute(attrs[i].name()).await.unwrap(),
+                attrs[i].value()
+            );
+        }
+
+        for i in 0..attrs.len() {
+            // Make sure expected attributes are still available.
+            let mut found_attrs = handle.list_extended_attributes().await.unwrap();
+            let mut expected_attrs: Vec<Vec<u8>> = attrs.iter().skip(i).map(|a| a.name()).collect();
+            found_attrs.sort();
+            expected_attrs.sort();
+            assert_eq!(found_attrs, expected_attrs);
+            for j in i..attrs.len() {
+                assert_eq!(
+                    handle.get_extended_attribute(attrs[j].name()).await.unwrap(),
+                    attrs[j].value()
+                );
+            }
+
+            handle.remove_extended_attribute(attrs[i].name()).await.expect("failed to remove");
+            is_error(
+                handle.get_extended_attribute(attrs[i].name()).await.unwrap_err(),
+                FxfsError::NotFound,
+            );
+        }
+
+        fs.close().await.expect("close failed");
+    }
+
+    #[fuchsia::test]
+    async fn multiple_extended_attributes_delete() {
+        let (fs, object) = test_filesystem_and_empty_object().await;
+        let store = object.owner().clone();
+        let handle = object.handle();
+
+        let attrs = [
+            TestAttr::new(b"security.selinux", b"foo"),
+            TestAttr::new(b"large.attribute", vec![3u8; 300]),
+            TestAttr::new(b"an.attribute", b"asdf"),
+            TestAttr::new(b"user.big", vec![5u8; 288]),
+            TestAttr::new(b"user.tiny", b"smol"),
+            TestAttr::new(b"this string doesn't matter", b"the quick brown fox etc"),
+            TestAttr::new(b"also big", vec![7u8; 500]),
+            TestAttr::new(b"all.ones", vec![1u8; 11111]),
+        ];
+
+        for i in 0..attrs.len() {
+            handle
+                .set_extended_attribute(
+                    attrs[i].name(),
+                    attrs[i].value(),
+                    SetExtendedAttributeMode::Set,
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                handle.get_extended_attribute(attrs[i].name()).await.unwrap(),
+                attrs[i].value()
+            );
+        }
+
+        // Unlink the file
+        let root_directory =
+            Directory::open(object.owner(), object.store().root_directory_object_id())
+                .await
+                .expect("open failed");
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                &[
+                    LockKey::object(store.store_object_id(), store.root_directory_object_id()),
+                    LockKey::object(store.store_object_id(), object.object_id()),
+                ],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        crate::object_store::directory::replace_child(
+            &mut transaction,
+            None,
+            (&root_directory, TEST_OBJECT_NAME),
+        )
+        .await
+        .expect("replace_child failed");
+        transaction.commit().await.unwrap();
+        store.tombstone(object.object_id(), Options::default()).await.unwrap();
+
+        crate::fsck::fsck(fs.clone()).await.unwrap();
+
+        fs.close().await.expect("close failed");
+    }
+
+    #[fuchsia::test]
+    async fn extended_attribute_changing_sizes() {
+        let (fs, object) = test_filesystem_and_empty_object().await;
+        let handle = object.handle();
+
+        let test_name = b"security.selinux";
+        let test_small_attr = TestAttr::new(test_name, b"smol");
+        let test_large_attr = TestAttr::new(test_name, vec![3u8; 300]);
+
+        handle
+            .set_extended_attribute(
+                test_small_attr.name(),
+                test_small_attr.value(),
+                SetExtendedAttributeMode::Set,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            handle.get_extended_attribute(test_small_attr.name()).await.unwrap(),
+            test_small_attr.value()
+        );
+
+        // With a small attribute, we don't expect it to write to an fxfs attribute.
+        assert!(handle.read_attr(64).await.expect("read_attr failed").is_none());
+
+        crate::fsck::fsck(fs.clone()).await.unwrap();
+
+        handle
+            .set_extended_attribute(
+                test_large_attr.name(),
+                test_large_attr.value(),
+                SetExtendedAttributeMode::Set,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            handle.get_extended_attribute(test_large_attr.name()).await.unwrap(),
+            test_large_attr.value()
+        );
+
+        // Once the value is above the threshold, we expect it to get upgraded to an fxfs
+        // attribute.
+        assert_eq!(
+            handle
+                .read_attr(64)
+                .await
+                .expect("read_attr failed")
+                .expect("read_attr returned none")
+                .into_vec(),
+            test_large_attr.value()
+        );
+
+        crate::fsck::fsck(fs.clone()).await.unwrap();
+
+        handle
+            .set_extended_attribute(
+                test_small_attr.name(),
+                test_small_attr.value(),
+                SetExtendedAttributeMode::Set,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            handle.get_extended_attribute(test_small_attr.name()).await.unwrap(),
+            test_small_attr.value()
+        );
+
+        // Even though we are back under the threshold, we still expect it to be stored in an fxfs
+        // attribute, because we don't downgrade to inline once we've allocated one.
+        assert_eq!(
+            handle
+                .read_attr(64)
+                .await
+                .expect("read_attr failed")
+                .expect("read_attr returned none")
+                .into_vec(),
+            test_small_attr.value()
+        );
+
+        crate::fsck::fsck(fs.clone()).await.unwrap();
+
+        handle.remove_extended_attribute(test_small_attr.name()).await.expect("failed to remove");
+
+        crate::fsck::fsck(fs.clone()).await.unwrap();
+
+        fs.close().await.expect("close failed");
+    }
+
+    #[fuchsia::test]
+    async fn extended_attribute_max_size() {
+        let (fs, object) = test_filesystem_and_empty_object().await;
+        let handle = object.handle();
+
+        let test_attr = TestAttr::new(
+            vec![3u8; super::MAX_XATTR_NAME_SIZE],
+            vec![1u8; super::MAX_XATTR_VALUE_SIZE],
+        );
+
+        handle
+            .set_extended_attribute(
+                test_attr.name(),
+                test_attr.value(),
+                SetExtendedAttributeMode::Set,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            handle.get_extended_attribute(test_attr.name()).await.unwrap(),
+            test_attr.value()
+        );
+        assert_eq!(handle.list_extended_attributes().await.unwrap(), vec![test_attr.name()]);
+        handle.remove_extended_attribute(test_attr.name()).await.unwrap();
+
+        fs.close().await.expect("close failed");
+    }
+
+    #[fuchsia::test]
+    async fn large_extended_attribute_max_number() {
+        let (fs, object) = test_filesystem_and_empty_object().await;
+        let handle = object.handle();
+
+        let max_xattrs =
+            super::EXTENDED_ATTRIBUTE_RANGE_END - super::EXTENDED_ATTRIBUTE_RANGE_START;
+        for i in 0..max_xattrs {
+            let test_attr = TestAttr::new(format!("{}", i).as_bytes(), vec![0x3; 300]);
+            handle
+                .set_extended_attribute(
+                    test_attr.name(),
+                    test_attr.value(),
+                    SetExtendedAttributeMode::Set,
+                )
+                .await
+                .unwrap_or_else(|_| panic!("failed to set xattr number {}", i));
+        }
+
+        // That should have taken up all the attributes we've allocated to extended attributes, so
+        // this one should return ERR_NO_SPACE.
+        match handle
+            .set_extended_attribute(
+                b"one.too.many".to_vec(),
+                vec![0x3; 300],
+                SetExtendedAttributeMode::Set,
+            )
+            .await
+        {
+            Ok(()) => panic!("set should not succeed"),
+            Err(e) => is_error(e, FxfsError::NoSpace),
+        }
+
+        // But inline attributes don't need an attribute number, so it should work fine.
+        handle
+            .set_extended_attribute(
+                b"this.is.okay".to_vec(),
+                b"small value".to_vec(),
+                SetExtendedAttributeMode::Set,
+            )
+            .await
+            .unwrap();
+
+        // And updating existing ones should be okay.
+        handle
+            .set_extended_attribute(b"11".to_vec(), vec![0x4; 300], SetExtendedAttributeMode::Set)
+            .await
+            .unwrap();
+        handle
+            .set_extended_attribute(
+                b"12".to_vec(),
+                vec![0x1; 300],
+                SetExtendedAttributeMode::Replace,
+            )
+            .await
+            .unwrap();
+
+        // And we should be able to remove an attribute and set another one.
+        handle.remove_extended_attribute(b"5".to_vec()).await.unwrap();
+        handle
+            .set_extended_attribute(
+                b"new attr".to_vec(),
+                vec![0x3; 300],
+                SetExtendedAttributeMode::Set,
+            )
+            .await
+            .unwrap();
+
+        fs.close().await.expect("close failed");
     }
 }
