@@ -52,7 +52,7 @@ async fn do_destroy_child(
                 child
             }
             InstanceState::Destroyed => None,
-            InstanceState::New | InstanceState::Unresolved => {
+            InstanceState::New | InstanceState::Unresolved(_) => {
                 panic!("DestroyChild: target is not resolved");
             }
         }
@@ -81,7 +81,7 @@ async fn do_destroy_child(
                     s.remove_child(moniker);
                 }
                 InstanceState::Destroyed => {}
-                InstanceState::New | InstanceState::Unresolved => {
+                InstanceState::New | InstanceState::Unresolved(_) => {
                     panic!("do_purge_child: not resolved");
                 }
             }

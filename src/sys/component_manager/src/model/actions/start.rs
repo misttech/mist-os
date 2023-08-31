@@ -232,7 +232,7 @@ pub fn should_return_early(
     moniker: &Moniker,
 ) -> Option<Result<fsys::StartResult, StartActionError>> {
     match component {
-        InstanceState::New | InstanceState::Unresolved | InstanceState::Resolved(_) => {}
+        InstanceState::New | InstanceState::Unresolved(_) | InstanceState::Resolved(_) => {}
         InstanceState::Destroyed => {
             return Some(Err(StartActionError::InstanceDestroyed { moniker: moniker.clone() }));
         }
@@ -378,25 +378,30 @@ async fn create_scoped_logger(
 #[cfg(test)]
 mod tests {
     use {
-        crate::model::{
-            actions::{
-                start::should_return_early, ActionSet, ShutdownAction, StartAction, StopAction,
+        crate::{
+            model::{
+                actions::{
+                    resolve::sandbox_construction::ComponentSandboxes, start::should_return_early,
+                    ActionSet, ShutdownAction, StartAction, StopAction,
+                },
+                component::{
+                    ComponentInstance, ExecutionState, InstanceState, ResolvedInstanceState,
+                    Runtime, StartReason, UnresolvedInstanceState,
+                },
+                error::{ModelError, StartActionError},
+                hooks::{Event, EventType, Hook, HooksRegistration},
+                testing::{
+                    test_helpers::{self, ActionsTest},
+                    test_hook::Lifecycle,
+                },
             },
-            component::{
-                ComponentInstance, ExecutionState, InstanceState, ResolvedInstanceState, Runtime,
-                StartReason,
-            },
-            error::{ModelError, StartActionError},
-            hooks::{Event, EventType, Hook, HooksRegistration},
-            testing::{
-                test_helpers::{self, ActionsTest},
-                test_hook::Lifecycle,
-            },
+            sandbox_util::Sandbox,
         },
         assert_matches::assert_matches,
         async_trait::async_trait,
         cm_rust::ComponentDecl,
         cm_rust_testing::{ChildDeclBuilder, ComponentDeclBuilder},
+        cm_types::Name,
         fidl_fuchsia_sys2 as fsys, fuchsia, fuchsia_zircon as zx,
         moniker::Moniker,
         routing::resolving::ComponentAddress,
@@ -580,13 +585,21 @@ mod tests {
 
         // Checks based on InstanceState:
         assert!(should_return_early(&InstanceState::New, &es, &m).is_none());
-        assert!(should_return_early(&InstanceState::Unresolved, &es, &m).is_none());
+        assert!(should_return_early(
+            &InstanceState::Unresolved(UnresolvedInstanceState::new(Sandbox::new())),
+            &es,
+            &m
+        )
+        .is_none());
         assert_matches!(
             should_return_early(&InstanceState::Destroyed, &es, &m),
             Some(Err(StartActionError::InstanceDestroyed { moniker: _ }))
         );
         let (_, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
-        let decl = ComponentDeclBuilder::new().add_lazy_child("bar").build();
+        let decl = ComponentDeclBuilder::new().add_lazy_child(TEST_CHILD_NAME).build();
+        let mut sandbox_finalization_output = ComponentSandboxes::default();
+        let name = Name::new(TEST_CHILD_NAME).unwrap();
+        sandbox_finalization_output.child_sandboxes.insert(name, Sandbox::new());
         let ris = ResolvedInstanceState::new(
             &child,
             decl,
@@ -594,6 +607,7 @@ mod tests {
             None,
             ComponentAddress::from_absolute_url(&child.component_url).unwrap(),
             None,
+            sandbox_finalization_output,
         )
         .await
         .unwrap();

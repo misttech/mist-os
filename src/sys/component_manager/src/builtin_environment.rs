@@ -29,7 +29,7 @@ use {
                 RealmBuilderResolver, RealmBuilderRunnerFactory,
                 RUNNER_NAME as REALM_BUILDER_RUNNER_NAME, SCHEME as REALM_BUILDER_SCHEME,
             },
-            root_job::{RootJob, ROOT_JOB_CAPABILITY_NAME, ROOT_JOB_FOR_INSPECT_CAPABILITY_NAME},
+            root_job::RootJob,
             root_resource::RootResource,
             runner::{BuiltinRunner, BuiltinRunnerFactory},
             smc_resource::SmcResource,
@@ -60,6 +60,7 @@ use {
             storage::admin_protocol::StorageAdmin,
         },
         root_stop_notifier::RootStopNotifier,
+        sandbox_util::{LaunchTaskOnReceive, Sandbox},
     },
     ::routing::{
         config::{RuntimeConfig, VmexSource},
@@ -68,23 +69,27 @@ use {
     anyhow::{format_err, Context as _, Error},
     cm_rust::{Availability, RunnerRegistration, UseEventStreamDecl, UseSource},
     cm_types::Name,
+    cm_util::TaskGroup,
     cstr::cstr,
     elf_runner::{
         crash_info::CrashRecords,
         vdso_vmo::{get_next_vdso_vmo, get_stable_vdso_vmo, get_vdso_vmo},
         ElfRunner,
     },
-    fidl::endpoints::{create_proxy, ServerEnd},
+    fidl::endpoints::{
+        create_proxy, DiscoverableProtocolMarker, ProtocolMarker, RequestStream, ServerEnd,
+    },
     fidl_fuchsia_component_internal::BuiltinBootResolver,
     fidl_fuchsia_diagnostics_types::Task as DiagnosticsTask,
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync,
     fuchsia_component::server::*,
     fuchsia_inspect::{self as inspect, component, health::Reporter, Inspector},
     fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType},
     fuchsia_zbi::{ZbiParser, ZbiType},
     fuchsia_zircon::{self as zx, Clock, HandleBased, Resource},
-    futures::prelude::*,
+    futures::{future::BoxFuture, sink::drain, stream::FuturesUnordered, FutureExt, StreamExt},
     moniker::{Moniker, MonikerBase},
+    sandbox::Receiver,
     std::sync::Arc,
     tracing::{info, warn},
 };
@@ -331,6 +336,67 @@ impl BuiltinEnvironmentBuilder {
     }
 }
 
+struct BuiltinSandboxBuilder {
+    sandbox: Sandbox,
+    builtin_task_launchers: Vec<LaunchTaskOnReceive>,
+    task_group: TaskGroup,
+    builtin_capabilities: Vec<cm_rust::CapabilityDecl>,
+}
+
+impl BuiltinSandboxBuilder {
+    fn new(task_group: TaskGroup, runtime_config: &Arc<RuntimeConfig>) -> Self {
+        Self {
+            sandbox: Sandbox::new(),
+            builtin_task_launchers: Vec::new(),
+            task_group,
+            builtin_capabilities: runtime_config.builtin_capabilities.clone(),
+        }
+    }
+
+    /// Adds a new builtin protocol to the sandbox that will be given to the root component. If the
+    /// protocol is not listed in `self.builtin_capabilities`, then it will silently be omitted
+    /// from the sandbox.
+    fn add_builtin_protocol_if_enabled<P>(
+        &mut self,
+        task_to_launch: impl Fn(P::RequestStream) -> BoxFuture<'static, Result<(), anyhow::Error>>
+            + Sync
+            + Send
+            + 'static,
+    ) where
+        P: DiscoverableProtocolMarker + ProtocolMarker,
+    {
+        let name = Name::new(P::PROTOCOL_NAME).unwrap();
+        // TODO: check capability type too
+        // TODO: if we store the capabilities in a hashmap by name, then we can remove them as
+        // they're added and confirm at the end that we've not been asked to enable something
+        // unknown.
+        if self.builtin_capabilities.iter().find(|decl| decl.name() == &name).is_none() {
+            // This builtin protocol is not enabled based on the runtime config, so don't add the
+            // capability to the sandbox.
+            return;
+        }
+        let receiver = Receiver::new();
+        let sender = receiver.new_sender();
+        self.sandbox.get_or_insert_protocol(name.clone()).insert_sender(sender);
+        self.builtin_task_launchers.push(LaunchTaskOnReceive::new(
+            self.task_group.as_weak(),
+            name,
+            receiver,
+            Box::new(move |message| task_to_launch(message.take_handle_as_stream::<P>()).boxed()),
+        ));
+    }
+
+    fn build(self) -> (Sandbox, fasync::Task<()>) {
+        let builtin_receivers_future: FuturesUnordered<_> =
+            self.builtin_task_launchers.into_iter().map(LaunchTaskOnReceive::run).collect();
+        let builtin_receivers_task = fasync::Task::spawn(async move {
+            // The result here is irrelevant because the stream is infallible
+            let _ = builtin_receivers_future.map(Result::Ok).forward(drain()).await;
+        });
+        (self.sandbox, builtin_receivers_task)
+    }
+}
+
 /// The built-in environment consists of the set of the root services and framework services. Use
 /// BuiltinEnvironmentBuilder to construct one.
 ///
@@ -354,8 +420,6 @@ pub struct BuiltinEnvironment {
     pub irq_resource: Option<Arc<IrqResource>>,
     pub kernel_stats: Option<Arc<KernelStats>>,
     pub process_launcher: Option<Arc<ProcessLauncherSvc>>,
-    pub root_job: Arc<RootJob>,
-    pub root_job_for_inspect: Arc<RootJob>,
     pub read_only_log: Option<Arc<ReadOnlyLog>>,
     pub write_only_log: Option<Arc<WriteOnlyLog>>,
     pub factory_items_service: Option<Arc<FactoryItems>>,
@@ -392,6 +456,8 @@ pub struct BuiltinEnvironment {
     pub num_threads: usize,
     pub inspector: Inspector,
     pub realm_builder_resolver: Option<Arc<RealmBuilderResolver>>,
+    pub sandbox: Sandbox,
+    _builtin_receivers_task: Option<fasync::Task<()>>,
     _service_fs_task: Option<fasync::Task<()>>,
 }
 
@@ -418,6 +484,10 @@ impl BuiltinEnvironment {
         } else {
             None
         };
+
+        let mut sandbox_builder =
+            BuiltinSandboxBuilder::new(model.top_instance().task_group(), &runtime_config);
+
         // Set up ProcessLauncher if available.
         let process_launcher = if runtime_config.use_builtin_process_launcher {
             let process_launcher = Arc::new(ProcessLauncherSvc::new());
@@ -428,19 +498,22 @@ impl BuiltinEnvironment {
         };
 
         // Set up RootJob service.
-        let root_job = RootJob::new(&ROOT_JOB_CAPABILITY_NAME, zx::Rights::SAME_RIGHTS);
-        model.root().hooks.install(root_job.hooks()).await;
+        sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::RootJobMarker>(|stream| {
+            RootJob::serve(stream, zx::Rights::SAME_RIGHTS).boxed()
+        });
 
         // Set up RootJobForInspect service.
-        let root_job_for_inspect = RootJob::new(
-            &ROOT_JOB_FOR_INSPECT_CAPABILITY_NAME,
-            zx::Rights::INSPECT
-                | zx::Rights::ENUMERATE
-                | zx::Rights::DUPLICATE
-                | zx::Rights::TRANSFER
-                | zx::Rights::GET_PROPERTY,
+        sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::RootJobForInspectMarker>(
+            |stream| {
+                let stream = stream.cast_stream::<fkernel::RootJobRequestStream>();
+                let rights = zx::Rights::INSPECT
+                    | zx::Rights::ENUMERATE
+                    | zx::Rights::DUPLICATE
+                    | zx::Rights::TRANSFER
+                    | zx::Rights::GET_PROPERTY;
+                RootJob::serve(stream, rights).boxed()
+            },
         );
-        model.root().hooks.install(root_job_for_inspect.hooks()).await;
 
         let mmio_resource_handle =
             take_startup_handle(HandleType::MmioResource.into()).map(zx::Resource::from);
@@ -856,12 +929,12 @@ impl BuiltinEnvironment {
         model.root().hooks.install(event_source_factory.hooks()).await;
         model.root().hooks.install(event_stream_provider.hooks()).await;
 
+        let (sandbox, builtin_receivers_task) = sandbox_builder.build();
+
         Ok(BuiltinEnvironment {
             model,
             boot_args,
             process_launcher,
-            root_job,
-            root_job_for_inspect,
             kernel_stats,
             read_only_log,
             write_only_log,
@@ -906,6 +979,8 @@ impl BuiltinEnvironment {
             num_threads,
             inspector,
             realm_builder_resolver,
+            sandbox,
+            _builtin_receivers_task: Some(builtin_receivers_task),
             _service_fs_task: None,
         })
     }
@@ -1125,13 +1200,21 @@ impl BuiltinEnvironment {
         self.emit_diagnostics(service_fs)
     }
 
+    #[cfg(test)]
+    /// Causes the root component to be discovered, which provides the root component with the
+    /// sandbox from the builtin environment. This is called in some tests because the tests create
+    /// a new model but do not call `Model::start`.
+    pub async fn discover_root_component(&self) {
+        self.model.discover_root_component(self.sandbox.clone()).await;
+    }
+
     pub async fn wait_for_root_stop(&self) {
         self.stop_notifier.wait_for_root_stop().await;
     }
 
     pub async fn run_root(&mut self) -> Result<(), Error> {
         self.bind_service_fs_to_out().await?;
-        self.model.start().await;
+        self.model.start(self.sandbox.clone()).await;
         component::health().set_ok();
         self.wait_for_root_stop().await;
 

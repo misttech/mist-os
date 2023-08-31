@@ -310,6 +310,7 @@ impl RoutingTest {
         }
         let builtin_environment =
             env_builder.build().await.expect("builtin environment setup failed");
+        builtin_environment.discover_root_component().await;
 
         let model = builtin_environment.model.clone();
         model.root().hooks.install(builder.additional_hooks.clone()).await;

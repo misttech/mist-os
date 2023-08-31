@@ -8,7 +8,7 @@ use {
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
     fuchsia_zircon::{self as zx, HandleBased},
     futures::{channel::mpsc, future::BoxFuture, FutureExt, TryStreamExt},
-    moniker::Moniker,
+    moniker::{Moniker, MonikerBase},
     std::fmt::Debug,
 };
 
@@ -17,15 +17,9 @@ use {
 #[capability(try_clone = "clone", convert = "to_self_only")]
 pub struct Sender {
     pub(crate) inner: mpsc::UnboundedSender<Message>,
-    /// The moniker of the component this sender was given to
-    pub(crate) moniker: Moniker,
 }
 
 impl Sender {
-    pub fn clone_with_new_moniker(&self, moniker: Moniker) -> Self {
-        Self { inner: self.inner.clone(), moniker }
-    }
-
     pub fn send(&mut self, message: Message) {
         self.inner.unbounded_send(message).expect("TODO: what lifecycle transitions would cause a receiver to be destroyed and leave a sender?");
     }
@@ -58,8 +52,8 @@ impl Sender {
                     }
                     self.send(Message {
                         handle: capability,
-                        flags: fio::OpenFlags::empty(), // TODO
-                        target_moniker: self.moniker.clone(),
+                        flags: fio::OpenFlags::empty(),  // TODO
+                        target_moniker: Moniker::root(), // TODO
                     });
                     let _ = responder.send(Ok(()));
                 }

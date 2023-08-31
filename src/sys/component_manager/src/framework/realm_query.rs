@@ -781,8 +781,13 @@ async fn serve_manifest_bytes_iterator(
 mod tests {
     use {
         super::*,
-        crate::model::component::StartReason,
-        crate::model::testing::test_helpers::{TestEnvironmentBuilder, TestModelResult},
+        crate::{
+            model::{
+                component::StartReason,
+                testing::test_helpers::{TestEnvironmentBuilder, TestModelResult},
+            },
+            sandbox_util::Sandbox,
+        },
         assert_matches::assert_matches,
         cm_rust::*,
         cm_rust_testing::ComponentDeclBuilder,
@@ -828,7 +833,7 @@ mod tests {
             realm_query.serve(Moniker::root(), query_request_stream).await
         });
 
-        model.start().await;
+        model.start(Sandbox::new()).await;
 
         let instance = query.get_instance(".").await.unwrap().unwrap();
 
@@ -889,7 +894,7 @@ mod tests {
             realm_query.serve(Moniker::root(), query_request_stream).await
         });
 
-        model.start().await;
+        model.start(Sandbox::new()).await;
 
         let iterator = query.get_resolved_declaration("./").await.unwrap().unwrap();
         let iterator = iterator.into_proxy().unwrap();
@@ -970,7 +975,7 @@ mod tests {
             realm_query.serve(Moniker::root(), query_request_stream).await
         });
 
-        model.start().await;
+        model.start(Sandbox::new()).await;
 
         let config = query.get_structured_config("./").await.unwrap().unwrap();
 
@@ -1023,7 +1028,7 @@ mod tests {
             realm_query.serve(Moniker::root(), query_request_stream).await
         });
 
-        model.start().await;
+        model.start(Sandbox::new()).await;
 
         let (outgoing_dir, server_end) = create_endpoints::<fio::DirectoryMarker>();
         let server_end = ServerEnd::new(server_end.into_channel());
@@ -1164,7 +1169,7 @@ mod tests {
             realm_query.serve(Moniker::root(), query_request_stream).await
         });
 
-        model.start().await;
+        model.start(Sandbox::new()).await;
 
         let mut ns = query.construct_namespace("./").await.unwrap().unwrap();
 
@@ -1252,7 +1257,7 @@ mod tests {
             realm_query.serve(Moniker::root(), query_request_stream).await
         });
 
-        model.start().await;
+        model.start(Sandbox::new()).await;
 
         let (storage_admin, server_end) = create_proxy::<fsys::StorageAdminMarker>().unwrap();
 

@@ -5,12 +5,12 @@
 use {
     crate::model::{
         actions::{Action, ActionKey, ActionSet, ShutdownAction},
-        component::{ComponentInstance, InstanceState},
+        component::{ComponentInstance, InstanceState, UnresolvedInstanceState},
         error::UnresolveActionError,
         hooks::{Event, EventPayload},
     },
     async_trait::async_trait,
-    std::sync::Arc,
+    std::{ops::DerefMut, sync::Arc},
 };
 
 /// Returns a resolved component to the discovered state. The result is that the component can be
@@ -54,7 +54,7 @@ async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), Unresolv
                     moniker: component.moniker.clone(),
                 })
             }
-            InstanceState::Unresolved | InstanceState::New => return Ok(()),
+            InstanceState::Unresolved(_) | InstanceState::New => return Ok(()),
         }
     };
 
@@ -70,9 +70,10 @@ async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), Unresolv
     // The state may have changed during the time taken for the recursions, so recheck here.
     {
         let mut state = component.lock_state().await;
-        match &*state {
-            InstanceState::Resolved(_) => {
-                state.set(InstanceState::Unresolved);
+        match state.deref_mut() {
+            InstanceState::Resolved(resolved_state) => {
+                let sandbox = resolved_state.sandbox_from_parent.clone();
+                state.set(InstanceState::Unresolved(UnresolvedInstanceState::new(sandbox)));
                 true
             }
             InstanceState::Destroyed => {
@@ -80,7 +81,7 @@ async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), Unresolv
                     moniker: component.moniker.clone(),
                 })
             }
-            InstanceState::Unresolved | InstanceState::New => return Ok(()),
+            InstanceState::Unresolved(_) | InstanceState::New => return Ok(()),
         }
     };
 
@@ -229,7 +230,8 @@ pub mod tests {
             .await
             .expect("subscribe to event stream");
         let model = test.model.clone();
-        fasync::Task::spawn(async move { model.start().await }).detach();
+        let sandbox = test.builtin_environment.lock().await.sandbox.clone();
+        fasync::Task::spawn(async move { model.start(sandbox).await }).detach();
         event_stream
     }
 

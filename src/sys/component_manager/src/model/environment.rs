@@ -174,12 +174,15 @@ impl Resolver for Environment {
 mod tests {
     use {
         super::*,
-        crate::model::{
-            component::StartReason,
-            context::ModelContext,
-            error::ModelError,
-            model::{Model, ModelParams},
-            testing::mocks::MockResolver,
+        crate::{
+            model::{
+                component::StartReason,
+                context::ModelContext,
+                error::ModelError,
+                model::{Model, ModelParams},
+                testing::mocks::MockResolver,
+            },
+            sandbox_util::Sandbox,
         },
         ::routing::{config::RuntimeConfig, environment::DebugRegistration},
         assert_matches::assert_matches,
@@ -313,6 +316,7 @@ mod tests {
         })
         .await
         .unwrap();
+        model.discover_root_component(Sandbox::new()).await;
         let component =
             model.start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager).await?;
         assert_eq!(component.component_url, "test:///b");
@@ -409,6 +413,7 @@ mod tests {
             top_instance,
         })
         .await?;
+        model.discover_root_component(Sandbox::new()).await;
         let component =
             model.start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager).await?;
         assert_eq!(component.component_url, "test:///b");
@@ -509,6 +514,7 @@ mod tests {
             top_instance,
         })
         .await?;
+        model.discover_root_component(Sandbox::new()).await;
         // Add instance to collection.
         {
             let parent =
@@ -613,6 +619,7 @@ mod tests {
         })
         .await
         .unwrap();
+        model.discover_root_component(Sandbox::new()).await;
 
         let component =
             model.start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager).await?;
@@ -684,6 +691,7 @@ mod tests {
             top_instance,
         })
         .await?;
+        model.discover_root_component(Sandbox::new()).await;
         assert_matches!(
             model.start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager).await,
             Err(ModelError::ResolveActionError { .. })

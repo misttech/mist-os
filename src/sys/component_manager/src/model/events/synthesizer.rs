@@ -241,7 +241,7 @@ fn get_subcomponents(
                     let state_guard = curr_component.lock_state().await;
                     match *state_guard {
                         InstanceState::New
-                        | InstanceState::Unresolved
+                        | InstanceState::Unresolved(_)
                         | InstanceState::Destroyed => {}
                         InstanceState::Resolved(ref s) => {
                             for (_, child) in s.children() {

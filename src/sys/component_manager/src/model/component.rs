@@ -7,6 +7,7 @@ use {
     crate::framework::controller,
     crate::model::{
         actions::{
+            resolve::sandbox_construction::{extend_dict_with_offers, ComponentSandboxes},
             shutdown, start, ActionSet, DestroyChildAction, DiscoverAction, ResolveAction,
             ShutdownAction, StartAction, StopAction, UnresolveAction,
         },
@@ -28,6 +29,7 @@ use {
         },
     },
     crate::runner::{builtin::RemoteRunner, NamespaceEntry},
+    crate::sandbox_util::Sandbox,
     ::routing::{
         capability_source::{BuiltinCapabilities, NamespaceCapabilities},
         component_id_index::{ComponentIdIndex, ComponentInstanceId},
@@ -481,7 +483,7 @@ impl ComponentInstance {
                         moniker: self.moniker.clone(),
                     });
                 }
-                InstanceState::New | InstanceState::Unresolved => {}
+                InstanceState::New | InstanceState::Unresolved(_) => {}
             }
             // Drop the lock before doing the work to resolve the state.
         }
@@ -596,11 +598,17 @@ impl ComponentInstance {
             return Err(AddDynamicChildError::NameTooLong { max_len: cm_types::MAX_NAME_LENGTH });
         }
 
+        let collection_sandbox = state
+            .collection_sandboxes
+            .get(&Name::new(&collection_name).unwrap())
+            .expect("sandbox missing for declared collection");
+
         if child_args.dynamic_offers.as_ref().map(|v| v.first()).flatten().is_some()
             && collection_decl.allowed_offers != cm_types::AllowedOffers::StaticAndDynamic
         {
             return Err(AddDynamicChildError::DynamicOffersNotAllowed { collection_name });
         }
+        let child_sandbox = collection_sandbox.clone();
         let discover_fut = state
             .add_child(
                 self,
@@ -608,6 +616,7 @@ impl ComponentInstance {
                 Some(&collection_decl),
                 child_args.dynamic_offers,
                 child_args.controller,
+                child_sandbox,
             )
             .await?;
         discover_fut.await?;
@@ -955,7 +964,7 @@ impl ComponentInstance {
                         moniker: self.moniker.clone(),
                     });
                 }
-                InstanceState::New | InstanceState::Unresolved => {
+                InstanceState::New | InstanceState::Unresolved(_) => {
                     panic!("start: not resolved")
                 }
             }
@@ -1175,7 +1184,7 @@ pub enum InstanceState {
     /// The instance was just created.
     New,
     /// A Discovered event has been dispatched for the instance, but it has not been resolved yet.
-    Unresolved,
+    Unresolved(UnresolvedInstanceState),
     /// The instance has been resolved.
     Resolved(ResolvedInstanceState),
     /// The instance has been destroyed. It has no content and no further actions may be registered
@@ -1192,13 +1201,13 @@ impl InstanceState {
         match (&self, &next) {
             (Self::New, Self::New)
             | (Self::New, Self::Resolved(_))
-            | (Self::Unresolved, Self::Unresolved)
-            | (Self::Unresolved, Self::New)
+            | (Self::Unresolved(_), Self::Unresolved(_))
+            | (Self::Unresolved(_), Self::New)
             | (Self::Resolved(_), Self::Resolved(_))
             | (Self::Resolved(_), Self::New)
             | (Self::Destroyed, Self::Destroyed)
             | (Self::Destroyed, Self::New)
-            | (Self::Destroyed, Self::Unresolved)
+            | (Self::Destroyed, Self::Unresolved(_))
             | (Self::Destroyed, Self::Resolved(_)) => {
                 panic!("Invalid instance state transition from {:?} to {:?}", self, next);
             }
@@ -1213,11 +1222,22 @@ impl fmt::Debug for InstanceState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
             Self::New => "New",
-            Self::Unresolved => "Discovered",
+            Self::Unresolved(_) => "Discovered",
             Self::Resolved(_) => "Resolved",
             Self::Destroyed => "Destroyed",
         };
         f.write_str(s)
+    }
+}
+
+pub struct UnresolvedInstanceState {
+    /// The sandbox containing all capabilities that the parent wished to provide to us.
+    pub sandbox_from_parent: Sandbox,
+}
+
+impl UnresolvedInstanceState {
+    pub fn new(sandbox_from_parent: Sandbox) -> Self {
+        Self { sandbox_from_parent }
     }
 }
 
@@ -1299,6 +1319,17 @@ pub struct ResolvedInstanceState {
     context_to_resolve_children: Option<ComponentResolutionContext>,
     /// Service directories aggregated from children in this component's collection.
     pub collection_services: HashMap<CollectionServiceRoute, Arc<CollectionServiceDirectory>>,
+
+    /// The sandbox containing all capabilities that the parent wished to provide to us.
+    pub sandbox_from_parent: Sandbox,
+
+    /// The sandbox containing all capabilities that we use or declare.
+    pub program_sandbox: Sandbox,
+
+    /// Sandboxes containing the capabilities we want to provide to each collection. Each new
+    /// dynamic child gets a clone of one of these sandboxes (which is potentially extended by
+    /// dynamic offers).
+    collection_sandboxes: HashMap<Name, Sandbox>,
 }
 
 impl ResolvedInstanceState {
@@ -1309,6 +1340,7 @@ impl ResolvedInstanceState {
         config: Option<ConfigFields>,
         address: ComponentAddress,
         context_to_resolve_children: Option<ComponentResolutionContext>,
+        component_sandboxes: ComponentSandboxes,
     ) -> Result<Self, ResolveActionError> {
         // TODO(https://fxbug.dev/120627): Determine whether this is expected to fail.
         let exposed_dir =
@@ -1333,8 +1365,11 @@ impl ResolvedInstanceState {
             context_to_resolve_children,
             collection_services: HashMap::new(),
             decl,
+            sandbox_from_parent: component_sandboxes.sandbox_from_parent,
+            program_sandbox: component_sandboxes.program_sandbox.clone(),
+            collection_sandboxes: component_sandboxes.collection_sandboxes,
         };
-        state.add_static_children(component).await?;
+        state.add_static_children(component, component_sandboxes.child_sandboxes).await?;
         Ok(state)
     }
 
@@ -1498,14 +1533,15 @@ impl ResolvedInstanceState {
         collection: Option<&CollectionDecl>,
         dynamic_offers: Option<Vec<fdecl::Offer>>,
         controller: Option<ServerEnd<fcomponent::ControllerMarker>>,
+        sandbox: Sandbox,
     ) -> Result<BoxFuture<'static, Result<(), DiscoverActionError>>, AddChildError> {
-        let child = self
-            .add_child_internal(component, child, collection, dynamic_offers, controller)
+        let (child, sandbox) = self
+            .add_child_internal(component, child, collection, dynamic_offers, controller, sandbox)
             .await?;
         // We can dispatch a Discovered event for the component now that it's installed in the
         // tree, which means any Discovered hooks will capture it.
         let mut actions = child.lock_actions().await;
-        Ok(actions.register_no_wait(&child, DiscoverAction::new()).boxed())
+        Ok(actions.register_no_wait(&child, DiscoverAction::new(sandbox)).boxed())
     }
 
     /// Adds a new child of this instance for the given `ChildDecl`. Returns
@@ -1519,7 +1555,9 @@ impl ResolvedInstanceState {
         child: &ChildDecl,
         collection: Option<&CollectionDecl>,
     ) -> Result<(), AddChildError> {
-        self.add_child_internal(component, child, collection, None, None).await.map(|_| ())
+        self.add_child_internal(component, child, collection, None, None, Sandbox::new())
+            .await
+            .map(|_| ())
     }
 
     async fn add_child_internal(
@@ -1529,15 +1567,20 @@ impl ResolvedInstanceState {
         collection: Option<&CollectionDecl>,
         dynamic_offers: Option<Vec<fdecl::Offer>>,
         controller: Option<ServerEnd<fcomponent::ControllerMarker>>,
-    ) -> Result<Arc<ComponentInstance>, AddChildError> {
+        mut child_sandbox: Sandbox,
+    ) -> Result<(Arc<ComponentInstance>, Sandbox), AddChildError> {
         assert!(
             (dynamic_offers.is_none()) || collection.is_some(),
             "setting numbered handles or dynamic offers for static children",
         );
         let dynamic_offers =
             self.validate_and_convert_dynamic_offers(dynamic_offers, child, collection)?;
+
         let child_moniker =
             ChildName::try_new(child.name.as_str(), collection.map(|c| c.name.as_str()))?;
+
+        extend_dict_with_offers(&self.sandbox_from_parent, &dynamic_offers, &mut child_sandbox);
+
         if self.get_child(&child_moniker).is_some() {
             return Err(AddChildError::InstanceAlreadyExists {
                 moniker: component.moniker().clone(),
@@ -1576,7 +1619,7 @@ impl ResolvedInstanceState {
         }
         self.children.insert(child_moniker, child.clone());
         self.dynamic_offers.extend(dynamic_offers.into_iter());
-        Ok(child)
+        Ok((child, child_sandbox))
     }
 
     fn validate_and_convert_dynamic_offers(
@@ -1641,14 +1684,20 @@ impl ResolvedInstanceState {
     async fn add_static_children(
         &mut self,
         component: &Arc<ComponentInstance>,
+        mut child_sandboxes: HashMap<Name, Sandbox>,
     ) -> Result<(), ResolveActionError> {
         // We can't hold an immutable reference to `self` while passing a mutable reference later
         // on. To get around this, clone the children.
         let children = self.decl.children.clone();
         for child in &children {
-            self.add_child(component, child, None, None, None).await.map_err(|err| {
-                ResolveActionError::AddStaticChildError { child_name: child.name.to_string(), err }
-            })?;
+            let child_name = Name::new(&child.name).unwrap();
+            let child_sandbox = child_sandboxes.remove(&child_name).expect("missing child sandbox");
+            self.add_child(component, child, None, None, None, child_sandbox).await.map_err(
+                |err| ResolveActionError::AddStaticChildError {
+                    child_name: child.name.to_string(),
+                    err,
+                },
+            )?;
         }
         Ok(())
     }
@@ -3158,18 +3207,23 @@ pub mod tests {
             None,
             ComponentAddress::from(&comp.component_url, &comp).await.unwrap(),
             None,
+            ComponentSandboxes::default(),
         )
         .await
         .unwrap();
         InstanceState::Resolved(ris)
     }
 
+    async fn new_unresolved() -> InstanceState {
+        InstanceState::Unresolved(UnresolvedInstanceState::new(Sandbox::new()))
+    }
+
     #[fuchsia::test]
     async fn instance_state_transitions_test() {
         // New --> Discovered.
         let mut is = InstanceState::New;
-        is.set(InstanceState::Unresolved);
-        assert_matches!(is, InstanceState::Unresolved);
+        is.set(new_unresolved().await);
+        assert_matches!(is, InstanceState::Unresolved(_));
 
         // New --> Destroyed.
         let mut is = InstanceState::New;
@@ -3177,19 +3231,19 @@ pub mod tests {
         assert_matches!(is, InstanceState::Destroyed);
 
         // Discovered --> Resolved.
-        let mut is = InstanceState::Unresolved;
+        let mut is = new_unresolved().await;
         is.set(new_resolved().await);
         assert_matches!(is, InstanceState::Resolved(_));
 
         // Discovered --> Destroyed.
-        let mut is = InstanceState::Unresolved;
+        let mut is = new_unresolved().await;
         is.set(InstanceState::Destroyed);
         assert_matches!(is, InstanceState::Destroyed);
 
         // Resolved --> Discovered.
         let mut is = new_resolved().await;
-        is.set(InstanceState::Unresolved);
-        assert_matches!(is, InstanceState::Unresolved);
+        is.set(new_unresolved().await);
+        assert_matches!(is, InstanceState::Unresolved(_));
 
         // Resolved --> Destroyed.
         let mut is = new_resolved().await;
@@ -3228,14 +3282,14 @@ pub mod tests {
         // Destroyed !-> {Destroyed, Resolved, Discovered, New}..
         p2p(InstanceState::Destroyed, InstanceState::Destroyed),
         p2r(InstanceState::Destroyed, new_resolved().await),
-        p2d(InstanceState::Destroyed, InstanceState::Unresolved),
+        p2d(InstanceState::Destroyed, new_unresolved().await),
         p2n(InstanceState::Destroyed, InstanceState::New),
         // Resolved !-> {Resolved, New}.
         r2r(new_resolved().await, new_resolved().await),
         r2n(new_resolved().await, InstanceState::New),
         // Discovered !-> {Discovered, New}.
-        d2d(InstanceState::Unresolved, InstanceState::Unresolved),
-        d2n(InstanceState::Unresolved, InstanceState::New),
+        d2d(new_unresolved().await, new_unresolved().await),
+        d2n(new_unresolved().await, InstanceState::New),
         // New !-> {Resolved, New}.
         n2r(InstanceState::New, new_resolved().await),
         n2n(InstanceState::New, InstanceState::New),

@@ -55,8 +55,8 @@ impl Receiver {
         Self { inner: Arc::new(Mutex::new(receiver.peekable())), sender }
     }
 
-    pub fn new_sender(&self, moniker: Moniker) -> Sender {
-        Sender { inner: self.sender.clone(), moniker }
+    pub fn new_sender(&self) -> Sender {
+        Sender { inner: self.sender.clone() }
     }
 
     pub async fn receive(&self) -> Message {

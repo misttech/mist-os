@@ -149,6 +149,15 @@ impl<const N: usize> BoundedName<N> {
     }
 }
 
+impl<const N: usize> TryFrom<FlyStr> for BoundedName<N> {
+    type Error = ParseError;
+
+    fn try_from(flystr: FlyStr) -> Result<Self, Self::Error> {
+        Self::validate(flystr.as_str())?;
+        Ok(Self(flystr))
+    }
+}
+
 impl<'a, const N: usize> From<&'a BoundedName<N>> for &'a FlyStr {
     fn from(o: &'a BoundedName<N>) -> Self {
         &o.0

@@ -3,117 +3,42 @@
 // found in the LICENSE file.
 
 use {
-    crate::builtin::capability::BuiltinCapability,
-    ::routing::capability_source::InternalCapability, anyhow::Error, async_trait::async_trait,
-    cm_types::Name, fidl_fuchsia_kernel as fkernel, fuchsia_runtime::job_default,
-    fuchsia_zircon as zx, futures::prelude::*, lazy_static::lazy_static, std::sync::Arc,
+    anyhow::Error, fidl_fuchsia_kernel as fkernel, fuchsia_runtime::job_default,
+    fuchsia_zircon as zx, futures::TryStreamExt,
 };
 
-lazy_static! {
-    pub static ref ROOT_JOB_CAPABILITY_NAME: Name = "fuchsia.kernel.RootJob".parse().unwrap();
-    pub static ref ROOT_JOB_FOR_INSPECT_CAPABILITY_NAME: Name =
-        "fuchsia.kernel.RootJobForInspect".parse().unwrap();
-}
-
 /// An implementation of the `fuchsia.kernel.RootJob` protocol.
-pub struct RootJob {
-    capability_name: &'static Name,
-    rights: zx::Rights,
-}
+pub struct RootJob;
 
 impl RootJob {
-    pub fn new(capability_name: &'static Name, rights: zx::Rights) -> Arc<Self> {
-        Arc::new(Self { capability_name, rights })
-    }
-}
-
-#[async_trait]
-impl BuiltinCapability for RootJob {
-    const NAME: &'static str = "RootJob";
-    type Marker = fkernel::RootJobMarker;
-
-    async fn serve(
-        self: Arc<Self>,
+    pub async fn serve(
         mut stream: fkernel::RootJobRequestStream,
+        rights: zx::Rights,
     ) -> Result<(), Error> {
         let job = job_default();
         while let Some(fkernel::RootJobRequest::Get { responder }) = stream.try_next().await? {
-            responder.send(job.duplicate(self.rights)?)?;
+            responder.send(job.duplicate(rights)?)?;
         }
         Ok(())
-    }
-
-    fn matches_routed_capability(&self, capability: &InternalCapability) -> bool {
-        capability.matches_protocol(self.capability_name)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            capability::CapabilitySource,
-            model::hooks::{Event, EventPayload, Hooks},
-        },
-        cm_util::TaskGroup,
-        fidl::endpoints::ClientEnd,
-        fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_zircon::sys,
-        fuchsia_zircon::AsHandleRef,
-        futures::lock::Mutex,
-        moniker::{Moniker, MonikerBase},
-        std::path::PathBuf,
-        std::sync::Weak,
-    };
+    use {super::*, fuchsia_async as fasync, fuchsia_zircon::AsHandleRef, futures::TryFutureExt};
 
     #[fuchsia::test]
     async fn has_correct_rights() -> Result<(), Error> {
-        let root_job = RootJob::new(&ROOT_JOB_CAPABILITY_NAME, zx::Rights::TRANSFER);
         let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fkernel::RootJobMarker>()?;
         fasync::Task::local(
-            root_job.serve(stream).unwrap_or_else(|err| panic!("Error serving root job: {}", err)),
+            RootJob::serve(stream, zx::Rights::TRANSFER)
+                .unwrap_or_else(|err| panic!("Error serving root job: {}", err)),
         )
         .detach();
 
         let root_job = proxy.get().await?;
         let info = zx::Handle::from(root_job).basic_info()?;
         assert_eq!(info.rights, zx::Rights::TRANSFER);
-        Ok(())
-    }
-
-    #[fuchsia::test]
-    async fn can_connect() -> Result<(), Error> {
-        let root_job = RootJob::new(&ROOT_JOB_CAPABILITY_NAME, zx::Rights::SAME_RIGHTS);
-        let hooks = Hooks::new();
-        hooks.install(root_job.hooks()).await;
-
-        let provider = Arc::new(Mutex::new(None));
-        let source = CapabilitySource::Builtin {
-            capability: InternalCapability::Protocol(ROOT_JOB_CAPABILITY_NAME.clone()),
-            top_instance: Weak::new(),
-        };
-
-        let event = Event::new_for_test(
-            Moniker::root(),
-            "fuchsia-pkg://root",
-            EventPayload::CapabilityRouted { source, capability_provider: provider.clone() },
-        );
-        hooks.dispatch(&event).await;
-
-        let (client, mut server) = zx::Channel::create();
-        let task_group = TaskGroup::new();
-        if let Some(provider) = provider.lock().await.take() {
-            provider
-                .open(task_group.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server)
-                .await?;
-        };
-
-        let client = ClientEnd::<fkernel::RootJobMarker>::new(client)
-            .into_proxy()
-            .expect("Failed to create proxy");
-        let handle = client.get().await?;
-        assert_ne!(handle.raw_handle(), sys::ZX_HANDLE_INVALID);
         Ok(())
     }
 }

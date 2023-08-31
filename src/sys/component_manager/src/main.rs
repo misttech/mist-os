@@ -40,6 +40,7 @@ mod framework;
 mod model;
 mod root_stop_notifier;
 mod runner;
+mod sandbox_util;
 mod startup;
 
 extern "C" {

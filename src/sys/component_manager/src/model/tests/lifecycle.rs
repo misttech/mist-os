@@ -17,6 +17,7 @@ use {
                 test_helpers::*, test_hook::TestHook,
             },
         },
+        sandbox_util::Sandbox,
     },
     ::routing::{config::AllowlistEntryBuilder, policy::PolicyError},
     assert_matches::assert_matches,
@@ -124,7 +125,7 @@ async fn bind_concurrent() {
     .await;
 
     // Start the root component.
-    model.start().await;
+    model.start(Sandbox::new()).await;
 
     // Attempt to start the "system" component
     let system_component = model.find(&vec!["system"].try_into().unwrap()).await.unwrap();
@@ -195,7 +196,7 @@ async fn bind_parent_then_child() {
     assert!(actual_children.is_empty());
     assert_matches!(
         *echo_component.lock_state().await,
-        InstanceState::New | InstanceState::Unresolved
+        InstanceState::New | InstanceState::Unresolved(_)
     );
     // Start echo.
     let m: Moniker = vec!["echo"].try_into().unwrap();
@@ -450,7 +451,7 @@ async fn bind_action_sequence() {
 
     // Child of root should start out discovered but not resolved yet.
     let m = Moniker::parse_str("/system").unwrap();
-    model.start().await;
+    model.start(Sandbox::new()).await;
     event_stream.wait_until(EventType::Resolved, vec![].try_into().unwrap()).await.unwrap();
     event_stream.wait_until(EventType::Discovered, m.clone()).await.unwrap();
     event_stream.wait_until(EventType::Started, vec![].try_into().unwrap()).await.unwrap();

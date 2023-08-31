@@ -41,6 +41,12 @@ pub struct Dict {
     not_found: UnboundedSender<Key>,
 }
 
+impl Default for Dict {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Dict {
     /// Creates an empty dictionary.
     pub fn new() -> Self {

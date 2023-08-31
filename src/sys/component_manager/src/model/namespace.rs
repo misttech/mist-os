@@ -22,8 +22,10 @@ use {
         endpoints::{create_endpoints, ClientEnd, ServerEnd},
         prelude::*,
     },
-    fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fuchsia_zircon::{self as zx, HandleBased},
     futures::future::BoxFuture,
+    sandbox::Message,
     std::{collections::HashMap, sync::Arc},
     tracing::{error, warn},
     vfs::{
@@ -291,6 +293,25 @@ fn add_service_or_protocol_use(
         };
         let target = component.clone();
         let task = async move {
+            if let UseDecl::Protocol(use_protocol_decl) = &use_ {
+                let name = &use_protocol_decl.source_name;
+                if let Ok(mut state) = target.lock_resolved_state().await {
+                    // The capability sandbox can be missing if we used a capability from our
+                    // parent but the parent did not offer this capability.
+                    if let Some(mut cap_sandbox) = state.program_sandbox.get_protocol_mut(name) {
+                        // The capability sandbox can be present but missing a sender if we're both
+                        // using from parent _and_ declaring a capability, but our parent didn't
+                        // offer the capability to us. In this case this capability sandbox will
+                        // only contain the receiver we declared.
+                        if cap_sandbox.get_sender().is_some() {
+                            let handle = server_end.into_channel().into_handle();
+                            let msg = Message::new(handle, flags, target.moniker.clone());
+                            cap_sandbox.send(msg).unwrap();
+                            return;
+                        }
+                    }
+                }
+            }
             let mut server_end = server_end.into_channel();
             let (route_request, open_options) = {
                 match &use_ {

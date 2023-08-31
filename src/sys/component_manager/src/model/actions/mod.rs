@@ -54,7 +54,7 @@
 mod destroy;
 mod destroy_child;
 mod discover;
-mod resolve;
+pub mod resolve;
 pub mod shutdown;
 pub mod start;
 mod stop;
@@ -121,6 +121,8 @@ pub enum ActionKey {
 /// Each action is mapped to a future that returns when the action is complete.
 pub struct ActionSet {
     rep: HashMap<ActionKey, Box<dyn Any + Send + Sync>>,
+    history: Vec<ActionKey>,
+    passive_waiters: HashMap<ActionKey, Vec<oneshot::Sender<()>>>,
 }
 
 /// A future bound to a particular action that completes when that action completes.
@@ -191,7 +193,7 @@ where
 
 impl ActionSet {
     pub fn new() -> Self {
-        ActionSet { rep: HashMap::new() }
+        ActionSet { rep: HashMap::new(), history: vec![], passive_waiters: HashMap::new() }
     }
 
     pub fn contains(&self, key: &ActionKey) -> bool {
@@ -210,6 +212,21 @@ impl ActionSet {
     #[cfg(test)]
     pub fn remove_notifier(&mut self, key: ActionKey) {
         self.rep.remove(&key).expect("No notifier found with that key");
+    }
+
+    /// Returns a oneshot receiver that will receive a message once the component has finished
+    /// performing an action with the given key. The oneshot will receive a message immediately if
+    /// the component has ever finished such an action. Does not cause any new actions to be
+    /// started.
+    pub fn wait_for_action(&mut self, action_key: ActionKey) -> oneshot::Receiver<()> {
+        let (sender, receiver) = oneshot::channel();
+        if self.history.contains(&action_key) {
+            sender.send(()).unwrap();
+            receiver
+        } else {
+            self.passive_waiters.entry(action_key).or_insert(vec![]).push(sender);
+            receiver
+        }
     }
 
     /// Registers an action in the set, returning when the action is finished (which may represent
@@ -266,6 +283,10 @@ impl ActionSet {
     async fn finish<'a>(component: &Arc<ComponentInstance>, key: &'a ActionKey) {
         let mut action_set = component.lock_actions().await;
         action_set.rep.remove(key);
+        action_set.history.push(key.clone());
+        for sender in action_set.passive_waiters.entry(key.clone()).or_insert(vec![]).drain(..) {
+            let _ = sender.send(());
+        }
     }
 
     /// Registers, but does not execute, an action.
@@ -324,7 +345,7 @@ impl ActionSet {
             }
             .boxed(),
         );
-        self.rep.insert(key, Box::new(notifier.clone()));
+        self.rep.insert(key.clone(), Box::new(notifier.clone()));
         (Some(task), notifier)
     }
 
@@ -489,7 +510,7 @@ pub(crate) mod test_utils {
                 None => false,
             },
             InstanceState::Destroyed => false,
-            InstanceState::New | InstanceState::Unresolved => {
+            InstanceState::New | InstanceState::Unresolved(_) => {
                 panic!("not resolved")
             }
         }
@@ -510,13 +531,13 @@ pub(crate) mod test_utils {
 
     pub async fn is_discovered(component: &ComponentInstance) -> bool {
         let state = component.lock_state().await;
-        matches!(*state, InstanceState::Unresolved)
+        matches!(*state, InstanceState::Unresolved(_))
     }
 
     pub async fn is_unresolved(component: &ComponentInstance) -> bool {
         let state = component.lock_state().await;
         let execution = component.lock_execution().await;
         execution.runtime.is_none()
-            && matches!(*state, InstanceState::New | InstanceState::Unresolved)
+            && matches!(*state, InstanceState::New | InstanceState::Unresolved(_))
     }
 }

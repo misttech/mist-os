@@ -287,7 +287,7 @@ impl EventRegistry {
         let decl = {
             let state = component.lock_state().await;
             match *state {
-                InstanceState::New | InstanceState::Unresolved => {
+                InstanceState::New | InstanceState::Unresolved(_) => {
                     // This should never happen. By this point,
                     // we've validated that the instance state should
                     // be resolved because we're routing events to it.

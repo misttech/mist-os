@@ -342,6 +342,7 @@ impl TestEnvironmentBuilder {
                 .await
                 .expect("builtin environment setup failed"),
         ));
+        builtin_environment.lock().await.discover_root_component().await;
         let model = builtin_environment.lock().await.model.clone();
 
         model.root().hooks.install(self.hooks).await;

@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+pub mod sandbox_construction;
+
 use {
     crate::model::{
-        actions::{Action, ActionKey, ActionSet, DiscoverAction},
+        actions::{Action, ActionKey},
         component::{
             Component, ComponentInstance, InstanceState, ResolvedInstanceState,
             WeakComponentInstance,
@@ -16,7 +18,8 @@ use {
     ::routing::{component_instance::ComponentInstanceInterface, resolving::ComponentAddress},
     async_trait::async_trait,
     cm_util::io::clone_dir,
-    std::sync::Arc,
+    sandbox_construction::build_component_sandboxes,
+    std::{ops::DerefMut, sync::Arc},
 };
 
 /// Resolves a component instance's declaration and initializes its state.
@@ -49,7 +52,13 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Res
         }
     }
     // Ensure `Resolved` is dispatched after `Discovered`.
-    ActionSet::register(component.clone(), DiscoverAction::new()).await?;
+    {
+        let discover_completed =
+            component.lock_actions().await.wait_for_action(ActionKey::Discover);
+        discover_completed.await.unwrap();
+    }
+    // Let's comment it out and see what happens. Fingers crossed this was superfluous. There's a
+    // panic right below this that should catch if we're undiscovered.
     let result = async move {
         let first_resolve = {
             let state = component.lock_state().await;
@@ -57,7 +66,7 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Res
                 InstanceState::New => {
                     panic!("Component should be at least discovered")
                 }
-                InstanceState::Unresolved => true,
+                InstanceState::Unresolved(_) => true,
                 InstanceState::Resolved(_) => false,
                 InstanceState::Destroyed => {
                     return Err(ResolveActionError::InstanceDestroyed {
@@ -88,17 +97,24 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Res
         if first_resolve {
             {
                 let mut state = component.lock_state().await;
-                match *state {
+                let sandbox_from_parent = match state.deref_mut() {
                     InstanceState::Resolved(_) => {
                         panic!("Component was marked Resolved during Resolve action?");
+                    }
+                    InstanceState::New => {
+                        panic!("Component was not marked Discovered before Resolve action?");
                     }
                     InstanceState::Destroyed => {
                         return Err(ResolveActionError::InstanceDestroyed {
                             moniker: component.moniker.clone(),
                         });
                     }
-                    InstanceState::New | InstanceState::Unresolved => {}
-                }
+                    InstanceState::Unresolved(unresolved_state) => {
+                        unresolved_state.sandbox_from_parent.clone()
+                    }
+                };
+                let component_sandboxes =
+                    build_component_sandboxes(&component_info.decl, sandbox_from_parent).await;
                 state.set(InstanceState::Resolved(
                     ResolvedInstanceState::new(
                         component,
@@ -107,6 +123,7 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Res
                         component_info.config.clone(),
                         component_address,
                         component_info.context_to_resolve_children.clone(),
+                        component_sandboxes,
                     )
                     .await?,
                 ));

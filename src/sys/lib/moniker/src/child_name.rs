@@ -4,6 +4,7 @@
 
 use {
     crate::error::MonikerError,
+    cm_rust,
     cm_types::{LongName, Name},
     core::cmp::{Ord, Ordering},
     std::fmt,
@@ -85,6 +86,14 @@ impl TryFrom<&str> for ChildName {
 
     fn try_from(rep: &str) -> Result<Self, MonikerError> {
         ChildName::parse(rep)
+    }
+}
+
+impl TryFrom<cm_rust::ChildRef> for ChildName {
+    type Error = cm_types::ParseError;
+
+    fn try_from(child_ref: cm_rust::ChildRef) -> Result<Self, Self::Error> {
+        Ok(Self { name: child_ref.name.try_into()?, collection: child_ref.collection })
     }
 }
 

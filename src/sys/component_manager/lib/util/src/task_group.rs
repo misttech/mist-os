@@ -5,7 +5,7 @@
 use {
     fuchsia_async as fasync,
     futures::{lock::Mutex, Future},
-    std::sync::Arc,
+    std::sync::{Arc, Weak},
 };
 
 /// A simple wrapper for `TaskGroup` that stores the `TaskGroup` in an `Arc` so it can be passed
@@ -18,6 +18,11 @@ pub struct TaskGroup {
 impl TaskGroup {
     pub fn new() -> Self {
         Self { task_group: Arc::new(Mutex::new(Some(fasync::TaskGroup::new()))) }
+    }
+
+    /// Creates a new WeakTaskGroup from this group.
+    pub fn as_weak(&self) -> WeakTaskGroup {
+        WeakTaskGroup { task_group: Arc::downgrade(&self.task_group) }
     }
 
     /// Spawns a new task in this TaskGroup.
@@ -42,6 +47,26 @@ impl TaskGroup {
         if let Some(task_group) = task_group_lock.take() {
             drop(task_group_lock);
             task_group.join().await;
+        }
+    }
+}
+
+/// Holds a weak reference to the internal `TaskGroup`, and can spawn futures on it as long as the
+/// reference is still valid. If a task group is to hold a future that wants to spawn other tasks
+/// on the same group, this future should hold a WeakTaskGroup so that there is no reference cycle
+/// between the task group and tasks on the task group.
+#[derive(Debug, Clone)]
+pub struct WeakTaskGroup {
+    task_group: Weak<Mutex<Option<fasync::TaskGroup>>>,
+}
+
+impl WeakTaskGroup {
+    /// Adds a task to the group this WeakTaskGroup was created from. The task is dropped if there
+    /// are no more strong references to the original task group.
+    pub async fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) {
+        if let Some(task_group) = self.task_group.upgrade() {
+            let temp_task_group = TaskGroup { task_group };
+            temp_task_group.spawn(future).await;
         }
     }
 }

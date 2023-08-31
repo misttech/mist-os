@@ -200,11 +200,15 @@ pub fn read_and_validate_config_values(
 mod tests {
     use {
         super::*,
-        crate::model::{
-            component::{ComponentInstance, ComponentManagerInstance, WeakExtendedInstance},
-            context::ModelContext,
-            environment::Environment,
-            hooks::Hooks,
+        crate::{
+            model::{
+                actions::DiscoverAction,
+                component::{ComponentInstance, ComponentManagerInstance, WeakExtendedInstance},
+                context::ModelContext,
+                environment::Environment,
+                hooks::Hooks,
+            },
+            sandbox_util::Sandbox,
         },
         anyhow::{format_err, Error},
         assert_matches::assert_matches,
@@ -334,6 +338,58 @@ mod tests {
         }
     }
 
+    async fn new_root_discovered_component(
+        environment: Environment,
+        context: Arc<ModelContext>,
+        component_manager_instance: Weak<ComponentManagerInstance>,
+        component_url: String,
+    ) -> Arc<ComponentInstance> {
+        let component = ComponentInstance::new_root(
+            environment,
+            context,
+            component_manager_instance,
+            component_url,
+        );
+        // We don't care about waiting for the discover action to complete, just that it's started.
+        let _ = component
+            .lock_actions()
+            .await
+            .register_no_wait(&component, DiscoverAction::new(Sandbox::new()));
+        component
+    }
+
+    async fn new_discovered_component(
+        environment: Arc<Environment>,
+        instanced_moniker: InstancedMoniker,
+        component_url: String,
+        startup: fdecl::StartupMode,
+        on_terminate: fdecl::OnTerminate,
+        config_parent_overrides: Option<Vec<cm_rust::ConfigOverride>>,
+        context: Arc<ModelContext>,
+        parent: WeakExtendedInstance,
+        hooks: Arc<Hooks>,
+        persistent_storage: bool,
+    ) -> Arc<ComponentInstance> {
+        let component = ComponentInstance::new(
+            environment,
+            instanced_moniker,
+            component_url,
+            startup,
+            on_terminate,
+            config_parent_overrides,
+            context,
+            parent,
+            hooks,
+            persistent_storage,
+        );
+        // We don't care about waiting for the discover action to complete, just that it's started.
+        let _ = component
+            .lock_actions()
+            .await
+            .register_no_wait(&component, DiscoverAction::new(Sandbox::new()));
+        component
+    }
+
     #[fuchsia_async::run_until_stalled(test)]
     async fn register_and_resolve() {
         let mut registry = ResolverRegistry::new();
@@ -354,12 +410,13 @@ mod tests {
             }),
         );
 
-        let root = ComponentInstance::new_root(
+        let root = new_root_discovered_component(
             Environment::empty(),
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-boot:///#meta/root.cm".to_string(),
-        );
+        )
+        .await;
 
         // Resolve known scheme that returns success.
         let component = registry
@@ -559,12 +616,13 @@ mod tests {
             ResolverRegistry::new(),
             DebugRegistry::default(),
         );
-        let root = ComponentInstance::new_root(
+        let root = new_root_discovered_component(
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/package#meta/comp.cm".to_string(),
-        );
+        )
+        .await;
 
         let abs =
             ComponentAddress::from("fuchsia-pkg://fuchsia.com/package#meta/comp.cm", &root).await?;
@@ -603,13 +661,14 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let root = ComponentInstance::new_root(
+        let root = new_root_discovered_component(
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/package#meta/comp.cm".to_string(),
-        );
-        let child = ComponentInstance::new(
+        )
+        .await;
+        let child = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0")?,
             "subpackage#meta/subcomp.cm".to_string(),
@@ -620,7 +679,8 @@ mod tests {
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
             false,
-        );
+        )
+        .await;
 
         let relpath = ComponentAddress::from("subpackage#meta/subcomp.cm", &child).await?;
         assert_matches!(relpath, ComponentAddress::RelativePath { .. });
@@ -674,13 +734,14 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let root = ComponentInstance::new_root(
+        let root = new_root_discovered_component(
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-boot:///package#meta/comp.cm".to_string(),
-        );
-        let child = ComponentInstance::new(
+        )
+        .await;
+        let child = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0")?,
             "subpackage#meta/subcomp.cm".to_string(),
@@ -691,7 +752,8 @@ mod tests {
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
             false,
-        );
+        )
+        .await;
 
         let relpath = ComponentAddress::from("subpackage#meta/subcomp.cm", &child).await?;
         assert_matches!(relpath, ComponentAddress::RelativePath { .. });
@@ -733,13 +795,14 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let root = ComponentInstance::new_root(
+        let root = new_root_discovered_component(
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "cast:00000000/package#meta/comp.cm".to_string(),
-        );
-        let child = ComponentInstance::new(
+        )
+        .await;
+        let child = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0")?,
             "subpackage#meta/subcomp.cm".to_string(),
@@ -750,7 +813,8 @@ mod tests {
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
             false,
-        );
+        )
+        .await;
 
         let relpath = ComponentAddress::from("subpackage#meta/subcomp.cm", &child).await?;
         assert_matches!(relpath, ComponentAddress::RelativePath { .. });
@@ -791,14 +855,15 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let root = ComponentInstance::new_root(
+        let root = new_root_discovered_component(
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm".to_string(),
-        );
+        )
+        .await;
 
-        let child = ComponentInstance::new(
+        let child = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0")?,
             "#meta/my-child.cm".to_string(),
@@ -809,7 +874,8 @@ mod tests {
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
             false,
-        );
+        )
+        .await;
 
         let resolved = child
             .environment
@@ -855,14 +921,15 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let root = ComponentInstance::new_root(
+        let root = new_root_discovered_component(
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm".to_string(),
-        );
+        )
+        .await;
 
-        let child_one = ComponentInstance::new(
+        let child_one = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0")?,
             "#meta/my-child.cm".to_string(),
@@ -873,9 +940,10 @@ mod tests {
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
             false,
-        );
+        )
+        .await;
 
-        let child_two = ComponentInstance::new(
+        let child_two = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0")?,
             "#meta/my-child2.cm".to_string(),
@@ -886,7 +954,8 @@ mod tests {
             WeakExtendedInstance::Component(WeakComponentInstance::from(&child_one)),
             Arc::new(Hooks::new()),
             false,
-        );
+        )
+        .await;
 
         let resolved = child_two
             .environment
@@ -926,14 +995,15 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let root = ComponentInstance::new_root(
+        let root = new_root_discovered_component(
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-boot:///#meta/my-root.cm".to_string(),
-        );
+        )
+        .await;
 
-        let child = ComponentInstance::new(
+        let child = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0")?,
             "#meta/my-child.cm".to_string(),
@@ -944,7 +1014,8 @@ mod tests {
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
             false,
-        );
+        )
+        .await;
 
         let resolved = child
             .environment
@@ -984,14 +1055,15 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let root = ComponentInstance::new_root(
+        let root = new_root_discovered_component(
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "cast:00000000#meta/my-root.cm".to_string(),
-        );
+        )
+        .await;
 
-        let child = ComponentInstance::new(
+        let child = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0")?,
             "#meta/my-child.cm".to_string(),
@@ -1002,7 +1074,8 @@ mod tests {
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
             false,
-        );
+        )
+        .await;
 
         let resolved = child
             .environment
@@ -1025,14 +1098,15 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let root = ComponentInstance::new_root(
+        let root = new_root_discovered_component(
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "#meta/my-root.cm".to_string(),
-        );
+        )
+        .await;
 
-        let child = ComponentInstance::new(
+        let child = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0")?,
             "#meta/my-child.cm".to_string(),
@@ -1043,7 +1117,8 @@ mod tests {
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
             false,
-        );
+        )
+        .await;
 
         let result = ComponentAddress::from(&child.component_url, &child).await;
         assert_matches!(result, Err(ResolverError::Internal(..)));
@@ -1083,14 +1158,15 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let root = ComponentInstance::new_root(
+        let root = new_root_discovered_component(
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm".to_string(),
-        );
+        )
+        .await;
 
-        let child_one = ComponentInstance::new(
+        let child_one = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0")?,
             "my-subpackage#meta/my-child.cm".to_string(),
@@ -1101,9 +1177,10 @@ mod tests {
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
             false,
-        );
+        )
+        .await;
 
-        let child_two = ComponentInstance::new(
+        let child_two = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0/child2:0")?,
             "#meta/my-child2.cm".to_string(),
@@ -1114,7 +1191,8 @@ mod tests {
             WeakExtendedInstance::Component(WeakComponentInstance::from(&child_one)),
             Arc::new(Hooks::new()),
             false,
-        );
+        )
+        .await;
 
         let resolved = child_two
             .environment
@@ -1164,14 +1242,15 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let root = ComponentInstance::new_root(
+        let root = new_root_discovered_component(
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm".to_string(),
-        );
+        )
+        .await;
 
-        let child_one = ComponentInstance::new(
+        let child_one = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0")?,
             "my-subpackage#meta/my-child.cm".to_string(),
@@ -1182,9 +1261,10 @@ mod tests {
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
             false,
-        );
+        )
+        .await;
 
-        let child_two = ComponentInstance::new(
+        let child_two = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0/child2:0")?,
             "#meta/my-child2.cm".to_string(),
@@ -1195,9 +1275,10 @@ mod tests {
             WeakExtendedInstance::Component(WeakComponentInstance::from(&child_one)),
             Arc::new(Hooks::new()),
             false,
-        );
+        )
+        .await;
 
-        let child_three = ComponentInstance::new(
+        let child_three = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/child:0/child2:0/child3:0")?,
             "#meta/my-child3.cm".to_string(),
@@ -1208,7 +1289,8 @@ mod tests {
             WeakExtendedInstance::Component(WeakComponentInstance::from(&child_two)),
             Arc::new(Hooks::new()),
             false,
-        );
+        )
+        .await;
 
         let resolved = child_three
             .environment
@@ -1271,14 +1353,15 @@ mod tests {
             DebugRegistry::default(),
         );
 
-        let root = ComponentInstance::new_root(
+        let root = new_root_discovered_component(
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm".to_string(),
-        );
+        )
+        .await;
 
-        let realm = ComponentInstance::new(
+        let realm = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/realm:0/child:0")?,
             "realm-builder://0/my-realm".to_string(),
@@ -1289,9 +1372,10 @@ mod tests {
             WeakExtendedInstance::Component(WeakComponentInstance::from(&root)),
             Arc::new(Hooks::new()),
             false,
-        );
+        )
+        .await;
 
-        let child_one = ComponentInstance::new(
+        let child_one = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/realm:0/child:0")?,
             "my-subpackage1#meta/sub1.cm".to_string(),
@@ -1302,9 +1386,10 @@ mod tests {
             WeakExtendedInstance::Component(WeakComponentInstance::from(&realm)),
             Arc::new(Hooks::new()),
             false,
-        );
+        )
+        .await;
 
-        let child_two = ComponentInstance::new(
+        let child_two = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/realm:0/child:0/child2:0")?,
             "#meta/sub1-child.cm".to_string(),
@@ -1315,9 +1400,10 @@ mod tests {
             WeakExtendedInstance::Component(WeakComponentInstance::from(&child_one)),
             Arc::new(Hooks::new()),
             false,
-        );
+        )
+        .await;
 
-        let child_three = ComponentInstance::new(
+        let child_three = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/realm:0/child:0/child2:0/child3:0")?,
             "my-subpackage2#meta/sub2.cm".to_string(),
@@ -1328,9 +1414,10 @@ mod tests {
             WeakExtendedInstance::Component(WeakComponentInstance::from(&child_two)),
             Arc::new(Hooks::new()),
             false,
-        );
+        )
+        .await;
 
-        let child_four = ComponentInstance::new(
+        let child_four = new_discovered_component(
             root.environment.clone(),
             InstancedMoniker::parse_str("/root:0/realm:0/child:0/child2:0/child3:0/child4:0")?,
             "#meta/sub2-child.cm".to_string(),
@@ -1341,7 +1428,8 @@ mod tests {
             WeakExtendedInstance::Component(WeakComponentInstance::from(&child_three)),
             Arc::new(Hooks::new()),
             false,
-        );
+        )
+        .await;
 
         let resolved = child_four
             .environment

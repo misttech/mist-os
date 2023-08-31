@@ -22,6 +22,7 @@ rustc_binary("bin") {
   deps = [
     ":measure_tape_for_events",
     ":measure_tape_for_instance",
+    "lib/sandbox",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
@@ -177,7 +178,8 @@ rustc_binary("bin") {
     "src/model/actions/destroy_child.rs",
     "src/model/actions/discover.rs",
     "src/model/actions/mod.rs",
-    "src/model/actions/resolve.rs",
+    "src/model/actions/resolve/mod.rs",
+    "src/model/actions/resolve/sandbox_construction.rs",
     "src/model/actions/shutdown.rs",
     "src/model/actions/start.rs",
     "src/model/actions/stop.rs",
@@ -233,6 +235,7 @@ rustc_binary("bin") {
     "src/runner/builtin.rs",
     "src/runner/mod.rs",
     "src/runner/namespace.rs",
+    "src/sandbox_util.rs",
     "src/startup.rs",
   ]
 
