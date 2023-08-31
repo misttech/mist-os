@@ -30,7 +30,7 @@ using component_testing::Route;
 constexpr auto kViewProvider = "view-provider";
 
 // This test verifies that a11y manager can fulfill its responsibility to create
-// the accessibility view on behalf of the scene owner. `FlatlandSceneManager`
+// the accessibility view on behalf of the scene owner. `SceneManager`
 // will only attach a client view if the accessibility view is attached to the
 // display, so verifying that the client view renders is sufficient to guarantee
 // that the a11y manager behaves correctly.

@@ -42,7 +42,7 @@ use {
         mouse_injector_handler::MouseInjectorHandler,
         touch_injector_handler::TouchInjectorHandler,
     },
-    scene_management::{self, SceneManager},
+    scene_management::{self, SceneManagerTrait},
     std::collections::HashSet,
     std::iter::FromIterator,
     std::rc::Rc,
@@ -63,7 +63,7 @@ use {
 /// - `focus_chain_publisher`: Forwards focus chain changes to downstream watchers.
 /// - `light_sensor_configuration`: An optional configuration used for light sensor requests.
 pub async fn handle_input(
-    scene_manager: Arc<Mutex<dyn SceneManager>>,
+    scene_manager: Arc<Mutex<dyn SceneManagerTrait>>,
     input_device_registry_request_stream_receiver: futures::channel::mpsc::UnboundedReceiver<
         InputDeviceRegistryRequestStream,
     >,
@@ -203,7 +203,7 @@ pub async fn handle_input(
 }
 
 fn setup_pointer_injector_config_request_stream(
-    scene_manager: Arc<Mutex<dyn SceneManager>>,
+    scene_manager: Arc<Mutex<dyn SceneManagerTrait>>,
 ) -> SetupProxy {
     let (setup_proxy, setup_request_stream) = fidl::endpoints::create_proxy_and_stream::<
         fidl_fuchsia_ui_pointerinjector_configuration::SetupMarker,
@@ -219,7 +219,7 @@ fn setup_pointer_injector_config_request_stream(
 }
 
 async fn add_touchscreen_handler(
-    scene_manager: Arc<Mutex<dyn SceneManager>>,
+    scene_manager: Arc<Mutex<dyn SceneManagerTrait>>,
     mut assembly: InputPipelineAssembly,
     input_handlers_node: &inspect::Node,
     metrics_logger: metrics::MetricsLogger,
@@ -247,7 +247,7 @@ async fn add_touchscreen_handler(
 }
 
 async fn add_mouse_handler(
-    scene_manager: Arc<Mutex<dyn SceneManager>>,
+    scene_manager: Arc<Mutex<dyn SceneManagerTrait>>,
     mut assembly: InputPipelineAssembly,
     sender: futures::channel::mpsc::Sender<CursorMessage>,
     input_handlers_node: &inspect::Node,
@@ -310,7 +310,7 @@ async fn register_keyboard_related_input_handlers(
 /// Installs the handlers for mouse input.
 async fn register_mouse_related_input_handlers(
     assembly: InputPipelineAssembly,
-    scene_manager: Arc<Mutex<dyn SceneManager>>,
+    scene_manager: Arc<Mutex<dyn SceneManagerTrait>>,
     input_pipeline_node: &inspect::Node,
     input_handlers_node: &inspect::Node,
     metrics_logger: metrics::MetricsLogger,
@@ -377,7 +377,7 @@ async fn register_mouse_related_input_handlers(
 }
 
 async fn build_input_pipeline_assembly(
-    scene_manager: Arc<Mutex<dyn SceneManager>>,
+    scene_manager: Arc<Mutex<dyn SceneManagerTrait>>,
     icu_data_loader: icu_data::Loader,
     node: &inspect::Node,
     display_ownership_event: zx::Event,

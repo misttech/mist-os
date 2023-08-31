@@ -15,7 +15,7 @@ use {
     fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::lock::Mutex,
     futures::stream::TryStreamExt,
-    scene_management::SceneManager,
+    scene_management::SceneManagerTrait,
     std::sync::Arc,
     tracing::{error, info, warn},
 };
@@ -37,7 +37,7 @@ pub struct ColorTransformManager {
     // Used to set color correction on displays, as well as brightness.
     color_converter: fidl_color::ConverterProxy,
 
-    scene_manager: Arc<Mutex<dyn SceneManager>>,
+    scene_manager: Arc<Mutex<dyn SceneManagerTrait>>,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -71,7 +71,7 @@ impl ColorTransformState {
 impl ColorTransformManager {
     pub fn new(
         color_converter: fidl_color::ConverterProxy,
-        scene_manager: Arc<Mutex<dyn SceneManager>>,
+        scene_manager: Arc<Mutex<dyn SceneManagerTrait>>,
     ) -> Arc<Mutex<Self>> {
         Arc::new(Mutex::new(Self {
             current_color_transform: None,

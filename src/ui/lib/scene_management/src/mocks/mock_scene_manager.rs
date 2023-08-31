@@ -7,14 +7,14 @@ use {
     async_trait::async_trait,
     fidl_fuchsia_ui_app as ui_app, fidl_fuchsia_ui_views as ui_views,
     fidl_fuchsia_ui_views::ViewRef,
-    scene_management::{DisplayMetrics, InjectorViewportSubscriber, SceneManager, ViewportToken},
+    scene_management::{DisplayMetrics, InjectorViewportSubscriber, SceneManagerTrait},
     std::cell::Cell,
 };
 
 pub struct MockSceneManager {
     was_present_root_view_called: Cell<bool>,
     was_set_root_view_called: Cell<bool>,
-    set_root_view_viewport_token: Cell<Option<ViewportToken>>,
+    set_root_view_viewport_token: Cell<Option<ui_views::ViewportCreationToken>>,
     set_root_view_view_ref: Cell<Option<ViewRef>>,
 }
 
@@ -33,7 +33,9 @@ impl MockSceneManager {
         self.was_present_root_view_called.set(false);
     }
 
-    pub fn get_set_root_view_called_args(&self) -> (ViewportToken, Option<ui_views::ViewRef>) {
+    pub fn get_set_root_view_called_args(
+        &self,
+    ) -> (ui_views::ViewportCreationToken, Option<ui_views::ViewRef>) {
         assert!(self.was_set_root_view_called.get() == true);
         (
             self.set_root_view_viewport_token
@@ -46,18 +48,18 @@ impl MockSceneManager {
 
 #[async_trait]
 #[allow(unused_variables)]
-impl SceneManager for MockSceneManager {
+impl SceneManagerTrait for MockSceneManager {
     fn present_root_view(&self) {
         self.was_present_root_view_called.set(true);
     }
 
     async fn set_root_view(
         &mut self,
-        viewport_token: ViewportToken,
+        viewport_creation_token: ui_views::ViewportCreationToken,
         view_ref: Option<ui_views::ViewRef>,
     ) -> Result<(), Error> {
         self.was_set_root_view_called.set(true);
-        self.set_root_view_viewport_token.set(Some(viewport_token));
+        self.set_root_view_viewport_token.set(Some(viewport_creation_token));
         self.set_root_view_view_ref.set(view_ref);
         Ok(())
     }
@@ -68,35 +70,6 @@ impl SceneManager for MockSceneManager {
         &mut self,
         view_provider: ui_app::ViewProviderProxy,
     ) -> Result<ui_views::ViewRef, Error> {
-        unimplemented!()
-    }
-
-    fn request_focus(
-        &self,
-        view_ref: ui_views::ViewRef,
-    ) -> fidl::client::QueryResponseFut<ui_views::FocuserRequestFocusResult> {
-        unimplemented!()
-    }
-
-    async fn insert_a11y_view(
-        &mut self,
-        a11y_view_holder_token: ui_views::ViewHolderToken,
-    ) -> Result<ui_views::ViewHolderToken, Error> {
-        unimplemented!()
-    }
-
-    fn insert_a11y_view2(
-        &mut self,
-        a11y_viewport_creation_token: ui_views::ViewportCreationToken,
-    ) -> Result<ui_views::ViewportCreationToken, Error> {
-        unimplemented!()
-    }
-
-    async fn set_camera_clip_space_transform(&mut self, x: f32, y: f32, scale: f32) {
-        unimplemented!()
-    }
-
-    async fn reset_camera_clip_space_transform(&mut self) {
         unimplemented!()
     }
 
