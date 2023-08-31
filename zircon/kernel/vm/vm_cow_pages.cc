@@ -1155,8 +1155,7 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_l
           DEBUG_ASSERT(page->object.get_object() == this);
           AssertHeld(lock_ref());
           AssertHeld(child.lock_ref());
-          DecrementResidentPagesLocked();
-          child.IncrementResidentPagesLocked();
+          TransferResidentPageLocked(&child);
 #endif
           pq->ChangeObjectOffsetLocked(page, &child, off);
         }
@@ -1240,8 +1239,7 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_l
               // Because the child exists in the same hierarchy, the lock will be the same.
               AssertHeld(lock_ref());
               AssertHeld(state.child->lock_ref());
-              DecrementResidentPagesLocked();
-              state.child->IncrementResidentPagesLocked();
+              TransferResidentPageLocked(state.child);
 #endif
               state.pq->ChangeObjectOffset(page_or_marker->Page(), state.child,
                                            offset - state.merge_start_offset);

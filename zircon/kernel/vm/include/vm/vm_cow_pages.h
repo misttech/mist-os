@@ -599,6 +599,20 @@ class VmCowPages final : public VmHierarchyBase,
       attribution_object_->RemovePages(1, shared_);
     }
   }
+
+  // Equivalent to DecrementResidentPagesLocked() followed by dest->IncrementResidentPagesLocked(),
+  // except that, if the source and the destination VmCowPages are tied to the same attribution
+  // object, it skips updating its counters.
+  void TransferResidentPageLocked(VmCowPages* dest) TA_REQ(lock(), dest->lock()) {
+    DEBUG_ASSERT(resident_pages_ > 0);
+    if (attribution_object_ != dest->attribution_object_) {
+      DecrementResidentPagesLocked();
+      dest->IncrementResidentPagesLocked();
+    } else {
+      --resident_pages_;
+      ++dest->resident_pages_;
+    }
+  }
 #endif
 
  private:
