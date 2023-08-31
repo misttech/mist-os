@@ -66,9 +66,6 @@ ffx_subtool_fidl_allowlist = [
   # used by ffx profile memory
   "//sdk/fidl/fuchsia.memory:fuchsia.memory",
 
-  # used by ffx profile heapdump
-  "//sdk/fidl/fuchsia.memory.heapdump.client:fuchsia.memory.heapdump.client",
-
   # used by ffx net
   "//sdk/fidl/fuchsia.net.debug:fuchsia.net.debug",
   "//sdk/fidl/fuchsia.net.dhcp:fuchsia.net.dhcp",
@@ -120,16 +117,6 @@ ffx_subtool_fidl_allowlist = [
   # used by ffx guest
   "//sdk/fidl/fuchsia.virtualization:fuchsia.virtualization",
   "//sdk/fidl/fuchsia.wayland:fuchsia.wayland",
-
-  # used by ffx wlan
-  "//sdk/fidl/fuchsia.wlan.common.security:fuchsia.wlan.common.security",
-  "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service",
-  "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal",
-  "//sdk/fidl/fuchsia.wlan.mesh:fuchsia.wlan.mesh",
-  "//sdk/fidl/fuchsia.wlan.minstrel:fuchsia.wlan.minstrel",
-  "//sdk/fidl/fuchsia.wlan.mlme:fuchsia.wlan.mlme",
-  "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme",
-  "//sdk/fidl/fuchsia.wlan.stats:fuchsia.wlan.stats",
 
   # used by ffx net-test-realm
   "//src/connectivity/network/testing/network-test-realm/fidl:fuchsia.net.test.realm",
