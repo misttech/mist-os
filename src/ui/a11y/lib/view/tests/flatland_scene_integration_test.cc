@@ -16,7 +16,7 @@
 
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/ui/testing/ui_test_manager/ui_test_manager.h"
-#include "src/ui/testing/util/flatland_test_view.h"
+#include "src/ui/testing/util/test_view.h"
 
 namespace accessibility_test {
 namespace {
@@ -54,10 +54,10 @@ class AccessibilitySceneTest
     FX_LOGS(INFO) << "AccessibilitySceneTest: Building realm";
     realm_ = ui_test_manager_->AddSubrealm();
 
-    test_view_access_ = std::make_unique<ui_testing::FlatlandTestViewAccess>();
+    test_view_access_ = std::make_unique<ui_testing::TestViewAccess>();
     // Add a test view provider.
     realm_->AddLocalChild(kViewProvider, [d = dispatcher(), a = test_view_access_]() {
-      return std::make_unique<ui_testing::FlatlandTestView>(
+      return std::make_unique<ui_testing::TestView>(
           d, /* content = */ ui_testing::TestView::ContentType::DEFAULT, a);
     });
     realm_->AddRoute(Route{.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},

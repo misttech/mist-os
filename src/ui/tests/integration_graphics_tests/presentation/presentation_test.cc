@@ -16,7 +16,7 @@
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/ui/testing/ui_test_manager/ui_test_manager.h"
 #include "src/ui/testing/ui_test_realm/ui_test_realm.h"
-#include "src/ui/testing/util/flatland_test_view.h"
+#include "src/ui/testing/util/test_view.h"
 
 namespace integration_tests {
 
@@ -56,7 +56,7 @@ class PresentationTest : public gtest::RealLoopFixture {
     // Add a test view provider.
     component_testing::LocalComponentFactory test_view = [d = dispatcher(),
                                                           a = test_view_access_]() {
-      return std::make_unique<ui_testing::FlatlandTestView>(
+      return std::make_unique<ui_testing::TestView>(
           d, /* content = */ ui_testing::TestView::ContentType::COORDINATE_GRID, a);
     };
 

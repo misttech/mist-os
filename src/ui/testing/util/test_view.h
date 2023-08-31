@@ -6,6 +6,7 @@
 #define SRC_UI_TESTING_UTIL_TEST_VIEW_H_
 
 #include <fuchsia/ui/app/cpp/fidl.h>
+#include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/views/cpp/fidl.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
@@ -19,8 +20,6 @@
 namespace ui_testing {
 
 class TestView;
-
-class FlatlandTestView;
 
 // Used to open up access to TestView internals, since LocalComponentImpl (and thus TestView) is not
 // accessible directly to the test fixture.
@@ -38,15 +37,8 @@ class TestViewAccess {
   // Since view component creation may be lazy, check first whether HasView()
   // returns true before calling this.
   TestView* view() const {
-    FX_CHECK(test_view_.get() != nullptr) << "Use HasView() here first";
+    FX_CHECK(HasView());
     return test_view_.get();
-  }
-
-  // Allows access to the view as a Flatland view. Not elegant, but easy to do,
-  // and should be OK for test code.
-  virtual FlatlandTestView* flatland_view() const {
-    FX_CHECK(false) << "Not a flatland view";
-    return nullptr;
   }
 
  protected:
@@ -74,8 +66,8 @@ class TestView : public fuchsia::ui::app::ViewProvider,
     COORDINATE_GRID = 1,
   };
 
-  TestView(async_dispatcher_t* dispatcher, ContentType content_type,
-           std::weak_ptr<TestViewAccess> access)
+  explicit TestView(async_dispatcher_t* dispatcher, ContentType content_type,
+                    std::weak_ptr<TestViewAccess> access)
       : dispatcher_(dispatcher),
         content_type_(content_type),
         access_(std::move(access)),
@@ -92,18 +84,17 @@ class TestView : public fuchsia::ui::app::ViewProvider,
   const std::optional<fuchsia::ui::views::ViewRef>& view_ref() { return view_ref_; }
   std::optional<zx_koid_t> GetViewRefKoid();
 
-  // |fuchsia::ui::app::ViewProvider|
-  void CreateViewWithViewRef(zx::eventpair token,
-                             fuchsia::ui::views::ViewRefControl view_ref_control,
-                             fuchsia::ui::views::ViewRef view_ref) override;
-
   // |fuchsia.ui.app.ViewProvider|
   void CreateView2(fuchsia::ui::app::CreateView2Args args) override;
 
-  virtual uint32_t width() = 0;
-  virtual uint32_t height() = 0;
+  // Add a child view!
+  // The viewport will have side length of 1/4 our side length and will be centered in our view.
+  void NestChildView();
 
- protected:
+  uint32_t width();
+  uint32_t height();
+
+ private:
   // Helper methods to add content to the view.
   void DrawSimpleBackground();
   void DrawCoordinateGrid();
@@ -114,15 +105,40 @@ class TestView : public fuchsia::ui::app::ViewProvider,
   // (width, height) specifies the rect's dimensions.
   // (red, green, blue, alpha) specifies the color.
   virtual void DrawRectangle(int32_t x, int32_t y, int32_t z, uint32_t width, uint32_t height,
-                             uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha) = 0;
+                             uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha);
 
-  virtual void PresentChanges() = 0;
+  virtual void PresentChanges();
+  void ResizeChildViewport();
 
   async_dispatcher_t* dispatcher_ = nullptr;
   std::optional<ContentType> content_type_;
   std::weak_ptr<TestViewAccess> access_;
   fidl::BindingSet<fuchsia::ui::app::ViewProvider> view_provider_bindings_;
   std::optional<fuchsia::ui::views::ViewRef> view_ref_;
+
+  // Scene graph:
+  // root transform (id=1)
+  // --> rectangle holder transform (id=2)
+  //     --> ... (optional) rectangles (id=100, 101, 102, ...)
+  // --> (optional) child viewport transform (id=3) {content: child viewport id=4}
+  const uint64_t kRootTransformId = 1;
+  const uint64_t kRectangleHolderTransform = 2;
+  const uint64_t kChildViewportTransformId = 3;
+  const uint64_t kChildViewportContentId = 4;
+
+  // We'll keep incrementing this to get the next resource id (100, 101, 102, ...)
+  uint64_t next_resource_id_ = 100;
+  bool child_view_is_nested = false;
+
+  // Scenic session resources.
+  fuchsia::ui::composition::FlatlandPtr flatland_;
+
+  // Used to retrieve a11y view layout info. These should not change over the
+  // lifetime of the view.
+  fuchsia::ui::composition::ParentViewportWatcherPtr parent_watcher_;
+
+  std::optional<fuchsia::ui::composition::LayoutInfo> layout_info_;
+
   fxl::WeakPtrFactory<TestView> weak_ptr_factory_;  // Keep last.
 };
 
