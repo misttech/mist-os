@@ -47,6 +47,17 @@ pub trait Releasable {
     fn release(&self, c: Self::Context<'_>);
 }
 
+/// Releasing an option calls release if the option is not empty.
+impl<T: Releasable> Releasable for Option<T> {
+    type Context<'a> = T::Context<'a>;
+
+    fn release(&self, c: Self::Context<'_>) {
+        if let Some(v) = self {
+            v.release(c);
+        }
+    }
+}
+
 /// A wrapper a round a Releasable object that will check, in test and when assertion are enabled,
 /// that the value has been released before being dropped.
 #[must_use = "ReleaseGuard must be released"]
