@@ -282,7 +282,7 @@ declare_args() {
   #   create a hard link between the blob and the blob repository. Note that it
   #   is possible to modify the blob through the hard link, which would result
   #   in the blob not matching the blob's merkle.
-  repository_publish_blob_copy_mode = "copy"
+  repository_publish_blob_copy_mode = "hard-link"
 }
 
 # Publish package manifests to a repository.
