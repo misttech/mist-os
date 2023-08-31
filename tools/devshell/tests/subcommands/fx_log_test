@@ -33,15 +33,21 @@ BT_SET_UP() {
 }
 
 TEST_log_raw() {
-  BT_EXPECT ${fx} log --raw
+  BT_EXPECT ${fx} log --legacy --raw
   BT_EXPECT_FILE_DOES_NOT_EXIST "${ffx}.mock_state" \
     "ffx should not have been called when using fx log --raw"
 }
 
 TEST_log() {
-  BT_EXPECT ${fx} log
+  BT_EXPECT ${fx} log --legacy
   source "${ffx}.mock_state"
   BT_EXPECT_STRING_CONTAINS_SUBSTRING "${BT_MOCK_ARGS[@]}" "debug symbolize"
+}
+
+TEST_log() {
+  BT_EXPECT ${fx} log --flag1 --flag2
+  source "${ffx}.mock_state"
+  BT_EXPECT_STRING_CONTAINS_SUBSTRING "${BT_MOCK_ARGS[@]}" "log --flag1 --flag2"
 }
 
 BT_RUN_TESTS "$@"
