@@ -14,10 +14,10 @@ import("//zircon/kernel/phys/test/turducken_zbi_test.gni")
 import("//zircon/kernel/phys/zbi_executable.gni")
 
 group("boot-shim") {
-  deps = [
-    ":efi-boot-shim",
-    ":zbi-boot-shim",
-  ]
+  deps = [ ":zbi-boot-shim" ]
+  if (current_cpu != "riscv64") {  # TODO(mcgrathr): EFI not there yet
+    deps += [ ":efi-boot-shim" ]
+  }
   if (current_cpu == "x64") {
     deps += [ "//zircon/kernel/arch/x86/phys/boot-shim" ]
   }
