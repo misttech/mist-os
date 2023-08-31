@@ -363,7 +363,9 @@ impl Waiter {
         let waiter_impl = Arc::downgrade(&self.inner);
         Ok(HandleWaitCanceler::new(move |handle_ref| {
             if let Some(waiter_impl) = waiter_impl.upgrade() {
-                waiter_impl.port.cancel(&handle_ref, key.raw).is_ok()
+                let cancelled = waiter_impl.port.cancel(&handle_ref, key.raw).is_ok();
+                waiter_impl.key_map.lock().remove(&key);
+                cancelled
             } else {
                 false
             }
@@ -554,6 +556,11 @@ impl WaitQueue {
         WaitCanceler::new(move || {
             let mut cancelled = false;
             if let Some(strong_self) = weak_self.upgrade() {
+                waiter.access(|waiter| {
+                    if let Some(waiter) = waiter {
+                        waiter.key_map.lock().remove(&key);
+                    }
+                });
                 // TODO(steveaustin) Maybe make waiters a map to avoid linear search
                 Self::filter_waiters(&mut strong_self.waiters.lock(), |entry| {
                     if entry.waiter.0.as_ptr() == waiter.0.as_ptr() && entry.key == key {
