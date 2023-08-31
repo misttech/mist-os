@@ -28,7 +28,7 @@ group("tests") {
 
   if (current_cpu == "riscv64") {
     deps -= [
-      # TODO(fxbug.dev/132944): Remove when `LibFuzzerRunnerTest.MinimizeNewError`
+      # TODO(fxbug.dev/297220809): Remove when `LibFuzzerRunnerTest.MinimizeNewError`
       # does not time out on RISC-V.
       "libfuzzer:tests",
     ]

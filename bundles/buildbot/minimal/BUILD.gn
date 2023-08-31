@@ -96,7 +96,7 @@ group("minimal") {
       # TODO(fxbug.dev/128614): Remove once cpuperf_provider supports RISC-V.
       "//src/performance:tests",
 
-      # TODO(fxbug.dev/132939): Remove when storage tests pass on RISC-V.
+      # TODO(fxbug.dev/297201368): Remove when storage tests pass on RISC-V.
       "//src/storage:tests",
     ]
 
