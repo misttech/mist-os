@@ -4,7 +4,7 @@
 
 use std::{collections::HashMap, fs::File, io::Cursor};
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use argh::FromArgs;
 use camino::{Utf8Path, Utf8PathBuf};
 use ext4_extract::ext4_extract;
@@ -47,6 +47,10 @@ struct Command {
     /// path to a depfile to write.
     #[argh(option)]
     depfile: Option<Utf8PathBuf>,
+
+    /// path to fstab, will go in /odm which overrides the one in /vendor
+    #[argh(option)]
+    fstab: Option<Utf8PathBuf>,
 }
 
 fn main() -> Result<()> {
@@ -186,6 +190,21 @@ fn generate(cmd: Command) -> Result<()> {
         }
     }
 
+    // Add the fstab.
+    if let Some(fstab) = cmd.fstab {
+        if let Some(file_name) = fstab.file_name() {
+            match (fstab.file_stem(), fstab.extension()) {
+                (Some("fstab"), Some(_)) => {}
+                _ => bail!("fstab must be named \"fstab.<ro.hardware>\""),
+            }
+            let mut fstab_file =
+                File::open(&fstab).with_context(|| format!("opening fstab from {fstab:?}"))?;
+            odm_writer
+                .add_file(&["etc", file_name], &mut fstab_file)
+                .with_context(|| format!("adding fstab to odm"))?;
+        }
+    }
+
     // Put all the ODM files into the container.
     let odm_files = odm_writer.inner.export().context("Exporting ODM files")?;
     for (dst, src) in &odm_files {
@@ -263,6 +282,7 @@ mod tests {
             vendor: Some(Utf8PathBuf::from_str(EXT4_IMAGE_PATH).unwrap()),
             hal: vec![hal_manifest_path],
             depfile: None,
+            fstab: None,
         };
         generate(cmd).unwrap();
 
@@ -321,6 +341,7 @@ mod tests {
             hal: vec![hal_manifest_path],
             depfile: None,
             vendor: None,
+            fstab: None,
         };
         generate(cmd).unwrap();
 
@@ -393,6 +414,7 @@ mod tests {
             hal: vec![hal_manifest_path],
             depfile: None,
             vendor: None,
+            fstab: None,
         };
         generate(cmd).unwrap();
 
@@ -432,5 +454,65 @@ mod tests {
         assert_eq!(xml.mode, 0o100444);
         assert_eq!(xml.uid, 0);
         assert_eq!(xml.gid, 0);
+    }
+
+    #[test]
+    fn test_fstab() {
+        const FSTAB: &'static str = r#"
+# Android fstab file.
+#<dev>  <mnt_point> <type>  <mnt_flags options> <fs_mgr_flags>
+tmpfs   /data       tmpfs   defaults            wait
+        "#;
+        let tmp = TempDir::new().unwrap();
+        let outdir = Utf8Path::from_path(tmp.path()).unwrap();
+        let base_manifest_path = fake_base(outdir);
+
+        // Make a fake fstab.
+        let fstab_path = outdir.join("fstab.foo");
+        std::fs::write(&fstab_path, FSTAB).unwrap();
+
+        // Run the generator.
+        let cmd = Command {
+            name: "test-name".into(),
+            outdir: outdir.to_owned(),
+            base: base_manifest_path,
+            system: Utf8PathBuf::from_str(EXT4_IMAGE_PATH).unwrap(),
+            hal: vec![],
+            depfile: None,
+            vendor: None,
+            fstab: Some(fstab_path),
+        };
+        generate(cmd).unwrap();
+
+        // Read the package manifest, and ensure the correct files are present as blobs, and
+        // there is an additional `.xml` file corresponding to `test-hal`.
+        let manifest_path = outdir.join("package_manifest.json");
+        let manifest = PackageManifest::try_load_from(manifest_path).unwrap();
+        assert_eq!(manifest.name().as_ref(), "test-name");
+        let (blobs, _subpackages) = manifest.into_blobs_and_subpackages();
+        assert_eq!(blobs.len(), 6);
+        let blob_filenames: Vec<String> = blobs.iter().map(|b| b.path.clone()).collect();
+        assert_eq!(
+            blob_filenames,
+            vec![
+                "meta/".to_string(),
+                "data/odm/7".to_string(),
+                "data/odm/metadata.v1".to_string(),
+                "data/system/13".to_string(),
+                "data/system/metadata.v1".to_string(),
+                "data/test".to_string(),
+            ]
+        );
+
+        let odm_metadata_path =
+            &blobs.iter().find(|b| b.path == "data/odm/metadata.v1").unwrap().source_path;
+        let m = Metadata::deserialize(
+            &std::fs::read(odm_metadata_path).expect("Failed to read metadata"),
+        )
+        .expect("Failed to deserialize metadata");
+        let etc = m.lookup(ROOT_INODE_NUM, "etc").expect("etc not found");
+        let fstab = m.lookup(etc, "fstab.foo").expect("fstab not found");
+        let fstab = m.get(fstab).expect("fstab not found");
+        assert_matches!(fstab.info(), NodeInfo::File(_));
     }
 }

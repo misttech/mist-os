@@ -83,6 +83,14 @@ template("android_starnix_container") {
         inputs += [ _hal_manifest ]
         deps += [ hal ]
       }
+
+      if (defined(invoker.fstab)) {
+        args += [
+          "--fstab",
+          rebase_path(invoker.fstab, root_build_dir),
+        ]
+        inputs += [ invoker.fstab ]
+      }
     }
   } else {
     # Redirect to a toolchain where the dependency packages exist.
