@@ -107,13 +107,14 @@ if $remote ; then
     # this together, the seemingly least worst way to check permissions is to
     # see whether `gsutil -q stat ...` returns any output.
     output=$(gsutil -q stat "${url}" 2>&1)
+    result=$?
     if [[ -n "${output}" ]]; then
       if $verbose ; then
         fx-warn "Insufficient privileges to access gs://${bucket}/. (Have you run \`gcloud auth login\`?)"
       fi
       continue
     fi
-    if [[ $? == 0 ]]; then
+    if [[ $result == 0 ]]; then
       echo "${url}"
     elif $verbose ; then
       fx-info "No binaries with build ID \"${id}\" found under gs://${bucket}/"
