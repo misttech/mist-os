@@ -133,19 +133,11 @@ def mangle_label(label):
     return "".join(result)
 
 
-class FeatureSpec(object):
-
-    def __init__(self, features, default_features):
-        self.features = features
-        self.default_features = default_features
-
-
 class Project(object):
 
     def __init__(self, project_json):
         self.targets = project_json
         self.patches = None
-        self.third_party_features = {}
 
     @functools.cached_property
     def rust_targets(self):
@@ -197,6 +189,32 @@ class Project(object):
         ]
 
 
+def get_features(rustflags):
+    features = []
+    feature_pat = re.compile(r"--cfg=feature=\"(.*)\"$")
+    for flag in rustflags:
+        if match := feature_pat.match(flag):
+            features.append(match.group(1))
+    return features
+
+
+def get_cfgs(rustflags):
+    cfgs = []
+    cfg_pat = re.compile(r"--cfg=([^=]*)=(.*)$")
+    for flag in rustflags:
+        if flag.startswith("--cfg=feature"):
+            continue
+        if match := cfg_pat.match(flag):
+            # __rust_toolchain is for a cfg that's used to invalidate old
+            # toolchain versions by changing the ninja command line, which is
+            # of no use to cargo.
+            if match.group(1) != "__rust_toolchain":
+                cfgs.append(f"{match.group(1)}={match.group(2)}")
+        elif flag.startswith("--cfg="):
+            cfgs.append(flag[len("--cfg="):])
+    return cfgs
+
+
 def write_toml_file(
         fout, metadata, project, target, lookup, root_path, root_build_dir,
         gn_cargo_dir, for_workspace, version):
@@ -223,19 +241,8 @@ def write_toml_file(
     else:
         is_proc_macro = ""
 
-    features = []
-    extra_configs = []
-    feature_pat = re.compile(r"--cfg=feature=\"(.*)\"$")
-    cfg_pat = re.compile(r"--cfg=([^=]*)=(.*)$")
-    for flag in metadata["rustflags"]:
-        match = feature_pat.match(flag)
-        if match:
-            features.append(match.group(1))
-        elif match := cfg_pat.match(flag):
-            if match.group(1) != "__rust_toolchain":
-                extra_configs.append(f"{match.group(1)}={match.group(2)}")
-        elif flag.startswith("--cfg="):
-            extra_configs.append(flag[len("--cfg="):])
+    features = get_features(metadata["rustflags"])
+    extra_configs = get_cfgs(metadata["rustflags"])
 
     crate_type = "rlib"
     package_name = lookup_gn_pkg_name(
@@ -364,18 +371,16 @@ def write_toml_file(
             # this is a third-party dependency
             # TODO remove this when all things use GN. temporary hack?
             if "third_party/rust_crates:" in dep:
-                match = re.search("rust_crates:([\w-]*)", dep)
+                match = re.search(r"rust_crates:([\w-]*)", dep)
                 crate_name, version = str(match.group(1)).rsplit("-v", 1)
                 dep_crate_names.add(crate_name)
                 version = version.replace("_", ".")
-                feature_spec = project.third_party_features.get(crate_name)
                 fout.write("[%s.\"%s\"]\n" % (dep_type, crate_name))
                 fout.write("version = \"%s\"\n" % version)
-                if feature_spec:
-                    fout.write(
-                        "features = %s\n" % json.dumps(feature_spec.features))
-                    if feature_spec.default_features is False:
-                        fout.write("default-features = false\n")
+                fout.write("default-features = false\n")
+                if dep_features := get_features(
+                        project.targets[dep]["rustflags"]):
+                    fout.write("features = %s\n" % json.dumps(dep_features))
                 if crate_name in features:
                     # Make the dependency optional if there is a feature with
                     # the same name. Later, we'll make sure to list the feature
@@ -441,21 +446,7 @@ def main():
 
     # this will be removed eventually?
     with open(rust_crates_path + "/Cargo.toml", "r") as f:
-        cargo_toml = toml.load(f)
-    project.patches = cargo_toml["patch"]["crates-io"]
-
-    # Map from crate name to FeatureSpec. We don't include the version because we don't directly
-    # depend on more than one version of the same crate.
-    def collect_features(deps):
-        for dep, info in deps.items():
-            if isinstance(info, str):
-                continue
-            project.third_party_features[dep] = FeatureSpec(
-                info.get("features", []), info.get("default-features", True))
-
-    collect_features(cargo_toml["dependencies"])
-    for target_info in cargo_toml["target"].values():
-        collect_features(target_info.get("dependencies", {}))
+        project.patches = toml.load(f)["patch"]["crates-io"]
 
     lookup = {}
     for target in project.rust_targets:
