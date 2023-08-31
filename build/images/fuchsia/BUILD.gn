@@ -269,7 +269,7 @@ if (is_fuchsia) {
     testonly = fuchsia_zbi_testonly
     deps = [
       ":fuchsia_assembly",
-      "//build/info:latest-commit-date",
+      "//build/info:build_info_files",
       _partitions_config,
       recovery_label,
     ]
@@ -286,7 +286,7 @@ if (is_fuchsia) {
     testonly = fuchsia_zbi_testonly
     deps = [
       ":fuchsia_assembly",
-      "//build/info:latest-commit-date",
+      "//build/info:build_info_files",
       _partitions_config,
       recovery_label,
     ]

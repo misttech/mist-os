@@ -50,6 +50,6 @@ if (current_toolchain == default_toolchain) {
       "64",
     ]
 
-    deps = [ "//build/info:latest-commit-date" ]
+    deps = [ "//build/info:build_info_files" ]
   }
 }

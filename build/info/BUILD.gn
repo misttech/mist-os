@@ -10,11 +10,14 @@ import("//build/dist/resource.gni")
 import("//build/info/info.gni")
 
 if (current_toolchain == default_toolchain) {
-  write_file(build_info_files.product, build_info_product)
-  write_file(build_info_files.board, board_name)
+  generated_file("product") {
+    outputs = [ build_info_files.product ]
+    contents = build_info_product
+  }
 
-  if (build_info_files.version != build_info_files.latest_commit_date) {
-    write_file(build_info_files.version, build_info_version)
+  generated_file("board") {
+    outputs = [ build_info_files.board ]
+    contents = board_name
   }
 
   action("latest-commit-date") {
@@ -26,6 +29,19 @@ if (current_toolchain == default_toolchain) {
     ]
     script = "gen-latest-commit-date.sh"
     args = rebase_path([ "//integration/" ] + outputs, root_build_dir)
+  }
+
+  if (build_info_version != "") {
+    generated_file("version") {
+      outputs = [ build_info_files.version ]
+      contents = build_info_version
+    }
+  } else {
+    copy("version") {
+      sources = [ build_info_files.latest_commit_date ]
+      outputs = [ build_info_files.version ]
+      deps = [ ":latest-commit-date" ]
+    }
   }
 
   resource("minimum_utc_stamp") {
@@ -54,11 +70,22 @@ if (current_toolchain == default_toolchain) {
     deps = [
       ":latest-commit-date",
       ":minimum_utc_stamp",
+      ":version",
+    ]
+  }
+
+  group("build_info_files") {
+    public_deps = [
+      ":board",
+      ":latest-commit-date",
+      ":minimum_utc_stamp",
+      ":product",
+      ":version",
     ]
   }
 } else {
-  group("latest-commit-date") {
-    public_deps = [ ":latest-commit-date($default_toolchain)" ]
+  group("build_info_files") {
+    public_deps = [ ":build_info_files($default_toolchain)" ]
   }
 }
 
@@ -90,7 +117,7 @@ if (is_fuchsia) {
         dest = "data/minimum-utc-stamp"
       },
     ]
-    deps = [ ":latest-commit-date" ]
+    deps = [ ":build_info_files" ]
   }
 
   fuchsia_package("build-info") {

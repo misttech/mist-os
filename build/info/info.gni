@@ -32,7 +32,3 @@ default_product_build_info = {
   latest_commit_date = "latest-commit-date.txt"
   minimum_utc_stamp = "minimum-utc-stamp.txt"
 }
-
-if (build_info_version == "") {
-  build_info_files.version = build_info_files.latest_commit_date
-}

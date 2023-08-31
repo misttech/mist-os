@@ -120,7 +120,7 @@ if (is_fuchsia) {
     deps = [
       ":assembly",
       ":partitions_config",
-      "//build/info:latest-commit-date",
+      "//build/info:build_info_files",
     ]
     partitions = files.partitions_config
     system_a = files.images_json
@@ -136,7 +136,7 @@ if (is_fuchsia) {
     deps = [
       ":assembly",
       ":partitions_config",
-      "//build/info:latest-commit-date",
+      "//build/info:build_info_files",
     ]
 
     update = {
