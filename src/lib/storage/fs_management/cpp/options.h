@@ -77,14 +77,6 @@ struct FsckOptions {
   bool always_modify = false;  // Fsck never asks to resolve problems; it will always do it.
   bool force = false;          // Force fsck to check the filesystem integrity, even if "clean".
 
-  // Appends arguments for running the fat32 fsck tool.  These arguments will exclude the binary
-  // name and the path of the device.
-  //
-  // TODO(fxbug.dev/96033): normalize fat32 launching so that it matches the rest of the platform
-  // filesystems.
-  __EXPORT
-  std::vector<std::string> append_argv_fat32(std::vector<std::string>& argv) const;
-
   // Generate a CheckOptions fidl struct to pass the a fuchsia.fs.startup.Startup interface based
   // on this set of options.
   //
