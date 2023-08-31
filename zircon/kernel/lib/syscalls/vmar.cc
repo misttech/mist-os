@@ -319,6 +319,7 @@ zx_status_t sys_vmar_map_iob(zx_handle_t handle, zx_vm_option_t options, size_t 
                                   : Resizability::NonResizable;
   status = iobuffer_disp->GetVmo(region_index)
                ->CreateChildReference(resizability, 0, 0, true, &child_reference);
+  child_reference->set_user_id(iobuffer_disp->GetVmo(region_index)->user_id());
   if (status != ZX_OK) {
     return status;
   }

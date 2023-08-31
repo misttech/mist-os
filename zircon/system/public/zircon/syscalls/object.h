@@ -474,6 +474,10 @@ typedef struct zx_info_maps_v1 {
 // The VMO is immutable and has been since creation.
 #define ZX_INFO_VMO_IMMUTABLE               (1u<<8)
 
+// When reading a list of VMOs pointed to by a process, indicates that the
+// process has a handle an IOB containing the vmo, which isn't necessarily mapped.
+#define ZX_INFO_VMO_VIA_IOB_HANDLE          (1u<<9)
+
 // Describes a VMO. For mapping information, see |zx_info_maps_t|.
 typedef struct zx_info_vmo {
     // The koid of this VMO.

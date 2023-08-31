@@ -46,9 +46,14 @@ class IoBufferDispatcher final : public PeeredDispatcher<IoBufferDispatcher, ZX_
   zx_iob_region_t GetRegion(size_t region_index) const;
   size_t RegionCount() const;
 
+  zx_info_iob_t GetInfo() const;
+  zx_iob_region_info_t GetRegionInfo(size_t index) const;
+
   // PeeredDispatcher implementation
   void on_zero_handles_locked() TA_REQ(get_lock());
   void OnPeerZeroHandlesLocked() TA_REQ(get_lock());
+  zx_status_t set_name(const char* name, size_t len) override;
+  zx_status_t get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const override;
 
   // VmObjectChildObserver implementation
   void OnZeroChild() override;
@@ -58,8 +63,9 @@ class IoBufferDispatcher final : public PeeredDispatcher<IoBufferDispatcher, ZX_
   class IobRegion {
    public:
     IobRegion() = default;
-    IobRegion(fbl::RefPtr<VmObject> ep0_vmo, fbl::RefPtr<VmObject> ep1_vmo, zx_iob_region_t region)
-        : ep_vmos_{ktl::move(ep0_vmo), ktl::move(ep1_vmo)}, region_(region) {}
+    IobRegion(fbl::RefPtr<VmObject> ep0_vmo, fbl::RefPtr<VmObject> ep1_vmo, zx_iob_region_t region,
+              zx_koid_t koid)
+        : ep_vmos_{ktl::move(ep0_vmo), ktl::move(ep1_vmo)}, region_(region), koid_(koid) {}
 
     zx_rights_t GetMapRights(IobEndpointId id) const {
       zx_rights_t rights = 0;
@@ -89,6 +95,19 @@ class IoBufferDispatcher final : public PeeredDispatcher<IoBufferDispatcher, ZX_
     }
 
     zx_iob_region_t GetRegion() const { return region_; }
+    zx_iob_region_info_t GetRegionInfo(bool swap_endpoints) const {
+      zx_iob_region_info_t info{region_, koid_};
+      if (swap_endpoints) {
+        uint32_t ep0_access =
+            info.region.access & (ZX_IOB_EP0_CAN_MAP_READ | ZX_IOB_EP0_CAN_MAP_WRITE |
+                                  ZX_IOB_EP0_CAN_MEDIATED_READ | ZX_IOB_EP0_CAN_MEDIATED_WRITE);
+        uint32_t ep1_access =
+            info.region.access & (ZX_IOB_EP1_CAN_MAP_READ | ZX_IOB_EP1_CAN_MAP_WRITE |
+                                  ZX_IOB_EP1_CAN_MEDIATED_READ | ZX_IOB_EP1_CAN_MEDIATED_WRITE);
+        info.region.access = (ep0_access << 4) | (ep1_access >> 4);
+      }
+      return info;
+    }
 
     zx_rights_t GetMediatedRights(IobEndpointId id) const {
       zx_rights_t rights = 0;
@@ -118,20 +137,22 @@ class IoBufferDispatcher final : public PeeredDispatcher<IoBufferDispatcher, ZX_
     // unmaps.
     fbl::RefPtr<VmObject> ep_vmos_[2];
     zx_iob_region_t region_;
+    zx_koid_t koid_;
   };
 
   // Wrapper struct to allow both peers to hold a reference to the regions.
   struct SharedIobState : public fbl::RefCounted<SharedIobState> {
    public:
-    fbl::Array<const IobRegion> regions;
+    DECLARE_CRITICAL_MUTEX(SharedIobState) state_lock;
+    fbl::Array<const IobRegion> TA_GUARDED(state_lock) regions;
   };
 
   explicit IoBufferDispatcher(fbl::RefPtr<PeerHolder<IoBufferDispatcher>> holder,
-                              IobEndpointId endpoint_id,
-                              fbl::RefPtr<const SharedIobState> shared_state);
+                              IobEndpointId endpoint_id, fbl::RefPtr<SharedIobState> shared_state);
 
-  fbl::RefPtr<const SharedIobState> const shared_state_;
+  fbl::RefPtr<SharedIobState> const shared_state_;
   const IobEndpointId endpoint_id_;
+
   size_t peer_mapped_regions_ TA_GUARDED(get_lock()) = 0;
   bool peer_zero_handles_ TA_GUARDED(get_lock()) = false;
 };

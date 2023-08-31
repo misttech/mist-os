@@ -1311,6 +1311,8 @@ closed protocol Object {
     ///     uint64_t committed_bytes;
     ///
     ///     // If |flags & ZX_INFO_VMO_VIA_HANDLE|, the handle rights.
+    ///     // If |flags & ZX_INFO_VMO_VIA_IOB_HANDLE|, the handle rights of the
+    ///     // containing IOB.
     ///     // Undefined otherwise.
     ///     zx_rights_t handle_rights;
     ///
@@ -1551,12 +1553,12 @@ closed protocol Object {
     ///     // Bitwise OR of ZX_VM_PERM_{READ,WRITE,EXECUTE} values.
     ///     zx_vm_option_t mmu_flags;
     ///     uint8_t padding1[4];
-    ///     // koid of the mapped VMO.
+    ///     // koid of the mapped VMO or IOB region.
     ///     zx_koid_t vmo_koid;
-    ///     // Offset into the above VMO.
+    ///     // Offset into the above VMO or IOB region.
     ///     uint64_t vmo_offset;
-    ///     // The number of PAGE_SIZE pages in the mapped region of the VMO
-    ///     // that are backed by physical memory.
+    ///     // The number of PAGE_SIZE pages in the mapped region of the VMO or
+    ///     // IOB region that are backed by physical memory.
     ///     size_t committed_pages;
     /// } zx_info_maps_mapping_t;
     /// ```
@@ -1584,8 +1586,12 @@ closed protocol Object {
     ///
     /// *buffer* type: `zx_info_vmo_t[n]`
     ///
-    /// The `zx_info_vmo_t` array is list of all VMOs pointed to by the target process.
-    /// Some VMOs are mapped, some are pointed to by handles, and some are both.
+    /// The `zx_info_vmo_t` array is list of all VMOs pointed to by the target
+    /// process. Some VMOs are mapped, some are pointed to by VMO or IOB
+    /// handles, and some are a combination of these. The `flags`
+    /// field of the returned struct will indicate one of
+    /// ZX_INFO_VMO_VIA_HANDLE, ZX_INFO_VMO_VIA_IOB_HANDLE, or
+    /// ZX_INFO_VMO_VIA_MAPPING to allow differentiation.
     ///
     /// Note: The same VMO may appear multiple times due to multiple mappings or
     /// handles, or because a handle to the VMO has been removed and then readded
@@ -1637,6 +1643,10 @@ closed protocol Object {
     ///     uint64_t committed_bytes;
     ///
     ///     // If |flags & ZX_INFO_VMO_VIA_HANDLE|, the handle rights.
+    ///     //
+    ///     // If |flags & ZX_INFO_VMO_VIA_IOB_HANDLE|, the effective combined
+    ///     // handle rights for the region and containing IOB
+    ///     //
     ///     // Undefined otherwise.
     ///     zx_rights_t handle_rights;
     ///
@@ -1929,6 +1939,46 @@ closed protocol Object {
     ///    uint64_t total_resident_pages_deallocated;
     /// } zx_info_memory_attribution_t;
     /// ```
+    ///
+    /// ### Topic ZX_INFO_IOB
+    ///
+    /// *handle* type: **IOBuffer**
+    ///
+    /// *buffer* type: `zx_info_iob_t[1]`
+    ///
+    /// Returns information about the overall IOB instance.
+    ///
+    /// ```
+    /// typedef struct zx_info_iob {
+    ///   // The value of the *options* parameter passed to `zx_iob_create`.
+    ///   uint64_t options;
+    ///   // The number of regions in the IOB.
+    ///   uint32_t region_count;
+    ///   // Reserved for future extensions.
+    ///   uint8_t padding[4];
+    /// } zx_info_iob_t;
+    /// ```
+    ///
+    /// ### Topic ZX_INFO_IOB_REGIONS
+    ///
+    /// Returns information about each region of an IOB as an array of `zx_iob_region_info_t`
+    ///
+    /// *handle* type: **IOBuffer**
+    ///
+    /// *buffer* type: `zx_iob_region_info_t[n]`
+    ///
+    /// struct zx_iob_region_info_t {
+    ///     // The region description, with potentially swapped access bits.
+    ///     zx_iob_region_t region;
+    ///     /// The koid of the underlying memory object.
+    ///     zx_koid_t koid;
+    /// };
+    ///
+    /// Access modifier bits are swapped, such that the Ep0 access bits reflect
+    /// the access of the endpoint making the query and the Ep1 bits reflect the
+    /// access of the other endpoint, making it possible to determine the access
+    /// of the local and remote handles without knowing which handles were Ep0
+    /// and Ep1 when created.
     ///
     /// ## Rights
     ///

@@ -9,6 +9,7 @@
 #include <string.h>
 #include <zircon/errors.h>
 #include <zircon/rights.h>
+#include <zircon/syscalls-next.h>
 #include <zircon/syscalls/iob.h>
 #include <zircon/types.h>
 
@@ -19,6 +20,7 @@
 #include <fbl/array.h>
 #include <fbl/ref_ptr.h>
 #include <kernel/attribution.h>
+#include <kernel/koid.h>
 #include <kernel/lockdep.h>
 #include <kernel/mutex.h>
 #include <ktl/move.h>
@@ -77,9 +79,13 @@ zx_status_t IoBufferDispatcher::Create(uint64_t options,
     return ZX_ERR_NO_MEMORY;
   }
 
+  Guard<CriticalMutex> guard{&shared_regions->state_lock};
   for (unsigned i = 0; i < region_configs.size(); i++) {
     zx_iob_region_t& region_config = region_configs[i];
     if (region_config.type != ZX_IOB_REGION_TYPE_PRIVATE) {
+      return ZX_ERR_INVALID_ARGS;
+    }
+    if (region_config.access == 0) {
       return ZX_ERR_INVALID_ARGS;
     }
 
@@ -119,6 +125,8 @@ zx_status_t IoBufferDispatcher::Create(uint64_t options,
     // VmObjectPaged::Create will round up the size to the nearest page. We need to know the actual
     // size of the vmo to later return if asked.
     region_config.size = vmo->size();
+    zx_koid_t koid = KernelObjectId::Generate();
+    vmo->set_user_id(koid);
 
     // In order to track mappings and unmappings separately for each endpoint, we give each
     // endpoint a child reference instead of the created vmo.
@@ -136,11 +144,15 @@ zx_status_t IoBufferDispatcher::Create(uint64_t options,
       return status;
     }
 
+    ep0_reference->set_user_id(koid);
+    ep1_reference->set_user_id(koid);
+
     // Now each endpoint can observe the mappings created by the other
     ep0_reference->SetChildObserver(new_handle1.dispatcher().get());
     ep1_reference->SetChildObserver(new_handle0.dispatcher().get());
 
-    region_inner[i] = IobRegion{ktl::move(ep0_reference), ktl::move(ep1_reference), region_config};
+    region_inner[i] =
+        IobRegion{ktl::move(ep0_reference), ktl::move(ep1_reference), region_config, koid};
   }
   shared_regions->regions = std::move(region_inner);
 
@@ -156,7 +168,7 @@ zx_status_t IoBufferDispatcher::Create(uint64_t options,
 
 IoBufferDispatcher::IoBufferDispatcher(fbl::RefPtr<PeerHolder<IoBufferDispatcher>> holder,
                                        IobEndpointId endpoint_id,
-                                       fbl::RefPtr<const SharedIobState> shared_state)
+                                       fbl::RefPtr<SharedIobState> shared_state)
     : PeeredDispatcher(ktl::move(holder)),
       shared_state_(std::move(shared_state)),
       endpoint_id_(endpoint_id) {
@@ -164,6 +176,7 @@ IoBufferDispatcher::IoBufferDispatcher(fbl::RefPtr<PeerHolder<IoBufferDispatcher
 }
 
 zx_rights_t IoBufferDispatcher::GetMapRights(zx_rights_t iob_rights, size_t region_index) const {
+  Guard<CriticalMutex> guard{&shared_state_->state_lock};
   DEBUG_ASSERT(region_index < shared_state_->regions.size());
   zx_rights_t region_rights = shared_state_->regions[region_index].GetMapRights(GetEndpointId());
   region_rights &= (iob_rights | ZX_RIGHT_MAP);
@@ -171,22 +184,26 @@ zx_rights_t IoBufferDispatcher::GetMapRights(zx_rights_t iob_rights, size_t regi
 }
 
 zx_rights_t IoBufferDispatcher::GetMediatedRights(size_t region_index) const {
+  Guard<CriticalMutex> guard{&shared_state_->state_lock};
   DEBUG_ASSERT(region_index < shared_state_->regions.size());
   return shared_state_->regions[region_index].GetMediatedRights(GetEndpointId());
 }
 
 const fbl::RefPtr<VmObject>& IoBufferDispatcher::GetVmo(size_t region_index) const {
+  Guard<CriticalMutex> guard{&shared_state_->state_lock};
   DEBUG_ASSERT(region_index < shared_state_->regions.size());
   return shared_state_->regions[region_index].GetVmo(GetEndpointId());
 }
 
 zx_iob_region_t IoBufferDispatcher::GetRegion(size_t region_index) const {
+  Guard<CriticalMutex> guard{&shared_state_->state_lock};
   DEBUG_ASSERT(region_index < shared_state_->regions.size());
   return shared_state_->regions[region_index].GetRegion();
 }
 
 size_t IoBufferDispatcher::RegionCount() const {
   canary_.Assert();
+  Guard<CriticalMutex> guard{&shared_state_->state_lock};
   return shared_state_->regions.size();
 }
 
@@ -238,6 +255,7 @@ IoBufferDispatcher::~IoBufferDispatcher() {
   //   and releases the lock.
   // - Thus we cannot continue to the Destruction Sequence until there are no observers in progress
   //   accessing our state, and no observer can start accessing our state.
+  Guard<CriticalMutex> guard{&shared_state_->state_lock};
   IobEndpointId other_id =
       endpoint_id_ == IobEndpointId::Ep0 ? IobEndpointId::Ep1 : IobEndpointId::Ep0;
   for (const IobRegion& region : shared_state_->regions) {
@@ -247,4 +265,46 @@ IoBufferDispatcher::~IoBufferDispatcher() {
   }
 
   kcounter_add(dispatcher_iob_destroy_count, 1);
+}
+
+zx_info_iob_t IoBufferDispatcher::GetInfo() const {
+  canary_.Assert();
+  Guard<CriticalMutex> guard{&shared_state_->state_lock};
+  return {.options = 0, .region_count = static_cast<uint32_t>(shared_state_->regions.size())};
+}
+
+zx_iob_region_info_t IoBufferDispatcher::GetRegionInfo(size_t index) const {
+  Guard<CriticalMutex> guard{&shared_state_->state_lock};
+  DEBUG_ASSERT(index < shared_state_->regions.size());
+  canary_.Assert();
+  return shared_state_->regions[index].GetRegionInfo(endpoint_id_ == IobEndpointId::Ep1);
+}
+
+zx_status_t IoBufferDispatcher::get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const {
+  Guard<CriticalMutex> guard{&shared_state_->state_lock};
+  shared_state_->regions[0].GetVmo(IobEndpointId::Ep0)->get_name(out_name, ZX_MAX_NAME_LEN);
+  return ZX_OK;
+}
+
+zx_status_t IoBufferDispatcher::set_name(const char* name, size_t len) {
+  canary_.Assert();
+  Guard<CriticalMutex> guard{&shared_state_->state_lock};
+  for (const IobRegion& region : shared_state_->regions) {
+    switch (region.GetRegion().type) {
+      case ZX_IOB_REGION_TYPE_PRIVATE: {
+        zx_status_t region_result = region.GetVmo(IobEndpointId::Ep0)->set_name(name, len);
+        if (region_result != ZX_OK) {
+          return region_result;
+        }
+        region_result = region.GetVmo(IobEndpointId::Ep1)->set_name(name, len);
+        if (region_result != ZX_OK) {
+          return region_result;
+        }
+        break;
+      }
+      default:
+        continue;
+    }
+  }
+  return ZX_OK;
 }

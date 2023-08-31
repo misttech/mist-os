@@ -574,6 +574,29 @@ typedef int zx_futex_storage_t;
 // These options can be passed to zx_process_create().
 #define ZX_PROCESS_SHARED     ((uint32_t)1u << 0)
 
+// IOBuffer types describing the structure of a region
+typedef struct iob_discipline {
+  uint64_t type;
+  uint64_t reserved[8];
+} zx_iob_discipline_t;
+
+typedef struct iob_region_private {
+  uint32_t options;
+  uint32_t padding1;
+  uint64_t padding2[3];
+} zx_iob_region_private_t;
+
+typedef struct iob_region {
+  uint32_t type;
+  uint32_t access;
+  uint64_t size;
+  zx_iob_discipline_t discipline;
+  union {
+    zx_iob_region_private_t private_region;
+    uint8_t max_extension[32];
+  };
+} zx_iob_region_t;
+
 __END_CDECLS
 
 #endif // ZIRCON_TYPES_H_

@@ -188,7 +188,8 @@ zx_status_t VmObjectDispatcher::GetSize(uint64_t* size) {
   return ZX_OK;
 }
 
-zx_info_vmo_t VmoToInfoEntry(const VmObject* vmo, bool is_handle, zx_rights_t handle_rights) {
+zx_info_vmo_t VmoToInfoEntry(const VmObject* vmo, VmoOwnership ownership,
+                             zx_rights_t handle_rights) {
   zx_info_vmo_t entry = {};
   entry.koid = vmo->user_id();
   vmo->get_name(entry.name, sizeof(entry.name));
@@ -202,15 +203,27 @@ zx_info_vmo_t VmoToInfoEntry(const VmObject* vmo, bool is_handle, zx_rights_t ha
                 (vmo->is_discardable() ? ZX_INFO_VMO_DISCARDABLE : 0) |
                 (vmo->is_user_pager_backed() ? ZX_INFO_VMO_PAGER_BACKED : 0) |
                 (vmo->is_contiguous() ? ZX_INFO_VMO_CONTIGUOUS : 0);
-  VmObject::AttributionCounts page_counts = vmo->AttributedPages();
+  // As an implementation detail, both ends of an IOBuffer keep a child reference to a shared parent
+  // which is dropped. Since references aren't normally attributed pages otherwise, we specifically
+  // request their page count.
+  VmObject::AttributionCounts page_counts = ownership == VmoOwnership::kIoBuffer
+                                                ? vmo->AttributedPagesInReferenceOwner()
+                                                : vmo->AttributedPages();
   entry.committed_bytes = page_counts.uncompressed * PAGE_SIZE;
   entry.populated_bytes = (page_counts.compressed + page_counts.uncompressed) * PAGE_SIZE;
   entry.cache_policy = vmo->GetMappingCachePolicy();
-  if (is_handle) {
-    entry.flags |= ZX_INFO_VMO_VIA_HANDLE;
-    entry.handle_rights = handle_rights;
-  } else {
-    entry.flags |= ZX_INFO_VMO_VIA_MAPPING;
+  switch (ownership) {
+    case VmoOwnership::kHandle:
+      entry.flags |= ZX_INFO_VMO_VIA_HANDLE;
+      entry.handle_rights = handle_rights;
+      break;
+    case VmoOwnership::kMapping:
+      entry.flags |= ZX_INFO_VMO_VIA_MAPPING;
+      break;
+    case VmoOwnership::kIoBuffer:
+      entry.flags |= ZX_INFO_VMO_VIA_IOB_HANDLE;
+      entry.handle_rights = handle_rights;
+      break;
   }
   if (vmo->child_type() == VmObject::ChildType::kCowClone) {
     entry.flags |= ZX_INFO_VMO_IS_COW_CLONE;
@@ -222,7 +235,7 @@ zx_info_vmo_t VmoToInfoEntry(const VmObject* vmo, bool is_handle, zx_rights_t ha
 }
 
 zx_info_vmo_t VmObjectDispatcher::GetVmoInfo(zx_rights_t rights) {
-  zx_info_vmo_t info = VmoToInfoEntry(vmo().get(), true, rights);
+  zx_info_vmo_t info = VmoToInfoEntry(vmo().get(), VmoOwnership::kHandle, rights);
   if (initial_mutability_ == InitialMutability::kImmutable) {
     info.flags |= ZX_INFO_VMO_IMMUTABLE;
   }

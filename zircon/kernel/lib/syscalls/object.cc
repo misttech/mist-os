@@ -26,6 +26,7 @@
 #include <object/diagnostics.h>
 #include <object/exception_dispatcher.h>
 #include <object/handle.h>
+#include <object/io_buffer_dispatcher.h>
 #include <object/job_dispatcher.h>
 #include <object/msi_dispatcher.h>
 #include <object/process_dispatcher.h>
@@ -1155,6 +1156,49 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
           return copy_status;
       }
       return writer.status();
+    }
+
+    case ZX_INFO_IOB: {
+      fbl::RefPtr<IoBufferDispatcher> iob;
+      zx_status_t status =
+          up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_INSPECT, &iob);
+      if (status != ZX_OK) {
+        return status;
+      }
+
+      return single_record_result(_buffer, buffer_size, _actual, _avail, iob->GetInfo());
+    }
+    case ZX_INFO_IOB_REGIONS: {
+      fbl::RefPtr<IoBufferDispatcher> iob;
+      zx_status_t status =
+          up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_INSPECT, &iob);
+      if (status != ZX_OK) {
+        return status;
+      }
+
+      const size_t num_regions = iob->RegionCount();
+      const size_t num_space_for = buffer_size / sizeof(zx_iob_region_info_t);
+      const size_t num_to_copy = ktl::min(num_regions, num_space_for);
+
+      for (size_t i = 0; i < num_to_copy; i++) {
+        zx_iob_region_info_t region = iob->GetRegionInfo(i);
+        status = _buffer.reinterpret<zx_iob_region_info_t>().element_offset(i).copy_to_user(region);
+        if (status != ZX_OK) {
+          return status;
+        }
+      }
+
+      if (_actual) {
+        zx_status_t copy_status = _actual.copy_to_user(num_to_copy);
+        if (copy_status != ZX_OK)
+          return copy_status;
+      }
+      if (_avail) {
+        zx_status_t copy_status = _avail.copy_to_user(num_regions);
+        if (copy_status != ZX_OK)
+          return copy_status;
+      }
+      return ZX_OK;
     }
 
     default:

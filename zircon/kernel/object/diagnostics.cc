@@ -18,6 +18,7 @@
 #include <kernel/deadline.h>
 #include <ktl/span.h>
 #include <object/handle.h>
+#include <object/io_buffer_dispatcher.h>
 #include <object/job_dispatcher.h>
 #include <object/process_dispatcher.h>
 #include <object/vm_object_dispatcher.h>
@@ -1022,8 +1023,7 @@ class AspaceVmoEnumerator final
     // We're likely to see the same VMO a couple times in a given
     // address space (e.g., somelib.so mapped as r--, r-x), but leave it
     // to userspace to do deduping.
-    *entry = VmoToInfoEntry(map->vmo_locked().get(),
-                            /*is_handle=*/false,
+    *entry = VmoToInfoEntry(map->vmo_locked().get(), VmoOwnership::kMapping,
                             /*handle_rights=*/0);
   }
 
@@ -1078,19 +1078,35 @@ zx_status_t GetProcessVmos(ProcessDispatcher* process, VmoInfoWriter& vmos, size
   zx_status_t s = process->handle_table().ForEachHandleBatched(
       [&](zx_handle_t handle, zx_rights_t rights, const Dispatcher* disp) {
         auto vmod = DownCastDispatcher<const VmObjectDispatcher>(disp);
-        if (vmod == nullptr) {
-          // This handle isn't a VMO; skip it.
+        if (vmod != nullptr) {
+          available++;
+          if (actual < max) {
+            zx_info_vmo_t entry = VmoToInfoEntry(vmod->vmo().get(), VmoOwnership::kHandle, rights);
+            if (vmos.Write(entry, actual) != ZX_OK) {
+              return ZX_ERR_INVALID_ARGS;
+            }
+            actual++;
+          }
           return ZX_OK;
         }
-        available++;
-        if (actual < max) {
-          zx_info_vmo_t entry = VmoToInfoEntry(vmod->vmo().get(),
-                                               /*is_handle=*/true, rights);
-          if (vmos.Write(entry, actual) != ZX_OK) {
-            return ZX_ERR_INVALID_ARGS;
+        auto iobd = DownCastDispatcher<const IoBufferDispatcher>(disp);
+        if (iobd != nullptr) {
+          available += iobd->RegionCount();
+          for (size_t i = 0; i < iobd->RegionCount(); i++) {
+            if (actual >= max) {
+              break;
+            }
+            fbl::RefPtr<VmObject> vmo = iobd->GetVmo(i);
+            zx_rights_t region_map_rights = iobd->GetMapRights(rights, i);
+            zx_info_vmo_t entry =
+                VmoToInfoEntry(vmo.get(), VmoOwnership::kIoBuffer, region_map_rights);
+            if (vmos.Write(entry, actual) != ZX_OK) {
+              return ZX_ERR_INVALID_ARGS;
+            }
+            actual++;
           }
-          actual++;
         }
+        // We can skip this if it isn't a VMO or IOB
         return ZX_OK;
       });
   if (s != ZX_OK) {

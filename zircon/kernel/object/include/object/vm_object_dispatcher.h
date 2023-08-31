@@ -122,6 +122,8 @@ class VmObjectDispatcher final : public SoloDispatcher<VmObjectDispatcher, ZX_DE
   mutable DECLARE_MUTEX(VmObjectDispatcher, lockdep::LockFlagsActiveListDisabled) shrink_lock_;
 };
 
-zx_info_vmo_t VmoToInfoEntry(const VmObject* vmo, bool is_handle, zx_rights_t handle_rights);
+enum class VmoOwnership { kHandle, kMapping, kIoBuffer };
+zx_info_vmo_t VmoToInfoEntry(const VmObject* vmo, VmoOwnership ownership,
+                             zx_rights_t handle_rights);
 
 #endif  // ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_VM_OBJECT_DISPATCHER_H_
