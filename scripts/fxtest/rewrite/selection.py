@@ -13,11 +13,13 @@ from collections import defaultdict
 from dataclasses import dataclass
 from dataclasses import field
 from enum import Enum
+import random
 import re
 import typing
 
 import jellyfish
 
+import args
 from test_list_file import Test
 
 
@@ -89,6 +91,10 @@ class TestSelections:
     # The list of tests selected, ordered by presence in tests.json.
     selected: typing.List[Test]
 
+    # Tests that were selected but will not be run due to flags.
+    # (e.g. --count)
+    selected_but_not_run: typing.List[Test]
+
     # The best score calculated for each test in tests.json, including non-selected tests.
     best_score: typing.Dict[str, int]
 
@@ -105,6 +111,18 @@ class TestSelections:
             bool: True if a test that requires a device is selected, False otherwise.
         """
         return any([entry.is_device_test() for entry in self.selected])
+
+    def apply_flags(self, flags: args.Flags):
+        """Mutate the set of selected tests based on flags.
+
+        Args:
+            flags (args.Flags): The flags to apply to these selections.
+        """
+        if flags.random:
+            random.shuffle(self.selected)
+        if flags.limit is not None:
+            self.selected_but_not_run = self.selected[flags.limit :]
+            self.selected = self.selected[: flags.limit]
 
 
 class SelectionMode(Enum):
@@ -165,6 +183,7 @@ def select_tests(
         # report them all as perfect matches.
         return TestSelections(
             entries.copy(),
+            [],
             make_final_scores({test.info.name: 0 for test in entries}),
             [],
             fuzzy_distance_threshold,
@@ -365,6 +384,7 @@ def select_tests(
 
     return TestSelections(
         selected_tests,
+        [],
         make_final_scores(dict(best_matches)),
         group_matches,
         fuzzy_distance_threshold,

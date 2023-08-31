@@ -5,6 +5,7 @@
 import typing
 import unittest
 
+import args
 import selection
 import test_list_file
 import tests_json_file
@@ -290,3 +291,18 @@ class SelectTestsTest(unittest.TestCase):
         )
         self.assertEqual(host_fuzzy.best_score["host_x64/binary_test"], 1)
         self.assertEqual(host_fuzzy.fuzzy_distance_threshold, 3)
+
+    def test_flag_mutation(self):
+        """Test that we can apply command line flag behavior to selections"""
+
+        tests = [
+            self._make_package_test("src/tests", "foo-pkg", "bar-test"),
+            self._make_package_test("src/tests", "bar-pkg", "baz-test"),
+            self._make_host_test("src/other-tests", "binary_test"),
+            self._make_host_test("src/other-tests", "script_test"),
+        ]
+
+        select_all = selection.select_tests(tests, [])
+        select_all.apply_flags(args.parse_args(["--limit=3"]))
+        self.assertEqual(len(select_all.selected), 3)
+        self.assertEqual(len(select_all.selected_but_not_run), 1)

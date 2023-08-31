@@ -12,7 +12,6 @@ import functools
 import gzip
 import json
 import os
-import random
 import re
 import sys
 import typing
@@ -188,6 +187,15 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
             mode,
             flags.fuzzy,
         )
+        # Mutate the selections based on the command line flags.
+        selections.apply_flags(flags)
+        if len(selections.selected_but_not_run) != 0:
+            total_count = len(selections.selected) + len(
+                selections.selected_but_not_run
+            )
+            recorder.emit_info_message(
+                f"Selected {total_count} tests, but only running {len(selections.selected)} due to flags."
+            )
         recorder.emit_test_selections(selections)
     except selection.SelectionError as e:
         recorder.emit_end(f"Selection is invalid: {e}")
@@ -199,11 +207,6 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
     except SelectionValidationError as e:
         recorder.emit_end(str(e))
         return 1
-
-    # If desired, we randomize the execution order of tests.
-    # Otherwise, they are run in the order they appear in the tests.json file.
-    if flags.random:
-        random.shuffle(selections.selected)
 
     # Don't actually run any tests if --dry was specified, instead just
     # print which tests were selected and exit.
@@ -585,7 +588,7 @@ async def run_all_tests(
         )
         return False
 
-    test_group = recorder.emit_test_group(len(tests.selected))
+    test_group = recorder.emit_test_group(len(tests.selected) * flags.count)
 
     @dataclass
     class ExecEntry:
@@ -612,14 +615,7 @@ async def run_all_tests(
     run_condition = asyncio.Condition()
     run_state = RunState()
 
-    limit_remaining = len(tests.selected) if flags.limit is None else flags.limit
     for test in tests.selected:
-        if limit_remaining <= 0:
-            recorder.emit_warning_message(
-                f"\nOnly running {flags.limit} tests out of {len(tests.selected)} due to --limit"
-            )
-            break
-
         abort_group = asyncio.Event()
 
         execs = [
@@ -639,7 +635,6 @@ async def run_all_tests(
                 run_state.non_hermetic_test_queue.put_nowait(
                     ExecEntry(exec, abort_group)
                 )
-        limit_remaining -= 1
 
     tasks = []
 

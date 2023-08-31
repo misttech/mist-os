@@ -163,6 +163,9 @@ class TestSelectionPayload:
     # Map of not selected test names to their score that was above the threshold.
     not_selected: typing.Dict[str, int]
 
+    # Map of selected but not run test names to their score that was below the threshold.
+    selected_but_not_run: typing.Dict[str, int]
+
     # The distance threshold this selection run was configured with.
     fuzzy_distance_threshold: int
 
@@ -864,6 +867,10 @@ class EventRecorder:
             item.info.name: selections.best_score[item.info.name]
             for item in selections.selected
         }
+        selected_but_not_run_scores = {
+            item.info.name: selections.best_score[item.info.name]
+            for item in selections.selected_but_not_run
+        }
         not_selected_scores = {
             name: score
             for name, score in selections.best_score.items()
@@ -877,6 +884,7 @@ class EventRecorder:
                     test_selections=TestSelectionPayload(
                         selected_scores,
                         not_selected_scores,
+                        selected_but_not_run_scores,
                         selections.fuzzy_distance_threshold,
                     )
                 ),

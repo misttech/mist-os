@@ -126,6 +126,7 @@ class TestEvents(unittest.IsolatedAsyncioTestCase):
                         test_list_file.TestListEntry("my-test", []),
                     ),
                 ],
+                selected_but_not_run=[],
                 best_score={
                     "my-test": 1,
                     "other-test": 0,

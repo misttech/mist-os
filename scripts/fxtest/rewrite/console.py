@@ -530,7 +530,11 @@ async def _console_event_loop(
                 label = statusinfo.highlight(
                     f"{count} test{'s' if count != 1 else ''}", style=flags.style
                 )
-                lines_to_print.append(f"\nPlan to run {label}")
+                suffix = statusinfo.highlight(
+                    f" {flags.count} times" if flags.count > 1 else "",
+                    style=flags.style,
+                )
+                lines_to_print.append(f"\nPlan to run {label}{suffix}")
             elif next_event.payload.build_targets is not None:
                 # Print the number of targets we are refreshing.
                 label = statusinfo.highlight(
