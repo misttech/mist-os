@@ -3,10 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    aes_gcm_siv::{
-        aead::{Aead, NewAead},
-        Aes256GcmSiv, Key, Nonce,
-    },
+    aes_gcm_siv::{aead::Aead, Aes256GcmSiv, Key, KeyInit as _, Nonce},
     anyhow::{anyhow, bail, Context, Error},
     async_trait::async_trait,
     fxfs_crypto::{Crypt, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes},
@@ -40,8 +37,8 @@ pub struct InsecureCrypt {
 impl InsecureCrypt {
     pub fn new() -> Self {
         let mut this = Self::default();
-        this.ciphers.insert(0, Aes256GcmSiv::new(Key::from_slice(&DATA_KEY)));
-        this.ciphers.insert(1, Aes256GcmSiv::new(Key::from_slice(&METADATA_KEY)));
+        this.ciphers.insert(0, Aes256GcmSiv::new(Key::<Aes256GcmSiv>::from_slice(&DATA_KEY)));
+        this.ciphers.insert(1, Aes256GcmSiv::new(Key::<Aes256GcmSiv>::from_slice(&METADATA_KEY)));
         this.active_data_key = Some(0);
         this.active_metadata_key = Some(1);
         this

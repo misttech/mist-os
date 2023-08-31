@@ -3,10 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    aes_gcm_siv::{
-        aead::{Aead, NewAead},
-        Aes256GcmSiv, Key, Nonce,
-    },
+    aes_gcm_siv::{aead::Aead, Aes256GcmSiv, Key, KeyInit as _, Nonce},
     anyhow::{Context, Error},
     fidl_fuchsia_fxfs::{
         CryptCreateKeyResult, CryptManagementAddWrappingKeyResult,
@@ -92,7 +89,7 @@ impl CryptService {
             Entry::Occupied(_) => Err(zx::Status::ALREADY_EXISTS.into_raw()),
             Entry::Vacant(vacant) => {
                 info!(wrapping_key_id, "Adding wrapping key");
-                vacant.insert(Aes256GcmSiv::new(Key::from_slice(&key[..])));
+                vacant.insert(Aes256GcmSiv::new(Key::<Aes256GcmSiv>::from_slice(&key[..])));
                 Ok(())
             }
         }

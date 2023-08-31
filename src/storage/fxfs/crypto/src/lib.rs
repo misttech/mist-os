@@ -4,8 +4,10 @@
 
 use {
     aes::{
-        cipher::{generic_array::GenericArray, NewCipher, StreamCipher as _, StreamCipherSeek},
-        Aes256, NewBlockCipher,
+        cipher::{
+            generic_array::GenericArray, KeyInit, KeyIvInit, StreamCipher as _, StreamCipherSeek,
+        },
+        Aes256,
     },
     anyhow::{anyhow, Error},
     async_trait::async_trait,

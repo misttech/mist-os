@@ -67,7 +67,7 @@ pub fn aes_from_anti_spoofing_and_public(
 
     // The first 16 bytes of the 32-byte hashed key is the Anti-Spoofing AES key.
     let mut hasher = Sha256::new();
-    hasher.update(shared_secret.as_bytes());
+    hasher.update(shared_secret.raw_secret_bytes());
     let calculated_hash: [u8; 32] = hasher.finalize().into();
 
     let mut anti_spoofing_key: [u8; 16] = [0; 16];
@@ -137,7 +137,7 @@ pub(crate) mod tests {
             0x68, 0xA0, 0xEE, 0x5A, 0x67, 0x06, 0xF5, 0x43, 0xD9, 0x06, 0x1A, 0xD5, 0x78, 0x89,
             0x49, 0x8A, 0xE6, 0xBA,
         ];
-        assert_eq!(shared_secret.as_bytes()[..], expected_shared_secret[..]);
+        assert_eq!(shared_secret.raw_secret_bytes()[..], expected_shared_secret[..]);
     }
 
     /// This test verifies the calculation of the Anti-Spoofing AES key.

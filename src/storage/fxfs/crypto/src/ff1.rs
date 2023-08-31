@@ -4,7 +4,10 @@
 
 use {
     crate::UnwrappedKey,
-    aes::{cipher::generic_array::GenericArray, Aes256, BlockEncrypt, NewBlockCipher},
+    aes::{
+        cipher::{generic_array::GenericArray, BlockEncrypt, KeyInit},
+        Aes256,
+    },
     byteorder::{BigEndian, ByteOrder},
 };
 

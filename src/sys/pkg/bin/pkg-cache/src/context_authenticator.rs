@@ -2,11 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_pkg as fpkg,
-    hmac::{Mac as _, NewMac as _},
-    rand::Rng as _,
-};
+use {fidl_fuchsia_pkg as fpkg, hmac::Mac as _, rand::Rng as _};
 
 /// Creates and authenticates `fidl_fuchsia_pkg::ResolutionContext`s using an HMAC.
 /// The contexts contain the hash of the superpackage.
@@ -54,7 +50,8 @@ impl ContextAuthenticator {
             .map_err(|_| ContextAuthenticatorError::InvalidLength(context.bytes.len()))?;
         let (tag, hash) = context.split_at(TAG_LEN);
         let () = self.hmac.update(hash);
-        let () = self.hmac.verify(tag).map_err(ContextAuthenticatorError::AuthenticationFailed)?;
+        let () =
+            self.hmac.verify_slice(tag).map_err(ContextAuthenticatorError::AuthenticationFailed)?;
         // This will never fail, but need a way to infallibly split an array reference into two
         // array references to communicate that to the type system.
         Ok(fuchsia_hash::Hash::try_from(hash)
@@ -68,7 +65,7 @@ pub(crate) enum ContextAuthenticatorError {
     InvalidLength(usize),
 
     #[error("authentication failed")]
-    AuthenticationFailed(#[source] hmac::crypto_mac::MacError),
+    AuthenticationFailed(#[source] hmac::digest::MacError),
 }
 
 #[cfg(test)]

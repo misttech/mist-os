@@ -6,10 +6,7 @@ use crate::crypto_provider::{
     mundane_provider::MundaneSoftwareProvider, AsymmetricProviderKey, CryptoProvider,
     CryptoProviderError, ProviderKey, SealingProviderKey,
 };
-use aes_gcm::{
-    aead::{AeadInPlace, NewAead},
-    Aes256Gcm, Key, Nonce, Tag,
-};
+use aes_gcm::{aead::AeadInPlace, Aes256Gcm, Key, KeyInit, Nonce, Tag};
 use bincode;
 use fidl_fuchsia_kms::{AsymmetricKeyAlgorithm, KeyProvider};
 use mundane;
@@ -81,7 +78,7 @@ impl ProviderKey for SoftwareSealingKey {
 
 impl SealingProviderKey for SoftwareSealingKey {
     fn encrypt(&self, data: &[u8]) -> Result<Vec<u8>, CryptoProviderError> {
-        let key = Key::from_slice(&self.inner_key.key);
+        let key = Key::<Aes256Gcm>::from_slice(&self.inner_key.key);
         let cipher = Aes256Gcm::new(key);
         let mut iv = Nonce::default();
         mundane::bytes::rand(&mut iv);
@@ -102,7 +99,7 @@ impl SealingProviderKey for SoftwareSealingKey {
     }
 
     fn decrypt(&self, data: &[u8]) -> Result<Vec<u8>, CryptoProviderError> {
-        let key = Key::from_slice(&self.inner_key.key);
+        let key = Key::<Aes256Gcm>::from_slice(&self.inner_key.key);
         let cipher = Aes256Gcm::new(key);
         let encrypted_data: EncryptedData = bincode::deserialize(data).map_err(|err| {
             CryptoProviderError::new(&format!("failed to deserialize encrypted data: {:?}", err))

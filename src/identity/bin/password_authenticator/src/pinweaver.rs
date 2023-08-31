@@ -19,7 +19,7 @@ use {
     fuchsia_component::client::connect_to_protocol,
     fuchsia_zircon as zx,
     futures::lock::Mutex,
-    hmac::{Hmac, Mac, NewMac},
+    hmac::{Hmac, Mac},
     identity_common::PrekeyMaterial,
     lazy_static::lazy_static,
     serde::{Deserialize, Serialize},

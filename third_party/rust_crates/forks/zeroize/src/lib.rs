@@ -21,6 +21,8 @@ pub trait Zeroize {
     fn zeroize(&mut self);
 }
 
+pub trait ZeroizeOnDrop {}
+
 pub trait DefaultIsZeroes: Copy + Default + Sized {}
 
 impl<Z> Zeroize for Z

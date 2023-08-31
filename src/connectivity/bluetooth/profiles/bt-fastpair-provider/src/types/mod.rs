@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use aes::cipher::generic_array::GenericArray;
-use aes::{Aes128, BlockDecrypt, BlockEncrypt, NewBlockCipher};
+use aes::cipher::{
+    generic_array::GenericArray, BlockDecrypt as _, BlockEncrypt as _, KeyInit as _,
+};
+use aes::Aes128;
 use fuchsia_inspect::{self as inspect, Property};
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use lru_cache::LruCache;

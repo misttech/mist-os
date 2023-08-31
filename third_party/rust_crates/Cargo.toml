@@ -24,9 +24,11 @@ version = "0.1.0"
 [dependencies]
 # Keep this sorted alphabetically, please.
 aead = { version = "0.4.2", features = ["std"] }
-aes = { version = "0.7.5", features = ["armv8"] }
-aes-gcm = "0.9"
-aes-gcm-siv = { version = "0.10.3", features = ["std"] }
+# Once aes is updated to 0.8.3 or beyond, remove --cfg=aes_armv8 below
+# (see for context: https://fuchsia-review.git.corp.google.com/c/fuchsia/+/711365/comment/f64fc21a_309bf0b8/)
+aes = { version = "0.8.2" }
+aes-gcm = "0.10.1"
+aes-gcm-siv = { version = "0.11.1", features = ["std"] }
 ansi_term = "0.12.0"
 anyhow = "1.0.75"
 arbitrary = { version = "1.0.3", features = ["derive"] }
@@ -76,7 +78,7 @@ crossbeam = "0.8.0"
 crossbeam-utils = "0.8.14"
 crypto-mac = { version = "0.11.1", features = ["std"] }
 cfg-if = "1.0.0"
-chacha20 = "0.8.1"
+chacha20 = "0.9.0"
 csv = "1.2.1"
 darling = "0.12.0"
 data-encoding = "2.1.2"
@@ -86,8 +88,8 @@ derp = "0.0.14"
 downcast-rs = "1.2.0"
 difference = "2.0.0"
 dyn-clone = "1.0.5"
-ecdsa = { version = "0.13.4", features = ["pkcs8"] }
-elliptic-curve = { version = "0.11.12", features = [ "ecdh" ] }
+ecdsa = { version = "0.14.3", features = ["pkcs8"] }
+elliptic-curve = { version = "0.12.3", features = [ "ecdh" ] }
 either = "1.5.0"
 eui48 = { version = "1.1.0", default-features = false, features = ["serde", "disp_hexstring"] }
 event-listener = "2.5.1"
@@ -110,8 +112,8 @@ half = "1.6.0"
 handlebars = "4.3.5"
 heck = "0.3.1"
 hex = "0.3.2"
-hmac = "0.11.0"
-hkdf = "0.11.0"
+hmac = "0.12.1"
+hkdf = "0.12.3"
 hound = "3.5.0"
 humansize = "1.1.1"
 http = "0.2.4"
@@ -151,8 +153,8 @@ num = { version = "0.4.0", features = ["rand"] }
 num-derive = "0.3"
 num-traits = "0.2"
 once_cell = { version = "1.2.0", features = ["parking_lot"] }
-p256 = { version = "0.10.1", features = ["pem", "serde"] }
-pkcs8 = "0.8.0"
+p256 = { version = "0.11.1", features = ["pem", "serde"] }
+pkcs8 = "0.9.0"
 parking_lot = "0.9"
 paste = "1.0"
 pathdiff = { version = "0.2.1", features = ["camino"] }
@@ -182,14 +184,14 @@ rustls = { version = "0.19.1", features = ["dangerous_configuration"] }
 rustyline = "2.1.0"
 schemars = { version = "0.8", features = ["chrono", "preserve_order"] }
 scopeguard = "1.1.0"
-scrypt = "0.8.0"
+scrypt = "0.10.0"
 serde = { version = "1.0.147", features = ["derive"] }
 serde_cbor = "0.11.1"
 serde_derive = "1.0.147"
 serde_json = "1.0.87"
 serde_json5 = "0.1.0"
 serde_repr = "0.1.7"
-sha2 = "0.9"
+sha2 = "0.10.2"
 signature =  "1.4.0"
 siphasher = "0.3.10"
 slab = "0.4.7"
@@ -222,7 +224,7 @@ vte = "0.3"
 wasm-bindgen = "0.2.63"
 webpki = "0.21"
 xml-rs = "0.8"
-xts-mode = "0.4.1"
+xts-mode = "0.5.0"
 unic-char-range = "0.9"
 unic-ucd-block = "0.9"
 unicode-segmentation = "1.0"
@@ -405,8 +407,9 @@ add_cfgs = []
 #
 # Keep this sorted alphabetically, please.
 
-[gn.package.aes."0.7.5"]
+[gn.package.aes."0.8.2"]
 configs = [ "//build/config/rust:allow_simd" ]
+rustflags = [ "--cfg=aes_armv8" ]
 
 [gn.package.anyhow."1.0.75"]
 # TODO(https://github.com/rust-lang/rust/pull/72981): uncomment when backtrace is stabilized.
@@ -638,7 +641,7 @@ testonly = true
 # We always want to optimize scrypt for speed, because a single key derivation
 # that takes 150 msec when speed-optimized takes 20 seconds (!) when not
 # optimized, and that's a terrible experience for checking passwords.
-[gn.package.scrypt."0.8.0"]
+[gn.package.scrypt."0.10.0"]
 configs = [ "//build/config:optimize_speed" ]
 
 [gn.package.serde."1.0.147"]
