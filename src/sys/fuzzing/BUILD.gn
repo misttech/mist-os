@@ -25,6 +25,14 @@ group("tests") {
     "realmfuzzer:tests",
     "registry:tests",
   ]
+
+  if (current_cpu == "riscv64") {
+    deps -= [
+      # TODO(fxbug.dev/132944): Remove when `LibFuzzerRunnerTest.MinimizeNewError`
+      # does not time out on RISC-V.
+      "libfuzzer:tests",
+    ]
+  }
 }
 
 core_shard("fuzzing-core-shard") {

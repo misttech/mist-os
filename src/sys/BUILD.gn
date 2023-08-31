@@ -32,4 +32,14 @@ group("tests") {
     "time:tests",
     "tools:tests",
   ]
+
+  if (current_cpu == "riscv64") {
+    deps -= [
+      # TODO(fxbug.dev/128957): Remove after removing Go dependencies on RISC-V.
+      "pkg:tests",
+
+      # TODO(fxbug.dev/122609): Remove after removing Go dependencies on RISC-V.
+      "time:tests",
+    ]
+  }
 }

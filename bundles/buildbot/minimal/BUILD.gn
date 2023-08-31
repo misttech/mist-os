@@ -65,32 +65,50 @@ group("minimal") {
 
     # TODO(fxbug.dev/132473): Uncomment once all tests pass on minimal.x64.
     # "//src/developer:tests",
+    "//src/bringup:tests",
+    "//src/devices:tests",
+    "//src/diagnostics:tests",
     "//src/fonts:tests",
     "//src/hwinfo:tests",
     "//src/intl:tests",
     "//src/lib:tests",
+    "//src/performance:tests",
     "//src/power:tests",
+    "//src/storage:tests",
+    "//src/sys:tests",
     "//src/zircon:tests",
     "//zircon/system/ulib:tests",
     "//zircon/system/utest:tests",
   ]
 
   if (current_cpu == "riscv64") {
-    deps += [
-      # Run a subset of the tests until fxbug.dev/122609 is addressed and all
-      # network tests can be built and run. See below.
-      "//src/connectivity/network/tests:tests",
-    ]
     deps -= [
       # TODO(fxbug.dev/122609): Remove after removing Go dependencies on RISC-V.
       "//src/connectivity/network:tests",
 
-      # TODO(fxbug.dev/130998): Enable once all dependencies succeed on RISC-V.
+      # TODO(fxbug.dev/292292675): Enable once all dependencies succeed on RISC-V.
       # TODO(fxbug.dev/132473): Uncomment when adding to the default targets.
       # "//src/developer:tests",
 
       # TODO(fxbug.dev/132426): Remove once the tests in the bug pass on RISC-V.
       "//src/lib:tests",
+
+      # TODO(fxbug.dev/128614): Remove once cpuperf_provider supports RISC-V.
+      "//src/performance:tests",
+
+      # TODO(fxbug.dev/132939): Remove when storage tests pass on RISC-V.
+      "//src/storage:tests",
+    ]
+
+    deps += [
+      # Run a subset of the network tests until fxbug.dev/122609 is addressed
+      # and all tests (removed above) can be built and run.
+      "//src/connectivity/network/tests:tests",
+
+      # Run a subset of the lib tests until fxbug.dev/132426 is addressed
+      # and all tests (removed above) can be built and run.
+      "//src/lib/fidl:tests",
+      "//src/lib/fuchsia:tests",
     ]
   }
 }

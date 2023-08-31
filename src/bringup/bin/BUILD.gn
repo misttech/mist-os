@@ -13,4 +13,11 @@ group("tests") {
     "pwrbtn-monitor:tests",
     "virtcon:tests",
   ]
+
+  if (current_cpu == "riscv64") {
+    deps -= [
+      # TODO(fxbug.dev/122609): Remove after removing Go dependencies on RISC-V.
+      "netsvc:tests",
+    ]
+  }
 }
