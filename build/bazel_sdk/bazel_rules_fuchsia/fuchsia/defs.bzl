@@ -18,6 +18,10 @@ load(
     _fuchsia_wrap_cc_test = "fuchsia_wrap_cc_test",
 )
 load(
+    "//fuchsia/private:fuchsia_cc_driver.bzl",
+    _fuchsia_cc_driver = "fuchsia_cc_driver",
+)
+load(
     "//fuchsia/private:fuchsia_component.bzl",
     _fuchsia_component = "fuchsia_component",
     _fuchsia_driver_component = "fuchsia_driver_component",
@@ -117,6 +121,7 @@ load(
 
 fuchsia_bind_library = _fuchsia_bind_library
 fuchsia_cc_binary = _fuchsia_cc_binary
+fuchsia_cc_driver = _fuchsia_cc_driver
 fuchsia_cc_test = _fuchsia_cc_test
 fuchsia_wrap_cc_binary = _fuchsia_wrap_cc_binary
 fuchsia_wrap_cc_test = _fuchsia_wrap_cc_test
