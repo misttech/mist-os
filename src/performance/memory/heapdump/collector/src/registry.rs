@@ -187,6 +187,9 @@ impl Registry {
                         }
                     });
                 }
+                fheapdump_client::CollectorRequest::_UnknownMethod { ordinal, .. } => {
+                    warn!(ordinal, "Unknown CollectorRequest");
+                }
             }
         }
         Ok(())

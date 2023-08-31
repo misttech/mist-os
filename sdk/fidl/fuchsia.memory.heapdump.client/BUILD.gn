@@ -5,7 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.memory.heapdump.client") {
-  sdk_category = "internal"
+  sdk_category = "partner_internal"
   sources = [ "client.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }

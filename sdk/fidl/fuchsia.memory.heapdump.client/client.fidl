@@ -1,6 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+@available(added=15)
 library fuchsia.memory.heapdump.client;
 
 using zx;
@@ -175,9 +176,9 @@ closed protocol StoredSnapshotIterator {
 
 /// Protocol to request and retrieve memory profiles.
 @discoverable
-closed protocol Collector {
+open protocol Collector {
     /// Obtains a snapshot of the current live allocations in an instrumented process.
-    strict TakeLiveSnapshot(resource table {
+    flexible TakeLiveSnapshot(resource table {
         /// The instrumented process to operate on.
         ///
         /// Required.
@@ -195,7 +196,7 @@ closed protocol Collector {
     });
 
     /// Retrieves the list of all the available stored snapshots.
-    strict ListStoredSnapshots(resource table {
+    flexible ListStoredSnapshots(resource table {
         /// The server_end of the StoredSnapshotIterator that will be used to retrieve the results.
         ///
         /// Required.
@@ -206,7 +207,7 @@ closed protocol Collector {
     });
 
     /// Retrieves a stored snapshot.
-    strict DownloadStoredSnapshot(resource table {
+    flexible DownloadStoredSnapshot(resource table {
         /// The identifier of the snapshot to be downloaded.
         ///
         /// The list of the available snapshots can be retrieved with ListStoredSnapshots.
