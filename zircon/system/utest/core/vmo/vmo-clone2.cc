@@ -1757,7 +1757,7 @@ TEST_F(VmoClone2TestCase, MapRangeReadOnly) {
 
   // No pages committed in the clone.
   ASSERT_OK(clone.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_EQ(0u, info.committed_bytes);
+  EXPECT_EQ(0u, info.populated_bytes);
 
   // Committed pages in the parent are unchanged.
   ASSERT_OK(vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));

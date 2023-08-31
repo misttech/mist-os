@@ -376,12 +376,12 @@ TEST(VmoReference, MappingUpdate) {
   // Decommit the page.
   ASSERT_OK(ref.op_range(ZX_VMO_OP_DECOMMIT, 0, zx_system_get_page_size(), nullptr, 0));
 
-  // Both the parent and the child should have no pages committed.
+  // Both the parent and the child should have no pages populated.
   zx_info_vmo_t info;
   ASSERT_OK(ref.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_EQ(0u, info.committed_bytes);
+  EXPECT_EQ(0u, info.populated_bytes);
   ASSERT_OK(vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_EQ(0u, info.committed_bytes);
+  EXPECT_EQ(0u, info.populated_bytes);
 
   // The mapping should now read zeros.
   EXPECT_EQ(0u, *buf);
@@ -399,12 +399,12 @@ TEST(VmoReference, AttributedCounts) {
   const uint8_t data = 0xaa;
   ASSERT_OK(vmo.write(&data, 0, sizeof(data)));
 
-  // The parent should see the page committed while the reference does not.
+  // The parent should see the page populated while the reference does not.
   zx_info_vmo_t info;
   ASSERT_OK(ref.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_EQ(0u, info.committed_bytes);
+  EXPECT_EQ(0u, info.populated_bytes);
   ASSERT_OK(vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_EQ(zx_system_get_page_size(), info.committed_bytes);
+  EXPECT_EQ(zx_system_get_page_size(), info.populated_bytes);
 
   // The reference should see the page.
   uint8_t buf;
@@ -416,7 +416,7 @@ TEST(VmoReference, AttributedCounts) {
 
   // Committed pages still not attributed to the reference.
   ASSERT_OK(ref.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_EQ(0u, info.committed_bytes);
+  EXPECT_EQ(0u, info.populated_bytes);
 
   // The reference can read the parent's page though.
   buf = 0;
@@ -610,7 +610,7 @@ TEST(VmoReference, MappingUpdateAfterDroppingRef) {
 
   zx_info_vmo_t info;
   ASSERT_OK(vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_EQ(0u, info.committed_bytes);
+  EXPECT_EQ(0u, info.populated_bytes);
 
   // The mapping should now read zeros.
   EXPECT_EQ(0u, *buf);
@@ -655,7 +655,7 @@ TEST(VmoReference, MappingUpdateAfterDroppingParent) {
 
   zx_info_vmo_t info;
   ASSERT_OK(ref.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_EQ(0u, info.committed_bytes);
+  EXPECT_EQ(0u, info.populated_bytes);
 
   // The mapping should now read zeros.
   EXPECT_EQ(0u, *buf);
@@ -704,7 +704,7 @@ TEST(VmoReference, MappingUpdateNestedChildDestroy) {
 
   zx_info_vmo_t info;
   ASSERT_OK(vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_EQ(0u, info.committed_bytes);
+  EXPECT_EQ(0u, info.populated_bytes);
 
   // The mapping should now read zeros.
   EXPECT_EQ(0u, *buf);
@@ -784,7 +784,7 @@ TEST(VmoReference, MappingUpdateNestedRootDestroy) {
 
   zx_info_vmo_t info;
   ASSERT_OK(nested.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_EQ(0u, info.committed_bytes);
+  EXPECT_EQ(0u, info.populated_bytes);
 
   // The mappings should now read zeros.
   buf = reinterpret_cast<uint8_t*>(ptr1);

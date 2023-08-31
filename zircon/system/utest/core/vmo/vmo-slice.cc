@@ -522,18 +522,18 @@ TEST(VmoSliceTestCase, AttributedCounts) {
   // Committed pages are attributed to the parent.
   zx_info_vmo_t info;
   ASSERT_OK(vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_EQ(zx_system_get_page_size(), info.committed_bytes);
+  EXPECT_EQ(zx_system_get_page_size(), info.populated_bytes);
 
   // Committed pages are not attributed to the slice.
   ASSERT_OK(slice.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_EQ(0u, info.committed_bytes);
+  EXPECT_EQ(0u, info.populated_bytes);
 
   // Drop the parent handle.
   vmo.reset();
 
   // Committed pages are still not attributed to the slice.
   ASSERT_OK(slice.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_EQ(0u, info.committed_bytes);
+  EXPECT_EQ(0u, info.populated_bytes);
 
   // Slice can read the parent's pages though.
   data = 0;
