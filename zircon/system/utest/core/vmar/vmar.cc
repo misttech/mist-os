@@ -2591,11 +2591,11 @@ TEST(Vmar, RangeOpCommit) {
   ASSERT_EQ(ZX_ERR_ACCESS_DENIED,
             vmar.op_range(ZX_VMAR_OP_COMMIT, addr, zx_system_get_page_size(), nullptr, 0));
 
-  // The commit counts should not have changed.
+  // The commit counts should not have changed (modulo any reclamation).
   ASSERT_OK(vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_EQ(2 * zx_system_get_page_size(), info.populated_bytes);
+  EXPECT_GE(2 * zx_system_get_page_size(), info.populated_bytes);
   ASSERT_OK(clone.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_EQ(kVmoSize, info.populated_bytes);
+  EXPECT_GE(kVmoSize, info.populated_bytes);
 
   // Some trivial failure cases.
   // Out of range.
