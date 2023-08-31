@@ -180,7 +180,7 @@ zx_status_t Gt92xxDevice::Create(zx_device_t* device) {
     }
   }
 
-  status = goodix_dev->DdkAdd(ddk::DeviceAddArgs("gt92xx HidDevice")
+  status = goodix_dev->DdkAdd(ddk::DeviceAddArgs("gt92xx-HidDevice")
                                   .set_inspect_vmo(goodix_dev->inspector_.DuplicateVmo()));
   if (status != ZX_OK) {
     zxlogf(ERROR, "gt92xx: Could not create hid device: %d", status);
