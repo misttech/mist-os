@@ -147,7 +147,7 @@ typedef struct zx_restricted_exception {
 
 // ====== Kernel-based memory attribution support ====== //
 // Topic for zx_object_get_info.
-#define ZX_INFO_MEMORY_ATTRIBUTION ((zx_object_info_topic_t)33u)  // zx_info_memory_attribution_t[n]
+#define ZX_INFO_MEMORY_ATTRIBUTION ((zx_object_info_topic_t)34u)  // zx_info_memory_attribution_t[n]
 
 typedef struct zx_info_memory_attribution {
   // The koid of the process for which these attribution statistics apply.

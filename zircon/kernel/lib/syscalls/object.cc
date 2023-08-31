@@ -38,6 +38,7 @@
 #include <object/vcpu_dispatcher.h>
 #include <object/vm_address_region_dispatcher.h>
 #include <object/vm_object_dispatcher.h>
+#include <vm/compression.h>
 #include <vm/discardable_vmo_tracker.h>
 #include <vm/pmm.h>
 #include <vm/vm.h>
@@ -891,6 +892,42 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
 
       return single_record_result(_buffer, buffer_size, _actual, _avail, stats_ext);
     }
+    case ZX_INFO_KMEM_STATS_COMPRESSION: {
+      auto status =
+          validate_ranged_resource(handle, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_INFO_BASE, 1);
+      if (status != ZX_OK)
+        return status;
+
+      zx_info_kmem_stats_compression_t kstats = {};
+
+      VmCompression* compression = pmm_page_compression();
+      if (compression) {
+        VmCompression::Stats stats = compression->GetStats();
+        kstats.uncompressed_storage_bytes = stats.memory_usage.uncompressed_content_bytes;
+        kstats.compressed_storage_bytes = stats.memory_usage.compressed_storage_bytes;
+        kstats.compressed_fragmentation_bytes = stats.memory_usage.compressed_storage_bytes -
+                                                stats.memory_usage.compressed_storage_used_bytes;
+        kstats.compression_time = stats.compression_time;
+        kstats.decompression_time = stats.decompression_time;
+        kstats.total_page_compression_attempts = stats.total_page_compression_attempts;
+        kstats.failed_page_compression_attempts = stats.failed_page_compression_attempts;
+        kstats.total_page_decompressions = stats.total_page_decompressions;
+        kstats.compressed_page_evictions = stats.compressed_page_evictions;
+        kstats.eager_page_compressions = PageQueues::GetLruPagesCompressed();
+        Evictor::EvictorStats evictor_stats = Evictor::GetGlobalStats();
+        kstats.memory_pressure_page_compressions = evictor_stats.compression_other;
+        kstats.critical_memory_page_compressions = evictor_stats.compression_oom;
+        kstats.pages_decompressed_unit_ns = ZX_SEC(1);
+        static_assert(8 <= VmCompression::kNumLogBuckets);
+        for (int i = 0; i < 8; i++) {
+          kstats.pages_decompressed_within_log_time[i] =
+              stats.pages_decompressed_within_log_seconds[i];
+        }
+      }
+
+      return single_record_result(_buffer, buffer_size, _actual, _avail, kstats);
+    }
+
     case ZX_INFO_RESOURCE: {
       // grab a reference to the dispatcher
       fbl::RefPtr<ResourceDispatcher> resource;

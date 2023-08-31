@@ -55,6 +55,7 @@ typedef uint32_t zx_object_info_topic_t;
 #define ZX_INFO_TASK_RUNTIME                __ZX_INFO_TOPIC(30u, 1)        // zx_info_task_runtime_t[1]
 #define ZX_INFO_KMEM_STATS_EXTENDED         ((zx_object_info_topic_t) 31u) // zx_info_kmem_stats_extended_t[1]
 #define ZX_INFO_VCPU                        ((zx_object_info_topic_t) 32u) // zx_info_vcpu_t[1]
+#define ZX_INFO_KMEM_STATS_COMPRESSION      ((zx_object_info_topic_t) 33u) // zx_info_kmem_stats_compression[1]
 
 // Return codes set when a task is killed.
 #define ZX_TASK_RETCODE_SYSCALL_KILL            ((int64_t) -1024)   // via zx_task_kill().
@@ -788,6 +789,75 @@ typedef struct zx_info_kmem_stats_extended {
     // reclamation, but has had reclamation disabled.
     uint64_t vmo_reclaim_disabled_bytes;
 } zx_info_kmem_stats_extended_t;
+
+typedef struct zx_info_kmem_stats_compression {
+    // Size in bytes of the content that is currently being compressed and stored.
+    uint64_t uncompressed_storage_bytes;
+
+    // Size in bytes of all memory, including metadata, fragmentation and other
+    // overheads, of the compressed memory area. Note that due to base book
+    // keeping overhead this could be non-zero, even when
+    // |uncompressed_content_bytes| is zero.
+    uint64_t compressed_storage_bytes;
+
+    // Size in bytes of any fragmentation in the compressed memory area.
+    uint64_t compressed_fragmentation_bytes;
+
+    // Total amount of CPU time spent on compression across all threads.
+    // Compression may happen in parallel and so this can be larger than
+    // wall clock time.
+    zx_duration_t compression_time;
+
+    // Total amount of time decompression has spent on a CPU across all threads.
+    // Decompression may happen in parallel and so this can increase faster than
+    // wall clock time.
+    zx_duration_t decompression_time;
+
+    // Total number of times compression has been done on a page, regardless of
+    // whether the compressed result was ultimately retained.
+    uint64_t total_page_compression_attempts;
+
+    // How many of the total compression attempts were considered failed and
+    // were not stored. An example reason for failure would be a page not being
+    // compressed sufficiently to be considered worth storing.
+    uint64_t failed_page_compression_attempts;
+
+    // Number of times pages have been decompressed.
+    uint64_t total_page_decompressions;
+
+    // Number of times a page was removed from storage without needing to be
+    // decompressed. An example that would cause this is a VMO being destroyed.
+    uint64_t compressed_page_evictions;
+
+    // How many pages compressed due to the page being inactive, but without
+    // there being memory pressure.
+    uint64_t eager_page_compressions;
+
+    // How many pages compressed due to general memory pressure. This excludes pages
+    // compressed due to critical memory pressure.
+    uint64_t memory_pressure_page_compressions;
+
+    // How many pages compressed due to attempting to avoid OOM or near OOM
+    // scenarios.
+    uint64_t critical_memory_page_compressions;
+
+    // The nanoseconds in the base unit of time for
+    // |pages_decompressed_within_log_time|.
+    uint64_t pages_decompressed_unit_ns;
+
+    // How long pages spent compressed before being decompressed, grouped in log
+    // buckets. Pages that got evicted, and hence were not decompressed, are not
+    // counted here. Buckets are in |pages_decompressed_unit_ns| and round up
+    // such that:
+    // 0: Pages decompressed in <1 unit
+    // 1: Pages decompressed between 1 and 2 units
+    // 2: Pages decompressed between 2 and 4 units
+    // ...
+    // 7: Pages decompressed between 64 and 128 units
+    // How many pages are held compressed for longer than 128 units can be
+    // inferred by subtracting from |total_page_decompressions|.
+    uint64_t pages_decompressed_within_log_time[8];
+} zx_info_kmem_stats_compression_t;
 
 typedef struct zx_info_resource {
     // The resource kind; resource object kinds are detailed in the resource.md
