@@ -57,9 +57,9 @@ pub struct PlayCommand {
         rate adjustment and offset are integers. To set offset without rate adjustment, pass 0\
         in place of rate adjustment.",
         from_str_fn(str_to_clock),
-        default = "fidl_fuchsia_audio_ffxdaemon::ClockType::Flexible(fidl_fuchsia_audio_ffxdaemon::Flexible)"
+        default = "fidl_fuchsia_audio_controller::ClockType::Flexible(fidl_fuchsia_audio_controller::Flexible)"
     )]
-    pub clock: fidl_fuchsia_audio_ffxdaemon::ClockType,
+    pub clock: fidl_fuchsia_audio_controller::ClockType,
 
     #[argh(
         option,
@@ -95,6 +95,6 @@ fn str_to_usage(src: &str) -> Result<AudioRenderUsageExtended, String> {
     }
 }
 
-fn str_to_clock(src: &str) -> Result<fidl_fuchsia_audio_ffxdaemon::ClockType, String> {
+fn str_to_clock(src: &str) -> Result<fidl_fuchsia_audio_controller::ClockType, String> {
     format_utils::str_to_clock(src)
 }

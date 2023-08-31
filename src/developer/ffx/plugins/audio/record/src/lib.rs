@@ -10,7 +10,7 @@ use {
     blocking::Unblock,
     ffx_audio_record_args::RecordCommand,
     fho::{moniker, FfxContext, FfxMain, FfxTool, SimpleWriter},
-    fidl_fuchsia_audio_ffxdaemon::{
+    fidl_fuchsia_audio_controller::{
         AudioDaemonProxy, AudioDaemonRecordRequest, CapturerConfig, RecordLocation,
         StandardCapturerConfig,
     },
@@ -39,11 +39,11 @@ impl FfxMain for RecordTool {
 
         let (location, gain_settings) = match self.cmd.usage {
             AudioCaptureUsageExtended::Loopback => {
-                (RecordLocation::Loopback(fidl_fuchsia_audio_ffxdaemon::Loopback {}), None)
+                (RecordLocation::Loopback(fidl_fuchsia_audio_controller::Loopback {}), None)
             }
             AudioCaptureUsageExtended::Ultrasound => (
                 RecordLocation::Capturer(CapturerConfig::UltrasoundCapturer(
-                    fidl_fuchsia_audio_ffxdaemon::UltrasoundCapturer {},
+                    fidl_fuchsia_audio_controller::UltrasoundCapturer {},
                 )),
                 None,
             ),
@@ -51,7 +51,7 @@ impl FfxMain for RecordTool {
                 RecordLocation::Capturer(CapturerConfig::StandardCapturer(
                     StandardCapturerConfig { usage: capturer_usage, ..Default::default() },
                 )),
-                Some(fidl_fuchsia_audio_ffxdaemon::GainSettings {
+                Some(fidl_fuchsia_audio_controller::GainSettings {
                     mute: Some(self.cmd.mute),
                     gain: Some(self.cmd.gain),
                     ..Default::default()
@@ -60,7 +60,7 @@ impl FfxMain for RecordTool {
         };
 
         let (cancel_client, cancel_server) = fidl::endpoints::create_endpoints::<
-            fidl_fuchsia_audio_ffxdaemon::AudioDaemonCancelerMarker,
+            fidl_fuchsia_audio_controller::AudioDaemonCancelerMarker,
         >();
 
         let request = AudioDaemonRecordRequest {

@@ -5,22 +5,21 @@
 mod device;
 mod ring_buffer;
 mod socket;
-use fidl_fuchsia_audio_ffxdaemon::GainSettings;
+
 pub use ring_buffer::RingBuffer;
 
 use {
     anyhow::{self, Context, Error},
     async_lock as _,
-    fidl_fuchsia_audio_ffxdaemon::{
+    fidl_fuchsia_audio_controller::{
         AudioDaemonCancelerMarker, AudioDaemonDeviceInfoResponse, AudioDaemonListDevicesResponse,
         AudioDaemonPlayRequest, AudioDaemonPlayResponse, AudioDaemonRecordRequest,
         AudioDaemonRecordResponse, AudioDaemonRequest, AudioDaemonRequestStream, CapturerConfig,
-        PlayLocation, RecordLocation, RendererConfig,
+        GainSettings, PlayLocation, RecordLocation, RendererConfig,
     },
+    fidl_fuchsia_hardware_audio::DeviceType,
     fidl_fuchsia_media::{AudioCapturerProxy, AudioRendererProxy, AudioStreamType},
-    fidl_fuchsia_media_audio,
-    fidl_fuchsia_virtualaudio::DeviceType,
-    fuchsia as _, fuchsia_async as fasync,
+    fidl_fuchsia_media_audio, fuchsia as _, fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_inspect::{component, health::Reporter},
     fuchsia_zircon::{self as zx, HandleBased},
@@ -155,11 +154,11 @@ impl AudioDaemon {
     }
 
     fn setup_reference_clock(
-        clock_type: fidl_fuchsia_audio_ffxdaemon::ClockType,
+        clock_type: fidl_fuchsia_audio_controller::ClockType,
     ) -> Result<Option<zx::Clock>, Error> {
         match clock_type {
-            fidl_fuchsia_audio_ffxdaemon::ClockType::Flexible(_) => Ok(None),
-            fidl_fuchsia_audio_ffxdaemon::ClockType::Monotonic(_) => {
+            fidl_fuchsia_audio_controller::ClockType::Flexible(_) => Ok(None),
+            fidl_fuchsia_audio_controller::ClockType::Monotonic(_) => {
                 let clock =
                     zx::Clock::create(zx::ClockOpts::CONTINUOUS | zx::ClockOpts::AUTO_START, None)
                         .map_err(|e| anyhow::anyhow!("Creating reference clock failed: {}", e))?;
@@ -170,7 +169,7 @@ impl AudioDaemon {
                     })?;
                 Ok(Some(rights_clock))
             }
-            fidl_fuchsia_audio_ffxdaemon::ClockType::Custom(info) => {
+            fidl_fuchsia_audio_controller::ClockType::Custom(info) => {
                 let rate = info.rate_adjust;
                 let offset = info.offset;
                 let now = zx::Time::get_monotonic();
@@ -203,7 +202,7 @@ impl AudioDaemon {
                         })?,
                 ))
             }
-            fidl_fuchsia_audio_ffxdaemon::ClockTypeUnknown!() => Ok(None),
+            fidl_fuchsia_audio_controller::ClockTypeUnknown!() => Ok(None),
         }
     }
 
@@ -762,7 +761,7 @@ pub async fn stop_listener(
 
     match stream.try_next().await {
         Ok(Some(request)) => match request {
-            fidl_fuchsia_audio_ffxdaemon::AudioDaemonCancelerRequest::Cancel { responder } => {
+            fidl_fuchsia_audio_controller::AudioDaemonCancelerRequest::Cancel { responder } => {
                 stop_signal.store(true, std::sync::atomic::Ordering::SeqCst);
                 responder.send(Ok(())).context("FIDL error with stop request")
             }

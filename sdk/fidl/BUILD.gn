@@ -221,6 +221,7 @@ group("sdk_partner_libs") {
 # this group is used to ensure that we run the FIDL API compatibility tests on
 # these libraries.
 _sdk_partner_internal_fidl_libraries = [
+  "fuchsia.audio.controller",
   "fuchsia.debugdata",
   "fuchsia.fs",
   "fuchsia.hardware.pty",

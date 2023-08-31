@@ -14,7 +14,7 @@ use {
         PlayCommand,
     },
     fho::{moniker, FfxMain, FfxTool, SimpleWriter},
-    fidl_fuchsia_audio_ffxdaemon::{AudioDaemonPlayRequest, AudioDaemonProxy},
+    fidl_fuchsia_audio_controller::{AudioDaemonPlayRequest, AudioDaemonProxy},
 };
 
 #[derive(FfxTool)]
@@ -82,16 +82,16 @@ where
     &'static E: std::io::Write,
 {
     let renderer = match command.usage {
-        Ultrasound => fidl_fuchsia_audio_ffxdaemon::RendererConfig::UltrasoundRenderer(
-            fidl_fuchsia_audio_ffxdaemon::UltrasoundRendererConfig {
+        Ultrasound => fidl_fuchsia_audio_controller::RendererConfig::UltrasoundRenderer(
+            fidl_fuchsia_audio_controller::UltrasoundRendererConfig {
                 packet_count: command.packet_count,
                 ..Default::default()
             },
         ),
 
         Background(usage) | Media(usage) | SystemAgent(usage) | Communication(usage)
-        | Interruption(usage) => fidl_fuchsia_audio_ffxdaemon::RendererConfig::StandardRenderer(
-            fidl_fuchsia_audio_ffxdaemon::StandardRendererConfig {
+        | Interruption(usage) => fidl_fuchsia_audio_controller::RendererConfig::StandardRenderer(
+            fidl_fuchsia_audio_controller::StandardRendererConfig {
                 usage: Some(usage),
                 clock: Some(command.clock),
                 ..Default::default()
@@ -106,8 +106,8 @@ where
 
     let request = AudioDaemonPlayRequest {
         socket: Some(daemon_request_socket),
-        location: Some(fidl_fuchsia_audio_ffxdaemon::PlayLocation::Renderer(renderer)),
-        gain_settings: Some(fidl_fuchsia_audio_ffxdaemon::GainSettings {
+        location: Some(fidl_fuchsia_audio_controller::PlayLocation::Renderer(renderer)),
+        gain_settings: Some(fidl_fuchsia_audio_controller::GainSettings {
             mute: Some(command.mute),
             gain: Some(command.gain),
             ..Default::default()
@@ -150,8 +150,8 @@ mod tests {
             file: None,
             gain: 0.0,
             mute: false,
-            clock: fidl_fuchsia_audio_ffxdaemon::ClockType::Flexible(
-                fidl_fuchsia_audio_ffxdaemon::Flexible,
+            clock: fidl_fuchsia_audio_controller::ClockType::Flexible(
+                fidl_fuchsia_audio_controller::Flexible,
             ),
         };
 
@@ -210,8 +210,8 @@ mod tests {
             file: Some(wav_path),
             gain: 0.0,
             mute: false,
-            clock: fidl_fuchsia_audio_ffxdaemon::ClockType::Flexible(
-                fidl_fuchsia_audio_ffxdaemon::Flexible,
+            clock: fidl_fuchsia_audio_controller::ClockType::Flexible(
+                fidl_fuchsia_audio_controller::Flexible,
             ),
         };
         let (play_remote, play_local) = fidl::Socket::create_datagram();

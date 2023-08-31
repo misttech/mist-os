@@ -16,7 +16,7 @@ rustc_library("format-utils") {
   edition = "2021"
 
   deps = [
-    "//sdk/fidl/fuchsia.audio.ffxdaemon:fuchsia.audio.ffxdaemon_rust",
+    "//sdk/fidl/fuchsia.audio.controller:fuchsia.audio.controller_rust",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_rust",
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//third_party/rust_crates:anyhow",
@@ -37,13 +37,12 @@ rustc_binary("bin") {
 
   deps = [
     ":format-utils",
-    "//sdk/fidl/fuchsia.audio.ffxdaemon:fuchsia.audio.ffxdaemon_rust",
+    "//sdk/fidl/fuchsia.audio.controller:fuchsia.audio.controller_rust",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//sdk/fidl/fuchsia.media.audio:fuchsia.media.audio_rust",
     "//sdk/fidl/fuchsia.ultrasound:fuchsia.ultrasound_rust",
-    "//sdk/fidl/fuchsia.virtualaudio:fuchsia.virtualaudio_rust",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fdio/rust:fdio",

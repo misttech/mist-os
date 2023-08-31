@@ -7,7 +7,7 @@ use {
     async_trait::async_trait,
     ffx_audio_listdevices_args::ListDevicesCommand,
     fho::{moniker, FfxMain, FfxTool, MachineWriter},
-    fidl_fuchsia_audio_ffxdaemon::AudioDaemonProxy,
+    fidl_fuchsia_audio_controller::AudioDaemonProxy,
     fuchsia_zircon_status::Status,
     itertools::Itertools,
     serde::{Deserialize, Serialize},
@@ -111,10 +111,10 @@ async fn list_devices_impl(
 mod tests {
     use super::*;
     use ffx_writer::{Format, TestBuffers};
-    use fidl_fuchsia_audio_ffxdaemon::{
+    use fidl_fuchsia_audio_controller::{
         AudioDaemonListDevicesResponse, AudioDaemonProxy, AudioDaemonRequest, DeviceSelector,
     };
-    use fidl_fuchsia_virtualaudio::DeviceType;
+    use fidl_fuchsia_hardware_audio::DeviceType;
 
     fn fake_audio_daemon() -> AudioDaemonProxy {
         let devices = vec![

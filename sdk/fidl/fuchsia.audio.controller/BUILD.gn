@@ -4,15 +4,14 @@
 
 import("//build/fidl/fidl.gni")
 
-fidl("fuchsia.audio.ffxdaemon") {
+fidl("fuchsia.audio.controller") {
   sources = [ "audio_proxy.fidl" ]
+  sdk_category = "partner_internal"
 
   public_deps = [
-    "//sdk/fidl/fuchsia.audio.device",
     "//sdk/fidl/fuchsia.hardware.audio",
     "//sdk/fidl/fuchsia.io",
     "//sdk/fidl/fuchsia.media",
-    "//sdk/fidl/fuchsia.virtualaudio",
     "//zircon/vdso/zx",
   ]
 }

@@ -6,7 +6,7 @@ use {
     blocking::Unblock,
     errors::ffx_bail,
     fidl::{endpoints::Proxy, Socket},
-    fidl_fuchsia_audio_ffxdaemon::{
+    fidl_fuchsia_audio_controller::{
         AudioDaemonPlayRequest, AudioDaemonPlayResponse, AudioDaemonProxy, AudioDaemonRequest,
     },
     futures::{AsyncReadExt, FutureExt},
@@ -106,7 +106,7 @@ where
 }
 
 pub async fn wait_for_keypress(
-    canceler: fidl::endpoints::ClientEnd<fidl_fuchsia_audio_ffxdaemon::AudioDaemonCancelerMarker>,
+    canceler: fidl::endpoints::ClientEnd<fidl_fuchsia_audio_controller::AudioDaemonCancelerMarker>,
 ) -> Result<(), std::io::Error> {
     let stdin_waiter = blocking::unblock(move || {
         let mut line = String::new();

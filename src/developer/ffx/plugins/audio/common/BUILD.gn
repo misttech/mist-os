@@ -10,7 +10,7 @@ rustc_library("ffx_audio_common") {
   edition = "2021"
 
   deps = [
-    "//sdk/fidl/fuchsia.audio.ffxdaemon:fuchsia.audio.ffxdaemon_rust",
+    "//sdk/fidl/fuchsia.audio.controller:fuchsia.audio.controller_rust",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/lib/fidl/rust/fidl",

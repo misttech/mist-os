@@ -10,7 +10,7 @@ use {
     ffx_audio_device_args::{DeviceCommand, DeviceDirection, SubCommand},
     fho::{moniker, FfxMain, FfxTool, SimpleWriter},
     fidl::HandleBased,
-    fidl_fuchsia_audio_ffxdaemon::{
+    fidl_fuchsia_audio_controller::{
         AudioDaemonDeviceInfoRequest, AudioDaemonDeviceSetGainStateRequest, AudioDaemonPlayRequest,
         AudioDaemonProxy, AudioDaemonRecordRequest, DeviceInfo, DeviceSelector, RecordLocation,
     },
@@ -86,7 +86,7 @@ impl FfxMain for DeviceTool {
                 let id = self.cmd.id.unwrap_or(
                     get_first_device(
                         &self.audio_proxy,
-                        fidl_fuchsia_virtualaudio::DeviceType::StreamConfig,
+                        fidl_fuchsia_hardware_audio::DeviceType::StreamConfig,
                         direction == DeviceDirection::Input,
                     )
                     .await?
@@ -168,7 +168,7 @@ pub struct JsonPcmFormats {
 
 async fn get_first_device(
     audio_proxy: &AudioDaemonProxy,
-    device_type: fidl_fuchsia_virtualaudio::DeviceType,
+    device_type: fidl_fuchsia_hardware_audio::DeviceType,
     is_input: bool,
 ) -> Result<DeviceSelector> {
     let list_devices_response = audio_proxy
@@ -203,7 +203,7 @@ async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
             DeviceSelector {
                 is_input: Some(device_direction == ffx_audio_device_args::DeviceDirection::Input),
                 id: Some(id),
-                device_type: Some(fidl_fuchsia_virtualaudio::DeviceType::StreamConfig),
+                device_type: Some(fidl_fuchsia_hardware_audio::DeviceType::StreamConfig),
                 ..Default::default()
             },
             false,
@@ -212,7 +212,7 @@ async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
         None => (
             get_first_device(
                 &audio_proxy,
-                fidl_fuchsia_virtualaudio::DeviceType::StreamConfig,
+                fidl_fuchsia_hardware_audio::DeviceType::StreamConfig,
                 device_direction == DeviceDirection::Input,
             )
             .await?,
@@ -536,7 +536,7 @@ where
         Some(id) => Ok(id),
         None => get_first_device(
             &audio_proxy,
-            fidl_fuchsia_virtualaudio::DeviceType::StreamConfig,
+            fidl_fuchsia_hardware_audio::DeviceType::StreamConfig,
             false,
         )
         .await
@@ -550,17 +550,17 @@ where
 
     let request = AudioDaemonPlayRequest {
         socket: Some(daemon_request_socket),
-        location: Some(fidl_fuchsia_audio_ffxdaemon::PlayLocation::DeviceRingBuffer(
-            fidl_fuchsia_audio_ffxdaemon::DeviceSelector {
+        location: Some(fidl_fuchsia_audio_controller::PlayLocation::DeviceRingBuffer(
+            fidl_fuchsia_audio_controller::DeviceSelector {
                 is_input: Some(false),
                 id: Some(device_id),
-                device_type: Some(fidl_fuchsia_virtualaudio::DeviceType::StreamConfig),
+                device_type: Some(fidl_fuchsia_hardware_audio::DeviceType::StreamConfig),
 
                 ..Default::default()
             },
         )),
 
-        gain_settings: Some(fidl_fuchsia_audio_ffxdaemon::GainSettings {
+        gain_settings: Some(fidl_fuchsia_audio_controller::GainSettings {
             mute: None, // TODO(fxbug.dev/121211)
             gain: None, // TODO(fxbug.dev/121211)
             ..Default::default()
@@ -585,7 +585,7 @@ async fn device_record(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Res
         Some(id) => Ok(id),
         None => get_first_device(
             &audio_proxy,
-            fidl_fuchsia_virtualaudio::DeviceType::StreamConfig,
+            fidl_fuchsia_hardware_audio::DeviceType::StreamConfig,
             true,
         )
         .await
@@ -598,15 +598,15 @@ async fn device_record(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Res
     };
 
     let (cancel_client, cancel_server) = fidl::endpoints::create_endpoints::<
-        fidl_fuchsia_audio_ffxdaemon::AudioDaemonCancelerMarker,
+        fidl_fuchsia_audio_controller::AudioDaemonCancelerMarker,
     >();
 
     let request = AudioDaemonRecordRequest {
         location: Some(RecordLocation::DeviceRingBuffer(
-            fidl_fuchsia_audio_ffxdaemon::DeviceSelector {
+            fidl_fuchsia_audio_controller::DeviceSelector {
                 is_input: Some(true),
                 id: Some(device_id),
-                device_type: Some(fidl_fuchsia_virtualaudio::DeviceType::StreamConfig),
+                device_type: Some(fidl_fuchsia_hardware_audio::DeviceType::StreamConfig),
                 ..Default::default()
             },
         )),

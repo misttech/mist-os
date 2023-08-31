@@ -4,7 +4,7 @@
 
 use {
     anyhow::{Error, Result},
-    fidl_fuchsia_audio_ffxdaemon::DeviceSelector,
+    fidl_fuchsia_audio_controller::DeviceSelector,
     fidl_fuchsia_media::AudioSampleFormat,
     regex::Regex,
     std::io::{Cursor, Seek, SeekFrom, Write},
@@ -327,13 +327,13 @@ pub fn device_id_for_path(path: &std::path::Path) -> Result<String> {
     Ok(id_str.to_string())
 }
 
-pub fn str_to_clock(src: &str) -> Result<fidl_fuchsia_audio_ffxdaemon::ClockType, String> {
+pub fn str_to_clock(src: &str) -> Result<fidl_fuchsia_audio_controller::ClockType, String> {
     match src.to_lowercase().as_str() {
-        "flexible" => Ok(fidl_fuchsia_audio_ffxdaemon::ClockType::Flexible(
-            fidl_fuchsia_audio_ffxdaemon::Flexible,
+        "flexible" => Ok(fidl_fuchsia_audio_controller::ClockType::Flexible(
+            fidl_fuchsia_audio_controller::Flexible,
         )),
-        "monotonic" => Ok(fidl_fuchsia_audio_ffxdaemon::ClockType::Monotonic(
-            fidl_fuchsia_audio_ffxdaemon::Monotonic,
+        "monotonic" => Ok(fidl_fuchsia_audio_controller::ClockType::Monotonic(
+            fidl_fuchsia_audio_controller::Monotonic,
         )),
         _ => {
             let splits: Vec<&str> = src.split(",").collect();
@@ -348,8 +348,8 @@ pub fn str_to_clock(src: &str) -> Result<fidl_fuchsia_audio_ffxdaemon::ClockType
                     Err(_) => None,
                 };
 
-                Ok(fidl_fuchsia_audio_ffxdaemon::ClockType::Custom(
-                    fidl_fuchsia_audio_ffxdaemon::CustomClockConfig {
+                Ok(fidl_fuchsia_audio_controller::ClockType::Custom(
+                    fidl_fuchsia_audio_controller::CustomClockConfig {
                         rate_adjust,
                         offset,
                         ..Default::default()

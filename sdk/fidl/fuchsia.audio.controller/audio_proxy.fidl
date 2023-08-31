@@ -4,14 +4,15 @@
 
 /// This library contains protocols used by the `ffx audio` tool only.
 @available(added=HEAD)
-library fuchsia.audio.ffxdaemon;
+library fuchsia.audio.controller;
 
 using fuchsia.media;
 using fuchsia.hardware.audio;
 using fuchsia.io;
-using fuchsia.audio.device;
-using fuchsia.virtualaudio;
 using zx;
+
+/// Maximum number of audio devices in the system at any time.
+const MAX_COUNT_DEVICES uint32 = 256;
 
 /// Where to output audio data supplied by an ffx client.
 type PlayLocation = flexible union {
@@ -178,7 +179,7 @@ type DeviceSelector = table {
     2: id fuchsia.io.Path;
 
     /// Device type. If not specified, defaults to StreamConfig.
-    3: device_type fuchsia.virtualaudio.DeviceType;
+    3: device_type fuchsia.hardware.audio.DeviceType;
 };
 
 /// Cancels an AudioDaemonRecordRequest if no duration was specified.
@@ -270,7 +271,7 @@ closed protocol AudioDaemon {
         /// List of available devices, sorted by name.
         ///
         /// Required.
-        1: devices vector<DeviceSelector>:fuchsia.audio.device.MAX_COUNT_DEVICES;
+        1: devices vector<DeviceSelector>:MAX_COUNT_DEVICES;
     }) error zx.Status;
 
     /// Returns details about a specific audio device.

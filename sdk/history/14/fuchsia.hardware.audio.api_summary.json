@@ -836,6 +836,32 @@
     },
     {
         "kind": "enum/member",
+        "name": "fuchsia.hardware.audio/DeviceType.CODEC",
+        "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.hardware.audio/DeviceType.COMPOSITE",
+        "value": "4"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.hardware.audio/DeviceType.DAI",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.hardware.audio/DeviceType.STREAM_CONFIG",
+        "value": "1"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.hardware.audio/DeviceType",
+        "strictness": "flexible",
+        "type": "uint32"
+    },
+    {
+        "kind": "enum/member",
         "name": "fuchsia.hardware.audio/DriverError.INTERNAL_ERROR",
         "value": "1"
     },

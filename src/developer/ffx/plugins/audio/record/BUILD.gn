@@ -9,14 +9,14 @@ ffx_plugin("ffx_audio_record") {
   edition = "2021"
 
   args_deps = [
-    "//sdk/fidl/fuchsia.audio.ffxdaemon:fuchsia.audio.ffxdaemon_rust",
+    "//sdk/fidl/fuchsia.audio.controller:fuchsia.audio.controller_rust",
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//src/media/audio/services/ffxdaemon:format-utils",
     "//third_party/rust_crates:anyhow",
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.audio.ffxdaemon:fuchsia.audio.ffxdaemon_rust",
+    "//sdk/fidl/fuchsia.audio.controller:fuchsia.audio.controller_rust",
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/plugins/audio/common:ffx_audio_common",

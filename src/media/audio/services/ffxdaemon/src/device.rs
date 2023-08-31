@@ -2,18 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_audio_ffxdaemon::DeviceSelector;
-
 use {
     crate::{socket, stop_listener, RingBuffer, SECONDS_PER_NANOSECOND},
     anyhow::{self, Context, Error},
     fdio,
     fidl::endpoints::Proxy,
-    fidl_fuchsia_audio_ffxdaemon::{
-        AudioDaemonCancelerMarker, DeviceInfo, DeviceInfo::StreamConfig, StreamConfigDeviceInfo,
+    fidl_fuchsia_audio_controller::{
+        AudioDaemonCancelerMarker, DeviceInfo, DeviceInfo::StreamConfig, DeviceSelector,
+        StreamConfigDeviceInfo,
     },
     fidl_fuchsia_hardware_audio::{GainState, StreamConfigProxy},
-    fidl_fuchsia_io as fio, fidl_fuchsia_virtualaudio, fuchsia_async as fasync,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_zircon::{self as zx},
     futures::{AsyncWriteExt, StreamExt},
 };
@@ -393,7 +392,7 @@ impl Device {
 // Helper function to enumerate on device directories to get information about available drivers.
 pub async fn get_entries(
     path: &str,
-    device_type: fidl_fuchsia_virtualaudio::DeviceType,
+    device_type: fidl_fuchsia_hardware_audio::DeviceType,
     is_input: bool,
 ) -> Result<Vec<DeviceSelector>, Error> {
     let (control_client, control_server) = zx::Channel::create();

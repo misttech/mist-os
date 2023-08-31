@@ -14,7 +14,7 @@ ffx_plugin("ffx_audio_listdevices") {
   args_sources = [ "src/args.rs" ]
 
   deps = [
-    "//sdk/fidl/fuchsia.audio.ffxdaemon:fuchsia.audio.ffxdaemon_rust",
+    "//sdk/fidl/fuchsia.audio.controller:fuchsia.audio.controller_rust",
     "//src/developer/ffx/lib/fho:lib",
     "//src/lib/zircon/rust:fuchsia-zircon-status",
     "//src/media/audio/services/ffxdaemon:format-utils",
@@ -23,7 +23,7 @@ ffx_plugin("ffx_audio_listdevices") {
     "//third_party/rust_crates:serde",
   ]
   test_deps = [
-    "//sdk/fidl/fuchsia.virtualaudio:fuchsia.virtualaudio_rust",
+    "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_rust",
     "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fuchsia-async",
   ]
