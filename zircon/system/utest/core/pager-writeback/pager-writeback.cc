@@ -7142,7 +7142,7 @@ TEST(PagerWriteback, EvictAfterDirtyRequest) {
   // Check if the middle page has been evicted yet.
   // Eviction is asynchronous. Wait for the eviction to occur.
   ASSERT_TRUE(
-      vmo_test::PollVmoCommittedBytes(vmo->vmo(), (kNumPages - 1) * zx_system_get_page_size()));
+      vmo_test::PollVmoPopulatedBytes(vmo->vmo(), (kNumPages - 1) * zx_system_get_page_size()));
 
   // Try to resolve the DIRTY request now. The entire operation should fail.
   ASSERT_FALSE(pager.DirtyPages(vmo, 0, kNumPages));

@@ -52,24 +52,24 @@ static inline size_t VmoNumChildren(const zx::vmo& vmo) {
   return info.num_children;
 }
 
-static inline size_t VmoCommittedBytes(const zx::vmo& vmo) {
+static inline size_t VmoPopulatedBytes(const zx::vmo& vmo) {
   zx_info_vmo_t info;
   if (vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr) != ZX_OK) {
     return UINT64_MAX;
   }
-  return info.committed_bytes;
+  return info.populated_bytes;
 }
 
-static inline bool PollVmoCommittedBytes(const zx::vmo& vmo, size_t expected_bytes) {
+static inline bool PollVmoPopulatedBytes(const zx::vmo& vmo, size_t expected_bytes) {
   zx_info_vmo_t info;
   while (true) {
     if (vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr) != ZX_OK) {
       return false;
     }
-    if (info.committed_bytes == expected_bytes) {
+    if (info.populated_bytes == expected_bytes) {
       return true;
     }
-    printf("polling again. page count %zu\n", info.committed_bytes / zx_system_get_page_size());
+    printf("polling again. page count %zu\n", info.populated_bytes / zx_system_get_page_size());
     zx::nanosleep(zx::deadline_after(zx::msec(50)));
   }
 }

@@ -69,14 +69,14 @@ TEST(VmoZeroTestCase, UnalignedUnCommitted) {
   zx::vmo vmo;
   EXPECT_OK(zx::vmo::create(zx_system_get_page_size() * 2, 0, &vmo));
 
-  EXPECT_EQ(0, VmoCommittedBytes(vmo));
+  EXPECT_EQ(0, VmoPopulatedBytes(vmo));
 
   // zero across both page boundaries. As these are already known zero pages this should not reuslt
   // in any pages being committed.
   EXPECT_OK(vmo.op_range(ZX_VMO_OP_ZERO, zx_system_get_page_size() / 2, zx_system_get_page_size(),
                          NULL, 0));
 
-  EXPECT_EQ(0, VmoCommittedBytes(vmo));
+  EXPECT_EQ(0, VmoPopulatedBytes(vmo));
 }
 
 TEST(VmoZeroTestCase, DecommitMiddle) {
@@ -88,14 +88,14 @@ TEST(VmoZeroTestCase, DecommitMiddle) {
   uint8_t *ptr = mapping.bytes();
 
   memset(ptr, 0xff, zx_system_get_page_size() * 3);
-  EXPECT_EQ(zx_system_get_page_size() * 3, VmoCommittedBytes(vmo));
+  EXPECT_EQ(zx_system_get_page_size() * 3, VmoPopulatedBytes(vmo));
 
   // zero across all three pages. This should decommit the middle one.
   EXPECT_OK(vmo.op_range(ZX_VMO_OP_ZERO, zx_system_get_page_size() / 2,
                          zx_system_get_page_size() * 2, NULL, 0));
 
   // Only two pages should be committed
-  EXPECT_EQ(zx_system_get_page_size() * 2, VmoCommittedBytes(vmo));
+  EXPECT_EQ(zx_system_get_page_size() * 2, VmoPopulatedBytes(vmo));
 }
 
 TEST(VmoZeroTestCase, Contiguous) {
@@ -115,7 +115,7 @@ TEST(VmoZeroTestCase, Contiguous) {
 
   zx::vmo vmo;
   EXPECT_OK(zx::vmo::create_contiguous(bti, zx_system_get_page_size() * 2, 0, &vmo));
-  EXPECT_EQ(zx_system_get_page_size() * 2, VmoCommittedBytes(vmo));
+  EXPECT_EQ(zx_system_get_page_size() * 2, VmoPopulatedBytes(vmo));
 
   // Pin momentarily to retrieve the physical address
   zx_paddr_t phys_addr;
@@ -133,7 +133,7 @@ TEST(VmoZeroTestCase, Contiguous) {
 
   // Zero a page. should not cause decommit as our VMO must remain contiguous.
   EXPECT_OK(vmo.op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), NULL, 0));
-  EXPECT_EQ(zx_system_get_page_size() * 2, VmoCommittedBytes(vmo));
+  EXPECT_EQ(zx_system_get_page_size() * 2, VmoPopulatedBytes(vmo));
 
   EXPECT_TRUE(AllSameVal(ptr, zx_system_get_page_size(), 0));
   EXPECT_TRUE(AllSameVal(ptr + zx_system_get_page_size(), zx_system_get_page_size(), 0xff));
@@ -176,8 +176,8 @@ TEST(VmoZeroTestCase, EmptyCowChildren) {
   EXPECT_OK(parent.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, zx_system_get_page_size() * 2, &child));
 
   // Parent should have the page currently attributed to it.
-  EXPECT_EQ(zx_system_get_page_size(), VmoCommittedBytes(parent));
-  EXPECT_EQ(0, VmoCommittedBytes(child));
+  EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(parent));
+  EXPECT_EQ(0, VmoPopulatedBytes(child));
 
   // Validate child contents.
   VmoCheck(child, 1, 0);
@@ -185,14 +185,14 @@ TEST(VmoZeroTestCase, EmptyCowChildren) {
   // Zero the child. Should not change pages committed, but child should now read as 0.
   EXPECT_OK(child.op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), NULL, 0));
   VmoCheck(child, 0, 0);
-  EXPECT_EQ(zx_system_get_page_size(), VmoCommittedBytes(parent));
-  EXPECT_EQ(0, VmoCommittedBytes(child));
+  EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(parent));
+  EXPECT_EQ(0, VmoPopulatedBytes(child));
 
   // Now zero the parent. Should be no need to keep the underlying pages around, dropping committed.
   EXPECT_OK(parent.op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), NULL, 0));
   VmoCheck(parent, 0, 0);
-  EXPECT_EQ(0, VmoCommittedBytes(parent));
-  EXPECT_EQ(0, VmoCommittedBytes(child));
+  EXPECT_EQ(0, VmoPopulatedBytes(parent));
+  EXPECT_EQ(0, VmoPopulatedBytes(child));
 }
 
 TEST(VmoZeroTestCase, MergeZeroChildren) {
@@ -204,17 +204,17 @@ TEST(VmoZeroTestCase, MergeZeroChildren) {
   EXPECT_OK(parent.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, zx_system_get_page_size(), &child));
 
   // Parent should have the page currently attributed to it.
-  EXPECT_EQ(zx_system_get_page_size(), VmoCommittedBytes(parent));
-  EXPECT_EQ(0, VmoCommittedBytes(child));
+  EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(parent));
+  EXPECT_EQ(0, VmoPopulatedBytes(child));
 
   // Zero the parent. Pages should move to the child.
   EXPECT_OK(parent.op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), NULL, 0));
-  EXPECT_EQ(0, VmoCommittedBytes(parent));
-  EXPECT_EQ(zx_system_get_page_size(), VmoCommittedBytes(child));
+  EXPECT_EQ(0, VmoPopulatedBytes(parent));
+  EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(child));
 
   // Close the child. Pages should cease being committed and not move to the parent.
   child.reset();
-  ASSERT_TRUE(PollVmoCommittedBytes(parent, 0));
+  ASSERT_TRUE(PollVmoPopulatedBytes(parent, 0));
 }
 
 // Tests that after merging a child with its hidden parent that hidden pages are correctly preserved
@@ -229,19 +229,19 @@ TEST(VmoZeroTestCase, AllocateAfterMerge) {
   // Validate initial state.
   VmoCheck(child, 1, 0);
   VmoCheck(child, 2, zx_system_get_page_size());
-  EXPECT_EQ(zx_system_get_page_size() * 2, VmoCommittedBytes(parent) + VmoCommittedBytes(child));
+  EXPECT_EQ(zx_system_get_page_size() * 2, VmoPopulatedBytes(parent) + VmoPopulatedBytes(child));
 
   // Zero first page of the child. This doesn't change number of pages committed as our sibling
   // is still using it.
   EXPECT_OK(child.op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), NULL, 0));
-  EXPECT_EQ(zx_system_get_page_size() * 2, VmoCommittedBytes(parent) + VmoCommittedBytes(child));
+  EXPECT_EQ(zx_system_get_page_size() * 2, VmoPopulatedBytes(parent) + VmoPopulatedBytes(child));
 
   // Close the parent to make the merge happen.
   parent.reset();
 
   // Should only have 1 page attributed to us, and reading should still give us our expected pages
   // and not those of our merge partner.
-  ASSERT_TRUE(PollVmoCommittedBytes(child, zx_system_get_page_size()));
+  ASSERT_TRUE(PollVmoPopulatedBytes(child, zx_system_get_page_size()));
   VmoCheck(child, 0, 0);
   VmoCheck(child, 2, zx_system_get_page_size());
 }
@@ -254,12 +254,12 @@ TEST(VmoZeroTestCase, AllocateAfterMergeHiddenChild) {
 
   zx::vmo child1, child2;
   EXPECT_OK(parent.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, zx_system_get_page_size() * 3, &child1));
-  EXPECT_EQ(zx_system_get_page_size() * 3, VmoCommittedBytes(parent) + VmoCommittedBytes(child1));
+  EXPECT_EQ(zx_system_get_page_size() * 3, VmoPopulatedBytes(parent) + VmoPopulatedBytes(child1));
 
   // Zero a page in the parent before creating the next child. This places a zero page in the
   // common hidden parent.
   EXPECT_OK(parent.op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), NULL, 0));
-  EXPECT_EQ(zx_system_get_page_size() * 3, VmoCommittedBytes(parent) + VmoCommittedBytes(child1));
+  EXPECT_EQ(zx_system_get_page_size() * 3, VmoPopulatedBytes(parent) + VmoPopulatedBytes(child1));
 
   EXPECT_OK(parent.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, zx_system_get_page_size() * 3, &child2));
 
@@ -267,14 +267,14 @@ TEST(VmoZeroTestCase, AllocateAfterMergeHiddenChild) {
   EXPECT_OK(child1.op_range(ZX_VMO_OP_ZERO, zx_system_get_page_size(), zx_system_get_page_size(),
                             NULL, 0));
   EXPECT_EQ(zx_system_get_page_size() * 3,
-            VmoCommittedBytes(parent) + VmoCommittedBytes(child1) + VmoCommittedBytes(child2));
+            VmoPopulatedBytes(parent) + VmoPopulatedBytes(child1) + VmoPopulatedBytes(child2));
 
   // Validate page states.
   VmoCheck(child2, 0, 0);
   VmoCheck(child2, 2, zx_system_get_page_size());
   VmoCheck(child2, 3, zx_system_get_page_size() * 2);
   EXPECT_EQ(zx_system_get_page_size() * 3,
-            VmoCommittedBytes(parent) + VmoCommittedBytes(child1) + VmoCommittedBytes(child2));
+            VmoPopulatedBytes(parent) + VmoPopulatedBytes(child1) + VmoPopulatedBytes(child2));
 
   // Close the first child, forcing that hidden parent to merge with the hidden parent of parent and
   // child2. Child1's zero page should be discarded and not overwrite the forked version, and the
@@ -292,21 +292,21 @@ TEST(VmoZeroTestCase, AllocateAfterMergeHiddenChild) {
   VmoCheck(child2, 3, zx_system_get_page_size() * 2);
   // The reset of child1 may be ongoing due to another part of the system holding a reference, so
   // poll the committed bytes individually until we know things are stable before continuing.
-  ASSERT_TRUE(PollVmoCommittedBytes(parent, 2 * zx_system_get_page_size()));
-  ASSERT_TRUE(PollVmoCommittedBytes(child2, 0));
-  EXPECT_EQ(zx_system_get_page_size() * 2, VmoCommittedBytes(parent) + VmoCommittedBytes(child2));
+  ASSERT_TRUE(PollVmoPopulatedBytes(parent, 2 * zx_system_get_page_size()));
+  ASSERT_TRUE(PollVmoPopulatedBytes(child2, 0));
+  EXPECT_EQ(zx_system_get_page_size() * 2, VmoPopulatedBytes(parent) + VmoPopulatedBytes(child2));
 
   // Write to a different byte in our zero page to see if we can uncover child1's data.
   VmoWrite(parent, 1, 64);
   VmoCheck(parent, 0, 0);
-  EXPECT_EQ(zx_system_get_page_size() * 3, VmoCommittedBytes(parent) + VmoCommittedBytes(child2));
+  EXPECT_EQ(zx_system_get_page_size() * 3, VmoPopulatedBytes(parent) + VmoPopulatedBytes(child2));
 
   // Fork the middle page that child1 zeroed and ensure we CoW the correct underlying page.
   VmoWrite(child2, 5, zx_system_get_page_size() + 64);
   VmoCheck(child2, 2, zx_system_get_page_size());
   VmoCheck(parent, 0, zx_system_get_page_size() + 64);
   VmoCheck(parent, 2, zx_system_get_page_size());
-  EXPECT_EQ(zx_system_get_page_size() * 4, VmoCommittedBytes(parent) + VmoCommittedBytes(child2));
+  EXPECT_EQ(zx_system_get_page_size() * 4, VmoPopulatedBytes(parent) + VmoPopulatedBytes(child2));
 }
 
 TEST(VmoZeroTestCase, WriteCowParent) {
@@ -318,28 +318,28 @@ TEST(VmoZeroTestCase, WriteCowParent) {
   EXPECT_OK(parent.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, zx_system_get_page_size() * 2, &child));
 
   // Parent should have the page currently attributed to it.
-  EXPECT_EQ(zx_system_get_page_size(), VmoCommittedBytes(parent));
-  EXPECT_EQ(0, VmoCommittedBytes(child));
+  EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(parent));
+  EXPECT_EQ(0, VmoPopulatedBytes(child));
 
   // Write to the parent to perform a COW copy.
   VmoCheck(parent, 1, 0);
   VmoWrite(parent, 2, 0);
 
-  EXPECT_EQ(zx_system_get_page_size(), VmoCommittedBytes(parent));
-  EXPECT_EQ(zx_system_get_page_size(), VmoCommittedBytes(child));
+  EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(parent));
+  EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(child));
 
   // Zero the child. This should decommit the child page.
   VmoCheck(child, 1, 0);
   EXPECT_OK(child.op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), NULL, 0));
   VmoCheck(child, 0, 0);
   VmoCheck(parent, 2, 0);
-  EXPECT_EQ(zx_system_get_page_size(), VmoCommittedBytes(parent));
-  EXPECT_EQ(0, VmoCommittedBytes(child));
+  EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(parent));
+  EXPECT_EQ(0, VmoPopulatedBytes(child));
 
   // Close the parent. No pages should get merged.
   parent.reset();
   VmoCheck(child, 0, 0);
-  ASSERT_TRUE(PollVmoCommittedBytes(child, 0));
+  ASSERT_TRUE(PollVmoPopulatedBytes(child, 0));
 }
 
 TEST(VmoZeroTestCase, ChildZeroThenWrite) {
@@ -351,25 +351,25 @@ TEST(VmoZeroTestCase, ChildZeroThenWrite) {
   EXPECT_OK(parent.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, zx_system_get_page_size() * 2, &child));
 
   // Parent should have the page currently attributed to it.
-  EXPECT_EQ(zx_system_get_page_size(), VmoCommittedBytes(parent));
-  EXPECT_EQ(0, VmoCommittedBytes(child));
+  EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(parent));
+  EXPECT_EQ(0, VmoPopulatedBytes(child));
 
   EXPECT_OK(child.op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), NULL, 0));
 
   // Page attribution should be unchanged.
-  EXPECT_EQ(zx_system_get_page_size(), VmoCommittedBytes(parent));
-  EXPECT_EQ(0, VmoCommittedBytes(child));
+  EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(parent));
+  EXPECT_EQ(0, VmoPopulatedBytes(child));
 
   // Write to the child, should cause a new page allocation.
   VmoWrite(child, 1, 0);
 
-  EXPECT_EQ(zx_system_get_page_size(), VmoCommittedBytes(parent));
-  EXPECT_EQ(zx_system_get_page_size(), VmoCommittedBytes(child));
+  EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(parent));
+  EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(child));
 
   // Reset the parent. The two committed pages should be different, and the parents page should be
   // dropped.
   parent.reset();
-  ASSERT_TRUE(PollVmoCommittedBytes(child, zx_system_get_page_size()));
+  ASSERT_TRUE(PollVmoPopulatedBytes(child, zx_system_get_page_size()));
 }
 
 TEST(VmoZeroTestCase, Nested) {
@@ -383,17 +383,17 @@ TEST(VmoZeroTestCase, Nested) {
   EXPECT_OK(parent.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, zx_system_get_page_size(), &child2));
 
   // Should have 1 page total attributed to the parent.
-  EXPECT_EQ(zx_system_get_page_size(), VmoCommittedBytes(parent));
-  EXPECT_EQ(0, VmoCommittedBytes(child1));
-  EXPECT_EQ(0, VmoCommittedBytes(child2));
+  EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(parent));
+  EXPECT_EQ(0, VmoPopulatedBytes(child1));
+  EXPECT_EQ(0, VmoPopulatedBytes(child2));
 
   // Zero the parent, this will cause the page to have to get forked down the intermediate hidden
   // nodes.
   EXPECT_OK(parent.op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), NULL, 0));
 
-  EXPECT_EQ(0, VmoCommittedBytes(parent));
-  EXPECT_EQ(zx_system_get_page_size(), VmoCommittedBytes(child1));
-  EXPECT_EQ(zx_system_get_page_size(), VmoCommittedBytes(child2));
+  EXPECT_EQ(0, VmoPopulatedBytes(parent));
+  EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(child1));
+  EXPECT_EQ(zx_system_get_page_size(), VmoPopulatedBytes(child2));
 }
 
 TEST(VmoZeroTestCase, ZeroLengths) {

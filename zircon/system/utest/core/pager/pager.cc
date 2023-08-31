@@ -1134,7 +1134,7 @@ TEST(Pager, CloneCommitTest) {
   zx_info_vmo_t info;
   uint64_t a1, a2;
   ASSERT_EQ(ZX_OK, clone->vmo().get_info(ZX_INFO_VMO, &info, sizeof(info), &a1, &a2));
-  EXPECT_EQ(kNumPages * zx_system_get_page_size(), info.committed_bytes);
+  EXPECT_EQ(kNumPages * zx_system_get_page_size(), info.populated_bytes);
 }
 
 // Tests that commit on the clone of a clone populates things properly.
@@ -1167,11 +1167,11 @@ TEST(Pager, CloneChainCommitTest) {
   zx_info_vmo_t info;
   uint64_t a1, a2;
   ASSERT_EQ(ZX_OK, clone->vmo().get_info(ZX_INFO_VMO, &info, sizeof(info), &a1, &a2));
-  EXPECT_EQ(kNumPages * zx_system_get_page_size(), info.committed_bytes);
+  EXPECT_EQ(kNumPages * zx_system_get_page_size(), info.populated_bytes);
 
   // Verify that the intermediate has no pages committed.
   ASSERT_EQ(ZX_OK, intermediate->vmo().get_info(ZX_INFO_VMO, &info, sizeof(info), &a1, &a2));
-  EXPECT_EQ(0ul, info.committed_bytes);
+  EXPECT_EQ(0ul, info.populated_bytes);
 }
 
 // Tests that commit on the clone populates things properly if things have already been touched.
@@ -1207,7 +1207,7 @@ TEST(Pager, CloneSplitCommitTest) {
   zx_info_vmo_t info;
   uint64_t a1, a2;
   ASSERT_EQ(ZX_OK, clone->vmo().get_info(ZX_INFO_VMO, &info, sizeof(info), &a1, &a2));
-  EXPECT_EQ(kNumPages * zx_system_get_page_size(), info.committed_bytes);
+  EXPECT_EQ(kNumPages * zx_system_get_page_size(), info.populated_bytes);
 }
 
 // Resizing a cloned VMO causes a fault.
@@ -2605,7 +2605,7 @@ TEST(Pager, CloneCommitSingleBatch) {
   zx_info_vmo_t info;
   uint64_t a1, a2;
   ASSERT_EQ(ZX_OK, clone->vmo().get_info(ZX_INFO_VMO, &info, sizeof(info), &a1, &a2));
-  EXPECT_EQ(kNumPages * zx_system_get_page_size(), info.committed_bytes);
+  EXPECT_EQ(kNumPages * zx_system_get_page_size(), info.populated_bytes);
 }
 
 // Tests that a commit on a clone generates two batch page requests when the parent has a page
@@ -2644,7 +2644,7 @@ TEST(Pager, CloneCommitTwoBatches) {
   zx_info_vmo_t info;
   uint64_t a1, a2;
   ASSERT_EQ(ZX_OK, clone->vmo().get_info(ZX_INFO_VMO, &info, sizeof(info), &a1, &a2));
-  EXPECT_EQ(kNumPages * zx_system_get_page_size(), info.committed_bytes);
+  EXPECT_EQ(kNumPages * zx_system_get_page_size(), info.populated_bytes);
 }
 
 // Tests that a commit on a clone generates three batch page requests when the parent has two
@@ -2688,7 +2688,7 @@ TEST(Pager, CloneCommitMultipleBatches) {
   zx_info_vmo_t info;
   uint64_t a1, a2;
   ASSERT_EQ(ZX_OK, clone->vmo().get_info(ZX_INFO_VMO, &info, sizeof(info), &a1, &a2));
-  EXPECT_EQ(kNumPages * zx_system_get_page_size(), info.committed_bytes);
+  EXPECT_EQ(kNumPages * zx_system_get_page_size(), info.populated_bytes);
 }
 
 // Tests that a commit on a clone populates pages as expected when the parent has some populated
@@ -2739,7 +2739,7 @@ TEST(Pager, CloneCommitRandomBatches) {
   zx_info_vmo_t info;
   uint64_t a1, a2;
   ASSERT_EQ(ZX_OK, clone->vmo().get_info(ZX_INFO_VMO, &info, sizeof(info), &a1, &a2));
-  EXPECT_EQ(kNumPages * zx_system_get_page_size(), info.committed_bytes);
+  EXPECT_EQ(kNumPages * zx_system_get_page_size(), info.populated_bytes);
 }
 
 // Tests that the ZX_VMO_OP_ALWAYS_NEED hint works as expected.
@@ -2812,7 +2812,7 @@ TEST(Pager, EvictionHintDontNeed) {
   // Verify that the vmo has no committed pages after eviction.
   // Eviction is asynchronous. Poll in a loop until we see the committed page count drop. In case
   // we're left polling forever, the external test timeout will kick in.
-  ASSERT_TRUE(vmo_test::PollVmoCommittedBytes(vmo->vmo(), 0));
+  ASSERT_TRUE(vmo_test::PollVmoPopulatedBytes(vmo->vmo(), 0));
 }
 
 // Tests that the zx_vmo_op_range() API succeeds and fails as expected for hints.
@@ -3197,7 +3197,7 @@ TEST(Pager, EvictionHintsCloneVmar) {
   zx_info_vmo_t info;
   uint64_t a1, a2;
   ASSERT_OK(clone->vmo().get_info(ZX_INFO_VMO, &info, sizeof(info), &a1, &a2));
-  ASSERT_EQ(zx_system_get_page_size(), info.committed_bytes);
+  ASSERT_EQ(zx_system_get_page_size(), info.populated_bytes);
   uint8_t new_data;
   ASSERT_OK(clone->vmo().read(&new_data, zx_system_get_page_size(), sizeof(data)));
   ASSERT_EQ(data, new_data);
@@ -3362,7 +3362,7 @@ TEST(Pager, OpCommitCloneVmar) {
   zx_info_vmo_t info;
   uint64_t a1, a2;
   ASSERT_OK(clone->vmo().get_info(ZX_INFO_VMO, &info, sizeof(info), &a1, &a2));
-  ASSERT_EQ(2 * zx_system_get_page_size(), info.committed_bytes);
+  ASSERT_EQ(2 * zx_system_get_page_size(), info.populated_bytes);
 
   // The previously forked page should not have been overwritten.
   uint8_t new_data;

@@ -2568,18 +2568,18 @@ TEST(Vmar, RangeOpCommit) {
   // reclamation to have already happened.
   zx_info_vmo_t info;
   ASSERT_OK(vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_LE(2 * zx_system_get_page_size(), info.committed_bytes);
+  EXPECT_GE(2 * zx_system_get_page_size(), info.populated_bytes);
   ASSERT_OK(clone.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_LE(2 * zx_system_get_page_size(), info.committed_bytes);
+  EXPECT_GE(2 * zx_system_get_page_size(), info.populated_bytes);
 
   // Commit all pages in the clone.
   ASSERT_OK(sub_vmar2.op_range(ZX_VMAR_OP_COMMIT, addr2, kVmoSize, nullptr, 0));
 
   // The clone now might have all its pages committed, but the parent should still be capped at 2.
   ASSERT_OK(vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_LE(2 * zx_system_get_page_size(), info.committed_bytes);
+  EXPECT_GE(2 * zx_system_get_page_size(), info.populated_bytes);
   ASSERT_OK(clone.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_LE(kVmoSize, info.committed_bytes);
+  EXPECT_GE(kVmoSize, info.populated_bytes);
 
   // Map a single page as read-only and try to commit it. The commit should fail.
   zx::vmo readonly_vmo;
@@ -2593,9 +2593,9 @@ TEST(Vmar, RangeOpCommit) {
 
   // The commit counts should not have changed.
   ASSERT_OK(vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_EQ(2 * zx_system_get_page_size(), info.committed_bytes);
+  EXPECT_EQ(2 * zx_system_get_page_size(), info.populated_bytes);
   ASSERT_OK(clone.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr));
-  EXPECT_EQ(kVmoSize, info.committed_bytes);
+  EXPECT_EQ(kVmoSize, info.populated_bytes);
 
   // Some trivial failure cases.
   // Out of range.
