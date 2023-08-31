@@ -33,7 +33,7 @@ impl GenerateBuildArchive {
         println!("@");
         println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
         let product_bundle = ProductBundle::try_load_from(&self.product_bundle)?;
-        let product_bundle = match product_bundle {
+        let mut product_bundle = match product_bundle {
             ProductBundle::V1(_) => bail!("Only v2 product bundles are supported"),
             ProductBundle::V2(pb) => pb,
         };
@@ -42,21 +42,40 @@ impl GenerateBuildArchive {
         std::fs::create_dir_all(&self.out_dir)
             .with_context(|| format!("Creating the out_dir: {}", &self.out_dir))?;
 
-        // Collect the Artifacts with the final destinations to add to an images manifest later.
-        let mut artifacts = vec![];
+        // Collect the Images with the final destinations to add to an images manifest later.
+        let mut images = vec![];
 
-        let mut add_image = |path: &Utf8PathBuf, name: &str, image: &Image| -> Result<()> {
+        let copy_artifact = |path: &Utf8PathBuf, name: &str| -> Result<()> {
             // Copy the image to the out_dir.
             let destination = self.out_dir.join(name);
             std::fs::copy(&path, &destination)
-                .with_context(|| format!("Copying image {} to {}", path, destination))?;
-
-            // Create a new Image with the new path.
-            let mut new_image = image.clone();
-            new_image.set_source(destination);
-            artifacts.push(new_image);
+                .with_context(|| format!("Copying artifact {} to {}", path, destination))?;
             Ok(())
         };
+
+        for part in &mut product_bundle.partitions.bootstrap_partitions {
+            let filename = part
+                .image
+                .file_name()
+                .context(format!("Misformatted bootstrap partition: {}", &part.image))?;
+            copy_artifact(&part.image, filename)?;
+        }
+        for part in &mut product_bundle.partitions.bootloader_partitions {
+            if part.name.is_none() {
+                continue;
+            }
+            let name = if part.partition_type == "" {
+                "firmware.img".to_owned()
+            } else {
+                format!("{}_{}.img", "firmware", part.partition_type)
+            };
+            copy_artifact(&part.image, &name)?;
+        }
+        for cred in &mut product_bundle.partitions.unlock_credentials {
+            let filename =
+                cred.file_name().context(format!("Misformatted credential: {}", &cred))?;
+            copy_artifact(&cred, filename)?;
+        }
 
         // Pull out the relevant files.
         if let Some(a) = product_bundle.system_a {
@@ -70,7 +89,13 @@ impl GenerateBuildArchive {
                     _ => None,
                 };
                 if let Some((path, name)) = entry {
-                    add_image(path, name, image)?;
+                    copy_artifact(path, name)?;
+
+                    // Create a new Image with the new path.
+                    let destination = self.out_dir.join(name);
+                    let mut new_image = image.clone();
+                    new_image.set_source(destination);
+                    images.push(new_image);
                 }
             }
         }
@@ -83,13 +108,13 @@ impl GenerateBuildArchive {
                     _ => None,
                 };
                 if let Some((path, name)) = entry {
-                    add_image(path, name, image)?;
+                    copy_artifact(path, name)?;
                 }
             }
         }
 
         // Write the images manifest with the rebased image paths.
-        let images_manifest = AssemblyManifest { images: artifacts };
+        let images_manifest = AssemblyManifest { images };
         let images_manifest_path = self.out_dir.join("images.json");
         images_manifest.write(images_manifest_path).context("Writing images manifest")?;
 
@@ -115,12 +140,72 @@ mod tests {
         let tmp = tempdir().unwrap();
         let tempdir = Utf8Path::from_path(tmp.path()).unwrap();
 
+        let json = r#"
+            {
+                "bootloader_partitions" : [
+                    {
+                        "image" : "TEMPDIR/u-boot.bin.signed.b4",
+                        "name" : "bootloader",
+                        "type" : "skip_metadata"
+                    }
+                ],
+                "bootstrap_partitions" : [
+                    {
+                        "condition" : {
+                        "value" : "0xe9000000",
+                        "variable" : "emmc-total-bytes"
+                        },
+                        "image" : "TEMPDIR/gpt.fuchsia.3728.bin",
+                        "name" : "gpt"
+                    },
+                    {
+                        "condition" : {
+                        "value" : "0xec000000",
+                        "variable" : "emmc-total-bytes"
+                        },
+                        "image" : "TEMPDIR/gpt.fuchsia.3776.bin",
+                        "name" : "gpt"
+                    }
+                ],
+                partitions: [
+                    {
+                        type: "ZBI",
+                        name: "zircon_a",
+                        slot: "A",
+                    },
+                    {
+                        type: "VBMeta",
+                        name: "vbmeta_b",
+                        slot: "B",
+                    },
+                    {
+                        type: "FVM",
+                        name: "fvm",
+                    },
+                    {
+                        type: "Fxfs",
+                        name: "fxfs",
+                    },
+                ],
+                hardware_revision: "hw",
+                unlock_credentials: [
+                    "TEMPDIR/unlock_creds.zip",
+                ],
+            }
+        "#;
+        let mut cursor = std::io::Cursor::new(json.replace("TEMPDIR", tempdir.as_str()));
+        let config: PartitionsConfig = PartitionsConfig::from_reader(&mut cursor).unwrap();
+
         let create_temp_file = |name: &str| {
             let path = tempdir.join(name);
             let mut file = File::create(path).unwrap();
             write!(file, "{}", name).unwrap();
         };
 
+        create_temp_file("unlock_creds.zip");
+        create_temp_file("gpt.fuchsia.3728.bin");
+        create_temp_file("gpt.fuchsia.3776.bin");
+        create_temp_file("u-boot.bin.signed.b4");
         create_temp_file("fuchsia.zbi");
         create_temp_file("fuchsia.vbmeta");
         create_temp_file("fvm.blk");
@@ -132,7 +217,7 @@ mod tests {
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "".to_string(),
             product_version: "".to_string(),
-            partitions: PartitionsConfig::default(),
+            partitions: config,
             sdk_version: "".to_string(),
             system_a: Some(vec![
                 Image::ZBI { path: tempdir.join("fuchsia.zbi"), signed: false },
@@ -159,6 +244,10 @@ mod tests {
             GenerateBuildArchive { product_bundle: pb_path.clone(), out_dir: ba_path.clone() };
         cmd.generate().unwrap();
 
+        assert!(ba_path.join("unlock_creds.zip").exists());
+        assert!(ba_path.join("gpt.fuchsia.3728.bin").exists());
+        assert!(ba_path.join("gpt.fuchsia.3776.bin").exists());
+        assert!(ba_path.join("firmware_skip_metadata.img").exists());
         assert!(ba_path.join("zircon-a.zbi").exists());
         assert!(ba_path.join("zircon-a.vbmeta").exists());
         assert!(ba_path.join("fvm.fastboot.blk").exists());
@@ -199,17 +288,6 @@ mod tests {
                     "type": "kernel",
                     "name": "qemu-kernel",
                     "path": "qemu-kernel.kernel"
-                },
-                {
-                    "name": "zircon-a",
-                    "type": "zbi",
-                    "path": "zircon-r.zbi",
-                    "signed": false
-                },
-                {
-                    "name": "zircon-a",
-                    "type": "vbmeta",
-                    "path": "zircon-r.vbmeta"
                 }
             ]
             "#
