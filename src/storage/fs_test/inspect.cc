@@ -166,7 +166,7 @@ class InspectTest : public FilesystemTest {
   // the overall node hierarchy/layout.
   void SetUp() override {
     // Take an initial snapshot.
-    ASSERT_NO_FATAL_FAILURE(UpdateAndValidateSnapshot());
+    ASSERT_NO_FATAL_FAILURE(UpdateAndValidateSnapshot()) << "Failed in InspectTest::SetUp";
   }
 
   // Take a new snapshot of the filesystem's inspect tree, and validate the layout for compliance.
@@ -174,7 +174,10 @@ class InspectTest : public FilesystemTest {
   // All calls to this function *must* be wrapped with ASSERT_NO_FATAL_FAILURE. Failure to do so
   // can result in some test fixture methods segfaulting.
   void UpdateAndValidateSnapshot() {
-    snapshot_ = fs().TakeSnapshot();
+    std::optional<inspect::Hierarchy> snapshot;
+    fs().TakeSnapshot(&snapshot);
+    ASSERT_TRUE(snapshot.has_value());
+    snapshot_ = std::move(*snapshot);
     // Validate the inspect hierarchy. Ensures all nodes/properties exist and are the correct types.
     ASSERT_NO_FATAL_FAILURE(ValidateHierarchy(snapshot_, fs().options()));
   }

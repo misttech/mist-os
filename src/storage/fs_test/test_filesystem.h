@@ -69,7 +69,7 @@ class TestFilesystem {
 
   // Obtain a snapshot from the underlying filesystem's inspect tree. Will cause an assertion if
   // the Inspect service could not be connected to or does not exist.
-  inspect::Hierarchy TakeSnapshot() const;
+  void TakeSnapshot(std::optional<inspect::Hierarchy>* out) const;
 
  private:
   // Creates a mount point for the instance, mounts it and returns a TestFilesystem.

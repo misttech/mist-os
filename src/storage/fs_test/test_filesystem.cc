@@ -12,6 +12,8 @@
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/inspect/service/cpp/reader.h>
 
+#include <gtest/gtest.h>
+
 #include "sdk/lib/syslog/cpp/macros.h"
 #include "src/storage/fs_test/crypt_service.h"
 
@@ -110,7 +112,9 @@ zx::result<fuchsia_io::wire::FilesystemInfo> TestFilesystem::GetFsInfo() const {
   return zx::ok(*result.value().info);
 }
 
-inspect::Hierarchy TestFilesystem::TakeSnapshot() const {
+void TestFilesystem::TakeSnapshot(std::optional<inspect::Hierarchy>* out) const {
+  ASSERT_NE(nullptr, out) << "out parameter must be non-null";
+  ASSERT_EQ(std::nullopt, *out) << "out parameter will overwrite value already held";
   async::Loop loop = async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   loop.StartThread("inspect-snapshot-thread");
   async::Executor executor(loop.dispatcher());
@@ -118,12 +122,12 @@ inspect::Hierarchy TestFilesystem::TakeSnapshot() const {
   fuchsia::inspect::TreePtr tree;
   async_dispatcher_t* dispatcher = executor.dispatcher();
   auto service_dir = ServiceDirectory();
-  ZX_ASSERT(service_dir.is_valid());
+  ASSERT_TRUE(service_dir.is_valid());
   zx_status_t status =
       fdio_service_connect_at(service_dir.handle()->get(), "diagnostics/fuchsia.inspect.Tree",
                               tree.NewRequest(dispatcher).TakeChannel().release());
-  ZX_ASSERT_MSG(status == ZX_OK, "Failed to connect to inspect service: %s",
-                zx_status_get_string(status));
+  ASSERT_EQ(status, ZX_OK) << "Failed to connect to inspect service: "
+                           << zx_status_get_string(status);
 
   std::condition_variable cv;
   std::mutex m;
@@ -148,8 +152,8 @@ inspect::Hierarchy TestFilesystem::TakeSnapshot() const {
   loop.Quit();
   loop.JoinThreads();
 
-  ZX_ASSERT_MSG(hierarchy_or_error.is_ok(), "Failed to obtain inspect tree snapshot!");
-  return hierarchy_or_error.take_value();
+  ASSERT_TRUE(hierarchy_or_error.is_ok()) << "Failed to obtain inspect tree snapshot!";
+  *out = {hierarchy_or_error.take_value()};
 }
 
 }  // namespace fs_test
