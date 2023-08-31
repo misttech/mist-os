@@ -9,6 +9,7 @@
 #include <bits.h>
 #include <debug.h>
 #include <inttypes.h>
+#include <lib/boot-options/boot-options.h>
 #include <lib/counters.h>
 #include <lib/fit/defer.h>
 #include <lib/heap.h>
@@ -70,7 +71,10 @@ namespace {
 alignas(PAGE_SIZE) pte_t
     riscv64_kernel_top_level_page_tables[RISCV64_MMU_PT_ENTRIES / 2][RISCV64_MMU_PT_ENTRIES];
 
+// Track the size and capability of the hardware ASID, and if its in use.
 uint64_t riscv_asid_mask;
+bool riscv_use_asid;
+AsidAllocator asid_allocator;
 
 KCOUNTER(cm_flush_call, "mmu.consistency_manager.flush_call")
 KCOUNTER(cm_asid_invalidate, "mmu.consistency_manager.asid_invalidate")
@@ -78,10 +82,23 @@ KCOUNTER(cm_global_invalidate, "mmu.consistency_manager.global_invalidate")
 KCOUNTER(cm_page_run_invalidate, "mmu.consistency_manager.page_run_invalidate")
 KCOUNTER(cm_single_page_invalidate, "mmu.consistency_manager.single_page_invalidate")
 
-AsidAllocator asid_allocator;
-
 KCOUNTER(vm_mmu_protect_make_execute_calls, "vm.mmu.protect.make_execute_calls")
 KCOUNTER(vm_mmu_protect_make_execute_pages, "vm.mmu.protect.make_execute_pages")
+
+// Return the asid that should be assigned to the kernel aspace.
+uint16_t kernel_asid() {
+  // When using ASIDs, the kernel is assigned KERNEL_ASID (1) instead of UNUSED_ASID (0)
+  // for two reasons:
+  // a) To keep it logically separate from UNUSED_ASID for debug and assert reasons.
+  // b) A note in SiFive documentation for various cores that says
+  //   "Supervisor software that uses ASIDs should use a nonzero ASID value to refer to the same
+  //   address space across all harts in the supervisor execution environment (SEE) and should not
+  //   use an ASID value of 0. If supervisor software does not use ASIDs, then the ASID field in the
+  //   satp CSR should be set to 0."
+  // Unclear if this is simply a suggestion or hardware will perform some sort of optimization based
+  // on this.
+  return riscv_use_asid ? MMU_RISCV64_KERNEL_ASID : MMU_RISCV64_UNUSED_ASID;
+}
 
 // given a va address and the level, compute the index in the current PT
 constexpr uint vaddr_to_index(vaddr_t va, uint level) {
@@ -494,6 +511,9 @@ void Riscv64ArchVmAspace::FlushTLBEntryRun(vaddr_t vaddr, size_t count) const {
   kcounter_add(cm_page_run_invalidate, 1);
   kcounter_add(cm_single_page_invalidate, static_cast<int64_t>(count));
 
+  // Future optimization here and FlushAsid() when asids are disabled:
+  // Based on which cpu has the aspace active, only send IPIs (either directly
+  // or via SBI) to the other cores from that list to shoot down TLBs.
   const cpu_mask_t cpu_mask = mask_all_but_one(arch_curr_cpu_num());
   if (IsKernel()) {
     // Flush all ASIDs with this address
@@ -1231,7 +1251,7 @@ zx_status_t Riscv64ArchVmAspace::Init() {
 
     tt_virt_ = riscv64_kernel_translation_table;
     tt_phys_ = kernel_virt_to_phys(riscv64_kernel_translation_table);
-    asid_ = (uint16_t)MMU_RISCV64_GLOBAL_ASID;
+    asid_ = kernel_asid();
   } else {
     if (type_ == Riscv64AspaceType::kUser) {
       DEBUG_ASSERT_MSG(IsUserBaseSizeValid(base_, size_), "base %#" PRIxPTR " size 0x%zx", base_,
@@ -1240,12 +1260,18 @@ zx_status_t Riscv64ArchVmAspace::Init() {
         return ZX_ERR_INVALID_ARGS;
       }
 
-      auto status = asid_allocator.Alloc();
-      if (status.is_error()) {
-        printf("RISC-V: out of ASIDs!\n");
-        return status.status_value();
+      // If using asids, assign a unique asid per process. If not, set the UNUSED
+      // asid to this address space, which will be the same between all aspaces.
+      if (riscv_use_asid) {
+        auto status = asid_allocator.Alloc();
+        if (status.is_error()) {
+          printf("RISC-V: out of ASIDs!\n");
+          return status.status_value();
+        }
+        asid_ = status.value();
+      } else {
+        asid_ = MMU_RISCV64_UNUSED_ASID;
       }
-      asid_ = status.value();
     } else {
       return ZX_ERR_NOT_SUPPORTED;
     }
@@ -1299,13 +1325,15 @@ zx_status_t Riscv64ArchVmAspace::Destroy() {
           pt_pages_);
   }
 
-  // Flush the ASID associated with this aspace
-  FlushAsid();
+  if (riscv_use_asid) {
+    // Flush the ASID associated with this aspace
+    FlushAsid();
 
-  // Free any ASID.
-  auto status = asid_allocator.Free(asid_);
-  ASSERT(status.is_ok());
-  asid_ = MMU_RISCV64_UNUSED_ASID;
+    // Free any ASID.
+    auto status = asid_allocator.Free(asid_);
+    ASSERT(status.is_ok());
+    asid_ = MMU_RISCV64_UNUSED_ASID;
+  }
 
   // Free the top level page table
   vm_page_t* page = paddr_to_vm_page(tt_phys_);
@@ -1324,6 +1352,7 @@ zx_status_t Riscv64ArchVmAspace::Destroy() {
 void Riscv64ArchVmAspace::ContextSwitch(Riscv64ArchVmAspace* old_aspace,
                                         Riscv64ArchVmAspace* aspace) {
   uint64_t satp;
+
   if (likely(aspace)) {
     aspace->canary_.Assert();
     DEBUG_ASSERT(aspace->type_ == Riscv64AspaceType::kUser);
@@ -1340,6 +1369,7 @@ void Riscv64ArchVmAspace::ContextSwitch(Riscv64ArchVmAspace* old_aspace,
   } else {
     // Switching to the null aspace, which means kernel address space only.
     satp = ((uint64_t)RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT) |
+           ((uint64_t)kernel_asid() << RISCV64_SATP_ASID_SHIFT) |
            (kernel_virt_to_phys(riscv64_kernel_translation_table) >> PAGE_SIZE_SHIFT);
   }
   if (likely(old_aspace != nullptr)) {
@@ -1353,6 +1383,11 @@ void Riscv64ArchVmAspace::ContextSwitch(Riscv64ArchVmAspace* old_aspace,
 
   riscv64_csr_write(RISCV64_CSR_SATP, satp);
   mb();
+
+  // If we're not using hardware features, flush all non global TLB entries on context switch.
+  if (!riscv_use_asid) {
+    riscv64_tlb_flush_asid(MMU_RISCV64_UNUSED_ASID);
+  }
 }
 
 Riscv64ArchVmAspace::Riscv64ArchVmAspace(vaddr_t base, size_t size, Riscv64AspaceType type,
@@ -1404,22 +1439,51 @@ void riscv64_mmu_early_init() {
 
   // Zero the bottom of the kernel page table to remove any left over boot mappings.
   memset(riscv64_kernel_translation_table, 0, PAGE_SIZE / 2);
+
+  // Make sure it's visible to the cpu
+  wmb();
 }
 
-void riscv64_mmu_early_init_percpu() {
-  // Switch to the proper kernel translation table.
-  uint64_t satp = (RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT) |
-                  ((uint64_t)MMU_RISCV64_GLOBAL_ASID << RISCV64_SATP_ASID_SHIFT) |
-                  (kernel_virt_to_phys(riscv64_kernel_translation_table) >> PAGE_SIZE_SHIFT);
+namespace {
+
+// Load the kernel page tables and set the passed in asid
+void riscv64_switch_kernel_asid(uint16_t asid) {
+  const uint64_t satp = (RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT) |
+                        ((uint64_t)asid << RISCV64_SATP_ASID_SHIFT) |
+                        (kernel_virt_to_phys(riscv64_kernel_translation_table) >> PAGE_SIZE_SHIFT);
   riscv64_csr_write(RISCV64_CSR_SATP, satp);
 
   // Globally TLB flush.
   riscv64_tlb_flush_all();
 }
 
+}  // anonymous namespace
+
+void riscv64_mmu_early_init_percpu() {
+  // Switch to the proper kernel translation table.
+  // Note: during early bringup on the boot cpu, we will have not decided to use asids yet, so
+  // kernel_asid() will return UNUSED_ASID. This is okay, we will decide later to
+  // use asids on the boot cpu in riscv64_mmu_prevm_init and reload the satp.
+  // Everything will be sorted out by the time secondary cpus are brought up.
+  riscv64_switch_kernel_asid(kernel_asid());
+
+  // Globally TLB flush.
+  riscv64_tlb_flush_all();
+}
+
+void riscv64_mmu_prevm_init() {
+  // Use asids if hardware has full 16 bit support and our command line switches allow.
+  // We decide here because before now we have not been able to read gBootOptions.
+  riscv_use_asid = gBootOptions->riscv64_enable_asid && riscv_asid_mask == 0xffff;
+
+  // Now that we've decided to use asids, reload the kernel satp with the proper asid
+  // on the boot cpu.
+  riscv64_switch_kernel_asid(kernel_asid());
+}
+
 void riscv64_mmu_init() {
   dprintf(INFO, "RISCV: MMU enabled sv39\n");
-  dprintf(INFO, "RISCV: MMU ASID mask %#lx\n", riscv_asid_mask);
+  dprintf(INFO, "RISCV: MMU ASID mask %#lx, using asids %u\n", riscv_asid_mask, riscv_use_asid);
 }
 
 void Riscv64VmICacheConsistencyManager::SyncAddr(vaddr_t start, size_t len) {

@@ -1068,6 +1068,12 @@ for a specific architecture.
 
 Note: The default value may vary for each architecture.
 
+### kernel.riscv64.enable-asid=\<bool>
+
+**Default:** `true`
+
+This enables use of ASIDs. True by default if the underlying hardware supports 16-bit ASIDs.
+
 
 ## Options available only on x86 machines
 

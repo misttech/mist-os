@@ -67,7 +67,7 @@ void arch_early_init() {
   mp_set_curr_cpu_online(true);
 }
 
-void arch_prevm_init() {}
+void arch_prevm_init() { riscv64_mmu_prevm_init(); }
 
 void arch_init() TA_NO_THREAD_SAFETY_ANALYSIS {
   // print some arch info

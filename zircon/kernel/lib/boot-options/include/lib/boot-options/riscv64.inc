@@ -17,3 +17,7 @@ for a specific architecture.
 Note: The default value may vary for each architecture.
 )""")
 
+DEFINE_OPTION("kernel.riscv64.enable-asid", bool, riscv64_enable_asid, {true}, R"""(
+This enables use of ASIDs. True by default if the underlying hardware supports 16-bit ASIDs.
+)""")
+

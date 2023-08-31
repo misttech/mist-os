@@ -65,15 +65,22 @@
 
 typedef uintptr_t pte_t;
 
+// Kernel's use of asids:
+//   When using asids, the kernel aspace (active when in kernel threads or idle) will be assigned
+// KERNEL_ASID, which is nonzero but otherwise hard assigned to the kernel. Each process is given a
+// unique asid for the duration of its lifetime, between FIRST_USER_ASID and MAX_USER_ASID.
+//   When not using asids, all aspaces are assigned UNUSED_ASID which is always zero. A full flush
+// of the TLB is performed when context switching.
 const size_t MMU_RISCV64_ASID_BITS = 16;
-const uint16_t MMU_RISCV64_GLOBAL_ASID = (1u << MMU_RISCV64_ASID_BITS) - 1;
 const uint16_t MMU_RISCV64_UNUSED_ASID = 0;
-const uint16_t MMU_RISCV64_FIRST_USER_ASID = 1;
-const uint16_t MMU_RISCV64_MAX_USER_ASID = MMU_RISCV64_GLOBAL_ASID - 1;
+const uint16_t MMU_RISCV64_KERNEL_ASID = 1;
+const uint16_t MMU_RISCV64_FIRST_USER_ASID = 2;
+const uint16_t MMU_RISCV64_MAX_USER_ASID = (1u << MMU_RISCV64_ASID_BITS) - 1;
 
 void riscv64_mmu_early_init();
 void riscv64_mmu_early_init_percpu();
 void riscv64_mmu_init();
+void riscv64_mmu_prevm_init();
 
 // Helper routines for various page table entry manipulation
 constexpr bool riscv64_pte_is_valid(pte_t pte) { return pte & RISCV64_PTE_V; }

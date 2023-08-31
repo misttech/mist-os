@@ -93,6 +93,7 @@ if (toolchain_base_environment == "kernel") {
       "//zircon/kernel/dev/iommu/dummy",
       "//zircon/kernel/dev/pdev/power",
       "//zircon/kernel/lib/arch",
+      "//zircon/kernel/lib/boot-options",
       "//zircon/kernel/lib/console",
       "//zircon/kernel/lib/counters",
       "//zircon/kernel/lib/crashlog",
