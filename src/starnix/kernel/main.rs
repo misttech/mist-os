@@ -20,11 +20,9 @@ use fidl_fuchsia_process_lifecycle as flifecycle;
 use fidl_fuchsia_starnix_container as fstarcontainer;
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
+use fuchsia_inspect::health::Reporter;
 use fuchsia_runtime as fruntime;
 use futures::{StreamExt, TryStreamExt};
-
-#[cfg(target_arch = "x86_64")]
-use fuchsia_inspect as inspect;
 
 #[macro_use]
 mod trace;
@@ -125,6 +123,8 @@ async fn main() -> Result<(), Error> {
         fuchsia_inspect::component::inspector(),
         inspect_runtime::PublishOptions::default(),
     );
+    let mut health = fuchsia_inspect::component::health();
+    health.set_starting_up();
 
     fuchsia_trace_provider::trace_provider_create_with_fdio();
     trace_instant!(
@@ -145,7 +145,7 @@ async fn main() -> Result<(), Error> {
 
     #[cfg(target_arch = "x86_64")]
     {
-        inspect::component::inspector().root().record_string(
+        fuchsia_inspect::component::inspector().root().record_string(
             "x86_64_extended_pstate_strategy",
             format!("{:?}", *extended_pstate::x86_64::PREFERRED_STRATEGY),
         );
@@ -154,13 +154,12 @@ async fn main() -> Result<(), Error> {
     // Wait for the UTC clock to start up before we start accepting requests since so many Linux
     // APIs need a running UTC clock to function.
     // See https://fxbug.dev/126111 for more discussion.
-    // TODO(https://fxbug.dev/93344): Once it's practical to do so we should report a STARTING_UP
-    // state in inspect's health node until we are ready to start accepting requests.
     log_debug!("Starting UTC clock.");
     time::utc::start_utc_clock().await;
 
     log_debug!("Serving kernel services on outgoing directory handle.");
     fs.take_and_serve_directory_handle()?;
+    health.set_ok();
 
     fs.for_each_concurrent(None, |request: KernelServices| async {
         match request {
