@@ -7,7 +7,7 @@
 
 #include <lib/async/task.h>
 
-#include "pw_async/internal/types.h"
+#include "pw_async/task_function.h"
 #include "pw_chrono/system_clock.h"
 
 namespace pw::async::fuchsia {
@@ -42,9 +42,6 @@ class NativeTask final : public async_task_t {
   chrono::SystemClock::time_point due_time() const;
 
   void set_due_time(chrono::SystemClock::time_point due_time);
-
-  std::optional<chrono::SystemClock::duration> interval() const;
-  void set_interval(std::optional<chrono::SystemClock::duration> interval);
 
   static void Handler(async_dispatcher_t* /*dispatcher*/, async_task_t* task, zx_status_t status);
 

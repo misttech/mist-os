@@ -11,7 +11,6 @@ config("public_include_path") {
 
 config("backend_config") {
   include_dirs = [ "public_overrides" ]
-  visibility = [ ":*" ]
 }
 
 # Backend for //pw_async:task
@@ -41,7 +40,7 @@ pw_source_set("fake_dispatcher") {
   ]
 }
 
-pw_source_set("dispatcher") {
+source_set("dispatcher") {
   public_configs = [ ":public_include_path" ]
   public = [ "public/pw_async_fuchsia/dispatcher.h" ]
   sources = [ "dispatcher.cc" ]
@@ -54,6 +53,7 @@ pw_source_set("dispatcher") {
 pw_source_set("util") {
   public_configs = [ ":public_include_path" ]
   public = [ "public/pw_async_fuchsia/util.h" ]
+  visibility = [ "//src/connectivity/bluetooth/core/bt-host/*" ]
 }
 
 pw_source_set("fake_dispatcher_fixture") {
@@ -62,6 +62,10 @@ pw_source_set("fake_dispatcher_fixture") {
   public_deps = [
     ":fake_dispatcher",
     "//third_party/googletest:gtest",
+  ]
+  visibility = [
+    ":*",
+    "//src/connectivity/bluetooth/core/bt-host/*",
   ]
 }
 

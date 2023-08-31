@@ -29,12 +29,6 @@ void NativeTask::set_due_time(chrono::SystemClock::time_point due_time) {
   deadline = pw_async_fuchsia::TimepointToZxTime(due_time).get();
 }
 
-std::optional<chrono::SystemClock::duration> NativeTask::interval() const { return std::nullopt; }
-void set_interval(std::optional<chrono::SystemClock::duration> /*interval*/) {
-  // TODO(fxbug.dev/125311): Implement periodic tasks.
-  ZX_PANIC("Not implemented");
-}
-
 void NativeTask::Handler(async_dispatcher_t* /*dispatcher*/, async_task_t* task,
                          zx_status_t status) {
   auto self = static_cast<NativeTask*>(task);

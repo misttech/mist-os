@@ -30,15 +30,6 @@ class NativeFakeDispatcher {
   void PostAfter(Task& task, chrono::SystemClock::duration delay);
   void PostAt(Task& task, chrono::SystemClock::time_point time);
 
-  // No-op
-  void PostPeriodic(Task& task, chrono::SystemClock::duration interval);
-  // No-op
-  void PostPeriodicAfter(Task& task, chrono::SystemClock::duration interval,
-                         chrono::SystemClock::duration delay);
-  // No-op
-  void PostPeriodicAt(Task& task, chrono::SystemClock::duration interval,
-                      chrono::SystemClock::time_point start_time);
-
   bool Cancel(Task& task);
 
   void RunUntilIdle();

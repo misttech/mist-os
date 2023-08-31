@@ -58,31 +58,6 @@ void NativeFakeDispatcher::RunFor(chrono::SystemClock::duration duration) {
   RunUntil(now() + duration);
 }
 
-void NativeFakeDispatcher::PostPeriodic(Task& task, chrono::SystemClock::duration interval) {
-  // TODO(fxbug.dev/125311): Implement periodic tasks.
-  ZX_PANIC("Not implemented");
-  static_cast<void>(task);
-  static_cast<void>(interval);
-}
-
-void NativeFakeDispatcher::PostPeriodicAfter(Task& task, chrono::SystemClock::duration interval,
-                                             chrono::SystemClock::duration delay) {
-  // TODO(fxbug.dev/125311): Implement periodic tasks.
-  ZX_PANIC("Not implemented");
-  static_cast<void>(task);
-  static_cast<void>(interval);
-  static_cast<void>(delay);
-}
-
-void NativeFakeDispatcher::PostPeriodicAt(Task& task, chrono::SystemClock::duration interval,
-                                          chrono::SystemClock::time_point start_time) {
-  // TODO(fxbug.dev/125311): Implement periodic tasks.
-  ZX_PANIC("Not implemented");
-  static_cast<void>(task);
-  static_cast<void>(interval);
-  static_cast<void>(start_time);
-}
-
 NativeFakeDispatcher::FakeAsyncLoop::FakeAsyncLoop() {
   list_initialize(&task_list_);
   list_initialize(&due_list_);

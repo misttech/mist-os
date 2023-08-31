@@ -11,8 +11,28 @@ source_set("pw_assert") {
   visibility = [ "//src/connectivity/bluetooth/core/bt-host/*" ]
 }
 
+source_set("pw_async_task") {
+  public_deps = [ "src/pw_async:task" ]
+  visibility = [ "//src/connectivity/bluetooth/core/bt-host/*" ]
+}
+
+source_set("pw_async_dispatcher") {
+  public_deps = [ "src/pw_async:dispatcher" ]
+  visibility = [ "//src/connectivity/bluetooth/core/bt-host/*" ]
+}
+
+source_set("pw_async_heap_dispatcher") {
+  public_deps = [ "src/pw_async:heap_dispatcher" ]
+  visibility = [ "//src/connectivity/bluetooth/core/bt-host/*" ]
+}
+
 source_set("pw_bluetooth") {
   public_deps = [ "src/pw_bluetooth" ]
+  visibility = [ "//src/connectivity/bluetooth/core/bt-host/*" ]
+}
+
+source_set("pw_chrono_system_clock") {
+  public_deps = [ "src/pw_chrono:system_clock" ]
   visibility = [ "//src/connectivity/bluetooth/core/bt-host/*" ]
 }
 

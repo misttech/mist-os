@@ -86,8 +86,10 @@ default_args = {
   dir_pw_third_party_emboss = "//third_party/github.com/google/emboss/src"
 
   # Enable usage of the pw_async Pigweed module.
-  pw_async_EXPERIMENTAL_MODULE_VISIBILITY =
-      [ "//third_party/pigweed/backends/pw_async_fuchsia:*" ]
+  pw_async_EXPERIMENTAL_MODULE_VISIBILITY = [
+    "//third_party/pigweed/backends/pw_async_fuchsia:*",
+    "//third_party/pigweed:*",
+  ]
 
   pw_async_TASK_BACKEND = "//third_party/pigweed/backends/pw_async_fuchsia:task"
 
