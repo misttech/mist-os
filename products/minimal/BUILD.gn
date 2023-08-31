@@ -83,6 +83,7 @@ bazel_product_bundle("product_bundle.x64") {
   bazel_inputs_from_gn = [
     "//boards/x64:x64.bazel_input",
     "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
+    "//build/images/zedboot:zedboot.bazel_legacy_aib",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi_for_bazel",
   ]
 }
@@ -97,6 +98,7 @@ bazel_product_bundle("product_bundle.qemu-x64") {
   bazel_inputs_from_gn = [
     "//boards/qemu-x64:qemu-x64.bazel_input",
     "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
+    "//build/images/zedboot:zedboot.bazel_legacy_aib",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi_for_bazel",
   ]
 }
@@ -111,5 +113,6 @@ bazel_product_bundle("product_bundle.riscv64") {
   bazel_inputs_from_gn = [
     "//boards/riscv64:riscv64.bazel_input",
     "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
+    "//build/images/zedboot:zedboot.bazel_legacy_aib",
   ]
 }
