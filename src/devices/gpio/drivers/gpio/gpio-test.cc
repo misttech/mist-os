@@ -356,15 +356,13 @@ TEST_F(GpioTest, InitErrorHandling) {
   metadata.steps[6].call = fhgpio::InitCall::WithOutputValue(0);
   gpio.ExpectConfigOut(ZX_ERR_NOT_FOUND, 3, 0);
 
-  // Processing should continue after the above error.
+  // Processing should not continue after the above error.
 
   metadata.steps[7].index = 2;
   metadata.steps[7].call = fhgpio::InitCall::WithAltFunction(arena, 0);
 
   metadata.steps[8].index = 2;
   metadata.steps[8].call = fhgpio::InitCall::WithDriveStrengthUa(arena, 1000);
-
-  gpio.ExpectSetAltFunction(ZX_OK, 2, 0).ExpectSetDriveStrength(ZX_OK, 2, 1000, 1000);
 
   fit::result encoded = fidl::Persist(metadata);
   ASSERT_TRUE(encoded.is_ok(), "%s", encoded.error_value().FormatDescription().c_str());

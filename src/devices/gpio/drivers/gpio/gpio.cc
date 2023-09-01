@@ -186,6 +186,9 @@ void GpioInitDevice::Create(zx_device_t* parent, const ddk::GpioImplProtocolClie
 
   auto device = std::make_unique<GpioInitDevice>(parent);
   if (device->ConfigureGpios(*decoded.value(), gpio) != ZX_OK) {
+    // Return without adding the init device if some GPIOs could not be configured. This will
+    // prevent all drivers that depend on the initial state from binding, which should make it more
+    // obvious that something has gone wrong.
     return;
   }
 
@@ -205,8 +208,8 @@ void GpioInitDevice::Create(zx_device_t* parent, const ddk::GpioImplProtocolClie
 zx_status_t GpioInitDevice::ConfigureGpios(
     const fuchsia_hardware_gpio::wire::InitMetadata& metadata,
     const ddk::GpioImplProtocolClient& gpio) {
-  // Log errors but continue processing to put as many GPIOs as possible into the requested state.
-  zx_status_t return_status = ZX_OK;
+  // Stop processing the list if any call returns an error so that GPIOs are not accidentally put
+  // into an unexpected state.
   for (const auto& step : metadata.steps) {
     if (step.call.is_input_flags()) {
       if (zx_status_t status =
@@ -215,21 +218,21 @@ zx_status_t GpioInitDevice::ConfigureGpios(
         zxlogf(ERROR, "ConfigIn(%u) failed for %u: %s",
                static_cast<uint32_t>(step.call.input_flags()), step.index,
                zx_status_get_string(status));
-        return_status = status;
+        return status;
       }
     } else if (step.call.is_output_value()) {
       if (zx_status_t status = gpio.ConfigOut(step.index, step.call.output_value());
           status != ZX_OK) {
         zxlogf(ERROR, "ConfigOut(%u) failed for %u: %s", step.call.output_value(), step.index,
                zx_status_get_string(status));
-        return_status = status;
+        return status;
       }
     } else if (step.call.is_alt_function()) {
       if (zx_status_t status = gpio.SetAltFunction(step.index, step.call.alt_function());
           status != ZX_OK) {
         zxlogf(ERROR, "SetAltFunction(%lu) failed for %u: %s", step.call.drive_strength_ua(),
                step.index, zx_status_get_string(status));
-        return_status = status;
+        return status;
       }
     } else if (step.call.is_drive_strength_ua()) {
       uint64_t actual_ds;
@@ -238,18 +241,18 @@ zx_status_t GpioInitDevice::ConfigureGpios(
           status != ZX_OK) {
         zxlogf(ERROR, "SetDriveStrength(%lu) failed for %u: %s", step.call.drive_strength_ua(),
                step.index, zx_status_get_string(status));
-        return_status = status;
+        return status;
       } else if (actual_ds != step.call.drive_strength_ua()) {
         zxlogf(WARNING, "Actual drive strength (%lu) doesn't match expected (%lu) for %u",
                actual_ds, step.call.drive_strength_ua(), step.index);
-        return_status = ZX_ERR_BAD_STATE;
+        return ZX_ERR_BAD_STATE;
       }
     } else if (step.call.is_delay()) {
       zx::nanosleep(zx::deadline_after(zx::duration(step.call.delay())));
     }
   }
 
-  return return_status;
+  return ZX_OK;
 }
 
 static constexpr zx_driver_ops_t driver_ops = []() {
