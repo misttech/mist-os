@@ -13,6 +13,7 @@
 
 #include <memory>
 
+#include <bind/fuchsia/clock/cpp/bind.h>
 #include <ddk/metadata/clock.h>
 #include <fbl/alloc_checker.h>
 
@@ -113,6 +114,9 @@ zx_status_t ClockDevice::Create(void* ctx, zx_device_t* parent) {
     return status;
   }
 
+  // Process init metadata while we are still the exclusive owner of the clock client.
+  ClockInitDevice::Create(parent, &clock_proto);
+
   auto clock_ids = ddk::GetMetadataArray<clock_id_t>(parent, DEVICE_METADATA_CLOCK_IDS);
   if (!clock_ids.is_ok()) {
     zxlogf(ERROR, "GetMetadataArray failed %d.", clock_ids.error_value());
@@ -162,6 +166,76 @@ zx_status_t ClockDevice::Create(void* ctx, zx_device_t* parent) {
 
     // dev is now owned by devmgr.
     [[maybe_unused]] auto ptr = dev.release();
+  }
+
+  return ZX_OK;
+}
+
+void ClockInitDevice::Create(zx_device_t* parent, const ddk::ClockImplProtocolClient& clock) {
+  auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_clock::wire::InitMetadata>(
+      parent, DEVICE_METADATA_CLOCK_INIT);
+  if (!decoded.is_ok()) {
+    if (decoded.status_value() == ZX_ERR_NOT_FOUND) {
+      zxlogf(INFO, "No init metadata provided");
+    } else {
+      zxlogf(ERROR, "Failed to decode metadata: %s", decoded.status_string());
+    }
+    return;
+  }
+
+  auto device = std::make_unique<ClockInitDevice>(parent);
+  if (device->ConfigureClocks(*decoded.value(), clock) != ZX_OK) {
+    // Return without adding the init device if some clocks could not be configured. This will
+    // prevent all drivers that depend on the initial state from binding, which should make it more
+    // obvious that something has gone wrong.
+    return;
+  }
+
+  zx_device_prop_t props[] = {
+      {BIND_INIT_STEP, 0, bind_fuchsia_clock::BIND_INIT_STEP_CLOCK},
+  };
+
+  zx_status_t status = device->DdkAdd(ddk::DeviceAddArgs("clock-init")
+                                          .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
+                                          .set_props(props));
+  if (status == ZX_OK) {
+    [[maybe_unused]] auto _ = device.release();
+  } else {
+    zxlogf(ERROR, "Failed to add clock-init: %s", zx_status_get_string(status));
+  }
+}
+
+zx_status_t ClockInitDevice::ConfigureClocks(
+    const fuchsia_hardware_clock::wire::InitMetadata& metadata,
+    const ddk::ClockImplProtocolClient& clock) {
+  // Stop processing the list if any call returns an error so that clocks are not accidentally
+  // enabled in an unknown state.
+  for (const auto& step : metadata.steps) {
+    if (step.call.is_enable()) {
+      if (zx_status_t status = clock.Enable(step.id); status != ZX_OK) {
+        zxlogf(ERROR, "Enable() failed for %u: %s", step.id, zx_status_get_string(status));
+        return status;
+      }
+    } else if (step.call.is_disable()) {
+      if (zx_status_t status = clock.Disable(step.id); status != ZX_OK) {
+        zxlogf(ERROR, "Disable() failed for %u: %s", step.id, zx_status_get_string(status));
+        return status;
+      }
+    } else if (step.call.is_rate_hz()) {
+      if (zx_status_t status = clock.SetRate(step.id, step.call.rate_hz()); status != ZX_OK) {
+        zxlogf(ERROR, "SetRate(%lu) failed for %u: %s", step.call.rate_hz(), step.id,
+               zx_status_get_string(status));
+        return status;
+      }
+    } else if (step.call.is_input_idx()) {
+      if (zx_status_t status = clock.SetInput(step.id, step.call.input_idx()); status != ZX_OK) {
+        zxlogf(ERROR, "SetInput(%u) failed for %u: %s", step.call.input_idx(), step.id,
+               zx_status_get_string(status));
+        return status;
+      }
+    } else if (step.call.is_delay()) {
+      zx::nanosleep(zx::deadline_after(zx::duration(step.call.delay())));
+    }
   }
 
   return ZX_OK;

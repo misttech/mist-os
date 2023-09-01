@@ -48,4 +48,20 @@ class ClockDevice : public ClockDeviceType, public fidl::WireServer<fuchsia_hard
   fidl::ServerBindingGroup<fuchsia_hardware_clock::Clock> bindings_;
 };
 
+class ClockInitDevice;
+using ClockInitDeviceType = ddk::Device<ClockInitDevice>;
+
+class ClockInitDevice : public ClockInitDeviceType {
+ public:
+  static void Create(zx_device_t* parent, const ddk::ClockImplProtocolClient& clock);
+
+  explicit ClockInitDevice(zx_device_t* parent) : ClockInitDeviceType(parent) {}
+
+  void DdkRelease() { delete this; }
+
+ private:
+  static zx_status_t ConfigureClocks(const fuchsia_hardware_clock::wire::InitMetadata& metadata,
+                                     const ddk::ClockImplProtocolClient& clock);
+};
+
 #endif  // SRC_DEVICES_CLOCK_DRIVERS_CLOCK_CLOCK_H_
