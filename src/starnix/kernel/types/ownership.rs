@@ -593,6 +593,16 @@ macro_rules! release_on_error {
     }};
 }
 
+/// Macro that ensure the releasable is released with the given context after the body returns.
+macro_rules! release_after {
+    ($releasable_name:ident, $context:expr, $body:block ) => {{
+        #[allow(clippy::redundant_closure_call)]
+        let result = { (|| $body)() };
+        $releasable_name.release($context);
+        result
+    }};
+}
+
 pub mod internal {
     pub async fn async_try<E>(block: impl std::future::Future<Output = E>) -> E {
         block.await
@@ -616,6 +626,7 @@ macro_rules! async_release_after {
 }
 
 pub(crate) use async_release_after;
+pub(crate) use release_after;
 pub(crate) use release_on_error;
 
 #[cfg(any(test, debug_assertions))]

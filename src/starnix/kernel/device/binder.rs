@@ -377,7 +377,7 @@ struct TransactionState {
 impl Drop for TransactionState {
     fn drop(&mut self) {
         log_trace!("Dropping binder TransactionState");
-        let mut drop_actions = vec![];
+        let mut drop_actions = RefCountActions::default();
         // Release the owned objects unconditionally.
         for object in &self.objects {
             object.release(&mut drop_actions);
@@ -399,10 +399,8 @@ impl Drop for TransactionState {
                 }
             }
         }
-        // Executing action must be done without holding BinderProcess lock.
-        for action in drop_actions {
-            action.execute();
-        }
+        // Releasing action must be done without holding BinderProcess lock.
+        drop_actions.release(());
     }
 }
 
@@ -635,11 +633,9 @@ impl BinderProcess {
         command: binder_driver_command_protocol,
         handle: Handle,
     ) -> Result<(), Errno> {
-        let mut actions = vec![];
+        let mut actions = RefCountActions::default();
         self.lock().handle_refcount_operation(command, handle, &mut actions)?;
-        for action in actions {
-            action.execute();
-        }
+        actions.release(());
         Ok(())
     }
 
@@ -651,11 +647,9 @@ impl BinderProcess {
         command: binder_driver_command_protocol,
         object: LocalBinderObject,
     ) -> Result<(), Errno> {
-        let mut actions = vec![];
+        let mut actions = RefCountActions::default();
         self.lock().handle_refcount_operation_done(command, object, &mut actions)?;
-        for action in actions {
-            action.execute();
-        }
+        actions.release(());
         Ok(())
     }
 
@@ -755,7 +749,7 @@ impl<'a> BinderProcessGuard<'a> {
         target_process: &Arc<BinderProcess>,
         object: Arc<BinderObject>,
     ) -> Handle {
-        let mut actions = vec![];
+        let mut actions = RefCountActions::default();
         // Increment the strong reference count of this object, while keeping the lock on the
         // source process. This ensures the object cannot be release before being installed into
         // the handle table to the target process. Moreover, this doesn't creates any new refcount
@@ -776,16 +770,14 @@ impl<'a> BinderProcessGuard<'a> {
         // increment can be released.
         guard.release(&mut actions);
 
-        // Once all reference operations are done, execute the actions.
-        for action in actions {
-            action.execute()
-        }
+        // Once all reference operations are done, release the actions.
+        actions.release(());
         handle
     }
 
     /// Handle a binder thread's request to increment/decrement a strong/weak reference to a remote
     /// binder object.
-    /// Takes a `RefCountActions` that must be `execute`d without holding a lock on
+    /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn handle_refcount_operation(
         &mut self,
@@ -827,7 +819,7 @@ impl<'a> BinderProcessGuard<'a> {
     /// Handle a binder thread's notification that it successfully incremented a strong/weak
     /// reference to a local (in-process) binder object. This is in response to a
     /// `BR_ACQUIRE`/`BR_INCREFS` command.
-    /// Takes a `RefCountActions` that must be `execute`d without holding a lock on
+    /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn handle_refcount_operation_done(
         &self,
@@ -1195,11 +1187,9 @@ struct HandleTable {
 impl Drop for HandleTable {
     fn drop(&mut self) {
         for (_, r) in self.table.iter_mut() {
-            let mut actions = vec![];
+            let mut actions = RefCountActions::default();
             r.clean_refs(&mut actions);
-            for action in actions {
-                action.execute();
-            }
+            actions.release(());
         }
     }
 }
@@ -1242,7 +1232,7 @@ impl BinderObjectRef {
     }
 
     /// Free any reference held on `binder_object` by this reference.
-    /// Takes a `RefCountActions` that must be `execute`d without holding a lock on
+    /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn clean_refs(&mut self, actions: &mut RefCountActions) {
         if let Some(guard) = self.strong_guard.take() {
@@ -1264,7 +1254,7 @@ impl BinderObjectRef {
     }
 
     /// Increments the strong reference count of the binder object reference.
-    /// Takes a `RefCountActions` that must be `execute`d without holding a lock on
+    /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn inc_strong(&mut self, actions: &mut RefCountActions) {
         if self.strong_count == 0 {
@@ -1275,7 +1265,7 @@ impl BinderObjectRef {
     }
 
     /// Increments the weak reference count of the binder object reference.
-    /// Takes a `RefCountActions` that must be `execute`d without holding a lock on
+    /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn inc_weak(&mut self, actions: &mut RefCountActions) {
         if self.weak_count == 0 {
@@ -1286,7 +1276,7 @@ impl BinderObjectRef {
     }
 
     /// Decrements the strong reference count of the binder object reference.
-    /// Takes a `RefCountActions` that must be `execute`d without holding a lock on
+    /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn dec_strong(&mut self, actions: &mut RefCountActions) -> Result<(), Errno> {
         if self.strong_count == 0 {
@@ -1303,7 +1293,7 @@ impl BinderObjectRef {
     }
 
     /// Decrements the weak reference count of the binder object reference.
-    /// Takes a `RefCountActions` that must be `execute`d without holding a lock on
+    /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn dec_weak(&mut self, actions: &mut RefCountActions) -> Result<(), Errno> {
         if self.weak_count == 0 {
@@ -1339,7 +1329,6 @@ impl BinderObjectRef {
 /// Instructs the [`BinderDriver`] on what to do on an object after an ref count
 /// operation.
 #[derive(Debug)]
-#[must_use = "RefCountAction must be handled"]
 enum RefCountAction {
     /// Send a AcquireRef command to the owning process.
     Acquire(Arc<BinderObject>),
@@ -1351,10 +1340,12 @@ enum RefCountAction {
     DecRefs(Arc<BinderObject>),
 }
 
-impl RefCountAction {
+impl Releasable for RefCountAction {
+    type Context<'a> = ();
+
     /// Execute the current action. This must be done without holding any lock to a
     /// `BinderProcess`.
-    fn execute(self) {
+    fn release(&self, _: ()) {
         match self {
             Self::Acquire(object) => {
                 if let Some(binder_process) = object.owner.upgrade() {
@@ -1388,14 +1379,26 @@ impl RefCountAction {
     }
 }
 
-type RefCountActions = Vec<RefCountAction>;
+/// A list of `RefCountAction` that is itself releasable. Releasing the list will release each
+/// individual action.
+type RefCountActions = ReleaseGuard<Vec<RefCountAction>>;
+
+impl Releasable for Vec<RefCountAction> {
+    type Context<'a> = <RefCountAction as Releasable>::Context<'a>;
+
+    fn release(&self, context: Self::Context<'_>) {
+        for action in self {
+            action.release(context);
+        }
+    }
+}
 
 impl HandleTable {
     /// Inserts a reference to a binder object, returning a handle that represents it.
     /// The handle may be an existing handle if the object was already present in the table.
     /// A new handle will have a single strong reference, an existing handle will have its strong
     /// reference count incremented by one.
-    /// Takes a `RefCountActions` that must be `execute`d without holding a lock on
+    /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess` and the handle representing the object.
     fn insert_for_transaction(
         &mut self,
@@ -1441,7 +1444,7 @@ impl HandleTable {
 
     /// Increments the strong reference count of the binder object reference at index `idx`,
     /// failing if the object no longer exists.
-    /// Takes a `RefCountActions` that must be `execute`d without holding a lock on
+    /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn inc_strong(&mut self, idx: usize, actions: &mut RefCountActions) -> Result<(), Errno> {
         Ok(self.table.get_mut(idx).ok_or_else(|| errno!(ENOENT))?.inc_strong(actions))
@@ -1449,7 +1452,7 @@ impl HandleTable {
 
     /// Increments the weak reference count of the binder object reference at index `idx`, failing
     /// if the object does not exist.
-    /// Takes a `RefCountActions` that must be `execute`d without holding a lock on
+    /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn inc_weak(&mut self, idx: usize, actions: &mut RefCountActions) -> Result<(), Errno> {
         Ok(self.table.get_mut(idx).ok_or_else(|| errno!(ENOENT))?.inc_weak(actions))
@@ -1457,7 +1460,7 @@ impl HandleTable {
 
     /// Decrements the strong reference count of the binder object reference at index `idx`, failing
     /// if the object no longer exists.
-    /// Takes a `RefCountActions` that must be `execute`d without holding a lock on
+    /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn dec_strong(&mut self, idx: usize, actions: &mut RefCountActions) -> Result<(), Errno> {
         let object_ref = self.table.get_mut(idx).ok_or_else(|| errno!(ENOENT))?;
@@ -1470,7 +1473,7 @@ impl HandleTable {
 
     /// Decrements the weak reference count of the binder object reference at index `idx`, failing
     /// if the object does not exist.
-    /// Takes a `RefCountActions` that must be `execute`d without holding a lock on
+    /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn dec_weak(&mut self, idx: usize, actions: &mut RefCountActions) -> Result<(), Errno> {
         let object_ref = self.table.get_mut(idx).ok_or_else(|| errno!(ENOENT))?;
@@ -2120,7 +2123,7 @@ impl BinderObject {
     }
 
     /// Increments the strong reference count of the binder object.
-    /// Takes a `RefCountActions` that must be `execute`d without holding a lock on
+    /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn inc_strong(self: &Arc<Self>, actions: &mut RefCountActions) -> StrongRefGuard {
         if self.lock().strong_count.inc() {
@@ -2130,7 +2133,7 @@ impl BinderObject {
     }
 
     /// Increments the weak reference count of the binder object.
-    /// Takes a `RefCountActions` that must be `execute`d without holding a lock on
+    /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn inc_weak(self: &Arc<Self>, actions: &mut RefCountActions) -> WeakRefGuard {
         if self.lock().weak_count.inc() {
@@ -2140,7 +2143,7 @@ impl BinderObject {
     }
 
     /// Acknowledge the BC_ACQUIRE_DONE command received from the object owner.
-    /// Takes a `RefCountActions` that must be `execute`d without holding a lock on
+    /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn ack_acquire(self: &Arc<Self>, actions: &mut RefCountActions) -> Result<(), Errno> {
         let mut state = self.lock();
@@ -2150,7 +2153,7 @@ impl BinderObject {
     }
 
     /// Acknowledge the BC_INCREFS_DONE command received from the object owner.
-    /// Takes a `RefCountActions` that must be `execute`d without holding a lock on
+    /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn ack_incref(self: &Arc<Self>, actions: &mut RefCountActions) -> Result<(), Errno> {
         let mut state = self.lock();
@@ -2896,150 +2899,148 @@ impl BinderDriver {
         binder_thread: &Arc<BinderThread>,
         data: binder_transaction_data_sg,
     ) -> Result<(), TransactionError> {
-        // SAFETY: Transactions can only refer to handles.
-        let handle = unsafe { data.transaction_data.target.handle }.into();
+        let mut actions = RefCountActions::default();
+        release_after!(actions, (), {
+            // SAFETY: Transactions can only refer to handles.
+            let handle = unsafe { data.transaction_data.target.handle }.into();
 
-        let mut actions = vec![];
-        let (object, target_proc, mut guard) = match handle {
-            Handle::ContextManager => {
-                let (object, owner) = self.get_context_manager(current_task)?;
-                (object, owner, None)
-            }
-            Handle::Object { index } => {
-                let binder_proc = binder_proc.lock();
-                let object = binder_proc.handles.get(index).ok_or(TransactionError::Failure)?;
-                let owner = object.owner.upgrade().ok_or(TransactionError::Dead)?;
-                let guard = object.inc_strong(&mut actions);
-                (object, owner, Some(guard))
-            }
-        };
-
-        release_on_error!(guard, &mut actions, {
-            let weak_task = current_task.get_task(target_proc.pid);
-            let target_task = weak_task.upgrade().ok_or_else(|| TransactionError::Dead)?;
-            let security_context: Option<FsString> = if object.flags
-                & uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_TXN_SECURITY_CTX
-                == uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_TXN_SECURITY_CTX
-            {
-                let mut security_context =
-                    target_task.thread_group.read().selinux.current_context.clone();
-                security_context.push(b'\0');
-                Some(security_context)
-            } else {
-                None
+            let (object, target_proc, mut guard) = match handle {
+                Handle::ContextManager => {
+                    let (object, owner) = self.get_context_manager(current_task)?;
+                    (object, owner, None)
+                }
+                Handle::Object { index } => {
+                    let binder_proc = binder_proc.lock();
+                    let object = binder_proc.handles.get(index).ok_or(TransactionError::Failure)?;
+                    let owner = object.owner.upgrade().ok_or(TransactionError::Dead)?;
+                    let guard = object.inc_strong(&mut actions);
+                    (object, owner, Some(guard))
+                }
             };
 
-            // Copy the transaction data to the target process.
-            let (buffers, mut transaction_state) = self.copy_transaction_buffers(
-                binder_proc.get_resource_accessor(current_task),
-                binder_proc,
-                binder_thread,
-                target_proc.get_resource_accessor(&target_task),
-                &target_proc,
-                &data,
-                security_context.as_deref(),
-            )?;
-
-            let transaction = TransactionData {
-                peer_pid: binder_proc.pid,
-                peer_tid: binder_thread.tid,
-                peer_euid: current_task.creds().euid,
-                object: {
-                    if handle.is_handle_0() {
-                        // This handle (0) always refers to the context manager, which is always
-                        // "remote", even for the context manager itself.
-                        FlatBinderObject::Remote { handle }
-                    } else {
-                        FlatBinderObject::Local { object: object.local }
-                    }
-                },
-                code: data.transaction_data.code,
-                flags: data.transaction_data.flags,
-
-                buffers: buffers.clone(),
-            };
-
-            if let Some(guard) = guard.take() {
-                transaction_state.state.add_guard(guard);
-            }
-
-            let (target_thread, command) =
-                if data.transaction_data.flags & transaction_flags_TF_ONE_WAY != 0 {
-                    // The caller is not expecting a reply.
-                    binder_thread.lock().enqueue_command(Command::OnewayTransactionComplete);
-
-                    // Register the transaction buffer.
-                    target_proc.lock().active_transactions.insert(
-                        buffers.data.address,
-                        ActiveTransaction {
-                            request_type: RequestType::Oneway { object: object.clone() },
-                            _state: transaction_state.into(),
-                        },
-                    );
-
-                    // Oneway transactions are enqueued on the binder object and processed one at a time.
-                    // This guarantees that oneway transactions are processed in the order they are
-                    // submitted, and one at a time.
-                    let mut object_state = object.lock();
-                    if object_state.handling_oneway_transaction {
-                        // Currently, a oneway transaction is being handled. Queue this one so that it is
-                        // scheduled when the buffer from the in-progress transaction is freed.
-                        object_state.oneway_transactions.push_back(transaction);
-                        return Ok(());
-                    }
-
-                    // No oneway transactions are being handled, which means that no buffer will be
-                    // freed, kicking off scheduling from the oneway queue. Instead, we must schedule
-                    // the transaction regularly, but mark the object as handling a oneway transaction.
-                    object_state.handling_oneway_transaction = true;
-
-                    (None, Command::OnewayTransaction(transaction))
+            release_after!(guard, &mut actions, {
+                let weak_task = current_task.get_task(target_proc.pid);
+                let target_task = weak_task.upgrade().ok_or_else(|| TransactionError::Dead)?;
+                let security_context: Option<FsString> = if object.flags
+                    & uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_TXN_SECURITY_CTX
+                    == uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_TXN_SECURITY_CTX
+                {
+                    let mut security_context =
+                        target_task.thread_group.read().selinux.current_context.clone();
+                    security_context.push(b'\0');
+                    Some(security_context)
                 } else {
-                    let target_thread = match match binder_thread.lock().transactions.last() {
-                        Some(TransactionRole::Receiver(rx)) => rx.upgrade(),
-                        _ => None,
-                    } {
-                        Some((proc, thread)) if proc.pid == target_proc.pid => Some(thread),
-                        _ => None,
-                    };
-
-                    // Make the sender thread part of the transaction so it doesn't get scheduled to handle
-                    // any other transactions.
-                    binder_thread.lock().transactions.push(TransactionRole::Sender(
-                        WeakBinderPeer::new(binder_proc, binder_thread),
-                    ));
-
-                    // Register the transaction buffer.
-                    target_proc.lock().active_transactions.insert(
-                        buffers.data.address,
-                        ActiveTransaction {
-                            request_type: RequestType::RequestResponse,
-                            _state: transaction_state.into(),
-                        },
-                    );
-
-                    (
-                        target_thread,
-                        Command::Transaction {
-                            sender: WeakBinderPeer::new(binder_proc, binder_thread),
-                            data: transaction,
-                        },
-                    )
+                    None
                 };
 
-            // Schedule the transaction on the target_thread if it is specified, otherwise use the
-            // process' command queue.
-            if let Some(target_thread) = target_thread {
-                target_thread.lock().enqueue_command(command);
-            } else {
-                target_proc.enqueue_command(command);
-            }
-            Ok(())
-        });
-        for action in actions {
-            action.execute();
-        }
-        Ok(())
+                // Copy the transaction data to the target process.
+                let (buffers, mut transaction_state) = self.copy_transaction_buffers(
+                    binder_proc.get_resource_accessor(current_task),
+                    binder_proc,
+                    binder_thread,
+                    target_proc.get_resource_accessor(&target_task),
+                    &target_proc,
+                    &data,
+                    security_context.as_deref(),
+                )?;
+
+                let transaction = TransactionData {
+                    peer_pid: binder_proc.pid,
+                    peer_tid: binder_thread.tid,
+                    peer_euid: current_task.creds().euid,
+                    object: {
+                        if handle.is_handle_0() {
+                            // This handle (0) always refers to the context manager, which is always
+                            // "remote", even for the context manager itself.
+                            FlatBinderObject::Remote { handle }
+                        } else {
+                            FlatBinderObject::Local { object: object.local }
+                        }
+                    },
+                    code: data.transaction_data.code,
+                    flags: data.transaction_data.flags,
+
+                    buffers: buffers.clone(),
+                };
+
+                if let Some(guard) = guard.take() {
+                    transaction_state.state.add_guard(guard);
+                }
+
+                let (target_thread, command) =
+                    if data.transaction_data.flags & transaction_flags_TF_ONE_WAY != 0 {
+                        // The caller is not expecting a reply.
+                        binder_thread.lock().enqueue_command(Command::OnewayTransactionComplete);
+
+                        // Register the transaction buffer.
+                        target_proc.lock().active_transactions.insert(
+                            buffers.data.address,
+                            ActiveTransaction {
+                                request_type: RequestType::Oneway { object: object.clone() },
+                                _state: transaction_state.into(),
+                            },
+                        );
+
+                        // Oneway transactions are enqueued on the binder object and processed one at a time.
+                        // This guarantees that oneway transactions are processed in the order they are
+                        // submitted, and one at a time.
+                        let mut object_state = object.lock();
+                        if object_state.handling_oneway_transaction {
+                            // Currently, a oneway transaction is being handled. Queue this one so that it is
+                            // scheduled when the buffer from the in-progress transaction is freed.
+                            object_state.oneway_transactions.push_back(transaction);
+                            return Ok(());
+                        }
+
+                        // No oneway transactions are being handled, which means that no buffer will be
+                        // freed, kicking off scheduling from the oneway queue. Instead, we must schedule
+                        // the transaction regularly, but mark the object as handling a oneway transaction.
+                        object_state.handling_oneway_transaction = true;
+
+                        (None, Command::OnewayTransaction(transaction))
+                    } else {
+                        let target_thread = match match binder_thread.lock().transactions.last() {
+                            Some(TransactionRole::Receiver(rx)) => rx.upgrade(),
+                            _ => None,
+                        } {
+                            Some((proc, thread)) if proc.pid == target_proc.pid => Some(thread),
+                            _ => None,
+                        };
+
+                        // Make the sender thread part of the transaction so it doesn't get scheduled to handle
+                        // any other transactions.
+                        binder_thread.lock().transactions.push(TransactionRole::Sender(
+                            WeakBinderPeer::new(binder_proc, binder_thread),
+                        ));
+
+                        // Register the transaction buffer.
+                        target_proc.lock().active_transactions.insert(
+                            buffers.data.address,
+                            ActiveTransaction {
+                                request_type: RequestType::RequestResponse,
+                                _state: transaction_state.into(),
+                            },
+                        );
+
+                        (
+                            target_thread,
+                            Command::Transaction {
+                                sender: WeakBinderPeer::new(binder_proc, binder_thread),
+                                data: transaction,
+                            },
+                        )
+                    };
+
+                // Schedule the transaction on the target_thread if it is specified, otherwise use the
+                // process' command queue.
+                if let Some(target_thread) = target_thread {
+                    target_thread.lock().enqueue_command(command);
+                } else {
+                    target_proc.enqueue_command(command);
+                }
+                Ok(())
+            })
+        })
     }
 
     /// A binder thread is sending a reply to a transaction.
@@ -4068,11 +4069,16 @@ pub mod tests {
         );
 
         // Insert the transaction once.
-        let _ = proc_2.lock().handles.insert_for_transaction(transaction_ref.clone(), &mut vec![]);
+        let _ = proc_2.lock().handles.insert_for_transaction(
+            transaction_ref.clone(),
+            &mut RefCountActions::default_released(),
+        );
 
         // Insert the same object.
-        let handle =
-            proc_2.lock().handles.insert_for_transaction(transaction_ref.clone(), &mut vec![]);
+        let handle = proc_2.lock().handles.insert_for_transaction(
+            transaction_ref.clone(),
+            &mut RefCountActions::default_released(),
+        );
 
         // The object should be present in the handle table until a strong decrement.
         assert!(Arc::ptr_eq(
@@ -4081,7 +4087,11 @@ pub mod tests {
         ));
 
         // Drop the transaction reference.
-        proc_2.lock().handles.dec_strong(handle.object_index(), &mut vec![]).expect("dec_strong");
+        proc_2
+            .lock()
+            .handles
+            .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
+            .expect("dec_strong");
 
         // The handle should not have been dropped, as it was already in the table beforehand.
         assert!(Arc::ptr_eq(
@@ -4105,12 +4115,14 @@ pub mod tests {
             0,
         );
         scopeguard::defer! {
-            transaction_ref.ack_acquire(&mut vec![]).expect("ack_acquire");
+            transaction_ref.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
         }
 
         // Transactions always take a strong reference to binder objects.
-        let handle =
-            proc_2.lock().handles.insert_for_transaction(transaction_ref.clone(), &mut vec![]);
+        let handle = proc_2.lock().handles.insert_for_transaction(
+            transaction_ref.clone(),
+            &mut RefCountActions::default_released(),
+        );
 
         // The object should be present in the handle table until a strong decrement.
         assert!(Arc::ptr_eq(
@@ -4119,7 +4131,11 @@ pub mod tests {
         ));
 
         // Drop the transaction reference.
-        proc_2.lock().handles.dec_strong(handle.object_index(), &mut vec![]).expect("dec_strong");
+        proc_2
+            .lock()
+            .handles
+            .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
+            .expect("dec_strong");
 
         // The handle should now have been dropped.
         assert!(proc_2.lock().handles.get(handle.object_index()).is_none());
@@ -4141,22 +4157,28 @@ pub mod tests {
         );
 
         // Simulate another process keeping a strong reference.
-        let guard = transaction_ref.inc_strong(&mut vec![]);
+        let guard = transaction_ref.inc_strong(&mut RefCountActions::default_released());
         scopeguard::defer! {
             // Other process releases the object.
-            guard.release(&mut vec![]);
+            guard.release(&mut RefCountActions::default_released());
             // Ack the initial acquire.
-            transaction_ref.ack_acquire(&mut vec![]).expect("ack_acquire");
+            transaction_ref.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
             // Ack the subsequent incref from the test.
-            transaction_ref.ack_incref(&mut vec![]).expect("ack_incref");
+            transaction_ref.ack_incref(&mut RefCountActions::default_released()).expect("ack_incref");
         }
 
         // The handle starts with a strong ref.
-        let handle =
-            proc_2.lock().handles.insert_for_transaction(transaction_ref.clone(), &mut vec![]);
+        let handle = proc_2.lock().handles.insert_for_transaction(
+            transaction_ref.clone(),
+            &mut RefCountActions::default_released(),
+        );
 
         // Acquire a weak reference.
-        proc_2.lock().handles.inc_weak(handle.object_index(), &mut vec![]).expect("inc_weak");
+        proc_2
+            .lock()
+            .handles
+            .inc_weak(handle.object_index(), &mut RefCountActions::default_released())
+            .expect("inc_weak");
 
         // The object should be present in the handle table.
         assert!(Arc::ptr_eq(
@@ -4166,7 +4188,11 @@ pub mod tests {
 
         // Drop the strong reference. The handle should still be present as there is an outstanding
         // weak reference.
-        proc_2.lock().handles.dec_strong(handle.object_index(), &mut vec![]).expect("dec_strong");
+        proc_2
+            .lock()
+            .handles
+            .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
+            .expect("dec_strong");
         assert!(Arc::ptr_eq(
             &proc_2.lock().handles.get(handle.object_index()).expect("valid object"),
             &transaction_ref
@@ -4174,7 +4200,11 @@ pub mod tests {
 
         // Drop the weak reference. The handle should now be gone, even though the underlying object
         // is still alive (another process could have references to it).
-        proc_2.lock().handles.dec_weak(handle.object_index(), &mut vec![]).expect("dec_weak");
+        proc_2
+            .lock()
+            .handles
+            .dec_weak(handle.object_index(), &mut RefCountActions::default_released())
+            .expect("dec_weak");
         assert!(
             proc_2.lock().handles.get(handle.object_index()).is_none(),
             "handle should be dropped"
@@ -4498,11 +4528,9 @@ pub mod tests {
 
         let object = BinderObject::new(&proc, LOCAL_BINDER_OBJECT, 0);
 
-        let mut actions = vec![];
+        let mut actions = RefCountActions::default();
         object.ack_acquire(&mut actions).expect("ack_acquire");
-        for action in actions {
-            action.execute();
-        }
+        actions.release(());
 
         assert_matches!(
             proc.command_queue.lock().commands.front(),
@@ -4524,45 +4552,62 @@ pub mod tests {
             0,
         );
         // Simulate another process keeping a strong reference.
-        let guard = object.inc_strong(&mut vec![]);
+        let guard = object.inc_strong(&mut RefCountActions::default_released());
 
         let mut handle_table = HandleTable::default();
 
         // Starts with one strong reference.
-        let handle = handle_table.insert_for_transaction(object.clone(), &mut vec![]);
+        let handle = handle_table
+            .insert_for_transaction(object.clone(), &mut RefCountActions::default_released());
 
-        handle_table.inc_strong(handle.object_index(), &mut vec![]).expect("inc_strong 1");
-        handle_table.inc_strong(handle.object_index(), &mut vec![]).expect("inc_strong 2");
-        handle_table.inc_weak(handle.object_index(), &mut vec![]).expect("inc_weak 0");
-        handle_table.dec_strong(handle.object_index(), &mut vec![]).expect("dec_strong 2");
-        handle_table.dec_strong(handle.object_index(), &mut vec![]).expect("dec_strong 1");
+        handle_table
+            .inc_strong(handle.object_index(), &mut RefCountActions::default_released())
+            .expect("inc_strong 1");
+        handle_table
+            .inc_strong(handle.object_index(), &mut RefCountActions::default_released())
+            .expect("inc_strong 2");
+        handle_table
+            .inc_weak(handle.object_index(), &mut RefCountActions::default_released())
+            .expect("inc_weak 0");
+        handle_table
+            .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
+            .expect("dec_strong 2");
+        handle_table
+            .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
+            .expect("dec_strong 1");
 
         // Remove the initial strong reference.
-        handle_table.dec_strong(handle.object_index(), &mut vec![]).expect("dec_strong 0");
+        handle_table
+            .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
+            .expect("dec_strong 0");
 
         // Removing more strong references should fail.
-        handle_table.dec_strong(handle.object_index(), &mut vec![]).expect_err("dec_strong -1");
+        handle_table
+            .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
+            .expect_err("dec_strong -1");
 
         // The object should still take up an entry in the handle table, as there is 1 weak
         // reference and it is maintained alive by anotger process.
         handle_table.get(handle.object_index()).expect("object still exists");
 
         // Simulate another process droppping its reference.
-        guard.release(&mut vec![]);
+        guard.release(&mut RefCountActions::default_released());
         // Ack the initial acquire.
-        object.ack_acquire(&mut vec![]).expect("ack_acquire");
+        object.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
         // Ack the subsequent incref from the test.
-        object.ack_incref(&mut vec![]).expect("ack_incref");
+        object.ack_incref(&mut RefCountActions::default_released()).expect("ack_incref");
 
         // Our weak reference won't keep the object alive.
         assert!(handle_table.get(handle.object_index()).is_none(), "object should be dead");
 
         // Remove from our table.
-        handle_table.dec_weak(handle.object_index(), &mut vec![]).expect("dec_weak 0");
+        handle_table
+            .dec_weak(handle.object_index(), &mut RefCountActions::default_released())
+            .expect("dec_weak 0");
 
         // Another removal attempt will prove the handle has been removed.
         handle_table
-            .dec_weak(handle.object_index(), &mut vec![])
+            .dec_weak(handle.object_index(), &mut RefCountActions::default_released())
             .expect_err("handle should no longer exist");
     }
 
@@ -5003,18 +5048,17 @@ pub mod tests {
         };
         let binder_object = BinderObject::new(&test.receiver_proc, local_binder_object, 0);
         scopeguard::defer! {
-            binder_object.ack_acquire(&mut vec![]).expect("ack_acquire");
+            binder_object.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
         }
 
         // Pretend the binder object was given to the sender earlier, so it can be sent back.
-        let handle = test
-            .sender_proc
-            .lock()
-            .handles
-            .insert_for_transaction(binder_object.clone(), &mut vec![]);
+        let handle = test.sender_proc.lock().handles.insert_for_transaction(
+            binder_object.clone(),
+            &mut RefCountActions::default_released(),
+        );
         // Clear the strong reference.
         scopeguard::defer! {
-            test.sender_proc.lock().handles.dec_strong(handle.object_index(), &mut vec![]).expect("dec_strong");
+            test.sender_proc.lock().handles.dec_strong(handle.object_index(), &mut RefCountActions::default_released()).expect("dec_strong");
         }
 
         const DATA_PREAMBLE: &[u8; 5] = b"stuff";
@@ -5071,18 +5115,17 @@ pub mod tests {
         const RECEIVING_HANDLE: Handle = Handle::from_raw(2);
 
         // Pretend the binder object was given to the sender earlier.
-        let handle = test
-            .sender_proc
-            .lock()
-            .handles
-            .insert_for_transaction(BinderObject::new(&owner_proc, binder_object, 0), &mut vec![]);
+        let handle = test.sender_proc.lock().handles.insert_for_transaction(
+            BinderObject::new(&owner_proc, binder_object, 0),
+            &mut RefCountActions::default_released(),
+        );
         assert_eq!(SENDING_HANDLE, handle);
 
         // Give the receiver another handle so that the input handle number and output handle
         // number aren't the same.
         test.receiver_proc.lock().handles.insert_for_transaction(
             BinderObject::new(&owner_proc, LocalBinderObject::default(), 0),
-            &mut vec![],
+            &mut RefCountActions::default_released(),
         );
 
         const DATA_PREAMBLE: &[u8; 5] = b"stuff";
@@ -5159,18 +5202,27 @@ pub mod tests {
         let sender_object = BinderObject::new(&test.sender_proc, binder_object_addr, 0);
         let other_object = BinderObject::new(&other_proc, binder_object_addr, 0);
         assert_eq!(
-            test.sender_proc.lock().handles.insert_for_transaction(sender_object, &mut vec![]),
+            test.sender_proc
+                .lock()
+                .handles
+                .insert_for_transaction(sender_object, &mut RefCountActions::default_released()),
             SENDING_HANDLE_SENDER
         );
         assert_eq!(
-            test.sender_proc.lock().handles.insert_for_transaction(other_object, &mut vec![]),
+            test.sender_proc
+                .lock()
+                .handles
+                .insert_for_transaction(other_object, &mut RefCountActions::default_released()),
             SENDING_HANDLE_OTHER
         );
 
         // Give the receiver another handle so that the input handle numbers and output handle
         // numbers aren't the same.
         let obj = BinderObject::new(&other_proc, LocalBinderObject::default(), 0);
-        test.receiver_proc.lock().handles.insert_for_transaction(obj, &mut vec![]);
+        test.receiver_proc
+            .lock()
+            .handles
+            .insert_for_transaction(obj, &mut RefCountActions::default_released());
 
         const DATA_PREAMBLE: &[u8; 5] = b"stuff";
 
@@ -5924,10 +5976,17 @@ pub mod tests {
         let weak_object = Arc::downgrade(&object);
 
         // Insert a handle to the object in the client. This also retains a strong reference.
-        let handle = client_proc.lock().handles.insert_for_transaction(object, &mut vec![]);
+        let handle = client_proc
+            .lock()
+            .handles
+            .insert_for_transaction(object, &mut RefCountActions::default_released());
 
         // Grab a weak reference.
-        client_proc.lock().handles.inc_weak(handle.object_index(), &mut vec![]).expect("inc_weak");
+        client_proc
+            .lock()
+            .handles
+            .inc_weak(handle.object_index(), &mut RefCountActions::default_released())
+            .expect("inc_weak");
 
         // Now the owner process dies.
         driver.procs.write().remove(&owner_proc.identifier);
@@ -5948,13 +6007,17 @@ pub mod tests {
         );
 
         // Decrement the weak reference. This should prove that the handle is still occupied.
-        client_proc.lock().handles.dec_weak(handle.object_index(), &mut vec![]).expect("dec_weak");
+        client_proc
+            .lock()
+            .handles
+            .dec_weak(handle.object_index(), &mut RefCountActions::default_released())
+            .expect("dec_weak");
 
         // Decrement the last strong reference.
         client_proc
             .lock()
             .handles
-            .dec_strong(handle.object_index(), &mut vec![])
+            .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
             .expect("dec_strong");
 
         // Confirm that now the handle has been removed from the table.
@@ -5986,7 +6049,10 @@ pub mod tests {
         );
 
         // Insert a handle to the object in the client. This also retains a strong reference.
-        let handle = client_proc.lock().handles.insert_for_transaction(object, &mut vec![]);
+        let handle = client_proc
+            .lock()
+            .handles
+            .insert_for_transaction(object, &mut RefCountActions::default_released());
 
         const DEATH_NOTIFICATION_COOKIE: binder_uintptr_t = 0xDEADBEEF;
 
@@ -6025,7 +6091,10 @@ pub mod tests {
         );
 
         // Insert a handle to the object in the client. This also retains a strong reference.
-        let handle = client_proc.lock().handles.insert_for_transaction(object, &mut vec![]);
+        let handle = client_proc
+            .lock()
+            .handles
+            .insert_for_transaction(object, &mut RefCountActions::default_released());
 
         // Now the owner process dies.
         driver.procs.write().remove(&owner_proc.identifier);
@@ -6066,7 +6135,10 @@ pub mod tests {
         );
 
         // Insert a handle to the object in the client. This also retains a strong reference.
-        let handle = client_proc.lock().handles.insert_for_transaction(object, &mut vec![]);
+        let handle = client_proc
+            .lock()
+            .handles
+            .insert_for_transaction(object, &mut RefCountActions::default_released());
 
         let death_notification_cookie = 0xDEADBEEF;
 
@@ -6275,7 +6347,7 @@ pub mod tests {
             .handles
             .get(EXPECTED_HANDLE.object_index())
             .expect("expected handle not present");
-        object.ack_acquire(&mut vec![]).expect("ack_acquire");
+        object.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
 
         // Verify that a strong acquire command is sent to the sender process (on the same thread
         // that sent the transaction).
@@ -6332,7 +6404,10 @@ pub mod tests {
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
         let object = register_binder_object(&receiver_proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
-        let handle = sender_proc.lock().handles.insert_for_transaction(object.clone(), &mut vec![]);
+        let handle = sender_proc
+            .lock()
+            .handles
+            .insert_for_transaction(object.clone(), &mut RefCountActions::default_released());
 
         // Construct a oneway transaction to send from the sender to the receiver.
         const FIRST_TRANSACTION_CODE: u32 = 42;
@@ -6449,7 +6524,10 @@ pub mod tests {
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
         let object = register_binder_object(&receiver_proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
-        let handle = sender_proc.lock().handles.insert_for_transaction(object.clone(), &mut vec![]);
+        let handle = sender_proc
+            .lock()
+            .handles
+            .insert_for_transaction(object.clone(), &mut RefCountActions::default_released());
 
         // Construct a oneway transaction to send from the sender to the receiver.
         const ONEWAY_TRANSACTION_CODE: u32 = 42;
@@ -6526,7 +6604,11 @@ pub mod tests {
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
         let object = register_binder_object(&test.receiver_proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
-        let handle = test.sender_proc.lock().handles.insert_for_transaction(object, &mut vec![]);
+        let handle = test
+            .sender_proc
+            .lock()
+            .handles
+            .insert_for_transaction(object, &mut RefCountActions::default_released());
 
         // Construct a synchronous transaction to send from the sender to the receiver.
         const FIRST_TRANSACTION_CODE: u32 = 42;
@@ -6578,7 +6660,11 @@ pub mod tests {
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
         let object = register_binder_object(&test.receiver_proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
-        let handle = test.sender_proc.lock().handles.insert_for_transaction(object, &mut vec![]);
+        let handle = test
+            .sender_proc
+            .lock()
+            .handles
+            .insert_for_transaction(object, &mut RefCountActions::default_released());
 
         // Construct a synchronous transaction to send from the sender to the receiver.
         const FIRST_TRANSACTION_CODE: u32 = 42;
@@ -6630,7 +6716,11 @@ pub mod tests {
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
         let object = register_binder_object(&test.receiver_proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
-        let handle = test.sender_proc.lock().handles.insert_for_transaction(object, &mut vec![]);
+        let handle = test
+            .sender_proc
+            .lock()
+            .handles
+            .insert_for_transaction(object, &mut RefCountActions::default_released());
 
         // Construct a synchronous transaction to send from the sender to the receiver.
         const FIRST_TRANSACTION_CODE: u32 = 42;
