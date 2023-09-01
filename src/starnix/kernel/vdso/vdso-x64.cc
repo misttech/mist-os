@@ -13,7 +13,7 @@
 #include <sys/time.h>
 #include <time.h>
 
-#include "vvar-data.h"
+#include "src/starnix/kernel/vdso/vvar-data.h"
 
 extern "C" vvar_data vvar;
 

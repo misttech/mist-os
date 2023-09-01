@@ -68,7 +68,6 @@ OPAQUE_TYPES = [
 INCLUDE_DIRS = [
     'third_party/android/platform/bionic/libc/kernel/uapi',
     'third_party/android/platform/bionic/libc/kernel/android/uapi',
-    'src/starnix/kernel/vdso',
     'src/starnix/lib/linux_uapi/stub',
 ]
 
