@@ -79,6 +79,7 @@ use {
     fidl::endpoints::{
         create_proxy, DiscoverableProtocolMarker, ProtocolMarker, RequestStream, ServerEnd,
     },
+    fidl_fuchsia_boot as fboot,
     fidl_fuchsia_component_internal::BuiltinBootResolver,
     fidl_fuchsia_diagnostics_types::Task as DiagnosticsTask,
     fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync,
@@ -409,7 +410,6 @@ pub struct BuiltinEnvironment {
     pub model: Arc<Model>,
 
     // Framework capabilities.
-    pub boot_args: Arc<BootArguments>,
     pub cpu_resource: Option<Arc<CpuResource>>,
     pub energy_info_resource: Option<Arc<EnergyInfoResource>>,
     pub debug_resource: Option<Arc<DebugResource>>,
@@ -555,7 +555,9 @@ impl BuiltinEnvironment {
 
         // Set up BootArguments service.
         let boot_args = BootArguments::new(&mut zbi_parser).await?;
-        model.root().hooks.install(boot_args.hooks()).await;
+        sandbox_builder.add_builtin_protocol_if_enabled::<fboot::ArgumentsMarker>(move |stream| {
+            boot_args.clone().serve(stream).boxed()
+        });
 
         let (factory_items_service, items_service) = match zbi_parser {
             None => (None, None),
@@ -933,7 +935,6 @@ impl BuiltinEnvironment {
 
         Ok(BuiltinEnvironment {
             model,
-            boot_args,
             process_launcher,
             kernel_stats,
             read_only_log,

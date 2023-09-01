@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::builtin::capability::BuiltinCapability,
     anyhow::{anyhow, Context, Error},
-    async_trait::async_trait,
     cm_types::Name,
     fidl::endpoints::{ControlHandle as _, Responder as _},
     fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio,
@@ -14,7 +12,6 @@ use {
     fuchsia_zircon_status::Status,
     futures::prelude::*,
     lazy_static::lazy_static,
-    routing::capability_source::InternalCapability,
     std::{
         collections::{hash_map::Iter, HashMap},
         env,
@@ -230,14 +227,8 @@ impl Arguments {
     fn vars<'a>(&'a self) -> Iter<'_, String, String> {
         self.vars.iter()
     }
-}
 
-#[async_trait]
-impl BuiltinCapability for Arguments {
-    const NAME: &'static str = "Arguments";
-    type Marker = fboot::ArgumentsMarker;
-
-    async fn serve(
+    pub async fn serve(
         self: Arc<Self>,
         mut stream: fboot::ArgumentsRequestStream,
     ) -> Result<(), Error> {
@@ -282,10 +273,6 @@ impl BuiltinCapability for Arguments {
             }
         }
         Ok(())
-    }
-
-    fn matches_routed_capability(&self, capability: &InternalCapability) -> bool {
-        capability.matches_protocol(&BOOT_ARGS_CAPABILITY_NAME)
     }
 }
 
