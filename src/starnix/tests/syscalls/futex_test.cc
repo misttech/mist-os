@@ -3,12 +3,16 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <stdint.h>
 #include <sys/mman.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 
+#include <atomic>
+#include <latch>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include <gtest/gtest.h>
 #include <linux/futex.h>
@@ -137,6 +141,59 @@ TEST(FutexTest, FutexAddressHasToBeAligned) {
     EXPECT_EQ(-1, futex_requeue(addr, 0, 0, addr + 4 + i));
     EXPECT_EQ(errno, EINVAL);
   }
+}
+
+TEST(FutexTest, FutexWaitOnRemappedMemory) {
+  // This test is inherently racy, and could be flaky:
+  // We are trying to race between the FUTEX_WAIT and mmap+FUTEX_WAKE
+  // operations. We want to make sure that if we remap the futex
+  // page, we don't get threads stuck.
+  //
+  // See b/298664027 for details.
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([] {
+    constexpr size_t kNumWaiters = 16;
+    constexpr uint32_t kFutexConstant = 0xbeef;
+    const size_t page_size = sysconf(_SC_PAGESIZE);
+    void *addr = mmap(NULL, page_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    ASSERT_NE(addr, MAP_FAILED);
+    auto futex_basic = [](std::atomic<uint32_t> *addr, uint32_t op, uint32_t val) {
+      return syscall(SYS_futex, reinterpret_cast<uint32_t *>(addr), op, val, NULL, NULL, 0);
+    };
+
+    std::atomic<uint32_t> *futex = new (addr) std::atomic<uint32_t>(kFutexConstant);
+
+    std::latch wait_for_all_threads(kNumWaiters + 1);
+
+    std::vector<std::thread> waiters;
+    for (size_t i = 0; i < kNumWaiters; i++) {
+      waiters.emplace_back([&wait_for_all_threads, futex, &futex_basic]() {
+        wait_for_all_threads.arrive_and_wait();
+
+        while (futex->load() == kFutexConstant) {
+          long res = futex_basic(futex, FUTEX_WAIT_PRIVATE, kFutexConstant);
+          EXPECT_TRUE(res == 0 || (res == -1 && errno == EAGAIN));
+        }
+        EXPECT_EQ(futex->load(), 0u);
+      });
+    }
+
+    wait_for_all_threads.arrive_and_wait();
+
+    void *new_addr = mmap(addr, page_size, PROT_READ | PROT_WRITE,
+                          MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+    ASSERT_NE(new_addr, MAP_FAILED);
+    ASSERT_EQ(new_addr, addr);
+    futex->store(0);
+    long res = futex_basic(futex, FUTEX_WAKE_PRIVATE, INT_MAX);
+    EXPECT_TRUE(res >= 0);
+
+    for (auto &waiter : waiters) {
+      waiter.join();
+    }
+    EXPECT_EQ(0, munmap(addr, page_size));
+  });
+  EXPECT_EQ(true, helper.WaitForChildren());
 }
 
 }  // anonymous namespace

@@ -46,10 +46,10 @@ impl<Key: FutexKey> FutexTable<Key> {
         mask: u32,
         deadline: zx::Time,
     ) -> Result<(), Errno> {
-        let (FutexOperand { vmo, offset }, key) = Key::get_operand_and_key(current_task, addr)?;
-
         let mut state = self.state.lock();
         // As the state is locked, no wake can happen before the waiter is registered.
+        // If the addr is remapped, we will read stale data, but we will not miss a futex wake.
+        let (FutexOperand { vmo, offset }, key) = Key::get_operand_and_key(current_task, addr)?;
         Self::check_futex_value(&vmo, offset, value)?;
 
         let event = InterruptibleEvent::new();
