@@ -112,6 +112,8 @@ impl TargetHandleInner {
                         responder.send(Ok(())).map_err(Into::into)
                     }
                     Err(e) => {
+                        // close connection on error so the next call re-establishes the Overnet connection
+                        self.target.disconnect();
                         responder.send(Err(e)).context("sending error response").map_err(Into::into)
                     }
                 }
