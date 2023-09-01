@@ -114,6 +114,7 @@ template("validated_test_types_group") {
       _files.test_components,
     ]
     outputs = [ _files.validated ]
+    depfile = "${_files.validated}.d"
 
     args = [
              "--test-group-name",
@@ -126,6 +127,8 @@ template("validated_test_types_group") {
              rebase_path(root_build_dir, root_build_dir),
              "--output",
              rebase_path(_files.validated, root_build_dir),
+             "--depfile",
+             rebase_path(depfile, root_build_dir),
              "--validate",
            ] + invoker.allowed_test_types
   }

@@ -57,6 +57,10 @@ pub struct Opt {
     #[structopt(short = "o", long = "output")]
     /// Path to an optional output file with the results.
     pub output: Option<Utf8PathBuf>,
+
+    #[structopt(short = "d", long = "depfile")]
+    // Path to output a depfile.
+    pub depfile: Option<Utf8PathBuf>,
 }
 
 impl Opt {
@@ -101,6 +105,7 @@ mod tests {
             validation_type: ValidateType::Hermetic,
             build_dir: Utf8PathBuf::from_path_buf(build_dir.path().into()).unwrap(),
             output: Some(Utf8PathBuf::from_path_buf(output).unwrap()),
+            depfile: Some(Utf8PathBuf::from("output.d")),
         };
 
         // Test valid paths
@@ -114,6 +119,7 @@ mod tests {
             validation_type: ValidateType::Hermetic,
             build_dir: Utf8PathBuf::from_str("/tmp/nonexistent").unwrap(),
             output: None,
+            depfile: None,
         };
         assert!(invalid_opt.validate().is_err());
     }

@@ -12,7 +12,10 @@ use fuchsia_archive;
 use fuchsia_pkg;
 use fuchsia_url::AbsoluteComponentUrl;
 use rayon::prelude::*;
-use std::collections::HashMap;
+use std::{
+    collections::{BTreeSet, HashMap},
+    sync::Mutex,
+};
 
 use crate::{
     CategorizedTestInfo, FailureReason, HermeticityStatus, TestPackageInfo, ValidationStatus,
@@ -30,7 +33,9 @@ pub(crate) fn validate_hermeticity(
     categorized_tests: Vec<CategorizedTestInfo>,
     component_test_realms: &HashMap<String, String>,
     build_dir: &Utf8Path,
+    inputs_for_depfile: &mut BTreeSet<Utf8PathBuf>,
 ) -> Vec<ValidationStatus> {
+    let inputs_for_depfile = Mutex::new(inputs_for_depfile);
     categorized_tests
         .into_par_iter()
         .map(|categorized_test_info| {
@@ -48,7 +53,7 @@ pub(crate) fn validate_hermeticity(
                         // So we also check the manifest to see if it lists a test realm. This in a
                         // separate function so that it is easy to remove when we are done with
                         // migrations.
-                        match check_manifest_hermeticity(&test, build_dir) {
+                        match check_manifest_hermeticity(&test, build_dir, &inputs_for_depfile) {
                             Ok(status) => match status {
                                 HermeticityStatus::Hermetic => ValidationStatus::Passed,
                                 HermeticityStatus::NotHermetic => {
@@ -64,7 +69,7 @@ pub(crate) fn validate_hermeticity(
                 }
             }
         })
-        .collect::<Vec<_>>()
+        .collect()
 }
 
 /// Given a TestPackageInfo, locate the package manifest, and from it, the
@@ -75,9 +80,11 @@ pub(crate) fn validate_hermeticity(
 fn check_manifest_hermeticity(
     test: &TestPackageInfo,
     build_dir: &Utf8Path,
+    inputs_for_depfile: &Mutex<&mut BTreeSet<Utf8PathBuf>>,
 ) -> Result<HermeticityStatus> {
     if test.package_manifests.len() > 0 {
         let pkg_manifest = &test.package_manifests[0];
+        inputs_for_depfile.lock().expect("Failed to get depfile lock.").insert(pkg_manifest.into());
         let res = find_meta_far(build_dir, pkg_manifest);
         if res.is_err() {
             return Err(format_err!(
@@ -90,6 +97,11 @@ fn check_manifest_hermeticity(
         let meta_far_path = res.unwrap();
         let pkg_url = AbsoluteComponentUrl::parse(&test.package_url)?;
         let cm_path = pkg_url.resource();
+
+        inputs_for_depfile
+            .lock()
+            .expect("Failed to get depfile lock.")
+            .insert(meta_far_path.to_owned());
 
         let decl = cm_decl_from_meta_far(&meta_far_path, cm_path)?;
         let facets = decl.facets.unwrap_or(fdata::Dictionary::default());
@@ -332,8 +344,14 @@ mod tests {
             let test_package_infos =
                 vec![TestPackageInfo::try_from(test_entry.test).unwrap().into()];
 
-            let statuses =
-                validate_hermeticity(test_package_infos, &test_components_map, "igored".into());
+            let mut inputs_for_depfile = BTreeSet::new();
+
+            let statuses = validate_hermeticity(
+                test_package_infos,
+                &test_components_map,
+                "igored".into(),
+                &mut inputs_for_depfile,
+            );
 
             assert_matches!(
                 statuses.get(0).unwrap(),

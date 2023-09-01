@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::collections::BTreeSet;
+
 use {
     anyhow::{anyhow, format_err, Context, Error, Result},
     camino::Utf8PathBuf,
@@ -308,11 +310,33 @@ impl ValidationStatus {
     }
 }
 
+fn write_depfile(
+    depfile: &Utf8PathBuf,
+    output: &Utf8PathBuf,
+    inputs: &BTreeSet<Utf8PathBuf>,
+) -> Result<(), Error> {
+    if inputs.len() == 0 {
+        return Ok(());
+    }
+    let mut contents = vec![format!("{}:", output)];
+
+    for input in inputs {
+        contents.push(format!("\\\n  {}", input))
+    }
+    contents.push("\n".to_string());
+
+    fs::write(depfile, contents.join(""))?;
+    Ok(())
+}
+
 fn run_tool() -> Result<()> {
     let opt = opts::Opt::from_args();
     opt.validate()?;
 
+    let mut inputs_for_depfile = BTreeSet::<Utf8PathBuf>::new();
+
     // Deserialize tests.json
+    inputs_for_depfile.insert(opt.test_list.clone());
     let tests_json = read_tests_json(&opt.test_list)
         .with_context(|| format!("Parsing test list: {}", &opt.test_list))?;
 
@@ -321,6 +345,7 @@ fn run_tool() -> Result<()> {
         categorize_tests(tests_json).with_context(|| format!("Categorizing tests"))?;
 
     // Deserialize test_components.json
+    inputs_for_depfile.insert(opt.test_components_list.clone());
     let test_components_json = read_test_components_json(&opt.test_components_list)
         .with_context(|| format!("Parsing test components list: {}", &opt.test_components_list))?;
 
@@ -335,6 +360,7 @@ fn run_tool() -> Result<()> {
             categorized_tests,
             &component_test_realms,
             &opt.build_dir,
+            &mut inputs_for_depfile,
         ),
     };
 
@@ -398,6 +424,11 @@ fn run_tool() -> Result<()> {
         }
         std::fs::write(&output_path, "Ok")
             .with_context(|| format!("Writing output file: {}", output_path))?;
+
+        if let Some(depfile_path) = opt.depfile {
+            write_depfile(&depfile_path, &output_path, &inputs_for_depfile)
+                .with_context(|| format!("Writing depfile to: {}", depfile_path))?;
+        }
     }
 
     Ok(())
