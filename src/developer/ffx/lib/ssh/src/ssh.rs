@@ -45,15 +45,19 @@ async fn apply_auth_sock(cmd: &mut Command) {
     }
 }
 
-// Setting up the tunnel requires config to be available, so we disable this step in tests.
-pub async fn build_ssh_command(addr: SocketAddr, command: Vec<&str>) -> Result<Command> {
+/// Builds the ssh command using the specified path to the ssh command.
+pub async fn build_ssh_command_with_ssh_path(
+    ssh_path: &str,
+    addr: SocketAddr,
+    command: Vec<&str>,
+) -> Result<Command> {
     if command.is_empty() {
         return Err(anyhow!("missing SSH command"));
     }
 
     let keys = get_ssh_key_paths().await?;
 
-    let mut c = Command::new("ssh");
+    let mut c = Command::new(ssh_path);
     apply_auth_sock(&mut c).await;
     c.args(DEFAULT_SSH_OPTIONS);
 
@@ -75,6 +79,11 @@ pub async fn build_ssh_command(addr: SocketAddr, command: Vec<&str>) -> Result<C
     c.args(&command);
 
     return Ok(c);
+}
+
+// Setting up the tunnel requires config to be available, so we disable this step in tests.
+pub async fn build_ssh_command(addr: SocketAddr, command: Vec<&str>) -> Result<Command> {
+    build_ssh_command_with_ssh_path("ssh", addr, command).await
 }
 
 #[cfg(test)]

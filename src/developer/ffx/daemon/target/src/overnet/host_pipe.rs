@@ -8,7 +8,7 @@ use async_io::Async;
 use async_trait::async_trait;
 use ffx_daemon_core::events;
 use ffx_daemon_events::{HostPipeErr, TargetEvent};
-use ffx_ssh::ssh::build_ssh_command;
+use ffx_ssh::ssh::build_ssh_command_with_ssh_path;
 use fuchsia_async::{unblock, Task, TimeoutExt, Timer};
 use futures::io::{copy_buf, AsyncBufRead, BufReader};
 use futures_lite::{io::AsyncBufReadExt, stream::StreamExt};
@@ -91,6 +91,10 @@ pub(crate) trait HostPipeChildBuilder {
     ) -> Result<(Option<HostAddr>, HostPipeChild)>
     where
         Self: Sized;
+
+    fn ssh_path(&self) -> &str {
+        "ssh"
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -107,7 +111,16 @@ impl HostPipeChildBuilder for HostPipeChildDefaultBuilder {
         watchdogs: bool,
         ssh_timeout: u16,
     ) -> Result<(Option<HostAddr>, HostPipeChild)> {
-        HostPipeChild::new_inner(addr, id, stderr_buf, event_queue, watchdogs, ssh_timeout).await
+        HostPipeChild::new_inner(
+            self.ssh_path(),
+            addr,
+            id,
+            stderr_buf,
+            event_queue,
+            watchdogs,
+            ssh_timeout,
+        )
+        .await
     }
 }
 
@@ -145,6 +158,7 @@ fn setup_watchdogs() {
 impl HostPipeChild {
     #[tracing::instrument(skip(stderr_buf, event_queue))]
     async fn new_inner(
+        ssh_path: &str,
         addr: SocketAddr,
         id: u64,
         stderr_buf: Rc<LogBuffer>,
@@ -165,7 +179,7 @@ impl HostPipeChild {
         // scope_id, of the ssh client from the perspective of the ssh server.
         // This is useful because the target might need to use a specific
         // interface to talk to the host device.
-        let mut ssh = build_ssh_command(addr, args).await?;
+        let mut ssh = build_ssh_command_with_ssh_path(ssh_path, addr, args).await?;
 
         tracing::debug!("Spawning new ssh instance: {:?}", ssh);
 
