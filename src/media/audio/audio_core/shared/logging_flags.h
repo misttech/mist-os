@@ -25,36 +25,54 @@ inline constexpr bool kLogAudioRendererSetUsageCalls = false;
 inline constexpr bool kLogRendererPlayCalls = false;
 inline constexpr bool kLogRendererPauseCalls = false;
 
-// In packet queue underflows, we discard data because its start timestamp has already passed. For
-// each packet queue, we log the first underflow, and subsequent instances depending on AudioCore's
-// logging level. If set to INFO, we log less often (at log_level 1: INFO), throttling by
-// kPacketQueueUnderflowInfoInterval. If WARNING or higher, we log even less, per
+// In packet queue underflows, we discard data because its start timestamp has already passed.
+// The client is not submitting packets fast enough to meet the pipeline demand, so these are
+// understood to be UNDERflows (not enough data).
+// For each packet queue, we log the first underflow, and subsequent instances depending on
+// AudioCore's logging level. If set to INFO, we log less often (at log_level 1: INFO), throttling
+// by kPacketQueueUnderflowInfoInterval. If WARNING or higher, we log even less, per
 // kPacketQueueUnderflowWarningInterval. By default, NDEBUG logs at WARNING, and DEBUG at INFO.
-//
-// We also log an underflow if its duration exceeds the previously-reported one by a set threshold.
-// This intends to more consistently log a long underflow's _first_ packet.
-//
 inline constexpr bool kLogPacketQueueUnderflow = true;
 inline constexpr uint16_t kPacketQueueUnderflowWarningInterval = 100;
 inline constexpr uint16_t kPacketQueueUnderflowInfoInterval = 10;
 // If AudioCore's log level is TRACE or DEBUG, we log all packet queue underflows.
+//
+// We also log an underflow if its duration exceeds the previously-reported one by a set threshold.
+// This intends to more consistently log a long underflow's _first_ packet.
 inline constexpr zx::duration kPacketQueueUnderflowDurationIncreaseWarningThreshold = zx::msec(500);
 inline constexpr zx::duration kPacketQueueUnderflowDurationIncreaseInfoThreshold = zx::msec(50);
 
 //
 // To disable timestamp checks of client-submitted packets, set kLogRendererUnderflow to false.
 inline constexpr bool kLogRendererUnderflow = true;
+//
+// In renderer continuity underflows, we discard data because a NO_TIMESTAMP packet (which is
+// understood to be played continuously with the previously-submitted packet) is received too late
+// for AudioCore to reliably play every frame in the packet. The client is not submitting data fast
+// enough (leading to renderer data loss), so these are considered UNDERflows.
+// As with other underflows/overflows, we always log the first one; subsequent instances are
+// logged depending on the throttling constants below, based on AudioCore's logging level.
 inline constexpr uint16_t kRendererContinuityUnderflowWarningInterval = 100;
 inline constexpr uint16_t kRendererContinuityUnderflowInfoInterval = 10;
 // If AudioCore's log level is TRACE or DEBUG, we log all continuity underflows.
+//
+// In renderer timestamp underflows, we discard data because a client-timestamped packet
+// intentionally starts before the end of the previous packet. Specifically, the overlapping
+// section of the new packet will be dropped. The client is not advancing timestamps fast enough
+// (leading to renderer data loss), so these are considered UNDERflows (despite their being
+// understood as packet OVERlaps, which can be confusing).
+// As with other underflows/overflows, we always log the first one; subsequent instances are
+// logged depending on the throttling constants below, based on AudioCore's logging level.
 inline constexpr uint16_t kRendererTimestampUnderflowWarningInterval = 100;
 inline constexpr uint16_t kRendererTimestampUnderflowInfoInterval = 10;
 // If AudioCore's log level is TRACE or DEBUG, we log all timestamp underflows.
 
 // Capture-related logging
 //
-// In a capture overflow, data is discarded because no buffer space is available. For each Capturer,
-// we log the first overflow, plus subsequent occurrences depending on audio_core's logging level.
+// In a capture overflow, we discard data when no buffer space is available. The client did not
+// free empty space fast enough for incoming data: these are OVERflows (too much data).
+// As with other underflows/overflows, we always log the first one; subsequent instances are
+// logged depending on the throttling constants below, based on AudioCore's logging level.
 inline constexpr bool kLogCaptureOverflow = true;
 inline constexpr uint16_t kCaptureOverflowWarningInterval = 100;  // Log 1/100 instances.
 inline constexpr uint16_t kCaptureOverflowInfoInterval = 10;      // Log 1/10 instances.

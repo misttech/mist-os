@@ -486,8 +486,17 @@ void BaseRenderer::SendPacketInternal(fuchsia::media::StreamPacket packet,
         zx::time padded_start_ref = deadline + kPaddingForUnspecifiedRefTime;
         auto padded_start_pts =
             Fixed::FromRaw(reference_clock_to_fractional_frames_->Apply(padded_start_ref.get()));
+        TRACE_INSTANT("audio", "Renderer-DiscontinuityNudge", TRACE_SCOPE_THREAD,
+                      "prev_packet_end_frac", next_frac_frame_pts_.raw_value(), "safety_frac",
+                      (first_valid_frame.raw_value() - next_frac_frame_pts_.raw_value()),
+                      "safety_ref_ns",
+                      frac_frames_per_ref_tick_.Inverse().Scale(first_valid_frame.raw_value() -
+                                                                next_frac_frame_pts_.raw_value()),
+                      "padded_start_frac", start_pts.raw_value(), "padded_start_ref_ns",
+                      padded_start_ref.get());
+
         FX_LOGS(TRACE) << "RENDER CONTINUITY UNDERFLOW is prevented: FLAG_DISCONTINUITY is set. "
-                       << "prev pkt ended at " << ffl::String::DecRational << start_pts
+                       << "prev packet ended at " << ffl::String::DecRational << start_pts
                        << ", but first safe PTS for this NO_TIMESTAMP packet is "
                        << first_valid_frame << " (ref_time " << deadline.get() << ") -- late by "
                        << Fixed(first_valid_frame - start_pts)
@@ -499,6 +508,12 @@ void BaseRenderer::SendPacketInternal(fuchsia::media::StreamPacket packet,
         auto safety_interval_frac = Fixed(start_pts - first_valid_frame);
         zx::duration safety_internal_ref =
             zx::nsec(frac_frames_per_ref_tick_.Inverse().Scale(safety_interval_frac.raw_value()));
+        TRACE_INSTANT("audio", "Renderer-DiscontinuityNoNudge", TRACE_SCOPE_THREAD,
+                      "prev_packet_end_frac", start_pts.raw_value(), "safety_interval_frac",
+                      safety_interval_frac.raw_value(), "safety_interval_ref_ns",
+                      safety_internal_ref.get(), "retained_start_ref_ns",
+                      (deadline - safety_internal_ref).get());
+
         FX_LOGS(TRACE)
             << "RENDER CONTINUITY: NO_TS packet set FLAG_DISCONTINUITY but is in time (early by "
             << ffl::String::DecRational << safety_interval_frac << " frames: ref_time "
@@ -508,6 +523,7 @@ void BaseRenderer::SendPacketInternal(fuchsia::media::StreamPacket packet,
     } else if (start_pts < first_valid_frame) {
       // NO_TIMESTAMP packet is late without STREAM_PACKET_FLAG_DISCONTINUITY. This represents a
       // break in continuity, and data will be lost. Report this to those who are concerned.
+      // For description of "Render Continuity Underflows", see logging_flags.h.
       ReportContinuityUnderflow(start_pts, first_valid_frame, deadline);
     }
   } else {
@@ -525,11 +541,20 @@ void BaseRenderer::SendPacketInternal(fuchsia::media::StreamPacket packet,
         // Timestamped packet overlaps with previous packet by the continuity threshold or more, and
         // FLAG_DISCONTINUITY is not set. Overlapping frames in this packet will be lost. Report
         // this to various parties (Inspect, Tracing, SysLog, perhaps Cobalt) who care.
+        // For description of "Render Timestamp Underflows", see logging_flags.h.
         ReportTimestampUnderflow(packet_ffpts, next_frac_frame_pts_);
         start_pts = packet_ffpts;  // Use the explicitly-stated packet PTS.
       } else {
         // Timestamped packet overlapped with previous packet, but by less than the continuity
         // threshold. We will adjust its timing ("nudge" it) to play continuously (no data loss).
+        TRACE_INSTANT("audio", "Renderer-TimestampOverlapNudge", TRACE_SCOPE_THREAD,
+                      "prev_packet_end_frac", next_frac_frame_pts_.raw_value(), "actual_pts_frac",
+                      packet_ffpts.raw_value(), "threshold_frac",
+                      pts_continuity_threshold_frac_frame_.raw_value(), "threshold_ref_ns",
+                      static_cast<int32_t>(pts_continuity_threshold_ * 1'000'000'000.0),
+                      "actual_overlap_frac", delta.raw_value(), "actual_overlap_ref_ns",
+                      frac_frames_per_ref_tick_.Inverse().Scale(delta.raw_value()));
+
         FX_LOGS(TRACE) << "RENDER TIMESTAMP UNDERFLOW is prevented: overlap ("
                        << ffl::String::DecRational << abs_delta
                        << " frames) is less than discontinuity threshold ("
@@ -540,6 +565,13 @@ void BaseRenderer::SendPacketInternal(fuchsia::media::StreamPacket packet,
         // Gap exists between end of previous packet and this timestamped packet. This gap equals/
         // exceeds the continuity threshold, and thus the packet's timing will NOT be adjusted
         // (restated: we will insert silence between previous-packet-end and this-packet-start).
+        TRACE_INSTANT("audio", "Renderer-TimestampGapNoNudge", TRACE_SCOPE_THREAD,
+                      "prev_packet_end_frac", next_frac_frame_pts_.raw_value(), "actual_pts_frac",
+                      packet_ffpts.raw_value(), "threshold_frac",
+                      pts_continuity_threshold_frac_frame_.raw_value(), "threshold_ref_ns",
+                      static_cast<int32_t>(pts_continuity_threshold_ * 1'000'000'000.0),
+                      "actual_overlap_frac", delta.raw_value(), "actual_overlap_ref_ns",
+                      frac_frames_per_ref_tick_.Inverse().Scale(delta.raw_value()));
 
         // Some clients do this intentionally, and 20+ times per second! ("sparse packets")
         // If changing this to >= INFO, consider wrapping the logging with a conditional such as:
@@ -551,6 +583,14 @@ void BaseRenderer::SendPacketInternal(fuchsia::media::StreamPacket packet,
       } else {
         // The gap between end of previous packet and this timestamped packet is less than the
         // continuity threshold, so this packet's timing will be adjusted to make it continuous.
+        TRACE_INSTANT("audio", "Renderer-TimestampGapNudge", TRACE_SCOPE_THREAD,
+                      "prev_packet_end_frac", next_frac_frame_pts_.raw_value(), "actual_pts_frac",
+                      packet_ffpts.raw_value(), "threshold_frac",
+                      pts_continuity_threshold_frac_frame_.raw_value(), "threshold_ref_ns",
+                      static_cast<int32_t>(pts_continuity_threshold_ * 1'000'000'000.0),
+                      "actual_overlap_frac", delta.raw_value(), "actual_overlap_ref_ns",
+                      frac_frames_per_ref_tick_.Inverse().Scale(delta.raw_value()));
+
         FX_LOGS(TRACE) << "RENDER TIMESTAMP OVERFLOW is prevented: gap ("
                        << ffl::String::DecRational << abs_delta
                        << " frames) is less than discontinuity threshold ("
@@ -605,6 +645,7 @@ void BaseRenderer::SendPacketInternal(fuchsia::media::StreamPacket packet,
 }
 
 // This NO_TIMESTAMP packet is too late to safely play continuously; expect a dropout.
+// For description of "Render Continuity Underflows", see logging_flags.h.
 void BaseRenderer::ReportContinuityUnderflow(Fixed implied_pts, Fixed first_safe_pts,
                                              zx::time first_safe_ref) {
   zx::duration duration_late{frac_frames_per_ref_tick_.Inverse().Scale(first_safe_pts.raw_value() -
@@ -645,6 +686,7 @@ void BaseRenderer::ReportContinuityUnderflow(Fixed implied_pts, Fixed first_safe
 }
 
 // This timestamped packet is too late to play without payload truncation; expect a dropout.
+// For description of "Render Timestamp Underflows", see logging_flags.h.
 void BaseRenderer::ReportTimestampUnderflow(Fixed packet_pts, Fixed prev_packet_end_pts) {
   zx::duration duration_late{frac_frames_per_ref_tick_.Inverse().Scale(
       prev_packet_end_pts.raw_value() - packet_pts.raw_value())};
