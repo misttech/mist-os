@@ -285,6 +285,7 @@ impl vfs::node::Node for FxFile {
             Mutable {
                 creation_time: props.creation_time.as_nanos(),
                 modification_time: props.modification_time.as_nanos(),
+                access_time: props.access_time.as_nanos(),
                 mode: props.posix_attributes.map(|a| a.mode).unwrap_or(0),
                 uid: props.posix_attributes.map(|a| a.uid).unwrap_or(0),
                 gid: props.posix_attributes.map(|a| a.gid).unwrap_or(0),
@@ -300,6 +301,7 @@ impl vfs::node::Node for FxFile {
                 storage_size: props.allocated_size,
                 link_count: props.refs,
                 id: self.handle.object_id(),
+                change_time: props.change_time.as_nanos(),
             }
         ))
     }

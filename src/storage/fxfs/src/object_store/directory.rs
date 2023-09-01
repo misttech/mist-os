@@ -88,7 +88,12 @@ impl<S: HandleOwner> Directory<S> {
         let modification_time = create_attributes
             .and_then(|a| a.modification_time)
             .map(Timestamp::from_nanos)
-            .unwrap_or_else(|| now);
+            .unwrap_or_else(|| now.clone());
+        let access_time = create_attributes
+            .and_then(|a| a.access_time)
+            .map(Timestamp::from_nanos)
+            .unwrap_or_else(|| now.clone());
+        let change_time = now;
         let posix_attributes = create_attributes.and_then(|a| {
             (a.mode.is_some() || a.uid.is_some() || a.gid.is_some() || a.rdev.is_some()).then_some(
                 PosixAttributes {
@@ -111,6 +116,8 @@ impl<S: HandleOwner> Directory<S> {
                         project_id: 0,
                         posix_attributes,
                         allocated_size: 0,
+                        access_time,
+                        change_time,
                     },
                 },
             ),
@@ -242,13 +249,15 @@ impl<S: HandleOwner> Directory<S> {
                 ObjectValue::child(handle.object_id(), ObjectDescriptor::Directory),
             ),
         );
+        let now = Timestamp::now();
         self.update_attributes(
             transaction,
             Some(&fio::MutableNodeAttributes {
-                modification_time: Some(Timestamp::now().as_nanos()),
+                modification_time: Some(now.as_nanos()),
                 ..Default::default()
             }),
             1,
+            Some(now),
         )
         .await?;
         self.copy_project_id_to_object_in_txn(transaction, handle.object_id())?;
@@ -269,16 +278,17 @@ impl<S: HandleOwner> Directory<S> {
                 ObjectValue::child(handle.object_id(), ObjectDescriptor::File),
             ),
         );
+        let now = Timestamp::now();
         self.update_attributes(
             transaction,
             Some(&fio::MutableNodeAttributes {
-                modification_time: Some(Timestamp::now().as_nanos()),
+                modification_time: Some(now.as_nanos()),
                 ..Default::default()
             }),
             0,
+            Some(now),
         )
-        .await?;
-        Ok(())
+        .await
     }
 
     // This applies the project id of this directory (if nonzero) to an object. The method assumes
@@ -380,6 +390,7 @@ impl<S: HandleOwner> Directory<S> {
                 ..Default::default()
             }),
             0,
+            None,
         )
         .await?;
         Ok(symlink_id)
@@ -399,13 +410,15 @@ impl<S: HandleOwner> Directory<S> {
                 ObjectValue::child(store_object_id, ObjectDescriptor::Volume),
             ),
         );
+        let now = Timestamp::now();
         self.update_attributes(
             transaction,
             Some(&fio::MutableNodeAttributes {
-                modification_time: Some(Timestamp::now().as_nanos()),
+                modification_time: Some(now.as_nanos()),
                 ..Default::default()
             }),
             0,
+            Some(now),
         )
         .await
     }
@@ -451,13 +464,15 @@ impl<S: HandleOwner> Directory<S> {
                 ObjectValue::child(object_id, descriptor),
             ),
         );
+        let now = Timestamp::now();
         self.update_attributes(
             transaction,
             Some(&fio::MutableNodeAttributes {
-                modification_time: Some(Timestamp::now().as_nanos()),
+                modification_time: Some(now.as_nanos()),
                 ..Default::default()
             }),
             sub_dirs_delta,
+            Some(now),
         )
         .await
     }
@@ -468,6 +483,7 @@ impl<S: HandleOwner> Directory<S> {
         transaction: &mut Transaction<'a>,
         node_attributes: Option<&fio::MutableNodeAttributes>,
         sub_dirs_delta: i64,
+        change_time: Option<Timestamp>,
     ) -> Result<(), Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
         if sub_dirs_delta != 0 {
@@ -485,8 +501,8 @@ impl<S: HandleOwner> Directory<S> {
         }
 
         // Delegate to the StoreObjectHandle update_attributes for the rest of the updates.
-        if let Some(node_attributes) = node_attributes {
-            self.handle.update_attributes(transaction, node_attributes).await?;
+        if node_attributes.is_some() || change_time.is_some() {
+            self.handle.update_attributes(transaction, node_attributes, change_time).await?;
         }
         Ok(())
     }
@@ -502,13 +518,22 @@ impl<S: HandleOwner> Directory<S> {
             ObjectValue::Object {
                 kind: ObjectKind::Directory { sub_dirs },
                 attributes:
-                    ObjectAttributes { creation_time, modification_time, posix_attributes, .. },
+                    ObjectAttributes {
+                        creation_time,
+                        modification_time,
+                        posix_attributes,
+                        access_time,
+                        change_time,
+                        ..
+                    },
             } => Ok(ObjectProperties {
                 refs: 1,
                 allocated_size: 0,
                 data_attribute_size: 0,
                 creation_time,
                 modification_time,
+                access_time,
+                change_time,
                 sub_dirs,
                 posix_attributes,
             }),
@@ -648,6 +673,7 @@ pub enum ReplacedChild {
 /// be deleted permanently (and must be empty).
 ///
 /// If |src| is None, this is effectively the same as unlink(dst.0/dst.1).
+// TODO(fxbug.dev/298128836): update the change_time for src if it exists
 pub async fn replace_child<'a, S: HandleOwner>(
     transaction: &mut Transaction<'a>,
     src: Option<(&'a Directory<S>, &str)>,
@@ -677,6 +703,7 @@ pub async fn replace_child<'a, S: HandleOwner>(
                         ..Default::default()
                     }),
                     -sub_dirs_delta,
+                    Some(now),
                 )
                 .await?;
         }
@@ -696,6 +723,8 @@ pub async fn replace_child<'a, S: HandleOwner>(
 ///
 /// `sub_dirs_delta` can be used if `src` is a directory and happened to already be a child of
 /// `dst`.
+// TODO(fxbug.dev/298128836): update the change_time for replaced child (e.g. when
+// unlinking)
 pub async fn replace_child_with_object<'a, S: HandleOwner>(
     transaction: &mut Transaction<'a>,
     src: Option<(u64, ObjectDescriptor)>,
@@ -751,6 +780,7 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
                 ..Default::default()
             }),
             sub_dirs_delta,
+            Some(timestamp),
         )
         .await?;
     Ok(result)
@@ -1561,6 +1591,7 @@ mod tests {
                     ..Default::default()
                 }),
                 0,
+                None,
             )
             .await,
         );
@@ -1805,6 +1836,7 @@ mod tests {
                 ..Default::default()
             }),
             0,
+            None,
         )
         .await
         .expect("update_attributes failed");
@@ -1841,6 +1873,7 @@ mod tests {
                 ..Default::default()
             }),
             0,
+            None,
         )
         .await
         .expect("update_attributes failed");
@@ -2149,5 +2182,59 @@ mod tests {
             .unwrap();
 
         filesystem.close().await.expect("close failed");
+    }
+
+    #[fuchsia::test]
+    async fn test_update_timestamps() {
+        let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
+        let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let dir;
+        let mut transaction = fs
+            .clone()
+            .new_transaction(&[], Options::default())
+            .await
+            .expect("new_transaction failed");
+
+        let create_attributes = fio::MutableNodeAttributes::default();
+        // Expect that atime, ctime, mtime (and creation time) to be the same when we create a
+        // directory
+        dir = Directory::create(&mut transaction, &fs.root_store(), Some(&create_attributes))
+            .await
+            .expect("create failed");
+        transaction.commit().await.expect("commit failed");
+        let mut properties = dir.get_properties().await.expect("get_properties failed");
+        let starting_time = properties.creation_time;
+        assert_eq!(properties.creation_time, starting_time);
+        assert_eq!(properties.modification_time, starting_time);
+        assert_eq!(properties.change_time, starting_time);
+        assert_eq!(properties.access_time, starting_time);
+
+        // Test that we can update the timestamps
+        transaction = fs
+            .clone()
+            .new_transaction(
+                &[LockKey::object(fs.root_store().store_object_id(), dir.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        let update1_time = Timestamp::now();
+        dir.update_attributes(
+            &mut transaction,
+            Some(&fio::MutableNodeAttributes {
+                modification_time: Some(update1_time.as_nanos()),
+                ..Default::default()
+            }),
+            0,
+            Some(update1_time),
+        )
+        .await
+        .expect("update_attributes failed");
+        transaction.commit().await.expect("commit failed");
+        properties = dir.get_properties().await.expect("get_properties failed");
+        assert_eq!(properties.modification_time, update1_time);
+        assert_eq!(properties.access_time, starting_time);
+        assert_eq!(properties.creation_time, starting_time);
+        assert_eq!(properties.change_time, update1_time);
     }
 }

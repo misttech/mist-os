@@ -797,11 +797,12 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     }
 
     pub async fn update_attributes<'a>(
-        &'a self,
+        &self,
         transaction: &mut Transaction<'a>,
-        node_attributes: &fio::MutableNodeAttributes,
+        node_attributes: Option<&fio::MutableNodeAttributes>,
+        change_time: Option<Timestamp>,
     ) -> Result<(), Error> {
-        self.handle.update_attributes(transaction, node_attributes).await
+        self.handle.update_attributes(transaction, node_attributes, change_time).await
     }
 
     /// Get the default set of transaction options for this object. This is mostly the overall
@@ -951,6 +952,8 @@ impl<S: HandleOwner> GetProperties for DataObjectHandle<S> {
                         modification_time,
                         posix_attributes,
                         allocated_size,
+                        access_time,
+                        change_time,
                         ..
                     },
             } => Ok(ObjectProperties {
@@ -959,6 +962,8 @@ impl<S: HandleOwner> GetProperties for DataObjectHandle<S> {
                 data_attribute_size: self.get_size(),
                 creation_time,
                 modification_time,
+                access_time,
+                change_time,
                 sub_dirs: 0,
                 posix_attributes,
             }),
@@ -2456,6 +2461,7 @@ mod tests {
         let (fs, object) = test_filesystem_and_object().await;
         const CRTIME: Timestamp = Timestamp::from_nanos(1234);
         const MTIME: Timestamp = Timestamp::from_nanos(5678);
+        const CTIME: Timestamp = Timestamp::from_nanos(8765);
 
         // ObjectProperties can be updated through `write_timestamps` and `update_attributes`.
         // `get_properties` should reflect the latest changes.
@@ -2467,11 +2473,12 @@ mod tests {
         object
             .update_attributes(
                 &mut transaction,
-                &fio::MutableNodeAttributes {
+                Some(&fio::MutableNodeAttributes {
                     mode: Some(111),
                     gid: Some(222),
                     ..Default::default()
-                },
+                }),
+                None,
             )
             .await
             .expect("update_timestamps failed");
@@ -2479,12 +2486,13 @@ mod tests {
         object
             .update_attributes(
                 &mut transaction,
-                &fio::MutableNodeAttributes {
+                Some(&fio::MutableNodeAttributes {
                     modification_time: Some(MTIME_NEW.as_nanos()),
                     gid: Some(333),
                     rdev: Some(444),
                     ..Default::default()
-                },
+                }),
+                Some(CTIME),
             )
             .await
             .expect("update_timestamps failed");
@@ -2500,6 +2508,7 @@ mod tests {
                 creation_time: CRTIME,
                 modification_time: MTIME_NEW,
                 posix_attributes: Some(PosixAttributes { mode: 111, gid: 333, rdev: 444, .. }),
+                change_time: CTIME,
                 ..
             }
         );

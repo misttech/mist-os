@@ -39,7 +39,8 @@ use {
                 JournalCheckpoint, JournalHandle as _, BLOCK_SIZE,
             },
             object_record::{
-                ObjectItem, ObjectItemV25, ObjectItemV29, ObjectItemV30, ObjectItemV5,
+                ObjectItem, ObjectItemV25, ObjectItemV29, ObjectItemV30, ObjectItemV31,
+                ObjectItemV5,
             },
             transaction::{AssocObj, Options},
             tree::MajorCompactable,
@@ -216,6 +217,14 @@ pub enum SuperBlockRecord {
 }
 
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+pub enum SuperBlockRecordV31 {
+    Extent(Range<u64>),
+    ObjectItem(ObjectItemV31),
+    End,
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[migrate_to_version(SuperBlockRecordV31)]
 pub enum SuperBlockRecordV30 {
     Extent(Range<u64>),
     ObjectItem(ObjectItemV30),
@@ -707,7 +716,7 @@ mod tests {
         // Create a large number of objects in the root parent store so that we test growing
         // of the super-block file, requiring us to add extents.
         let mut created_object_ids = vec![];
-        const NUM_ENTRIES: u64 = MIN_SUPER_BLOCK_SIZE / 16;
+        const NUM_ENTRIES: u64 = MIN_SUPER_BLOCK_SIZE / 32;
         for _ in 0..NUM_ENTRIES {
             let mut transaction = fs
                 .clone()
@@ -897,7 +906,7 @@ mod tests {
         let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
         let root_store = fs.root_store();
         // Generate enough work to induce a journal flush and thus a new superblock being written.
-        for _ in 0..8000 {
+        for _ in 0..6000 {
             let mut transaction = fs
                 .clone()
                 .new_transaction(&[], Options::default())
@@ -960,7 +969,7 @@ mod tests {
         let fs = FxFilesystem::open(device).await.expect("open failed");
         let root_store = fs.root_store();
         // Generate enough work to induce a journal flush.
-        for _ in 0..8000 {
+        for _ in 0..6000 {
             let mut transaction = fs
                 .clone()
                 .new_transaction(&[], Options::default())
@@ -1039,7 +1048,7 @@ mod tests {
 
         // Generate enough work to induce a journal flush.
         let root_store = fs.root_store();
-        for _ in 0..8000 {
+        for _ in 0..6000 {
             let mut transaction = fs
                 .clone()
                 .new_transaction(&[], Options::default())

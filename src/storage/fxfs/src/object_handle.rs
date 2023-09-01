@@ -44,6 +44,10 @@ pub struct ObjectProperties {
     pub creation_time: Timestamp,
     /// The timestamp at which the objects's data was last modified (i.e. mtime).
     pub modification_time: Timestamp,
+    /// The timestamp at which the object was last read (i.e. atime).
+    pub access_time: Timestamp,
+    /// The timestamp at which the object's status was last modified (i.e. ctime).
+    pub change_time: Timestamp,
     /// The number of sub-directories.
     pub sub_dirs: u64,
     // The POSIX attributes: mode, uid, gid, rdev

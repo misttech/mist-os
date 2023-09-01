@@ -151,13 +151,22 @@ impl FxNode for FxSymlink {
             ObjectValue::Object {
                 kind: ObjectKind::Symlink { refs, .. },
                 attributes:
-                    ObjectAttributes { creation_time, modification_time, posix_attributes, .. },
+                    ObjectAttributes {
+                        creation_time,
+                        modification_time,
+                        posix_attributes,
+                        access_time,
+                        change_time,
+                        ..
+                    },
             } => Ok(ObjectProperties {
                 refs,
                 allocated_size: 0,
                 data_attribute_size: 0,
                 creation_time,
                 modification_time,
+                access_time,
+                change_time,
                 sub_dirs: 0,
                 posix_attributes,
             }),

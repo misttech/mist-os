@@ -46,7 +46,7 @@ use {
             object_record::{AttributeKey, ObjectKey, ObjectKeyData, ObjectValue},
             transaction::{
                 AllocatorMutation, Mutation, MutationV20, MutationV25, MutationV29, MutationV30,
-                ObjectStoreMutation, Options, Transaction, TxnMutation,
+                MutationV31, ObjectStoreMutation, Options, Transaction, TxnMutation,
                 TRANSACTION_MAX_JOURNAL_USAGE,
             },
             DataObjectHandle, HandleOptions, HandleOwner, Item, ItemRef, LastObjectId, LockState,
@@ -83,7 +83,7 @@ use {
 // Exposed for serialized_types.
 pub use super_block::{
     SuperBlockHeader, SuperBlockRecord, SuperBlockRecordV25, SuperBlockRecordV29,
-    SuperBlockRecordV30, SuperBlockRecordV5,
+    SuperBlockRecordV30, SuperBlockRecordV31, SuperBlockRecordV5,
 };
 
 // The journal file is written to in blocks of this size.
@@ -149,6 +149,15 @@ pub enum JournalRecord {
 }
 
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+pub enum JournalRecordV31 {
+    EndBlock,
+    Mutation { object_id: u64, mutation: MutationV31 },
+    Commit,
+    Discard(u64),
+    DidFlushDevice(u64),
+}
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[migrate_to_version(JournalRecordV31)]
 pub enum JournalRecordV30 {
     EndBlock,
     Mutation { object_id: u64, mutation: MutationV30 },

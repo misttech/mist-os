@@ -1049,7 +1049,16 @@ mod tests {
         let tombstone = Item::new(ObjectKey::object(1), ObjectValue::None);
         let other_object = Item::new(
             ObjectKey::object(2),
-            ObjectValue::file(1, 0, Timestamp::default(), Timestamp::default(), 0, None),
+            ObjectValue::file(
+                1,
+                0,
+                Timestamp::default(),
+                Timestamp::default(),
+                Timestamp::default(),
+                Timestamp::default(),
+                0,
+                None,
+            ),
         );
         let tree = LSMTree::new(merge, Box::new(NullCache {}));
         test_merge(
@@ -1058,7 +1067,16 @@ mod tests {
             &[
                 Item::new(
                     ObjectKey::object(1),
-                    ObjectValue::file(1, 100, Timestamp::default(), Timestamp::default(), 0, None),
+                    ObjectValue::file(
+                        1,
+                        100,
+                        Timestamp::default(),
+                        Timestamp::default(),
+                        Timestamp::default(),
+                        Timestamp::default(),
+                        0,
+                        None,
+                    ),
                 ),
                 Item::new(
                     ObjectKey::attribute(1, 0, AttributeKey::Attribute),

@@ -154,6 +154,8 @@ impl GetProperties for FakeObjectHandle {
             data_attribute_size: size,
             creation_time: Timestamp::zero(),
             modification_time: Timestamp::zero(),
+            access_time: Timestamp::zero(),
+            change_time: Timestamp::zero(),
             sub_dirs: 0,
             posix_attributes: None,
         })

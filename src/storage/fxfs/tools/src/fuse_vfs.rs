@@ -291,11 +291,15 @@ impl FuseFs {
     /// Return NotFound if `inode` does not exist.
     async fn setattr_fxfs(&self, inode: u64, set_attr: SetAttr) -> FxfsResult<ReplyAttr> {
         let object_type = self.get_object_type(inode).await?;
-        let ctime: Option<Timestamp> = match set_attr.ctime {
+        let mtime: Option<Timestamp> = match set_attr.mtime {
             Some(t) => Some(to_fxfs_time(t)),
             None => None,
         };
-        let mtime: Option<Timestamp> = match set_attr.mtime {
+        let atime: Option<Timestamp> = match set_attr.atime {
+            Some(t) => Some(to_fxfs_time(t)),
+            None => None,
+        };
+        let ctime: Option<Timestamp> = match set_attr.ctime {
             Some(t) => Some(to_fxfs_time(t)),
             None => None,
         };
@@ -331,11 +335,12 @@ impl FuseFs {
             dir.update_attributes(
                 &mut transaction,
                 Some(&fio::MutableNodeAttributes {
-                    creation_time: ctime.map(|t| t.as_nanos()),
                     modification_time: mtime.map(|t| t.as_nanos()),
+                    access_time: atime.map(|t| t.as_nanos()),
                     ..Default::default()
                 }),
                 0,
+                ctime,
             )
             .await?;
             transaction.commit().await?;

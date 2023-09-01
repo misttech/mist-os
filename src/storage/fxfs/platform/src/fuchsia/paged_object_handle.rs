@@ -806,7 +806,7 @@ impl PagedObjectHandle {
 
         let mut transaction = self.handle.new_transaction().await?;
         self.handle
-            .update_attributes(&mut transaction, attributes)
+            .update_attributes(&mut transaction, Some(attributes), None)
             .await
             .context("update_attributes failed")?;
         transaction.commit().await.context("Failed to commit transaction")?;

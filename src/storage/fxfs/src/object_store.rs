@@ -94,13 +94,13 @@ pub use extent_record::{
 };
 pub use journal::{
     JournalRecord, JournalRecordV20, JournalRecordV25, JournalRecordV29, JournalRecordV30,
-    SuperBlockHeader, SuperBlockRecord, SuperBlockRecordV25, SuperBlockRecordV29,
-    SuperBlockRecordV30, SuperBlockRecordV5,
+    JournalRecordV31, SuperBlockHeader, SuperBlockRecord, SuperBlockRecordV25, SuperBlockRecordV29,
+    SuperBlockRecordV30, SuperBlockRecordV31, SuperBlockRecordV5,
 };
 pub use object_record::{
     AttributeKey, EncryptionKeys, ExtendedAttributeValue, ObjectAttributes, ObjectAttributesV5,
     ObjectKey, ObjectKeyData, ObjectKeyDataV5, ObjectKeyV25, ObjectKeyV5, ObjectKind, ObjectValue,
-    ObjectValueV25, ObjectValueV29, ObjectValueV30, ObjectValueV5, ProjectProperty,
+    ObjectValueV25, ObjectValueV29, ObjectValueV30, ObjectValueV31, ObjectValueV5, ProjectProperty,
 };
 pub use transaction::Mutation;
 
@@ -888,7 +888,12 @@ impl ObjectStore {
         let modification_time = create_attributes
             .and_then(|a| a.modification_time)
             .map(Timestamp::from_nanos)
-            .unwrap_or_else(|| now);
+            .unwrap_or_else(|| now.clone());
+        let access_time = create_attributes
+            .and_then(|a| a.access_time)
+            .map(Timestamp::from_nanos)
+            .unwrap_or_else(|| now.clone());
+        let change_time = now;
         let posix_attributes = create_attributes.and_then(|a| {
             (a.mode.is_some() || a.uid.is_some() || a.gid.is_some() || a.rdev.is_some()).then_some(
                 PosixAttributes {
@@ -903,7 +908,16 @@ impl ObjectStore {
             store.store_object_id(),
             Mutation::insert_object(
                 ObjectKey::object(object_id),
-                ObjectValue::file(1, 0, creation_time, modification_time, 0, posix_attributes),
+                ObjectValue::file(
+                    1,
+                    0,
+                    creation_time,
+                    modification_time,
+                    access_time,
+                    change_time,
+                    0,
+                    posix_attributes,
+                ),
             ),
         );
         if let Some(crypt) = crypt {

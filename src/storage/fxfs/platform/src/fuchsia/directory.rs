@@ -429,7 +429,7 @@ impl MutableDirectory for FxDirectory {
             .await
             .map_err(map_to_status)?;
         self.directory
-            .update_attributes(&mut transaction, Some(&attributes), 0)
+            .update_attributes(&mut transaction, Some(&attributes), 0, None)
             .await
             .map_err(map_to_status)?;
         transaction.commit().await.map_err(map_to_status)?;
@@ -748,6 +748,7 @@ impl vfs::node::Node for FxDirectory {
             Mutable {
                 creation_time: props.creation_time.as_nanos(),
                 modification_time: props.modification_time.as_nanos(),
+                access_time: props.access_time.as_nanos(),
                 mode: props.posix_attributes.map(|a| a.mode).unwrap_or(0),
                 uid: props.posix_attributes.map(|a| a.uid).unwrap_or(0),
                 gid: props.posix_attributes.map(|a| a.gid).unwrap_or(0),
@@ -764,6 +765,7 @@ impl vfs::node::Node for FxDirectory {
                 storage_size: props.allocated_size,
                 link_count: props.refs + 1 + props.sub_dirs,
                 id: self.directory.object_id(),
+                change_time: props.change_time.as_nanos(),
             }
         ))
     }
@@ -1972,7 +1974,11 @@ mod tests {
                 .into_any()
                 .downcast::<FxDirectory>()
                 .expect("Not a directory")
-                .get_attributes(fio::NodeAttributesQuery::MODE | fio::NodeAttributesQuery::UID)
+                .get_attributes(
+                    fio::NodeAttributesQuery::MODE
+                        | fio::NodeAttributesQuery::UID
+                        | fio::NodeAttributesQuery::ACCESS_TIME,
+                )
                 .await
                 .expect("FIDL call failed");
             assert_eq!(attrs.mutable_attributes.mode.unwrap(), mode);
@@ -1980,6 +1986,7 @@ mod tests {
             // Expect these attributes to be None as they were not queried in `get_attributes(..)`
             assert!(attrs.mutable_attributes.gid.is_none());
             assert!(attrs.mutable_attributes.rdev.is_none());
+            assert!(attrs.mutable_attributes.access_time.is_some());
         }
         fixture.close().await;
     }
@@ -2055,6 +2062,7 @@ mod tests {
             assert!(attrs.mutable_attributes.rdev.is_none());
             assert!(attrs.mutable_attributes.creation_time.is_none());
             assert!(attrs.mutable_attributes.modification_time.is_none());
+            assert!(attrs.mutable_attributes.access_time.is_none());
         }
         fixture.close().await;
     }
@@ -2101,6 +2109,7 @@ mod tests {
                 .get_attributes(
                     fio::NodeAttributesQuery::CREATION_TIME
                         | fio::NodeAttributesQuery::MODIFICATION_TIME
+                        | fio::NodeAttributesQuery::CHANGE_TIME
                         | fio::NodeAttributesQuery::MODE
                         | fio::NodeAttributesQuery::UID
                         | fio::NodeAttributesQuery::GID
@@ -2113,9 +2122,8 @@ mod tests {
             assert_eq!(gid, attributes.mutable_attributes.gid.unwrap());
             assert_eq!(rdev, attributes.mutable_attributes.rdev.unwrap());
             assert_eq!(modification_time, attributes.mutable_attributes.modification_time.unwrap());
-            // Although the file was created with `creation_time` and `modification_time` set to
-            // `None`,
             assert!(attributes.mutable_attributes.creation_time.is_some());
+            assert!(attributes.immutable_attributes.change_time.is_some());
         }
         fixture.close().await;
     }
