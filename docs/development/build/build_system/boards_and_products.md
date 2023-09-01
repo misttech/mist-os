@@ -91,11 +91,16 @@ and can update a system over-the-air.
 
 ### Minimal
 
-As [RFC-0220](/docs/contribute/governance/rfcs/0220_the_future_of_in_tree_products.md)
-Minimal is intended to be "the smallest thing which can be called Fuchsia." Definitionally, this is a system which can:
-* Boot into userspace
-* Run Component Manager and components
-* Update itself using our over-the-air update system (This implies that storage and networking are working, with drivers provided by the board)
+As described in
+[RFC-0220](/docs/contribute/governance/rfcs/0220_the_future_of_in_tree_products.md),
+Minimal is intended to be "the smallest thing which can be called Fuchsia."
+Definitionally, this is a system which can:
+
+* Boot into userspace.
+* Run Component Manager and components.
+* Update itself using Fuchsia's over-the-air update system. (This implies
+  that storage and networking are working, with drivers provided by the
+  board.)
 
 ### Workbench
 Workbench is a product configuration for local development, running larger
