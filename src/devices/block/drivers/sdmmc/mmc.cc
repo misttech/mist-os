@@ -489,12 +489,14 @@ void SdmmcBlockDevice::MmcSetInspectProperties() {
     lifetime_max = std::min(type_a, type_b);
   }
 
-  type_a_lifetime_used_ = root_.CreateUint("type_a_lifetime_used", type_a);
-  type_b_lifetime_used_ = root_.CreateUint("type_b_lifetime_used", type_b);
-  max_lifetime_used_ = root_.CreateUint("max_lifetime_used", lifetime_max);
-  cache_size_bits_ = root_.CreateUint("cache_size_bits", GetCacheSizeBits(raw_ext_csd_));
-  cache_enabled_prop_ = root_.CreateBool("cache_enabled", cache_enabled_);
-  trim_enabled_prop_ = root_.CreateBool("trim_enabled", block_info_.flags & FLAG_TRIM_SUPPORT);
+  properties_.type_a_lifetime_used_ = root_.CreateUint("type_a_lifetime_used", type_a);
+  properties_.type_b_lifetime_used_ = root_.CreateUint("type_b_lifetime_used", type_b);
+  properties_.max_lifetime_used_ = root_.CreateUint("max_lifetime_used", lifetime_max);
+  properties_.cache_size_bits_ =
+      root_.CreateUint("cache_size_bits", GetCacheSizeBits(raw_ext_csd_));
+  properties_.cache_enabled_ = root_.CreateBool("cache_enabled", cache_enabled_);
+  properties_.trim_enabled_ =
+      root_.CreateBool("trim_enabled", block_info_.flags & FLAG_TRIM_SUPPORT);
 }
 
 }  // namespace sdmmc

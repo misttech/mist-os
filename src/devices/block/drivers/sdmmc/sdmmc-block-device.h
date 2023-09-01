@@ -138,14 +138,16 @@ class SdmmcBlockDevice : public SdmmcBlockDeviceType {
 
   inspect::Inspector inspector_;
   inspect::Node root_;
-  inspect::UintProperty io_errors_;             // Only updated from the worker thread.
-  inspect::UintProperty io_retries_;            // Only updated from the worker thread.
-  inspect::UintProperty type_a_lifetime_used_;  // Set once by the init thread.
-  inspect::UintProperty type_b_lifetime_used_;  // Set once by the init thread.
-  inspect::UintProperty max_lifetime_used_;     // Set once by the init thread.
-  inspect::UintProperty cache_size_bits_;       // Set once by the init thread.
-  inspect::BoolProperty cache_enabled_prop_;    // Set once by the init thread.
-  inspect::BoolProperty trim_enabled_prop_;     // Set once by the init thread.
+  struct InspectProperties {
+    inspect::UintProperty io_errors_;             // Only updated from the worker thread.
+    inspect::UintProperty io_retries_;            // Only updated from the worker thread.
+    inspect::UintProperty type_a_lifetime_used_;  // Set once by the init thread.
+    inspect::UintProperty type_b_lifetime_used_;  // Set once by the init thread.
+    inspect::UintProperty max_lifetime_used_;     // Set once by the init thread.
+    inspect::UintProperty cache_size_bits_;       // Set once by the init thread.
+    inspect::BoolProperty cache_enabled_;         // Set once by the init thread.
+    inspect::BoolProperty trim_enabled_;          // Set once by the init thread.
+  } properties_;
 };
 
 }  // namespace sdmmc

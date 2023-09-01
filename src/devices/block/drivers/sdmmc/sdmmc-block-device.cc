@@ -62,8 +62,8 @@ zx_status_t SdmmcBlockDevice::AddDevice() {
   }
 
   root_ = inspector_.GetRoot().CreateChild("sdmmc_core");
-  io_errors_ = root_.CreateUint("io_errors", 0);
-  io_retries_ = root_.CreateUint("io_retries", 0);
+  properties_.io_errors_ = root_.CreateUint("io_errors", 0);
+  properties_.io_retries_ = root_.CreateUint("io_retries", 0);
 
   if (!is_sd_) {
     MmcSetInspectProperties();
@@ -265,10 +265,10 @@ zx_status_t SdmmcBlockDevice::ReadWrite(const block_read_write_t& txn,
 
   uint32_t retries = 0;
   st = sdmmc_.SdmmcIoRequestWithRetries(req, &retries, set_block_count);
-  io_retries_.Add(retries);
+  properties_.io_retries_.Add(retries);
   if (st != ZX_OK) {
     zxlogf(ERROR, "do_txn error %d", st);
-    io_errors_.Add(1);
+    properties_.io_errors_.Add(1);
   }
 
   // SdmmcIoRequestWithRetries sends STOP_TRANSMISSION (cmd12) when an error occurs, so it only
@@ -278,7 +278,7 @@ zx_status_t SdmmcBlockDevice::ReadWrite(const block_read_write_t& txn,
     zx_status_t stop_st = sdmmc_.SdmmcStopTransmission();
     if (stop_st != ZX_OK) {
       zxlogf(WARNING, "do_txn stop transmission error %d", stop_st);
-      io_errors_.Add(1);
+      properties_.io_errors_.Add(1);
     }
   }
 
@@ -327,12 +327,12 @@ zx_status_t SdmmcBlockDevice::Trim(const block_trim_t& txn, const EmmcPartition 
   uint32_t response[4] = {};
   if ((status = sdmmc_.host().Request(&discard_start, response)) != ZX_OK) {
     zxlogf(ERROR, "failed to set discard group start: %d", status);
-    io_errors_.Add(1);
+    properties_.io_errors_.Add(1);
     return status;
   }
   if (response[0] & kEraseErrorFlags) {
     zxlogf(ERROR, "card reported discard group start error: 0x%08x", response[0]);
-    io_errors_.Add(1);
+    properties_.io_errors_.Add(1);
     return ZX_ERR_IO;
   }
 
@@ -343,12 +343,12 @@ zx_status_t SdmmcBlockDevice::Trim(const block_trim_t& txn, const EmmcPartition 
   };
   if ((status = sdmmc_.host().Request(&discard_end, response)) != ZX_OK) {
     zxlogf(ERROR, "failed to set discard group end: %d", status);
-    io_errors_.Add(1);
+    properties_.io_errors_.Add(1);
     return status;
   }
   if (response[0] & kEraseErrorFlags) {
     zxlogf(ERROR, "card reported discard group end error: 0x%08x", response[0]);
-    io_errors_.Add(1);
+    properties_.io_errors_.Add(1);
     return ZX_ERR_IO;
   }
 
@@ -359,12 +359,12 @@ zx_status_t SdmmcBlockDevice::Trim(const block_trim_t& txn, const EmmcPartition 
   };
   if ((status = sdmmc_.host().Request(&discard, response)) != ZX_OK) {
     zxlogf(ERROR, "discard failed: %d", status);
-    io_errors_.Add(1);
+    properties_.io_errors_.Add(1);
     return status;
   }
   if (response[0] & kEraseErrorFlags) {
     zxlogf(ERROR, "card reported discard error: 0x%08x", response[0]);
-    io_errors_.Add(1);
+    properties_.io_errors_.Add(1);
     return ZX_ERR_IO;
   }
 
@@ -393,7 +393,7 @@ zx_status_t SdmmcBlockDevice::RpmbRequest(const RpmbRequestInfo& request) {
   uint32_t unused_response[4];
   if ((status = sdmmc_.host().Request(&set_tx_block_count, unused_response)) != ZX_OK) {
     zxlogf(ERROR, "failed to set block count for RPMB request: %d", status);
-    io_errors_.Add(1);
+    properties_.io_errors_.Add(1);
     return status;
   }
 
@@ -413,7 +413,7 @@ zx_status_t SdmmcBlockDevice::RpmbRequest(const RpmbRequestInfo& request) {
   };
   if ((status = sdmmc_.host().Request(&write_tx_frames, unused_response)) != ZX_OK) {
     zxlogf(ERROR, "failed to write RPMB frames: %d", status);
-    io_errors_.Add(1);
+    properties_.io_errors_.Add(1);
     return status;
   }
 
@@ -428,7 +428,7 @@ zx_status_t SdmmcBlockDevice::RpmbRequest(const RpmbRequestInfo& request) {
   };
   if ((status = sdmmc_.host().Request(&set_rx_block_count, unused_response)) != ZX_OK) {
     zxlogf(ERROR, "failed to set block count for RPMB request: %d", status);
-    io_errors_.Add(1);
+    properties_.io_errors_.Add(1);
     return status;
   }
 
@@ -448,7 +448,7 @@ zx_status_t SdmmcBlockDevice::RpmbRequest(const RpmbRequestInfo& request) {
   };
   if ((status = sdmmc_.host().Request(&read_rx_frames, unused_response)) != ZX_OK) {
     zxlogf(ERROR, "failed to read RPMB frames: %d", status);
-    io_errors_.Add(1);
+    properties_.io_errors_.Add(1);
     return status;
   }
 
@@ -469,7 +469,7 @@ zx_status_t SdmmcBlockDevice::SetPartition(const EmmcPartition partition) {
   zx_status_t status = MmcDoSwitch(MMC_EXT_CSD_PARTITION_CONFIG, partition_config_value);
   if (status != ZX_OK) {
     zxlogf(ERROR, "failed to switch to partition %u", partition);
-    io_errors_.Add(1);
+    properties_.io_errors_.Add(1);
     return status;
   }
 
