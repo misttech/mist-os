@@ -269,7 +269,7 @@ From //products/bringup.gni:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:38
+From //BUILD.gn:39
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -277,7 +277,7 @@ From //products/bringup.gni:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:38
+From //BUILD.gn:39
 
 ### base_package_labels
 
@@ -293,7 +293,7 @@ From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:46
+From //BUILD.gn:47
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -301,7 +301,7 @@ From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:46
+From //BUILD.gn:47
 
 ### basic_env_names
 
@@ -1028,7 +1028,7 @@ From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:55
+From //BUILD.gn:56
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -1036,7 +1036,7 @@ From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:55
+From //BUILD.gn:56
 
 ### camera_debug
 
@@ -1609,7 +1609,7 @@ From //out/not-default/args.gn:28
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:114
+From //BUILD.gn:115
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -1617,7 +1617,7 @@ From //out/not-default/args.gn:28
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:114
+From //BUILD.gn:115
 
 ### devicetree_board_driver
 
@@ -2610,7 +2610,7 @@ As these cannot be part of the legacy AIB for a product, there is no
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:77
+From //BUILD.gn:78
 
 ### dont_profile_source_files
 
@@ -2640,7 +2640,7 @@ From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:105
+From //BUILD.gn:106
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -2648,7 +2648,7 @@ From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:105
+From //BUILD.gn:106
 
 ### emu_window_size_height
 
@@ -3659,7 +3659,7 @@ From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:92
+From //BUILD.gn:93
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3667,7 +3667,7 @@ From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:92
+From //BUILD.gn:93
 
 ### host_byteorder
 
@@ -3691,7 +3691,7 @@ From //out/not-default/args.gn:8
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:119
+From //BUILD.gn:120
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3699,7 +3699,7 @@ From //out/not-default/args.gn:8
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:119
+From //BUILD.gn:120
 
 ### host_os
 
@@ -3716,7 +3716,7 @@ From //out/not-default/args.gn:25
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:109
+From //BUILD.gn:110
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3724,7 +3724,7 @@ From //out/not-default/args.gn:25
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:109
+From //BUILD.gn:110
 
 ### host_tools_dir
 
@@ -4333,25 +4333,25 @@ From //build/config/BUILDCONFIG.gn:1446
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:39
+From //BUILD.gn:40
 
 ### legacy_base_package_labels
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:47
+From //BUILD.gn:48
 
 ### legacy_cache_package_labels
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:56
+From //BUILD.gn:57
 
 ### legacy_host_labels
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:120
+From //BUILD.gn:121
 
 ### legacy_product_bootfs_labels
 
@@ -4360,7 +4360,7 @@ product_bootfs_labels = []  (defined in product.gni)
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:81
+From //BUILD.gn:82
 
 ### legacy_product_system_image_deps
 
@@ -4369,13 +4369,13 @@ product_system_image_deps = []  (defined in product.gni)
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:85
+From //BUILD.gn:86
 
 ### legacy_universe_package_labels
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:65
+From //BUILD.gn:66
 
 ### llvm_prefix
 
@@ -7515,7 +7515,7 @@ From //products/bringup.gni:18
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:131
+From //BUILD.gn:132
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -7523,7 +7523,7 @@ From //products/bringup.gni:18
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:131
+From //BUILD.gn:132
 
 ### sdk_cross_compile_host_tools
 
@@ -8027,7 +8027,7 @@ afterwards.
 
 **Current value (from the default):** `""`
 
-From //BUILD.gn:126
+From //BUILD.gn:127
 
 ### test_package_labels
 
@@ -8040,7 +8040,7 @@ From //out/not-default/args.gn:22
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:96
+From //BUILD.gn:97
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -8048,7 +8048,7 @@ From //out/not-default/args.gn:22
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:96
+From //BUILD.gn:97
 
 ### testonly_in_containers
 
@@ -8080,7 +8080,7 @@ From //out/not-default/args.gn:23
 
 **Overridden from the default:** `false`
 
-From //BUILD.gn:101
+From //BUILD.gn:102
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -8088,7 +8088,7 @@ From //out/not-default/args.gn:23
 
 **Overridden from the default:** `false`
 
-From //BUILD.gn:101
+From //BUILD.gn:102
 
 ### thinlto_cache_dir
 
@@ -8200,7 +8200,7 @@ From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:64
+From //BUILD.gn:65
 
 **Current value for `target_cpu = "x64"`:** `["//bundles/kitchen_sink"]`
 
@@ -8208,7 +8208,7 @@ From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:64
+From //BUILD.gn:65
 
 ### update_goldens
 
