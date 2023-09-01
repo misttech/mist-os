@@ -12,7 +12,7 @@ group("transport") {
   ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [
     ":banjo-test-package",

@@ -11,11 +11,11 @@ group("diagnostics") {
   ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [
-    "inspect:tests",
-    "logs:tests",
-    "workshop:tests",
+    "inspect:hermetic_tests",
+    "logs:hermetic_tests",
+    "workshop:hermetic_tests",
   ]
 }

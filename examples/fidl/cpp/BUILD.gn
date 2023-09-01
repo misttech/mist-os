@@ -22,7 +22,7 @@ group("all") {
   ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
 
   deps = [

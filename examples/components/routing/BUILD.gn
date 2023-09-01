@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+assert(is_fuchsia, "These targets are only compiled in the fuchsia toolchain.")
+
 import("//build/components.gni")
 
 group("components-routing-example") {
@@ -33,11 +35,11 @@ fuchsia_package("components-routing-example-cpp") {
   ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [
     "integration_tests/cpp:echo_integration_test_cpp",
     "integration_tests/rust:echo_integration_test_rust",
-    "with_subpackages:tests",
+    "with_subpackages:hermetic_tests",
   ]
 }

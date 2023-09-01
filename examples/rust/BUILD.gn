@@ -6,17 +6,17 @@ import("//build/components.gni")
 
 group("rust") {
   testonly = true
-  deps = [ ":tests" ]
+  deps = [ ":hermetic_tests" ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [
     ":rust-examples",
-    "cdylib:tests",
-    "dylib:tests",
-    "rust_static_linking:tests",
-    "staticlib:tests",
+    "cdylib:hermetic_tests",
+    "dylib:hermetic_tests",
+    "rust_static_linking:hermetic_tests",
+    "staticlib:hermetic_tests",
   ]
 }
 

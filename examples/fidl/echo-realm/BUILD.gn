@@ -31,7 +31,7 @@ fuchsia_component("fidl_examples_test") {
   deps = [ ":bin" ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [
     ":echo-cpp-async-test",

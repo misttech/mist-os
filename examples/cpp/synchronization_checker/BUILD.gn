@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+assert(is_fuchsia, "These targets are only compiled in the fuchsia toolchain.")
+
 import("//build/components.gni")
 import("//build/test.gni")
 
@@ -21,6 +23,11 @@ fuchsia_unittest_package("cpp-examples-synchronization-checker-test") {
 }
 
 group("synchronization_checker") {
+  testonly = true
+  deps = [ ":hermetic_tests" ]
+}
+
+group("hermetic_tests") {
   testonly = true
   deps = [ ":cpp-examples-synchronization-checker-test" ]
 }

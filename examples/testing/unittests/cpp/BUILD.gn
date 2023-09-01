@@ -25,7 +25,7 @@ fuchsia_unittest_package("reverser_library_unittest") {
   deps = [ ":reverser_library_test" ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [ ":reverser_library_unittest" ]
 }

@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+assert(is_fuchsia, "These targets are only compiled in the fuchsia toolchain.")
+
 import("//build/components.gni")
 import("//build/rust/rustc_test.gni")
 
@@ -71,7 +73,7 @@ fuchsia_test_package("cpp_config_from_parent_integration_test") {
   ]
 }
 
-group("integration_test") {
+group("hermetic_tests") {
   testonly = true
   deps = [
     ":cpp_config_from_parent_integration_test",

@@ -21,7 +21,7 @@ fuchsia_unittest_package("example-hlcpp-protocol-test") {
   deps = [ ":bin" ]
 }
 
-group("testing") {
+group("hermetic_tests") {
   testonly = true
   deps = [ ":example-hlcpp-protocol-test" ]
 }

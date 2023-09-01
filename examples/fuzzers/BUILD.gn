@@ -6,17 +6,19 @@ import("//build/fuzz.gni")
 
 group("fuzzers") {
   testonly = true
-  deps = [ ":tests" ]
+  deps = [
+    ":hermetic_tests",
+
+    # This is an example, but doesn't have a test spec.
+    "rust:toy-example",
+  ]
 }
 
 # This target is the same as the one above; whether fuzzers or unit tests are built depends on which
 # toolchain variant is active. Typically, you should include fuzzers in your package's tests.
-group("tests") {
+group("hermetic_tests") {
   testonly = true
-  deps = [
-    ":fuzzing-examples",
-    "rust:toy-example",
-  ]
+  deps = [ ":fuzzing-examples" ]
 }
 
 fuchsia_fuzzer_component("crash-fuzzer-component") {

@@ -5,7 +5,7 @@
 import("//build/components.gni")
 import("//build/test.gni")
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
 
   deps = [ ":hello-world-cpp-unittests" ]

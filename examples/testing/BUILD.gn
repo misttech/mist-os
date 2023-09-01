@@ -2,10 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [
-    "tools:tests",
-    "unittests:tests",
+    "tools:hermetic_tests",
+    "unittests:hermetic_tests",
   ]
 }

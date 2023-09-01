@@ -7,7 +7,7 @@ group("cpp") {
   deps = [ "synchronization_checker" ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
-  deps = [ "synchronization_checker" ]
+  deps = [ "synchronization_checker:hermetic_tests" ]
 }

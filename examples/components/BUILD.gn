@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+assert(is_fuchsia, "These targets are only compiled in the fuchsia toolchain.")
+
 group("components") {
   testonly = true
   deps = [
@@ -16,16 +18,16 @@ group("components") {
   ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [
-    "config:tests",
-    "config_from_parent:tests",
-    "echo:tests",
-    "realm_builder:tests",
-    "routing:tests",
-    "services:tests",
-    "storage:tests",
-    "subpackages:tests",
+    "config:hermetic_tests",
+    "config_from_parent:hermetic_tests",
+    "echo:hermetic_tests",
+    "realm_builder:hermetic_tests",
+    "routing:hermetic_tests",
+    "services:hermetic_tests",
+    "storage:hermetic_tests",
+    "subpackages:hermetic_tests",
   ]
 }

@@ -4,7 +4,7 @@
 
 import("//build/components.gni")
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   public_deps = [ ":crust" ]
 }

@@ -15,7 +15,7 @@ fuchsia_unittest_package("reverser_rust_unittest") {
   deps = [ ":reverser_crate_test" ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [ ":reverser_rust_unittest" ]
 }

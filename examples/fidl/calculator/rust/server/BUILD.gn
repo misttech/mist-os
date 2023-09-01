@@ -8,12 +8,12 @@ import("//build/rust/rustc_binary.gni")
 group("server") {
   testonly = true
   deps = [
+    ":hermetic_tests",
     ":package",
-    ":tests",
   ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [ ":calculator-server-rust-unittests" ]
 }

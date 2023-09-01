@@ -13,11 +13,11 @@ group("drivers") {
   ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [
-    "driver_test_realm:tests",
-    "transport:tests",
-    "v2/demo-number:tests",
+    "driver_test_realm:hermetic_tests",
+    "transport:hermetic_tests",
+    "v2/demo-number:hermetic_tests",
   ]
 }

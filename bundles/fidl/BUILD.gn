@@ -9,7 +9,8 @@ group("tests_no_e2e") {
   deps = [
     ":tools",
     "//build/fidl:tests",
-    "//examples/fidl:tests",
+    "//examples/fidl:hermetic_tests",
+    "//examples/fidl:host_tests($host_toolchain)",
     "//sdk/ctf/tests/pkg/fidl/cpp:tests",
     "//sdk/lib/fidl/cpp/fuzzing:tests",
     "//sdk/lib/fidl/cpp/wire:wire_sdk",

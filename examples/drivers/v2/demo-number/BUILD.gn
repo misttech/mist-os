@@ -63,7 +63,7 @@ fuchsia_unittest_package("test-package") {
   ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [ ":test-package" ]
 }

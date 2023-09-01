@@ -14,9 +14,9 @@ group("all") {
   ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
-  deps = [ "fidl_packages" ]
+  deps = [ "fidl_packages:hermetic_tests" ]
 }
 
 # //docs/reference/fidl/bindings/go-bindings.md

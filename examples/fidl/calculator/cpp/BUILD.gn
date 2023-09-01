@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [
     "client:calculator-client-cpp-parser-unittests",

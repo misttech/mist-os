@@ -17,7 +17,7 @@ fuchsia_unittest_package("stdout-test") {
   deps = [ ":stdout_test" ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [ ":stdout-test" ]
 }

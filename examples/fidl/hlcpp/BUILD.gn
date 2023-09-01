@@ -2,70 +2,82 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/components.gni")
+if (is_fuchsia) {
+  import("//build/components.gni")
 
-group("all") {
-  testonly = true
-  deps = [
-    ":echo-hlcpp-client",
-    ":echo-hlcpp-client-sync",
-    ":echo-hlcpp-multi-client",
-    ":echo-launcher-hlcpp",
-    ":echo-service-hlcpp",
-    "server:echo-hlcpp-server",
-  ]
+  group("all") {
+    testonly = true
+    deps = [
+      ":echo-hlcpp-client",
+      ":echo-hlcpp-client-sync",
+      ":echo-hlcpp-multi-client",
+      ":echo-launcher-hlcpp",
+      ":echo-service-hlcpp",
+      "server:echo-hlcpp-server",
+    ]
+  }
+
+  group("hermetic_tests") {
+    testonly = true
+    deps = [
+      "fostr:hermetic_tests",
+      "testing:hermetic_tests",
+    ]
+  }
+
+  # //docs/development/languages/fidl/tutorials/hlcpp/basics/client.md
+  fuchsia_package("echo-hlcpp-client") {
+    deps = [
+      "client:echo-client",
+      "server:echo-server",
+      "//examples/fidl/echo-realm:echo_realm",
+    ]
+  }
+
+  # //docs/development/languages/fidl/tutorials/hlcpp/basics/sync_client.md
+  fuchsia_package("echo-hlcpp-client-sync") {
+    deps = [
+      "client_sync:echo-client",
+      "server:echo-server",
+      "//examples/fidl/echo-realm:echo_realm",
+    ]
+  }
+
+  # //docs/development/languages/fidl/tutorials/hlcpp/topics/multiple-clients.md
+  fuchsia_package("echo-hlcpp-multi-client") {
+    deps = [
+      "multiple_clients/client:echo-client",
+      "multiple_clients/server:echo-server",
+      "//examples/fidl/echo-realm:echo_realm",
+    ]
+  }
+
+  # //docs/development/languages/fidl/tutorials/hlcpp/topics/request-pipelining.md
+  fuchsia_package("echo-launcher-hlcpp") {
+    deps = [
+      "request_pipelining/client:echo-client",
+      "request_pipelining/server:echo-server",
+      "//examples/fidl/echo-realm:echo_realm",
+    ]
+  }
+
+  # //docs/development/languages/fidl/tutorials/hlcpp/topics/services.md
+  fuchsia_package("echo-service-hlcpp") {
+    deps = [
+      "services/client:echo-client",
+      "services/server:echo-server",
+      "//examples/fidl/echo-realm:echo_realm",
+    ]
+  }
 }
 
-group("tests") {
-  testonly = true
-  deps = [
-    "fostr",
-    "testing",
-    "unittests",
-  ]
-}
-
-# //docs/development/languages/fidl/tutorials/hlcpp/basics/client.md
-fuchsia_package("echo-hlcpp-client") {
-  deps = [
-    "client:echo-client",
-    "server:echo-server",
-    "//examples/fidl/echo-realm:echo_realm",
-  ]
-}
-
-# //docs/development/languages/fidl/tutorials/hlcpp/basics/sync_client.md
-fuchsia_package("echo-hlcpp-client-sync") {
-  deps = [
-    "client_sync:echo-client",
-    "server:echo-server",
-    "//examples/fidl/echo-realm:echo_realm",
-  ]
-}
-
-# //docs/development/languages/fidl/tutorials/hlcpp/topics/multiple-clients.md
-fuchsia_package("echo-hlcpp-multi-client") {
-  deps = [
-    "multiple_clients/client:echo-client",
-    "multiple_clients/server:echo-server",
-    "//examples/fidl/echo-realm:echo_realm",
-  ]
-}
-
-# //docs/development/languages/fidl/tutorials/hlcpp/topics/request-pipelining.md
-fuchsia_package("echo-launcher-hlcpp") {
-  deps = [
-    "request_pipelining/client:echo-client",
-    "request_pipelining/server:echo-server",
-    "//examples/fidl/echo-realm:echo_realm",
-  ]
-}
-
-# //docs/development/languages/fidl/tutorials/hlcpp/topics/services.md
-fuchsia_package("echo-service-hlcpp") {
-  deps = [
-    "services/client:echo-client",
-    "services/server:echo-server",
-    "//examples/fidl/echo-realm:echo_realm",
-  ]
+if (is_host) {
+  group("host_tests") {
+    testonly = true
+    deps = [
+      # This doesn't use the standard naming convention because it's
+      # used as example source on fucshia.dev.
+      "unittests",
+    ]
+  }
 }

@@ -8,13 +8,13 @@ import("//build/rust/rustc_library.gni")
 group("rust_static_linking") {
   testonly = true
   public_deps = [
+    ":hermetic_tests",
     ":lib",
     ":static",
-    ":tests",
   ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   public_deps = [ ":static_linking_tests" ]
 }

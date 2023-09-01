@@ -5,12 +5,12 @@
 group("logs") {
   testonly = true
   deps = [
-    ":tests",
+    ":hermetic_tests",
     "rust",
   ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
-  deps = [ "rust:tests" ]
+  deps = [ "rust:hermetic_tests" ]
 }

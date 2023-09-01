@@ -12,12 +12,12 @@ group("inspect") {
   ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [
-    "codelab:tests",
-    "cpp:tests",
-    "rust:tests",
-    "rust-ergonomic:tests",
+    "codelab:hermetic_tests",
+    "cpp:hermetic_tests",
+    "rust:hermetic_tests",
+    "rust-ergonomic:hermetic_tests",
   ]
 }

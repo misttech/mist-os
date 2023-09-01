@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+assert(is_fuchsia, "These targets are only compiled in the fuchsia toolchain.")
+
 import("//build/components.gni")
 import("//build/test.gni")
 
@@ -147,10 +149,10 @@ group("workshop") {
   ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [
     ":profile_store_example_unittests",
-    "example-integration:tests",
+    "example-integration:hermetic_tests",
   ]
 }

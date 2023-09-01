@@ -2,17 +2,15 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/testing/validated_test_types_group.gni")
+
 assert(is_fuchsia, "These can only be defined in the default toolchain")
 
 # For use with the 'hermetic_test_package_labels' GN build argument.
-group("hermetic_tests") {
+validated_test_types_group("hermetic_tests") {
   testonly = true
-  deps = []
-
-  # TODO(fxbug.dev/131001): Define the set of tests that should run on minimal.
-  assert(
-      deps == [],
-      "'hermetic_tests' cannot be used before adding validation of test type.")
+  allowed_test_types = [ "hermetic" ]
+  deps = [ "//examples:hermetic_tests" ]
 }
 
 # For use with the 'test_package_labels' GN build argument.

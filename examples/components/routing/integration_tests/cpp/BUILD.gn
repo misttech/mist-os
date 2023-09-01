@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+assert(is_fuchsia, "These targets are only compiled in the fuchsia toolchain.")
+
 # [START imports]
 import("//build/components.gni")
 
@@ -56,7 +58,7 @@ fuchsia_test_package("subpackaged_echo_integration_test_cpp") {
   subpackages = [ "//examples/components/routing/cpp/echo_server" ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [
     ":echo_integration_test_cpp",

@@ -45,10 +45,10 @@ fuchsia_package("calculator-example-cpp") {
   ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [
-    "cpp:tests",
-    "rust:tests",
+    "cpp:hermetic_tests",
+    "rust:hermetic_tests",
   ]
 }

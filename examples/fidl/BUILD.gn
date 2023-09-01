@@ -2,38 +2,51 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("fidl") {
-  testonly = true
-  deps = [
-    ":tests",
-    "calculator:all",
-    "cpp:all",
-    "hlcpp:all",
-    "rust:all",
-  ]
-
-  if (current_cpu != "riscv64") {
-    deps += [
-      # The Go toolchain does not support RISC-V.
-      "go:all",
+if (is_fuchsia) {
+  group("fidl") {
+    testonly = true
+    deps = [
+      ":hermetic_tests",
+      ":host_tests($host_toolchain)",
+      "calculator:all",
+      "cpp:all",
+      "hlcpp:all",
+      "rust:all",
     ]
+
+    if (current_cpu != "riscv64") {
+      deps += [
+        # The Go toolchain does not support RISC-V.
+        "go:all",
+      ]
+    }
+  }
+
+  group("hermetic_tests") {
+    testonly = true
+    deps = [
+      "calculator:hermetic_tests",
+      "cpp:hermetic_tests",
+      "echo-realm:hermetic_tests",
+      "hlcpp:hermetic_tests",
+
+      # These examples are full off "do not remove" comments, but only contain
+      # hermetic tests.
+      "new:tests",
+    ]
+
+    if (current_cpu != "riscv64") {
+      deps += [
+        # The Go toolchain does not support RISC-V.
+        "go:hermetic_tests",
+      ]
+    }
   }
 }
 
-group("tests") {
-  testonly = true
-  deps = [
-    "calculator:tests",
-    "cpp:tests",
-    "echo-realm:tests",
-    "hlcpp:tests",
-    "new:tests",
-  ]
-
-  if (current_cpu != "riscv64") {
-    deps += [
-      # The Go toolchain does not support RISC-V.
-      "go:tests",
-    ]
+if (is_host) {
+  group("host_tests") {
+    testonly = true
+    deps = [ "hlcpp:host_tests" ]
   }
 }

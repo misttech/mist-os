@@ -152,7 +152,8 @@ group("tests") {
     # test_manager_test launches these tests.
     # TODO(fxbug.dev/104764): consider reorganizing these tests so that these dependencies
     # are not necessary.
-    "//examples/components/routing/integration_tests:tests",
+    "//examples/components/routing/integration_tests/cpp:subpackaged_echo_integration_test_cpp",
+    "//examples/components/routing/integration_tests/rust:subpackaged_echo_integration_test_rust",
     "//src/sys/test_runners/gtest/test_data:gtest-runner-example-tests",
   ]
 }

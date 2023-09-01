@@ -22,7 +22,7 @@ fuchsia_unittest_package("fidl-example-go-tests") {
   deps = [ ":fidl-example-go-test" ]
 }
 
-group("fidl_packages") {
+group("hermetic_tests") {
   testonly = true
   deps = [ ":fidl-example-go-tests" ]
 }

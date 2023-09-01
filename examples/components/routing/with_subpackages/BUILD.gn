@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+assert(is_fuchsia, "These targets are only compiled in the fuchsia toolchain.")
+
 import("//build/components.gni")
 
 group("subpackaged-echo-realm") {
@@ -33,7 +35,7 @@ fuchsia_package_with_single_component("subpackaged_echo_realm_cpp") {
   ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [
     "../integration_tests/cpp:subpackaged_echo_integration_test_cpp",

@@ -2,13 +2,15 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+assert(is_fuchsia, "These targets are only compiled in the fuchsia toolchain.")
+
 # [START imports]
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
 # [END imports]
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [ ":echo-rust-unittests" ]
 }
