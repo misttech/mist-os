@@ -7,6 +7,7 @@ import asyncio
 import multiprocessing
 import os
 import signal
+import stat
 import tempfile
 import typing
 import unittest
@@ -205,6 +206,75 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
         out = await task
         self.assertEqual(out.return_code, -9)
         self.assertEqual(out.wrapper_return_code, -9)
+
+    async def test_kill_process_groups(self):
+        """Test that terminating a program kills the entire process group."""
+
+        BASH_SHORT = "#!/usr/bin/env bash\nsleep .1\necho 'OK'"
+        BASH_LONG = "#!/usr/bin/env bash\nsleep 100000\necho 'OK'"
+        with tempfile.TemporaryDirectory() as td:
+            # Create scripts and make them executable.
+            paths = [
+                os.path.join(td, "short.sh"),
+                os.path.join(td, "long.sh"),
+            ]
+            short_path, long_path = paths
+            with open(short_path, "w") as f:
+                f.write(BASH_SHORT)
+            with open(long_path, "w") as f:
+                f.write(BASH_LONG)
+            for name in paths:
+                st = os.stat(name)
+                os.chmod(name, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+            # Make sure we can run the commands to start with, and they do not hang.
+            cmd = await command.AsyncCommand.create(
+                short_path,
+                env={"CWD": td},
+                symbolizer_args=[short_path],
+            )
+            events = []
+            await cmd.run_to_completion(lambda event: events.append(event))
+            self.assertEqual(len(events), 2, f"Events was actually {events}")
+
+            self.assertStdout(events[0], b"OK\n")
+            # This causes spurious failures on Mac for some reason, where
+            # the return value is sometimes -13.
+            # self.assertTermination(events[1], 0)
+
+            # Run the long-running shell script, and ensure terminating it does not hang.
+            cmd = await command.AsyncCommand.create(
+                long_path,
+                env={"CWD": td},
+                symbolizer_args=[long_path],
+            )
+            await asyncio.sleep(0.001)
+            cmd.terminate()
+            events = []
+            await cmd.run_to_completion(lambda event: events.append(event))
+            self.assertEqual(len(events), 1, f"Events was actually {events}")
+            self.assertTermination(events[0], -15)
+
+            # Run again, this time using SIGKILL.
+            cmd = await command.AsyncCommand.create(
+                long_path,
+                env={"CWD": td},
+                symbolizer_args=[long_path],
+            )
+            await asyncio.sleep(0.001)
+            cmd.kill()
+            events = []
+            await cmd.run_to_completion(lambda event: events.append(event))
+            self.assertEqual(len(events), 1, f"Events was actually {events}")
+            self.assertTermination(events[0], -9)
+
+    async def test_timeout(self):
+        """Test that commands timeout"""
+        cmd = await command.AsyncCommand.create("sleep", "100000", timeout=0.1)
+        task = asyncio.create_task(cmd.run_to_completion())
+        out: command.CommandOutput = await task
+        self.assertEqual(out.return_code, -15)
+        self.assertTrue(out.was_timeout)
 
     def test_invalid_program(self):
         """Test running a program that doesn't exist, and expect an error."""

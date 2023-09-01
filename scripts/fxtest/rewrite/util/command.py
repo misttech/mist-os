@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from dataclasses import field
 from io import StringIO
 import os
+import signal
 import time
 import typing
 
@@ -181,6 +182,7 @@ class AsyncCommand:
                     stderr=output_pipe,
                     env=env,
                     cwd=cwd,
+                    preexec_fn=os.setpgrp,  # To support killing by pgid.
                 )
 
             base_command = None
@@ -199,6 +201,7 @@ class AsyncCommand:
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                     stdin=read_pipe,
+                    preexec_fn=os.setpgrp,  # To support killing by pgid.
                 )
                 os.close(read_pipe)
             else:
@@ -210,17 +213,29 @@ class AsyncCommand:
         except Exception as e:
             raise AsyncCommandError(f"An unknown error occurred: {e}")
 
+    def send_signal(self, sig: int):
+        """Send the given signal to the underlying process(es) and their
+        children in the same process group.
+
+        Args:
+            sig (int): The signal to send.
+        """
+        # We need to signal the entire process group we created, otherwise
+        # we run the risk of signallying only a shell script and not
+        # the processes run by that shell script (e.g. `fx`).
+        pg = os.getpgid(self._process.pid)
+        os.killpg(pg, sig)
+        if self._wrapped_process is not None:
+            pg = os.getpgid(self._wrapped_process.pid)
+            os.killpg(pg, sig)
+
     def terminate(self):
         """Terminate the underlying process(es) by sending SIGTERM."""
-        self._process.terminate()
-        if self._wrapped_process is not None:
-            self._wrapped_process.terminate()
+        self.send_signal(signal.SIGTERM)
 
     def kill(self):
         """Immediately kill the underlying process(es) by sending SIGKILL."""
-        self._process.kill()
-        if self._wrapped_process is not None:
-            self._wrapped_process.kill()
+        self.send_signal(signal.SIGKILL)
 
     async def run_to_completion(
         self,
