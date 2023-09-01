@@ -98,6 +98,14 @@ impl<L> InterruptibleBaseLock<L> {
     where
         F: Fn(&'a L) -> Option<G>,
     {
+        // Try once to lock without creating a waiter.
+        if let Some(guard) = acquire_guard(&self.lock) {
+            return Ok(InterruptibleGuard {
+                guard,
+                _notifier: LockNotifier { lock: self, notify_all },
+            });
+        }
+        // The lock is contended, creating a waiter.
         let waiter = Waiter::new();
         loop {
             self.waiters.wait_async(&waiter);
