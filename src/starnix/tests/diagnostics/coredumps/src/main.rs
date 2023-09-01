@@ -22,13 +22,14 @@ async fn main() {
         // about the observed diagnostics.
         eprintln!("retrieving coredump reports...");
         let observed_coredumps = loop {
-            let observed_coredumps = get_coredumps_from_inspect().await;
-            if let Some(most_recent) = observed_coredumps.last() {
-                if most_recent.idx == current_idx {
-                    break observed_coredumps;
+            if let Some(observed_coredumps) = get_coredumps_from_inspect().await {
+                if let Some(most_recent) = observed_coredumps.last() {
+                    if most_recent.idx == current_idx {
+                        break observed_coredumps;
+                    }
                 }
+                eprintln!("waiting for coredump ({current_idx}/{max_idx}) to show up...");
             }
-            eprintln!("waiting for coredump ({current_idx}/{max_idx}) to show up...");
             std::thread::sleep(std::time::Duration::from_secs(1));
         };
         eprintln!("observed coredump {current_idx} in inspect, validating...");
@@ -71,25 +72,27 @@ struct CoredumpReport {
     argv: String,
 }
 
-async fn get_coredumps_from_inspect() -> Vec<CoredumpReport> {
+// Snapshotting inspect can be a bit racy -- over enough runs we'll end up reading the node
+// hierarchy at points where the node exists but none of its children, where nodes exist but not
+// one of their properties, etc. Return an Option here for cases where we couldn't actually read the
+// coredump report so the caller can try again..
+async fn get_coredumps_from_inspect() -> Option<Vec<CoredumpReport>> {
     let kernel_inspect = ArchiveReader::new()
         .select_all_for_moniker("kernel")
         .with_minimum_schema_count(1)
         .retry_if_empty(true)
         .snapshot::<Inspect>()
         .await
-        .unwrap();
+        .ok()?;
     assert_eq!(kernel_inspect.len(), 1);
 
     // Examine all of the properties and children so that we are alerted that this test may need to
     // be updated if coredump reports gain new information.
     let DiagnosticsHierarchy { name, properties, children, .. } = kernel_inspect[0]
         .payload
-        .as_ref()
-        .unwrap()
+        .as_ref()?
         .get_child_by_path(&["container", "kernel", "coredumps"])
-        .cloned()
-        .unwrap();
+        .cloned()?;
     assert_eq!(name, "coredumps");
     assert_eq!(properties, vec![]);
 
@@ -107,21 +110,33 @@ async fn get_coredumps_from_inspect() -> Vec<CoredumpReport> {
         let mut pid = None;
         for property in coredump_properties {
             match property.name() {
-                "argv" => argv = Some(property.string().unwrap().to_string()),
+                "argv" => {
+                    argv = Some(
+                        property
+                            .string()
+                            .expect("starnix should put a string in the argv property")
+                            .to_string(),
+                    )
+                }
 
                 // TODO(https://fxbug.dev/130834) i64/int in kernel shows up as u64/uint here
-                "pid" => pid = Some(*property.uint().unwrap() as i64),
+                "pid" => {
+                    pid = Some(
+                        *property.uint().expect("starnix should put a uint in the pid property")
+                            as i64,
+                    )
+                }
                 other => panic!("unrecognized coredump report property `{other}`"),
             }
         }
 
         reports.push(CoredumpReport {
-            idx: idx_str.parse().unwrap(),
+            idx: idx_str.parse().expect("starnix coredump node names should be integers"),
             pid: pid.expect("retrieving pid property"),
             argv: argv.expect("retrieving argv property"),
         });
     }
     reports.sort();
 
-    reports
+    Some(reports)
 }
