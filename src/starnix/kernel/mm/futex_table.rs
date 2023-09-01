@@ -175,10 +175,16 @@ pub struct PrivateFutexKey {
 
 impl FutexKey for PrivateFutexKey {
     fn get_key(_task: &Task, addr: UserAddress) -> Result<Self, Errno> {
+        if !addr.is_aligned(4) {
+            return error!(EINVAL);
+        }
         Ok(PrivateFutexKey { addr })
     }
 
     fn get_operand_and_key(task: &Task, addr: UserAddress) -> Result<(FutexOperand, Self), Errno> {
+        if !addr.is_aligned(4) {
+            return error!(EINVAL);
+        }
         let (vmo, offset) = task.mm.get_mapping_vmo(addr, ProtectionFlags::READ)?;
         let key = PrivateFutexKey { addr };
         Ok((FutexOperand { vmo, offset }, key))
@@ -199,6 +205,9 @@ impl FutexKey for SharedFutexKey {
     }
 
     fn get_operand_and_key(task: &Task, addr: UserAddress) -> Result<(FutexOperand, Self), Errno> {
+        if !addr.is_aligned(4) {
+            return error!(EINVAL);
+        }
         let (vmo, offset) = task.mm.get_mapping_vmo(addr, ProtectionFlags::READ)?;
         let key = SharedFutexKey::new(&vmo, offset)?;
         Ok((FutexOperand { vmo, offset }, key))

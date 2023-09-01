@@ -113,4 +113,30 @@ TEST(RobustFutexTest, FutexStateAfterExecCheck) {
   });
 }
 
+TEST(FutexTest, FutexAddressHasToBeAligned) {
+  uint32_t some_addresses[] = {0, 0};
+  uintptr_t addr = reinterpret_cast<uintptr_t>(&some_addresses[0]);
+
+  auto futex_basic = [](uintptr_t addr, uint32_t op, uint32_t val) {
+    return syscall(SYS_futex, addr, op, val, NULL, NULL, 0);
+  };
+
+  auto futex_requeue = [](uintptr_t addr, uint32_t val, uint32_t val2, uintptr_t addr2) {
+    return syscall(SYS_futex, addr, FUTEX_REQUEUE, val, val2, addr2, 0);
+  };
+
+  for (size_t i = 1; i <= 3; i++) {
+    EXPECT_EQ(-1, futex_basic(addr + i, FUTEX_WAIT, 0));
+    EXPECT_EQ(errno, EINVAL);
+    EXPECT_EQ(-1, futex_basic(addr + i, FUTEX_WAIT_PRIVATE, 0));
+    EXPECT_EQ(errno, EINVAL);
+    EXPECT_EQ(-1, futex_basic(addr + i, FUTEX_WAKE, 0));
+    EXPECT_EQ(errno, EINVAL);
+    EXPECT_EQ(-1, futex_basic(addr + i, FUTEX_WAKE_PRIVATE, 0));
+    EXPECT_EQ(errno, EINVAL);
+    EXPECT_EQ(-1, futex_requeue(addr, 0, 0, addr + 4 + i));
+    EXPECT_EQ(errno, EINVAL);
+  }
+}
+
 }  // anonymous namespace
