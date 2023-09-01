@@ -209,7 +209,7 @@ extern "C" uintptr_t StartLd(StartupStack& stack) {
   // Bail out before relocation if there were any loading errors.
   CheckErrors(diag);
 
-  main_executable->RelocateRelative(diag);
+  StartupModule::LinkModules(diag, main_executable);
 
   if constexpr (kProtectData) {
     // Now that startup is completed, protect not only the RELRO, but also all
@@ -219,8 +219,6 @@ extern "C" uintptr_t StartLd(StartupStack& stack) {
 
   // Bail out before handoff if any errors have been detected.
   CheckErrors(diag);
-
-  // TODO(mcgrathr): Populate _ld_abi.
 
   return entry;
 }

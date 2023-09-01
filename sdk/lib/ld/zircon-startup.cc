@@ -177,7 +177,7 @@ extern "C" StartLdResult StartLd(zx_handle_t handle, void* vdso) {
   // Bail out before relocation if there were any loading errors.
   CheckErrors(diag);
 
-  main.module->RelocateRelative(diag);
+  StartupModule::LinkModules(diag, main.module);
 
   if constexpr (kProtectData) {
     // Now that startup is completed, protect not only the RELRO, but also all

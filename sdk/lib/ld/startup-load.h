@@ -14,6 +14,8 @@
 #include <lib/ld/load-module.h>
 #include <lib/ld/load.h>
 
+#include <algorithm>
+
 #include <fbl/intrusive_double_list.h>
 
 #include "allocator.h"
@@ -34,6 +36,7 @@ static_assert(kMaxPhdrs > kMaxSegments);
 using Elf = elfldltl::Elf<>;
 using Ehdr = typename Elf::Ehdr;
 using Phdr = typename Elf::Phdr;
+using Sym = typename Elf::Sym;
 
 using RelroBounds = decltype(elfldltl::RelroBounds(Phdr{}, 0));
 
@@ -63,6 +66,8 @@ template <class Loader>
 struct StartupLoadModule : public StartupLoadModuleBase,
                            fbl::DoublyLinkedListable<StartupLoadModule<Loader>*> {
  public:
+  using List = fbl::DoublyLinkedList<StartupLoadModule*>;
+
   StartupLoadModule() = delete;
 
   StartupLoadModule(StartupLoadModule&&) = default;
@@ -166,8 +171,11 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     std::ignore = loader_.ProtectRelro(diag, relro_);
   }
 
-  void RelocateRelative(Diagnostics& diag) {
+  void Relocate(Diagnostics& diag, const List& modules) {
+    ModuleDiagnostics module_diag{diag, this->name().str()};
     elfldltl::RelocateRelative(diag, memory(), reloc_info(), load_bias());
+    auto resolver = elfldltl::MakeSymbolResolver(symbol_info(), modules, diag);
+    elfldltl::RelocateSymbolic(memory(), diag, reloc_info(), symbol_info(), load_bias(), resolver);
   }
 
   // Returns number of DT_NEEDED entries. See StartupLoadResult, for why that is useful.
@@ -178,9 +186,45 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     return needed.count();
   }
 
+  // This must be the last method called before the StartupLoadModule is destroyed.
+  void Commit() && { std::move(loader_).Commit(); }
+
+  List MakeList() {
+    List list;
+    list.push_back(this);
+    return list;
+  }
+
   Loader& loader() { return loader_; }
 
   decltype(auto) memory() { return loader_.memory(); }
+
+  static void LinkModules(Diagnostics& diag, StartupLoadModule* main_executable) {
+    List modules = main_executable->MakeList();
+
+    RelocateModules(diag, modules);
+    CheckErrors(diag);
+
+    // TODO(mcgrathr): Populate _ld_abi.
+
+    CommitModules(diag, std::move(modules));
+  }
+
+  static void RelocateModules(Diagnostics& diag, List& modules) {
+    for (auto& module : modules) {
+      module.Relocate(diag, modules);
+
+      // TODO: Apply relro
+    }
+  }
+
+  static void CommitModules(Diagnostics& diag, List modules) {
+    while (!modules.is_empty()) {
+      auto* module = modules.pop_front();
+      std::move(*module).Commit();
+      delete module;
+    }
+  }
 
  private:
   Loader loader_;  // Must be initialized by constructor.

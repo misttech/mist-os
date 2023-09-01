@@ -13,6 +13,8 @@ executables = [
   ":ret17.in-process",
   ":relative-reloc",
   ":relative-reloc.in-process",
+  ":symbolic-reloc",
+  ":symbolic-reloc.in-process",
 ]
 libs = []
 modules = []
@@ -62,6 +64,17 @@ if (is_fuchsia) {
   }
 }
 
+config("semantic-interposition") {
+  visibility = [ ":*" ]
+
+  # TODO(fxbug.dev/117866): clang will still perform interprocedural
+  # optimization in a PIC, this flag disallows that and requires the PLT call
+  # always be made so we can properly test applying plt relocations.
+  if (!is_gcc) {
+    cflags = [ "-fsemantic-interposition" ]
+  }
+}
+
 template("test_executable") {
   suffices = [ "" ]
   if (defined(invoker.can_be_in_process) && invoker.can_be_in_process) {
@@ -72,8 +85,16 @@ template("test_executable") {
       testonly = true
 
       deps = []
-      forward_variables_from(invoker, "*", [ "testonly" ])
+      forward_variables_from(invoker,
+                             "*",
+                             [
+                               "configs",
+                               "testonly",
+                             ])
       deps += [ ":test-executable$suffix" ]
+      if (defined(invoker.configs)) {
+        configs += invoker.configs
+      }
 
       # This is needed in the non-Zircon (host/Linux) toolchains to avoid
       # having any implicit deps injected.
@@ -107,7 +128,10 @@ foreach(in_process,
     }
 
     public_deps = [ "//sdk/lib/ld:standalone" ]
-    public_configs = [ "//sdk/lib/ld:abi-interp" ]
+    public_configs = [
+      "//sdk/lib/ld:abi-interp",
+      ":semantic-interposition",
+    ]
     if (is_fuchsia) {
       if (in_process == "") {
         sources = [ "zircon-test-start.cc" ]
@@ -143,4 +167,27 @@ test_executable("ret17") {
 test_executable("relative-reloc") {
   can_be_in_process = true
   sources = [ "relative-reloc.cc" ]
+}
+
+config("temporarily-build-as-shared") {
+  visibility = [ ":*" ]
+
+  cflags = [
+    "-fPIC",
+    "-Wno-unused-command-line-argument",
+    "-Wno-option-ignored",
+  ]
+  ldflags = cflags
+  ldflags += [ "-shared" ]
+}
+
+test_executable("symbolic-reloc") {
+  can_be_in_process = true
+  sources = [
+    "interp.S",
+    "symbolic-reloc.cc",
+  ]
+  defines = [ "DYNAMIC_LINKER_PATH=\"${toolchain_variant.libprefix}ld.so.1\"" ]
+  deps = [ "//zircon/system/public" ]
+  configs = [ ":temporarily-build-as-shared" ]
 }

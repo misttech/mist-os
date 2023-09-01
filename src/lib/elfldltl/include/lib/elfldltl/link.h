@@ -89,11 +89,9 @@ enum class RelocateTls {
 //
 template <ElfMachine Machine = ElfMachine::kNative, class Memory, class DiagnosticsType,
           class RelocInfo, class SymbolInfo, typename Resolve>
-[[nodiscard]] constexpr bool RelocateSymbolic(Memory& memory, DiagnosticsType& diagnostics,
-                                              const RelocInfo& reloc_info,
-                                              const SymbolInfo& symbol_info,
-                                              typename RelocInfo::size_type bias,
-                                              Resolve&& resolve) {
+constexpr bool RelocateSymbolic(Memory& memory, DiagnosticsType& diagnostics,
+                                const RelocInfo& reloc_info, const SymbolInfo& symbol_info,
+                                typename RelocInfo::size_type bias, Resolve&& resolve) {
   using namespace std::literals;
 
   using Addr = typename RelocInfo::Addr;

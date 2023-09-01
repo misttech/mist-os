@@ -6,6 +6,8 @@
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_RESOLVE_H_
 
 #include <memory>
+#include <type_traits>
+#include <utility>
 
 #include "diagnostics.h"
 #include "link.h"
@@ -69,7 +71,7 @@ struct ResolverDefinition {
 template <class SymbolInfo, class ModuleList, class Diagnostics>
 constexpr auto MakeSymbolResolver(const SymbolInfo& ref_info, const ModuleList& modules,
                                   Diagnostics& diag) {
-  using Module = typename ModuleList::value_type;
+  using Module = std::decay_t<decltype(*std::declval<ModuleList>().begin())>;
   using Definition = ResolverDefinition<Module>;
 
   return [&](const auto& ref, elfldltl::RelocateTls tls_type) -> std::optional<Definition> {

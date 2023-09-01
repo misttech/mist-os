@@ -56,4 +56,16 @@ TYPED_TEST(LdLoadTests, Relative) {
   this->ExpectLog("");
 }
 
+TYPED_TEST(LdLoadTests, Symbolic) {
+  constexpr int64_t kReturnValue = 17;
+
+  ASSERT_NO_FATAL_FAILURE(this->Init());
+
+  ASSERT_NO_FATAL_FAILURE(this->Load("symbolic-reloc"));
+
+  EXPECT_EQ(this->Run(), kReturnValue);
+
+  this->ExpectLog("");
+}
+
 }  // namespace

@@ -56,6 +56,7 @@ class LoadModule {
   using RelocationInfo = elfldltl::RelocationInfo<Elf>;
   using Soname = elfldltl::Soname<Elf>;
   using Ref = LoadModuleRef<LoadModule>;
+  using Sym = typename Elf::Sym;
 
   constexpr LoadModule() = default;
 
@@ -143,6 +144,22 @@ class LoadModule {
   constexpr size_type load_bias() const { return module().link_map.addr; }
 
   // TODO(fxbug.dev/128502): tls methods
+  constexpr size_t static_tls_bias() const {
+    ZX_PANIC("Should never be called");
+    return 0;
+  }
+  constexpr size_t tls_module_id() const {
+    ZX_PANIC("Should never be called");
+    return 0;
+  }
+  constexpr size_t tls_desc_hook(const Sym& sym) const {
+    ZX_PANIC("Should never be called");
+    return 0;
+  }
+  constexpr size_t tls_desc_value(const Sym& sym) const {
+    ZX_PANIC("Should never be called");
+    return 0;
+  }
 
  private:
   using ModuleStorage =
