@@ -199,6 +199,7 @@ fuchsia_component("font_provider_hermetic_for_test") {
   cm_label = ":font_provider_hermetic_for_test_manifest"
   deps = [
     ":font_provider",
+    ":font_provider_hermetic_for_test_config_values",
     "//src/fonts/collections:downstream-test-fonts-collection",
   ]
 

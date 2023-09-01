@@ -102,7 +102,7 @@ class WebSemanticsTest : public SemanticsIntegrationTestV2 {
   static constexpr auto kWebViewUrl = "#meta/semantics-test-web-client.cm";
 
   static constexpr auto kFontsProvider = "fonts_provider";
-  static constexpr auto kFontsProviderUrl = "#meta/fonts.cm";
+  static constexpr auto kFontsProviderUrl = "#meta/font_provider_hermetic_for_test.cm";
 
   static constexpr auto kTextManager = "text_manager";
   static constexpr auto kTextManagerUrl = "#meta/text_manager.cm";
