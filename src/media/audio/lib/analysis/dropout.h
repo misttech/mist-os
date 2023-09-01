@@ -5,23 +5,65 @@
 #ifndef SRC_MEDIA_AUDIO_LIB_ANALYSIS_DROPOUT_H_
 #define SRC_MEDIA_AUDIO_LIB_ANALYSIS_DROPOUT_H_
 
+#include <fuchsia/media/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/types.h>
 
 #include <cmath>
 #include <iomanip>
-#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
 
 #include "src/lib/fxl/strings/string_printf.h"
-#include "src/media/audio/lib/format/audio_buffer.h"
-#include "src/media/audio/lib/timeline/timeline_rate.h"
 
 namespace media::audio {
 
-// Below are two utility classes that can be used to detect dropouts.
+// Below are three utility classes that can be used to detect dropouts.
+
+// SilentPacketChecker checks each audio packet, returning _false_ if the packet contains at least
+// one non-silent sample. For performance reasons, it stops when the first non-zero sample is found.
+// This class works with all supported sample formats.
+class SilentPacketChecker {
+ public:
+  static bool IsSilenceFloat32(const void* samples, int64_t sample_count) {
+    auto floats = static_cast<const float*>(samples);
+    for (int64_t idx = 0; idx < sample_count; ++idx) {
+      if (floats[idx] > std::numeric_limits<float>::epsilon() ||
+          floats[idx] < -std::numeric_limits<float>::epsilon()) {
+        return false;
+      }
+    }
+    return true;
+  }
+  static bool IsSilenceInt16(const void* samples, int64_t sample_count) {
+    auto ints = static_cast<const int16_t*>(samples);
+    for (int64_t idx = 0; idx < sample_count; ++idx) {
+      if (ints[idx]) {
+        return false;
+      }
+    }
+    return true;
+  }
+  static bool IsSilenceInt24In32(const void* samples, int64_t sample_count) {
+    auto ints = static_cast<const int32_t*>(samples);
+    for (int64_t idx = 0; idx < sample_count; ++idx) {
+      if (ints[idx] & 0xFFFFFF00) {
+        return false;
+      }
+    }
+    return true;
+  }
+  static bool IsSilenceUint8(const void* samples, int64_t sample_count) {
+    auto ints = static_cast<const uint8_t*>(samples);
+    for (int64_t idx = 0; idx < sample_count; ++idx) {
+      if (ints[idx] != 0x80) {
+        return false;
+      }
+    }
+    return true;
+  }
+};
 
 // PowerChecker verifies that a stream contains a signal of expected power.
 // It calculates an audio section's power, returning false if this does not meet the expected val.

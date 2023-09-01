@@ -396,6 +396,29 @@ void BaseRenderer::SetPtsContinuityThreshold(float threshold_seconds) {
   cleanup.cancel();
 }
 
+// This method returns true if the entire packet contents are digital silence. The checker enforces
+// this only to the extent supported by the sample format. For samples in the SIGNED_24_IN_32
+// format, it ignores the contents of the padding byte. For FLOAT samples, it considers the range
+// [-numeric_limits<float>::epsilon(), numeric_limits<float>::epsilon()] as equivalent to 0.0f.
+//
+// Only ever called if tracing is started and the specific tracing category "audio" is enabled.
+bool BaseRenderer::CheckForSilentPacket(const void* packet_buffer, int64_t frame_count) {
+  switch (format()->stream_type().sample_format) {
+    case fuchsia::media::AudioSampleFormat::FLOAT:
+      return SilentPacketChecker::IsSilenceFloat32(packet_buffer,
+                                                   frame_count * format()->stream_type().channels);
+    case fuchsia::media::AudioSampleFormat::SIGNED_24_IN_32:
+      return SilentPacketChecker::IsSilenceInt24In32(
+          packet_buffer, frame_count * format()->stream_type().channels);
+    case fuchsia::media::AudioSampleFormat::SIGNED_16:
+      return SilentPacketChecker::IsSilenceInt16(packet_buffer,
+                                                 frame_count * format()->stream_type().channels);
+    case fuchsia::media::AudioSampleFormat::UNSIGNED_8:
+      return SilentPacketChecker::IsSilenceUint8(packet_buffer,
+                                                 frame_count * format()->stream_type().channels);
+  }
+}
+
 void BaseRenderer::SendPacket(fuchsia::media::StreamPacket packet, SendPacketCallback callback) {
   SendPacketInternal(packet, std::move(callback));
 }
@@ -607,8 +630,17 @@ void BaseRenderer::SendPacketInternal(fuchsia::media::StreamPacket packet,
                  << Fixed(start_pts + Fixed::FromRaw(pts_to_frac_frames_.Apply(frame_count)))
                  << ", offset " << Fixed::FromRaw(pts_to_frac_frames_.Apply(frame_offset));
 
-  // Regardless of timing, capture this data to file.
   auto packet_buff = reinterpret_cast<uint8_t*>(payload_buffer->start()) + packet.payload_offset;
+  if (TRACE_CATEGORY_ENABLED("audio")) {
+    if (CheckForSilentPacket(reinterpret_cast<const void*>(packet_buff), frame_count)) {
+      TRACE_INSTANT("audio", "Renderer-SilentPacket", TRACE_SCOPE_THREAD, "packet_start_frac",
+                    start_pts.raw_value(), "frame_count", frame_count, "channel_count",
+                    format()->channels(), "bytes_per_sample", format()->bytes_per_sample(),
+                    "sample_format_ordinal", fidl::ToUnderlying(format()->sample_format()));
+    }
+  }
+
+  // Regardless of timing, capture this data to file.
   wav_writer_.Write(packet_buff, packet.payload_size);
   wav_writer_.UpdateHeader();
 

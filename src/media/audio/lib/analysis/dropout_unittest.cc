@@ -14,6 +14,60 @@ using ASF = fuchsia::media::AudioSampleFormat;
 
 namespace media::audio {
 
+// SilentPacketChecker tests
+// All samples in a buffer must be silent, for SilentPacketChecker to qualify a buffer as silent.
+// These methods return [false] if the buffer contains even one non-silent sample.
+//
+TEST(SilentPacketChecker, Uint8) {
+  uint8_t source_data[4] = {0, 0x80, 0x80, 0x80};
+
+  EXPECT_FALSE(SilentPacketChecker::IsSilenceUint8(source_data, 4));
+  EXPECT_TRUE(SilentPacketChecker::IsSilenceUint8(source_data + 1, 3));
+}
+
+TEST(SilentPacketChecker, Int16) {
+  int16_t source_data[6] = {0, 0, 0, 0, 0, 0x0001};
+
+  EXPECT_TRUE(SilentPacketChecker::IsSilenceInt16(source_data, 5));
+  EXPECT_FALSE(SilentPacketChecker::IsSilenceInt16(source_data + 3, 3));
+}
+
+// We ignore the fourth, least-significant byte in padded-24 frames.
+TEST(SilentPacketChecker, Int24Padded) {
+  int32_t source_data[6] = {
+      0, 0, 0x000000FF, 0, 0, static_cast<int32_t>(0xFFFFFFFF),
+  };
+
+  EXPECT_TRUE(SilentPacketChecker::IsSilenceInt24In32(source_data, 5));
+  EXPECT_FALSE(SilentPacketChecker::IsSilenceInt24In32(source_data, 6));
+}
+
+TEST(SilentPacketChecker, Float32) {
+  float source_data[8] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+
+  EXPECT_TRUE(SilentPacketChecker::IsSilenceFloat32(source_data, 6));
+  EXPECT_TRUE(SilentPacketChecker::IsSilenceFloat32(source_data + 1, 6));
+  EXPECT_FALSE(SilentPacketChecker::IsSilenceFloat32(source_data + 2, 6));
+}
+
+// The numeric range [-numeric_limits<float>::epsilon(),numeric_limits<float>::epsilon()] is
+// considered equivalent to +/-0.0f (absolute silence).
+TEST(SilentPacketChecker, Epsilon) {
+  float bad_vals[] = {
+      2.0f * std::numeric_limits<float>::epsilon(),
+      std::numeric_limits<float>::epsilon(),
+      -std::numeric_limits<float>::epsilon(),
+      -2.0f * std::numeric_limits<float>::epsilon(),
+  };
+
+  EXPECT_FALSE(SilentPacketChecker::IsSilenceFloat32(bad_vals, 4));
+  EXPECT_TRUE(SilentPacketChecker::IsSilenceFloat32(bad_vals + 1, 2));
+  EXPECT_TRUE(SilentPacketChecker::IsSilenceFloat32(bad_vals + 2, 1));
+  EXPECT_FALSE(SilentPacketChecker::IsSilenceFloat32(bad_vals + 3, 1));
+}
+
+// DropoutPowerChecker tests
+//
 TEST(DropoutPowerChecker, Constant) {
   constexpr int32_t kSamplesPerSecond = 48000;
   constexpr float kConstValue = 0.12345f;

@@ -24,6 +24,7 @@
 #include "src/media/audio/audio_core/v1/packet_queue.h"
 #include "src/media/audio/audio_core/v1/route_graph.h"
 #include "src/media/audio/audio_core/v1/utils.h"
+#include "src/media/audio/lib/analysis/dropout.h"
 #include "src/media/audio/lib/format/format.h"
 #include "src/media/audio/lib/timeline/timeline_function.h"
 #include "src/media/audio/lib/wav/wav_writer.h"
@@ -129,6 +130,8 @@ class BaseRenderer : public AudioObject,
 
   bool ValidateConfig();
   void ComputePtsToFracFrames(int64_t first_pts);
+  // Only called when tracing is started and enabled for the "audio" category.
+  bool CheckForSilentPacket(const void* packet_buffer, int64_t frame_count);
 
   Context& context_;
   fidl::Binding<fuchsia::media::AudioRenderer> audio_renderer_binding_;

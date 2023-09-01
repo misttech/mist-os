@@ -19,8 +19,9 @@ namespace {
 constexpr uint32_t kFrameRate = 48000;
 
 // This example feeds the system 1 second of audio, in 10-millisecond payloads.
-constexpr uint32_t kNumPayloads = 100;
-constexpr uint32_t kFramesPerPayload = kFrameRate / kNumPayloads;
+constexpr uint32_t kNumPayloadsPerBuffer = 100;
+constexpr uint32_t kNumPacketsToSend = kNumPayloadsPerBuffer;
+constexpr uint32_t kFramesPerPayload = kFrameRate / kNumPayloadsPerBuffer;
 
 // Play a 439 Hz sine wave at 1/8 of full-scale volume.
 constexpr double kFrequency = 439.0;
@@ -45,7 +46,7 @@ void MediaApp::Run(sys::ComponentContext* app_context) {
   }
 
   WriteAudioIntoBuffer();
-  for (uint32_t payload_num = 0; payload_num < kNumPayloads; ++payload_num) {
+  for (uint32_t payload_num = 0; payload_num < kNumPayloadsPerBuffer; ++payload_num) {
     SendPacket(CreatePacket(payload_num));
   }
 
@@ -93,7 +94,7 @@ zx_status_t MediaApp::CreateMemoryMapping() {
   zx::vmo payload_vmo;
 
   payload_size_ = kFramesPerPayload * sizeof(float);
-  total_mapping_size_ = payload_size_ * kNumPayloads;
+  total_mapping_size_ = payload_size_ * kNumPayloadsPerBuffer;
 
   zx_status_t status =
       payload_buffer_.CreateAndMap(total_mapping_size_, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, nullptr,
@@ -113,7 +114,7 @@ zx_status_t MediaApp::CreateMemoryMapping() {
 void MediaApp::WriteAudioIntoBuffer() {
   auto float_buffer = reinterpret_cast<float*>(payload_buffer_.start());
 
-  for (uint32_t frame = 0; frame < kFramesPerPayload * kNumPayloads; ++frame) {
+  for (uint32_t frame = 0; frame < kFramesPerPayload * kNumPayloadsPerBuffer; ++frame) {
     float_buffer[frame] = static_cast<float>(
         kAmplitude * sin(2.0 * M_PI * (kFrequency / static_cast<double>(kFrameRate)) *
                          static_cast<double>(frame)));
@@ -146,11 +147,11 @@ void MediaApp::SendPacket(fuchsia::media::StreamPacket packet) {
 
 void MediaApp::OnSendPacketComplete() {
   ++num_packets_completed_;
-  FX_CHECK(num_packets_completed_ <= kNumPayloads);
+  FX_CHECK(num_packets_completed_ <= kNumPacketsToSend);
 
-  if (num_packets_sent_ < kNumPayloads) {
+  if (num_packets_sent_ < kNumPacketsToSend) {
     SendPacket(CreatePacket(num_packets_sent_));
-  } else if (num_packets_completed_ >= kNumPayloads) {
+  } else if (num_packets_completed_ >= kNumPacketsToSend) {
     Shutdown();
   }
 }
