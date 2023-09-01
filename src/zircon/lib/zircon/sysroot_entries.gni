@@ -16,7 +16,8 @@ _rebased_include_dir =
 _rebased_gen_include_dir = rebase_path(_gen_include_dir, root_build_dir)
 
 _vdso_link_label = "//src/zircon/lib/zircon:zircon.stub($default_toolchain)"
-_vdso_link = get_label_info(_vdso_link_label, "root_out_dir") + "/libzircon.so"
+_vdso_link =
+    get_label_info(_vdso_link_label, "target_out_dir") + "/libzircon.so"
 
 sysroot_vdso_entries = [
   {

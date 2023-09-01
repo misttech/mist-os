@@ -223,7 +223,7 @@ template("_create_sysroot") {
   _libc_file = rebase_path(sysroot_libc_stub, root_build_dir)
 
   _vdso_target = "//src/zircon/lib/zircon:zircon.stub($default_toolchain)"
-  _vdso_path = get_label_info(_vdso_target, "root_out_dir") + "/libzircon.so"
+  _vdso_path = get_label_info(_vdso_target, "target_out_dir") + "/libzircon.so"
 
   _crt1_file = rebase_path(sysroot_crt1_obj, root_build_dir)
 

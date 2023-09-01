@@ -66,7 +66,7 @@ template("ifs_shared_library") {
 
   gen_dir = "$gen_dir_base$clang_cpu"
   gen_stub_file = "$gen_dir/lib$output_name.so"
-  public_stub_file = "$root_out_dir/lib$output_name.so"
+  public_stub_file = "$target_out_dir/lib$output_name.so"
 
   source_set(main_target) {
     public_configs = []
