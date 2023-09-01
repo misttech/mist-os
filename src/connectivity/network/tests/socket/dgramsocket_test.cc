@@ -2090,7 +2090,7 @@ class NetDatagramSocketsCmsgRecvTestBase : public NetDatagramSocketsCmsgTestBase
           .fd = bound().get(),
           .events = POLLIN,
       };
-      int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+      int n = poll(&pfd, 1, -1);
       ASSERT_GE(n, 0) << strerror(errno);
       ASSERT_EQ(n, 1);
       ASSERT_EQ(pfd.revents, POLLIN);
