@@ -211,20 +211,19 @@ static bool vmpl_replace_preserves_split_bits() {
   test_page.object.cow_left_split = 1;
 
   EXPECT_EQ(entry.SwapPageForReference(test_ref), &test_page);
+  EXPECT_EQ(0, test_page.object.cow_left_split);
+  EXPECT_EQ(0, test_page.object.cow_right_split);
 
-  EXPECT_TRUE(entry->PageOrRefLeftSplit());
-  EXPECT_FALSE(entry->PageOrRefRightSplit());
-  test_page.object.cow_left_split = 0;
   EXPECT_TRUE(entry->PageOrRefLeftSplit());
   EXPECT_FALSE(entry->PageOrRefRightSplit());
 
   entry.SetPageOrRefRightSplit(true);
-  test_page.object.cow_left_split = 1;
-  test_page.object.cow_right_split = 1;
 
   EXPECT_EQ(entry.SwapReferenceForPage(&test_page).value(), test_ref.value());
   EXPECT_TRUE(entry->PageOrRefLeftSplit());
   EXPECT_TRUE(entry->PageOrRefRightSplit());
+  EXPECT_EQ(1, test_page.object.cow_left_split);
+  EXPECT_EQ(1, test_page.object.cow_right_split);
 
   EXPECT_EQ(pl.RemoveContent(0).ReleasePage(), &test_page);
 

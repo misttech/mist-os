@@ -284,8 +284,6 @@ zx_status_t VmCowPages::MakePageFromReference(VmPageOrMarkerRef page_or_mark,
     return status;
   }
   InitializeVmPage(p);
-  p->object.cow_left_split = page_or_mark->PageOrRefLeftSplit();
-  p->object.cow_right_split = page_or_mark->PageOrRefRightSplit();
   const auto ref = page_or_mark.SwapReferenceForPage(p);
   compression->Decompress(ref, paddr_to_physmap(p->paddr()));
   return ZX_OK;
