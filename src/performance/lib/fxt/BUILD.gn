@@ -81,6 +81,9 @@ if (!is_kernel) {
 
   group("tests") {
     testonly = true
-    public_deps = [ ":fxt_tests" ]
+    public_deps = [
+      ":fxt_tests",
+      "rust:tests",
+    ]
   }
 }
