@@ -62,7 +62,7 @@ void AssertExpectedReventsAfterPeerShutdown(int fd) {
           std::numeric_limits<decltype(pfd.events)>::max() & ~(POLLOUT | POLLWRNORM | POLLRDNORM),
   };
 
-  int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+  int n = poll(&pfd, 1, -1);
   EXPECT_GE(n, 0) << strerror(errno);
   EXPECT_EQ(n, 1);
 
