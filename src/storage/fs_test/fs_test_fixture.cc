@@ -5,6 +5,8 @@
 #include "src/storage/fs_test/fs_test_fixture.h"
 
 #include <zircon/errors.h>
+#include <zircon/syscalls/clock.h>
+#include <zircon/utc.h>
 
 #include <gtest/gtest-spi.h>
 
@@ -48,6 +50,32 @@ void BaseFilesystemTest::RunSimulatedPowerCutTest(const PowerCutOptions& options
     }
     ASSERT_EQ(fs().Mount().status_value(), ZX_OK);
   }
+}
+
+BaseFilesystemTest::ClockSwapper::ClockSwapper() {
+  // First, get the current UTC reference clock details so we can obtain the backstop time.
+  zx_clock_details_v1_t utc_details;
+  ZX_ASSERT(zx_clock_get_details(zx_utc_reference_get(), ZX_CLOCK_ARGS_VERSION(1), &utc_details) ==
+            ZX_OK);
+  ZX_ASSERT(utc_details.backstop_time > 0);
+  // Create a fake monotonic clock to replace the UTC reference with.
+  zx_handle_t fake_clock;
+  ZX_ASSERT(zx_clock_create(ZX_CLOCK_OPT_MONOTONIC | ZX_CLOCK_OPT_CONTINUOUS, nullptr,
+                            &fake_clock) == ZX_OK);
+  // Update the clock with the UTC reference backstop time. This also starts the clock ticking.
+  const zx_clock_update_args_v2_t args{.synthetic_value = utc_details.backstop_time};
+  ZX_ASSERT(zx_clock_update(fake_clock,
+                            ZX_CLOCK_ARGS_VERSION(2) | ZX_CLOCK_UPDATE_OPTION_SYNTHETIC_VALUE_VALID,
+                            &args) == ZX_OK);
+  // Swap the UTC reference clock with our fake.
+  ZX_ASSERT(zx_utc_reference_swap(fake_clock, &utc_clock_) == ZX_OK);
+}
+
+BaseFilesystemTest::ClockSwapper::~ClockSwapper() {
+  // Swap the original UTC reference clock back.
+  zx_handle_t fake_clock;
+  ZX_ASSERT(zx_utc_reference_swap(utc_clock_, &fake_clock) == ZX_OK);
+  ZX_ASSERT(zx_handle_close(fake_clock) == ZX_OK);
 }
 
 }  // namespace fs_test

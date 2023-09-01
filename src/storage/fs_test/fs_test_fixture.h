@@ -50,6 +50,24 @@ class BaseFilesystemTest : public testing::Test {
                                 const std::function<void()>& test_function);
 
  protected:
+  // RAII helper to swap the UTC reference clock with a continuous monotonic clock.  The fake clock
+  // starts at the backstop time (typically time of latest commit), providing a plausible source.
+  // We have to swap clocks before starting the filesystem, as it will inherit the UTC clock from
+  // this process via the PA_CLOCK_UTC handle.
+  //
+  // TODO(b/295537827): Investigate if we still need to do this once the system UTC clock starts
+  // automatically. We want to try and use the real UTC time source where possible.
+  class ClockSwapper {
+   public:
+    // Create and replace the process-global UTC clock with a monotonic equivalent.
+    ClockSwapper();
+    // Restore the original UTC clock.
+    ~ClockSwapper();
+
+   private:
+    zx_handle_t utc_clock_;  // Original UTC clock this process inherited.
+  } swapper_;
+
   TestFilesystem fs_;
 };
 
