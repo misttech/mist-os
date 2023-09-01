@@ -68,6 +68,10 @@ type NodeAttributesQuery = strict bits : uint64 {
     GID = 0x400;
     @available(added=HEAD)
     RDEV = 0x800;
+    @available(added=HEAD)
+    ACCESS_TIME = 0x1000;
+    @available(added=HEAD)
+    CHANGE_TIME = 0x2000;
 };
 
 type MutableNodeAttributes = table {
@@ -89,6 +93,11 @@ type MutableNodeAttributes = table {
     5: gid uint32; // gid_t
     @available(added=HEAD)
     6: rdev uint64; // dev_t
+
+    /// Time of last access in nanoseconds since the Unix epoch, UTC. Note that servers might not
+    /// always update this if this is the only attribute being updated.
+    @available(added=HEAD)
+    7: access_time uint64;
 };
 
 // TODO(https://fxbug.dev/105840): Inline this into its only reference when fidlgen_go is fixed.
@@ -128,6 +137,10 @@ type NodeAttributes2 = struct {
         /// An ID for the node. See [`Id`].
         /// This `id` should be unique among all entries of a directory.
         6: id Id;
+
+        /// Time of last change to the metadata in nanoseconds since the Unix epoch, UTC.
+        @available(added=HEAD)
+        7: change_time uint64;
     };
 };
 
