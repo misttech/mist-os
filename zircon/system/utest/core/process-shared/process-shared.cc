@@ -5,6 +5,7 @@
 #include <lib/fit/defer.h>
 #include <lib/zx/job.h>
 #include <lib/zx/process.h>
+#include <lib/zx/profile.h>
 #include <lib/zx/thread.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls-next.h>
@@ -12,6 +13,30 @@
 
 #include <mini-process/mini-process.h>
 #include <zxtest/zxtest.h>
+
+namespace {
+
+void SetDeadlineMemoryPriority(zx::vmar& vmar) {
+  zx::unowned_job root_job(zx::job::default_job());
+  ASSERT_TRUE(root_job->is_valid());
+  zx::profile profile;
+  zx_profile_info_t profile_info = {.flags = ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY,
+                                    .priority = ZX_PRIORITY_HIGH};
+
+  zx_status_t status = zx::profile::create(*root_job, 0u, &profile_info, &profile);
+  if (status == ZX_ERR_ACCESS_DENIED) {
+    // If we are running as a component test, and not a zbi test, we do not have the root job and
+    // cannot create a profile. This is not an issue as when running tests as a component
+    // compression is not enabled so the profile is not needed anyway.
+    // TODO(fxb/60238): Once compression is enabled for builds with component tests support setting
+    // a profile via the profile provider.
+    return;
+  }
+  ASSERT_OK(status);
+  EXPECT_OK(vmar.set_profile(profile, 0));
+}
+
+}  // namespace
 
 TEST(ProcessShared, MapInPrototype) {
   zx::process prototype_process;
@@ -224,6 +249,13 @@ TEST(ProcessShared, InfoTaskStats) {
   static constexpr char kNameProc3[] = "proc3";
   ASSERT_OK(zx::process::create(*zx::job::default_job(), kNameProc3, sizeof(kNameProc3), 0, &proc3,
                                 &vmar3));
+
+  // With all the processes created apply a deadline memory priority to them all so that our memory
+  // stats are predictable and will not change due to compression.
+  ASSERT_NO_FATAL_FAILURE(SetDeadlineMemoryPriority(vmar_shared));
+  ASSERT_NO_FATAL_FAILURE(SetDeadlineMemoryPriority(vmar1));
+  ASSERT_NO_FATAL_FAILURE(SetDeadlineMemoryPriority(vmar2));
+  ASSERT_NO_FATAL_FAILURE(SetDeadlineMemoryPriority(vmar3));
 
   // Now create the 6 VMOs of 1 page each.
   const size_t kSize = zx_system_get_page_size();
