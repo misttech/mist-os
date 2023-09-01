@@ -35,6 +35,7 @@ _REPROXY_CFG = _SCRIPT_DIR / "fuchsia-reproxy.cfg"
 # default path to `bb` buildbucket tool
 _BB_TOOL = PROJECT_ROOT_REL / 'prebuilt' / 'tools' / 'buildbucket' / 'bb'
 
+
 def msg(text: str):
     print(f'[{_SCRIPT_BASENAME}] {text}')
 
@@ -58,13 +59,23 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         help="Reproxy configuration file.",
         metavar='FILE',
     )
-    parser.add_argument(
+
+    # Require one of the following:
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument(
         "--bbid",
         type=str,
-        help="Buildbucket ID (leading 'b' optional/permitted)",
+        help=
+        "Buildbucket ID (leading 'b' optional/permitted).  Begin search fore reproxy log here.",
         metavar="ID",
-        required=True,
     )
+    input_group.add_argument(
+        "--reproxy_log",
+        type=Path,
+        help="Use this reproxy log directly instead of searching from bbid.",
+        metavar="LOG",
+    )
+
     parser.add_argument(
         "--path",
         type=Path,
@@ -93,14 +104,15 @@ _MAIN_ARG_PARSER = _main_arg_parser()
 
 
 class BBError(RuntimeError):
-  """BuildBucketTool related errors."""
-  def __init__(self, msg: str):
-    super().__init__(msg)
+    """BuildBucketTool related errors."""
+
+    def __init__(self, msg: str):
+        super().__init__(msg)
 
 
 class BuildBucketTool(object):
 
-    def __init__(self, bb: Path=None):
+    def __init__(self, bb: Path = None):
         self.bb = bb or _BB_TOOL
 
     def get_json_fields(self, bbid: str) -> Dict[str, Any]:
@@ -116,8 +128,7 @@ class BuildBucketTool(object):
             raise BBError(f'bb failed to lookup id {bbid}.')
         return json.loads('\n'.join(bb_result.stdout) + '\n')
 
-    def download_reproxy_log(self, build_id: str,
-                             reproxy_log_name: str) -> str:
+    def download_reproxy_log(self, build_id: str, reproxy_log_name: str) -> str:
         # 'bb log' prints log contents to stdout.  Capture it and write it out.
         rpl_log_result = cl_utils.subprocess_call(
             [
@@ -156,7 +167,9 @@ class BuildBucketTool(object):
 
         return reproxy_log_cache_path
 
-    def get_rbe_build_info(self, bbid: str, verbose: bool = False) -> Tuple[str, Dict[str, Any]]:
+    def get_rbe_build_info(self,
+                           bbid: str,
+                           verbose: bool = False) -> Tuple[str, Dict[str, Any]]:
         """Returns info for the build that actually used RBE (maybe a subbuild).
 
         Args:
@@ -190,10 +203,10 @@ class BuildBucketTool(object):
 
         return rbe_build_id, rbe_build_json
 
+
 def rbe_downloader(cfg: Path) -> remotetool.RemoteTool:
     with open(cfg) as f:
-        downloader = remotetool.RemoteTool(
-            remotetool.read_config_file_lines(f))
+        downloader = remotetool.RemoteTool(remotetool.read_config_file_lines(f))
     return downloader
 
 
@@ -211,7 +224,8 @@ def download_artifact(
     return 0
 
 
-def _main(bbpath: Path, bbid: str, artifact_path: Path, cfg: Path, output: Path=None, verbose: bool=False) -> int:
+def fetch_reproxy_log_from_bbid(
+        bbpath: Path, bbid: str, verbose: bool = False) -> Path:
     bb = BuildBucketTool(bbpath)
 
     # Get the build that actually used RBE, and has an reproxy log.
@@ -223,7 +237,7 @@ def _main(bbpath: Path, bbid: str, artifact_path: Path, cfg: Path, output: Path=
 
     if rpl_files is None:
         msg(f'Error looking up reproxy log from build {rbe_build_id}')
-        return 1
+        return None
 
     # Assume there is only one.
     reproxy_log_name = rpl_files[0]
@@ -238,9 +252,18 @@ def _main(bbpath: Path, bbid: str, artifact_path: Path, cfg: Path, output: Path=
     )
     # TODO: writing log out to disk and re-reading/parsing it can be slow.
     # Perhaps add an interface to take a string in-memory.
+    return reproxy_log_cache_path
 
+
+def fetch_artifact_from_reproxy_log(
+    reproxy_log: Path,
+    artifact_path: Path,
+    cfg: Path,
+    output: Path,
+    verbose: bool = False,
+) -> int:
     digest = reproxy_logs.lookup_output_file_digest(
-        log=reproxy_log_cache_path,
+        log=reproxy_log,
         path=artifact_path,
     )
     if digest is None:
@@ -257,24 +280,51 @@ def _main(bbpath: Path, bbid: str, artifact_path: Path, cfg: Path, output: Path=
     if exit_code != 0:
         return exit_code
 
-    msg(
-        f"Artifact {artifact_path} from build {rbe_build_id} downloaded to {output}.\n  digest: {digest}"
-    )
+    msg(f"Artifact {artifact_path} downloaded to {output}.\n  digest: {digest}")
     return 0
+
+
+def _main(
+        bbpath: Path,
+        artifact_path: Path,
+        cfg: Path,
+        bbid: str = None,
+        reproxy_log: Path = None,
+        output: Path = None,
+        verbose: bool = False) -> int:
+    reproxy_log = reproxy_log or fetch_reproxy_log_from_bbid(
+        bbpath=bbpath,
+        bbid=bbid,
+        verbose=verbose,
+    )
+    if reproxy_log is None:
+        return 1
+
+    return fetch_artifact_from_reproxy_log(
+        reproxy_log=reproxy_log,
+        artifact_path=artifact_path,
+        cfg=cfg,
+        output=output,
+        verbose=verbose,
+    )
+
 
 def main(argv: Sequence[str]) -> int:
     args = _MAIN_ARG_PARSER.parse_args(argv)
     try:
-      return _main(bbpath=args.bb,
-                   bbid=args.bbid.lstrip('b'),
-                   artifact_path=args.path,
-                   cfg=args.cfg,
-                   output=args.output,
-                   verbose=args.verbose,
-                   )
+        return _main(
+            bbpath=args.bb,
+            bbid=args.bbid.lstrip('b') if args.bbid else None,
+            artifact_path=args.path,
+            reproxy_log=args.reproxy_log,
+            cfg=args.cfg,
+            output=args.output or args.path.name,
+            verbose=args.verbose,
+        )
     except BBError as e:
-      msg(f"Error: {e}")
-      return 1
+        msg(f"Error: {e}")
+        return 1
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))

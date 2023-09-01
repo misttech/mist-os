@@ -15,13 +15,23 @@ import reproxy_logs
 
 class MainArgParserTests(unittest.TestCase):
 
-    def test_basic_usage(self):
+    def test_with_bbid(self):
         args = bb_fetch_rbe_cas._MAIN_ARG_PARSER.parse_args(
             ['--bbid', '1234', '--path', 'obj/hello.o'])
         self.assertEqual(args.bbid, '1234')
         self.assertEqual(args.path, Path('obj/hello.o'))
         self.assertIsNone(args.output)
         self.assertFalse(args.verbose)
+        self.assertIsNone(args.reproxy_log)
+
+    def test_with_reproxy_log(self):
+        args = bb_fetch_rbe_cas._MAIN_ARG_PARSER.parse_args(
+            ['--reproxy_log', 'x.rrpl', '--path', 'obj/hello.o', '--verbose'])
+        self.assertIsNone(args.bbid)
+        self.assertEqual(args.path, Path('obj/hello.o'))
+        self.assertIsNone(args.output)
+        self.assertTrue(args.verbose)
+        self.assertEqual(args.reproxy_log, Path('x.rrpl'))
 
 
 class BuildBucketToolTests(unittest.TestCase):
@@ -175,13 +185,9 @@ class DownloadArtifactTests(unittest.TestCase):
             self.assertEqual(exit_code, 1)
 
 
-class MainTest(unittest.TestCase):
+class FetchReproxyLogFromBbidTests(unittest.TestCase):
 
-    @property
-    def downloader(self):
-        return remotetool.RemoteTool(reproxy_cfg=_reproxy_cfg)
-
-    def test_e2e_success(self):
+    def test_lookup_and_fetch(self):
         bb_json = {
             'output': {
                 'properties': {
@@ -198,82 +204,191 @@ class MainTest(unittest.TestCase):
                     bb_fetch_rbe_cas.BuildBucketTool,
                     'fetch_reproxy_log_cached',
                     return_value=reproxy_log_path) as mock_fetch_log:
-                with mock.patch.object(
-                        reproxy_logs, 'lookup_output_file_digest',
-                        return_value='b1297c97e9d/102') as mock_lookup:
-                    with mock.patch.object(
-                            bb_fetch_rbe_cas, 'rbe_downloader',
-                            return_value=self.downloader) as mock_downloader:
-                        with mock.patch.object(bb_fetch_rbe_cas,
-                                               'download_artifact',
-                                               return_value=0) as mock_download:
-                            self.assertEqual(
-                                bb_fetch_rbe_cas.main(
-                                    [
-                                        '--bbid', 'b4356254', '--path',
-                                        'foo/bar/baz.rlib'
-                                    ]), 0)
+                self.assertEqual(
+                    bb_fetch_rbe_cas.fetch_reproxy_log_from_bbid(
+                        bbpath=Path('bb'), bbid='b789789'), reproxy_log_path)
         mock_rbe_build_info.assert_called_once()
         mock_fetch_log.assert_called_once()
-        mock_lookup.assert_called_once()
-        mock_downloader.assert_called_once()
-        mock_download.assert_called_once()
+
+    def test_no_rpl_files(self):
+        bb_json = {'output': {'properties': {}}}
+        with mock.patch.object(bb_fetch_rbe_cas.BuildBucketTool,
+                               'get_rbe_build_info',
+                               return_value=('8728721',
+                                             bb_json)) as mock_rbe_build_info:
+            self.assertIsNone(
+                bb_fetch_rbe_cas.fetch_reproxy_log_from_bbid(
+                    bbpath=Path('bb'), bbid='b789789'))
+        mock_rbe_build_info.assert_called_once()
+
+
+class FetchArtifactFromReproxyLogTests(unittest.TestCase):
+
+    @property
+    def downloader(self):
+        return remotetool.RemoteTool(reproxy_cfg=_reproxy_cfg)
+
+    def test_digest_found(self):
+        reproxy_log = Path('cached.rrpl')
+        artifact_path = Path('obj/hello.cc.o')
+        cfg = Path('reproxy.cfg')
+        digest = 'f1233c9744d/101'
+        output = Path('fetched-hello.cc.o')
+        status = 0
+        with mock.patch.object(reproxy_logs, 'lookup_output_file_digest',
+                               return_value=digest) as mock_lookup:
+            with mock.patch.object(
+                    bb_fetch_rbe_cas, 'rbe_downloader',
+                    return_value=self.downloader) as mock_downloader:
+                with mock.patch.object(bb_fetch_rbe_cas, 'download_artifact',
+                                       return_value=status) as mock_download:
+                    self.assertEqual(
+                        bb_fetch_rbe_cas.fetch_artifact_from_reproxy_log(
+                            reproxy_log=reproxy_log,
+                            artifact_path=artifact_path,
+                            cfg=cfg,
+                            output=output,
+                        ), status)
+        mock_lookup.assert_called_once_with(log=reproxy_log, path=artifact_path)
+        mock_downloader.assert_called_once_with(cfg)
+        mock_download.assert_called_once_with(self.downloader, digest, output)
+
+    def test_digest_not_found(self):
+        reproxy_log = Path('cached.rrpl')
+        artifact_path = Path('obj/hello.cc.o')
+        with mock.patch.object(reproxy_logs, 'lookup_output_file_digest',
+                               return_value=None) as mock_lookup:
+            self.assertEqual(
+                bb_fetch_rbe_cas.fetch_artifact_from_reproxy_log(
+                    reproxy_log=reproxy_log,
+                    artifact_path=artifact_path,
+                    cfg=Path('reproxy.cfg'),
+                    output=Path('fetched-hello.cc.o'),
+                ), 1)
+        mock_lookup.assert_called_once_with(log=reproxy_log, path=artifact_path)
+
+    def test_download_failed(self):
+        reproxy_log = Path('smashed.rrpl')
+        artifact_path = Path('obj/h3llo.cc.o')
+        cfg = Path('reproxy_2.cfg')
+        output = Path('fetched-h3llo.cc.o')
+        digest = 'a87e1321/88'
+        status = 1
+        with mock.patch.object(reproxy_logs, 'lookup_output_file_digest',
+                               return_value=digest) as mock_lookup:
+            with mock.patch.object(
+                    bb_fetch_rbe_cas, 'rbe_downloader',
+                    return_value=self.downloader) as mock_downloader:
+                with mock.patch.object(bb_fetch_rbe_cas, 'download_artifact',
+                                       return_value=status) as mock_download:
+                    self.assertEqual(
+                        bb_fetch_rbe_cas.fetch_artifact_from_reproxy_log(
+                            reproxy_log=reproxy_log,
+                            artifact_path=artifact_path,
+                            cfg=cfg,
+                            output=output,
+                        ), status)
+        mock_lookup.assert_called_once_with(log=reproxy_log, path=artifact_path)
+        mock_downloader.assert_called_once_with(cfg)
+        mock_download.assert_called_once_with(self.downloader, digest, output)
+
+
+class MainTests(unittest.TestCase):
+
+    def test_e2e_using_bbid_success(self):
+        bb = bb_fetch_rbe_cas._BB_TOOL
+        bbid = 'b4356254'
+        artifact_path = Path('foo/bar/baz.rlib')
+        cfg = bb_fetch_rbe_cas._REPROXY_CFG
+        reproxy_log_path = Path('/some/where/in/temp/foo.rrpl')
+        with mock.patch.object(bb_fetch_rbe_cas, 'fetch_reproxy_log_from_bbid',
+                               return_value=reproxy_log_path) as mock_fetch_log:
+            with mock.patch.object(bb_fetch_rbe_cas,
+                                   'fetch_artifact_from_reproxy_log',
+                                   return_value=0) as mock_fetch_artifact:
+                self.assertEqual(
+                    bb_fetch_rbe_cas.main(
+                        ['--bbid', bbid, '--path',
+                         str(artifact_path)]), 0)
+        mock_fetch_log.assert_called_once_with(
+            bbpath=bb, bbid=bbid.lstrip('b'), verbose=False)
+        mock_fetch_artifact.assert_called_once_with(
+            reproxy_log=reproxy_log_path,
+            artifact_path=artifact_path,
+            cfg=cfg,
+            output=artifact_path.name,
+            verbose=False)
+
+    def test_e2e_using_reproxy_log_success(self):
+        bb = bb_fetch_rbe_cas._BB_TOOL
+        artifact_path = Path('foo/bar/baz.rlib')
+        cfg = bb_fetch_rbe_cas._REPROXY_CFG
+        reproxy_log_path = Path('use/me.rrpl')
+        with mock.patch.object(bb_fetch_rbe_cas,
+                               'fetch_artifact_from_reproxy_log',
+                               return_value=0) as mock_fetch_artifact:
+            self.assertEqual(
+                bb_fetch_rbe_cas.main(
+                    [
+                        '--reproxy_log',
+                        str(reproxy_log_path), '--path',
+                        str(artifact_path)
+                    ]), 0)
+        # bypassed call to fetch_reproxy_log_from_bbid
+        mock_fetch_artifact.assert_called_once_with(
+            reproxy_log=reproxy_log_path,
+            artifact_path=artifact_path,
+            cfg=cfg,
+            output=artifact_path.name,
+            verbose=False)
+
+    def test_e2e_reproxy_log_failed(self):
+        bb = bb_fetch_rbe_cas._BB_TOOL
+        bbid = 'b4356254'
+        with mock.patch.object(bb_fetch_rbe_cas, 'fetch_reproxy_log_from_bbid',
+                               return_value=None) as mock_fetch_log:
+            self.assertEqual(
+                bb_fetch_rbe_cas.main(
+                    ['--bbid', bbid, '--path', 'foo/bar/baz.rlib']), 1)
+        mock_fetch_log.assert_called_once_with(
+            bbpath=bb, bbid=bbid.lstrip('b'), verbose=False)
 
     def test_e2e_bb_error(self):
-        bb_json = {
-            'output': {
-                'properties': {
-                    'rpl_files': ['reproxy_2.718.rrpl']
-                }
-            }
-        }
-        reproxy_log_path = Path('/some/where/in/temp/foo.rrpl')
+        bbid = 'b99669966'
         with mock.patch.object(bb_fetch_rbe_cas.BuildBucketTool,
                                'get_rbe_build_info',
                                side_effect=bb_fetch_rbe_cas.BBError(
                                    'error')) as mock_rbe_build_info:
             self.assertEqual(
                 bb_fetch_rbe_cas.main(
-                    ['--bbid', 'b99669966', '--path', 'zoo/bar/faz.rlib']), 1)
-        mock_rbe_build_info.assert_called_once()
+                    ['--bbid', bbid, '--path', 'zoo/bar/faz.rlib']), 1)
+        mock_rbe_build_info.assert_called_once_with(
+            bbid.lstrip('b'), verbose=False)
 
-    def test_e2e_download_error(self):
-        bb_json = {
-            'output': {
-                'properties': {
-                    'rpl_files': ['reproxy_2.718.rrpl']
-                }
-            }
-        }
+    def test_e2e_download_artifact_error(self):
+        bb = bb_fetch_rbe_cas._BB_TOOL
+        bbid = 'b881231281'
         reproxy_log_path = Path('/some/where/in/temp/foo.rrpl')
-        with mock.patch.object(bb_fetch_rbe_cas.BuildBucketTool,
-                               'get_rbe_build_info',
-                               return_value=('8728721',
-                                             bb_json)) as mock_rbe_build_info:
-            with mock.patch.object(
-                    bb_fetch_rbe_cas.BuildBucketTool,
-                    'fetch_reproxy_log_cached',
-                    return_value=reproxy_log_path) as mock_fetch_log:
-                with mock.patch.object(
-                        reproxy_logs, 'lookup_output_file_digest',
-                        return_value='b1297c97e9d/102') as mock_lookup:
-                    with mock.patch.object(
-                            bb_fetch_rbe_cas, 'rbe_downloader',
-                            return_value=self.downloader) as mock_downloader:
-                        with mock.patch.object(bb_fetch_rbe_cas,
-                                               'download_artifact',
-                                               return_value=1) as mock_download:
-                            self.assertEqual(
-                                bb_fetch_rbe_cas.main(
-                                    [
-                                        '--bbid', 'b4356254', '--path',
-                                        'foo/bar/baz.rlib'
-                                    ]), 1)
-        mock_rbe_build_info.assert_called_once()
-        mock_fetch_log.assert_called_once()
-        mock_lookup.assert_called_once()
-        mock_downloader.assert_called_once()
-        mock_download.assert_called_once()
+        artifact_path = Path('foo/bar/baz.rlib')
+        cfg = bb_fetch_rbe_cas._REPROXY_CFG
+        status = 1
+        with mock.patch.object(bb_fetch_rbe_cas, 'fetch_reproxy_log_from_bbid',
+                               return_value=reproxy_log_path) as mock_fetch_log:
+            with mock.patch.object(bb_fetch_rbe_cas,
+                                   'fetch_artifact_from_reproxy_log',
+                                   return_value=status) as mock_fetch_artifact:
+                self.assertEqual(
+                    bb_fetch_rbe_cas.main(
+                        ['--bbid', bbid, '--path',
+                         str(artifact_path)]), status)
+        mock_fetch_log.assert_called_once_with(
+            bbpath=bb, bbid=bbid.lstrip('b'), verbose=False)
+        mock_fetch_artifact.assert_called_once_with(
+            reproxy_log=reproxy_log_path,
+            artifact_path=artifact_path,
+            cfg=cfg,
+            output=artifact_path.name,
+            verbose=False)
 
 
 if __name__ == '__main__':
