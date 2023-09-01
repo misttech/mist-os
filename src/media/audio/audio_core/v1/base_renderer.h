@@ -107,6 +107,9 @@ class BaseRenderer : public AudioObject,
 
   zx_status_t SetAdjustableReferenceClock();
   zx_status_t SetCustomReferenceClock(zx::clock ref_clock);
+
+  void ReportContinuityUnderflow(Fixed implied_pts, Fixed first_safe_pts, zx::time first_safe_ref);
+  void ReportTimestampUnderflow(Fixed packet_pts, Fixed prev_packet_end_pts);
   Reporter::Renderer& reporter() { return *reporter_; }
 
   // Only needed by AudioRenderer if glitch-/dropout-detection is enabled.
@@ -165,6 +168,8 @@ class BaseRenderer : public AudioObject,
 
   WavWriter<kEnableRendererWavWriters> wav_writer_;
   Reporter::Container<Reporter::Renderer, Reporter::kObjectsToCache>::Ptr reporter_;
+  size_t continuity_underflow_count_ = 0;
+  size_t timestamp_underflow_count_ = 0;
 
   std::shared_ptr<Clock> clock_;
 };

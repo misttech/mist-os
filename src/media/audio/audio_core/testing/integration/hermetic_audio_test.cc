@@ -549,7 +549,9 @@ void HermeticAudioTest::ExpectNoPipelineUnderflows() {
 void HermeticAudioTest::ExpectNoRendererUnderflows() {
   for (auto& r : renderers_) {
     ExpectInspectMetrics(r.get(), {.children = {
-                                       {"underflows", {.uints = {{"count", 0}}}},
+                                       {"continuity underflows", {.uints = {{"count", 0}}}},
+                                       {"packet queue underflows", {.uints = {{"count", 0}}}},
+                                       {"timestamp underflows", {.uints = {{"count", 0}}}},
                                    }});
   }
 }

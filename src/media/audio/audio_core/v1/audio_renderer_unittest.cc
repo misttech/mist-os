@@ -251,6 +251,105 @@ TEST_F(AudioRendererTestSyntheticClocks, SendPacket_NO_TIMESTAMP) {
   }
 }
 
+TEST_F(AudioRendererTestSyntheticClocks, SendPacket_ContinuityUnderflow) {
+  context().route_graph().AddRenderer(std::move(renderer_));
+  context().route_graph().AddDeviceToRoutes(fake_output_.get());
+
+  constexpr int64_t kPacketSizeFrames = 32;
+  fidl_renderer_->SetPcmStreamType(PcmStreamType());
+  AddPayloadBuffer(0, zx_system_get_page_size(), fidl_renderer_.get());
+  fuchsia::media::StreamPacket packet;
+  packet.payload_buffer_id = 0;
+  packet.payload_offset = 0;
+  packet.payload_size = kPacketSizeFrames * sizeof(float);
+  // packet.pts is NO_TIMESTAMP by default.
+  fidl_renderer_->SendPacketNoReply(fidl::Clone(packet));
+  fidl_renderer_->SendPacketNoReply(fidl::Clone(packet));
+  fidl_renderer_->SendPacketNoReply(fidl::Clone(packet));
+  fidl_renderer_->PlayNoReply(fuchsia::media::NO_TIMESTAMP, fuchsia::media::NO_TIMESTAMP);
+  RunLoopUntilIdle();
+
+  std::vector<LinkMatrix::LinkHandle> links;
+  context().link_matrix().SourceLinks(*fake_output_, &links);
+  ASSERT_EQ(1u, links.size());
+  auto stream = links[0].stream;
+  ASSERT_TRUE(stream);
+
+  // Expect 3 buffers. Since these have NO_TIMESTAMP and also no discontinutity flag, they should
+  // be continuous starting at pts 0.
+  int64_t expected_packet_pts = 0;
+  for (uint32_t i = 0; i < 3; ++i) {
+    auto buffer = stream->ReadLock(rlctx, Fixed(expected_packet_pts), kPacketSizeFrames);
+    ASSERT_TRUE(buffer);
+    EXPECT_EQ(buffer->start().Floor(), expected_packet_pts);
+    EXPECT_EQ(buffer->length(), kPacketSizeFrames);
+    EXPECT_NE(nullptr, buffer->payload());
+    expected_packet_pts = buffer->end().Floor();
+  }
+
+  // Send another packet, after first advancing the clock by lead_time+padding which ensures the
+  // implied PTS has already passed. Because we do not specify the flag DISCONTINUITY, the renderer
+  // should place it immediately after the previous packet, even though its payload will be dropped.
+  context().clock_factory()->AdvanceMonoTimeBy(stream->GetPresentationDelay() + zx::msec(10));
+  fidl_renderer_->SendPacketNoReply(fidl::Clone(packet));
+  RunLoopUntilIdle();
+  {
+    auto delay_ms = stream->GetPresentationDelay().to_msecs() + 10 + 1 /* round up */;
+    auto total_to_read = kPacketSizeFrames + delay_ms * kAudioRendererUnittestFrameRate / 1000;
+    auto buffer = stream->ReadLock(rlctx, Fixed(expected_packet_pts), total_to_read);
+    ASSERT_TRUE(buffer);
+    EXPECT_EQ(buffer->length(), kPacketSizeFrames);
+    EXPECT_NE(nullptr, buffer->payload());
+
+    // EXPECT_EQ here (instead of EXPECT_GT) even though it was late: this packet should be
+    // continuous with the previous packet. If we HAD specified FLAG_DISCONTINUITY, the renderer
+    // would have moved ths start of this buffer later in time, so that no payload was truncated
+    // (as shown in the previous test case SendPacket_NO_TIMESTAMP).
+    EXPECT_EQ(buffer->start().Floor(), expected_packet_pts);
+  }
+}
+
+TEST_F(AudioRendererTestSyntheticClocks, SendPacket_TimestampUnderflow) {
+  context().route_graph().AddRenderer(std::move(renderer_));
+  context().route_graph().AddDeviceToRoutes(fake_output_.get());
+
+  constexpr int64_t kPacketSizeFrames = 32;
+  fidl_renderer_->SetPcmStreamType(PcmStreamType());
+  AddPayloadBuffer(0, zx_system_get_page_size(), fidl_renderer_.get());
+  fuchsia::media::StreamPacket packet;
+  packet.payload_buffer_id = 0;
+  packet.payload_offset = 0;
+  packet.payload_size = kPacketSizeFrames * sizeof(float);
+  packet.pts = 0;
+  fidl_renderer_->SendPacketNoReply(fidl::Clone(packet));
+  fidl_renderer_->SendPacketNoReply(fidl::Clone(packet));
+  fidl_renderer_->SendPacketNoReply(fidl::Clone(packet));
+  fidl_renderer_->PlayNoReply(fuchsia::media::NO_TIMESTAMP, 0);
+  RunLoopUntilIdle();
+
+  std::vector<LinkMatrix::LinkHandle> links;
+  context().link_matrix().SourceLinks(*fake_output_, &links);
+  ASSERT_EQ(1u, links.size());
+  auto stream = links[0].stream;
+  ASSERT_TRUE(stream);
+
+  // Expect only 1 buffer -- the other two packets should generate Timestamp Underflows (overlaps).
+  int64_t expected_packet_pts = 0;
+  {
+    auto buffer = stream->ReadLock(rlctx, Fixed(expected_packet_pts), kPacketSizeFrames);
+    ASSERT_TRUE(buffer);
+    EXPECT_EQ(buffer->start().Floor(), expected_packet_pts);
+    EXPECT_EQ(buffer->length(), kPacketSizeFrames);
+    EXPECT_NE(nullptr, buffer->payload());
+    expected_packet_pts = buffer->end().Floor();
+  }
+  for (uint32_t i = 1; i < 3; ++i) {
+    auto buffer = stream->ReadLock(rlctx, Fixed(expected_packet_pts), kPacketSizeFrames);
+    ASSERT_FALSE(buffer);
+    expected_packet_pts += kPacketSizeFrames;
+  }
+}
+
 // The renderer should be routed once the format is set.
 TEST_F(AudioRendererTestSyntheticClocks, RegistersWithRouteGraphIfHasUsageStreamTypeAndBuffers) {
   EXPECT_EQ(context().link_matrix().DestLinkCount(*renderer_), 0u);

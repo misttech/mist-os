@@ -34,13 +34,22 @@ inline constexpr bool kLogRendererPauseCalls = false;
 // We also log an underflow if its duration exceeds the previously-reported one by a set threshold.
 // This intends to more consistently log a long underflow's _first_ packet.
 //
-// To disable all client-side underflow logging, set kLogPacketQueueUnderflow to false.
 inline constexpr bool kLogPacketQueueUnderflow = true;
 inline constexpr uint16_t kPacketQueueUnderflowWarningInterval = 100;
 inline constexpr uint16_t kPacketQueueUnderflowInfoInterval = 10;
 // If AudioCore's log level is TRACE or DEBUG, we log all packet queue underflows.
 inline constexpr zx::duration kPacketQueueUnderflowDurationIncreaseWarningThreshold = zx::msec(500);
 inline constexpr zx::duration kPacketQueueUnderflowDurationIncreaseInfoThreshold = zx::msec(50);
+
+//
+// To disable timestamp checks of client-submitted packets, set kLogRendererUnderflow to false.
+inline constexpr bool kLogRendererUnderflow = true;
+inline constexpr uint16_t kRendererContinuityUnderflowWarningInterval = 100;
+inline constexpr uint16_t kRendererContinuityUnderflowInfoInterval = 10;
+// If AudioCore's log level is TRACE or DEBUG, we log all continuity underflows.
+inline constexpr uint16_t kRendererTimestampUnderflowWarningInterval = 100;
+inline constexpr uint16_t kRendererTimestampUnderflowInfoInterval = 10;
+// If AudioCore's log level is TRACE or DEBUG, we log all timestamp underflows.
 
 // Capture-related logging
 //

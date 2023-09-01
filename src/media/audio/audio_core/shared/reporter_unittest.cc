@@ -469,7 +469,15 @@ TEST_F(ReporterTest, RendererMetrics) {
           NodeMatches(NameMatches("renderers")),
           ChildrenMatch(UnorderedElementsAre(AllOf(
               ChildrenMatch(UnorderedElementsAre(
-                  NodeMatches(AllOf(NameMatches("underflows"),
+                  NodeMatches(AllOf(NameMatches("packet queue underflows"),
+                                    PropertyList(UnorderedElementsAre(
+                                        UintIs("count", 0), UintIs("duration (ns)", 0),
+                                        UintIs("session count", 0))))),
+                  NodeMatches(AllOf(NameMatches("continuity underflows"),
+                                    PropertyList(UnorderedElementsAre(
+                                        UintIs("count", 0), UintIs("duration (ns)", 0),
+                                        UintIs("session count", 0))))),
+                  NodeMatches(AllOf(NameMatches("timestamp underflows"),
                                     PropertyList(UnorderedElementsAre(
                                         UintIs("count", 0), UintIs("duration (ns)", 0),
                                         UintIs("session count", 0))))),
@@ -511,7 +519,16 @@ TEST_F(ReporterTest, RendererMetrics) {
   renderer->SetFinalGain(-6.0);
 
   renderer->StartSession(zx::time(0));
-  renderer->Underflow(zx::time(10), zx::time(15));
+
+  renderer->PacketQueueUnderflow(zx::time(10), zx::time(15));
+
+  renderer->ContinuityUnderflow(zx::time(20), zx::time(30));
+  renderer->ContinuityUnderflow(zx::time(40), zx::time(50));
+
+  renderer->TimestampUnderflow(zx::time(0), zx::time(15));
+  renderer->TimestampUnderflow(zx::time(30), zx::time(45));
+  renderer->TimestampUnderflow(zx::time(60), zx::time(75));
+
   renderer->StopSession(zx::time(100));
 
   EXPECT_THAT(
@@ -520,9 +537,17 @@ TEST_F(ReporterTest, RendererMetrics) {
           NodeMatches(NameMatches("renderers")),
           ChildrenMatch(UnorderedElementsAre(AllOf(
               ChildrenMatch(UnorderedElementsAre(
-                  NodeMatches(AllOf(NameMatches("underflows"),
+                  NodeMatches(AllOf(NameMatches("packet queue underflows"),
                                     PropertyList(UnorderedElementsAre(
                                         UintIs("count", 1), UintIs("duration (ns)", 5),
+                                        UintIs("session count", 1))))),
+                  NodeMatches(AllOf(NameMatches("continuity underflows"),
+                                    PropertyList(UnorderedElementsAre(
+                                        UintIs("count", 2), UintIs("duration (ns)", 20),
+                                        UintIs("session count", 1))))),
+                  NodeMatches(AllOf(NameMatches("timestamp underflows"),
+                                    PropertyList(UnorderedElementsAre(
+                                        UintIs("count", 3), UintIs("duration (ns)", 45),
                                         UintIs("session count", 1))))),
                   NodeMatches(AllOf(
                       NameMatches("format"),
@@ -594,6 +619,10 @@ TEST_F(ReporterTest, CapturerMetrics) {
   capturer->SetMute(true);
   capturer->SetMinFenceTime(zx::nsec(2'000'000));
 
+  capturer->StartSession(zx::time(0));
+  capturer->Overflow(zx::time(60), zx::time(65));
+  capturer->StopSession(zx::time(100));
+
   EXPECT_THAT(
       GetHierarchy(),
       ChildrenMatch(Contains(AllOf(
@@ -602,8 +631,8 @@ TEST_F(ReporterTest, CapturerMetrics) {
               ChildrenMatch(UnorderedElementsAre(
                   NodeMatches(AllOf(NameMatches("overflows"),
                                     PropertyList(UnorderedElementsAre(
-                                        UintIs("count", 0), UintIs("duration (ns)", 0),
-                                        UintIs("session count", 0))))),
+                                        UintIs("count", 1), UintIs("duration (ns)", 5),
+                                        UintIs("session count", 1))))),
                   NodeMatches(AllOf(
                       NameMatches("format"),
                       PropertyList(UnorderedElementsAre(StringIs("sample format", "SIGNED_16"),

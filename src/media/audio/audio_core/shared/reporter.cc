@@ -116,7 +116,10 @@ class RendererNop : public Reporter::Renderer {
   void AddPayloadBuffer(uint32_t buffer_id, uint64_t size) override {}
   void RemovePayloadBuffer(uint32_t buffer_id) override {}
   void SendPacket(const fuchsia::media::StreamPacket& packet) override {}
-  void Underflow(zx::time start_time, zx::time end_time) override {}
+
+  void PacketQueueUnderflow(zx::time start_time, zx::time end_time) override {}
+  void ContinuityUnderflow(zx::time start_time, zx::time end_time) override {}
+  void TimestampUnderflow(zx::time start_time, zx::time end_time) override {}
 };
 
 class CapturerNop : public Reporter::Capturer {
@@ -845,13 +848,33 @@ class Reporter::RendererImpl : public Reporter::Renderer {
         pts_units_per_second_denominator_(node_.CreateUint("pts units denominator", 1)),
         final_stream_gain_(node_.CreateDouble("final stream gain (post-volume) dbfs", 0.0)),
         usage_(node_.CreateString("usage", "default")),
-        underflows_(std::make_unique<OverflowUnderflowTracker>(OverflowUnderflowTracker::Args{
-            .event_name = "underflows",
-            .parent_node = node_,
-            .impl = impl,
-            .is_underflow = true,
-            .cobalt_component_id = AudioSessionDurationMigratedMetricDimensionComponent::Renderer,
-        })) {
+        packet_queue_underflows_(
+            std::make_unique<OverflowUnderflowTracker>(OverflowUnderflowTracker::Args{
+                .event_name = "packet queue underflows",
+                .parent_node = node_,
+                .impl = impl,
+                .is_underflow = true,
+                .cobalt_component_id =
+                    AudioSessionDurationMigratedMetricDimensionComponent::Renderer,
+            })),
+        continuity_underflows_(
+            std::make_unique<OverflowUnderflowTracker>(OverflowUnderflowTracker::Args{
+                .event_name = "continuity underflows",
+                .parent_node = node_,
+                .impl = impl,
+                .is_underflow = true,
+                .cobalt_component_id =
+                    AudioSessionDurationMigratedMetricDimensionComponent::Renderer,
+            })),
+        timestamp_underflows_(
+            std::make_unique<OverflowUnderflowTracker>(OverflowUnderflowTracker::Args{
+                .event_name = "timestamp underflows",
+                .parent_node = node_,
+                .impl = impl,
+                .is_underflow = true,
+                .cobalt_component_id =
+                    AudioSessionDurationMigratedMetricDimensionComponent::Renderer,
+            })) {
     time_since_death_ = node_.CreateLazyValues("RendererTimeSinceDeath", [this] {
       inspect::Inspector i;
       i.GetRoot().CreateUint(
@@ -863,8 +886,16 @@ class Reporter::RendererImpl : public Reporter::Renderer {
 
   void Destroy() override { time_of_death_ = zx::clock::get_monotonic(); }
 
-  void StartSession(zx::time start_time) override { underflows_->StartSession(start_time); }
-  void StopSession(zx::time stop_time) override { underflows_->StopSession(stop_time); }
+  void StartSession(zx::time start_time) override {
+    packet_queue_underflows_->StartSession(start_time);
+    continuity_underflows_->StartSession(start_time);
+    timestamp_underflows_->StartSession(start_time);
+  }
+  void StopSession(zx::time stop_time) override {
+    packet_queue_underflows_->StopSession(stop_time);
+    continuity_underflows_->StopSession(stop_time);
+    timestamp_underflows_->StopSession(stop_time);
+  }
 
   void SetUsage(RenderUsage usage) override { usage_.Set(RenderUsageToString(usage)); }
   void SetFormat(const Format& format) override { client_port_.SetFormat(format); }
@@ -896,8 +927,15 @@ class Reporter::RendererImpl : public Reporter::Renderer {
   void SendPacket(const fuchsia::media::StreamPacket& packet) override {
     client_port_.SendPacket(packet);
   }
-  void Underflow(zx::time start_time, zx::time end_time) override {
-    underflows_->Report(start_time, end_time);
+
+  void PacketQueueUnderflow(zx::time start_time, zx::time end_time) override {
+    packet_queue_underflows_->Report(start_time, end_time);
+  }
+  void ContinuityUnderflow(zx::time start_time, zx::time end_time) override {
+    continuity_underflows_->Report(start_time, end_time);
+  }
+  void TimestampUnderflow(zx::time start_time, zx::time end_time) override {
+    timestamp_underflows_->Report(start_time, end_time);
   }
 
  private:
@@ -910,7 +948,9 @@ class Reporter::RendererImpl : public Reporter::Renderer {
   inspect::UintProperty pts_units_per_second_denominator_;
   inspect::DoubleProperty final_stream_gain_;
   inspect::StringProperty usage_;
-  std::unique_ptr<OverflowUnderflowTracker> underflows_;
+  std::unique_ptr<OverflowUnderflowTracker> packet_queue_underflows_;
+  std::unique_ptr<OverflowUnderflowTracker> continuity_underflows_;
+  std::unique_ptr<OverflowUnderflowTracker> timestamp_underflows_;
   std::optional<zx::time> time_of_death_;
 };
 
@@ -1282,10 +1322,19 @@ void Reporter::OverflowUnderflowTracker::Report(zx::time start_time, zx::time en
   LogCobaltDuration(cobalt_event_duration_metric_id_, {cobalt_component_id_}, event_duration);
 
   if (state_ != State::Started) {
-    // This can happen because reporting can race with session boundaries. For example:
-    // If the mixer detects a renderer underflow as the client concurrently pauses the
-    // renderer, the Report and StopSession calls will race.
-    FX_LOGS_FIRST_N(INFO, 20) << "Overflow/Underflow event arrived when the session is stopped";
+    // This can happen because reporting can race with session boundaries. If we detect an underflow
+    // as the client concurrently pauses the renderer, the Report and StopSession calls will race.
+    // Also, data discontinuities can occur before a stream starts: when a client submits
+    // timestamped packets before starting a renderer, an overlap in packet timestamp ranges leads
+    // to data loss ("timestamp underflow"). In that case, Report is called before StartSession.
+    //
+    // We still track all overflows/underflows, even if the session is not currently running. We
+    // mention this possibility only because it may cause the total time of overflow/underflow to
+    // seem large, compared to the "total duration of all parent sessions" field that essentially
+    // tracks the lifetimes of renderers/capturers/outputs/inputs.
+    FX_LOGS_FIRST_N(INFO, 20)
+        << "Overflow/Underflow event arrived when the session is stopped: start "
+        << start_time.get() << ", end " << end_time.get();
     return;
   }
 

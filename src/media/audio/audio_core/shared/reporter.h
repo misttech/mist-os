@@ -113,7 +113,10 @@ class Reporter {
     virtual void AddPayloadBuffer(uint32_t buffer_id, uint64_t size) = 0;
     virtual void RemovePayloadBuffer(uint32_t buffer_id) = 0;
     virtual void SendPacket(const fuchsia::media::StreamPacket& packet) = 0;
-    virtual void Underflow(zx::time start_time, zx::time end_time) = 0;
+
+    virtual void PacketQueueUnderflow(zx::time start_time, zx::time end_time) = 0;
+    virtual void ContinuityUnderflow(zx::time start_time, zx::time end_time) = 0;
+    virtual void TimestampUnderflow(zx::time start_time, zx::time end_time) = 0;
   };
 
   class Capturer {
