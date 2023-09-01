@@ -239,7 +239,7 @@ impl Serializer for ChannelMessageSerializer {
                 // Special case no handles case to avoid allocation dance
                 if handles.is_empty() {
                     *serialized = encode_fidl_with_context(
-                        coding::DEFAULT_CONTEXT,
+                        coding_context,
                         &mut ZirconChannelMessage {
                             bytes: std::mem::replace(&mut msg.bytes, Vec::new()),
                             handles: Vec::new(),
@@ -277,7 +277,7 @@ impl Serializer for ChannelMessageSerializer {
             ChannelMessageSerializer::Pending(handles) => {
                 let handles = ready!(handles.as_mut().poll(fut_ctx))?;
                 *serialized = encode_fidl_with_context(
-                    coding::DEFAULT_CONTEXT,
+                    coding_context,
                     &mut ZirconChannelMessage {
                         bytes: std::mem::replace(&mut msg.bytes, Vec::new()),
                         handles,

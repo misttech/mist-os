@@ -27,6 +27,7 @@ pub(crate) async fn follow<Hdl: 'static + for<'a> ProxyableRW<'a>>(
     new_destination_node: NodeId,
     transfer_key: TransferKey,
     stream_reader: StreamReader<Hdl::Message>,
+    coding_context: crate::coding::Context,
 ) -> Result<(), Error> {
     futures::future::try_join(stream_reader.expect_shutdown(Ok(())), async move {
         stream_writer.send_ack_transfer().await?;
@@ -49,6 +50,7 @@ pub(crate) async fn follow<Hdl: 'static + for<'a> ProxyableRW<'a>>(
                     new_writer.into(),
                     None,
                     new_reader.into(),
+                    coding_context,
                 )
                 .await?;
                 Ok(())
@@ -66,6 +68,7 @@ fn make_boxed_main_loop<Hdl: 'static + for<'a> ProxyableRW<'a>>(
     stream_writer: FramedStreamWriter,
     initial_stream_reader: Option<FramedStreamReader>,
     stream_reader: FramedStreamReader,
+    coding_context: crate::coding::Context,
 ) -> std::pin::Pin<Box<dyn Send + Future<Output = Result<(), Error>>>> {
     super::main::run_main_loop(
         proxy,
@@ -73,6 +76,7 @@ fn make_boxed_main_loop<Hdl: 'static + for<'a> ProxyableRW<'a>>(
         stream_writer,
         initial_stream_reader,
         stream_reader,
+        coding_context,
     )
     .boxed()
 }
@@ -87,10 +91,11 @@ pub(crate) async fn initiate<Hdl: 'static + for<'a> ProxyableRW<'a>>(
     mut stream_reader: StreamReader<Hdl::Message>,
     drain_stream: FramedStreamWriter,
     stream_ref_sender: StreamRefSender,
+    coding_context: crate::coding::Context,
 ) -> Result<(), Error> {
     let transfer_key = generate_transfer_key();
 
-    let drain_stream = drain_stream.bind(&proxy.hdl());
+    let drain_stream = drain_stream.bind(coding_context, &proxy.hdl());
     let drain_stream_id = drain_stream.id();
     let peer_node_id = drain_stream.conn().peer_node_id();
 

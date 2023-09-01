@@ -107,6 +107,7 @@ pub(crate) async fn run_main_loop<Hdl: 'static + for<'a> ProxyableRW<'a>>(
     stream_writer: FramedStreamWriter,
     initial_stream_reader: Option<FramedStreamReader>,
     stream_reader: FramedStreamReader,
+    coding_context: crate::coding::Context,
 ) -> Result<(), Error> {
     #[cfg(not(target_os = "fuchsia"))]
     if stream_writer.is_circuit() {
@@ -117,7 +118,7 @@ pub(crate) async fn run_main_loop<Hdl: 'static + for<'a> ProxyableRW<'a>>(
 
     let (tx_join, rx_join) = new_task_joiner();
     let hdl = proxy.hdl();
-    let mut stream_writer = stream_writer.bind(hdl);
+    let mut stream_writer = stream_writer.bind(coding_context, hdl);
     let initial_stream_reader = initial_stream_reader.map(|s| s.bind(hdl));
     let mut stream_reader = stream_reader.bind(hdl);
 
@@ -142,7 +143,8 @@ pub(crate) async fn run_main_loop<Hdl: 'static + for<'a> ProxyableRW<'a>>(
     futures::future::try_join(
         stream_to_handle(proxy.clone(), initiate_transfer, stream_reader, tx_join)
             .map_err(|e| e.context("stream_to_handle")),
-        handle_to_stream(proxy, stream_writer, rx_join).map_err(|e| e.context("handle_to_stream")),
+        handle_to_stream(proxy, stream_writer, rx_join, coding_context)
+            .map_err(|e| e.context("handle_to_stream")),
     )
     .map_ok(drop)
     .await
@@ -152,6 +154,7 @@ async fn handle_to_stream<Hdl: 'static + for<'a> ProxyableRW<'a>>(
     proxy: Arc<Proxy<Hdl>>,
     mut stream: StreamWriter<Hdl::Message>,
     mut finish_proxy_loop: FinishProxyLoopReceiver<Hdl>,
+    coding_context: crate::coding::Context,
 ) -> Result<(), Error> {
     let mut message = Default::default();
     let finish_proxy_loop_action = loop {
@@ -198,6 +201,7 @@ async fn handle_to_stream<Hdl: 'static + for<'a> ProxyableRW<'a>>(
                 stream_reader,
                 drain_stream,
                 stream_ref_sender,
+                coding_context,
             )
             .await
         }
@@ -214,6 +218,7 @@ async fn handle_to_stream<Hdl: 'static + for<'a> ProxyableRW<'a>>(
                 new_destination_node,
                 transfer_key,
                 stream_reader,
+                coding_context,
             )
             .await
         }

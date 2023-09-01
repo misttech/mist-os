@@ -208,6 +208,10 @@ impl<'a> PeerConnRef<'a> {
         PeerConnRef { inner: PeerConnRefInner::Circuit(conn), node_id }
     }
 
+    pub fn is_circuit(&self) -> bool {
+        matches!(self.inner, PeerConnRefInner::Circuit(_))
+    }
+
     pub fn into_peer_conn(&self) -> PeerConn {
         PeerConn { inner: self.inner.into_owned(), node_id: self.node_id }
     }

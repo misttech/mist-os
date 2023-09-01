@@ -877,6 +877,13 @@ impl Router {
                     111 //std::backtrace::Backtrace::force_capture()
                 )
             }));
+
+            let coding_context = if conn.is_circuit() {
+                crate::coding::Context { use_persistent_header: true }
+            } else {
+                crate::coding::DEFAULT_CONTEXT
+            };
+
             let (stream_writer, stream_reader) = conn.alloc_bidi().await?;
             let stream_ref = StreamRef::Creating(StreamId { id: stream_writer.id() });
             Ok(match info.handle_type {
@@ -893,6 +900,7 @@ impl Router {
                             stream_reader.into(),
                             stats,
                             Arc::downgrade(&self),
+                            coding_context,
                         ),
                     );
                     ZirconHandle::Channel(ChannelHandle { stream_ref, rights })
@@ -910,6 +918,7 @@ impl Router {
                             stream_reader.into(),
                             stats,
                             Arc::downgrade(&self),
+                            coding_context,
                         ),
                     );
                     ZirconHandle::Socket(SocketHandle { stream_ref, socket_type, rights })
@@ -927,6 +936,7 @@ impl Router {
                             stream_reader.into(),
                             stats,
                             Arc::downgrade(&self),
+                            coding_context,
                         ),
                     );
                     ZirconHandle::EventPair(EventPairHandle {
@@ -1001,6 +1011,12 @@ impl Router {
             + std::fmt::Debug
             + crate::handle_info::WithRights,
     {
+        let coding_context = if conn.is_circuit() {
+            crate::coding::Context { use_persistent_header: true }
+        } else {
+            crate::coding::DEFAULT_CONTEXT
+        };
+
         let (tx, rx) = futures::channel::oneshot::channel();
         let rx = ProxyTransferInitiationReceiver::new(
             rx.map_err(move |_| format_err!("cancelled transfer via recv_proxied")),
@@ -1013,6 +1029,7 @@ impl Router {
             conn,
             stats,
             Arc::downgrade(&self),
+            coding_context,
         )
         .await?;
         if let Some(p) = p {

@@ -23,6 +23,7 @@ pub(crate) async fn send<Hdl: 'static + for<'a> ProxyableRW<'a>>(
     stream_reader: FramedStreamReader,
     stats: Arc<MessageStats>,
     router: Weak<Router>,
+    coding_context: crate::coding::Context,
 ) -> Result<(), Error> {
     super::main::run_main_loop(
         Proxy::new(hdl, router, stats),
@@ -30,6 +31,7 @@ pub(crate) async fn send<Hdl: 'static + for<'a> ProxyableRW<'a>>(
         stream_writer,
         None,
         stream_reader,
+        coding_context,
     )
     .await
 }
@@ -44,6 +46,7 @@ pub(crate) async fn recv<Hdl, CreateType>(
     conn: PeerConnRef<'_>,
     stats: Arc<MessageStats>,
     router: Weak<Router>,
+    coding_context: crate::coding::Context,
 ) -> Result<(fidl::Handle, Option<impl Send + Future<Output = Result<(), Error>>>), Error>
 where
     Hdl: 'static + for<'a> ProxyableRW<'a>,
@@ -63,6 +66,7 @@ where
                     stream_writer,
                     None,
                     stream_reader,
+                    coding_context,
                 )),
             )
         }
@@ -101,6 +105,7 @@ where
                         stream_writer,
                         Some(initial_stream_reader),
                         stream_reader,
+                        coding_context,
                     )),
                 ),
             }
@@ -135,6 +140,7 @@ where
                             stream_writer,
                             Some(initial_stream_reader),
                             stream_reader,
+                            coding_context,
                         )),
                     )
                 }

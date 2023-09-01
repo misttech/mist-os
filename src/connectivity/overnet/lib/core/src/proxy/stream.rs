@@ -23,6 +23,7 @@ use std::task::{Context, Poll};
 
 pub(crate) struct StreamWriter<Msg: Message> {
     stream: FramedStreamWriter,
+    coding_context: coding::Context,
     send_buffer: Vec<u8>,
     stats: Arc<MessageStats>,
     router: Weak<Router>,
@@ -46,39 +47,36 @@ impl<Msg: Message> StreamWriter<Msg> {
         let conn = self.stream.conn();
         let mut rh = RouterHolder::Unused(&self.router);
         let stats = &self.stats;
-        let coding_context = coding::DEFAULT_CONTEXT;
         poll_fn(|fut_ctx| {
-            s.poll_ser(msg, send_buffer, conn, stats, &mut rh, fut_ctx, coding_context)
+            s.poll_ser(msg, send_buffer, conn, stats, &mut rh, fut_ctx, self.coding_context)
         })
         .await
         .with_context(|| format_err!("Serializing message {:?}", msg))?;
         self.stream
-            .send(FrameType::Data(coding_context), &self.send_buffer, false, &self.stats)
+            .send(FrameType::Data(self.coding_context), &self.send_buffer, false, &self.stats)
             .await
             .with_context(|| format_err!("sending data {:?} ser={:?}", msg, self.send_buffer))
     }
 
     async fn send_control(&mut self, mut msg: StreamControl, fin: bool) -> Result<(), Error> {
         assert_ne!(self.closed, true);
-        let coding_context = coding::DEFAULT_CONTEXT;
-        let msg = encode_fidl_with_context(coding_context, &mut msg)
+        let msg = encode_fidl_with_context(self.coding_context, &mut msg)
             .with_context(|| format_err!("encoding control message {:?}", msg))?;
         if fin {
             self.closed = true;
         }
         self.stream
-            .send(FrameType::Control(coding_context), msg.as_slice(), fin, &self.stats)
+            .send(FrameType::Control(self.coding_context), msg.as_slice(), fin, &self.stats)
             .await
             .with_context(|| format_err!("sending control message {:?}", msg))
     }
 
     pub async fn send_signal(&mut self, mut msg: SignalUpdate) -> Result<(), Error> {
         assert_ne!(self.closed, true);
-        let coding_context = coding::DEFAULT_CONTEXT;
-        let msg = encode_fidl_with_context(coding_context, &mut msg)
+        let msg = encode_fidl_with_context(self.coding_context, &mut msg)
             .with_context(|| format_err!("encoding control message {:?}", msg))?;
         self.stream
-            .send(FrameType::Signal(coding_context), msg.as_slice(), false, &self.stats)
+            .send(FrameType::Signal(self.coding_context), msg.as_slice(), false, &self.stats)
             .await
             .with_context(|| format_err!("sending control message {:?}", msg))
     }
@@ -132,6 +130,7 @@ impl<Msg: Message> StreamWriter<Msg> {
 pub(crate) trait StreamWriterBinder {
     fn bind<Msg: Message, H: Proxyable<Message = Msg>>(
         self,
+        coding_context: coding::Context,
         hdl: &ProxyableHandle<H>,
     ) -> StreamWriter<Msg>;
 }
@@ -139,11 +138,13 @@ pub(crate) trait StreamWriterBinder {
 impl StreamWriterBinder for FramedStreamWriter {
     fn bind<Msg: Message, H: Proxyable<Message = Msg>>(
         self,
+        coding_context: coding::Context,
         hdl: &ProxyableHandle<H>,
     ) -> StreamWriter<Msg> {
         StreamWriter {
             stream: self,
             send_buffer: Vec::new(),
+            coding_context,
             stats: hdl.stats().clone(),
             router: hdl.router().clone(),
             closed: false,
