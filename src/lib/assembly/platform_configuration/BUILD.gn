@@ -23,7 +23,6 @@ rustc_library("platform_configuration") {
     "src/subsystems/driver_framework.rs",
     "src/subsystems/example.rs",
     "src/subsystems/fonts.rs",
-    "src/subsystems/forensics.rs",
     "src/subsystems/graphics.rs",
     "src/subsystems/hwinfo.rs",
     "src/subsystems/identity.rs",
