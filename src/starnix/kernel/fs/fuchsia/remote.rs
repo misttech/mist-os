@@ -116,7 +116,7 @@ impl RemoteFs {
         // caches, so we can't use remote IDs if the remote filesystem is not guaranteed to provide
         // unique IDs, or if the remote filesystem spans multiple filesystems.
         let (status, info) =
-            root_proxy.query_filesystem(zx::Time::INFINITE).map_err(|_| errno!(EIO)).unwrap();
+            root_proxy.query_filesystem(zx::Time::INFINITE).map_err(|_| errno!(EIO))?;
         // Be tolerant of errors here; many filesystems return `ZX_ERR_NOT_SUPPORTED`.
         let use_remote_ids = status == 0
             && info
