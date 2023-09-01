@@ -16,6 +16,7 @@
 #include <fbl/string_printf.h>
 
 #include "src/devices/lib/log/log.h"
+#include "src/lib/driver_symbols/symbols.h"
 
 namespace fdh = fuchsia_driver_host;
 namespace fio = fuchsia_io;
@@ -27,6 +28,8 @@ using namespace fuchsia_driver_framework;
 namespace dfv2 {
 
 namespace {
+
+static constexpr std::string_view kCompatDriverRelativePath = "driver/compat.so";
 
 std::string_view GetManifest(std::string_view url) {
   auto index = url.rfind('/');
@@ -46,19 +49,13 @@ class FileEventHandler : public fidl::AsyncEventHandler<fio::File> {
   std::string url_;
 };
 
-zx::result<fidl::ClientEnd<fio::File>> OpenDriverFile(
-    const fdf::DriverStartArgs& start_args, const fuchsia_data::wire::Dictionary& program) {
+zx::result<fidl::ClientEnd<fio::File>> OpenDriverFile(const fdf::DriverStartArgs& start_args,
+                                                      std::string_view relative_binary_path) {
   const auto& incoming = start_args.incoming();
   auto pkg = incoming ? fdf_internal::NsValue(*incoming, "/pkg") : zx::error(ZX_ERR_INVALID_ARGS);
   if (pkg.is_error()) {
     LOGF(ERROR, "Failed to start driver, missing '/pkg' directory: %s", pkg.status_string());
     return pkg.take_error();
-  }
-
-  zx::result<std::string> binary = fdf_internal::ProgramValue(program, "binary");
-  if (binary.is_error()) {
-    LOGF(ERROR, "Failed to start driver, missing 'binary' argument: %s", binary.status_string());
-    return binary.take_error();
   }
   // Open the driver's binary within the driver's package.
   auto endpoints = fidl::CreateEndpoints<fio::File>();
@@ -66,7 +63,7 @@ zx::result<fidl::ClientEnd<fio::File>> OpenDriverFile(
     return endpoints.take_error();
   }
   zx_status_t status = fdio_open_at(
-      pkg->channel()->get(), binary->data(),
+      pkg->channel()->get(), relative_binary_path.data(),
       static_cast<uint32_t>(fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightExecutable),
       endpoints->server.TakeChannel().release());
   if (status != ZX_OK) {
@@ -78,7 +75,8 @@ zx::result<fidl::ClientEnd<fio::File>> OpenDriverFile(
 
 }  // namespace
 
-zx::result<fbl::RefPtr<Driver>> Driver::Load(std::string url, zx::vmo vmo) {
+zx::result<fbl::RefPtr<Driver>> Driver::Load(std::string url, zx::vmo vmo,
+                                             std::string_view relative_binary_path) {
   // Give the driver's VMO a name. We can't fit the entire URL in the name, so
   // use the name of the manifest from the URL.
   auto manifest = GetManifest(url);
@@ -87,6 +85,25 @@ zx::result<fbl::RefPtr<Driver>> Driver::Load(std::string url, zx::vmo vmo) {
     LOGF(ERROR, "Failed to start driver '%s',, could not name library VMO: %s", url.c_str(),
          zx_status_get_string(status));
     return zx::error(status);
+  }
+
+  // If we are using the compat shim, we do symbol validation when loading the DFv1 driver vmo.
+  // This is as here the |vmo| will correspond to the compat driver, but the |url| will be the
+  // DFv1 driver's url, so we would be incorrectly looking for |url| in the allowlist for
+  // the compat driver's symbols.
+  if (relative_binary_path != kCompatDriverRelativePath) {
+    auto result = driver_symbols::FindRestrictedSymbols(vmo, url);
+    if (result.is_error()) {
+      LOGF(WARNING, "Driver '%s' failed to validate as ELF: %s", url.c_str(),
+           result.status_value());
+    } else if (result->size() > 0) {
+      LOGF(ERROR, "Driver '%s' referenced %lu restricted libc symbols: ", url.c_str(),
+           result->size());
+      for (auto& str : *result) {
+        LOGF(ERROR, str.c_str());
+      }
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
+    }
   }
 
   void* library = dlopen_vmo(vmo.get(), RTLD_NOW);
@@ -316,7 +333,14 @@ void LoadDriver(fuchsia_driver_framework::DriverStartArgs start_args,
   fidl::Arena arena;
   fuchsia_data::wire::Dictionary wire_program = fidl::ToWire(arena, *start_args.program());
 
-  auto driver_file = OpenDriverFile(start_args, wire_program);
+  zx::result<std::string> binary = fdf_internal::ProgramValue(wire_program, "binary");
+  if (binary.is_error()) {
+    LOGF(ERROR, "Failed to start driver, missing 'binary' argument: %s", binary.status_string());
+    callback(binary.take_error());
+    return;
+  }
+
+  auto driver_file = OpenDriverFile(start_args, *binary);
   if (driver_file.is_error()) {
     LOGF(ERROR, "Failed to open driver '%s' file: %s", url.c_str(), driver_file.status_string());
     callback(driver_file.take_error());
@@ -340,43 +364,43 @@ void LoadDriver(fuchsia_driver_framework::DriverStartArgs start_args,
   // lifetime.
   fidl::SharedClient file(std::move(*driver_file), dispatcher,
                           std::make_unique<FileEventHandler>(url));
-  auto vmo_callback =
-      [start_args = std::move(start_args), default_dispatcher_opts,
-       default_dispatcher_scheduler_role, callback = std::move(callback),
-       _ = file.Clone()](fidl::Result<fio::File::GetBackingMemory>& result) mutable {
-        const std::string& url = *start_args.url();
-        if (!result.is_ok()) {
-          LOGF(ERROR, "Failed to start driver '%s', could not get library VMO: %s", url.c_str(),
-               result.error_value().FormatDescription().c_str());
-          zx_status_t status = result.error_value().is_domain_error()
-                                   ? result.error_value().domain_error()
-                                   : result.error_value().framework_error().status();
-          callback(zx::error(status));
-          return;
-        }
-        auto driver = Driver::Load(url, std::move(result->vmo()));
-        if (driver.is_error()) {
-          LOGF(ERROR, "Failed to start driver '%s', could not Load driver: %s", url.c_str(),
-               driver.status_string());
-          callback(driver.take_error());
-          return;
-        }
+  auto vmo_callback = [start_args = std::move(start_args), default_dispatcher_opts,
+                       default_dispatcher_scheduler_role, callback = std::move(callback),
+                       relative_binary_path = *binary, _ = file.Clone()](
+                          fidl::Result<fio::File::GetBackingMemory>& result) mutable {
+    const std::string& url = *start_args.url();
+    if (!result.is_ok()) {
+      LOGF(ERROR, "Failed to start driver '%s', could not get library VMO: %s", url.c_str(),
+           result.error_value().FormatDescription().c_str());
+      zx_status_t status = result.error_value().is_domain_error()
+                               ? result.error_value().domain_error()
+                               : result.error_value().framework_error().status();
+      callback(zx::error(status));
+      return;
+    }
+    auto driver = Driver::Load(url, std::move(result->vmo()), relative_binary_path);
+    if (driver.is_error()) {
+      LOGF(ERROR, "Failed to start driver '%s', could not Load driver: %s", url.c_str(),
+           driver.status_string());
+      callback(driver.take_error());
+      return;
+    }
 
-        zx::result<fdf::Dispatcher> driver_dispatcher =
-            CreateDispatcher(*driver, default_dispatcher_opts, default_dispatcher_scheduler_role);
-        if (driver_dispatcher.is_error()) {
-          LOGF(ERROR, "Failed to start driver '%s', could not create dispatcher: %s", url.c_str(),
-               driver_dispatcher.status_string());
-          callback(driver_dispatcher.take_error());
-          return;
-        }
+    zx::result<fdf::Dispatcher> driver_dispatcher =
+        CreateDispatcher(*driver, default_dispatcher_opts, default_dispatcher_scheduler_role);
+    if (driver_dispatcher.is_error()) {
+      LOGF(ERROR, "Failed to start driver '%s', could not create dispatcher: %s", url.c_str(),
+           driver_dispatcher.status_string());
+      callback(driver_dispatcher.take_error());
+      return;
+    }
 
-        callback(zx::ok(LoadedDriver{
-            .driver = std::move(*driver),
-            .start_args = std::move(start_args),
-            .dispatcher = std::move(*driver_dispatcher),
-        }));
-      };
+    callback(zx::ok(LoadedDriver{
+        .driver = std::move(*driver),
+        .start_args = std::move(start_args),
+        .dispatcher = std::move(*driver_dispatcher),
+    }));
+  };
   file->GetBackingMemory(fio::VmoFlags::kRead | fio::VmoFlags::kExecute |
                          fio::VmoFlags::kPrivateClone)
       .ThenExactlyOnce(std::move(vmo_callback));

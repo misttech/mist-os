@@ -21,7 +21,8 @@ class Driver : public fidl::Server<fuchsia_driver_host::Driver>,
                public fbl::RefCounted<Driver>,
                public fbl::DoublyLinkedListable<fbl::RefPtr<Driver>> {
  public:
-  static zx::result<fbl::RefPtr<Driver>> Load(std::string url, zx::vmo vmo);
+  static zx::result<fbl::RefPtr<Driver>> Load(std::string url, zx::vmo vmo,
+                                              std::string_view relative_binary_path);
 
   Driver(std::string url, void* library, const DriverLifecycle* lifecycle);
   ~Driver() override;

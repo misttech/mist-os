@@ -25,6 +25,7 @@
 
 #include "src/devices/lib/log/log.h"
 #include "src/devices/misc/drivers/compat/loader.h"
+#include "src/lib/driver_symbols/symbols.h"
 
 namespace fboot = fuchsia_boot;
 namespace fdf {
@@ -401,6 +402,19 @@ zx::result<> Driver::LoadDriver(zx::vmo loader_vmo, zx::vmo driver_vmo) {
     }
     Loader loader(loader_loop.dispatcher(), original_loader.borrow(), std::move(loader_vmo));
     fidl::BindServer(loader_loop.dispatcher(), std::move(new_loader_endpoints->server), &loader);
+
+    auto result = driver_symbols::FindRestrictedSymbols(driver_vmo, url_str);
+    if (result.is_error()) {
+      LOGF(WARNING, "Driver '%s' failed to validate as ELF: %s", url_str.c_str(),
+           result.status_value());
+    } else if (result->size() > 0) {
+      LOGF(ERROR, "Driver '%s' referenced %lu restricted libc symbols: ", url_str.c_str(),
+           result->size());
+      for (auto& str : *result) {
+        LOGF(ERROR, str.c_str());
+      }
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
+    }
 
     // Open driver.
     library_ = dlopen_vmo(driver_vmo.get(), RTLD_NOW);

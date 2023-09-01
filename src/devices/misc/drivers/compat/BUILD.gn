@@ -41,6 +41,7 @@ source_set("lib") {
     "//src/devices/bin/driver_host:composite_node_spec_util",
     "//src/devices/lib/fidl:devfs_fidl",
     "//src/devices/lib/log",
+    "//src/lib/driver_symbols:driver_symbols",
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",

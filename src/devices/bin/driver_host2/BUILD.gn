@@ -27,6 +27,7 @@ source_set("driver") {
     "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
     "//sdk/lib/fit",
     "//src/devices/lib/log",
+    "//src/lib/driver_symbols:driver_symbols",
     "//zircon/system/ulib/zircon-internal",
   ]
 
