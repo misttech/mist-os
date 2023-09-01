@@ -61,6 +61,7 @@ OPAQUE_TYPES = [
     '__sigrestore_t',
     'group_filter.*',
     'sigval',
+    'StdAtomic.*',
 ]
 
 # Cross-architecture include paths (the ArchInfo class also has an arch-specific one to add).
@@ -145,6 +146,10 @@ REPLACEMENTS = [
         r'::std::option::Option<unsafe extern "C" fn\([a-zA-Z_0-9: ]*\)>',
         'uaddr'),
     (r'([:=]) \*(const|mut) ([a-zA-Z_0-9:]*)', '\\1 uref<\\3>'),
+
+    # Convert atomic wrapper.
+    (r': StdAtomicI64', ': std::sync::atomic::AtomicI64'),
+    (r': StdAtomicU32', ': std::sync::atomic::AtomicU32'),
 ]
 
 INPUT_FILE = 'src/starnix/lib/linux_uapi/wrapper.h'
@@ -153,6 +158,9 @@ NO_DEBUG_TYPES = [
     '__sifields__bindgen_ty_(2|3)',
 ]
 
+NO_COPY_TYPES = [
+    'StdAtomic.*',
+]
 
 class ArchInfo:
 
@@ -180,6 +188,7 @@ bindgen.set_auto_derive_traits(AUTO_DERIVE_TRAITS)
 bindgen.set_replacements(REPLACEMENTS)
 bindgen.ignore_functions = True
 bindgen.no_debug_types = NO_DEBUG_TYPES
+bindgen.no_copy_types = NO_COPY_TYPES
 
 for arch in ARCH_INFO:
     bindgen.c_types_prefix = "crate::types"

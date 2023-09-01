@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <atomic>
 #include <cerrno>
 #define EXPORT __attribute__((visibility("default")))
 #define WEAK __attribute__((weak, visibility("default")))
@@ -31,9 +32,10 @@ extern "C" EXPORT int __vdso_clock_gettime(int clock_id, struct timespec* tp) {
   if ((clock_id == CLOCK_MONOTONIC) || (clock_id == CLOCK_MONOTONIC_RAW) ||
       (clock_id == CLOCK_MONOTONIC_COARSE) || (clock_id == CLOCK_BOOTTIME)) {
     uint64_t raw_ticks = __rdtsc();
-    uint64_t ticks = raw_ticks + vvar.raw_ticks_to_ticks_offset;
+    uint64_t ticks = raw_ticks + vvar.raw_ticks_to_ticks_offset.load(std::memory_order_acquire);
     // TODO(mariagl): This could potentially overflow; Find a way to avoid this.
-    uint64_t monot_nsec = ticks * vvar.ticks_to_mono_numerator / vvar.ticks_to_mono_denominator;
+    uint64_t monot_nsec = ticks * vvar.ticks_to_mono_numerator.load(std::memory_order_acquire) /
+                          vvar.ticks_to_mono_denominator.load(std::memory_order_acquire);
     tp->tv_sec = monot_nsec / NSEC_PER_SEC;
     tp->tv_nsec = monot_nsec % NSEC_PER_SEC;
   } else {

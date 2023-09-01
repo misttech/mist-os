@@ -12053,11 +12053,23 @@ pub struct sockaddr_vm {
     pub svm_zero: [crate::types::c_uchar; 3usize],
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[repr(align(8))]
+#[derive(Debug, Default)]
+pub struct StdAtomicI64 {
+    pub _bindgen_opaque_blob: u64,
+}
+#[repr(C)]
+#[repr(align(4))]
+#[derive(Debug, Default)]
+pub struct StdAtomicU32 {
+    pub _bindgen_opaque_blob: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default)]
 pub struct vvar_data {
-    pub raw_ticks_to_ticks_offset: i64,
-    pub ticks_to_mono_numerator: u32,
-    pub ticks_to_mono_denominator: u32,
+    pub raw_ticks_to_ticks_offset: std::sync::atomic::AtomicI64,
+    pub ticks_to_mono_numerator: std::sync::atomic::AtomicU32,
+    pub ticks_to_mono_denominator: std::sync::atomic::AtomicU32,
 }
 pub const _SECCOMP_IOCTL_NOTIF_RECV: __u32 = 3226476800;
 pub const SECCOMP_IOCTL_NOTIF_RECV: __u32 = 3226476800;

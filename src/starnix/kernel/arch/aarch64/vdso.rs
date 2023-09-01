@@ -8,12 +8,16 @@ use zerocopy::AsBytes;
 
 use crate::{
     types::{errno, from_status_like_fdio, Errno},
-    vdso::vdso_loader::MemoryMappedVvar,
+    vdso::vdso_loader::VvarInitialValues,
 };
 
 pub const HAS_VDSO: bool = true;
 
-pub fn set_vvar_data(_vvar_vmo: &mut MemoryMappedVvar) {}
+pub fn get_vvar_values() -> VvarInitialValues {
+    // Returns an empty struct since vvar_data is currently unused in this architecture
+    // TODO(fxb/129367): Implement gettimeofday() in aarch64.
+    VvarInitialValues::default()
+}
 
 pub fn get_sigreturn_offset(vdso_vmo: &zx::Vmo) -> Result<Option<u64>, Errno> {
     let dyn_section = elf_parse::Elf64DynSection::from_vmo(vdso_vmo).map_err(|_| errno!(EINVAL))?;

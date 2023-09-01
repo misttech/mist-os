@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    arch::vdso::{get_sigreturn_offset, set_vvar_data, HAS_VDSO},
+    arch::vdso::{get_sigreturn_offset, get_vvar_values, HAS_VDSO},
     lock::Mutex,
     mm::PAGE_SIZE,
     types::{errno, from_status_like_fdio, uapi, Errno},
@@ -11,9 +11,19 @@ use crate::{
 use fidl::AsHandleRef;
 use fuchsia_zircon::{self as zx, HandleBased};
 use once_cell::sync::Lazy;
-use std::{mem::size_of, sync::Arc};
+use std::{
+    mem::size_of,
+    sync::{atomic::Ordering, Arc},
+};
 
 static VVAR_SIZE: Lazy<usize> = Lazy::new(|| *PAGE_SIZE as usize);
+
+#[derive(Default)]
+pub struct VvarInitialValues {
+    pub raw_ticks_to_ticks_offset: i64,
+    pub ticks_to_mono_numerator: u32,
+    pub ticks_to_mono_denominator: u32,
+}
 
 pub struct MemoryMappedVvar {
     map_addr: usize,
@@ -22,7 +32,11 @@ pub struct MemoryMappedVvar {
 impl MemoryMappedVvar {
     /// Maps the vvar vmo to a region of the Starnix kernel root VMAR and stores the address of
     /// the mapping in this object.
-    pub fn new(vmo: &zx::Vmo) -> Result<MemoryMappedVvar, zx::Status> {
+    /// Initialises the mapped region with data by writing an initial set of vvar data
+    pub fn new(
+        vmo: &zx::Vmo,
+        vvar_initial_values: VvarInitialValues,
+    ) -> Result<MemoryMappedVvar, zx::Status> {
         let vvar_data_size = size_of::<uapi::vvar_data>();
         // Check that the vvar_data struct isn't larger than the size of the memory mapped vvar
         debug_assert!(vvar_data_size <= *VVAR_SIZE);
@@ -31,15 +45,25 @@ impl MemoryMappedVvar {
             | zx::VmarFlags::REQUIRE_NON_RESIZABLE
             | zx::VmarFlags::PERM_WRITE;
         let map_addr = fuchsia_runtime::vmar_root_self().map(0, &vmo, 0, *VVAR_SIZE, flags)?;
-        Ok(MemoryMappedVvar { map_addr })
-    }
+        // This initial writing of vvar_data isn't atomic, as no other thread can write to this
+        // mapping yet.
+        // All subsequent updates to vvar_data must be atomic.
+        let vvar_data = unsafe {
+            // SAFETY: It is checked in the assertion above that the size of the memory region
+            // map_addr points to is larger than the size of uapi::vvar_data.
+            &*(map_addr as *const uapi::vvar_data)
+        };
+        vvar_data
+            .raw_ticks_to_ticks_offset
+            .store(vvar_initial_values.raw_ticks_to_ticks_offset, Ordering::Release);
+        vvar_data
+            .ticks_to_mono_numerator
+            .store(vvar_initial_values.ticks_to_mono_numerator, Ordering::Release);
+        vvar_data
+            .ticks_to_mono_denominator
+            .store(vvar_initial_values.ticks_to_mono_denominator, Ordering::Release);
 
-    /// Writes vvar_data to the mapping of the vvar vmo in the Starnix kernel VMAR
-    pub fn write_vvar_data(&mut self, vvar_data: uapi::vvar_data) {
-        let mut_ptr = self.map_addr as *mut uapi::vvar_data;
-        unsafe {
-            *mut_ptr = vvar_data;
-        }
+        Ok(MemoryMappedVvar { map_addr })
     }
 }
 
@@ -91,13 +115,12 @@ fn create_vvar_and_handles() -> (Mutex<MemoryMappedVvar>, Arc<zx::Vmo>) {
     // Creating a vvar vmo which has a handle which is writeable.
     let vvar_vmo_writeable =
         Arc::new(zx::Vmo::create(*VVAR_SIZE as u64).expect("Couldn't create vvar vvmo"));
-    // Map the writeable vvar_vmo to a region of Starnix kernel VMAR
-    let vvar_memory_mapped =
-        Mutex::new(MemoryMappedVvar::new(&vvar_vmo_writeable).expect("couldn't map vvar vmo"));
-    // Initialise vvar_data by writing to this memory region
-    let mut binding = vvar_memory_mapped.lock();
-    set_vvar_data(&mut binding);
-    drop(binding);
+    // Map the writeable vvar_vmo to a region of Starnix kernel VMAR and write initial vvar_data
+    let vvar_initial_values = get_vvar_values();
+    let vvar_memory_mapped = Mutex::new(
+        MemoryMappedVvar::new(&vvar_vmo_writeable, vvar_initial_values)
+            .expect("couldn't map vvar vmo"),
+    );
     let vvar_writeable_rights = vvar_vmo_writeable
         .basic_info()
         .expect("Couldn't get rights of writeable vvar handle")

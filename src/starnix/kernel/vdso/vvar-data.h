@@ -7,6 +7,8 @@
 
 #include <stdint.h>
 
+#include "src/starnix/lib/linux_uapi/bindgen_atomics.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -15,15 +17,15 @@ extern "C" {
 // perspective.
 struct vvar_data {
   // Offset for converting from the raw system timer to zx_ticks_t
-  int64_t raw_ticks_to_ticks_offset;
+  StdAtomicI64 raw_ticks_to_ticks_offset;
 
   // Ratio which relates ticks (zx_ticks_get) to clock monotonic (zx_clock_get_monotonic).
   // Specifically...
   //
   // ClockMono(ticks) = (ticks * N) / D
   //
-  uint32_t ticks_to_mono_numerator;
-  uint32_t ticks_to_mono_denominator;
+  StdAtomicU32 ticks_to_mono_numerator;
+  StdAtomicU32 ticks_to_mono_denominator;
 };
 #ifdef __cplusplus
 }
