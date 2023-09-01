@@ -10,6 +10,36 @@
 #include "pw_async/dispatcher.h"
 #include "pw_async/task.h"
 
+namespace pw_async_fuchsia {
+
+struct AllocatedTaskAndFunction {
+  pw::async::Task task;
+  pw::async::TaskFunction func;
+};
+
+// TODO(fxbug.dev/125129): Replace these temporary allocating utilities.
+inline void PostAt(pw::async::Dispatcher* dispatcher, pw::async::TaskFunction&& task,
+                   pw::chrono::SystemClock::time_point time) {
+  AllocatedTaskAndFunction* t = new AllocatedTaskAndFunction();
+  t->func = std::move(task);
+  t->task.set_function([t](pw::async::Context& ctx, pw::Status status) {
+    t->func(ctx, status);
+    delete t;
+  });
+  dispatcher->PostAt(t->task, time);
+}
+
+inline void PostAfter(pw::async::Dispatcher* dispatcher, pw::async::TaskFunction&& task,
+                      pw::chrono::SystemClock::duration delay) {
+  PostAt(dispatcher, std::move(task), dispatcher->now() + delay);
+}
+
+inline void Post(pw::async::Dispatcher* dispatcher, pw::async::TaskFunction&& task) {
+  PostAt(dispatcher, std::move(task), dispatcher->now());
+}
+
+}  // namespace pw_async_fuchsia
+
 namespace pw::async::fuchsia {
 
 class FuchsiaDispatcher final : public Dispatcher {
