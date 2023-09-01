@@ -3,104 +3,28 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        capability::{CapabilityProvider, CapabilitySource},
-        model::{
-            error::{CapabilityProviderError, ModelError},
-            hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
-            model::Model,
-        },
-    },
-    ::routing::capability_source::InternalCapability,
+    crate::model::model::Model,
     anyhow::{format_err, Context as _, Error},
-    async_trait::async_trait,
-    cm_types::Name,
-    cm_util::channel,
-    cm_util::TaskGroup,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio,
     fidl_fuchsia_sys2::*,
     fuchsia_async::{self as fasync},
     fuchsia_zircon as zx,
     futures::prelude::*,
-    lazy_static::lazy_static,
-    std::{
-        path::PathBuf,
-        sync::{Arc, Weak},
-        time::Duration,
-    },
-    tracing::{info, warn},
+    std::{sync::Weak, time::Duration},
+    tracing::info,
 };
 
-lazy_static! {
-    pub static ref SYSTEM_CONTROLLER_CAPABILITY_NAME: Name =
-        "fuchsia.sys2.SystemController".parse().unwrap();
-}
-
-#[derive(Clone)]
 pub struct SystemController {
-    model: Weak<Model>,
-    shutdown_timeout: Duration,
-}
-
-impl SystemController {
-    pub fn new(model: Weak<Model>, shutdown_timeout: Duration) -> Self {
-        Self { model, shutdown_timeout }
-    }
-
-    pub fn hooks(self: &Arc<Self>) -> Vec<HooksRegistration> {
-        vec![HooksRegistration::new(
-            "SystemController",
-            vec![EventType::CapabilityRouted],
-            Arc::downgrade(self) as Weak<dyn Hook>,
-        )]
-    }
-
-    async fn on_framework_capability_routed_async<'a>(
-        self: Arc<Self>,
-        capability: &'a InternalCapability,
-        capability_provider: Option<Box<dyn CapabilityProvider>>,
-    ) -> Result<Option<Box<dyn CapabilityProvider>>, ModelError> {
-        if capability.matches_protocol(&SYSTEM_CONTROLLER_CAPABILITY_NAME) {
-            Ok(Some(Box::new(SystemControllerCapabilityProvider::new(
-                self.model.clone(),
-                self.shutdown_timeout.clone(),
-            )) as Box<dyn CapabilityProvider>))
-        } else {
-            Ok(capability_provider)
-        }
-    }
-}
-
-#[async_trait]
-impl Hook for SystemController {
-    async fn on(self: Arc<Self>, event: &Event) -> Result<(), ModelError> {
-        if let EventPayload::CapabilityRouted {
-            source: CapabilitySource::Builtin { capability, .. },
-            capability_provider,
-        } = &event.payload
-        {
-            let mut capability_provider = capability_provider.lock().await;
-            *capability_provider = self
-                .on_framework_capability_routed_async(&capability, capability_provider.take())
-                .await?;
-        };
-        Ok(())
-    }
-}
-
-pub struct SystemControllerCapabilityProvider {
     model: Weak<Model>,
     request_timeout: Duration,
 }
 
-impl SystemControllerCapabilityProvider {
+impl SystemController {
     // TODO (jmatt) allow timeout to be supplied in the constructor
     pub fn new(model: Weak<Model>, request_timeout: Duration) -> Self {
         Self { model, request_timeout }
     }
 
-    async fn open_async(self, mut stream: SystemControllerRequestStream) -> Result<(), Error> {
+    pub async fn serve(self, mut stream: SystemControllerRequestStream) -> Result<(), Error> {
         while let Some(request) = stream.try_next().await? {
             // TODO(jmatt) There is the potential for a race here. If
             // the thing that called SystemController.Shutdown is a
@@ -139,43 +63,19 @@ impl SystemControllerCapabilityProvider {
     }
 }
 
-#[async_trait]
-impl CapabilityProvider for SystemControllerCapabilityProvider {
-    async fn open(
-        self: Box<Self>,
-        task_group: TaskGroup,
-        _flags: fio::OpenFlags,
-        _relative_path: PathBuf,
-        server_end: &mut zx::Channel,
-    ) -> Result<(), CapabilityProviderError> {
-        let server_end = channel::take_channel(server_end);
-        let server_end = ServerEnd::<SystemControllerMarker>::new(server_end);
-        let stream: SystemControllerRequestStream =
-            server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
-        task_group
-            .spawn(async move {
-                let result = self.open_async(stream).await;
-                if let Err(error) = result {
-                    warn!(%error, "SystemController.open failed");
-                }
-            })
-            .await;
-        Ok(())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use {
         super::*,
         crate::model::{
-            hooks::{EventType, Hook, HooksRegistration},
+            error::ModelError,
+            hooks::{Event, EventType, Hook, HooksRegistration},
             testing::test_helpers::{component_decl_with_test_runner, ActionsTest, ComponentInfo},
         },
         async_trait::async_trait,
         cm_rust_testing::ComponentDeclBuilder,
-        fidl::endpoints,
-        fidl_fuchsia_sys2 as fsys,
+        fidl::endpoints::create_proxy_and_stream,
+        fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
         moniker::{Moniker, MonikerBase},
         std::{boxed::Box, convert::TryFrom, sync::Arc, time::Duration},
     };
@@ -207,21 +107,16 @@ mod tests {
         let component_d = test.start(vec!["a", "b", "d"].try_into().unwrap()).await;
 
         // Wire up connections to SystemController
-        let sys_controller = Box::new(SystemControllerCapabilityProvider::new(
+        let sys_controller = SystemController::new(
             Arc::downgrade(&test.model),
             // allow simulated shutdown to take up to 30 days
             Duration::from_secs(60 * 60 * 24 * 30),
-        ));
-        let (client_channel, server_channel) =
-            endpoints::create_endpoints::<fsys::SystemControllerMarker>();
-        let mut server_channel = server_channel.into_channel();
-        let task_group = TaskGroup::new();
-        sys_controller
-            .open(task_group.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server_channel)
-            .await
-            .expect("failed to open capability");
-        let controller_proxy =
-            client_channel.into_proxy().expect("failed converting endpoint into proxy");
+        );
+        let (controller_proxy, stream) =
+            create_proxy_and_stream::<fsys::SystemControllerMarker>().unwrap();
+        let _task = fasync::Task::spawn(async move {
+            sys_controller.serve(stream).await.expect("error serving system controller");
+        });
 
         let root_component_info = ComponentInfo::new(test.model.root().clone()).await;
         let component_a_info = ComponentInfo::new(component_a.clone()).await;
@@ -292,26 +187,16 @@ mod tests {
             let component_a = test.start(vec!["a"].try_into().unwrap()).await;
 
             // Wire up connections to SystemController
-            let sys_controller = Box::new(SystemControllerCapabilityProvider::new(
+            let sys_controller = SystemController::new(
                 Arc::downgrade(&test.model),
                 // require shutdown in a second
                 Duration::from_secs(u64::try_from(TIMEOUT_SECONDS).unwrap()),
-            ));
-            let (client_channel, server_channel) =
-                endpoints::create_endpoints::<fsys::SystemControllerMarker>();
-            let mut server_channel = server_channel.into_channel();
-            let task_group = TaskGroup::new();
-            sys_controller
-                .open(
-                    task_group.clone(),
-                    fio::OpenFlags::empty(),
-                    PathBuf::new(),
-                    &mut server_channel,
-                )
-                .await
-                .expect("failed to open capability");
-            let controller_proxy =
-                client_channel.into_proxy().expect("failed converting endpoint into proxy");
+            );
+            let (controller_proxy, stream) =
+                create_proxy_and_stream::<fsys::SystemControllerMarker>().unwrap();
+            let _task = fasync::Task::spawn(async move {
+                sys_controller.serve(stream).await.expect("error serving system controller");
+            });
 
             let root_component_info = ComponentInfo::new(test.model.root().clone()).await;
             let component_a_info = ComponentInfo::new(component_a.clone()).await;

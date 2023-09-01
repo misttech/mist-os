@@ -82,7 +82,8 @@ use {
     fidl_fuchsia_boot as fboot,
     fidl_fuchsia_component_internal::BuiltinBootResolver,
     fidl_fuchsia_diagnostics_types::Task as DiagnosticsTask,
-    fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync,
+    fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fidl_fuchsia_sys2 as fsys,
+    fuchsia_async as fasync,
     fuchsia_component::server::*,
     fuchsia_inspect::{self as inspect, component, health::Reporter, Inspector},
     fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType},
@@ -430,7 +431,6 @@ pub struct BuiltinEnvironment {
     pub root_resource: Option<Arc<RootResource>>,
     #[cfg(target_arch = "aarch64")]
     pub smc_resource: Option<Arc<SmcResource>>,
-    pub system_controller: Arc<SystemController>,
     pub utc_time_maintainer: Option<Arc<UtcTimeMaintainer>>,
     pub vmex_resource: Option<Arc<VmexResource>>,
     pub crash_records_svc: Arc<CrashIntrospectSvc>,
@@ -828,9 +828,12 @@ impl BuiltinEnvironment {
         }
 
         // Set up System Controller service.
-        let system_controller =
-            Arc::new(SystemController::new(Arc::downgrade(&model), SHUTDOWN_TIMEOUT));
-        model.root().hooks.install(system_controller.hooks()).await;
+        let weak_model = Arc::downgrade(&model);
+        sandbox_builder.add_builtin_protocol_if_enabled::<fsys::SystemControllerMarker>(
+            move |stream| {
+                SystemController::new(weak_model.clone(), SHUTDOWN_TIMEOUT).serve(stream).boxed()
+            },
+        );
 
         // Set up the realm service.
         let realm_capability_host =
@@ -958,7 +961,6 @@ impl BuiltinEnvironment {
             crash_records_svc,
             svc_stash_provider,
             root_resource,
-            system_controller,
             utc_time_maintainer,
             binder_capability_host,
             realm_capability_host,
