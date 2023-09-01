@@ -77,7 +77,7 @@
 #include <linux/xattr.h>
 
 // Data shared between Starnix and a vDSO implementation.
-#include <vvar-data.h>
+#include "src/starnix/kernel/vdso/vvar-data.h"
 
 #ifdef __x86_64__
 #include <asm/prctl.h>

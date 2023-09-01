@@ -86,6 +86,7 @@ class Bindgen:
         ]
         for i in self.include_dirs:
             args += ['-I', i]
+        args += ['-I', '.']
 
         # Need to set the PATH to the prebuilt binary location for it to find rustfmt.
         env = os.environ.copy()
