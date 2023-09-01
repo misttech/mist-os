@@ -515,6 +515,16 @@ impl<T> Strong<T> {
     ) -> bool {
         alloc::sync::Arc::ptr_eq(this, other)
     }
+
+    /// Compares the two pointers.
+    pub fn ptr_cmp(
+        Self { inner: this, name: _ }: &Self,
+        Self { inner: other, name: _ }: &Self,
+    ) -> core::cmp::Ordering {
+        let this = alloc::sync::Arc::as_ptr(this);
+        let other = alloc::sync::Arc::as_ptr(other);
+        this.cmp(&other)
+    }
 }
 
 /// A weakly-held reference.

@@ -12,7 +12,7 @@ use net_types::{
 };
 
 /// The priority of a forwarding entry. Lower metrics are preferred.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct RawMetric(pub u32);
 
 impl Display for RawMetric {

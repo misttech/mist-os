@@ -1313,6 +1313,21 @@ impl<C: DeviceLayerTypes> PartialEq<EthernetWeakDeviceId<C>> for EthernetDeviceI
 
 impl<C: DeviceLayerTypes> Eq for EthernetDeviceId<C> {}
 
+impl<C: DeviceLayerTypes> PartialOrd for EthernetDeviceId<C> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<C: DeviceLayerTypes> Ord for EthernetDeviceId<C> {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        let Self(me_id, me) = self;
+        let Self(other_id, other) = other;
+
+        me_id.cmp(other_id).then(StrongRc::ptr_cmp(me, other))
+    }
+}
+
 impl<C: DeviceLayerTypes> Debug for EthernetDeviceId<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Display::fmt(self, f)
@@ -1589,6 +1604,23 @@ impl<C: DeviceLayerTypes> PartialEq<WeakDeviceId<C>> for DeviceId<C> {
             (DeviceId::Loopback(strong), WeakDeviceId::Loopback(weak)) => strong == weak,
             (DeviceId::Loopback(_), WeakDeviceId::Ethernet(_))
             | (DeviceId::Ethernet(_), WeakDeviceId::Loopback(_)) => false,
+        }
+    }
+}
+
+impl<C: DeviceLayerTypes> PartialOrd for DeviceId<C> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<C: DeviceLayerTypes> Ord for DeviceId<C> {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        match (self, other) {
+            (DeviceId::Ethernet(me), DeviceId::Ethernet(other)) => me.cmp(other),
+            (DeviceId::Loopback(me), DeviceId::Loopback(other)) => me.cmp(other),
+            (DeviceId::Loopback(_), DeviceId::Ethernet(_)) => core::cmp::Ordering::Less,
+            (DeviceId::Ethernet(_), DeviceId::Loopback(_)) => core::cmp::Ordering::Greater,
         }
     }
 }
@@ -2451,7 +2483,7 @@ pub(crate) mod testutil {
     }
 
     /// A fake device ID for use in testing.
-    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
     pub(crate) struct FakeDeviceId;
 
     impl StrongId for FakeDeviceId {
@@ -2471,11 +2503,11 @@ pub(crate) mod testutil {
     }
 
     pub(crate) trait FakeStrongDeviceId:
-        StrongId<Weak = FakeWeakDeviceId<Self>> + 'static
+        StrongId<Weak = FakeWeakDeviceId<Self>> + 'static + Ord
     {
     }
 
-    impl<D: StrongId<Weak = FakeWeakDeviceId<Self>> + 'static> FakeStrongDeviceId for D {}
+    impl<D: StrongId<Weak = FakeWeakDeviceId<Self>> + 'static + Ord> FakeStrongDeviceId for D {}
 
     /// Calls [`receive_frame`], with a [`Ctx`].
     #[cfg(test)]

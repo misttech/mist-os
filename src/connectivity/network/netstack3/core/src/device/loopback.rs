@@ -144,6 +144,21 @@ impl<C: DeviceLayerTypes> PartialEq<LoopbackWeakDeviceId<C>> for LoopbackDeviceI
 
 impl<C: DeviceLayerTypes> Eq for LoopbackDeviceId<C> {}
 
+impl<C: DeviceLayerTypes> PartialOrd for LoopbackDeviceId<C> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<C: DeviceLayerTypes> Ord for LoopbackDeviceId<C> {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        let Self(me) = self;
+        let Self(other) = other;
+
+        StrongRc::ptr_cmp(me, other)
+    }
+}
+
 impl<C: DeviceLayerTypes> Debug for LoopbackDeviceId<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Display::fmt(self, f)
