@@ -37,7 +37,4 @@
             from: "self",
         },
     ],
-    config: {
-        use_flatland: { type: "bool" },
-    },
 }

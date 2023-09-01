@@ -79,7 +79,6 @@
         },
     ],
     config: {
-        use_flatland: { type: "bool" },
         display_rotation: { type: "uint32" },
 
         // Structured configuration doesn't support floats.

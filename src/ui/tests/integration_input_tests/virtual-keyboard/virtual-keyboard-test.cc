@@ -147,7 +147,6 @@ class VirtualKeyboardBase : public gtest::RealLoopFixture {
   void SetUp() override {
     FX_LOGS(INFO) << "Setting up test case";
     ui_testing::UITestRealm::Config config;
-    config.use_flatland = true;
     config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
     config.use_scene_owner = true;
     config.ui_to_client_services = {

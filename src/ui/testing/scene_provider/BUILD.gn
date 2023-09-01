@@ -27,7 +27,6 @@ source_set("lib") {
   ]
 
   public_deps = [
-    ":scene_provider_config_lib",
     "//sdk/fidl/fuchsia.element:fuchsia.element_hlcpp",
     "//sdk/fidl/fuchsia.session.scene:fuchsia.session.scene_hlcpp",
     "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_hlcpp",
@@ -41,7 +40,6 @@ source_set("lib") {
   ]
 }
 
-# Required for structured config.
 fuchsia_component_manifest("scene_provider_manifest") {
   testonly = true
   component_name = "scene-provider"
@@ -52,26 +50,4 @@ fuchsia_component("scene-provider") {
   testonly = true
   cm_label = ":scene_provider_manifest"
   deps = [ ":bin" ]
-}
-
-fuchsia_structured_config_cpp_elf_lib("scene_provider_config_lib") {
-  testonly = true
-  cm_label = ":scene_provider_manifest"
-}
-
-fuchsia_structured_config_values("scene_provider_default_config") {
-  testonly = true
-  cm_label = ":scene_provider_manifest"
-  values = {
-    use_flatland = false
-  }
-}
-
-group("scene-provider-deps") {
-  testonly = true
-
-  deps = [
-    ":scene-provider",
-    ":scene_provider_default_config",
-  ]
 }

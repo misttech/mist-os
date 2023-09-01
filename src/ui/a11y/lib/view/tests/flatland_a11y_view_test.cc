@@ -62,7 +62,6 @@ class FlatlandAccessibilityViewTest : public gtest::RealLoopFixture {
 
   void SetUp() override {
     ui_testing::UITestRealm::Config config;
-    config.use_flatland = true;
     config.ui_to_client_services = {fuchsia::ui::scenic::Scenic::Name_,
                                     fuchsia::ui::composition::Flatland::Name_};
     config.exposed_client_services = {fuchsia::accessibility::scene::Provider::Name_,

@@ -25,7 +25,6 @@ using the following arguments via Structured Configuration:
 
 - **display_rotation**: The rotation of the display, counter-clockwise, in 90-degree increments.
 - **device_pixel_ratio**: The conversion factor between logical and physical coordinates.
-- **use_flatland** (soon to be deprecated): Whether to use Flatland or not.
 
 ## Example Usage
 

@@ -520,10 +520,6 @@ class TouchInputBase : public ui_testing::PortableUITest,
 
   uint32_t display_width() { return display_size().width; }
   uint32_t display_height() { return display_size().height; }
-
-  // Override test-ui-stack parameters.
-  bool use_flatland() override { return true; }
-
   uint32_t display_rotation() override { return 90; }
 
   // TODO: fxbug.dev/132413 - Test for DPR=2.0, too.

@@ -71,7 +71,6 @@ void SemanticsIntegrationTestV2::SetUp() {
 
   // Initialize ui test manager.
   ui_testing::UITestRealm::Config config;
-  config.use_flatland = true;
   config.device_pixel_ratio = kDevicePixelRatio;
   config.use_scene_owner = true;
   config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;

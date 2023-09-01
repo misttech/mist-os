@@ -31,7 +31,6 @@ constexpr zx::duration kPredicateTimeout = zx::sec(10);
 // to validate content.
 class CarnelianPixelTest : public ui_testing::PortableUITest {
  public:
-  bool use_flatland() override { return true; }
   std::string GetTestUIStackUrl() override { return "#meta/test-ui-stack.cm"; }
 
  private:

@@ -90,7 +90,6 @@ double MaxSumProject(const ui_testing::Pixel& v,
 class WebRunnerPixelTest : public ui_testing::PortableUITest,
                            public ::testing::WithParamInterface<bool> {
  public:
-  bool use_flatland() override { return true; }
   std::string GetTestUIStackUrl() override { return "#meta/test-ui-stack.cm"; }
   bool use_vulkan() const { return GetParam(); }
 

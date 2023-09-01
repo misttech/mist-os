@@ -83,10 +83,6 @@ class UITestRealm {
     //
     // Must result in integer logical display dimensions.
     float device_pixel_ratio = kDefaultDevicePixelRatio;
-
-    // Indicates which graphics composition API to use (true -> flatland, false
-    // -> gfx).
-    bool use_flatland = false;
   };
 
   explicit UITestRealm(Config config);

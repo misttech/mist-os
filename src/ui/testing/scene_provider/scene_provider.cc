@@ -12,15 +12,12 @@
 
 #include "sdk/lib/syslog/cpp/macros.h"
 #include "src/lib/fsl/handles/object_info.h"
-#include "src/ui/testing/scene_provider/scene_provider_config_lib.h"
 
 namespace ui_testing {
 
 void FakeViewController::Dismiss() { dismiss_(); }
 
 SceneProvider::SceneProvider(sys::ComponentContext* context) : context_(context) {
-  auto scene_provider_config = scene_provider_config_lib::Config::TakeFromStartupHandle();
-  use_flatland_ = scene_provider_config.use_flatland();
   context_->svc()->Connect(scene_manager_.NewRequest());
 }
 
@@ -44,8 +41,6 @@ void SceneProvider::AttachClientView(
 
 void SceneProvider::PresentClientView(
     fuchsia::ui::test::scene::ControllerPresentClientViewRequest request) {
-  FX_CHECK(use_flatland_)
-      << "Client attempted to present a view using a flatland token when GFX is enabled";
   FX_CHECK(request.has_viewport_creation_token()) << "Missing viewport creation token";
 
   fuchsia::session::scene::Manager_PresentRootView_Result present_root_view_result;
@@ -85,24 +80,7 @@ void SceneProvider::PresentView(
   // TODO(fxbug.dev/106094): Register client's scoped view tree watcher, if
   // requested.
 
-  // On GFX, |view_spec| will have the `view_ref` and `view_holder_token` fields
-  // set. On flatland, it will have the `viewport_creation_token` field set.
-  // Any other combination thereof is invalid.
-  if (view_spec.has_view_ref() && view_spec.has_view_holder_token()) {
-    FX_CHECK(!use_flatland_)
-        << "Client attempted to present a view using GFX tokens when flatland is enabled";
-    fuchsia::session::scene::Manager_PresentRootViewLegacy_Result set_root_view_result;
-    zx_status_t status = scene_manager_->PresentRootViewLegacy(
-        std::move(*view_spec.mutable_view_holder_token()), std::move(*view_spec.mutable_view_ref()),
-        &set_root_view_result);
-    FX_CHECK(status == ZX_OK) << "Failed to call PresentRootViewLegacy: "
-                              << zx_status_get_string(status);
-    FX_CHECK(set_root_view_result.is_response())
-        << "Failed to present root view: " << set_root_view_result.err();
-  } else if (view_spec.has_viewport_creation_token()) {
-    FX_CHECK(use_flatland_)
-        << "Client attempted to present a view using a flatland token when GFX is enabled";
-
+  if (view_spec.has_viewport_creation_token()) {
     fuchsia::session::scene::Manager_PresentRootView_Result set_root_view_result;
     scene_manager_->PresentRootView(std::move(*view_spec.mutable_viewport_creation_token()),
                                     &set_root_view_result);
@@ -134,22 +112,7 @@ SceneProvider::GetGraphicalPresenterHandler() {
 }
 
 void SceneProvider::DismissView() {
-  FX_CHECK(!use_flatland_)
-      << "Dismissing views on flatland is not yet supported (fxbug.dev/114431)";
-
-  // Give the scene provider a new ViewHolderToken to drop the existing view.
-  auto client_view_tokens = scenic::ViewTokenPair::New();
-  auto [client_control_ref, client_view_ref] = scenic::ViewRefPair::New();
-
-  fuchsia::session::scene::Manager_PresentRootViewLegacy_Result set_root_view_result;
-
-  zx_status_t status =
-      scene_manager_->PresentRootViewLegacy(std::move(client_view_tokens.view_holder_token),
-                                            fidl::Clone(client_view_ref), &set_root_view_result);
-  FX_CHECK(status == ZX_OK) << "Failed to call PresentRootViewLegacy: "
-                            << zx_status_get_string(status);
-  FX_CHECK(set_root_view_result.is_response())
-      << "Failed to present empty root view: " << set_root_view_result.err();
+  FX_LOGS(FATAL) << "Dismissing views on flatland is not yet supported (fxbug.dev/114431)";
 }
 
 }  // namespace ui_testing

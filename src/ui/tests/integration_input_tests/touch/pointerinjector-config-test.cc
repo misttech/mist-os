@@ -199,7 +199,6 @@ class PointerInjectorConfigTest
 
     ui_testing::UITestRealm::Config config;
     config.display_rotation = test_data.display_rotation;
-    config.use_flatland = true;
     config.use_scene_owner = true;
     config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
     config.ui_to_client_services = {

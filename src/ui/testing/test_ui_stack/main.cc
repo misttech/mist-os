@@ -46,7 +46,6 @@ int run_test_ui_stack(int argc, const char** argv) {
   auto test_ui_stack_config = test_ui_stack_config_lib::Config::TakeFromStartupHandle();
   ui_testing::UITestRealm::Config config;
 
-  config.use_flatland = test_ui_stack_config.use_flatland();
   config.use_scene_owner = true;
   config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
   config.display_rotation = test_ui_stack_config.display_rotation();

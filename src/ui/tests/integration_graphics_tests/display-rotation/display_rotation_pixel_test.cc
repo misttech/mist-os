@@ -41,7 +41,6 @@ class DisplayRotationPixelTestBase : public gtest::RealLoopFixture {
   // |testing::Test|
   void SetUp() override {
     ui_testing::UITestRealm::Config config;
-    config.use_flatland = true;
     config.use_scene_owner = true;
     config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
     config.device_pixel_ratio = ui_testing::kDefaultDevicePixelRatio;

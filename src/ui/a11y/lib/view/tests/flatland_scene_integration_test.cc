@@ -43,7 +43,6 @@ class AccessibilitySceneTest
 
   void SetUp() override {
     ui_testing::UITestRealm::Config config;
-    config.use_flatland = true;
     config.accessibility_owner = GetParam();
     config.use_scene_owner = true;
     config.ui_to_client_services = {fuchsia::ui::scenic::Scenic::Name_,

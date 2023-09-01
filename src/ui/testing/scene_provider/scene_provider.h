@@ -78,7 +78,6 @@ class SceneProvider : public fuchsia::ui::test::scene::Controller,
   std::optional<FakeViewController> fake_view_controller_;
   fuchsia::element::AnnotationControllerPtr annotation_controller_;
   sys::ComponentContext* context_ = nullptr;
-  bool use_flatland_ = false;
 };
 
 }  // namespace ui_testing

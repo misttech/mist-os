@@ -81,7 +81,6 @@ constexpr auto kScenicName = "scenic";
 constexpr auto kSceneManagerName = "scene_manager";
 constexpr auto kTextManagerName = "text_manager";
 constexpr auto kVirtualKeyboardManagerName = "virtual_keyboard_manager";
-constexpr auto kSceneProviderName = "scene-provider";
 constexpr auto kSetUIAccessibility = "setui";
 constexpr auto kIntl = "intl";
 
@@ -95,27 +94,18 @@ std::vector<std::string> DefaultSystemServices() {
 
 // List of scenic services available in the test realm.
 std::vector<std::string> ScenicServices(const UITestRealm::Config& config) {
-  if (config.use_flatland) {
-    // Note that we expose FlatlandDisplay to the client subrealm for now, since
-    // we only have in-tree test clients at the moment. Once UITestManager is
-    // used for out-of-tree tests, we'll want to add a flag to
-    // UITestRealm::Config to control whether we expose internal-only APIs to
-    // the client subrealm.
-    return {fuchsia::ui::observation::test::Registry::Name_,
-            fuchsia::ui::observation::scope::Registry::Name_,
-            fuchsia::ui::pointer::augment::LocalHit::Name_,
-            fuchsia::ui::composition::Allocator::Name_,
-            fuchsia::ui::composition::Flatland::Name_,
-            fuchsia::ui::composition::FlatlandDisplay::Name_,
-            fuchsia::ui::scenic::Scenic::Name_};
-  } else {
-    return {fuchsia::ui::observation::test::Registry::Name_,
-            fuchsia::ui::observation::scope::Registry::Name_,
-            fuchsia::ui::pointer::augment::LocalHit::Name_,
-            fuchsia::ui::focus::FocusChainListenerRegistry::Name_,
-            fuchsia::ui::scenic::Scenic::Name_,
-            fuchsia::ui::views::ViewRefInstalled::Name_};
-  }
+  // Note that we expose FlatlandDisplay to the client subrealm for now, since
+  // we only have in-tree test clients at the moment. Once UITestManager is
+  // used for out-of-tree tests, we'll want to add a flag to
+  // UITestRealm::Config to control whether we expose internal-only APIs to
+  // the client subrealm.
+  return {fuchsia::ui::observation::test::Registry::Name_,
+          fuchsia::ui::observation::scope::Registry::Name_,
+          fuchsia::ui::pointer::augment::LocalHit::Name_,
+          fuchsia::ui::composition::Allocator::Name_,
+          fuchsia::ui::composition::Flatland::Name_,
+          fuchsia::ui::composition::FlatlandDisplay::Name_,
+          fuchsia::ui::scenic::Scenic::Name_};
 }
 
 // List of a11y services available in the test realm.
@@ -270,11 +260,7 @@ void UITestRealm::ConfigureAccessibility() {
 
   switch (config_.accessibility_owner.value()) {
     case UITestRealm::AccessibilityOwnerType::REAL:
-      // We can only enable real a11y manager on flatland because real a11y
-      // manager has circular dependency with gfx on
-      // `fuchsia.ui.accessibility.view.Registry` from scene_manager to real a11y
-      // manager.
-      a11y_manager_url = config_.use_flatland ? kRealA11yManagerUrl : kFakeA11yManagerUrl;
+      a11y_manager_url = kRealA11yManagerUrl;
       use_real_a11y_manager = true;
       break;
     case AccessibilityOwnerType::FAKE:
@@ -300,23 +286,16 @@ void UITestRealm::ConfigureAccessibility() {
                 /* targets = */ {ParentRef()});
 
   if (config_.use_scene_owner) {
-    if (config_.use_flatland) {
-      RouteServices({fuchsia::tracing::provider::Registry::Name_},
-                    /* source = */ ParentRef(),
-                    /* targets = */ {ChildRef{kA11yManagerName}});
-      RouteServices({fuchsia::ui::focus::FocusChainListenerRegistry::Name_},
-                    /* source = */ ChildRef{kScenicName},
-                    /* targets = */ {ChildRef{kA11yManagerName}});
-      RouteServices({fuchsia::accessibility::scene::Provider::Name_,
-                     fuchsia::accessibility::ColorTransform::Name_},
-                    /* source = */ ChildRef{kA11yManagerName},
-                    /* targets = */ {ChildRef{kSceneManagerName}});
-
-    } else {
-      RouteServices({fuchsia::accessibility::Magnifier::Name_},
-                    /* source = */ ChildRef{kA11yManagerName},
-                    /* targets = */ {ChildRef{kSceneManagerName}});
-    }
+    RouteServices({fuchsia::tracing::provider::Registry::Name_},
+                  /* source = */ ParentRef(),
+                  /* targets = */ {ChildRef{kA11yManagerName}});
+    RouteServices({fuchsia::ui::focus::FocusChainListenerRegistry::Name_},
+                  /* source = */ ChildRef{kScenicName},
+                  /* targets = */ {ChildRef{kA11yManagerName}});
+    RouteServices({fuchsia::accessibility::scene::Provider::Name_,
+                   fuchsia::accessibility::ColorTransform::Name_},
+                  /* source = */ ChildRef{kA11yManagerName},
+                  /* targets = */ {ChildRef{kSceneManagerName}});
   }
 
   if (use_real_a11y_manager) {
@@ -382,13 +361,6 @@ void UITestRealm::ConfigureSceneOwner() {
   input_config_directory_contents.AddFile("empty.json", "");
   realm_builder_.RouteReadOnlyDirectory("sensor-config", std::move(targets),
                                         std::move(input_config_directory_contents));
-
-  // Configure scene provider, which will only be present in the test realm if
-  // the client specifies a scene owner. Note: scene-provider has more config
-  // fields than we set here, load the defaults.
-  realm_builder_.InitMutableConfigFromPackage(kSceneProviderName);
-  realm_builder_.SetConfigValue(kSceneProviderName, "use_flatland",
-                                ConfigValue::Bool(config_.use_flatland));
 
   // Route non-public DisplayOwnership protocol from Scenic to SceneManager.
   RouteServices({fuchsia::ui::composition::internal::DisplayOwnership::Name_},

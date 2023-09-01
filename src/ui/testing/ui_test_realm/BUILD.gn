@@ -101,6 +101,6 @@ fuchsia_component("scene_manager_scene") {
     "//src/ui/bin/virtual_keyboard_manager:virtual_keyboard_component",
     "//src/ui/scenic:component_v2",
     "//src/ui/testing/input_helper:input-helper-component",
-    "//src/ui/testing/scene_provider:scene-provider-deps",
+    "//src/ui/testing/scene_provider:scene-provider",
   ]
 }

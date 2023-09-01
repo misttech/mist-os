@@ -77,7 +77,6 @@ class MediaButtonsListenerTest : public gtest::RealLoopFixture {
 
     ui_testing::UITestRealm::Config config;
     config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
-    config.use_flatland = true;
     config.use_scene_owner = true;
     ui_test_manager_.emplace(std::move(config));
 
