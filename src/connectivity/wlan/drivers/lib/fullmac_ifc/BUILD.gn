@@ -6,7 +6,7 @@ source_set("fullmac_ifc") {
   public = [ "wlan_fullmac_ifc.h" ]
   sources = [ "wlan_fullmac_ifc.cc" ]
   deps = [
-    "//sdk/banjo/fuchsia.hardware.wlan.fullmac:fuchsia.hardware.wlan.fullmac_banjo_cpp",
+    "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_banjo_cpp",
     "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_cpp_driver",
     "//src/connectivity/wlan/drivers/lib/log/cpp",
     "//src/connectivity/wlan/lib/common/cpp:common",

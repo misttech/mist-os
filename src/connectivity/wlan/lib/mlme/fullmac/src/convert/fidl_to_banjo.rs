@@ -4,8 +4,8 @@
 
 use {
     anyhow::{self, bail},
-    banjo_fuchsia_hardware_wlan_fullmac as banjo_wlan_fullmac,
     banjo_fuchsia_wlan_common as banjo_wlan_common,
+    banjo_fuchsia_wlan_fullmac as banjo_wlan_fullmac,
     banjo_fuchsia_wlan_ieee80211 as banjo_wlan_ieee80211,
     banjo_fuchsia_wlan_internal as banjo_wlan_internal, fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_mlme as fidl_mlme,
@@ -85,7 +85,9 @@ fn convert_set_key_descriptor(
         address: descriptor.address,
         rsc: descriptor.rsc,
         cipher_suite_oui: descriptor.cipher_suite_oui,
-        cipher_suite_type: descriptor.cipher_suite_type,
+        cipher_suite_type: banjo_fuchsia_wlan_ieee80211::CipherSuiteType(
+            descriptor.cipher_suite_type.into_primitive(),
+        ),
     })
 }
 
@@ -98,7 +100,7 @@ fn dummy_set_key_descriptor() -> banjo_wlan_fullmac::SetKeyDescriptor {
         address: [0; 6],
         rsc: 0,
         cipher_suite_oui: [0; 3],
-        cipher_suite_type: 0,
+        cipher_suite_type: banjo_fuchsia_wlan_ieee80211::CipherSuiteType(0),
     }
 }
 
@@ -161,8 +163,8 @@ pub fn convert_ssid(ssid: &[u8]) -> banjo_wlan_ieee80211::CSsid {
 pub fn convert_scan_request<'a>(
     req: &'a fidl_mlme::ScanRequest,
     ssid_list_copy: &'a [banjo_wlan_ieee80211::CSsid],
-) -> BanjoReturnType<'a, banjo_wlan_fullmac::WlanFullmacScanReq> {
-    BanjoReturnType::new(banjo_wlan_fullmac::WlanFullmacScanReq {
+) -> BanjoReturnType<'a, banjo_wlan_fullmac::WlanFullmacImplStartScanRequest> {
+    BanjoReturnType::new(banjo_wlan_fullmac::WlanFullmacImplStartScanRequest {
         txn_id: req.txn_id,
         scan_type: match req.scan_type {
             fidl_mlme::ScanTypes::Active => banjo_wlan_fullmac::WlanScanType::ACTIVE,
@@ -179,9 +181,9 @@ pub fn convert_scan_request<'a>(
 
 pub fn convert_connect_request(
     req: &fidl_mlme::ConnectRequest,
-) -> BanjoReturnType<'_, banjo_wlan_fullmac::WlanFullmacConnectReq> {
+) -> BanjoReturnType<'_, banjo_wlan_fullmac::WlanFullmacImplConnectRequest> {
     use banjo_wlan_fullmac::WlanAuthType;
-    BanjoReturnType::new(banjo_wlan_fullmac::WlanFullmacConnectReq {
+    BanjoReturnType::new(banjo_wlan_fullmac::WlanFullmacImplConnectRequest {
         selected_bss: convert_bss_description(&req.selected_bss).0,
         connect_failure_timeout: req.connect_failure_timeout,
         auth_type: match req.auth_type {

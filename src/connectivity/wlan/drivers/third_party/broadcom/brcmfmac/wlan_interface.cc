@@ -20,7 +20,7 @@
 #include <cstdio>
 #include <cstring>
 
-#include "fuchsia/hardware/wlan/fullmac/c/banjo.h"
+#include "fuchsia/wlan/fullmac/c/banjo.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/cfg80211.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/common.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/debug.h"
@@ -304,8 +304,8 @@ void WlanInterface::StartScan(StartScanRequestView request, fdf::Arena& arena,
   completer.buffer(arena).Reply();
 }
 
-void WlanInterface::ConnectReq(ConnectReqRequestView request, fdf::Arena& arena,
-                               ConnectReqCompleter::Sync& completer) {
+void WlanInterface::Connect(ConnectRequestView request, fdf::Arena& arena,
+                            ConnectCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);
   if (wdev_ != nullptr) {
     brcmf_if_connect_req(wdev_->netdev, request);

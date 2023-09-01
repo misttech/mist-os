@@ -330,7 +330,7 @@ void SimInterface::StartConnect(const common::MacAddr& bssid, const wlan_ieee802
   assoc_ctx_.channel = channel;
 
   // Send connect request
-  auto builder = wlan_fullmac::WlanFullmacImplConnectReqRequest::Builder(test_arena_);
+  auto builder = wlan_fullmac::WlanFullmacImplConnectRequest::Builder(test_arena_);
   fuchsia_wlan_internal::wire::BssDescription bss;
   memcpy(bss.bssid.data(), bssid.byte, ETH_ALEN);
   auto ies =
@@ -342,7 +342,7 @@ void SimInterface::StartConnect(const common::MacAddr& bssid, const wlan_ieee802
   builder.auth_type(wlan_fullmac::WlanAuthType::kOpenSystem);
   builder.connect_failure_timeout(1000);  // ~1s (although value is ignored for now)
 
-  auto result = client_.buffer(test_arena_)->ConnectReq(builder.Build());
+  auto result = client_.buffer(test_arena_)->Connect(builder.Build());
   ZX_ASSERT(result.ok());
 }
 

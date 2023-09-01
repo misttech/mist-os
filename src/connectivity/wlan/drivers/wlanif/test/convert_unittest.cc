@@ -96,7 +96,7 @@ class ConvertTest : public LogTest {};
 /* Tests for to-FIDL conversions */
 
 TEST_F(ConvertTest, ToFidlStartScanRequest) {
-  wlan_fullmac_scan_req_t in;
+  wlan_fullmac_impl_start_scan_request_t in;
   in.txn_id = kRandomPopulaterUint64;
   in.scan_type = kFakeBanjoScanType;
 
@@ -137,7 +137,7 @@ TEST_F(ConvertTest, ToFidlStartScanRequest) {
 }
 
 TEST_F(ConvertTest, ToFidlQueryConnectReqRequest) {
-  wlan_fullmac_connect_req_t in;
+  wlan_fullmac_impl_connect_request_t in;
   bss_description_t bss;
 
   memcpy(bss.bssid, kFakeMacAddr, sizeof(kFakeMacAddr));
@@ -176,7 +176,7 @@ TEST_F(ConvertTest, ToFidlQueryConnectReqRequest) {
   in.security_ie_count = kFakeIeLen;
 
   fidl::Arena arena;
-  fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest out;
+  fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest out;
 
   wlanif::ConvertConnectReq(in, &out, arena);
 

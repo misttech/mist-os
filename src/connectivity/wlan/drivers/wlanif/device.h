@@ -6,7 +6,7 @@
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_WLANIF_DEVICE_H_
 
 #include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
-#include <fuchsia/hardware/wlan/fullmac/c/banjo.h>
+#include <fuchsia/wlan/fullmac/c/banjo.h>
 #include <fuchsia/wlan/mlme/cpp/fidl.h>
 #include <lib/ddk/driver.h>
 #include <lib/fidl/cpp/binding.h>
@@ -41,8 +41,8 @@ class Device : public ddk::Device<Device, ddk::Unbindable>,
 
   zx_status_t Start(const rust_wlan_fullmac_ifc_protocol_copy_t* ifc, zx::channel* out_sme_channel);
 
-  void StartScan(const wlan_fullmac_scan_req_t* req);
-  void ConnectReq(const wlan_fullmac_connect_req_t* req);
+  void StartScan(const wlan_fullmac_impl_start_scan_request_t* req);
+  void Connect(const wlan_fullmac_impl_connect_request_t* req);
   void ReconnectReq(const wlan_fullmac_reconnect_req_t* req);
   void AuthenticateResp(const wlan_fullmac_auth_resp_t* resp);
   void DeauthenticateReq(const wlan_fullmac_deauth_req_t* req);

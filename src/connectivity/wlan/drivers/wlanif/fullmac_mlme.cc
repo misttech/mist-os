@@ -51,10 +51,12 @@ void FullmacMlme::Init() {
         DEVICE(device)->QuerySpectrumManagementSupport(&out_resp);
         return out_resp;
       },
-      .start_scan = [](void *device,
-                       wlan_fullmac_scan_req_t *req) { DEVICE(device)->StartScan(req); },
-      .connect_req = [](void *device,
-                        wlan_fullmac_connect_req_t *req) { DEVICE(device)->ConnectReq(req); },
+      .start_scan =
+          [](void *device, wlan_fullmac_impl_start_scan_request_t *req) {
+            DEVICE(device)->StartScan(req);
+          },
+      .connect = [](void *device,
+                    wlan_fullmac_impl_connect_request_t *req) { DEVICE(device)->Connect(req); },
       .reconnect_req = [](void *device,
                           wlan_fullmac_reconnect_req_t *req) { DEVICE(device)->ReconnectReq(req); },
       .auth_resp = [](void *device,

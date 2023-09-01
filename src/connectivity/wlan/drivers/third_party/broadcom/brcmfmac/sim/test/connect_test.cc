@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/hardware/wlan/fullmac/c/banjo.h>
 #include <fuchsia/wlan/common/c/banjo.h>
 #include <fuchsia/wlan/ieee80211/cpp/fidl.h>
 #include <fuchsia/wlan/internal/c/banjo.h>
@@ -423,7 +422,7 @@ void ConnectTest::OnSignalReport(const wlan_fullmac::WlanFullmacSignalReportIndi
 
 void ConnectTest::StartConnect() {
   // Send connect request
-  auto builder = wlan_fullmac::WlanFullmacImplConnectReqRequest::Builder(client_ifc_.test_arena_);
+  auto builder = wlan_fullmac::WlanFullmacImplConnectRequest::Builder(client_ifc_.test_arena_);
   fuchsia_wlan_internal::wire::BssDescription bss;
   std::memcpy(bss.bssid.data(), context_.bssid.byte, ETH_ALEN);
   bss.ies = fidl::VectorView<uint8_t>(client_ifc_.test_arena_, context_.ies);
@@ -431,7 +430,7 @@ void ConnectTest::StartConnect() {
   builder.selected_bss(bss);
   builder.auth_type(wlan_fullmac::WlanAuthType::kOpenSystem);
   builder.connect_failure_timeout(1000);  // ~1s (although value is ignored for now)
-  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->ConnectReq(builder.Build());
+  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->Connect(builder.Build());
   EXPECT_TRUE(result.ok());
 }
 

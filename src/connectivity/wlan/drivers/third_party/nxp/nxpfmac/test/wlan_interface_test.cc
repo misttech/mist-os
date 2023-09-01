@@ -621,9 +621,7 @@ TEST_F(WlanInterfaceTest, WlanFullmacImplStartScan) {
   builder.txn_id(kScanTxnId);
   builder.scan_type(fuchsia_wlan_fullmac::wire::WlanScanType::kActive);
 
-  auto scan_request = builder.Build();
-
-  auto result = client_.buffer(test_arena_)->StartScan(scan_request);
+  auto result = client_.buffer(test_arena_)->StartScan(builder.Build());
   ASSERT_TRUE(result.ok());
 
   mlan_event scan_report_event{.event_id = MLAN_EVENT_ID_DRV_SCAN_REPORT};
@@ -685,7 +683,7 @@ TEST_F(WlanInterfaceTest, WlanFullmacImplConnectDisconnectReq) {
   constexpr uint8_t kIesWithSsid[] = {"\x00\x04Test"};
   constexpr uint8_t kTestChannel = 1;
 
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest::Builder(test_arena_);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest::Builder(test_arena_);
 
   fuchsia_wlan_internal::wire::BssDescription bss = {
       .ies = fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(kIesWithSsid),
@@ -695,10 +693,9 @@ TEST_F(WlanInterfaceTest, WlanFullmacImplConnectDisconnectReq) {
 
   builder.selected_bss(bss);
   builder.auth_type(fuchsia_wlan_fullmac::wire::WlanAuthType::kOpenSystem);
-  auto connect_request = builder.Build();
 
   {
-    auto result = client_.buffer(test_arena_)->ConnectReq(connect_request);
+    auto result = client_.buffer(test_arena_)->Connect(builder.Build());
     ASSERT_TRUE(result.ok());
   }
 
@@ -777,7 +774,7 @@ TEST_F(WlanInterfaceTest, WlanFullmacImplConnectRemoteDisconnectReq) {
 
   constexpr uint8_t kIesWithSsid[] = {"\x00\x04Test"};
   constexpr uint8_t kTestChannel = 1;
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest::Builder(test_arena_);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest::Builder(test_arena_);
 
   fuchsia_wlan_internal::wire::BssDescription bss = {
       .ies = fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(kIesWithSsid),
@@ -787,9 +784,8 @@ TEST_F(WlanInterfaceTest, WlanFullmacImplConnectRemoteDisconnectReq) {
 
   builder.selected_bss(bss);
   builder.auth_type(fuchsia_wlan_fullmac::wire::WlanAuthType::kOpenSystem);
-  auto connect_request = builder.Build();
 
-  auto result = client_.buffer(test_arena_)->ConnectReq(connect_request);
+  auto result = client_.buffer(test_arena_)->Connect(builder.Build());
   ASSERT_TRUE(result.ok());
 
   // Wait until the timer has been scheduled.

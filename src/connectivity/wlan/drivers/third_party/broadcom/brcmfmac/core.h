@@ -24,9 +24,9 @@
 #include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
 #include <fidl/fuchsia.wlan.fullmac/cpp/fidl.h>
 #include <fuchsia/hardware/network/driver/c/banjo.h>
-#include <fuchsia/hardware/wlan/fullmac/c/banjo.h>
 #include <fuchsia/hardware/wlanphyimpl/c/banjo.h>
 #include <fuchsia/wlan/common/c/banjo.h>
+#include <fuchsia/wlan/fullmac/c/banjo.h>
 #include <lib/stdcompat/span.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/channel.h>
@@ -195,6 +195,9 @@ using reassoc_context_t = struct {
   wlan::common::MacAddr bssid;
 };
 
+constexpr size_t kConnectReqBufferSize =
+    fidl::MaxSizeInChannel<fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest,
+                           fidl::MessageDirection::kSending>();
 /**
  * struct brcmf_if - interface control information.
  *
@@ -208,7 +211,6 @@ using reassoc_context_t = struct {
  * @bsscfgidx: index of bss associated with this interface.
  * @mac_addr: assigned mac address.
  * @netif_stop: bitmap indicates reason why netif queues are stopped.
- * //@netif_stop_lock: spinlock for update netif_stop from multiple sources.
  *  (replaced by irq_callback_lock)
  * @roam_req: request for a roam attempt, populated if a roam is requested from
  *   above the driver.
@@ -231,9 +233,8 @@ struct brcmf_if {
   int32_t bsscfgidx;
   uint8_t mac_addr[ETH_ALEN];
   uint8_t netif_stop;
-  fuchsia_wlan_fullmac::WlanFullmacImplConnectReqRequest connect_req;
+  fuchsia_wlan_fullmac::WlanFullmacImplConnectRequest connect_req;
   reassoc_context_t reassoc_context;
-  // spinlock_t netif_stop_lock;
   std::atomic<int> pend_8021x_cnt;
   sync_completion_t pend_8021x_wait;
   sync_completion_t disconnect_done;

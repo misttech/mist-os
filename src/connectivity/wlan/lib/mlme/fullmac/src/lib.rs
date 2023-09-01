@@ -372,7 +372,7 @@ impl FullmacMlme {
             Connect(req) => {
                 self.device.set_link_state(fidl_mlme::ControlledPortState::Closed);
                 self.is_bss_protected = !req.security_ie.is_empty();
-                self.device.connect_req(&mut convert_connect_request(&req))
+                self.device.connect(&mut convert_connect_request(&req))
             }
             Reconnect(req) => self.device.reconnect_req(convert_reconnect_request(&req)),
             AuthResponse(resp) => self.device.auth_resp(convert_authenticate_response(&resp)),
@@ -761,7 +761,7 @@ mod handle_mlme_request_tests {
     use {
         super::*,
         crate::device::test_utils::{DriverCall, FakeFullmacDevice},
-        banjo_fuchsia_hardware_wlan_fullmac as banjo_wlan_fullmac,
+        banjo_fuchsia_wlan_fullmac as banjo_wlan_fullmac,
         banjo_fuchsia_wlan_ieee80211 as banjo_wlan_ieee80211,
         fidl_fuchsia_wlan_stats as fidl_stats,
         std::pin::Pin,
@@ -868,7 +868,9 @@ mod handle_mlme_request_tests {
                 address: [8u8; 6],
                 rsc: 9,
                 cipher_suite_oui: [10u8; 3],
-                cipher_suite_type: 11,
+                cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(
+                    11,
+                ),
             })),
             security_ie: vec![12u8, 13],
         });
@@ -909,7 +911,7 @@ mod handle_mlme_request_tests {
             assert_eq!(req.wep_key.address, [8u8; 6]);
             assert_eq!(req.wep_key.rsc, 9);
             assert_eq!(req.wep_key.cipher_suite_oui, [10u8; 3]);
-            assert_eq!(req.wep_key.cipher_suite_type, 11);
+            assert_eq!(req.wep_key.cipher_suite_type, banjo_wlan_ieee80211::CipherSuiteType(11));
 
             assert_eq!(*security_ie, vec![12u8, 13]);
         });
@@ -1106,7 +1108,9 @@ mod handle_mlme_request_tests {
                 address: [8u8; 6],
                 rsc: 9,
                 cipher_suite_oui: [10u8; 3],
-                cipher_suite_type: 11,
+                cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(
+                    11,
+                ),
             }],
         });
 
@@ -1121,7 +1125,10 @@ mod handle_mlme_request_tests {
         assert_eq!(driver_req.keylist[0].address, [8u8; 6]);
         assert_eq!(driver_req.keylist[0].rsc, 9);
         assert_eq!(driver_req.keylist[0].cipher_suite_oui, [10u8; 3]);
-        assert_eq!(driver_req.keylist[0].cipher_suite_type, 11);
+        assert_eq!(
+            driver_req.keylist[0].cipher_suite_type,
+            banjo_wlan_ieee80211::CipherSuiteType(11)
+        );
 
         let conf = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(fidl_mlme::MlmeEvent::SetKeysConf { conf })) => conf);
         assert_eq!(
@@ -1148,7 +1155,7 @@ mod handle_mlme_request_tests {
             address: [8u8; 6],
             rsc: 9,
             cipher_suite_oui: [10u8; 3],
-            cipher_suite_type: 11,
+            cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(11),
         };
         for i in 0..NUM_KEYS {
             keylist.push(fidl_mlme::SetKeyDescriptor { key_id: i as u16, ..key.clone() });
@@ -1187,7 +1194,7 @@ mod handle_mlme_request_tests {
             address: [8u8; 6],
             rsc: 9,
             cipher_suite_oui: [10u8; 3],
-            cipher_suite_type: 11,
+            cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(11),
         };
         let fidl_req = wlan_sme::MlmeRequest::SetKeys(fidl_mlme::SetKeysRequest {
             keylist: vec![key.clone(); 5],
@@ -1214,7 +1221,9 @@ mod handle_mlme_request_tests {
                 address: [8u8; 6],
                 rsc: 9,
                 cipher_suite_oui: [10u8; 3],
-                cipher_suite_type: 11,
+                cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(
+                    11,
+                ),
             }],
         });
 
@@ -1533,7 +1542,7 @@ mod handle_driver_event_tests {
     use {
         super::*,
         crate::device::test_utils::{DriverCall, FakeFullmacDevice},
-        banjo_fuchsia_hardware_wlan_fullmac as banjo_wlan_fullmac,
+        banjo_fuchsia_wlan_fullmac as banjo_wlan_fullmac,
         banjo_fuchsia_wlan_ieee80211 as banjo_wlan_ieee80211,
         banjo_fuchsia_wlan_internal as banjo_wlan_internal, fidl_fuchsia_wlan_mlme as fidl_mlme,
         fuchsia_async as fasync,

@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/hardware/wlan/fullmac/c/banjo.h>
 #include <fuchsia/wlan/common/c/banjo.h>
 #include <fuchsia/wlan/ieee80211/cpp/fidl.h>
 #include <zircon/errors.h>
@@ -244,7 +243,7 @@ wlan_fullmac::SetKeyDescriptor AuthTest::CreateSetKeyDescriptor(
 }
 
 void AuthTest::StartConnect() {
-  auto builder = wlan_fullmac::WlanFullmacImplConnectReqRequest::Builder(client_ifc_.test_arena_);
+  auto builder = wlan_fullmac::WlanFullmacImplConnectRequest::Builder(client_ifc_.test_arena_);
   fuchsia_wlan_internal::wire::BssDescription bss;
   memcpy(bss.bssid.data(), kDefaultBssid.byte, ETH_ALEN);
   bss.ies = fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(kIes), sizeof(kIes));
@@ -405,7 +404,7 @@ void AuthTest::StartConnect() {
   }
   builder.security_ie(fidl::VectorView<uint8_t>::FromExternal(security_ie_, security_ie_count));
 
-  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->ConnectReq(builder.Build());
+  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->Connect(builder.Build());
   EXPECT_TRUE(result.ok());
 }
 

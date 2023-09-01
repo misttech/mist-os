@@ -13,4 +13,5 @@ fidl("fuchsia.wlan.fullmac") {
     "//zircon/vdso/zx",
   ]
   contains_drivers = true
+  enable_banjo = true
 }

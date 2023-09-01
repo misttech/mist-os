@@ -899,7 +899,6 @@ static zx_status_t brcmf_escan_prep(struct brcmf_cfg80211_info* cfg,
   uint32_t n_channels = 0;
   int32_t offset = 0;
   uint16_t chanspec;
-
   if (!(request->has_scan_type() && request->has_channels())) {
     BRCMF_ERR("Missing required field, scan_type: %d, channels: %d", request->has_scan_type(),
               request->has_channels());
@@ -1846,8 +1845,8 @@ std::vector<uint8_t> brcmf_find_ssid_in_ies(const uint8_t* ie, size_t ie_len) {
   return ssid;
 }
 
-zx_status_t brcmf_cfg80211_connect(
-    struct net_device* ndev, const fuchsia_wlan_fullmac::WlanFullmacImplConnectReqRequest* req) {
+zx_status_t brcmf_cfg80211_connect(struct net_device* ndev,
+                                   const fuchsia_wlan_fullmac::WlanFullmacImplConnectRequest* req) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
   struct brcmf_join_params join_params;
@@ -3511,11 +3510,11 @@ void brcmf_if_start_scan(net_device* ndev,
 }
 
 void brcmf_if_connect_req(net_device* ndev,
-                          const wlan_fullmac::WlanFullmacImplConnectReqRequest* req) {
+                          const wlan_fullmac::WlanFullmacImplConnectRequest* req) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_cfg80211_profile* profile = &ifp->vif->profile;
-  fuchsia_wlan_fullmac::WlanFullmacImplConnectReqRequest* saved_req = &ifp->connect_req;
+  fuchsia_wlan_fullmac::WlanFullmacImplConnectRequest* saved_req = &ifp->connect_req;
 
   if (ndev->if_proto == nullptr) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping connect request");

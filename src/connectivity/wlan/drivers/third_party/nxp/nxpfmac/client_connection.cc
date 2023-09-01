@@ -48,19 +48,17 @@ constexpr uint8_t kSaeFramePriority = 7u;
 class ConnectRequestParams {
  public:
   explicit ConnectRequestParams(
-      const fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest* req)
+      const fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest* req)
       : request_arena_() {
     auto natural_req = fidl::ToNatural(*req);
     request_ = fidl::ToWire(request_arena_, natural_req);
   }
 
-  const fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest* get() const {
-    return &request_;
-  }
+  const fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest* get() const { return &request_; }
 
  private:
   fidl::Arena<kConnectReqBufferSize> request_arena_;
-  fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest request_;
+  fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest request_;
 };
 
 ClientConnection::ClientConnection(ClientConnectionIfc* ifc, DeviceContext* context,
@@ -125,7 +123,7 @@ ClientConnection::~ClientConnection() {
 }
 
 zx_status_t ClientConnection::Connect(
-    const fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest* req,
+    const fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest* req,
     OnConnectCallback&& on_connect) {
   std::lock_guard lock(mutex_);
   if (state_ != State::Idle && state_ != State::Authenticating) {
@@ -157,7 +155,7 @@ zx_status_t ClientConnection::Connect(
 }
 
 zx_status_t ClientConnection::ConnectLocked(
-    const fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest* req,
+    const fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest* req,
     OnConnectCallback&& on_connect) {
   if (!req->has_selected_bss() || !req->has_auth_type()) {
     NXPF_ERR("Missing field in connection request: %s %s",
@@ -658,7 +656,7 @@ void ClientConnection::OnSaeTimeout() {
 }
 
 zx_status_t ClientConnection::InitiateSaeHandshake(
-    const fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest* req) {
+    const fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest* req) {
   // The SAE handshake requires that we manually handle some management frames. Register to receive
   // them here before the authentication process starts.
   zx_status_t status = RegisterForMgmtFrames({wlan::ManagementSubtype::kAuthentication,

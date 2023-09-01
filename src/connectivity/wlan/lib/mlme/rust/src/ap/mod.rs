@@ -1059,7 +1059,7 @@ mod tests {
         ap.handle_mlme_setkeys_req(fidl_mlme::SetKeysRequest {
             keylist: vec![fidl_mlme::SetKeyDescriptor {
                 cipher_suite_oui: [1, 2, 3],
-                cipher_suite_type: 4,
+                cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(4),
                 key_type: fidl_mlme::KeyType::Pairwise,
                 address: [5; 6],
                 key_id: 6,
@@ -1088,7 +1088,8 @@ mod tests {
             ap.handle_mlme_setkeys_req(fidl_mlme::SetKeysRequest {
                 keylist: vec![fidl_mlme::SetKeyDescriptor {
                     cipher_suite_oui: [1, 2, 3],
-                    cipher_suite_type: 4,
+                    cipher_suite_type:
+                        fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(4),
                     key_type: fidl_mlme::KeyType::Pairwise,
                     address: [5; 6],
                     key_id: 6,
@@ -1123,7 +1124,8 @@ mod tests {
             ap.handle_mlme_setkeys_req(fidl_mlme::SetKeysRequest {
                 keylist: vec![fidl_mlme::SetKeyDescriptor {
                     cipher_suite_oui: [1, 2, 3],
-                    cipher_suite_type: 4,
+                    cipher_suite_type:
+                        fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(4),
                     key_type: fidl_mlme::KeyType::Pairwise,
                     address: [5; 6],
                     key_id: 6,

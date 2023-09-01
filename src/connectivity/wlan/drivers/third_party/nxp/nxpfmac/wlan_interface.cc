@@ -364,8 +364,8 @@ void WlanInterface::StartScan(StartScanRequestView request, fdf::Arena& arena,
   completer.buffer(arena).Reply();
 }
 
-void WlanInterface::ConnectReq(ConnectReqRequestView request, fdf::Arena& arena,
-                               ConnectReqCompleter::Sync& completer) {
+void WlanInterface::Connect(ConnectRequestView request, fdf::Arena& arena,
+                            ConnectCompleter::Sync& completer) {
   auto ssid =
       IeView(request->selected_bss().ies.data(), request->selected_bss().ies.count()).get(SSID);
   if (!ssid) {

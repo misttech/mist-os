@@ -7,7 +7,7 @@
 
 #include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
 
-#include "fuchsia/hardware/wlan/fullmac/c/banjo.h"
+#include "fuchsia/wlan/fullmac/c/banjo.h"
 
 /*
   This is a temporary library that converts banjo type to FIDL wire types and fire FIDL requests

@@ -13,7 +13,7 @@ use {
         },
         MlmeRequest, MlmeSink,
     },
-    fidl_fuchsia_wlan_mlme as fidl_mlme,
+    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fuchsia_inspect_contrib::{inspect_log, log::InspectBytes},
     fuchsia_zircon as zx,
     ieee80211::{Bssid, MacAddr, WILDCARD_BSSID},
@@ -424,7 +424,9 @@ fn send_keys(mlme_sink: &MlmeSink, bssid: Bssid, key: Key) -> Option<u16> {
             key_id: 0,
             address: bssid.0,
             cipher_suite_oui: eapol::to_array(&ptk.cipher.oui[..]),
-            cipher_suite_type: ptk.cipher.suite_type,
+            cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(
+                ptk.cipher.suite_type.into(),
+            ),
             rsc: 0,
         },
         Key::Gtk(gtk) => fidl_mlme::SetKeyDescriptor {
@@ -433,7 +435,9 @@ fn send_keys(mlme_sink: &MlmeSink, bssid: Bssid, key: Key) -> Option<u16> {
             key_id: gtk.key_id() as u16,
             address: WILDCARD_BSSID.0,
             cipher_suite_oui: eapol::to_array(&gtk.cipher.oui[..]),
-            cipher_suite_type: gtk.cipher.suite_type,
+            cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(
+                gtk.cipher.suite_type.into(),
+            ),
             rsc: gtk.rsc,
         },
         Key::Igtk(igtk) => {
@@ -445,7 +449,9 @@ fn send_keys(mlme_sink: &MlmeSink, bssid: Bssid, key: Key) -> Option<u16> {
                 key_id: igtk.key_id,
                 address: [0xFFu8; 6],
                 cipher_suite_oui: eapol::to_array(&igtk.cipher.oui[..]),
-                cipher_suite_type: igtk.cipher.suite_type,
+                cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(
+                    igtk.cipher.suite_type.into(),
+                ),
                 rsc: u64::from_be_bytes(rsc),
             }
         }

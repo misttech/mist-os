@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <arpa/inet.h>
-#include <fuchsia/hardware/wlan/fullmac/c/banjo.h>
 #include <fuchsia/wlan/ieee80211/cpp/fidl.h>
 #include <zircon/errors.h>
 

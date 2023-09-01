@@ -15,7 +15,7 @@
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_NXP_NXPFMAC_SCANNER_H_
 
 #include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
-#include <fuchsia/hardware/wlan/fullmac/cpp/banjo.h>
+#include <fuchsia/wlan/fullmac/cpp/banjo.h>
 #include <lib/fit/function.h>
 #include <zircon/compiler.h>
 

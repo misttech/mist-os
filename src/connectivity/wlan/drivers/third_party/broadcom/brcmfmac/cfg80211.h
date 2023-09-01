@@ -603,8 +603,7 @@ void brcmf_if_query_spectrum_management_support(net_device* ndev,
                                                 wlan_common::SpectrumManagementSupport* resp);
 void brcmf_if_start_scan(net_device* ndev,
                          const wlan_fullmac::WlanFullmacImplStartScanRequest* req);
-void brcmf_if_connect_req(net_device* ndev,
-                          const wlan_fullmac::WlanFullmacImplConnectReqRequest* req);
+void brcmf_if_connect_req(net_device* ndev, const wlan_fullmac::WlanFullmacImplConnectRequest* req);
 void brcmf_if_reconnect_req(net_device* ndev, const wlan_fullmac::WlanFullmacReconnectReq* req);
 void brcmf_if_auth_resp(net_device* ndev, const wlan_fullmac::WlanFullmacAuthResp* ind);
 void brcmf_if_deauth_req(net_device* ndev, const wlan_fullmac::WlanFullmacDeauthReq* req);

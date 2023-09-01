@@ -201,7 +201,7 @@ impl Idle {
                 let wep_key = build_wep_set_key_descriptor(cmd.bss.bssid.clone(), key);
                 inspect_log!(context.inspect.rsn_events.lock(), {
                     derived_key: "WEP",
-                    cipher: format!("{:?}", cipher::Cipher::new_dot11(wep_key.cipher_suite_type)),
+                    cipher: format!("{:?}", cipher::Cipher::new_dot11(wep_key.cipher_suite_type.into_primitive() as u8)),
                     key_index: wep_key.key_id,
                 });
                 (fidl_mlme::AuthenticationTypes::SharedKey, vec![], Some(wep_key))
@@ -1287,7 +1287,9 @@ fn build_wep_set_key_descriptor(bssid: Bssid, key: &WepKey) -> fidl_mlme::SetKey
         key_id: 0,
         address: bssid.0,
         cipher_suite_oui: OUI.into(),
-        cipher_suite_type: cipher_suite,
+        cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(
+            cipher_suite.into(),
+        ),
         rsc: 0,
     }
 }
@@ -1563,7 +1565,7 @@ mod tests {
                     key_id: 0,
                     address: bss.bssid.0,
                     cipher_suite_oui: OUI.into(),
-                    cipher_suite_type: 1,
+                    cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(1),
                     rsc: 0,
                 })),
                 security_ie: vec![],
@@ -3120,7 +3122,7 @@ mod tests {
             assert_eq!(k.address, bssid.0);
             assert_eq!(k.rsc, 0);
             assert_eq!(k.cipher_suite_oui, [0x00, 0x0F, 0xAC]);
-            assert_eq!(k.cipher_suite_type, 4);
+            assert_eq!(k.cipher_suite_type, fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(4));
         });
     }
 
@@ -3134,7 +3136,7 @@ mod tests {
             assert_eq!(k.address, [0xFFu8; 6]);
             assert_eq!(k.rsc, 0);
             assert_eq!(k.cipher_suite_oui, [0x00, 0x0F, 0xAC]);
-            assert_eq!(k.cipher_suite_type, 4);
+            assert_eq!(k.cipher_suite_type, fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(4));
         });
     }
 
@@ -3148,7 +3150,7 @@ mod tests {
             assert_eq!(k.address, bssid.0);
             assert_eq!(k.rsc, 0);
             assert_eq!(k.cipher_suite_oui, [0x00, 0x50, 0xF2]);
-            assert_eq!(k.cipher_suite_type, 2);
+            assert_eq!(k.cipher_suite_type, fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(2));
         });
     }
 
@@ -3162,7 +3164,7 @@ mod tests {
             assert_eq!(k.address, [0xFFu8; 6]);
             assert_eq!(k.rsc, 0);
             assert_eq!(k.cipher_suite_oui, [0x00, 0x50, 0xF2]);
-            assert_eq!(k.cipher_suite_type, 2);
+            assert_eq!(k.cipher_suite_type, fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(2));
         });
     }
 

@@ -26,8 +26,6 @@ mod minstrel;
 #[allow(unused)] // TODO(fxbug.dev/79543): Remove annotation once used.
 mod probe_sequence;
 
-pub use {ddk_converter::*, wlan_common as common};
-
 use {
     anyhow::{bail, Error},
     banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
@@ -43,6 +41,7 @@ use {
     tracing::{error, info},
     wlan_sme,
 };
+pub use {ddk_converter::*, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, wlan_common as common};
 
 pub trait MlmeImpl {
     type Config: Send;
@@ -343,7 +342,7 @@ pub mod test_utils {
     pub(crate) fn fake_key(address: [u8; 6]) -> fidl_mlme::SetKeyDescriptor {
         fidl_mlme::SetKeyDescriptor {
             cipher_suite_oui: [1, 2, 3],
-            cipher_suite_type: 4,
+            cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(4),
             key_type: fidl_mlme::KeyType::Pairwise,
             address,
             key_id: 6,

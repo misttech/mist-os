@@ -14,7 +14,7 @@
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_NXP_NXPFMAC_WLAN_INTERFACE_H_
 
 #include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
-#include <fuchsia/hardware/wlan/fullmac/cpp/banjo.h>
+#include <fuchsia/wlan/fullmac/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/fit/function.h>
@@ -78,8 +78,8 @@ class WlanInterface : public WlanInterfaceDeviceType,
       fdf::Arena& arena, QuerySpectrumManagementSupportCompleter::Sync& completer) override;
   void StartScan(StartScanRequestView request, fdf::Arena& arena,
                  StartScanCompleter::Sync& completer) override;
-  void ConnectReq(ConnectReqRequestView request, fdf::Arena& arena,
-                  ConnectReqCompleter::Sync& completer) override;
+  void Connect(ConnectRequestView request, fdf::Arena& arena,
+               ConnectCompleter::Sync& completer) override;
   void ReconnectReq(ReconnectReqRequestView request, fdf::Arena& arena,
                     ReconnectReqCompleter::Sync& completer) override;
   void AuthResp(AuthRespRequestView request, fdf::Arena& arena,

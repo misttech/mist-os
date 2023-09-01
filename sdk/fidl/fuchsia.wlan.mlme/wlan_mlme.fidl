@@ -31,7 +31,7 @@ type SetKeyDescriptor = struct {
     address ieee80211.MacAddr;
     rsc uint64;
     cipher_suite_oui array<uint8, 3>;
-    cipher_suite_type uint8;
+    cipher_suite_type ieee80211.CipherSuiteType;
 };
 
 type SetKeysRequest = struct {

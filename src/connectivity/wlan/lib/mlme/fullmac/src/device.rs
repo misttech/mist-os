@@ -4,8 +4,8 @@
 
 use {
     super::{convert::banjo_to_fidl, FullmacDriverEvent, FullmacDriverEventSink},
-    banjo_fuchsia_hardware_wlan_fullmac as banjo_wlan_fullmac,
-    banjo_fuchsia_wlan_common as banjo_wlan_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
+    banjo_fuchsia_wlan_common as banjo_wlan_common,
+    banjo_fuchsia_wlan_fullmac as banjo_wlan_fullmac, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fuchsia_zircon as zx,
     std::ffi::c_void,
 };
@@ -328,10 +328,14 @@ pub struct FullmacDeviceInterface {
     query_spectrum_management_support:
         extern "C" fn(device: *mut c_void) -> banjo_wlan_common::SpectrumManagementSupport,
 
-    start_scan:
-        extern "C" fn(device: *mut c_void, req: *mut banjo_wlan_fullmac::WlanFullmacScanReq),
-    connect_req:
-        extern "C" fn(device: *mut c_void, req: *mut banjo_wlan_fullmac::WlanFullmacConnectReq),
+    start_scan: extern "C" fn(
+        device: *mut c_void,
+        req: *mut banjo_wlan_fullmac::WlanFullmacImplStartScanRequest,
+    ),
+    connect: extern "C" fn(
+        device: *mut c_void,
+        req: *mut banjo_wlan_fullmac::WlanFullmacImplConnectRequest,
+    ),
     reconnect_req:
         extern "C" fn(device: *mut c_void, req: *mut banjo_wlan_fullmac::WlanFullmacReconnectReq),
     auth_resp:
@@ -409,11 +413,14 @@ impl FullmacDeviceInterface {
         (self.query_spectrum_management_support)(self.device)
     }
 
-    pub fn start_scan(&self, req: &mut banjo_wlan_fullmac::WlanFullmacScanReq) {
-        (self.start_scan)(self.device, req as *mut banjo_wlan_fullmac::WlanFullmacScanReq)
+    pub fn start_scan(&self, req: &mut banjo_wlan_fullmac::WlanFullmacImplStartScanRequest) {
+        (self.start_scan)(
+            self.device,
+            req as *mut banjo_wlan_fullmac::WlanFullmacImplStartScanRequest,
+        )
     }
-    pub fn connect_req(&self, req: &mut banjo_wlan_fullmac::WlanFullmacConnectReq) {
-        (self.connect_req)(self.device, req as *mut banjo_wlan_fullmac::WlanFullmacConnectReq)
+    pub fn connect(&self, req: &mut banjo_wlan_fullmac::WlanFullmacImplConnectRequest) {
+        (self.connect)(self.device, req as *mut banjo_wlan_fullmac::WlanFullmacImplConnectRequest)
     }
     pub fn reconnect_req(&self, mut req: banjo_wlan_fullmac::WlanFullmacReconnectReq) {
         (self.reconnect_req)(
@@ -512,12 +519,12 @@ pub mod test_utils {
     #[derive(Debug)]
     pub enum DriverCall {
         StartScan {
-            req: banjo_wlan_fullmac::WlanFullmacScanReq,
+            req: banjo_wlan_fullmac::WlanFullmacImplStartScanRequest,
             channels: Vec<u8>,
             ssids: Vec<banjo_wlan_ieee80211::CSsid>,
         },
         ConnectReq {
-            req: banjo_wlan_fullmac::WlanFullmacConnectReq,
+            req: banjo_wlan_fullmac::WlanFullmacImplConnectRequest,
             selected_bss_ies: Vec<u8>,
             sae_password: Vec<u8>,
             wep_key: Vec<u8>,
@@ -648,7 +655,7 @@ pub mod test_utils {
                 query_security_support: Self::query_security_support,
                 query_spectrum_management_support: Self::query_spectrum_management_support,
                 start_scan: Self::start_scan,
-                connect_req: Self::connect_req,
+                connect: Self::connect,
                 reconnect_req: Self::reconnect_req,
                 auth_resp: Self::auth_resp,
                 deauth_req: Self::deauth_req,
@@ -726,7 +733,7 @@ pub mod test_utils {
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
         pub extern "C" fn start_scan(
             device: *mut c_void,
-            req: *mut banjo_wlan_fullmac::WlanFullmacScanReq,
+            req: *mut banjo_wlan_fullmac::WlanFullmacImplStartScanRequest,
         ) {
             let device = unsafe { &mut *(device as *mut Self) };
             let req = unsafe { *req };
@@ -738,9 +745,9 @@ pub mod test_utils {
 
         // Cannot mark fn unsafe because it has to match fn signature in FullDeviceInterface
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
-        pub extern "C" fn connect_req(
+        pub extern "C" fn connect(
             device: *mut c_void,
-            req: *mut banjo_wlan_fullmac::WlanFullmacConnectReq,
+            req: *mut banjo_wlan_fullmac::WlanFullmacImplConnectRequest,
         ) {
             let device = unsafe { &mut *(device as *mut Self) };
             let req = unsafe { *req };

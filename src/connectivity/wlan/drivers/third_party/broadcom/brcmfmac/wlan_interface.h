@@ -85,8 +85,8 @@ class WlanInterface : public ddk::Device<WlanInterface, ddk::Unbindable>,
       fdf::Arena& arena, QuerySpectrumManagementSupportCompleter::Sync& completer) override;
   void StartScan(StartScanRequestView request, fdf::Arena& arena,
                  StartScanCompleter::Sync& completer) override;
-  void ConnectReq(ConnectReqRequestView request, fdf::Arena& arena,
-                  ConnectReqCompleter::Sync& completer) override;
+  void Connect(ConnectRequestView request, fdf::Arena& arena,
+               ConnectCompleter::Sync& completer) override;
   void ReconnectReq(ReconnectReqRequestView request, fdf::Arena& arena,
                     ReconnectReqCompleter::Sync& completer) override;
   void AuthResp(AuthRespRequestView request, fdf::Arena& arena,

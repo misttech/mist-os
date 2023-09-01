@@ -44,7 +44,7 @@ fuchsia_wlan_fullmac::WlanScanType ConvertScanType(wlan_scan_type_t scan_type) {
   }
 }
 
-void ConvertScanReq(const wlan_fullmac_scan_req_t& in,
+void ConvertScanReq(const wlan_fullmac_impl_start_scan_request_t& in,
                     fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest* out,
                     fidl::AnyArena& arena) {
   auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest::Builder(arena);
@@ -217,10 +217,10 @@ void ConvertDeleteKeyDescriptor(const delete_key_descriptor_t& in,
   memcpy(out->address.data(), in.address, fuchsia_wlan_ieee80211::wire::kMacAddrLen);
 }
 
-void ConvertConnectReq(const wlan_fullmac_connect_req_t& in,
-                       fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest* out,
+void ConvertConnectReq(const wlan_fullmac_impl_connect_request_t& in,
+                       fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest* out,
                        fidl::AnyArena& arena) {
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest::Builder(arena);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest::Builder(arena);
   fuchsia_wlan_internal::wire::BssDescription bss;
   ConvertBssDecription(in.selected_bss, &bss, arena);
   builder.selected_bss(bss);
@@ -313,7 +313,7 @@ void ConvertHtCapabilities(const fuchsia_wlan_ieee80211::wire::HtCapabilities& i
                            ht_capabilities_t* out) {
   ZX_ASSERT(sizeof(out->bytes) == in.bytes.size());
   // TODO(fxbug.dev/95240): The underlying bytes in
-  // fuchsia.hardware.wlan.fullmac/HtCapabilitiesField are @packed so that copying them directly to
+  // fuchsia.wlan.fullmac/HtCapabilitiesField are @packed so that copying them directly to
   // a byte array works. We may wish to change the FIDL definition in the future so this copy is
   // however more obviously correct.
   memcpy(out->bytes, in.bytes.data(), in.bytes.size());
@@ -323,7 +323,7 @@ void ConvertVhtCapabilities(const fuchsia_wlan_ieee80211::wire::VhtCapabilities&
                             vht_capabilities_t* out) {
   ZX_ASSERT(sizeof(out->bytes) == in.bytes.size());
   // TODO(fxbug.dev/95240): The underlying bytes in
-  // fuchsia.hardware.wlan.fullmac/VhtCapabilitiesField are @packed so that copying them directly to
+  // fuchsia.wlan.fullmac/VhtCapabilitiesField are @packed so that copying them directly to
   // a byte array works. We may wish to change the definition in the future so this copy is however
   // more obviously correct.
   memcpy(out->bytes, in.bytes.data(), in.bytes.size());

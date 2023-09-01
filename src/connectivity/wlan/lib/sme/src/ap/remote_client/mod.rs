@@ -176,7 +176,9 @@ impl RemoteClient {
                 address: self.addr.clone(),
                 rsc: 0,
                 cipher_suite_oui: eapol::to_array(&ptk.cipher.oui[..]),
-                cipher_suite_type: ptk.cipher.suite_type,
+                cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(
+                    ptk.cipher.suite_type.into(),
+                ),
             },
             Key::Gtk(gtk) => fidl_mlme::SetKeyDescriptor {
                 key: gtk.tk().to_vec(),
@@ -185,7 +187,9 @@ impl RemoteClient {
                 address: [0xFFu8; 6],
                 rsc: gtk.rsc,
                 cipher_suite_oui: eapol::to_array(&gtk.cipher.oui[..]),
-                cipher_suite_type: gtk.cipher.suite_type,
+                cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(
+                    gtk.cipher.suite_type.into(),
+                ),
             },
             _ => {
                 error!("unsupported key type in UpdateSink");
@@ -431,7 +435,7 @@ mod tests {
             assert_eq!(k.address, CLIENT_ADDR);
             assert_eq!(k.rsc, 0);
             assert_eq!(k.cipher_suite_oui, [0x00, 0x0F, 0xAC]);
-            assert_eq!(k.cipher_suite_type, 4);
+            assert_eq!(k.cipher_suite_type, fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(4));
         });
     }
 
@@ -450,7 +454,7 @@ mod tests {
             assert_eq!(k.address, [0xFFu8; 6]);
             assert_eq!(k.rsc, 0);
             assert_eq!(k.cipher_suite_oui, [0x00, 0x0F, 0xAC]);
-            assert_eq!(k.cipher_suite_type, 4);
+            assert_eq!(k.cipher_suite_type, fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(4));
         });
     }
 

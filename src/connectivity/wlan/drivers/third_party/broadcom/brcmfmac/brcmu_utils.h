@@ -17,7 +17,7 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_BRCMU_UTILS_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_BRCMU_UTILS_H_
 
-#include <fuchsia/hardware/wlan/fullmac/c/banjo.h>
+#include <fuchsia/wlan/fullmac/c/banjo.h>
 #include <stdlib.h>
 #include <string.h>
 #include <zircon/compiler.h>
@@ -40,7 +40,6 @@
     }                                               \
   }
 
-
 #define BCME_STRLEN 64 /* Max string length for BCM errors */
 
 /* the largest reasonable packet buffer driver uses for ethernet MTU in bytes */
@@ -60,7 +59,7 @@
 #define NBITVAL(nbits) (1 << (nbits))
 #define MAXBITVAL(nbits) ((1 << (nbits)) - 1)
 #define NBITMASK(nbits) MAXBITVAL(nbits)
-#define MAXNBVAL(nbyte) MAXBITVAL((nbyte)*8)
+#define MAXNBVAL(nbyte) MAXBITVAL((nbyte) * 8)
 
 /* crc defines */
 #define CRC16_INIT_VALUE 0xffff /* Initial CRC16 checksum value */

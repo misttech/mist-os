@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::bail, banjo_fuchsia_hardware_wlan_fullmac as banjo_wlan_fullmac,
-    banjo_fuchsia_wlan_common as banjo_wlan_common,
+    anyhow::bail, banjo_fuchsia_wlan_common as banjo_wlan_common,
+    banjo_fuchsia_wlan_fullmac as banjo_wlan_fullmac,
     banjo_fuchsia_wlan_ieee80211 as banjo_wlan_ieee80211,
     banjo_fuchsia_wlan_internal as banjo_wlan_internal, fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,

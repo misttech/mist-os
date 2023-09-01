@@ -27,8 +27,8 @@
 
 #include <zxtest/zxtest.h>
 
-#include "fuchsia/hardware/wlan/fullmac/c/banjo.h"
 #include "fuchsia/wlan/common/c/banjo.h"
+#include "fuchsia/wlan/fullmac/c/banjo.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {
@@ -81,8 +81,8 @@ struct WlanifDeviceTest : public ::zxtest::Test,
       fdf::Arena& arena, QuerySpectrumManagementSupportCompleter::Sync& completer) override {}
   void StartScan(StartScanRequestView request, fdf::Arena& arena,
                  StartScanCompleter::Sync& completer) override {}
-  void ConnectReq(ConnectReqRequestView request, fdf::Arena& arena,
-                  ConnectReqCompleter::Sync& completer) override {}
+  void Connect(ConnectRequestView request, fdf::Arena& arena,
+               ConnectCompleter::Sync& completer) override {}
   void ReconnectReq(ReconnectReqRequestView request, fdf::Arena& arena,
                     ReconnectReqCompleter::Sync& completer) override {}
   void AuthResp(AuthRespRequestView request, fdf::Arena& arena,

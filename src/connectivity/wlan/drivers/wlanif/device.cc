@@ -4,7 +4,7 @@
 
 #include "device.h"
 
-#include <fuchsia/hardware/wlan/fullmac/c/banjo.h>
+#include <fuchsia/wlan/fullmac/c/banjo.h>
 #include <fuchsia/wlan/ieee80211/cpp/fidl.h>
 #include <fuchsia/wlan/internal/c/banjo.h>
 #include <fuchsia/wlan/internal/cpp/fidl.h>
@@ -231,7 +231,7 @@ zx_status_t Device::Start(const rust_wlan_fullmac_ifc_protocol_copy_t* ifc,
   return ZX_OK;
 }
 
-void Device::StartScan(const wlan_fullmac_scan_req_t* req) {
+void Device::StartScan(const wlan_fullmac_impl_start_scan_request_t* req) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     lerror("Arena creation failed: %s", arena.status_string());
@@ -248,7 +248,7 @@ void Device::StartScan(const wlan_fullmac_scan_req_t* req) {
   }
 }
 
-void Device::ConnectReq(const wlan_fullmac_connect_req_t* req) {
+void Device::Connect(const wlan_fullmac_impl_connect_request_t* req) {
   OnLinkStateChanged(false);
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
@@ -256,10 +256,10 @@ void Device::ConnectReq(const wlan_fullmac_connect_req_t* req) {
     return;
   }
 
-  fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest connect_req;
+  fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest connect_req;
   ConvertConnectReq(*req, &connect_req, *arena);
 
-  auto result = client_.buffer(*arena)->ConnectReq(connect_req);
+  auto result = client_.buffer(*arena)->Connect(connect_req);
 
   if (!result.ok()) {
     lerror("ConnectReq failed FIDL error: %s", result.status_string());

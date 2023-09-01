@@ -548,6 +548,7 @@ type WlanFullmacPmkInfo = struct {
 
 @discoverable
 @transport("Driver")
+@banjo_layout("ddk-interface")
 closed protocol WlanFullmacImplIfc {
     // MLME operations
     strict OnScanResult(struct {
@@ -647,6 +648,7 @@ closed protocol WlanFullmacImpl {
 
     // MLME operations
     strict StartScan(table {
+        /// Unique transaction id (will be indicated in corresponding scan results).
         1: txn_id uint64;
         2: scan_type WlanScanType;
         /// List of channels to scan on. An empty list of channels will cause a
@@ -666,18 +668,20 @@ closed protocol WlanFullmacImpl {
         /// in IEEE 802.11-2016 that limits the number of SSIDs in a single Probe Request
         /// frame to ieee80211.SSID_LIST_MAX SSIDs.
         4: ssids vector<ieee80211.CSsid>:MAX;
+        /// Minimum amount of time in msecs spent on a channel during scan.
         5: min_channel_time uint32;
+        /// Maximum amount of time in msecs spent on a channel during scan.
         6: max_channel_time uint32;
     }) -> ();
-    strict ConnectReq(table {
+    strict Connect(table {
         1: selected_bss fuchsia.wlan.internal.BssDescription;
-        // Timeout specified in beacon interval.
+        /// Timeout specified in beacon interval.
         2: connect_failure_timeout uint32;
 
         /// Additional parameters specific to the authentication exchange.
         3: auth_type WlanAuthType;
-        // sae_password is ignored except when SAE_DRIVER_AUTH is enabled and the
-        // auth_type is SAE.
+        /// sae_password is ignored except when SAE_DRIVER_AUTH is enabled and the
+        /// auth_type is SAE.
         4: sae_password vector<uint8>:MAX;
 
         /// WEP key used in the authentication exchange. Only included for WEP security type.

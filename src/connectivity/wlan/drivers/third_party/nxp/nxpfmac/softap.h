@@ -15,7 +15,7 @@
 
 #include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
 #include <fidl/fuchsia.wlan.ieee80211/cpp/wire_types.h>
-#include <fuchsia/hardware/wlan/fullmac/cpp/banjo.h>
+#include <fuchsia/wlan/fullmac/cpp/banjo.h>
 #include <lib/sync/completion.h>
 #include <netinet/if_ether.h>
 #include <zircon/compiler.h>

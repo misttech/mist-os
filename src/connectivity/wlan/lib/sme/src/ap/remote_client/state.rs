@@ -1966,7 +1966,7 @@ mod tests {
             assert_eq!(k.address, CLIENT_ADDR);
             assert_eq!(k.rsc, 0);
             assert_eq!(k.cipher_suite_oui, [0x00, 0x0F, 0xAC]);
-            assert_eq!(k.cipher_suite_type, 4);
+            assert_eq!(k.cipher_suite_type, fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(4));
         });
     }
 

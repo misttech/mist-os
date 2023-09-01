@@ -15,7 +15,7 @@
 
 #include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
 #include <fidl/fuchsia.wlan.ieee80211/cpp/common_types.h>
-#include <fuchsia/hardware/wlan/fullmac/cpp/banjo.h>
+#include <fuchsia/wlan/fullmac/cpp/banjo.h>
 #include <lib/stdcompat/span.h>
 #include <netinet/if_ether.h>
 #include <zircon/compiler.h>
@@ -48,7 +48,7 @@ class ClientConnectionIfc {
 };
 
 constexpr size_t kConnectReqBufferSize =
-    fidl::MaxSizeInChannel<fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest,
+    fidl::MaxSizeInChannel<fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest,
                            fidl::MessageDirection::kSending>();
 
 class ClientConnection {
@@ -64,7 +64,7 @@ class ClientConnection {
   // connection attempt is already in progress. Returns ZX_OK if the request is successfully
   // initiated, `on_connect` will be called asynchronously with the result of the connection
   // attempt.
-  zx_status_t Connect(const fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest* req,
+  zx_status_t Connect(const fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest* req,
                       OnConnectCallback&& on_connect) __TA_EXCLUDES(mutex_);
   // Cancel a connection attempt. This will call the on_connect callback passed to Connect if a
   // connection attempt was found. Returns ZX_ERR_NOT_FOUND if no connection attempt is in progress.
@@ -82,7 +82,7 @@ class ClientConnection {
   zx_status_t OnSaeResponse(const uint8_t* peer, uint16_t status_code) __TA_EXCLUDES(mutex_);
 
  private:
-  zx_status_t ConnectLocked(const fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest* req,
+  zx_status_t ConnectLocked(const fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest* req,
                             OnConnectCallback&& on_connect) __TA_REQUIRES(mutex_);
 
   zx_status_t OnSaeResponseLocked(const uint8_t* peer, uint16_t status_code) __TA_REQUIRES(mutex_);
@@ -91,7 +91,7 @@ class ClientConnection {
   void OnSaeTimeout() __TA_EXCLUDES(mutex_);
 
   zx_status_t InitiateSaeHandshake(
-      const fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest* req);
+      const fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest* req);
   zx_status_t RegisterForMgmtFrames(const std::vector<wlan::ManagementSubtype>& types);
   zx_status_t RemainOnChannel(uint8_t channel);
   zx_status_t CancelRemainOnChannel();

@@ -14,7 +14,7 @@ language = "C"
 
 sys_includes = [
     # Banjo types.
-    "fuchsia/hardware/wlan/fullmac/c/banjo.h",   # wlan_fullmac_scan_result_t, etc.
+    "fuchsia/wlan/fullmac/c/banjo.h",   # wlan_fullmac_scan_result_t, etc.
 ]
 
 [parse]

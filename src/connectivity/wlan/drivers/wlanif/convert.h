@@ -6,8 +6,8 @@
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_WLANIF_CONVERT_H_
 
 #include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
-#include <fuchsia/hardware/wlan/fullmac/c/banjo.h>
 #include <fuchsia/wlan/common/c/banjo.h>
+#include <fuchsia/wlan/fullmac/c/banjo.h>
 #include <fuchsia/wlan/internal/c/banjo.h>
 #include <fuchsia/wlan/internal/cpp/fidl.h>
 #include <fuchsia/wlan/mlme/cpp/fidl.h>
@@ -17,12 +17,12 @@ namespace wlanif {
 
 void ConvertCSsid(const cssid_t& cssid, fuchsia_wlan_ieee80211::wire::CSsid* out_cssid);
 
-void ConvertScanReq(const wlan_fullmac_scan_req_t& in,
+void ConvertScanReq(const wlan_fullmac_impl_start_scan_request_t& in,
                     fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest* out,
                     fidl::AnyArena& arena);
 
-void ConvertConnectReq(const wlan_fullmac_connect_req_t& in,
-                       fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectReqRequest* out,
+void ConvertConnectReq(const wlan_fullmac_impl_connect_request_t& in,
+                       fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest* out,
                        fidl::AnyArena& arena);
 
 fuchsia_wlan_fullmac::wire::WlanAuthResult ConvertAuthResult(uint8_t in);

@@ -12,6 +12,7 @@ rustc_library("wep_deprecated") {
   edition = "2021"
 
   deps = [
+    "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_rust",
     "//sdk/fidl/fuchsia.wlan.mlme:fuchsia.wlan.mlme_rust",
     "//src/connectivity/wlan/lib/common/rust:wlan-common",
     "//third_party/rust_crates:hex",

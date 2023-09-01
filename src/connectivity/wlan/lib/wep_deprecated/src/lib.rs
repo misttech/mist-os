@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    fidl_fuchsia_wlan_mlme as fidl_mlme,
+    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
     hex::FromHex,
     std::ops::Deref,
     thiserror::Error,
@@ -72,7 +72,9 @@ pub fn make_mlme_set_keys_request(peer: [u8; 6], key: &Key) -> fidl_mlme::SetKey
             key_id: 0,
             address: peer,
             cipher_suite_oui: OUI.into(),
-            cipher_suite_type: key.cipher_suite_type(),
+            cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(
+                key.cipher_suite_type().into(),
+            ),
             rsc: 0,
         }],
     }
@@ -123,7 +125,7 @@ mod tests {
                 key_id: 0,
                 address: [4; 6],
                 cipher_suite_oui: [0x00, 0x0F, 0xAC],
-                cipher_suite_type: 1,
+                cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(1),
                 rsc: 0,
             }],
         };
@@ -138,7 +140,7 @@ mod tests {
                 key_id: 0,
                 address: [4; 6],
                 cipher_suite_oui: [0x00, 0x0F, 0xAC],
-                cipher_suite_type: 5,
+                cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(5),
                 rsc: 0,
             }],
         };
