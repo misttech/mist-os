@@ -25,6 +25,15 @@ rustc_library("injectable-time") {
 
 fuchsia_unittest_package("injectable-time-test") {
   deps = [ ":injectable-time_test" ]
+
+  if (current_cpu == "riscv64") {
+    # TODO(fxbug.dev/132426): Make the test pass on RISC-V and remove these lines.
+    test_specs = {
+    }
+    test_specs = {
+      environments = []
+    }
+  }
 }
 
 group("tests") {

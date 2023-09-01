@@ -56,6 +56,7 @@ fuchsia_unittest_component("tcp-stream-ext_test-component") {
     ":tcp-stream-ext_test",
     "//src/connectivity/network/netstack:component-debug",
   ]
+
   if (current_cpu == "riscv64") {
     # TODO(fxbug.dev/298437881): Make this target depend on netstack3 on RISC-V
     # and remove this.
@@ -69,6 +70,14 @@ fuchsia_test_package("tcp-stream-ext-tests") {
     ":stub-netstack-test-component",
     ":tcp-stream-ext_test-component",
   ]
+
+  if (current_cpu == "riscv64") {
+    # TODO(fxbug.dev/298437881): Make this target depend on netstack3
+    # (see above) on RISC-V and remove these lines.
+    test_specs = {
+      environments = []
+    }
+  }
 }
 
 group("tests") {
