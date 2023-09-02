@@ -16,6 +16,16 @@ fuchsia.microbenchmarks.starnix: Filesystem_Open_Sysfs
 fuchsia.microbenchmarks.starnix: Filesystem_Open_Tmpfs
 fuchsia.microbenchmarks.starnix: Filesystem_Stat
 fuchsia.microbenchmarks.starnix: Filesystem_Stat_Ext4
+fuchsia.microbenchmarks.starnix: Fork.fork
+fuchsia.microbenchmarks.starnix: Fork.wait
+fuchsia.microbenchmarks.starnix: ForkMultiple/64.fork
+fuchsia.microbenchmarks.starnix: ForkMultiple/64.wait
+fuchsia.microbenchmarks.starnix: ForkMultiple/8.fork
+fuchsia.microbenchmarks.starnix: ForkMultiple/8.wait
+fuchsia.microbenchmarks.starnix: ForkMultipleNested/64.fork
+fuchsia.microbenchmarks.starnix: ForkMultipleNested/64.wait
+fuchsia.microbenchmarks.starnix: ForkMultipleNested/8.fork
+fuchsia.microbenchmarks.starnix: ForkMultipleNested/8.wait
 fuchsia.microbenchmarks.starnix: Getpid
 fuchsia.microbenchmarks.starnix: MallocFree/100bytes.free
 fuchsia.microbenchmarks.starnix: MallocFree/100bytes.malloc

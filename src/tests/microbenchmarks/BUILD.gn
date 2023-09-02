@@ -34,6 +34,8 @@ fuchsia_microbenchmark_sources = [
 
 if (is_linux) {
   fuchsia_microbenchmark_sources += [
+    "fork.cc",
+
     # The getpid() microbenchmark would work on Fuchsia, but it is
     # not useful to run it on Fuchsia because Fuchsia's getpid()
     # function does not return a real process ID.
