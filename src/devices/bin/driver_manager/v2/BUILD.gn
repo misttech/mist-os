@@ -87,6 +87,20 @@ source_set("driver_development_service") {
   ]
 }
 
+source_set("driver_manager_test_base") {
+  testonly = true
+  sources = [
+    "tests/driver_manager_test_base.cc",
+    "tests/driver_manager_test_base.h",
+  ]
+  public_deps = [
+    ":driver_runner",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
+    "//zircon/system/ulib/zircon-internal",
+  ]
+}
+
 executable("driver_runner_test") {
   testonly = true
   sources = [ "tests/driver_runner_test.cc" ]
@@ -121,14 +135,12 @@ executable("bind_manager_test") {
   ]
 
   deps = [
-    ":driver_runner",
+    ":driver_manager_test_base",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
     "//sdk/fidl/fuchsia.driver.index:fuchsia.driver.index_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
-    "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
-    "//zircon/system/ulib/zircon-internal",
   ]
 }
 
@@ -141,13 +153,10 @@ executable("composite_assembler_test") {
   sources = [ "tests/composite_assembler_test.cc" ]
 
   deps = [
-    ":driver_runner",
+    ":driver_manager_test_base",
     "//sdk/lib/inspect/testing/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//src/lib/ddk",
-    "//src/lib/fxl/test:gtest_main",
-    "//src/lib/testing/loop_fixture",
-    "//zircon/system/ulib/zircon-internal",
   ]
 }
 
@@ -159,12 +168,7 @@ executable("composite_node_spec_v2_test") {
   testonly = true
   sources = [ "tests/composite_node_spec_v2_test.cc" ]
 
-  deps = [
-    ":driver_runner",
-    "//src/lib/fxl/test:gtest_main",
-    "//src/lib/testing/loop_fixture",
-    "//zircon/system/ulib/zircon-internal",
-  ]
+  deps = [ ":driver_manager_test_base" ]
 }
 
 fuchsia_unittest_component("node-test") {
@@ -176,11 +180,8 @@ executable("node_test") {
   sources = [ "tests/node_test.cc" ]
 
   deps = [
-    ":driver_runner",
+    ":driver_manager_test_base",
     "//sdk/fidl/fuchsia.component:fuchsia.component_hlcpp",
-    "//src/lib/fxl/test:gtest_main",
-    "//src/lib/testing/loop_fixture",
-    "//zircon/system/ulib/zircon-internal",
   ]
 }
 

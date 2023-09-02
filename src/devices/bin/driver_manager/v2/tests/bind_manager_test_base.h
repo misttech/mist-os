@@ -9,8 +9,7 @@
 
 #include "src/devices/bin/driver_manager/v2/bind_manager.h"
 #include "src/devices/bin/driver_manager/v2/composite_node_spec_v2.h"
-#include "src/devices/bin/driver_manager/v2/node.h"
-#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
+#include "src/devices/bin/driver_manager/v2/tests/driver_manager_test_base.h"
 
 // Test class to expose protected functions.
 class TestBindManager : public dfv2::BindManager {
@@ -120,20 +119,10 @@ class TestBindManagerBridge final : public dfv2::BindManagerBridge, public Compo
   TestBindManager* bind_manager_;
 };
 
-class TestNodeManager : public dfv2::NodeManager {
+class TestNodeManager : public TestNodeManagerBase {
  public:
   void Bind(dfv2::Node& node, std::shared_ptr<dfv2::BindResultTracker> result_tracker) override {
     bind_manager_->Bind(node, {}, std::move(result_tracker));
-  }
-
-  zx::result<dfv2::DriverHost*> CreateDriverHost() override { return zx::ok(nullptr); }
-  void DestroyDriverComponent(
-      dfv2::Node& node,
-      fit::callback<void(fidl::WireUnownedResult<fuchsia_component::Realm::DestroyChild>& result)>
-          callback) override {}
-  zx::result<> StartDriver(dfv2::Node& node, std::string_view url,
-                           fuchsia_driver_index::DriverPackageType package_type) override {
-    return zx::ok();
   }
 
   void set_bind_manager(TestBindManager* bind_manager) { bind_manager_ = bind_manager; }
@@ -142,7 +131,7 @@ class TestNodeManager : public dfv2::NodeManager {
   TestBindManager* bind_manager_;
 };
 
-class BindManagerTestBase : public gtest::TestLoopFixture {
+class BindManagerTestBase : public DriverManagerTestBase {
  public:
   struct BindManagerData {
     size_t driver_index_request_count;
@@ -153,6 +142,8 @@ class BindManagerTestBase : public gtest::TestLoopFixture {
 
   void SetUp() override;
   void TearDown() override;
+
+  dfv2::NodeManager* GetNodeManager() override { return &node_manager_; }
 
   BindManagerData CurrentBindManagerData() const;
   void VerifyBindManagerData(BindManagerData expected);
@@ -238,8 +229,6 @@ class BindManagerTestBase : public gtest::TestLoopFixture {
   // unique instance ID if it's missing.
   uint32_t GetOrAddInstanceId(std::string node_name);
 
-  InspectManager inspect_{dispatcher()};
-
   std::unique_ptr<TestDriverIndex> driver_index_;
   std::unique_ptr<TestBindManagerBridge> bridge_;
   TestNodeManager node_manager_;
@@ -250,10 +239,6 @@ class BindManagerTestBase : public gtest::TestLoopFixture {
   // Maps each node to a unique instance id. The instance id is used to the node's
   // property for binding.
   std::unordered_map<std::string, uint32_t> instance_ids_;
-
-  std::shared_ptr<dfv2::Node> root_;
-  std::optional<Devnode> root_devnode_;
-  std::optional<Devfs> devfs_;
 
   fidl::Arena<> arena_;
 };

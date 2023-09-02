@@ -4,34 +4,16 @@
 
 #include "src/devices/bin/driver_manager/v2/composite_node_spec_v2.h"
 
-#include "src/devices/bin/driver_manager/v2/node.h"
-#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
+#include "src/devices/bin/driver_manager/v2/tests/driver_manager_test_base.h"
 
-// TODO(fxb/132293): Move FakeNodeManager and common node construction code into a separate class.
-
-class FakeNodeManager : public dfv2::NodeManager {
- public:
-  void Bind(dfv2::Node& node, std::shared_ptr<dfv2::BindResultTracker> result_tracker) override {}
-
-  zx::result<dfv2::DriverHost*> CreateDriverHost() override { return zx::ok(nullptr); }
-
-  void DestroyDriverComponent(
-      dfv2::Node& node,
-      fit::callback<void(fidl::WireUnownedResult<fuchsia_component::Realm::DestroyChild>& result)>
-          callback) override {}
-};
-
-class CompositeNodeSpecV2Test : public gtest::TestLoopFixture {
+class CompositeNodeSpecV2Test : public DriverManagerTestBase {
  public:
   void SetUp() override {
-    TestLoopFixture::SetUp();
-
+    DriverManagerTestBase::SetUp();
     arena_ = std::make_unique<fidl::Arena<512>>();
-
-    devfs_.emplace(root_devnode_);
-    root_ = CreateNode("root");
-    root_->AddToDevfsForTesting(root_devnode_.value());
   }
+
+  dfv2::NodeManager* GetNodeManager() override { return &node_manager; }
 
   dfv2::CompositeNodeSpecV2 CreateCompositeNodeSpec(std::string name, size_t size) {
     return dfv2::CompositeNodeSpecV2(
@@ -40,14 +22,6 @@ class CompositeNodeSpecV2Test : public gtest::TestLoopFixture {
             .size = size,
         },
         dispatcher(), &node_manager);
-  }
-
-  std::shared_ptr<dfv2::Node> CreateNode(const char* name) {
-    std::shared_ptr new_node =
-        std::make_shared<dfv2::Node>(name, std::vector<std::weak_ptr<dfv2::Node>>(), &node_manager,
-                                     dispatcher(), inspect_.CreateDevice(name, zx::vmo(), 0));
-    new_node->AddToDevfsForTesting(root_devnode_.value());
-    return new_node;
   }
 
   zx::result<std::optional<DeviceOrNode>> MatchAndBindParentSpec(
@@ -80,15 +54,9 @@ class CompositeNodeSpecV2Test : public gtest::TestLoopFixture {
     ASSERT_EQ(expected_parents[primary_index], composite_node_ptr->GetPrimaryParent()->name());
   }
 
-  FakeNodeManager node_manager;
+  TestNodeManagerBase node_manager;
 
  private:
-  InspectManager inspect_{dispatcher()};
-
-  std::shared_ptr<dfv2::Node> root_;
-  std::optional<Devnode> root_devnode_;
-  std::optional<Devfs> devfs_;
-
   std::unique_ptr<fidl::Arena<512>> arena_;
 };
 

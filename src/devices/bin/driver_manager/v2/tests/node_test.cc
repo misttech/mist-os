@@ -8,9 +8,7 @@
 
 #include "src/devices/bin/driver_manager/v2/composite_node_spec_v2.h"
 #include "src/devices/bin/driver_manager/v2/driver_host.h"
-#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
-
-// TODO(fxb/132293): Move FakeNodeManager and common node construction code into a separate class.
+#include "src/devices/bin/driver_manager/v2/tests/driver_manager_test_base.h"
 
 class TestRealm final : public fidl::WireServer<fuchsia_component::Realm> {
  public:
@@ -62,11 +60,9 @@ class FakeDriverHost : public dfv2::DriverHost {
   std::unordered_map<std::string, fidl::ServerEnd<fuchsia_driver_host::Driver>> drivers_;
 };
 
-class FakeNodeManager : public dfv2::NodeManager {
+class FakeNodeManager : public TestNodeManagerBase {
  public:
   FakeNodeManager(fidl::WireClient<fuchsia_component::Realm> realm) : realm_(std::move(realm)) {}
-
-  void Bind(dfv2::Node& node, std::shared_ptr<dfv2::BindResultTracker> result_tracker) override {}
 
   zx::result<dfv2::DriverHost*> CreateDriverHost() override { return zx::ok(&driver_host_); }
 
@@ -90,43 +86,16 @@ class FakeNodeManager : public dfv2::NodeManager {
   FakeDriverHost driver_host_;
 };
 
-class Dfv2NodeTest : public gtest::TestLoopFixture {
+class Dfv2NodeTest : public DriverManagerTestBase {
  public:
   void SetUp() override {
-    TestLoopFixture::SetUp();
+    DriverManagerTestBase::SetUp();
     realm_ = std::make_unique<TestRealm>(dispatcher());
 
     auto client = realm_->Connect();
     ASSERT_TRUE(client.is_ok());
     node_manager = std::make_unique<FakeNodeManager>(
         fidl::WireClient<fuchsia_component::Realm>(std::move(client.value()), dispatcher()));
-
-    devfs_.emplace(root_devnode_);
-    root_ = CreateNode("root");
-    root_->AddToDevfsForTesting(root_devnode_.value());
-  }
-
-  std::shared_ptr<dfv2::Node> CreateNode(const char* name) {
-    auto node = std::make_shared<dfv2::Node>(name, std::vector<std::weak_ptr<dfv2::Node>>(),
-                                             node_manager.get(), dispatcher(),
-                                             inspect_.CreateDevice(name, zx::vmo(), 0));
-    node->AddToDevfsForTesting(root_devnode_.value());
-    return node;
-  }
-
-  std::shared_ptr<dfv2::Node> CreateCompositeNode(std::string_view name,
-                                                  std::vector<std::weak_ptr<dfv2::Node>> parents,
-                                                  bool is_legacy, uint32_t primary_index = 0) {
-    std::vector<std::string> parent_names;
-    parent_names.reserve(parents.size());
-    for (auto& parent : parents) {
-      parent_names.push_back(parent.lock()->name());
-    }
-
-    return dfv2::Node::CreateCompositeNode(name, parents, std::move(parent_names), {},
-                                           node_manager.get(), dispatcher(), is_legacy,
-                                           primary_index)
-        .value();
   }
 
   void StartTestDriver(std::shared_ptr<dfv2::Node> node) {
@@ -161,16 +130,12 @@ class Dfv2NodeTest : public gtest::TestLoopFixture {
   }
 
  protected:
+  dfv2::NodeManager* GetNodeManager() override { return node_manager.get(); }
+
   std::unique_ptr<FakeNodeManager> node_manager;
 
  private:
   std::unique_ptr<TestRealm> realm_;
-
-  InspectManager inspect_{dispatcher()};
-
-  std::shared_ptr<dfv2::Node> root_;
-  std::optional<Devnode> root_devnode_;
-  std::optional<Devfs> devfs_;
 };
 
 TEST_F(Dfv2NodeTest, RemoveDuringFailedBind) {

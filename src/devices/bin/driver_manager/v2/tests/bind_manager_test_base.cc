@@ -109,11 +109,7 @@ void TestBindManagerBridge::AddCompositeNodeSpec(std::string composite,
 }
 
 void BindManagerTestBase::SetUp() {
-  TestLoopFixture::SetUp();
-
-  devfs_.emplace(root_devnode_);
-  root_ = CreateNode("root", false);
-  root_->AddToDevfsForTesting(root_devnode_.value());
+  DriverManagerTestBase::SetUp();
 
   driver_index_ = std::make_unique<TestDriverIndex>(dispatcher());
   auto client = driver_index_->Connect();
@@ -132,7 +128,7 @@ void BindManagerTestBase::SetUp() {
 
 void BindManagerTestBase::TearDown() {
   nodes_.clear();
-  TestLoopFixture::TearDown();
+  DriverManagerTestBase::TearDown();
 }
 
 BindManagerTestBase::BindManagerData BindManagerTestBase::CurrentBindManagerData() const {
@@ -154,10 +150,7 @@ void BindManagerTestBase::VerifyBindManagerData(BindManagerTestBase::BindManager
 
 std::shared_ptr<dfv2::Node> BindManagerTestBase::CreateNode(const std::string name,
                                                             bool enable_multibind) {
-  std::shared_ptr new_node =
-      std::make_shared<dfv2::Node>(name, std::vector<std::weak_ptr<dfv2::Node>>(), &node_manager_,
-                                   dispatcher(), inspect_.CreateDevice(name, zx::vmo(), 0));
-  new_node->AddToDevfsForTesting(root_devnode_.value());
+  std::shared_ptr new_node = DriverManagerTestBase::CreateNode(name);
   new_node->set_can_multibind_composites(enable_multibind);
   return new_node;
 }
