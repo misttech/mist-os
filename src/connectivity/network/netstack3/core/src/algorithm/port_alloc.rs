@@ -9,15 +9,17 @@
 
 use alloc::vec::Vec;
 use core::{
-    hash::Hash,
+    hash::{Hash, Hasher},
     marker::PhantomData,
     num::{NonZeroU16, NonZeroUsize},
     ops::RangeInclusive,
 };
 
-use mundane::{hash::Digest, hmac::HmacSha256};
+use hmac::Mac;
 use net_types::{ip::IpAddress, SpecifiedAddr};
 use rand::RngCore;
+
+type HmacSha256 = hmac::Hmac<sha2::Sha256>;
 
 /// A port number.
 // NOTE(brunodalbo): `PortNumber` could be a trait, but given the expected use
@@ -249,10 +251,23 @@ impl<I: PortAllocImpl> PortAlloc<I> {
 fn hmac_with_secret<I: Hash>(id: &I, secret: &[u8]) -> usize {
     use core::convert::TryInto as _;
 
-    let mut hmac = HmacSha256::new(secret);
-    let () = id.hash(&mut hmac);
+    struct MacHasher<'a, M>(&'a mut M);
 
-    usize::from_ne_bytes(hmac.finish().bytes()[..core::mem::size_of::<usize>()].try_into().unwrap())
+    impl<'a, M: Mac> Hasher for MacHasher<'a, M> {
+        fn finish(&self) -> u64 {
+            unimplemented!()
+        }
+
+        fn write(&mut self, bytes: &[u8]) {
+            self.0.update(bytes);
+        }
+    }
+
+    let mut hmac = HmacSha256::new_from_slice(secret).expect("create new HmacSha256");
+    id.hash(&mut MacHasher(&mut hmac));
+
+    let bytes: [u8; 32] = hmac.finalize().into_bytes().into();
+    usize::from_ne_bytes(bytes[..core::mem::size_of::<usize>()].try_into().unwrap())
 }
 
 #[cfg(test)]

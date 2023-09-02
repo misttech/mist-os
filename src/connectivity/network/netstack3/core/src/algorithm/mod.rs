@@ -8,7 +8,7 @@ mod port_alloc;
 
 use core::convert::TryInto;
 
-use mundane::{hash::Digest as _, hmac::HmacSha256};
+use hmac::Mac as _;
 use net_types::ip::{Ipv6Addr, Subnet};
 
 pub(crate) use port_alloc::*;
@@ -16,6 +16,8 @@ pub(crate) use port_alloc::*;
 /// The length in bytes of the `secret_key` argument to
 /// [`generate_opaque_interface_identifier`].
 pub const STABLE_IID_SECRET_KEY_BYTES: usize = 32;
+
+type HmacSha256 = hmac::Hmac<sha2::Sha256>;
 
 /// Computes an opaque interface identifier (IID) using the algorithm in [RFC
 /// 7217 Section 5].
@@ -131,7 +133,7 @@ where
         write_u64(hmac, u.try_into().unwrap())
     }
 
-    let mut hmac = HmacSha256::new(&secret_key[..]);
+    let mut hmac = HmacSha256::new_from_slice(&secret_key[..]).expect("create new HmacSha256");
 
     // Write prefix address; no need to prefix with length because this is
     // always the same length.
@@ -157,7 +159,7 @@ where
 
     write_u64(&mut hmac, dad_counter.into());
 
-    let hmac_bytes: [u8; 32] = hmac.finish().bytes();
+    let hmac_bytes: [u8; 32] = hmac.finalize().into_bytes().into();
     u128::from_be_bytes((&hmac_bytes[..16]).try_into().unwrap())
 }
 
