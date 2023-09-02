@@ -338,10 +338,7 @@ group("tests") {
 }
 
 bootfs_files_for_assembly("bootfs") {
-  deps = [
-    ":bin",
-    "//src/sys/startup:bootfs",
-  ]
+  deps = [ ":bin" ]
 }
 
 component_config("component_manager_realm_builder_config") {

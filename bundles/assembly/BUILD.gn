@@ -105,6 +105,7 @@ assembly_input_bundle("bootstrap") {
     "//src/power/power-manager:package",
     "//src/power/shutdown-shim:package",
     "//src/sys/bootstrap:package",
+    "//src/sys/startup:package",
   ]
   kernel_cmdline = [ "blobfs.cache-eviction-policy=NEVER_EVICT" ]
 

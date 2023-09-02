@@ -10,7 +10,7 @@
         },
         {
             name: "startup",
-            url: "fuchsia-boot:///#meta/startup.cm",
+            url: "fuchsia-boot:///startup#meta/startup.cm",
             startup: "eager",
         },
         {
