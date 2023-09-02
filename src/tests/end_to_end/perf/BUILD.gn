@@ -47,8 +47,9 @@ if (target_cpu != "arm64") {
 if (target_cpu == "x64" && !is_asan) {
   if (host_os == "linux") {
     test_list += [
-      "starnix_benchmarks_test",
       "netstack_starnix_benchmarks_test",
+      "starnix_benchmarks_test",
+      "storage_starnix_benchmarks_test",
     ]
   }
 }
@@ -273,6 +274,8 @@ if (is_host) {
     "fuchsia.starnix.gvisor_benchmarks.stat.txt",
     "fuchsia.starnix.gvisor_benchmarks.unlink.txt",
     "fuchsia.starnix.gvisor_benchmarks.write.txt",
+    "fuchsia.storage.starnix_data.txt",
+    "fuchsia.storage.starnix_tmp.txt",
     "fuchsia.storage.txt",
   ]
 
@@ -323,8 +326,8 @@ group("package_deps") {
     # These are used by flatland_benchmarks.
     "//src/ui/examples:flatland-examples",
 
-    # These are used by storage_benchmarks_test
-    "//src/storage/benchmarks",
+    # This is used by storage_benchmarks_test.
+    "//src/storage/benchmarks/fuchsia:benchmarks",
 
     # These are used by extended_pstate_test
     "//src/starnix/lib/extended_pstate",
@@ -334,6 +337,9 @@ group("package_deps") {
     public_deps += [
       # This is used by starnix benchmarks.
       "//src/starnix/tests/gvisor:starnix_gvisor_benchmarks",
+
+      # This is used by storage_starnix_benchmarks_test.
+      "//src/storage/benchmarks/starnix:benchmarks",
     ]
     if (host_os == "linux") {
       public_deps +=
@@ -363,7 +369,7 @@ group("tests_to_run_on_internal_builders") {
     ":audio_mixer_profiler_test($host_toolchain)",
     ":kernel_boot_stats_test($host_toolchain)",
     ":storage_benchmarks_test($host_toolchain)",
-    "//src/storage/benchmarks",
+    "//src/storage/benchmarks/fuchsia:benchmarks",
     "//src/tests/benchmarks:kernel-boot-benchmarks",
   ]
 }

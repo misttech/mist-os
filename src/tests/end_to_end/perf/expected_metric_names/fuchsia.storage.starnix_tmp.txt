@@ -1,0 +1,11 @@
+fuchsia.storage: GitStatus/starnix_tmp
+fuchsia.storage: OpenDeeplyNestedFile/starnix_tmp
+fuchsia.storage: OpenFile/starnix_tmp
+fuchsia.storage: ReadRandomWarm/8192/starnix_tmp
+fuchsia.storage: ReadSequentialWarm/8192/starnix_tmp
+fuchsia.storage: StatPath/starnix_tmp
+fuchsia.storage: WalkDirectoryTreeWarm/Files3/Dirs2/Depth5/starnix_tmp
+fuchsia.storage: WriteRandomCold/8192/starnix_tmp
+fuchsia.storage: WriteRandomWarm/8192/starnix_tmp
+fuchsia.storage: WriteSequentialCold/8192/starnix_tmp
+fuchsia.storage: WriteSequentialWarm/8192/starnix_tmp

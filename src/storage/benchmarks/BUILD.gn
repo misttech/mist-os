@@ -53,6 +53,7 @@ group("benchmarks") {
   deps = [
     "fuchsia:benchmarks",
     "host:benchmarks",
+    "starnix:benchmarks",
   ]
 }
 

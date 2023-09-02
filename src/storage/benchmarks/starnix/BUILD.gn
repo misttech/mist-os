@@ -1,0 +1,56 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/dist/resource.gni")
+import("//src/starnix/kernel/starnix.gni")
+import("//src/starnix/tests/starnix_test_subpackages.gni")
+
+storage_benchmarks_target = "//src/storage/benchmarks/host:host-storage-benchmarks($target_linux_toolchain)"
+
+resource("storage-starnix-benchmarks-bin") {
+  out_dir = get_label_info(storage_benchmarks_target, "root_out_dir")
+  testonly = true
+  deps = [ storage_benchmarks_target ]
+  sources = [ "${out_dir}/storage-benchmarks" ]
+  outputs = [ "data/tests/storage-starnix-benchmarks" ]
+}
+
+template("storage_starnix_benchmarks_component") {
+  fuchsia_test_component(target_name) {
+    testonly = true
+    test_type = "starnix"
+    deps = [
+      ":storage-starnix-benchmarks-bin",
+      "//src/starnix/tests:starnix_test",
+    ]
+    manifest = "${invoker.manifest}"
+  }
+}
+
+storage_starnix_benchmarks_component("storage-starnix-data-benchmarks") {
+  manifest = "meta/storage-starnix-data-benchmarks.cml"
+}
+
+storage_starnix_benchmarks_component("storage-starnix-tmp-benchmarks") {
+  manifest = "meta/storage-starnix-tmp-benchmarks.cml"
+}
+
+fuchsia_test_package("storage-starnix-benchmarks") {
+  test_components = [
+    ":storage-starnix-data-benchmarks",
+    ":storage-starnix-tmp-benchmarks",
+  ]
+  subpackages = starnix_test_subpackages +
+                [ "//src/starnix/containers/debian:debian_package" ]
+  deps = [ "//src/starnix/containers/debian:container_resources" ]
+  test_specs = {
+    environments = []
+  }
+}
+
+group("benchmarks") {
+  testonly = true
+  deps = [ ":storage-starnix-benchmarks" ]
+}
