@@ -504,7 +504,7 @@ TEST(Vmar, MapOverDestroyedTest) {
 }
 
 struct AlignTestdata {
-  zx_vm_option_t aligment;
+  zx_vm_option_t alignment;
   int zero_bits;
 };
 
@@ -583,7 +583,7 @@ TEST(Vmar, AlignmentVmarMapTest) {
   // Test all supported alignments.
   for (const auto& d : align_data) {
     zx_vaddr_t mapping_addr = 0u;
-    ASSERT_EQ(zx_vmar_map(vmar, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | d.aligment, 0, vmo, 0, size,
+    ASSERT_EQ(zx_vmar_map(vmar, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | d.alignment, 0, vmo, 0, size,
                           &mapping_addr),
               ZX_OK);
 
@@ -639,7 +639,7 @@ TEST(Vmar, AlignmentVmarAllocateTest) {
   for (const auto& d : align_data) {
     zx_handle_t child_vmar;
     uintptr_t mapping_addr = 0u;
-    ASSERT_EQ(zx_vmar_allocate(vmar, ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | d.aligment, 0, size,
+    ASSERT_EQ(zx_vmar_allocate(vmar, ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | d.alignment, 0, size,
                                &child_vmar, &mapping_addr),
               ZX_OK);
 
