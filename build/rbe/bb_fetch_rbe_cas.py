@@ -79,8 +79,9 @@ def _main_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--path",
         type=Path,
-        help="Path of artifact under the build output directory.",
-        required=True,
+        help=
+        "Path of artifact under the build output directory.  If omitted, print the path to the cached reproxy log and exit without downloading anything.",
+        default=None,
     )
     parser.add_argument(
         "-o",
@@ -286,10 +287,10 @@ def fetch_artifact_from_reproxy_log(
 
 def _main(
         bbpath: Path,
-        artifact_path: Path,
         cfg: Path,
         bbid: str = None,
         reproxy_log: Path = None,
+        artifact_path: Path = None,
         output: Path = None,
         verbose: bool = False) -> int:
     reproxy_log = reproxy_log or fetch_reproxy_log_from_bbid(
@@ -300,17 +301,25 @@ def _main(
     if reproxy_log is None:
         return 1
 
+    if artifact_path is None:
+        # print the path to the log and exit without downloading anything
+        msg(f'reproxy log: {reproxy_log}')
+        return 0
+
     return fetch_artifact_from_reproxy_log(
         reproxy_log=reproxy_log,
         artifact_path=artifact_path,
         cfg=cfg,
-        output=output,
+        output=output or artifact_path.name,
         verbose=verbose,
     )
 
 
 def main(argv: Sequence[str]) -> int:
     args = _MAIN_ARG_PARSER.parse_args(argv)
+    if args.output is not None and args.path is None:
+        _MAIN_ARG_PARSER.error('-o requires --path')
+        return 1
     try:
         return _main(
             bbpath=args.bb,
@@ -318,7 +327,7 @@ def main(argv: Sequence[str]) -> int:
             artifact_path=args.path,
             reproxy_log=args.reproxy_log,
             cfg=args.cfg,
-            output=args.output or args.path.name,
+            output=args.output,
             verbose=args.verbose,
         )
     except BBError as e:

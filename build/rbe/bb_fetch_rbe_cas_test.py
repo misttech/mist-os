@@ -3,6 +3,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import contextlib
+import io
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -318,6 +320,21 @@ class MainTests(unittest.TestCase):
             cfg=cfg,
             output=artifact_path.name,
             verbose=False)
+
+    def test_e2e_bbid_to_log_only(self):
+        bb = bb_fetch_rbe_cas._BB_TOOL
+        bbid = 'b991918261'
+        reproxy_log_path = Path('/path/to/cache/foobar.rrpl')
+        result = io.StringIO()
+        with contextlib.redirect_stdout(result):
+            with mock.patch.object(
+                    bb_fetch_rbe_cas, 'fetch_reproxy_log_from_bbid',
+                    return_value=reproxy_log_path) as mock_fetch_log:
+                self.assertEqual(bb_fetch_rbe_cas.main(['--bbid', bbid]), 0)
+        self.assertTrue(
+            result.getvalue().endswith(f"reproxy log: {reproxy_log_path}\n"))
+        mock_fetch_log.assert_called_once_with(
+            bbpath=bb, bbid=bbid.lstrip('b'), verbose=False)
 
     def test_e2e_using_reproxy_log_success(self):
         bb = bb_fetch_rbe_cas._BB_TOOL
