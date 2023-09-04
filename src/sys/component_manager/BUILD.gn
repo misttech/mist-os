@@ -96,7 +96,6 @@ rustc_binary("bin") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
-    "//src/lib/process_builder:test-util-fidl_rust",
     "//src/sys/lib/cm_rust/testing",
     "//src/sys/lib/component_id_index",
     "//src/sys/lib/library_loader",
@@ -140,7 +139,6 @@ rustc_binary("bin") {
     "src/builtin/mmio_resource.rs",
     "src/builtin/mod.rs",
     "src/builtin/power_resource.rs",
-    "src/builtin/process_launcher.rs",
     "src/builtin/realm_builder.rs",
     "src/builtin/root_job.rs",
     "src/builtin/root_resource.rs",
@@ -278,10 +276,7 @@ resource("component_manager_tests_invalid_manifest") {
 }
 
 fuchsia_test_component("component-manager-tests-cmp") {
-  deps = [
-    ":bin_test",
-    "//src/lib/process_builder:test_util",
-  ]
+  deps = [ ":bin_test" ]
   component_name = "component_manager_tests"
   manifest = "meta/component_manager_tests.cml"
   test_type = "system"

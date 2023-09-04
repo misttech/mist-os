@@ -20,7 +20,6 @@ pub mod log;
 pub mod mexec_resource;
 pub mod mmio_resource;
 pub mod power_resource;
-pub mod process_launcher;
 pub mod realm_builder;
 pub mod root_job;
 pub mod root_resource;

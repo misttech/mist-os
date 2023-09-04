@@ -24,7 +24,6 @@ use {
             mexec_resource::MexecResource,
             mmio_resource::MmioResource,
             power_resource::PowerResource,
-            process_launcher::ProcessLauncherSvc,
             realm_builder::{
                 RealmBuilderResolver, RealmBuilderRunnerFactory,
                 RUNNER_NAME as REALM_BUILDER_RUNNER_NAME, SCHEME as REALM_BUILDER_SCHEME,
@@ -73,6 +72,7 @@ use {
     cstr::cstr,
     elf_runner::{
         crash_info::CrashRecords,
+        process_launcher::ProcessLauncher,
         vdso_vmo::{get_next_vdso_vmo, get_stable_vdso_vmo, get_vdso_vmo},
         ElfRunner,
     },
@@ -82,8 +82,8 @@ use {
     fidl_fuchsia_boot as fboot,
     fidl_fuchsia_component_internal::BuiltinBootResolver,
     fidl_fuchsia_diagnostics_types::Task as DiagnosticsTask,
-    fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fidl_fuchsia_sys2 as fsys,
-    fuchsia_async as fasync,
+    fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fidl_fuchsia_process as fprocess,
+    fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
     fuchsia_component::server::*,
     fuchsia_inspect::{self as inspect, component, health::Reporter, Inspector},
     fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType},
@@ -420,7 +420,6 @@ pub struct BuiltinEnvironment {
     pub ioport_resource: Option<Arc<IoportResource>>,
     pub irq_resource: Option<Arc<IrqResource>>,
     pub kernel_stats: Option<Arc<KernelStats>>,
-    pub process_launcher: Option<Arc<ProcessLauncherSvc>>,
     pub read_only_log: Option<Arc<ReadOnlyLog>>,
     pub write_only_log: Option<Arc<WriteOnlyLog>>,
     pub factory_items_service: Option<Arc<FactoryItems>>,
@@ -489,13 +488,13 @@ impl BuiltinEnvironment {
             BuiltinSandboxBuilder::new(model.top_instance().task_group(), &runtime_config);
 
         // Set up ProcessLauncher if available.
-        let process_launcher = if runtime_config.use_builtin_process_launcher {
-            let process_launcher = Arc::new(ProcessLauncherSvc::new());
-            model.root().hooks.install(process_launcher.hooks()).await;
-            Some(process_launcher)
-        } else {
-            None
-        };
+        if runtime_config.use_builtin_process_launcher {
+            sandbox_builder.add_builtin_protocol_if_enabled::<fprocess::LauncherMarker>(|stream| {
+                async move {
+                    ProcessLauncher::serve(stream).await.map_err(|e| format_err!("{:?}", e))
+                }.boxed()
+            });
+        }
 
         // Set up RootJob service.
         sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::RootJobMarker>(|stream| {
@@ -938,7 +937,6 @@ impl BuiltinEnvironment {
 
         Ok(BuiltinEnvironment {
             model,
-            process_launcher,
             kernel_stats,
             read_only_log,
             write_only_log,
