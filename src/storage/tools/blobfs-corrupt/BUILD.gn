@@ -11,8 +11,8 @@ executable("blobfs-corrupt") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/digest",
-    "//src/lib/storage/block_client/cpp",
     "//src/storage/blobfs",
+    "//src/storage/lib/block_client/cpp",
     "//zircon/system/ulib/fbl",
   ]
 }
@@ -25,8 +25,8 @@ executable("blobfs-corrupt-test") {
   deps = [
     ":common",
     "//src/lib/digest",
-    "//src/lib/storage/block_client/cpp:fake_device",
     "//src/storage/blobfs",
+    "//src/storage/lib/block_client/cpp:fake_device",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zxtest",
   ]
@@ -40,8 +40,8 @@ source_set("common") {
   deps = [
     "//sdk/lib/syslog/cpp",
     "//src/lib/digest",
-    "//src/lib/storage/block_client/cpp",
     "//src/storage/blobfs",
+    "//src/storage/lib/block_client/cpp",
     "//zircon/system/ulib/fbl",
   ]
 }

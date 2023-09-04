@@ -42,7 +42,7 @@ source_set("driver-integration-test-shim") {
     "//sdk/lib/sys/cpp",
     "//src/devices/board/drivers/integration-test:fuchsia.board.test_cpp_wire",
     "//src/lib/ddk",
-    "//src/lib/storage/vfs/cpp",
+    "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/fzl",

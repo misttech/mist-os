@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-#include "src/lib/storage/block_client/cpp/block_device.h"
+#include "src/storage/lib/block_client/cpp/block_device.h"
 
 namespace disk_inspector {
 

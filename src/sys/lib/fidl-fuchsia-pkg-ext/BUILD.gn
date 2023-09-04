@@ -63,7 +63,7 @@ rustc_library("fidl-fuchsia-pkg-ext") {
 
   if (is_fuchsia) {
     test_deps += [
-      "//src/lib/storage/delivery_blob",
+      "//src/storage/lib/delivery_blob",
       "//src/sys/pkg/lib/fuchsia-merkle",
       "//src/sys/pkg/testing/blobfs-ramdisk",
     ]

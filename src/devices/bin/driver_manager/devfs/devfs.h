@@ -17,8 +17,8 @@
 #include <fbl/ref_ptr.h>
 #include <fbl/string.h>
 
-#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
-#include "src/lib/storage/vfs/cpp/vnode.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 class Devfs;
 class PseudoDir;

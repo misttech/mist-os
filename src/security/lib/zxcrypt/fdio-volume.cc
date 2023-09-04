@@ -24,8 +24,8 @@
 #include <fbl/string_buffer.h>
 #include <fbl/vector.h>
 
-#include "src/lib/storage/block_client/cpp/remote_block_device.h"
 #include "src/security/lib/zxcrypt/volume.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
 
 #define ZXDEBUG 0
 

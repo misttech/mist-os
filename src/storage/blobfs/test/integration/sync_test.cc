@@ -8,10 +8,10 @@
 
 #include <gtest/gtest.h>
 
-#include "src/lib/storage/block_client/cpp/fake_block_device.h"
 #include "src/storage/blobfs/test/blob_utils.h"
 #include "src/storage/blobfs/test/integration/blobfs_fixtures.h"
 #include "src/storage/blobfs/test/integration/fdio_test.h"
+#include "src/storage/lib/block_client/cpp/fake_block_device.h"
 
 namespace blobfs {
 namespace {

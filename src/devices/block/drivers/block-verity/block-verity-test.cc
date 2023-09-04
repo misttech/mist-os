@@ -22,8 +22,8 @@
 #include <zxtest/zxtest.h>
 
 #include "constants.h"
-#include "src/lib/storage/block_client/cpp/remote_block_device.h"
 #include "src/storage/fvm/test_support.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
 #include "verified-volume-client.h"
 
 namespace {

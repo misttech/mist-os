@@ -27,7 +27,7 @@
 #include <src/lib/uuid/uuid.h>
 
 #include "src/devices/block/drivers/core/block-fifo.h"
-#include "src/lib/storage/fs_management/cpp/fvm.h"
+#include "src/storage/lib/fs_management/cpp/fvm.h"
 #include "src/zircon/bin/hwstress/status.h"
 #include "src/zircon/bin/hwstress/util.h"
 

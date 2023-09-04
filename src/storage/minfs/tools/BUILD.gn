@@ -14,8 +14,8 @@ import("//build/sdk/sdk_host_tool.gni")
 executable("minfs") {
   sources = [ "main.cc" ]
   deps = [
-    "//src/lib/storage/vfs/cpp/journal",
     "//src/storage/lib/host",
+    "//src/storage/lib/vfs/cpp/journal",
     "//src/storage/minfs",
     "//zircon/system/ulib/bitmap",
     "//zircon/system/ulib/fbl",

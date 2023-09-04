@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 
 #include <zircon/syscalls.h>
 
@@ -14,7 +14,7 @@
 #include <perftest/perftest.h>
 
 #include "src/lib/fxl/strings/string_printf.h"
-#include "src/lib/storage/vfs/cpp/pseudo_file.h"
+#include "src/storage/lib/vfs/cpp/pseudo_file.h"
 #include "util.h"
 
 namespace {

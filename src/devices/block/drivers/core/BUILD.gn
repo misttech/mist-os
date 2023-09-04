@@ -121,8 +121,8 @@ rustc_test("block_driver_integration_test") {
   source_root = "test/integration/src/main.rs"
   deps = [
     "//src/lib/fuchsia",
-    "//src/lib/storage/block_client/rust:remote-block-device",
-    "//src/lib/storage/ramdevice_client",
+    "//src/storage/lib/block_client/rust:remote-block-device",
+    "//src/storage/lib/ramdevice_client",
   ]
 }
 

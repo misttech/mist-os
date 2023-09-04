@@ -51,8 +51,8 @@ static_library("fvm") {
     deps += [
       "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp_wire",
       "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
-      "//src/lib/storage/block_client/cpp",
       "//src/storage/gpt",
+      "//src/storage/lib/block_client/cpp",
       "//zircon/system/ulib/fzl",
       "//zircon/system/ulib/sync",
       "//zircon/system/ulib/zx",
@@ -73,8 +73,8 @@ static_library("test_support") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp_wire",
-    "//src/lib/storage/ramdevice_client/cpp",
     "//src/storage/fvm",
+    "//src/storage/lib/ramdevice_client/cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]
@@ -88,10 +88,10 @@ static_library("test_support") {
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fidl",
-    "//src/lib/storage/block_client/cpp",
-    "//src/lib/storage/fs_management",
-    "//src/lib/storage/ramdevice_client/cpp",
     "//src/storage/fvm",
+    "//src/storage/lib/block_client/cpp",
+    "//src/storage/lib/fs_management",
+    "//src/storage/lib/ramdevice_client/cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/fzl",
@@ -120,7 +120,7 @@ test("fvm_unit") {
     sources += [ "client_test.cc" ]
     deps += [
       "//sdk/lib/fdio",
-      "//src/lib/storage/block_client/cpp",
+      "//src/storage/lib/block_client/cpp",
       "//zircon/system/ulib/fdio-caller",
       "//zircon/system/ulib/zx",
     ]
@@ -147,11 +147,11 @@ test("fvm-integration") {
     "//sdk/lib/fdio",
     "//src/devices/testing/driver-integration-test-shim",
     "//src/lib/fxl",
-    "//src/lib/storage/block_client/cpp",
-    "//src/lib/storage/fs_management",
-    "//src/lib/storage/ramdevice_client/cpp",
     "//src/storage/blobfs",
     "//src/storage/fvm",
+    "//src/storage/lib/block_client/cpp",
+    "//src/storage/lib/fs_management",
+    "//src/storage/lib/ramdevice_client/cpp",
     "//src/storage/minfs",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",

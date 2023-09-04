@@ -15,7 +15,7 @@ include /src/fonts/OWNERS
 include /src/lib/assembly/OWNERS
 include /src/lib/diagnostics/OWNERS
 include /src/lib/diagnostics/inspect/format/rust/OWNERS
-include /src/lib/storage/OWNERS
+include /src/storage/OWNERS
 include /src/media/OWNERS
 include /src/security/bin/kms/OWNERS
 include /src/security/lib/scrutiny/OWNERS
@@ -24,15 +24,12 @@ include /src/sys/OWNERS
 include /src/sys/component_manager/OWNERS
 include /src/sys/lib/fuchsia-bootfs/OWNERS
 include /src/sys/lib/fuchsia-zbi/OWNERS
-include /third_party/rust_crates/ask2patch/regex-automata/OWNERS
 include /third_party/rust_crates/forks/fatfs/OWNERS
 include /third_party/rust_crates/vendor/deflate-0.7.19/OWNERS
 include /third_party/rust_crates/vendor/proptest-1.0.0/OWNERS
 include /third_party/rust_crates/vendor/rand_xoshiro-0.1.0/OWNERS
 include /third_party/rust_crates/vendor/rustc-hash-1.0.1/OWNERS
 include /third_party/rust_crates/vendor/term-0.5.1/OWNERS
-include /third_party/rust_crates/vendor/xts-mode-0.4.1/OWNERS
-include /third_party/rust_crates/vendor/zerocopy-0.7.0-alpha.2/OWNERS
 include /tools/OWNERS
 include /tools/blackout/OWNERS
 include /tools/zedmon/OWNERS

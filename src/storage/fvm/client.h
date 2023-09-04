@@ -15,7 +15,7 @@
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/zx/channel.h>
 
-#include "src/lib/storage/block_client/cpp/block_device.h"
+#include "src/storage/lib/block_client/cpp/block_device.h"
 
 namespace fvm {
 

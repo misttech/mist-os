@@ -19,7 +19,7 @@
 #include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/zx/vmo.h>
 
-#include "src/lib/storage/block_client/cpp/block_device.h"
+#include "src/storage/lib/block_client/cpp/block_device.h"
 #endif
 
 namespace minfs {

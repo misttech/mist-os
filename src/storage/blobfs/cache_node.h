@@ -16,8 +16,8 @@
 #include <fbl/ref_ptr.h>
 
 #include "src/lib/digest/digest.h"
-#include "src/lib/storage/vfs/cpp/paged_vnode.h"
 #include "src/storage/blobfs/cache_policy.h"
+#include "src/storage/lib/vfs/cpp/paged_vnode.h"
 
 namespace blobfs {
 

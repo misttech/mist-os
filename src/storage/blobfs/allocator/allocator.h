@@ -18,12 +18,12 @@
 #include <id_allocator/id_allocator.h>
 #include <storage/buffer/vmoid_registry.h>
 
-#include "src/lib/storage/vfs/cpp/transaction/device_transaction_handler.h"
 #include "src/storage/blobfs/allocator/base_allocator.h"
 #include "src/storage/blobfs/allocator/extent_reserver.h"
 #include "src/storage/blobfs/allocator/node_reserver.h"
 #include "src/storage/blobfs/common.h"
 #include "src/storage/blobfs/node_finder.h"
+#include "src/storage/lib/vfs/cpp/transaction/device_transaction_handler.h"
 
 namespace blobfs {
 

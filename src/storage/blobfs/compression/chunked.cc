@@ -13,9 +13,9 @@
 #include <src/lib/chunked-compression/status.h>
 #include <src/lib/chunked-compression/streaming-chunked-compressor.h>
 
-#include "src/lib/storage/vfs/cpp/trace.h"
 #include "src/storage/blobfs/compression/configs/chunked_compression_params.h"
 #include "src/storage/blobfs/compression_settings.h"
+#include "src/storage/lib/vfs/cpp/trace.h"
 
 namespace blobfs {
 

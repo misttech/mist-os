@@ -20,8 +20,8 @@
 #include "lib/ddk/device.h"
 #include "lib/ddk/driver.h"
 #include "src/devices/misc/drivers/compat/driver.h"
-#include "src/lib/storage/vfs/cpp/service.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
+#include "src/storage/lib/vfs/cpp/service.h"
 
 namespace fdf {
 using namespace fuchsia_driver_framework;

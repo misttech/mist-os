@@ -16,9 +16,9 @@
 #include <gtest/gtest.h>
 #include <safemath/checked_math.h>
 
-#include "src/lib/storage/block_client/cpp/fake_block_device.h"
-#include "src/lib/storage/fs_management/cpp/mount.h"
-#include "src/lib/storage/vfs/cpp/journal/format.h"
+#include "src/storage/lib/block_client/cpp/fake_block_device.h"
+#include "src/storage/lib/fs_management/cpp/mount.h"
+#include "src/storage/lib/vfs/cpp/journal/format.h"
 #include "src/storage/minfs/format.h"
 #include "src/storage/minfs/runner.h"
 

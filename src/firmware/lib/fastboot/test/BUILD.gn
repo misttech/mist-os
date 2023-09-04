@@ -40,7 +40,7 @@ test("fastboot-test") {
     "//sdk/lib/async_patterns/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/lib/fxl",
-    "//src/lib/storage/vfs/cpp",
+    "//src/storage/lib/vfs/cpp",
     "//src/storage/testing:fake-paver",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-default",

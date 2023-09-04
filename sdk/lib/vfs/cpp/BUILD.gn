@@ -65,7 +65,7 @@ sdk_source_set("cpp") {
   #    |\_________\   \|__|  \|_______|\|__|
   #    \|_________|
   #
-  # New code should use //src/lib/storage/vfs/cpp instead. https://fxbug.dev/103032 tracks removal
+  # New code should use //src/storage/lib/vfs/cpp instead. https://fxbug.dev/103032 tracks removal
   # of this library.
   #
   # To remove items from the allowlist, please send a change to one of the OWNERS of

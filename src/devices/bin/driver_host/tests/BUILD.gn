@@ -116,7 +116,7 @@ test("integration_tests") {
     "//src/devices/testing/devmgr-integration-test-shim",
     "//src/devices/testing/driver-integration-test-shim",
     "//src/lib/fxl",
-    "//src/lib/storage/vfs/cpp:test_support",
+    "//src/storage/lib/vfs/cpp:test_support",
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/zxtest",
   ]
@@ -158,7 +158,7 @@ test("driver_host_test") {
     "//sdk/lib/sys/cpp",
     "//src/devices/bin/driver_host:common",
     "//src/lib/fxl",
-    "//src/lib/storage/vfs/cpp:test_support",
+    "//src/storage/lib/vfs/cpp:test_support",
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/zxtest",
   ]

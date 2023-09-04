@@ -7,9 +7,9 @@
 
 #include <fidl/fuchsia.fs.startup/cpp/wire.h>
 
-#include "src/lib/storage/vfs/cpp/service.h"
 #include "src/storage/f2fs/bcache.h"
 #include "src/storage/f2fs/mount.h"
+#include "src/storage/lib/vfs/cpp/service.h"
 
 namespace f2fs {
 

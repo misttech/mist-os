@@ -18,9 +18,9 @@ fxfs_deps = [
   "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
   "//src/lib/diagnostics/inspect/rust",
   "//src/lib/fuchsia-async",
-  "//src/lib/storage/storage_device",
   "//src/storage/fxfs/crypto",
   "//src/storage/lib/interval_tree",
+  "//src/storage/lib/storage_device",
   "//src/storage/type-fprint:fprint",
   "//third_party/rust_crates:anyhow",
   "//third_party/rust_crates:assert_matches",
@@ -238,7 +238,7 @@ fs_test_config("fxfs") {
   supports_mmap_shared_write = true
   supports_shutdown_on_no_connections = true
   timestamp_granularity = 1
-  disk_format = 12  # See //src/storage/fs_management/cpp/format.h
+  disk_format = 12  # See //src/storage/lib/fs_management/cpp/format.h
   uses_crypt = true
 
   options = [
@@ -260,10 +260,10 @@ test("fxfs-interop-fs") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
     "//sdk/lib/component/incoming/cpp",
     "//src/lib/fxl/test:gtest_main",
-    "//src/lib/storage/block_client/cpp",
     "//src/storage/fs_test",
     "//src/storage/fs_test:test_crypt_service",
     "//src/storage/fxfs",
+    "//src/storage/lib/block_client/cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
   ]

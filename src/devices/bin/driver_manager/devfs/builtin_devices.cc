@@ -4,7 +4,7 @@
 
 #include "src/devices/bin/driver_manager/devfs/builtin_devices.h"
 
-#include "src/lib/storage/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 zx_status_t BuiltinDevVnode::Read(void* data, size_t len, size_t off, size_t* out_actual) {
   // /dev/null implementation.

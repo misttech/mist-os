@@ -54,7 +54,7 @@ fake_dependencies_deps = [
   "//src/lib/fidl/rust/fidl",
   "//src/lib/fuchsia",
   "//src/lib/fuchsia-runtime",
-  "//src/lib/storage/vfs/rust:vfs",
+  "//src/storage/lib/vfs/rust:vfs",
   "//src/sys/pkg/lib/fuchsia-hash",
   "//src/sys/pkg/lib/fuchsia-pkg-testing",
   "//src/sys/pkg/lib/system-image",

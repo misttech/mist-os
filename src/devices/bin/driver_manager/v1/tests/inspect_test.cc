@@ -8,7 +8,7 @@
 #include <zxtest/zxtest.h>
 
 #include "src/devices/bin/driver_manager/v1/tests/multiple_device_test.h"
-#include "src/lib/storage/vfs/cpp/dir_test_util.h"
+#include "src/storage/lib/vfs/cpp/dir_test_util.h"
 
 class InspectManagerTestCase : public zxtest::Test {
  public:

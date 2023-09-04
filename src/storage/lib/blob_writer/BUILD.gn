@@ -45,11 +45,11 @@ rustc_test("blob-writer-test") {
   deps = [
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
-    "//src/lib/storage/delivery_blob",
-    "//src/lib/storage/fs_management/rust:fs_management",
-    "//src/lib/storage/ramdevice_client/rust:ramdevice_client",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/storage/lib/blob_writer:blob-writer",
+    "//src/storage/lib/delivery_blob",
+    "//src/storage/lib/fs_management/rust:fs_management",
+    "//src/storage/lib/ramdevice_client/rust:ramdevice_client",
     "//src/sys/pkg/lib/fuchsia-merkle",
     "//third_party/rust_crates:rand",
   ]

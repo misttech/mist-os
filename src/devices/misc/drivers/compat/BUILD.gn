@@ -59,7 +59,7 @@ source_set("lib") {
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
     "//src/lib/ddktl",
-    "//src/lib/storage/vfs/cpp",
+    "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/sync:sync-cpp",
   ]

@@ -136,7 +136,7 @@
 
 ## Storage
 
-* [storage](/src/lib/storage/)
+* [storage](/src/storage/)
 
     Bindings and protocol for serving filesystems on the Fuchsia platform
 

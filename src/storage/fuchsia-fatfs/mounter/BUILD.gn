@@ -19,10 +19,10 @@ rustc_binary("bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
-    "//src/lib/storage/block_client/rust:remote-block-device",
-    "//src/lib/storage/vfs/rust:vfs",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/storage/fuchsia-fatfs:lib",
+    "//src/storage/lib/block_client/rust:remote-block-device",
+    "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
@@ -31,7 +31,7 @@ rustc_binary("bin") {
   test_deps = [
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
     "//src/lib/fuchsia-async",
-    "//src/lib/storage/ramdevice_client",
+    "//src/storage/lib/ramdevice_client",
     "//third_party/rust_crates:fatfs",
   ]
 

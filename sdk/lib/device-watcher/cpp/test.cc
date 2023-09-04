@@ -18,10 +18,10 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "src/lib/storage/vfs/cpp/managed_vfs.h"
-#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
-#include "src/lib/storage/vfs/cpp/pseudo_file.h"
 #include "src/lib/testing/predicates/status.h"
+#include "src/storage/lib/vfs/cpp/managed_vfs.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
+#include "src/storage/lib/vfs/cpp/pseudo_file.h"
 
 namespace {
 

@@ -82,7 +82,7 @@ test_deps = [
   "//src/devices/testing/fake-mmio-reg",
   "//src/devices/testing/mock-ddk",
   "//src/lib/json_parser",
-  "//src/lib/storage/block_client/cpp",
+  "//src/storage/lib/block_client/cpp",
   "//zircon/system/ulib/fdio-caller",
   "//zircon/system/ulib/zxtest",
   "//zircon/third_party/ulib/safemath",

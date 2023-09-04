@@ -12,7 +12,7 @@
 
 #include "fidl/fuchsia.hardware.block.volume/cpp/markers.h"
 #include "src/lib/digest/digest.h"
-#include "src/lib/storage/block_client/cpp/remote_block_device.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
 #include "src/storage/tools/blobfs-corrupt/corrupt_blob.h"
 
 using block_client::RemoteBlockDevice;

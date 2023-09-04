@@ -13,7 +13,7 @@
 #include <disk_inspector/common_types.h>
 #include <fbl/unique_fd.h>
 
-#include "src/lib/storage/vfs/cpp/journal/format.h"
+#include "src/storage/lib/vfs/cpp/journal/format.h"
 #include "src/storage/minfs/allocator/inode_manager.h"
 #include "src/storage/minfs/format.h"
 #include "src/storage/minfs/runner.h"

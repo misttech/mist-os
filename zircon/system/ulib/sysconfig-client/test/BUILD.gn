@@ -15,7 +15,7 @@ test("sysconfig-sync-client-test") {
   include_dirs = [ ".." ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_cpp_wire",
-    "//src/lib/storage/ramdevice_client/cpp:ramdevice-client-test",
+    "//src/storage/lib/ramdevice_client/cpp:ramdevice-client-test",
     "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",

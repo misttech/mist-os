@@ -46,7 +46,7 @@
 #include "src/devices/bin/driver_manager/v2/driver_runner.h"
 #include "src/devices/bin/driver_manager/v2/shutdown_manager.h"
 #include "src/devices/lib/log/log.h"
-#include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
+#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 
 namespace fio = fuchsia_io;
 

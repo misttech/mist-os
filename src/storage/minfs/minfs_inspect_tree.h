@@ -10,9 +10,9 @@
 
 #include <mutex>
 
-#include "src/lib/storage/vfs/cpp/fuchsia_vfs.h"
-#include "src/lib/storage/vfs/cpp/inspect/inspect_tree.h"
-#include "src/lib/storage/vfs/cpp/inspect/node_operations.h"
+#include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
+#include "src/storage/lib/vfs/cpp/inspect/inspect_tree.h"
+#include "src/storage/lib/vfs/cpp/inspect/node_operations.h"
 #include "src/storage/minfs/format.h"
 
 namespace minfs {

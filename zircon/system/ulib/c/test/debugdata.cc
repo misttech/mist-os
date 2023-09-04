@@ -30,10 +30,10 @@
 #include <zxtest/zxtest.h>
 
 #include "../sanitizers/fuchsia-io-constants.h"
-#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
-#include "src/lib/storage/vfs/cpp/service.h"
-#include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
-#include "src/lib/storage/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
+#include "src/storage/lib/vfs/cpp/service.h"
+#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 namespace {
 

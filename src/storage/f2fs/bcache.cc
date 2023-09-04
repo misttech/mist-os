@@ -15,9 +15,9 @@
 #include <storage/buffer/vmo_buffer.h>
 #include <storage/operation/operation.h>
 
-#include "src/lib/storage/block_client/cpp/remote_block_device.h"
 #include "src/storage/f2fs/f2fs_layout.h"
 #include "src/storage/f2fs/f2fs_lib.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
 
 namespace f2fs {
 

@@ -5,7 +5,7 @@
 #ifndef SRC_STORAGE_MEMFS_VNODE_DIR_H_
 #define SRC_STORAGE_MEMFS_VNODE_DIR_H_
 
-#include "src/lib/storage/vfs/cpp/watcher.h"
+#include "src/storage/lib/vfs/cpp/watcher.h"
 #include "src/storage/memfs/memfs.h"
 #include "src/storage/memfs/vnode.h"
 

@@ -27,7 +27,7 @@
 #include <fbl/macros.h>
 #include <fbl/ref_ptr.h>
 
-#include "src/lib/storage/vfs/cpp/vfs.h"
+#include "src/storage/lib/vfs/cpp/vfs.h"
 #include "src/storage/minfs/minfs_private.h"
 #include "src/storage/minfs/writeback.h"
 

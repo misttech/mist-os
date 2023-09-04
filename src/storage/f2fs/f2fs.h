@@ -40,22 +40,22 @@
 #include <mutex>
 #include <semaphore>
 
-#include "src/lib/storage/vfs/cpp/vfs.h"
-#include "src/lib/storage/vfs/cpp/vnode.h"
-#include "src/lib/storage/vfs/cpp/transaction/buffered_operations_builder.h"
+#include "src/storage/lib/vfs/cpp/vfs.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
+#include "src/storage/lib/vfs/cpp/transaction/buffered_operations_builder.h"
 
-#include "src/lib/storage/vfs/cpp/paged_vfs.h"
-#include "src/lib/storage/vfs/cpp/paged_vnode.h"
-#include "src/lib/storage/vfs/cpp/watcher.h"
-#include "src/lib/storage/vfs/cpp/shared_mutex.h"
-#include "src/lib/storage/vfs/cpp/service.h"
-#include "src/lib/storage/vfs/cpp/trace.h"
+#include "src/storage/lib/vfs/cpp/paged_vfs.h"
+#include "src/storage/lib/vfs/cpp/paged_vnode.h"
+#include "src/storage/lib/vfs/cpp/watcher.h"
+#include "src/storage/lib/vfs/cpp/shared_mutex.h"
+#include "src/storage/lib/vfs/cpp/service.h"
+#include "src/storage/lib/vfs/cpp/trace.h"
 
 #include "lib/inspect/cpp/inspect.h"
 #include "lib/inspect/service/cpp/service.h"
 
-#include "src/lib/storage/vfs/cpp/fuchsia_vfs.h"
-#include "src/lib/storage/vfs/cpp/inspect/inspect_tree.h"
+#include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
+#include "src/storage/lib/vfs/cpp/inspect/inspect_tree.h"
 
 #include "src/storage/f2fs/f2fs_types.h"
 #include "src/storage/f2fs/f2fs_lib.h"

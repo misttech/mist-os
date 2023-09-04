@@ -10,7 +10,7 @@ rustc_binary("run-with-logs") {
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-component",
-    "//src/lib/storage/block_client/rust:remote-block-device",
+    "//src/storage/lib/block_client/rust:remote-block-device",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:byteorder",
   ]

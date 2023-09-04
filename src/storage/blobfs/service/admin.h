@@ -7,8 +7,8 @@
 
 #include <fidl/fuchsia.fs/cpp/wire.h>
 
-#include "src/lib/storage/vfs/cpp/fuchsia_vfs.h"
-#include "src/lib/storage/vfs/cpp/service.h"
+#include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
+#include "src/storage/lib/vfs/cpp/service.h"
 
 namespace blobfs {
 

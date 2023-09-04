@@ -9,8 +9,8 @@
 
 #include <fbl/ref_ptr.h>
 
-#include "src/lib/storage/vfs/cpp/vfs_types.h"
-#include "src/lib/storage/vfs/cpp/vnode.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 constexpr char kNullDevName[] = "null";
 constexpr char kZeroDevName[] = "zero";

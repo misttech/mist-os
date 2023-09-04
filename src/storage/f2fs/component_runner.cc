@@ -4,11 +4,11 @@
 
 #include <fidl/fuchsia.fs.startup/cpp/wire.h>
 
-#include "src/lib/storage/vfs/cpp/remote_dir.h"
 #include "src/storage/f2fs/f2fs.h"
 #include "src/storage/f2fs/service/admin.h"
 #include "src/storage/f2fs/service/lifecycle.h"
 #include "src/storage/f2fs/service/startup.h"
+#include "src/storage/lib/vfs/cpp/remote_dir.h"
 
 namespace f2fs {
 

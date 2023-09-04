@@ -32,10 +32,6 @@
 #include <fbl/ref_ptr.h>
 #include <storage/operation/unbuffered_operations_builder.h>
 
-#include "src/lib/storage/block_client/cpp/block_device.h"
-#include "src/lib/storage/vfs/cpp/journal/journal.h"
-#include "src/lib/storage/vfs/cpp/paged_vfs.h"
-#include "src/lib/storage/vfs/cpp/vnode.h"
 #include "src/storage/blobfs/allocator/allocator.h"
 #include "src/storage/blobfs/allocator/extent_reserver.h"
 #include "src/storage/blobfs/blob_cache.h"
@@ -52,6 +48,10 @@
 #include "src/storage/blobfs/page_loader.h"
 #include "src/storage/blobfs/transaction.h"
 #include "src/storage/blobfs/transaction_manager.h"
+#include "src/storage/lib/block_client/cpp/block_device.h"
+#include "src/storage/lib/vfs/cpp/journal/journal.h"
+#include "src/storage/lib/vfs/cpp/paged_vfs.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace blobfs {
 

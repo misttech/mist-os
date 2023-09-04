@@ -14,7 +14,7 @@ executable("iochk") {
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_cpp_wire",
     "//sdk/lib/fdio",
-    "//src/lib/storage/block_client/cpp",
+    "//src/storage/lib/block_client/cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/fzl",

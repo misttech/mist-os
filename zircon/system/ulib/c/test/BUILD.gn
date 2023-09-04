@@ -79,7 +79,7 @@ test("cdebugdata-test") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
     "//sdk/lib/fdio",
     "//sdk/lib/fidl",
-    "//src/lib/storage/vfs/cpp",
+    "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/async",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop",

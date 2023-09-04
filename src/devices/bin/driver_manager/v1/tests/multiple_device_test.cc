@@ -10,7 +10,7 @@
 
 #include <string>
 
-#include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
+#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 
 TEST_F(MultipleDeviceTestCase, UnbindThenSuspend) {
   size_t parent_index;

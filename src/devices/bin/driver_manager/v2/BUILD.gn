@@ -64,7 +64,7 @@ source_set("driver_runner") {
     "//src/devices/bin/driver_manager:inspect",
     "//src/devices/bin/driver_manager/devfs",
     "//src/lib/ddk",
-    "//src/lib/storage/vfs/cpp",
+    "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/zircon-internal",
   ]
 }

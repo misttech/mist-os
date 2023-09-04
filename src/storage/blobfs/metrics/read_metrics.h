@@ -12,8 +12,8 @@
 
 #include <mutex>
 
-#include "src/lib/storage/vfs/cpp/ticker.h"
 #include "src/storage/blobfs/compression_settings.h"
+#include "src/storage/lib/vfs/cpp/ticker.h"
 
 namespace blobfs {
 

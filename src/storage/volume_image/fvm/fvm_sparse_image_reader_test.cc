@@ -14,11 +14,11 @@
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
-#include "src/lib/storage/block_client/cpp/remote_block_device.h"
-#include "src/lib/storage/fs_management/cpp/admin.h"
-#include "src/lib/storage/fs_management/cpp/fvm.h"
 #include "src/storage/fvm/format.h"
 #include "src/storage/fvm/fvm_sparse.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
+#include "src/storage/lib/fs_management/cpp/admin.h"
+#include "src/storage/lib/fs_management/cpp/fvm.h"
 #include "src/storage/testing/fvm.h"
 #include "src/storage/testing/ram_disk.h"
 #include "src/storage/volume_image/ftl/ftl_image.h"

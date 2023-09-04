@@ -13,7 +13,7 @@
 
 #include <disk_inspector/disk_struct.h>
 
-#include "src/lib/storage/vfs/cpp/journal/disk_struct.h"
+#include "src/storage/lib/vfs/cpp/journal/disk_struct.h"
 #include "src/storage/minfs/inspector/disk_struct.h"
 
 namespace minfs {

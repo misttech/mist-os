@@ -20,10 +20,10 @@
 #include <ramdevice-client/ramnand.h>
 #include <zxtest/zxtest.h>
 
-#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
-#include "src/lib/storage/vfs/cpp/service.h"
-#include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
 #include "src/storage/lib/paver/device-partitioner.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
+#include "src/storage/lib/vfs/cpp/service.h"
+#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 
 constexpr uint64_t kBlockSize = 0x1000;
 constexpr uint32_t kBlockCount = 0x100;

@@ -8,8 +8,8 @@
 #include <gtest/gtest.h>
 #include <storage/buffer/array_buffer.h>
 
-#include "src/lib/storage/vfs/cpp/journal/format.h"
-#include "src/lib/storage/vfs/cpp/transaction/transaction_handler.h"
+#include "src/storage/lib/vfs/cpp/journal/format.h"
+#include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
 #include "src/storage/minfs/format.h"
 
 namespace minfs {

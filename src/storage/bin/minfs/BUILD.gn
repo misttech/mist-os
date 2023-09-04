@@ -31,7 +31,7 @@ group("minfs-test-component") {
   visibility += [ "*" ]
   deps = [
     ":minfs-component",
-    "//src/lib/storage/fs_management:fs_management_shard",
+    "//src/storage/lib/fs_management:fs_management_shard",
   ]
 }
 

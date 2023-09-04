@@ -3,7 +3,10 @@
 # found in the LICENSE file.
 
 group("storage") {
-  deps = [ "ext4" ]
+  deps = [
+    "ext4",
+    "lib",
+  ]
 }
 
 group("tests") {

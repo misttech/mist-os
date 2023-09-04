@@ -43,7 +43,7 @@ fuchsia_driver("root-driver") {
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
     "//src/devices/lib/driver:driver_runtime",
-    "//src/lib/storage/vfs/cpp",
+    "//src/storage/lib/vfs/cpp",
   ]
 }
 

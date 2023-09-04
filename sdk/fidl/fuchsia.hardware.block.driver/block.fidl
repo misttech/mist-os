@@ -78,7 +78,7 @@ const MAX_TXN_GROUP_COUNT uint32 = 8;
 // while `BlockFifoRequest` is part of a client <--> server interface and
 // related to the block FIDL API.
 //
-// See src/lib/storage/block_client/cpp/block_fifo.h for FIFO protocol.
+// See src/storage/lib/block_client/cpp/block_fifo.h for FIFO protocol.
 //
 type BlockReadWrite = resource struct {
     /// Opcode and flags.

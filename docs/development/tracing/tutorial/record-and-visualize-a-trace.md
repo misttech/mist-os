@@ -279,7 +279,7 @@ of the report for more detailed information about a specific object:
   *  The length of time of the function execution.
 
   To understand how tracing is performed for `FileReatAt`,
-  see [`//src/lib/storage/vfs/cpp/connection.cc`][connection-cc].
+  see [`//src/storage/lib/vfs/cpp/connection.cc`][connection-cc].
 
 * If you click on `Blob::Read`, you may see information similar to
   the following:
@@ -322,5 +322,5 @@ of the report for more detailed information about a specific object:
 [trace-event-profileing-tool]: https://www.chromium.org/developers/how-tos/trace-event-profiling-tool
 [catapult-project]: https://github.com/catapult-project
 [process-creation]: /docs/concepts/process/process_creation.md
-[connection-cc]: https://cs.opensource.google/fuchsia/fuchsia/+/main:/src/lib/storage/vfs/cpp/connection.cc
+[connection-cc]: https://cs.opensource.google/fuchsia/fuchsia/+/main:/src/storage/lib/vfs/cpp/connection.cc
 [blob-cc]: https://cs.opensource.google/fuchsia/fuchsia/+/main:/src/storage/blobfs/blob.cc

@@ -14,9 +14,9 @@
 #include <disk_inspector/common_types.h>
 #include <disk_inspector/loader.h>
 
-#include "src/lib/storage/vfs/cpp/journal/format.h"
-#include "src/lib/storage/vfs/cpp/transaction/transaction_handler.h"
 #include "src/storage/blobfs/format.h"
+#include "src/storage/lib/vfs/cpp/journal/format.h"
+#include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
 
 namespace blobfs {
 

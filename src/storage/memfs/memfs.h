@@ -15,8 +15,8 @@
 
 #include <fbl/ref_ptr.h>
 
-#include "src/lib/storage/vfs/cpp/fuchsia_vfs.h"
-#include "src/lib/storage/vfs/cpp/paged_vfs.h"
+#include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
+#include "src/storage/lib/vfs/cpp/paged_vfs.h"
 #include "src/storage/memfs/dnode.h"
 
 namespace memfs {

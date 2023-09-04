@@ -12,7 +12,7 @@
 
 #include "src/graphics/bin/opencl_loader/icd_component.h"
 #include "src/graphics/bin/opencl_loader/magma_device.h"
-#include "src/lib/storage/vfs/cpp/remote_dir.h"
+#include "src/storage/lib/vfs/cpp/remote_dir.h"
 
 LoaderApp::LoaderApp(sys::ComponentContext* context, async_dispatcher_t* dispatcher)
     : context_(context),

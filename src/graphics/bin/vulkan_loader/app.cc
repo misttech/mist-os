@@ -14,7 +14,7 @@
 #include "src/graphics/bin/vulkan_loader/icd_component.h"
 #include "src/graphics/bin/vulkan_loader/lavapipe_device.h"
 #include "src/graphics/bin/vulkan_loader/magma_device.h"
-#include "src/lib/storage/vfs/cpp/remote_dir.h"
+#include "src/storage/lib/vfs/cpp/remote_dir.h"
 
 LoaderApp::LoaderApp(sys::ComponentContext* context, async_dispatcher_t* dispatcher,
                      structured_config_lib::Config structured_config)

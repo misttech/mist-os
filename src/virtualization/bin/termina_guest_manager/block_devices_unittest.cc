@@ -15,7 +15,7 @@
 
 #include "src/lib/files/directory.h"
 #include "src/lib/files/path.h"
-#include "src/lib/storage/block_client/cpp/remote_block_device.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
 #include "src/storage/testing/fvm.h"
 #include "src/storage/testing/ram_disk.h"
 

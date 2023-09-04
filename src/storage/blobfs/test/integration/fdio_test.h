@@ -12,11 +12,11 @@
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
-#include "src/lib/storage/block_client/cpp/fake_block_device.h"
 #include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/blobfs.h"
 #include "src/storage/blobfs/component_runner.h"
 #include "src/storage/blobfs/mount.h"
+#include "src/storage/lib/block_client/cpp/fake_block_device.h"
 
 namespace blobfs {
 

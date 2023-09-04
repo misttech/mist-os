@@ -11,7 +11,7 @@
 #include <disk_inspector/inspector_transaction_handler.h>
 #include <disk_inspector/vmo_buffer_factory.h>
 
-#include "src/lib/storage/vfs/cpp/journal/inspector_parser.h"
+#include "src/storage/lib/vfs/cpp/journal/inspector_parser.h"
 #include "src/storage/minfs/format.h"
 #include "src/storage/minfs/inspector/loader.h"
 #include "src/storage/minfs/inspector/parser.h"

@@ -136,8 +136,8 @@ executable("codec_factory_integration_test_exe") {
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//sdk/lib/vfs/cpp",
     "//src/lib/fxl/test:gtest_main",
-    "//src/lib/storage/vfs/cpp",
     "//src/lib/testing/loop_fixture",
+    "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]

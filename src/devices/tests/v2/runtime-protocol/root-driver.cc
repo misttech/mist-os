@@ -16,8 +16,8 @@
 
 #include <bind/fuchsia/test/cpp/bind.h>
 
-#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
-#include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
+#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 
 namespace fdf {
 using namespace fuchsia_driver_framework;

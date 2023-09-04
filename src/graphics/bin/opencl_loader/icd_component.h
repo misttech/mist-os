@@ -17,7 +17,7 @@
 #include "rapidjson/document.h"
 #include "sdk/lib/sys/inspect/cpp/component.h"
 #include "src/lib/fxl/synchronization/thread_annotations.h"
-#include "src/lib/storage/vfs/cpp/pseudo_file.h"
+#include "src/storage/lib/vfs/cpp/pseudo_file.h"
 
 class LoaderApp;
 

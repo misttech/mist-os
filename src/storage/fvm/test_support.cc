@@ -25,8 +25,8 @@
 #include <zxtest/zxtest.h>
 
 #include "lib/fdio/directory.h"
-#include "src/lib/storage/block_client/cpp/remote_block_device.h"
-#include "src/lib/storage/fs_management/cpp/fvm.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
+#include "src/storage/lib/fs_management/cpp/fvm.h"
 
 namespace fvm {
 namespace {

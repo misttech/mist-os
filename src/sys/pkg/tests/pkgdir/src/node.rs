@@ -332,8 +332,8 @@ async fn assert_get_flags(root_dir: &fio::DirectoryProxy, path: &str, open_flags
     // The flags returned by GetFlags() do NOT always match the flags the node is opened with
     // because GetFlags only returns those flags that are meaningful after the Open call (instead
     // of only during).
-    // C++ VFS https://cs.opensource.google/fuchsia/fuchsia/+/main:src/lib/storage/vfs/cpp/file_connection.cc;l=124;drc=6865fdce358ab86d9d2deae5d4693786fbe88d45
-    // Rust VFS https://cs.opensource.google/fuchsia/fuchsia/+/main:src/lib/storage/vfs/rust/src/common.rs;l=21;drc=8cea889022e03a335c73905f5b0aa80937165c03
+    // C++ VFS https://cs.opensource.google/fuchsia/fuchsia/+/main:src/storage/lib/vfs/cpp/file_connection.cc;l=124;drc=6865fdce358ab86d9d2deae5d4693786fbe88d45
+    // Rust VFS https://cs.opensource.google/fuchsia/fuchsia/+/main:src/storage/lib/vfs/rust/src/common.rs;l=21;drc=8cea889022e03a335c73905f5b0aa80937165c03
     let mask = fio::OpenFlags::APPEND
         | fio::OpenFlags::NODE_REFERENCE
         | fio::OpenFlags::RIGHT_READABLE

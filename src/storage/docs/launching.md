@@ -64,7 +64,7 @@ child in the realm. It attempts to connect to it's exposed directory via
 `fuchsia.component.Realm`.
 
 A shard is provided for cml files to include if they plan to launch filesystems as dynamic children
-at `//src/lib/storage/fs_management/client.shard.cml`. The `component_collection_name` using this
+at `//src/storage/lib/fs_management/client.shard.cml`. The `component_collection_name` using this
 shard is `fs-collection`.
 
 Launching a filesystem using regular processes -

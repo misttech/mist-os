@@ -8,7 +8,7 @@
 #include <zxtest/zxtest.h>
 
 #include "src/devices/bin/driver_host/driver_host.h"
-#include "src/lib/storage/vfs/cpp/dir_test_util.h"
+#include "src/storage/lib/vfs/cpp/dir_test_util.h"
 
 namespace {
 

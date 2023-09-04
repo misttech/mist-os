@@ -40,7 +40,7 @@
 #include <runtests-utils/fuchsia-run-test.h>
 #include <runtests-utils/service-proxy-dir.h>
 
-#include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
+#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 
 namespace runtests {
 

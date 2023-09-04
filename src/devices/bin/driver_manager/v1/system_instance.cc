@@ -9,7 +9,7 @@
 #include <zircon/syscalls/policy.h>
 
 #include "src/devices/lib/log/log.h"
-#include "src/lib/storage/vfs/cpp/service.h"
+#include "src/storage/lib/vfs/cpp/service.h"
 
 DirectoryFilter::~DirectoryFilter() {
   sync_completion_t done;

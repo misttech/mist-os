@@ -26,11 +26,11 @@
 #include <ramdevice-client/ramdisk.h>
 
 #include "fidl/fuchsia.device/cpp/markers.h"
-#include "src/lib/storage/block_client/cpp/remote_block_device.h"
-#include "src/lib/storage/fs_management/cpp/admin.h"
-#include "src/lib/storage/fs_management/cpp/format.h"
-#include "src/lib/storage/fs_management/cpp/fvm.h"
 #include "src/storage/fvm/format.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
+#include "src/storage/lib/fs_management/cpp/admin.h"
+#include "src/storage/lib/fs_management/cpp/format.h"
+#include "src/storage/lib/fs_management/cpp/fvm.h"
 #include "src/storage/testing/fvm.h"
 #include "src/storage/testing/ram_disk.h"
 #include "src/storage/volume_image/adapter/blobfs_partition.h"

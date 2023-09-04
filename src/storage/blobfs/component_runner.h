@@ -14,11 +14,11 @@
 
 #include <optional>
 
-#include "src/lib/storage/vfs/cpp/managed_vfs.h"
-#include "src/lib/storage/vfs/cpp/paged_vfs.h"
-#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
 #include "src/storage/blobfs/blobfs.h"
 #include "src/storage/blobfs/mount.h"
+#include "src/storage/lib/vfs/cpp/managed_vfs.h"
+#include "src/storage/lib/vfs/cpp/paged_vfs.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 
 namespace blobfs {
 

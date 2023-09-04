@@ -18,9 +18,9 @@
 #include <storage/buffer/vmo_buffer.h>
 #include <storage/buffer/vmoid_registry.h>
 
-#include "src/lib/storage/block_client/cpp/block_device.h"
-#include "src/lib/storage/vfs/cpp/transaction/device_transaction_handler.h"
 #include "src/storage/f2fs/f2fs_types.h"
+#include "src/storage/lib/block_client/cpp/block_device.h"
+#include "src/storage/lib/vfs/cpp/transaction/device_transaction_handler.h"
 
 namespace f2fs {
 

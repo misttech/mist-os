@@ -11,11 +11,11 @@
 #include <memory>
 #include <mutex>
 
-#include "src/lib/storage/vfs/cpp/inspect/inspect_tree.h"
-#include "src/lib/storage/vfs/cpp/inspect/node_operations.h"
 #include "src/storage/blobfs/format.h"
 #include "src/storage/blobfs/metrics/compression_metrics.h"
 #include "src/storage/blobfs/metrics/fragmentation_metrics.h"
+#include "src/storage/lib/vfs/cpp/inspect/inspect_tree.h"
+#include "src/storage/lib/vfs/cpp/inspect/node_operations.h"
 namespace blobfs {
 
 class Blobfs;

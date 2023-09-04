@@ -9,7 +9,7 @@
 #include <string>
 
 #include <fbl/ref_ptr.h>
-#include <src/lib/storage/vfs/cpp/pseudo_dir.h>
+#include <src/storage/lib/vfs/cpp/pseudo_dir.h>
 
 namespace ot {
 namespace Fuchsia {

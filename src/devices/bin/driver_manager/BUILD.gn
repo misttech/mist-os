@@ -57,7 +57,7 @@ source_set("inspect") {
     "//sdk/lib/inspect/service/cpp",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-deprecated-binding-headers",
-    "//src/lib/storage/vfs/cpp",
+    "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/fbl",
   ]
   deps = [ "//sdk/lib/inspect/component/cpp:inspect_component_cpp" ]
@@ -114,7 +114,7 @@ test("driver_manager_devfs_test") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fdio",
-    "//src/lib/storage/vfs/cpp:test_support",
+    "//src/storage/lib/vfs/cpp:test_support",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zxtest",

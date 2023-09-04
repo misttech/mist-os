@@ -10,7 +10,7 @@ Non-filesystem programs can also implement a pager. With the addition of another
 userspace program can implement paging functionality for a memory region. This can enable
 significant flexibility for dynamically-populated data regions.
 
-Most filesystems will use the [vfs](/src/lib/storage/vfs) library which implements these concepts
+Most filesystems will use the [vfs](/src/storage/lib/vfs) library which implements these concepts
 and exposes them to the filesystem in an easier-to-use interface. Using the "vfs" library is
 recommended when possible to implement filesystems.
 
@@ -31,13 +31,13 @@ For general setup:
   * Create a [pager](/docs/reference/kernel_objects/pager) kernel object with
     [zx\_pager\_create](/docs/reference/syscalls/pager_create) (or `zx::pager::create` in C++). This
     object will be used to create individual VMOs. An example of this setup is in the
-    [paged_vfs.cc](/src/lib/storage/vfs/cpp/pager-backed.cc) implementation.
+    [paged_vfs.cc](/src/storage/lib/vfs/cpp/pager-backed.cc) implementation.
 
   * Create a thread or pool of threads to respond to paging requests. You can use the
     [async loop](/zircon/system/ulib/async/include/lib/async/cpp/paged_vmo.h), but if all your
     thread does is respond to paging requests, it can be simpler to create a port and wait on it
     manually. An example is in
-    [pager\_thread\_pool.cc](/src/lib/storage/vfs/cpp/pager_thread_pool.cc) implementation.
+    [pager\_thread\_pool.cc](/src/storage/lib/vfs/cpp/pager_thread_pool.cc) implementation.
 
 To create a pager-backed vmo, call
 [zx\_pager\_create\_vmo](/docs/reference/syscalls/pager_create_vmo) and supply the size, the port
@@ -78,7 +78,7 @@ Page requests for a pager-backed VMO are delivered on the port associated with t
 `zx_pager_create_vmo()` call that created it. They will come in with a packet type of
 `ZX_PKT_TYPE_PAGE_REQUEST` and the `key` will be the unique ID supplied at creation time. The
 pager would use the ID to lookup the information required for the object. An example is in the
-[pager\_thread\_pool.cc](/src/lib/storage/vfs/cpp/pager_thread_pool.cc) implementation.
+[pager\_thread\_pool.cc](/src/storage/lib/vfs/cpp/pager_thread_pool.cc) implementation.
 
 The pager responds to the request by either populating the requested range of the VMO or by marking
 it as failed. The pager must always report the entire requested range as either populated or failed
@@ -114,13 +114,13 @@ pager requests and will reenter the pager. The use of the aux vmo and the specia
 
 When there are no mapped clones of the pager-backed vmo, it can be deleted. A pager implementation
 watches for the "no clones" notification of the main pager-backed VMO to know when this happens. For
-an example, see `PagedVnode::WatchForZeroVmoClones()` in [paged\_vnode.cc](/src/lib/storage/vfs/cpp/paged_vnode.cc).
+an example, see `PagedVnode::WatchForZeroVmoClones()` in [paged\_vnode.cc](/src/storage/lib/vfs/cpp/paged_vnode.cc).
 
 One thing to keep in mind is that the kernel will queue this message for delivery. In the meantime,
 it might be possible for the pager to create a new clone of the VMO. As a result, the message
 handler should verify there are actually no clones before doing any cleanup. An example can be seen
 in the `PagedVnode::OnNoPagedVmoClonesMessage()` in
-[paged\_vnode.cc](/src/lib/storage/vfs/cpp/paged_vnode.cc).
+[paged\_vnode.cc](/src/storage/lib/vfs/cpp/paged_vnode.cc).
 
 ### Freeing a pager-backed VMO when there are still clones
 

@@ -8,8 +8,8 @@
 #include <fidl/fuchsia.process.lifecycle/cpp/wire.h>
 #include <lib/zx/result.h>
 
-#include "src/lib/storage/vfs/cpp/managed_vfs.h"
-#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
+#include "src/storage/lib/vfs/cpp/managed_vfs.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/minfs/minfs_private.h"
 #include "src/storage/minfs/mount.h"
 

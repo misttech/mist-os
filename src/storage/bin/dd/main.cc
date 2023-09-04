@@ -36,7 +36,7 @@
 #include <safemath/checked_math.h>
 #include <storage/buffer/vmoid_registry.h>
 
-#include "src/lib/storage/block_client/cpp/client.h"
+#include "src/storage/lib/block_client/cpp/client.h"
 
 namespace {
 

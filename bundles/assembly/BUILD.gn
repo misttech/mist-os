@@ -1452,7 +1452,7 @@ assembly_input_bundle("fshost_common") {
           component_name = "fshost"
           shards =
               rebase_path([
-                            "//src/lib/storage/fs_management/client.shard.cml",
+                            "//src/storage/lib/fs_management/client.shard.cml",
                             "//src/storage/fshost/meta/config.cml",
                           ],
                           root_build_dir)

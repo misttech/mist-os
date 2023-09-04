@@ -12,8 +12,8 @@
 #include <string_view>
 #include <vector>
 
-#include "src/lib/storage/vfs/cpp/inspect/inspect_tree.h"
 #include "src/storage/fs_test/fs_test_fixture.h"
+#include "src/storage/lib/vfs/cpp/inspect/inspect_tree.h"
 
 namespace fs_test {
 namespace {

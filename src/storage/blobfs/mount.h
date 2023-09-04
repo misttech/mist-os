@@ -14,10 +14,10 @@
 
 #include <optional>
 
-#include "src/lib/storage/block_client/cpp/block_device.h"
 #include "src/storage/blobfs/cache_policy.h"
 #include "src/storage/blobfs/compression/external_decompressor.h"
 #include "src/storage/blobfs/compression_settings.h"
+#include "src/storage/lib/block_client/cpp/block_device.h"
 
 namespace blobfs {
 

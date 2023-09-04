@@ -31,9 +31,9 @@
 
 #include "sparse_format.h"
 #include "src/lib/fxl/strings/string_printf.h"
-#include "src/lib/storage/vfs/cpp/managed_vfs.h"
-#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
-#include "src/lib/storage/vfs/cpp/service.h"
+#include "src/storage/lib/vfs/cpp/managed_vfs.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
+#include "src/storage/lib/vfs/cpp/service.h"
 #include "src/storage/testing/fake-paver.h"
 
 namespace fastboot {

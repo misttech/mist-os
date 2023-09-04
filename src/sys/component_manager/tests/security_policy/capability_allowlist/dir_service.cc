@@ -8,7 +8,7 @@
 #include <lib/svc/outgoing.h>
 #include <lib/zx/channel.h>
 
-#include "src/lib/storage/vfs/cpp/remote_dir.h"
+#include "src/storage/lib/vfs/cpp/remote_dir.h"
 #include "src/storage/memfs/memfs.h"
 #include "src/storage/memfs/vnode_dir.h"
 

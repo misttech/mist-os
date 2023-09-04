@@ -14,8 +14,8 @@
 #include <fbl/string_printf.h>
 #include <gtest/gtest.h>
 
-#include "src/lib/storage/block_client/cpp/fake_block_device.h"
-#include "src/lib/storage/vfs/cpp/journal/inspector_journal.h"
+#include "src/storage/lib/block_client/cpp/fake_block_device.h"
+#include "src/storage/lib/vfs/cpp/journal/inspector_journal.h"
 #include "src/storage/minfs/inspector/inspector_inode.h"
 #include "src/storage/minfs/inspector/inspector_inode_table.h"
 #include "src/storage/minfs/inspector/inspector_private.h"

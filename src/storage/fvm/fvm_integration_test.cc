@@ -58,14 +58,14 @@
 
 #include "lib/fidl/cpp/wire/internal/transport_channel.h"
 #include "src/lib/fxl/strings/string_printf.h"
-#include "src/lib/storage/block_client/cpp/client.h"
-#include "src/lib/storage/block_client/cpp/remote_block_device.h"
-#include "src/lib/storage/fs_management/cpp/admin.h"
-#include "src/lib/storage/fs_management/cpp/fvm.h"
-#include "src/lib/storage/fs_management/cpp/mount.h"
 #include "src/storage/blobfs/format.h"
 #include "src/storage/fvm/format.h"
 #include "src/storage/fvm/fvm_check.h"
+#include "src/storage/lib/block_client/cpp/client.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
+#include "src/storage/lib/fs_management/cpp/admin.h"
+#include "src/storage/lib/fs_management/cpp/fvm.h"
+#include "src/storage/lib/fs_management/cpp/mount.h"
 #include "src/storage/minfs/format.h"
 
 constexpr char kFvmDriverLib[] = "fvm.cm";

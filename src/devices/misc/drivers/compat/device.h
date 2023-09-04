@@ -29,7 +29,7 @@
 #include <fbl/intrusive_double_list.h>
 
 #include "src/devices/lib/fidl/device_server.h"
-#include "src/lib/storage/vfs/cpp/vmo_file.h"
+#include "src/storage/lib/vfs/cpp/vmo_file.h"
 
 namespace compat {
 

@@ -18,7 +18,7 @@ zx_library("debugdata") {
     "//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata_cpp_wire",
     "//sdk/lib/fidl",
     "//src/lib/fxl",
-    "//src/lib/storage/vfs/cpp",
+    "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",

@@ -23,11 +23,11 @@
 #include <fbl/unique_fd.h>
 #include <ramdevice-client/ramnand.h>
 
-#include "src/lib/storage/fs_management/cpp/admin.h"
-#include "src/lib/storage/fs_management/cpp/format.h"
-#include "src/lib/storage/fs_management/cpp/mount.h"
 #include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/compression_settings.h"
+#include "src/storage/lib/fs_management/cpp/admin.h"
+#include "src/storage/lib/fs_management/cpp/format.h"
+#include "src/storage/lib/fs_management/cpp/mount.h"
 #include "src/storage/testing/ram_disk.h"
 
 namespace fs_test {

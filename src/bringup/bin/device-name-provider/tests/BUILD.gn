@@ -10,7 +10,7 @@ test("device-name-provider-test") {
   deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
     "//src/bringup/bin/device-name-provider:args",
-    "//src/lib/storage/vfs/cpp",
+    "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/mock-boot-arguments",

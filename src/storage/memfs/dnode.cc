@@ -8,7 +8,7 @@
 
 #include <memory>
 
-#include "src/lib/storage/vfs/cpp/vfs.h"
+#include "src/storage/lib/vfs/cpp/vfs.h"
 #include "src/storage/memfs/vnode.h"
 
 namespace memfs {

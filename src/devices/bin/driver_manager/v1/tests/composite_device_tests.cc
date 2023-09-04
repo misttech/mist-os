@@ -14,7 +14,7 @@
 
 #include "src/devices/bin/driver_manager/testing/fake_driver_index.h"
 #include "src/devices/bin/driver_manager/v1/tests/multiple_device_test.h"
-#include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
+#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 
 namespace fio = fuchsia_io;
 

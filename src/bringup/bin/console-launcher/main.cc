@@ -37,11 +37,11 @@
 #include "src/bringup/bin/console-launcher/console_launcher.h"
 #include "src/lib/fxl/strings/split_string.h"
 #include "src/lib/loader_service/loader_service.h"
-#include "src/lib/storage/vfs/cpp/managed_vfs.h"
-#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
-#include "src/lib/storage/vfs/cpp/remote_dir.h"
-#include "src/lib/storage/vfs/cpp/vfs_types.h"
-#include "src/lib/storage/vfs/cpp/vnode.h"
+#include "src/storage/lib/vfs/cpp/managed_vfs.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
+#include "src/storage/lib/vfs/cpp/remote_dir.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 #include "src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h"
 
 namespace {

@@ -1,17 +1,7 @@
-# Copyright 2021 The Fuchsia Authors. All rights reserved.
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("tests") {
-  testonly = true
-  deps = [
-    "rust:tests",
-    "//src/lib/fuchsia",
-  ]
-}
-
-# Forward some targets for easier transition
-# Note the old zircon directory forwarded to the CPP implementation.
 group("ramdevice_client") {
-  public_deps = [ "rust" ]
+  public_deps = [ "//src/storage/lib/ramdevice_client" ]
 }

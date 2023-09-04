@@ -9,7 +9,7 @@
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include "src/lib/storage/vfs/cpp/remote_dir.h"
+#include "src/storage/lib/vfs/cpp/remote_dir.h"
 
 // Serve /pkg as /pkg in the outgoing directory to provide access to configuration data
 // i.e. /pkg/data/guest.cfg

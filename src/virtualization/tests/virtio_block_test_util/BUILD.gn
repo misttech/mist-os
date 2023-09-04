@@ -14,7 +14,7 @@ rustc_binary("virtio_block_test_util") {
       "//src/lib/fuchsia",
       "//src/lib/fuchsia-component",
       "//src/lib/fuchsia-fs",
-      "//src/lib/storage/block_client/rust:remote-block-device",
+      "//src/storage/lib/block_client/rust:remote-block-device",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:structopt",
     ]

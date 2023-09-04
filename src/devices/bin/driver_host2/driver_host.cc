@@ -16,7 +16,7 @@
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/dlfcn.h>
 
-#include "src/lib/storage/vfs/cpp/service.h"
+#include "src/storage/lib/vfs/cpp/service.h"
 
 // The driver runtime libraries use the fdf namespace, but we would also like to use fdf
 // as an alias for the fdf FIDL library.

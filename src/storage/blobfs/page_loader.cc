@@ -18,9 +18,9 @@
 #include <algorithm>
 #include <memory>
 
-#include "src/lib/storage/vfs/cpp/trace.h"
 #include "src/storage/blobfs/blobfs_metrics.h"
 #include "src/storage/blobfs/format.h"
+#include "src/storage/lib/vfs/cpp/trace.h"
 #include "src/storage/lib/watchdog/include/lib/watchdog/operations.h"
 
 namespace blobfs {

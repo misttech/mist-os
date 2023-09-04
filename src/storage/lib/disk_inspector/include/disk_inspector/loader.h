@@ -7,7 +7,7 @@
 
 #include <storage/buffer/block_buffer.h>
 
-#include "src/lib/storage/vfs/cpp/transaction/transaction_handler.h"
+#include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
 
 namespace disk_inspector {
 

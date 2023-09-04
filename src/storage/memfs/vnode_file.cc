@@ -8,7 +8,7 @@
 #include <lib/zx/vmo.h>
 #include <zircon/syscalls-next.h>
 
-#include "src/lib/storage/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/memfs/memfs.h"
 
 namespace memfs {

@@ -11,7 +11,7 @@ source_set("fake_logical_buffer_collection") {
   deps = [
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
     "//sdk/lib/syslog/cpp",
-    "//src/lib/storage/vfs/cpp",
+    "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",

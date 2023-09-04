@@ -9,8 +9,8 @@
 
 #include <storage/operation/unbuffered_operations_builder.h>
 
-#include "src/lib/storage/vfs/cpp/journal/journal.h"
 #include "src/storage/blobfs/allocator/extent_reserver.h"
+#include "src/storage/lib/vfs/cpp/journal/journal.h"
 
 namespace blobfs {
 

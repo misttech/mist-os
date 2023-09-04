@@ -11,8 +11,8 @@
 
 #include <gtest/gtest.h>
 
-#include "src/lib/storage/block_client/cpp/fake_block_device.h"
 #include "src/storage/f2fs/f2fs.h"
+#include "src/storage/lib/block_client/cpp/fake_block_device.h"
 #include "unit_lib.h"
 
 namespace f2fs {
@@ -1044,8 +1044,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesCrossMultiPage) {
     LockedPage dnode_page;
     ASSERT_EQ(fs_->GetNodeManager().GetLockedDnodePage(*vnode, kAddrsPerInode - 1, &dnode_page),
               ZX_OK);
-    ASSERT_EQ(dnode_page.GetPage<NodePage>().GetBlockAddr(kAddrsPerInode - 1),
-              block_addresses[0]);
+    ASSERT_EQ(dnode_page.GetPage<NodePage>().GetBlockAddr(kAddrsPerInode - 1), block_addresses[0]);
     dnode_page.reset();
 
     ASSERT_EQ(fs_->GetNodeManager().GetLockedDnodePage(*vnode, kAddrsPerInode, &dnode_page), ZX_OK);
@@ -1072,8 +1071,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesCrossMultiPage) {
     ASSERT_EQ(fs_->GetNodeManager().GetLockedDnodePage(*vnode, indirect_index_lv1 + direct_blks - 1,
                                                        &dnode_page),
               ZX_OK);
-    ASSERT_EQ(dnode_page.GetPage<NodePage>().GetBlockAddr(kAddrsPerBlock - 1),
-              block_addresses[0]);
+    ASSERT_EQ(dnode_page.GetPage<NodePage>().GetBlockAddr(kAddrsPerBlock - 1), block_addresses[0]);
     dnode_page.reset();
 
     ASSERT_EQ(fs_->GetNodeManager().GetLockedDnodePage(*vnode, indirect_index_lv1 + direct_blks,
@@ -1100,8 +1098,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesCrossMultiPage) {
     ASSERT_EQ(fs_->GetNodeManager().GetLockedDnodePage(
                   *vnode, indirect_index_lv1 + direct_blks * 2 - 1, &dnode_page),
               ZX_OK);
-    ASSERT_EQ(dnode_page.GetPage<NodePage>().GetBlockAddr(kAddrsPerBlock - 1),
-              block_addresses[0]);
+    ASSERT_EQ(dnode_page.GetPage<NodePage>().GetBlockAddr(kAddrsPerBlock - 1), block_addresses[0]);
     dnode_page.reset();
 
     ASSERT_EQ(fs_->GetNodeManager().GetLockedDnodePage(*vnode, indirect_index_lv1 + direct_blks * 2,
@@ -1128,8 +1125,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesCrossMultiPage) {
     LockedPage dnode_page;
     ASSERT_EQ(fs_->GetNodeManager().GetLockedDnodePage(*vnode, indirect_index_lv2 - 1, &dnode_page),
               ZX_OK);
-    ASSERT_EQ(dnode_page.GetPage<NodePage>().GetBlockAddr(kAddrsPerBlock - 1),
-              block_addresses[0]);
+    ASSERT_EQ(dnode_page.GetPage<NodePage>().GetBlockAddr(kAddrsPerBlock - 1), block_addresses[0]);
     dnode_page.reset();
 
     ASSERT_EQ(fs_->GetNodeManager().GetLockedDnodePage(*vnode, indirect_index_lv2, &dnode_page),
@@ -1157,8 +1153,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesCrossMultiPage) {
     ASSERT_EQ(fs_->GetNodeManager().GetLockedDnodePage(
                   *vnode, indirect_index_lv2 + indirect_blks + direct_blks - 1, &dnode_page),
               ZX_OK);
-    ASSERT_EQ(dnode_page.GetPage<NodePage>().GetBlockAddr(kAddrsPerBlock - 1),
-              block_addresses[0]);
+    ASSERT_EQ(dnode_page.GetPage<NodePage>().GetBlockAddr(kAddrsPerBlock - 1), block_addresses[0]);
     dnode_page.reset();
 
     ASSERT_EQ(fs_->GetNodeManager().GetLockedDnodePage(
@@ -1187,8 +1182,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesCrossMultiPage) {
     ASSERT_EQ(fs_->GetNodeManager().GetLockedDnodePage(*vnode, indirect_index_lv3 + direct_blks - 1,
                                                        &dnode_page),
               ZX_OK);
-    ASSERT_EQ(dnode_page.GetPage<NodePage>().GetBlockAddr(kAddrsPerBlock - 1),
-              block_addresses[0]);
+    ASSERT_EQ(dnode_page.GetPage<NodePage>().GetBlockAddr(kAddrsPerBlock - 1), block_addresses[0]);
     dnode_page.reset();
 
     ASSERT_EQ(fs_->GetNodeManager().GetLockedDnodePage(*vnode, indirect_index_lv3 + direct_blks,

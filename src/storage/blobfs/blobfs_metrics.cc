@@ -19,8 +19,8 @@
 
 #include <fbl/algorithm.h>
 
-#include "src/lib/storage/vfs/cpp/service.h"
-#include "src/lib/storage/vfs/cpp/vnode.h"
+#include "src/storage/lib/vfs/cpp/service.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace blobfs {
 namespace {

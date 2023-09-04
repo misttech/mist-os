@@ -5,7 +5,7 @@
 #ifndef SRC_STORAGE_MINFS_SERVICE_ADMIN_H_
 #define SRC_STORAGE_MINFS_SERVICE_ADMIN_H_
 
-#include "src/lib/storage/vfs/cpp/service.h"
+#include "src/storage/lib/vfs/cpp/service.h"
 #include "src/storage/minfs/runner.h"
 
 namespace minfs {

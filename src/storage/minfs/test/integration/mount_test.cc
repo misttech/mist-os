@@ -26,9 +26,9 @@
 #include <gtest/gtest.h>
 #include <ramdevice-client/ramdisk.h>
 
-#include "src/lib/storage/block_client/cpp/block_device.h"
-#include "src/lib/storage/block_client/cpp/remote_block_device.h"
-#include "src/lib/storage/fs_management/cpp/admin.h"
+#include "src/storage/lib/block_client/cpp/block_device.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
+#include "src/storage/lib/fs_management/cpp/admin.h"
 #include "src/storage/minfs/format.h"
 #include "src/storage/minfs/runner.h"
 #include "src/storage/testing/ram_disk.h"

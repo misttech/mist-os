@@ -13,7 +13,7 @@
 
 #include <zxtest/zxtest.h>
 
-#include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
+#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 
 namespace {
 

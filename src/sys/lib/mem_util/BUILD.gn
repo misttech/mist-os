@@ -19,7 +19,7 @@ rustc_library("mem_util") {
   ]
   test_deps = [
     "//src/lib/fuchsia",
-    "//src/lib/storage/vfs/rust:vfs",
+    "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:futures",
   ]
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]

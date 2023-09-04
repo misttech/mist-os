@@ -5,8 +5,8 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/fdio/namespace.h>
 
-#include "src/lib/storage/fs_management/cpp/mount.h"
 #include "src/storage/fs_test/fs_test.h"
+#include "src/storage/lib/fs_management/cpp/mount.h"
 #include "src/storage/memfs/memfs.h"
 #include "src/storage/memfs/vnode_dir.h"
 

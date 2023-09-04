@@ -26,9 +26,9 @@
 #include <fbl/alloc_checker.h>
 #include <safemath/safe_math.h>
 
-#include "src/lib/storage/vfs/cpp/journal/format.h"
-#include "src/lib/storage/vfs/cpp/journal/initializer.h"
-#include "src/lib/storage/vfs/cpp/trace.h"
+#include "src/storage/lib/vfs/cpp/journal/format.h"
+#include "src/storage/lib/vfs/cpp/journal/initializer.h"
+#include "src/storage/lib/vfs/cpp/trace.h"
 #include "src/storage/minfs/allocator/allocator_reservation.h"
 #include "src/storage/minfs/fsck.h"
 #include "src/storage/minfs/minfs_private.h"
@@ -46,10 +46,10 @@
 #include <storage/buffer/owned_vmoid.h>
 
 #include "sdk/lib/sys/cpp/service_directory.h"
-#include "src/lib/storage/vfs/cpp/journal/header_view.h"
-#include "src/lib/storage/vfs/cpp/journal/journal.h"
-#include "src/lib/storage/vfs/cpp/journal/replay.h"
 #include "src/storage/fvm/client.h"
+#include "src/storage/lib/vfs/cpp/journal/header_view.h"
+#include "src/storage/lib/vfs/cpp/journal/journal.h"
+#include "src/storage/lib/vfs/cpp/journal/replay.h"
 #endif
 
 namespace minfs {

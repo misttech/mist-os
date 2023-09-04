@@ -9,7 +9,7 @@ executable("nand-loader") {
   sources = [ "main.cc" ]
   deps = [
     "//sdk/lib/fdio",
-    "//src/lib/storage/ramdevice_client/cpp",
+    "//src/storage/lib/ramdevice_client/cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zx",

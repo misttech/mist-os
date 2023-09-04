@@ -39,7 +39,7 @@
 #include "src/devices/bin/driver_manager/v1/system_instance.h"
 #include "src/devices/bin/driver_manager/v2/shutdown_manager.h"
 #include "src/devices/lib/log/log.h"
-#include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
+#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 
 DriverHostCrashPolicy CrashPolicyFromString(const std::string& crash_policy) {
   if (crash_policy == "reboot-system") {

@@ -22,7 +22,6 @@
 
 #include "src/lib/digest/digest.h"
 #include "src/lib/digest/merkle-tree.h"
-#include "src/lib/storage/vfs/cpp/journal/data_streamer.h"
 #include "src/storage/blobfs/allocator/extent_reserver.h"
 #include "src/storage/blobfs/allocator/node_reserver.h"
 #include "src/storage/blobfs/blob.h"
@@ -33,6 +32,7 @@
 #include "src/storage/blobfs/delivery_blob_private.h"
 #include "src/storage/blobfs/iterator/block_iterator.h"
 #include "src/storage/blobfs/transaction.h"
+#include "src/storage/lib/vfs/cpp/journal/data_streamer.h"
 
 namespace blobfs {
 

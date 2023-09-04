@@ -13,7 +13,7 @@
 #include <fbl/ref_ptr.h>
 
 #include "src/lib/digest/digest.h"
-#include "src/lib/storage/vfs/cpp/trace.h"
+#include "src/storage/lib/vfs/cpp/trace.h"
 
 using digest::Digest;
 

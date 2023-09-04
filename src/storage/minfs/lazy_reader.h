@@ -13,8 +13,8 @@
 #include <bitmap/rle-bitmap.h>
 #include <fbl/algorithm.h>
 
-#include "src/lib/storage/vfs/cpp/transaction/buffered_operations_builder.h"
-#include "src/lib/storage/vfs/cpp/transaction/transaction_handler.h"
+#include "src/storage/lib/vfs/cpp/transaction/buffered_operations_builder.h"
+#include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
 #include "src/storage/minfs/block_utils.h"
 #include "src/storage/minfs/format.h"
 #include "src/storage/minfs/writeback.h"

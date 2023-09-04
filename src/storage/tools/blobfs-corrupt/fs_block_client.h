@@ -11,7 +11,7 @@
 
 #include <fbl/macros.h>
 
-#include "src/lib/storage/block_client/cpp/block_device.h"
+#include "src/storage/lib/block_client/cpp/block_device.h"
 
 // Wrapper around a BlockDevice that provides a simple ReadBlock/WriteBlock API using blobfs block
 // indices instead of device block indices. This class is not threadsafe.

@@ -12,8 +12,8 @@ test("memfs-test") {
   deps = [
     "//sdk/lib/fdio",
     "//src/lib/fxl/test:gtest_main",
-    "//src/lib/storage/vfs/cpp",
     "//src/lib/testing/predicates",
+    "//src/storage/lib/vfs/cpp",
     "//src/storage/memfs:lib",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
@@ -66,7 +66,7 @@ test("memfs-legacy-test") {
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
-    "//src/lib/storage/vfs/cpp",
+    "//src/storage/lib/vfs/cpp",
     "//src/storage/memfs:cpp",
     "//src/storage/memfs:lib",
     "//zircon/system/ulib/async",

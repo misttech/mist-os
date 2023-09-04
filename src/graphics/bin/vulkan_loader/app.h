@@ -20,10 +20,10 @@
 #include "src/lib/fxl/macros.h"
 #include "src/lib/fxl/observer_list.h"
 #include "src/lib/fxl/synchronization/thread_annotations.h"
-#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
-#include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
-#include "src/lib/storage/vfs/cpp/vfs.h"
-#include "src/lib/storage/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
+#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
+#include "src/storage/lib/vfs/cpp/vfs.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 class MagmaDevice;
 class IcdComponent;

@@ -12,8 +12,8 @@
 #include <fidl/fuchsia.update.verify/cpp/wire.h>
 #include <lib/async/dispatcher.h>
 
-#include "src/lib/storage/vfs/cpp/service.h"
 #include "src/storage/blobfs/blobfs.h"
+#include "src/storage/lib/vfs/cpp/service.h"
 
 namespace blobfs {
 

@@ -6,7 +6,7 @@ source_set("fake-wlanix") {
   sources = [ "fake-wlanix.cc" ]
   public_deps = [
     "//src/connectivity/wlan/wlanix:fuchsia.wlan.wlanix_cpp_wire",
-    "//src/lib/storage/vfs/cpp",
+    "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fzl",

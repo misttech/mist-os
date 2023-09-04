@@ -15,8 +15,6 @@
 #include <gtest/gtest.h>
 #include <storage/buffer/vmo_buffer.h>
 
-#include "src/lib/storage/block_client/cpp/fake_block_device.h"
-#include "src/lib/storage/block_client/cpp/reader.h"
 #include "src/storage/blobfs/blob.h"
 #include "src/storage/blobfs/compression/external_decompressor.h"
 #include "src/storage/blobfs/format.h"
@@ -26,6 +24,8 @@
 #include "src/storage/blobfs/test/blobfs_test_setup.h"
 #include "src/storage/blobfs/test/test_scoped_vnode_open.h"
 #include "src/storage/blobfs/transaction.h"
+#include "src/storage/lib/block_client/cpp/fake_block_device.h"
+#include "src/storage/lib/block_client/cpp/reader.h"
 #include "zircon/time.h"
 
 namespace blobfs {

@@ -35,12 +35,12 @@
 #include <safemath/safe_math.h>
 
 #include "pave-logging.h"
-#include "src/lib/storage/block_client/cpp/client.h"
-#include "src/lib/storage/fs_management/cpp/fvm.h"
 #include "src/lib/uuid/uuid.h"
 #include "src/security/lib/zxcrypt/client.h"
 #include "src/storage/fvm/format.h"
 #include "src/storage/fvm/fvm_sparse.h"
+#include "src/storage/lib/block_client/cpp/client.h"
+#include "src/storage/lib/fs_management/cpp/fvm.h"
 
 namespace paver {
 namespace {

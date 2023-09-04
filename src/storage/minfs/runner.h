@@ -8,7 +8,7 @@
 #ifdef __Fuchsia__
 #include <lib/async-loop/cpp/loop.h>
 
-#include "src/lib/storage/vfs/cpp/managed_vfs.h"
+#include "src/storage/lib/vfs/cpp/managed_vfs.h"
 #endif
 
 #include <lib/zx/result.h>

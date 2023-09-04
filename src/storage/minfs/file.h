@@ -18,7 +18,7 @@
 #include <fbl/algorithm.h>
 #include <fbl/ref_ptr.h>
 
-#include "src/lib/storage/vfs/cpp/vnode.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 #include "src/storage/minfs/format.h"
 #include "src/storage/minfs/minfs.h"
 #include "src/storage/minfs/superblock.h"

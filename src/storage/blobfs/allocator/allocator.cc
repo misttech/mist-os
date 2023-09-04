@@ -24,11 +24,11 @@
 #include <safemath/safe_conversions.h>
 #include <storage/buffer/owned_vmoid.h>
 
-#include "src/lib/storage/vfs/cpp/trace.h"
-#include "src/lib/storage/vfs/cpp/transaction/device_transaction_handler.h"
 #include "src/storage/blobfs/allocator/base_allocator.h"
 #include "src/storage/blobfs/common.h"
 #include "src/storage/blobfs/format.h"
+#include "src/storage/lib/vfs/cpp/trace.h"
+#include "src/storage/lib/vfs/cpp/transaction/device_transaction_handler.h"
 
 namespace blobfs {
 

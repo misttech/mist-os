@@ -18,7 +18,7 @@ rustc_library("realmbuilder-mock-helpers") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
-    "//src/lib/storage/vfs/rust:vfs",
+    "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",

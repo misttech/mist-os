@@ -22,8 +22,8 @@ rustc_library("light_realm") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
-    "//src/lib/storage/vfs/rust:vfs",
     "//src/settings/service/integration_tests/utils",
+    "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
   ]

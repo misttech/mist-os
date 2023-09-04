@@ -36,7 +36,7 @@ source_set("app") {
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_hlcpp",
     "//sdk/lib/sys/inspect/cpp",
     "//src/lib/json_parser",
-    "//src/lib/storage/vfs/cpp",
+    "//src/storage/lib/vfs/cpp",
   ]
 
   deps = [

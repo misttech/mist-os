@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/lib/storage/fs_management/client.shard.cml",
         "//src/storage/fs_test/meta/fxfs_crypt_test.shard.cml",
         "//src/storage/fxfs/meta/test_fxfs.shard.cml",
+        "//src/storage/lib/fs_management/client.shard.cml",
         "//tools/blackout/blackout-target/meta/blackout.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",

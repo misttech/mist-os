@@ -11,8 +11,8 @@
 #include <fbl/unique_fd.h>
 #include <safemath/safe_conversions.h>
 
-#include "src/lib/storage/block_client/cpp/block_device.h"
-#include "src/lib/storage/vfs/cpp/journal/inspector_journal.h"
+#include "src/storage/lib/block_client/cpp/block_device.h"
+#include "src/storage/lib/vfs/cpp/journal/inspector_journal.h"
 #include "src/storage/minfs/bcache.h"
 #include "src/storage/minfs/inspector/inspector_inode_table.h"
 #include "src/storage/minfs/inspector/inspector_private.h"

@@ -34,7 +34,7 @@ test("fan-controller-test-bin") {
   sources = [ "fan-controller-test.cc" ]
   deps = [
     ":common",
-    "//src/lib/storage/vfs/cpp",
+    "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zxtest",
   ]

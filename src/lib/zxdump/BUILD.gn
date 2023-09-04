@@ -163,7 +163,7 @@ source_set("test-tool-process") {
       "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
       "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
       "//sdk/lib/component/outgoing/cpp",
-      "//src/lib/storage/vfs/cpp",
+      "//src/storage/lib/vfs/cpp",
       "//zircon/system/ulib/async-loop:async-loop-cpp",
       "//zircon/system/ulib/async-loop:async-loop-default",
     ]

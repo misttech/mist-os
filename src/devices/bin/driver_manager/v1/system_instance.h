@@ -10,8 +10,8 @@
 #include <lib/stdcompat/span.h>
 
 #include "src/devices/bin/driver_manager/v1/coordinator.h"
-#include "src/lib/storage/vfs/cpp/managed_vfs.h"
-#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
+#include "src/storage/lib/vfs/cpp/managed_vfs.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 
 // Host's a vfs which forwards a subset of requests to a channel.
 class DirectoryFilter {

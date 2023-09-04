@@ -26,7 +26,7 @@
 #include <usb/usb.h>
 #include <zxtest/zxtest.h>
 
-#include "src/lib/storage/block_client/cpp/remote_block_device.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
 
 namespace usb_virtual_bus {
 namespace {

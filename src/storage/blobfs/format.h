@@ -22,7 +22,7 @@
 #include <fbl/macros.h>
 #include <safemath/safe_conversions.h>
 
-#include "src/lib/storage/vfs/cpp/journal/format.h"
+#include "src/storage/lib/vfs/cpp/journal/format.h"
 
 #ifdef __Fuchsia__
 #include <zircon/syscalls.h>

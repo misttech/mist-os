@@ -19,7 +19,7 @@
 
 #include <fbl/auto_lock.h>
 
-#include "src/lib/storage/vfs/cpp/watcher.h"
+#include "src/storage/lib/vfs/cpp/watcher.h"
 #include "src/storage/minfs/vnode_allocation.h"
 #endif
 
@@ -29,8 +29,8 @@
 #include <fbl/macros.h>
 #include <fbl/ref_ptr.h>
 
-#include "src/lib/storage/vfs/cpp/vfs.h"
-#include "src/lib/storage/vfs/cpp/vnode.h"
+#include "src/storage/lib/vfs/cpp/vfs.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 #include "src/storage/minfs/format.h"
 #include "src/storage/minfs/lazy_buffer.h"
 #include "src/storage/minfs/minfs.h"

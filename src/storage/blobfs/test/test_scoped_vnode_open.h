@@ -7,7 +7,7 @@
 
 #include <gtest/gtest.h>
 
-#include "src/lib/storage/vfs/cpp/scoped_vnode_open.h"
+#include "src/storage/lib/vfs/cpp/scoped_vnode_open.h"
 
 namespace blobfs {
 

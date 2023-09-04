@@ -25,8 +25,8 @@
 
 #include <fbl/ref_ptr.h>
 
-#include "src/lib/storage/vfs/cpp/vfs.h"
-#include "src/lib/storage/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/vfs.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/minfs/format.h"
 #include "src/storage/minfs/minfs.h"
 #include "src/storage/minfs/runner.h"

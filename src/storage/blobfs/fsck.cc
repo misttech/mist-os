@@ -9,9 +9,9 @@
 
 #include <memory>
 
-#include "src/lib/storage/vfs/cpp/paged_vfs.h"
 #include "src/storage/blobfs/blobfs.h"
 #include "src/storage/blobfs/blobfs_checker.h"
+#include "src/storage/lib/vfs/cpp/paged_vfs.h"
 #include "zircon/errors.h"
 
 namespace blobfs {

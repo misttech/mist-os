@@ -12,8 +12,8 @@
 #include <fbl/algorithm.h>
 #include <fbl/ref_ptr.h>
 
-#include "src/lib/storage/vfs/cpp/vfs.h"
-#include "src/lib/storage/vfs/cpp/vnode.h"
+#include "src/storage/lib/vfs/cpp/vfs.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace blobfs {
 

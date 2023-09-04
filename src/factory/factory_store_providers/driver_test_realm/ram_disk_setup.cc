@@ -11,8 +11,8 @@
 #include <src/lib/files/file.h>
 #include <src/lib/fsl/vmo/file.h>
 #include <src/lib/fsl/vmo/sized_vmo.h>
-#include <src/lib/storage/block_client/cpp/client.h>
-#include <src/lib/storage/block_client/cpp/remote_block_device.h>
+#include <src/storage/lib/block_client/cpp/client.h>
+#include <src/storage/lib/block_client/cpp/remote_block_device.h>
 #include <src/storage/testing/ram_disk.h>
 
 const int kRamdiskBlockSize = 1024;

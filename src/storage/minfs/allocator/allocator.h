@@ -18,7 +18,7 @@
 #include <bitmap/storage.h>
 #include <fbl/macros.h>
 
-#include "src/lib/storage/vfs/cpp/transaction/buffered_operations_builder.h"
+#include "src/storage/lib/vfs/cpp/transaction/buffered_operations_builder.h"
 #include "src/storage/minfs/allocator/allocator_reservation.h"
 #include "src/storage/minfs/allocator/storage.h"
 #include "src/storage/minfs/format.h"

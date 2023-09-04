@@ -16,10 +16,10 @@
 #include <gtest/gtest.h>
 
 #include "src/lib/fxl/macros.h"
-#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
-#include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
-#include "src/lib/storage/vfs/cpp/vfs_types.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
+#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 namespace fsl {
 namespace {

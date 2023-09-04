@@ -6,8 +6,8 @@
 
 #include "driver_host.h"
 #include "log.h"
-#include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
-#include "src/lib/storage/vfs/cpp/vmo_file.h"
+#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
+#include "src/storage/lib/vfs/cpp/vmo_file.h"
 #include "zx_device.h"
 
 DriverHostInspect::DriverHostInspect() {

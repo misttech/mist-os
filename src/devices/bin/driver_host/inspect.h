@@ -14,8 +14,8 @@
 #include <fbl/ref_ptr.h>
 
 #include "src/devices/bin/driver_host/defaults.h"
-#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
-#include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
+#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 
 class InspectCallStats {
  public:

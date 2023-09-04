@@ -14,7 +14,7 @@
 #include "src/devices/bin/driver_manager/v1/coordinator.h"
 #include "src/devices/bin/driver_manager/v1/fdio.h"
 #include "src/devices/lib/log/log.h"
-#include "src/lib/storage/vfs/cpp/remote_dir.h"
+#include "src/storage/lib/vfs/cpp/remote_dir.h"
 
 namespace frunner = fuchsia_component_runner;
 

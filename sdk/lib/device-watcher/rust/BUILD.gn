@@ -22,7 +22,7 @@ rustc_library("rust") {
 
   test_deps = [
     "//src/lib/fuchsia-async",
-    "//src/lib/storage/vfs/rust:vfs",
+    "//src/storage/lib/vfs/rust:vfs",
   ]
 
   sources = [ "src/lib.rs" ]

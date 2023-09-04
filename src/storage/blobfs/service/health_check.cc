@@ -11,9 +11,9 @@
 
 #include <fbl/ref_ptr.h>
 
-#include "src/lib/storage/vfs/cpp/service.h"
 #include "src/storage/blobfs/blob.h"
 #include "src/storage/blobfs/cache_node.h"
+#include "src/storage/lib/vfs/cpp/service.h"
 #include "zircon/errors.h"
 
 namespace fuv = fuchsia_update_verify;

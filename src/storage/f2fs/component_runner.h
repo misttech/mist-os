@@ -5,7 +5,7 @@
 #ifndef SRC_STORAGE_F2FS_COMPONENT_RUNNER_H_
 #define SRC_STORAGE_F2FS_COMPONENT_RUNNER_H_
 
-#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 
 namespace f2fs {
 

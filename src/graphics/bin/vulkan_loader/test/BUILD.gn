@@ -44,8 +44,8 @@ executable("unittest_bin") {
     "//sdk/lib/vfs/cpp",
     "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",
-    "//src/lib/storage/vfs/cpp",
     "//src/lib/testing/loop_fixture",
+    "//src/storage/lib/vfs/cpp",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
@@ -65,7 +65,7 @@ executable("pkg-server-bin") {
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl",
-    "//src/lib/storage/vfs/cpp",
+    "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]

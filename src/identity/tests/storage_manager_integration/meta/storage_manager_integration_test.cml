@@ -4,7 +4,7 @@
 {
     include: [
         "//src/identity/lib/storage_manager/meta/fxfs.shard.cml",
-        "//src/lib/storage/fs_management/client.shard.cml",
+        "//src/storage/lib/fs_management/client.shard.cml",
         "//src/storage/testing/driver_test_realm/meta/client.shard.cml",
         "//src/storage/testing/meta/storage_test.shard.cml",
         "//src/sys/test_runners/rust/default.shard.cml",

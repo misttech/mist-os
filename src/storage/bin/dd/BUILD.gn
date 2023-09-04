@@ -16,7 +16,7 @@ executable("dd") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/stdcompat",
-    "//src/lib/storage/block_client/cpp",
+    "//src/storage/lib/block_client/cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/storage/buffer",

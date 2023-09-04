@@ -4,7 +4,7 @@
 
 #include "src/storage/memfs/vnode.h"
 
-#include "src/lib/storage/vfs/cpp/paged_vnode.h"
+#include "src/storage/lib/vfs/cpp/paged_vnode.h"
 #include "src/storage/memfs/dnode.h"
 
 namespace memfs {

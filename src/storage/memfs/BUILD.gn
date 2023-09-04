@@ -24,8 +24,8 @@ template("memfs_lib") {
     ]
 
     public_deps = [
-      # <memfs.h> has #include "src/lib/storage/vfs/*.h"
-      "//src/lib/storage/vfs/cpp",
+      # <memfs.h> has #include "src/storage/lib/vfs/*.h"
+      "//src/storage/lib/vfs/cpp",
       "//zircon/system/ulib/async-loop:async-loop-cpp",
     ]
     deps = [

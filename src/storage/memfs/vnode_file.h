@@ -7,7 +7,7 @@
 
 #include <lib/zx/vmo.h>
 
-#include "src/lib/storage/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/memfs/memfs.h"
 #include "src/storage/memfs/vnode.h"
 

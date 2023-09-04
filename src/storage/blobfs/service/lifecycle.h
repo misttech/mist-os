@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.process.lifecycle/cpp/wire.h>
 #include <lib/async-loop/default.h>
 
-#include "src/lib/storage/vfs/cpp/fuchsia_vfs.h"
+#include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
 
 namespace blobfs {
 

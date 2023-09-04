@@ -255,7 +255,7 @@ config("fidl-wire-deprecated-mutable-tables") {
 
     #------------------
     #------------------
-    "//src/lib/storage/vfs/cpp",
+    "//src/storage/lib/vfs/cpp",
 
     #------------------
     #------------------

@@ -23,7 +23,7 @@ declare_args() {
 }
 
 executable("blobfs") {
-  visibility += [ "//src/lib/storage/fs_management/cpp:fs-management-test" ]
+  visibility += [ "//src/storage/lib/fs_management/cpp:fs-management-test" ]
   sources = [ "main.cc" ]
   deps = [
     ":blobfs-component-config",
@@ -33,10 +33,10 @@ executable("blobfs") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp",
-    "//src/lib/storage/block_client/cpp",
-    "//src/lib/storage/vfs/cpp",
     "//src/storage/blobfs",
     "//src/storage/blobfs:decompressor-sandbox",
+    "//src/storage/lib/block_client/cpp",
+    "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",
@@ -60,15 +60,15 @@ fuchsia_component("component") {
 # shard.
 group("blobfs-component") {
   visibility += [
-    "//src/lib/storage/fs_management/rust:*",
     "//src/recovery/system:*",
     "//src/security/tests/pkg_test/fshost:*",
+    "//src/storage/lib/fs_management/rust:*",
     "//src/sys/pkg/testing/blobfs-ramdisk:*",
     "//tools/blackout/blobfs-checkerboard:*",
   ]
   deps = [
     ":component",
-    "//src/lib/storage/fs_management:fs_management_shard",
+    "//src/storage/lib/fs_management:fs_management_shard",
   ]
 }
 

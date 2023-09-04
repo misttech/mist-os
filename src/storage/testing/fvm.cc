@@ -15,7 +15,7 @@
 #include <fbl/unique_fd.h>
 #include <ramdevice-client/ramdisk.h>
 
-#include "src/lib/storage/fs_management/cpp/fvm.h"
+#include "src/storage/lib/fs_management/cpp/fvm.h"
 
 namespace storage {
 

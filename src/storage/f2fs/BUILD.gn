@@ -62,10 +62,10 @@ static_library("f2fs") {
   ]
 
   public_deps = [
-    "//src/lib/storage/vfs/cpp",
-    "//src/lib/storage/vfs/cpp/journal",
-    "//src/lib/storage/vfs/cpp/transaction",
     "//src/lib/uuid",
+    "//src/storage/lib/vfs/cpp",
+    "//src/storage/lib/vfs/cpp/journal",
+    "//src/storage/lib/vfs/cpp/transaction",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/storage/buffer",
     "//zircon/third_party/ulib/safemath",
@@ -99,8 +99,8 @@ static_library("f2fs") {
       "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp_wire",
       "//sdk/lib/component/incoming/cpp",
       "//sdk/lib/sys/cpp",
-      "//src/lib/storage/block_client/cpp",
       "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_cpp_wire",
+      "//src/storage/lib/block_client/cpp",
       "//zircon/system/ulib/zircon-internal",
       "//zircon/system/ulib/zx",
     ]
@@ -112,7 +112,7 @@ static_library("f2fs") {
       "//sdk/lib/fidl",
       "//sdk/lib/inspect/service/cpp",
       "//src/lib/fuchsia-component",
-      "//src/lib/storage/vfs/cpp/inspect",
+      "//src/storage/lib/vfs/cpp/inspect",
       "//zircon/system/ulib/async",
       "//zircon/system/ulib/async:async-cpp",
       "//zircon/system/ulib/async-default",

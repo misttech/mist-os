@@ -17,8 +17,8 @@
 #include <fbl/algorithm.h>
 #include <safemath/checked_math.h>
 
-#include "src/lib/storage/vfs/cpp/trace.h"
-#include "src/lib/storage/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/trace.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 #ifdef __Fuchsia__
 #include <zircon/syscalls.h>

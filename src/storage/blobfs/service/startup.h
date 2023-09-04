@@ -9,8 +9,8 @@
 #include <lib/fit/function.h>
 #include <lib/zx/resource.h>
 
-#include "src/lib/storage/vfs/cpp/service.h"
 #include "src/storage/blobfs/mount.h"
+#include "src/storage/lib/vfs/cpp/service.h"
 
 namespace blobfs {
 

@@ -17,7 +17,6 @@
 
 #include <fbl/ref_ptr.h>
 
-#include "src/lib/storage/vfs/cpp/journal/data_streamer.h"
 #include "src/storage/blobfs/blob_data_producer.h"
 #include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/blobfs.h"
@@ -29,6 +28,7 @@
 #include "src/storage/blobfs/iterator/extent_iterator.h"
 #include "src/storage/blobfs/iterator/node_populator.h"
 #include "src/storage/blobfs/iterator/vector_extent_iterator.h"
+#include "src/storage/lib/vfs/cpp/journal/data_streamer.h"
 
 namespace blobfs {
 

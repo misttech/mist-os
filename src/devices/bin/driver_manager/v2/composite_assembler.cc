@@ -7,7 +7,7 @@
 #include <lib/driver/component/cpp/node_add_args.h>
 
 #include "src/devices/lib/log/log.h"
-#include "src/lib/storage/vfs/cpp/service.h"
+#include "src/storage/lib/vfs/cpp/service.h"
 
 namespace fdf {
 using namespace fuchsia_driver_framework;

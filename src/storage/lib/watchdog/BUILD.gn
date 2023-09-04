@@ -22,8 +22,8 @@ test("watchdog_unittest") {
     "//src/diagnostics/lib/cpp-log-tester:cpp_log_tester",
     "//src/lib/diagnostics/accessor2logger",
     "//src/lib/fsl",
-    "//src/lib/storage/vfs/cpp",
     "//src/lib/uuid",
+    "//src/storage/lib/vfs/cpp",
     "//src/storage/lib/watchdog",
     "//third_party/rapidjson",
     "//zircon/system/ulib/async",
@@ -54,7 +54,7 @@ zx_library("watchdog") {
   ]
   deps = [
     "//sdk/lib/fit",
-    "//src/lib/storage/vfs/cpp",
+    "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]

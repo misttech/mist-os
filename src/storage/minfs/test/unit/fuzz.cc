@@ -10,7 +10,7 @@
 
 #include <fuzzer/FuzzedDataProvider.h>
 
-#include "src/lib/storage/block_client/cpp/fake_block_device.h"
+#include "src/storage/lib/block_client/cpp/fake_block_device.h"
 #include "src/storage/minfs/runner.h"
 
 namespace minfs {

@@ -16,7 +16,7 @@ rustc_library("fuchsia-repo") {
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-url",
     "//src/lib/mundane:mundane",
-    "//src/lib/storage/delivery_blob",
+    "//src/storage/lib/delivery_blob",
     "//src/sys/lib/fidl-fuchsia-pkg-ext",
     "//src/sys/pkg/lib/far/rust:fuchsia-archive",
     "//src/sys/pkg/lib/fuchsia-hash",

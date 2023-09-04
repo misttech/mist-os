@@ -17,9 +17,9 @@
 #include <lib/zx/result.h>
 
 #include "lib/fidl/cpp/wire/internal/transport_channel.h"
-#include "src/lib/storage/fs_management/cpp/admin.h"
-#include "src/lib/storage/fs_management/cpp/mount.h"
 #include "src/storage/blobfs/mkfs.h"
+#include "src/storage/lib/fs_management/cpp/admin.h"
+#include "src/storage/lib/fs_management/cpp/mount.h"
 
 namespace blobfs {
 

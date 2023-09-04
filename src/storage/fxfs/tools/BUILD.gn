@@ -14,10 +14,10 @@ if (is_host) {
     edition = "2021"
     deps = [
       "//build/validate:non_production_tag",
-      "//src/lib/storage/storage_device",
       "//src/storage/fxfs:lib",
       "//src/storage/fxfs/crypto",
       "//src/storage/fxfs/crypto/insecure",
+      "//src/storage/lib/storage_device",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:chrono",
       "//third_party/rust_crates:serde_json",
@@ -55,10 +55,10 @@ if (is_host) {
     deps = [
       ":lib",
       "//src/lib/fuchsia",
-      "//src/lib/storage/storage_device",
       "//src/storage/fxfs:lib($host_toolchain)",
       "//src/storage/fxfs/crypto",
       "//src/storage/fxfs/crypto/insecure",
+      "//src/storage/lib/storage_device",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:argh",
       "//third_party/rust_crates:tracing",

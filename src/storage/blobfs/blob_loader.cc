@@ -22,8 +22,6 @@
 #include <storage/buffer/owned_vmoid.h>
 
 #include "src/lib/digest/digest.h"
-#include "src/lib/storage/vfs/cpp/trace.h"
-#include "src/lib/storage/vfs/cpp/transaction/buffered_operations_builder.h"
 #include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/blob_verifier.h"
 #include "src/storage/blobfs/common.h"
@@ -34,6 +32,8 @@
 #include "src/storage/blobfs/format.h"
 #include "src/storage/blobfs/iterator/block_iterator.h"
 #include "src/storage/blobfs/transfer_buffer.h"
+#include "src/storage/lib/vfs/cpp/trace.h"
+#include "src/storage/lib/vfs/cpp/transaction/buffered_operations_builder.h"
 #include "storage/operation/operation.h"
 
 namespace blobfs {

@@ -22,8 +22,8 @@
 #include <fbl/unique_fd.h>
 
 #include "src/lib/line_input/modal_line_input.h"
-#include "src/lib/storage/block_client/cpp/block_device.h"
-#include "src/lib/storage/block_client/cpp/remote_block_device.h"
+#include "src/storage/lib/block_client/cpp/block_device.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
 #include "src/storage/minfs/inspector/command_handler.h"
 #include "src/storage/minfs/inspector/minfs_inspector.h"
 

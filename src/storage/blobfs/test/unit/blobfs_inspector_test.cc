@@ -14,11 +14,11 @@
 #include <safemath/checked_math.h>
 #include <storage/buffer/array_buffer.h>
 
-#include "src/lib/storage/vfs/cpp/journal/format.h"
-#include "src/lib/storage/vfs/cpp/journal/initializer.h"
 #include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/common.h"
 #include "src/storage/blobfs/format.h"
+#include "src/storage/lib/vfs/cpp/journal/format.h"
+#include "src/storage/lib/vfs/cpp/journal/initializer.h"
 
 namespace blobfs {
 namespace {

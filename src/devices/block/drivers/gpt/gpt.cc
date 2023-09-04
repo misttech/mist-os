@@ -33,7 +33,7 @@
 
 #include "lib/ddk/driver.h"
 #include "src/devices/block/lib/common/include/common.h"
-#include "src/lib/storage/block_client/cpp/block_device.h"
+#include "src/storage/lib/block_client/cpp/block_device.h"
 #include "zircon/errors.h"
 #include "zircon/status.h"
 

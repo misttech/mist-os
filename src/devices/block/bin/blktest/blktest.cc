@@ -33,8 +33,8 @@
 #include <pretty/hexdump.h>
 #include <zxtest/zxtest.h>
 
-#include "src/lib/storage/block_client/cpp/client.h"
-#include "src/lib/storage/block_client/cpp/remote_block_device.h"
+#include "src/storage/lib/block_client/cpp/client.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
 
 namespace tests {
 

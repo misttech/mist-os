@@ -22,7 +22,7 @@
 
 #include "storage/operation/unbuffered_operations_builder.h"
 #else
-#include "src/lib/storage/vfs/cpp/transaction/buffered_operations_builder.h"
+#include "src/storage/lib/vfs/cpp/transaction/buffered_operations_builder.h"
 #endif
 
 #include <fbl/algorithm.h>

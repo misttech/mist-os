@@ -101,7 +101,7 @@ source_set("common") {
     "//sdk/lib/fidl",
     "//src/lib/ddk:ddk-deprecated-binding-headers",
     "//src/lib/ddktl",
-    "//src/lib/storage/vfs/cpp",
+    "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",

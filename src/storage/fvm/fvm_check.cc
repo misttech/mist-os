@@ -21,9 +21,9 @@
 #include <fbl/vector.h>
 #include <gpt/guid.h>
 
-#include "src/lib/storage/block_client/cpp/remote_block_device.h"
 #include "src/storage/fvm/format.h"
 #include "src/storage/fvm/fvm.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
 
 namespace fvm {
 

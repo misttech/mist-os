@@ -26,8 +26,8 @@ rustc_test("resolve_bootfs_package") {
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
-    "//src/lib/storage/vfs/rust:vfs",
     "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/storage/lib/vfs/rust:vfs",
   ]
 
   sources = [ "src/resolve_bootfs_package.rs" ]

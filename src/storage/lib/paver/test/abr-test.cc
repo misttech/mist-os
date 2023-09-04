@@ -20,8 +20,8 @@
 #include <mock-boot-arguments/server.h>
 #include <zxtest/zxtest.h>
 
-#include "src/lib/storage/block_client/cpp/remote_block_device.h"
 #include "src/lib/uuid/uuid.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
 #include "src/storage/lib/paver/abr-client.h"
 #include "src/storage/lib/paver/astro.h"
 #include "src/storage/lib/paver/luis.h"

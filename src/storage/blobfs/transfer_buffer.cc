@@ -8,7 +8,7 @@
 
 #include <safemath/safe_conversions.h>
 
-#include "src/lib/storage/vfs/cpp/trace.h"
+#include "src/storage/lib/vfs/cpp/trace.h"
 
 namespace blobfs {
 

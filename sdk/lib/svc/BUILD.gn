@@ -18,7 +18,7 @@ sdk_shared_library("svc") {
 
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
-    "//src/lib/storage/vfs/cpp",
+    "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/fbl",
   ]
 

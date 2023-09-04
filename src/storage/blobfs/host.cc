@@ -42,8 +42,6 @@
 #include "src/lib/digest/digest.h"
 #include "src/lib/digest/merkle-tree.h"
 #include "src/lib/digest/node-digest.h"
-#include "src/lib/storage/vfs/cpp/journal/initializer.h"
-#include "src/lib/storage/vfs/cpp/transaction/transaction_handler.h"
 #include "src/storage/blobfs/allocator/extent_reserver.h"
 #include "src/storage/blobfs/allocator/host_allocator.h"
 #include "src/storage/blobfs/allocator/node_reserver.h"
@@ -63,6 +61,8 @@
 #include "src/storage/blobfs/iterator/vector_extent_iterator.h"
 #include "src/storage/blobfs/node_finder.h"
 #include "src/storage/lib/host/common.h"
+#include "src/storage/lib/vfs/cpp/journal/initializer.h"
+#include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
 
 using digest::Digest;
 using digest::MerkleTreeCreator;

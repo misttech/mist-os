@@ -40,7 +40,7 @@ zx_library("runtests-utils") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fidl",
-    "//src/lib/storage/vfs/cpp",
+    "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/async",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-default",

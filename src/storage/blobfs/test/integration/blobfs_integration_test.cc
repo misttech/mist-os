@@ -46,13 +46,13 @@
 #include <safemath/safe_conversions.h>
 
 #include "src/lib/digest/digest.h"
-#include "src/lib/storage/block_client/cpp/remote_block_device.h"
-#include "src/lib/storage/fs_management/cpp/mount.h"
 #include "src/storage/blobfs/format.h"
 #include "src/storage/blobfs/test/blob_utils.h"
 #include "src/storage/blobfs/test/integration/blobfs_fixtures.h"
 #include "src/storage/blobfs/test/integration/fdio_test.h"
 #include "src/storage/fvm/format.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
+#include "src/storage/lib/fs_management/cpp/mount.h"
 
 namespace blobfs {
 namespace {

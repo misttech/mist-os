@@ -19,8 +19,8 @@
 #include <gtest/gtest.h>
 
 #include "src/devices/lib/block/block.h"
-#include "src/lib/storage/fs_management/cpp/fvm.h"
 #include "src/lib/testing/predicates/status.h"
+#include "src/storage/lib/fs_management/cpp/fvm.h"
 #include "src/storage/testing/fvm.h"
 #include "src/storage/testing/ram_disk.h"
 #include "src/zircon/bin/hwstress/status.h"

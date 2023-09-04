@@ -18,8 +18,6 @@
 #include "src/lib/digest/digest.h"
 #include "src/lib/digest/merkle-tree.h"
 #include "src/lib/digest/node-digest.h"
-#include "src/lib/storage/block_client/cpp/fake_block_device.h"
-#include "src/lib/storage/vfs/cpp/paged_vfs.h"
 #include "src/storage/blobfs/blob.h"
 #include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/blobfs.h"
@@ -32,6 +30,8 @@
 #include "src/storage/blobfs/test/test_scoped_vnode_open.h"
 #include "src/storage/blobfs/test/unit/local_decompressor_creator.h"
 #include "src/storage/blobfs/test/unit/utils.h"
+#include "src/storage/lib/block_client/cpp/fake_block_device.h"
+#include "src/storage/lib/vfs/cpp/paged_vfs.h"
 
 namespace blobfs {
 

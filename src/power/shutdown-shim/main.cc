@@ -22,9 +22,9 @@
 #include <fbl/mutex.h>
 #include <fbl/string_printf.h>
 
-#include "src/lib/storage/vfs/cpp/managed_vfs.h"
-#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
-#include "src/lib/storage/vfs/cpp/service.h"
+#include "src/storage/lib/vfs/cpp/managed_vfs.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
+#include "src/storage/lib/vfs/cpp/service.h"
 #include "src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h"
 
 namespace fio = fuchsia_io;
@@ -313,7 +313,8 @@ zx_status_t forward_command(fuchsia_device_manager::SystemPowerState fallback_st
                             const statecontrol_fidl::wire::RebootReason* reboot_reason = nullptr) {
   zx::result local = connect_to_protocol_with_timeout<statecontrol_fidl::Admin>();
   if (local.is_ok()) {
-    fprintf(stderr, "[shutdown-shim]: forwarding command %d\n", static_cast<uint8_t>(fallback_state));
+    fprintf(stderr, "[shutdown-shim]: forwarding command %d\n",
+            static_cast<uint8_t>(fallback_state));
     zx_status_t status =
         send_command(fidl::WireSyncClient(std::move(local.value())), fallback_state, reboot_reason);
     if (status != ZX_ERR_UNAVAILABLE && status != ZX_ERR_NOT_SUPPORTED) {
@@ -327,7 +328,7 @@ zx_status_t forward_command(fuchsia_device_manager::SystemPowerState fallback_st
   }
 
   fprintf(stderr, "[shutdown-shim]: failed to forward command to power_manager: %s\n",
-         local.status_string());
+          local.status_string());
 
   drive_shutdown_manually(fallback_state);
 
@@ -427,7 +428,7 @@ void StateControlAdminServer::Mexec(MexecRequestView request, MexecCompleter::Sy
   }
 
   fprintf(stderr, "[shutdown-shim]: failed to forward command to power_manager: %s\n",
-         local.status_string());
+          local.status_string());
 
   drive_shutdown_manually(fuchsia_device_manager::SystemPowerState::kMexec);
 

@@ -5,8 +5,8 @@
 #ifndef SRC_STORAGE_TOOLS_BLOBFS_CORRUPT_CORRUPT_BLOB_H_
 #define SRC_STORAGE_TOOLS_BLOBFS_CORRUPT_CORRUPT_BLOB_H_
 
-#include "src/lib/storage/block_client/cpp/block_device.h"
 #include "src/storage/blobfs/common.h"
+#include "src/storage/lib/block_client/cpp/block_device.h"
 
 struct BlobCorruptOptions {
   blobfs::Digest merkle;

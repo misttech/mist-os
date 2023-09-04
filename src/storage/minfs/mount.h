@@ -10,7 +10,7 @@
 #ifdef __Fuchsia__
 #include <fidl/fuchsia.process.lifecycle/cpp/wire.h>
 
-#include "src/lib/storage/vfs/cpp/managed_vfs.h"
+#include "src/storage/lib/vfs/cpp/managed_vfs.h"
 #include "src/storage/minfs/bcache.h"
 #endif
 

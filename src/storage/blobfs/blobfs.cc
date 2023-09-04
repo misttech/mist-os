@@ -32,12 +32,6 @@
 #include <safemath/safe_conversions.h>
 
 #include "src/lib/digest/digest.h"
-#include "src/lib/storage/block_client/cpp/pass_through_read_only_device.h"
-#include "src/lib/storage/block_client/cpp/reader.h"
-#include "src/lib/storage/vfs/cpp/journal/journal.h"
-#include "src/lib/storage/vfs/cpp/journal/replay.h"
-#include "src/lib/storage/vfs/cpp/journal/superblock.h"
-#include "src/lib/storage/vfs/cpp/scoped_vnode_open.h"
 #include "src/storage/blobfs/allocator/extent_reserver.h"
 #include "src/storage/blobfs/blob.h"
 #include "src/storage/blobfs/blob_loader.h"
@@ -52,6 +46,12 @@
 #include "src/storage/blobfs/iterator/block_iterator.h"
 #include "src/storage/blobfs/transaction.h"
 #include "src/storage/blobfs/transfer_buffer.h"
+#include "src/storage/lib/block_client/cpp/pass_through_read_only_device.h"
+#include "src/storage/lib/block_client/cpp/reader.h"
+#include "src/storage/lib/vfs/cpp/journal/journal.h"
+#include "src/storage/lib/vfs/cpp/journal/replay.h"
+#include "src/storage/lib/vfs/cpp/journal/superblock.h"
+#include "src/storage/lib/vfs/cpp/scoped_vnode_open.h"
 
 namespace blobfs {
 namespace {

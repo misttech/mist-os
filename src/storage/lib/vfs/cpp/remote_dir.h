@@ -1,0 +1,60 @@
+// Copyright 2017 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#ifndef SRC_STORAGE_LIB_VFS_CPP_REMOTE_DIR_H_
+#define SRC_STORAGE_LIB_VFS_CPP_REMOTE_DIR_H_
+
+#include <fidl/fuchsia.io/cpp/wire.h>
+
+#include <fbl/macros.h>
+
+#include "vnode.h"
+
+namespace fs {
+
+// A remote directory holds a channel to a remotely hosted directory to which requests are delegated
+// when opened.
+//
+// This class is designed to allow programs to publish remote filesystems as directories without
+// requiring a separate "mount" step.  In effect, a remote directory is "mounted" at creation time.
+//
+// It is not possible for the client to detach the remote directory or to mount a new one in its
+// place.
+//
+// This class is thread-safe.
+class RemoteDir : public Vnode {
+ public:
+  // Construct with fbl::MakeRefCounted.
+
+  fidl::UnownedClientEnd<fuchsia_io::Directory> client_end() const { return remote_client_; }
+
+  // |Vnode| implementation:
+  VnodeProtocolSet GetProtocols() const final;
+  zx_status_t GetAttributes(VnodeAttributes* a) final;
+  bool IsRemote() const final;
+  zx_status_t OpenRemote(fuchsia_io::OpenFlags, fuchsia_io::ModeType, fidl::StringView,
+                         fidl::ServerEnd<fuchsia_io::Node>) const final;
+  zx_status_t GetNodeInfoForProtocol(VnodeProtocol protocol, Rights rights,
+                                     VnodeRepresentation* info) final;
+
+ protected:
+  friend fbl::internal::MakeRefCountedHelper<RemoteDir>;
+  friend fbl::RefPtr<RemoteDir>;
+
+  // Binds to a remotely hosted directory using the specified FIDL client channel endpoint.  The
+  // channel must be valid.
+  explicit RemoteDir(fidl::ClientEnd<fuchsia_io::Directory> remote_dir_client);
+
+  // Releases the remotely hosted directory.
+  ~RemoteDir() override;
+
+ private:
+  fidl::ClientEnd<fuchsia_io::Directory> const remote_client_;
+
+  DISALLOW_COPY_ASSIGN_AND_MOVE(RemoteDir);
+};
+
+}  // namespace fs
+
+#endif  // SRC_STORAGE_LIB_VFS_CPP_REMOTE_DIR_H_

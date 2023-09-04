@@ -6,9 +6,9 @@
 
 #include <gtest/gtest.h>
 
-#include "src/lib/storage/block_client/cpp/fake_block_device.h"
 #include "src/storage/blobfs/mkfs.h"
 #include "src/storage/blobfs/test/unit/local_decompressor_creator.h"
+#include "src/storage/lib/block_client/cpp/fake_block_device.h"
 
 namespace blobfs {
 

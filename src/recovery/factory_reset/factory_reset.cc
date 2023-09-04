@@ -18,10 +18,10 @@
 #include <zircon/errors.h>
 #include <zircon/status.h>
 
-#include "src/lib/storage/block_client/cpp/remote_block_device.h"
-#include "src/lib/storage/fs_management/cpp/format.h"
 #include "src/security/lib/kms-stateless/kms-stateless.h"
 #include "src/security/lib/zxcrypt/client.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
+#include "src/storage/lib/fs_management/cpp/format.h"
 
 namespace factory_reset {
 

@@ -17,13 +17,12 @@ include /src/lib/fidl_table_validation/OWNERS
 include /src/lib/fuchsia/OWNERS
 include /src/lib/fuchsia-async-macro/OWNERS
 include /src/lib/fuzzing/OWNERS
-include /src/lib/storage/OWNERS
+include /src/storage/OWNERS
 include /src/lib/testing/fixture/OWNERS
 include /src/storage/OWNERS
 include /src/sys/lib/cm_rust/OWNERS
 include /src/sys/test_runners/OWNERS
 include /src/sys/time/OWNERS
-include /third_party/rust_crates/vendor/deepsize_derive-0.1.1/OWNERS
 include /third_party/rust_crates/vendor/proptest-derive-0.3.0/OWNERS
 include /third_party/rust_crates/vendor/structopt-derive-0.2.14/OWNERS
 include /third_party/rust_crates/vendor/syn-0.15.26/OWNERS

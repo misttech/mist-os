@@ -18,7 +18,7 @@ source_set("devfs") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/lib/ddk",
-    "//src/lib/storage/vfs/cpp",
+    "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",

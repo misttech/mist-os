@@ -25,9 +25,9 @@ template("fshost_cml") {
                              "testonly",
                            ])
     sources = [
-      "//src/lib/storage/fs_management/client.shard.cml",
       "//src/storage/fshost/meta/base_fshost.cml",
       "//src/storage/fshost/meta/config.cml",
+      "//src/storage/lib/fs_management/client.shard.cml",
     ]
     options = invoker.options
     if (!defined(options.bootfs_only) || !options.bootfs_only) {

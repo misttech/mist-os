@@ -51,8 +51,8 @@
 #include <ramdevice-client/ramdisk.h>
 
 #include "src/devices/lib/block/block.h"
-#include "src/lib/storage/block_client/cpp/client.h"
-#include "src/lib/storage/block_client/cpp/remote_block_device.h"
+#include "src/storage/lib/block_client/cpp/client.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
 
 namespace ramdisk {
 namespace {

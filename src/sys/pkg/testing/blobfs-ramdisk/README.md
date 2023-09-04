@@ -31,7 +31,7 @@ In the component manifest tests that utilize this crate, include the following s
 ```json5
 {
     include: [
-        "//src/lib/storage/fs_management/client.shard.cml",
+        "//src/storage/lib/fs_management/client.shard.cml",
         "//src/storage/testing/driver_test_realm/meta/client.shard.cml",
     ],
 }

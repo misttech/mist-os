@@ -30,11 +30,11 @@
 #include "src/graphics/bin/vulkan_loader/magma_device.h"
 #include "src/graphics/bin/vulkan_loader/structured_config_lib.h"
 #include "src/lib/json_parser/json_parser.h"
-#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
-#include "src/lib/storage/vfs/cpp/service.h"
-#include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
-#include "src/lib/storage/vfs/cpp/vfs_types.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
+#include "src/storage/lib/vfs/cpp/service.h"
+#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 class LoaderUnittest : public gtest::RealLoopFixture {
  protected:

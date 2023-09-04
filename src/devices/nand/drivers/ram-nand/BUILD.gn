@@ -93,7 +93,7 @@ test("test") {
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/ddktl",
-    "//src/lib/storage/ramdevice_client/cpp",
+    "//src/storage/lib/ramdevice_client/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",

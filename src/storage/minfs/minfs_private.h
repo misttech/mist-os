@@ -23,9 +23,9 @@
 #include <lib/zx/vmo.h>
 #include <zircon/compiler.h>
 
-#include "src/lib/storage/vfs/cpp/journal/journal.h"
-#include "src/lib/storage/vfs/cpp/managed_vfs.h"
-#include "src/lib/storage/vfs/cpp/watcher.h"
+#include "src/storage/lib/vfs/cpp/journal/journal.h"
+#include "src/storage/lib/vfs/cpp/managed_vfs.h"
+#include "src/storage/lib/vfs/cpp/watcher.h"
 #include "src/storage/minfs/minfs_inspect_tree.h"
 #endif
 
@@ -36,11 +36,11 @@
 #include <fbl/intrusive_single_list.h>
 #include <fbl/macros.h>
 
-#include "src/lib/storage/vfs/cpp/inspect/node_operations.h"
-#include "src/lib/storage/vfs/cpp/journal/inspector_journal.h"
-#include "src/lib/storage/vfs/cpp/transaction/transaction_handler.h"
-#include "src/lib/storage/vfs/cpp/vfs.h"
-#include "src/lib/storage/vfs/cpp/vnode.h"
+#include "src/storage/lib/vfs/cpp/inspect/node_operations.h"
+#include "src/storage/lib/vfs/cpp/journal/inspector_journal.h"
+#include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
+#include "src/storage/lib/vfs/cpp/vfs.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 #include "src/storage/minfs/format.h"
 #include "src/storage/minfs/minfs.h"
 #include "src/storage/minfs/superblock.h"

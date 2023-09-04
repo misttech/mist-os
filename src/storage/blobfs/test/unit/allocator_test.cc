@@ -11,13 +11,13 @@
 
 #include <gtest/gtest.h>
 
-#include "src/lib/storage/block_client/cpp/fake_block_device.h"
 #include "src/storage/blobfs/blobfs.h"
 #include "src/storage/blobfs/common.h"
 #include "src/storage/blobfs/mkfs.h"
 #include "src/storage/blobfs/test/blob_utils.h"
 #include "src/storage/blobfs/test/blobfs_test_setup.h"
 #include "src/storage/blobfs/test/unit/utils.h"
+#include "src/storage/lib/block_client/cpp/fake_block_device.h"
 
 namespace blobfs {
 namespace {

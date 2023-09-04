@@ -14,7 +14,7 @@ test("minfs-allocator-unit") {
   sources = [ "allocator_test.cc" ]
   deps = [
     "//src/lib/fxl/test:gtest_main",
-    "//src/lib/storage/block_client/cpp",
+    "//src/storage/lib/block_client/cpp",
     "//src/storage/minfs",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/bitmap",

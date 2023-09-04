@@ -18,9 +18,9 @@ test("fvm-driver-integration") {
     "//sdk/lib/component/incoming/cpp",
     "//src/devices/testing/driver-integration-test-shim",
     "//src/devices/testing/no_ddk",
-    "//src/lib/storage/fs_management",
     "//src/storage/fvm:test_support",
     "//src/storage/fvm/driver:shared",
+    "//src/storage/lib/fs_management",
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/zxtest",
   ]

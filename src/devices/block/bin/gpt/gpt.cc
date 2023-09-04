@@ -22,7 +22,7 @@
 #include <gpt/gpt.h>
 #include <gpt/guid.h>
 
-#include "src/lib/storage/block_client/cpp/remote_block_device.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
 
 using gpt::GptDevice;
 using gpt::GuidProperties;

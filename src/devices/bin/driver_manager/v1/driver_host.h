@@ -19,7 +19,7 @@
 
 #include "src/devices/bin/driver_manager/v1/device.h"
 #include "src/devices/bin/driver_manager/v1/fdio.h"
-#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 
 using LoaderServiceConnector = fit::function<zx_status_t(zx::channel*)>;
 class Coordinator;

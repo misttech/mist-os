@@ -14,11 +14,11 @@
 #include <utility>
 
 #include <fbl/ref_ptr.h>
-#include <src/lib/storage/vfs/cpp/pseudo_dir.h>
-#include <src/lib/storage/vfs/cpp/remote_dir.h>
-#include <src/lib/storage/vfs/cpp/service.h>
-#include <src/lib/storage/vfs/cpp/synchronous_vfs.h>
-#include <src/lib/storage/vfs/cpp/vnode.h>
+#include <src/storage/lib/vfs/cpp/pseudo_dir.h>
+#include <src/storage/lib/vfs/cpp/remote_dir.h>
+#include <src/storage/lib/vfs/cpp/service.h>
+#include <src/storage/lib/vfs/cpp/synchronous_vfs.h>
+#include <src/storage/lib/vfs/cpp/vnode.h>
 
 namespace {
 

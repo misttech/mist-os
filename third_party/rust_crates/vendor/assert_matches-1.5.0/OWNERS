@@ -67,7 +67,7 @@ include /src/lib/network/OWNERS
 include /src/lib/network/fidl_fuchsia_net_interfaces_ext/OWNERS
 include /src/lib/network/packet/OWNERS
 include /src/lib/process_builder/OWNERS
-include /src/lib/storage/OWNERS
+include /src/storage/OWNERS
 include /src/lib/tcp-stream-ext/OWNERS
 include /src/lib/test_diagnostics/OWNERS
 include /src/lib/ui/flatland-frame-scheduling/OWNERS
@@ -82,7 +82,6 @@ include /src/recovery/system/OWNERS
 include /src/session/OWNERS
 include /src/settings/OWNERS
 include /src/storage/OWNERS
-include /src/sys/base-resolver/OWNERS
 include /src/sys/component_manager/OWNERS
 include /src/sys/full-resolver/OWNERS
 include /src/sys/lib/component_debug/OWNERS

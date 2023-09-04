@@ -30,11 +30,11 @@
 #include "src/devices/lib/log/log.h"
 #include "src/lib/fxl/strings/split_string.h"
 #include "src/lib/fxl/strings/string_printf.h"
-#include "src/lib/storage/vfs/cpp/fuchsia_vfs.h"
-#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
-#include "src/lib/storage/vfs/cpp/remote_dir.h"
-#include "src/lib/storage/vfs/cpp/service.h"
-#include "src/lib/storage/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
+#include "src/storage/lib/vfs/cpp/remote_dir.h"
+#include "src/storage/lib/vfs/cpp/service.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 namespace {
 

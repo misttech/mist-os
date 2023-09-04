@@ -9,7 +9,7 @@
 #include <gtest/gtest.h>
 #include <storage/buffer/vmo_buffer.h>
 
-#include "src/lib/storage/block_client/cpp/fake_block_device.h"
+#include "src/storage/lib/block_client/cpp/fake_block_device.h"
 
 namespace disk_inspector {
 namespace {

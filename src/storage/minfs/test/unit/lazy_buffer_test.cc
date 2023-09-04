@@ -9,7 +9,7 @@
 #include <gtest/gtest.h>
 #include <storage/buffer/resizeable_vmo_buffer.h>
 
-#include "src/lib/storage/block_client/cpp/fake_block_device.h"
+#include "src/storage/lib/block_client/cpp/fake_block_device.h"
 #include "src/storage/minfs/bcache.h"
 #include "src/storage/minfs/format.h"
 #include "src/storage/minfs/minfs.h"

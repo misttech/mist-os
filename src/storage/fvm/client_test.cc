@@ -6,7 +6,7 @@
 
 #include <zxtest/zxtest.h>
 
-#include "src/lib/storage/block_client/cpp/block_device.h"
+#include "src/storage/lib/block_client/cpp/block_device.h"
 
 namespace fvm {
 namespace {

@@ -15,7 +15,7 @@
 #include <gpt/c/gpt.h>
 
 #ifdef __Fuchsia__
-#include "src/lib/storage/block_client/cpp/block_device.h"
+#include "src/storage/lib/block_client/cpp/block_device.h"
 #endif
 
 namespace gpt {

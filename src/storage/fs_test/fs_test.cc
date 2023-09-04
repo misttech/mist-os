@@ -35,14 +35,14 @@
 
 #include "sdk/lib/syslog/cpp/macros.h"
 #include "src/lib/json_parser/json_parser.h"
-#include "src/lib/storage/fs_management/cpp/admin.h"
-#include "src/lib/storage/fs_management/cpp/format.h"
-#include "src/lib/storage/fs_management/cpp/fvm.h"
-#include "src/lib/storage/fs_management/cpp/mkfs_with_default.h"
-#include "src/lib/storage/fs_management/cpp/mount.h"
 #include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/fs_test/blobfs_test.h"
 #include "src/storage/fs_test/json_filesystem.h"
+#include "src/storage/lib/fs_management/cpp/admin.h"
+#include "src/storage/lib/fs_management/cpp/format.h"
+#include "src/storage/lib/fs_management/cpp/fvm.h"
+#include "src/storage/lib/fs_management/cpp/mkfs_with_default.h"
+#include "src/storage/lib/fs_management/cpp/mount.h"
 #include "src/storage/testing/fvm.h"
 
 namespace fs_test {

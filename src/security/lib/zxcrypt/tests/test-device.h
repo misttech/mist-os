@@ -32,12 +32,12 @@
 #include <fbl/unique_fd.h>
 #include <ramdevice-client/ramdisk.h>
 
-#include "src/lib/storage/block_client/cpp/client.h"
-#include "src/lib/storage/block_client/cpp/remote_block_device.h"
 #include "src/security/lib/fcrypto/secret.h"
 #include "src/security/lib/zxcrypt/client.h"
 #include "src/security/lib/zxcrypt/fdio-volume.h"
 #include "src/storage/fvm/format.h"
+#include "src/storage/lib/block_client/cpp/client.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
 
 // Value-parameterized tests: Consumers of this file can define an 'EACH_PARAM' macro as follows:
 //   #define EACH_PARAM(OP, Test)

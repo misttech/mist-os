@@ -12,13 +12,13 @@
 
 #include <fbl/ref_ptr.h>
 
-#include "src/lib/storage/vfs/cpp/fuchsia_vfs.h"
-#include "src/lib/storage/vfs/cpp/remote_dir.h"
 #include "src/storage/blobfs/mount.h"
 #include "src/storage/blobfs/service/admin.h"
 #include "src/storage/blobfs/service/health_check.h"
 #include "src/storage/blobfs/service/lifecycle.h"
 #include "src/storage/blobfs/service/startup.h"
+#include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
+#include "src/storage/lib/vfs/cpp/remote_dir.h"
 
 namespace blobfs {
 

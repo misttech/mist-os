@@ -197,10 +197,10 @@ merely understand the FIDL wire format. As a consequence, there could be
 any number of “VFS” implementations in a language. There are currently these
 implementations:
 
-  * [In-tree C++ VFS](/src/lib/storage/vfs/cpp): Used by Fuchsia's "main" filesystems minfs and
+  * [In-tree C++ VFS](/src/storage/lib/vfs/cpp): Used by Fuchsia's "main" filesystems minfs and
     blobfs. It currently has the most features of any VFS implementation, but can also be the most
     difficult to use.
-  * [In-tree Rust VFS](/src/lib/storage/vfs/rust): This is used by some Rust filesystems including
+  * [In-tree Rust VFS](/src/storage/lib/vfs/rust): This is used by some Rust filesystems including
     the fat32 implementation. It is newer and currently has fewer features than the C++
     implementation.
   * [SDK C++ VFS](/sdk/lib/vfs/cpp): A somewhat simplified version of of the "in-tree" C++ version

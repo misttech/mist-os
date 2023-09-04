@@ -13,10 +13,10 @@
 #include <fbl/ref_ptr.h>
 #include <zxtest/zxtest.h>
 
-#include "src/lib/storage/vfs/cpp/managed_vfs.h"
-#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
-#include "src/lib/storage/vfs/cpp/pseudo_file.h"
-#include "src/lib/storage/vfs/cpp/service.h"
+#include "src/storage/lib/vfs/cpp/managed_vfs.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
+#include "src/storage/lib/vfs/cpp/pseudo_file.h"
+#include "src/storage/lib/vfs/cpp/service.h"
 
 TEST(CompatConnectTest, Connection) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);

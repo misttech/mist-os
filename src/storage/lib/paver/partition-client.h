@@ -23,7 +23,7 @@
 #include <storage/buffer/owned_vmoid.h>
 
 #include "src/devices/block/drivers/core/block-fifo.h"
-#include "src/lib/storage/block_client/cpp/client.h"
+#include "src/storage/lib/block_client/cpp/client.h"
 #include "src/storage/lib/paver/utils.h"
 
 namespace paver {

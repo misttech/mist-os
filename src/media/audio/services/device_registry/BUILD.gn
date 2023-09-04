@@ -85,7 +85,7 @@ executable("device_registry_unittests_bin") {
 
   deps = [
     ":unittest_base",
-    "//src/lib/storage/vfs/cpp",
+    "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/sync:sync-cpp",
   ]
 }

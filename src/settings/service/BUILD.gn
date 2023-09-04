@@ -89,7 +89,7 @@ icu_rustc_library("lib") {
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
     "//sdk/fidl/fuchsia.stash:fuchsia.stash_rust",
     "//src/lib/fuchsia",
-    "//src/lib/storage/vfs/rust:vfs",
+    "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:pin-utils",

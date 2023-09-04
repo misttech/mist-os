@@ -23,7 +23,7 @@ source_set("lib") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp",
-    "//src/lib/storage/vfs/cpp",
+    "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/zircon-internal",
   ]
 
@@ -60,7 +60,7 @@ executable("bin") {
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
     "//src/lib/loader_service",
-    "//src/lib/storage/vfs/cpp",
+    "//src/storage/lib/vfs/cpp",
     "//src/sys/lib/stdout-to-debuglog/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",

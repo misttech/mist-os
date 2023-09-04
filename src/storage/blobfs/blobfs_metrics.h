@@ -14,12 +14,12 @@
 
 #include <mutex>
 
-#include "src/lib/storage/vfs/cpp/ticker.h"
-#include "src/lib/storage/vfs/cpp/vnode.h"
 #include "src/storage/blobfs/format.h"
 #include "src/storage/blobfs/metrics/read_metrics.h"
 #include "src/storage/blobfs/metrics/verification_metrics.h"
 #include "src/storage/blobfs/mount.h"
+#include "src/storage/lib/vfs/cpp/ticker.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace blobfs {
 

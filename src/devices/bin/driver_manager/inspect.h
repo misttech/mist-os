@@ -13,9 +13,9 @@
 #include <fbl/array.h>
 #include <fbl/ref_ptr.h>
 
-#include "src/lib/storage/vfs/cpp/pseudo_dir.h"
-#include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
-#include "src/lib/storage/vfs/cpp/vmo_file.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
+#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
+#include "src/storage/lib/vfs/cpp/vmo_file.h"
 
 struct ProtocolInfo {
   const char* name;

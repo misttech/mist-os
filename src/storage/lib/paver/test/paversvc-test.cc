@@ -39,8 +39,8 @@
 #include <soc/aml-common/aml-guid.h>
 #include <zxtest/zxtest.h>
 
-#include "src/lib/storage/block_client/cpp/remote_block_device.h"
-#include "src/lib/storage/fs_management/cpp/format.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
+#include "src/storage/lib/fs_management/cpp/format.h"
 #include "src/storage/lib/paver/fvm.h"
 #include "src/storage/lib/paver/gpt.h"
 #include "src/storage/lib/paver/paver.h"

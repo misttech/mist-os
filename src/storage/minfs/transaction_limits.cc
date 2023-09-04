@@ -11,7 +11,7 @@
 
 #include <fbl/algorithm.h>
 
-#include "src/lib/storage/vfs/cpp/journal/format.h"
+#include "src/storage/lib/vfs/cpp/journal/format.h"
 #include "src/storage/minfs/format.h"
 
 namespace minfs {

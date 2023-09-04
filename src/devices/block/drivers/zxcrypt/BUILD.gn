@@ -108,11 +108,11 @@ test("device-manager-test-bin") {
     "//src/devices/block/drivers/zxcrypt",
     "//src/devices/testing/driver-integration-test-shim",
     "//src/lib/fxl",
-    "//src/lib/storage/ramdevice_client/cpp",
     "//src/lib/uuid",
     "//src/security/lib/fcrypto",
     "//src/security/lib/zxcrypt:zxcrypt-client",
     "//src/security/lib/zxcrypt:zxcrypt-dev",
+    "//src/storage/lib/ramdevice_client/cpp",
     "//zircon/system/ulib/zxtest",
   ]
 }

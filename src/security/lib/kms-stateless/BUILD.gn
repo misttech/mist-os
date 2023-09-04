@@ -14,9 +14,9 @@ source_set("kms-stateless") {
   deps = [
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fdio",
-    "//src/lib/storage/ramdevice_client/cpp",
     "//src/security/lib/keysafe",
     "//src/security/lib/tee/tee-client-api",
+    "//src/storage/lib/ramdevice_client/cpp",
     "//zircon/system/ulib/zx",
   ]
 }

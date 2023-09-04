@@ -20,7 +20,7 @@
 
 #include <safemath/checked_math.h>
 
-#include "src/lib/storage/vfs/cpp/journal/format.h"
+#include "src/storage/lib/vfs/cpp/journal/format.h"
 #include "src/storage/minfs/format.h"
 #include "zircon/errors.h"
 
@@ -31,7 +31,7 @@
 
 #include <storage/buffer/owned_vmoid.h>
 
-#include "src/lib/storage/block_client/cpp/reader.h"
+#include "src/storage/lib/block_client/cpp/reader.h"
 
 #else
 

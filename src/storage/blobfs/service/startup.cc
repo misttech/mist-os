@@ -6,10 +6,10 @@
 
 #include <lib/syslog/cpp/macros.h>
 
-#include "src/lib/storage/block_client/cpp/remote_block_device.h"
 #include "src/storage/blobfs/fsck.h"
 #include "src/storage/blobfs/mkfs.h"
 #include "src/storage/blobfs/mount.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
 
 namespace blobfs {
 namespace {

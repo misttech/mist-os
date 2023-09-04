@@ -12,7 +12,7 @@
 #include <disk_inspector/common_types.h>
 #include <disk_inspector/inspector_transaction_handler.h>
 
-#include "src/lib/storage/vfs/cpp/journal/format.h"
+#include "src/storage/lib/vfs/cpp/journal/format.h"
 #include "src/storage/minfs/format.h"
 
 namespace minfs {
