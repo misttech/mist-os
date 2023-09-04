@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load("./python.star", "register_python_checks")
+
 _FORMATTER_MSG = "File not formatted. Run `fx format-code` to fix."
 
 def _cipd_platform_name(ctx):
@@ -58,3 +60,4 @@ def register_all_checks():
     file.
     """
     shac.register_check(shac.check(_gn_format, formatter = True))
+    register_python_checks()

@@ -1,4 +1,6 @@
 #!/usr/bin/env -S python3 -B
+# allow-non-vendored-python
+#
 # TODO(b/295039695): We intentionally use the host python3 here instead of
 # fuchsia-vendored-python. This script calls out to cbindgen that is not part
 # of the Fuchsia repo and must be installed on the local host.
