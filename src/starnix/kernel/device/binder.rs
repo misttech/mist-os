@@ -36,7 +36,7 @@ use std::{
     collections::{btree_map::BTreeMap, VecDeque},
     ops::DerefMut,
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Weak,
     },
 };
@@ -763,8 +763,7 @@ impl<'a> BinderProcessGuard<'a> {
 
         // Create a handle in the receiving process that references the binder object
         // in the sender's process. A new strong reference will be taken on `object`.
-        let handle =
-            target_process.lock().handles.insert_for_transaction(object.clone(), &mut actions);
+        let handle = target_process.lock().handles.insert_for_transaction(object, &mut actions);
 
         // Now that the object is kept by the target process handle table, the initial strong
         // increment can be released.
@@ -1357,6 +1356,7 @@ impl Releasable for RefCountAction {
                     let mut process_state = binder_process.lock();
                     binder_process.enqueue_command(Command::ReleaseRef(object.local));
                     if !object.has_ref() {
+                        object.poisoned.store(true, Ordering::Relaxed);
                         process_state.objects.remove(&object.local.weak_ref_addr);
                     }
                 }
@@ -1371,6 +1371,7 @@ impl Releasable for RefCountAction {
                     let mut process_state = binder_process.lock();
                     binder_process.enqueue_command(Command::DecRef(object.local));
                     if !object.has_ref() {
+                        object.poisoned.store(true, Ordering::Relaxed);
                         process_state.objects.remove(&object.local.weak_ref_addr);
                     }
                 }
@@ -1409,7 +1410,7 @@ impl HandleTable {
             if let Some(existing_idx) = self.get_object_index(&object) {
                 existing_idx
             } else {
-                self.table.insert(BinderObjectRef::new(object.clone()))
+                self.table.insert(BinderObjectRef::new(object))
             }
         };
         // Increment the number of strong reference, as the caller expects having a strong
@@ -1999,6 +2000,9 @@ struct BinderObject {
     flags: u32,
     /// Mutable state for the binder object, protected behind a mutex.
     state: Mutex<BinderObjectMutableState>,
+    /// Debug boolean to ensure a removed BinderObject cannot be resurrected.
+    // TODO(https://fxbug.dev/298935909): Remove when the bug has been solved.
+    poisoned: AtomicBool,
 }
 
 /// Assert that a dropped object from a live process has no reference.
@@ -2092,6 +2096,7 @@ impl BinderObject {
                 strong_count: ObjectReferenceCount::WaitingAck(0),
                 ..Default::default()
             }),
+            poisoned: Default::default(),
         })
     }
 
@@ -2101,6 +2106,7 @@ impl BinderObject {
             local: Default::default(),
             flags,
             state: Default::default(),
+            poisoned: Default::default(),
         })
     }
 
@@ -2126,6 +2132,7 @@ impl BinderObject {
     /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn inc_strong(self: &Arc<Self>, actions: &mut RefCountActions) -> StrongRefGuard {
+        assert!(!self.poisoned.load(Ordering::Relaxed));
         if self.lock().strong_count.inc() {
             actions.push(RefCountAction::Acquire(self.clone()));
         }
@@ -2136,6 +2143,7 @@ impl BinderObject {
     /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn inc_weak(self: &Arc<Self>, actions: &mut RefCountActions) -> WeakRefGuard {
+        assert!(!self.poisoned.load(Ordering::Relaxed));
         if self.lock().weak_count.inc() {
             actions.push(RefCountAction::IncRefs(self.clone()));
         }
