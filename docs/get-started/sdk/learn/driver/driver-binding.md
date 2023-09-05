@@ -166,8 +166,8 @@ initial `Start()` hook:
 Add the following build rule to the bottom of your `qemu_edu/drivers/BUILD.bazel`
 file to compile the driver code into a shared library binary:
 
-*   `cc_binary()`: Specifies the source and header files (for instance,
-    `qemu_edu.cc` and `qemu_edu.h`) for building a C++ binary.
+*   `fuchsia_cc_driver()`: Specifies the source and header files (for instance,
+    `qemu_edu.cc` and `qemu_edu.h`) for building a C++ driver for Fuchsia.
 
 `qemu_edu/drivers/BUILD.bazel`:
 
