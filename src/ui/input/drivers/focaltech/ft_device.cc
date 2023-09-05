@@ -312,7 +312,7 @@ zx_status_t FtDevice::Create(void* ctx, zx_device_t* device) {
     }
   }
 
-  status = ft_dev->DdkAdd(ddk::DeviceAddArgs("focaltouch HidDevice")
+  status = ft_dev->DdkAdd(ddk::DeviceAddArgs("focaltouch-HidDevice")
                               .set_inspect_vmo(ft_dev->inspector_.DuplicateVmo()));
   if (status != ZX_OK) {
     zxlogf(ERROR, "focaltouch: Could not create hid device: %d", status);
