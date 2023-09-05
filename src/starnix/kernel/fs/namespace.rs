@@ -44,7 +44,7 @@ impl Namespace {
         let kernel = fs.kernel.upgrade().expect("can't create namespace without a kernel");
         Arc::new(Self {
             root_mount: Mount::new(WhatToMount::Fs(fs), MountFlags::empty()),
-            id: kernel.next_namespace_id.fetch_add(1, Ordering::Relaxed),
+            id: kernel.get_next_namespace_id(),
         })
     }
 
@@ -57,7 +57,7 @@ impl Namespace {
             self.root_mount.fs.kernel.upgrade().expect("can't clone namespace without a kernel");
         Arc::new(Self {
             root_mount: self.root_mount.clone_mount_recursive(),
-            id: kernel.next_namespace_id.fetch_add(1, Ordering::Relaxed),
+            id: kernel.get_next_namespace_id(),
         })
     }
 
@@ -196,7 +196,7 @@ impl Mount {
         let fs = root.node.fs();
         let kernel = fs.kernel.upgrade().expect("can't create mount without kernel");
         Arc::new(Self {
-            id: kernel.next_mount_id.fetch_add(1, Ordering::Relaxed),
+            id: kernel.get_next_mount_id(),
             flags: Mutex::new(flags),
             root,
             fs,
@@ -477,9 +477,7 @@ impl MountState<Base = Mount> {
         }
         let kernel =
             self.base.fs.kernel.upgrade().expect("can't create new peer group without kernel");
-        self.set_peer_group(PeerGroup::new(
-            kernel.next_peer_group_id.fetch_add(1, Ordering::Relaxed),
-        ));
+        self.set_peer_group(PeerGroup::new(kernel.get_next_peer_group_id()));
     }
 
     /// Take the mount out of its peer group, also remove upstream if any. Implements MS_PRIVATE.
@@ -595,6 +593,18 @@ impl Kernel {
                 return error!(ENODEV, String::from_utf8_lossy(fs_type));
             }
         })
+    }
+
+    pub fn get_next_mount_id(&self) -> u64 {
+        self.next_mount_id.fetch_add(1, Ordering::Relaxed)
+    }
+
+    pub fn get_next_peer_group_id(&self) -> u64 {
+        self.next_peer_group_id.fetch_add(1, Ordering::Relaxed)
+    }
+
+    pub fn get_next_namespace_id(&self) -> u64 {
+        self.next_namespace_id.fetch_add(1, Ordering::Relaxed)
     }
 }
 
