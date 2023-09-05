@@ -209,7 +209,6 @@ impl InnerPacketBuilder for SendPayload<'_> {
 /// *Reserved* memory will never become readable or writable, and is non-empty
 /// only while a shrink is in progress. Once the reserved segment is large
 /// enough it will be removed to complete the shrinking.
-#[derive(Debug)]
 #[cfg_attr(any(test, feature = "testutils"), derive(Clone, PartialEq, Eq))]
 pub struct RingBuffer {
     storage: Vec<u8>,
@@ -227,6 +226,18 @@ pub struct RingBuffer {
     /// target number of bytes to be trimmed and the current size of the
     /// reserved region.
     shrink: Option<PendingShrink>,
+}
+
+impl Debug for RingBuffer {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let Self { storage, head, len, shrink } = self;
+        f.debug_struct("RingBuffer")
+            .field("storage (len, cap)", &(storage.len(), storage.capacity()))
+            .field("head", head)
+            .field("len", len)
+            .field("shrink", shrink)
+            .finish()
+    }
 }
 
 #[derive(Debug)]
