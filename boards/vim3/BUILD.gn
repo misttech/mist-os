@@ -25,8 +25,6 @@ board_configuration("vim3") {
       sparse_output = {
       }
       fastboot_output = {
-        compress = true
-
         # For VIM3, FVM partition uses all of the remaining eMMC.
         # However, the total size of the eMMC storage maybe 16G or 32G
         # depending on whether it is a basic or pro version. In
