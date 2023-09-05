@@ -1220,8 +1220,17 @@ impl Drop for BinderObjectRef {
 }
 
 impl BinderObjectRef {
-    fn new(binder_object: Arc<BinderObject>) -> Self {
-        Self { binder_object, strong_count: 0, strong_guard: None, weak_count: 0, weak_guard: None }
+    /// Build a new reference to the given object. The reference will start with a strong count of
+    /// 1.
+    fn new(binder_object: Arc<BinderObject>, actions: &mut RefCountActions) -> Self {
+        let strong_guard = binder_object.inc_strong(actions);
+        Self {
+            binder_object,
+            strong_count: 1,
+            strong_guard: Some(strong_guard),
+            weak_count: 0,
+            weak_guard: None,
+        }
     }
 
     /// Returns whether this object has still any strong or weak reference. The object must be kept
@@ -1256,6 +1265,7 @@ impl BinderObjectRef {
     /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn inc_strong(&mut self, actions: &mut RefCountActions) {
+        assert!(self.has_ref());
         if self.strong_count == 0 {
             let guard = self.binder_object.inc_strong(actions);
             self.strong_guard = Some(guard);
@@ -1267,6 +1277,7 @@ impl BinderObjectRef {
     /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn inc_weak(&mut self, actions: &mut RefCountActions) {
+        assert!(self.has_ref());
         if self.weak_count == 0 {
             let guard = self.binder_object.inc_weak(actions);
             self.weak_guard = Some(guard);
@@ -1406,24 +1417,23 @@ impl HandleTable {
         object: Arc<BinderObject>,
         actions: &mut RefCountActions,
     ) -> Handle {
-        let index = {
-            if let Some(existing_idx) = self.get_object_index(&object) {
-                existing_idx
-            } else {
-                self.table.insert(BinderObjectRef::new(object))
-            }
+        let index = if let Some((existing_idx, object_ref)) = self.find_ref_for_object(&object) {
+            // Increment the number of reference to the handle as expected by the caller.
+            object_ref.inc_strong(actions);
+            existing_idx
+        } else {
+            // The new handle will be created with a strong reference as expected by the
+            // caller.
+            self.table.insert(BinderObjectRef::new(object, actions))
         };
-        // Increment the number of strong reference, as the caller expects having a strong
-        // reference to it.
-        // The incrementation cannot fail as the index has just been computed and checked.
-        self.inc_strong(index, actions).expect("inc_strong");
         Handle::Object { index }
     }
 
-    fn get_object_index(&mut self, object: &Arc<BinderObject>) -> Option<usize> {
-        self.table
-            .iter()
-            .find_map(|(idx, object_ref)| object_ref.is_ref_to_object(object).then_some(idx))
+    fn find_ref_for_object(
+        &mut self,
+        object: &Arc<BinderObject>,
+    ) -> Option<(usize, &mut BinderObjectRef)> {
+        self.table.iter_mut().filter(|(_, object_ref)| object_ref.is_ref_to_object(object)).next()
     }
 
     /// Retrieves a reference to a binder object at index `idx`. Returns None if the index doesn't
