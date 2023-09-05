@@ -119,5 +119,8 @@ fuchsia_structured_config_values("config_for_test") {
       "mouse",
       "touchscreen",
     ]
+    display_rotation = 270
+    display_pixel_density = "4.1668"
+    viewing_distance = "near"
   }
 }

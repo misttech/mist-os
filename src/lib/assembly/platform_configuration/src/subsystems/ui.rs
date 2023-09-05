@@ -48,15 +48,18 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
 
         let mut scene_manager_config =
             builder.package("scene_manager").component("meta/scene_manager.cm")?;
-        // Configure the supported input devices. Default to an empty list.
-        scene_manager_config.field(
-            "supported_input_devices",
-            ui_config
-                .supported_input_devices
-                .iter()
-                .filter_map(|d| serde_json::to_value(d).ok())
-                .collect::<serde_json::Value>(),
-        )?;
+        scene_manager_config
+            .field(
+                "supported_input_devices",
+                ui_config
+                    .supported_input_devices
+                    .iter()
+                    .filter_map(|d| serde_json::to_value(d).ok())
+                    .collect::<serde_json::Value>(),
+            )?
+            .field("display_pixel_density", ui_config.display_pixel_density.clone())?
+            .field("display_rotation", ui_config.display_rotation)?
+            .field("viewing_distance", ui_config.viewing_distance.as_ref())?;
 
         let config_dir = builder.add_domain_config("sensor-config").directory("sensor-config");
         if let Some(sensor_config_path) = &ui_config.sensor_config {

@@ -36,6 +36,19 @@ pub struct PlatformUiConfig {
     /// input handlers. Default to an empty set.
     #[serde(default)]
     pub supported_input_devices: Vec<InputDeviceType>,
+
+    // The rotation of the display, counter-clockwise, in 90-degree increments.
+    #[serde(default)]
+    pub display_rotation: i64,
+
+    // TODO(132584): change to float when supported in structured config.
+    // The density of the display, in pixels per mm.
+    #[serde(default)]
+    pub display_pixel_density: String,
+
+    // The expected viewing distance for the display.
+    #[serde(default)]
+    pub viewing_distance: ViewingDistance,
 }
 
 impl Default for PlatformUiConfig {
@@ -47,6 +60,9 @@ impl Default for PlatformUiConfig {
             pointer_auto_focus: true,
             enable_display_composition: false,
             supported_input_devices: Default::default(),
+            display_rotation: Default::default(),
+            display_pixel_density: Default::default(),
+            viewing_distance: Default::default(),
         }
     }
 }
@@ -76,3 +92,26 @@ impl From<InputDeviceType> for PlatformInputDeviceType {
     }
 }
 // LINT.ThenChange(/src/ui/lib/input-device-constants/src/lib.rs)
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "lowercase", deny_unknown_fields)]
+pub enum ViewingDistance {
+    Handheld,
+    Close,
+    #[default]
+    Near,
+    Midrange,
+    Far,
+}
+
+impl AsRef<str> for ViewingDistance {
+    fn as_ref(&self) -> &str {
+        match &self {
+            Self::Handheld => "handheld",
+            Self::Close => "close",
+            Self::Near => "near",
+            Self::Midrange => "midrange",
+            Self::Far => "far",
+        }
+    }
+}

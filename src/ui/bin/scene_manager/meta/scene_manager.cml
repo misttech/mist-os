@@ -90,5 +90,14 @@
             },
             max_count: 6,
         },
+        display_rotation: { type: "int64" },
+        display_pixel_density: {
+            type: "string",
+            max_size: 6,
+        },
+        viewing_distance: {
+            type: "string",
+            max_size: 8,
+        },
     },
 }

@@ -245,7 +245,7 @@ async fn inner_main() -> Result<(), Error> {
     let inspect_node = inspector.root().create_child("input_pipeline");
 
     // Start input pipeline.
-    let Config { supported_input_devices } = Config::take_from_startup_handle();
+    let Config { supported_input_devices, .. } = Config::take_from_startup_handle();
     let has_light_sensor_configuration = light_sensor_configuration.is_some();
     if let Ok(input_pipeline) = input_pipeline::handle_input(
         scene_manager.clone(),
