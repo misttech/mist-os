@@ -965,7 +965,10 @@ mod tests {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(root_store.store_object_id(), root_directory.object_id())],
+                &[
+                    LockKey::object(root_store.store_object_id(), root_directory.object_id()),
+                    LockKey::object(root_store.store_object_id(), object.object_id()),
+                ],
                 Options::default(),
             )
             .await

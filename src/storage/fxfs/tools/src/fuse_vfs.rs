@@ -102,9 +102,11 @@ impl FuseFs {
     async fn unlink_fxfs(&self, parent: u64, name: &OsStr) -> FxfsResult<()> {
         let dir = self.open_dir(parent).await?;
 
-        let (mut transaction, object_id_and_descriptor) =
-            dir.acquire_transaction_for_replace(&[], name.osstr_to_str()?, true).await?;
-        let object_descriptor = match object_id_and_descriptor {
+        let replace_context =
+            dir.acquire_context_for_replace(None, name.osstr_to_str()?, true).await?;
+        let mut transaction = replace_context.transaction;
+
+        let object_descriptor = match replace_context.dst_id_and_descriptor {
             Some((_, object_descriptor)) => object_descriptor,
             None => return Err(FxfsError::NotFound.into()),
         };
@@ -136,9 +138,10 @@ impl FuseFs {
     async fn rmdir_fxfs(&self, parent: u64, name: &OsStr) -> FxfsResult<()> {
         let dir = self.open_dir(parent).await?;
 
-        let (mut transaction, object_id_and_descriptor) =
-            dir.acquire_transaction_for_replace(&[], name.osstr_to_str()?, true).await?;
-        let object_descriptor = match object_id_and_descriptor {
+        let replace_context =
+            dir.acquire_context_for_replace(None, name.osstr_to_str()?, true).await?;
+        let mut transaction = replace_context.transaction;
+        let object_descriptor = match replace_context.dst_id_and_descriptor {
             Some((_, object_descriptor)) => object_descriptor,
             None => return Err(FxfsError::NotFound.into()),
         };
@@ -166,16 +169,18 @@ impl FuseFs {
         new_name: &OsStr,
     ) -> FxfsResult<()> {
         let old_dir = self.open_dir(parent).await?;
-        let new_dir = self.open_dir(new_parent).await?;
-        let (mut transaction, _) = new_dir
-            .acquire_transaction_for_replace(
-                &[LockKey::object(self.default_store.store_object_id(), old_dir.object_id())],
+        let new_dir: fxfs::object_store::Directory<fxfs::object_store::ObjectStore> =
+            self.open_dir(new_parent).await?;
+        let replace_context = new_dir
+            .acquire_context_for_replace(
+                Some((&old_dir, name.osstr_to_str()?)),
                 new_name.osstr_to_str()?,
                 true,
             )
             .await?;
+        let mut transaction = replace_context.transaction;
 
-        if old_dir.lookup(name.osstr_to_str()?).await?.is_some() {
+        if replace_context.src_id_and_descriptor.is_some() {
             let replaced_child = replace_child(
                 &mut transaction,
                 Some((&old_dir, name.osstr_to_str()?)),

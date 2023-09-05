@@ -15,7 +15,7 @@ use {
             object_manager::ObjectManager,
             object_record::{
                 AttributeKey, EncryptionKeys, ExtendedAttributeValue, ObjectAttributes, ObjectItem,
-                ObjectKey, ObjectKeyData, ObjectValue, PosixAttributes, Timestamp,
+                ObjectKey, ObjectKeyData, ObjectValue, Timestamp,
             },
             transaction::{
                 AssocObj, AssociatedObject, LockKey, Mutation, ObjectStoreMutation, Options,
@@ -396,58 +396,9 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         node_attributes: Option<&fio::MutableNodeAttributes>,
         change_time: Option<Timestamp>,
     ) -> Result<(), Error> {
-        if change_time.is_none() && node_attributes.is_none() {
-            return Ok(());
-        }
-        let mut mutation = self.txn_get_object_mutation(transaction).await?;
-        if let ObjectValue::Object { ref mut attributes, .. } = mutation.item.value {
-            if let Some(time) = change_time {
-                attributes.change_time = time;
-            }
-            if let Some(node_attributes) = node_attributes {
-                if let Some(time) = node_attributes.creation_time {
-                    attributes.creation_time = Timestamp::from_nanos(time);
-                }
-                if let Some(time) = node_attributes.modification_time {
-                    attributes.modification_time = Timestamp::from_nanos(time);
-                }
-                if let Some(time) = node_attributes.access_time {
-                    attributes.access_time = Timestamp::from_nanos(time);
-                }
-                if node_attributes.mode.is_some()
-                    || node_attributes.uid.is_some()
-                    || node_attributes.gid.is_some()
-                    || node_attributes.rdev.is_some()
-                {
-                    if let Some(a) = &mut attributes.posix_attributes {
-                        if let Some(mode) = node_attributes.mode {
-                            a.mode = mode;
-                        }
-                        if let Some(uid) = node_attributes.uid {
-                            a.uid = uid;
-                        }
-                        if let Some(gid) = node_attributes.gid {
-                            a.gid = gid;
-                        }
-                        if let Some(rdev) = node_attributes.rdev {
-                            a.rdev = rdev;
-                        }
-                    } else {
-                        attributes.posix_attributes = Some(PosixAttributes {
-                            mode: node_attributes.mode.unwrap_or_default(),
-                            uid: node_attributes.uid.unwrap_or_default(),
-                            gid: node_attributes.gid.unwrap_or_default(),
-                            rdev: node_attributes.rdev.unwrap_or_default(),
-                        });
-                    }
-                }
-            }
-        } else {
-            bail!(anyhow!(FxfsError::Inconsistent)
-                .context("StoreObjectHandle.update_attributes: Expected object value"));
-        };
-        transaction.add(self.store().store_object_id(), Mutation::ObjectStore(mutation));
-        Ok(())
+        self.store()
+            .update_attributes(transaction, self.object_id, node_attributes, change_time)
+            .await
     }
 
     /// Zeroes the given range.  The range must be aligned.  Returns the amount of data deallocated.

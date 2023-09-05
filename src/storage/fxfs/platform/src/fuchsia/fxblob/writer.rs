@@ -26,7 +26,6 @@ use {
         object_handle::{ObjectHandle, ObjectProperties, WriteObjectHandle},
         object_store::{
             directory::{replace_child_with_object, ReplacedChild},
-            transaction::{LockKey, Options},
             DataObjectHandle, ObjectDescriptor, Timestamp, BLOB_MERKLE_ATTRIBUTE_ID,
         },
         round::{round_down, round_up},
@@ -246,13 +245,18 @@ impl FxDeliveryBlob {
             .downcast::<BlobDirectory>()
             .expect("Expected blob directory");
 
-        let keys = [LockKey::object(store.store_object_id(), dir.object_id())];
-        let mut transaction = store.filesystem().new_transaction(&keys, Options::default()).await?;
+        let name = format!("{}", self.hash);
+        let mut transaction = dir
+            .directory()
+            .directory()
+            .acquire_context_for_replace(None, &name, false)
+            .await
+            .map_err(map_to_status)?
+            .transaction;
 
         let object_id = self.handle.object_id();
         store.remove_from_graveyard(&mut transaction, object_id);
 
-        let name = format!("{}", self.hash);
         match replace_child_with_object(
             &mut transaction,
             Some((object_id, ObjectDescriptor::File)),

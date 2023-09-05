@@ -116,10 +116,11 @@ pub async fn unlink(
 ) -> Result<(), Error> {
     let dir = walk_dir(vol, path.parent().unwrap()).await?;
     // Not worried about the race between lookup and lock, this is a single-threaded mode.
-    let (mut transaction, object_id_and_descriptor) = dir
-        .acquire_transaction_for_replace(&[], path.file_name().unwrap().to_str().unwrap(), true)
+    let replace_context = dir
+        .acquire_context_for_replace(None, path.file_name().unwrap().to_str().unwrap(), true)
         .await?;
-    if object_id_and_descriptor.is_none() {
+    let mut transaction = replace_context.transaction;
+    if replace_context.dst_id_and_descriptor.is_none() {
         bail!("Object not found.");
     }
     let replaced_child =

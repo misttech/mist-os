@@ -345,12 +345,13 @@ impl MutableDirectory for FxDirectory {
         name: &str,
         must_be_directory: bool,
     ) -> Result<(), zx::Status> {
-        let (mut transaction, object_id_and_descriptor) = self
+        let replace_context = self
             .directory
-            .acquire_transaction_for_replace(&[], name, true)
+            .acquire_context_for_replace(None, name, true)
             .await
             .map_err(map_to_status)?;
-        let object_descriptor = match object_id_and_descriptor {
+        let mut transaction = replace_context.transaction;
+        let object_descriptor = match replace_context.dst_id_and_descriptor {
             Some((_, object_descriptor)) => object_descriptor,
             None => return Err(zx::Status::NOT_FOUND),
         };
@@ -459,28 +460,22 @@ impl MutableDirectory for FxDirectory {
         let src_dir =
             src_dir.into_any().downcast::<FxDirectory>().map_err(|_| Err(zx::Status::NOT_DIR))?;
 
-        // Acquire a transaction that locks |src_dir|, |self|, and |dst_name| if it exists.
-        let store = self.store();
-        let (mut transaction, dst_id_and_descriptor) = self
+        // Acquire the transaction that locks |src_dir|, |src_name|, |self|, and |dst_name| if they
+        // exist, and also the ID and type of dst and src.
+        let replace_context = self
             .directory
-            .acquire_transaction_for_replace(
-                &[LockKey::object(store.store_object_id(), src_dir.object_id())],
-                dst,
-                false,
-            )
+            .acquire_context_for_replace(Some((src_dir.directory(), src)), dst, false)
             .await
             .map_err(map_to_status)?;
+        let mut transaction = replace_context.transaction;
 
         if self.is_deleted() {
             return Err(zx::Status::NOT_FOUND);
         }
 
-        let (moved_id, moved_descriptor) = src_dir
-            .directory()
-            .lookup(src)
-            .await
-            .map_err(map_to_status)?
-            .ok_or(zx::Status::NOT_FOUND)?;
+        let (moved_id, moved_descriptor) =
+            replace_context.src_id_and_descriptor.ok_or(zx::Status::NOT_FOUND)?;
+
         // Make sure the dst path is compatible with the moved node.
         if let ObjectDescriptor::File = moved_descriptor {
             if src_name.is_dir() || dst_name.is_dir() {
@@ -494,7 +489,7 @@ impl MutableDirectory for FxDirectory {
             return Ok(());
         }
 
-        if let Some((_, dst_descriptor)) = dst_id_and_descriptor.as_ref() {
+        if let Some((_, dst_descriptor)) = replace_context.dst_id_and_descriptor.as_ref() {
             // dst is being overwritten; make sure it's a file iff src is.
             match (&moved_descriptor, dst_descriptor) {
                 (ObjectDescriptor::Directory, ObjectDescriptor::Directory) => {}
