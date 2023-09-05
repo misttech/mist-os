@@ -25,12 +25,6 @@ pub(crate) struct ServeSyslogOutcome {
     /// Task serving any protocols needed to proxy logs. For example, this is populated
     /// when logs are served over overnet using DiagnosticsBridge.
     pub logs_iterator_task: Option<fasync::Task<Result<(), Error>>>,
-    /// A task which resolves when Archivist responds to a request. This task
-    /// should resolve before tearing down the realm. This is a workaround that
-    /// ensures that Archivist isn't torn down before it receives all ArchiveAccessor
-    /// requests.
-    // TODO(fxbug.dev/105308): Remove this hack once component events are ordered.
-    pub archivist_responding_task: fasync::Task<()>,
 }
 
 /// Connect to archivist and starting serving syslog.
@@ -53,23 +47,7 @@ pub(crate) fn serve_syslog(
         }
         _ => None,
     };
-    let archivist_responding_task = fasync::Task::spawn(async move {
-        let (proxy, iterator) =
-            fidl::endpoints::create_proxy().expect("cannot create batch iterator");
-        if let Err(e) =
-            provider.start_streaming(iterator, StreamMode::Snapshot, DataType::Inspect, Some(0))
-        {
-            warn!("Failed to start streaming logs: {:?}", e);
-            return;
-        }
-        // This should always return something immediately, even if there are no logs
-        // due to Snapshot.
-        match proxy.get_next().await {
-            Ok(Ok(_)) => (),
-            other => warn!("Error retrieving logs from archivist: {:?}", other),
-        }
-    });
-    Ok(ServeSyslogOutcome { logs_iterator_task, archivist_responding_task })
+    Ok(ServeSyslogOutcome { logs_iterator_task })
 }
 
 struct IsolatedLogsProvider {
