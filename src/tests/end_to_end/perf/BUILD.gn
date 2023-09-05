@@ -189,9 +189,6 @@ if (is_host) {
         "//src/testing/end_to_end/fuchsia_base_test:fuchsia_base_test",
       ]
 
-      local_config_source =
-          "//src/testing/end_to_end/examples/testbeds/One-FEmu.yaml"
-
       environments = [
         atlas_env,
         nuc_env,

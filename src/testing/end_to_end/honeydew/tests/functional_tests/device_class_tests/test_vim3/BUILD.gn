@@ -13,7 +13,6 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew/tests/functional_tests/device_class_tests/test_fuchsia_device:test_fuchsia_device_lib",
     ]
     params_source = "params.yaml"
-    local_config_source = "../../testbeds/One-Vim3.yaml"
     environments = [ vim3_env ]
   }
 
@@ -24,7 +23,6 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew/tests/functional_tests/device_class_tests/test_fuchsia_device:test_fuchsia_device_lib",
     ]
     params_source = "params.yaml"
-    local_config_source = "../../testbeds/One-Vim3.yaml"
     transport = "fuchsia-controller"
     environments = [ vim3_env ]
   }

@@ -19,7 +19,6 @@ if (is_host) {
     libraries = [ ":fuchsia_device" ]
 
     params_source = "params.yaml"
-    local_config_source = "local_mobly_config.yaml"
 
     # Used for infra Swarming bot allocation.
     environments = [

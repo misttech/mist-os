@@ -1,6 +1,0 @@
-TestBeds:
-  - Name: Testbed-One-GoogleDevice
-    Controllers:
-      FuchsiaDevice:
-        - name: fuchsia-ac67-847a-2e50
-          ssh_private_key: ~/.ssh/fuchsia_ed25519

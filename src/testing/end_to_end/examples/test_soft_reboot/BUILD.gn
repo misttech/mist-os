@@ -14,7 +14,6 @@ if (is_host) {
     ]
 
     params_source = "params.yaml"
-    local_config_source = "../testbeds/One-FEmu.yaml"
 
     environments = [ emu_env ]
   }
@@ -27,7 +26,6 @@ if (is_host) {
     ]
 
     params_source = "params.yaml"
-    local_config_source = "../testbeds/One-FEmu.yaml"
     transport = "fuchsia-controller"
 
     environments = [ emu_env ]

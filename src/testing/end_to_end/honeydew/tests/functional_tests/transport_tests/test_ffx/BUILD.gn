@@ -13,7 +13,6 @@ if (is_host) {
       "//src/testing/end_to_end/fuchsia_base_test:fuchsia_base_test",
     ]
     params_source = "params.yaml"
-    local_config_source = "../../testbeds/One-FEmu.yaml"
     environments = [ emu_env ]
   }
 }

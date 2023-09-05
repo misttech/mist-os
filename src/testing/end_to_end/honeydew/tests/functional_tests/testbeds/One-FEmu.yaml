@@ -1,6 +1,0 @@
-TestBeds:
-  - Name: Testbed-One-FEmu
-    Controllers:
-      FuchsiaDevice:
-        - name: fuchsia-emulator
-          ssh_private_key: ~/.ssh/fuchsia_ed25519

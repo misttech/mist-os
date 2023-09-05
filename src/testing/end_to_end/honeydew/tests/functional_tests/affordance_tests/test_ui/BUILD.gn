@@ -12,7 +12,6 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/fuchsia_base_test:fuchsia_base_test",
     ]
-    local_config_source = "../../testbeds/One-FEmu.yaml"
     environments = [ emu_env ]
   }
 
@@ -22,7 +21,6 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/fuchsia_base_test:fuchsia_base_test",
     ]
-    local_config_source = "../../testbeds/One-FEmu.yaml"
     transport = "fuchsia-controller"
     environments = [ emu_env ]
   }
@@ -33,7 +31,6 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/fuchsia_base_test:fuchsia_base_test",
     ]
-    local_config_source = "../../testbeds/One-FEmu.yaml"
     environments = [ emu_env ]
   }
 
@@ -43,7 +40,6 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/fuchsia_base_test:fuchsia_base_test",
     ]
-    local_config_source = "../../testbeds/One-FEmu.yaml"
     transport = "fuchsia-controller"
     environments = [ emu_env ]
   }
