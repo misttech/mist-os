@@ -20,7 +20,6 @@
 # depends on FUCHSIA_DIR being defined correctly.
 
 _METRICS_GA_PROPERTY_ID="UA-127897021-6"
-_METRICS_TRACK_ALL_ARGS=( "emu" "set" "fidlcat" "run-host-tests" )
 _METRICS_TRACK_RESULTS=( "set" "build" )
 _METRICS_ALLOWS_CUSTOM_REPORTING=( "test" )
 # If args match the below, then track capture group 1
@@ -178,7 +177,7 @@ _METRICS_TRACK_UNKNOWN_OPS=( "shell" )
 # old versions of Bash, particularly in the one in MacOS. The alternative is to
 # make them global first via the assignments above and marking they readonly
 # later.
-readonly _METRICS_GA_PROPERTY_ID _METRICS_TRACK_ALL_ARGS _METRICS_TRACK_RESULTS _METRICS_ALLOWS_CUSTOM_REPORTING _METRICS_TRACK_REGEX _METRICS_TRACK_COMMAND_OPS _METRICS_TRACK_UNKNOWN_OPS
+readonly _METRICS_GA_PROPERTY_ID _METRICS_TRACK_RESULTS _METRICS_ALLOWS_CUSTOM_REPORTING _METRICS_TRACK_REGEX _METRICS_TRACK_COMMAND_OPS _METRICS_TRACK_UNKNOWN_OPS
 
 # To properly enable unit testing, METRICS_CONFIG is not read-only
 METRICS_CONFIG="${FUCHSIA_DIR}/.fx-metrics-config"
@@ -193,11 +192,11 @@ INIT_WARNING+=$'To check what data we collect, run `fx metrics`\n'
 INIT_WARNING+=$'To opt in or out, run `fx metrics <enable|disable>\n'
 
 # Each Analytics batch call can send at most this many hits.
-declare -r BATCH_SIZE=20
+declare -r BATCH_SIZE=25
 # Keep track of how many hits have accumulated.
 hit_count=0
-# Holds curl args for the current batch of hits.
-curl_args=()
+# Holds events for the current batch
+events=()
 
 function __is_in {
   local v="$1"
@@ -336,14 +335,12 @@ function track-subcommand-custom-event {
     return 0
   fi
 
-  analytics_args=(
-    "t=event" \
-    "ec=fx_custom_${subcommand}" \
-    "ea=${event_action}" \
-    "el=${event_label}" \
-    )
-
-  _add-to-analytics-batch "${analytics_args[@]}"
+  event_params=$(fx-command-run jq -c -n \
+    --arg subcommand "${subcommand}" \
+    --arg action "${event_action}" \
+    --arg label "${event_label}" \
+    '$ARGS.named')
+  _add-to-analytics-batch "custom" "${event_params}"
   # Send any remaining hits.
   _send-analytics-batch
   return 0
@@ -376,16 +373,10 @@ function track-command-execution {
     _process-fx-set-command "$@"
   fi
 
-  # Track arguments to the subcommands in $_METRICS_TRACK_ALL_ARGS
-  if __is_in "$subcommand" "${_METRICS_TRACK_ALL_ARGS[@]}"; then
-    # Track all arguments.
+  if __is_in_regex "${subcommand} ${args}" "${_METRICS_TRACK_REGEX[@]}"; then
     # Limit to the first 100 characters of arguments.
-    # The Analytics API supports up to 500 bytes, but it is likely that
-    # anything larger than 100 characters is an invalid execution and/or not
-    # what we want to track.
-    args=${args:0:100}
-  elif __is_in_regex "${subcommand} ${args}" "${_METRICS_TRACK_REGEX[@]}"; then
-    args="${BASH_REMATCH[1]}"
+    # The GA4 API supports up to 100 characters for parameter values
+    args="${BASH_REMATCH[1]:0:100}"
   elif [ -n "${subcommand_op}" ]; then
     if __is_in "${subcommand} ${subcommand_op}" \
         "${_METRICS_TRACK_COMMAND_OPS[@]}"; then
@@ -403,14 +394,12 @@ function track-command-execution {
     args=""
   fi
 
-  analytics_args=(
-    "t=event" \
-    "ec=fx" \
-    "ea=${subcommand}" \
-    "el=${args}" \
-    )
+  event_params=$(fx-command-run jq -c -n \
+    --arg subcommand "${subcommand}" \
+    --arg args "${args}" \
+    '$ARGS.named')
 
-  _add-to-analytics-batch "${analytics_args[@]}"
+  _add-to-analytics-batch "invoke" "${event_params}"
   # Send any remaining hits.
   _send-analytics-batch
   return 0
@@ -449,14 +438,13 @@ function _add-fx-set-hit {
   # Packages argument can be a comma-separated list.
   IFS=',' read -ra packages_parts <<< "$packages"
   for p in "${packages_parts[@]}"; do
-    analytics_args=(
-      "t=event" \
-      "ec=${category}" \
-      "ea=${p}" \
-      "el=${target}" \
-      )
+    event_params=$(fx-command-run jq -c -n \
+      --arg with_type "${category}" \
+      --arg package_name "${p}" \
+      --arg target "${target}" \
+      '$ARGS.named')
 
-    _add-to-analytics-batch "${analytics_args[@]}"
+    _add-to-analytics-batch "set" "${event_params}"
   done
 }
 
@@ -489,29 +477,25 @@ function track-command-finished {
   fi
 
   if [[ $exit_status == 0 ]]; then
-    # Successes are logged as timing hits
-    hit_type="timing"
-    analytics_args=(
-      "t=timing" \
-      "utc=fx" \
-      "utv=${subcommand}" \
-      "utt=${timing}" \
-      "utl=${args}" \
-      )
+    # Successes are logged as finish events
+    event_params=$(fx-command-run jq -c -n \
+      --arg subcommand "${subcommand}" \
+      --arg args "${args}" \
+      --argjson timing ${timing} \
+      '$ARGS.named')
+
+    _add-to-analytics-batch "finish" "${event_params}"
   else
-    # Failures are logged as event hits with a separate category
-    # exit status is stored as Custom Dimension 1
-    hit_type="event"
-    analytics_args=(
-      "t=event" \
-      "ec=fx_exception" \
-      "ea=${subcommand}" \
-      "el=${args}" \
-      "cd1=${exit_status}" \
-      )
+    # Failures are logged as fail events
+    event_params=$(fx-command-run jq -c -n \
+      --arg subcommand "${subcommand}" \
+      --arg args "${args}" \
+      --arg exit_status "${exit_status}" \
+      '$ARGS.named')
+
+    _add-to-analytics-batch "fail" "${event_params}"
   fi
 
-  _add-to-analytics-batch "${analytics_args[@]}"
   # Send any remaining hits.
   _send-analytics-batch
   return 0
@@ -527,31 +511,26 @@ function _add-to-analytics-batch {
     return 0
   fi
 
-  if (( hit_count > 0 )); then
-    # Each hit in a batch must be on its own line. The below will append a newline
-    # without url-encoding it. Note that this does add a '&' to the end of each hit,
-    # but those are ignored by Google Analytics.
-    curl_args+=(--data-binary)
-    curl_args+=($'\n')
+  event_name=$1
+  shift
+
+  timestamp_micros=$("${PREBUILT_PYTHON3}" \
+    -c 'import time; print(int(time.time() * 1000000))')
+  if [[ $# -eq 0 ]]; then
+    event=$(fx-command-run jq -c -n \
+      --arg name "${event_name}" \
+      --argjson timestamp_micros "${timestamp_micros}" \
+      '$ARGS.named')
+  else
+    event=$(fx-command-run jq -c -n \
+      --arg name "${event_name}" \
+      --argjson params "$*" \
+      --argjson timestamp_micros "${timestamp_micros}" \
+      '$ARGS.named')
   fi
+  events+=("$event")
 
-  # All hits send some common parameters
-  local app_name="$(_app_name)"
-  local app_version="$(_app_version)"
-  params=(
-    "v=1" \
-    "tid=${_METRICS_GA_PROPERTY_ID}" \
-    "cid=${METRICS_UUID}" \
-    "an=${app_name}" \
-    "av=${app_version}" \
-    "$@" \
-    )
-  for p in "${params[@]}"; do
-    curl_args+=(--data-urlencode)
-    curl_args+=("$p")
-  done
-
-  : $(( hit_count += 1 ))
+  (( hit_count += 1 ))
   if ((hit_count == BATCH_SIZE)); then
     _send-analytics-batch
   fi
@@ -564,34 +543,41 @@ function _send-analytics-batch {
     return 0
   fi
 
-  local user_agent="Fuchsia-fx $(_os_data)"
-  local url_path="/batch"
+  # Construct the measuremnt data
+  local user_properties="{\"os\":{\"value\":\"$(uname -s)\"},\
+  \"arch\":{\"value\":\"$(uname -m)\"},\
+  \"shell\":{\"value\":\"$(_app_name)\"},\
+  \"shell_version\":{\"value\":\"$(_app_version)\"},\
+  \"kernel_release\":{\"value\":\"$(uname -rs)\"}\
+  }"
+  local events_json=$(fx-command-run jq -n -c '$ARGS.positional' \
+    --jsonargs "${events[@]}")
+  local measurement=$(fx-command-run jq -n -c \
+    --arg client_id "${METRICS_UUID}" \
+    --argjson events "${events_json}" \
+    --argjson user_properties "${user_properties}" \
+    '$ARGS.named')
+
+  local url_path="mp/collect"
+  local url_parameters=$(printf "\x61\x70\x69\x5f\x73\x65\x63\x72\x65\x74=xjiXbh8eSGiExMthvAXd6w&measurement_id=G-L2YHSDD8ZF")
   local result=""
   if [[ $_METRICS_DEBUG == 1 && $_METRICS_USE_VALIDATION_SERVER == 1 ]]; then
-    url_path="/debug/collect"
-    # Validation server does not accept batches. Send just the first hit instead.
-    local limit=0
-    for i in "${curl_args[@]}"; do
-      if [[ "$i" == "--data-binary" ]]; then
-        curl_args=("${curl_args[@]:0:$limit}")
-        break
-      fi
-      : $(( limit += 1 ))
-    done
+    url_path="debug/mp/collect"
   fi
   if [[ $_METRICS_DEBUG == 1 && $_METRICS_USE_VALIDATION_SERVER == 0 ]]; then
     # if testing and not using the validation server, always return 202
     result="202"
   elif [[ $_METRICS_DEBUG == 0 || $_METRICS_USE_VALIDATION_SERVER == 1 ]]; then
-    result=$(curl -s -o /dev/null -w "%{http_code}" "${curl_args[@]}" \
-      -H "User-Agent: $user_agent" \
-      "https://www.google-analytics.com/${url_path}")
+    result=$(curl -s -o /dev/null -w "%{http_code}" -L -X POST \
+      -H "Content-Type: application/json" \
+      --data-raw "${measurement}" \
+      "https://www.google-analytics.com/${url_path}?${url_parameters}")
   fi
-  metrics-maybe-log "${curl_args[@]}" "RESULT=${result}"
+  metrics-maybe-log "${measurement}" "RESULT=${result}"
 
   # Clear batch.
   hit_count=0
-  curl_args=()
+  events=()
 }
 
 function _os_data {
