@@ -83,6 +83,9 @@ pub fn setup_fake_archive_accessor(expected_data: Vec<FakeAccessorData>) -> Arch
                     }
                     assert!(false, "{:?} did not match any expected parameters", parameters);
                 }
+                ArchiveAccessorRequest::_UnknownMethod { .. } => {
+                    unreachable!("We don't expect any other call");
+                }
             }
         }
     })

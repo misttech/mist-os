@@ -223,6 +223,7 @@ group("sdk_partner_libs") {
 _sdk_partner_internal_fidl_libraries = [
   "fuchsia.audio.controller",
   "fuchsia.debugdata",
+  "fuchsia.diagnostics.host",
   "fuchsia.fs",
   "fuchsia.hardware.pty",
   "fuchsia.net.name",
