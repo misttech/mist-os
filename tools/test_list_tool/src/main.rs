@@ -5,7 +5,7 @@
 //! test_list_tool generates test-list.json.
 
 use {
-    anyhow::{format_err, Error},
+    anyhow::{format_err, Context, Error},
     camino::{Utf8Path, Utf8PathBuf},
     fidl::unpersist,
     fidl_fuchsia_component_decl::Component,
@@ -331,7 +331,11 @@ fn write_depfile(
     }
     let contents =
         format!("{}: {}\n", output, &inputs.iter().map(|i| format!(" {}", i)).collect::<String>(),);
-    fs::write(depfile, contents)?;
+    if let Some(depfile_dir) = depfile.parent() {
+        std::fs::create_dir_all(depfile_dir)
+            .with_context(|| format!("Creating directory for depfile: {}", depfile))?;
+    }
+    fs::write(depfile, contents).with_context(|| format!("Writing depfile to: {}", depfile))?;
     Ok(())
 }
 
