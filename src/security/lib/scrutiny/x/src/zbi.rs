@@ -3,11 +3,13 @@
 // found in the LICENSE file.
 
 use super::api;
-use super::blob::UnverifiedMemoryBlob;
+use super::api::Blob as _;
+use super::blob::BlobOpenError;
+use super::blob::BlobSet;
+use super::blob::VerifiedMemoryBlob;
 use super::data_source as ds;
-use super::hash::Hash;
 use derivative::Derivative;
-use fuchsia_merkle::MerkleTree;
+use once_cell::sync::OnceCell;
 use scrutiny_utils::bootfs::BootfsReader;
 use scrutiny_utils::zbi::ZbiReader;
 use scrutiny_utils::zbi::ZbiType;
@@ -65,18 +67,16 @@ impl Zbi {
         }
         let bootfs_reader = Rc::new(RefCell::new(BootfsReader::new(bootfs_section.buffer.clone())));
 
-        Ok(Self(Rc::new(ZbiData { data_source: Box::new(data_source), bootfs_reader })))
+        Ok(Self(Rc::new(ZbiData {
+            data_source: Box::new(data_source),
+            bootfs_reader,
+            bootfs: OnceCell::new(),
+        })))
     }
-}
 
-impl api::Zbi for Zbi {
-    fn bootfs(
-        &self,
-    ) -> Result<Box<dyn Iterator<Item = (Box<dyn api::Path>, Box<dyn api::Blob>)>>, api::ZbiError>
-    {
+    fn init_bootfs(&self) -> Result<Bootfs, api::ZbiError> {
         let mut bootfs_reader = self.0.bootfs_reader.borrow_mut();
-
-        let mut bootfs_files = HashMap::new();
+        let mut bootfs_files = vec![];
         for (path_string, bytes) in bootfs_reader
             .parse()
             .map_err(|error| api::ZbiError::ParseBootfs {
@@ -86,21 +86,21 @@ impl api::Zbi for Zbi {
             .into_iter()
         {
             let path: Box<dyn api::Path> = Box::new(path_string);
-            let hash: Hash = MerkleTree::from_reader(bytes.as_slice())
-                .map_err(|error| api::ZbiError::Hash { bootfs_path: path.clone(), error })?
-                .root()
-                .into();
-            bootfs_files.insert(path, (hash, bytes));
+            let blob = VerifiedMemoryBlob::new([self.0.data_source.clone()].into_iter(), bytes)
+                .map_err(|error| api::ZbiError::Hash { bootfs_path: path.clone(), error })?;
+            bootfs_files.push((path, blob));
         }
 
-        let data_source = self.0.data_source.clone();
+        Ok(Bootfs::new(self.0.data_source.clone(), bootfs_files))
+    }
+}
 
-        Ok(Box::new(bootfs_files.into_iter().map(move |(path, (hash, bytes))| {
-            let hash: Box<dyn api::Hash> = Box::new(hash);
-            let blob: Box<dyn api::Blob> =
-                Box::new(UnverifiedMemoryBlob::new([data_source.clone()].into_iter(), hash, bytes));
-            (path, blob)
-        })))
+impl api::Zbi for Zbi {
+    fn bootfs(
+        &self,
+    ) -> Result<Box<dyn Iterator<Item = (Box<dyn api::Path>, Box<dyn api::Blob>)>>, api::ZbiError>
+    {
+        self.0.bootfs.get_or_try_init(|| self.init_bootfs()).map(Bootfs::iter_by_path)
     }
 }
 
@@ -110,4 +110,249 @@ struct ZbiData {
     data_source: Box<dyn api::DataSource>,
     #[derivative(Debug = "ignore")]
     bootfs_reader: Rc<RefCell<BootfsReader>>,
+    #[derivative(Debug = "ignore")]
+    bootfs: OnceCell<Bootfs>,
+}
+
+#[derive(Clone)]
+struct Bootfs {
+    data_source: Box<dyn api::DataSource>,
+    blobs_by_path: HashMap<Box<dyn api::Path>, VerifiedMemoryBlob>,
+    blobs_by_hash: HashMap<Box<dyn api::Hash>, VerifiedMemoryBlob>,
+}
+
+impl Bootfs {
+    fn new<BlobsByPath: Clone + IntoIterator<Item = (Box<dyn api::Path>, VerifiedMemoryBlob)>>(
+        data_source: Box<dyn api::DataSource>,
+        blobs_by_path: BlobsByPath,
+    ) -> Self {
+        let blobs_by_hash = blobs_by_path
+            .clone()
+            .into_iter()
+            .map(|(_path, blob)| (blob.hash(), blob))
+            .collect::<HashMap<_, _>>();
+        let blobs_by_path = blobs_by_path.into_iter().collect::<HashMap<_, _>>();
+        Self { data_source, blobs_by_path, blobs_by_hash }
+    }
+
+    fn iter_by_path(&self) -> Box<dyn Iterator<Item = (Box<dyn api::Path>, Box<dyn api::Blob>)>> {
+        Box::new(self.blobs_by_path.clone().into_iter().map(|(path, verified_memory_blob)| {
+            let blob: Box<dyn api::Blob> = Box::new(verified_memory_blob);
+            (path, blob)
+        }))
+    }
+}
+
+impl BlobSet for Bootfs {
+    fn iter(&self) -> Box<dyn Iterator<Item = Box<dyn api::Blob>>> {
+        Box::new(self.blobs_by_hash.clone().into_iter().map(|(_path, verified_memory_blob)| {
+            let blob: Box<dyn api::Blob> = Box::new(verified_memory_blob);
+            blob
+        }))
+    }
+
+    fn blob(&self, hash: Box<dyn api::Hash>) -> Result<Box<dyn api::Blob>, BlobOpenError> {
+        self.blobs_by_hash
+            .get(&hash)
+            .ok_or_else(|| BlobOpenError::BlobNotFound { hash, directory: None })
+            .map(|verified_memory_blob_ref| {
+                let blob: Box<dyn api::Blob> = Box::new(verified_memory_blob_ref.clone());
+                blob
+            })
+    }
+
+    fn data_sources(&self) -> Box<dyn Iterator<Item = Box<dyn api::DataSource>>> {
+        Box::new([self.data_source.clone()].into_iter())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::api;
+    use super::super::blob::BlobSet as _;
+    use super::super::blob::VerifiedMemoryBlob;
+    use super::super::data_source as ds;
+    use super::Bootfs;
+    use std::collections::HashMap;
+    use std::io::Read as _;
+
+    #[fuchsia::test]
+    fn bootfs_iter_by_paths() {
+        let data_source: Box<dyn api::DataSource> =
+            Box::new(ds::DataSource::new(ds::DataSourceInfo::new(
+                api::DataSourceKind::Unknown,
+                None,
+                api::DataSourceVersion::Unknown,
+            )));
+        let path_1: Box<dyn api::Path> = Box::new("path_1");
+        let path_2: Box<dyn api::Path> = Box::new("path_2");
+        let blob_1 =
+            VerifiedMemoryBlob::new([data_source.clone()].into_iter(), "blob_1".as_bytes().into())
+                .expect("blob");
+        let blob_2 =
+            VerifiedMemoryBlob::new([data_source.clone()].into_iter(), "blob_2".as_bytes().into())
+                .expect("blob");
+        let blobs = [(path_1.clone(), blob_1.clone()), (path_2.clone(), blob_2.clone())];
+        let bootfs = Bootfs::new(data_source, blobs.clone().into_iter());
+        let mut expected = blobs
+            .into_iter()
+            .map(|(path, verified_memory_blob)| {
+                let blob: Box<dyn api::Blob> = Box::new(verified_memory_blob);
+                (path, blob)
+            })
+            .collect::<HashMap<_, _>>();
+        let actual = bootfs.iter_by_path().collect::<Vec<(_, _)>>();
+        for (path, blob) in actual {
+            let expected_blob = expected.get(&path).expect("actual blob in expectation set");
+            assert_eq!(expected_blob.hash().as_ref(), blob.hash().as_ref());
+            let mut expected_bytes = vec![];
+            expected_blob
+                .reader_seeker()
+                .expect("expected blob reader/seeker")
+                .read_to_end(&mut expected_bytes)
+                .expect("read expected blob");
+            let mut actual_bytes = vec![];
+            blob.reader_seeker()
+                .expect("actual blob reader/seeker")
+                .read_to_end(&mut actual_bytes)
+                .expect("read actual blob");
+            assert_eq!(expected_bytes, actual_bytes);
+            expected.remove(&path);
+        }
+        assert_eq!(0, expected.len());
+    }
+
+    #[fuchsia::test]
+    fn bootfs_blob_set_api() {
+        let data_source: Box<dyn api::DataSource> =
+            Box::new(ds::DataSource::new(ds::DataSourceInfo::new(
+                api::DataSourceKind::Unknown,
+                None,
+                api::DataSourceVersion::Unknown,
+            )));
+        let path_1: Box<dyn api::Path> = Box::new("path_1");
+        let path_2: Box<dyn api::Path> = Box::new("path_2");
+        let blob_1 =
+            VerifiedMemoryBlob::new([data_source.clone()].into_iter(), "blob_1".as_bytes().into())
+                .expect("blob");
+        let blob_2 =
+            VerifiedMemoryBlob::new([data_source.clone()].into_iter(), "blob_2".as_bytes().into())
+                .expect("blob");
+        let blobs = [(path_1.clone(), blob_1.clone()), (path_2.clone(), blob_2.clone())];
+        let bootfs = Bootfs::new(data_source, blobs.clone().into_iter());
+        let mut expected = blobs
+            .into_iter()
+            .map(|(_path, verified_memory_blob)| {
+                let blob: Box<dyn api::Blob> = Box::new(verified_memory_blob);
+                (blob.hash(), blob)
+            })
+            .collect::<HashMap<_, _>>();
+        let actual = bootfs.iter().collect::<Vec<_>>();
+        for blob in actual {
+            let hash = blob.hash();
+            let expected_blob = expected.get(&hash).expect("actual blob in expectation set");
+            let mut expected_bytes = vec![];
+            expected_blob
+                .reader_seeker()
+                .expect("expected blob reader/seeker")
+                .read_to_end(&mut expected_bytes)
+                .expect("read expected blob");
+            let mut actual_bytes = vec![];
+            blob.reader_seeker()
+                .expect("actual blob reader/seeker")
+                .read_to_end(&mut actual_bytes)
+                .expect("read actual blob");
+            assert_eq!(expected_bytes, actual_bytes);
+            expected.remove(&hash);
+        }
+        assert_eq!(0, expected.len());
+    }
+
+    #[fuchsia::test]
+    fn bootfs_different_iterators() {
+        let data_source: Box<dyn api::DataSource> =
+            Box::new(ds::DataSource::new(ds::DataSourceInfo::new(
+                api::DataSourceKind::Unknown,
+                None,
+                api::DataSourceVersion::Unknown,
+            )));
+        let blob_1_path_1: Box<dyn api::Path> = Box::new("blob_1_path_1");
+        let blob_1_path_2: Box<dyn api::Path> = Box::new("blob_1_path_2");
+        let blob_2_path: Box<dyn api::Path> = Box::new("blob_2_path");
+        let blob_1 =
+            VerifiedMemoryBlob::new([data_source.clone()].into_iter(), "blob_1".as_bytes().into())
+                .expect("blob");
+        let blob_2 =
+            VerifiedMemoryBlob::new([data_source.clone()].into_iter(), "blob_2".as_bytes().into())
+                .expect("blob");
+        let blobs = [
+            (blob_1_path_1.clone(), blob_1.clone()),
+            (blob_1_path_2.clone(), blob_1.clone()),
+            (blob_2_path.clone(), blob_2.clone()),
+        ];
+        let bootfs = Bootfs::new(data_source, blobs.clone().into_iter());
+
+        // Iterate-by-path should contain all 3 entries.
+        let mut expected_by_path = blobs
+            .clone()
+            .into_iter()
+            .map(|(path, verified_memory_blob)| {
+                let blob: Box<dyn api::Blob> = Box::new(verified_memory_blob);
+                (path, blob)
+            })
+            .collect::<HashMap<_, _>>();
+        assert_eq!(3, expected_by_path.len());
+        let actual_by_path = bootfs.iter_by_path().collect::<Vec<(_, _)>>();
+        for (path, blob) in actual_by_path {
+            let expected_blob =
+                expected_by_path.get(&path).expect("actual blob in expectation set");
+            assert_eq!(expected_blob.hash().as_ref(), blob.hash().as_ref());
+            let mut expected_bytes = vec![];
+            expected_blob
+                .reader_seeker()
+                .expect("expected blob reader/seeker")
+                .read_to_end(&mut expected_bytes)
+                .expect("read expected blob");
+            let mut actual_bytes = vec![];
+            blob.reader_seeker()
+                .expect("actual blob reader/seeker")
+                .read_to_end(&mut actual_bytes)
+                .expect("read actual blob");
+            assert_eq!(expected_bytes, actual_bytes);
+            expected_by_path.remove(&path);
+        }
+        assert_eq!(0, expected_by_path.len());
+
+        // Iterate-by-hash should contain all 2 entries; two identical blobs at different paths get
+        // deduplicated.
+        let mut expected_by_hash = blobs
+            .into_iter()
+            .map(|(_path, verified_memory_blob)| {
+                let blob: Box<dyn api::Blob> = Box::new(verified_memory_blob);
+                (blob.hash(), blob)
+            })
+            // Will add `blob_1` twice, but dedup by `blob.hash()`.
+            .collect::<HashMap<_, _>>();
+        assert_eq!(2, expected_by_hash.len());
+        let actual = bootfs.iter().collect::<Vec<_>>();
+        for blob in actual {
+            let hash = blob.hash();
+            let expected_blob =
+                expected_by_hash.get(&hash).expect("actual blob in expectation set");
+            let mut expected_bytes = vec![];
+            expected_blob
+                .reader_seeker()
+                .expect("expected blob reader/seeker")
+                .read_to_end(&mut expected_bytes)
+                .expect("read expected blob");
+            let mut actual_bytes = vec![];
+            blob.reader_seeker()
+                .expect("actual blob reader/seeker")
+                .read_to_end(&mut actual_bytes)
+                .expect("read actual blob");
+            assert_eq!(expected_bytes, actual_bytes);
+            expected_by_hash.remove(&hash);
+        }
+        assert_eq!(0, expected_by_hash.len());
+    }
 }

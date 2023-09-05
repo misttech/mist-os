@@ -357,7 +357,7 @@ mod tests {
     use super::super::blob::test::VerifiedMemoryBlobSet;
     use super::super::blob::BlobOpenError;
     use super::super::blob::BlobSet as _;
-    use super::super::blob::UnverifiedMemoryBlob;
+    use super::super::blob::VerifiedMemoryBlob;
     use super::super::data_source as ds;
     use super::super::hash::Hash;
     use super::Error;
@@ -536,11 +536,8 @@ mod tests {
     #[fuchsia::test]
     fn bad_far() {
         let bad_far_contents = vec![];
-        let bad_far_blob = UnverifiedMemoryBlob::new(
-            [].into_iter(),
-            Box::new(Hash::from_contents(bad_far_contents.as_slice())),
-            bad_far_contents.clone(),
-        );
+        let bad_far_blob = VerifiedMemoryBlob::new([].into_iter(), bad_far_contents.clone())
+            .expect("bad far blob");
         match Package::new(
             None,
             api::PackageResolverUrl::Url,
@@ -571,11 +568,8 @@ mod tests {
         };
         let mut far_bytes = vec![];
         fuchsia_archive::write(&mut far_bytes, far_map).unwrap();
-        let far_blob = UnverifiedMemoryBlob::new(
-            [].into_iter(),
-            Box::new(Hash::from_contents(far_bytes.as_slice())),
-            far_bytes.clone(),
-        );
+        let far_blob =
+            VerifiedMemoryBlob::new([].into_iter(), far_bytes.clone()).expect("far blob");
 
         // Use empty blob set.
         let blob_set = VerifiedMemoryBlobSet::new(iter::empty(), iter::empty::<&[u8]>());
@@ -612,11 +606,8 @@ mod tests {
         };
         let mut far_bytes = vec![];
         fuchsia_archive::write(&mut far_bytes, far_map).unwrap();
-        let far_blob = UnverifiedMemoryBlob::new(
-            [].into_iter(),
-            Box::new(Hash::from_contents(far_bytes.as_slice())),
-            far_bytes.clone(),
-        );
+        let far_blob =
+            VerifiedMemoryBlob::new([].into_iter(), far_bytes.clone()).expect("far blob");
 
         // Use empty blob set.
         let blob_set = VerifiedMemoryBlobSet::new(iter::empty(), iter::empty::<&[u8]>());
@@ -678,11 +669,8 @@ mod tests {
         // Use empty blob set: Lookup of content blob will fail.
         let blob_set = VerifiedMemoryBlobSet::new(iter::empty(), iter::empty::<&[u8]>());
 
-        let far_blob = UnverifiedMemoryBlob::new(
-            [].into_iter(),
-            Box::new(Hash::from_contents(far_bytes.as_slice())),
-            far_bytes.clone(),
-        );
+        let far_blob =
+            VerifiedMemoryBlob::new([].into_iter(), far_bytes.clone()).expect("far blob");
 
         // Attempt to construct package. This will construct content blobs that store their metadata
         // such as their data source. Locating the content blob that is missing from `blob_set`
