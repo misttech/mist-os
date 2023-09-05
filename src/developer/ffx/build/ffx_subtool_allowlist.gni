@@ -8,7 +8,6 @@
 ffx_subtool_fidl_allowlist = [
   # ffx audio
   "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device",
-  "//sdk/fidl/fuchsia.audio.ffxdaemon:fuchsia.audio.ffxdaemon",
   "//sdk/fidl/fuchsia.audio:fuchsia.audio",
 
   # Used by RemoteControl
