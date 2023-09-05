@@ -10,6 +10,71 @@ use assembly_manifest::{AssemblyManifest, Image};
 use camino::Utf8PathBuf;
 use sdk_metadata::ProductBundle;
 
+const FLASH_SCRIPT_TEMPLATE: &str = r#"#!/bin/sh
+DIR="$(dirname "$0")"
+set -e
+
+ZIRCON_IMAGE=zircon-a.signed.zbi.signed
+ZIRCON_VBMETA=zircon-a.vbmeta
+RECOVERY_IMAGE=zircon-r.zbi
+RECOVERY_VBMETA=zircon-r.vbmeta
+RECOVERY=
+SSH_KEY=
+
+for i in "$@"
+do
+case $i in
+    --recovery)
+    RECOVERY=true
+    ZIRCON_IMAGE=zircon-r.zbi
+    ZIRCON_VBMETA=zircon-r.vbmeta
+    shift
+    ;;
+    --ssh-key=*)
+    SSH_KEY="${i#*=}"
+    shift
+    ;;
+    *)
+    break
+    ;;
+esac
+done
+
+FASTBOOT_ARGS="$@"
+PRODUCT="%PRODUCT_NAME_STRING%"
+actual=$("$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} getvar product 2>&1 | head -n1 | cut -d' ' -f2-)
+if [[ "${actual}" != "${PRODUCT}" ]]; then
+  echo >&2 "Expected device ${PRODUCT} but found ${actual}"
+  exit 1
+fi
+
+BOOTLOADER_STR
+"$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} reboot bootloader
+echo 'Sleeping for 5 seconds for the device to de-enumerate.'
+sleep 5
+
+"$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} flash zircon_a "${DIR}/${ZIRCON_IMAGE}"
+"$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} flash zircon_b "${DIR}/${ZIRCON_IMAGE}"
+"$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} flash zircon_r "${DIR}/${RECOVERY_IMAGE}"
+"$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} flash vbmeta_a "${DIR}/${ZIRCON_VBMETA}"
+"$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} flash vbmeta_b "${DIR}/${ZIRCON_VBMETA}"
+"$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} flash vbmeta_r "${DIR}/${RECOVERY_VBMETA}"
+"$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} set_active a
+
+if [[ -z "${RECOVERY}" ]]; then
+  "$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} flash fvm "${DIR}/fvm.fastboot.blk"
+fi
+if [[ ! -z "${SSH_KEY}" ]]; then
+  "$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} stage "${SSH_KEY}"
+  "$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} oem add-staged-bootloader-file ssh.authorized_keys
+fi
+
+"$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} continue
+"#;
+
+const BOOTLOADER_STR: &str = r#""$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} flash TYPE "${DIR}/BOOTLOADER_NAME"
+"#;
+
 /// Generate a build archive using the specified `args`.
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "generate-build-archive")]
@@ -17,6 +82,11 @@ pub struct GenerateBuildArchive {
     /// path to a product bundle.
     #[argh(option)]
     product_bundle: Utf8PathBuf,
+
+    /// path to a fastboot binary. When set, a flash script using this fastboot
+    /// binary is generated at the root of the build archive.
+    #[argh(option)]
+    fastboot: Option<Utf8PathBuf>,
 
     /// path to the directory to write a build archive into.
     #[argh(option)]
@@ -45,6 +115,8 @@ impl GenerateBuildArchive {
         // Collect the Images with the final destinations to add to an images manifest later.
         let mut images = vec![];
 
+        let mut bootloader_string = "".to_owned();
+
         let copy_artifact = |path: &Utf8PathBuf, name: &str| -> Result<()> {
             // Copy the image to the out_dir.
             let destination = self.out_dir.join(name);
@@ -69,6 +141,12 @@ impl GenerateBuildArchive {
             } else {
                 format!("{}_{}.img", "firmware", part.partition_type)
             };
+            let bootloader_type = match name.as_str() {
+                "firmware.img" | "firmware_tpl.img" => "tpl",
+                _ => "bootloader",
+            };
+            let bootloader_str = BOOTLOADER_STR.replace("TYPE", bootloader_type);
+            bootloader_string.push_str(&bootloader_str.replace("BOOTLOADER_NAME", &name));
             copy_artifact(&part.image, &name)?;
         }
         for cred in &mut product_bundle.partitions.unlock_credentials {
@@ -117,6 +195,17 @@ impl GenerateBuildArchive {
         let images_manifest = AssemblyManifest { images };
         let images_manifest_path = self.out_dir.join("images.json");
         images_manifest.write(images_manifest_path).context("Writing images manifest")?;
+
+        if let Some(path) = self.fastboot {
+            copy_artifact(&path, "fastboot.exe.linux-x64")?;
+
+            // Create flash.sh file
+            let flash_script_content =
+                FLASH_SCRIPT_TEMPLATE.replace("BOOTLOADER_STR", &bootloader_string.trim());
+            let flash_script_path = self.out_dir.join("flash.sh");
+            std::fs::write(flash_script_path, flash_script_content)
+                .context("Failed to write flash.sh")?;
+        }
 
         Ok(())
     }
@@ -213,6 +302,7 @@ mod tests {
         create_temp_file("kernel");
         create_temp_file("zedboot.zbi");
         create_temp_file("zedboot.vbmeta");
+        create_temp_file("fastboot");
 
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "".to_string(),
@@ -240,8 +330,11 @@ mod tests {
         pb.write(&pb_path).unwrap();
 
         let ba_path = tempdir.join("build_archive");
-        let cmd =
-            GenerateBuildArchive { product_bundle: pb_path.clone(), out_dir: ba_path.clone() };
+        let cmd = GenerateBuildArchive {
+            product_bundle: pb_path.clone(),
+            out_dir: ba_path.clone(),
+            fastboot: Some(tempdir.join("fastboot")),
+        };
         cmd.generate().unwrap();
 
         assert!(ba_path.join("unlock_creds.zip").exists());
@@ -255,6 +348,7 @@ mod tests {
         assert!(ba_path.join("qemu-kernel.kernel").exists());
         assert!(ba_path.join("zircon-r.zbi").exists());
         assert!(ba_path.join("zircon-r.vbmeta").exists());
+        assert!(ba_path.join("flash.sh").exists());
 
         let images_manifest_file = File::open(ba_path.join("images.json")).unwrap();
         let images_manifest: Value = serde_json::from_reader(images_manifest_file).unwrap();
@@ -294,5 +388,70 @@ mod tests {
             )
             .unwrap()
         );
+
+        let expected_flash_content = r#"#!/bin/sh
+DIR="$(dirname "$0")"
+set -e
+
+ZIRCON_IMAGE=zircon-a.signed.zbi.signed
+ZIRCON_VBMETA=zircon-a.vbmeta
+RECOVERY_IMAGE=zircon-r.zbi
+RECOVERY_VBMETA=zircon-r.vbmeta
+RECOVERY=
+SSH_KEY=
+
+for i in "$@"
+do
+case $i in
+    --recovery)
+    RECOVERY=true
+    ZIRCON_IMAGE=zircon-r.zbi
+    ZIRCON_VBMETA=zircon-r.vbmeta
+    shift
+    ;;
+    --ssh-key=*)
+    SSH_KEY="${i#*=}"
+    shift
+    ;;
+    *)
+    break
+    ;;
+esac
+done
+
+FASTBOOT_ARGS="$@"
+PRODUCT="%PRODUCT_NAME_STRING%"
+actual=$("$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} getvar product 2>&1 | head -n1 | cut -d' ' -f2-)
+if [[ "${actual}" != "${PRODUCT}" ]]; then
+  echo >&2 "Expected device ${PRODUCT} but found ${actual}"
+  exit 1
+fi
+
+"$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} flash bootloader "${DIR}/firmware_skip_metadata.img"
+"$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} reboot bootloader
+echo 'Sleeping for 5 seconds for the device to de-enumerate.'
+sleep 5
+
+"$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} flash zircon_a "${DIR}/${ZIRCON_IMAGE}"
+"$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} flash zircon_b "${DIR}/${ZIRCON_IMAGE}"
+"$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} flash zircon_r "${DIR}/${RECOVERY_IMAGE}"
+"$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} flash vbmeta_a "${DIR}/${ZIRCON_VBMETA}"
+"$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} flash vbmeta_b "${DIR}/${ZIRCON_VBMETA}"
+"$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} flash vbmeta_r "${DIR}/${RECOVERY_VBMETA}"
+"$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} set_active a
+
+if [[ -z "${RECOVERY}" ]]; then
+  "$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} flash fvm "${DIR}/fvm.fastboot.blk"
+fi
+if [[ ! -z "${SSH_KEY}" ]]; then
+  "$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} stage "${SSH_KEY}"
+  "$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} oem add-staged-bootloader-file ssh.authorized_keys
+fi
+
+"$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} continue
+"#;
+
+        let flash_content = std::fs::read_to_string(ba_path.join("flash.sh")).unwrap();
+        assert_eq!(expected_flash_content, flash_content);
     }
 }
