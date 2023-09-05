@@ -21,6 +21,7 @@ ffx_plugin("ffx_repository") {
     "packages:ffx_repository_packages",
     "publish:ffx_repository_publish",
     "remove:ffx_repository_remove",
+    "serve:ffx_repository_serve",
     "server:ffx_repository_server",
   ]
 
