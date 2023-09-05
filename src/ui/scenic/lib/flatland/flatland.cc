@@ -18,6 +18,7 @@
 #include <utility>
 #include <vector>
 
+#include "src/lib/fostr/fidl/fuchsia.math/amendments.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/ui/scenic/lib/allocation/id.h"
 #include "src/ui/scenic/lib/flatland/flatland_types.h"
@@ -48,6 +49,13 @@ using fuchsia::ui::views::ViewCreationToken;
 using fuchsia::ui::views::ViewportCreationToken;
 
 namespace {
+
+// Handle floating point errors up to an epsilon for sample region calls.
+void ClampIfNear(float* val, float difference) {
+  if (difference > 0.f && difference < 1e-3f) {
+    *val -= difference;
+  }
+}
 
 std::optional<std::string> ValidateViewportProperties(const ViewportProperties& properties) {
   if (properties.has_logical_size()) {
@@ -1098,10 +1106,19 @@ void Flatland::SetImageSampleRegion(ContentId image_id, RectF rect) {
     const auto& metadata = image_kv->second;
     const auto image_width = static_cast<float>(metadata.width);
     const auto image_height = static_cast<float>(metadata.height);
-    if (rect.x < 0.f || rect.x > image_width || rect.width < 0.f ||
-        (rect.x + rect.width) > image_width || rect.y < 0.f || rect.y > image_height ||
+    // This clamping is required in cases where (x+width>image_width) or (y+height>image_height) by
+    // a small epsilon. The downstream code expects these numbers to be within the (image_width,
+    // image_height) limits, so we only clamp the positive differences. The root cause is the
+    // precision errors in floating point arithmetic when a client tries to calculate floats within
+    // pixel space.
+    // TODO(fxbug.dev/132486): Remove floating point precision error checks and use uints instead.
+    ClampIfNear(&rect.width, rect.x + rect.width - image_width);
+    ClampIfNear(&rect.height, rect.y + rect.height - image_height);
+    if (rect.x < 0.f || rect.width < 0.f || (rect.x + rect.width) > image_width || rect.y < 0.f ||
         rect.height < 0.f || (rect.y + rect.height) > image_height) {
-      error_reporter_->ERROR() << "SetImageSampleRegion rect out of bounds for image.";
+      error_reporter_->ERROR() << "SetImageSampleRegion rect " << rect
+                               << " out of bounds for image (" << image_width << ", "
+                               << image_height << ")";
       ReportBadOperationError();
       return;
     }

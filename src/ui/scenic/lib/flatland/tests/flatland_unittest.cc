@@ -21,6 +21,7 @@
 #include "fuchsia/ui/composition/cpp/fidl.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
+#include "src/ui/lib/escher/util/epsilon_compare.h"
 #include "src/ui/scenic/lib/allocation/allocator.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
@@ -4067,20 +4068,20 @@ TEST_F(FlatlandTest, SetImageSampleRegionTestCases) {
   std::shared_ptr<Allocator> allocator = CreateAllocator();
   const TransformId kTransformId = {1};
   const ContentId kId = {3};
-  const uint32_t kImageWidth = 300;
-  const uint32_t kImageHeight = 400;
+  const uint32_t kImageWidth = 854;
+  const uint32_t kImageHeight = 480;
 
   // Zero is not a valid content ID.
   {
     std::shared_ptr<Flatland> flatland = CreateFlatland();
-    flatland->SetImageSampleRegion({0}, {0, 0, 100, 200});
+    flatland->SetImageSampleRegion({0}, {0, 0, kImageWidth, kImageHeight});
     PRESENT(flatland, false);
   }
 
   // The content id hasn't been imported yet.
   {
     std::shared_ptr<Flatland> flatland = CreateFlatland();
-    flatland->SetImageSampleRegion(kId, {0, 0, 100, 200});
+    flatland->SetImageSampleRegion(kId, {0, 0, kImageWidth, kImageHeight});
     PRESENT(flatland, false);
   }
 
@@ -4103,7 +4104,16 @@ TEST_F(FlatlandTest, SetImageSampleRegionTestCases) {
     flatland->SetImageSampleRegion(kId, {0, 0, kImageWidth, kImageHeight});
     PRESENT(flatland, true);
 
-    flatland->SetImageSampleRegion(kId, {50, 60, kImageWidth - 100, kImageHeight - 200});
+    const float kYDeltaCoefficient = 0.370833f;
+    const float kHeightCoefficient = 0.629167f;
+    EXPECT_EQ(1.f, kYDeltaCoefficient + kHeightCoefficient);
+    const float kYDelta = kYDeltaCoefficient * kImageHeight;
+    const float kYHeight = kHeightCoefficient * kImageHeight;
+    // Note that comparing these values using == operator as floats fails due to the loss of
+    // precision.
+    EXPECT_GT(kYDelta + kYHeight, static_cast<float>(kImageHeight));
+    EXPECT_TRUE(escher::CompareFloat(kYDelta + kYHeight, static_cast<float>(kImageHeight), 0.01f));
+    flatland->SetImageSampleRegion(kId, {0, kYDelta, kImageWidth, kYHeight});
     PRESENT(flatland, true);
   }
 
