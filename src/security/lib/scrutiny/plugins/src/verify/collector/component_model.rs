@@ -33,7 +33,7 @@ use {
 // unless the RuntimeConfig specifies a different root URL.
 pub static DEFAULT_ROOT_URL: Lazy<Url> = Lazy::new(|| {
     Url::parse(
-        &BootUrl::new_resource("/".to_string(), ROOT_RESOURCE.to_string()).unwrap().to_string(),
+        &BootUrl::new_resource("/root".to_string(), ROOT_RESOURCE.to_string()).unwrap().to_string(),
     )
     .unwrap()
 });

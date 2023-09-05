@@ -588,7 +588,7 @@ mod tests {
     fn test_component_resolvers_child_source() -> Result<()> {
         let model = cmls_to_model(vec![
             (
-                "fuchsia-boot:///#meta/root.cm",
+                "fuchsia-boot:///root#meta/root.cm",
                 json!({
                     "capabilities": [
                         {
@@ -695,7 +695,7 @@ mod tests {
     fn test_component_resolvers_self_source() -> Result<()> {
         let model = cmls_to_model(vec![
             (
-                "fuchsia-boot:///#meta/root.cm",
+                "fuchsia-boot:///root#meta/root.cm",
                 json!({
                     "capabilities": [
                         {
@@ -767,7 +767,7 @@ mod tests {
     fn test_component_resolvers_parent_source() -> Result<()> {
         let model = cmls_to_model(vec![
             (
-                "fuchsia-boot:///#meta/root.cm",
+                "fuchsia-boot:///root#meta/root.cm",
                 json!({
                     "capabilities": [
                         {
@@ -859,7 +859,7 @@ mod tests {
     fn test_component_resolvers_ignores_invalid_resolver_registration() -> Result<()> {
         let model = cmls_to_model(vec![
             (
-                "fuchsia-boot:///#meta/root.cm",
+                "fuchsia-boot:///root#meta/root.cm",
                 json!({
                     "children": [
                         {
