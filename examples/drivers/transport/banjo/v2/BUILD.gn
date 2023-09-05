@@ -1,16 +1,8 @@
-# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
 import("//build/drivers.gni")
-import("//build/fidl/fidl.gni")
-
-group("banjo") {
-  deps = [
-    ":child_component",
-    ":parent_component",
-  ]
-}
 
 driver_bind_rules("parent_bind") {
   rules = "parent-driver.bind"
@@ -19,20 +11,23 @@ driver_bind_rules("parent_bind") {
 }
 
 fuchsia_driver("parent_driver") {
-  output_name = "banjo_transport_parent_v1"
+  output_name = "banjo_transport_parent"
   sources = [ "parent-driver.cc" ]
   deps = [
     ":parent_bind",
     "//examples/drivers/transport/banjo:fuchsia.examples.gizmo_banjo_cpp",
-    "//examples/drivers/transport/banjo:fuchsia.examples.gizmo_bindlib_cpp",
-    "//src/devices/lib/driver",
-    "//src/lib/ddktl",
+    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/compat/cpp:symbols",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//src/devices/lib/driver:driver_runtime",
   ]
 }
 
 fuchsia_driver_component("parent_component") {
   component_name = "banjo_transport_parent"
-  colocate = true
+  manifest = "meta/parent-driver.cml"
   deps = [ ":parent_driver" ]
   info = "component-info.json"
 }
@@ -44,19 +39,23 @@ driver_bind_rules("child_bind") {
 }
 
 fuchsia_driver("child_driver") {
-  output_name = "banjo_transport_child_v1"
+  output_name = "banjo_transport_child"
   sources = [ "child-driver.cc" ]
   deps = [
     ":child_bind",
     "//examples/drivers/transport/banjo:fuchsia.examples.gizmo_banjo_cpp",
-    "//src/devices/lib/driver",
-    "//src/lib/ddktl",
+    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/compat/cpp:symbols",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/devfs/cpp",
+    "//src/devices/lib/driver:driver_runtime",
   ]
 }
 
 fuchsia_driver_component("child_component") {
   component_name = "banjo_transport_child"
-  colocate = true
+  manifest = "meta/child-driver.cml"
   deps = [ ":child_driver" ]
   info = "component-info.json"
 }

@@ -16,6 +16,7 @@ group("hermetic_tests") {
   testonly = true
   deps = [
     ":banjo-test-package-v1",
+    ":banjo-test-package-v2",
     ":driver-test-package-v1",
     ":driver-test-package-v2",
     ":zircon-test-package-v1",
@@ -30,6 +31,16 @@ fuchsia_unittest_package("banjo-test-package-v1") {
     "tests:transport_test_v1",
     "//examples/drivers/transport/banjo/v1:child_component",
     "//examples/drivers/transport/banjo/v1:parent_component",
+    "//src/devices/misc/drivers/test-parent",
+  ]
+}
+
+fuchsia_unittest_package("banjo-test-package-v2") {
+  package_name = "banjo_transport_test_v2"
+  deps = [
+    "tests:transport_test_v2",
+    "//examples/drivers/transport/banjo/v2:child_component",
+    "//examples/drivers/transport/banjo/v2:parent_component",
     "//src/devices/misc/drivers/test-parent",
   ]
 }

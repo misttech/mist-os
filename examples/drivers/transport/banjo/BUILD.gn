@@ -8,6 +8,8 @@ group("banjo") {
   deps = [
     "v1:child_component",
     "v1:parent_component",
+    "v2:child_component",
+    "v2:parent_component",
   ]
 }
 
