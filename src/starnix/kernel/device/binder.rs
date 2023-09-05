@@ -634,9 +634,9 @@ impl BinderProcess {
         handle: Handle,
     ) -> Result<(), Errno> {
         let mut actions = RefCountActions::default();
-        self.lock().handle_refcount_operation(command, handle, &mut actions)?;
-        actions.release(());
-        Ok(())
+        release_after!(actions, (), {
+            self.lock().handle_refcount_operation(command, handle, &mut actions)
+        })
     }
 
     /// Handle a binder thread's notification that it successfully incremented a strong/weak
@@ -648,9 +648,9 @@ impl BinderProcess {
         object: LocalBinderObject,
     ) -> Result<(), Errno> {
         let mut actions = RefCountActions::default();
-        self.lock().handle_refcount_operation_done(command, object, &mut actions)?;
-        actions.release(());
-        Ok(())
+        release_after!(actions, (), {
+            self.lock().handle_refcount_operation_done(command, object, &mut actions)
+        })
     }
 
     /// Subscribe a process to the death of the owner of `handle`.
