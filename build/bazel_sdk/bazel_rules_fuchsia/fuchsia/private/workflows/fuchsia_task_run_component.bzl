@@ -17,14 +17,21 @@ def _fuchsia_task_run_component_impl(ctx, make_fuchsia_task):
     url = "fuchsia-pkg://%s/%s#meta/%s" % (repo, package, manifest)
     moniker = ctx.attr.moniker or "/core/ffx-laboratory:%s" % component_name
     if component.is_driver:
+        args = [
+            "--ffx",
+            sdk.ffx,
+            "--url",
+            url,
+        ]
+        if ctx.attr.disable_repository:
+            disable_url = "fuchsia-pkg://%s/%s#meta/%s" % (ctx.attr.disable_repository, package, manifest)
+            args += [
+                "--disable-url",
+                disable_url,
+            ]
         return make_fuchsia_task(
             ctx.attr._register_driver_tool,
-            [
-                "--ffx",
-                sdk.ffx,
-                "--url",
-                url,
-            ],
+            args,
         )
     elif component.is_test:
         return make_fuchsia_task(
@@ -73,6 +80,9 @@ def _fuchsia_task_run_component_impl(ctx, make_fuchsia_task):
             doc = "The component to run.",
             providers = [FuchsiaComponentInfo],
             mandatory = True,
+        ),
+        "disable_repository": attr.string(
+            doc = "The repository that contains the pre-existed driver we want to disable. This is only used in driver workflow now.",
         ),
         "_register_driver_tool": attr.label(
             doc = "The tool used to run components",

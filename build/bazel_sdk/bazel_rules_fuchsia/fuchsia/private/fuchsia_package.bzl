@@ -4,6 +4,11 @@
 
 """fuchsia_package() rule."""
 
+load("//fuchsia/private/workflows:fuchsia_package_tasks.bzl", "fuchsia_package_tasks")
+load(":fuchsia_component.bzl", "fuchsia_component_for_unit_test")
+load(":fuchsia_debug_symbols.bzl", "collect_debug_symbols", "get_build_id_dirs", "strip_resources")
+load(":fuchsia_transition.bzl", "fuchsia_transition")
+load(":package_publishing.bzl", "package_repo_path_from_label", "publish_package")
 load(
     ":providers.bzl",
     "FuchsiaComponentInfo",
@@ -11,12 +16,7 @@ load(
     "FuchsiaPackageInfo",
     "FuchsiaPackageResourcesInfo",
 )
-load(":fuchsia_component.bzl", "fuchsia_component_for_unit_test")
-load(":fuchsia_debug_symbols.bzl", "collect_debug_symbols", "get_build_id_dirs", "strip_resources")
-load(":fuchsia_transition.bzl", "fuchsia_transition")
-load(":package_publishing.bzl", "package_repo_path_from_label", "publish_package")
 load(":utils.bzl", "label_name", "make_resource_struct", "rule_variants", "stub_executable")
-load("//fuchsia/private/workflows:fuchsia_package_tasks.bzl", "fuchsia_package_tasks")
 
 def fuchsia_package(
         *,
@@ -67,9 +67,9 @@ def fuchsia_package(
         **kwargs: extra attributes to pass along to the build rule.
     """
 
-    # Temporary work around to pass in a repository name for driver URL.
-    # This will help us unblock the Intel WIFI driver hot reload issue.
-    driver_repository_name = kwargs.pop("driver_repository_name", None)
+    # This is only used when we want to disable a pre-existing driver so we can
+    # register another driver.
+    disable_repository_name = kwargs.pop("disable_repository_name", None)
 
     _build_fuchsia_package(
         name = "%s_fuchsia_package" % name,
@@ -86,7 +86,7 @@ def fuchsia_package(
         package = "%s_fuchsia_package" % name,
         components = {component: component for component in components},
         tools = {tool: tool for tool in tools},
-        driver_repository_name = driver_repository_name,
+        disable_repository_name = disable_repository_name,
         **kwargs
     )
 

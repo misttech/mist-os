@@ -10,6 +10,7 @@ from fuchsia_task_lib import *
 
 
 class FuchsiaTaskRegisterDriver(FuchsiaTask):
+
     def parse_args(self, parser: ScopedArgumentParser) -> argparse.Namespace:
         '''Parses arguments.'''
 
@@ -26,6 +27,12 @@ class FuchsiaTaskRegisterDriver(FuchsiaTask):
             required=True,
         )
         parser.add_argument(
+            '--disable-url',
+            type=str,
+            help='The pre-existed component url we want to disable.',
+            required=False,
+        )
+        parser.add_argument(
             '--target',
             help='Optionally specify the target fuchsia device.',
             required=False,
@@ -33,10 +40,20 @@ class FuchsiaTaskRegisterDriver(FuchsiaTask):
         )
         return parser.parse_args()
 
-
     def run(self, parser: ScopedArgumentParser) -> None:
         args = self.parse_args(parser)
         ffx = [args.ffx] + (['--target', args.target] if args.target else [])
+
+        # If disable url is provided, we will disable the pre-existing driver
+        # before register a new one.
+        if args.disable_url:
+            subprocess.check_call(
+                [
+                    *ffx,
+                    'driver',
+                    'disable',
+                    args.disable_url,
+                ])
 
         subprocess.check_call([
             *ffx,
