@@ -17,8 +17,9 @@ use crate::{
         DirectoryOptions,
     },
     execution_scope::ExecutionScope,
+    name::validate_name,
     node::OpenNode,
-    path::{validate_name, Path},
+    path::Path,
     token_registry::{TokenInterface, TokenRegistry, Tokenizable},
     ObjectRequestRef, ProtocolsExt,
 };
@@ -143,7 +144,7 @@ impl MutableConnection {
             } => {
                 if !this.base.options.rights.contains(fio::Operations::MODIFY_DIRECTORY) {
                     responder.send(Err(zx::Status::ACCESS_DENIED.into_raw()))?;
-                } else if !validate_name(&name) {
+                } else if validate_name(&name).is_err() {
                     responder.send(Err(zx::Status::INVALID_ARGS.into_raw()))?;
                 } else {
                     responder.send(

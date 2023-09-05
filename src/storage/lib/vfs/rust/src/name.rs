@@ -140,12 +140,47 @@ mod tests {
     #[fuchsia::test]
     fn test_parse_name() {
         assert_matches!(parse_name("a".repeat(1000)), Err(ParseNameError::TooLong(_)));
+        assert_matches!(
+            parse_name(
+                std::str::from_utf8(&vec![65; fio::MAX_FILENAME as usize + 1]).unwrap().to_string()
+            ),
+            Err(ParseNameError::TooLong(_))
+        );
+        assert_matches!(
+            parse_name(
+                std::str::from_utf8(&vec![65; fio::MAX_FILENAME as usize]).unwrap().to_string()
+            ),
+            Ok(_)
+        );
         assert_matches!(parse_name("".to_string()), Err(ParseNameError::Empty));
         assert_matches!(parse_name(".".to_string()), Err(ParseNameError::Dot));
         assert_matches!(parse_name("..".to_string()), Err(ParseNameError::DotDot));
+        assert_matches!(parse_name(".a".to_string()), Ok(Name(name)) if &name == ".a");
+        assert_matches!(parse_name("..a".to_string()), Ok(Name(name)) if &name == "..a");
         assert_matches!(parse_name("a/b".to_string()), Err(ParseNameError::Slash));
         assert_matches!(parse_name("a\0b".to_string()), Err(ParseNameError::EmbeddedNul));
         assert_matches!(parse_name("abc".to_string()), Ok(Name(name)) if &name == "abc");
+    }
+
+    #[fuchsia::test]
+    fn test_validate_name() {
+        assert_matches!(validate_name(&"a".repeat(1000)), Err(ParseNameError::TooLong(_)));
+        assert_matches!(
+            validate_name(std::str::from_utf8(&vec![65; fio::MAX_FILENAME as usize + 1]).unwrap()),
+            Err(ParseNameError::TooLong(_))
+        );
+        assert_matches!(
+            validate_name(std::str::from_utf8(&vec![65; fio::MAX_FILENAME as usize]).unwrap()),
+            Ok(())
+        );
+        assert_matches!(validate_name(""), Err(ParseNameError::Empty));
+        assert_matches!(validate_name("."), Err(ParseNameError::Dot));
+        assert_matches!(validate_name(".."), Err(ParseNameError::DotDot));
+        assert_matches!(validate_name(".a"), Ok(()));
+        assert_matches!(validate_name("..a"), Ok(()));
+        assert_matches!(validate_name("a/b"), Err(ParseNameError::Slash));
+        assert_matches!(validate_name("a\0b"), Err(ParseNameError::EmbeddedNul));
+        assert_matches!(validate_name("abc"), Ok(()));
     }
 
     #[fuchsia::test]

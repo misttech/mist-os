@@ -7,7 +7,7 @@
 //! approach is used to allow passing the path string, from one `open()` method to the next,
 //! without the need to copy the path itself.
 
-use {fidl_fuchsia_io as fio, fuchsia_zircon::Status};
+use fuchsia_zircon::Status;
 
 #[derive(Clone, Debug)]
 pub struct Path {
@@ -180,19 +180,10 @@ impl AsRef<str> for Path {
     }
 }
 
-/// Validates a file name.  `name` *must* not be '.' or '..'.
-pub fn validate_name(name: &str) -> bool {
-    name.len() as u64 <= fio::MAX_FILENAME
-        && !name.is_empty()
-        && name != "."
-        && name != ".."
-        && !name.contains('/')
-        && !name.contains('\0')
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fidl_fuchsia_io as fio;
 
     macro_rules! simple_construction_test {
         (path: $str:expr, $path:ident => $body:block) => {
@@ -685,20 +676,5 @@ mod tests {
         assert_eq!(path.as_ref(), "c/");
         path.next();
         assert_eq!(path.as_ref(), ".");
-    }
-
-    #[test]
-    fn test_validate_name() {
-        assert!(!validate_name(
-            std::str::from_utf8(&vec![65; fio::MAX_FILENAME as usize + 1]).unwrap()
-        ));
-        assert!(!validate_name("."));
-        assert!(!validate_name(".."));
-        assert!(!validate_name("a/b"));
-        assert!(!validate_name("a\0b"));
-
-        assert!(validate_name(std::str::from_utf8(&vec![65; fio::MAX_FILENAME as usize]).unwrap()));
-        assert!(validate_name(".a"));
-        assert!(validate_name("..a"));
     }
 }
