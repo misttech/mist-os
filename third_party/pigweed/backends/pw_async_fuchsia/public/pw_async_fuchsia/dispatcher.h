@@ -40,6 +40,7 @@ inline void Post(pw::async::Dispatcher* dispatcher, pw::async::TaskFunction&& ta
 
 }  // namespace pw_async_fuchsia
 
+// TODO(fxbug.dev/132962): move to pw_async_fuchsia namespace
 namespace pw::async::fuchsia {
 
 class FuchsiaDispatcher final : public Dispatcher {
