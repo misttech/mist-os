@@ -355,6 +355,10 @@ verify_public_symbols("verify_abi") {
     "--exclude=__asan*",
     "--exclude=__hwasan*",
     "--exclude=__ubsan*",
+
+    # TODO(fxbug.dev/98888): Remove this after the symbol is removed after the
+    # waiting period.
+    "--exclude=_Z27native_thread_get_zx_handlem",
   ]
 }
 

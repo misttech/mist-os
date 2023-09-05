@@ -29,6 +29,17 @@ __EXPORT zx_handle_t native_thread_get_zx_handle(std::thread::native_handle_type
   return GetHandle(t);
 }
 
+// TODO(fxbug.dev/98888): Remove this after the waiting period.
+extern "C" {
+
+// For no previous declaration warnings
+zx_handle_t _Z27native_thread_get_zx_handlem(std::thread::native_handle_type);
+
+__EXPORT zx_handle_t _Z27native_thread_get_zx_handlem(std::thread::native_handle_type t) {
+  return GetHandle(t);
+}
+}  // extern "C"
+
 __EXPORT zx_handle_t _zx_thread_self() {
   return zxr_thread_get_handle(&__pthread_self()->zxr_thread);
 }

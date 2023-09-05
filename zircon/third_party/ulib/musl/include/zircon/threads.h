@@ -57,7 +57,7 @@ __END_CDECLS
 // See `thrd_get_zx_handle` (above) for constraints on the returned handle.
 // Using this API avoids any assumptions about std::thread::native_handle_type
 // corresponding exactly to thrd_t or any other particular type.
-zx_handle_t native_thread_get_zx_handle(std::thread::native_handle_type);
+extern "C" zx_handle_t native_thread_get_zx_handle(std::thread::native_handle_type);
 
 #endif  // __has_include(<thread>)
 

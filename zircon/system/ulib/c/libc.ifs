@@ -9,7 +9,6 @@ Symbols:
   - { Name: _IO_getc_unlocked, Type: Func, Weak: true }
   - { Name: _IO_putc, Type: Func, Weak: true }
   - { Name: _IO_putc_unlocked, Type: Func, Weak: true }
-  - { Name: _Z27native_thread_get_zx_handlem, Type: Func }
   - { Name: ___environ, Type: Object, Weak: true }
   - { Name: __assert_fail, Type: Func }
   - { Name: __c_dot_utf8, Type: Object }
@@ -825,6 +824,7 @@ Symbols:
   - { Name: nanf, Type: Func }
   - { Name: nanl, Type: Func }
   - { Name: nanosleep, Type: Func }
+  - { Name: native_thread_get_zx_handle, Type: Func }
   - { Name: nearbyint, Type: Func }
   - { Name: nearbyintf, Type: Func }
   - { Name: nearbyintl, Type: Func }
