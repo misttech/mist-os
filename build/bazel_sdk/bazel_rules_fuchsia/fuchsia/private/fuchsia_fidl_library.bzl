@@ -117,7 +117,7 @@ def fuchsia_fidl_library(name, srcs, library = None, target_api_level = None, sd
         cc_bindings: list of FIDL CC binding types to generate. Each binding specified will be represented by
             a new target named {name}_{cc_binding} of type fuchsia_fidl_cc_library.
         deps: List of labels for FIDL libraries this library depends on.
-        sdk_for_default_deps: Name of the Bazel workspace where default FIDL library dependencies are defined. If empty or not defined, defaults to the current repository.
+        sdk_for_default_deps: Name of the Bazel workspace where default FIDL library dependencies are defined. If empty or not defined, defaults to @fuchsia_sdk.
         **kwargs: Remaining args to be passed to the C++ binding rules
     """
 

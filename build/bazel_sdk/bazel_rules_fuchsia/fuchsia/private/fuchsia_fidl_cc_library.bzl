@@ -151,7 +151,7 @@ _codegen = rule(
             mandatory = True,
         ),
         "sdk_for_default_deps": attr.string(
-            doc = "Name of the Bazel workspace where default FIDL library dependencies are defined. If empty or not defined, defaults to the current repository.",
+            doc = "Name of the Bazel workspace where default FIDL library dependencies are defined. If empty or not defined, defaults to @fuchsia_sdk.",
             mandatory = False,
         ),
     },
@@ -181,7 +181,7 @@ def _get_binding_info(sdk_for_default_deps, binding_type):
     # Note: deps needs to be flattened, since Starlark does not support
     # recursivity or unbounded loops.
     if not sdk_for_default_deps:
-        sdk_for_default_deps = ""
+        sdk_for_default_deps = "@fuchsia_sdk"
 
     wire_dep = sdk_for_default_deps + "//pkg/fidl_cpp_wire"
     natural_dep = sdk_for_default_deps + "//pkg/fidl_cpp_v2"
