@@ -32,9 +32,6 @@ ffx_subtool_fidl_allowlist = [
   # Used by ffx Daemon
   "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager",
 
-  # used by ffx log
-  "//sdk/fidl/fuchsia.diagnostics.host:fuchsia.diagnostics.host",
-
   # ffx driver
   "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development",
   "//sdk/fidl/fuchsia.driver.index:fuchsia.driver.index",
