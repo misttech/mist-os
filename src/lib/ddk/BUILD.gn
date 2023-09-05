@@ -94,6 +94,7 @@ sdk_static_library("ddk") {
   visibility = [
     "//examples/drivers/dotmatrix_display:*",
     "//examples/drivers/transport/banjo:*",
+    "//examples/drivers/transport/banjo/v1:*",
     "//sdk/banjo/*",
     "//sdk/fidl/*",
     "//sdk/lib/driver_test_realm:*",

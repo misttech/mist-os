@@ -81,6 +81,7 @@ source_set("ddktl") {
   visibility = [
     "//examples/drivers/driver_test_realm/sample-driver:*",
     "//examples/drivers/transport/banjo:*",
+    "//examples/drivers/transport/banjo/v1:*",
     "//examples/drivers/transport/driver/v1:*",
     "//examples/drivers/transport/zircon/v1:*",
     "//sdk/banjo/*",

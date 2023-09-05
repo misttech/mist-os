@@ -15,7 +15,7 @@ group("transport") {
 group("hermetic_tests") {
   testonly = true
   deps = [
-    ":banjo-test-package",
+    ":banjo-test-package-v1",
     ":driver-test-package-v1",
     ":driver-test-package-v2",
     ":zircon-test-package-v1",
@@ -24,12 +24,12 @@ group("hermetic_tests") {
 }
 
 # Test packages to run each driver pair in DriverTestRealm
-fuchsia_unittest_package("banjo-test-package") {
-  package_name = "banjo_transport_test"
+fuchsia_unittest_package("banjo-test-package-v1") {
+  package_name = "banjo_transport_test_v1"
   deps = [
     "tests:transport_test_v1",
-    "//examples/drivers/transport/banjo:child_component",
-    "//examples/drivers/transport/banjo:parent_component",
+    "//examples/drivers/transport/banjo/v1:child_component",
+    "//examples/drivers/transport/banjo/v1:parent_component",
     "//src/devices/misc/drivers/test-parent",
   ]
 }
