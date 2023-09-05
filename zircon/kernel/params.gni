@@ -152,3 +152,12 @@ declare_args() {
 
 assert(!enable_lock_dep_tests || enable_lock_dep,
        "enable_lock_dep_tests=true requires enable_lock_dep=true")
+
+kernel_test_device_types = [
+  "AEMU",
+  "Astro",
+  "QEMU",
+  "Intel NUC Kit NUC7i5DNHE",
+  "Sherlock",
+  "Vim3",
+]

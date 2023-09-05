@@ -9,6 +9,7 @@ import("//build/testing/bootfs_test.gni")
 import("//build/testing/kernel_zbi_test.gni")
 import("//build/testing/zbi_test.gni")
 import("//build/testing/zbi_test_executable.gni")
+import("//zircon/kernel/params.gni")
 
 # Each subdirectory just provides an eponymous source_set().
 core_tests = [
@@ -238,13 +239,7 @@ if (is_fuchsia) {
 
 boot_tests = [ ":core-tests" ]
 core_tests("core-tests") {
-  device_types = [
-    "AEMU",
-    "Astro",
-    "QEMU",
-    "Intel NUC Kit NUC7i5DNHE",
-    "Sherlock",
-  ]
+  device_types = kernel_test_device_types
 
   # We've observed the ASAN variant of core-tests take as long as 701 seconds
   # when booted via firmware on certain types of hardware.  Leave a little buffer
