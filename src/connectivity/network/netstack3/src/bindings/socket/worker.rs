@@ -17,6 +17,19 @@ pub(crate) struct SocketWorker<Data> {
     data: Data,
 }
 
+/// A collection of task spawners provided to [`SocketWorkerHandler`]
+/// implementations.
+///
+/// Implementations may chose which scope to spawn tasks on, which has
+/// implications on when those tasks are going to be joined.
+pub(crate) struct TaskSpawnerCollection<S> {
+    /// Socket scoped tasks are joined on as part of closing the socket.
+    pub(crate) socket_scope: SocketScopedSpawner<S>,
+    /// Provider scoped tasks are joined on outside of a single [`SocketWorker`]
+    /// scope as part of clean system shutdown.
+    pub(crate) provider_scope: ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
+}
+
 /// Handler for individual requests on a socket.
 ///
 /// Implementations should hold on to a single socket from [`netstack3_core`]
@@ -39,9 +52,19 @@ pub(crate) trait SocketWorkerHandler: Send + 'static {
     /// A responder for a "close" request.
     type CloseResponder: CloseResponder;
 
-    /// Type of futures spawned by the worker that must be polled to
-    /// completion when the worker terminates.
-    type TaskFuture: futures::Future<Output = ()>;
+    /// Argument to pass to the handler on setup.
+    type SetupArgs;
+
+    /// The task spawner.
+    type Spawner: SocketTaskSpawner;
+
+    /// Called once when [`SocketWorker`] starts to setup the socket.
+    fn setup(
+        &mut self,
+        ctx: &mut Ctx,
+        args: Self::SetupArgs,
+        spawner: &TaskSpawnerCollection<Self::Spawner>,
+    );
 
     /// Handles a single request.
     ///
@@ -59,7 +82,8 @@ pub(crate) trait SocketWorkerHandler: Send + 'static {
         &mut self,
         ctx: &mut Ctx,
         request: Self::Request,
-    ) -> ControlFlow<Self::CloseResponder, (Option<Self::RequestStream>, Option<Self::TaskFuture>)>;
+        spawner: &TaskSpawnerCollection<Self::Spawner>,
+    ) -> ControlFlow<Self::CloseResponder, Option<Self::RequestStream>>;
 
     /// Closes the socket managed by this handler.
     ///
@@ -81,6 +105,71 @@ pub(crate) trait CloseResponder: Send {
     fn send(self, response: Result<(), i32>) -> Result<(), fidl::Error>;
 }
 
+/// A trait abstracting socket task spawners.
+pub(crate) trait SocketTaskSpawner {
+    /// The type that is used to wait for all spawned tasks.
+    type Waiter: futures::Future<Output = ()>;
+
+    /// Creates a new socket scoped spawner and waiter.
+    fn new() -> (Self::Waiter, Self);
+}
+
+impl SocketTaskSpawner for () {
+    type Waiter = futures::future::Ready<()>;
+
+    fn new() -> (Self::Waiter, Self) {
+        (futures::future::ready(()), ())
+    }
+}
+
+impl SocketTaskSpawner for crate::bindings::util::TaskWaitGroupSpawner {
+    type Waiter = crate::bindings::util::TaskWaitGroup;
+
+    fn new() -> (Self::Waiter, Self) {
+        crate::bindings::util::TaskWaitGroup::new()
+    }
+}
+
+/// A newtype around a spawner providing a type-level statement that the
+/// contained spawner is socket-scoped.
+#[derive(Clone)]
+pub(crate) struct SocketScopedSpawner<S>(S);
+
+impl<S> std::ops::Deref for SocketScopedSpawner<S> {
+    type Target = S;
+
+    fn deref(&self) -> &Self::Target {
+        let Self(s) = self;
+        s
+    }
+}
+
+impl<S> From<S> for SocketScopedSpawner<S> {
+    fn from(value: S) -> Self {
+        Self(value)
+    }
+}
+
+/// A newtype around a spawner providing a type-level statement that the
+/// contained spawner is provider-scoped.
+#[derive(Clone)]
+pub(crate) struct ProviderScopedSpawner<S>(S);
+
+impl<S> std::ops::Deref for ProviderScopedSpawner<S> {
+    type Target = S;
+
+    fn deref(&self) -> &Self::Target {
+        let Self(s) = self;
+        s
+    }
+}
+
+impl<S> From<S> for ProviderScopedSpawner<S> {
+    fn from(value: S) -> Self {
+        Self(value)
+    }
+}
+
 impl<H: SocketWorkerHandler> SocketWorker<H> {
     /// Starts servicing events from the provided state and event stream.
     pub(crate) async fn serve_stream_with<
@@ -96,6 +185,8 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
         make_data: F,
         properties: SocketWorkerProperties,
         events: H::RequestStream,
+        setup_args: H::SetupArgs,
+        provider_spawner: ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
     ) {
         let data = {
             let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
@@ -109,7 +200,7 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
         // closed. If any errors occurred as a result of the closure, we just
         // log them.
         worker
-            .handle_stream(events)
+            .handle_stream(events, setup_args, provider_spawner)
             .await
             .unwrap_or_else(|e: fidl::Error| error!("socket control request error: {:?}", e))
     }
@@ -117,20 +208,23 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
     /// Handles a stream of POSIX socket requests.
     ///
     /// Returns when getting the first `Close` request.
-    async fn handle_stream(mut self, events: H::RequestStream) -> Result<(), fidl::Error> {
+    async fn handle_stream(
+        mut self,
+        events: H::RequestStream,
+        setup_args: H::SetupArgs,
+        provider_scope: ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
+    ) -> Result<(), fidl::Error> {
         let mut request_streams = OneOrMany::new(events.into_future());
-        let mut tasks = futures::stream::FuturesUnordered::new();
+        let (wait_group, socket_scope) = H::Spawner::new();
+        let spawners = TaskSpawnerCollection { socket_scope: socket_scope.into(), provider_scope };
+
+        {
+            let Self { ctx, data } = &mut self;
+            data.setup(ctx, setup_args, &spawners);
+        }
+
         let respond_close = loop {
-            let request = futures::select! {
-                request = request_streams.next() => request,
-                // Continuously poll tasks to pop them from the collection and
-                // avoid unbounded memory growth.
-                r = tasks.by_ref().next() => {
-                    r.unwrap_or(());
-                    continue;
-                }
-            };
-            let Some((request, request_stream)) = request else {
+            let Some((request, request_stream)) = request_streams.next().await else {
                 // There are no more streams left, so there's no close responder
                 // to defer responding to.
                 break None
@@ -151,13 +245,10 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
                 Some(Ok(t)) => t,
             };
             let Self { ctx, data } = &mut self;
-            match data.handle_request(ctx, request) {
-                ControlFlow::Continue((stream, task)) => {
+            match data.handle_request(ctx, request, &spawners) {
+                ControlFlow::Continue(stream) => {
                     if let Some(stream) = stream {
                         request_streams.push(stream.into_future());
-                    }
-                    if let Some(task) = task {
-                        tasks.push(task);
                     }
                 }
                 ControlFlow::Break(close_responder) => {
@@ -190,8 +281,14 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
         if let Some(respond_close) = respond_close {
             respond_close();
         }
-        // Socket should be closed, join on all spawned tasks.
-        tasks.collect::<()>().await;
+
+        // Join all tasks created by this socket.
+        // TODO(https://fxbug.dev/132920): We should join all tasks before we
+        // respond to close for a stronger statement that we're not leaking
+        // these resources.
+        std::mem::drop(spawners);
+        wait_group.await;
+
         Ok(())
     }
 }

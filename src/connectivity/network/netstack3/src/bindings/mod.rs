@@ -1073,18 +1073,25 @@ impl NetstackSeed {
                             // Run on a separate task so socket requests are not
                             // bound to the same thread as the main services
                             // loop.
-                            fuchsia_async::Task::spawn(socket::serve(netstack.ctx.clone(), socket))
-                                .await;
+                            let wait_group = fuchsia_async::Task::spawn(socket::serve(
+                                netstack.ctx.clone(),
+                                socket,
+                            ))
+                            .await;
+                            // Wait for all socket tasks to finish.
+                            wait_group.await;
                         }
                         Service::PacketSocket(socket) => {
                             // Run on a separate task so socket requests are not
                             // bound to the same thread as the main services
                             // loop.
-                            fuchsia_async::Task::spawn(socket::packet::serve(
+                            let wait_group = fuchsia_async::Task::spawn(socket::packet::serve(
                                 netstack.ctx.clone(),
                                 socket,
                             ))
                             .await;
+                            // Wait for all socket tasks to finish.
+                            wait_group.await;
                         }
                         Service::RawSocket(socket) => {
                             socket.serve_with(|rs| socket::raw::serve(rs)).await

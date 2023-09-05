@@ -12,7 +12,6 @@ use fidl::{
     endpoints::{ProtocolMarker as _, RequestStream as _},
     Peered as _,
 };
-use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, HandleBased as _};
 use futures::StreamExt as _;
 use net_types::ethernet::Mac;
@@ -78,10 +77,15 @@ impl NonSyncContext<DeviceId<Self>> for BindingsNonSyncCtxImpl {
     }
 }
 
-pub(crate) async fn serve(ctx: Ctx, stream: fppacket::ProviderRequestStream) {
+pub(crate) async fn serve(
+    ctx: Ctx,
+    stream: fppacket::ProviderRequestStream,
+) -> crate::bindings::util::TaskWaitGroup {
     let ctx = &ctx;
+    let (wait_group, spawner) = crate::bindings::util::TaskWaitGroup::new();
+    let spawner: worker::ProviderScopedSpawner<_> = spawner.into();
     stream
-        .filter_map(|req| {
+        .map(|req| {
             let req = match req {
                 Ok(req) => req,
                 Err(e) => {
@@ -91,7 +95,7 @@ pub(crate) async fn serve(ctx: Ctx, stream: fppacket::ProviderRequestStream) {
                             fppacket::ProviderMarker::DEBUG_NAME
                         );
                     }
-                    return futures::future::ready(None);
+                    return;
                 }
             };
             match req {
@@ -100,26 +104,26 @@ pub(crate) async fn serve(ctx: Ctx, stream: fppacket::ProviderRequestStream) {
                         .unwrap_or_else(|e: fidl::Error| {
                             panic!("failed to create a new request stream: {e}")
                         });
-                    let task = fasync::Task::spawn(SocketWorker::serve_stream_with(
+                    spawner.spawn(SocketWorker::serve_stream_with(
                         ctx.clone(),
                         move |sync_ctx, non_sync_ctx, properties| {
                             BindingData::new(sync_ctx, non_sync_ctx, kind, properties)
                         },
                         SocketWorkerProperties {},
                         request_stream,
+                        (),
+                        spawner.clone(),
                     ));
                     responder
                         .send(Ok(client))
                         .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
-                    futures::future::ready(Some(task))
                 }
             }
         })
-        .for_each_concurrent(None, |task| {
-            // Wait for all the socket tasks on this provider to finish.
-            task
-        })
-        .await
+        .collect::<()>()
+        .await;
+
+    wait_group
 }
 
 #[derive(Debug)]
@@ -239,19 +243,18 @@ impl worker::SocketWorkerHandler for BindingData {
     type Request = fppacket::SocketRequest;
     type RequestStream = fppacket::SocketRequestStream;
     type CloseResponder = fppacket::SocketCloseResponder;
-    type TaskFuture = crate::bindings::util::UninstantiableFuture<()>;
+    type SetupArgs = ();
+    type Spawner = ();
+
+    fn setup(&mut self, _ctx: &mut Ctx, _args: (), _spawner: &worker::TaskSpawnerCollection<()>) {}
 
     fn handle_request(
         &mut self,
         ctx: &mut Ctx,
         request: Self::Request,
-    ) -> ControlFlow<Self::CloseResponder, (Option<Self::RequestStream>, Option<Self::TaskFuture>)>
-    {
-        let flow = RequestHandler { ctx, data: self }.handle_request(request);
-        match flow {
-            ControlFlow::Break(b) => ControlFlow::Break(b),
-            ControlFlow::Continue(r) => ControlFlow::Continue((r, None)),
-        }
+        _spawners: &worker::TaskSpawnerCollection<()>,
+    ) -> ControlFlow<Self::CloseResponder, Option<Self::RequestStream>> {
+        RequestHandler { ctx, data: self }.handle_request(request)
     }
 
     fn close(

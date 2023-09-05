@@ -56,125 +56,112 @@ const ZXSIO_SIGNAL_CONNECTED: zx::Signals =
 #[derive(Debug)]
 pub(crate) struct SocketWorkerProperties {}
 
-pub(crate) async fn serve(ctx: crate::bindings::Ctx, stream: psocket::ProviderRequestStream) {
+pub(crate) async fn serve(
+    ctx: crate::bindings::Ctx,
+    stream: psocket::ProviderRequestStream,
+) -> crate::bindings::util::TaskWaitGroup {
     let ctx = &ctx;
+    let (wait_group, task_spawner) = crate::bindings::util::TaskWaitGroup::new();
+    let task_spawner: worker::ProviderScopedSpawner<_> = task_spawner.into();
     stream
-        .filter_map(move |req| {
-            async move {
-                let req = match req {
-                    Ok(req) => req,
-                    Err(e) => {
-                        if !e.is_closed() {
-                            tracing::error!(
-                                "{} request error {e:?}",
-                                psocket::ProviderMarker::DEBUG_NAME
-                            );
-                        }
-                        return None;
+        .map(move |req| {
+            let req = match req {
+                Ok(req) => req,
+                Err(e) => {
+                    if !e.is_closed() {
+                        tracing::error!(
+                            "{} request error {e:?}",
+                            psocket::ProviderMarker::DEBUG_NAME
+                        );
                     }
-                };
-                match req {
-                    psocket::ProviderRequest::InterfaceIndexToName { index, responder } => {
-                        let response = {
-                            let non_sync_ctx = ctx.non_sync_ctx();
-                            BindingId::new(index)
-                                .ok_or(DeviceNotFoundError)
-                                .and_then(|id| id.try_into_core_with_ctx(non_sync_ctx))
-                                .map(|core_id: DeviceId<_>| {
-                                    core_id.external_state().static_common_info().name.clone()
-                                })
-                                .map_err(|DeviceNotFoundError| zx::Status::NOT_FOUND.into_raw())
-                        };
-                        responder
-                            .send(response.as_deref().map_err(|e| *e))
-                            .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
-                        None
-                    }
-                    psocket::ProviderRequest::InterfaceNameToIndex { name, responder } => {
-                        let response = {
-                            let non_sync_ctx = ctx.non_sync_ctx();
-                            let devices = AsRef::<Devices<_>>::as_ref(non_sync_ctx);
-                            let result = devices
-                                .get_device_by_name(&name)
-                                .map(|d| d.external_state().static_common_info().binding_id.get())
-                                .ok_or(zx::Status::NOT_FOUND.into_raw());
-                            result
-                        };
-                        responder
-                            .send(response)
-                            .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
-                        None
-                    }
-                    psocket::ProviderRequest::InterfaceNameToFlags { name, responder } => {
-                        responder
-                            .send(get_interface_flags(&ctx, &name))
-                            .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
-                        None
-                    }
-                    psocket::ProviderRequest::StreamSocket { domain, proto, responder } => {
-                        let (client, request_stream) = create_request_stream();
-                        let task = stream::spawn_worker(domain, proto, ctx.clone(), request_stream);
-                        responder
-                            .send(Ok(client))
-                            .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
-                        Some(task)
-                    }
-                    psocket::ProviderRequest::DatagramSocketDeprecated {
+                    return;
+                }
+            };
+            match req {
+                psocket::ProviderRequest::InterfaceIndexToName { index, responder } => {
+                    let response = {
+                        let non_sync_ctx = ctx.non_sync_ctx();
+                        BindingId::new(index)
+                            .ok_or(DeviceNotFoundError)
+                            .and_then(|id| id.try_into_core_with_ctx(non_sync_ctx))
+                            .map(|core_id: DeviceId<_>| {
+                                core_id.external_state().static_common_info().name.clone()
+                            })
+                            .map_err(|DeviceNotFoundError| zx::Status::NOT_FOUND.into_raw())
+                    };
+                    responder
+                        .send(response.as_deref().map_err(|e| *e))
+                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                }
+                psocket::ProviderRequest::InterfaceNameToIndex { name, responder } => {
+                    let response = {
+                        let non_sync_ctx = ctx.non_sync_ctx();
+                        let devices = AsRef::<Devices<_>>::as_ref(non_sync_ctx);
+                        let result = devices
+                            .get_device_by_name(&name)
+                            .map(|d| d.external_state().static_common_info().binding_id.get())
+                            .ok_or(zx::Status::NOT_FOUND.into_raw());
+                        result
+                    };
+                    responder
+                        .send(response)
+                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                }
+                psocket::ProviderRequest::InterfaceNameToFlags { name, responder } => {
+                    responder
+                        .send(get_interface_flags(&ctx, &name))
+                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                }
+                psocket::ProviderRequest::StreamSocket { domain, proto, responder } => {
+                    let (client, request_stream) = create_request_stream();
+                    stream::spawn_worker(domain, proto, ctx.clone(), request_stream, &task_spawner);
+                    responder
+                        .send(Ok(client))
+                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                }
+                psocket::ProviderRequest::DatagramSocketDeprecated { domain, proto, responder } => {
+                    let (client, request_stream) = create_request_stream();
+                    let response = datagram::spawn_worker(
                         domain,
                         proto,
-                        responder,
-                    } => {
-                        let (response, task) = {
-                            let (client, request_stream) = create_request_stream();
-                            match datagram::spawn_worker(
-                                domain,
-                                proto,
-                                ctx.clone(),
-                                request_stream,
-                                SocketWorkerProperties {},
-                            ) {
-                                Ok(task) => (Ok(client), Some(task)),
-                                Err(e) => (Err(e), None)
-                            }
-                        };
-                        responder
-                            .send(response)
-                            .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
-                        task
-                    }
-                    psocket::ProviderRequest::DatagramSocket { domain, proto, responder } => {
-                        let (response, task) =  {
-                            let (client, request_stream) = create_request_stream();
-                            match datagram::spawn_worker(
-                                domain,
-                                proto,
-                                ctx.clone(),
-                                request_stream,
-                                SocketWorkerProperties {},
-                            ) {
-                                Ok(task) =>  (Ok(psocket::ProviderDatagramSocketResponse::SynchronousDatagramSocket(
-                                    client,
-                                )), Some(task)),
-                                Err(e) => (Err(e), None)
-                            }
-                        };
-                        responder
-                            .send(response)
-                            .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
-                        task
-                    }
-                    psocket::ProviderRequest::GetInterfaceAddresses { responder } => {
-                        responder
-                            .send(&get_interface_addresses(&ctx))
-                            .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
-                        None
-                    }
+                        ctx.clone(),
+                        request_stream,
+                        SocketWorkerProperties {},
+                        &task_spawner,
+                    )
+                    .map(|()| client);
+                    responder
+                        .send(response)
+                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                }
+                psocket::ProviderRequest::DatagramSocket { domain, proto, responder } => {
+                    let (client, request_stream) = create_request_stream();
+                    let response = datagram::spawn_worker(
+                        domain,
+                        proto,
+                        ctx.clone(),
+                        request_stream,
+                        SocketWorkerProperties {},
+                        &task_spawner,
+                    )
+                    .map(|()| {
+                        psocket::ProviderDatagramSocketResponse::SynchronousDatagramSocket(client)
+                    });
+                    responder
+                        .send(response)
+                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                }
+                psocket::ProviderRequest::GetInterfaceAddresses { responder } => {
+                    responder
+                        .send(&get_interface_addresses(&ctx))
+                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
                 }
             }
-        }).for_each_concurrent(None, |task| {
-            // Wait for all the socket tasks on this provider to finish.
-            task
-        }).await;
+        })
+        .collect::<()>()
+        .await;
+
+    wait_group
 }
 
 pub(crate) fn create_request_stream<T: fidl::endpoints::ProtocolMarker>(

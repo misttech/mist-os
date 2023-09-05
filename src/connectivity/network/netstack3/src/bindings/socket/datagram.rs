@@ -22,7 +22,6 @@ use assert_matches::assert_matches;
 use derivative::Derivative;
 use explicit::ResultExt as _;
 use fidl::endpoints::RequestStream as _;
-use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, prelude::HandleBased as _, Peered as _};
 use net_types::{
     ip::{Ip, IpAddress, IpVersion, Ipv4, Ipv6},
@@ -693,23 +692,30 @@ pub(super) fn spawn_worker(
     ctx: crate::bindings::Ctx,
     events: fposix_socket::SynchronousDatagramSocketRequestStream,
     properties: SocketWorkerProperties,
-) -> Result<fasync::Task<()>, fposix::Errno> {
+    spawner: &worker::ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
+) -> Result<(), fposix::Errno> {
     match (domain, proto) {
         (fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::Udp) => {
-            Ok(fasync::Task::spawn(SocketWorker::serve_stream_with(
+            spawner.spawn(SocketWorker::serve_stream_with(
                 ctx,
                 BindingData::<Ipv4, Udp>::new,
                 properties,
                 events,
-            )))
+                (),
+                spawner.clone(),
+            ));
+            Ok(())
         }
         (fposix_socket::Domain::Ipv6, fposix_socket::DatagramSocketProtocol::Udp) => {
-            Ok(fasync::Task::spawn(SocketWorker::serve_stream_with(
+            spawner.spawn(SocketWorker::serve_stream_with(
                 ctx,
                 BindingData::<Ipv6, Udp>::new,
                 properties,
                 events,
-            )))
+                (),
+                spawner.clone(),
+            ));
+            Ok(())
         }
         (
             fposix_socket::Domain::Ipv4 | fposix_socket::Domain::Ipv6,
@@ -741,19 +747,18 @@ where
     type Request = fposix_socket::SynchronousDatagramSocketRequest;
     type RequestStream = fposix_socket::SynchronousDatagramSocketRequestStream;
     type CloseResponder = fposix_socket::SynchronousDatagramSocketCloseResponder;
-    type TaskFuture = crate::bindings::util::UninstantiableFuture<()>;
+    type SetupArgs = ();
+    type Spawner = ();
+
+    fn setup(&mut self, _ctx: &mut Ctx, _args: (), _spawner: &worker::TaskSpawnerCollection<()>) {}
 
     fn handle_request(
         &mut self,
         ctx: &mut Ctx,
         request: Self::Request,
-    ) -> ControlFlow<Self::CloseResponder, (Option<Self::RequestStream>, Option<Self::TaskFuture>)>
-    {
-        let flow = RequestHandler { ctx, data: self }.handle_request(request);
-        match flow {
-            ControlFlow::Break(b) => ControlFlow::Break(b),
-            ControlFlow::Continue(c) => ControlFlow::Continue((c, None)),
-        }
+        _spawners: &worker::TaskSpawnerCollection<()>,
+    ) -> ControlFlow<Self::CloseResponder, Option<Self::RequestStream>> {
+        RequestHandler { ctx, data: self }.handle_request(request)
     }
 
     fn close(
