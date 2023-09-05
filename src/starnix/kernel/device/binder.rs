@@ -841,8 +841,8 @@ impl<'a> BinderProcessGuard<'a> {
     }
 
     /// Finds the binder object that corresponds to the process-local addresses `local`.
-    pub fn find_object(&self, local: &LocalBinderObject) -> Option<Arc<BinderObject>> {
-        self.objects.get(&local.weak_ref_addr).map(Arc::clone)
+    pub fn find_object(&self, local: &LocalBinderObject) -> Option<&Arc<BinderObject>> {
+        self.objects.get(&local.weak_ref_addr)
     }
 
     /// Finds the binder object that corresponds to the process-local addresses `local`, or creates
@@ -854,7 +854,7 @@ impl<'a> BinderProcessGuard<'a> {
         flags: u32,
     ) -> Arc<BinderObject> {
         if let Some(object) = self.find_object(&local) {
-            object
+            Arc::clone(object)
         } else {
             let object = BinderObject::new(self.base, local, flags);
             self.objects.insert(object.local.weak_ref_addr, object.clone());
