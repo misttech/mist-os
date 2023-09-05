@@ -8,6 +8,10 @@
 #include <fuchsia/mediacodec/cpp/fidl.h>
 #include <lib/media/codec_impl/codec_buffer.h>
 
+#include <map>
+#include <mutex>
+#include <optional>
+
 #include "src/lib/fxl/synchronization/thread_annotations.h"
 #include "src/media/lib/mpsc_queue/mpsc_queue.h"
 

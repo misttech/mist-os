@@ -14,6 +14,7 @@
 #include <zircon/status.h>
 
 #include <memory>
+#include <mutex>
 #include <thread>
 #include <unordered_map>
 #include <utility>

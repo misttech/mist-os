@@ -10,8 +10,10 @@
 #include <lib/zx/clock.h>
 
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
+#include <string_view>
 
 #include "src/media/audio/lib/clock/clock.h"
 #include "src/media/audio/lib/clock/pid_control.h"

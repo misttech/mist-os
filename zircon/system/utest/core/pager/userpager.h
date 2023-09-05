@@ -17,6 +17,7 @@
 #include <zircon/types.h>
 
 #include <memory>
+#include <mutex>
 
 #include <fbl/intrusive_double_list.h>
 

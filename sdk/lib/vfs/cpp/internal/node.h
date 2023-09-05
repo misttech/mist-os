@@ -10,7 +10,10 @@
 #include <lib/fidl/cpp/binding.h>
 #include <limits.h>
 
+#include <memory>
+#include <mutex>
 #include <string_view>
+#include <vector>
 
 namespace vfs {
 namespace internal {

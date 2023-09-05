@@ -10,7 +10,11 @@
 #include <lib/async-loop/default.h>
 #include <lib/fidl/cpp/binding.h>
 
+#include <condition_variable>
 #include <list>
+#include <memory>
+#include <mutex>
+#include <vector>
 
 #include "codec_buffer.h"
 #include "codec_output.h"

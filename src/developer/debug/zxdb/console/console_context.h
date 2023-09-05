@@ -6,6 +6,10 @@
 #define SRC_DEVELOPER_DEBUG_ZXDB_CONSOLE_CONSOLE_CONTEXT_H_
 
 #include <condition_variable>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <string>
 #include <thread>
 #include <unordered_set>
 

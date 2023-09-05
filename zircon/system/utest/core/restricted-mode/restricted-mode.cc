@@ -15,6 +15,7 @@
 #include <zircon/testonly-syscalls.h>
 #include <zircon/threads.h>
 
+#include <mutex>
 #include <thread>
 
 #include <runtime/thread.h>
