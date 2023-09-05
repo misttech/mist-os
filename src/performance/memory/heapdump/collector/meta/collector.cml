@@ -19,6 +19,14 @@
         {
             protocol: [
                 "fuchsia.memory.heapdump.client.Collector",
+
+                // Note: This protocol is only used by the instrumentation
+                // library, which is also part of the the SDK and updated in
+                // lockstep with the package. It can stay in the "internal"
+                // category because nothing else needs to interact with it.
+                //
+                // This is currently being handled as a special case and may be
+                // reconsidered in the future.
                 "fuchsia.memory.heapdump.process.Registry",
             ],
             from: "self",
