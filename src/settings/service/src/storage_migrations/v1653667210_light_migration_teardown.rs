@@ -6,7 +6,6 @@ use crate::migration::{FileGenerator, Migration, MigrationError};
 use anyhow::{anyhow, Context};
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_stash::StoreProxy;
-use setui_metrics_registry::ActiveMigrationsMetricDimensionMigrationId as MigrationIdMetric;
 
 const LIGHT_KEY: &str = "settings_light_info";
 
@@ -17,10 +16,6 @@ pub(crate) struct V1653667210LightMigrationTeardown(pub(crate) StoreProxy);
 impl Migration for V1653667210LightMigrationTeardown {
     fn id(&self) -> u64 {
         1653667210
-    }
-
-    fn cobalt_id(&self) -> u32 {
-        MigrationIdMetric::V1653667210 as u32
     }
 
     async fn migrate(&self, _: FileGenerator) -> Result<(), MigrationError> {

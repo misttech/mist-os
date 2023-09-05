@@ -19,16 +19,11 @@
 use anyhow::{anyhow, bail, Context, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_io::{DirectoryProxy, FileProxy, UnlinkOptions};
-use fidl_fuchsia_metrics::MetricEventLoggerProxy;
 use fuchsia_fs::directory::{readdir, DirEntry, DirentKind};
 use fuchsia_fs::file::WriteError;
 use fuchsia_fs::node::{OpenError, RenameError};
 use fuchsia_fs::OpenFlags;
 use fuchsia_zircon as zx;
-use setui_metrics_registry::{
-    SetuiMetricDimensionError as ErrorMetric, SetuiMetricDimensionMigrationId as MigrationIdMetric,
-    ACTIVE_MIGRATIONS_METRIC_ID, MIGRATION_ERRORS_METRIC_ID,
-};
 use std::collections::{BTreeMap, HashSet};
 
 /// Errors that can occur during an individual migration.
@@ -48,9 +43,8 @@ impl From<Error> for MigrationError {
     }
 }
 
-/// The migration index is a combination of the migration id first, followed by the cobalt id
-/// associated with that same migration id.
-type MigrationIndex = (u64, u32);
+/// The migration index is just the migration id.
+type MigrationIndex = u64;
 
 pub(crate) struct MigrationManager {
     migrations: BTreeMap<MigrationIndex, Box<dyn Migration>>,
@@ -60,7 +54,6 @@ pub(crate) struct MigrationManager {
 pub(crate) struct MigrationManagerBuilder {
     migrations: BTreeMap<MigrationIndex, Box<dyn Migration>>,
     id_set: HashSet<u64>,
-    cobalt_id_set: HashSet<u32>,
     dir_proxy: Option<DirectoryProxy>,
 }
 
@@ -70,12 +63,7 @@ const TMP_MIGRATION_FILE_NAME: &str = "tmp_migrations.txt";
 impl MigrationManagerBuilder {
     /// Construct a new [MigrationManagerBuilder]
     pub(crate) fn new() -> Self {
-        Self {
-            migrations: BTreeMap::new(),
-            id_set: HashSet::new(),
-            cobalt_id_set: HashSet::new(),
-            dir_proxy: None,
-        }
+        Self { migrations: BTreeMap::new(), id_set: HashSet::new(), dir_proxy: None }
     }
 
     /// Register a `migration` with a unique `id`. This will fail if another migration with the same
@@ -86,15 +74,11 @@ impl MigrationManagerBuilder {
 
     fn register_internal(&mut self, migration: Box<dyn Migration>) -> Result<(), Error> {
         let id = migration.id();
-        let cobalt_id = migration.cobalt_id();
         if !self.id_set.insert(id) {
             bail!("migration with id {id} already registered");
         }
-        if !self.cobalt_id_set.insert(cobalt_id) {
-            bail!("migration with cobalt id {cobalt_id} already registered");
-        }
 
-        let _ = self.migrations.insert((id, cobalt_id), migration);
+        let _ = self.migrations.insert(id, migration);
         Ok(())
     }
 
@@ -114,81 +98,10 @@ impl MigrationManagerBuilder {
 }
 
 impl MigrationManager {
-    /// Run all migrations, and then log the results to cobalt. Will only return an error if there
-    /// was an error running the migrations, but not if there's an error logging to cobalt.
-    pub(crate) async fn run_tracked_migrations(
-        self,
-        metric_event_logger_proxy: Option<MetricEventLoggerProxy>,
-    ) -> Result<Option<u64>, (Option<u64>, MigrationError)> {
-        let migration_result = self.run_migrations().await;
-        let (last_migration, migration_result) = match migration_result {
-            Ok(last_migration) => (last_migration, Ok(last_migration.map(|m| m.migration_id))),
-            Err((last_migration, e)) => {
-                (last_migration, Err((last_migration.map(|m| m.migration_id), e)))
-            }
-        };
-        if let Some(metric_event_logger_proxy) = metric_event_logger_proxy {
-            if let Err(e) = Self::log_migration_metrics(
-                last_migration,
-                &migration_result,
-                metric_event_logger_proxy,
-            )
-            .await
-            {
-                tracing::error!("Failed to log migration metrics: {:?}", e);
-            }
-        }
-
-        migration_result
-    }
-
-    /// Log the results of the migration to cobalt.
-    async fn log_migration_metrics(
-        last_migration: Option<LastMigration>,
-        migration_result: &Result<Option<u64>, (Option<u64>, MigrationError)>,
-        metric_event_logger_proxy: MetricEventLoggerProxy,
-    ) -> Result<(), Error> {
-        match last_migration {
-            None => {
-                // When there is no migration id, then the storage is still using stash.
-                metric_event_logger_proxy
-                    .log_occurrence(
-                        ACTIVE_MIGRATIONS_METRIC_ID,
-                        1,
-                        &[MigrationIdMetric::Stash as u32],
-                    )
-                    .await
-                    .context("failed fidl call")?
-                    .map_err(|e| anyhow!("failed to log migration id metric: {:?}", e))?;
-            }
-            Some(LastMigration { cobalt_id, .. }) => {
-                metric_event_logger_proxy
-                    .log_occurrence(ACTIVE_MIGRATIONS_METRIC_ID, 1, &[cobalt_id])
-                    .await
-                    .context("failed fidl call")?
-                    .map_err(|e| anyhow!("failed to log migration id metric: {:?}", e))?;
-            }
-        }
-
-        if let Err((_, e)) = &migration_result {
-            let event_code = match e {
-                MigrationError::NoData => ErrorMetric::NoData,
-                MigrationError::DiskFull => ErrorMetric::DiskFull,
-                MigrationError::Unrecoverable(_) => ErrorMetric::Unrecoverable,
-            } as u32;
-            metric_event_logger_proxy
-                .log_occurrence(MIGRATION_ERRORS_METRIC_ID, 1, &[event_code])
-                .await
-                .context("failed fidl call")?
-                .map_err(|e| anyhow!("failed to log migration error metric: {:?}", e))?;
-        }
-        Ok(())
-    }
-
     /// Run all registered migrations. On success will return final migration number if there are
     /// any registered migrations. On error it will return the most recent migration number that was
     /// able to complete, along with the migration error.
-    async fn run_migrations(
+    pub(crate) async fn run_migrations(
         mut self,
     ) -> Result<Option<LastMigration>, (Option<LastMigration>, MigrationError)> {
         let last_migration = {
@@ -228,10 +141,8 @@ impl MigrationManager {
                         .parse()
                         .context("Failed to parse migration id from migrations.txt")
                         .map_err(|e| (None, e.into()))?;
-                    if let Some(&(_, cobalt_id)) =
-                        self.migrations.keys().find(|(id, _)| *id == migration_id)
-                    {
-                        LastMigration { migration_id, cobalt_id }
+                    if self.migrations.keys().any(|id| *id == migration_id) {
+                        LastMigration { migration_id }
                     } else {
                         tracing::warn!(
                             "Unknown migration {migration_id}, reverting to default data"
@@ -246,10 +157,7 @@ impl MigrationManager {
                         // fallback handling is in place. This is safe for now since Light settings
                         // are always overwritten. The follow-up must be compatible with this
                         // fallback.
-                        let last_migration = LastMigration {
-                            migration_id: 1653667210,
-                            cobalt_id: MigrationIdMetric::V1653667210 as u32,
-                        };
+                        let last_migration = LastMigration { migration_id: 1653667210 };
                         Self::write_migration_file(&self.dir_proxy, last_migration.migration_id)
                             .await
                             .map_err(|e| (Some(last_migration), e))?;
@@ -270,10 +178,10 @@ impl MigrationManager {
         let mut new_last_migration = last_migration;
 
         // Skip over migrations already previously completed.
-        for ((id, cobalt_id), migration) in self
+        for (id, migration) in self
             .migrations
             .into_iter()
-            .skip_while(|&((id, _), _)| id != last_migration.migration_id)
+            .skip_while(|&(id, _)| id != last_migration.migration_id)
             .skip(1)
         {
             Self::run_single_migration(
@@ -292,7 +200,7 @@ impl MigrationManager {
                 };
                 (Some(new_last_migration), e)
             })?;
-            new_last_migration = LastMigration { migration_id: id, cobalt_id };
+            new_last_migration = LastMigration { migration_id: id };
         }
 
         // Remove old files that don't match the current pattern.
@@ -416,12 +324,12 @@ impl MigrationManager {
         // Try to run the first migration. If it fails because there's no data in stash then we can
         // use default values and skip to the final migration number. If it fails because the disk
         // is full, propagate the error up so the main client can decide how to gracefully fallback.
-        let &(id, cobalt_id) = if let Some(key) = self.migrations.keys().next() {
+        let &id = if let Some(key) = self.migrations.keys().next() {
             key
         } else {
             return Ok(None);
         };
-        let migration = self.migrations.get(&(id, cobalt_id)).unwrap();
+        let migration = self.migrations.get(&id).unwrap();
         if let Err(migration_error) =
             Self::run_single_migration(&self.dir_proxy, 0, &**migration).await
         {
@@ -434,7 +342,7 @@ impl MigrationManager {
                         .keys()
                         .last()
                         .copied()
-                        .map(|(id, cobalt_id)| LastMigration { migration_id: id, cobalt_id });
+                        .map(|id| LastMigration { migration_id: id });
                     if let Some(last_migration) = migration_id.as_ref() {
                         Self::write_migration_file(&self.dir_proxy, last_migration.migration_id)
                             .await?;
@@ -450,7 +358,7 @@ impl MigrationManager {
             }
         }
 
-        Ok(Some(LastMigration { migration_id: id, cobalt_id }))
+        Ok(Some(LastMigration { migration_id: id }))
     }
 }
 
@@ -508,36 +416,29 @@ impl FileGenerator {
 #[async_trait]
 pub(crate) trait Migration {
     fn id(&self) -> u64;
-    fn cobalt_id(&self) -> u32;
     async fn migrate(&self, file_generator: FileGenerator) -> Result<(), MigrationError>;
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct LastMigration {
-    migration_id: u64,
-    cobalt_id: u32,
+    pub(crate) migration_id: u64,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use fasync::Task;
-    use fidl::endpoints::{create_proxy, create_proxy_and_stream, ServerEnd};
+    use fidl::endpoints::{create_proxy, ServerEnd};
     use fidl::Vmo;
     use fidl_fuchsia_io::{DirectoryMarker, DirectoryProxy};
-    use fidl_fuchsia_metrics::{
-        MetricEventLoggerMarker, MetricEventLoggerRequest, MetricEventLoggerRequestStream,
-    };
     use fuchsia_async as fasync;
     use fuchsia_fs::OpenFlags;
     use futures::future::BoxFuture;
     use futures::lock::Mutex;
-    use futures::{FutureExt, StreamExt};
+    use futures::FutureExt;
     use std::collections::HashMap;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
-    use test_case::test_case;
     use vfs::directory::entry::DirectoryEntry;
     use vfs::directory::mutable::simple::tree_constructor;
     use vfs::execution_scope::ExecutionScope;
@@ -545,7 +446,7 @@ mod tests {
     use vfs::mut_pseudo_directory;
 
     #[async_trait]
-    impl<T> Migration for (u64, u32, T)
+    impl<T> Migration for (u64, T)
     where
         T: Fn(FileGenerator) -> BoxFuture<'static, Result<(), MigrationError>> + Send + Sync,
     {
@@ -553,20 +454,14 @@ mod tests {
             self.0
         }
 
-        fn cobalt_id(&self) -> u32 {
-            self.1
-        }
-
         async fn migrate(&self, file_generator: FileGenerator) -> Result<(), MigrationError> {
-            (self.2)(file_generator).await
+            (self.1)(file_generator).await
         }
     }
 
     const ID_FILE_SIZE: Option<u64> = Some(15);
     const ID: u64 = 20_220_130_120_000;
-    const COBALT_ID: u32 = 99;
     const ID2: u64 = 20_220_523_120_000;
-    const COBALT_ID2: u32 = 100;
     const DATA_FILE_NAME: &str = "test_20220130120000.pfidl";
     const DATA_FILE_SIZE: Option<u64> = Some(1);
 
@@ -574,10 +469,10 @@ mod tests {
     fn cannot_register_same_id_twice() {
         let mut builder = MigrationManagerBuilder::new();
         builder
-            .register((ID, COBALT_ID, Box::new(|_| async move { Ok(()) }.boxed())))
+            .register((ID, Box::new(|_| async move { Ok(()) }.boxed())))
             .expect("should register once");
         let result = builder
-            .register((ID, COBALT_ID, Box::new(|_| async move { Ok(()) }.boxed())))
+            .register((ID, Box::new(|_| async move { Ok(()) }.boxed())))
             .map_err(|e| format!("{e:}"));
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "migration with id 20220130120000 already registered");
@@ -629,7 +524,6 @@ mod tests {
         builder
             .register((
                 ID,
-                COBALT_ID,
                 Box::new({
                     let migration_ran = Arc::clone(&migration_ran);
                     move |_| {
@@ -649,8 +543,7 @@ mod tests {
         let result = migration_manager.run_migrations().await;
         assert_matches!(
             result,
-            Ok(Some(LastMigration { migration_id: id, cobalt_id }))
-                if id == ID && cobalt_id == COBALT_ID
+            Ok(Some(LastMigration { migration_id: id })) if id == ID
         );
         let migration_file = fuchsia_fs::directory::open_file(
             &directory,
@@ -677,7 +570,6 @@ mod tests {
         builder
             .register((
                 ID,
-                COBALT_ID,
                 Box::new({
                     let migration_ran = Arc::clone(&migration_ran);
                     move |_| {
@@ -697,8 +589,7 @@ mod tests {
         let result = migration_manager.run_migrations().await;
         assert_matches!(
             result,
-            Ok(Some(LastMigration { migration_id: id, cobalt_id }))
-                if id == ID && cobalt_id == COBALT_ID
+            Ok(Some(LastMigration { migration_id: id })) if id == ID
         );
         let migration_file = fuchsia_fs::directory::open_file(
             &directory,
@@ -747,7 +638,6 @@ mod tests {
         builder
             .register((
                 ID,
-                COBALT_ID,
                 Box::new({
                     let migration_ran = Arc::clone(&migration_1_ran);
                     move |_| {
@@ -765,7 +655,6 @@ mod tests {
         builder
             .register((
                 ID2,
-                COBALT_ID2,
                 Box::new({
                     let migration_ran = Arc::clone(&migration_2_ran);
                     move |_| {
@@ -785,8 +674,7 @@ mod tests {
         let result = migration_manager.run_migrations().await;
         assert_matches!(
             result,
-            Ok(Some(LastMigration { migration_id: id, cobalt_id }))
-                if id == ID2 && cobalt_id == COBALT_ID2
+            Ok(Some(LastMigration { migration_id: id })) if id == ID2
         );
         assert!(migration_1_ran.load(Ordering::SeqCst));
         assert!(migration_2_ran.load(Ordering::SeqCst));
@@ -805,7 +693,6 @@ mod tests {
         builder
             .register((
                 ID,
-                COBALT_ID,
                 Box::new({
                     let migration_ran = Arc::clone(&migration_ran);
                     move |_| {
@@ -825,8 +712,7 @@ mod tests {
         let result = migration_manager.run_migrations().await;
         assert_matches!(
             result,
-            Ok(Some(LastMigration { migration_id: id, cobalt_id }))
-                if id == ID && cobalt_id == COBALT_ID
+            Ok(Some(LastMigration { migration_id: id })) if id == ID
         );
         assert!(!migration_ran.load(Ordering::SeqCst));
     }
@@ -843,7 +729,6 @@ mod tests {
         builder
             .register((
                 ID,
-                COBALT_ID,
                 Box::new({
                     let initial_migration_ran = Arc::clone(&initial_migration_ran);
                     move |_| {
@@ -862,7 +747,6 @@ mod tests {
         builder
             .register((
                 ID2,
-                COBALT_ID2,
                 Box::new({
                     let second_migration_ran = Arc::clone(&second_migration_ran);
                     move |_| {
@@ -882,8 +766,8 @@ mod tests {
         let result = migration_manager.run_migrations().await;
         assert_matches!(
             result,
-            Err((Some(LastMigration { migration_id: id, cobalt_id }), MigrationError::NoData))
-                if id == ID && cobalt_id == COBALT_ID
+            Err((Some(LastMigration { migration_id: id }), MigrationError::NoData))
+                if id == ID
         );
         assert!(!initial_migration_ran.load(Ordering::SeqCst));
         assert!(second_migration_ran.load(Ordering::SeqCst));
@@ -903,7 +787,6 @@ mod tests {
         builder
             .register((
                 ID,
-                COBALT_ID,
                 Box::new({
                     let migration_ran = Arc::clone(&migration_ran);
                     move |_| {
@@ -922,7 +805,6 @@ mod tests {
         builder
             .register((
                 ID2,
-                COBALT_ID2,
                 Box::new({
                     let migration_ran = Arc::clone(&migration_ran);
                     move |file_generator: FileGenerator| {
@@ -946,8 +828,7 @@ mod tests {
         let result = migration_manager.run_migrations().await;
         assert_matches!(
             result,
-            Ok(Some(LastMigration { migration_id: id, cobalt_id }))
-                if id == ID2 && cobalt_id == COBALT_ID2
+            Ok(Some(LastMigration { migration_id: id })) if id == ID2
         );
 
         let migration_file = fuchsia_fs::directory::open_file(
@@ -991,7 +872,6 @@ mod tests {
         builder
             .register((
                 ID,
-                COBALT_ID,
                 Box::new({
                     let migration_ran = Arc::clone(&migration_ran);
                     move |_| {
@@ -1010,9 +890,9 @@ mod tests {
 
         let result = migration_manager.run_migrations().await;
         assert_matches!(result, Err((Some(LastMigration {
-                    migration_id, cobalt_id
+                    migration_id
                 }), MigrationError::Unrecoverable(_)))
-            if migration_id == LIGHT_MIGRATION && cobalt_id == MigrationIdMetric::V1653667210 as u32);
+            if migration_id == LIGHT_MIGRATION);
 
         let migration_file = fuchsia_fs::directory::open_file(
             &directory,
@@ -1027,177 +907,5 @@ mod tests {
             .parse()
             .expect("should be a number");
         assert_eq!(migration_number, LIGHT_MIGRATION);
-    }
-
-    /// Setup the event logger, It will track whether the expected metric id and event get
-    /// triggered.
-    fn setup_event_logger(
-        mut stream: MetricEventLoggerRequestStream,
-        triggered: Arc<AtomicBool>,
-        expected_metric_ids: Vec<u32>,
-        expected_event_codes: Vec<u32>,
-    ) -> Task<()> {
-        fasync::Task::spawn(async move {
-            let mut index = 0;
-            while let Some(Ok(request)) = stream.next().await {
-                if let MetricEventLoggerRequest::LogOccurrence {
-                    metric_id,
-                    count,
-                    responder,
-                    event_codes,
-                } = request
-                {
-                    triggered.store(true, Ordering::SeqCst);
-                    assert_eq!(metric_id, expected_metric_ids[index]);
-                    assert_eq!(count, 1);
-                    assert_eq!(event_codes[0], expected_event_codes[index]);
-                    let _ = responder.send(Ok(()));
-                    index += 1;
-                }
-            }
-        })
-    }
-
-    #[fasync::run_until_stalled(test)]
-    async fn logs_migration_on_success() {
-        let (proxy, stream) = create_proxy_and_stream::<MetricEventLoggerMarker>().unwrap();
-
-        let triggered = Arc::new(AtomicBool::new(false));
-        let join_handle = setup_event_logger(
-            stream,
-            Arc::clone(&triggered),
-            vec![ACTIVE_MIGRATIONS_METRIC_ID],
-            vec![COBALT_ID],
-        );
-
-        let fs = mut_pseudo_directory! {
-            MIGRATION_FILE_NAME => read_write(ID.to_string(), ID_FILE_SIZE),
-            DATA_FILE_NAME => read_write(b"", DATA_FILE_SIZE),
-        };
-        let (directory, _vmo_map) = serve_vfs_dir(fs);
-        let mut builder = MigrationManagerBuilder::new();
-        let migration_ran = Arc::new(AtomicBool::new(false));
-
-        builder
-            .register((
-                ID,
-                COBALT_ID,
-                Box::new({
-                    let migration_ran = Arc::clone(&migration_ran);
-                    move |_| {
-                        let migration_ran = Arc::clone(&migration_ran);
-                        async move {
-                            migration_ran.store(true, Ordering::SeqCst);
-                            Ok(())
-                        }
-                        .boxed()
-                    }
-                }),
-            ))
-            .expect("can register");
-        builder.set_migration_dir(directory);
-        let migration_manager = builder.build();
-
-        let result = migration_manager.run_tracked_migrations(Some(proxy)).await;
-        assert_matches!(result, Ok(Some(ID)));
-
-        join_handle.await;
-        assert!(triggered.load(Ordering::SeqCst));
-    }
-
-    #[fasync::run_until_stalled(test)]
-    async fn logs_stash_on_no_migrations() {
-        let (proxy, stream) = create_proxy_and_stream::<MetricEventLoggerMarker>().unwrap();
-
-        let triggered = Arc::new(AtomicBool::new(false));
-        let join_handle = setup_event_logger(
-            stream,
-            Arc::clone(&triggered),
-            vec![ACTIVE_MIGRATIONS_METRIC_ID],
-            vec![MigrationIdMetric::Stash as u32],
-        );
-
-        let fs = mut_pseudo_directory! {};
-        let (directory, _vmo_map) = serve_vfs_dir(fs);
-        let mut builder = MigrationManagerBuilder::new();
-        builder.set_migration_dir(Clone::clone(&directory));
-        let migration_manager = builder.build();
-
-        let result = migration_manager.run_tracked_migrations(Some(proxy)).await;
-        assert_matches!(result, Ok(None));
-
-        join_handle.await;
-        assert!(triggered.load(Ordering::SeqCst));
-    }
-
-    #[allow(clippy::unused_unit)]
-    #[test_case(MigrationError::NoData, MigrationError::NoData, ErrorMetric::NoData)]
-    #[test_case(MigrationError::DiskFull, MigrationError::DiskFull, ErrorMetric::DiskFull)]
-    #[test_case(
-        MigrationError::Unrecoverable(anyhow!("abc")),
-        MigrationError::Unrecoverable(anyhow!("abc")),
-        ErrorMetric::Unrecoverable
-    )]
-    #[fasync::run_until_stalled(test)]
-    async fn logs_error_on_migration_error(
-        generated_error: MigrationError,
-        expected_error: MigrationError,
-        expected_event_code: ErrorMetric,
-    ) {
-        let generated_error = Arc::new(Mutex::new(Some(generated_error)));
-        let (proxy, stream) = create_proxy_and_stream::<MetricEventLoggerMarker>().unwrap();
-
-        let triggered = Arc::new(AtomicBool::new(false));
-        let join_handle = setup_event_logger(
-            stream,
-            Arc::clone(&triggered),
-            vec![ACTIVE_MIGRATIONS_METRIC_ID, MIGRATION_ERRORS_METRIC_ID],
-            vec![COBALT_ID, expected_event_code as u32],
-        );
-
-        let fs = mut_pseudo_directory! {
-            MIGRATION_FILE_NAME => read_write(ID.to_string(), ID_FILE_SIZE),
-            DATA_FILE_NAME => read_write(b"", DATA_FILE_SIZE),
-        };
-        let (directory, _vmo_map) = serve_vfs_dir(fs);
-        let mut builder = MigrationManagerBuilder::new();
-
-        builder
-            .register((ID, COBALT_ID, Box::new(move |_| async move { Ok(()) }.boxed())))
-            .expect("can register");
-
-        builder
-            .register((
-                ID2,
-                COBALT_ID2,
-                Box::new({
-                    let generated_error = Arc::clone(&generated_error);
-                    move |_| {
-                        let generated_error = Arc::clone(&generated_error);
-                        async move {
-                            let generated_error = generated_error.lock().await.take().unwrap();
-                            Err(generated_error)
-                        }
-                        .boxed()
-                    }
-                }),
-            ))
-            .expect("can register");
-        builder.set_migration_dir(directory);
-        let migration_manager = builder.build();
-
-        let result = migration_manager.run_tracked_migrations(Some(proxy)).await;
-        assert!(matches!(
-            (result, expected_error),
-            (Err((Some(id), MigrationError::NoData)), MigrationError::NoData)
-                | (Err((Some(id), MigrationError::DiskFull)), MigrationError::DiskFull)
-                | (
-                    Err((Some(id), MigrationError::Unrecoverable(_))),
-                    MigrationError::Unrecoverable(_)
-                ) if id == ID
-        ));
-
-        join_handle.await;
-        assert!(triggered.load(Ordering::SeqCst));
     }
 }

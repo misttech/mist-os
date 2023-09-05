@@ -35,7 +35,6 @@ icu_rustc_library("lib") {
   ]
 
   deps = [
-    ":setui_metrics_registry",
     "storage_fidl:fuchsia.settings.storage_rust",
     "//sdk/fidl/fuchsia.camera3:fuchsia.camera3_rust",
     "//sdk/fidl/fuchsia.hardware.light:fuchsia.hardware.light_rust",
@@ -47,7 +46,6 @@ icu_rustc_library("lib") {
     "//sdk/fidl/fuchsia.media.audio:fuchsia.media.audio_rust",
     "//sdk/fidl/fuchsia.media.sessions2:fuchsia.media.sessions2_rust",
     "//sdk/fidl/fuchsia.media.sounds:fuchsia.media.sounds_rust",
-    "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//sdk/fidl/fuchsia.recovery.policy:fuchsia.recovery.policy_rust",
     "//sdk/fidl/fuchsia.settings:fuchsia.settings_rust",
     "//sdk/fidl/fuchsia.settings.policy:fuchsia.settings.policy_rust",
@@ -94,7 +92,6 @@ icu_rustc_library("lib") {
     "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:pin-utils",
     "//third_party/rust_crates:rand",
-    "//third_party/rust_crates:test-case",
   ]
 
   sources = [
@@ -259,11 +256,6 @@ icu_rustc_library("lib") {
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
-metrics_registry("setui_metrics_registry") {
-  project_id = 16
-  generate_rust = true
-}
-
 fuchsia_unittest_package("setui_service_tests") {
   component_name = "settings_lib_test"
   manifest = "meta/settings_lib_test.cml"
@@ -311,7 +303,6 @@ icu_rustc_binary("bin") {
   icu_deps = [ ":lib" ]
 
   deps = [
-    "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//sdk/fidl/fuchsia.stash:fuchsia.stash_rust",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",

@@ -13,7 +13,6 @@ use fidl_fuchsia_settings_storage::LightGroups;
 use fidl_fuchsia_stash::{StoreProxy, Value};
 use fuchsia_zircon as zx;
 use settings_storage::fidl_storage::FidlStorageConvertible;
-use setui_metrics_registry::ActiveMigrationsMetricDimensionMigrationId as MigrationIdMetric;
 
 const LIGHT_KEY: &str = "settings_light_info";
 
@@ -24,10 +23,6 @@ pub(crate) struct V1653667208LightMigration(pub(crate) StoreProxy);
 impl Migration for V1653667208LightMigration {
     fn id(&self) -> u64 {
         1653667208
-    }
-
-    fn cobalt_id(&self) -> u32 {
-        MigrationIdMetric::V1653667208 as u32
     }
 
     async fn migrate(&self, file_generator: FileGenerator) -> Result<(), MigrationError> {

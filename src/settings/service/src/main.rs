@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Error};
-use fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker;
 use fidl_fuchsia_stash::StoreMarker;
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
@@ -111,9 +110,6 @@ fn main() -> Result<(), Error> {
         )
         .storage_dir(storage_dir)
         .store_proxy(store_proxy)
-        .metric_event_logger_factory_proxy(
-            connect_to_protocol::<MetricEventLoggerFactoryMarker>().ok(),
-        )
         .spawn(executor, fs)
         .context("Failed to spawn environment for setui")
 }
