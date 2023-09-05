@@ -2918,3 +2918,16 @@
   reviewers: ['jamesr@google.com', 'mvanotti@google.com', 'rashaeqbal@google.com']
   submitted: '2023-05-22'
   reviewed: '2023-08-14'
+
+- name: 'RFC-0224'
+  title: 'Userspace J-Extension Pointer Masking'
+  short_description: 'Changes needed to accomodate the RISC-V pointer masking extension.'
+  authors: ['leonardchan@google.com']
+  file: '0224_userspace_pointer_masking.md'
+  area: ['Kernel']
+  issue: []
+  gerrit_change_id: ['817252']
+  status: 'Accepted'
+  reviewers: ['maniscalco@google.com', 'travisg@google.com', 'mvanotti@google.com', 'mcgrathr@google.com', 'phosek@google.com']
+  submitted: '2023-03-09'
+  reviewed: '2023-09-05'

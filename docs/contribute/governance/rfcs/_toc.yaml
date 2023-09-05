@@ -462,3 +462,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0222_fuchsia_controller.md
   - title: "RFC-0223: zx_vmo_transfer_data"
     path: /docs/contribute/governance/rfcs/0223_zx_vmo_transfer_data.md
+  - title: "RFC-0224: Userspace J-Extension Pointer Masking"
+    path: /docs/contribute/governance/rfcs/0224_userspace_pointer_masking.md
