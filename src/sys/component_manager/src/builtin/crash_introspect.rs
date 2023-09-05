@@ -3,17 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    crate::builtin::capability::BuiltinCapability,
-    ::routing::capability_source::InternalCapability, anyhow::Error, async_trait::async_trait,
-    cm_types::Name, elf_runner::crash_info::CrashRecords, fidl_fuchsia_component as fcomponent,
-    fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx, futures::TryStreamExt,
-    lazy_static::lazy_static, std::sync::Arc,
+    anyhow::Error, elf_runner::crash_info::CrashRecords, fidl_fuchsia_component as fcomponent,
+    fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx, futures::TryStreamExt, std::sync::Arc,
 };
-
-lazy_static! {
-    static ref CRASH_RECORDS_CAPABILITY_NAME: Name =
-        "fuchsia.sys2.CrashIntrospect".parse().unwrap();
-}
 
 pub struct CrashIntrospectSvc(CrashRecords);
 
@@ -21,14 +13,8 @@ impl CrashIntrospectSvc {
     pub fn new(crash_records: CrashRecords) -> Arc<Self> {
         Arc::new(Self(crash_records))
     }
-}
 
-#[async_trait]
-impl BuiltinCapability for CrashIntrospectSvc {
-    const NAME: &'static str = "CrashIntrospect";
-    type Marker = fsys::CrashIntrospectMarker;
-
-    async fn serve(
+    pub async fn serve(
         self: Arc<Self>,
         mut stream: fsys::CrashIntrospectRequestStream,
     ) -> Result<(), Error> {
@@ -44,10 +30,6 @@ impl BuiltinCapability for CrashIntrospectSvc {
             }
         }
         Ok(())
-    }
-
-    fn matches_routed_capability(&self, capability: &InternalCapability) -> bool {
-        capability.matches_protocol(&CRASH_RECORDS_CAPABILITY_NAME)
     }
 }
 

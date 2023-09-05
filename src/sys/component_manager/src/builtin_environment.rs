@@ -431,7 +431,6 @@ pub struct BuiltinEnvironment {
     pub smc_resource: Option<Arc<SmcResource>>,
     pub utc_time_maintainer: Option<Arc<UtcTimeMaintainer>>,
     pub vmex_resource: Option<Arc<VmexResource>>,
-    pub crash_records_svc: Arc<CrashIntrospectSvc>,
     pub svc_stash_provider: Option<Arc<SvcStashCapability>>,
 
     pub binder_capability_host: Arc<BinderCapabilityHost>,
@@ -572,7 +571,9 @@ impl BuiltinEnvironment {
 
         // Set up CrashRecords service.
         let crash_records_svc = CrashIntrospectSvc::new(crash_records);
-        model.root().hooks.install(crash_records_svc.hooks()).await;
+        sandbox_builder.add_builtin_protocol_if_enabled::<fsys::CrashIntrospectMarker>(
+            move |stream| crash_records_svc.clone().serve(stream).boxed(),
+        );
 
         // Set up KernelStats service.
         let info_resource_handle = system_resource_handle
@@ -956,7 +957,6 @@ impl BuiltinEnvironment {
             #[cfg(target_arch = "aarch64")]
             smc_resource: _smc_resource,
             vmex_resource,
-            crash_records_svc,
             svc_stash_provider,
             root_resource,
             utc_time_maintainer,
