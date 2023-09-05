@@ -1870,14 +1870,9 @@ impl CurrentTask {
         };
 
         let offset = head.futex_offset;
-        if head.list.next.addr.addr as usize == robust_list_addr.ptr() {
-            // There is a list, but it is empty
-            return;
-        }
 
         let mut curr_ptr = head.list.next;
-        let null_ref = uaddr { addr: 0 };
-        while curr_ptr.addr != null_ref {
+        while curr_ptr.addr != robust_list_addr.into() {
             let curr_ref = self.mm.read_object(curr_ptr.into());
 
             let curr = if let Ok(curr) = curr_ref {

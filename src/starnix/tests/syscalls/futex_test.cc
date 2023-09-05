@@ -43,9 +43,31 @@ TEST(RobustFutexTest, FutexStateCheck) {
       head.list.next = reinterpret_cast<struct robust_list *>(&entry);
       EXPECT_EQ(0, syscall(SYS_set_robust_list, &head, sizeof(robust_list_head)));
       entry.futex = static_cast<int>(syscall(SYS_gettid));
+      entry.next = reinterpret_cast<struct robust_list *>(&head);
       // Thread dies without releasing futex, so futex's FUTEX_OWNER_DIED bit is set.
     });
     t.join();
+    EXPECT_EQ(FUTEX_OWNER_DIED, entry.futex & FUTEX_OWNER_DIED);
+  });
+}
+
+// Tests that an entry with next = NULL doesn't cause issues.
+TEST(RobustFutexTest, NullEntryStopsProcessing) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([] {
+    robust_list_entry entry = {.next = nullptr, .futex = 0};
+    robust_list_head head = {.list = {.next = nullptr},
+                             .futex_offset = offsetof(robust_list_entry, futex),
+                             .list_op_pending = nullptr};
+
+    std::thread t([&entry, &head]() {
+      head.list.next = reinterpret_cast<struct robust_list *>(&entry);
+      EXPECT_EQ(0, syscall(SYS_set_robust_list, &head, sizeof(robust_list_head)));
+      entry.futex = static_cast<int>(syscall(SYS_gettid));
+      entry.next = nullptr;
+    });
+    t.join();
+    // We expect the first entry to be correctly modified.
     EXPECT_EQ(FUTEX_OWNER_DIED, entry.futex & FUTEX_OWNER_DIED);
   });
 }
@@ -64,7 +86,7 @@ TEST(RobustFutexTest, FutexStateAfterExecCheck) {
     robust_list_entry *entry = reinterpret_cast<robust_list_entry *>(
         reinterpret_cast<intptr_t>(shared) + sizeof(robust_list_head));
 
-    *entry = {.next = nullptr, .futex = 0};
+    *entry = {.next = reinterpret_cast<struct robust_list *>(head), .futex = 0};
     *head = {.list = {.next = reinterpret_cast<struct robust_list *>(entry)},
              .futex_offset = offsetof(robust_list_entry, futex),
              .list_op_pending = nullptr};
