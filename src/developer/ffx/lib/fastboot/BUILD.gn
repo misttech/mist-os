@@ -59,6 +59,7 @@ if (is_host) {
       "src/boot/mod.rs",
       "src/common/cmd.rs",
       "src/common/crypto.rs",
+      "src/common/fastboot_interface.rs",
       "src/common/mod.rs",
       "src/common/vars.rs",
       "src/file_resolver/gcs.rs",
