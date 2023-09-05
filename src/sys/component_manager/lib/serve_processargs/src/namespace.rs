@@ -2,27 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    cm_types::Path,
-    fuchsia_zircon::HandleBased,
-    futures::stream::FuturesUnordered,
-    futures::{
-        channel::mpsc::{unbounded, UnboundedSender},
-        future::BoxFuture,
-        FutureExt, StreamExt,
-    },
-    process_builder::NamespaceEntry,
-    sandbox::{AnyCapability, Dict, Open, Remote},
-    std::collections::HashMap,
-    std::ffi::CString,
-    std::ffi::NulError,
-    thiserror::Error,
+use futures::stream::FuturesUnordered;
+use futures::{
+    channel::mpsc::{unbounded, UnboundedSender},
+    future::BoxFuture,
+    FutureExt, StreamExt,
 };
+use namespace::{Entry as NamespaceEntry, Path as NamespacePath, PathError};
+use sandbox::{AnyCapability, Dict, Open, Remote};
+use std::collections::HashMap;
+use thiserror::Error;
 
 /// A builder object for assembling a program's incoming namespace.
 pub struct Namespace {
     /// Mapping from namespace path to capabilities that can be turned into `Open`.
-    entries: HashMap<CString, AnyCapability>,
+    entries: HashMap<NamespacePath, AnyCapability>,
 
     /// Path-not-found errors are sent here.
     not_found: UnboundedSender<String>,
@@ -32,25 +26,25 @@ pub struct Namespace {
     namespace_checker: NamespaceChecker,
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum NamespaceError {
-    #[error("path `{0}` has an embedded nul")]
-    EmbeddedNul(String, #[source] NulError),
+    #[error("path is invalid for a namespace entry: `{0}`")]
+    InvalidPath(#[from] PathError),
 
     #[error(
         "the parent of path `{0}` shares a prefix sequence of directories with another namespace entry. \
         This is not supported."
     )]
-    Shadow(Path),
+    Shadow(NamespacePath),
 
     #[error("cannot install two capabilities at the same namespace path `{0}`")]
-    Duplicate(Path),
+    Duplicate(NamespacePath),
 
     #[error(
         "while installing capabilities within the namespace entry `{path}`, \
         failed to convert the namespace entry to Open"
     )]
-    TryIntoOpenError { path: String },
+    TryIntoOpenError { path: NamespacePath },
 }
 
 impl Namespace {
@@ -68,12 +62,12 @@ impl Namespace {
     pub fn add_object(
         self: &mut Self,
         cap: AnyCapability,
-        path: &Path,
+        path: &NamespacePath,
     ) -> Result<(), NamespaceError> {
-        let c_str = self.namespace_checker.add_parent(path)?;
+        let dirname = self.namespace_checker.add_parent(path)?;
 
         // If these is no such entry, make an empty dictionary.
-        let dict: &mut AnyCapability = self.entries.entry(c_str).or_insert_with(|| {
+        let dict: &mut AnyCapability = self.entries.entry(dirname).or_insert_with(|| {
             let (dict, fut) = make_dict_with_not_found_logging(
                 path.dirname().clone().into(),
                 self.not_found.clone(),
@@ -104,16 +98,16 @@ impl Namespace {
     pub fn add_entry(
         self: &mut Self,
         cap: AnyCapability,
-        path: &Path,
+        path: &NamespacePath,
     ) -> Result<(), NamespaceError> {
-        let c_str = self.namespace_checker.add(path)?;
+        let path = self.namespace_checker.add(path)?;
 
         // Ensure that there is no such entry beforehand.
-        if self.entries.contains_key(&c_str) {
+        if self.entries.contains_key(&path) {
             return Err(NamespaceError::Duplicate(path.clone()));
         }
 
-        self.entries.insert(c_str, cap);
+        self.entries.insert(path, cap);
         Ok(())
     }
 
@@ -124,9 +118,9 @@ impl Namespace {
         let mut futures = self.futures;
 
         for (path, cap) in self.entries {
-            let open: Open = cap.try_into().map_err(|_| NamespaceError::TryIntoOpenError {
-                path: path.to_string_lossy().into_owned(),
-            })?;
+            let open: Open = cap
+                .try_into()
+                .map_err(|_| NamespaceError::TryIntoOpenError { path: path.clone() })?;
             let (client_end, fut) = Box::new(open).to_zx_handle();
 
             ns.push(NamespaceEntry { path, directory: client_end.into() });
@@ -190,25 +184,23 @@ impl NamespaceChecker {
         NamespaceChecker { root: TreeNode::IntermediateDir(HashMap::new()) }
     }
 
-    fn add_parent(self: &mut Self, path: &Path) -> Result<CString, NamespaceError> {
+    fn add_parent(self: &mut Self, path: &NamespacePath) -> Result<NamespacePath, NamespaceError> {
         let mut names = path.split();
         // Get rid of the last path component to obtain only names corresponding to directory nodes.
         // Path has been validated to must not be empty.
         let _ = names.pop().unwrap();
         Self::add_path(&mut self.root, names.into_iter())
             .map_err(|_: ShadowError| NamespaceError::Shadow(path.clone()))?;
-        let c_str = CString::new(path.dirname().to_string())
-            .map_err(|e| NamespaceError::EmbeddedNul(path.dirname().to_string(), e))?;
-        Ok(c_str)
+        let path = NamespacePath::new(path.dirname())?;
+        Ok(path)
     }
 
-    fn add(self: &mut Self, path: &Path) -> Result<CString, NamespaceError> {
+    fn add(self: &mut Self, path: &NamespacePath) -> Result<NamespacePath, NamespaceError> {
         let names = path.split();
         Self::add_path(&mut self.root, names.into_iter())
             .map_err(|_: ShadowError| NamespaceError::Shadow(path.clone()))?;
-        let c_str = CString::new(path.as_str().to_string())
-            .map_err(|e| NamespaceError::EmbeddedNul(path.as_str().to_string(), e))?;
-        Ok(c_str)
+        let path = NamespacePath::new(path.as_str())?;
+        Ok(path)
     }
 
     fn add_path(
@@ -248,18 +240,24 @@ mod tests {
         crate::test_util::multishot,
         anyhow::Result,
         assert_matches::assert_matches,
+        cm_types::Path,
         fidl::{endpoints::Proxy, AsHandleRef, Peered},
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_fs::directory::DirEntry,
         fuchsia_zircon as zx,
+        fuchsia_zircon::HandleBased,
         futures::StreamExt,
         std::str::FromStr,
     };
 
+    fn ns_path(str: &str) -> NamespacePath {
+        Path::from_str(str).unwrap().into()
+    }
+
     fn parents_valid(paths: Vec<&str>) -> Result<(), NamespaceError> {
         let mut shadow = NamespaceChecker::new();
         for path in paths {
-            shadow.add_parent(&Path::from_str(path).unwrap())?;
+            shadow.add_parent(&ns_path(path))?;
         }
         Ok(())
     }
@@ -274,12 +272,12 @@ mod tests {
         assert_matches!(parents_valid(vec!["/a", "/b", "/c"]), Ok(()));
 
         let mut shadow = NamespaceChecker::new();
-        shadow.add_parent(&Path::from_str("/svc/foo").unwrap()).unwrap();
-        assert_matches!(shadow.add(&Path::from_str("/svc/foo/bar").unwrap()), Err(_));
+        shadow.add_parent(&ns_path("/svc/foo")).unwrap();
+        assert_matches!(shadow.add(&ns_path("/svc/foo/bar")), Err(_));
 
         let mut shadow = NamespaceChecker::new();
-        shadow.add_parent(&Path::from_str("/svc/foo").unwrap()).unwrap();
-        assert_matches!(shadow.add(&Path::from_str("/svc2").unwrap()), Ok(_));
+        shadow.add_parent(&ns_path("/svc/foo")).unwrap();
+        assert_matches!(shadow.add(&ns_path("/svc2")), Ok(_));
     }
 
     fn open_cap() -> AnyCapability {
@@ -290,10 +288,10 @@ mod tests {
     #[fuchsia::test]
     fn test_duplicate_object() {
         let mut namespace = Namespace::new(ignore_not_found());
-        namespace.add_object(open_cap(), &Path::from_str("/svc/a").unwrap()).expect("");
+        namespace.add_object(open_cap(), &ns_path("/svc/a")).expect("");
         // Adding again will fail.
         assert_matches!(
-            namespace.add_object(open_cap(), &Path::from_str("/svc/a").unwrap()),
+            namespace.add_object(open_cap(), &ns_path("/svc/a")),
             Err(NamespaceError::Duplicate(path))
             if path.as_str() == "/svc/a"
         );
@@ -302,10 +300,10 @@ mod tests {
     #[fuchsia::test]
     fn test_duplicate_entry() {
         let mut namespace = Namespace::new(ignore_not_found());
-        namespace.add_entry(open_cap(), &Path::from_str("/svc/a").unwrap()).expect("");
+        namespace.add_entry(open_cap(), &ns_path("/svc/a")).expect("");
         // Adding again will fail.
         assert_matches!(
-            namespace.add_entry(open_cap(), &Path::from_str("/svc/a").unwrap()),
+            namespace.add_entry(open_cap(), &ns_path("/svc/a")),
             Err(NamespaceError::Duplicate(path))
             if path.as_str() == "/svc/a"
         );
@@ -314,9 +312,9 @@ mod tests {
     #[fuchsia::test]
     fn test_duplicate_object_and_entry() {
         let mut namespace = Namespace::new(ignore_not_found());
-        namespace.add_object(open_cap(), &Path::from_str("/svc/a").unwrap()).expect("");
+        namespace.add_object(open_cap(), &ns_path("/svc/a")).expect("");
         assert_matches!(
-            namespace.add_entry(open_cap(), &Path::from_str("/svc/a").unwrap()),
+            namespace.add_entry(open_cap(), &ns_path("/svc/a")),
             Err(NamespaceError::Shadow(path))
             if path.as_str() == "/svc/a"
         );
@@ -327,9 +325,9 @@ mod tests {
     #[fuchsia::test]
     fn test_duplicate_entry_at_object_parent() {
         let mut namespace = Namespace::new(ignore_not_found());
-        namespace.add_object(open_cap(), &Path::from_str("/foo/bar").unwrap()).expect("");
+        namespace.add_object(open_cap(), &ns_path("/foo/bar")).expect("");
         assert_matches!(
-            namespace.add_entry(open_cap(), &Path::from_str("/foo").unwrap()),
+            namespace.add_entry(open_cap(), &ns_path("/foo")),
             Err(NamespaceError::Duplicate(path))
             if path.as_str() == "/foo"
         );
@@ -341,9 +339,9 @@ mod tests {
     #[fuchsia::test]
     fn test_duplicate_object_parent_at_entry() {
         let mut namespace = Namespace::new(ignore_not_found());
-        namespace.add_entry(open_cap(), &Path::from_str("/foo").unwrap()).expect("");
+        namespace.add_entry(open_cap(), &ns_path("/foo")).expect("");
         assert_matches!(
-            namespace.add_object(open_cap(), &Path::from_str("/foo/bar").unwrap()),
+            namespace.add_object(open_cap(), &ns_path("/foo/bar")),
             Err(NamespaceError::Duplicate(path))
             if path.as_str() == "/foo/bar"
         );
@@ -363,12 +361,12 @@ mod tests {
         let (open, receiver) = multishot();
 
         let mut namespace = Namespace::new(ignore_not_found());
-        namespace.add_object(Box::new(open), &Path::from_str("/svc/a").unwrap()).unwrap();
+        namespace.add_object(Box::new(open), &ns_path("/svc/a")).unwrap();
         let (mut ns, fut) = namespace.serve().unwrap();
         let fut = fasync::Task::spawn(fut);
 
         assert_eq!(ns.len(), 1);
-        assert_eq!(ns[0].path.to_str().unwrap(), "/svc");
+        assert_eq!(ns[0].path.as_str(), "/svc");
 
         // Check that there is exactly one protocol inside the svc directory.
         let dir = ns.pop().unwrap().directory.into_proxy().unwrap();
@@ -394,13 +392,13 @@ mod tests {
     #[fuchsia::test]
     async fn test_two_senders_in_same_namespace_entry() {
         let mut namespace = Namespace::new(ignore_not_found());
-        namespace.add_object(open_cap(), &Path::from_str("/svc/a").unwrap()).unwrap();
-        namespace.add_object(open_cap(), &Path::from_str("/svc/b").unwrap()).unwrap();
+        namespace.add_object(open_cap(), &ns_path("/svc/a")).unwrap();
+        namespace.add_object(open_cap(), &ns_path("/svc/b")).unwrap();
         let (mut ns, fut) = namespace.serve().unwrap();
         let fut = fasync::Task::spawn(fut);
 
         assert_eq!(ns.len(), 1);
-        assert_eq!(ns[0].path.to_str().unwrap(), "/svc");
+        assert_eq!(ns[0].path.as_str(), "/svc");
 
         // Check that there are exactly two protocols inside the svc directory.
         let dir = ns.pop().unwrap().directory.into_proxy().unwrap();
@@ -420,16 +418,16 @@ mod tests {
     #[fuchsia::test]
     async fn test_two_senders_in_different_namespace_entries() {
         let mut namespace = Namespace::new(ignore_not_found());
-        namespace.add_object(open_cap(), &Path::from_str("/svc1/a").unwrap()).unwrap();
-        namespace.add_object(open_cap(), &Path::from_str("/svc2/b").unwrap()).unwrap();
+        namespace.add_object(open_cap(), &ns_path("/svc1/a")).unwrap();
+        namespace.add_object(open_cap(), &ns_path("/svc2/b")).unwrap();
         let (ns, fut) = namespace.serve().unwrap();
         let fut = fasync::Task::spawn(fut);
 
         assert_eq!(ns.len(), 2);
         let (mut svc1, ns): (Vec<_>, Vec<_>) =
-            ns.into_iter().partition(|e| e.path.to_str().unwrap() == "/svc1");
+            ns.into_iter().partition(|e| e.path.as_str() == "/svc1");
         let (mut svc2, _ns): (Vec<_>, Vec<_>) =
-            ns.into_iter().partition(|e| e.path.to_str().unwrap() == "/svc2");
+            ns.into_iter().partition(|e| e.path.as_str() == "/svc2");
 
         // Check that there are one protocol inside each directory.
         {
@@ -456,12 +454,12 @@ mod tests {
     async fn test_not_found() {
         let (not_found_sender, mut not_found_receiver) = unbounded();
         let mut namespace = Namespace::new(not_found_sender);
-        namespace.add_object(open_cap(), &Path::from_str("/svc/a").unwrap()).unwrap();
+        namespace.add_object(open_cap(), &ns_path("/svc/a")).unwrap();
         let (mut ns, fut) = namespace.serve().unwrap();
         let fut = fasync::Task::spawn(fut);
 
         assert_eq!(ns.len(), 1);
-        assert_eq!(ns[0].path.to_str().unwrap(), "/svc");
+        assert_eq!(ns[0].path.as_str(), "/svc");
 
         let dir = ns.pop().unwrap().directory.into_proxy().unwrap();
         let (client_end, server_end) = zx::Channel::create();

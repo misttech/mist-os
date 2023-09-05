@@ -30,11 +30,10 @@ pub async fn serve_controller(
         match request {
             fcomponent::ControllerRequest::Start { mut args, execution_controller, responder } => {
                 let component = weak_component_instance.upgrade();
-                if component.is_err() {
+                let Ok(component) = component else {
                     responder.send(Err(fcomponent::Error::InstanceNotFound))?;
                     continue;
-                }
-                let component = component.unwrap();
+                };
                 let execution = component.lock_execution().await;
                 if execution.runtime.is_some() {
                     responder.send(Err(fcomponent::Error::InstanceAlreadyStarted))?;
@@ -52,8 +51,11 @@ pub async fn serve_controller(
                     stop_payload: None,
                 };
                 let numbered_handles = args.numbered_handles.take().unwrap_or_default();
-                let namespace: crate::runner::Namespace =
-                    args.namespace_entries.take().unwrap_or_default().try_into().unwrap();
+                let Ok(namespace): Result<crate::runner::Namespace, _> =
+                    args.namespace_entries.take().unwrap_or_default().try_into() else {
+                        responder.send(Err(fcomponent::Error::InvalidArguments))?;
+                        continue;
+                    };
                 if let Err(err) = component
                     .start(
                         &StartReason::Controller,

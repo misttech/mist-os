@@ -1279,7 +1279,7 @@ mod tests {
             // /pkg and /svc
             assert_eq!(ns.entries.len(), 2);
             let ns = ns.entries.remove(1);
-            assert_eq!(ns.path, "/svc");
+            assert_eq!(ns.path.as_str(), "/svc");
             let svc_dir = ns.directory.into_proxy().unwrap();
             fuchsia_fs::directory::open_directory(&svc_dir, "foo.bar", fio::OpenFlags::empty())
                 .await

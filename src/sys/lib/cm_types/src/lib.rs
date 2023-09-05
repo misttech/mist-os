@@ -10,6 +10,7 @@ use {
     fidl_fuchsia_component_decl as fdecl,
     flyweights::FlyStr,
     lazy_static::lazy_static,
+    namespace::{Path as NamespacePath, PathError},
     serde::{de, ser},
     serde::{Deserialize, Serialize},
     std::{cmp, default::Default, fmt, path::PathBuf, str::FromStr},
@@ -240,20 +241,17 @@ impl<'de, const N: usize> de::Deserialize<'de> for BoundedName<N> {
 
 /// A filesystem path.
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Path {
-    path: FlyStr,
-    dirname_idx: usize,
-}
+pub struct Path(NamespacePath);
 
 impl fmt::Debug for Path {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.path)
+        write!(f, "{:?}", self.0)
     }
 }
 
 impl fmt::Display for Path {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.path)
+        write!(f, "{}", self.0)
     }
 }
 
@@ -262,62 +260,65 @@ impl ser::Serialize for Path {
     where
         S: serde::ser::Serializer,
     {
-        self.path.serialize(serializer)
+        self.0.serialize(serializer)
     }
 }
 
 impl Path {
-    /// Creates a `Path` from a `String`, returning an `Err` if the string
-    /// fails validation. The string must be non-empty, no more than 1024
-    /// characters in length, start with a leading `/`, and contain no empty
-    /// path segments.
+    /// Creates a [`Path`] from a [`String`], returning an `Err` if the string fails
+    /// validation. The string must be non-empty, no more than [`MAX_PATH_LENGTH`] bytes
+    /// in length, start with a leading `/`, not be exactly `/`, contain no empty path
+    /// segments, and not have embedded NULs. As a result, [`Path`]s are always valid
+    /// [`NamespacePath`]s.
     pub fn new(path: impl AsRef<str> + Into<String>) -> Result<Self, ParseError> {
-        Self::validate(path.as_ref())?;
-        let path = FlyStr::new(path);
-        let dirname_idx = path.rfind('/').expect("path validation is wrong");
-        Ok(Self { path, dirname_idx })
+        match NamespacePath::new(path) {
+            Ok(path) => {
+                if path.as_ref().len() > MAX_PATH_LENGTH {
+                    Err(ParseError::TooLong)
+                } else if path.as_ref() == "/" {
+                    // The `/` is a valid [`NamespacePath`], but the way capabilities
+                    // are installed into namespaces require [`Path`]s to always have
+                    // a parent, so `/` is an invalid [`Path`].
+                    Err(ParseError::InvalidValue)
+                } else {
+                    Ok(Path(path))
+                }
+            }
+            Err(e) => match e {
+                PathError::Empty => Err(ParseError::Empty),
+                PathError::EmbeddedNul(_)
+                | PathError::NotUtf8(_)
+                | PathError::NoLeadingSlash(_)
+                | PathError::EmptySegment(_) => Err(ParseError::InvalidValue),
+            },
+        }
     }
 
-    /// Validates `path` but does not construct a new `Path` object.
-    pub fn validate(path: &str) -> Result<(), ParseError> {
-        if path.is_empty() {
-            return Err(ParseError::Empty);
-        }
-        if path.len() > MAX_PATH_LENGTH {
-            return Err(ParseError::TooLong);
-        }
-        if !path.starts_with('/') {
-            return Err(ParseError::InvalidValue);
-        }
-        if !path[1..].split('/').all(|part| !part.is_empty()) {
-            return Err(ParseError::InvalidValue);
-        }
-        Ok(())
-    }
-
-    /// Splits the path according to "/", ignoring empty path components
+    /// Splits the path according to "/".
     pub fn split(&self) -> Vec<String> {
-        self.to_string().split("/").map(|s| s.to_string()).filter(|s| !s.is_empty()).collect()
+        self.0.split()
     }
 
     pub fn as_str(&self) -> &str {
-        &self.path
+        &self.0.as_str()
     }
 
     pub fn to_path_buf(&self) -> PathBuf {
-        PathBuf::from(self.to_string())
+        PathBuf::from(self.0.to_string())
     }
 
     pub fn dirname(&self) -> &str {
-        if self.dirname_idx == 0 {
-            "/"
-        } else {
-            &self.path[0..self.dirname_idx]
-        }
+        self.0.dirname()
     }
 
     pub fn basename(&self) -> &str {
-        &self.path[self.dirname_idx + 1..]
+        self.0.basename()
+    }
+}
+
+impl From<Path> for NamespacePath {
+    fn from(value: Path) -> Self {
+        value.0
     }
 }
 
@@ -329,9 +330,15 @@ impl FromStr for Path {
     }
 }
 
+impl AsRef<NamespacePath> for Path {
+    fn as_ref(&self) -> &NamespacePath {
+        &self.0
+    }
+}
+
 impl From<Path> for String {
     fn from(path: Path) -> String {
-        path.path.to_string()
+        path.0.to_string()
     }
 }
 
@@ -881,6 +888,7 @@ mod tests {
         expect_err!(Path, "foo/");
         expect_err!(Path, "/foo/");
         expect_err!(Path, "/foo//bar");
+        expect_err!(Path, "/fo\0b/bar");
         expect_err!(Path, &format!("/{}", repeat("x").take(1024).collect::<String>()));
     }
 

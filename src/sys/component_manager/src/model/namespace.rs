@@ -10,8 +10,9 @@ use {
             error::CreateNamespaceError,
             routing::{self, route_and_open_capability, OpenOptions},
         },
-        runner::{namespace::Entry as NamespaceEntry, Namespace},
+        runner::Namespace,
     },
+    ::namespace::Entry as NamespaceEntry,
     ::routing::{
         capability_source::ComponentCapability, component_instance::ComponentInstanceInterface,
         mapper::NoopRouteMapper, rights::Rights, route_to_storage_decl,
@@ -59,7 +60,7 @@ pub async fn create_namespace(
 fn add_pkg_directory(namespace: &mut Namespace, pkg_dir: fio::DirectoryProxy) {
     // TODO(https://fxbug.dev/108786): Use Proxy::into_client_end when available.
     let client_end = ClientEnd::new(pkg_dir.into_channel().unwrap().into_zx_channel());
-    namespace.add(PKG_PATH.to_str().unwrap().to_string(), client_end);
+    namespace.add(PKG_PATH.to_str().unwrap().try_into().unwrap(), client_end);
 }
 
 /// Adds namespace entries for a component's use declarations.
@@ -222,7 +223,7 @@ fn add_directory_helper(
     };
 
     waiters.push(Box::pin(route_on_usage));
-    namespace.add(target_path.clone(), client_end);
+    namespace.add(target_path.clone().try_into().unwrap(), client_end);
 }
 
 async fn route_directory(
@@ -394,7 +395,7 @@ fn serve_and_add_svc_dirs(namespace: &mut Namespace, svc_dirs: HashMap<String, D
             server_end.into_channel().into(),
         );
 
-        namespace.add(target_dir_path, client_end);
+        namespace.add(target_dir_path.try_into().unwrap(), client_end);
     }
 }
 

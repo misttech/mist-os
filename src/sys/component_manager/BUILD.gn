@@ -70,6 +70,7 @@ rustc_binary("bin") {
     "//src/sys/lib/fuchsia-zbi",
     "//src/sys/lib/mem_util",
     "//src/sys/lib/moniker",
+    "//src/sys/lib/namespace",
     "//src/sys/lib/routing",
     "//src/sys/pkg/lib/fuchsia-pkg",
     "//src/sys/pkg/lib/package-directory",

@@ -481,7 +481,7 @@ impl RoutingTest {
             .await
             .entries
             .iter()
-            .map(|entry| entry.path.clone())
+            .map(|entry| entry.path.clone().into())
             .collect();
 
         expected_paths.sort_unstable();
@@ -1487,7 +1487,7 @@ pub mod capability_util {
         let index = ns
             .entries
             .iter()
-            .position(|entry| entry.path == dir_path)
+            .position(|entry| entry.path.as_str() == dir_path)
             .unwrap_or_else(|| panic!("didn't find dir {}", dir_path));
         let entry = ns.entries.remove(index);
         let dir_proxy = entry.directory.into_proxy().unwrap();
@@ -1504,7 +1504,7 @@ pub mod capability_util {
         let mut ns = namespace.lock().await;
         // TODO(https://fxbug.dev/108786): Use Proxy::into_client_end when available.
         let client_end = ClientEnd::new(dir_proxy.into_channel().unwrap().into_zx_channel());
-        ns.add(dir_path.to_string(), client_end);
+        ns.add(dir_path.try_into().unwrap(), client_end);
     }
 
     /// Open the exposed dir for `moniker`.

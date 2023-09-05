@@ -1,14 +1,17 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    fidl::endpoints::ClientEnd, fidl_fuchsia_component as fcomponent,
-    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, thiserror::Error,
-};
+
+use ::namespace::{Entry as NamespaceEntry, EntryError, Path as NamespacePath};
+use fidl::endpoints::ClientEnd;
+use fidl_fuchsia_component as fcomponent;
+use fidl_fuchsia_component_runner as fcrunner;
+use fidl_fuchsia_io as fio;
+use thiserror::Error;
 
 /// The namespace of a component instance.
 pub struct Namespace {
-    pub entries: Vec<Entry>,
+    pub entries: Vec<NamespaceEntry>,
 }
 
 impl Namespace {
@@ -16,12 +19,12 @@ impl Namespace {
         Self { entries: Vec::new() }
     }
 
-    pub fn add(&mut self, path: String, directory: ClientEnd<fio::DirectoryMarker>) {
-        self.entries.push(Entry { path, directory });
+    pub fn add(&mut self, path: NamespacePath, directory: ClientEnd<fio::DirectoryMarker>) {
+        self.entries.push(NamespaceEntry { path, directory });
     }
 
     /// Adds entries to the namespace, returning an error if any of the paths overlap.
-    pub fn merge(&mut self, mut entries: Vec<Entry>) -> Result<(), NamespaceError> {
+    pub fn merge(&mut self, mut entries: Vec<NamespaceEntry>) -> Result<(), NamespaceError> {
         for existing_entry in &self.entries {
             if entries
                 .iter()
@@ -34,8 +37,8 @@ impl Namespace {
         Ok(())
     }
 
-    fn is_path_conflict(path_1: &String, path_2: &String) -> bool {
-        path_1.starts_with(path_2) || path_2.starts_with(path_1)
+    fn is_path_conflict(path_1: &NamespacePath, path_2: &NamespacePath) -> bool {
+        path_1.as_str().starts_with(path_2.as_str()) || path_2.as_str().starts_with(path_1.as_str())
     }
 }
 
@@ -45,13 +48,13 @@ impl Default for Namespace {
     }
 }
 
-impl From<Vec<Entry>> for Namespace {
-    fn from(entries: Vec<Entry>) -> Self {
+impl From<Vec<NamespaceEntry>> for Namespace {
+    fn from(entries: Vec<NamespaceEntry>) -> Self {
         Self { entries }
     }
 }
 
-impl From<Namespace> for Vec<Entry> {
+impl From<Namespace> for Vec<NamespaceEntry> {
     fn from(namespace: Namespace) -> Self {
         namespace.entries
     }
@@ -95,48 +98,5 @@ impl TryFrom<Vec<fcomponent::NamespaceEntry>> for Namespace {
             .collect::<Result<Vec<_>, EntryError>>()
             .map_err(NamespaceError::EntryError)?;
         Ok(Self { entries })
-    }
-}
-
-/// A component namespace entry.
-pub struct Entry {
-    pub path: String,
-    pub directory: ClientEnd<fio::DirectoryMarker>,
-}
-
-#[derive(Debug, Clone, Error)]
-pub enum EntryError {
-    #[error("path is not set")]
-    MissingPath,
-
-    #[error("directory is not set")]
-    MissingDirectory,
-}
-
-impl From<Entry> for fcrunner::ComponentNamespaceEntry {
-    fn from(entry: Entry) -> Self {
-        Self { path: Some(entry.path), directory: Some(entry.directory), ..Default::default() }
-    }
-}
-
-impl TryFrom<fcrunner::ComponentNamespaceEntry> for Entry {
-    type Error = EntryError;
-
-    fn try_from(entry: fcrunner::ComponentNamespaceEntry) -> Result<Self, Self::Error> {
-        Ok(Self {
-            path: entry.path.ok_or_else(|| EntryError::MissingPath)?,
-            directory: entry.directory.ok_or_else(|| EntryError::MissingDirectory)?,
-        })
-    }
-}
-
-impl TryFrom<fcomponent::NamespaceEntry> for Entry {
-    type Error = EntryError;
-
-    fn try_from(entry: fcomponent::NamespaceEntry) -> Result<Self, Self::Error> {
-        Ok(Self {
-            path: entry.path.ok_or_else(|| EntryError::MissingPath)?,
-            directory: entry.directory.ok_or_else(|| EntryError::MissingDirectory)?,
-        })
     }
 }

@@ -179,7 +179,7 @@ mod tests {
         url::Url,
     };
 
-    const PATH_REGEX_STR: &str = r"(/[^/]+)+";
+    const PATH_REGEX_STR: &str = "(/[^/\0]+)+";
     const NAME_REGEX_STR: &str = r"[0-9a-zA-Z_][0-9a-zA-Z_\-\.]*";
 
     lazy_static! {

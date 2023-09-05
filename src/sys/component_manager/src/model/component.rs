@@ -28,8 +28,9 @@ use {
             OpenOptions, RouteRequest,
         },
     },
-    crate::runner::{builtin::RemoteRunner, NamespaceEntry},
+    crate::runner::builtin::RemoteRunner,
     crate::sandbox_util::Sandbox,
+    ::namespace::Entry as NamespaceEntry,
     ::routing::{
         capability_source::{BuiltinCapabilities, NamespaceCapabilities},
         component_id_index::{ComponentIdIndex, ComponentInstanceId},

@@ -6,7 +6,6 @@ use {
     futures::channel::mpsc::UnboundedSender,
     futures::future::{BoxFuture, FutureExt},
     futures::stream::{FuturesUnordered, StreamExt},
-    namespace::Namespace,
     process_builder::StartupHandle,
     processargs::ProcessArgs,
     sandbox::{AnyCapability, Dict, DictKey},
@@ -16,6 +15,8 @@ use {
 };
 
 mod namespace;
+
+pub use crate::namespace::{ignore_not_found, Namespace, NamespaceError};
 
 /// How to deliver a particular capability from a dict to an Elf process. Broadly speaking,
 /// one could either deliver a capability using namespace entries, or using numbered handles.
@@ -93,10 +94,10 @@ pub fn add_to_processargs(
     // Take entries away from dict and install them accordingly.
     visit_map(delivery_map, dict, &mut |cap: AnyCapability, delivery: &Delivery| match delivery {
         Delivery::NamespacedObject(path) => {
-            namespace.add_object(cap, path).map_err(DeliveryError::NamespaceError)
+            namespace.add_object(cap, path.as_ref()).map_err(DeliveryError::NamespaceError)
         }
         Delivery::NamespaceEntry(path) => {
-            namespace.add_entry(cap, path).map_err(DeliveryError::NamespaceError)
+            namespace.add_entry(cap, path.as_ref()).map_err(DeliveryError::NamespaceError)
         }
         Delivery::Handle(info) => {
             processargs.add_handles(once(translate_handle(cap, info, &mut futures)?));
@@ -105,6 +106,7 @@ pub fn add_to_processargs(
     })?;
 
     let (namespace, namespace_fut) = namespace.serve().map_err(DeliveryError::NamespaceError)?;
+    let namespace: Vec<_> = namespace.into_iter().map(Into::into).collect();
     processargs.namespace_entries.extend(namespace);
     futures.push(namespace_fut);
 
@@ -241,6 +243,7 @@ mod tests {
 
     use {
         super::*,
+        crate::namespace::{ignore_not_found as ignore, NamespaceError},
         anyhow::Result,
         assert_matches::assert_matches,
         fidl::endpoints::{Proxy, ServerEnd},
@@ -250,7 +253,6 @@ mod tests {
         fuchsia_zircon::{AsHandleRef, HandleBased, Peered, Signals, Time},
         futures::TryStreamExt,
         maplit::hashmap,
-        namespace::{ignore_not_found as ignore, NamespaceError},
         std::str::FromStr,
         test_util::{multishot, open},
     };
@@ -596,7 +598,7 @@ mod tests {
             DeliveryError::NamespaceError(NamespaceError::TryIntoOpenError {
                 path, ..
             })
-            if &path == "/svc"
+            if path.as_ref() == "/svc"
         );
     }
 
