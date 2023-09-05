@@ -7,9 +7,9 @@ use errors;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_remotecontrol::{
-    ConnectCapabilityError, IdentifyHostError, RemoteControlMarker, RemoteControlProxy,
+    ConnectCapabilityError, IdentifyHostError, RemoteControlConnectCapabilityResult,
+    RemoteControlMarker, RemoteControlProxy,
 };
-use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_overnet_protocol::NodeId;
 use futures::{StreamExt, TryFutureExt};
 use hoist::{Hoist, OvernetInstance};
@@ -18,6 +18,9 @@ use std::{
     time::Duration,
 };
 use timeout::{timeout, TimeoutError};
+
+pub use fidl_fuchsia_io::OpenFlags;
+pub use fidl_fuchsia_sys2::OpenDirType;
 
 #[derive(Debug, Clone)]
 pub struct RcsConnection {
@@ -157,15 +160,42 @@ async fn knock_rcs_impl(rcs_proxy: &RemoteControlProxy) -> Result<(), KnockRcsEr
     }
 }
 
-pub async fn connect_with_timeout_at(
+/// Compatibility shim that will use [`RemoteControlProxy::connect_capability`]
+/// when `capability_set` is [`OpenDirType::ExposedDir`] or
+/// [`RemoteControlProxy::open_capability`] otherwise, since older targets may
+/// not support connecting to anything other than exposed.
+async fn open_capability(
+    proxy: &RemoteControlProxy,
+    moniker: &str,
+    capability_set: OpenDirType,
+    capability_name: &str,
+    server: fidl::Channel,
+    flags: OpenFlags,
+) -> Result<RemoteControlConnectCapabilityResult, fidl::Error> {
+    match capability_set {
+        OpenDirType::ExposedDir => {
+            proxy.connect_capability(moniker, capability_name, server, flags).await
+        }
+        _ => proxy.open_capability(moniker, capability_set, capability_name, server, flags).await,
+    }
+}
+
+pub async fn open_with_timeout_at(
     dur: Duration,
     moniker: &str,
+    capability_set: OpenDirType,
     capability_name: &str,
     rcs_proxy: &RemoteControlProxy,
     server_end: fidl::Channel,
 ) -> Result<()> {
-    let connect_capability_fut =
-        rcs_proxy.connect_capability(moniker, capability_name, server_end, OpenFlags::empty());
+    let connect_capability_fut = open_capability(
+        rcs_proxy,
+        moniker,
+        capability_set,
+        capability_name,
+        server_end,
+        OpenFlags::empty(),
+    );
     timeout::timeout(dur, connect_capability_fut
         .map_ok_or_else(|e| Result::<(), anyhow::Error>::Err(anyhow::anyhow!(e)), |fidl_result| {
             fidl_result.map(|_| ()).map_err(|e| {
@@ -205,11 +235,48 @@ If you have encountered what you think is a bug, Please report it at http://fxbu
 To diagnose the issue, use `ffx doctor`.").into()).and_then(|r| r)
 }
 
+pub async fn connect_with_timeout_at(
+    dur: Duration,
+    moniker: &str,
+    capability_name: &str,
+    rcs_proxy: &RemoteControlProxy,
+    server_end: fidl::Channel,
+) -> Result<()> {
+    open_with_timeout_at(
+        dur,
+        moniker,
+        OpenDirType::ExposedDir,
+        capability_name,
+        rcs_proxy,
+        server_end,
+    )
+    .await
+}
+
 pub async fn connect_with_timeout<P: DiscoverableProtocolMarker>(
     dur: Duration,
     moniker: &str,
     rcs_proxy: &RemoteControlProxy,
     server_end: fidl::Channel,
 ) -> Result<()> {
-    connect_with_timeout_at(dur, moniker, P::PROTOCOL_NAME, rcs_proxy, server_end).await
+    open_with_timeout_at(
+        dur,
+        moniker,
+        OpenDirType::ExposedDir,
+        P::PROTOCOL_NAME,
+        rcs_proxy,
+        server_end,
+    )
+    .await
+}
+
+pub async fn open_with_timeout<P: DiscoverableProtocolMarker>(
+    dur: Duration,
+    moniker: &str,
+    capability_set: OpenDirType,
+    rcs_proxy: &RemoteControlProxy,
+    server_end: fidl::Channel,
+) -> Result<()> {
+    open_with_timeout_at(dur, moniker, capability_set, P::PROTOCOL_NAME, rcs_proxy, server_end)
+        .await
 }
