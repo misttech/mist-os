@@ -171,6 +171,6 @@ class Test:
         except KeyError as e:
             raise ValueError(
                 f"Test '{e.args[0]} was found in "
-                + "tests.json, but not test-list.json. This may be an error "
-                + "with your build configuration."
+                + "tests.json, but not test-list.json.\nYou may need to run "
+                + "`fx build :test-list` or a full `fx build`."
             )
