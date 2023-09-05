@@ -16,21 +16,15 @@ if (is_host) {
       "//src/connectivity/overnet/lib/circuit",
       "//src/connectivity/overnet/lib/core",
       "//src/connectivity/overnet/lib/hoist",
-      "//src/connectivity/overnet/lib/serial_link",
-      "//src/connectivity/overnet/lib/stream_link",
       "//src/devices/bind/fuchsia.google.usb:fuchsia.google.usb_rust",
       "//src/devices/bind/fuchsia.usb:fuchsia.usb_rust",
       "//src/lib/fuchsia-async",
       "//src/lib/usb_rs",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:argh",
-      "//third_party/rust_crates:async-fs",
       "//third_party/rust_crates:async-net",
-      "//third_party/rust_crates:blocking",
       "//third_party/rust_crates:futures",
-      "//third_party/rust_crates:nix",
       "//third_party/rust_crates:tempfile",
-      "//third_party/rust_crates:termios",
       "//third_party/rust_crates:tracing",
     ]
 
@@ -38,7 +32,6 @@ if (is_host) {
 
     sources = [
       "src/lib.rs",
-      "src/serial.rs",
       "src/usb.rs",
     ]
   }

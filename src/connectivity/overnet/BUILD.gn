@@ -29,14 +29,3 @@ group("tests_no_e2e") {
     "usb:tests",
   ]
 }
-
-# TODO(ctiller): This is clearly not great and we should not be hardcoding certificates
-# and private keys into packages. Design and implement security.
-resource("certificates") {
-  sources = [
-    "//third_party/rust_crates/mirrors/quiche/quiche/examples/cert.crt",
-    "//third_party/rust_crates/mirrors/quiche/quiche/examples/cert.key",
-    "//third_party/rust_crates/mirrors/quiche/quiche/examples/rootca.crt",
-  ]
-  outputs = [ "data/{{source_file_part}}" ]
-}

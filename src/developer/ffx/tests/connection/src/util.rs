@@ -148,7 +148,7 @@ where
     F: FnOnce(LaunchedComponentConnector) -> Fut + Send + 'static,
     Fut: futures::future::Future<Output = ()>,
 {
-    let hoist = Hoist::new().expect("creating hoist");
+    let hoist = Hoist::new(None).expect("creating hoist");
 
     let ssh_path = std::env::var("FUCHSIA_SSH_KEY").unwrap().into();
     let test_env = ffx_config::test_init().await.expect("Setting up test environment");

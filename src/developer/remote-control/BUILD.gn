@@ -149,7 +149,6 @@ fuchsia_component("remote-control-component") {
   manifest = "meta/remote-control.cml"
   deps = [
     ":bin",
-    "//src/connectivity/overnet:certificates",
     "//src/developer/remote-control/diagnostics-bridge",
   ]
 }
