@@ -3,22 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    crate::builtin::capability::BuiltinCapability,
-    ::routing::capability_source::InternalCapability,
     anyhow::{format_err, Error},
-    async_trait::async_trait,
-    cm_types::Name,
     fidl_fuchsia_kernel as fkernel,
     fuchsia_zircon::{self as zx, HandleBased, Resource},
     futures::prelude::*,
-    lazy_static::lazy_static,
     std::sync::Arc,
 };
-
-lazy_static! {
-    static ref DEBUG_RESOURCE_CAPABILITY_NAME: Name =
-        "fuchsia.kernel.DebugResource".parse().unwrap();
-}
 
 /// An implementation of fuchsia.kernel.DebugResource protocol.
 pub struct DebugResource {
@@ -37,14 +27,8 @@ impl DebugResource {
         }
         Ok(Arc::new(Self { resource }))
     }
-}
 
-#[async_trait]
-impl BuiltinCapability for DebugResource {
-    const NAME: &'static str = "DebugResource";
-    type Marker = fkernel::DebugResourceMarker;
-
-    async fn serve(
+    pub async fn serve(
         self: Arc<Self>,
         mut stream: fkernel::DebugResourceRequestStream,
     ) -> Result<(), Error> {
@@ -54,31 +38,13 @@ impl BuiltinCapability for DebugResource {
         }
         Ok(())
     }
-
-    fn matches_routed_capability(&self, capability: &InternalCapability) -> bool {
-        capability.matches_protocol(&DEBUG_RESOURCE_CAPABILITY_NAME)
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
-        crate::{
-            builtin::capability::BuiltinCapability,
-            capability::CapabilitySource,
-            model::hooks::{Event, EventPayload, Hooks},
-        },
-        cm_util::TaskGroup,
-        fidl::endpoints::ClientEnd,
-        fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync,
+        super::*, fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync,
         fuchsia_component::client::connect_to_protocol,
-        fuchsia_zircon::sys,
-        fuchsia_zircon::AsHandleRef,
-        futures::lock::Mutex,
-        moniker::{Moniker, MonikerBase},
-        std::path::PathBuf,
-        std::sync::Weak,
     };
 
     async fn get_debug_resource() -> Result<Resource, Error> {
@@ -110,41 +76,6 @@ mod tests {
         assert_eq!(resource_info.kind, zx::sys::ZX_RSRC_KIND_SYSTEM);
         assert_eq!(resource_info.base, zx::sys::ZX_RSRC_SYSTEM_DEBUG_BASE);
         assert_eq!(resource_info.size, 1);
-        Ok(())
-    }
-
-    #[fuchsia::test]
-    async fn can_connect_to_debug_service() -> Result<(), Error> {
-        let debug_resource = DebugResource::new(get_debug_resource().await?).unwrap();
-        let hooks = Hooks::new();
-        hooks.install(debug_resource.hooks()).await;
-
-        let provider = Arc::new(Mutex::new(None));
-        let source = CapabilitySource::Builtin {
-            capability: InternalCapability::Protocol(DEBUG_RESOURCE_CAPABILITY_NAME.clone()),
-            top_instance: Weak::new(),
-        };
-
-        let event = Event::new_for_test(
-            Moniker::root(),
-            "fuchsia-pkg://root",
-            EventPayload::CapabilityRouted { source, capability_provider: provider.clone() },
-        );
-        hooks.dispatch(&event).await;
-
-        let (client, mut server) = zx::Channel::create();
-        let task_group = TaskGroup::new();
-        if let Some(provider) = provider.lock().await.take() {
-            provider
-                .open(task_group.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server)
-                .await?;
-        };
-
-        let debug_client = ClientEnd::<fkernel::DebugResourceMarker>::new(client)
-            .into_proxy()
-            .expect("failed to create launcher proxy");
-        let debug_resource = debug_client.get().await?;
-        assert_ne!(debug_resource.raw_handle(), sys::ZX_HANDLE_INVALID);
         Ok(())
     }
 }

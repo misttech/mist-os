@@ -412,7 +412,6 @@ pub struct BuiltinEnvironment {
 
     // Framework capabilities.
     pub energy_info_resource: Option<Arc<EnergyInfoResource>>,
-    pub debug_resource: Option<Arc<DebugResource>>,
     pub hypervisor_resource: Option<Arc<HypervisorResource>>,
     pub info_resource: Option<Arc<InfoResource>>,
     #[cfg(target_arch = "x86_64")]
@@ -724,8 +723,10 @@ impl BuiltinEnvironment {
             })
             .map(DebugResource::new)
             .and_then(Result::ok);
-        if let Some(debug_resource) = debug_resource.as_ref() {
-            model.root().hooks.install(debug_resource.hooks()).await;
+        if let Some(debug_resource) = debug_resource {
+            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::DebugResourceMarker>(
+                move |stream| debug_resource.clone().serve(stream).boxed(),
+            );
         }
 
         // Set up the HypervisorResource service.
@@ -945,7 +946,6 @@ impl BuiltinEnvironment {
             factory_items_service,
             items_service,
             energy_info_resource,
-            debug_resource,
             hypervisor_resource,
             info_resource,
             #[cfg(target_arch = "x86_64")]
