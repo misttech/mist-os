@@ -6,6 +6,7 @@
 
 from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts
+from mobly import test_runner
 
 from honeydew.interfaces.device_classes import fuchsia_device
 
@@ -51,3 +52,7 @@ class ScreenshotAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         # Example app render a colorful image with color HSV(?, 75 or 30, 75).
         # Ensure the top left pixel is not BGRA(0, 0, 0, 255).
         asserts.assert_equal(image.data[0:4], [0x0, 0x0, 0x0, 0xff])
+
+
+if __name__ == "__main__":
+    test_runner.main()
