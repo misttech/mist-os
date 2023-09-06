@@ -21,7 +21,7 @@ pub struct WithToolbox<P> {
 impl<P> WithToolbox<P> {
     /// The well known moniker location for the global toolbox capabilities
     /// on a target device.
-    pub const TOOLBOX_MONIKER: &str = "/core/toolbox";
+    pub const TOOLBOX_MONIKER: &'static str = "/core/toolbox";
 }
 
 #[async_trait(?Send)]
