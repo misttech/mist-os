@@ -51,6 +51,7 @@ group("tests") {
     ":virtualization_vsock_tests_pkg",
     "hypervisor",
     "lib:tests",
+    "smoke",
     "virtio_input_test_util:tests($host_toolchain)",
   ]
 
