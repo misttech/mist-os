@@ -2,11 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/focaltech/focaltech.h>
 #include <limits.h>
 #include <unistd.h>
@@ -25,44 +28,43 @@
 #include "sherlock.h"
 
 namespace sherlock {
+namespace fpbus = fuchsia_hardware_platform_bus;
 
-const uint32_t kI2cAddressValues[] = {bind_fuchsia_focaltech_platform::BIND_I2C_ADDRESS_TOUCH,
-                                      bind_fuchsia_ti_platform::BIND_I2C_ADDRESS_INA231_SPEAKERS};
-
-const ddk::BindRule kI2cRules[] = {
-    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+const std::vector kI2cRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                             bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
-    ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, static_cast<uint32_t>(SHERLOCK_I2C_2)),
-    ddk::MakeAcceptBindRuleList(bind_fuchsia::I2C_ADDRESS, kI2cAddressValues),
+    fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, static_cast<uint32_t>(SHERLOCK_I2C_2)),
+    fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
+                            bind_fuchsia_focaltech_platform::BIND_I2C_ADDRESS_TOUCH),
 };
 
-const device_bind_prop_t kI2cProperties[] = {
-    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
-    ddk::MakeProperty(bind_fuchsia::I2C_ADDRESS,
+const std::vector kI2cProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+    fdf::MakeProperty(bind_fuchsia::I2C_ADDRESS,
                       bind_fuchsia_focaltech_platform::BIND_I2C_ADDRESS_TOUCH),
 };
 
-const ddk::BindRule kInterruptRules[] = {
-    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+const std::vector kInterruptRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                             bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-    ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+    fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                             bind_fuchsia_amlogic_platform_t931::GPIOZ_PIN_ID_PIN_1),
 };
 
-const device_bind_prop_t kInterruptProperties[] = {
-    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-    ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_INTERRUPT)};
+const std::vector kInterruptProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_INTERRUPT)};
 
-const ddk::BindRule kResetRules[] = {
-    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+const std::vector kResetRules = {
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                             bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-    ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+    fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                             bind_fuchsia_amlogic_platform_t931::GPIOZ_PIN_ID_PIN_9),
 };
 
-const device_bind_prop_t kResetProperties[] = {
-    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-    ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_RESET),
+const std::vector kResetProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_RESET),
 };
 
 zx_status_t Sherlock::TouchInit() {
@@ -72,19 +74,53 @@ zx_status_t Sherlock::TouchInit() {
       .display_vendor = GetDisplayVendor(),
       .ddic_version = GetDdicVersion(),
   };
-  static const device_metadata_t ft5726_touch_metadata[] = {
-      {.type = DEVICE_METADATA_PRIVATE, .data = &device_info, .length = sizeof(device_info)},
+
+  fpbus::Node dev;
+  dev.name() = "focaltech_touch";
+  dev.vid() = PDEV_VID_GENERIC;
+  dev.pid() = PDEV_PID_GENERIC;
+  dev.did() = PDEV_DID_FOCALTOUCH;
+  dev.metadata() = std::vector<fpbus::Metadata>{
+      {{
+          .type = DEVICE_METADATA_PRIVATE,
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&device_info),
+              reinterpret_cast<const uint8_t*>(&device_info) + sizeof(device_info)),
+      }},
   };
 
-  auto status = DdkAddCompositeNodeSpec("focaltech_touch",
-                                        ddk::CompositeNodeSpec(kI2cRules, kI2cProperties)
-                                            .AddParentSpec(kInterruptRules, kInterruptProperties)
-                                            .AddParentSpec(kResetRules, kResetProperties)
-                                            .set_metadata(ft5726_touch_metadata));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: DdkAddCompositeNodeSpec failed: %d", __func__, status);
-    return status;
+  auto parents = std::vector{
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = kI2cRules,
+          .properties = kI2cProperties,
+      }},
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = kInterruptRules,
+          .properties = kInterruptProperties,
+      }},
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = kResetRules,
+          .properties = kResetProperties,
+      }},
+  };
+
+  auto composite_node_spec =
+      fuchsia_driver_framework::CompositeNodeSpec{{.name = "focaltech_touch", .parents = parents}};
+
+  fidl::Arena<> fidl_arena;
+  fdf::Arena arena('FOCL');
+  fdf::WireUnownedResult result = pbus_.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, dev), fidl::ToWire(fidl_arena, composite_node_spec));
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send AddCompositeNodeSpec request: %s", result.status_string());
+    return result.status();
   }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to add composite node spec: %s",
+           zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
+
   return ZX_OK;
 }
 
