@@ -277,7 +277,10 @@ def expand_paths_from_files(files: Iterable[Path]) -> Iterable[Path]:
             for line in f:
                 stripped = line.strip()
                 if stripped:
-                    yield Path(stripped)
+                    # Response files can list more than one path per line,
+                    # separated by un-escaped whitespace.
+                    for p in shlex.split(stripped):
+                        yield Path(p.replace(' ', '\\ '))  # preserve escape
 
 
 def keyed_flags_to_values_dict(

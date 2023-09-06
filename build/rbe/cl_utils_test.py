@@ -504,6 +504,30 @@ class ExpandPathsFromFilesTests(unittest.TestCase):
             all_paths = list(cl_utils.expand_paths_from_files([list1, list2]))
             self.assertEqual(all_paths, [Path(p) for p in paths1 + paths2])
 
+    def test_escaped_spaces(self):
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            paths1 = ["foo\\ spacey1.txt", "bar\\ spacer.txt"]
+            paths2 = ["foo\\ spacey2.txt", "bar\\ spaced.txt"]
+            list1 = tdp / "list1.rsp"
+            list2 = tdp / "list2.rsp"
+            list1.write_text("\n".join(paths1) + "\n")
+            list2.write_text("\n".join(paths2) + "\n")
+            all_paths = list(cl_utils.expand_paths_from_files([list1, list2]))
+            self.assertEqual(all_paths, [Path(p) for p in paths1 + paths2])
+
+    def test_multiple_paths_per_line(self):
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            paths1 = ["foo/bar1.txt", "bar/foo1.txt"]
+            paths2 = ["foo/bar2.txt", "bar/foo2.txt"]
+            list1 = tdp / "list1.rsp"
+            list2 = tdp / "list2.rsp"
+            list1.write_text(" ".join(paths1) + "\n")
+            list2.write_text(" ".join(paths2) + "\n")
+            all_paths = list(cl_utils.expand_paths_from_files([list1, list2]))
+            self.assertEqual(all_paths, [Path(p) for p in paths1 + paths2])
+
 
 class FlagForwarderTests(unittest.TestCase):
 
