@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::path::Path;
 use std::time::Duration;
 
 use anyhow::{Context as _, Result};
@@ -76,6 +77,7 @@ impl Injection {
     #[tracing::instrument(skip(env_context))]
     pub async fn initialize_overnet(
         env_context: EnvironmentContext,
+        hoist_cache_dir: &Path,
         router_interval: Option<Duration>,
         daemon_check: DaemonVersionCheck,
         format: Option<Format>,
@@ -86,8 +88,11 @@ impl Injection {
         // avoiding complicated merge conflicts with isolation. Once we're ready for that, this should be
         // `let Hoist = hoist::Hoist::new()...`
         tracing::debug!("Initializing Hoist");
-        let hoist = hoist::init_hoist_with(Hoist::new(router_interval)?)
-            .bug_context("Failed to initialize overnet")?;
+        let hoist = hoist::init_hoist_with(Hoist::with_cache_dir_maybe_router(
+            hoist_cache_dir,
+            router_interval,
+        )?)
+        .bug_context("Failed to initialize overnet")?;
         tracing::debug!("Getting target");
         let target = ffx_target::maybe_inline_target(target, &env_context).await;
         tracing::debug!("Building Injection");
@@ -391,7 +396,7 @@ mod test {
 
         let res = init_daemon_proxy(
             DaemonStart::AutoStart,
-            Hoist::new(None).unwrap(),
+            Hoist::new().unwrap(),
             test_env.context.clone(),
             DaemonVersionCheck::SameBuildId("testcurrenthash".to_owned()),
         )
@@ -411,7 +416,7 @@ mod test {
 
         let res = init_daemon_proxy(
             DaemonStart::AutoStart,
-            Hoist::new(None).unwrap(),
+            Hoist::new().unwrap(),
             test_env.context.clone(),
             DaemonVersionCheck::SameBuildId("testcurrenthash".to_owned()),
         )
@@ -432,7 +437,7 @@ mod test {
             build_id: Some(build_id.to_owned()),
             ..Default::default()
         };
-        let daemon_hoist = Arc::new(Hoist::new(None).unwrap());
+        let daemon_hoist = Arc::new(Hoist::new().unwrap());
         let listener = UnixListener::bind(&sockpath).unwrap();
         let local_link_task = local_hoist.start_socket_link(sockpath.clone());
 
@@ -450,9 +455,15 @@ mod test {
                 let hoist_clone = daemon_hoist.clone();
                 link_tasks1.lock().await.push(Task::local(async move {
                     let (mut rx, mut tx) = sock.split();
-                    ascendd::run_stream(hoist_clone.node(), &mut rx, &mut tx)
-                        .map(|r| eprintln!("link error: {:?}", r))
-                        .await;
+                    ascendd::run_stream(
+                        hoist_clone.node(),
+                        &mut rx,
+                        &mut tx,
+                        Some("fake daemon".to_string()),
+                        None,
+                    )
+                    .map(|r| eprintln!("link error: {:?}", r))
+                    .await;
                 }));
             }
         });
@@ -504,7 +515,7 @@ mod test {
     async fn test_init_daemon_proxy_hash_matches() {
         let test_env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let sockpath = test_env.context.get_ascendd_path().await.expect("No ascendd path");
-        let local_hoist = Hoist::new(None).unwrap();
+        let local_hoist = Hoist::new().unwrap();
 
         let sockpath1 = sockpath.to_owned();
         let local_hoist1 = local_hoist.clone();
@@ -527,7 +538,7 @@ mod test {
     async fn test_init_daemon_proxy_upgrade() {
         let test_env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let sockpath = test_env.context.get_ascendd_path().await.expect("No ascendd path");
-        let local_hoist = Hoist::new(None).unwrap();
+        let local_hoist = Hoist::new().unwrap();
 
         let sockpath1 = sockpath.to_owned();
         let local_hoist1 = local_hoist.clone();
@@ -562,7 +573,7 @@ mod test {
     async fn test_init_daemon_blocked_for_4s_succeeds() {
         let test_env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let sockpath = test_env.context.get_ascendd_path().await.expect("No ascendd path");
-        let local_hoist = Hoist::new(None).unwrap();
+        let local_hoist = Hoist::new().unwrap();
 
         // Spawn two daemons, the first out of date, the second is up to date.
         let sockpath1 = sockpath.to_owned();
@@ -586,7 +597,7 @@ mod test {
     async fn test_init_daemon_blocked_for_6s_timesout() {
         let test_env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let sockpath = test_env.context.get_ascendd_path().await.expect("No ascendd path");
-        let local_hoist = Hoist::new(None).unwrap();
+        let local_hoist = Hoist::new().unwrap();
 
         // Spawn two daemons, the first out of date, the second is up to date.
         let sockpath1 = sockpath.to_owned();

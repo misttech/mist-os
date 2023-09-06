@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+mod serial;
 mod usb;
 
+use crate::serial::run_serial_link_handlers;
 use crate::usb::listen_for_usb_devices;
 use anyhow::Context as ErrorContext;
 use anyhow::{bail, format_err, Error};
@@ -24,6 +26,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
+use stream_link::run_stream_link;
 
 #[cfg(not(target_os = "fuchsia"))]
 pub use hoist::default_ascendd_path;
@@ -69,18 +72,35 @@ pub struct Ascendd {
 
 impl Ascendd {
     // Initializes and binds ascendd socket, but does not accept connections yet.
-    pub async fn prime(mut opt: Opt, hoist: &Hoist) -> Result<impl FnOnce() -> Self, Error> {
+    pub async fn prime(
+        mut opt: Opt,
+        hoist: &Hoist,
+        stdout: impl AsyncWrite + Unpin + Send + 'static,
+    ) -> Result<impl FnOnce() -> Self, Error> {
         let usb = opt.usb;
         let link = std::mem::replace(&mut opt.link, vec![]);
-        let (sockpath, client_routing, incoming) = bind_listener(opt, hoist).await?;
+        let (sockpath, serial, client_routing, incoming) = bind_listener(opt, hoist).await?;
         let hoist = hoist.clone();
         Ok(move || Self {
-            task: Task::spawn(run_ascendd(hoist, sockpath, incoming, client_routing, usb, link)),
+            task: Task::spawn(run_ascendd(
+                hoist,
+                sockpath,
+                serial,
+                incoming,
+                client_routing,
+                usb,
+                stdout,
+                link,
+            )),
         })
     }
 
-    pub async fn new(opt: Opt, hoist: &Hoist) -> Result<Self, Error> {
-        Self::prime(opt, hoist).await.map(|f| f())
+    pub async fn new(
+        opt: Opt,
+        hoist: &Hoist,
+        stdout: impl AsyncWrite + Unpin + Send + 'static,
+    ) -> Result<Self, Error> {
+        Self::prime(opt, hoist, stdout).await.map(|f| f())
     }
 }
 
@@ -96,8 +116,7 @@ impl Future for Ascendd {
 #[derive(Debug)]
 pub enum RunStreamError {
     Circuit(circuit::Error),
-    EarlyHangup(std::io::Error),
-    Unsupported,
+    Other(Error),
 }
 
 /// Run an ascendd server on the given stream IOs identified by the given labels
@@ -106,14 +125,21 @@ pub async fn run_stream<'a>(
     node: Arc<overnet_core::Router>,
     rx: &'a mut (dyn AsyncRead + Unpin + Send),
     tx: &'a mut (dyn AsyncWrite + Unpin + Send),
+    label: Option<String>,
+    path: Option<String>,
 ) -> Result<(), RunStreamError> {
     let mut id = [0; 8];
+    let mut read = 0;
 
-    if let Err(e) = rx.read_exact(&mut id).await {
-        return Err(RunStreamError::EarlyHangup(e));
+    while read < 8 {
+        match rx.read(&mut id[read..]).await {
+            Ok(got) if got > 0 => read += got,
+            // If the socket errors early it's the link's job to handle it.
+            Ok(_) | Err(_) => break,
+        }
     }
 
-    if id == CIRCUIT_ID {
+    if read == 8 && id == CIRCUIT_ID {
         let (errors_sender, errors) = unbounded();
         futures::future::join(
             circuit::multi_stream::multi_stream_node_connection_to_async(
@@ -135,7 +161,21 @@ pub async fn run_stream<'a>(
         .await
         .map_err(RunStreamError::Circuit)
     } else {
-        Err(RunStreamError::Unsupported)
+        let config = Box::new(move || {
+            Some(fidl_fuchsia_overnet_protocol::LinkConfig::AscenddServer(
+                fidl_fuchsia_overnet_protocol::AscenddLinkConfig {
+                    path: path.clone(),
+                    connection_label: label.clone(),
+                    ..Default::default()
+                },
+            ))
+        });
+
+        let read = if read != 0 { Some(id[..read].to_vec()) } else { None };
+
+        run_stream_link(node, read, rx, tx, Default::default(), config)
+            .await
+            .map_err(RunStreamError::Other)
     }
 }
 
@@ -177,9 +217,10 @@ pub async fn run_linked_ascendd<'a>(
 async fn bind_listener(
     opt: Opt,
     hoist: &Hoist,
-) -> Result<(PathBuf, AscenddClientRouting, UnixListener), Error> {
-    let Opt { sockpath, serial: _, client_routing, usb: _, link: _ } = opt;
+) -> Result<(PathBuf, String, AscenddClientRouting, UnixListener), Error> {
+    let Opt { sockpath, serial, client_routing, usb: _, link: _ } = opt;
     let sockpath = sockpath.unwrap_or(default_ascendd_path());
+    let serial = serial.unwrap_or("none".to_string());
 
     let client_routing =
         if client_routing { AscenddClientRouting::Enabled } else { AscenddClientRouting::Disabled };
@@ -230,7 +271,7 @@ async fn bind_listener(
     if let Err(e) = write_pidfile(&sockpath, std::process::id()) {
         tracing::warn!("failed to write pidfile alongside {}: {e:?}", sockpath.display());
     }
-    Ok((sockpath, client_routing, incoming))
+    Ok((sockpath, serial, client_routing, incoming))
 }
 
 /// Writes a pid file alongside the socketpath so we know what pid last successfully tried to
@@ -246,9 +287,11 @@ fn write_pidfile(sockpath: &Path, pid: u32) -> anyhow::Result<()> {
 async fn run_ascendd(
     hoist: Hoist,
     sockpath: PathBuf,
+    serial: String,
     incoming: UnixListener,
     client_routing: AscenddClientRouting,
     usb: bool,
+    stdout: impl AsyncWrite + Unpin + Send,
     link: Vec<PathBuf>,
 ) -> Result<(), Error> {
     let node = hoist.node();
@@ -257,9 +300,10 @@ async fn run_ascendd(
 
     tracing::debug!("ascendd listening to socket {}", sockpath.display());
 
+    let sockpath = &sockpath.to_str().context("Non-unicode in socket path")?.to_owned();
     let hoist = &hoist;
 
-    futures::future::try_join3(
+    futures::future::try_join4(
         futures::stream::iter(link.into_iter().map(Ok)).try_for_each_concurrent(None, |path| {
             let node = Arc::clone(&node);
             async move {
@@ -278,6 +322,7 @@ async fn run_ascendd(
                 Ok(())
             }
         }),
+        run_serial_link_handlers(Arc::downgrade(&hoist.node()), &serial, stdout),
         async move {
             if usb {
                 listen_for_usb_devices(Arc::downgrade(&hoist.node())).await
@@ -292,22 +337,29 @@ async fn run_ascendd(
                     match stream {
                         Ok(stream) => {
                             let (mut rx, mut tx) = stream.split();
-                            if let Err(e) = run_stream(hoist.node(), &mut rx, &mut tx).await {
+                            if let Err(e) = run_stream(
+                                hoist.node(),
+                                &mut rx,
+                                &mut tx,
+                                None,
+                                Some(sockpath.clone()),
+                            )
+                            .await
+                            {
                                 match e {
+                                    // A close of the remote side is not an error.
+                                    // TODO: Use typed error instead of String
+                                    RunStreamError::Other(e)
+                                        if format!("{e:?}") == "Framer closed during read" =>
+                                    {
+                                        tracing::debug!("Completed socket read: {:?}", e)
+                                    }
                                     RunStreamError::Circuit(circuit::Error::ConnectionClosed(
                                         reason,
                                     )) => {
-                                        tracing::debug!("Circuit connection closed: {reason:?}")
+                                        tracing::debug!("Circuit connection closed: {:?}", reason)
                                     }
-                                    RunStreamError::Circuit(other) => {
-                                        tracing::warn!("Failed serving socket: {other:?}")
-                                    }
-                                    RunStreamError::EarlyHangup(e) => {
-                                        tracing::debug!("Socket hung up early: {e:?}")
-                                    }
-                                    RunStreamError::Unsupported => {
-                                        tracing::warn!("Socket was not a circuit connection.")
-                                    }
+                                    other => tracing::warn!("Failed serving socket: {:?}", other),
                                 }
                             }
                         }

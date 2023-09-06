@@ -9,6 +9,8 @@ use futures::future::Either;
 use futures::lock::Mutex;
 use futures::stream::StreamExt as _;
 use futures::FutureExt;
+use quic as _;
+use quiche as _;
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Arc, Weak};

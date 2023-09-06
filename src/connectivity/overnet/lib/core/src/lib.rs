@@ -10,18 +10,27 @@ mod coding;
 mod future_help;
 mod handle_info;
 mod labels;
+mod link;
 mod peer;
 mod proxy;
 mod router;
+mod stat_counter;
 mod test_util;
 
 // Export selected types from modules.
-pub use coding::{decode_fidl, encode_fidl};
+pub use coding::{decode_fidl_with_context, encode_fidl_with_context};
 pub use future_help::log_errors;
-pub use labels::{Endpoint, NodeId, NodeLinkId};
+pub use labels::{ConnectionId, Endpoint, NodeId, NodeLinkId};
+pub use link::{
+    ConfigProducer, LinkIntroductionFacts, LinkReceiver, LinkSender, SendFrame, MAX_FRAME_LENGTH,
+};
+pub use router::security_context::{SecurityContext, SimpleSecurityContext};
 pub use router::{generate_node_id, AscenddClientRouting, ListPeersContext, Router, RouterOptions};
 
-pub use test_util::NodeIdGenerator;
+pub use test_util::{test_security_context, NodeIdGenerator};
+
+#[cfg(not(target_os = "fuchsia"))]
+pub use router::security_context::MemoryBuffers;
 
 /// Utility trait to trace a variable to the log.
 pub(crate) trait Trace {

@@ -1,0 +1,67 @@
+# Copyright 2019 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_library.gni")
+
+rustc_library("serial_link") {
+  with_unit_tests = true
+  edition = "2021"
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_rust",
+    "//sdk/fidl/fuchsia.overnet.protocol:fuchsia.overnet.protocol_rust",
+    "//src/connectivity/overnet/lib/core",
+    "//src/connectivity/overnet/lib/stream_framer",
+    "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:base64",
+    "//third_party/rust_crates:byteorder",
+    "//third_party/rust_crates:crc",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:thiserror",
+    "//third_party/rust_crates:tracing",
+  ]
+
+  if (!is_fuchsia && !is_mac) {
+    deps += [ "//third_party/rust_crates:async-fs" ]
+  }
+
+  test_deps = [
+    "//src/connectivity/overnet/lib/onet_test_util",
+    "//src/lib/fuchsia",
+    "//third_party/rust_crates:tracing-subscriber",
+  ]
+
+  sources = [
+    "src/descriptor.rs",
+    "src/fragment_io.rs",
+    "src/lib.rs",
+    "src/lossy_text.rs",
+    "src/reassembler.rs",
+    "src/report_skipped.rs",
+    "src/run.rs",
+  ]
+
+  inputs = [
+    "//third_party/rust_crates/mirrors/quiche/quiche/examples/cert.crt",
+    "//third_party/rust_crates/mirrors/quiche/quiche/examples/cert.key",
+    "//third_party/rust_crates/mirrors/quiche/quiche/examples/rootca.crt",
+    "src/long_packet.bin",
+  ]
+}
+
+fuchsia_unittest_package("overnet-serial-link-tests") {
+  deps = [
+    ":serial_link_test",
+    "//src/connectivity/overnet:certificates",
+  ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+    ":overnet-serial-link-tests",
+    ":serial_link_test($host_toolchain)",
+  ]
+}

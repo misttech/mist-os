@@ -19,17 +19,25 @@ rustc_library("circuit") {
     "src/test.rs",
   ]
   deps = [
+    "//src/connectivity/overnet/lib/quic",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates/mirrors/quiche/quiche",
   ]
   test_deps = [ "//src/lib/fuchsia" ]
+  if (is_host) {
+    test_deps += [ "//src/connectivity/overnet/lib/core:test_certs" ]
+  }
 }
 
 fuchsia_unittest_package("overnet-circuit-tests") {
-  deps = [ ":circuit_test" ]
+  deps = [
+    ":circuit_test",
+    "//src/connectivity/overnet:certificates",
+  ]
 }
 
 group("tests") {
