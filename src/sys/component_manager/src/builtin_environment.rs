@@ -411,7 +411,6 @@ pub struct BuiltinEnvironment {
     pub model: Arc<Model>,
 
     // Framework capabilities.
-    pub hypervisor_resource: Option<Arc<HypervisorResource>>,
     pub info_resource: Option<Arc<InfoResource>>,
     #[cfg(target_arch = "x86_64")]
     pub ioport_resource: Option<Arc<IoportResource>>,
@@ -743,8 +742,10 @@ impl BuiltinEnvironment {
             })
             .map(HypervisorResource::new)
             .and_then(Result::ok);
-        if let Some(hypervisor_resource) = hypervisor_resource.as_ref() {
-            model.root().hooks.install(hypervisor_resource.hooks()).await;
+        if let Some(hypervisor_resource) = hypervisor_resource {
+            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::HypervisorResourceMarker>(
+                move |stream| hypervisor_resource.clone().serve(stream).boxed(),
+            );
         }
 
         // Set up the InfoResource service.
@@ -941,7 +942,6 @@ impl BuiltinEnvironment {
             kernel_stats,
             read_only_log,
             write_only_log,
-            hypervisor_resource,
             info_resource,
             #[cfg(target_arch = "x86_64")]
             ioport_resource: _ioport_resource,
