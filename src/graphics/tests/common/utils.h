@@ -12,11 +12,21 @@
 
 #include "vulkan/vulkan.hpp"
 
+// Unconditionally return |err| with message.
 #define RTN_MSG(err, ...)                          \
   {                                                \
     fprintf(stderr, "%s:%d ", __FILE__, __LINE__); \
     fprintf(stderr, __VA_ARGS__);                  \
     fflush(stderr);                                \
+    return err;                                    \
+  }                                                \
+  static_assert(true, "no-op to require trailing semicolon")
+
+// Return |err| based on |cond| with message.
+#define RTN_IF_MSG(err, cond, ...)                 \
+  if ((cond)) {                                    \
+    fprintf(stderr, "%s:%d ", __FILE__, __LINE__); \
+    fprintf(stderr, __VA_ARGS__);                  \
     return err;                                    \
   }                                                \
   static_assert(true, "no-op to require trailing semicolon")

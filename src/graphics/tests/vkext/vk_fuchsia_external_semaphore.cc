@@ -36,6 +36,7 @@ class VulkanTest {
  private:
   bool InitVulkan();
   bool InitImage();
+  void VerifyZirconEventSemaphoresAreAvailable() const;
 
   bool is_initialized_ = false;
 
@@ -90,27 +91,23 @@ bool VulkanTest::Initialize() {
 bool VulkanTest::InitVulkan() {
   VkResult result;
 
+  // Count instance extension properties.
   uint32_t extension_count;
   result = vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, nullptr);
-  if (result != VK_SUCCESS) {
-    PRINT_STDERR("vkEnumerateInstanceExtensionProperties returned %d", result);
-    return false;
-  }
+  RTN_IF_VK_ERR(false, result, "vkEnumerateInstanceExtensionProperties");
 
+  // Retrieve instance extension properties into |extension_properties|.
   std::vector<VkExtensionProperties> extension_properties(extension_count);
   result = vkEnumerateInstanceExtensionProperties(nullptr, &extension_count,
                                                   extension_properties.data());
-  if (result != VK_SUCCESS) {
-    PRINT_STDERR("vkEnumerateInstanceExtensionProperties returned %d", result);
-    return false;
-  }
+  RTN_IF_VK_ERR(false, result, "vkEnumerateInstanceExtensionProperties");
 
+  // Specify required instance extensions to search for.
   std::array<const char*, 2> instance_extensions{
       VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME,
       VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME};
-  std::array<const char*, 2> device_extensions{VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME,
-                                               VK_FUCHSIA_EXTERNAL_SEMAPHORE_EXTENSION_NAME};
 
+  // Verify that all required instance extensions are present.
   uint32_t found_count = 0;
   for (auto& prop : extension_properties) {
     for (uint32_t i = 0; i < instance_extensions.size(); i++) {
@@ -118,19 +115,13 @@ bool VulkanTest::InitVulkan() {
         found_count++;
     }
   }
+  RTN_IF_MSG(false, (found_count != instance_extensions.size()),
+             "failed to find instance extensions");
 
-  if (found_count != instance_extensions.size()) {
-    PRINT_STDERR("failed to find instance extensions");
-    return false;
-  }
-
-  // Setup validation layer.
+  // Request validation layer if available.
   uint32_t layer_count;
   result = vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
-  if (result != VK_SUCCESS) {
-    PRINT_STDERR("vkEnumerateInstanceLayerProperties returned %d", result);
-    return false;
-  }
+  RTN_IF_VK_ERR(false, result, "vkEnumerateInstanceLayerProperties");
 
   std::vector<VkLayerProperties> layer_properties(layer_count);
   result = vkEnumerateInstanceLayerProperties(&layer_count, layer_properties.data());
@@ -148,7 +139,7 @@ bool VulkanTest::InitVulkan() {
     layers.push_back("VK_LAYER_KHRONOS_validation");
   }
 
-  VkInstanceCreateInfo create_info{
+  VkInstanceCreateInfo instance_create_info{
       VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,  // VkStructureType             sType;
       nullptr,                                 // const void*                 pNext;
       0,                                       // VkInstanceCreateFlags       flags;
@@ -161,39 +152,29 @@ bool VulkanTest::InitVulkan() {
   VkAllocationCallbacks* allocation_callbacks = nullptr;
   VkInstance instance;
 
-  if ((result = vkCreateInstance(&create_info, allocation_callbacks, &instance)) != VK_SUCCESS) {
-    PRINT_STDERR("vkCreateInstance failed %d", result);
-    return false;
-  }
+  // Create instance.
+  RTN_IF_VK_ERR(false, vkCreateInstance(&instance_create_info, allocation_callbacks, &instance),
+                "vkCreateInstance");
 
   vk_instance_ = instance;
 
+  // Retrieve available physical devices.
   uint32_t physical_device_count = 0;
-  if ((result = vkEnumeratePhysicalDevices(instance, &physical_device_count, nullptr)) !=
-      VK_SUCCESS) {
-    PRINT_STDERR("vkEnumeratePhysicalDevices failed %d", result);
-    return false;
-  }
-
-  if (physical_device_count < 1) {
-    PRINT_STDERR("unexpected physical_device_count %d", physical_device_count);
-    return false;
-  }
+  RTN_IF_VK_ERR(false, vkEnumeratePhysicalDevices(instance, &physical_device_count, nullptr),
+                "vkEnumeratePhysicalDevices");
+  RTN_IF_MSG(false, (physical_device_count < 1), "unexpected physical_device_count %d",
+             physical_device_count);
 
   std::vector<VkPhysicalDevice> physical_devices(physical_device_count);
-  if ((result = vkEnumeratePhysicalDevices(instance, &physical_device_count,
-                                           physical_devices.data())) != VK_SUCCESS) {
-    PRINT_STDERR("vkEnumeratePhysicalDevices failed %d", result);
-    return false;
-  }
+  RTN_IF_VK_ERR(
+      false, vkEnumeratePhysicalDevices(instance, &physical_device_count, physical_devices.data()),
+      "vkEnumeratePhysicalDevices");
 
+  // Always select the first physical device retrieved by default.
+  // Select a graphics queue compatible family.
   uint32_t queue_family_count = 0;
   vkGetPhysicalDeviceQueueFamilyProperties(physical_devices[0], &queue_family_count, nullptr);
-
-  if (queue_family_count < 1) {
-    PRINT_STDERR("invalid queue_family_count %d", queue_family_count);
-    return false;
-  }
+  RTN_IF_MSG(false, (queue_family_count < 1), "invalid queue_family_count %d", queue_family_count);
 
   std::vector<VkQueueFamilyProperties> queue_family_properties(queue_family_count);
   vkGetPhysicalDeviceQueueFamilyProperties(physical_devices[0], &queue_family_count,
@@ -206,26 +187,22 @@ bool VulkanTest::InitVulkan() {
       break;
     }
   }
+  RTN_IF_MSG(false, (queue_family_index < 0), "couldn't find an appropriate queue");
 
-  if (queue_family_index < 0) {
-    PRINT_STDERR("couldn't find an appropriate queue");
-    return false;
-  }
+  // Empty and reuse |extension_properties| - this time for device extensions.
+  extension_properties.clear();
 
+  // Verify that the external semaphore device extensions are available.  If not, bail.
+  std::array<const char*, 2> device_extensions{VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME,
+                                               VK_FUCHSIA_EXTERNAL_SEMAPHORE_EXTENSION_NAME};
   result =
       vkEnumerateDeviceExtensionProperties(physical_devices[0], nullptr, &extension_count, nullptr);
-  if (result != VK_SUCCESS) {
-    PRINT_STDERR("vkEnumerateDeviceExtensionProperties returned %d", result);
-    return false;
-  }
+  RTN_IF_VK_ERR(false, result, "vkEnumerateDeviceExtensionProperties");
 
   extension_properties.resize(extension_count);
   result = vkEnumerateDeviceExtensionProperties(physical_devices[0], nullptr, &extension_count,
                                                 extension_properties.data());
-  if (result != VK_SUCCESS) {
-    PRINT_STDERR("vkEnumerateDeviceExtensionProperties returned %d", result);
-    return false;
-  }
+  RTN_IF_VK_ERR(false, result, "vkEnumerateDeviceExtensionProperties");
 
   found_count = 0;
   for (const auto& prop : extension_properties) {
@@ -234,13 +211,9 @@ bool VulkanTest::InitVulkan() {
         found_count++;
     }
   }
+  RTN_IF_MSG(false, (found_count != device_extensions.size()), "failed to find device extensions");
 
-  if (found_count != device_extensions.size()) {
-    PRINT_STDERR("failed to find device extensions");
-    return false;
-  }
-
-  // Create the device
+  // Create the device.
   float queue_priorities[1] = {0.0};
 
   VkDeviceQueueCreateInfo queue_create_info = {.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
@@ -249,7 +222,7 @@ bool VulkanTest::InitVulkan() {
                                                .queueFamilyIndex = 0,
                                                .queueCount = 1,
                                                .pQueuePriorities = queue_priorities};
-  VkDeviceCreateInfo createInfo = {
+  VkDeviceCreateInfo device_create_info = {
       .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,
@@ -262,41 +235,60 @@ bool VulkanTest::InitVulkan() {
       .pEnabledFeatures = nullptr};
   VkDevice vkdevice;
 
-  if ((result = vkCreateDevice(physical_devices[0], &createInfo, nullptr /* allocationcallbacks */,
-                               &vkdevice)) != VK_SUCCESS) {
-    PRINT_STDERR("vkCreateDevice failed: %d", result);
-    return false;
-  }
+  result = vkCreateDevice(physical_devices[0], &device_create_info,
+                          nullptr /* allocationcallbacks */, &vkdevice);
+  RTN_IF_VK_ERR(false, result, "vkCreateDevice");
 
   vk_physical_device_ = physical_devices[0];
   vk_device_ = vkdevice;
 
   vkGetDeviceQueue(vkdevice, queue_family_index, 0, &vk_queue_);
 
-  // Get extension function pointers
+  // Get extension function pointers.
   vkGetPhysicalDeviceExternalSemaphorePropertiesKHR_ =
       reinterpret_cast<PFN_vkGetPhysicalDeviceExternalSemaphorePropertiesKHR>(
           vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceExternalSemaphorePropertiesKHR"));
-  if (!vkGetPhysicalDeviceExternalSemaphorePropertiesKHR_) {
-    PRINT_STDERR("couldn't find vkGetPhysicalDeviceExternalSemaphorePropertiesKHR");
-    return false;
-  }
+  RTN_IF_MSG(false, (!vkGetPhysicalDeviceExternalSemaphorePropertiesKHR_),
+             "Couldn't find vkGetPhysicalDeviceExternalSemaphorePropertiesKHR");
 
   vkImportSemaphoreZirconHandleFUCHSIA_ =
       reinterpret_cast<PFN_vkImportSemaphoreZirconHandleFUCHSIA>(
           vkGetDeviceProcAddr(vk_device_, "vkImportSemaphoreZirconHandleFUCHSIA"));
-  if (!vkImportSemaphoreZirconHandleFUCHSIA_) {
-    PRINT_STDERR("couldn't find vkImportSemaphoreZirconHandleFUCHSIA");
-    return false;
-  }
+  RTN_IF_MSG(false, (!vkImportSemaphoreZirconHandleFUCHSIA_),
+             "Couldn't find vkImportSemaphoreZirconHandleFUCHSIA");
 
   vkGetSemaphoreZirconHandleFUCHSIA_ = reinterpret_cast<PFN_vkGetSemaphoreZirconHandleFUCHSIA>(
       vkGetDeviceProcAddr(vk_device_, "vkGetSemaphoreZirconHandleFUCHSIA"));
-  if (!vkGetSemaphoreZirconHandleFUCHSIA_) {
-    PRINT_STDERR("couldn't find vkGetSemaphoreZirconHandleFUCHSIA");
-    return false;
+  RTN_IF_MSG(false, (!vkGetSemaphoreZirconHandleFUCHSIA_),
+             "Couldn't find vkGetSemaphoreZirconHandleFUCHSIA");
+
+  VerifyZirconEventSemaphoresAreAvailable();
+
+  // Create semaphores configured for export.
+  for (uint32_t i = 0; i < kSemaphoreCount; i++) {
+    VkExportSemaphoreCreateInfo export_create_info = {
+        .sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO_KHR,
+        .pNext = nullptr,
+        .handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_ZIRCON_EVENT_BIT_FUCHSIA};
+
+    VkSemaphoreCreateInfo semaphore_create_info = {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+        .pNext = &export_create_info,
+        .flags = 0,
+    };
+
+    VkSemaphore semaphore;
+    result = vkCreateSemaphore(vk_device_, &semaphore_create_info, nullptr, &semaphore);
+    RTN_IF_VK_ERR(false, result, "vkCreateSemaphore");
+
+    vk_semaphores_[i] = semaphore;
   }
 
+  return true;
+}
+
+void VulkanTest::VerifyZirconEventSemaphoresAreAvailable() const {
+  // Verify that Zircon event based semaphores are available.
   VkExternalSemaphorePropertiesKHR external_semaphore_properties = {
       .sType = VK_STRUCTURE_TYPE_EXTERNAL_SEMAPHORE_PROPERTIES_KHR,
   };
@@ -312,60 +304,36 @@ bool VulkanTest::InitVulkan() {
   EXPECT_EQ(external_semaphore_properties.externalSemaphoreFeatures,
             0u | VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT_KHR |
                 VK_EXTERNAL_SEMAPHORE_FEATURE_IMPORTABLE_BIT_KHR);
-
-  // Create semaphores for export
-  for (uint32_t i = 0; i < kSemaphoreCount; i++) {
-    VkExportSemaphoreCreateInfo export_create_info = {
-        .sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO_KHR,
-        .pNext = nullptr,
-        .handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_ZIRCON_EVENT_BIT_FUCHSIA};
-
-    VkSemaphoreCreateInfo create_info = {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-        .pNext = &export_create_info,
-        .flags = 0,
-    };
-
-    VkSemaphore semaphore;
-    result = vkCreateSemaphore(vk_device_, &create_info, nullptr, &semaphore);
-    if (result != VK_SUCCESS) {
-      PRINT_STDERR("vkCreateSemaphore returned %d", result);
-      return false;
-    }
-
-    vk_semaphores_[i] = semaphore;
-  }
-
-  return true;
 }
 
 bool VulkanTest::Exec(VulkanTest* t1, VulkanTest* t2, bool temporary) {
   VkResult result;
 
-  std::vector<uint32_t> handle(kSemaphoreCount);
+  std::vector<uint32_t> exported_event_handles(kSemaphoreCount);
 
-  // Export semaphores
+  // Create and take ownership of Zircon event handles from the semaphores under |t1|
+  // that were configured for export.
   for (uint32_t i = 0; i < kSemaphoreCount; i++) {
     VkSemaphoreGetZirconHandleInfoFUCHSIA info{
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_ZIRCON_HANDLE_INFO_FUCHSIA,
         .pNext = nullptr,
         .semaphore = t1->vk_semaphores_[i],
         .handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_ZIRCON_EVENT_BIT_FUCHSIA};
-    result = t1->vkGetSemaphoreZirconHandleFUCHSIA_(t1->vk_device_, &info, &handle[i]);
-    if (result != VK_SUCCESS) {
-      PRINT_STDERR("vkGetSemaphoreZirconHandleFUCHSIA returned %d", result);
-      return false;
-    }
+    result =
+        t1->vkGetSemaphoreZirconHandleFUCHSIA_(t1->vk_device_, &info, &exported_event_handles[i]);
+    RTN_IF_VK_ERR(false, result, "vkGetSemaphoreZirconHandleFUCHSIA");
   }
 
-  std::vector<std::unique_ptr<magma::PlatformSemaphore>> exported;
+  std::vector<std::unique_ptr<magma::PlatformSemaphore>> platform_semaphore_exports;
 
-  // Import semaphores
+  // Transfer the ownership of the exported semaphore event handles
+  // (the exported semaphore's payload) to Vulkan by importing them into |t2->vk_semaphores_|.
   for (uint32_t i = 0; i < kSemaphoreCount; i++) {
-    uint32_t flags = temporary ? VK_SEMAPHORE_IMPORT_TEMPORARY_BIT_KHR : 0;
-    exported.emplace_back(magma::PlatformSemaphore::Import(handle[i], /*flags=*/0));
+    platform_semaphore_exports.emplace_back(
+        magma::PlatformSemaphore::Import(exported_event_handles[i], 0 /* flags */));
     uint32_t import_handle;
-    EXPECT_TRUE(exported.back()->duplicate_handle(&import_handle));
+    EXPECT_TRUE(platform_semaphore_exports.back()->duplicate_handle(&import_handle));
+    uint32_t flags = temporary ? VK_SEMAPHORE_IMPORT_TEMPORARY_BIT_KHR : 0;
     VkImportSemaphoreZirconHandleInfoFUCHSIA import_info = {
         .sType = VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_ZIRCON_HANDLE_INFO_FUCHSIA,
         .pNext = nullptr,
@@ -375,33 +343,31 @@ bool VulkanTest::Exec(VulkanTest* t1, VulkanTest* t2, bool temporary) {
         .zirconHandle = import_handle};
 
     result = t1->vkImportSemaphoreZirconHandleFUCHSIA_(t2->vk_device_, &import_info);
-    if (result != VK_SUCCESS) {
-      PRINT_STDERR("vkImportSemaphoreZirconHandleFUCHSIA failed: %d", result);
-      return false;
-    }
+    RTN_IF_VK_ERR(false, result, "vkImportSemaphoreZirconHandleFUCHSIA");
   }
 
-  // Test semaphores
+  // Test semaphores.
   for (uint32_t i = 0; i < kSemaphoreCount; i++) {
-    auto& platform_semaphore_export = exported[i];
+    auto& platform_semaphore_export = platform_semaphore_exports[i];
 
-    // Export the imported semaphores
+    // Create and take ownership of Zircon event handles from the semaphores now under |t2|
+    // that were initialized by the import operation from |t1| above.
     VkSemaphoreGetZirconHandleInfoFUCHSIA info{
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_ZIRCON_HANDLE_INFO_FUCHSIA,
         .pNext = nullptr,
         .semaphore = t2->vk_semaphores_[i],
         .handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_ZIRCON_EVENT_BIT_FUCHSIA};
-    result = t1->vkGetSemaphoreZirconHandleFUCHSIA_(t2->vk_device_, &info, &handle[i]);
-    if (result != VK_SUCCESS) {
-      PRINT_STDERR("vkGetSemaphoreZirconHandleFUCHSIA_ returned %d", result);
-      return false;
-    }
+    result =
+        t1->vkGetSemaphoreZirconHandleFUCHSIA_(t2->vk_device_, &info, &exported_event_handles[i]);
+    RTN_IF_VK_ERR(false, result, "vkGetSemaphoreZirconHandleFUCHSIA");
 
+    // Transfer handle ownership into magma::PlatformSemaphore (zx_event wrapper).
     std::shared_ptr<magma::PlatformSemaphore> platform_semaphore_import =
-        magma::PlatformSemaphore::Import(handle[i], /*flags=*/0);
+        magma::PlatformSemaphore::Import(exported_event_handles[i], 0 /* flags */);
 
     EXPECT_EQ(platform_semaphore_export->id(), platform_semaphore_import->id());
 
+    // Set semaphore state to unsignalled.
     platform_semaphore_export->Reset();
 
     std::thread thread(
@@ -428,10 +394,7 @@ bool VulkanTest::ExecUsingQueue(VulkanTest* t1, VulkanTest* t2, bool temporary) 
         .handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_ZIRCON_EVENT_BIT_FUCHSIA,
     };
     result = t1->vkGetSemaphoreZirconHandleFUCHSIA_(t1->vk_device_, &info, &handle[i]);
-    if (result != VK_SUCCESS) {
-      PRINT_STDERR("vkGetSemaphoreZirconHandleFUCHSIA_ returned %d", result);
-      return false;
-    }
+    RTN_IF_VK_ERR(false, result, "vkGetSemaphoreZirconHandleFUCHSIA");
   }
 
   // Import semaphores
@@ -446,20 +409,14 @@ bool VulkanTest::ExecUsingQueue(VulkanTest* t1, VulkanTest* t2, bool temporary) 
         .zirconHandle = handle[i]};
 
     result = t1->vkImportSemaphoreZirconHandleFUCHSIA_(t2->vk_device_, &import_info);
-    if (result != VK_SUCCESS) {
-      PRINT_STDERR("vkImportSemaphoreZirconHandleFUCHSIA_ failed: %d", result);
-      return false;
-    }
+    RTN_IF_VK_ERR(false, result, "vkImportSemaphoreZirconHandleFUCHSIA");
   }
 
   VkSubmitInfo submit_info1 = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
                                .signalSemaphoreCount = 1,
                                .pSignalSemaphores = &t1->vk_semaphores_[0]};
   result = vkQueueSubmit(t1->vk_queue_, 1, &submit_info1, VK_NULL_HANDLE);
-  if (result != VK_SUCCESS) {
-    PRINT_STDERR("vkQueueSubmit failed: %d", result);
-    return false;
-  }
+  RTN_IF_VK_ERR(false, result, "vkQueueSubmit");
 
   VkPipelineStageFlags stage_flags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
   VkSubmitInfo submit_info2 = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -469,31 +426,20 @@ bool VulkanTest::ExecUsingQueue(VulkanTest* t1, VulkanTest* t2, bool temporary) 
                                .signalSemaphoreCount = 1,
                                .pSignalSemaphores = &t2->vk_semaphores_[1]};
   result = vkQueueSubmit(t2->vk_queue_, 1, &submit_info2, VK_NULL_HANDLE);
-  if (result != VK_SUCCESS) {
-    PRINT_STDERR("vkQueueSubmit failed: %d", result);
-    return false;
-  }
+  RTN_IF_VK_ERR(false, result, "vkQueueSubmit");
 
   VkSubmitInfo submit_info3 = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
                                .waitSemaphoreCount = 1,
                                .pWaitSemaphores = &t1->vk_semaphores_[1],
                                .pWaitDstStageMask = &stage_flags};
   vkQueueSubmit(t1->vk_queue_, 1, &submit_info3, VK_NULL_HANDLE);
-  if (result != VK_SUCCESS) {
-    PRINT_STDERR("vkQueueSubmit failed: %d", result);
-    return false;
-  }
+  RTN_IF_VK_ERR(false, result, "vkQueueSubmit");
 
   result = vkQueueWaitIdle(t1->vk_queue_);
-  if (result != VK_SUCCESS) {
-    PRINT_STDERR("vkQueueWaitIdle failed: %d", result);
-    return false;
-  }
+  RTN_IF_VK_ERR(false, result, "vkQueueWaitIdle");
+
   result = vkQueueWaitIdle(t2->vk_queue_);
-  if (result != VK_SUCCESS) {
-    PRINT_STDERR("vkQueueWaitIdle failed: %d", result);
-    return false;
-  }
+  RTN_IF_VK_ERR(false, result, "vkQueueWaitIdle");
 
   return true;
 }
