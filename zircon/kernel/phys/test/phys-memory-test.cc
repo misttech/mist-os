@@ -35,14 +35,21 @@ size_t AllocateAndOverwriteFreeMemory() {
   // trying to do large allocations, and gradually ask for less and less
   // memory as the larger allocations fail.
   size_t allocation_size = kMiB;  // start with 1MiB allocations.
+  int iter = 0;
   while (allocation_size > 0) {
+    if (iter % 200 == 0) {
+      printf("Iteration %d: Allocation size %#zx bytes.\n", iter, allocation_size);
+    }
+    iter++;
     // Allocate some memory.
     fbl::AllocChecker ac;
     auto result = Allocation::New(ac, memalloc::Type::kZbiTestPayload, allocation_size);
     if (!ac.check()) {
+      printf("Iteration %d: Allocation size reduced to %#zx bytes.\n", iter, allocation_size / 2);
       allocation_size /= 2;
       continue;
     }
+
     bytes_allocated += allocation_size;
 
     // Overwrite the memory.
