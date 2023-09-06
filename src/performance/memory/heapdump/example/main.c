@@ -8,7 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "heapdump/bind_with_fdio.h"
+#include "heapdump/bind.h"
 #include "heapdump/snapshot.h"
 
 struct LinkedListNode {

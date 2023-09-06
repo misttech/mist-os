@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "heapdump/bind_with_fdio.h"
-
 #include <fidl/fuchsia.memory.heapdump.process/cpp/wire.h>
 #include <lib/fdio/directory.h>
 
-#include "heapdump/bind_with_channel.h"
+#include "heapdump/bind.h"
 
 static constexpr const char *kServicePath =
     fidl::DiscoverableProtocolDefaultPath<fuchsia_memory_heapdump_process::Registry>;

@@ -8,7 +8,7 @@
 #include <lib/zx/eventpair.h>
 
 #include <gtest/gtest.h>
-#include <heapdump/bind_with_channel.h>
+#include <heapdump/bind.h>
 
 // Why death tests?
 //

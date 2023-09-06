@@ -12,8 +12,8 @@ point in time and export them in a
   `executable` target that you want to profile.
 * Add `//src/performance/memory/heapdump/instrumentation/collector.shard.cml`
   to the `include` list in your component's manifest.
-* Add `#include <heapdump/bind_with_fdio.h>` and call
-  `heapdump_bind_with_fdio()` at the beginning of `main` in your program.
+* Add `#include <heapdump/bind.h>` and call `heapdump_bind_with_fdio()` at the
+  beginning of `main` in your program.
 * Run your program as usual.
 * Use `ffx profile heapdump snapshot` while your program is running to take a
   snapshot of all the current live allocations. For instance, assuming that your

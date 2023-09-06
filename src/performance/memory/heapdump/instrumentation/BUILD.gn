@@ -75,8 +75,7 @@ library_headers("instrumentation.headers") {
 
   include_dir = "include"
   headers = [
-    "heapdump/bind_with_channel.h",
-    "heapdump/bind_with_fdio.h",
+    "heapdump/bind.h",
     "heapdump/snapshot.h",
     "heapdump/stats.h",
   ]
