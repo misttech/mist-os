@@ -58,6 +58,12 @@ template("hwreg_asm_header") {
           get_label_info(":$tool_target($host_toolchain)", "target_out_dir")
       outputs = [ "$header_dir/${invoker.output_name}" ]
       args = rebase_path(outputs, root_build_dir) + [ invoker.output_name ]
+
+      # Disable the use of a prebuilt version of the tool. This is required
+      # because the tool's binary location and name depends on the target cpu
+      # architecture
+      # (e.g. host_x64/obj/zircon/kernel/lib/arch/arm64/_hwreg_header.tool.gen-arm64-system-asm)
+      allow_prebuilt_tool_use = false
     }
   } else {
     not_needed(invoker, [ "output_name" ])

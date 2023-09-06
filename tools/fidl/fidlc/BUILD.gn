@@ -151,6 +151,11 @@ if (is_host) {
   }
 }
 
+install_host_tools("fidl-lint.host") {
+  deps = [ ":fidl-lint" ]
+  outputs = [ "fidl-lint" ]
+}
+
 golden_files("fidlc_golden_tests") {
   testonly = true
   deps = []

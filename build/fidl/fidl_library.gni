@@ -148,22 +148,16 @@ template("fidl_library") {
     _tool_with_no_output = "//tools/fidl/fidlc:fidl-lint"
 
     # Construct the host toolchain version of the tool.
-    host_tool = "${_tool_with_no_output}($host_toolchain)"
+    host_tool_label = "//tools/fidl/fidlc:fidl-lint.host"
+    host_tool_path = "$root_build_dir/host-tools/fidl-lint"
 
-    # Get the path to the executable.
-    if (!defined(tool_output_name)) {
-      tool_output_name = get_label_info(host_tool, "name")
-    }
-    tool_out_dir = get_label_info(host_tool, "root_out_dir")
-    host_executable = "$tool_out_dir/$tool_output_name"
-
-    deps = [ host_tool ]
+    deps = [ host_tool_label ]
     if (defined(invoker.non_fidl_deps)) {
       deps += invoker.non_fidl_deps
     }
 
     # Add the executable itself as an input.
-    inputs = [ host_executable ]
+    inputs = [ host_tool_path ]
 
     outputs = [ lint_stamp_file ]
 
@@ -181,7 +175,7 @@ template("fidl_library") {
                        ]) != []) {
       args += [ ":" ]  # NOOP - Nothing to lint, but touch the stamp file
     } else {
-      args += [ rebase_path(host_executable, root_build_dir) ]
+      args += [ rebase_path(host_tool_path, root_build_dir) ]
 
       excluded_checks = []
       if (defined(invoker.excluded_checks)) {

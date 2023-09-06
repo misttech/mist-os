@@ -137,6 +137,9 @@ template("sdk_fuchsia_package") {
     _ffx_package_dep =
         "//src/developer/ffx/plugins/package:ffx_package_tool($host_toolchain)"
 
+    _far_tool_dep = "//src/sys/pkg/bin/far:host"
+    _far_tool_bin = "$root_build_dir/host-tools/far"
+
     # Generates content checklist file using input package manifest, and runs checks
     # against golden. See
     # `//build/packages/generate_sdk_package_content_checklist.py` for more.
@@ -148,11 +151,11 @@ template("sdk_fuchsia_package") {
       inputs = [
         package_manifest_file,
         _ffx_package_bin,
-        "${host_out_dir}/far",
+        _far_tool_bin,
       ]
       outputs = [ computed_content_checklist_file ]
       deps = [
-        "//src/sys/pkg/bin/far:bin($host_toolchain)",
+        _far_tool_dep,
         _ffx_package_dep,
         _full_package_label,
       ]
@@ -168,7 +171,7 @@ template("sdk_fuchsia_package") {
         "--ffx-bin",
         rebase_path(_ffx_package_bin, root_build_dir),
         "--far-bin",
-        rebase_path("${host_out_dir}/far", root_build_dir),
+        rebase_path(_far_tool_bin, root_build_dir),
         "--depfile",
         rebase_path(depfile, root_build_dir),
       ]

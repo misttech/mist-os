@@ -20,6 +20,9 @@ template("fidl_api_compatibility_test") {
     policy = "update_golden"
   }
 
+  fidl_api_diff_tool_target = "//tools/fidl/fidl_api_diff:host"
+  fidl_api_diff_tool_path = "$root_build_dir/host-tools/fidl_api_diff"
+
   # Run the test.
   action(target_name) {
     forward_variables_from(invoker, "*", [ "policy" ])
@@ -47,12 +50,11 @@ template("fidl_api_compatibility_test") {
       "--stamp",
       rebase_path(stamp_file, root_build_dir),
       "--fidl_api_diff_path",
-      rebase_path("$root_build_dir/host_${host_cpu}/fidl_api_diff",
-                  root_build_dir),
+      rebase_path(fidl_api_diff_tool_path, root_build_dir),
       "--policy",
       policy,
     ]
 
-    deps += [ "//tools/fidl/fidl_api_diff:host" ]
+    deps += [ fidl_api_diff_tool_target ]
   }
 }

@@ -297,6 +297,13 @@ def main():
         args_gn_content += "sdk_no_host_tools = true\n"
         args_gn_content += "sdk_inside_idk_sub_build = true\n"
 
+        # Reuse host tools from the top-level build. This assumes that
+        # sub-builds cannot use host tools that were not already built by
+        # the top-level build, as there is no way to inject dependencies
+        # between the two build graphs.
+        relative_top_build_dir = ".."
+        args_gn_content += f'use_prebuilt_host_tools_from_build_dir = "{relative_top_build_dir}"'
+
         if write_file_if_unchanged(build_dir / 'args.gn', args_gn_content):
             if run_checked_command([gn_path,
                                     "--root=%s" % fuchsia_dir.resolve(), "gen",

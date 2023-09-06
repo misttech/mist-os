@@ -3,11 +3,19 @@
 # found in the LICENSE file.
 
 import("//build/config/clang/clang.gni")
+import("//build/host.gni")
 
 # This file introduces two related templates that act like action and
 # action_foreach but instead of running a script, it will compile a given tool
 # in the host toolchain and run that (either once or over the list of inputs,
 # depending on the variant).
+#
+# As a special case, when the `use_prebuilt_host_tools_from_build_dir` build
+# argument is not empty, the host tool binary is taken directly, as a prebuilt
+# from the build directory pointed to by the variable. This happens when
+# launching IDK sub-builds to generate binaries for different target CPU
+# architectures and API levels. Use `allow_prebuilt_tool_use = false` to
+# disable it.
 #
 # Parameters
 #
@@ -32,6 +40,16 @@ import("//build/config/clang/clang.gni")
 #       compiled_action_foreach(), this would contain source expansions mapping
 #       input to output files).
 #     - Type: list(path)
+#
+#   * allow_prebuilt_tool_use
+#     - Optional: set to false to avoid using prebuilt versions of the host
+#       tool coming from previous builds (e.g. when
+#       `use_prebuilt_host_tools_from_build_dir` is set). In practice
+#       this should only be disabled when the host binary itself, or its
+#       location depends on the current CPU architecture and/or Fuchsia API
+#       level.
+#     - Type: boolean
+#     - Default: true
 #
 #   * args, inputs sources, depfile, deps, public_deps, testonly, visibility
 #     - See action() / action_foreach().
@@ -119,17 +137,30 @@ template("_compiled_action_target") {
     }
     host_executable = "$tool_output_dir/$tool_output_name"
 
-    # Add the executable itself as an input.
-    inputs += [ host_executable ]
+    _allow_prebuilt = true
+    if (defined(invoker.allow_prebuilt_tool_use)) {
+      _allow_prebuilt = invoker.allow_prebuilt_tool_use
+    }
+    if (_allow_prebuilt && use_prebuilt_host_tools_from_build_dir != "") {
+      # Use a prebuilt version of the host tool. Assume the tool is already
+      # built so do not add any dependency to the target.
+      host_executable_rebased = use_prebuilt_host_tools_from_build_dir + "/" +
+                                rebase_path(host_executable, root_build_dir)
+      host_executable =
+          "//" + rebase_path(host_executable_rebased, "//", root_build_dir)
+    } else {
+      deps += [ host_tool ]
+      host_executable_rebased = rebase_path(host_executable, root_build_dir)
+    }
 
-    deps += [ host_tool ]
+    inputs += [ host_executable ]
 
     # The script takes as arguments Clang bin directory (for passing
     # llvm-symbolizer to runtimes), the binary to run, and then the
     # arguments to pass it.
     args = [
              rebased_clang_prefix,
-             rebase_path(host_executable, root_build_dir),
+             host_executable_rebased,
            ] + invoker.args
   }
 }
