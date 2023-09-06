@@ -9,6 +9,8 @@ use {
     std::{ffi::CStr, marker::PhantomData, mem, ptr},
 };
 
+pub use sys::{TRACE_BLOB_TYPE_DATA, TRACE_BLOB_TYPE_LAST_BRANCH, TRACE_BLOB_TYPE_PERFETTO};
+
 /// `Scope` represents the scope of a trace event.
 #[derive(Copy, Clone)]
 pub enum Scope {
@@ -39,6 +41,22 @@ pub fn category_enabled(category: &'static CStr) -> bool {
     // Function requires a pointer to a static null-terminated string literal,
     // which `&'static CStr` is.
     unsafe { sys::trace_is_category_enabled(category.as_ptr()) }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TraceState {
+    Stopped,
+    Started,
+    Stopping,
+}
+
+pub fn trace_state() -> TraceState {
+    match unsafe { sys::trace_state() } {
+        sys::TRACE_STOPPED => TraceState::Stopped,
+        sys::TRACE_STARTED => TraceState::Started,
+        sys::TRACE_STOPPING => TraceState::Stopping,
+        s => panic!("Unknown trace state {:?}", s),
+    }
 }
 
 /// An identifier for flows and async spans.
@@ -1146,6 +1164,80 @@ impl std::ops::Drop for TraceCategoryContext {
     }
 }
 
+/// RAII wrapper for trace contexts without a specific associated category.
+pub struct Context {
+    context: *const sys::trace_context_t,
+}
+
+impl Context {
+    pub fn acquire() -> Option<Self> {
+        let context = unsafe { sys::trace_acquire_context() };
+        if context.is_null() {
+            None
+        } else {
+            Some(Self { context })
+        }
+    }
+
+    pub fn register_string_literal(&self, s: &'static CStr) -> sys::trace_string_ref_t {
+        unsafe {
+            let mut s_ref = mem::MaybeUninit::<sys::trace_string_ref_t>::uninit();
+            sys::trace_context_register_string_literal(
+                self.context,
+                s.as_ptr(),
+                s_ref.as_mut_ptr(),
+            );
+            s_ref.assume_init()
+        }
+    }
+
+    pub fn write_blob_record(
+        &self,
+        type_: sys::trace_blob_type_t,
+        name_ref: &sys::trace_string_ref_t,
+        data: &[u8],
+    ) {
+        unsafe {
+            sys::trace_context_write_blob_record(
+                self.context,
+                type_,
+                name_ref as *const sys::trace_string_ref_t,
+                data.as_ptr() as *const libc::c_void,
+                data.len(),
+            );
+        }
+    }
+}
+
+impl std::ops::Drop for Context {
+    fn drop(&mut self) {
+        unsafe { sys::trace_release_context(self.context) }
+    }
+}
+
+pub struct ProlongedContext {
+    context: *const sys::trace_prolonged_context_t,
+}
+
+impl ProlongedContext {
+    pub fn acquire() -> Option<Self> {
+        let context = unsafe { sys::trace_acquire_prolonged_context() };
+        if context.is_null() {
+            None
+        } else {
+            Some(Self { context })
+        }
+    }
+}
+
+impl Drop for ProlongedContext {
+    fn drop(&mut self) {
+        unsafe { sys::trace_release_prolonged_context(self.context) }
+    }
+}
+
+unsafe impl Send for ProlongedContext {}
+
 mod sys {
     #![allow(non_camel_case_types, unused)]
     use fuchsia_zircon::sys::{zx_handle_t, zx_koid_t, zx_obj_type_t, zx_status_t, zx_ticks_t};
@@ -1159,6 +1251,7 @@ mod sys {
     pub type trace_string_index_t = u32;
     pub type trace_thread_index_t = u32;
     pub type trace_context_t = libc::c_void;
+    pub type trace_prolonged_context_t = libc::c_void;
 
     pub type trace_encoded_string_ref_t = u32;
     pub const TRACE_ENCODED_STRING_REF_EMPTY: trace_encoded_string_ref_t = 0;
@@ -1508,6 +1601,14 @@ mod sys {
             thread_koid: zx_koid_t,
         );
 
+        pub fn trace_context_write_blob_record(
+            context: *const trace_context_t,
+            type_: trace_blob_type_t,
+            name_ref: *const trace_string_ref_t,
+            data: *const libc::c_void,
+            size: libc::size_t,
+        );
+
         pub fn trace_context_alloc_record(
             context: *const trace_context_t,
             num_bytes: libc::size_t,
@@ -1540,6 +1641,10 @@ mod sys {
         ) -> *const trace_context_t;
 
         pub fn trace_release_context(context: *const trace_context_t);
+
+        pub fn trace_acquire_prolonged_context() -> *const trace_prolonged_context_t;
+
+        pub fn trace_release_prolonged_context(context: *const trace_prolonged_context_t);
 
         pub fn trace_register_observer(event: zx_handle_t) -> zx_status_t;
 
