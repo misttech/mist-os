@@ -11,7 +11,12 @@ use {
             error::ModelError,
             hooks::HooksRegistration,
             model::Model,
-            testing::{echo_service::*, mocks::*, out_dir::OutDir, test_helpers::*},
+            testing::{
+                echo_service::{EchoProtocol, ECHO_CAPABILITY},
+                mocks::*,
+                out_dir::OutDir,
+                test_helpers::*,
+            },
         },
     },
     ::routing::{
@@ -221,7 +226,6 @@ pub struct RoutingTest {
     components: Vec<(&'static str, ComponentDecl)>,
     pub model: Arc<Model>,
     pub builtin_environment: BuiltinEnvironment,
-    _echo_service: Arc<EchoService>,
     pub mock_runner: Arc<MockRunner>,
     test_dir: TempDir,
     pub test_dir_proxy: fio::DirectoryProxy,
@@ -273,8 +277,6 @@ impl RoutingTest {
             mock_resolver.add_blocker(name, send, recv);
         }
 
-        let echo_service = Arc::new(EchoService::new());
-
         // Add the `test_runner` capability as a built-in.
         builder.builtin_capabilities.push(CapabilityDecl::Runner(RunnerDecl {
             name: TEST_RUNNER_NAME.parse().unwrap(),
@@ -308,19 +310,24 @@ impl RoutingTest {
         for (name, runner) in builder.builtin_runners.clone() {
             env_builder = env_builder.add_runner(name, runner);
         }
-        let builtin_environment =
+        let mut builtin_environment =
             env_builder.build().await.expect("builtin environment setup failed");
-        builtin_environment.discover_root_component().await;
+
+        builtin_environment
+            .add_protocol_to_root_sandbox::<fidl_fidl_examples_routing_echo::EchoMarker>(
+                ECHO_CAPABILITY.clone(),
+                |s| EchoProtocol::serve(s).boxed(),
+            )
+            .await;
 
         let model = builtin_environment.model.clone();
         model.root().hooks.install(builder.additional_hooks.clone()).await;
-        model.root().hooks.install(echo_service.hooks()).await;
+        builtin_environment.discover_root_component().await;
 
         Self {
             components: builder.components,
             model,
             builtin_environment,
-            _echo_service: echo_service,
             mock_runner,
             test_dir,
             test_dir_proxy,

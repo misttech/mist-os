@@ -444,7 +444,7 @@ pub struct BuiltinEnvironment {
     pub inspector: Inspector,
     pub realm_builder_resolver: Option<Arc<RealmBuilderResolver>>,
     pub sandbox: Sandbox,
-    _builtin_receivers_task: Option<fasync::Task<()>>,
+    _builtin_receivers_task_group: TaskGroup,
     _service_fs_task: Option<fasync::Task<()>>,
 }
 
@@ -937,6 +937,8 @@ impl BuiltinEnvironment {
         model.root().hooks.install(event_stream_provider.hooks()).await;
 
         let (sandbox, builtin_receivers_task) = sandbox_builder.build();
+        let builtin_receivers_task_group = TaskGroup::new();
+        builtin_receivers_task_group.spawn(builtin_receivers_task).await;
 
         Ok(BuiltinEnvironment {
             model,
@@ -970,7 +972,7 @@ impl BuiltinEnvironment {
             inspector,
             realm_builder_resolver,
             sandbox,
-            _builtin_receivers_task: Some(builtin_receivers_task),
+            _builtin_receivers_task_group: builtin_receivers_task_group,
             _service_fs_task: None,
         })
     }
@@ -1188,6 +1190,34 @@ impl BuiltinEnvironment {
         service_fs: &mut ServiceFs<ServiceObj<'a, ()>>,
     ) -> Result<(), Error> {
         self.emit_diagnostics(service_fs)
+    }
+
+    #[cfg(test)]
+    /// Adds a protocol to the root sandbox, replacing prior entries. This must be called before
+    /// the model is started.
+    pub async fn add_protocol_to_root_sandbox<P>(
+        &mut self,
+        name: Name,
+        task_to_launch: impl Fn(P::RequestStream) -> BoxFuture<'static, Result<(), anyhow::Error>>
+            + Sync
+            + Send
+            + 'static,
+    ) where
+        P: ProtocolMarker,
+    {
+        warn!("adding builtin capability {} to root sandbox", name);
+        let receiver = Receiver::new();
+        let sender = receiver.new_sender();
+        self.sandbox.get_or_insert_protocol(name.clone()).insert_sender(sender);
+
+        let launch_task_on_receive = LaunchTaskOnReceive::new(
+            self.model.top_instance().task_group().as_weak(),
+            name,
+            receiver,
+            Box::new(move |message| task_to_launch(message.take_handle_as_stream::<P>()).boxed()),
+        );
+
+        self._builtin_receivers_task_group.spawn(launch_task_on_receive.run()).await;
     }
 
     #[cfg(test)]
