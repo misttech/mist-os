@@ -67,8 +67,7 @@ static zx::result<bool> MaybeAddDevice(
 
 zx::result<fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>>
 SdmmcRootDevice::GetMetadata(fidl::AnyArena& allocator) {
-  // TODO(fxbug.dev/133112): Enable packing up to 16 commands.
-  constexpr uint32_t kMaxCommandPacking = 0;
+  constexpr uint32_t kMaxCommandPacking = 16;
 
   auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>(
       parent(), DEVICE_METADATA_SDMMC);

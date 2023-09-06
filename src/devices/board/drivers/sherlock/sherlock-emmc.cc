@@ -164,6 +164,9 @@ zx_status_t Sherlock::EmmcInit() {
           .enable_trim(false)
           // Maintain the current Sherlock behavior until we determine that cache is needed.
           .enable_cache(false)
+          // Maintain the current Sherlock behavior until we determine that eMMC Packed Commands are
+          // needed.
+          .max_command_packing(0)
           .Build());
   if (!sdmmc_metadata.is_ok()) {
     zxlogf(ERROR, "Failed to encode SDMMC metadata: %s",

@@ -135,6 +135,9 @@ zx_status_t Nelson::EmmcInit() {
           .enable_trim(true)
           // Maintain the current Nelson behavior until we determine that cache is needed.
           .enable_cache(false)
+          // Maintain the current Nelson behavior until we determine that eMMC Packed Commands are
+          // needed.
+          .max_command_packing(0)
           .Build());
   if (!sdmmc_metadata.is_ok()) {
     zxlogf(ERROR, "Failed to encode SDMMC metadata: %s",
