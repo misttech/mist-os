@@ -12,6 +12,7 @@ use {
     fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync,
     futures::Stream,
     futures::{channel::mpsc, stream::BoxStream, AsyncReadExt, SinkExt, StreamExt},
+    log_command::log_socket_stream::LogsDataStream,
     pin_project::pin_project,
     serde_json,
     std::{
@@ -59,6 +60,10 @@ fn get_log_stream(syslog: ftest_manager::Syslog) -> Result<LogStream, fidl::Erro
         ftest_manager::Syslog::Batch(client_end) => {
             Ok(LogStream::new(BatchLogStream::from_client_end(client_end)?))
         }
+        ftest_manager::Syslog::Stream(client_end) => Ok(LogStream::new(
+            LogsDataStream::new(fuchsia_async::Socket::from_socket(client_end).unwrap())
+                .map(|result| Ok(result)),
+        )),
         _ => {
             panic!("not supported")
         }
@@ -71,6 +76,10 @@ fn get_log_stream(syslog: ftest_manager::Syslog) -> Result<LogStream, fidl::Erro
         ftest_manager::Syslog::Archive(client_end) => {
             Ok(LogStream::new(ArchiveLogStream::from_client_end(client_end)?))
         }
+        ftest_manager::Syslog::Stream(client_end) => Ok(LogStream::new(
+            LogsDataStream::new(fuchsia_async::Socket::from_socket(client_end).unwrap())
+                .map(|result| Ok(result)),
+        )),
         ftest_manager::Syslog::Batch(_) => panic!("batch iterator not supported on host"),
         _ => {
             panic!("not supported")

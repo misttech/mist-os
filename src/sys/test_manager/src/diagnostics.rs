@@ -11,13 +11,14 @@ use {
     diagnostics_reader as reader,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_developer_remotecontrol::StreamError,
+    fidl_fuchsia_diagnostics as fdiagnostics,
     fidl_fuchsia_diagnostics::{
-        ArchiveAccessorProxy, BatchIteratorMarker, ClientSelectorConfiguration, DataType, Format,
-        StreamMode, StreamParameters,
+        BatchIteratorMarker, ClientSelectorConfiguration, DataType, Format, StreamMode,
+        StreamParameters,
     },
-    fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync,
+    fidl_fuchsia_diagnostics_host as fhost, fidl_fuchsia_test_manager as ftest_manager,
+    fuchsia_async as fasync,
     futures::stream::FusedStream,
-    std::ops::Deref,
     tracing::warn,
 };
 
@@ -28,21 +29,30 @@ pub(crate) struct ServeSyslogOutcome {
 }
 
 /// Connect to archivist and starting serving syslog.
+/// TODO(https://fxbug.dev/133153): Only take one ArchiveAccessorProxy, not both.
 pub(crate) fn serve_syslog(
-    accessor: ArchiveAccessorProxy,
+    accessor: fdiagnostics::ArchiveAccessorProxy,
+    host_accessor: fhost::ArchiveAccessorProxy,
     log_iterator: ftest_manager::LogsIterator,
 ) -> Result<ServeSyslogOutcome, StreamError> {
-    let mut provider = IsolatedLogsProvider::new(accessor);
     let logs_iterator_task = match log_iterator {
         ftest_manager::LogsIterator::Archive(iterator) => {
-            let iterator_fut = provider.run_iterator_server(iterator)?;
+            let iterator_fut =
+                IsolatedLogsProvider::new(&accessor).run_iterator_server(iterator)?;
             Some(fasync::Task::spawn(async move {
                 let _on_drop = LogOnDrop("Log iterator task dropped");
                 iterator_fut.await
             }))
         }
+        ftest_manager::LogsIterator::Stream(iterator) => {
+            let iterator_fut = run_iterator_socket(&host_accessor, iterator);
+            Some(fasync::Task::spawn(async move {
+                iterator_fut.await?;
+                Ok(())
+            }))
+        }
         ftest_manager::LogsIterator::Batch(iterator) => {
-            provider.start_streaming_logs(iterator)?;
+            IsolatedLogsProvider::new(&accessor).start_streaming_logs(iterator)?;
             None
         }
         _ => None,
@@ -50,12 +60,31 @@ pub(crate) fn serve_syslog(
     Ok(ServeSyslogOutcome { logs_iterator_task })
 }
 
-struct IsolatedLogsProvider {
-    accessor: ArchiveAccessorProxy,
+fn run_iterator_socket(
+    host_accessor: &fhost::ArchiveAccessorProxy,
+    socket: fuchsia_zircon::Socket,
+) -> fidl::client::QueryResponseFut<()> {
+    host_accessor.stream_diagnostics(
+        &StreamParameters {
+            stream_mode: Some(StreamMode::SnapshotThenSubscribe),
+            data_type: Some(DataType::Logs),
+            format: Some(Format::Json),
+            client_selector_configuration: Some(ClientSelectorConfiguration::SelectAll(true)),
+            batch_retrieval_timeout_seconds: None,
+            ..Default::default()
+        },
+        socket,
+    )
 }
 
-impl IsolatedLogsProvider {
-    fn new(accessor: ArchiveAccessorProxy) -> Self {
+/// Type alias for &'a ArchiveAccessorProxy
+/// so we can impl ArchiveReaderManager on it.
+struct IsolatedLogsProvider<'a> {
+    accessor: &'a fdiagnostics::ArchiveAccessorProxy,
+}
+
+impl<'a> IsolatedLogsProvider<'a> {
+    fn new(accessor: &'a fdiagnostics::ArchiveAccessorProxy) -> Self {
         Self { accessor }
     }
 
@@ -63,22 +92,12 @@ impl IsolatedLogsProvider {
         &self,
         iterator: ServerEnd<BatchIteratorMarker>,
     ) -> Result<(), StreamError> {
-        self.start_streaming(iterator, StreamMode::SnapshotThenSubscribe, DataType::Logs, None)
-    }
-
-    fn start_streaming(
-        &self,
-        iterator: ServerEnd<BatchIteratorMarker>,
-        stream_mode: StreamMode,
-        data_type: DataType,
-        batch_timeout: Option<i64>,
-    ) -> Result<(), StreamError> {
         let stream_parameters = StreamParameters {
-            stream_mode: Some(stream_mode),
-            data_type: Some(data_type),
+            stream_mode: Some(StreamMode::SnapshotThenSubscribe),
+            data_type: Some(DataType::Logs),
             format: Some(Format::Json),
             client_selector_configuration: Some(ClientSelectorConfiguration::SelectAll(true)),
-            batch_retrieval_timeout_seconds: batch_timeout,
+            batch_retrieval_timeout_seconds: None,
             ..Default::default()
         };
         self.accessor.stream_diagnostics(&stream_parameters, iterator).map_err(|err| {
@@ -89,16 +108,8 @@ impl IsolatedLogsProvider {
     }
 }
 
-impl Deref for IsolatedLogsProvider {
-    type Target = ArchiveAccessorProxy;
-
-    fn deref(&self) -> &Self::Target {
-        &self.accessor
-    }
-}
-
 #[async_trait]
-impl ArchiveReaderManager for IsolatedLogsProvider {
+impl ArchiveReaderManager for IsolatedLogsProvider<'_> {
     type Error = reader::Error;
 
     async fn snapshot<D: diagnostics_data::DiagnosticsData + 'static>(

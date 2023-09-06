@@ -15,9 +15,13 @@ using zx;
 /// Holds the server end of an iterator over the isolated logs of a test.
 type LogsIterator = flexible resource union {
     /// Server end of the iterator, when this protocol is used by host-side clients.
+    @deprecated
     1: archive server_end:fuchsia.developer.remotecontrol.ArchiveIterator;
     /// Server end of the iterator, when this protocol is used by Fuchsia clients.
     2: batch server_end:fuchsia.diagnostics.BatchIterator;
+    /// Server end of the iterator, when this protocol is used by host-side clients.
+    /// This uses the protocol specified in fuchsia.diagnostics.host.ArchiveReader.
+    3: stream zx.Handle:<SOCKET, zx.Rights.WRITE | zx.Rights.WAIT>;
 };
 
 /// Error for `LaunchSuite` call.
@@ -207,6 +211,7 @@ type RunOptions = table {
 type LogsIteratorOption = flexible enum {
     BATCH_ITERATOR = 0;
     ARCHIVE_ITERATOR = 1;
+    SOCKET_BATCH_ITERATOR = 2;
 };
 
 /// The server end will disconnect after all the suite runs have finished and
@@ -420,9 +425,14 @@ type Stderr = resource struct {
 
 type Syslog = flexible resource union {
     /// Client end of the iterator, when this protocol is used by host-side clients.
+    /// This will be removed once all SDK users
+    /// have migrated to stream.
+    @deprecated
     1: archive client_end:fuchsia.developer.remotecontrol.ArchiveIterator;
     /// Client end of the iterator, when this protocol is used by Fuchsia clients.
     2: batch client_end:fuchsia.diagnostics.BatchIterator;
+    /// Client end of the iterator, when this protocol is used by host-side clients.
+    3: stream zx.Handle:SOCKET;
 };
 
 /// Arbitrary artifacts produced by a test.

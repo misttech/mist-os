@@ -551,6 +551,21 @@ async fn collect_isolated_logs_using_archive_iterator() {
 }
 
 #[fuchsia::test]
+async fn collect_isolated_logs_using_host_socket() {
+    let test_url = "fuchsia-pkg://fuchsia.com/test-manager-diagnostics-tests#meta/test-root.cm";
+    let options = RunOptions {
+        log_iterator: Some(ftest_manager::LogsIteratorOption::SocketBatchIterator),
+        ..default_run_option()
+    };
+    let (_events, logs) = run_single_test(test_url, options).await.unwrap();
+
+    assert_eq!(
+        logs,
+        vec!["Started diagnostics publisher".to_owned(), "Finishing through Stop".to_owned()]
+    );
+}
+
+#[fuchsia::test]
 async fn update_log_severity_for_all_components() {
     let test_url = "fuchsia-pkg://fuchsia.com/test-manager-diagnostics-tests#meta/test-root.cm";
     let options = RunOptions {

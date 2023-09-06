@@ -25,8 +25,9 @@ use {
     fidl::endpoints::{create_proxy, ClientEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_resolution::ResolverProxy,
-    fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    fidl_fuchsia_test as ftest, fidl_fuchsia_test_manager as ftest_manager,
+    fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_diagnostics_host as fhost,
+    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fidl_fuchsia_test as ftest,
+    fidl_fuchsia_test_manager as ftest_manager,
     ftest::Invocation,
     ftest_manager::{CaseStatus, LaunchError, SuiteEvent as FidlSuiteEvent, SuiteStatus},
     fuchsia_async::{self as fasync, TimeoutExt},
@@ -181,6 +182,10 @@ impl RunningSuite {
                     ftest_manager::Syslog::Archive(proxy),
                 )
             }
+            Some(ftest_manager::LogsIteratorOption::SocketBatchIterator) => {
+                let (local, remote) = fuchsia_zircon::Socket::create_stream();
+                (ftest_manager::LogsIterator::Stream(local), ftest_manager::Syslog::Stream(remote))
+            }
             _ => {
                 let (proxy, request) = fidl::endpoints::create_endpoints();
                 (ftest_manager::LogsIterator::Batch(request), ftest_manager::Syslog::Batch(proxy))
@@ -230,8 +235,23 @@ impl RunningSuite {
                 return;
             }
         };
+        let host_archive_accessor = match self
+            .instance
+            .root
+            .connect_to_protocol_at_exposed_dir::<fhost::ArchiveAccessorMarker>()
+        {
+            Ok(accessor) => accessor,
+            Err(e) => {
+                warn!("Error connecting to ArchiveAccessor");
+                sender
+                    .send(Err(LaunchTestError::ConnectToArchiveAccessor(e.into()).into()))
+                    .await
+                    .unwrap();
+                return;
+            }
+        };
 
-        match diagnostics::serve_syslog(archive_accessor, log_iterator) {
+        match diagnostics::serve_syslog(archive_accessor, host_archive_accessor, log_iterator) {
             Ok(diagnostics::ServeSyslogOutcome { logs_iterator_task }) => {
                 self.logs_iterator_task = logs_iterator_task;
             }
@@ -788,6 +808,18 @@ async fn get_realm(
     wrapper_realm
         .add_route(
             Route::new()
+                .capability(Capability::protocol::<
+                    fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker,
+                >())
+                .from(&archivist)
+                .to(Ref::parent())
+                .to(test_root.clone()),
+        )
+        .await?;
+
+    wrapper_realm
+        .add_route(
+            Route::new()
                 .capability(Capability::protocol::<fdiagnostics::LogSettingsMarker>())
                 .from(&archivist)
                 .to(Ref::parent()),
@@ -843,6 +875,9 @@ async fn get_realm(
             Route::new()
                 // from archivist
                 .capability(Capability::protocol::<fdiagnostics::ArchiveAccessorMarker>())
+                .capability(Capability::protocol::<
+                    fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker,
+                >())
                 .capability(Capability::protocol::<fdiagnostics::LogSettingsMarker>())
                 // from test root
                 .capability(Capability::protocol::<ftest::SuiteMarker>())

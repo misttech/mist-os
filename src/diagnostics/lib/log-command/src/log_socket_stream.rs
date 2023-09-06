@@ -80,7 +80,7 @@ where
 
 /// Stream of JSON logs from the target device.
 pub struct LogsDataStream {
-    inner: Pin<Box<dyn Stream<Item = LogsData>>>,
+    inner: Pin<Box<dyn Stream<Item = LogsData> + Send>>,
 }
 
 impl LogsDataStream {
