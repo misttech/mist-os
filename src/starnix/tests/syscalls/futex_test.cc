@@ -106,6 +106,67 @@ TEST(RobustFutexTest, NullEntryStopsProcessing) {
   });
 }
 
+// Test that exceeding the maximum number of robust futexes would lead to a
+// futex not being processed.
+TEST(RobustFutexTest, RobustListLimitIsEnforced) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([] {
+    constexpr size_t kNumEntries = ROBUST_LIST_LIMIT + 1;
+    robust_list_entry entries[kNumEntries] = {};
+    robust_list_head head = {.list = {.next = nullptr},
+                             .futex_offset = offsetof(robust_list_entry, futex),
+                             .list_op_pending = nullptr};
+
+    head.list.next = reinterpret_cast<struct robust_list *>(&entries[0]);
+    for (size_t i = 0; i < kNumEntries - 1; i++) {
+      entries[i].next = reinterpret_cast<struct robust_list *>(&entries[i + 1].next);
+    }
+    entries[kNumEntries - 1].next = reinterpret_cast<struct robust_list *>(&head);
+
+    std::thread t([&entries, &head]() {
+      int tid = static_cast<int>(syscall(SYS_gettid));
+      for (size_t i = 0; i < kNumEntries; i++) {
+        entries[i].futex = tid;
+      }
+
+      EXPECT_EQ(0, syscall(SYS_set_robust_list, &head, sizeof(robust_list_head)));
+    });
+
+    t.join();
+
+    for (size_t i = 0; i < kNumEntries - 1; i++) {
+      EXPECT_EQ(FUTEX_OWNER_DIED, entries[i].futex & FUTEX_OWNER_DIED);
+    }
+    // The last entry was not modified.
+    EXPECT_EQ(0, entries[kNumEntries - 1].futex & FUTEX_OWNER_DIED);
+  });
+
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
+// Tests that issuing a cyclic robust list doesn't hang the starnix kernel.
+TEST(RobustFutexTest, CyclicRobustListDoesntHang) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([] {
+    robust_list_entry entry1 = {.next = nullptr, .futex = 0};
+    robust_list_entry entry2 = {.next = nullptr, .futex = 0};
+    robust_list_head head = {.list = {.next = nullptr},
+                             .futex_offset = offsetof(robust_list_entry, futex),
+                             .list_op_pending = nullptr};
+
+    std::thread t([&entry1, &entry2, &head]() {
+      entry1.next = reinterpret_cast<struct robust_list *>(&entry2);
+      entry2.next = reinterpret_cast<struct robust_list *>(&entry1);
+
+      head.list.next = reinterpret_cast<struct robust_list *>(&entry1);
+      EXPECT_EQ(0, syscall(SYS_set_robust_list, &head, sizeof(robust_list_head)));
+    });
+    t.join();
+    // Our robust list has a cycle. We should be able to stop correctly.
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
 // Tests that robust_lists set futex FUTEX_OWNER_DIED bit if the thread that locked a futex
 // executes an exec() without unlocking it.
 TEST(RobustFutexTest, FutexStateAfterExecCheck) {

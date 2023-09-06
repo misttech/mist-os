@@ -1871,8 +1871,9 @@ impl CurrentTask {
 
         let offset = head.futex_offset;
 
+        let mut entries_count = 0;
         let mut curr_ptr = head.list.next;
-        while curr_ptr.addr != robust_list_addr.into() {
+        while curr_ptr.addr != robust_list_addr.into() && entries_count < ROBUST_LIST_LIMIT {
             let curr_ref = self.mm.read_object(curr_ptr.into());
 
             let curr = if let Ok(curr) = curr_ref {
@@ -1904,6 +1905,7 @@ impl CurrentTask {
                 }
             }
             curr_ptr = curr.next;
+            entries_count += 1;
         }
     }
 
