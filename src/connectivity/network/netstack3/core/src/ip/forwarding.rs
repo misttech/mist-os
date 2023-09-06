@@ -56,6 +56,36 @@ impl From<crate::error::ExistsError> for AddRouteError {
     }
 }
 
+pub(crate) fn select_device_for_gateway<
+    I: IpLayerIpExt,
+    C: IpLayerNonSyncContext<I, SC::DeviceId>,
+    SC: IpStateContext<I, C>,
+>(
+    sync_ctx: &mut SC,
+    gateway: SpecifiedAddr<I::Addr>,
+) -> Option<SC::DeviceId> {
+    sync_ctx.with_ip_routing_table_mut(|sync_ctx, table| {
+        select_device_for_gateway_using_table::<I, C, SC>(sync_ctx, table, gateway)
+    })
+}
+
+fn select_device_for_gateway_using_table<
+    I: IpLayerIpExt,
+    C: IpLayerNonSyncContext<I, SC::DeviceId>,
+    SC: IpStateContext<I, C>,
+>(
+    sync_ctx: &mut <SC as IpStateContext<I, C>>::IpDeviceIdCtx<'_>,
+    table: &mut ForwardingTable<I, SC::DeviceId>,
+    gateway: SpecifiedAddr<I::Addr>,
+) -> Option<SC::DeviceId> {
+    table.lookup(sync_ctx, None, *gateway).and_then(
+        |Destination { next_hop: found_next_hop, device: found_device }| match found_next_hop {
+            NextHop::RemoteAsNeighbor => Some(found_device),
+            NextHop::Gateway(_intermediary_gateway) => None,
+        },
+    )
+}
+
 /// Add a route to the forwarding table.
 pub(crate) fn add_route<
     I: IpLayerIpExt,
@@ -74,17 +104,11 @@ pub(crate) fn add_route<
             (None, Some(gateway)) => {
                 // Find an on-link route to the gateway when the device is not
                 // specified.
-                table.lookup(sync_ctx, None, *gateway).map_or(
-                    Err(AddRouteError::GatewayNotNeighbor),
-                    |Destination { next_hop: found_next_hop, device: found_device }| {
-                        match found_next_hop {
-                            NextHop::RemoteAsNeighbor => Ok((found_device, Some(gateway))),
-                            NextHop::Gateway(_intermediary_gateway) => {
-                                Err(AddRouteError::GatewayNotNeighbor)
-                            }
-                        }
-                    },
-                )?
+                (
+                    select_device_for_gateway_using_table::<I, C, SC>(sync_ctx, table, gateway)
+                        .ok_or(AddRouteError::GatewayNotNeighbor)?,
+                    Some(gateway),
+                )
             }
         };
         let metric = observe_metric(sync_ctx, &device, metric);

@@ -48,7 +48,7 @@ use core::{fmt::Debug, marker::PhantomData, time};
 use derivative::Derivative;
 use lock_order::Locked;
 use net_types::{
-    ip::{AddrSubnetEither, IpAddr, Ipv4, Ipv6, SubnetEither},
+    ip::{AddrSubnetEither, IpAddr, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, SubnetEither},
     SpecifiedAddr,
 };
 use packet::{Buf, BufferMut, EmptyBuf};
@@ -467,6 +467,23 @@ pub fn del_ip_addr<NonSyncCtx: NonSyncContext>(
     )
 }
 
+/// Selects the device to use for gateway routes when the device was unspecified
+/// by the client.
+/// This can be used to construct an `Entry` from an `AddableEntry` the same
+/// way that the core routing table does.
+pub fn select_device_for_gateway<NonSyncCtx: NonSyncContext>(
+    sync_ctx: &SyncCtx<NonSyncCtx>,
+    gateway: SpecifiedAddr<IpAddr>,
+) -> Option<DeviceId<NonSyncCtx>> {
+    let mut sync_ctx = Locked::new(sync_ctx);
+    let gateway: IpAddr<SpecifiedAddr<Ipv4Addr>, SpecifiedAddr<Ipv6Addr>> = gateway.into();
+    map_addr_version!(
+        gateway: IpAddr;
+        ip::forwarding::select_device_for_gateway::<Ipv4, _, _>(&mut sync_ctx, gateway),
+        ip::forwarding::select_device_for_gateway::<Ipv6, _, _>(&mut sync_ctx, gateway)
+    )
+}
+
 /// Adds a route to the forwarding table.
 pub fn add_route<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
@@ -507,7 +524,7 @@ mod tests {
     use ip_test_macro::ip_test;
     use net_declare::{net_subnet_v4, net_subnet_v6};
     use net_types::{
-        ip::{AddrSubnet, Ip, Ipv4, Ipv6},
+        ip::{AddrSubnet, Ip, IpAddress, Ipv4, Ipv6},
         Witness,
     };
     use test_case::test_case;
@@ -735,6 +752,75 @@ mod tests {
                 ))
             ),
             expected_second_result,
+        );
+    }
+
+    #[ip_test]
+    #[test_case(true; "when there is an on-link route to the gateway")]
+    #[test_case(false; "when there is no on-link route to the gateway")]
+    fn select_device_for_gateway<I: Ip + TestIpExt>(on_link_route: bool) {
+        let FakeCtx { sync_ctx, mut non_sync_ctx } =
+            Ctx::new_with_builder(crate::StackStateBuilder::default());
+        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+
+        let device_id: DeviceId<_> = crate::device::add_ethernet_device(
+            &sync_ctx,
+            I::FAKE_CONFIG.local_mac,
+            crate::device::ethernet::MaxFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
+            DEFAULT_INTERFACE_METRIC,
+        )
+        .into();
+
+        let gateway = SpecifiedAddr::new(
+            // Set the last bit to make it an address inside the fake config's
+            // subnet.
+            I::map_ip::<_, I::Addr>(
+                I::FAKE_CONFIG.subnet.network(),
+                |addr| {
+                    let mut bytes = addr.ipv4_bytes();
+                    bytes[bytes.len() - 1] = 1;
+                    Ipv4Addr::from(bytes)
+                },
+                |addr| {
+                    let mut bytes = addr.ipv6_bytes();
+                    bytes[bytes.len() - 1] = 1;
+                    Ipv6Addr::from(bytes)
+                },
+            )
+            .to_ip_addr(),
+        )
+        .expect("should be specified");
+
+        // Try to resolve a device for a gateway that we have no route to.
+        assert_eq!(crate::select_device_for_gateway(&sync_ctx, gateway), None);
+
+        // Add a route to the gateway.
+        let route_to_add = if on_link_route {
+            AddableEntryEither::from(AddableEntry::without_gateway(
+                I::FAKE_CONFIG.subnet,
+                device_id.clone(),
+                AddableMetric::ExplicitMetric(RawMetric(0)),
+            ))
+        } else {
+            AddableEntryEither::from(AddableEntry::with_gateway(
+                I::FAKE_CONFIG.subnet,
+                Some(device_id.clone()),
+                I::FAKE_CONFIG.remote_ip,
+                AddableMetric::ExplicitMetric(RawMetric(0)),
+            ))
+        };
+
+        assert_eq!(crate::add_route(&sync_ctx, &mut non_sync_ctx, route_to_add), Ok(()));
+
+        // It still won't resolve successfully because the device is not enabled yet.
+        assert_eq!(crate::select_device_for_gateway(&sync_ctx, gateway), None);
+
+        crate::device::testutil::enable_device(&sync_ctx, &mut non_sync_ctx, &device_id);
+
+        // Now, try to resolve a device for the gateway.
+        assert_eq!(
+            crate::select_device_for_gateway(&sync_ctx, gateway),
+            if on_link_route { Some(device_id) } else { None }
         );
     }
 
