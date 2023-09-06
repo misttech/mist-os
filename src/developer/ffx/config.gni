@@ -63,7 +63,6 @@ dual_mode_plugins = [
   "//src/developer/ffx/plugins/fuzz:ffx_fuzz",
   "//src/developer/ffx/plugins/inspect:ffx_inspect",
   "//src/developer/ffx/plugins/log:ffx_log",
-  "//src/developer/ffx/plugins/overnet:ffx_overnet_plugin",
   "//src/developer/ffx/plugins/package:ffx_package",
   "//src/developer/ffx/plugins/power:ffx_power",
   "//src/developer/ffx/plugins/process:ffx_process",
