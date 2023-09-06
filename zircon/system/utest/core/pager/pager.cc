@@ -3020,32 +3020,37 @@ TEST(Pager, EvictionHintsVmar) {
   });
   ASSERT_TRUE(t1.Start());
 
-  // We should see page requests for both VMOs.
-  ASSERT_TRUE(pager.WaitForPageRead(vmo1, 0, 1, ZX_TIME_INFINITE));
-  ASSERT_TRUE(pager.SupplyPages(vmo1, 0, 1));
-  // The next page was committed and then marked DONT_NEED and could have been evicted already, so
-  // get the next request manually and see where we're at.
-  uint64_t req_offset;
-  uint64_t req_count;
-  ASSERT_TRUE(pager.GetPageReadRequest(vmo1, ZX_TIME_INFINITE, &req_offset, &req_count));
-  if (req_offset == 1) {
-    pager.SupplyPages(vmo1, 1, 1);
-    ASSERT_TRUE(pager.WaitForPageRead(vmo1, 2, 1, ZX_TIME_INFINITE));
-  } else {
-    ASSERT_EQ(req_offset, 2);
-  }
-  ASSERT_TRUE(pager.SupplyPages(vmo1, 2, 1));
-  ASSERT_TRUE(pager.WaitForPageRead(vmo2, 0, 1, ZX_TIME_INFINITE));
-  ASSERT_TRUE(pager.SupplyPages(vmo2, 0, 1));
-  // Similar as before, page might have been evicted.
-  ASSERT_TRUE(pager.GetPageReadRequest(vmo2, ZX_TIME_INFINITE, &req_offset, &req_count));
-  if (req_offset == 1) {
-    pager.SupplyPages(vmo2, 1, 1);
-    ASSERT_TRUE(pager.WaitForPageRead(vmo2, 2, 1, ZX_TIME_INFINITE));
-  } else {
-    ASSERT_EQ(req_offset, 2);
-  }
-  ASSERT_TRUE(pager.SupplyPages(vmo2, 2, 1));
+  // We should see page requests for both VMOs, however we do not know if the pages we marked
+  // DONT_NEED got evicted or not. As such there are three page request outcomes we might see
+  //  1. Single request for all three pages (page was evicted before our ALWAYS_NEED op)
+  //  2. Request for page 1 then request for pages 2 and 3 (page was evicted while servicing request
+  //     for page 1)
+  //  3. Request for page 1 then request for page 3 (page was not evicted at all)
+  auto wait_for_pages = [&pager](Vmo* vmo) {
+    uint64_t req_offset;
+    uint64_t req_count;
+    ASSERT_TRUE(pager.GetPageReadRequest(vmo, ZX_TIME_INFINITE, &req_offset, &req_count));
+    // First page is always absent, so our request should be for that.
+    ASSERT_EQ(req_offset, 0);
+    // 1 or 3 pages
+    ASSERT_TRUE(req_count == 3 || req_count == 1);
+    pager.SupplyPages(vmo, 0, req_count);
+    if (req_count == 3) {
+      return;
+    }
+    // The next request is either just the last page, or the last two pages.
+    ASSERT_TRUE(pager.GetPageReadRequest(vmo, ZX_TIME_INFINITE, &req_offset, &req_count));
+    if (req_offset == 1) {
+      ASSERT_EQ(req_count, 2);
+      pager.SupplyPages(vmo, 1, 2);
+    } else {
+      ASSERT_EQ(req_offset, 2);
+      ASSERT_EQ(req_count, 1);
+      pager.SupplyPages(vmo, 2, 1);
+    }
+  };
+  ASSERT_NO_FATAL_FAILURE(wait_for_pages(vmo1));
+  ASSERT_NO_FATAL_FAILURE(wait_for_pages(vmo2));
 
   ASSERT_TRUE(t1.Wait());
 
