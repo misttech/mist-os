@@ -113,6 +113,26 @@ async def select_tests(
     COMPONENT_REGEX = re.compile(r"#meta/([\w\-_]+)\.cm")
     PACKAGE_REGEX = re.compile(r"/([\w\-_]+)#meta")
 
+    def fast_match(s1: str, s2: str) -> int:
+        """Perform a fast Damerau-Levenshtein Distance match on the given strings.
+
+        Strings with significantly different lengths cannot possible be below
+        the threshold, so to avoid expensive calculations this function
+        returns NO_MATCH_DISTANCE for strings whose lengths differ by more than
+        the current fuzzy distance threshold.
+
+        Args:
+            s1 (str): First string to match.
+            s2 (str): Second string to match.
+
+        Returns:
+            int: Damerau-Levenshtein distance if strings are close
+                in length, NO_MATCH_DISTANCE otherwise.
+        """
+        if abs(len(s1) - len(s2)) > fuzzy_distance_threshold:
+            return NO_MATCH_DISTANCE
+        return jellyfish.damerau_levenshtein_distance(s1, s2)
+
     def match_label(entry: Test, value: str) -> int:
         """Match build labels against a value.
 
@@ -121,7 +141,7 @@ async def select_tests(
         For example "//src/sys" would match all tests defined under src/sys.
 
         Matchers return a perfect match (0) if value is a prefix, otherwise they return
-        Damerau-Levenshtein Distance (see top of file).
+        the result of fast_match (see definition.)
 
         Args:
             entry (Test): Test to evaluate.
@@ -129,11 +149,11 @@ async def select_tests(
 
         Returns:
             int: # of edits (including transposition) to match the
-                strings. 0 is perfect match.
+                strings. See fast_match.
         """
         if entry.build.test.label.strip("/").startswith(value.strip("/")):
             return PERFECT_MATCH_DISTANCE
-        return jellyfish.damerau_levenshtein_distance(entry.build.test.label, value)
+        return fast_match(entry.build.test.label, value)
 
     def match_name(entry: Test, value: str) -> int:
         """Match test names against a value.
@@ -144,7 +164,7 @@ async def select_tests(
         that exact test by name.
 
         Matchers return a perfect match (0) if value is a prefix, otherwise they return
-        Damerau-Levenshtein Distance.
+        the result of fast_match (see definition.)
 
         Args:
             entry (Test): Test to evaluate.
@@ -152,11 +172,11 @@ async def select_tests(
 
         Returns:
             int: # of edits (including transposition) to match the
-                strings. 0 is perfect match.
+                strings. See fast_match.
         """
         if entry.info.name.startswith(value):
             return PERFECT_MATCH_DISTANCE
-        return jellyfish.damerau_levenshtein_distance(entry.info.name, value)
+        return fast_match(entry.info.name, value)
 
     def match_component(entry: Test, value: str) -> int:
         """Match component names against a value.
@@ -167,7 +187,7 @@ async def select_tests(
         fuchsia-pkg://fuchsia.com/my-package#meta/my-component.cm
 
         Matchers return a perfect match (0) if value is a prefix, otherwise they return
-        Damerau-Levenshtein Distance.
+        the result of fast_match (see definition.)
 
         Args:
             entry (Test): Test to evaluate.
@@ -175,7 +195,7 @@ async def select_tests(
 
         Returns:
             int: # of edits (including transposition) to match the
-                strings. 0 is perfect match.
+                strings. See fast_match.
         """
         if entry.build.test.package_url is None:
             return NO_MATCH_DISTANCE
@@ -183,7 +203,7 @@ async def select_tests(
         if m:
             if m[0].startswith(value):
                 return PERFECT_MATCH_DISTANCE
-            return jellyfish.damerau_levenshtein_distance(m[0], value)
+            return fast_match(m[0], value)
         return NO_MATCH_DISTANCE
 
     def match_trailing_path(entry: Test, value: str) -> int:
@@ -196,7 +216,7 @@ async def select_tests(
         path for test "host_x64/tests/my_test_script".
 
         Matchers return a perfect match (0) if value is a prefix, otherwise they return
-        Damerau-Levenshtein Distance.
+        the result of fast_match (see definition.)
 
         Args:
             entry (Test): Test to evaluate.
@@ -204,7 +224,7 @@ async def select_tests(
 
         Returns:
             int: # of edits (including transposition) to match the
-                strings. 0 is perfect match.
+                strings. See fast_match.
         """
         if entry.build.test.path is None:
             return NO_MATCH_DISTANCE
@@ -212,7 +232,7 @@ async def select_tests(
         if m:
             if m[0].startswith(value):
                 return PERFECT_MATCH_DISTANCE
-            return jellyfish.damerau_levenshtein_distance(m[0], value)
+            return fast_match(m[0], value)
         return NO_MATCH_DISTANCE
 
     def match_package(entry: Test, value: str) -> int:
@@ -224,7 +244,7 @@ async def select_tests(
         fuchsia-pkg://fuchsia.com/my-package#meta/my-component.cm
 
         Matchers return a perfect match (0) if value is a prefix, otherwise they return
-        Damerau-Levenshtein Distance.
+        the result of fast_match (see definition.)
 
         Args:
             entry (Test): Test to evaluate.
@@ -232,7 +252,7 @@ async def select_tests(
 
         Returns:
             int: # of edits (including transposition) to match the
-                strings. 0 is perfect match.
+                strings. See fast_match.
         """
         if entry.build.test.package_url is None:
             return NO_MATCH_DISTANCE
@@ -240,7 +260,7 @@ async def select_tests(
         if m:
             if m[0].startswith(value):
                 return PERFECT_MATCH_DISTANCE
-            return jellyfish.damerau_levenshtein_distance(m[0], value)
+            return fast_match(m[0], value)
         return NO_MATCH_DISTANCE
 
     matchers = [
