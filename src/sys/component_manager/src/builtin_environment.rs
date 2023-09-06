@@ -413,7 +413,6 @@ pub struct BuiltinEnvironment {
     pub model: Arc<Model>,
 
     // Framework capabilities.
-    pub mmio_resource: Option<Arc<MmioResource>>,
     pub power_resource: Option<Arc<PowerResource>>,
     pub root_resource: Option<Arc<RootResource>>,
     #[cfg(target_arch = "aarch64")]
@@ -620,8 +619,10 @@ impl BuiltinEnvironment {
 
         // Set up the MmioResource service.
         let mmio_resource = mmio_resource_handle.map(MmioResource::new);
-        if let Some(mmio_resource) = mmio_resource.as_ref() {
-            model.root().hooks.install(mmio_resource.hooks()).await;
+        if let Some(mmio_resource) = mmio_resource {
+            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::MmioResourceMarker>(
+                move |stream| mmio_resource.clone().serve(stream).boxed(),
+            );
         }
 
         #[cfg(target_arch = "x86_64")]
@@ -943,7 +944,6 @@ impl BuiltinEnvironment {
 
         Ok(BuiltinEnvironment {
             model,
-            mmio_resource,
             power_resource,
             #[cfg(target_arch = "aarch64")]
             smc_resource: _smc_resource,

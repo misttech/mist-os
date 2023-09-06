@@ -3,22 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    crate::builtin::capability::ResourceCapability,
-    ::routing::capability_source::InternalCapability,
-    anyhow::Error,
-    async_trait::async_trait,
-    cm_types::Name,
-    fidl::endpoints::ProtocolMarker,
+    anyhow::{format_err, Error},
     fidl_fuchsia_kernel as fkernel,
-    fuchsia_zircon::{self as zx, HandleBased, Resource, ResourceInfo},
+    fuchsia_zircon::{self as zx, HandleBased, Resource},
     futures::prelude::*,
-    lazy_static::lazy_static,
     std::sync::Arc,
 };
-
-lazy_static! {
-    static ref MMIO_RESOURCE_CAPABILITY_NAME: Name = "fuchsia.kernel.MmioResource".parse().unwrap();
-}
 
 /// An implementation of fuchsia.kernel.MmioResource protocol.
 pub struct MmioResource {
@@ -30,52 +20,26 @@ impl MmioResource {
     pub fn new(resource: Resource) -> Arc<Self> {
         Arc::new(Self { resource })
     }
-}
 
-#[async_trait]
-impl ResourceCapability for MmioResource {
-    const KIND: zx::sys::zx_rsrc_kind_t = zx::sys::ZX_RSRC_KIND_MMIO;
-    const NAME: &'static str = "MmioResource";
-    type Marker = fkernel::MmioResourceMarker;
-
-    fn get_resource_info(self: &Arc<Self>) -> Result<ResourceInfo, Error> {
-        Ok(self.resource.info()?)
-    }
-
-    async fn server_loop(
+    pub async fn serve(
         self: Arc<Self>,
-        mut stream: <Self::Marker as ProtocolMarker>::RequestStream,
+        mut stream: fkernel::MmioResourceRequestStream,
     ) -> Result<(), Error> {
+        if self.resource.info()?.kind != zx::sys::ZX_RSRC_KIND_MMIO {
+            return Err(format_err!("invalid handle kind, expected IRQ"));
+        }
         while let Some(fkernel::MmioResourceRequest::Get { responder }) = stream.try_next().await? {
             responder.send(self.resource.duplicate_handle(zx::Rights::SAME_RIGHTS)?)?;
         }
         Ok(())
-    }
-
-    fn matches_routed_capability(&self, capability: &InternalCapability) -> bool {
-        capability.matches_protocol(&MMIO_RESOURCE_CAPABILITY_NAME)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
-        crate::{
-            builtin::capability::BuiltinCapability,
-            capability::CapabilitySource,
-            model::hooks::{Event, EventPayload, Hooks},
-        },
-        cm_util::TaskGroup,
-        fidl::endpoints::ClientEnd,
-        fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync,
+        super::*, fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync,
         fuchsia_component::client::connect_to_protocol,
-        fuchsia_zircon::sys,
-        fuchsia_zircon::AsHandleRef,
-        futures::lock::Mutex,
-        moniker::{Moniker, MonikerBase},
-        std::path::PathBuf,
-        std::sync::Weak,
     };
 
     async fn get_mmio_resource() -> Result<Resource, Error> {
@@ -106,41 +70,6 @@ mod tests {
         assert_eq!(resource_info.kind, zx::sys::ZX_RSRC_KIND_MMIO);
         assert_eq!(resource_info.base, 0);
         assert_eq!(resource_info.size, 0);
-        Ok(())
-    }
-
-    #[fuchsia::test]
-    async fn can_connect_to_mmio_service() -> Result<(), Error> {
-        let mmio_resource = MmioResource::new(get_mmio_resource().await?);
-        let hooks = Hooks::new();
-        hooks.install(mmio_resource.hooks()).await;
-
-        let provider = Arc::new(Mutex::new(None));
-        let source = CapabilitySource::Builtin {
-            capability: InternalCapability::Protocol(MMIO_RESOURCE_CAPABILITY_NAME.clone()),
-            top_instance: Weak::new(),
-        };
-
-        let event = Event::new_for_test(
-            Moniker::root(),
-            "fuchsia-pkg://root",
-            EventPayload::CapabilityRouted { source, capability_provider: provider.clone() },
-        );
-        hooks.dispatch(&event).await;
-
-        let (client, mut server) = zx::Channel::create();
-        let task_group = TaskGroup::new();
-        if let Some(provider) = provider.lock().await.take() {
-            provider
-                .open(task_group.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server)
-                .await?;
-        };
-
-        let mmio_client = ClientEnd::<fkernel::MmioResourceMarker>::new(client)
-            .into_proxy()
-            .expect("failed to create launcher proxy");
-        let mmio_resource = mmio_client.get().await?;
-        assert_ne!(mmio_resource.raw_handle(), sys::ZX_HANDLE_INVALID);
         Ok(())
     }
 }
