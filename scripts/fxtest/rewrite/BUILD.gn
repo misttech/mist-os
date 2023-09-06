@@ -39,6 +39,7 @@ if (is_host) {
     "log.py",
     "package_repository.py",
     "selection.py",
+    "selection_types.py",
     "test_list_file.py",
     "tests_json_file.py",
   ]

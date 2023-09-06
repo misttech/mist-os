@@ -10,16 +10,13 @@ wrappers for the outcomes of the selection process.
 """
 
 from collections import defaultdict
-from dataclasses import dataclass
-from dataclasses import field
 from enum import Enum
-import random
 import re
 import typing
 
 import jellyfish
 
-import args
+import selection_types
 from test_list_file import Test
 
 
@@ -27,47 +24,10 @@ class SelectionError(Exception):
     """There was an error preventing test selection from continuing."""
 
 
-@dataclass
-class MatchGroup:
-    """Description of one set of properties that must match a test for selection.
-
-    All properties are logically ANDed together. Logical OR is represented by
-    multiple MatchGroups applied in sequence.
-
-    Examples:
-      `--package foo --component bar`
-        Matches tests with package foo OR component bar
-      `--package foo --and --component bar`
-        Matches only tests with package foo and component bar.
-      `my-test --package foo --and unittest`
-        Matches tests named "my-test" OR tests named "unittest" in package foo.
-    """
-
-    # Set of names to match. "Name" matches are the most permissive.
-    names: typing.Set[str] = field(default_factory=set)
-
-    # Set of package names to match. The package field must be a match.
-    packages: typing.Set[str] = field(default_factory=set)
-
-    # Set of component names to match. The component field must be a match.
-    components: typing.Set[str] = field(default_factory=set)
-
-    def __str__(self) -> str:
-        """Create a human-readable representation of this match group.
-
-        This aligns with the input flags to `fx test` such that a
-        user can copy and paste the output of this function and
-        produce an equivalent MatchGroup.
-
-        Returns:
-            str: The copy/pasteable command line representing this group.
-        """
-        elements = (
-            list(self.names)
-            + [f"--package {p}" for p in self.packages]
-            + [f"--component {c}" for c in self.components]
-        )
-        return " --and ".join(elements)
+class SelectionMode(Enum):
+    ANY = 0
+    HOST = 1
+    DEVICE = 2
 
 
 # Default threshold for matching.
@@ -80,63 +40,12 @@ NO_MATCH_DISTANCE: int = 1000000
 PERFECT_MATCH_DISTANCE: int = 0
 
 
-@dataclass
-class TestSelections:
-    """Return value for test selection.
-
-    This class contains the list of selected tests as well as
-    information related to the selection process for debugging.
-    """
-
-    # The list of tests selected, ordered by presence in tests.json.
-    selected: typing.List[Test]
-
-    # Tests that were selected but will not be run due to flags.
-    # (e.g. --count)
-    selected_but_not_run: typing.List[Test]
-
-    # The best score calculated for each test in tests.json, including non-selected tests.
-    best_score: typing.Dict[str, int]
-
-    # List of match groups with the set of tests selected by that match group.
-    group_matches: typing.List[typing.Tuple[MatchGroup, typing.List[str]]]
-
-    # The threshold used to match these tests.
-    fuzzy_distance_threshold: int
-
-    def has_device_test(self) -> bool:
-        """Determine if this set of test selections has any device tests.
-
-        Returns:
-            bool: True if a test that requires a device is selected, False otherwise.
-        """
-        return any([entry.is_device_test() for entry in self.selected])
-
-    def apply_flags(self, flags: args.Flags):
-        """Mutate the set of selected tests based on flags.
-
-        Args:
-            flags (args.Flags): The flags to apply to these selections.
-        """
-        if flags.random:
-            random.shuffle(self.selected)
-        if flags.limit is not None:
-            self.selected_but_not_run = self.selected[flags.limit :]
-            self.selected = self.selected[: flags.limit]
-
-
-class SelectionMode(Enum):
-    ANY = 0
-    HOST = 1
-    DEVICE = 2
-
-
 def select_tests(
     entries: typing.List[Test],
     selection: typing.List[str],
     mode: SelectionMode = SelectionMode.ANY,
     fuzzy_distance_threshold: int = DEFAULT_FUZZY_DISTANCE_THRESHOLD,
-) -> TestSelections:
+) -> selection_types.TestSelections:
     """Perform selection on the incoming list of tests.
 
     Selection may be passed directly from the command line. Each selection entry
@@ -181,7 +90,7 @@ def select_tests(
     if not selection:
         # If no selection text is specified, select all tests and
         # report them all as perfect matches.
-        return TestSelections(
+        return selection_types.TestSelections(
             entries.copy(),
             [],
             make_final_scores({test.info.name: 0 for test in entries}),
@@ -192,7 +101,9 @@ def select_tests(
     match_groups = _parse_selection_command_line(selection)
 
     tests_to_run: typing.Set[Test] = set()
-    group_matches: typing.List[typing.Tuple[MatchGroup, typing.List[str]]] = []
+    group_matches: typing.List[
+        typing.Tuple[selection_types.MatchGroup, typing.List[str]]
+    ] = []
     best_matches: typing.Dict[str, int] = defaultdict(int)
     TRAILING_PATH = re.compile(r"/([\w\-_\.]+)$")
     COMPONENT_REGEX = re.compile(r"#meta/([\w\-_]+)\.cm")
@@ -382,7 +293,7 @@ def select_tests(
     # Ensure tests match the input ordering for consistency.
     selected_tests = [e for e in entries if e in tests_to_run]
 
-    return TestSelections(
+    return selection_types.TestSelections(
         selected_tests,
         [],
         make_final_scores(dict(best_matches)),
@@ -393,10 +304,10 @@ def select_tests(
 
 def _parse_selection_command_line(
     selection: typing.List[str],
-) -> typing.List[MatchGroup]:
+) -> typing.List[selection_types.MatchGroup]:
     selection = selection.copy()  # Do not affect input list.
-    output_groups: typing.List[MatchGroup] = []
-    cur_group: MatchGroup | None = None
+    output_groups: typing.List[selection_types.MatchGroup] = []
+    cur_group: selection_types.MatchGroup | None = None
 
     def pop_for_arg(arg: str):
         """Mutate the outer cur_group variable depending on the contents of the argument.
@@ -429,7 +340,7 @@ def _parse_selection_command_line(
         nonlocal cur_group
         if cur_group:
             output_groups.append(cur_group)
-        cur_group = MatchGroup()
+        cur_group = selection_types.MatchGroup()
 
     special_tokens = ["--package", "--component"]
     while selection:

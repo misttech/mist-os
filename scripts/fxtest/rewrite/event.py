@@ -20,7 +20,7 @@ import time
 import typing
 
 from dataparse import dataparse
-import selection
+import selection_types
 import tests_json_file
 
 # Events may have a unique Id, represented as a monotonically increasing integer.
@@ -855,7 +855,7 @@ class EventRecorder:
 
     def emit_test_selections(
         self,
-        selections: selection.TestSelections,
+        selections: selection_types.TestSelections,
     ):
         """Event with details of test selection.
 

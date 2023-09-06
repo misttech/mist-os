@@ -24,6 +24,7 @@ import event
 import execution
 import log
 import selection
+import selection_types
 import statusinfo
 import termout
 import test_list_file
@@ -299,7 +300,7 @@ class SelectionValidationError(Exception):
 
 
 async def validate_test_selections(
-    selections: selection.TestSelections,
+    selections: selection_types.TestSelections,
     recorder: event.EventRecorder,
     flags: args.Flags,
 ):
@@ -313,7 +314,7 @@ async def validate_test_selections(
         SelectionValidationError: If the selections are invalid.
     """
 
-    missing_groups: typing.List[selection.MatchGroup] = []
+    missing_groups: typing.List[selection_types.MatchGroup] = []
 
     for group, matches in selections.group_matches:
         if not matches:
@@ -394,7 +395,7 @@ async def validate_test_selections(
 
 
 async def do_build(
-    tests: selection.TestSelections,
+    tests: selection_types.TestSelections,
     recorder: event.EventRecorder,
     exec_env: environment.ExecutionEnvironment,
 ) -> bool:
@@ -477,7 +478,7 @@ async def do_build(
 
 
 def has_tests_in_base(
-    tests: selection.TestSelections,
+    tests: selection_types.TestSelections,
     recorder: event.EventRecorder,
     exec_env: environment.ExecutionEnvironment,
 ) -> bool:
@@ -527,7 +528,7 @@ async def has_device_connected(
 
 
 async def post_build_checklist(
-    tests: selection.TestSelections,
+    tests: selection_types.TestSelections,
     recorder: event.EventRecorder,
     exec_env: environment.ExecutionEnvironment,
     build_id: event.Id,
@@ -564,7 +565,7 @@ async def post_build_checklist(
 
 
 async def run_all_tests(
-    tests: selection.TestSelections,
+    tests: selection_types.TestSelections,
     recorder: event.EventRecorder,
     flags: args.Flags,
     exec_env: environment.ExecutionEnvironment,

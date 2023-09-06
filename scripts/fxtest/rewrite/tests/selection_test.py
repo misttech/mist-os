@@ -7,6 +7,7 @@ import unittest
 
 import args
 import selection
+import selection_types
 import test_list_file
 import tests_json_file
 
@@ -21,7 +22,7 @@ class MatchGroupTest(unittest.TestCase):
 
     def assertMatchContents(
         self,
-        group: selection.MatchGroup,
+        group: selection_types.MatchGroup,
         names: typing.Set[str],
         packages: typing.Set[str],
         components: typing.Set[str],

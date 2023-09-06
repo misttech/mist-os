@@ -6,7 +6,7 @@ import asyncio
 import unittest
 
 import event
-import selection
+import selection_types
 import test_list_file
 import tests_json_file
 
@@ -115,7 +115,7 @@ class TestEvents(unittest.IsolatedAsyncioTestCase):
             "/home/tests.json",
         )
         recorder.emit_test_selections(
-            selection.TestSelections(
+            selection_types.TestSelections(
                 selected=[
                     test_list_file.Test(
                         tests_json_file.TestEntry(
