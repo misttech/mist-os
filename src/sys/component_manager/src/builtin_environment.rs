@@ -419,7 +419,6 @@ pub struct BuiltinEnvironment {
     pub kernel_stats: Option<Arc<KernelStats>>,
     pub read_only_log: Option<Arc<ReadOnlyLog>>,
     pub write_only_log: Option<Arc<WriteOnlyLog>>,
-    pub items_service: Option<Arc<Items>>,
     pub mexec_resource: Option<Arc<MexecResource>>,
     pub mmio_resource: Option<Arc<MmioResource>>,
     pub power_resource: Option<Arc<PowerResource>>,
@@ -553,20 +552,17 @@ impl BuiltinEnvironment {
             boot_args.clone().serve(stream).boxed()
         });
 
-        let items_service = match zbi_parser {
-            None => None,
-            Some(mut zbi_parser) => {
-                let factory_items = FactoryItems::new(&mut zbi_parser)?;
-                sandbox_builder.add_builtin_protocol_if_enabled::<fboot::FactoryItemsMarker>(
-                    move |stream| factory_items.clone().serve(stream).boxed(),
-                );
+        if let Some(mut zbi_parser) = zbi_parser {
+            let factory_items = FactoryItems::new(&mut zbi_parser)?;
+            sandbox_builder.add_builtin_protocol_if_enabled::<fboot::FactoryItemsMarker>(
+                move |stream| factory_items.clone().serve(stream).boxed(),
+            );
 
-                let items = Items::new(zbi_parser)?;
-                model.root().hooks.install(items.hooks()).await;
-
-                Some(items)
-            }
-        };
+            let items = Items::new(zbi_parser)?;
+            sandbox_builder.add_builtin_protocol_if_enabled::<fboot::ItemsMarker>(move |stream| {
+                items.clone().serve(stream).boxed()
+            });
+        }
 
         // Set up CrashRecords service.
         let crash_records_svc = CrashIntrospectSvc::new(crash_records);
@@ -945,7 +941,6 @@ impl BuiltinEnvironment {
             kernel_stats,
             read_only_log,
             write_only_log,
-            items_service,
             hypervisor_resource,
             info_resource,
             #[cfg(target_arch = "x86_64")]

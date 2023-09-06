@@ -3,23 +3,14 @@
 // found in the LICENSE file.
 
 use {
-    crate::builtin::capability::BuiltinCapability,
     anyhow::{anyhow, Error},
-    async_trait::async_trait,
-    cm_types::Name,
     core::mem::size_of,
     fidl_fuchsia_boot as fboot,
     fuchsia_zbi::{ZbiParser, ZbiParserError, ZbiResult, ZbiType::BootloaderFile},
     fuchsia_zircon as zx,
     futures::prelude::*,
-    lazy_static::lazy_static,
-    routing::capability_source::InternalCapability,
     std::{collections::HashMap, convert::TryInto, str::from_utf8, sync::Arc},
 };
-
-lazy_static! {
-    static ref ITEMS_CAPABILITY_NAME: Name = "fuchsia.boot.Items".parse().unwrap();
-}
 
 pub struct Items {
     zbi_parser: ZbiParser,
@@ -83,14 +74,11 @@ impl Items {
 
         Ok(bootloader_result)
     }
-}
 
-#[async_trait]
-impl BuiltinCapability for Items {
-    const NAME: &'static str = "Items";
-    type Marker = fboot::ItemsMarker;
-
-    async fn serve(self: Arc<Self>, mut stream: fboot::ItemsRequestStream) -> Result<(), Error> {
+    pub async fn serve(
+        self: Arc<Self>,
+        mut stream: fboot::ItemsRequestStream,
+    ) -> Result<(), Error> {
         while let Some(request) = stream.try_next().await? {
             match request {
                 fboot::ItemsRequest::Get { type_, extra, responder } => {
@@ -148,10 +136,6 @@ impl BuiltinCapability for Items {
             };
         }
         Ok(())
-    }
-
-    fn matches_routed_capability(&self, capability: &InternalCapability) -> bool {
-        capability.matches_protocol(&ITEMS_CAPABILITY_NAME)
     }
 }
 
