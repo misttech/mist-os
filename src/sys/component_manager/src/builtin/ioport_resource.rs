@@ -71,7 +71,7 @@ mod tests {
         IoportResource::new(Resource::from(zx::Handle::invalid()))
             .serve(stream)
             .await
-            .expect_err("failed to serve IoportResource stream");
+            .expect_err("should fail to serve stream with an invalid resource");
         Ok(())
     }
 

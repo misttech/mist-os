@@ -413,7 +413,6 @@ pub struct BuiltinEnvironment {
     pub model: Arc<Model>,
 
     // Framework capabilities.
-    pub irq_resource: Option<Arc<IrqResource>>,
     pub kernel_stats: Option<Arc<KernelStats>>,
     pub read_only_log: Option<Arc<ReadOnlyLog>>,
     pub write_only_log: Option<Arc<WriteOnlyLog>>,
@@ -634,8 +633,10 @@ impl BuiltinEnvironment {
 
         // Set up the IrqResource service.
         let irq_resource = irq_resource_handle.map(IrqResource::new);
-        if let Some(irq_resource) = irq_resource.as_ref() {
-            model.root().hooks.install(irq_resource.hooks()).await;
+        if let Some(irq_resource) = irq_resource {
+            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::IrqResourceMarker>(
+                move |stream| irq_resource.clone().serve(stream).boxed(),
+            );
         }
 
         // Set up RootResource service.
@@ -940,7 +941,6 @@ impl BuiltinEnvironment {
             kernel_stats,
             read_only_log,
             write_only_log,
-            irq_resource,
             mexec_resource,
             mmio_resource,
             power_resource,

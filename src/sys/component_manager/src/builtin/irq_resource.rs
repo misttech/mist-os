@@ -3,22 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    crate::builtin::capability::ResourceCapability,
-    ::routing::capability_source::InternalCapability,
-    anyhow::Error,
-    async_trait::async_trait,
-    cm_types::Name,
-    fidl::endpoints::ProtocolMarker,
+    anyhow::{format_err, Error},
     fidl_fuchsia_kernel as fkernel,
-    fuchsia_zircon::{self as zx, HandleBased, Resource, ResourceInfo},
+    fuchsia_zircon::{self as zx, HandleBased, Resource},
     futures::prelude::*,
-    lazy_static::lazy_static,
     std::sync::Arc,
 };
-
-lazy_static! {
-    static ref IRQ_RESOURCE_CAPABILITY_NAME: Name = "fuchsia.kernel.IrqResource".parse().unwrap();
-}
 
 /// An implementation of fuchsia.kernel.IrqResource protocol.
 pub struct IrqResource {
@@ -30,52 +20,26 @@ impl IrqResource {
     pub fn new(resource: Resource) -> Arc<Self> {
         Arc::new(Self { resource })
     }
-}
 
-#[async_trait]
-impl ResourceCapability for IrqResource {
-    const KIND: zx::sys::zx_rsrc_kind_t = zx::sys::ZX_RSRC_KIND_IRQ;
-    const NAME: &'static str = "IrqResource";
-    type Marker = fkernel::IrqResourceMarker;
-
-    fn get_resource_info(self: &Arc<Self>) -> Result<ResourceInfo, Error> {
-        Ok(self.resource.info()?)
-    }
-
-    async fn server_loop(
+    pub async fn serve(
         self: Arc<Self>,
-        mut stream: <Self::Marker as ProtocolMarker>::RequestStream,
+        mut stream: fkernel::IrqResourceRequestStream,
     ) -> Result<(), Error> {
+        if self.resource.info()?.kind != zx::sys::ZX_RSRC_KIND_IRQ {
+            return Err(format_err!("invalid handle kind, expected IRQ"));
+        }
         while let Some(fkernel::IrqResourceRequest::Get { responder }) = stream.try_next().await? {
             responder.send(self.resource.duplicate_handle(zx::Rights::SAME_RIGHTS)?)?;
         }
         Ok(())
-    }
-
-    fn matches_routed_capability(&self, capability: &InternalCapability) -> bool {
-        capability.matches_protocol(&IRQ_RESOURCE_CAPABILITY_NAME)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
-        crate::{
-            builtin::capability::BuiltinCapability,
-            capability::CapabilitySource,
-            model::hooks::{Event, EventPayload, Hooks},
-        },
-        cm_util::TaskGroup,
-        fidl::endpoints::ClientEnd,
-        fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync,
+        super::*, fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync,
         fuchsia_component::client::connect_to_protocol,
-        fuchsia_zircon::sys,
-        fuchsia_zircon::AsHandleRef,
-        futures::lock::Mutex,
-        moniker::{Moniker, MonikerBase},
-        std::path::PathBuf,
-        std::sync::Weak,
     };
 
     async fn get_irq_resource() -> Result<Resource, Error> {
@@ -101,10 +65,10 @@ mod tests {
     #[fuchsia::test]
     async fn fail_with_no_irq_resource() -> Result<(), Error> {
         let (_, stream) = fidl::endpoints::create_proxy_and_stream::<fkernel::IrqResourceMarker>()?;
-        assert!(!IrqResource::new(Resource::from(zx::Handle::invalid()))
+        IrqResource::new(Resource::from(zx::Handle::invalid()))
             .serve(stream)
             .await
-            .is_ok());
+            .expect_err("should fail to serve stream with an invalid resource");
         Ok(())
     }
 
@@ -116,41 +80,6 @@ mod tests {
         assert_eq!(resource_info.kind, zx::sys::ZX_RSRC_KIND_IRQ);
         assert_eq!(resource_info.base, 0);
         assert_eq!(resource_info.size, 0);
-        Ok(())
-    }
-
-    #[fuchsia::test]
-    async fn can_connect_to_irq_service() -> Result<(), Error> {
-        let irq_resource = IrqResource::new(get_irq_resource().await?);
-        let hooks = Hooks::new();
-        hooks.install(irq_resource.hooks()).await;
-
-        let provider = Arc::new(Mutex::new(None));
-        let source = CapabilitySource::Builtin {
-            capability: InternalCapability::Protocol(IRQ_RESOURCE_CAPABILITY_NAME.clone()),
-            top_instance: Weak::new(),
-        };
-
-        let event = Event::new_for_test(
-            Moniker::root(),
-            "fuchsia-pkg://root",
-            EventPayload::CapabilityRouted { source, capability_provider: provider.clone() },
-        );
-        hooks.dispatch(&event).await;
-
-        let (client, mut server) = zx::Channel::create();
-        let task_group = TaskGroup::new();
-        if let Some(provider) = provider.lock().await.take() {
-            provider
-                .open(task_group.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server)
-                .await?;
-        };
-
-        let irq_client = ClientEnd::<fkernel::IrqResourceMarker>::new(client)
-            .into_proxy()
-            .expect("failed to create launcher proxy");
-        let irq_resource = irq_client.get().await?;
-        assert_ne!(irq_resource.raw_handle(), sys::ZX_HANDLE_INVALID);
         Ok(())
     }
 }
