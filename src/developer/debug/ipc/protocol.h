@@ -59,9 +59,9 @@ constexpr uint32_t kCurrentProtocolVersion = 56;
 //   - CURRENT_SUPPORTED_API_LEVEL = FUCHSIA_API_LEVEL
 
 #define INITIAL_VERSION_FOR_API_LEVEL_MINUS_2 55
-#define INITIAL_VERSION_FOR_API_LEVEL_MINUS_1 55
+#define INITIAL_VERSION_FOR_API_LEVEL_MINUS_1 56
 #define INITIAL_VERSION_FOR_API_LEVEL_CURRENT 56
-#define CURRENT_SUPPORTED_API_LEVEL 14
+#define CURRENT_SUPPORTED_API_LEVEL 15
 
 #if !defined(FUCHSIA_API_LEVEL)
 // This is a workaround when using this library in the @internal_sdk, as the SDK
