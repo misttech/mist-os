@@ -135,7 +135,7 @@ impl Action {
                 print,
                 file_bug,
                 tag,
-                /// TODO(fxbug.dev/73441): `Warning` will be deprecated once all config files use `Alert`
+                // TODO(fxbug.dev/73441): `Warning` will be deprecated once all config files use `Alert`
                 severity: Severity::Warning,
             }),
             ActionConfig::Gauge { value, format, tag } => Action::Gauge(Gauge {
