@@ -346,7 +346,7 @@ impl ChunkedArchive {
 pub struct ChunkedDecompressor {
     seek_table: Vec<ChunkInfo>,
     buffer: Vec<u8>,
-    buffer_offset: usize,
+    data_written: usize,
     curr_chunk: usize,
     total_compressed_size: usize,
     decompressor: zstd::bulk::Decompressor<'static>,
@@ -358,16 +358,18 @@ impl ChunkedDecompressor {
     pub fn new(seek_table: Vec<ChunkInfo>) -> Result<Self, ChunkedArchiveError> {
         let total_compressed_size =
             seek_table.last().map(|last_chunk| last_chunk.compressed_range.end).unwrap_or(0);
+        let decompressed_buffer =
+            vec![0u8; seek_table.first().map(|c| c.decompressed_range.len()).unwrap_or(0)];
         let decompressor = zstd::bulk::Decompressor::new()
             .map_err(|err| ChunkedArchiveError::DecompressionError(err))?;
         Ok(Self {
             seek_table,
             buffer: vec![],
-            buffer_offset: 0,
+            data_written: 0,
             curr_chunk: 0,
             total_compressed_size,
             decompressor,
-            decompressed_buffer: vec![],
+            decompressed_buffer,
         })
     }
 
@@ -375,46 +377,81 @@ impl ChunkedDecompressor {
         &self.seek_table
     }
 
-    pub fn update(
+    fn finish_chunk(
         &mut self,
         data: &[u8],
         chunk_callback: &mut impl FnMut(&[u8]) -> (),
     ) -> Result<(), ChunkedArchiveError> {
+        debug_assert_eq!(data.len(), self.seek_table[self.curr_chunk].compressed_range.len());
+        let chunk = &self.seek_table[self.curr_chunk];
+        let decompressed_size = self
+            .decompressor
+            .decompress_to_buffer(data, self.decompressed_buffer.as_mut_slice())
+            .map_err(|err| ChunkedArchiveError::DecompressionError(err))?;
+        if decompressed_size != chunk.decompressed_range.len() {
+            return Err(ChunkedArchiveError::IntegrityError);
+        }
+        chunk_callback(&self.decompressed_buffer[..decompressed_size]);
+        self.curr_chunk += 1;
+        Ok(())
+    }
+
+    pub fn update(
+        &mut self,
+        mut data: &[u8],
+        chunk_callback: &mut impl FnMut(&[u8]) -> (),
+    ) -> Result<(), ChunkedArchiveError> {
         // Caller must not provide too much data.
-        if self.buffer.len() + self.buffer_offset + data.len() > self.total_compressed_size {
+        if self.data_written + data.len() > self.total_compressed_size {
             return Err(ChunkedArchiveError::OutOfRange);
         }
-        self.buffer.extend_from_slice(data);
+        self.data_written += data.len();
 
-        // Decode as many chunks as we can from the buffer.
-        let mut last_chunk_end: usize = 0;
-        while self.curr_chunk < self.seek_table.len()
-            && self.seek_table[self.curr_chunk].compressed_range.end
-                <= self.buffer_offset + self.buffer.len()
+        // If we had leftover data from a previous read, append until we've filled a chunk.
+        if !self.buffer.is_empty() {
+            let to_read = std::cmp::min(
+                data.len(),
+                self.seek_table[self.curr_chunk]
+                    .compressed_range
+                    .len()
+                    .checked_sub(self.buffer.len())
+                    .unwrap(),
+            );
+            self.buffer.extend_from_slice(&data[..to_read]);
+            if self.buffer.len() == self.seek_table[self.curr_chunk].compressed_range.len() {
+                // Take self.buffer temporarily (so we don't have to split borrows).
+                // That way we don't have to re-commit the pages we've already used in the buffer
+                // for next time.
+                let full_chunk = std::mem::take(&mut self.buffer);
+                self.finish_chunk(&full_chunk[..], chunk_callback)?;
+                self.buffer = full_chunk;
+                // Draining the buffer will set the length to 0 but keep the capacity the same.
+                self.buffer.drain(..);
+            }
+            data = &data[to_read..];
+        }
+
+        // Decode as many full chunks as we can.
+        while !data.is_empty()
+            && self.curr_chunk < self.seek_table.len()
+            && self.seek_table[self.curr_chunk].compressed_range.len() <= data.len()
         {
-            let chunk = &self.seek_table[self.curr_chunk];
-            let range = chunk.compressed_range.start - self.buffer_offset
-                ..chunk.compressed_range.end - self.buffer_offset;
-            if chunk.decompressed_range.len() > self.decompressed_buffer.len() {
-                self.decompressed_buffer.resize(chunk.decompressed_range.len(), 0);
-            }
-            let decompressed_size = self
-                .decompressor
-                .decompress_to_buffer(&self.buffer[range], self.decompressed_buffer.as_mut_slice())
-                .map_err(|err| ChunkedArchiveError::DecompressionError(err))?;
-            if decompressed_size != chunk.decompressed_range.len() {
-                return Err(ChunkedArchiveError::IntegrityError);
-            }
-            chunk_callback(&self.decompressed_buffer[..decompressed_size]);
-            last_chunk_end = chunk.compressed_range.end;
-            self.curr_chunk += 1;
+            let len = self.seek_table[self.curr_chunk].compressed_range.len();
+            self.finish_chunk(&data[..len], chunk_callback)?;
+            data = &data[len..];
         }
 
-        // Drain chunk data we no longer need.
-        if last_chunk_end >= self.buffer.len() + self.buffer_offset {
-            self.buffer.drain(..last_chunk_end - self.buffer_offset);
-            self.buffer_offset = last_chunk_end;
+        // Buffer the rest for the next call.
+        if !data.is_empty() {
+            debug_assert!(self.curr_chunk < self.seek_table.len());
+            debug_assert!(self.data_written < self.total_compressed_size);
+            self.buffer.extend_from_slice(data);
         }
+
+        debug_assert!(
+            self.data_written < self.total_compressed_size
+                || self.curr_chunk == self.seek_table.len()
+        );
 
         Ok(())
     }
