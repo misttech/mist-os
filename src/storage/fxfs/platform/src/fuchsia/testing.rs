@@ -4,7 +4,7 @@
 
 use {
     crate::fuchsia::{
-        directory::FxDirectory, file::FxFile, fxblob::BlobDirectory, pager::PagerBackedVmo,
+        directory::FxDirectory, file::FxFile, fxblob::BlobDirectory, pager::PagerBacked,
         volume::FxVolumeAndRoot, volumes_directory::VolumesDirectory,
     },
     anyhow::Context,

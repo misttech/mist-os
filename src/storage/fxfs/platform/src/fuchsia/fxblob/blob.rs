@@ -10,7 +10,7 @@ use {
         directory::FxDirectory,
         errors::map_to_status,
         node::FxNode,
-        pager::{PagerBackedVmo, TransferBuffers, TRANSFER_BUFFER_MAX_SIZE},
+        pager::{default_page_in, PagerBacked},
         volume::FxVolume,
     },
     anyhow::{anyhow, ensure, Context, Error},
@@ -18,16 +18,13 @@ use {
     fuchsia_merkle::{hash_block, MerkleTree},
     fuchsia_zircon::Status,
     fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::join,
     fxfs::{
         async_enter,
         errors::FxfsError,
-        log::*,
         object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle},
         object_store::DataObjectHandle,
         round::{round_down, round_up},
     },
-    once_cell::sync::Lazy,
     std::{
         io::Read,
         ops::Range,
@@ -54,9 +51,9 @@ pub struct FxBlob {
     vmo: zx::Vmo,
     open_count: AtomicUsize,
     merkle_tree: MerkleTree,
-    compressed_chunk_size: u64,
-    compressed_offsets: Vec<u64>,
-    uncompressed_size: u64,
+    compressed_chunk_size: u64,   // zero if blob is not compressed.
+    compressed_offsets: Vec<u64>, // unused if blob is not compressed.
+    uncompressed_size: u64,       // always set.
 }
 
 impl FxBlob {
@@ -121,19 +118,110 @@ impl Drop for FxBlob {
     }
 }
 
-/// Implements an on-demand paged VMO that decompresses blobs on the fly from a compressed on-disk
-/// representation.
-impl FxBlob {
-    // Returns a buffer containing the data, as well as the number of bytes which are actually
-    // available in the buffer.
-    async fn read_uncached(&self, range: Range<u64>) -> Result<(buffer::Buffer<'_>, usize), Error> {
+#[async_trait]
+
+/// Implements VFS pseudo-filesystem entries for blobs.
+#[async_trait]
+impl FxNode for FxBlob {
+    fn object_id(&self) -> u64 {
+        self.handle.object_id()
+    }
+
+    fn parent(&self) -> Option<Arc<FxDirectory>> {
+        unreachable!(); // Add a parent back-reference if needed.
+    }
+
+    fn set_parent(&self, _parent: Arc<FxDirectory>) {
+        // NOP
+    }
+
+    async fn get_properties(&self) -> Result<ObjectProperties, Error> {
+        unimplemented!()
+    }
+
+    fn open_count_add_one(&self) {
+        let old = self.open_count.fetch_add(1, Ordering::Relaxed);
+        assert!(old != PURGED && old != PURGED - 1);
+    }
+
+    fn open_count_sub_one(self: Arc<Self>) {
+        let old = self.open_count.fetch_sub(1, Ordering::Relaxed);
+        assert!(old & !PURGED > 0);
+        if old == PURGED + 1 {
+            let store = self.handle.store();
+            store
+                .filesystem()
+                .graveyard()
+                .queue_tombstone(store.store_object_id(), self.object_id());
+        }
+    }
+}
+
+#[async_trait]
+impl PagerBacked for FxBlob {
+    fn pager(&self) -> &crate::pager::Pager {
+        self.handle.owner().pager()
+    }
+
+    fn pager_key(&self) -> u64 {
+        self.handle.object_id()
+    }
+
+    fn vmo(&self) -> &zx::Vmo {
+        &self.vmo
+    }
+
+    // TODO(fxbug.dev/122125): refactor and share with file.rs
+    fn page_in(self: Arc<Self>, mut range: Range<u64>) {
+        async_enter!("page_in");
+
+        // Apply some read-ahead.
+        let read_alignment = self.read_alignment();
+        let aligned_size = round_up(self.uncompressed_size, read_alignment).unwrap();
+        if aligned_size < range.end {
+            range.end = aligned_size;
+        } else {
+            range = round_down(range.start, READ_AHEAD_SIZE)
+                ..round_up(range.end, READ_AHEAD_SIZE).unwrap();
+            if range.end > aligned_size {
+                range.end = aligned_size;
+            }
+        }
+        range.start = round_down(range.start, read_alignment);
+
+        // Delegate the rest to to generic page handling code.
+        default_page_in(self, range)
+    }
+
+    fn mark_dirty(self: Arc<Self>, _range: Range<u64>) {
+        unreachable!();
+    }
+
+    fn on_zero_children(self: Arc<Self>) {
+        self.open_count_sub_one();
+    }
+
+    fn read_alignment(&self) -> u64 {
+        if self.compressed_offsets.is_empty() {
+            BLOCK_SIZE
+        } else {
+            self.compressed_chunk_size
+        }
+    }
+    fn byte_size(&self) -> u64 {
+        self.uncompressed_size
+    }
+    async fn aligned_read(&self, range: Range<u64>) -> Result<(buffer::Buffer<'_>, usize), Error> {
+        let block_alignment = self.read_alignment();
+        ensure!(block_alignment > 0, FxfsError::Inconsistent);
+        debug_assert_eq!(block_alignment % zx::system_get_page_size() as u64, 0);
+
         let mut buffer = self.handle.allocate_buffer((range.end - range.start) as usize);
         let read = if self.compressed_offsets.is_empty() {
             self.handle.read(range.start, buffer.as_mut()).await?
         } else {
-            ensure!(self.compressed_chunk_size > 0, FxfsError::Inconsistent);
-            let indices = (range.start / self.compressed_chunk_size) as usize
-                ..(range.end / self.compressed_chunk_size) as usize;
+            let indices =
+                (range.start / block_alignment) as usize..(range.end / block_alignment) as usize;
             let seek_table_len = self.compressed_offsets.len();
             ensure!(
                 indices.start < seek_table_len && indices.end <= seek_table_len,
@@ -192,168 +280,6 @@ impl FxBlob {
         // Zero the tail.
         buffer.as_mut_slice()[read..].fill(0);
         Ok((buffer, read))
-    }
-
-    fn align_range(&self, range: Range<u64>) -> Range<u64> {
-        if self.compressed_offsets.is_empty() {
-            round_down(range.start, BLOCK_SIZE)..round_up(range.end, BLOCK_SIZE).unwrap()
-        } else {
-            round_down(range.start, self.compressed_chunk_size)
-                ..round_up(range.end, self.compressed_chunk_size).unwrap()
-        }
-    }
-}
-
-/// Implements VFS pseudo-filesystem entries for blobs.
-#[async_trait]
-impl FxNode for FxBlob {
-    fn object_id(&self) -> u64 {
-        self.handle.object_id()
-    }
-
-    fn parent(&self) -> Option<Arc<FxDirectory>> {
-        unreachable!(); // Add a parent back-reference if needed.
-    }
-
-    fn set_parent(&self, _parent: Arc<FxDirectory>) {
-        // NOP
-    }
-
-    async fn get_properties(&self) -> Result<ObjectProperties, Error> {
-        unimplemented!()
-    }
-
-    fn open_count_add_one(&self) {
-        let old = self.open_count.fetch_add(1, Ordering::Relaxed);
-        assert!(old != PURGED && old != PURGED - 1);
-    }
-
-    fn open_count_sub_one(self: Arc<Self>) {
-        let old = self.open_count.fetch_sub(1, Ordering::Relaxed);
-        assert!(old & !PURGED > 0);
-        if old == PURGED + 1 {
-            let store = self.handle.store();
-            store
-                .filesystem()
-                .graveyard()
-                .queue_tombstone(store.store_object_id(), self.object_id());
-        }
-    }
-}
-
-impl PagerBackedVmo for FxBlob {
-    fn pager_key(&self) -> u64 {
-        self.handle.object_id()
-    }
-
-    fn vmo(&self) -> &zx::Vmo {
-        &self.vmo
-    }
-
-    // TODO(fxbug.dev/122125): refactor and share with file.rs
-    fn page_in(self: Arc<Self>, mut range: Range<u64>) {
-        async_enter!("page_in");
-        const ZERO_VMO_SIZE: u64 = TRANSFER_BUFFER_MAX_SIZE;
-        static ZERO_VMO: Lazy<zx::Vmo> = Lazy::new(|| zx::Vmo::create(ZERO_VMO_SIZE).unwrap());
-
-        let page_size = zx::system_get_page_size();
-
-        let vmo = self.vmo();
-        let aligned_size = round_up(self.uncompressed_size, page_size).unwrap();
-        let mut offset = std::cmp::max(range.start, aligned_size);
-        while offset < range.end {
-            let end = std::cmp::min(range.end, offset + ZERO_VMO_SIZE);
-            self.handle.owner().pager().supply_pages(vmo, offset..end, &ZERO_VMO, 0);
-            offset = end;
-        }
-        if aligned_size < range.end {
-            range.end = aligned_size;
-        } else {
-            range = round_down(range.start, READ_AHEAD_SIZE)
-                ..round_up(range.end, READ_AHEAD_SIZE).unwrap();
-            if range.end > aligned_size {
-                range.end = aligned_size;
-            }
-        }
-        if range.end <= range.start {
-            return;
-        }
-        range.start = round_down(range.start, self.handle.block_size());
-        range = self.align_range(range);
-
-        self.handle.owner().clone().spawn(async move {
-            static TRANSFER_BUFFERS: Lazy<TransferBuffers> = Lazy::new(|| TransferBuffers::new());
-            let (buffer_result, transfer_buffer) =
-                join!(self.read_uncached(range.clone()), async {
-                    let buffer = TRANSFER_BUFFERS.get().await;
-                    // Committing pages in the kernel is time consuming, so we do this in parallel
-                    // to the read.  This assumes that the implementation of join! polls the other
-                    // future first (which happens to be the case for now).
-                    buffer.commit(range.end - range.start);
-                    buffer
-                });
-            let (buffer, len) = match buffer_result {
-                Ok(v) => v,
-                Err(e) => {
-                    error!(
-                        ?range,
-                        merkle_root = %self.merkle_tree.root(),
-                        ?self.uncompressed_size,
-                        error = ?e,
-                        "Failed to load range"
-                    );
-                    // TODO(fxbug.dev/122125): Should we fuse further reads shut?  This would match
-                    // blobfs' behaviour.
-                    self.handle.owner().pager().report_failure(
-                        self.vmo(),
-                        range.clone(),
-                        map_to_status(e),
-                    );
-                    return;
-                }
-            };
-            let len = round_up(len, page_size as usize).unwrap();
-            debug_assert!(range.start + len as u64 <= aligned_size);
-            let mut buf = &buffer.as_slice()[..len];
-            while !buf.is_empty() {
-                let (source, remainder) =
-                    buf.split_at(std::cmp::min(buf.len(), TRANSFER_BUFFER_MAX_SIZE as usize));
-                buf = remainder;
-                let range_chunk = range.start..range.start + source.len() as u64;
-                match transfer_buffer.vmo().write(source, transfer_buffer.offset()) {
-                    Ok(_) => {
-                        self.handle.owner().pager().supply_pages(
-                            self.vmo(),
-                            range_chunk,
-                            transfer_buffer.vmo(),
-                            transfer_buffer.offset(),
-                        );
-                    }
-                    Err(e) => {
-                        // Failures here due to OOM will get reported as IO errors, as those are
-                        // considered transient.
-                        error!(
-                            range = ?range_chunk,
-                            error = ?e,
-                            "Failed to transfer range");
-                        self.handle.owner().pager().report_failure(
-                            self.vmo(),
-                            range_chunk,
-                            zx::Status::IO,
-                        );
-                    }
-                }
-                range.start += source.len() as u64;
-            }
-        });
-    }
-
-    fn mark_dirty(self: Arc<Self>, _range: Range<u64>) {
-        unreachable!();
-    }
-
-    fn on_zero_children(self: Arc<Self>) {
-        self.open_count_sub_one();
     }
 }
 

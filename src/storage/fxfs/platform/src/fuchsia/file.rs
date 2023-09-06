@@ -8,7 +8,7 @@ use {
         errors::map_to_status,
         node::{FxNode, OpenedNode},
         paged_object_handle::PagedObjectHandle,
-        pager::{PagerBackedVmo, TransferBuffers, TRANSFER_BUFFER_MAX_SIZE},
+        pager::{default_page_in, PagerBacked},
         volume::{info_to_filesystem_info, FxVolume},
     },
     anyhow::Error,
@@ -16,7 +16,7 @@ use {
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
     fuchsia_zircon::{self as zx, HandleBased, Status},
-    futures::{future::BoxFuture, join},
+    futures::future::BoxFuture,
     fxfs::{
         async_enter,
         filesystem::SyncOptions,
@@ -26,9 +26,8 @@ use {
             transaction::{LockKey, Options},
             DataObjectHandle, ObjectDescriptor, Timestamp,
         },
-        round::{round_down, round_up},
+        round::round_up,
     },
-    once_cell::sync::Lazy,
     std::{
         ops::Range,
         sync::{
@@ -36,6 +35,7 @@ use {
             Arc,
         },
     },
+    storage_device::buffer,
     vfs::{
         attributes,
         common::rights_to_posix_mode_bits,
@@ -478,7 +478,12 @@ impl File for FxFile {
     }
 }
 
-impl PagerBackedVmo for FxFile {
+#[async_trait]
+impl PagerBacked for FxFile {
+    fn pager(&self) -> &crate::pager::Pager {
+        self.handle.owner().pager()
+    }
+
     fn pager_key(&self) -> u64 {
         self.object_id()
     }
@@ -489,20 +494,8 @@ impl PagerBackedVmo for FxFile {
 
     fn page_in(self: Arc<Self>, mut range: Range<u64>) {
         async_enter!("page_in");
-        const ZERO_VMO_SIZE: u64 = TRANSFER_BUFFER_MAX_SIZE;
-        static ZERO_VMO: Lazy<zx::Vmo> = Lazy::new(|| zx::Vmo::create(ZERO_VMO_SIZE).unwrap());
-
-        let volume = self.handle.owner();
-
-        let vmo = self.vmo();
         let aligned_size =
             round_up(self.handle.uncached_size(), zx::system_get_page_size()).unwrap();
-        let mut offset = std::cmp::max(range.start, aligned_size);
-        while offset < range.end {
-            let end = std::cmp::min(range.end, offset + ZERO_VMO_SIZE);
-            volume.pager().supply_pages(vmo, offset..end, &ZERO_VMO, 0);
-            offset = end;
-        }
         if aligned_size < range.end {
             range.end = aligned_size;
         } else {
@@ -513,62 +506,7 @@ impl PagerBackedVmo for FxFile {
                 range.end += READ_AHEAD;
             }
         }
-        if range.end <= range.start {
-            return;
-        }
-
-        range.start = round_down(range.start, self.handle.block_size());
-
-        volume.clone().spawn(async move {
-            static TRANSFER_BUFFERS: Lazy<TransferBuffers> = Lazy::new(|| TransferBuffers::new());
-            let (buffer_result, transfer_buffer) =
-                join!(async { self.handle.read_uncached(range.clone()).await }, async {
-                    let buffer = TRANSFER_BUFFERS.get().await;
-                    // Committing pages in the kernel is time consuming, so we do this in parallel
-                    // to the read.  This assumes that the implementation of join! polls the other
-                    // future first (which happens to be the case for now).
-                    buffer.commit(range.end - range.start);
-                    buffer
-                });
-            let buffer = match buffer_result {
-                Ok(buffer) => buffer,
-                Err(e) => {
-                    error!(
-                        ?range,
-                        oid = self.handle.uncached_handle().object_id(),
-                        error = ?e,
-                        "Failed to page-in range"
-                    );
-                    self.handle.pager().report_failure(self.vmo(), range.clone(), zx::Status::IO);
-                    return;
-                }
-            };
-            let mut buf = buffer.as_slice();
-            while !buf.is_empty() {
-                let (source, remainder) =
-                    buf.split_at(std::cmp::min(buf.len(), TRANSFER_BUFFER_MAX_SIZE as usize));
-                buf = remainder;
-                let range_chunk = range.start..range.start + source.len() as u64;
-                match transfer_buffer.vmo().write(source, transfer_buffer.offset()) {
-                    Ok(_) => self.handle.pager().supply_pages(
-                        self.vmo(),
-                        range_chunk,
-                        transfer_buffer.vmo(),
-                        transfer_buffer.offset(),
-                    ),
-                    Err(e) => {
-                        // Failures here due to OOM will get reported as IO errors, as those are
-                        // considered transient.
-                        error!(
-                            range = ?range_chunk,
-                            error = ?e,
-                            "Failed to transfer range");
-                        self.handle.pager().report_failure(self.vmo(), range_chunk, zx::Status::IO);
-                    }
-                }
-                range.start += source.len() as u64;
-            }
-        });
+        default_page_in(self, range)
     }
 
     fn mark_dirty(self: Arc<Self>, range: Range<u64>) {
@@ -581,6 +519,18 @@ impl PagerBackedVmo for FxFile {
     fn on_zero_children(self: Arc<Self>) {
         // Drop the open count that we took in `get_backing_memory`.
         self.open_count_sub_one();
+    }
+
+    fn read_alignment(&self) -> u64 {
+        self.handle.block_size()
+    }
+    fn byte_size(&self) -> u64 {
+        self.handle.uncached_size()
+    }
+    async fn aligned_read(&self, range: Range<u64>) -> Result<(buffer::Buffer<'_>, usize), Error> {
+        let buffer = self.handle.read_uncached(range).await?;
+        let buffer_len = buffer.len();
+        Ok((buffer, buffer_len))
     }
 }
 

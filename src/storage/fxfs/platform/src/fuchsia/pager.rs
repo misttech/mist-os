@@ -3,14 +3,22 @@
 // found in the LICENSE file.
 
 use {
+    crate::fuchsia::errors::map_to_status,
     anyhow::Error,
+    async_trait::async_trait,
     bitflags::bitflags,
+    fuchsia_async as fasync,
     fuchsia_zircon::{
         self as zx,
         sys::zx_page_request_command_t::{ZX_PAGER_VMO_DIRTY, ZX_PAGER_VMO_READ},
         AsHandleRef, PacketContents, PagerPacket, SignalPacket,
     },
-    fxfs::log::*,
+    futures::{join, stream, Future, StreamExt},
+    fxfs::{
+        log::*,
+        round::{round_down, round_up},
+    },
+    once_cell::sync::Lazy,
     std::{
         collections::{hash_map::Entry, HashMap},
         marker::{Send, Sync},
@@ -18,11 +26,14 @@ use {
         ops::Range,
         sync::{Arc, Mutex, Weak},
     },
+    storage_device::buffer,
     vfs::execution_scope::ExecutionScope,
 };
 
 pub struct Pager {
     pager: zx::Pager,
+    scope: ExecutionScope,
+    executor: fasync::EHandle,
     inner: Arc<Inner>,
 }
 
@@ -130,8 +141,8 @@ impl Inner {
 // the file alive.  When we detect that there are no more children, we can downgrade to a weak
 // reference which will allow the file to be cleaned up if there are no other uses.
 enum FileHolder {
-    Strong(Arc<dyn PagerBackedVmo>),
-    Weak(Weak<dyn PagerBackedVmo>),
+    Strong(Arc<dyn PagerBacked>),
+    Weak(Weak<dyn PagerBacked>),
 }
 
 impl FileHolder {
@@ -143,7 +154,7 @@ impl FileHolder {
     }
 }
 
-fn watch_for_zero_children(port: &zx::Port, file: &dyn PagerBackedVmo) -> Result<(), zx::Status> {
+fn watch_for_zero_children(port: &zx::Port, file: &dyn PagerBacked) -> Result<(), zx::Status> {
     file.vmo().as_handle_ref().wait_async_handle(
         port,
         file.pager_key(),
@@ -152,14 +163,14 @@ fn watch_for_zero_children(port: &zx::Port, file: &dyn PagerBackedVmo) -> Result
     )
 }
 
-impl From<Arc<dyn PagerBackedVmo>> for FileHolder {
-    fn from(file: Arc<dyn PagerBackedVmo>) -> FileHolder {
+impl From<Arc<dyn PagerBacked>> for FileHolder {
+    fn from(file: Arc<dyn PagerBacked>) -> FileHolder {
         FileHolder::Strong(file)
     }
 }
 
-impl From<Weak<dyn PagerBackedVmo>> for FileHolder {
-    fn from(file: Weak<dyn PagerBackedVmo>) -> FileHolder {
+impl From<Weak<dyn PagerBacked>> for FileHolder {
+    fn from(file: Weak<dyn PagerBacked>) -> FileHolder {
         FileHolder::Weak(file)
     }
 }
@@ -173,9 +184,19 @@ impl Pager {
             Arc::new(Inner { files: Mutex::new(HashMap::default()), port: zx::Port::create() });
         {
             let inner = inner.clone();
+            let scope = scope.clone();
             std::thread::spawn(|| inner.port_thread_lifecycle(scope));
         }
-        Ok(Pager { pager, inner })
+        Ok(Pager { pager, scope, executor: fasync::EHandle::local(), inner })
+    }
+
+    /// Spawns a short term task for the pager that includes a guard that will prevent termination.
+    pub fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) {
+        let guard = self.scope.active_guard();
+        self.executor.spawn_detached(async move {
+            task.await;
+            std::mem::drop(guard);
+        });
     }
 
     /// Creates a new VMO to be used with the pager. Page requests will not be serviced until
@@ -190,18 +211,18 @@ impl Pager {
     }
 
     /// Registers a file with the pager.
-    pub fn register_file(&self, file: &Arc<impl PagerBackedVmo>) -> u64 {
+    pub fn register_file(&self, file: &Arc<impl PagerBacked>) -> u64 {
         let pager_key = file.pager_key();
         self.inner
             .files
             .lock()
             .unwrap()
-            .insert(pager_key, FileHolder::Weak(Arc::downgrade(file) as Weak<dyn PagerBackedVmo>));
+            .insert(pager_key, FileHolder::Weak(Arc::downgrade(file) as Weak<dyn PagerBacked>));
         pager_key
     }
 
     /// Unregisters a file with the pager.
-    pub fn unregister_file(&self, file: &dyn PagerBackedVmo) {
+    pub fn unregister_file(&self, file: &dyn PagerBacked) {
         if let Entry::Occupied(o) = self.inner.files.lock().unwrap().entry(file.pager_key()) {
             if std::ptr::eq(file as *const _ as *const (), o.get().as_ptr()) {
                 if let FileHolder::Strong(file) = o.remove() {
@@ -214,7 +235,7 @@ impl Pager {
     /// Starts watching for the `VMO_ZERO_CHILDREN` signal on `file`'s vmo. Returns false if the
     /// signal is already being watched for. When the pager receives the `VMO_ZERO_CHILDREN` signal
     /// [`PagerBacked::on_zero_children`] will be called.
-    pub fn watch_for_zero_children(&self, file: &dyn PagerBackedVmo) -> Result<bool, Error> {
+    pub fn watch_for_zero_children(&self, file: &dyn PagerBacked) -> Result<bool, Error> {
         let mut files = self.inner.files.lock().unwrap();
         let file = files.get_mut(&file.pager_key()).unwrap();
 
@@ -373,8 +394,12 @@ impl Pager {
     }
 }
 
-/// Trait for handling pager packets on pager backed VMOs.
-pub trait PagerBackedVmo: Sync + Send + 'static {
+/// This is a trait for objects (files/blobs) that expose a pager backed VMO.
+#[async_trait]
+pub trait PagerBacked: Sync + Send + 'static {
+    /// The pager backing this VMO.
+    fn pager(&self) -> &Pager;
+
     /// The pager key passed to [`Pager::create_vmo`].
     fn pager_key(&self) -> u64;
 
@@ -392,6 +417,148 @@ pub trait PagerBackedVmo: Sync + Send + 'static {
 
     /// Called by the pager to indicate there are no more VMO children.
     fn on_zero_children(self: Arc<Self>);
+
+    /// Total bytes readable. Anything reads over this will be zero padded in the VMO.
+    fn byte_size(&self) -> u64;
+
+    /// The alignment (in bytes) at which block aligned reads must be performed.
+    /// This may be larger than the system page size (e.g. for compressed chunks).
+    fn read_alignment(&self) -> u64;
+
+    /// Reads one or more blocks into a buffer and returns it.
+    /// Note that |aligned_byte_range| *must* be aligned to a
+    /// multiple of |self.read_alignment()|.
+    async fn aligned_read(
+        &self,
+        _aligned_byte_range: std::ops::Range<u64>,
+    ) -> Result<(buffer::Buffer<'_>, usize), Error>;
+}
+
+/// A generic page_in implementation that supplies pages using block-aligned reads.
+pub fn default_page_in<P: PagerBacked>(this: Arc<P>, mut range: Range<u64>) {
+    let read_alignment = this.read_alignment();
+    let byte_size = round_up(this.byte_size(), read_alignment).unwrap();
+
+    // Zero-pad the tail if requested range exceeds the size of the thing we're reading.
+    const ZERO_VMO_SIZE: u64 = 1_048_576;
+    static ZERO_VMO: Lazy<zx::Vmo> = Lazy::new(|| zx::Vmo::create(ZERO_VMO_SIZE).unwrap());
+    let mut offset = std::cmp::max(range.start, byte_size);
+    while offset < range.end {
+        let end = std::cmp::min(range.end, offset + ZERO_VMO_SIZE);
+        this.pager().supply_pages(this.vmo(), offset..end, &ZERO_VMO, 0);
+        offset = end;
+    }
+
+    if range.start % read_alignment != 0 {
+        tracing::warn!(
+            "Misaligned range.start in DefaultPagerBackedVmo::default_page_in. {} % {}",
+            range.start,
+            read_alignment
+        );
+        range.start = round_down(range.start, read_alignment);
+    }
+    if range.end % read_alignment != 0 {
+        tracing::warn!(
+            "Misaligned range.end in DefaultPagerBackedVmo::default_page_in. {} % {}",
+            range.end,
+            read_alignment
+        );
+        range.end = round_up(range.end, read_alignment).unwrap();
+    }
+    let mut read_size = round_down(TRANSFER_BUFFER_MAX_SIZE, read_alignment);
+
+    if read_size == 0 {
+        // TODO(fxbug.dev/299040602): If/when we can be sure compressed chunks are not larger
+        // than transfer buffers, we can simplify this. For now, we must read a whole block
+        // and use multiple transfer buffers in this case.
+        read_size = read_alignment;
+        // Maximum supported read size is 8MiB at time of writing. This is sufficient
+        // for 1023*8MiB = ~8GiB blobs which is much larger than we need.
+        assert!(read_size < TRANSFER_BUFFER_COUNT * TRANSFER_BUFFER_MAX_SIZE);
+    }
+
+    let mut futures = Vec::with_capacity(8);
+    while range.start < range.end {
+        let read_range = range.start..std::cmp::min(range.end, range.start + read_size);
+        range.start = read_range.end;
+
+        static TRANSFER_BUFFERS: Lazy<TransferBuffers> = Lazy::new(|| TransferBuffers::new());
+        let this = this.clone();
+        futures.push(async move {
+            let num_tx_buffers =
+                (read_size + TRANSFER_BUFFER_MAX_SIZE - 1) / TRANSFER_BUFFER_MAX_SIZE;
+            let (buffer_result, tx_buffers) = join!(this.aligned_read(read_range.clone()), async {
+                // Committing pages in the kernel is time consuming, so we do this in
+                // parallel to the read.  This assumes that the implementation of join!
+                // polls the other future first (which happens to be the case for now).
+                let mut tx_buffers = Vec::new();
+                for i in 0..num_tx_buffers {
+                    let buffer = TRANSFER_BUFFERS.get().await;
+                    let commit_size = std::cmp::min(
+                        TRANSFER_BUFFER_MAX_SIZE,
+                        read_range.end - (read_range.start + i * TRANSFER_BUFFER_MAX_SIZE),
+                    );
+                    buffer.commit(commit_size);
+                    tx_buffers.push(buffer);
+                }
+                tx_buffers
+            });
+            let (buffer, buffer_len) = match buffer_result {
+                Ok(v) => v,
+                Err(e) => {
+                    error!(
+                        range = ?read_range,
+                        pager_key = ?this.pager_key(),
+                        ?byte_size,
+                        error = ?e,
+                        "Failed to load range"
+                    );
+                    this.pager().report_failure(this.vmo(), read_range.clone(), map_to_status(e));
+                    return;
+                }
+            };
+            let buf = &buffer.as_slice()[..buffer_len];
+            let mut buf_range = read_range.start
+                ..round_up(read_range.start + buffer_len as u64, zx::system_get_page_size())
+                    .unwrap();
+            for (buf, transfer_buffer) in
+                std::iter::zip(buf.chunks(TRANSFER_BUFFER_MAX_SIZE as usize), tx_buffers)
+            {
+                let supply_range = buf_range.start
+                    ..round_up(buf_range.start + buf.len() as u64, zx::system_get_page_size())
+                        .unwrap();
+                buf_range.start += buf.len() as u64;
+                match transfer_buffer.vmo().write(buf, transfer_buffer.offset()) {
+                    Ok(_) => {
+                        this.pager().supply_pages(
+                            this.vmo(),
+                            supply_range.clone(),
+                            transfer_buffer.vmo(),
+                            transfer_buffer.offset(),
+                        );
+                    }
+                    Err(e) => {
+                        // Failures here due to OOM will get reported as IO errors, as those are
+                        // considered transient.
+                        error!(
+                        range = ?supply_range,
+                        pager_key = ?this.pager_key(),
+                        error = ?e,
+                        "Failed to transfer range");
+                        this.pager().report_failure(
+                            this.vmo(),
+                            supply_range.clone(),
+                            zx::Status::IO,
+                        );
+                    }
+                }
+            }
+        });
+    }
+
+    // TODO(fxbug.dev/299206422): Cap concurrency and prevent parallelism until we have a
+    // solution for buffer allocation failing.
+    this.pager().spawn(stream::iter(futures).buffer_unordered(8).collect());
 }
 
 /// Represents a dirty range of page aligned bytes within a pager backed VMO.
@@ -511,11 +678,7 @@ impl Drop for TransferBuffer<'_> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        futures::{channel::mpsc, StreamExt as _},
-        vfs::execution_scope::ExecutionScope,
-    };
+    use {super::*, futures::channel::mpsc, vfs::execution_scope::ExecutionScope};
 
     struct MockFile {
         vmo: zx::Vmo,
@@ -530,7 +693,12 @@ mod tests {
         }
     }
 
-    impl PagerBackedVmo for MockFile {
+    #[async_trait]
+    impl PagerBacked for MockFile {
+        fn pager(&self) -> &Pager {
+            &self.pager
+        }
+
         fn pager_key(&self) -> u64 {
             self.pager_key
         }
@@ -549,6 +717,19 @@ mod tests {
         }
 
         fn on_zero_children(self: Arc<Self>) {}
+
+        fn byte_size(&self) -> u64 {
+            unimplemented!();
+        }
+        fn read_alignment(&self) -> u64 {
+            unimplemented!();
+        }
+        async fn aligned_read(
+            &self,
+            _aligned_byte_range: std::ops::Range<u64>,
+        ) -> Result<(buffer::Buffer<'_>, usize), Error> {
+            unimplemented!();
+        }
     }
 
     #[fuchsia::test(threads = 10)]
@@ -577,19 +758,25 @@ mod tests {
     }
 
     struct OnZeroChildrenFile {
+        pager: Arc<Pager>,
         vmo: zx::Vmo,
         pager_key: u64,
         sender: Mutex<mpsc::UnboundedSender<()>>,
     }
 
     impl OnZeroChildrenFile {
-        fn new(pager: &Pager, pager_key: u64, sender: mpsc::UnboundedSender<()>) -> Self {
+        fn new(pager: Arc<Pager>, pager_key: u64, sender: mpsc::UnboundedSender<()>) -> Self {
             let vmo = pager.create_vmo(pager_key, zx::system_get_page_size().into()).unwrap();
-            Self { vmo, pager_key, sender: Mutex::new(sender) }
+            Self { pager, vmo, pager_key, sender: Mutex::new(sender) }
         }
     }
 
-    impl PagerBackedVmo for OnZeroChildrenFile {
+    #[async_trait]
+    impl PagerBacked for OnZeroChildrenFile {
+        fn pager(&self) -> &Pager {
+            &self.pager
+        }
+
         fn pager_key(&self) -> u64 {
             self.pager_key
         }
@@ -609,6 +796,18 @@ mod tests {
         fn on_zero_children(self: Arc<Self>) {
             self.sender.lock().unwrap().unbounded_send(()).unwrap();
         }
+        fn byte_size(&self) -> u64 {
+            unreachable!();
+        }
+        fn read_alignment(&self) -> u64 {
+            unreachable!();
+        }
+        async fn aligned_read(
+            &self,
+            _aligned_byte_range: std::ops::Range<u64>,
+        ) -> Result<(buffer::Buffer<'_>, usize), Error> {
+            unreachable!();
+        }
     }
 
     #[fuchsia::test(threads = 10)]
@@ -616,7 +815,7 @@ mod tests {
         let (sender, mut receiver) = mpsc::unbounded();
         let scope = ExecutionScope::new();
         let pager = Arc::new(Pager::new(scope.clone()).unwrap());
-        let file = Arc::new(OnZeroChildrenFile::new(&pager, 1234, sender));
+        let file = Arc::new(OnZeroChildrenFile::new(pager.clone(), 1234, sender));
         assert_eq!(pager.register_file(&file), file.pager_key());
         {
             let _child_vmo = file
@@ -642,7 +841,7 @@ mod tests {
         let (sender, mut receiver) = mpsc::unbounded();
         let scope = ExecutionScope::new();
         let pager = Arc::new(Pager::new(scope.clone()).unwrap());
-        let file = Arc::new(OnZeroChildrenFile::new(&pager, 1234, sender));
+        let file = Arc::new(OnZeroChildrenFile::new(pager.clone(), 1234, sender));
         assert_eq!(pager.register_file(&file), file.pager_key());
         {
             let _child_vmo = file
@@ -678,7 +877,12 @@ mod tests {
             status_code: Mutex<zx::Status>,
         }
 
-        impl PagerBackedVmo for StatusCodeFile {
+        #[async_trait]
+        impl PagerBacked for StatusCodeFile {
+            fn pager(&self) -> &Pager {
+                &self.pager
+            }
+
             fn pager_key(&self) -> u64 {
                 self.pager_key
             }
@@ -696,6 +900,19 @@ mod tests {
             }
 
             fn on_zero_children(self: Arc<Self>) {
+                unreachable!();
+            }
+
+            fn byte_size(&self) -> u64 {
+                unreachable!();
+            }
+            fn read_alignment(&self) -> u64 {
+                unreachable!();
+            }
+            async fn aligned_read(
+                &self,
+                _aligned_byte_range: std::ops::Range<u64>,
+            ) -> Result<(buffer::Buffer<'_>, usize), Error> {
                 unreachable!();
             }
         }
