@@ -404,12 +404,6 @@ impl Drop for TransactionState {
     }
 }
 
-impl TransactionState {
-    fn add_guard(&mut self, guard: StrongRefGuard) {
-        self.guards.push(guard);
-    }
-}
-
 /// Transaction state held during the processing and dispatching of a transaction. In the event of
 /// an error while dispatching a transaction, this object is meant to cleanup any temporary
 /// resources that were allocated. Once a transaction has been dispatched successfully, this object
@@ -448,12 +442,16 @@ impl<'a> TransientTransactionState<'a> {
         }
     }
 
-    /// Schedule `handle` to have its strong reference count decremented if the transaction fails.
-    /// If the transaction succeeds and this object is converted into a [`TransactionState`], the
-    /// strong reference will be released when the transaction completes ([`TransactionState`] is
-    /// dropped).
+    /// Schedule `handle` to have its strong reference count decremented when the transaction ends
+    /// (both in case of success or failure).
     fn push_handle(&mut self, handle: Handle) {
         self.state.handles.push(handle)
+    }
+
+    /// Schedule `guard` to be released when the transaction ends (both in case of success or
+    /// failure).
+    fn push_guard(&mut self, guard: StrongRefGuard) {
+        self.state.guards.push(guard);
     }
 
     /// Schedule `fd` to be removed from the file descriptor table if the transaction fails.
@@ -2980,7 +2978,7 @@ impl BinderDriver {
                 };
 
                 if let Some(guard) = guard.take() {
-                    transaction_state.state.add_guard(guard);
+                    transaction_state.push_guard(guard);
                 }
 
                 let (target_thread, command) =
@@ -3350,7 +3348,7 @@ impl BinderDriver {
                                         //    ensures the receiving process keep it alive until the
                                         //    transactions is finished
                                         let guard = proxy.inc_strong(&mut actions);
-                                        transaction_state.state.add_guard(guard);
+                                        transaction_state.push_guard(guard);
 
                                         // 2. Convert the binder object from a handle to a local object.
                                         SerializedBinderObject::Object { local: proxy.local, flags }
