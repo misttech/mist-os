@@ -4,8 +4,6 @@
 
 //! Parsing and serialization of ARP packets.
 
-#![allow(private_in_public)]
-
 use core::convert::TryFrom;
 #[cfg(test)]
 use core::fmt::{self, Debug, Formatter};
