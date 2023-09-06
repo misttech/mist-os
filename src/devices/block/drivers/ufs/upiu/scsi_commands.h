@@ -19,22 +19,6 @@ namespace ufs {
 
 class ScsiCommandUpiu;
 
-// TODO(fxbug.dev/124835): Currently, |scsi_xfer| is used internally as an entry in the I/O command
-// queue. This will be replaced by an |IoCommand| struct containing a |block_op_t|.
-struct scsi_xfer
-    : public fbl::DoublyLinkedListable<std::unique_ptr<scsi_xfer>, fbl::NodeOptions::None> {
-  std::unique_ptr<ScsiCommandUpiu> upiu;
-  uint8_t lun;
-  scsi::Opcode op;
-  uint64_t start_lba;
-  uint64_t block_count;
-  std::vector<zx_paddr_t> buffer_phys;
-  sync_completion_t *done;
-  sync_completion_t local_event;
-  zx_status_t status;
-  uint32_t block_size;
-};
-
 using uint24_t = struct {
   uint8_t byte[3];
 };

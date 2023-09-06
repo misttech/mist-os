@@ -15,6 +15,7 @@
 
 #include <safemath/safe_conversions.h>
 
+#include "fbl/auto_lock.h"
 #include "logical_unit.h"
 
 namespace ufs {
@@ -62,83 +63,101 @@ zx_status_t Ufs::WaitWithTimeout(fit::function<zx_status_t()> wait_for, uint32_t
   }
 }
 
-void Ufs::HandleBlockOp(IoCommand* io_cmd) {
-  zx::pmt pmt;
-  std::unique_ptr<ScsiCommandUpiu> upiu;
-  std::vector<zx_paddr_t> data_paddrs;
-
-  const uint32_t opcode = io_cmd->op.command.opcode;
-  switch (opcode) {
-    case BLOCK_OPCODE_READ:
-    case BLOCK_OPCODE_WRITE: {
-      zx::unowned_vmo vmo(io_cmd->op.rw.vmo);
-      const uint32_t block_size = io_cmd->block_size_bytes;
-      const uint64_t length = io_cmd->op.rw.length * block_size;
-      const uint32_t kPageSize = zx_system_get_page_size();
-
-      // TODO(fxbug.dev/124835): Support the use of READ(16), WRITE(16) CDBs
-      if ((io_cmd->op.rw.offset_dev > UINT32_MAX) || (io_cmd->op.rw.length > UINT16_MAX)) {
-        zxlogf(ERROR, "Cannot handle block offset(%lu) or length(%d).", io_cmd->op.rw.offset_dev,
-               io_cmd->op.rw.length);
-        io_cmd->Complete(ZX_ERR_NOT_SUPPORTED);
-        return;
-      }
-      const uint32_t block_offset = static_cast<uint32_t>(io_cmd->op.rw.offset_dev);
-      const uint16_t block_length = static_cast<uint16_t>(io_cmd->op.rw.length);
-
-      // Assign physical addresses(pin) to data vmo. The return value is the physical address of the
-      // pinned memory.
-      uint32_t option = (opcode == BLOCK_OPCODE_READ) ? ZX_BTI_PERM_WRITE : ZX_BTI_PERM_READ;
-      ZX_DEBUG_ASSERT(length % kPageSize == 0);
-      data_paddrs.resize(length / kPageSize, 0);
-      if (zx_status_t status = bti_.pin(option, *vmo, io_cmd->op.rw.offset_vmo * block_size, length,
-                                        data_paddrs.data(), length / kPageSize, &pmt);
-          status != ZX_OK) {
-        zxlogf(ERROR, "Failed to pin IO buffer: %s", zx_status_get_string(status));
-        io_cmd->Complete(ZX_ERR_IO);
-        return;
-      }
-
-      if (opcode == BLOCK_OPCODE_READ) {
-        upiu = std::make_unique<ScsiRead10Upiu>(block_offset, block_length, block_size,
-                                                /*fua=*/false, 0);
-      } else {
-        upiu = std::make_unique<ScsiWrite10Upiu>(block_offset, block_length, block_size,
-                                                 /*fua=*/false, 0);
-      }
-    } break;
-    case BLOCK_OPCODE_TRIM: {
-      if (io_cmd->op.trim.length > UINT16_MAX) {
-        zxlogf(ERROR, "Cannot handle trim block length(%d).", io_cmd->op.trim.length);
-        io_cmd->Complete(ZX_ERR_NOT_SUPPORTED);
-        return;
-      }
-      upiu = std::make_unique<ScsiUnmapUpiu>(static_cast<uint16_t>(io_cmd->op.trim.length));
-      break;
+void Ufs::ProcessIoSubmissions() {
+  while (true) {
+    IoCommand* io_cmd;
+    {
+      fbl::AutoLock lock(&commands_lock_);
+      io_cmd = list_remove_head_type(&pending_commands_, IoCommand, node);
     }
-    case BLOCK_OPCODE_FLUSH:
-      // TODO(fxbug.dev/124835): Use Synchronize Cache (16)
-      io_cmd->Complete(ZX_OK);
-      // TODO(fxbug.dev/124835): Use break;
+
+    if (io_cmd == nullptr) {
       return;
-  }
-  auto unpin = fit::defer([&] {
-    if (pmt.is_valid()) {
-      pmt.unpin();
     }
-  });
 
-  // TODO(fxbug.dev/124835): Remove synchronous mode from QueueScsiCommand(). If it is a sync
-  // command, SendScsiUpiu() should be called directly.
-  if (zx::result<> result =
-          QueueScsiCommand(std::move(upiu), io_cmd->lun_id, std::move(data_paddrs), nullptr);
-      result.is_error()) {
-    zxlogf(ERROR, "Failed to send SCSI command (command: 0x%x)", opcode);
-    io_cmd->Complete(result.error_value());
-    return;
+    zx::pmt pmt;
+    std::unique_ptr<ScsiCommandUpiu> upiu;
+    std::vector<zx_paddr_t> data_paddrs;
+
+    const uint32_t opcode = io_cmd->op.command.opcode;
+    switch (opcode) {
+      case BLOCK_OPCODE_READ:
+      case BLOCK_OPCODE_WRITE: {
+        zx::unowned_vmo vmo(io_cmd->op.rw.vmo);
+        const uint32_t block_size = io_cmd->block_size_bytes;
+        const uint64_t length = io_cmd->op.rw.length * block_size;
+        const uint32_t kPageSize = zx_system_get_page_size();
+
+        // TODO(fxbug.dev/124835): Support the use of READ(16), WRITE(16) CDBs
+        if ((io_cmd->op.rw.offset_dev > UINT32_MAX) || (io_cmd->op.rw.length > UINT16_MAX)) {
+          zxlogf(ERROR, "Cannot handle block offset(%lu) or length(%u).", io_cmd->op.rw.offset_dev,
+                 io_cmd->op.rw.length);
+          io_cmd->Complete(ZX_ERR_NOT_SUPPORTED);
+          return;
+        }
+
+        const uint32_t block_offset = static_cast<uint32_t>(io_cmd->op.rw.offset_dev);
+        const uint16_t block_length = static_cast<uint16_t>(io_cmd->op.rw.length);
+
+        if (opcode == BLOCK_OPCODE_READ) {
+          upiu = std::make_unique<ScsiRead10Upiu>(block_offset, block_length, block_size,
+                                                  /*fua=*/false, 0);
+        } else {
+          upiu = std::make_unique<ScsiWrite10Upiu>(block_offset, block_length, block_size,
+                                                   /*fua=*/false, 0);
+        }
+
+        // Assign physical addresses(pin) to data vmo. The return value is the physical address of
+        // the pinned memory.
+        uint32_t option = (opcode == BLOCK_OPCODE_READ) ? ZX_BTI_PERM_WRITE : ZX_BTI_PERM_READ;
+        ZX_DEBUG_ASSERT(length % kPageSize == 0);
+        data_paddrs.resize(length / kPageSize, 0);
+        if (zx_status_t status = bti_.pin(option, *vmo, io_cmd->op.rw.offset_vmo * block_size,
+                                          length, data_paddrs.data(), length / kPageSize, &pmt);
+            status != ZX_OK) {
+          zxlogf(ERROR, "Failed to pin IO buffer: %s", zx_status_get_string(status));
+          io_cmd->Complete(ZX_ERR_IO);
+          return;
+        }
+        // There shouldn't be any returning after the pinning, since the unpinning follows after the
+        // switch statement.
+      } break;
+      case BLOCK_OPCODE_TRIM: {
+        if (io_cmd->op.trim.length > UINT16_MAX) {
+          zxlogf(ERROR, "Cannot handle trim block length(%d).", io_cmd->op.trim.length);
+          io_cmd->Complete(ZX_ERR_NOT_SUPPORTED);
+          return;
+        }
+        upiu = std::make_unique<ScsiUnmapUpiu>(static_cast<uint16_t>(io_cmd->op.trim.length));
+        break;
+      }
+      case BLOCK_OPCODE_FLUSH:
+        // TODO(fxbug.dev/124835): Use Synchronize Cache (10)
+        io_cmd->Complete(ZX_OK);
+        // TODO(fxbug.dev/124835): Use break;
+        return;
+    }
+    auto unpin = fit::defer([&] {
+      if (pmt.is_valid()) {
+        pmt.unpin();
+      }
+    });
+
+    auto response = transfer_request_processor_->SendScsiUpiu(*upiu, io_cmd->lun_id, data_paddrs);
+    if (response.is_error()) {
+      if (response.error_value() == ZX_ERR_NO_RESOURCES) {
+        fbl::AutoLock lock(&commands_lock_);
+        list_add_head(&pending_commands_, &io_cmd->node);
+        return;
+      }
+      zxlogf(ERROR, "Failed to submit SCSI command (command %p): %s", io_cmd,
+             response.status_string());
+      io_cmd->Complete(ZX_ERR_INTERNAL);
+    }
+
+    // TODO(fxbug.dev/124835): We should respond with the actual status of the command.
+    io_cmd->Complete(ZX_OK);
   }
-
-  io_cmd->Complete(ZX_OK);
 }
 
 zx::result<> Ufs::Isr() {
@@ -216,117 +235,51 @@ int Ufs::IrqLoop() {
   return thrd_success;
 }
 
-int Ufs::ScsiLoop() {
+int Ufs::IoLoop() {
   while (true) {
     if (IsDriverShutdown()) {
       zxlogf(DEBUG, "IO thread exiting.");
       break;
     }
 
-    if (zx_status_t status = sync_completion_wait(&scsi_event_, ZX_TIME_INFINITE);
-        status != ZX_OK) {
-      zxlogf(ERROR, "Waiting scsi_event_ is Failed: %s", zx_status_get_string(status));
+    if (zx_status_t status = sync_completion_wait(&io_signal_, ZX_TIME_INFINITE); status != ZX_OK) {
+      zxlogf(ERROR, "Failed to wait for sync completion: %s", zx_status_get_string(status));
       break;
     }
-    sync_completion_reset(&scsi_event_);
+    sync_completion_reset(&io_signal_);
 
-    {
-      std::lock_guard lock(xfer_list_lock_);
-      if (scsi_xfer_list_.is_empty()) {
-        continue;
-      }
-    }
+    // TODO(fxbug.dev/124835): Process async completions
 
-    zx::result<uint8_t> slot = transfer_request_processor_->ReserveSlot();
-    if (slot.is_error()) {
-      continue;  // If there is no free slot, continue.
-    }
-
-    std::unique_ptr<scsi_xfer> xfer;
-    {
-      // TODO(fxbug.dev/124835): One performance optimization possible here is to maintain a
-      // bitmap of free slots, enabling a quick check of whether we have any free slots. This
-      // prevents us from having to acquire this same lock a second time (pop the list when the
-      // lock is acquired above if we know there is a free slot).
-      std::lock_guard lock(xfer_list_lock_);
-      xfer = scsi_xfer_list_.pop_front();
-    }
-    ZX_ASSERT(xfer != nullptr);
-
-    auto response = transfer_request_processor_->SendRequestUsingSlot<ScsiCommandUpiu>(
-        *(xfer->upiu), slot.value(), std::move(xfer));
-    if (response.is_error()) {
-      zxlogf(ERROR, "ScsiThread SendRequestUsingSlot() is Failed: %s", response.status_string());
-    }
+    ProcessIoSubmissions();
   }
   return thrd_success;
 }
 
-zx::result<> Ufs::QueueScsiCommand(std::unique_ptr<ScsiCommandUpiu> upiu, uint8_t lun,
-                                   std::vector<zx_paddr_t> buffer_phys, sync_completion_t* event) {
-  auto xfer = std::make_unique<scsi_xfer>();
-  sync_completion_t* local_event = &xfer->local_event;
-  BlockDevice& block_device = block_devices_[lun];
-
-  xfer->lun = lun;
-  xfer->op = upiu->GetOpcode();
-  if (upiu->GetStartLba().has_value()) {
-    xfer->start_lba = upiu->GetStartLba().value();
-  } else {
-    xfer->start_lba = 0;
-  }
-  xfer->block_count = upiu->GetTransferBytes() / block_device.block_size;
-  xfer->upiu = std::move(upiu);
-  xfer->buffer_phys = std::move(buffer_phys);
-  xfer->status = ZX_OK;
-
-  xfer->block_size = static_cast<uint32_t>(block_device.block_size);
-
-  xfer->done = event ? event : &xfer->local_event;
-  sync_completion_reset(xfer->done);
-
-  TRACE_DURATION("ufs", "QueueScsiCommand::lock_guard,sync_completion_wait", "offset",
-                 xfer->start_lba, "length", xfer->block_count);
-
-  // Queue SCSI command to xfer list.
+void Ufs::QueueIoCommand(IoCommand* io_cmd) {
   {
-    std::lock_guard lock(xfer_list_lock_);
-    scsi_xfer_list_.push_back(std::move(xfer));
+    fbl::AutoLock lock(&commands_lock_);
+    list_add_tail(&pending_commands_, &io_cmd->node);
   }
-
-  // Kick scsi thread.
-  sync_completion_signal(&scsi_event_);
-
-  if (event) {
-    return zx::ok();
-  }
-
-  // Sync request, so wait until transfer is done.
-  zx_status_t status =
-      sync_completion_wait(local_event, ZX_MSEC(transfer_request_processor_->GetTimeoutMsec()));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed waiting for event %d", status);
-    return zx::error(ZX_ERR_TIMED_OUT);
-  }
-
-  return zx::ok();
+  sync_completion_signal(&io_signal_);
 }
 
 zx_status_t Ufs::Init() {
+  list_initialize(&pending_commands_);
+
   if (zx::result<> result = InitController(); result.is_error()) {
     zxlogf(ERROR, "Failed to init UFS controller: %s", result.status_string());
     return result.error_value();
   }
 
   if (int thrd_status = thrd_create_with_name(
-          &scsi_thread_, [](void* ctx) { return static_cast<Ufs*>(ctx)->ScsiLoop(); }, this,
-          "ufs-scsi-thread");
+          &io_thread_, [](void* ctx) { return static_cast<Ufs*>(ctx)->IoLoop(); }, this,
+          "ufs-io-thread");
       thrd_status) {
     zx_status_t status = thrd_status_to_zx_status(thrd_status);
-    zxlogf(ERROR, " Failed to create SCSI thread: %s", zx_status_get_string(status));
+    zxlogf(ERROR, " Failed to create IO thread: %s", zx_status_get_string(status));
     return status;
   }
-  scsi_thread_started_ = true;
+  io_thread_started_ = true;
 
   if (zx::result<> result = GetControllerDescriptor(); result.is_error()) {
     return result.error_value();
@@ -717,11 +670,12 @@ zx::result<> Ufs::ScanLogicalUnits() {
     ZX_ASSERT_MSG(block_device.block_size == 4096, "Currently, it only supports a 4KB block size.");
 
     // Checks for block size consistency.
-    auto read_capacity_upiu = std::make_unique<ScsiReadCapacity10Upiu>();
-    if (auto result = QueueScsiCommand(std::move(read_capacity_upiu), i, data_paddrs, nullptr);
-        result.is_error()) {
-      zxlogf(ERROR, "Failed to send SCSI READ CAPACITY 10 command: %s", result.status_string());
-      return result.take_error();
+    ScsiReadCapacity10Upiu read_capacity_upiu;
+    if (auto response =
+            transfer_request_processor_->SendScsiUpiu(read_capacity_upiu, i, data_paddrs);
+        response.is_error()) {
+      zxlogf(ERROR, "Failed to send SCSI READ CAPACITY 10 command: %s", response.status_string());
+      return response.take_error();
     }
     auto* read_capacity_data = reinterpret_cast<scsi::ReadCapacity10ParameterData*>(mapper.start());
     const uint32_t block_length_in_bytes = betoh32(read_capacity_data->block_length_in_bytes);
@@ -746,15 +700,15 @@ zx::result<> Ufs::ScanLogicalUnits() {
            block_device.block_count);
 
     // Verify that the Lun is ready. This command expects a unit attention error.
-    auto unit_ready_upiu = std::make_unique<ScsiTestUnitReadyUpiu>();
-    if (auto result = QueueScsiCommand(std::move(unit_ready_upiu), i, data_paddrs, nullptr);
-        result.is_error()) {
+    ScsiTestUnitReadyUpiu unit_ready_upiu;
+    if (auto response = transfer_request_processor_->SendScsiUpiu(unit_ready_upiu, i, data_paddrs);
+        response.is_error()) {
       auto* response_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader*>(mapper.start());
       if (response_data->sense_key() == static_cast<uint8_t>(scsi::SenseKey::UNIT_ATTENTION)) {
-        zxlogf(DEBUG, "Expected Unit Attention error: %s", result.status_string());
+        zxlogf(DEBUG, "Expected Unit Attention error: %s", response.status_string());
       } else {
-        zxlogf(ERROR, "Failed to send SCSI command: %s", result.status_string());
-        return result.take_error();
+        zxlogf(ERROR, "Failed to send SCSI command: %s", response.status_string());
+        return response.take_error();
       }
     }
 
@@ -762,19 +716,19 @@ zx::result<> Ufs::ScanLogicalUnits() {
     // condition which needs to be serviced before the logical unit can process commands.
     // This command will get sense data, but ignore it for now because our goal is to clear the
     // UAC.
-    auto request_sense_upiu = std::make_unique<ScsiRequestSenseUpiu>();
-    if (auto result = QueueScsiCommand(std::move(request_sense_upiu), i, data_paddrs, nullptr);
-        result.is_error()) {
-      zxlogf(ERROR, "Failed to send SCSI command: %s", result.status_string());
-      return result.take_error();
+    ScsiRequestSenseUpiu request_sense_upiu;
+    if (auto response =
+            transfer_request_processor_->SendScsiUpiu(request_sense_upiu, i, data_paddrs);
+        response.is_error()) {
+      zxlogf(ERROR, "Failed to send SCSI command: %s", response.status_string());
+      return response.take_error();
     }
 
     // Verify that the Lun is ready. This command expects a success.
-    unit_ready_upiu = std::make_unique<ScsiTestUnitReadyUpiu>();
-    if (auto result = QueueScsiCommand(std::move(unit_ready_upiu), i, data_paddrs, nullptr);
-        result.is_error()) {
-      zxlogf(ERROR, "Failed to send SCSI command: %s", result.status_string());
-      return result.take_error();
+    if (auto response = transfer_request_processor_->SendScsiUpiu(unit_ready_upiu, i, data_paddrs);
+        response.is_error()) {
+      zxlogf(ERROR, "Failed to send SCSI command: %s", response.status_string());
+      return response.take_error();
     }
   }
 
@@ -941,9 +895,9 @@ void Ufs::DdkRelease() {
   if (irq_thread_started_) {
     thrd_join(irq_thread_, nullptr);
   }
-  if (scsi_thread_started_) {
-    sync_completion_signal(&scsi_event_);
-    thrd_join(scsi_thread_, nullptr);
+  if (io_thread_started_) {
+    sync_completion_signal(&io_signal_);
+    thrd_join(io_thread_, nullptr);
   }
 
   delete this;

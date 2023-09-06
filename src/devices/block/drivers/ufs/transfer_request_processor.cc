@@ -35,13 +35,12 @@ void FillPrdt(PhysicalRegionDescriptionTableEntry *prdt,
 
 template <>
 std::tuple<uint16_t, uint32_t> TransferRequestProcessor::PreparePrdt<ScsiCommandUpiu>(
-    ScsiCommandUpiu &request, const uint8_t slot, const scsi_xfer *xfer,
-    const uint16_t response_offset, const uint16_t response_length) {
-  ZX_ASSERT(xfer != nullptr);
-
+    ScsiCommandUpiu &request, const uint8_t lun, const uint8_t slot,
+    const std::vector<zx_paddr_t> &buffer_phys, const uint16_t response_offset,
+    const uint16_t response_length) {
   const uint32_t data_transfer_length = std::min(request.GetTransferBytes(), kMaxPrdtDataLength);
 
-  request.GetHeader().lun = xfer->lun;
+  request.GetHeader().lun = lun;
   request.SetExpectedDataTransferLength(data_transfer_length);
 
   // Prepare PRDT(physical region description table).
@@ -62,7 +61,7 @@ std::tuple<uint16_t, uint32_t> TransferRequestProcessor::PreparePrdt<ScsiCommand
         request_list_.GetDescriptorBuffer<PhysicalRegionDescriptionTableEntry>(slot, prdt_offset);
     memset(prdt, 0, prdt_length_in_bytes);
   }
-  FillPrdt(prdt, xfer->buffer_phys, prdt_entry_count, data_transfer_length);
+  FillPrdt(prdt, buffer_phys, prdt_entry_count, data_transfer_length);
 
   // TODO(fxbug.dev/124835): Enable unmmap and write buffer command. Umap and writebuffer must set
   // the xfer->count value differently.
@@ -78,8 +77,9 @@ std::tuple<uint16_t, uint32_t> TransferRequestProcessor::PreparePrdt<ScsiCommand
     zxlogf(TRACE, "4. SCSI: PRDT = 0x%lx",
            request_list_.GetSlot(slot).command_descriptor_io.phys() + response_offset +
                response_length);
-    zxlogf(TRACE, "5. SCSI: Data Buffer = 0x%lx, 0x%lx", xfer->buffer_phys[0],
-           xfer->buffer_phys[1]);
+    if (!buffer_phys.empty()) {
+      zxlogf(TRACE, "5. SCSI: Data Buffer physical address = 0x%lx", buffer_phys[0]);
+    }
     zxlogf(TRACE,
            "6. SCSI: PRDT prdt_offset = %hu, prdt_length_in_bytes = %u, prdt_entry_count = %u",
            prdt_offset, prdt_length_in_bytes, prdt_entry_count);
@@ -148,10 +148,6 @@ zx::result<uint8_t> TransferRequestProcessor::ReserveSlot() {
     RequestSlot &slot = request_list_.GetSlot(slot_num);
     if (slot.state == SlotState::kFree) {
       slot.state = SlotState::kReserved;
-      if (slot.xfer) {
-        // Release old SCSI transfer.
-        slot.xfer = nullptr;
-      }
       return zx::ok(slot_num);
     }
   }
@@ -159,24 +155,45 @@ zx::result<uint8_t> TransferRequestProcessor::ReserveSlot() {
   return zx::error(ZX_ERR_NO_RESOURCES);
 }
 
+// |SendScsiUpiu| allocates a slot for SCSI UPIU and calls SendRequestUsingSlot.
+zx::result<std::unique_ptr<ResponseUpiu>> TransferRequestProcessor::SendScsiUpiu(
+    ScsiCommandUpiu &request, uint8_t lun, const std::vector<zx_paddr_t> &buffer_phys) {
+  zx::result<uint8_t> slot = ReserveSlot();
+  if (slot.is_error()) {
+    return zx::error(ZX_ERR_NO_RESOURCES);
+  }
+
+  TRACE_DURATION("ufs", "SendScsiUpiu", "slot", slot.value(), "offset",
+                 request.GetStartLba().has_value() ? request.GetStartLba().value() : 0, "length",
+                 request.GetTransferBytes());
+
+  zx::result<void *> response;
+  if (response = SendRequestUsingSlot<ScsiCommandUpiu>(request, lun, slot.value(), buffer_phys);
+      response.is_error()) {
+    return response.take_error();
+  }
+  auto response_upiu = std::make_unique<ResponseUpiu>(response.value());
+
+  // Check response.
+  if (response_upiu->GetHeader().response != UpiuHeaderResponse::kTargetSuccess) {
+    zxlogf(ERROR, "Failed to get response: response=%x", response_upiu->GetHeader().response);
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+  return zx::ok(std::move(response_upiu));
+}
+
 template <class RequestType>
 zx::result<void *> TransferRequestProcessor::SendRequestUsingSlot(
-    RequestType &request, uint8_t slot, std::optional<std::unique_ptr<scsi_xfer>> xfer) {
+    RequestType &request, uint8_t lun, uint8_t slot, const std::vector<zx_paddr_t> &buffer_phys) {
   const bool is_scsi = std::is_base_of<ScsiCommandUpiu, RequestType>::value;
 
   const uint16_t response_offset = request.GetResponseOffset();
   const uint16_t response_length = request.GetResponseLength();
 
-  if (is_scsi) {
-    ZX_ASSERT(xfer != std::nullopt && xfer.value() != nullptr);
-    TRACE_DURATION_BEGIN("ufs", "SendRequestUsingSlot SCSI command", "offset",
-                         xfer.value()->start_lba, "length", xfer.value()->block_count);
-  }
-
   // Record the slot number to |task_tag| for debugging.
   request.GetHeader().task_tag = slot;
-  auto [prdt_offset, prdt_entry_count] = PreparePrdt<RequestType>(
-      request, slot, (is_scsi ? xfer->get() : nullptr), response_offset, response_length);
+  auto [prdt_offset, prdt_entry_count] =
+      PreparePrdt<RequestType>(request, lun, slot, buffer_phys, response_offset, response_length);
 
   // Copy request and prepare response.
   void *response;
@@ -184,7 +201,6 @@ zx::result<void *> TransferRequestProcessor::SendRequestUsingSlot(
     std::lock_guard lock(request_list_lock_);
     RequestSlot &request_slot = request_list_.GetSlot(slot);
     ZX_ASSERT_MSG(request_slot.state == SlotState::kReserved, "Invalid slot state");
-    ZX_ASSERT_MSG(request_slot.xfer == nullptr, "Slot already occupied");
 
     const size_t length = static_cast<size_t>(response_offset) + response_length;
     ZX_DEBUG_ASSERT_MSG(length <= request_list_.GetDescriptorBufferSize(slot), "Invalid UPIU size");
@@ -193,9 +209,7 @@ zx::result<void *> TransferRequestProcessor::SendRequestUsingSlot(
     memset(request_list_.GetDescriptorBuffer<uint8_t>(slot) + response_offset, 0, response_length);
     response = request_list_.GetDescriptorBuffer(slot, response_offset);
 
-    if (is_scsi) {
-      request_slot.xfer = std::move(xfer.value());
-    }
+    request_slot.is_scsi_command = is_scsi;
   }
 
   if (zx::result<> result = FillDescriptorAndSendRequest(
@@ -214,33 +228,28 @@ zx::result<void *> TransferRequestProcessor::SendRequestUsingSlot(
     return result.take_error();
   }
 
-  if (is_scsi) {
-    TRACE_DURATION_END("ufs", "SendRequestUsingSlot SCSI command");
-  }
-
   return zx::ok(response);
 }
 
 template zx::result<void *> TransferRequestProcessor::SendRequestUsingSlot<QueryRequestUpiu>(
-    QueryRequestUpiu &request, uint8_t slot, std::optional<std::unique_ptr<scsi_xfer>> xfer);
+    QueryRequestUpiu &request, uint8_t lun, uint8_t slot,
+    const std::vector<zx_paddr_t> &buffer_phys);
 template zx::result<void *> TransferRequestProcessor::SendRequestUsingSlot<ScsiCommandUpiu>(
-    ScsiCommandUpiu &request, uint8_t slot, std::optional<std::unique_ptr<scsi_xfer>> xfer);
+    ScsiCommandUpiu &request, uint8_t lun, uint8_t slot,
+    const std::vector<zx_paddr_t> &buffer_phys);
 template zx::result<void *> TransferRequestProcessor::SendRequestUsingSlot<NopOutUpiu>(
-    NopOutUpiu &request, uint8_t slot, std::optional<std::unique_ptr<scsi_xfer>> xfer);
+    NopOutUpiu &request, uint8_t lun, uint8_t slot, const std::vector<zx_paddr_t> &buffer_phys);
 
 void TransferRequestProcessor::ScsiCompletion(uint8_t slot_num, RequestSlot &request_slot,
                                               TransferRequestDescriptor *descriptor) {
-  TRACE_DURATION("ufs", "ScsiCompletion", "offset", request_slot.xfer->start_lba, "length",
-                 request_slot.xfer->block_count, "slot", slot_num);
+  TRACE_DURATION("ufs", "ScsiCompletion", "slot", slot_num);
 
   ResponseUpiu response(
       request_list_.GetDescriptorBuffer<ResponseUpiu>(slot_num, sizeof(CommandUpiuData)));
 
   // TODO(fxbug.dev/124835): Need to check if response.header.trans_code() is a kCommnad.
-  request_slot.xfer->status =
-      GetResponseStatus(descriptor, response, UpiuTransactionCodes::kCommand).status_value();
-
-  sync_completion_signal(request_slot.xfer->done);
+  // TODO(fxbug.dev/124835): This return value should be reported back to command completion.
+  GetResponseStatus(descriptor, response, UpiuTransactionCodes::kCommand).status_value();
 }
 
 zx::result<> TransferRequestProcessor::RingRequestDoorbell(uint8_t slot_num, bool sync) {
@@ -255,7 +264,6 @@ zx::result<> TransferRequestProcessor::RingRequestDoorbell(uint8_t slot_num, boo
   }
 
   sync_completion_t *complete;
-  uint64_t start_lba = 0, block_count = 0;
   {
     std::lock_guard lock(request_list_lock_);
     RequestSlot &request_slot = request_list_.GetSlot(slot_num);
@@ -263,10 +271,6 @@ zx::result<> TransferRequestProcessor::RingRequestDoorbell(uint8_t slot_num, boo
     sync_completion_reset(complete);
     ZX_ASSERT(request_slot.state == SlotState::kReserved);
     request_slot.state = SlotState::kScheduled;
-    if (request_slot.xfer) {
-      start_lba = request_slot.xfer->start_lba;
-      block_count = request_slot.xfer->block_count;
-    }
 
     // TODO(fxbug.dev/124835): Set the UtrInterruptAggregationControlReg.
 
@@ -278,8 +282,7 @@ zx::result<> TransferRequestProcessor::RingRequestDoorbell(uint8_t slot_num, boo
   }
 
   // Wait for completion.
-  TRACE_DURATION("ufs", "RingRequestDoorbell::sync_completion_wait", "offset", start_lba, "length",
-                 block_count, "slot", slot_num);
+  TRACE_DURATION("ufs", "RingRequestDoorbell::sync_completion_wait", "slot", slot_num);
   if (zx_status_t status = sync_completion_wait(complete, ZX_MSEC(GetTimeoutMsec()));
       status != ZX_OK) {
     return zx::error(status);
@@ -299,8 +302,7 @@ uint32_t TransferRequestProcessor::RequestCompletion() {
       RequestSlot &request_slot = request_list_.GetSlot(slot_num);
       if (request_slot.state == SlotState::kScheduled) {
         if (!(UtrListDoorBellReg::Get().ReadFrom(&register_).door_bell() & (1 << slot_num))) {
-          // Is SCSI command
-          if (request_slot.xfer) {
+          if (request_slot.is_scsi_command) {
             auto descriptor =
                 request_list_.GetRequestDescriptor<TransferRequestDescriptor>(slot_num);
             ScsiCompletion(slot_num, request_slot, descriptor);
@@ -319,7 +321,7 @@ uint32_t TransferRequestProcessor::RequestCompletion() {
     }
   }
 
-  sync_completion_signal(&controller_.GetScsiEvent());
+  sync_completion_signal(&controller_.GetIoEvent());
 
   return completion_count;
 }

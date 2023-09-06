@@ -41,7 +41,7 @@ TEST_F(UicTest, DmeSet) {
   ASSERT_NO_FATAL_FAILURE(RunInit());
 
   DmeSetUicCommand dme_set_command(*ufs_, 0, 0, 0);
-  ASSERT_EQ(dme_set_command.SendCommand().status_value(), ZX_OK);
+  ASSERT_OK(dme_set_command.SendCommand());
 
   // TODO(fxbug.dev/124835): Add more tests.
 }

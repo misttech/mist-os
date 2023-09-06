@@ -193,7 +193,7 @@ TEST_F(RequestProcessorTest, SendQueryUpiu) {
   auto response =
       ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
           request);
-  ASSERT_EQ(response.status_value(), ZX_OK);
+  ASSERT_OK(response);
 
   // Check that the Request UPIU is copied into the command descriptor.
   constexpr uint8_t slot_num = 0;
@@ -269,7 +269,7 @@ TEST_F(RequestProcessorTest, SendNopUpiu) {
   NopOutUpiu nop_out_upiu;
   auto nop_in =
       ufs_->GetTransferRequestProcessor().SendRequestUpiu<NopOutUpiu, NopInUpiu>(nop_out_upiu);
-  ASSERT_EQ(nop_in.status_value(), ZX_OK);
+  ASSERT_OK(nop_in);
 
   // Check that the nop out UPIU is copied into the command descriptor.
   constexpr uint8_t slot_num = 0;
@@ -323,50 +323,77 @@ TEST_F(RequestProcessorTest, SendNopUpiuException) {
   ASSERT_EQ(nop_in.status_value(), ZX_ERR_BAD_STATE);
 }
 
+TEST_F(RequestProcessorTest, SendRequestUpiuWithSlotIsFull) {
+  ASSERT_NO_FATAL_FAILURE(RunInit());
+  const uint8_t kMaxSlotCount = ufs_->GetTransferRequestProcessor().GetRequestList().GetSlotCount();
+
+  // Reserve all slots.
+  for (uint32_t slot_num = 0; slot_num < kMaxSlotCount; ++slot_num) {
+    ASSERT_OK(ufs_->GetTransferRequestProcessor().ReserveSlot());
+  }
+
+  // Make request UPIU
+  NopOutUpiu nop_out_upiu;
+  auto nop_in =
+      ufs_->GetTransferRequestProcessor().SendRequestUpiu<NopOutUpiu, NopInUpiu>(nop_out_upiu);
+  ASSERT_EQ(nop_in.status_value(), ZX_ERR_NO_RESOURCES);
+}
+
 TEST_F(RequestProcessorTest, SendScsiUpiu) {
   ASSERT_NO_FATAL_FAILURE(RunInit());
+  constexpr uint8_t kTestLun = 0;
 
   auto slot = ufs_->GetTransferRequestProcessor().ReserveSlot();
-  ASSERT_EQ(slot.status_value(), ZX_OK);
+  ASSERT_OK(slot);
 
   // Make SCSI UPIU
   constexpr uint32_t block_offset = 0;
   constexpr uint16_t block_length = 1;
-  auto upiu = std::make_unique<ScsiSynchronizeCache10Upiu>(block_offset, block_length);
-  auto upiu_backup = std::make_unique<ScsiSynchronizeCache10Upiu>(block_offset, block_length);
 
-  // Make SCSI transfer
-  constexpr uint8_t lun = 0;
-  uint32_t block_size = static_cast<uint32_t>(ufs_->GetBlockDevice(lun).block_size);
-  auto xfer = std::make_unique<scsi_xfer>();
-  xfer->lun = lun;
-  xfer->op = upiu->GetOpcode();
-  xfer->start_lba = 0;
-  xfer->block_count = upiu->GetTransferBytes() / block_size;
-  xfer->upiu = std::move(upiu);
-  xfer->block_size = block_size;
+  std::vector<zx_paddr_t> data_paddrs;
 
-  xfer->done = &xfer->local_event;
-
+  // Send scsi command with SendRequestUsingSlot()
+  ScsiSynchronizeCache10Upiu upiu(block_offset, block_length);
   auto response_or = ufs_->GetTransferRequestProcessor().SendRequestUsingSlot<ScsiCommandUpiu>(
-      *(xfer->upiu), slot.value(), std::move(xfer));
-  ASSERT_EQ(response_or.status_value(), ZX_OK);
+      upiu, kTestLun, slot.value(), data_paddrs);
+  ASSERT_OK(response_or.status_value());
 
   // Check that the SCSI UPIU is copied into the command descriptor.
   AbstractUpiu command_descriptor(
       ufs_->GetTransferRequestProcessor().GetRequestList().GetDescriptorBuffer(slot.value()));
 
-  upiu_backup->GetHeader().lun = lun;
-  upiu_backup->GetHeader().task_tag = slot.value();
-  upiu_backup->SetExpectedDataTransferLength(upiu_backup->GetTransferBytes());
-  ASSERT_EQ(memcmp(upiu_backup->GetData(), command_descriptor.GetData(), sizeof(CommandUpiuData)),
-            0);
+  ASSERT_EQ(memcmp(upiu.GetData(), command_descriptor.GetData(), sizeof(CommandUpiuData)), 0);
 
   // Check response
   ResponseUpiu response(response_or.value());
   ASSERT_EQ(response.GetHeader().trans_code(), UpiuTransactionCodes::kResponse);
   ASSERT_EQ(response.GetHeader().status, static_cast<uint8_t>(scsi::StatusCode::GOOD));
   ASSERT_EQ(response.GetHeader().response, UpiuHeaderResponse::kTargetSuccess);
+
+  // Send scsi command with SendScsiUpiu()
+  ASSERT_OK(ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, data_paddrs));
+}
+
+TEST_F(RequestProcessorTest, SendScsiUpiuWithSlotIsFull) {
+  ASSERT_NO_FATAL_FAILURE(RunInit());
+  constexpr uint8_t kTestLun = 0;
+  const uint8_t kMaxSlotCount = ufs_->GetTransferRequestProcessor().GetRequestList().GetSlotCount();
+
+  // Reserve all slots.
+  for (uint32_t slot_num = 0; slot_num < kMaxSlotCount; ++slot_num) {
+    ASSERT_OK(ufs_->GetTransferRequestProcessor().ReserveSlot());
+  }
+
+  // Make SCSI UPIU
+  constexpr uint32_t block_offset = 0;
+  constexpr uint16_t block_length = 1;
+
+  std::vector<zx_paddr_t> data_paddrs;
+  data_paddrs.resize(block_length, 0);
+
+  ScsiSynchronizeCache10Upiu upiu(block_offset, block_length);
+  auto response = ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, data_paddrs);
+  ASSERT_EQ(response.status_value(), ZX_ERR_NO_RESOURCES);
 }
 
 }  // namespace ufs

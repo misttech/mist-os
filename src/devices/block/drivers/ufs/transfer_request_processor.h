@@ -31,16 +31,22 @@ class TransferRequestProcessor : public RequestProcessor {
   zx::result<> RingRequestDoorbell(uint8_t slot, bool sync) override;
   uint32_t RequestCompletion() override;
 
+  // |SendScsiUpiu| allocates a slot for SCSI command UPIU and calls SendRequestUsingSlot.
+  zx::result<std::unique_ptr<ResponseUpiu>> SendScsiUpiu(
+      ScsiCommandUpiu &request, uint8_t lun, const std::vector<zx_paddr_t> &buffer_phys);
+
   // |SendRequestUpiu| allocates a slot for request UPIU and calls SendRequestUsingSlot.
   template <class RequestType, class ResponseType>
-  zx::result<std::unique_ptr<ResponseType>> SendRequestUpiu(RequestType &request) {
+  zx::result<std::unique_ptr<ResponseType>> SendRequestUpiu(RequestType &request, uint8_t lun = 0) {
     zx::result<uint8_t> slot = ReserveSlot();
     if (slot.is_error()) {
       return zx::error(ZX_ERR_NO_RESOURCES);
     }
 
+    std::vector<zx_paddr_t> empty_buffer_phys;
     zx::result<void *> response;
-    if (response = SendRequestUsingSlot<RequestType>(request, slot.value()); response.is_error()) {
+    if (response = SendRequestUsingSlot<RequestType>(request, lun, slot.value(), empty_buffer_phys);
+        response.is_error()) {
       return response.take_error();
     }
     auto response_upiu = std::make_unique<ResponseType>(response.value());
@@ -54,22 +60,21 @@ class TransferRequestProcessor : public RequestProcessor {
   }
 
   template <class RequestType>
-  std::tuple<uint16_t, uint32_t> PreparePrdt(RequestType &request, uint8_t slot,
-                                             const scsi_xfer *xfer, uint16_t response_offset,
-                                             uint16_t response_length) {
+  std::tuple<uint16_t, uint32_t> PreparePrdt(RequestType &request, uint8_t lun, uint8_t slot,
+                                             const std::vector<zx_paddr_t> &buffer_phys,
+                                             uint16_t response_offset, uint16_t response_length) {
     return {0, 0};
   }
 
   template <>
-  std::tuple<uint16_t, uint32_t> PreparePrdt<ScsiCommandUpiu>(ScsiCommandUpiu &request,
-                                                              uint8_t slot, const scsi_xfer *xfer,
-                                                              uint16_t response_offset,
-                                                              uint16_t response_length);
+  std::tuple<uint16_t, uint32_t> PreparePrdt<ScsiCommandUpiu>(
+      ScsiCommandUpiu &request, uint8_t lun, uint8_t slot,
+      const std::vector<zx_paddr_t> &buffer_phys, uint16_t response_offset,
+      uint16_t response_length);
 
   template <class RequestType>
-  zx::result<void *> SendRequestUsingSlot(
-      RequestType &request, uint8_t slot,
-      std::optional<std::unique_ptr<scsi_xfer>> xfer = std::nullopt);
+  zx::result<void *> SendRequestUsingSlot(RequestType &request, uint8_t lun, uint8_t slot,
+                                          const std::vector<zx_paddr_t> &buffer_phys);
 
  private:
   friend class UfsTest;

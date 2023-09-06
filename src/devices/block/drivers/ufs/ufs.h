@@ -62,7 +62,6 @@ struct IoCommand {
 
   uint8_t lun_id;
   uint32_t block_size_bytes;
-  uint64_t block_count;
 
   list_node_t node;
 };
@@ -92,8 +91,7 @@ class Ufs : public UfsDeviceType {
   void DdkInit(ddk::InitTxn txn);
   void DdkRelease();
 
-  inspect::Inspector &inspector() { return inspector_; }
-  inspect::Node &inspect_node() { return inspect_node_; }
+  // TODO(fxbug.dev/124835): Implement inspector.
 
   fdf::MmioBuffer &GetMmio() { return mmio_; }
 
@@ -102,8 +100,13 @@ class Ufs : public UfsDeviceType {
     return *transfer_request_processor_;
   }
 
+  // Queue an IO command to be performed asynchronously.
+  void QueueIoCommand(IoCommand *io_cmd);
+
   // Synchronously handle block operations delivered to the logical unit.
-  void HandleBlockOp(IoCommand *io_cmd);
+  // TODO(fxbug.dev/124835): Currently, ProcessIoSubmissions() waits for command completion. To
+  // support Multi-QD, we need to submit the next command without waiting for command completion.
+  void ProcessIoSubmissions();
 
   // Used to register a platform-specific NotifyEventCallback, which handles variants and quirks for
   // each host interface platform.
@@ -121,18 +124,9 @@ class Ufs : public UfsDeviceType {
   zx_status_t WaitWithTimeout(fit::function<zx_status_t()> wait_for, uint32_t timeout_us,
                               const fbl::String &timeout_message);
 
-  sync_completion_t &GetScsiEvent() { return scsi_event_; }
-
-  // Create a scsi transfer and add it to the transfer list. The added transfer is processed by the
-  // scsi thread. If |event| is nullptr, then the SCSI command is executed synchronously.
-  zx::result<> QueueScsiCommand(std::unique_ptr<ScsiCommandUpiu> upiu, uint8_t lun,
-                                std::vector<zx_paddr_t> buffer_phys, sync_completion_t *event);
+  sync_completion_t &GetIoEvent() { return io_signal_; }
 
   // for test
-  BlockDevice &GetBlockDevice(uint8_t lun) {
-    ZX_ASSERT_MSG(lun < kMaxLun, "Invalid lun %d", lun);
-    return block_devices_[lun];
-  }
   uint32_t GetLogicalUnitCount() const { return logical_unit_count_; }
   DeviceDescriptor &GetDeviceDescriptor() { return device_descriptor_; }
   GeometryDescriptor &GetGeometryDescriptor() { return geometry_descriptor_; }
@@ -141,9 +135,8 @@ class Ufs : public UfsDeviceType {
 
  private:
   friend class UfsTest;
-  // TODO(fxbug.dev/124835): Irq threads and scsi threads will be refactored.
   int IrqLoop();
-  int ScsiLoop();
+  int IoLoop();
 
   // Interrupt service routine. Check that the request is complete.
   zx::result<> Isr();
@@ -168,15 +161,19 @@ class Ufs : public UfsDeviceType {
 
   BlockDevice block_devices_[kMaxLun];
 
-  // TODO(fxbug.dev/124835): Replace SCSI thread to I/O thread
-  thrd_t scsi_thread_ = 0;
+  fbl::Mutex commands_lock_;
+  // The pending list consists of commands that have been received via QueueIoCommand() and are
+  // waiting for IO to start.
+  list_node_t pending_commands_ TA_GUARDED(commands_lock_);
+
+  // Notifies IoThread() that it has work to do. Signaled from QueueIoCommand() or the IRQ handler.
+  sync_completion_t io_signal_;
+
   thrd_t irq_thread_ = 0;
-  bool scsi_thread_started_ = false;
+  thrd_t io_thread_ = 0;
   bool irq_thread_started_ = false;
 
-  sync_completion_t scsi_event_;
-  std::mutex xfer_list_lock_;
-  fbl::DoublyLinkedList<std::unique_ptr<scsi_xfer>> scsi_xfer_list_ TA_GUARDED(xfer_list_lock_);
+  bool io_thread_started_ = false;
 
   std::unique_ptr<TransferRequestProcessor> transfer_request_processor_;
 

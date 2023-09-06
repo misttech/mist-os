@@ -29,10 +29,9 @@ enum class SlotState {
 
 struct RequestSlot {
   SlotState state = SlotState::kFree;
-  // Only populated for SCSI commands, else nullptr.
-  std::unique_ptr<scsi_xfer> xfer;
   ddk::IoBuffer command_descriptor_io;
   sync_completion_t complete;
+  bool is_scsi_command = false;
 };
 
 // Implements the UTP 'transfer/task management' request list.

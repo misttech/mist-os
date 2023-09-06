@@ -37,7 +37,6 @@ device. The UIC layer automatically detects and recovers I/O errors through the 
 and provides reliable data transfer through the M-PHY physical layer.
 
 ## TODO
-* Refactoring I/O queue
 * Support FLUSH command
 * Support FUA flag
 * Support TRIM command (unmap)

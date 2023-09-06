@@ -40,7 +40,7 @@ class ScsiCommandTest : public UfsTest {
   }
 
   void *GetVirtualAddress() const { return mapper_.start(); }
-  std::vector<zx_paddr_t> GetPhysicalAddress() const { return paddrs_; }
+  std::vector<zx_paddr_t> &GetPhysicalAddress() { return paddrs_; }
 
   uint16_t GetBlockCount() const { return block_count_; }
   uint32_t GetBlockSize() const { return block_size_; }
@@ -65,9 +65,9 @@ TEST_F(ScsiCommandTest, Read10) {
   std::strncpy(buf, kTestString, sizeof(buf));
   ASSERT_OK(mock_device_->BufferWrite(kTestLun, buf, GetBlockCount(), block_offset));
 
-  auto upiu = std::make_unique<ScsiRead10Upiu>(block_offset, GetBlockCount(), GetBlockSize(), 0, 0);
-  auto result = ufs_->QueueScsiCommand(std::move(upiu), kTestLun, GetPhysicalAddress(), nullptr);
-  ASSERT_EQ(result.status_value(), ZX_OK);
+  ScsiRead10Upiu upiu(block_offset, GetBlockCount(), GetBlockSize(), /*fua=*/false, 0);
+  ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::READ_10);
+  ASSERT_OK(ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, GetPhysicalAddress()));
 
   // Check the read data
   ASSERT_EQ(memcmp(GetVirtualAddress(), buf, kMockBlockSize), 0);
@@ -77,13 +77,12 @@ TEST_F(ScsiCommandTest, Write10) {
   const uint8_t kTestLun = 0;
   uint32_t block_offset = 0;
 
-  auto upiu =
-      std::make_unique<ScsiWrite10Upiu>(block_offset, GetBlockCount(), GetBlockSize(), 0, 0);
   constexpr char kTestString[] = "test";
   std::strncpy(static_cast<char *>(GetVirtualAddress()), kTestString, kMockBlockSize);
 
-  auto result = ufs_->QueueScsiCommand(std::move(upiu), kTestLun, GetPhysicalAddress(), nullptr);
-  ASSERT_EQ(result.status_value(), ZX_OK);
+  ScsiWrite10Upiu upiu(block_offset, GetBlockCount(), GetBlockSize(), /*fua=*/false, 0);
+  ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::WRITE_10);
+  ASSERT_OK(ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, GetPhysicalAddress()));
 
   // Read test data form the mock device
   char buf[kMockBlockSize];
@@ -96,9 +95,9 @@ TEST_F(ScsiCommandTest, Write10) {
 TEST_F(ScsiCommandTest, ReadCapacity10) {
   const uint8_t kTestLun = 0;
 
-  auto upiu = std::make_unique<ScsiReadCapacity10Upiu>();
-  auto result = ufs_->QueueScsiCommand(std::move(upiu), kTestLun, GetPhysicalAddress(), nullptr);
-  ASSERT_EQ(result.status_value(), ZX_OK);
+  ScsiReadCapacity10Upiu upiu;
+  ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::READ_CAPACITY_10);
+  ASSERT_OK(ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, GetPhysicalAddress()));
 
   auto *read_capacity_data =
       reinterpret_cast<scsi::ReadCapacity10ParameterData *>(GetVirtualAddress());
@@ -112,9 +111,9 @@ TEST_F(ScsiCommandTest, ReadCapacity10) {
 TEST_F(ScsiCommandTest, RequestSense) {
   const uint8_t kTestLun = 0;
 
-  auto upiu = std::make_unique<ScsiRequestSenseUpiu>();
-  auto result = ufs_->QueueScsiCommand(std::move(upiu), kTestLun, GetPhysicalAddress(), nullptr);
-  ASSERT_EQ(result.status_value(), ZX_OK);
+  ScsiRequestSenseUpiu upiu;
+  ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::REQUEST_SENSE);
+  ASSERT_OK(ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, GetPhysicalAddress()));
 
   auto *sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(GetVirtualAddress());
   ASSERT_EQ(sense_data->response_code(), 0x70);
@@ -126,10 +125,10 @@ TEST_F(ScsiCommandTest, SynchronizeCache10) {
   const uint8_t kTestLun = 0;
   uint32_t block_offset = 0;
 
-  auto cache_upiu = std::make_unique<ScsiSynchronizeCache10Upiu>(block_offset, GetBlockCount());
-  auto result =
-      ufs_->QueueScsiCommand(std::move(cache_upiu), kTestLun, GetPhysicalAddress(), nullptr);
-  ASSERT_EQ(result.status_value(), ZX_OK);
+  ScsiSynchronizeCache10Upiu cache_upiu(block_offset, GetBlockCount());
+  ASSERT_EQ(cache_upiu.GetOpcode(), scsi::Opcode::SYNCHRONIZE_CACHE_10);
+  ASSERT_OK(
+      ufs_->GetTransferRequestProcessor().SendScsiUpiu(cache_upiu, kTestLun, GetPhysicalAddress()));
 }
 
 TEST(ScsiCommandTest, uint24_t) {

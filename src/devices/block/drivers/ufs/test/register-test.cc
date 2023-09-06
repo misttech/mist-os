@@ -58,9 +58,9 @@ TEST_F(RegisterTest, InterruptStatus) {
       InterruptStatusReg::Get().ReadFrom(&ufs_->GetMmio()).uic_command_completion_status());
 
   // Send UPIU command to set |utp_transfer_request_completion_status|
-  auto unit_ready_upiu = std::make_unique<ScsiTestUnitReadyUpiu>();
+  ScsiTestUnitReadyUpiu unit_ready_upiu;
   std::vector<zx_paddr_t> paddrs;
-  EXPECT_TRUE(ufs_->QueueScsiCommand(std::move(unit_ready_upiu), 0, paddrs, nullptr).is_ok());
+  EXPECT_OK(ufs_->GetTransferRequestProcessor().SendScsiUpiu(unit_ready_upiu, 0, paddrs));
 
   // InterruptStatus is cleared by Isr().
   EXPECT_FALSE(InterruptStatusReg::Get()

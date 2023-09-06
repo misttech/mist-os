@@ -69,7 +69,6 @@ void LogicalUnit::BlockImplQueue(block_op_t *op, block_impl_queue_callback callb
   io_cmd->cookie = cookie;
   io_cmd->lun_id = lun_id_;
   io_cmd->block_size_bytes = block_info_.block_size;
-  io_cmd->block_count = block_info_.block_count;
 
   const uint32_t opcode = io_cmd->op.command.opcode;
   switch (opcode) {
@@ -97,7 +96,7 @@ void LogicalUnit::BlockImplQueue(block_op_t *op, block_impl_queue_callback callb
       return;
   }
 
-  controller_.HandleBlockOp(io_cmd);
+  controller_.QueueIoCommand(io_cmd);
 }
 
 }  // namespace ufs

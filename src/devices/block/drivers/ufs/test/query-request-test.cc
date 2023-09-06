@@ -23,7 +23,7 @@ TEST_F(QueryRequestTest, DeviceDescriptor) {
   auto response =
       ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
           device_desc_upiu);
-  ASSERT_EQ(response.status_value(), ZX_OK);
+  ASSERT_OK(response);
   auto device_descriptor =
       response->GetResponse<DescriptorResponseUpiu>().GetDescriptor<DeviceDescriptor>();
 
@@ -45,7 +45,7 @@ TEST_F(QueryRequestTest, GeometryDescriptor) {
   auto response =
       ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
           geometry_desc_upiu);
-  ASSERT_EQ(response.status_value(), ZX_OK);
+  ASSERT_OK(response);
   auto geometry_desc =
       response->GetResponse<DescriptorResponseUpiu>().GetDescriptor<GeometryDescriptor>();
 
@@ -62,7 +62,7 @@ TEST_F(QueryRequestTest, UnitDescriptor) {
   auto response =
       ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
           unit_desc_upiu);
-  ASSERT_EQ(response.status_value(), ZX_OK);
+  ASSERT_OK(response);
   auto unit_desc = response->GetResponse<DescriptorResponseUpiu>().GetDescriptor<UnitDescriptor>();
 
   const auto& mock_desc = mock_device_->GetLogicalUnit(lun).GetUnitDesc();
@@ -91,7 +91,7 @@ TEST_F(QueryRequestTest, WriteDescriptor) {
   auto response =
       ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
           config_desc_upiu);
-  ASSERT_EQ(response.status_value(), ZX_OK);
+  ASSERT_OK(response);
 
   ASSERT_EQ(high_priority_lun, mock_device_->GetDeviceDesc().bHighPriorityLUN);
 }
@@ -106,8 +106,7 @@ TEST_F(QueryRequestTest, WriteAttribute) {
   auto response =
       ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
           write_attribute_upiu);
-  ASSERT_EQ(response.status_value(), ZX_OK);
-
+  ASSERT_OK(response);
   ASSERT_EQ(power_mode, mock_device_->GetAttribute(Attributes::bCurrentPowerMode));
 }
 
@@ -121,7 +120,7 @@ TEST_F(QueryRequestTest, ReadAttribute) {
   auto response =
       ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
           read_attribute_upiu);
-  ASSERT_EQ(response.status_value(), ZX_OK);
+  ASSERT_OK(response);
   auto attribute = response->GetResponse<AttributeResponseUpiu>().GetAttribute();
 
   ASSERT_EQ(attribute, power_mode);
@@ -137,7 +136,7 @@ TEST_F(QueryRequestTest, ReadFlag) {
   auto response =
       ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
           read_flag_upiu);
-  ASSERT_EQ(response.status_value(), ZX_OK);
+  ASSERT_OK(response);
   auto flag = response->GetResponse<FlagResponseUpiu>().GetFlag();
 
   ASSERT_EQ(flag, device_init);
@@ -152,7 +151,7 @@ TEST_F(QueryRequestTest, SetFlag) {
   auto response =
       ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
           set_flag_upiu);
-  ASSERT_EQ(response.status_value(), ZX_OK);
+  ASSERT_OK(response);
 
   ASSERT_EQ(true, mock_device_->GetFlag(Flags::fPermanentWPEn));
 }
@@ -167,7 +166,7 @@ TEST_F(QueryRequestTest, ToggleFlag) {
   auto response =
       ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
           toggle_flag_upiu);
-  ASSERT_EQ(response.status_value(), ZX_OK);
+  ASSERT_OK(response);
 
   ASSERT_EQ(!device_init, mock_device_->GetFlag(Flags::fDeviceInit));
 }
@@ -182,7 +181,7 @@ TEST_F(QueryRequestTest, ClearFlag) {
   auto response =
       ufs_->GetTransferRequestProcessor().SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
           clear_flag_upiu);
-  ASSERT_EQ(response.status_value(), ZX_OK);
+  ASSERT_OK(response);
 
   device_init = false;
   ASSERT_EQ(device_init, mock_device_->GetFlag(Flags::fDeviceInit));
