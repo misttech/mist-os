@@ -8,8 +8,8 @@
 
 ## usage: fx unset-device
 ##
-## Unset the default device to work with. See "fx set-device" for more
-## information.
+## Unset the default device to work with for the active build directory. See "fx set-device"
+## for more information.
 
 set -e
 
@@ -17,8 +17,10 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.
 fx-standard-switches "$@"
 fx-config-read
 
-if [[ -n $(get-device-raw) ]]; then
-  fx-command-run ffx target remove $(get-device-raw)
+device_name=$(get-device-raw)
+if [[ -n ${device_name} ]]; then
+  fx-command-run ffx target default unset --level build --build-dir "${FUCHSIA_BUILD_DIR}"
+  fx-command-run ffx target remove ${device_name}
 fi
 
 if [[ -n "${FUCHSIA_BUILD_DIR}" ]]; then

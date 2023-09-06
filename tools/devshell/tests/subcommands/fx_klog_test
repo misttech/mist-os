@@ -28,13 +28,13 @@ BT_SET_UP() {
 }
 
 TEST_klog_raw() {
-  BT_EXPECT ${fx} klog --raw
+  BT_EXPECT ${fx} -d "testing" klog --raw
   BT_EXPECT_FILE_DOES_NOT_EXIST "${ffx}.mock_state" \
     "ffx should not have been called when using fx klog --raw"
 }
 
 TEST_klog() {
-  BT_EXPECT ${fx} klog
+  BT_EXPECT ${fx} -d "testing" klog
   source "${ffx}.mock_state"
   BT_EXPECT_STRING_CONTAINS_SUBSTRING "${BT_MOCK_ARGS[@]}" "debug symbolize"
 }

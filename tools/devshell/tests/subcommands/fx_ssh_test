@@ -74,7 +74,7 @@ TEST_ssh_addr() {
 # ensure that "fx shell" calls ssh with address returned by ffx and the proper port number
 TEST_ssh_resolve_addr_port() {
   local ipv6="fe80::4607:bff:fea0:44f%enx44070ba0044e"
-  echo "${ipv6}" > "${ffx}.mock_stdout"
+  echo "[${ipv6}]" > "${ffx}.mock_stdout"
   BT_EXPECT ${fx} shell
   BT_EXPECT btf::does-mock-args-contain "${ssh}.mock_state" "${ipv6}"
   BT_EXPECT btf::does-mock-args-not-contain "${ssh}.mock_state" "-p"

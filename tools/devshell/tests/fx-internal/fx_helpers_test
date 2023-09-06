@@ -103,8 +103,21 @@ TEST_get-device-pair() {
 
   BT_EXPECT fx-config-read
 
+  # correct when only a device-pair file
   echo "foo" > "${EXPECT_BUILD_DIR}.device"
   BT_EXPECT_EQ "foo" $(get-device-pair)
+  # correct when device-pair and ffx config agree
+  echo '{"target":{"default":"foo"}}' > "${EXPECT_BUILD_DIR}.json"
+  BT_EXPECT_EQ "foo" $(get-device-pair)
+  # correct when device-pair and ffx config disagree (prefer ffx)
+  echo '{"target":{"default":"bar"}}' > "${EXPECT_BUILD_DIR}.json"
+  BT_EXPECT_EQ "bar" $(get-device-pair)
+  # correct when only ffx config
+  rm "${EXPECT_BUILD_DIR}.device"
+  BT_EXPECT_EQ "bar" $(get-device-pair)
+  # errors when neither
+  rm "${EXPECT_BUILD_DIR}.json"
+  BT_EXPECT_FAIL get-device-pair
 }
 
 TEST_is-remote-workflow-device() {

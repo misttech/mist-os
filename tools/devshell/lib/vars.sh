@@ -341,12 +341,64 @@ function json-config-del {
   fi
 }
 
+# Get a configuration value in a build config file:
+# `json-config-get path/to/file.json path.to.value`
+#
+# Returns 1 and prints an empty line if the file does not exist or
+# the path given was not already set.
+function json-config-get {
+  local json_file="$1"
+  local path="$2"
+
+  if ! [[ -f "${json_file}" ]] ; then
+    echo
+    return 1
+  else
+    fx-command-run jq -e -r ".${path} | values" "${json_file}"
+  fi
+}
+
 function get-device-pair {
-  # Uses a file outside the build dir so that it is not removed by `gn clean`
+  # Get the ffx configured device
+  local ffx_build_device=$(json-config-get "${FUCHSIA_BUILD_DIR}.json" target.default)
+  # And the older fx-written device
+  # TODO(123887): Remove checking this after some time has passed.
+  # Note: Uses a file outside the build dir so that it is not removed by `gn clean`
   local pairfile="${FUCHSIA_BUILD_DIR}.device"
-  # If .device file exists, use that
+  local fx_build_device=""
   if [[ -f "${pairfile}" ]]; then
-    echo "$(<"${pairfile}")"
+    fx_build_device="$(<"${pairfile}")"
+  fi
+  # If only one is set, use that. If both are set, make sure they're the same.
+  # If they're not, tell the user to resolve the ambiguity by re-running
+  # `fx set-device` but use the one from ffx.
+  if [[ -n "${ffx_build_device}" && -z "${fx_build_device}" ]] ; then
+    echo "${ffx_build_device}"
+    return 0
+  elif [[ -z "${ffx_build_device}" && -n "${fx_build_device}" ]] ; then
+    echo "${fx_build_device}"
+    return 0
+  elif [[ -n "${ffx_build_device}" && -n "${fx_build_device}" ]] ; then
+    if [[ "${ffx_build_device}" == "${fx_build_device}" ]]; then
+      echo "${ffx_build_device}"
+      return 0
+    else
+      fx-warn "Mismatch between fx and ffx build-level default device"
+      fx-warn "configurations ('${fx_build_device}' vs. '${ffx_build_device}')."
+      fx-warn "Re-run 'fx set-device' with the correct device to resolve the"
+      fx-warn "ambiguity and clear this warning."
+      fx-warn "Using ffx-set '${ffx_build_device}' by default."
+      echo "${ffx_build_device}"
+      return 0
+    fi
+  fi
+  return 1
+}
+
+function get-global-default-device {
+  local ffx_global_device=$(fx-command-run host-tool ffx target default get --build-dir "${FUCHSIA_BUILD_DIR}")
+  if [[ -n ${ffx_global_device} ]] ; then
+    echo "${ffx_global_device}"
     return 0
   fi
   return 1
@@ -365,7 +417,7 @@ function get-device-raw {
     fi
     device="${FUCHSIA_DEVICE_NAME}"
   else
-    device=$(get-device-pair)
+    device=$(get-device-pair || get-global-default-device)
   fi
   if ! is-valid-device "${device}"; then
     fx-error "Invalid device name or address: '${device}'. Some valid examples are:
@@ -390,7 +442,7 @@ function is-valid-device {
 export _FX_REMOTE_WORKFLOW_DEVICE_ADDR='[::1]:8022'
 
 function is-remote-workflow-device {
-  [[ $(get-device-pair) == "${_FX_REMOTE_WORKFLOW_DEVICE_ADDR}" ]]
+  [[ $(get-device-pair 2>/dev/null) == "${_FX_REMOTE_WORKFLOW_DEVICE_ADDR}" ]]
 }
 
 # fx-export-device-address is "public API" to commands that wish to
