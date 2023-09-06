@@ -1271,7 +1271,7 @@ pub fn sys_getpriority(current_task: &CurrentTask, which: u32, who: i32) -> Resu
     let weak = get_task_or_current(current_task, who);
     let target_task = Task::from_weak(&weak)?;
     let state = target_task.read();
-    Ok(state.priority)
+    Ok(state.scheduler_policy.raw_priority())
 }
 
 pub fn sys_setpriority(
@@ -1292,7 +1292,10 @@ pub fn sys_setpriority(
     // be lying anymore by the time you read this.)
     let priority = 20 - priority;
     let max_priority = std::cmp::min(40, target_task.thread_group.get_rlimit(Resource::NICE));
-    target_task.write().priority = priority.clamp(1, max_priority as i32) as u8;
+    target_task
+        .write()
+        .scheduler_policy
+        .set_raw_priority(priority.clamp(1, max_priority as i32) as u8);
     Ok(())
 }
 

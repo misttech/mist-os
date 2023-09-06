@@ -168,13 +168,6 @@ pub struct TaskMutableState {
     /// implement ExitStatus::CoreDump.
     pub dump_on_exit: bool,
 
-    /// The priority of the current task, a value between 1 and 40 (inclusive). Higher value means
-    /// higher priority. Defaults to 20.
-    ///
-    /// In POSIX, priority is a per-process setting, but in Linux it is per-thread.
-    /// See https://man7.org/linux/man-pages/man2/setpriority.2.html#BUGS
-    pub priority: u8,
-
     /// Desired scheduler policy for the task.
     pub scheduler_policy: SchedulerPolicy,
 
@@ -459,7 +452,7 @@ impl Task {
         exit_signal: Option<Signal>,
         signal_mask: SigSet,
         vfork_event: Option<Arc<zx::Event>>,
-        priority: u8,
+        scheduler_policy: SchedulerPolicy,
         uts_ns: UtsNamespaceHandle,
         no_new_privs: bool,
         seccomp_filter_state: SeccompState,
@@ -490,8 +483,7 @@ impl Task {
                 signals: SignalState::with_mask(signal_mask),
                 exit_status: None,
                 dump_on_exit: false,
-                priority,
-                scheduler_policy: Default::default(),
+                scheduler_policy,
                 uts_ns,
                 no_new_privs,
                 oom_score_adj: Default::default(),
@@ -731,7 +723,7 @@ impl Task {
             None,
             Default::default(),
             None,
-            DEFAULT_TASK_PRIORITY,
+            Default::default(),
             kernel.root_uts_ns.clone(),
             false,
             SeccompState::default(),
@@ -760,12 +752,12 @@ impl Task {
         let mut pids = system_task.kernel().pids.write();
         let pid = pids.allocate_pid();
 
-        let priority;
+        let scheduler_policy;
         let uts_ns;
         let default_timerslack_ns;
         {
             let state = system_task.read();
-            priority = state.priority;
+            scheduler_policy = state.scheduler_policy;
             uts_ns = state.uts_ns.clone();
             default_timerslack_ns = state.default_timerslack_ns;
         }
@@ -784,7 +776,7 @@ impl Task {
             None,
             Default::default(),
             None,
-            priority,
+            scheduler_policy,
             uts_ns,
             false,
             SeccompState::default(),
@@ -888,7 +880,7 @@ impl Task {
         let pid;
         let command;
         let creds;
-        let priority;
+        let scheduler_policy;
         let uts_ns;
         let no_new_privs;
         let seccomp_filters;
@@ -908,7 +900,8 @@ impl Task {
             pid = pids.allocate_pid();
             command = self.command();
             creds = self.creds();
-            priority = state.priority;
+            // TODO(https://fxbug.dev/297961833) implement SCHED_RESET_ON_FORK
+            scheduler_policy = state.scheduler_policy;
             timerslack_ns = state.timerslack_ns;
 
             uts_ns = if new_uts {
@@ -971,7 +964,7 @@ impl Task {
             child_exit_signal,
             child_signal_mask,
             vfork_event,
-            priority,
+            scheduler_policy,
             uts_ns,
             no_new_privs,
             SeccompState::from(&self.seccomp_filter_state),
