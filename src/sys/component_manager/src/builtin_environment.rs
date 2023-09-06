@@ -413,7 +413,6 @@ pub struct BuiltinEnvironment {
     pub model: Arc<Model>,
 
     // Framework capabilities.
-    pub kernel_stats: Option<Arc<KernelStats>>,
     pub read_only_log: Option<Arc<ReadOnlyLog>>,
     pub write_only_log: Option<Arc<WriteOnlyLog>>,
     pub mexec_resource: Option<Arc<MexecResource>>,
@@ -583,9 +582,10 @@ impl BuiltinEnvironment {
                 }
             })
             .flatten();
-        let kernel_stats = info_resource_handle.map(KernelStats::new);
-        if let Some(kernel_stats) = kernel_stats.as_ref() {
-            model.root().hooks.install(kernel_stats.hooks()).await;
+        if let Some(kernel_stats) = info_resource_handle.map(KernelStats::new) {
+            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::StatsMarker>(move |stream| {
+                kernel_stats.clone().serve(stream).boxed()
+            });
         }
 
         // Set up ReadOnlyLog service.
@@ -938,7 +938,6 @@ impl BuiltinEnvironment {
 
         Ok(BuiltinEnvironment {
             model,
-            kernel_stats,
             read_only_log,
             write_only_log,
             mexec_resource,

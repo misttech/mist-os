@@ -3,22 +3,13 @@
 // found in the LICENSE file.
 
 use {
-    crate::builtin::capability::BuiltinCapability,
-    ::routing::capability_source::InternalCapability,
     anyhow::Error,
-    async_trait::async_trait,
-    cm_types::Name,
     fidl_fuchsia_kernel as fkernel,
     fuchsia_async::DurationExt as _,
     fuchsia_zircon::{self as zx, Resource},
     futures::prelude::*,
-    lazy_static::lazy_static,
     std::sync::Arc,
 };
-
-lazy_static! {
-    static ref KERNEL_STATS_CAPABILITY_NAME: Name = "fuchsia.kernel.Stats".parse().unwrap();
-}
 
 /// An implementation of the `fuchsia.kernel.Stats` protocol.
 pub struct KernelStats {
@@ -30,14 +21,11 @@ impl KernelStats {
     pub fn new(resource: Resource) -> Arc<Self> {
         Arc::new(Self { resource })
     }
-}
 
-#[async_trait]
-impl BuiltinCapability for KernelStats {
-    const NAME: &'static str = "KernelStats";
-    type Marker = fkernel::StatsMarker;
-
-    async fn serve(self: Arc<Self>, mut stream: fkernel::StatsRequestStream) -> Result<(), Error> {
+    pub async fn serve(
+        self: Arc<Self>,
+        mut stream: fkernel::StatsRequestStream,
+    ) -> Result<(), Error> {
         while let Some(stats_request) = stream.try_next().await? {
             match stats_request {
                 fkernel::StatsRequest::GetMemoryStats { responder } => {
@@ -132,10 +120,6 @@ impl BuiltinCapability for KernelStats {
             }
         }
         Ok(())
-    }
-
-    fn matches_routed_capability(&self, capability: &InternalCapability) -> bool {
-        capability.matches_protocol(&KERNEL_STATS_CAPABILITY_NAME)
     }
 }
 
