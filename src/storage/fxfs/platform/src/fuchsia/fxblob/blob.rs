@@ -26,7 +26,6 @@ use {
         round::{round_down, round_up},
     },
     std::{
-        io::Read,
         ops::Range,
         sync::{
             atomic::{AtomicUsize, Ordering},
@@ -118,8 +117,6 @@ impl Drop for FxBlob {
     }
 }
 
-#[async_trait]
-
 /// Implements VFS pseudo-filesystem entries for blobs.
 #[async_trait]
 impl FxNode for FxBlob {
@@ -208,10 +205,16 @@ impl PagerBacked for FxBlob {
             self.compressed_chunk_size
         }
     }
+
     fn byte_size(&self) -> u64 {
         self.uncompressed_size
     }
+
     async fn aligned_read(&self, range: Range<u64>) -> Result<(buffer::Buffer<'_>, usize), Error> {
+        thread_local! {
+            static DECOMPRESSOR: std::cell::RefCell<zstd::bulk::Decompressor<'static>> =
+                std::cell::RefCell::new(zstd::bulk::Decompressor::new().unwrap());
+        }
         let block_alignment = self.read_alignment();
         ensure!(block_alignment > 0, FxfsError::Inconsistent);
         debug_assert_eq!(block_alignment % zx::system_get_page_size() as u64, 0);
@@ -259,10 +262,16 @@ impl PagerBacked for FxBlob {
             );
             let len = (std::cmp::min(range.end, self.uncompressed_size) - range.start) as usize;
             let buf = buffer.as_mut_slice();
-            zstd::Decoder::new(std::io::Cursor::new(
-                &compressed_buf.as_slice()[compressed_buf_range],
-            ))?
-            .read_exact(&mut buf[..len])?;
+            let decompressed_size = DECOMPRESSOR
+                .with(|decompressor| {
+                    let mut decompressor = decompressor.borrow_mut();
+                    decompressor.decompress_to_buffer(
+                        &compressed_buf.as_slice()[compressed_buf_range],
+                        &mut buf[..len],
+                    )
+                })
+                .map_err(|_| FxfsError::IntegrityError)?;
+            ensure!(decompressed_size == len, FxfsError::IntegrityError);
             len
         };
         // TODO(fxbug.dev/122055): This should be offloaded to the kernel at which point we can
