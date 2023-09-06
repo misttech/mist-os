@@ -468,8 +468,10 @@ zx_status_t Riscv64ArchVmAspace::SplitLargePage(vaddr_t vaddr, uint level, vaddr
   LTRACEF("vaddr %#lx, level %u, pt_index %#lx, page_table %p\n", vaddr, level, pt_index,
           page_table);
 
-  const pte_t pte = page_table[pt_index];
-  DEBUG_ASSERT(riscv64_pte_is_leaf(pte));
+  const pte_t old_pte = page_table[pt_index];
+  DEBUG_ASSERT(riscv64_pte_is_leaf(old_pte));
+
+  LTRACEF("old leaf table entry is %#lx\n", old_pte);
 
   paddr_t paddr;
   zx_status_t ret = AllocPageTable(&paddr);
@@ -479,17 +481,21 @@ zx_status_t Riscv64ArchVmAspace::SplitLargePage(vaddr_t vaddr, uint level, vaddr
   }
 
   const auto new_page_table = static_cast<volatile pte_t*>(paddr_to_physmap(paddr));
-  const auto attrs = pte & (RISCV64_PTE_PERM_MASK | RISCV64_PTE_V);
+
+  // Inherit all of the page table entry bits that aren't part of the address.
+  const pte_t new_page_attrs = old_pte & ~(RISCV64_PTE_PPN_MASK);
+
+  LTRACEF("new page table filled with attrs %#lx | address\n", new_page_attrs);
 
   const size_t next_size = page_size_per_level(level - 1);
-  for (uint64_t i = 0, mapped_paddr = riscv64_pte_pa(pte); i < RISCV64_MMU_PT_ENTRIES;
+  for (uint64_t i = 0, mapped_paddr = riscv64_pte_pa(old_pte); i < RISCV64_MMU_PT_ENTRIES;
        i++, mapped_paddr += next_size) {
     // directly write to the pte, no need to update since this is
     // a completely new table
-    new_page_table[i] = riscv64_pte_pa_to_pte(mapped_paddr) | attrs;
+    new_page_table[i] = riscv64_pte_pa_to_pte(mapped_paddr) | new_page_attrs;
   }
 
-  // Ensure all zeroing becomes visible prior to page table installation.
+  // Ensure page table initialization becomes visible prior to page table installation.
   wmb();
 
   update_pte(&page_table[pt_index], mmu_non_leaf_pte(paddr, IsKernel()));
