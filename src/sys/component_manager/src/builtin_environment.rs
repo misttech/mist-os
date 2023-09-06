@@ -413,7 +413,6 @@ pub struct BuiltinEnvironment {
     pub model: Arc<Model>,
 
     // Framework capabilities.
-    pub power_resource: Option<Arc<PowerResource>>,
     pub root_resource: Option<Arc<RootResource>>,
     #[cfg(target_arch = "aarch64")]
     pub smc_resource: Option<Arc<SmcResource>>,
@@ -807,8 +806,10 @@ impl BuiltinEnvironment {
             })
             .map(PowerResource::new)
             .and_then(Result::ok);
-        if let Some(power_resource) = power_resource.as_ref() {
-            model.root().hooks.install(power_resource.hooks()).await;
+        if let Some(power_resource) = power_resource {
+            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::PowerResourceMarker>(
+                move |stream| power_resource.clone().serve(stream).boxed(),
+            );
         }
 
         // Set up the VmexResource service.
@@ -944,7 +945,6 @@ impl BuiltinEnvironment {
 
         Ok(BuiltinEnvironment {
             model,
-            power_resource,
             #[cfg(target_arch = "aarch64")]
             smc_resource: _smc_resource,
             vmex_resource,
