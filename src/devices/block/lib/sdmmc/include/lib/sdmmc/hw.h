@@ -85,6 +85,7 @@ __BEGIN_CDECLS
 #define MMC_ERASE_GROUP_START_FLAGS SDMMC_RESP_R1
 #define MMC_ERASE_GROUP_END_FLAGS SDMMC_RESP_R1
 #define MMC_ERASE_DISCARD_ARG 0x00000003
+#define MMC_SET_BLOCK_COUNT_PACKED (1u << 30)
 #define MMC_SET_BLOCK_COUNT_RELIABLE_WRITE (1u << 31)
 
 // Common SD/MMC commands
@@ -143,7 +144,7 @@ __BEGIN_CDECLS
 // OCR fields (MMC)
 #define MMC_OCR_BUSY (1 << 31)
 #define MMC_OCR_ACCESS_MODE_MASK (0b11 << 29)
-#define MMC_OCR_SECTOR_MODE      (0b10 << 29)
+#define MMC_OCR_SECTOR_MODE (0b10 << 29)
 
 // EXT_CSD fields (MMC)
 #define MMC_EXT_CSD_SIZE 512
@@ -189,6 +190,9 @@ __BEGIN_CDECLS
 // All invalid values are set to this.
 #define MMC_EXT_CSD_DEVICE_LIFE_TIME_EST_INVALID 0xc
 
+#define MMC_EXT_CSD_MAX_PACKED_WRITES 500
+#define MMC_EXT_CSD_MAX_PACKED_READS 501
+
 // Device register (CMD13 response) fields (SD/MMC)
 #define MMC_STATUS_ADDR_OUT_OF_RANGE (1 << 31)
 #define MMC_STATUS_ADDR_MISALIGN (1 << 30)
@@ -207,7 +211,7 @@ __BEGIN_CDECLS
 #define MMC_STATUS_WP_ERASE_SKIP (1 << 15)
 #define MMC_STATUS_ERASE_RESET (1 << 13)
 #define MMC_STATUS_CURRENT_STATE_MASK (0xf << 9)
-#define MMC_STATUS_CURRENT_STATE(resp) ((resp)&MMC_STATUS_CURRENT_STATE_MASK)
+#define MMC_STATUS_CURRENT_STATE(resp) ((resp) & MMC_STATUS_CURRENT_STATE_MASK)
 /* eMMC4.5 Spec, Section 6.13, page 140: CURRENT_STATE Field:
  * 0 = Idle 1 = Ready 2 = Ident 3 = Stby command. 4 = Tran 5 = Data
  * 6 = Rcv 7 = Prg 8 = Dis 9 = Btst 10 = Slp 11–15 = reserved
@@ -221,5 +225,19 @@ __BEGIN_CDECLS
 #define MMC_STATUS_APP_CMD (1 << 5)
 
 __END_CDECLS
+
+constexpr uint32_t kMaxPackedCommandsFor512ByteBlockSize = 63;
+struct PackedCommand {
+  uint8_t version;
+  uint8_t rw;
+  uint8_t num_entries;
+  uint8_t padding[5];
+
+  struct Arg {
+    uint32_t cmd23_arg;
+    uint32_t cmdXX_arg;
+  } __PACKED;
+  Arg arg[kMaxPackedCommandsFor512ByteBlockSize];
+} __PACKED;
 
 #endif  // SRC_DEVICES_BLOCK_LIB_SDMMC_INCLUDE_LIB_SDMMC_HW_H_

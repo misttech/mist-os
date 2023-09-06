@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.sdmmc/cpp/wire.h>
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <lib/ddk/trace/event.h>
+#include <lib/fzl/vmo-mapper.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/operation/block.h>
 #include <lib/sdmmc/hw.h>
@@ -78,7 +79,7 @@ class SdmmcBlockDevice : public SdmmcBlockDeviceType {
   // until both queues are empty.
   static constexpr size_t kRoundRobinRequestCount = 16;
 
-  zx_status_t ReadWrite(const block_read_write_t& txn, const EmmcPartition partition);
+  zx_status_t ReadWrite(const std::vector<BlockOperation>& btxns, const EmmcPartition partition);
   zx_status_t Flush();
   zx_status_t Trim(const block_trim_t& txn, const EmmcPartition partition);
   zx_status_t SetPartition(const EmmcPartition partition);
@@ -136,17 +137,31 @@ class SdmmcBlockDevice : public SdmmcBlockDeviceType {
   bool is_sd_ = false;
   bool cache_enabled_ = false;
 
+  uint32_t max_packed_reads_effective_ = 0;   // Use command packing up to this many reads.
+  uint32_t max_packed_writes_effective_ = 0;  // Use command packing up to this many writes.
+  // During device probing, this buffer is replaced (extended) to support multiple buffer regions
+  // for packed commands.
+  std::unique_ptr<sdmmc_buffer_region_t[]> buffer_regions_ =
+      std::make_unique<sdmmc_buffer_region_t[]>(1);
+  zx::vmo packed_command_header_vmo_;
+  fzl::VmoMapper packed_command_header_mapper_;
+  PackedCommand* packed_command_header_data_;
+
   inspect::Inspector inspector_;
   inspect::Node root_;
   struct InspectProperties {
-    inspect::UintProperty io_errors_;             // Only updated from the worker thread.
-    inspect::UintProperty io_retries_;            // Only updated from the worker thread.
-    inspect::UintProperty type_a_lifetime_used_;  // Set once by the init thread.
-    inspect::UintProperty type_b_lifetime_used_;  // Set once by the init thread.
-    inspect::UintProperty max_lifetime_used_;     // Set once by the init thread.
-    inspect::UintProperty cache_size_bits_;       // Set once by the init thread.
-    inspect::BoolProperty cache_enabled_;         // Set once by the init thread.
-    inspect::BoolProperty trim_enabled_;          // Set once by the init thread.
+    inspect::UintProperty io_errors_;                    // Only updated from the worker thread.
+    inspect::UintProperty io_retries_;                   // Only updated from the worker thread.
+    inspect::UintProperty type_a_lifetime_used_;         // Set once by the init thread.
+    inspect::UintProperty type_b_lifetime_used_;         // Set once by the init thread.
+    inspect::UintProperty max_lifetime_used_;            // Set once by the init thread.
+    inspect::UintProperty cache_size_bits_;              // Set once by the init thread.
+    inspect::BoolProperty cache_enabled_;                // Set once by the init thread.
+    inspect::BoolProperty trim_enabled_;                 // Set once by the init thread.
+    inspect::UintProperty max_packed_reads_;             // Set once by the init thread.
+    inspect::UintProperty max_packed_writes_;            // Set once by the init thread.
+    inspect::UintProperty max_packed_reads_effective_;   // Set once by the init thread.
+    inspect::UintProperty max_packed_writes_effective_;  // Set once by the init thread.
   } properties_;
 };
 

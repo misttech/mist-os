@@ -67,6 +67,9 @@ static zx::result<bool> MaybeAddDevice(
 
 zx::result<fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>>
 SdmmcRootDevice::GetMetadata(fidl::AnyArena& allocator) {
+  // TODO(fxbug.dev/133112): Enable packing up to 16 commands.
+  constexpr uint32_t kMaxCommandPacking = 0;
+
   auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>(
       parent(), DEVICE_METADATA_SDMMC);
   if (decoded.is_error()) {
@@ -77,6 +80,7 @@ SdmmcRootDevice::GetMetadata(fidl::AnyArena& allocator) {
                                          .enable_trim(true)
                                          .enable_cache(true)
                                          .removable(false)
+                                         .max_command_packing(kMaxCommandPacking)
                                          .Build()));
     } else {
       zxlogf(ERROR, "Failed to decode metadata: %s", decoded.status_string());
@@ -86,11 +90,14 @@ SdmmcRootDevice::GetMetadata(fidl::AnyArena& allocator) {
 
   // Default to trim and cache enabled, non-removable.
   return zx::ok(fidl::ObjectView(
-      allocator, fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(allocator)
-                     .enable_trim(!decoded->has_enable_trim() || decoded->enable_trim())
-                     .enable_cache(!decoded->has_enable_cache() || decoded->enable_cache())
-                     .removable(decoded->has_removable() && decoded->removable())
-                     .Build()));
+      allocator,
+      fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(allocator)
+          .enable_trim(!decoded->has_enable_trim() || decoded->enable_trim())
+          .enable_cache(!decoded->has_enable_cache() || decoded->enable_cache())
+          .removable(decoded->has_removable() && decoded->removable())
+          .max_command_packing(decoded->has_max_command_packing() ? decoded->max_command_packing()
+                                                                  : kMaxCommandPacking)
+          .Build()));
 }
 
 void SdmmcRootDevice::DdkInit(ddk::InitTxn txn) {

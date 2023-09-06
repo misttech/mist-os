@@ -113,6 +113,7 @@ class SdmmcBlockDeviceTest : public zxtest::Test {
         .enable_trim(true)
         .enable_cache(true)
         .removable(removable)
+        .max_command_packing(16)
         .Build();
   }
 
@@ -1714,6 +1715,8 @@ TEST_F(SdmmcBlockDeviceTest, Inspect) {
     out_data[MMC_EXT_CSD_CACHE_SIZE_MSB] = 0x12;
     out_data[MMC_EXT_CSD_DEVICE_LIFE_TIME_EST_TYP_A] = 3;
     out_data[MMC_EXT_CSD_DEVICE_LIFE_TIME_EST_TYP_B] = 7;
+    out_data[MMC_EXT_CSD_MAX_PACKED_WRITES] = 63;
+    out_data[MMC_EXT_CSD_MAX_PACKED_READS] = 62;
   });
 
   AddMmcDevice();
@@ -1758,6 +1761,26 @@ TEST_F(SdmmcBlockDeviceTest, Inspect) {
       root->node().get_property<inspect::BoolPropertyValue>("cache_enabled");
   ASSERT_NOT_NULL(cache_enabled);
   EXPECT_TRUE(cache_enabled->value());
+
+  const auto* max_packed_reads =
+      root->node().get_property<inspect::UintPropertyValue>("max_packed_reads");
+  ASSERT_NOT_NULL(max_packed_reads);
+  EXPECT_EQ(max_packed_reads->value(), 62);
+
+  const auto* max_packed_writes =
+      root->node().get_property<inspect::UintPropertyValue>("max_packed_writes");
+  ASSERT_NOT_NULL(max_packed_writes);
+  EXPECT_EQ(max_packed_writes->value(), 63);
+
+  const auto* max_packed_reads_effective =
+      root->node().get_property<inspect::UintPropertyValue>("max_packed_reads_effective");
+  ASSERT_NOT_NULL(max_packed_reads_effective);
+  EXPECT_EQ(max_packed_reads_effective->value(), 16);
+
+  const auto* max_packed_writes_effective =
+      root->node().get_property<inspect::UintPropertyValue>("max_packed_writes_effective");
+  ASSERT_NOT_NULL(max_packed_writes_effective);
+  EXPECT_EQ(max_packed_writes_effective->value(), 16);
 
   // IO error count should be a successful block op.
   std::optional<block::Operation<OperationContext>> op1;

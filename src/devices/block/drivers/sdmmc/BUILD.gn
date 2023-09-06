@@ -62,6 +62,7 @@ fuchsia_driver("sdmmc-driver") {
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
+    "//zircon/third_party/ulib/safemath",
   ]
 }
 
@@ -129,6 +130,7 @@ test("sdmmc-test-bin") {
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
+    "//zircon/third_party/ulib/safemath",
   ]
 }
 

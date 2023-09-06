@@ -47,7 +47,9 @@ class SdmmcDevice {
   // SET BLOCK COUNT command for pre-defined transfer mode.
   zx_status_t SdmmcIoRequestWithRetries(
       const sdmmc_req_t& request, uint32_t* retries,
-      const std::optional<sdmmc_req_t>& set_block_count = std::nullopt);
+      const std::optional<sdmmc_req_t>& set_block_count = std::nullopt,
+      const std::optional<sdmmc_req_t>& set_block_count_for_header = std::nullopt,
+      const std::optional<sdmmc_req_t>& write_header = std::nullopt);
 
   // SD ops
   zx_status_t SdSendOpCond(uint32_t flags, uint32_t* ocr);

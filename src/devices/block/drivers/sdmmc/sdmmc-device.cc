@@ -139,15 +139,29 @@ zx_status_t SdmmcDevice::SdmmcWaitForState(uint32_t state) {
 
 zx_status_t SdmmcDevice::SdmmcIoRequestWithRetries(
     const sdmmc_req_t& request, uint32_t* retries,
-    const std::optional<sdmmc_req_t>& set_block_count) {
+    const std::optional<sdmmc_req_t>& set_block_count,
+    const std::optional<sdmmc_req_t>& set_block_count_for_header,
+    const std::optional<sdmmc_req_t>& write_header) {
   zx_status_t st;
   for (uint32_t i = 0; i < kTryAttempts; i++) {
     if (i > 0) {
       (*retries)++;
     }
 
+    uint32_t unused_response[4];
+    if (set_block_count_for_header.has_value()) {
+      if ((st = Request(set_block_count_for_header.value(), unused_response)) != ZX_OK) {
+        continue;
+      }
+    }
+
+    if (write_header.has_value()) {
+      if ((st = Request(write_header.value(), unused_response)) != ZX_OK) {
+        continue;
+      }
+    }
+
     if (set_block_count.has_value()) {
-      uint32_t unused_response[4];
       if ((st = Request(set_block_count.value(), unused_response)) != ZX_OK) {
         continue;
       }
@@ -156,7 +170,6 @@ zx_status_t SdmmcDevice::SdmmcIoRequestWithRetries(
     sdmmc_req_t req = request;
     req.suppress_error_messages = i < (kTryAttempts - 1);
 
-    uint32_t unused_response[4];
     if ((st = Request(req, unused_response)) == ZX_OK) {
       break;
     }
