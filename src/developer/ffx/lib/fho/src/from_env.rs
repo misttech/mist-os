@@ -3,18 +3,26 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use ffx_command::{return_user_error, user_error, Error, FfxContext, Result};
+use ffx_command::{return_user_error, FfxCommandLine, FfxContext, Result};
 use ffx_config::EnvironmentContext;
-use ffx_fidl::{DaemonError, VersionInfo};
-use fidl::endpoints::Proxy;
+use ffx_core::Injector;
+use ffx_fidl::VersionInfo;
+use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
 use fidl_fuchsia_developer_ffx as ffx_fidl;
+use rcs::OpenDirType;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::time::Duration;
 use std::{rc::Rc, sync::Arc};
 
-use crate::FhoEnvironment;
+mod from_toolbox;
+mod helpers;
+
+pub use from_toolbox::*;
+pub(crate) use helpers::*;
+
+const DEFAULT_PROXY_TIMEOUT: Duration = Duration::from_secs(15);
 
 #[async_trait(?Send)]
 pub trait TryFromEnv: Sized {
@@ -30,6 +38,13 @@ pub trait CheckEnv {
 pub trait TryFromEnvWith: 'static {
     type Output: 'static;
     async fn try_from_env_with(self, env: &FhoEnvironment) -> Result<Self::Output>;
+}
+
+#[derive(Clone)]
+pub struct FhoEnvironment {
+    pub ffx: FfxCommandLine,
+    pub context: EnvironmentContext,
+    pub injector: Arc<dyn Injector>,
 }
 
 /// This is so that you can use a () somewhere that generically expects something
@@ -194,7 +209,6 @@ impl TryFromEnv for ffx_config::Sdk {
         env.context.get_sdk().await.user_message("Could not load currently active SDK")
     }
 }
-
 /// The implementation of the decorator returned by [`moniker`] and [`moniker_timeout`]
 pub struct WithMoniker<P> {
     moniker: String,
@@ -206,31 +220,21 @@ pub struct WithMoniker<P> {
 impl<P> TryFromEnvWith for WithMoniker<P>
 where
     P: Proxy + 'static,
-    P::Protocol: fidl::endpoints::DiscoverableProtocolMarker,
+    P::Protocol: DiscoverableProtocolMarker,
 {
     type Output = P;
     async fn try_from_env_with(self, env: &FhoEnvironment) -> Result<Self::Output> {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<P::Protocol>()
-            .with_user_message(|| format!("Failed creating proxy for moniker {}", self.moniker))?;
-        let retry_count = 1;
-        let mut tries = 0;
-        // TODO(fxbug.dev/113143): Remove explicit retries/timeouts here so they can be
-        // configurable instead.
-        let rcs_instance = loop {
-            tries += 1;
-            let res = env.injector.remote_factory().await;
-            if res.is_ok() || tries > retry_count {
-                break res;
-            }
-        }?;
-        rcs::connect_with_timeout::<P::Protocol>(
-            self.timeout,
-            &self.moniker,
+        let rcs_instance = connect_to_rcs(&env).await?;
+        let (proxy, server_end) = create_proxy()?;
+        open_moniker(
+            proxy,
+            server_end,
             &rcs_instance,
-            server_end.into_channel(),
+            OpenDirType::ExposedDir,
+            &self.moniker,
+            self.timeout,
         )
-        .await?;
-        Ok(proxy)
+        .await
     }
 }
 
@@ -247,7 +251,11 @@ where
 /// }
 /// ```
 pub fn moniker<P: Proxy>(moniker: impl AsRef<str>) -> WithMoniker<P> {
-    moniker_timeout(moniker, 15)
+    WithMoniker {
+        moniker: moniker.as_ref().to_owned(),
+        timeout: DEFAULT_PROXY_TIMEOUT,
+        _p: Default::default(),
+    }
 }
 
 /// Like [`moniker`], but lets you also specify an override for the default
@@ -286,60 +294,11 @@ impl<P: Clone> std::ops::Deref for DaemonProtocol<P> {
     }
 }
 
-fn map_daemon_error(svc_name: &str, err: DaemonError) -> Error {
-    match err {
-        DaemonError::ProtocolNotFound => user_error!(
-            "The daemon protocol '{svc_name}' did not match any protocols on the daemon
-If you are not developing this plugin or the protocol it connects to, then this is a bug
-
-Please report it at http://fxbug.dev/new/ffx+User+Bug."
-        ),
-        DaemonError::ProtocolOpenError => user_error!(
-            "The daemon protocol '{svc_name}' failed to open on the daemon.
-
-If you are developing the protocol, there may be an internal failure when invoking the start
-function. See the ffx.daemon.log for details at `ffx config get log.dir -p sub`.
-
-If you are NOT developing this plugin or the protocol it connects to, then this is a bug.
-
-Please report it at http://fxbug.dev/new/ffx+User+Bug."
-        ),
-        unexpected => user_error!(
-"While attempting to open the daemon protocol '{svc_name}', received an unexpected error:
-
-{unexpected:?}
-
-This is not intended behavior and is a bug.
-Please report it at http://fxbug.dev/new/ffx+User+Bug."
-
-        ),
-    }
-    .into()
-}
-
-async fn load_daemon_protocol<P>(env: &FhoEnvironment) -> Result<P>
-where
-    P: Proxy + Clone,
-    P::Protocol: fidl::endpoints::DiscoverableProtocolMarker,
-{
-    let svc_name = <P::Protocol as fidl::endpoints::DiscoverableProtocolMarker>::PROTOCOL_NAME;
-    let (proxy, server_end) = fidl::endpoints::create_proxy::<P::Protocol>()
-        .with_user_message(|| format!("Failed creating proxy for service {}", svc_name))?;
-    let daemon = env.injector.daemon_factory().await?;
-
-    daemon
-        .connect_to_protocol(svc_name, server_end.into_channel())
-        .await
-        .bug_context("Connecting to protocol")?
-        .map_err(|err| map_daemon_error(svc_name, err))?;
-
-    Ok(proxy)
-}
-
 #[async_trait(?Send)]
-impl<P: Proxy + Clone> TryFromEnv for DaemonProtocol<P>
+impl<P> TryFromEnv for DaemonProtocol<P>
 where
-    P::Protocol: fidl::endpoints::DiscoverableProtocolMarker,
+    P: Proxy + Clone + 'static,
+    P::Protocol: DiscoverableProtocolMarker,
 {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         load_daemon_protocol(env).await.map(DaemonProtocol)
@@ -350,7 +309,7 @@ where
 impl<P> TryFromEnvWith for WithDaemonProtocol<P>
 where
     P: Proxy + Clone + 'static,
-    P::Protocol: fidl::endpoints::DiscoverableProtocolMarker,
+    P::Protocol: DiscoverableProtocolMarker,
 {
     type Output = P;
     async fn try_from_env_with(self, env: &FhoEnvironment) -> Result<P> {
@@ -447,6 +406,8 @@ impl TryFromEnv for EnvironmentContext {
 
 #[cfg(test)]
 mod tests {
+    use ffx_command::Error;
+
     use super::*;
 
     #[derive(Debug)]

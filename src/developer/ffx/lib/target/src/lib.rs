@@ -7,12 +7,15 @@ use errors::FfxError;
 use ffx_config::EnvironmentContext;
 use fidl::{endpoints::create_proxy, prelude::*};
 use fidl_fuchsia_developer_ffx::{
-    DaemonError, DaemonProxy, TargetCollectionMarker, TargetMarker, TargetProxy, TargetQuery,
+    DaemonError, DaemonProxy, TargetCollectionMarker, TargetMarker, TargetQuery,
 };
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
 use futures::{select, Future, FutureExt};
 use std::time::Duration;
 use timeout::timeout;
+
+/// Re-export of [`fidl_fuchsia_developer_ffx::TargetProxy`] for ease of use
+pub use fidl_fuchsia_developer_ffx::TargetProxy;
 
 const FASTBOOT_INLINE_TARGET: &str = "ffx.fastboot.inline_target";
 

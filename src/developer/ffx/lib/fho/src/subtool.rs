@@ -9,14 +9,13 @@ use ffx_command::{
 };
 use ffx_config::environment::ExecutableKind;
 use ffx_config::EnvironmentContext;
-use ffx_core::Injector;
 use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
 use std::os::unix::process::ExitStatusExt;
 use std::process::ExitStatus;
 use std::sync::Arc;
 use std::{fs::File, path::PathBuf};
 
-use crate::{FhoToolMetadata, TryFromEnv};
+use crate::{FhoEnvironment, FhoToolMetadata, TryFromEnv};
 
 /// The main trait for defining an ffx tool. This is not intended to be implemented directly
 /// by the user, but instead derived via `#[derive(FfxTool)]`.
@@ -113,13 +112,6 @@ impl ToolRunner for MetadataRunner {
         .user_message("Failed writing metadata")?;
         Ok(ExitStatus::from_raw(0))
     }
-}
-
-#[derive(Clone)]
-pub struct FhoEnvironment {
-    pub ffx: FfxCommandLine,
-    pub context: EnvironmentContext,
-    pub injector: Arc<dyn Injector>,
 }
 
 #[async_trait(?Send)]

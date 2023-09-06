@@ -40,6 +40,8 @@ rustc_library("lib") {
   sources = [
     "src/adapters.rs",
     "src/from_env.rs",
+    "src/from_env/from_toolbox.rs",
+    "src/from_env/helpers.rs",
     "src/lib.rs",
     "src/subtool.rs",
     "src/testing.rs",
