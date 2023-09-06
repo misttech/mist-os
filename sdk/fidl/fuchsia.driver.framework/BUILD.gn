@@ -10,6 +10,7 @@ fidl("fuchsia.driver.framework") {
 
   sources = [
     "composite_node_spec.fidl",
+    "driver.fidl",
     "driver_start_args.fidl",
     "overview.fidl",
     "topology.fidl",

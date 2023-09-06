@@ -1,0 +1,40 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library fuchsia.driver.framework;
+
+using zx;
+
+/// This protocol is used by the Driver Framework's Driver Host to communicate various messages and
+/// lifecycle hooks to the driver. The connection for this protocol is established through the
+/// |DriverRegistration| defined in the `driver_symbols` library.
+///
+/// Once the driver has closed its server end, the Driver Framework will initiate the shutdown
+/// of all dispatchers belonging to this driver.
+@transport("Driver")
+@available(added=HEAD)
+open protocol Driver {
+    /// Starts the driver with the given |start_args|.
+    ///
+    /// Drivers should finish their initial setup and enumeration before returning from |Start|.
+    /// In particular they should enumerate all currently available nodes by utilizing
+    /// `fuchsia.driver.framework/Node.AddChild` and waiting for all calls to be completed.
+    ///
+    /// The Framework will not consider the driver to be started until this call has returned
+    /// successfully. Therefore a driver will not have |Stop| called on it until after it has
+    /// replied to |Start| successfully.
+    ///
+    /// If a driver returns an error, it will not have |Stop| called on it before the
+    /// Driver Framework initiates shutdown of the driver's dispatchers. Therefore it should have
+    /// performed all necessary cleanup before returning an error.
+    flexible Start(resource struct {
+        start_args DriverStartArgs;
+    }) -> () error zx.Status;
+
+    /// Stops the driver. To stop, the driver should teardown any resources it set up in or after
+    /// |Start|. This is a one-way FIDL method. When the driver has completed stopping, it should
+    /// close its server end. Asynchronous operations should fully complete before closing
+    /// the server end.
+    flexible Stop();
+};
