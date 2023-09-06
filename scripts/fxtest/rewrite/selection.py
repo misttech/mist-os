@@ -17,6 +17,7 @@ import typing
 import jellyfish
 
 import selection_types
+import event
 from test_list_file import Test
 
 
@@ -45,6 +46,7 @@ def select_tests(
     selection: typing.List[str],
     mode: SelectionMode = SelectionMode.ANY,
     fuzzy_distance_threshold: int = DEFAULT_FUZZY_DISTANCE_THRESHOLD,
+    recorder: event.EventRecorder | None = None,
 ) -> selection_types.TestSelections:
     """Perform selection on the incoming list of tests.
 
@@ -58,6 +60,7 @@ def select_tests(
         selection (typing.List[str]): Selection command line.
         mode (SelectionMode, optional): Selection mode. Defaults to ANY.
         fuzzy_distance_threshold (int, optional): Distance threshold for including tests in selection.
+        recorder (EventRecorder, optional): If set, record match duration events.
 
     Raises:
         RuntimeError: _description_
@@ -248,6 +251,9 @@ def select_tests(
     ]
 
     for group in match_groups:
+        id: event.Id | None = None
+        if recorder is not None:
+            id = recorder.emit_event_group(f"Matching {group}")
         matched: typing.List[str] = []
         for entry in entries:
             # Calculate the worst matching {name, package name, component name}
@@ -289,6 +295,8 @@ def select_tests(
                 matched.append(entry.info.name)
                 tests_to_run.add(entry)
         group_matches.append((group, matched))
+        if recorder is not None and id is not None:
+            recorder.emit_end(id=id)
 
     # Ensure tests match the input ordering for consistency.
     selected_tests = [e for e in entries if e in tests_to_run]

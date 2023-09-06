@@ -187,6 +187,7 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
             flags.selection,
             mode,
             flags.fuzzy,
+            recorder=recorder,
         )
         # Mutate the selections based on the command line flags.
         selections.apply_flags(flags)
