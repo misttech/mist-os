@@ -161,31 +161,27 @@ class X86PageTableBase {
   class ConsistencyManager;
 
   zx_status_t AddMapping(volatile pt_entry_t* table, uint mmu_flags, PageTableLevel level,
-                         ExistingEntryAction existing_action, const MappingCursor& start_cursor,
-                         MappingCursor* new_cursor, ConsistencyManager* cm) TA_REQ(lock_);
+                         ExistingEntryAction existing_action, MappingCursor& cursor,
+                         ConsistencyManager* cm) TA_REQ(lock_);
   zx_status_t AddMappingL0(volatile pt_entry_t* table, uint mmu_flags,
-                           ExistingEntryAction existing_action, const MappingCursor& start_cursor,
-                           MappingCursor* new_cursor, ConsistencyManager* cm) TA_REQ(lock_);
+                           ExistingEntryAction existing_action, MappingCursor& cursor,
+                           ConsistencyManager* cm) TA_REQ(lock_);
 
   zx::result<bool> RemoveMapping(volatile pt_entry_t* table, PageTableLevel level,
-                                 EnlargeOperation enlarge, const MappingCursor& start_cursor,
-                                 MappingCursor* new_cursor, ConsistencyManager* cm) TA_REQ(lock_);
-  bool RemoveMappingL0(volatile pt_entry_t* table, const MappingCursor& start_cursor,
-                       MappingCursor* new_cursor, ConsistencyManager* cm) TA_REQ(lock_);
+                                 EnlargeOperation enlarge, MappingCursor& cursor,
+                                 ConsistencyManager* cm) TA_REQ(lock_);
+  bool RemoveMappingL0(volatile pt_entry_t* table, MappingCursor& cursor, ConsistencyManager* cm)
+      TA_REQ(lock_);
 
   zx_status_t UpdateMapping(volatile pt_entry_t* table, uint mmu_flags, PageTableLevel level,
-                            const MappingCursor& start_cursor, MappingCursor* new_cursor,
-                            ConsistencyManager* cm) TA_REQ(lock_);
-  zx_status_t UpdateMappingL0(volatile pt_entry_t* table, uint mmu_flags,
-                              const MappingCursor& start_cursor, MappingCursor* new_cursor,
+                            MappingCursor& cursor, ConsistencyManager* cm) TA_REQ(lock_);
+  zx_status_t UpdateMappingL0(volatile pt_entry_t* table, uint mmu_flags, MappingCursor& cursor,
                               ConsistencyManager* cm) TA_REQ(lock_);
   bool HarvestMapping(volatile pt_entry_t* table, NonTerminalAction non_terminal_action,
-                      TerminalAction terminal_action, PageTableLevel level,
-                      const MappingCursor& start_cursor, MappingCursor* new_cursor,
+                      TerminalAction terminal_action, PageTableLevel level, MappingCursor& cursor,
                       ConsistencyManager* cm) TA_REQ(lock_);
   void HarvestMappingL0(volatile pt_entry_t* table, TerminalAction terminal_action,
-                        const MappingCursor& start_cursor, MappingCursor* new_cursor,
-                        ConsistencyManager* cm) TA_REQ(lock_);
+                        MappingCursor& cursor, ConsistencyManager* cm) TA_REQ(lock_);
 
   zx_status_t GetMapping(volatile pt_entry_t* table, vaddr_t vaddr, PageTableLevel level,
                          PageTableLevel* ret_level, volatile pt_entry_t** mapping) TA_REQ(lock_);
