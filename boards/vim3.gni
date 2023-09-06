@@ -46,7 +46,6 @@ _common_bootfs_deps = [
   "//src/graphics/display/drivers/aml-hdmi",
   "//src/graphics/display/drivers/amlogic-display",
   "//src/graphics/display/drivers/dsi-dw",
-  "//src/graphics/drivers/aml-gpu",
   "//src/media/audio/drivers/aml-g12-tdm",
   "//src/media/audio/drivers/aml-g12-tdm:aml-g12-composite",
   "//src/power/power-manager/thermal_config:vim3",
@@ -66,6 +65,7 @@ board_recovery_bootfs_labels += _common_bootfs_deps
 
 board_driver_package_labels += [
   "//src/graphics/drivers/msd-arm-mali:msd-arm-mali-dfv2",
+  "//src/graphics/drivers/aml-gpu:aml-gpu-package",
   "//src/graphics/drivers/msd-vsi-vip",
   "//src/media/drivers/amlogic_decoder",
   "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:brcmfmac-vim3",
