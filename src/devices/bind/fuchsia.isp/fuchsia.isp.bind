@@ -5,5 +5,5 @@
 library fuchsia.isp;
 
 extend uint fuchsia.BIND_PROTOCOL {
-  DEVICE = 66,
+  DEVICE = 0x42,
 };

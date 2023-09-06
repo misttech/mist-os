@@ -5,6 +5,6 @@
 library fuchsia.spi;
 
 extend uint fuchsia.BIND_PROTOCOL {
-  DEVICE = 121,
-  IMPL = 122,
+  DEVICE = 0x79,
+  IMPL = 0x7A,
 };

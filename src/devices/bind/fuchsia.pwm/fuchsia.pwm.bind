@@ -5,5 +5,5 @@
 library fuchsia.pwm;
 
 extend uint fuchsia.BIND_PROTOCOL {
-  PWM_IMPL = 128,
+  PWM_IMPL = 0x80,
 };

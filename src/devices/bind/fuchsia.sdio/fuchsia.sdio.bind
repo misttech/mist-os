@@ -5,5 +5,5 @@
 library fuchsia.sdio;
 
 extend uint fuchsia.BIND_PROTOCOL {
-  DEVICE = 56,
+  DEVICE = 0x38,
 };
