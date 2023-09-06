@@ -46,6 +46,10 @@
             "14": {
                 "abi_revision": "0x099D5AB9C26B64DA",
                 "status": "supported"
+            },
+            "15": {
+                "abi_revision": "0x7D68E46C02F819AE",
+                "status": "in-development"
             }
         }
     },
