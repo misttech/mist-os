@@ -3,51 +3,31 @@
 // found in the LICENSE file.
 
 use {
-    crate::builtin::capability::ResourceCapability,
-    ::routing::capability_source::InternalCapability,
-    anyhow::Error,
-    async_trait::async_trait,
-    cm_types::Name,
-    fidl::endpoints::ProtocolMarker,
+    anyhow::{format_err, Error},
     fidl_fuchsia_kernel as fkernel,
-    fuchsia_zircon::{self as zx, HandleBased, Resource, ResourceInfo},
+    fuchsia_zircon::{self as zx, HandleBased, Resource},
     futures::prelude::*,
-    lazy_static::lazy_static,
     std::sync::Arc,
 };
-
-lazy_static! {
-    static ref IOPORT_RESOURCE_CAPABILITY_NAME: Name =
-        "fuchsia.kernel.IoportResource".parse().unwrap();
-}
 
 /// An implementation of fuchsia.kernel.IoportResource protocol.
 pub struct IoportResource {
     resource: Resource,
 }
 
-#[cfg(target_arch = "x86_64")]
 impl IoportResource {
     /// `resource` must be the IOPORT resource.
     pub fn new(resource: Resource) -> Arc<Self> {
         Arc::new(Self { resource })
     }
-}
 
-#[async_trait]
-impl ResourceCapability for IoportResource {
-    const KIND: zx::sys::zx_rsrc_kind_t = zx::sys::ZX_RSRC_KIND_IOPORT;
-    const NAME: &'static str = "IoportResource";
-    type Marker = fkernel::IoportResourceMarker;
-
-    fn get_resource_info(self: &Arc<Self>) -> Result<ResourceInfo, Error> {
-        Ok(self.resource.info()?)
-    }
-
-    async fn server_loop(
+    pub async fn serve(
         self: Arc<Self>,
-        mut stream: <Self::Marker as ProtocolMarker>::RequestStream,
+        mut stream: fkernel::IoportResourceRequestStream,
     ) -> Result<(), Error> {
+        if self.resource.info()?.kind != zx::sys::ZX_RSRC_KIND_IOPORT {
+            return Err(format_err!("invalid handle kind, expected IOPORT"));
+        }
         while let Some(fkernel::IoportResourceRequest::Get { responder }) =
             stream.try_next().await?
         {
@@ -55,31 +35,13 @@ impl ResourceCapability for IoportResource {
         }
         Ok(())
     }
-
-    fn matches_routed_capability(&self, capability: &InternalCapability) -> bool {
-        capability.matches_protocol(&IOPORT_RESOURCE_CAPABILITY_NAME)
-    }
 }
 
-#[cfg(all(test, target_arch = "x86_64"))]
+#[cfg(test)]
 mod tests {
     use {
-        super::*,
-        crate::{
-            builtin::capability::BuiltinCapability,
-            capability::CapabilitySource,
-            model::hooks::{Event, EventPayload, Hooks},
-        },
-        cm_util::TaskGroup,
-        fidl::endpoints::ClientEnd,
-        fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync,
+        super::*, fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync,
         fuchsia_component::client::connect_to_protocol,
-        fuchsia_zircon::sys,
-        fuchsia_zircon::AsHandleRef,
-        futures::lock::Mutex,
-        moniker::{Moniker, MonikerBase},
-        std::path::PathBuf,
-        std::sync::Weak,
     };
 
     async fn get_ioport_resource() -> Result<Resource, Error> {
@@ -106,10 +68,10 @@ mod tests {
     async fn fail_with_no_ioport_resource() -> Result<(), Error> {
         let (_, stream) =
             fidl::endpoints::create_proxy_and_stream::<fkernel::IoportResourceMarker>()?;
-        assert!(!IoportResource::new(Resource::from(zx::Handle::invalid()))
+        IoportResource::new(Resource::from(zx::Handle::invalid()))
             .serve(stream)
             .await
-            .is_ok());
+            .expect_err("failed to serve IoportResource stream");
         Ok(())
     }
 
@@ -121,41 +83,6 @@ mod tests {
         assert_eq!(resource_info.kind, zx::sys::ZX_RSRC_KIND_IOPORT);
         assert_eq!(resource_info.base, 0);
         assert_eq!(resource_info.size, 0);
-        Ok(())
-    }
-
-    #[fuchsia::test]
-    async fn can_connect_to_ioport_service() -> Result<(), Error> {
-        let ioport_resource = IoportResource::new(get_ioport_resource().await?);
-        let hooks = Hooks::new();
-        hooks.install(ioport_resource.hooks()).await;
-
-        let provider = Arc::new(Mutex::new(None));
-        let source = CapabilitySource::Builtin {
-            capability: InternalCapability::Protocol(IOPORT_RESOURCE_CAPABILITY_NAME.clone()),
-            top_instance: Weak::new(),
-        };
-
-        let event = Event::new_for_test(
-            Moniker::root(),
-            "fuchsia-pkg://root",
-            EventPayload::CapabilityRouted { source, capability_provider: provider.clone() },
-        );
-        hooks.dispatch(&event).await;
-
-        let (client, mut server) = zx::Channel::create();
-        let task_group = TaskGroup::new();
-        if let Some(provider) = provider.lock().await.take() {
-            provider
-                .open(task_group.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server)
-                .await?;
-        };
-
-        let ioport_client = ClientEnd::<fkernel::IoportResourceMarker>::new(client)
-            .into_proxy()
-            .expect("failed to create launcher proxy");
-        let ioport_resource = ioport_client.get().await?;
-        assert_ne!(ioport_resource.raw_handle(), sys::ZX_HANDLE_INVALID);
         Ok(())
     }
 }

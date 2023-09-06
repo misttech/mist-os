@@ -12,6 +12,7 @@ pub mod factory_items;
 pub mod fuchsia_boot_resolver;
 pub mod hypervisor_resource;
 pub mod info_resource;
+#[cfg(target_arch = "x86_64")]
 pub mod ioport_resource;
 pub mod irq_resource;
 pub mod items;

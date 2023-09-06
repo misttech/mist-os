@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#[cfg(target_arch = "x86_64")]
+use crate::builtin::ioport_resource::IoportResource;
+
 use {
     crate::{
         bootfs::BootfsSvc,
@@ -16,7 +19,6 @@ use {
             fuchsia_boot_resolver::{FuchsiaBootResolver, SCHEME as BOOT_SCHEME},
             hypervisor_resource::HypervisorResource,
             info_resource::InfoResource,
-            ioport_resource::IoportResource,
             irq_resource::IrqResource,
             items::Items,
             kernel_stats::KernelStats,
@@ -411,8 +413,6 @@ pub struct BuiltinEnvironment {
     pub model: Arc<Model>,
 
     // Framework capabilities.
-    #[cfg(target_arch = "x86_64")]
-    pub ioport_resource: Option<Arc<IoportResource>>,
     pub irq_resource: Option<Arc<IrqResource>>,
     pub kernel_stats: Option<Arc<KernelStats>>,
     pub read_only_log: Option<Arc<ReadOnlyLog>>,
@@ -624,15 +624,12 @@ impl BuiltinEnvironment {
             model.root().hooks.install(mmio_resource.hooks()).await;
         }
 
-        let _ioport_resource: Option<Arc<IoportResource>>;
         #[cfg(target_arch = "x86_64")]
-        {
-            let ioport_resource_handle =
-                take_startup_handle(HandleType::IoportResource.into()).map(zx::Resource::from);
-            _ioport_resource = ioport_resource_handle.map(IoportResource::new);
-            if let Some(_ioport_resource) = _ioport_resource.as_ref() {
-                model.root().hooks.install(_ioport_resource.hooks()).await;
-            }
+        if let Some(handle) = take_startup_handle(HandleType::IoportResource.into()) {
+            let ioport_resource = IoportResource::new(handle.into());
+            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::IoportResourceMarker>(
+                move |stream| ioport_resource.clone().serve(stream).boxed(),
+            );
         }
 
         // Set up the IrqResource service.
@@ -943,8 +940,6 @@ impl BuiltinEnvironment {
             kernel_stats,
             read_only_log,
             write_only_log,
-            #[cfg(target_arch = "x86_64")]
-            ioport_resource: _ioport_resource,
             irq_resource,
             mexec_resource,
             mmio_resource,
