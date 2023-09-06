@@ -369,7 +369,7 @@ struct TransactionState {
     /// The process whose handle table `handles` belong to.
     proc: Weak<BinderProcess>,
     /// The objects to strongly owned for the duration of the transaction.
-    objects: Vec<StrongRefGuard>,
+    guards: Vec<StrongRefGuard>,
     /// The handles to decrement their strong reference count.
     handles: Vec<Handle>,
 }
@@ -379,8 +379,8 @@ impl Drop for TransactionState {
         log_trace!("Dropping binder TransactionState");
         let mut drop_actions = RefCountActions::default();
         // Release the owned objects unconditionally.
-        for object in &self.objects {
-            object.release(&mut drop_actions);
+        for guard in &self.guards {
+            guard.release(&mut drop_actions);
         }
         if let Some(proc) = self.proc.upgrade() {
             // Release handles only if the owning process is still alive.
@@ -406,7 +406,7 @@ impl Drop for TransactionState {
 
 impl TransactionState {
     fn add_guard(&mut self, guard: StrongRefGuard) {
-        self.objects.push(guard);
+        self.guards.push(guard);
     }
 }
 
@@ -440,7 +440,7 @@ impl<'a> TransientTransactionState<'a> {
         TransientTransactionState {
             state: TransactionState {
                 proc: Arc::downgrade(target_proc),
-                objects: vec![],
+                guards: vec![],
                 handles: vec![],
             },
             accessor,
