@@ -5,7 +5,7 @@
 //! General-purpose socket utilities common to device layer and IP layer
 //! sockets.
 
-pub(crate) mod address;
+pub mod address;
 pub mod datagram;
 
 use alloc::collections::HashMap;
@@ -81,11 +81,11 @@ pub(crate) fn can_device_change<A: IpAddress, W: WeakId<Strong = S>, S: StrongId
 /// Otherwise returns `None`.
 pub(crate) fn try_into_null_zoned<A: IpAddress>(
     addr: &SpecifiedAddr<A>,
-) -> Option<AddrAndZone<A, ()>> {
+) -> Option<AddrAndZone<SpecifiedAddr<A>, ()>> {
     if addr.get().is_loopback() {
         return None;
     }
-    AddrAndZone::new(addr.get(), ())
+    AddrAndZone::new(*addr, ())
 }
 
 /// A bidirectional map between connection sockets and addresses.
@@ -1008,7 +1008,7 @@ mod tests {
         const ZONE: u32 = 5;
         assert_eq!(
             try_into_null_zoned(&zoned).map(|a| a.map_zone(|()| ZONE)),
-            Some(AddrAndZone::new(zoned.get(), ZONE).unwrap())
+            Some(AddrAndZone::new(zoned, ZONE).unwrap())
         );
     }
 

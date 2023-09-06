@@ -211,6 +211,21 @@ macro_rules! impl_trait_for_witness {
     };
 }
 
+/// Implements a trait with an associated type for a witness type.
+///
+/// `impl_trait_with_associated_type_for_witness` implements `$trait` with
+/// associated type `$type` for `$witness<A>` if `A: $trait`.
+macro_rules! impl_trait_with_associated_type_for_witness {
+    ($trait:ident, $method:ident, $type:ident, $witness:ident) => {
+        impl<A: $trait> $trait for $witness<A> {
+            type $type = A::$type;
+            fn $method(&self) -> Self::$type {
+                self.0.$method()
+            }
+        }
+    };
+}
+
 /// Addresses that can be specified.
 ///
 /// `SpecifiedAddress` is implemented by address types for which some values are
@@ -414,6 +429,13 @@ pub trait ScopeableAddress {
     /// have a zone.
     fn scope(&self) -> Self::Scope;
 }
+
+impl_trait_with_associated_type_for_witness!(ScopeableAddress, scope, Scope, SpecifiedAddr);
+impl_trait_with_associated_type_for_witness!(ScopeableAddress, scope, Scope, UnicastAddr);
+impl_trait_with_associated_type_for_witness!(ScopeableAddress, scope, Scope, MulticastAddr);
+impl_trait_with_associated_type_for_witness!(ScopeableAddress, scope, Scope, BroadcastAddr);
+impl_trait_with_associated_type_for_witness!(ScopeableAddress, scope, Scope, LinkLocalAddr);
+impl_trait_with_associated_type_for_witness!(ScopeableAddress, scope, Scope, NonMappedAddr);
 
 /// An address that may represent an address from another addressing scheme.
 ///
@@ -988,6 +1010,15 @@ impl<A: ScopeableAddress, Z> AddrAndZone<A, Z> {
         let AddrAndZone(addr, zone) = self;
         f(zone).map(|zone| AddrAndZone(addr, zone))
     }
+
+    /// Accesses the addr for this `AddrAndZone`.
+    pub fn addr(&self) -> A
+    where
+        A: Copy,
+    {
+        let AddrAndZone(addr, _zone) = self;
+        *addr
+    }
 }
 
 impl<A, Z> AddrAndZone<A, Z> {
@@ -1004,22 +1035,6 @@ impl<A, Z> AddrAndZone<A, Z> {
     }
 }
 
-impl<A: ScopeableAddress + SpecifiedAddress, Z> AddrAndZone<A, Z> {
-    /// Consumes this `AddrAndZone`, returning the address (as a
-    /// [`SpecifiedAddr`]) and zone separately.
-    pub fn into_specified_addr_zone(self) -> (SpecifiedAddr<A>, Z) {
-        (SpecifiedAddr(self.0), self.1)
-    }
-
-    /// Returns the address (as a [`SpecifiedAddr`]).
-    pub fn specified_addr(&self) -> SpecifiedAddr<A>
-    where
-        A: Copy,
-    {
-        SpecifiedAddr(self.0)
-    }
-}
-
 impl<A: ScopeableAddress + Display, Z: Display> Display for AddrAndZone<A, Z> {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -1033,11 +1048,11 @@ impl<A, Z> sealed::Sealed for AddrAndZone<A, Z> {}
 #[allow(missing_docs)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum ZonedAddr<A, Z> {
-    Unzoned(SpecifiedAddr<A>),
+    Unzoned(A),
     Zoned(AddrAndZone<A, Z>),
 }
 
-impl<A: ScopeableAddress + SpecifiedAddress, Z> ZonedAddr<A, Z> {
+impl<A: ScopeableAddress, Z> ZonedAddr<A, Z> {
     /// Creates a new `ZonedAddr` with the provided optional scope zone.
     ///
     /// If `zone` is `None`, [`ZonedAddr::Unzoned`] is returned. Otherwise, a
@@ -1046,30 +1061,29 @@ impl<A: ScopeableAddress + SpecifiedAddress, Z> ZonedAddr<A, Z> {
     pub fn new(addr: A, zone: Option<Z>) -> Option<Self> {
         match zone {
             Some(zone) => AddrAndZone::new(addr, zone).map(ZonedAddr::Zoned),
-            None => SpecifiedAddr::new(addr).map(ZonedAddr::Unzoned),
+            None => Some(ZonedAddr::Unzoned(addr)),
         }
     }
 
-    /// Decomposes this `ZonedAddr` into a [`SpecifiedAddr`] and an optional
-    /// scope zone.
-    pub fn into_addr_zone(self) -> (SpecifiedAddr<A>, Option<Z>) {
+    /// Decomposes this `ZonedAddr` into an addr and an optional scope zone.
+    pub fn into_addr_zone(self) -> (A, Option<Z>) {
         match self {
             ZonedAddr::Unzoned(addr) => (addr, None),
             ZonedAddr::Zoned(scope_and_zone) => {
-                let (addr, zone) = scope_and_zone.into_specified_addr_zone();
+                let (addr, zone) = scope_and_zone.into_addr_scope_id();
                 (addr, Some(zone))
             }
         }
     }
 
-    /// Accesses the `SpecifiedAddr` for this `ZonedAddr`.
-    pub fn addr(&self) -> SpecifiedAddr<A>
+    /// Accesses the addr for this `ZonedAddr`.
+    pub fn addr(&self) -> A
     where
         A: Copy,
     {
         match self {
             ZonedAddr::Unzoned(addr) => *addr,
-            ZonedAddr::Zoned(addr_and_zone) => addr_and_zone.specified_addr(),
+            ZonedAddr::Zoned(addr_and_zone) => addr_and_zone.addr(),
         }
     }
 
@@ -1079,12 +1093,6 @@ impl<A: ScopeableAddress + SpecifiedAddress, Z> ZonedAddr<A, Z> {
             ZonedAddr::Unzoned(u) => ZonedAddr::Unzoned(u),
             ZonedAddr::Zoned(z) => ZonedAddr::Zoned(z.map_zone(f)),
         }
-    }
-}
-
-impl<A, Z> From<SpecifiedAddr<A>> for ZonedAddr<A, Z> {
-    fn from(a: SpecifiedAddr<A>) -> Self {
-        Self::Unzoned(a)
     }
 }
 
@@ -1475,12 +1483,15 @@ mod tests {
         type ZonedAddr = crate::ZonedAddr<Address, ()>;
         assert_eq!(
             ZonedAddr::new(Address::GlobalUnicast, None),
-            Some(ZonedAddr::Unzoned(SpecifiedAddr(Address::GlobalUnicast)))
+            Some(ZonedAddr::Unzoned(Address::GlobalUnicast))
         );
-        assert_eq!(ZonedAddr::new(Address::Unspecified, None), None);
+        assert_eq!(
+            ZonedAddr::new(Address::Unspecified, None).unwrap().into_addr_zone(),
+            (Address::Unspecified, None)
+        );
         assert_eq!(
             ZonedAddr::new(Address::LinkLocalUnicast, None),
-            Some(ZonedAddr::Unzoned(SpecifiedAddr(Address::LinkLocalUnicast)))
+            Some(ZonedAddr::Unzoned(Address::LinkLocalUnicast))
         );
         assert_eq!(ZonedAddr::new(Address::GlobalUnicast, Some(())), None);
         assert_eq!(ZonedAddr::new(Address::Unspecified, Some(())), None);
@@ -1491,11 +1502,11 @@ mod tests {
 
         assert_eq!(
             ZonedAddr::new(Address::GlobalUnicast, None).unwrap().into_addr_zone(),
-            (SpecifiedAddr(Address::GlobalUnicast), None)
+            (Address::GlobalUnicast, None)
         );
         assert_eq!(
             ZonedAddr::new(Address::LinkLocalUnicast, Some(())).unwrap().into_addr_zone(),
-            (SpecifiedAddr(Address::LinkLocalUnicast), Some(()))
+            (Address::LinkLocalUnicast, Some(()))
         );
     }
 

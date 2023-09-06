@@ -70,6 +70,7 @@ use crate::{
     device::WeakDeviceId,
     error::ZonedAddressError,
     ip::EitherDeviceId,
+    socket::address::SocketZonedIpAddr,
     sync::{RwLockReadGuard, RwLockWriteGuard},
     transport::{
         tcp::TcpState,
@@ -196,16 +197,16 @@ impl_timer_context!(
 fn maybe_with_zone<A: IpAddress, D>(
     addr: SpecifiedAddr<A>,
     device: impl OwnedOrCloned<Option<D>>,
-) -> ZonedAddr<A, D> {
+) -> SocketZonedIpAddr<A, D> {
     // Invariant guaranteed by bind/connect/reconnect: if a socket has an
     // address that must have a zone, it has a bound device.
     if let Some(addr_and_zone) = crate::socket::try_into_null_zoned(&addr) {
         let device = device.into_owned().unwrap_or_else(|| {
             unreachable!("connected address has zoned address {:?} but no device", addr)
         });
-        ZonedAddr::Zoned(addr_and_zone.map_zone(|()| device))
+        ZonedAddr::Zoned(addr_and_zone.map_zone(|()| device)).into()
     } else {
-        ZonedAddr::Unzoned(addr)
+        ZonedAddr::Unzoned(addr).into()
     }
 }
 
@@ -217,10 +218,10 @@ fn maybe_with_zone<A: IpAddress, D>(
 /// or if `addr` requires a zone but there is none specified (by `addr` or
 /// `device`), an error is returned.
 pub(crate) fn resolve_addr_with_device<A: IpAddress, S: PartialEq, W: PartialEq + PartialEq<S>>(
-    addr: ZonedAddr<A, S>,
+    addr: SocketZonedIpAddr<A, S>,
     device: Option<W>,
 ) -> Result<(SpecifiedAddr<A>, Option<EitherDeviceId<S, W>>), ZonedAddressError> {
-    let (addr, zone) = addr.into_addr_zone();
+    let (addr, zone) = addr.into_inner().into_addr_zone();
     let device = match (zone, device) {
         (Some(zone), Some(device)) => {
             if device != zone {

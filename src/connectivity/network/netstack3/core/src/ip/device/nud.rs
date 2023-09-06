@@ -3979,7 +3979,7 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 socket,
-                Some(net_types::ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
+                Some(net_types::ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
                 Some(REMOTE_PORT),
             )
             .unwrap();
@@ -3994,7 +3994,7 @@ mod tests {
                 non_sync_ctx,
                 socket,
                 tcp::socket::SocketAddr {
-                    ip: net_types::ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip),
+                    ip: net_types::ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into(),
                     port: REMOTE_PORT,
                 },
             )

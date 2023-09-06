@@ -726,10 +726,9 @@ where
         let (ip, remote_port) =
             addr.try_into_core_with_ctx(&non_sync_ctx).map_err(IntoErrno::into_errno)?;
         let port = NonZeroU16::new(remote_port).ok_or(fposix::Errno::Einval)?;
-        let ip = ip.unwrap_or(ZonedAddr::Unzoned(I::LOOPBACK_ADDRESS));
+        let ip = ip.unwrap_or(ZonedAddr::Unzoned(I::LOOPBACK_ADDRESS).into());
         let connection = connect::<I, _>(sync_ctx, non_sync_ctx, *id, SocketAddr { ip, port })
             .map_err(IntoErrno::into_errno)?;
-
         if let Some((local, watcher)) = self.data.local_socket_and_watcher.take() {
             spawn_send_task::<I>(ctx.clone(), local, watcher, connection, spawner);
             *id = connection;

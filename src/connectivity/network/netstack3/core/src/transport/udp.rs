@@ -22,7 +22,7 @@ use net_types::{
         GenericOverIp, Ip, IpAddress, IpInvariant, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
         Ipv6SourceAddr,
     },
-    MulticastAddr, SpecifiedAddr, Witness, ZonedAddr,
+    MulticastAddr, SpecifiedAddr, Witness,
 };
 use packet::{BufferMut, Nested, ParsablePacket, ParseBuffer, Serializer};
 use packet_formats::{
@@ -52,7 +52,9 @@ use crate::{
         MulticastMembershipHandler, TransportIpContext, TransportReceiveError,
     },
     socket::{
-        address::{ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr},
+        address::{
+            ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr, SocketZonedIpAddr,
+        },
         datagram::{
             self, AddrEntry, BoundSocketState as DatagramBoundSocketState,
             BoundSockets as DatagramBoundSockets, ConnectError, DatagramBoundStateContext,
@@ -758,11 +760,11 @@ impl<I: IpExt, D: WeakId> PortAllocImpl for UdpBoundSocketMap<I, D> {
 #[cfg_attr(test, derive(PartialEq))]
 pub struct ConnInfo<A: IpAddress, D> {
     /// The local address associated with a UDP connection.
-    pub local_ip: ZonedAddr<A, D>,
+    pub local_ip: SocketZonedIpAddr<A, D>,
     /// The local port associated with a UDP connection.
     pub local_port: NonZeroU16,
     /// The remote address associated with a UDP connection.
-    pub remote_ip: ZonedAddr<A, D>,
+    pub remote_ip: SocketZonedIpAddr<A, D>,
     /// The remote port associated with a UDP connection.
     pub remote_port: NonZeroU16,
 }
@@ -790,7 +792,7 @@ impl<A: IpAddress, D: Clone + Debug> From<ConnAddr<A, D, NonZeroU16, NonZeroU16>
 pub struct ListenerInfo<A: IpAddress, D> {
     /// The local address associated with a UDP listener, or `None` for any
     /// address.
-    pub local_ip: Option<ZonedAddr<A, D>>,
+    pub local_ip: Option<SocketZonedIpAddr<A, D>>,
     /// The local port associated with a UDP listener.
     pub local_port: NonZeroU16,
 }
@@ -1369,7 +1371,7 @@ pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
         &mut self,
         ctx: &mut C,
         id: SocketId<I>,
-        remote_ip: ZonedAddr<I::Addr, Self::DeviceId>,
+        remote_ip: SocketZonedIpAddr<I::Addr, Self::DeviceId>,
         remote_port: NonZeroU16,
     ) -> Result<(), ConnectError>;
 
@@ -1462,7 +1464,7 @@ pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
         &mut self,
         ctx: &mut C,
         id: SocketId<I>,
-        addr: Option<ZonedAddr<I::Addr, Self::DeviceId>>,
+        addr: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
         port: Option<NonZeroU16>,
     ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>>;
 }
@@ -1476,7 +1478,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         &mut self,
         ctx: &mut C,
         id: SocketId<I>,
-        remote_ip: ZonedAddr<<I>::Addr, Self::DeviceId>,
+        remote_ip: SocketZonedIpAddr<<I>::Addr, Self::DeviceId>,
         remote_port: NonZeroU16,
     ) -> Result<(), ConnectError> {
         datagram::connect(self, ctx, id, remote_ip, remote_port, IpProto::Udp)
@@ -1652,7 +1654,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         &mut self,
         ctx: &mut C,
         id: SocketId<I>,
-        addr: Option<ZonedAddr<I::Addr, Self::DeviceId>>,
+        addr: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
         port: Option<NonZeroU16>,
     ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
         datagram::listen(self, ctx, id, addr, port)
@@ -1682,7 +1684,7 @@ pub(crate) trait BufferSocketHandler<I: IpExt, C, B: BufferMut>:
         &mut self,
         ctx: &mut C,
         id: SocketId<I>,
-        remote_ip: ZonedAddr<I::Addr, Self::DeviceId>,
+        remote_ip: SocketZonedIpAddr<I::Addr, Self::DeviceId>,
         remote_port: NonZeroU16,
         body: B,
     ) -> Result<(), (B, Either<LocalAddressError, SendToError>)>;
@@ -1714,7 +1716,7 @@ impl<
         &mut self,
         ctx: &mut C,
         id: SocketId<I>,
-        remote_ip: ZonedAddr<I::Addr, Self::DeviceId>,
+        remote_ip: SocketZonedIpAddr<I::Addr, Self::DeviceId>,
         remote_port: NonZeroU16,
         body: B,
     ) -> Result<(), (B, Either<LocalAddressError, SendToError>)> {
@@ -1791,7 +1793,7 @@ pub fn send_udp_to<I: Ip, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: &SocketId<I>,
-    remote_ip: ZonedAddr<I::Addr, DeviceId<C>>,
+    remote_ip: SocketZonedIpAddr<I::Addr, DeviceId<C>>,
     remote_port: NonZeroU16,
     body: B,
 ) -> Result<(), (B, Either<LocalAddressError, SendToError>)> {
@@ -2046,7 +2048,7 @@ pub fn connect<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: &SocketId<I>,
-    remote_ip: ZonedAddr<I::Addr, DeviceId<C>>,
+    remote_ip: SocketZonedIpAddr<I::Addr, DeviceId<C>>,
     remote_port: NonZeroU16,
 ) -> Result<(), ConnectError> {
     let mut sync_ctx = Locked::new(sync_ctx);
@@ -2495,7 +2497,7 @@ pub fn listen_udp<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: &SocketId<I>,
-    addr: Option<ZonedAddr<I::Addr, DeviceId<C>>>,
+    addr: Option<SocketZonedIpAddr<I::Addr, DeviceId<C>>>,
     port: Option<NonZeroU16>,
 ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
     let mut sync_ctx = Locked::new(sync_ctx);
@@ -2530,7 +2532,7 @@ mod tests {
     use net_declare::net_ip_v6;
     use net_types::{
         ip::{IpAddr, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr},
-        AddrAndZone, LinkLocalAddr, MulticastAddr, Scope as _, ScopeableAddress as _,
+        AddrAndZone, LinkLocalAddr, MulticastAddr, Scope as _, ScopeableAddress as _, ZonedAddr,
     };
     use packet::{Buf, InnerPacketBuilder, ParsablePacket, Serializer};
     use packet_formats::{
@@ -3234,7 +3236,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            Some(ZonedAddr::Unzoned(local_ip)),
+            Some(ZonedAddr::Unzoned(local_ip).into()),
             NonZeroU16::new(100),
         )
         .expect("listen_udp failed");
@@ -3275,7 +3277,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            ZonedAddr::Unzoned(remote_ip),
+            ZonedAddr::Unzoned(remote_ip).into(),
             NonZeroU16::new(200).unwrap(),
             Buf::new(body.to_vec(), ..),
         )
@@ -3285,7 +3287,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            ZonedAddr::Unzoned(remote_ip),
+            ZonedAddr::Unzoned(remote_ip).into(),
             NonZeroU16::new(200).unwrap(),
             Buf::new(body.to_vec(), ..),
         )
@@ -3357,7 +3359,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            Some(ZonedAddr::Unzoned(local_ip)),
+            Some(ZonedAddr::Unzoned(local_ip).into()),
             Some(NonZeroU16::new(100).unwrap()),
         )
         .expect("listen_udp failed");
@@ -3365,7 +3367,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            ZonedAddr::Unzoned(remote_ip),
+            ZonedAddr::Unzoned(remote_ip).into(),
             NonZeroU16::new(200).unwrap(),
         )
         .expect("connect failed");
@@ -3426,7 +3428,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             unbound,
-            ZonedAddr::Unzoned(remote_ip),
+            ZonedAddr::Unzoned(remote_ip).into(),
             NonZeroU16::new(200).unwrap(),
         )
         .unwrap_err();
@@ -3450,7 +3452,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             unbound,
-            Some(ZonedAddr::Unzoned(remote_ip)),
+            Some(ZonedAddr::Unzoned(remote_ip).into()),
             NonZeroU16::new(200),
         );
 
@@ -3478,7 +3480,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            ZonedAddr::Unzoned(remote_ip),
+            ZonedAddr::Unzoned(remote_ip).into(),
             REMOTE_PORT,
         )
         .expect("can connect");
@@ -3487,17 +3489,17 @@ mod tests {
         let (conn_local_ip, conn_remote_ip) = assert_matches!(
             info,
             SocketInfo::Connected(ConnInfo {
-                local_ip: ZonedAddr::Zoned(conn_local_ip),
-                remote_ip: ZonedAddr::Unzoned(conn_remote_ip),
+                local_ip: conn_local_ip,
+                remote_ip: conn_remote_ip,
                 local_port: _,
                 remote_port: REMOTE_PORT
             }) => (conn_local_ip, conn_remote_ip)
         );
         assert_eq!(
-            conn_local_ip,
-            AddrAndZone::new(local_ip.get(), FakeWeakDeviceId(FakeDeviceId)).unwrap()
+            conn_local_ip.into_inner(),
+            ZonedAddr::Zoned(AddrAndZone::new(local_ip, FakeWeakDeviceId(FakeDeviceId)).unwrap())
         );
-        assert_eq!(conn_remote_ip, remote_ip);
+        assert_eq!(conn_remote_ip.into_inner(), ZonedAddr::Unzoned(remote_ip));
 
         // Double-check that the bound device can't be changed after being set
         // implicitly.
@@ -3545,7 +3547,7 @@ mod tests {
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 unbound,
-                ZonedAddr::Unzoned(remote_ip),
+                ZonedAddr::Unzoned(remote_ip).into(),
                 NonZeroU16::new(100).unwrap(),
             ),
             expected,
@@ -3568,7 +3570,7 @@ mod tests {
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 socket,
-                Some(ZonedAddr::Unzoned(local_ip)),
+                Some(ZonedAddr::Unzoned(local_ip).into()),
                 NonZeroU16::new(port_num),
             )
             .unwrap();
@@ -3580,7 +3582,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             unbound,
-            ZonedAddr::Unzoned(remote_ip),
+            ZonedAddr::Unzoned(remote_ip).into(),
             NonZeroU16::new(100).unwrap(),
         )
         .unwrap_err();
@@ -3618,7 +3620,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            Some(ZonedAddr::Unzoned(local_ip)),
+            Some(ZonedAddr::Unzoned(local_ip).into()),
             Some(local_port),
         )
         .expect("Initial call to listen_udp was expected to succeed");
@@ -3627,7 +3629,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            ZonedAddr::Unzoned(remote_ip),
+            ZonedAddr::Unzoned(remote_ip).into(),
             const_unwrap_option(NonZeroU16::new(200)),
         )
         .expect("connect should succeed");
@@ -3683,7 +3685,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            Some(ZonedAddr::Unzoned(local_ip)),
+            Some(ZonedAddr::Unzoned(local_ip).into()),
             Some(const_unwrap_option(NonZeroU16::new(100))),
         )
         .expect("Initial call to listen_udp was expected to succeed");
@@ -3693,7 +3695,7 @@ mod tests {
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 socket,
-                ZonedAddr::Unzoned(remote_ip),
+                ZonedAddr::Unzoned(remote_ip).into(),
                 const_unwrap_option(NonZeroU16::new(1234))
             ),
             Err(ConnectError::Ip(IpSockCreationError::Route(ResolveRouteError::Unreachable)))
@@ -3736,9 +3738,9 @@ mod tests {
             ));
 
         let local_port = NonZeroU16::new(100).unwrap();
-        let local_ip = ZonedAddr::Unzoned(local_ip);
-        let remote_ip = ZonedAddr::Unzoned(remote_ip);
-        let other_remote_ip = ZonedAddr::Unzoned(other_remote_ip);
+        let local_ip = ZonedAddr::Unzoned(local_ip).into();
+        let remote_ip = ZonedAddr::Unzoned(remote_ip).into();
+        let other_remote_ip = ZonedAddr::Unzoned(other_remote_ip).into();
 
         let socket = SocketHandler::create_udp(&mut sync_ctx);
         SocketHandler::listen_udp(
@@ -3770,9 +3772,9 @@ mod tests {
         assert_eq!(
             SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, socket),
             SocketInfo::Connected(ConnInfo {
-                local_ip: local_ip.map_zone(FakeWeakDeviceId),
+                local_ip: local_ip.into_inner().map_zone(FakeWeakDeviceId).into(),
                 local_port,
-                remote_ip: other_remote_ip.map_zone(FakeWeakDeviceId),
+                remote_ip: other_remote_ip.into_inner().map_zone(FakeWeakDeviceId).into(),
                 remote_port: other_remote_port
             })
         );
@@ -3783,9 +3785,9 @@ mod tests {
         set_logger_for_test();
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
             UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
-        let local_ip = ZonedAddr::Unzoned(local_ip::<I>());
-        let remote_ip = ZonedAddr::Unzoned(remote_ip::<I>());
-        let other_remote_ip = ZonedAddr::Unzoned(I::get_other_ip_address(3));
+        let local_ip = ZonedAddr::Unzoned(local_ip::<I>()).into();
+        let remote_ip = ZonedAddr::Unzoned(remote_ip::<I>()).into();
+        let other_remote_ip = ZonedAddr::Unzoned(I::get_other_ip_address(3)).into();
 
         let socket = SocketHandler::create_udp(&mut sync_ctx);
         SocketHandler::listen_udp(
@@ -3816,9 +3818,9 @@ mod tests {
         assert_eq!(
             SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, socket),
             SocketInfo::Connected(ConnInfo {
-                local_ip: local_ip.map_zone(FakeWeakDeviceId),
+                local_ip: local_ip.into_inner().map_zone(FakeWeakDeviceId).into(),
                 local_port: LOCAL_PORT,
-                remote_ip: remote_ip.map_zone(FakeWeakDeviceId),
+                remote_ip: remote_ip.into_inner().map_zone(FakeWeakDeviceId).into(),
                 remote_port: REMOTE_PORT
             })
         );
@@ -3843,7 +3845,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            Some(ZonedAddr::Unzoned(local_ip)),
+            Some(ZonedAddr::Unzoned(local_ip).into()),
             Some(LOCAL_PORT),
         )
         .expect("listen should succeed");
@@ -3851,7 +3853,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            ZonedAddr::Unzoned(remote_ip),
+            ZonedAddr::Unzoned(remote_ip).into(),
             REMOTE_PORT,
         )
         .expect("connect should succeed");
@@ -3862,7 +3864,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            ZonedAddr::Unzoned(other_remote_ip),
+            ZonedAddr::Unzoned(other_remote_ip).into(),
             NonZeroU16::new(200).unwrap(),
             Buf::new(body.to_vec(), ..),
         )
@@ -3871,8 +3873,8 @@ mod tests {
         // The socket should not have been affected.
         let info = SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, socket);
         let info = assert_matches!(info, SocketInfo::Connected(info) => info);
-        assert_eq!(info.local_ip, ZonedAddr::Unzoned(local_ip));
-        assert_eq!(info.remote_ip, ZonedAddr::Unzoned(remote_ip));
+        assert_eq!(info.local_ip, ZonedAddr::Unzoned(local_ip).into());
+        assert_eq!(info.remote_ip, ZonedAddr::Unzoned(remote_ip).into());
         assert_eq!(info.remote_port, REMOTE_PORT);
 
         // Check first frame.
@@ -3908,7 +3910,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            ZonedAddr::Unzoned(remote_ip),
+            ZonedAddr::Unzoned(remote_ip).into(),
             NonZeroU16::new(200).unwrap(),
         )
         .expect("connect failed");
@@ -3941,7 +3943,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            ZonedAddr::Unzoned(remote_ip),
+            ZonedAddr::Unzoned(remote_ip).into(),
             NonZeroU16::new(200).unwrap(),
         )
         .expect("connect failed");
@@ -3984,7 +3986,7 @@ mod tests {
         struct NotWriteableError;
 
         fn send<I: Ip + TestIpExt, SC: BufferSocketHandler<I, FakeUdpNonSyncCtx, Buf<Vec<u8>>>>(
-            remote_ip: Option<ZonedAddr<I::Addr, SC::DeviceId>>,
+            remote_ip: Option<SocketZonedIpAddr<I::Addr, SC::DeviceId>>,
             sync_ctx: &mut SC,
             non_sync_ctx: &mut FakeUdpNonSyncCtx,
             id: SocketId<I>,
@@ -4013,7 +4015,7 @@ mod tests {
 
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
             UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
-        let remote_ip = ZonedAddr::Unzoned(remote_ip::<I>());
+        let remote_ip = ZonedAddr::Unzoned(remote_ip::<I>()).into();
         const REMOTE_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(200));
         let send_to_ip = send_to.then_some(remote_ip);
 
@@ -4046,7 +4048,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            Some(local_ip::<I>().into()),
+            Some(ZonedAddr::Unzoned(local_ip::<I>()).into()),
             Some(LOCAL_PORT),
         )
         .expect("can bind");
@@ -4054,7 +4056,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            ZonedAddr::Unzoned(remote_ip::<I>()),
+            ZonedAddr::Unzoned(remote_ip::<I>()).into(),
             REMOTE_PORT,
         )
         .expect("can connect");
@@ -4144,7 +4146,7 @@ mod tests {
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 socket,
-                Some(ZonedAddr::Unzoned(local_ip)),
+                Some(ZonedAddr::Unzoned(local_ip).into()),
                 Some(local_port_d),
             )
             .expect("connect failed");
@@ -4152,7 +4154,7 @@ mod tests {
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 socket,
-                ZonedAddr::Unzoned(remote_ip),
+                ZonedAddr::Unzoned(remote_ip).into(),
                 remote_port_a,
             )
             .expect("connect failed");
@@ -4163,7 +4165,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             list1,
-            Some(ZonedAddr::Unzoned(local_ip)),
+            Some(ZonedAddr::Unzoned(local_ip).into()),
             Some(local_port_a),
         )
         .expect("listen_udp failed");
@@ -4172,7 +4174,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             list2,
-            Some(ZonedAddr::Unzoned(local_ip)),
+            Some(ZonedAddr::Unzoned(local_ip).into()),
             Some(local_port_b),
         )
         .expect("listen_udp failed");
@@ -4529,7 +4531,7 @@ mod tests {
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 socket,
-                Some(ZonedAddr::Unzoned(multicast_addr.into_specified())),
+                Some(ZonedAddr::Unzoned(multicast_addr.into_specified()).into()),
                 Some(local_port),
             )
             .expect("listen_udp failed");
@@ -4601,7 +4603,7 @@ mod tests {
             sync_ctx,
             &mut non_sync_ctx,
             bound_first_device,
-            Some(ZonedAddr::Unzoned(local_ip::<I>())),
+            Some(ZonedAddr::Unzoned(local_ip::<I>()).into()),
             Some(LOCAL_PORT),
         )
         .expect("listen should succeed");
@@ -4609,7 +4611,7 @@ mod tests {
             sync_ctx,
             &mut non_sync_ctx,
             bound_first_device,
-            ZonedAddr::Unzoned(I::get_other_remote_ip_address(1)),
+            ZonedAddr::Unzoned(I::get_other_remote_ip_address(1)).into(),
             REMOTE_PORT,
         )
         .expect("connect should succeed");
@@ -4698,7 +4700,7 @@ mod tests {
                 sync_ctx,
                 &mut non_sync_ctx,
                 socket,
-                ZonedAddr::Unzoned(I::get_other_remote_ip_address(1)),
+                ZonedAddr::Unzoned(I::get_other_remote_ip_address(1)).into(),
                 REMOTE_PORT,
                 Buf::new(body.to_vec(), ..),
             )
@@ -4834,7 +4836,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            ZonedAddr::Unzoned(device_configs[&MultipleDevicesId::A].remote_ips[0]),
+            ZonedAddr::Unzoned(device_configs[&MultipleDevicesId::A].remote_ips[0]).into(),
             LOCAL_PORT,
         )
         .expect("connect should succeed");
@@ -4955,7 +4957,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            ZonedAddr::Unzoned(remote_ip::<I>()),
+            ZonedAddr::Unzoned(remote_ip::<I>()).into(),
             remote_port,
         )
         .expect("connect failed");
@@ -4963,9 +4965,9 @@ mod tests {
         assert_eq!(
             info,
             SocketInfo::Connected(ConnInfo {
-                local_ip: ZonedAddr::Unzoned(local_ip::<I>()),
+                local_ip: ZonedAddr::Unzoned(local_ip::<I>()).into(),
                 local_port,
-                remote_ip: ZonedAddr::Unzoned(remote_ip::<I>()),
+                remote_ip: ZonedAddr::Unzoned(remote_ip::<I>()).into(),
                 remote_port,
             })
         );
@@ -4992,7 +4994,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             conn_a,
-            ZonedAddr::Unzoned(ip_a),
+            ZonedAddr::Unzoned(ip_a).into(),
             NonZeroU16::new(1010).unwrap(),
         )
         .expect("connect failed");
@@ -5001,7 +5003,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             conn_b,
-            ZonedAddr::Unzoned(ip_b),
+            ZonedAddr::Unzoned(ip_b).into(),
             NonZeroU16::new(1010).unwrap(),
         )
         .expect("connect failed");
@@ -5010,7 +5012,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             conn_c,
-            ZonedAddr::Unzoned(ip_a),
+            ZonedAddr::Unzoned(ip_a).into(),
             NonZeroU16::new(2020).unwrap(),
         )
         .expect("connect failed");
@@ -5019,7 +5021,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             conn_d,
-            ZonedAddr::Unzoned(ip_a),
+            ZonedAddr::Unzoned(ip_a).into(),
             NonZeroU16::new(1010).unwrap(),
         )
         .expect("connect failed");
@@ -5059,7 +5061,7 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 socket,
-                Some(ZonedAddr::Unzoned(local_ip::<I>())),
+                Some(ZonedAddr::Unzoned(local_ip::<I>()).into()),
                 Some(NonZeroU16::new(100).unwrap()),
             )
         }
@@ -5102,7 +5104,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             specified_list,
-            Some(ZonedAddr::Unzoned(local_ip)),
+            Some(ZonedAddr::Unzoned(local_ip).into()),
             None,
         )
         .expect("listen_udp failed");
@@ -5235,8 +5237,8 @@ mod tests {
     fn test_remove_udp_conn<I: Ip + TestIpExt>() {
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
             UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
-        let local_ip = ZonedAddr::Unzoned(local_ip::<I>());
-        let remote_ip = ZonedAddr::Unzoned(remote_ip::<I>());
+        let local_ip = ZonedAddr::Unzoned(local_ip::<I>()).into();
+        let remote_ip = ZonedAddr::Unzoned(remote_ip::<I>()).into();
         let local_port = NonZeroU16::new(100).unwrap();
         let remote_port = NonZeroU16::new(200).unwrap();
         let socket = SocketHandler::create_udp(&mut sync_ctx);
@@ -5253,9 +5255,9 @@ mod tests {
         let info = SocketHandler::remove_udp(&mut sync_ctx, &mut non_sync_ctx, socket);
         let info = assert_matches!(info, SocketInfo::Connected(info) => info);
         // Assert that the info gotten back matches what was expected.
-        assert_eq!(info.local_ip, local_ip.map_zone(FakeWeakDeviceId));
+        assert_eq!(info.local_ip, local_ip.into_inner().map_zone(FakeWeakDeviceId).into());
         assert_eq!(info.local_port, local_port);
-        assert_eq!(info.remote_ip, remote_ip.map_zone(FakeWeakDeviceId));
+        assert_eq!(info.remote_ip, remote_ip.into_inner().map_zone(FakeWeakDeviceId).into());
         assert_eq!(info.remote_port, remote_port);
 
         // Assert that that connection id was removed from the connections
@@ -5269,7 +5271,7 @@ mod tests {
     fn test_remove_udp_listener<I: Ip + TestIpExt>() {
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
             UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
-        let local_ip = ZonedAddr::Unzoned(local_ip::<I>());
+        let local_ip = ZonedAddr::Unzoned(local_ip::<I>()).into();
         let local_port = NonZeroU16::new(100).unwrap();
 
         // Test removing a specified listener.
@@ -5284,7 +5286,7 @@ mod tests {
         .expect("listen_udp failed");
         let info = SocketHandler::remove_udp(&mut sync_ctx, &mut non_sync_ctx, specified);
         let info = assert_matches!(info, SocketInfo::Listener(info) => info);
-        assert_eq!(info.local_ip.unwrap(), local_ip.map_zone(FakeWeakDeviceId));
+        assert_eq!(info.local_ip.unwrap(), local_ip.into_inner().map_zone(FakeWeakDeviceId).into());
         assert_eq!(info.local_port, local_port);
         let Wrapped { outer: sockets_state, inner: _ } = &sync_ctx;
         assert_matches!(sockets_state.get_socket_state(&specified), None);
@@ -5369,7 +5371,7 @@ where {
             sync_ctx,
             non_sync_ctx,
             unbound,
-            Some(ZonedAddr::Unzoned(local_ip::<I>())),
+            Some(ZonedAddr::Unzoned(local_ip::<I>()).into()),
             NonZeroU16::new(100),
         )
         .expect("listen should succeed")
@@ -5384,7 +5386,7 @@ where {
             sync_ctx,
             non_sync_ctx,
             unbound,
-            ZonedAddr::Unzoned(I::get_other_remote_ip_address(1)),
+            ZonedAddr::Unzoned(I::get_other_remote_ip_address(1)).into(),
             NonZeroU16::new(200).unwrap(),
         )
         .expect("connect should succeed")
@@ -5562,7 +5564,7 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            Some(ZonedAddr::Unzoned(local_ip)),
+            Some(ZonedAddr::Unzoned(local_ip).into()),
             Some(local_port),
         )
         .expect("listen_udp failed");
@@ -5614,7 +5616,7 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            ZonedAddr::Unzoned(I::get_other_remote_ip_address(1)),
+            ZonedAddr::Unzoned(I::get_other_remote_ip_address(1)).into(),
             NonZeroU16::new(200).unwrap(),
         )
         .expect("connect failed");
@@ -5655,7 +5657,7 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            Some(ZonedAddr::Unzoned(local_ip)),
+            Some(ZonedAddr::Unzoned(local_ip).into()),
             NonZeroU16::new(100),
         )
         .expect("listen_udp failed");
@@ -5666,7 +5668,7 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            Some(ZonedAddr::Unzoned(local_ip)),
+            Some(ZonedAddr::Unzoned(local_ip).into()),
             NonZeroU16::new(200),
         )
         .expect("listen again failed");
@@ -5676,8 +5678,8 @@ where {
     fn test_get_conn_info<I: Ip + TestIpExt>() {
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
             UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
-        let local_ip = ZonedAddr::Unzoned(local_ip::<I>());
-        let remote_ip = ZonedAddr::Unzoned(remote_ip::<I>());
+        let local_ip = ZonedAddr::Unzoned(local_ip::<I>()).into();
+        let remote_ip = ZonedAddr::Unzoned(remote_ip::<I>()).into();
         // Create a UDP connection with a specified local port and local IP.
         let socket = SocketHandler::create_udp(&mut sync_ctx);
         SocketHandler::listen_udp(
@@ -5698,9 +5700,9 @@ where {
         .expect("connect failed");
         let info = SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, socket);
         let info = assert_matches!(info, SocketInfo::Connected(info) => info);
-        assert_eq!(info.local_ip, local_ip.map_zone(FakeWeakDeviceId));
+        assert_eq!(info.local_ip, local_ip.into_inner().map_zone(FakeWeakDeviceId).into());
         assert_eq!(info.local_port.get(), 100);
-        assert_eq!(info.remote_ip, remote_ip.map_zone(FakeWeakDeviceId));
+        assert_eq!(info.remote_ip, remote_ip.into_inner().map_zone(FakeWeakDeviceId).into());
         assert_eq!(info.remote_port.get(), 200);
     }
 
@@ -5708,7 +5710,7 @@ where {
     fn test_get_listener_info<I: Ip + TestIpExt>() {
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
             UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::new_fake_device());
-        let local_ip = ZonedAddr::Unzoned(local_ip::<I>());
+        let local_ip = ZonedAddr::Unzoned(local_ip::<I>()).into();
 
         // Check getting info on specified listener.
         let specified = SocketHandler::create_udp(&mut sync_ctx);
@@ -5722,7 +5724,7 @@ where {
         .expect("listen_udp failed");
         let info = SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, specified);
         let info = assert_matches!(info, SocketInfo::Listener(info) => info);
-        assert_eq!(info.local_ip.unwrap(), local_ip.map_zone(FakeWeakDeviceId));
+        assert_eq!(info.local_ip.unwrap(), local_ip.into_inner().map_zone(FakeWeakDeviceId).into());
         assert_eq!(info.local_port.get(), 100);
 
         // Check getting info on wildcard listener.
@@ -5763,7 +5765,7 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             first,
-            Some(ZonedAddr::Unzoned(local_ip::<I>())),
+            Some(ZonedAddr::Unzoned(local_ip::<I>()).into()),
             None,
         )
         .expect("listen failed");
@@ -5781,7 +5783,7 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             second,
-            ZonedAddr::Unzoned(remote_ip::<I>()),
+            ZonedAddr::Unzoned(remote_ip::<I>()).into(),
             const_unwrap_option(NonZeroU16::new(569)),
         )
         .expect("connect failed");
@@ -5823,7 +5825,7 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            Some(ZonedAddr::Unzoned(local_ip::<I>())),
+            Some(ZonedAddr::Unzoned(local_ip::<I>()).into()),
             Some(NonZeroU16::new(100).unwrap()),
         )
         .expect("failed to listen");
@@ -5849,7 +5851,7 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            ZonedAddr::Unzoned(remote_ip::<I>()),
+            ZonedAddr::Unzoned(remote_ip::<I>()).into(),
             NonZeroU16::new(200).unwrap(),
         )
         .expect("failed to connect");
@@ -5874,7 +5876,7 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             unbound,
-            Some(ZonedAddr::Unzoned(remote_ip)),
+            Some(ZonedAddr::Unzoned(remote_ip).into()),
             NonZeroU16::new(100),
         )
         .expect_err("listen_udp unexpectedly succeeded");
@@ -5925,7 +5927,7 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             unbound,
-            Some(ZonedAddr::Unzoned(bind_addr)),
+            Some(ZonedAddr::Unzoned(bind_addr).into()),
             NonZeroU16::new(200),
         );
         assert_eq!(
@@ -5971,7 +5973,7 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            Some(ZonedAddr::Zoned(AddrAndZone::new(ll_addr.get(), zone_id).unwrap())),
+            Some(ZonedAddr::Zoned(AddrAndZone::new(ll_addr, zone_id).unwrap()).into()),
             NonZeroU16::new(200),
         )
         .map_err(Either::unwrap_right);
@@ -6007,7 +6009,7 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            Some(ZonedAddr::Zoned(AddrAndZone::new(ll_addr.get(), zone_id).unwrap())),
+            Some(ZonedAddr::Zoned(AddrAndZone::new(ll_addr, zone_id).unwrap()).into()),
             NonZeroU16::new(200),
         )
         .map_err(Either::unwrap_right);
@@ -6045,7 +6047,7 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            Some(ZonedAddr::Zoned(AddrAndZone::new(ll_addr.get(), MultipleDevicesId::A).unwrap())),
+            Some(ZonedAddr::Zoned(AddrAndZone::new(ll_addr, MultipleDevicesId::A).unwrap()).into()),
             NonZeroU16::new(200),
         )
         .expect("listen failed");
@@ -6068,10 +6070,10 @@ where {
 
     #[test_case(None; "bind all IPs")]
     #[test_case(Some(ZonedAddr::Unzoned(local_ip::<Ipv6>())); "bind unzoned")]
-    #[test_case(Some(ZonedAddr::Zoned(AddrAndZone::new(net_ip_v6!("fe80::1"),
+    #[test_case(Some(ZonedAddr::Zoned(AddrAndZone::new(SpecifiedAddr::new(net_ip_v6!("fe80::1")).unwrap(),
         MultipleDevicesId::A).unwrap())); "bind with same zone")]
     fn test_udp_ipv6_connect_with_unzoned(
-        bound_addr: Option<ZonedAddr<Ipv6Addr, MultipleDevicesId>>,
+        bound_addr: Option<ZonedAddr<SpecifiedAddr<Ipv6Addr>, MultipleDevicesId>>,
     ) {
         let remote_ips = vec![remote_ip::<Ipv6>()];
 
@@ -6100,7 +6102,7 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            bound_addr,
+            bound_addr.map(SocketZonedIpAddr::from),
             Some(LOCAL_PORT),
         )
         .unwrap();
@@ -6110,7 +6112,7 @@ where {
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 socket,
-                ZonedAddr::Unzoned(remote_ip::<Ipv6>()),
+                ZonedAddr::Unzoned(remote_ip::<Ipv6>()).into(),
                 REMOTE_PORT,
             ),
             Ok(())
@@ -6145,7 +6147,7 @@ where {
         .unwrap();
 
         let zoned_local_addr =
-            ZonedAddr::Zoned(AddrAndZone::new(ll_addr.get(), MultipleDevicesId::A).unwrap());
+            ZonedAddr::Zoned(AddrAndZone::new(ll_addr, MultipleDevicesId::A).unwrap()).into();
         SocketHandler::listen_udp(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -6159,7 +6161,7 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            ZonedAddr::Unzoned(remote_ip::<Ipv6>()),
+            ZonedAddr::Unzoned(remote_ip::<Ipv6>()).into(),
             REMOTE_PORT,
         )
         .expect("connect should succeed");
@@ -6167,22 +6169,22 @@ where {
         assert_eq!(
             SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, socket),
             SocketInfo::Connected(ConnInfo {
-                local_ip: zoned_local_addr.map_zone(FakeWeakDeviceId),
+                local_ip: zoned_local_addr.into_inner().map_zone(FakeWeakDeviceId).into(),
                 local_port: LOCAL_PORT,
-                remote_ip: ZonedAddr::Unzoned(remote_ip::<Ipv6>()),
+                remote_ip: ZonedAddr::Unzoned(remote_ip::<Ipv6>()).into(),
                 remote_port: REMOTE_PORT,
             })
         );
     }
 
-    #[test_case(ZonedAddr::Zoned(AddrAndZone::new(net_ip_v6!("fe80::2"),
+    #[test_case(ZonedAddr::Zoned(AddrAndZone::new(SpecifiedAddr::new(net_ip_v6!("fe80::2")).unwrap(),
         MultipleDevicesId::B).unwrap()),
         Err(ConnectError::Zone(ZonedAddressError::DeviceZoneMismatch));
         "connect to different zone")]
     #[test_case(ZonedAddr::Unzoned(SpecifiedAddr::new(net_ip_v6!("fe80::3")).unwrap()),
         Ok(FakeWeakDeviceId(MultipleDevicesId::A)); "connect implicit zone")]
     fn test_udp_ipv6_bind_zoned(
-        remote_addr: ZonedAddr<Ipv6Addr, MultipleDevicesId>,
+        remote_addr: ZonedAddr<SpecifiedAddr<Ipv6Addr>, MultipleDevicesId>,
         expected: Result<FakeWeakDeviceId<MultipleDevicesId>, ConnectError>,
     ) {
         let remote_ips = vec![SpecifiedAddr::new(net_ip_v6!("fe80::3")).unwrap()];
@@ -6209,9 +6211,16 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            Some(ZonedAddr::Zoned(
-                AddrAndZone::new(net_ip_v6!("fe80::1"), MultipleDevicesId::A).unwrap(),
-            )),
+            Some(
+                ZonedAddr::Zoned(
+                    AddrAndZone::new(
+                        SpecifiedAddr::new(net_ip_v6!("fe80::1")).unwrap(),
+                        MultipleDevicesId::A,
+                    )
+                    .unwrap(),
+                )
+                .into(),
+            ),
             Some(LOCAL_PORT),
         )
         .unwrap();
@@ -6220,7 +6229,7 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            remote_addr,
+            remote_addr.into(),
             REMOTE_PORT,
         )
         .map(|()| {
@@ -6262,7 +6271,7 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             unbound,
-            Some(ZonedAddr::Unzoned(loopback_addr)),
+            Some(ZonedAddr::Unzoned(loopback_addr).into()),
             NonZeroU16::new(200),
         );
         assert_matches!(result, Ok(_));
@@ -6314,13 +6323,13 @@ where {
         }
 
         let send_to_remote_addr =
-            ZonedAddr::Zoned(AddrAndZone::new(ll_addr.get(), MultipleDevicesId::A).unwrap());
+            ZonedAddr::Zoned(AddrAndZone::new(ll_addr, MultipleDevicesId::A).unwrap()).into();
         let result = if connect {
             SocketHandler::connect(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 socket,
-                ZonedAddr::Unzoned(conn_remote_ip),
+                ZonedAddr::Unzoned(conn_remote_ip).into(),
                 REMOTE_PORT,
             )
             .expect("connect should succeed");
@@ -6384,9 +6393,16 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            Some(ZonedAddr::Zoned(
-                AddrAndZone::new(device_a_local_ip, MultipleDevicesId::A).unwrap(),
-            )),
+            Some(
+                ZonedAddr::Zoned(
+                    AddrAndZone::new(
+                        SpecifiedAddr::new(device_a_local_ip).unwrap(),
+                        MultipleDevicesId::A,
+                    )
+                    .unwrap(),
+                )
+                .into(),
+            ),
             Some(LOCAL_PORT),
         )
         .expect("listen should succeed");
@@ -6394,14 +6410,14 @@ where {
         // Use a remote address on device B, while the socket is listening on
         // device A. This should cause a failure when sending.
         let send_to_remote_addr =
-            ZonedAddr::Zoned(AddrAndZone::new(ll_addr.get(), MultipleDevicesId::B).unwrap());
+            ZonedAddr::Zoned(AddrAndZone::new(ll_addr, MultipleDevicesId::B).unwrap()).into();
 
         let result = if connect {
             SocketHandler::connect(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 socket,
-                ZonedAddr::Unzoned(conn_remote_ip),
+                ZonedAddr::Unzoned(conn_remote_ip).into(),
                 REMOTE_PORT,
             )
             .expect("connect should succeed");
@@ -6451,7 +6467,7 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            Some(ZonedAddr::Unzoned(local_ip)),
+            Some(ZonedAddr::Unzoned(local_ip).into()),
             Some(LOCAL_PORT),
         )
         .unwrap();
@@ -6459,7 +6475,7 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            ZonedAddr::Zoned(AddrAndZone::new(ll_addr.get(), FakeDeviceId).unwrap()),
+            ZonedAddr::Zoned(AddrAndZone::new(ll_addr, FakeDeviceId).unwrap()).into(),
             REMOTE_PORT,
         )
         .expect("connect should succeed");
@@ -6496,7 +6512,7 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            Some(ZonedAddr::Zoned(AddrAndZone::new(ll_addr.get(), FakeDeviceId).unwrap())),
+            Some(ZonedAddr::Zoned(AddrAndZone::new(ll_addr, FakeDeviceId).unwrap()).into()),
             Some(LOCAL_PORT),
         )
         .unwrap();
@@ -6504,7 +6520,7 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            ZonedAddr::Unzoned(remote_ip),
+            ZonedAddr::Unzoned(remote_ip).into(),
             REMOTE_PORT,
         )
         .expect("connect should succeed");
@@ -6540,7 +6556,7 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            Some(ZonedAddr::Unzoned(local_ip)),
+            Some(ZonedAddr::Unzoned(local_ip).into()),
             Some(LOCAL_PORT),
         )
         .unwrap();
@@ -6548,7 +6564,7 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            ZonedAddr::Zoned(AddrAndZone::new(ll_addr.get(), FakeDeviceId).unwrap()),
+            ZonedAddr::Zoned(AddrAndZone::new(ll_addr, FakeDeviceId).unwrap()).into(),
             REMOTE_PORT,
         )
         .expect("connect should succeed");
@@ -6622,7 +6638,7 @@ where {
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 listener,
-                ZonedAddr::Unzoned(remote_ip),
+                ZonedAddr::Unzoned(remote_ip).into(),
                 const_unwrap_option(NonZeroU16::new(9090)),
                 Buf::new(vec![], ..),
             )
@@ -6696,7 +6712,7 @@ where {
             &mut sync_ctx,
             &mut non_sync_ctx,
             listener,
-            SpecifiedAddr::new(bind_addr).map(ZonedAddr::Unzoned),
+            SpecifiedAddr::new(bind_addr).map(|a| ZonedAddr::Unzoned(a).into()),
             Some(LOCAL_PORT),
         )
         .expect("can bind");
@@ -6762,7 +6778,7 @@ where {
                 sync_ctx,
                 non_sync_ctx,
                 v4_listener,
-                SpecifiedAddr::new(V4_LOCAL_IP).map(ZonedAddr::Unzoned),
+                SpecifiedAddr::new(V4_LOCAL_IP).map(|a| ZonedAddr::Unzoned(a).into()),
                 Some(LOCAL_PORT),
             )
         };
@@ -6772,7 +6788,7 @@ where {
                 non_sync_ctx,
                 v6_listener,
                 SpecifiedAddr::new(bind_addr.v6_addr().unwrap_or(V4_LOCAL_IP_MAPPED))
-                    .map(ZonedAddr::Unzoned),
+                    .map(|a| ZonedAddr::Unzoned(a).into()),
                 Some(LOCAL_PORT),
             )
         };
@@ -6816,7 +6832,7 @@ where {
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 listener,
-                SpecifiedAddr::new(bind_addr).map(ZonedAddr::Unzoned),
+                SpecifiedAddr::new(bind_addr).map(|a| ZonedAddr::Unzoned(a).into()),
                 Some(LOCAL_PORT),
             ),
             Err(Either::Right(LocalAddressError::CannotBindToAddress))
@@ -6842,7 +6858,7 @@ where {
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 listener,
-                SpecifiedAddr::new(bind_addr).map(ZonedAddr::Unzoned),
+                SpecifiedAddr::new(bind_addr).map(|a| ZonedAddr::Unzoned(a).into()),
                 Some(LOCAL_PORT),
             ),
             Ok(())
@@ -6881,7 +6897,7 @@ where {
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 listener,
-                SpecifiedAddr::new(NOT_ASSIGNED_MAPPED).map(ZonedAddr::Unzoned),
+                SpecifiedAddr::new(NOT_ASSIGNED_MAPPED).map(|a| ZonedAddr::Unzoned(a).into()),
                 Some(LOCAL_PORT),
             ),
             Err(Either::Right(LocalAddressError::CannotBindToAddress))
@@ -6920,7 +6936,7 @@ where {
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 listener,
-                bind_addr.map(ZonedAddr::Unzoned),
+                bind_addr.map(|a| ZonedAddr::Unzoned(a).into()),
                 Some(LOCAL_PORT),
             ),
             Ok(())
@@ -6929,7 +6945,7 @@ where {
         assert_eq!(
             SocketHandler::<Ipv6, _>::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, listener),
             SocketInfo::Listener(ListenerInfo {
-                local_ip: bind_addr.map(ZonedAddr::Unzoned),
+                local_ip: bind_addr.map(|a| ZonedAddr::Unzoned(a).into()),
                 local_port: LOCAL_PORT,
             })
         );
@@ -6971,7 +6987,7 @@ where {
                     &mut sync_ctx,
                     &mut non_sync_ctx,
                     listener,
-                    bind_addr.map(ZonedAddr::Unzoned),
+                    bind_addr.map(|a| ZonedAddr::Unzoned(a).into()),
                     Some(LOCAL_PORT),
                 ),
                 Ok(())
@@ -6980,7 +6996,7 @@ where {
             assert_eq!(
                 SocketHandler::<Ipv6, _>::remove_udp(&mut sync_ctx, &mut non_sync_ctx, listener),
                 SocketInfo::Listener(ListenerInfo {
-                    local_ip: bind_addr.map(ZonedAddr::Unzoned),
+                    local_ip: bind_addr.map(|a| ZonedAddr::Unzoned(a).into()),
                     local_port: LOCAL_PORT,
                 })
             );
@@ -7025,7 +7041,7 @@ where {
                 sync_ctx,
                 non_sync_ctx,
                 specific_listener,
-                Some(ZonedAddr::Unzoned(local_ip::<I>())),
+                Some(ZonedAddr::Unzoned(local_ip::<I>()).into()),
                 Some(NonZeroU16::new(2).unwrap()),
             )
             .unwrap();
@@ -7035,7 +7051,7 @@ where {
                 sync_ctx,
                 non_sync_ctx,
                 connection,
-                Some(ZonedAddr::Unzoned(local_ip::<I>())),
+                Some(ZonedAddr::Unzoned(local_ip::<I>()).into()),
                 Some(NonZeroU16::new(3).unwrap()),
             )
             .unwrap();
@@ -7043,7 +7059,7 @@ where {
                 sync_ctx,
                 non_sync_ctx,
                 connection,
-                ZonedAddr::Unzoned(remote_ip::<I>()),
+                ZonedAddr::Unzoned(remote_ip::<I>()).into(),
                 NonZeroU16::new(4).unwrap(),
             )
             .unwrap();

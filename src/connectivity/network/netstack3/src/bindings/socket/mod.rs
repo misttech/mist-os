@@ -23,7 +23,7 @@ use fuchsia_zircon as zx;
 use futures::StreamExt as _;
 use net_types::{
     ip::{Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
-    ScopeableAddress, SpecifiedAddr, Witness, ZonedAddr,
+    ScopeableAddress, SpecifiedAddr, Witness,
 };
 use netstack3_core::{
     device::DeviceId,
@@ -32,7 +32,10 @@ use netstack3_core::{
         socket::{IpSockCreationError, IpSockSendError},
         ResolveRouteError,
     },
-    socket::datagram::{ConnectError, SetMulticastMembershipError},
+    socket::{
+        address::SocketZonedIpAddr,
+        datagram::{ConnectError, SetMulticastMembershipError},
+    },
     transport::{tcp, udp},
 };
 
@@ -299,7 +302,7 @@ pub(crate) trait SockAddr: std::fmt::Debug + Sized + Send {
     /// `addr` is either `Some(a)` where `a` holds a specified address an
     /// optional zone, or `None` for the unspecified address (which can't have a
     /// zone).
-    fn new(addr: Option<ZonedAddr<Self::AddrType, Self::Zone>>, port: u16) -> Self;
+    fn new(addr: Option<SocketZonedIpAddr<Self::AddrType, Self::Zone>>, port: u16) -> Self;
 
     /// Gets this `SockAddr`'s address.
     fn addr(&self) -> Self::AddrType;
@@ -334,9 +337,9 @@ impl SockAddr for fnet::Ipv6SocketAddress {
     type Zone = NonZeroU64;
 
     /// Creates a new `SockAddr6`.
-    fn new(addr: Option<ZonedAddr<Ipv6Addr, NonZeroU64>>, port: u16) -> Self {
+    fn new(addr: Option<SocketZonedIpAddr<Ipv6Addr, NonZeroU64>>, port: u16) -> Self {
         let (addr, zone_index) = addr.map_or((Ipv6::UNSPECIFIED_ADDRESS, 0), |addr| {
-            let (addr, zone) = ZonedAddr::into_addr_zone(addr);
+            let (addr, zone) = addr.into_addr_zone();
             (addr.get(), zone.map_or(0, NonZeroU64::get))
         });
         fnet::Ipv6SocketAddress { address: addr.into_fidl(), port, zone_index }
@@ -380,7 +383,7 @@ impl SockAddr for fnet::Ipv4SocketAddress {
     type Zone = Never;
 
     /// Creates a new `SockAddr4`.
-    fn new(addr: Option<ZonedAddr<Ipv4Addr, Never>>, port: u16) -> Self {
+    fn new(addr: Option<SocketZonedIpAddr<Ipv4Addr, Never>>, port: u16) -> Self {
         let addr = addr.map_or(Ipv4::UNSPECIFIED_ADDRESS, |zoned| match zoned.into_addr_zone() {
             (a, None) => a.get(),
             (_a, Some(n)) => match n {},
@@ -454,7 +457,10 @@ impl From<psocket::Ipv6MulticastMembership> for IpMulticastMembership {
 
 #[cfg(test)]
 mod testutil {
-    use net_types::ip::{AddrSubnetEither, IpAddr};
+    use net_types::{
+        ip::{AddrSubnetEither, IpAddr},
+        ZonedAddr,
+    };
 
     use super::*;
 
@@ -480,7 +486,8 @@ mod testutil {
 
         /// Creates an [`fnet::SocketAddress`] with the given `addr` and `port`.
         fn create(addr: Self::AddrType, port: u16) -> fnet::SocketAddress {
-            Self::new(SpecifiedAddr::new(addr).map(ZonedAddr::Unzoned), port).into_sock_addr()
+            Self::new(SpecifiedAddr::new(addr).map(|a| ZonedAddr::Unzoned(a).into()), port)
+                .into_sock_addr()
         }
 
         /// Gets the local address and prefix configured for the test

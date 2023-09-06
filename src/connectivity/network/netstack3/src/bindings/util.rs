@@ -42,7 +42,10 @@ use netstack3_core::{
             AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither, Metric, RawMetric,
         },
     },
-    socket::datagram::{MulticastInterfaceSelector, MulticastMembershipInterfaceSelector},
+    socket::{
+        address::SocketZonedIpAddr,
+        datagram::{MulticastInterfaceSelector, MulticastMembershipInterfaceSelector},
+    },
 };
 
 use crate::bindings::{
@@ -620,7 +623,7 @@ where
 
     fn try_into_fidl(self) -> Result<<A::Version as IpSockAddrExt>::SocketAddress, Self::Error> {
         let (addr, port) = self;
-        Ok(SockAddr::new(addr.map(ZonedAddr::Unzoned), port.get()))
+        Ok(SockAddr::new(addr.map(|a| ZonedAddr::Unzoned(a).into()), port.get()))
     }
 }
 
@@ -850,7 +853,7 @@ impl IntoErrno for SocketAddressError {
 }
 
 impl<A: IpAddress, D> TryFromFidlWithContext<<A::Version as IpSockAddrExt>::SocketAddress>
-    for (Option<ZonedAddr<A, D>>, u16)
+    for (Option<SocketZonedIpAddr<A, D>>, u16)
 where
     A::Version: IpSockAddrExt,
     D: TryFromFidlWithContext<
@@ -872,24 +875,24 @@ where
 
         let zoned = match fidl.zone() {
             Some(zone) => {
-                let addr_and_zone = AddrAndZone::new(specified.get(), zone)
-                    .ok_or(SocketAddressError::UnexpectedZone)?;
+                let addr_and_zone =
+                    AddrAndZone::new(specified, zone).ok_or(SocketAddressError::UnexpectedZone)?;
 
                 addr_and_zone
                     .try_map_zone(|zone| {
                         TryFromFidlWithContext::try_from_fidl_with_ctx(ctx, zone)
                             .map_err(SocketAddressError::Device)
                     })
-                    .map(Into::into)?
+                    .map(|a| ZonedAddr::Zoned(a).into())?
             }
-            None => specified.into(),
+            None => ZonedAddr::Unzoned(specified).into(),
         };
         Ok((Some(zoned), port))
     }
 }
 
 impl<A: IpAddress, D> TryIntoFidlWithContext<<A::Version as IpSockAddrExt>::SocketAddress>
-    for (Option<ZonedAddr<A, D>>, u16)
+    for (Option<SocketZonedIpAddr<A, D>>, u16)
 where
     A::Version: IpSockAddrExt,
     D: TryIntoFidlWithContext<<<A::Version as IpSockAddrExt>::SocketAddress as SockAddr>::Zone>,
@@ -903,14 +906,15 @@ where
         let (addr, port) = self;
         let addr = addr
             .map(|addr| {
-                Ok(match addr {
-                    ZonedAddr::Unzoned(addr) => addr.into(),
+                Ok(match addr.into_inner() {
+                    ZonedAddr::Unzoned(addr) => ZonedAddr::Unzoned(addr),
                     ZonedAddr::Zoned(z) => z
                         .try_map_zone(|zone| {
                             TryIntoFidlWithContext::try_into_fidl_with_ctx(zone, ctx)
                         })?
                         .into(),
-                })
+                }
+                .into())
             })
             .transpose()?;
         Ok(SockAddr::new(addr, port))
@@ -918,7 +922,7 @@ where
 }
 
 impl<A: IpAddress, D> TryIntoFidlWithContext<<A::Version as IpSockAddrExt>::SocketAddress>
-    for (ZonedAddr<A, D>, NonZeroU16)
+    for (SocketZonedIpAddr<A, D>, NonZeroU16)
 where
     A::Version: IpSockAddrExt,
     D: TryIntoFidlWithContext<
@@ -938,7 +942,7 @@ where
 }
 
 impl<A: IpAddress, D> TryIntoFidlWithContext<<A::Version as IpSockAddrExt>::SocketAddress>
-    for (Option<ZonedAddr<A, D>>, NonZeroU16)
+    for (Option<SocketZonedIpAddr<A, D>>, NonZeroU16)
 where
     A::Version: IpSockAddrExt,
     D: TryIntoFidlWithContext<
@@ -1420,7 +1424,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn sock_addr_into_core_err<A: SockAddr>(addr: A, expected: SocketAddressError)
     where
-        (Option<ZonedAddr<A::AddrType, DeviceId<BindingsNonSyncCtxImpl>>>, u16):
+        (Option<SocketZonedIpAddr<A::AddrType, DeviceId<BindingsNonSyncCtxImpl>>>, u16):
             TryFromFidlWithContext<A, Error = SocketAddressError>,
         <A::AddrType as IpAddress>::Version: IpSockAddrExt<SocketAddress = A>,
         DeviceId<BindingsNonSyncCtxImpl>:
@@ -1438,7 +1442,7 @@ mod tests {
 
     #[test_case(
         fidl_net::Ipv4SocketAddress {address: net_ip_v4!("192.168.0.0").into_ext(), port: 8080},
-        (Some(SpecifiedAddr::new(net_ip_v4!("192.168.0.0")).unwrap().into()), 8080);
+        (Some(ZonedAddr::Unzoned(SpecifiedAddr::new(net_ip_v4!("192.168.0.0")).unwrap())), 8080);
         "IPv4 specified")]
     #[test_case(
         fidl_net::Ipv4SocketAddress {address: net_ip_v4!("0.0.0.0").into_ext(), port: 8000},
@@ -1450,7 +1454,7 @@ mod tests {
             port: 8080,
             zone_index: 0
         },
-        (Some(SpecifiedAddr::new(net_ip_v6!("1:2:3:4::")).unwrap().into()), 8080);
+        (Some(ZonedAddr::Unzoned(SpecifiedAddr::new(net_ip_v6!("1:2:3:4::")).unwrap())), 8080);
         "IPv6 specified no zone")]
     #[test_case(
         fidl_net::Ipv6SocketAddress {
@@ -1467,17 +1471,17 @@ mod tests {
             zone_index: 1
         },
         (Some(
-            AddrAndZone::new(net_ip_v6!("fe80::1"), ReplaceWithCoreId).unwrap().into()
+            ZonedAddr::Zoned(AddrAndZone::new(SpecifiedAddr::new(net_ip_v6!("fe80::1")).unwrap(), ReplaceWithCoreId).unwrap())
         ), 8080);
         "IPv6 specified valid zone")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn sock_addr_conversion_reversible<A: SockAddr + Eq + Clone>(
         addr: A,
-        (zoned, port): (Option<ZonedAddr<A::AddrType, ReplaceWithCoreId>>, u16),
+        (zoned, port): (Option<ZonedAddr<SpecifiedAddr<A::AddrType>, ReplaceWithCoreId>>, u16),
     ) where
-        (Option<ZonedAddr<A::AddrType, DeviceId<BindingsNonSyncCtxImpl>>>, u16):
+        (Option<SocketZonedIpAddr<A::AddrType, DeviceId<BindingsNonSyncCtxImpl>>>, u16):
             TryFromFidlWithContext<A, Error = SocketAddressError> + TryIntoFidlWithContext<A>,
-        <(Option<ZonedAddr<A::AddrType, DeviceId<BindingsNonSyncCtxImpl>>>, u16) as
+        <(Option<SocketZonedIpAddr<A::AddrType, DeviceId<BindingsNonSyncCtxImpl>>>, u16) as
                  TryIntoFidlWithContext<A>>::Error: Debug,
         <A::AddrType as IpAddress>::Version: IpSockAddrExt<SocketAddress = A>,
         DeviceId<BindingsNonSyncCtxImpl>:
@@ -1485,11 +1489,13 @@ mod tests {
     {
         let ctx = FakeConversionContext::new().await;
         let zoned = zoned.map(|z| match z {
-            ZonedAddr::Unzoned(z) => z.into(),
-            ZonedAddr::Zoned(z) => z.map_zone(|ReplaceWithCoreId| ctx.core.clone()).into(),
+            ZonedAddr::Unzoned(z) => ZonedAddr::Unzoned(z).into(),
+            ZonedAddr::Zoned(z) => {
+                ZonedAddr::Zoned(z.map_zone(|ReplaceWithCoreId| ctx.core.clone())).into()
+            }
         });
 
-        let result: (Option<ZonedAddr<_, _>>, _) =
+        let result: (Option<SocketZonedIpAddr<_, _>>, _) =
             addr.clone().try_into_core_with_ctx(&ctx).expect("into core should succeed");
         assert_eq!(result, (zoned, port));
 

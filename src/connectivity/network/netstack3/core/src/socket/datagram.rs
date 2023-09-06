@@ -11,6 +11,7 @@ use core::{
     hash::Hash,
     marker::PhantomData,
     num::{NonZeroU16, NonZeroU8},
+    ops::Deref as _,
 };
 
 use derivative::Derivative;
@@ -44,7 +45,7 @@ use crate::{
         self,
         address::{
             AddrVecIter, ConnAddr, ConnIpAddr, DualStackIpAddr, DualStackListenerIpAddr,
-            ListenerIpAddr,
+            ListenerIpAddr, SocketZonedIpAddr,
         },
         AddrVec, BoundSocketMap, ExistsError, InsertError, ListenerAddr, Shutdown,
         SocketMapAddrSpec, SocketMapConflictPolicy, SocketMapStateSpec,
@@ -1624,7 +1625,7 @@ pub(crate) fn listen<
     sync_ctx: &mut SC,
     ctx: &mut C,
     id: S::SocketId<I>,
-    addr: Option<ZonedAddr<I::Addr, SC::DeviceId>>,
+    addr: Option<SocketZonedIpAddr<I::Addr, SC::DeviceId>>,
     local_id: Option<<S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
 ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>>
 where
@@ -1892,7 +1893,7 @@ fn try_pick_identifier<
 }
 
 fn try_pick_bound_address<I: IpExt, SC: TransportIpContext<I, C>, C, LI>(
-    addr: Option<ZonedAddr<I::Addr, SC::DeviceId>>,
+    addr: Option<SocketZonedIpAddr<I::Addr, SC::DeviceId>>,
     device: &Option<SC::WeakDeviceId>,
     sync_ctx: &mut SC,
     identifier: LI,
@@ -1935,14 +1936,14 @@ enum TryUnmapResult<I: Ip + DualStackIpExt, D> {
     /// The address does not have an un-mapped representation.
     ///
     /// This spits back the input address unmodified.
-    CannotBeUnmapped(ZonedAddr<I::Addr, D>),
+    CannotBeUnmapped(SocketZonedIpAddr<I::Addr, D>),
     /// The address in the other stack that corresponds to the input.
     ///
-    /// Since [`ZonedAddr`] is guaranteed to hold a specified address, this must
-    /// hold an `Option<ZonedAddr>`. Since `::FFFF:0.0.0.0` is a legal
-    /// IPv4-mapped IPv6 address, this allows us to represent it as the
+    /// Since [`SocketZonedIpAddr`] is guaranteed to hold a specified address,
+    /// this must hold an `Option<SocketZonedIpAddr>`. Since `::FFFF:0.0.0.0` is
+    /// a legal IPv4-mapped IPv6 address, this allows us to represent it as the
     /// unspecified IPv4 address.
-    Mapped(Option<ZonedAddr<<I::OtherVersion as Ip>::Addr, D>>),
+    Mapped(Option<SocketZonedIpAddr<<I::OtherVersion as Ip>::Addr, D>>),
 }
 
 /// Try to convert a specified address into the address that maps to it from
@@ -1957,7 +1958,7 @@ enum TryUnmapResult<I: Ip + DualStackIpExt, D> {
 /// [`TryUnmapResult::CannotBeUnmapped`].
 // TODO(https://fxbug.dev/21198): Move this onto a method on the dual-stack
 // context trait so that it doesn't need map_ip.
-fn try_unmap<A: IpAddress, D>(addr: ZonedAddr<A, D>) -> TryUnmapResult<A::Version, D>
+fn try_unmap<A: IpAddress, D>(addr: SocketZonedIpAddr<A, D>) -> TryUnmapResult<A::Version, D>
 where
     A::Version: DualStackIpExt,
 {
@@ -1965,7 +1966,9 @@ where
         addr,
         |v4| TryUnmapResult::CannotBeUnmapped(v4),
         |v6| match v6.addr().to_ipv4_mapped() {
-            Some(v4) => TryUnmapResult::Mapped(SpecifiedAddr::new(v4).map(ZonedAddr::Unzoned)),
+            Some(v4) => {
+                TryUnmapResult::Mapped(SpecifiedAddr::new(v4).map(|a| ZonedAddr::Unzoned(a).into()))
+            }
             None => TryUnmapResult::CannotBeUnmapped(v6),
         },
     )
@@ -1981,7 +1984,7 @@ fn listen_inner<
     ctx: &mut C,
     state: &mut SocketsState<I, SC::WeakDeviceId, S>,
     id: S::SocketId<I>,
-    addr: Option<ZonedAddr<I::Addr, SC::DeviceId>>,
+    addr: Option<SocketZonedIpAddr<I::Addr, SC::DeviceId>>,
     local_id: Option<<S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
 ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>>
 where
@@ -1998,10 +2001,13 @@ where
         /// Bind to a non-dual-stack address only on the current stack.
         OnlyCurrentStack(
             MaybeDualStack<&'a mut DS, &'a mut NDS>,
-            Option<ZonedAddr<I::Addr, DS::DeviceId>>,
+            Option<SocketZonedIpAddr<I::Addr, DS::DeviceId>>,
         ),
         /// Bind to an address only on the other stack.
-        OnlyOtherStack(&'a mut DS, Option<ZonedAddr<<I::OtherVersion as Ip>::Addr, DS::DeviceId>>),
+        OnlyOtherStack(
+            &'a mut DS,
+            Option<SocketZonedIpAddr<<I::OtherVersion as Ip>::Addr, DS::DeviceId>>,
+        ),
     }
 
     let mut entry = match state.entry(id.get_key_index()) {
@@ -2055,7 +2061,7 @@ where
             // The address has a representation in the other stack but there's
             // no dual-stack support!
             TryUnmapResult::Mapped(_addr) => {
-                let _: Option<ZonedAddr<<I::OtherVersion as Ip>::Addr, _>> = _addr;
+                let _: Option<SocketZonedIpAddr<<I::OtherVersion as Ip>::Addr, _>> = _addr;
                 return Err(Either::Right(LocalAddressError::CannotBindToAddress));
             }
         },
@@ -2075,7 +2081,7 @@ where
             S::AddrSpec,
             S::SocketMapSpec<I, SC::WeakDeviceId>,
         >,
-        addr: Option<ZonedAddr<I::Addr, SC::DeviceId>>,
+        addr: Option<SocketZonedIpAddr<I::Addr, SC::DeviceId>>,
         device: &Option<SC::WeakDeviceId>,
         local_id: Option<<S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
         id: <S::SocketMapSpec<I, SC::WeakDeviceId> as SocketMapStateSpec>::ListenerId,
@@ -2090,7 +2096,7 @@ where
         let identifier = match local_id {
             Some(id) => Some(id),
             None => try_pick_identifier::<I, S, _, _, _>(
-                addr.as_ref().map(ZonedAddr::addr),
+                addr.as_ref().map(|a| a.deref().addr()),
                 bound,
                 ctx,
                 &sharing,
@@ -2255,7 +2261,7 @@ pub(crate) fn connect<
     sync_ctx: &mut SC,
     ctx: &mut C,
     id: S::SocketId<I>,
-    remote_ip: ZonedAddr<I::Addr, SC::DeviceId>,
+    remote_ip: SocketZonedIpAddr<I::Addr, SC::DeviceId>,
     remote_id: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     proto: IpProto,
 ) -> Result<(), ConnectError>
@@ -2778,7 +2784,7 @@ pub(crate) fn send_to<
     sync_ctx: &mut SC,
     ctx: &mut C,
     id: S::SocketId<I>,
-    remote_ip: ZonedAddr<I::Addr, SC::DeviceId>,
+    remote_ip: SocketZonedIpAddr<I::Addr, SC::DeviceId>,
     remote_identifier: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     proto: <I as IpProtoExt>::Proto,
     body: B,
@@ -2886,7 +2892,7 @@ fn send_oneshot<
         Option<SpecifiedAddr<I::Addr>>,
         <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
     ),
-    remote_ip: ZonedAddr<I::Addr, SC::DeviceId>,
+    remote_ip: SocketZonedIpAddr<I::Addr, SC::DeviceId>,
     remote_id: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     device: &Option<SC::WeakDeviceId>,
     ip_options: &IpOptions<I, SC::WeakDeviceId, S>,
@@ -4084,7 +4090,7 @@ mod test {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            I::FAKE_CONFIG.remote_ip.into(),
+            ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into(),
             'a',
             IpProto::Udp.into(),
             body,
@@ -4119,7 +4125,7 @@ mod test {
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 socket,
-                I::FAKE_CONFIG.remote_ip.into(),
+                ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into(),
                 'a',
                 IpProto::Udp.into(),
                 body,

@@ -4,15 +4,40 @@
 
 //! A collection of types that represent the various parts of socket addresses.
 
-use core::num::NonZeroU16;
+use core::{num::NonZeroU16, ops::Deref};
 
 use derivative::Derivative;
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress},
-    SpecifiedAddr,
+    SpecifiedAddr, ZonedAddr,
 };
 
 use crate::socket::{datagram::DualStackIpExt, AddrVec, SocketMapAddrSpec};
+
+/// A [`ZonedAddr`] whose addr is witness to the properties required by sockets.
+#[derive(Copy, Clone, Debug, Eq, GenericOverIp, Hash, PartialEq)]
+pub struct SocketZonedIpAddr<A: IpAddress, Z>(ZonedAddr<SpecifiedAddr<A>, Z>);
+
+impl<A: IpAddress, Z> SocketZonedIpAddr<A, Z> {
+    /// Convert self the inner [`ZonedAddr`]
+    pub fn into_inner(self) -> ZonedAddr<SpecifiedAddr<A>, Z> {
+        self.0
+    }
+}
+
+impl<A: IpAddress, Z> Deref for SocketZonedIpAddr<A, Z> {
+    type Target = ZonedAddr<SpecifiedAddr<A>, Z>;
+    fn deref(&self) -> &Self::Target {
+        let SocketZonedIpAddr(addr) = self;
+        addr
+    }
+}
+
+impl<A: IpAddress, Z> From<ZonedAddr<SpecifiedAddr<A>, Z>> for SocketZonedIpAddr<A, Z> {
+    fn from(addr: ZonedAddr<SpecifiedAddr<A>, Z>) -> Self {
+        SocketZonedIpAddr(addr)
+    }
+}
 
 /// The IP address and identifier (port) of a listening socket.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
