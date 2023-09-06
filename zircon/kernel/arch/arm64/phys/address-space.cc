@@ -71,9 +71,9 @@ void EnablePagingForEl(Paddr ttbr0_root) {
   TcrReg tcr;
   tcr.set_tg0(arch::ArmTcrTg0Value::k4KiB)                      // Use 4 KiB granules.
       .set_t0sz(64 - kDefaultPageTableLayout.region_size_bits)  // Set region size.
-      .set_sh0(arch::ArmTcrShareAttr::kInnerShareable)
-      .set_orgn0(arch::ArmTcrCacheAttr::kWriteBackWriteAllocate)
-      .set_irgn0(arch::ArmTcrCacheAttr::kWriteBackWriteAllocate);
+      .set_sh0(arch::ArmShareabilityAttribute::kInner)
+      .set_orgn0(arch::ArmCacheabilityAttribute::kWriteBackReadWriteAllocate)
+      .set_irgn0(arch::ArmCacheabilityAttribute::kWriteBackReadWriteAllocate);
 
   // Allow the CPU to access all of its supported physical address space.
   // If the hardware declares it has support for 52bit PA addresses but we're only

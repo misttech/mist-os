@@ -21,6 +21,8 @@
 #include <fbl/bits.h>
 #include <hwreg/bitfields.h>
 
+#include "memory.h"
+
 //
 // The definitions here just deal with stage 1 translation for now.
 //
@@ -51,17 +53,7 @@ enum class ArmAddressTranslationLevel {
   k3,
 };
 
-// [arm/v8]: Table D5-36 SH[1:0] field encoding for Normal memory, VMSAv8-64 translation table
-// format
-//
-// Shareability attribute for Normal memory
-enum class ArmAddressTranslationShareability {
-  kNonShareable = 0b00,
-  kOuterShareable = 0b10,
-  kInnerShareable = 0b11,
-};
-
-// [arm/v8]: Table D5-28 Data access permissions for stage 1 translations
+// [arm/v8]: Table D5-29 Data access permissions for stage 1 translations
 //
 // Access permission for page table entries.
 enum class ArmAddressTranslationAccessPermissions {
@@ -469,7 +461,7 @@ class ArmAddressTranslationPageDescriptor
 
   DEF_BIT(10, af);  // Access Flag
 
-  DEF_COND_ENUM_FIELD(ArmAddressTranslationShareability, 9, 8, sh, kWidth48);  // SHareability
+  DEF_COND_ENUM_FIELD(ArmShareabilityAttribute, 9, 8, sh, kWidth48);  // SHareability
 
   // Access Permissions
   DEF_ENUM_FIELD(ArmAddressTranslationAccessPermissions, 7, 6, ap);
@@ -577,7 +569,7 @@ class ArmAddressTranslationBlockDescriptor
   DEF_RSVDZ_BIT(11);
   DEF_BIT(10, af);  // Access Flag
 
-  DEF_COND_ENUM_FIELD(ArmAddressTranslationShareability, 9, 8, sh, kWidth48);  // SHareability
+  DEF_COND_ENUM_FIELD(ArmShareabilityAttribute, 9, 8, sh, kWidth48);  // SHareability
 
   DEF_ENUM_FIELD(ArmAddressTranslationAccessPermissions, 7, 6, ap);  // Access Permissions
   DEF_BIT(5, ns);                                                    // Non-Secure

@@ -6,7 +6,7 @@
 
 #include "lookup.h"
 
-#include <lib/arch/arm64/system.h>
+#include <lib/arch/arm64/memory.h>
 #include <lib/page-table/arch/arm64/mmu.h>
 #include <lib/page-table/internal/bits.h>
 #include <lib/page-table/types.h>
@@ -30,19 +30,27 @@ bool IsPage(uint64_t level, PageTableEntry entry) {
 //
 // The MAIR is installed globally, and maps indices specified in a page table
 // entry to a set of cache attributes.
-size_t ToMairIndex(CacheAttributes cache_attrs) {
-  size_t index = static_cast<size_t>(cache_attrs);
+unsigned int ToMairIndex(CacheAttributes cache_attrs) {
+  unsigned int index = static_cast<unsigned int>(cache_attrs);
   ZX_DEBUG_ASSERT(index < arch::ArmMemoryAttrIndirectionRegister::kNumAttributes);
   return index;
 }
+
+constexpr arch::ArmDeviceMemory kMairAttrDevice =
+    arch::ArmDeviceMemory::kNonGatheringNonReorderingEarlyAck;
+
+constexpr arch::ArmMairNormalAttribute kMairAttrNormal = {
+    .inner = arch::ArmCacheabilityAttribute::kWriteBackReadWriteAllocate,
+    .outer = arch::ArmCacheabilityAttribute::kWriteBackReadWriteAllocate,
+};
 
 }  // namespace
 
 arch::ArmMemoryAttrIndirectionRegister GetArmMemoryAttrIndirectionRegister() {
   return arch::ArmMemoryAttrIndirectionRegister::Get()
       .FromValue(0)
-      .SetAttribute(ToMairIndex(CacheAttributes::kNormal), arch::ArmMemoryAttribute::kNormalCached)
-      .SetAttribute(ToMairIndex(CacheAttributes::kDevice), arch::ArmMemoryAttribute::kDevice_nGnRE);
+      .SetAttribute(ToMairIndex(CacheAttributes::kNormal), kMairAttrNormal)
+      .SetAttribute(ToMairIndex(CacheAttributes::kDevice), kMairAttrDevice);
 }
 
 std::optional<LookupPageResult> LookupPage(MemoryManager& allocator, const PageTableLayout& layout,

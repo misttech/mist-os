@@ -144,19 +144,6 @@ ARCH_ARM64_SYSREG(ArmSctlrEl2, "sctlr_el2");
 struct ArmSctlrEl3 : public arch::SysRegDerived<ArmSctlrEl3, ArmSystemControlRegister> {};
 ARCH_ARM64_SYSREG(ArmSctlrEl3, "sctlr_el3");
 
-// TCR_EL1 Cache Attributes
-//
-// Used in multiple bitfields for TCR_EL1 and TCR_EL2.
-//
-// [arm/v8]: D13.2.120 TCR_EL1, Translation Control Register (EL1)
-// [arm/v8]: D13.2.121 TCR_EL2, Translation Control Register (EL2)
-enum class ArmTcrCacheAttr {
-  kNonCacheable = 0b00,
-  kWriteBackWriteAllocate = 0b01,
-  kWriteThrough = 0b10,
-  kWriteBack = 0b11,
-};
-
 // Granule size values for the TCR_EL1 and TCR_EL2 fields.
 //
 // WARNING: The encodings for the TG0 field and TG1 field are different.
@@ -172,16 +159,6 @@ enum class ArmTcrTg1Value {
   k4KiB = 0b10,
   k16KiB = 0b01,
   k64KiB = 0b11,
-};
-
-// Cache shareability attribute for the TCR_EL1 and TCR_EL2 fields.
-//
-// [arm/v8]: D13.2.120 TCR_EL1, Translation Control Register (EL1)
-// [arm/v8]: D13.2.121 TCR_EL2, Translation Control Register (EL2)
-enum class ArmTcrShareAttr {
-  kNonShareable = 0b00,
-  kOuterShareable = 0b10,
-  kInnerShareable = 0b11,
 };
 
 // Forward declaration, defined below.
@@ -225,19 +202,19 @@ class ArmTcrEl1 : public SysRegBase<ArmTcrEl1> {
   DEF_BIT(37, tbi0);  // TTBR0 Top Byte Ignored
   DEF_BIT(36, as);    // ASID size: 0 = 8-bit, 1 = 16-bit
   // Bit 35 reserved.
-  DEF_ENUM_FIELD(ArmPhysicalAddressSize, 34, 32, ips);  // Intermediate physical address size.
-  DEF_ENUM_FIELD(ArmTcrTg1Value, 31, 30, tg1);          // TTBR1 granule size
-  DEF_ENUM_FIELD(ArmTcrShareAttr, 29, 28, sh1);         // TTBR1 cache sharability
-  DEF_ENUM_FIELD(ArmTcrCacheAttr, 27, 26, orgn1);       // TTBR1 outer cacheability
-  DEF_ENUM_FIELD(ArmTcrCacheAttr, 25, 24, irgn1);       // TTBR1 inner cacheability
-  DEF_BIT(23, epd1);                                    // TTBR1 table walks disabled
-  DEF_BIT(22, a1);                                      // ASID select: 0 = TTBR0, 1 = TTBR1
-  DEF_FIELD(21, 16, t1sz);                              // TTBR0 size offset
-  DEF_ENUM_FIELD(ArmTcrTg0Value, 15, 14, tg0);          // TTBR0 granule size
-  DEF_ENUM_FIELD(ArmTcrShareAttr, 13, 12, sh0);         // TTBR0 cache sharability
-  DEF_ENUM_FIELD(ArmTcrCacheAttr, 11, 10, orgn0);       // TTBR0 outer cacheability
-  DEF_ENUM_FIELD(ArmTcrCacheAttr, 9, 8, irgn0);         // TTBR0 inner cacheability
-  DEF_BIT(7, epd0);                                     // TTBR0 table walks disabled
+  DEF_ENUM_FIELD(ArmPhysicalAddressSize, 34, 32, ips);      // Intermediate physical address size.
+  DEF_ENUM_FIELD(ArmTcrTg1Value, 31, 30, tg1);              // TTBR1 granule size
+  DEF_ENUM_FIELD(ArmShareabilityAttribute, 29, 28, sh1);    // TTBR1 cache sharability
+  DEF_ENUM_FIELD(ArmCacheabilityAttribute, 27, 26, orgn1);  // TTBR1 outer cacheability
+  DEF_ENUM_FIELD(ArmCacheabilityAttribute, 25, 24, irgn1);  // TTBR1 inner cacheability
+  DEF_BIT(23, epd1);                                        // TTBR1 table walks disabled
+  DEF_BIT(22, a1);                                          // ASID select: 0 = TTBR0, 1 = TTBR1
+  DEF_FIELD(21, 16, t1sz);                                  // TTBR0 size offset
+  DEF_ENUM_FIELD(ArmTcrTg0Value, 15, 14, tg0);              // TTBR0 granule size
+  DEF_ENUM_FIELD(ArmShareabilityAttribute, 13, 12, sh0);    // TTBR0 cache sharability
+  DEF_ENUM_FIELD(ArmCacheabilityAttribute, 11, 10, orgn0);  // TTBR0 outer cacheability
+  DEF_ENUM_FIELD(ArmCacheabilityAttribute, 9, 8, irgn0);    // TTBR0 inner cacheability
+  DEF_BIT(7, epd0);                                         // TTBR0 table walks disabled
   // Bit 6 reserved.
   DEF_FIELD(5, 0, t0sz);  // TTBR0 size offset
 };
@@ -269,11 +246,11 @@ struct ArmTranslationControlRegisterEl2Base
   DEF_BIT(22, hd);          // Hardware Dirty state management
   DEF_BIT(21, ha);          // Hardware Access flag updated
   // Bits [20:19] differ between TCR_EL2 and VTCR_EL2.  See below.
-  DEF_ENUM_FIELD(ArmPhysicalAddressSize, 18, 16, ps);  // Physical address size
-  DEF_ENUM_FIELD(ArmTcrTg0Value, 15, 14, tg0);         // TTBR0 Granule size
-  DEF_ENUM_FIELD(ArmTcrShareAttr, 13, 12, sh0);        // TTBR0 Cache sharability
-  DEF_ENUM_FIELD(ArmTcrCacheAttr, 11, 10, orgn0);      // TTBR0 Outer cacheability
-  DEF_ENUM_FIELD(ArmTcrCacheAttr, 9, 8, irgn0);        // TTBR0 Inner cacheability
+  DEF_ENUM_FIELD(ArmPhysicalAddressSize, 18, 16, ps);       // Physical address size
+  DEF_ENUM_FIELD(ArmTcrTg0Value, 15, 14, tg0);              // TTBR0 Granule size
+  DEF_ENUM_FIELD(ArmShareabilityAttribute, 13, 12, sh0);    // TTBR0 Cache sharability
+  DEF_ENUM_FIELD(ArmCacheabilityAttribute, 11, 10, orgn0);  // TTBR0 Outer cacheability
+  DEF_ENUM_FIELD(ArmCacheabilityAttribute, 9, 8, irgn0);    // TTBR0 Inner cacheability
   // Bits [7:6] differ between TCR_EL2 and VTCR_EL2.  See below.
   DEF_FIELD(5, 0, t0sz);  // TTBR0 size offset
 };

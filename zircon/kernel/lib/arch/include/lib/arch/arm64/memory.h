@@ -8,30 +8,69 @@
 #include <lib/arch/internal/bits.h>
 #include <lib/arch/sysreg.h>
 #include <zircon/assert.h>
+#include <zircon/compiler.h>
 
 #include <cstdint>
+#include <optional>
+#include <variant>
 
 #include <hwreg/bitfields.h>
+#include <hwreg/internal.h>
 
 namespace arch {
 
-// Memory attributes.
+// The cache shareability attribute for memory regions, as defined by the
+// TCR_ELx.SHn fields.
 //
-// This is a list of used memory attributes, and not comprehensive.
-enum class ArmMemoryAttribute : uint8_t {
-  // Device memory: non write combining, no reorder, no early ack.
-  kDevice_nGnRnE = 0b0000'0000,
-
-  // Device memory: non write combining, no reorder, early ack.
-  kDevice_nGnRE = 0b0000'0100,
-
-  // Normal Memory, Outer Write-back non-transient Read/Write allocate, Inner
-  // Write-back non-transient Read/Write allocate
-  kNormalCached = 0b1111'1111,
-
-  // Normal memory, Inner/Outer uncached, Write Combined
-  kNormalUncached = 0b0100'0100,
+// [arm/v8]: D13.2.120 TCR_EL1, Translation Control Register (EL1)
+// [arm/v8]: D13.2.121 TCR_EL2, Translation Control Register (EL2)
+enum class ArmShareabilityAttribute {
+  kNone = 0b00,
+  // 0b01 is reserved.
+  kOuter = 0b10,
+  kInner = 0b11,
 };
+
+// The cacheability attribute of a normal memory regions, as defined by the
+// TCR_ELx.IRGNn and TCR_ELx.ORGNn fields.
+//
+// [arm/v8]: D13.2.120 TCR_EL1, Translation Control Register (EL1)
+// [arm/v8]: D13.2.121 TCR_EL2, Translation Control Register (EL2)
+enum class ArmCacheabilityAttribute {
+  kNonCacheable = 0b00,
+  kWriteBackReadWriteAllocate = 0b01,
+  kWriteThroughReadAllocate = 0b10,
+  kWriteBackReadAllocate = 0b11,
+};
+
+// Types of ARM device memory.
+//
+// Numeric values are as expected by MAIR_ELx attribute encodings for device
+// memory.
+enum class ArmDeviceMemory {
+  kNonGatheringNonReorderingNoEarlyAck = 0b00,  // nGnRnE
+  kNonGatheringNonReorderingEarlyAck = 0b01,    // nGnRE
+  kNonGatheringReorderingEarlyAck = 0b10,       // nGRE
+  kGatheringReorderingEarlyAck = 0b11,          // GRE
+};
+
+// Represents a MAIR_ELx attribute value for normal memory.
+//
+// This representation flattens any "transience" distinctions (an
+// underspecified, additional, implementation-defined attribute), and by
+// default refers to the non-transient version. Ditto for certain
+// feature-aware configurations.
+struct ArmMairNormalAttribute {
+  constexpr bool operator==(const ArmMairNormalAttribute& other) const {
+    return inner == other.inner && outer == other.outer;
+  }
+
+  ArmCacheabilityAttribute inner;
+  ArmCacheabilityAttribute outer;
+};
+
+// Represents a MAIR_ELx attribute value.
+using ArmMairAttribute = std::variant<ArmDeviceMemory, ArmMairNormalAttribute>;
 
 // Memory Attribute Indirection Register
 //
@@ -39,42 +78,143 @@ enum class ArmMemoryAttribute : uint8_t {
 // [arm/v8]: D13.2.96  MAIR_EL2, Memory Attribute Indirection Register, EL2
 struct ArmMemoryAttrIndirectionRegister
     : public SysRegDerivedBase<ArmMemoryAttrIndirectionRegister, uint64_t> {
-  DEF_ENUM_FIELD(ArmMemoryAttribute, 63, 56, attr7);
-  DEF_ENUM_FIELD(ArmMemoryAttribute, 55, 48, attr6);
-  DEF_ENUM_FIELD(ArmMemoryAttribute, 47, 40, attr5);
-  DEF_ENUM_FIELD(ArmMemoryAttribute, 39, 32, attr4);
-  DEF_ENUM_FIELD(ArmMemoryAttribute, 31, 24, attr3);
-  DEF_ENUM_FIELD(ArmMemoryAttribute, 23, 16, attr2);
-  DEF_ENUM_FIELD(ArmMemoryAttribute, 15, 8, attr1);
-  DEF_ENUM_FIELD(ArmMemoryAttribute, 7, 0, attr0);
+  DEF_FIELD(63, 56, attr7);
+  DEF_FIELD(55, 48, attr6);
+  DEF_FIELD(47, 40, attr5);
+  DEF_FIELD(39, 32, attr4);
+  DEF_FIELD(31, 24, attr3);
+  DEF_FIELD(23, 16, attr2);
+  DEF_FIELD(15, 8, attr1);
+  DEF_FIELD(7, 0, attr0);
 
-  static constexpr size_t kNumAttributes = 8;
+  static constexpr unsigned int kNumAttributes = 8;
 
-  // Get the ArmMemoryAttribute at the given index.
+  // Get the memory attribute at the given index.
   //
   // TODO(fxbug.dev/78027): Ideally hwreg would support this natively.
-  ArmMemoryAttribute GetAttribute(size_t index) const {
+  constexpr uint8_t GetAttributeValue(unsigned int index) const {
     ZX_DEBUG_ASSERT(index < kNumAttributes);
-    size_t low_bit = index * kAttributeBits;
-    size_t high_bit = low_bit + kAttributeBits - 1;
-    return static_cast<ArmMemoryAttribute>(internal::ExtractBits(high_bit, low_bit, reg_value()));
+    unsigned int low_bit = index * kAttributeBits;
+    unsigned int high_bit = low_bit + kAttributeBits - 1;
+    return static_cast<uint8_t>(internal::ExtractBits(high_bit, low_bit, reg_value()));
   }
 
-  // Set the ArmMemoryAttribute at the given index.
+  constexpr std::optional<ArmMairAttribute> GetAttribute(unsigned int index) const {
+    return AttributeFromValue(GetAttributeValue(index));
+  }
+
+  // Set the memory attribute at the given index.
   //
   // TODO(fxbug.dev/78027): Ideally hwreg would support this natively.
-  ArmMemoryAttrIndirectionRegister& SetAttribute(size_t index, ArmMemoryAttribute value) {
+  constexpr ArmMemoryAttrIndirectionRegister& SetAttributeValue(unsigned int index, uint8_t value) {
     ZX_DEBUG_ASSERT(index < kNumAttributes);
 
-    size_t low_bit = index * kAttributeBits;
-    size_t high_bit = low_bit + kAttributeBits - 1;
+    unsigned int low_bit = index * kAttributeBits;
+    unsigned int high_bit = low_bit + kAttributeBits - 1;
     set_reg_value(
         internal::UpdateBits(high_bit, low_bit, reg_value(), static_cast<uint64_t>(value)));
     return *this;
   }
 
+  constexpr ArmMemoryAttrIndirectionRegister& SetAttribute(unsigned int index,
+                                                           ArmMairAttribute attr) {
+    return SetAttributeValue(index, AttributeToValue(attr));
+  }
+
+  // Converts structured attribute to the associated raw value.
+  static constexpr uint8_t AttributeToValue(const ArmMairAttribute& attr) {
+    uint8_t value = 0;
+    hwreg::internal::Visit([&value](auto&& mair_attr) { value = AttributeToValue(mair_attr); },
+                           attr);
+    return value;
+  }
+
+  // Converts a raw attribute value to the structured version.
+  //
+  // Bizarrely, there are valid attribute encodings that correspond to
+  // currently impossible hardware configurations (limited by what knobs are
+  // available on TCR_ELx); in this case, std::nullopt is returned.
+  //
+  // [arm/v8]: D13.2.95  MAIR_EL1, Memory Attribute Indirection Register, EL1
+  // [arm/v8]: D13.2.96  MAIR_EL2, Memory Attribute Indirection Register, EL2
+  static constexpr std::optional<ArmMairAttribute> AttributeFromValue(uint8_t value) {
+    using Cacheability = ArmCacheabilityAttribute;
+
+    if ((value & 0b0000'1100) == value || (value & 0b0000'1101) == value) {
+      return static_cast<ArmDeviceMemory>(value >> 2);
+    }
+
+    auto cacheability = [](uint8_t bits) -> std::optional<Cacheability> {
+      if (bits == 0b0100) {
+        return Cacheability::kNonCacheable;
+      }
+      bool write_back = (bits & 0b0100) != 0;
+      bool read_allocate = (bits & 0b0010) != 0;
+      bool write_allocate = (bits & 0b0001) != 0;
+      if (write_back) {
+        if (read_allocate && write_allocate) {
+          return Cacheability::kWriteBackReadWriteAllocate;
+        }
+        if (read_allocate) {
+          return Cacheability::kWriteBackReadAllocate;
+        }
+      } else if (read_allocate && !write_allocate) {
+        return Cacheability::kWriteThroughReadAllocate;
+      }
+      return {};
+    };
+
+    uint8_t outer_attr = value >> 4;
+    uint8_t inner_attr = value & 0b1111;
+    if (outer_attr != 0 && inner_attr != 0) {
+      std::optional inner = cacheability(inner_attr);
+      std::optional outer = cacheability(outer_attr);
+      if (!inner || !outer) {
+        return {};
+      }
+      return ArmMairNormalAttribute{.inner = *inner, .outer = *outer};
+    }
+
+    if (value == 0b0100'0000) {
+      return ArmMairNormalAttribute{
+          .inner = Cacheability::kWriteThroughReadAllocate,
+          .outer = Cacheability::kWriteThroughReadAllocate,
+      };
+    }
+    if (value == 0b1010'0000) {
+      return ArmMairNormalAttribute{
+          .inner = Cacheability::kWriteBackReadWriteAllocate,
+          .outer = Cacheability::kWriteBackReadWriteAllocate,
+      };
+    }
+    return {};
+  }
+
  private:
-  static constexpr size_t kAttributeBits = 8;  // Width of each attribute (in bits).
+  static constexpr unsigned int kAttributeBits = 8;  // Width of each attribute (in bits).
+
+  static constexpr uint8_t AttributeToValue(ArmDeviceMemory device) {
+    return static_cast<uint8_t>(static_cast<unsigned int>(device) << 2);
+  }
+
+  // [arm/v8]: D13.2.95  MAIR_EL1, Memory Attribute Indirection Register, EL1
+  // [arm/v8]: D13.2.96  MAIR_EL2, Memory Attribute Indirection Register, EL2
+  static constexpr uint8_t AttributeToValue(const ArmMairNormalAttribute& normal) {
+    auto domain_bits = [](ArmCacheabilityAttribute attr) {
+      switch (attr) {
+        case ArmCacheabilityAttribute::kNonCacheable:
+          return 0b0100u;
+        case ArmCacheabilityAttribute::kWriteBackReadWriteAllocate:
+          return 0b1111u;
+        case ArmCacheabilityAttribute::kWriteThroughReadAllocate:
+          return 0b1010u;
+        case ArmCacheabilityAttribute::kWriteBackReadAllocate:
+          return 0b1110u;
+      }
+      __UNREACHABLE;
+    };
+    return static_cast<uint8_t>((domain_bits(normal.outer) << 4) | domain_bits(normal.inner));
+  }
 };
 
 struct ArmMairEl1 : public arch::SysRegDerived<ArmMairEl1, ArmMemoryAttrIndirectionRegister> {};

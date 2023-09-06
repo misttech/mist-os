@@ -226,10 +226,10 @@ constexpr bool IsVariant<std::variant<Variants...>> = true;
 
 // Forward declaration.
 template <typename F, typename V, typename... A, size_t... I>
-void VisitEach(F&& f, V&& v, A&&... args, std::index_sequence<I...>);
+constexpr void VisitEach(F&& f, V&& v, A&&... args, std::index_sequence<I...>);
 
 template <typename F, typename V, typename... A>
-void Visit(F&& f, V&& v, A&&... args) {
+constexpr void Visit(F&& f, V&& v, A&&... args) {
   if constexpr (IsVariant<std::decay_t<V>>) {
     constexpr auto n = std::variant_size_v<std::decay_t<V>>;
     VisitEach(std::forward<F>(f), std::forward<V>(v), std::forward<A>(args)...,
@@ -243,7 +243,7 @@ void Visit(F&& f, V&& v, A&&... args) {
 // the variant indices.  Forward the remaining arguments to a Visit call using
 // the selected variant.
 template <typename F, typename V, typename... A, size_t... I>
-void VisitEach(F&& f, V&& v, A&&... args, std::index_sequence<I...>) {
+constexpr void VisitEach(F&& f, V&& v, A&&... args, std::index_sequence<I...>) {
   static_assert(sizeof...(I) == std::variant_size_v<std::decay_t<V>>);
   [[maybe_unused]] bool visited_one =  // Statically always true.
       ((v.index() == I

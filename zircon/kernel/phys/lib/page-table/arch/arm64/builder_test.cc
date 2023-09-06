@@ -161,10 +161,12 @@ TEST(Builder, CacheAttributes) {
   // Ensure each one has the correct attributes.
   arch::ArmMemoryAttrIndirectionRegister mair =
       AddressSpaceBuilder::GetArmMemoryAttrIndirectionRegister();
-  EXPECT_EQ(mair.GetAttribute(device_pte.as_page().lower_attrs().attr_indx()),
-            arch::ArmMemoryAttribute::kDevice_nGnRE);
-  EXPECT_EQ(mair.GetAttribute(normal_pte.as_page().lower_attrs().attr_indx()),
-            arch::ArmMemoryAttribute::kNormalCached);
+  EXPECT_EQ(mair.GetAttributeValue(
+                static_cast<unsigned int>(device_pte.as_page().lower_attrs().attr_indx())),
+            0b0000'0100u);
+  EXPECT_EQ(mair.GetAttributeValue(
+                static_cast<unsigned int>(normal_pte.as_page().lower_attrs().attr_indx())),
+            0b1111'1111u);
 }
 
 }  // namespace

@@ -159,7 +159,7 @@ class RegisterBase {
   constexpr ValueType reg_value() const { return reg_value_; }
   ValueType* reg_value_ptr() { return &reg_value_; }
   const ValueType* reg_value_ptr() const { return &reg_value_; }
-  SelfType& set_reg_value(IntType value) {
+  constexpr SelfType& set_reg_value(IntType value) {
     reg_value_ = value;
     return *static_cast<SelfType*>(this);
   }
