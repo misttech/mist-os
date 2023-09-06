@@ -10,7 +10,7 @@
 //! These should be aligned with the library comments in sdk/fidl/fuchsia.io/io.fidl.
 
 use {
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx, static_assertions::assert_eq_size,
+    fidl_fuchsia_io as fio, fuchsia_zircon_status as zx, static_assertions::assert_eq_size,
     std::borrow::Borrow, std::fmt::Display, std::ops::Deref, thiserror::Error,
 };
 
@@ -33,7 +33,7 @@ pub struct Name(String);
 pub const MAX_NAME_LENGTH: usize = fio::MAX_NAME_LENGTH as usize;
 assert_eq_size!(u64, usize);
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum ParseNameError {
     #[error("name `{0}` is too long")]
     TooLong(String),
@@ -137,7 +137,7 @@ impl Borrow<str> for Name {
 mod tests {
     use {super::*, assert_matches::assert_matches};
 
-    #[fuchsia::test]
+    #[test]
     fn test_parse_name() {
         assert_matches!(parse_name("a".repeat(1000)), Err(ParseNameError::TooLong(_)));
         assert_matches!(
@@ -162,7 +162,7 @@ mod tests {
         assert_matches!(parse_name("abc".to_string()), Ok(Name(name)) if &name == "abc");
     }
 
-    #[fuchsia::test]
+    #[test]
     fn test_validate_name() {
         assert_matches!(validate_name(&"a".repeat(1000)), Err(ParseNameError::TooLong(_)));
         assert_matches!(
@@ -183,20 +183,20 @@ mod tests {
         assert_matches!(validate_name("abc"), Ok(()));
     }
 
-    #[fuchsia::test]
+    #[test]
     fn test_try_from() {
         assert_matches!(Name::try_from("a".repeat(1000)), Err(ParseNameError::TooLong(_)));
         assert_matches!(Name::try_from("abc".to_string()), Ok(Name(name)) if &name == "abc");
     }
 
-    #[fuchsia::test]
+    #[test]
     fn test_into() {
         let name = Name::try_from("a".to_string()).unwrap();
         let name: String = name.into();
         assert_eq!(name, "a".to_string());
     }
 
-    #[fuchsia::test]
+    #[test]
     fn test_deref() {
         let name = Name::try_from("a".to_string()).unwrap();
         let name: &str = &name;

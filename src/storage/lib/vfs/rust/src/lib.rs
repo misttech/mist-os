@@ -15,7 +15,7 @@ pub mod test_utils;
 pub mod common;
 
 pub mod execution_scope;
-pub mod name;
+pub use ::name;
 pub mod path;
 
 pub mod directory;
