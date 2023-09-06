@@ -36,6 +36,8 @@ pub struct RemoteFs {
     // TODO(fxbug.dev/131807): At the time of writing, package directories do not have unique IDs so
     // this *must* be false in that case.
     use_remote_ids: bool,
+
+    root_proxy: fio::DirectorySynchronousProxy,
 }
 
 impl RemoteFs {
@@ -50,11 +52,48 @@ impl RemoteFs {
     }
 }
 
+const REMOTE_FS_MAGIC: u32 = u32::from_be_bytes(*b"f.io");
+
 impl FileSystemOps for RemoteFs {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
-        const REMOTE_FS_MAGIC: u32 = u32::from_be_bytes(*b"f.io");
+        let (status, info) =
+            self.root_proxy.query_filesystem(zx::Time::INFINITE).map_err(|_| errno!(EIO))?;
+        // Not all remote filesystems support `QueryFilesystem`, many return ZX_ERR_NOT_SUPPORTED.
+        if status == 0 {
+            if let Some(info) = info {
+                let (total_blocks, free_blocks) = if info.block_size > 0 {
+                    (
+                        (info.total_bytes / u64::from(info.block_size))
+                            .try_into()
+                            .unwrap_or(i64::MAX),
+                        ((info.total_bytes.saturating_sub(info.used_bytes))
+                            / u64::from(info.block_size))
+                        .try_into()
+                        .unwrap_or(i64::MAX),
+                    )
+                } else {
+                    (0, 0)
+                };
+
+                return Ok(statfs {
+                    f_bsize: info.block_size.into(),
+                    f_blocks: total_blocks,
+                    f_bfree: free_blocks,
+                    f_bavail: free_blocks,
+                    f_files: info.total_nodes.try_into().unwrap_or(i64::MAX),
+                    f_ffree: (info.total_nodes.saturating_sub(info.used_nodes))
+                        .try_into()
+                        .unwrap_or(i64::MAX),
+                    f_fsid: info.fs_id.try_into().unwrap_or(0),
+                    f_namelen: info.max_filename_size.try_into().unwrap_or(0),
+                    f_frsize: info.block_size.into(),
+                    ..statfs::default(REMOTE_FS_MAGIC)
+                });
+            }
+        }
         Ok(statfs::default(REMOTE_FS_MAGIC))
     }
+
     fn name(&self) -> &'static FsStr {
         b"remote"
     }
@@ -131,9 +170,13 @@ impl RemoteFs {
             match Zxio::create_with_on_representation(client_end.into(), Some(&mut attrs)) {
                 Err(zx::Status::NOT_SUPPORTED) => {
                     // Fall back to open.
+                    let (client_end, server_end) = zx::Channel::create();
+                    root_proxy
+                        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server_end.into())
+                        .map_err(|_| errno!(EIO))?;
                     let remote_node = RemoteNode {
                         zxio: Arc::new(
-                            Zxio::create(root_proxy.into_channel().into())
+                            Zxio::create(client_end.into())
                                 .map_err(|status| from_status_like_fdio!(status))?,
                         ),
                         rights,
@@ -165,7 +208,7 @@ impl RemoteFs {
         let fs = FileSystem::new(
             kernel,
             CacheMode::Cached,
-            RemoteFs { supports_open2, use_remote_ids },
+            RemoteFs { supports_open2, use_remote_ids, root_proxy },
             options,
         );
         if let Some(context) = context {
@@ -1859,6 +1902,42 @@ mod test {
                 .lookup_child(&current_task, &mut context, b"file")
                 .expect("lookup_child failed");
             assert_eq!(child.entry.node.info().mode, MODE | FileMode::ALLOW_ALL);
+        })
+        .await;
+
+        fixture.close().await;
+    }
+
+    #[::fuchsia::test]
+    async fn test_statfs() {
+        let fixture = TestFixture::new().await;
+        let (server, client) = zx::Channel::create();
+        fixture
+            .root()
+            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
+            .expect("clone failed");
+
+        let (kernel, current_task) = create_kernel_and_task();
+        fasync::unblock(move || {
+            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+            let fs = RemoteFs::new_fs(
+                &kernel,
+                client,
+                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                rights,
+            )
+            .expect("new_fs failed");
+
+            let statfs = fs.statfs(&current_task).expect("statfs failed");
+            assert_eq!(statfs.f_type, super::REMOTE_FS_MAGIC as i64);
+            assert!(statfs.f_bsize > 0);
+            assert!(statfs.f_blocks > 0);
+            assert!(statfs.f_bfree > 0 && statfs.f_bfree <= statfs.f_blocks);
+            assert!(statfs.f_files > 0);
+            assert!(statfs.f_ffree > 0 && statfs.f_ffree <= statfs.f_files);
+            assert!(statfs.f_fsid != 0);
+            assert!(statfs.f_namelen > 0);
+            assert!(statfs.f_frsize > 0);
         })
         .await;
 
