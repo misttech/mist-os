@@ -319,13 +319,21 @@ pub(crate) struct SendBufferWithZirconSocket {
 
 impl Buffer for SendBufferWithZirconSocket {
     fn limits(&self) -> BufferLimits {
-        let Self { zx_socket_capacity, socket, ready_to_send, notifier: _ } = self;
+        let Self { zx_socket_capacity, socket, ready_to_send, notifier } = self;
         let info = socket.info().expect("failed to get socket info");
 
         let BufferLimits { capacity: ready_to_send_capacity, len: ready_to_send_len } =
             ready_to_send.limits();
         let len = info.rx_buf_size + ready_to_send_len;
         let capacity = *zx_socket_capacity + ready_to_send_capacity;
+
+        // Core checks for limits whenever `tcp::do_send` is hit. If it sees
+        // that there's no data in the send buffer, it'll end its attempt to
+        // send so we must make sure the watcher in the send task is hit when we
+        // observe zero bytes on the zircon socket from here.
+        if len == 0 {
+            notifier.schedule();
+        }
         BufferLimits { capacity, len }
     }
 
@@ -1810,5 +1818,34 @@ mod tests {
             let _: usize = peer.write(&LARGE_PAYLOAD[..]).expect("can write");
             sbuf.poll();
         }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn send_buffer_installs_notifier_on_empty_limits_check() {
+        let (local, peer) = zx::Socket::create_stream();
+        let notifier = NeedsDataNotifier::default();
+        let mut watcher = notifier.watcher();
+        let sbuf = SendBufferWithZirconSocket::new(
+            Arc::new(local),
+            notifier,
+            SendBufferWithZirconSocket::MAX_CAPACITY,
+        );
+        // Watcher starts without pending data.
+        assert_eq!(futures::poll!(watcher.next()), futures::task::Poll::Pending);
+
+        // Check initial limits, there's no data and the watcher should be
+        // asserted once.
+        let BufferLimits { len, capacity: _ } = sbuf.limits();
+        assert_eq!(len, 0);
+        assert_eq!(futures::poll!(watcher.next()), futures::task::Poll::Ready(Some(())));
+        assert_eq!(futures::poll!(watcher.next()), futures::task::Poll::Pending);
+
+        // Send data from the peer. Limits returns the available data and
+        // doesn't wake the watcher.
+        let peer_data = [1, 2, 3, 4];
+        assert_eq!(peer.write(&peer_data[..]).expect("write to peer"), peer_data.len());
+        let BufferLimits { len, capacity: _ } = sbuf.limits();
+        assert_eq!(len, peer_data.len());
+        assert_eq!(futures::poll!(watcher.next()), futures::task::Poll::Pending);
     }
 }
