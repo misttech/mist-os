@@ -3,22 +3,16 @@
 // found in the LICENSE file.
 
 use {
-    crate::builtin::capability::BuiltinCapability,
     anyhow::{anyhow, Error},
-    async_trait::async_trait,
-    cm_types::Name,
     fidl_fuchsia_boot as fboot,
     fuchsia_zbi::{ZbiParser, ZbiParserError, ZbiResult, ZbiType::StorageBootfsFactory},
     fuchsia_zircon::{self as zx, HandleBased},
     futures::prelude::*,
     lazy_static::lazy_static,
-    routing::capability_source::InternalCapability,
     std::{collections::HashMap, convert::TryInto, sync::Arc},
 };
 
 lazy_static! {
-    static ref FACTORY_ITEMS_CAPABILITY_NAME: Name = "fuchsia.boot.FactoryItems".parse().unwrap();
-
     // The default rights for an immutable VMO. For details see
     // https://fuchsia.dev/fuchsia-src/reference/syscalls/vmo_create#description.
     static ref IMMUTABLE_VMO_RIGHTS: zx::Rights = zx::Rights::DUPLICATE
@@ -79,14 +73,8 @@ impl FactoryItems {
 
         Ok(Arc::new(FactoryItems { items: parsed_items }))
     }
-}
 
-#[async_trait]
-impl BuiltinCapability for FactoryItems {
-    const NAME: &'static str = "FactoryItems";
-    type Marker = fboot::FactoryItemsMarker;
-
-    async fn serve(
+    pub async fn serve(
         self: Arc<Self>,
         mut stream: fboot::FactoryItemsRequestStream,
     ) -> Result<(), Error> {
@@ -100,10 +88,6 @@ impl BuiltinCapability for FactoryItems {
             };
         }
         Ok(())
-    }
-
-    fn matches_routed_capability(&self, capability: &InternalCapability) -> bool {
-        capability.matches_protocol(&FACTORY_ITEMS_CAPABILITY_NAME)
     }
 }
 

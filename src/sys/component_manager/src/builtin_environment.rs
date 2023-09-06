@@ -419,7 +419,6 @@ pub struct BuiltinEnvironment {
     pub kernel_stats: Option<Arc<KernelStats>>,
     pub read_only_log: Option<Arc<ReadOnlyLog>>,
     pub write_only_log: Option<Arc<WriteOnlyLog>>,
-    pub factory_items_service: Option<Arc<FactoryItems>>,
     pub items_service: Option<Arc<Items>>,
     pub mexec_resource: Option<Arc<MexecResource>>,
     pub mmio_resource: Option<Arc<MmioResource>>,
@@ -554,16 +553,18 @@ impl BuiltinEnvironment {
             boot_args.clone().serve(stream).boxed()
         });
 
-        let (factory_items_service, items_service) = match zbi_parser {
-            None => (None, None),
+        let items_service = match zbi_parser {
+            None => None,
             Some(mut zbi_parser) => {
                 let factory_items = FactoryItems::new(&mut zbi_parser)?;
-                model.root().hooks.install(factory_items.hooks()).await;
+                sandbox_builder.add_builtin_protocol_if_enabled::<fboot::FactoryItemsMarker>(
+                    move |stream| factory_items.clone().serve(stream).boxed(),
+                );
 
                 let items = Items::new(zbi_parser)?;
                 model.root().hooks.install(items.hooks()).await;
 
-                (Some(factory_items), Some(items))
+                Some(items)
             }
         };
 
@@ -944,7 +945,6 @@ impl BuiltinEnvironment {
             kernel_stats,
             read_only_log,
             write_only_log,
-            factory_items_service,
             items_service,
             hypervisor_resource,
             info_resource,
