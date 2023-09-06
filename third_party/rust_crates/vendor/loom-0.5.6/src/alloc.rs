@@ -2,7 +2,6 @@
 
 use crate::rt;
 
-#[doc(no_inline)]
 pub use std::alloc::Layout;
 
 /// Allocate memory with the global allocator.

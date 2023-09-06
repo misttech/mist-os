@@ -50,7 +50,6 @@ impl Execution {
         max_threads: usize,
         max_branches: usize,
         preemption_bound: Option<usize>,
-        exploring: bool,
     ) -> Execution {
         let id = Id::new();
         let threads = thread::Set::new(id, max_threads);
@@ -60,7 +59,7 @@ impl Execution {
 
         Execution {
             id,
-            path: Path::new(max_branches, preemption_bound, exploring),
+            path: Path::new(max_branches, preemption_bound),
             threads,
             lazy_statics: lazy_static::Set::new(),
             objects: object::Store::with_capacity(max_branches),

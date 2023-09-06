@@ -4,7 +4,6 @@ pub use crate::rt::thread::AccessError;
 pub use crate::rt::yield_now;
 use crate::rt::{self, Execution, Location};
 
-#[doc(no_inline)]
 pub use std::thread::panicking;
 
 use std::marker::PhantomData;
@@ -82,7 +81,6 @@ pub struct LocalKey<T> {
 #[derive(Debug)]
 pub struct Builder {
     name: Option<String>,
-    stack_size: Option<usize>,
 }
 
 static CURRENT_THREAD_KEY: LocalKey<Thread> = LocalKey {
@@ -129,7 +127,7 @@ where
     F: 'static,
     T: 'static,
 {
-    spawn_internal(f, None, None, location!())
+    spawn_internal(f, None, location!())
 }
 
 /// Mock implementation of `std::thread::park`.
@@ -143,12 +141,7 @@ pub fn park() {
     rt::park(location!());
 }
 
-fn spawn_internal<F, T>(
-    f: F,
-    name: Option<String>,
-    stack_size: Option<usize>,
-    location: Location,
-) -> JoinHandle<T>
+fn spawn_internal<F, T>(f: F, name: Option<String>, location: Location) -> JoinHandle<T>
 where
     F: FnOnce() -> T,
     F: 'static,
@@ -160,7 +153,7 @@ where
     let id = {
         let name = name.clone();
         let result = result.clone();
-        rt::spawn(stack_size, move || {
+        rt::spawn(move || {
             rt::execution(|execution| {
                 init_current(execution, name);
             });
@@ -187,10 +180,7 @@ impl Builder {
     // not either, as it's a mock version of the `std` type.
     #[allow(clippy::new_without_default)]
     pub fn new() -> Builder {
-        Builder {
-            name: None,
-            stack_size: None,
-        }
+        Builder { name: None }
     }
 
     /// Names the thread-to-be. Currently the name is used for identification
@@ -202,9 +192,7 @@ impl Builder {
     }
 
     /// Sets the size of the stack (in bytes) for the new thread.
-    pub fn stack_size(mut self, size: usize) -> Builder {
-        self.stack_size = Some(size);
-
+    pub fn stack_size(self, _size: usize) -> Builder {
         self
     }
 
@@ -217,7 +205,7 @@ impl Builder {
         F: Send + 'static,
         T: Send + 'static,
     {
-        Ok(spawn_internal(f, self.name, self.stack_size, location!()))
+        Ok(spawn_internal(f, self.name, location!()))
     }
 }
 

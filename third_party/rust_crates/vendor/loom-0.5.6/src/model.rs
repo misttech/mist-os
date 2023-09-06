@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use tracing::{info, subscriber};
 use tracing_subscriber::{fmt, EnvFilter};
 
-const DEFAULT_MAX_THREADS: usize = 5;
+const DEFAULT_MAX_THREADS: usize = 4;
 const DEFAULT_MAX_BRANCHES: usize = 1_000;
 
 /// Configure a model
@@ -51,10 +51,6 @@ pub struct Builder {
     ///
     /// Defaults to `LOOM_CHECKPOINT_INTERVAL` environment variable.
     pub checkpoint_interval: usize,
-
-    /// When `true` loom won't start state exploration until `explore_state` is
-    /// called.
-    pub expect_explicit_explore: bool,
 
     /// When `true`, locations are captured on each loom operation.
     ///
@@ -121,7 +117,6 @@ impl Builder {
             preemption_bound,
             checkpoint_file,
             checkpoint_interval,
-            expect_explicit_explore: false,
             location,
             log,
         }
@@ -141,12 +136,8 @@ impl Builder {
         let mut i = 1;
         let mut _span = tracing::info_span!("iter", message = i).entered();
 
-        let mut execution = Execution::new(
-            self.max_threads,
-            self.max_branches,
-            self.preemption_bound,
-            !self.expect_explicit_explore,
-        );
+        let mut execution =
+            Execution::new(self.max_threads, self.max_branches, self.preemption_bound);
         let mut scheduler = Scheduler::new(self.max_threads);
 
         if let Some(ref path) = self.checkpoint_file {

@@ -1,14 +1,20 @@
 #![allow(deprecated)]
 
-use crate::rt::Execution;
+use crate::rt::{thread, Execution};
 
 use generator::{self, Generator, Gn};
 use scoped_tls::scoped_thread_local;
 use std::cell::RefCell;
 use std::collections::VecDeque;
+use std::fmt;
 
 pub(crate) struct Scheduler {
-    max_threads: usize,
+    /// Threads
+    threads: Vec<Thread>,
+
+    next_thread: usize,
+
+    queued_spawn: VecDeque<Box<dyn FnOnce()>>,
 }
 
 type Thread = Generator<'static, Option<Box<dyn FnOnce()>>, ()>;
@@ -17,21 +23,20 @@ scoped_thread_local! {
     static STATE: RefCell<State<'_>>
 }
 
-struct QueuedSpawn {
-    f: Box<dyn FnOnce()>,
-    stack_size: Option<usize>,
-}
-
 struct State<'a> {
     execution: &'a mut Execution,
-    queued_spawn: &'a mut VecDeque<QueuedSpawn>,
+    queued_spawn: &'a mut VecDeque<Box<dyn FnOnce()>>,
 }
 
 impl Scheduler {
     /// Create an execution
     pub(crate) fn new(capacity: usize) -> Scheduler {
+        let threads = spawn_threads(capacity);
+
         Scheduler {
-            max_threads: capacity,
+            threads,
+            next_thread: 0,
+            queued_spawn: VecDeque::new(),
         }
     }
 
@@ -70,54 +75,48 @@ impl Scheduler {
         assert!(switch.poll(&mut cx).is_ready());
     }
 
-    pub(crate) fn spawn(stack_size: Option<usize>, f: Box<dyn FnOnce()>) {
-        Self::with_state(|state| state.queued_spawn.push_back(QueuedSpawn { stack_size, f }));
+    pub(crate) fn spawn(f: Box<dyn FnOnce()>) {
+        Self::with_state(|state| state.queued_spawn.push_back(f));
     }
 
     pub(crate) fn run<F>(&mut self, execution: &mut Execution, f: F)
     where
         F: FnOnce() + Send + 'static,
     {
-        let mut threads = Vec::new();
-        threads.push(spawn_thread(Box::new(f), None));
-        threads[0].resume();
+        self.next_thread = 1;
+        self.threads[0].set_para(Some(Box::new(f)));
+        self.threads[0].resume();
 
         loop {
-            if execution.threads.is_complete() {
-                for thread in &mut threads {
-                    thread.resume();
-                    assert!(thread.is_done());
-                }
+            if !execution.threads.is_active() {
                 return;
             }
 
             let active = execution.threads.active_id();
 
-            let mut queued_spawn = Self::tick(&mut threads[active.as_usize()], execution);
+            self.tick(active, execution);
 
-            while let Some(th) = queued_spawn.pop_front() {
-                assert!(threads.len() < self.max_threads);
+            while let Some(th) = self.queued_spawn.pop_front() {
+                let thread_id = self.next_thread;
+                self.next_thread += 1;
 
-                let thread_id = threads.len();
-                let QueuedSpawn { f, stack_size } = th;
-
-                threads.push(spawn_thread(f, stack_size));
-                threads[thread_id].resume();
+                self.threads[thread_id].set_para(Some(th));
+                self.threads[thread_id].resume();
             }
         }
     }
 
-    fn tick(thread: &mut Thread, execution: &mut Execution) -> VecDeque<QueuedSpawn> {
-        let mut queued_spawn = VecDeque::new();
+    fn tick(&mut self, thread: thread::Id, execution: &mut Execution) {
         let state = RefCell::new(State {
             execution,
-            queued_spawn: &mut queued_spawn,
+            queued_spawn: &mut self.queued_spawn,
         });
 
+        let threads = &mut self.threads;
+
         STATE.set(unsafe { transmute_lt(&state) }, || {
-            thread.resume();
+            threads[thread.as_usize()].resume();
         });
-        queued_spawn
     }
 
     fn with_state<F, R>(f: F) -> R
@@ -132,28 +131,30 @@ impl Scheduler {
     }
 }
 
-fn spawn_thread(f: Box<dyn FnOnce()>, stack_size: Option<usize>) -> Thread {
-    let body = move || {
-        loop {
-            let f: Option<Option<Box<dyn FnOnce()>>> = generator::yield_(());
+impl fmt::Debug for Scheduler {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("Schedule")
+            .field("threads", &self.threads)
+            .finish()
+    }
+}
 
-            if let Some(f) = f {
-                generator::yield_with(());
-                f.unwrap()();
-            } else {
-                break;
-            }
-        }
+fn spawn_threads(n: usize) -> Vec<Thread> {
+    (0..n)
+        .map(|_| {
+            let mut g = Gn::new(move || {
+                loop {
+                    let f: Option<Box<dyn FnOnce()>> = generator::yield_(()).unwrap();
+                    generator::yield_with(());
+                    f.unwrap()();
+                }
 
-        generator::done!();
-    };
-    let mut g = match stack_size {
-        Some(stack_size) => Gn::new_opt(stack_size, body),
-        None => Gn::new(body),
-    };
-    g.resume();
-    g.set_para(Some(f));
-    g
+                // done!();
+            });
+            g.resume();
+            g
+        })
+        .collect()
 }
 
 unsafe fn transmute_lt<'a, 'b>(state: &'a RefCell<State<'b>>) -> &'a RefCell<State<'static>> {
