@@ -276,10 +276,10 @@ impl Listen {
                     rwnd,
                     Options {
                         mss: Some(smss),
-                        /// Per RFC 7323 Section 2.3:
-                        ///   If a TCP receives a <SYN> segment containing a
-                        ///   Window Scale option, it SHOULD send its own Window
-                        ///   Scale option in the <SYN,ACK> segment.
+                        // Per RFC 7323 Section 2.3:
+                        //   If a TCP receives a <SYN> segment containing a
+                        //   Window Scale option, it SHOULD send its own Window
+                        //   Scale option in the <SYN,ACK> segment.
                         window_scale: options.window_scale.map(|_| rcv_wnd_scale),
                     },
                 ),

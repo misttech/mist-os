@@ -36,8 +36,8 @@ pub(crate) struct DequeueState<Meta, Buffer> {
 impl<Meta, Buffer> Default for DequeueState<Meta, Buffer> {
     fn default() -> DequeueState<Meta, Buffer> {
         DequeueState {
-            /// Make sure we can dequeue up to `MAX_BATCH_SIZE` frames without
-            /// needing to reallocate.
+            // Make sure we can dequeue up to `MAX_BATCH_SIZE` frames without
+            // needing to reallocate.
             dequeued_frames: VecDeque::with_capacity(MAX_BATCH_SIZE),
         }
     }
