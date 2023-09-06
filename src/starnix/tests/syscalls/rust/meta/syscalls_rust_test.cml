@@ -1,0 +1,13 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/starnix/containers/debian/meta/debian_container_for_test.shard.cml",
+        "//src/starnix/tests/starnix_test.shard.cml",
+    ],
+    program: {
+        binary: "data/tests/syscalls_rust_test_bin",
+        uid: "0",
+    },
+}

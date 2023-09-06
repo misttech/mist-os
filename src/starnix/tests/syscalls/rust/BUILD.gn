@@ -1,0 +1,54 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_test.gni")
+import("//build/testing/host_test.gni")
+import("//src/starnix/kernel/starnix.gni")
+import("//src/starnix/tests/build/starnix_linux_test_component.gni")
+import("//src/starnix/tests/starnix_test_subpackages.gni")
+
+group("tests") {
+  testonly = true
+  deps = [ ":starnix_syscalls_rust_tests" ]
+  if (host_os == "linux" && has_board) {
+    deps += [
+      # These are Linux tests, so we can run them as host tests on our host Linux bot.
+      ":syscalls_rust_host_tests($host_toolchain)",
+    ]
+  }
+}
+
+rustc_test("syscalls_rust_test_bin") {
+  edition = "2021"
+  source_root = "src/lib.rs"
+  sources = [ source_root ]
+
+  # TODO(https://fxbug.dev/297293167) enable ASan instrumentation for Linux binaries in Starnix
+  exclude_toolchain_tags = [ "asan" ]
+}
+
+starnix_linux_test_component("syscalls_rust_test") {
+  test_label = ":syscalls_rust_test_bin"
+  test_binary = "syscalls_rust_test_bin"
+  test_type = "starnix"
+}
+
+fuchsia_test_package("starnix_syscalls_rust_tests") {
+  test_components = [ ":syscalls_rust_test" ]
+
+  subpackages = starnix_test_subpackages
+  subpackages += [ "//src/starnix/containers/debian:debian_package" ]
+
+  deps = [ "//src/lib/testing/expectation:expectation_comparer" ]
+}
+
+if (is_host && has_board) {
+  host_test("syscalls_rust_host_tests") {
+    binary_path =
+        get_label_info(":syscalls_rust_test_bin($target_linux_toolchain)",
+                       "root_out_dir") + "/syscalls_rust_test_bin"
+    deps = [ ":syscalls_rust_test_bin($target_linux_toolchain)" ]
+  }
+}
