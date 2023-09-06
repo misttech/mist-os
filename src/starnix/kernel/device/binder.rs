@@ -748,14 +748,14 @@ impl<'a> BinderProcessGuard<'a> {
         self,
         target_process: &Arc<BinderProcess>,
         object: Arc<BinderObject>,
+        actions: &mut RefCountActions,
     ) -> Handle {
-        let mut actions = RefCountActions::default();
         // Increment the strong reference count of this object, while keeping the lock on the
         // source process. This ensures the object cannot be release before being installed into
         // the handle table to the target process. Moreover, this doesn't creates any new refcount
         // operation, as `HandleTable::insert_for_transaction` also increase the strong reference
         // count of the object.
-        let guard = object.inc_strong(&mut actions);
+        let guard = object.inc_strong(actions);
 
         // Now that the object has at least one strong reference, release the lock on the source
         // process, so that the lock on the target process can be acquired.
@@ -763,14 +763,12 @@ impl<'a> BinderProcessGuard<'a> {
 
         // Create a handle in the receiving process that references the binder object
         // in the sender's process. A new strong reference will be taken on `object`.
-        let handle = target_process.lock().handles.insert_for_transaction(object, &mut actions);
+        let handle = target_process.lock().handles.insert_for_transaction(object, actions);
 
         // Now that the object is kept by the target process handle table, the initial strong
         // increment can be released.
-        guard.release(&mut actions);
+        guard.release(actions);
 
-        // Once all reference operations are done, release the actions.
-        actions.release(());
         handle
     }
 
@@ -3332,44 +3330,77 @@ impl BinderDriver {
                             serialized_object
                         }
                         Handle::Object { index } => {
-                            let source_proc = source_proc.lock();
-                            let proxy =
-                                source_proc.handles.get(index).ok_or(TransactionError::Failure)?;
-                            // Insert the handle in the handle table of the receiving process
-                            // and add a strong reference to it to ensure it survives for the
-                            // lifetime of the transaction, even if it is owned by the
-                            // receiving process. Otherwise the receiving process might end up
-                            // deleting the reference before handling the transaction.
-                            let new_handle =
-                                source_proc.insert_for_transaction(target_proc, proxy.clone());
-                            // Tie this handle's strong reference to be held as long as this
-                            // buffer.
-                            transaction_state.push_handle(new_handle);
-                            if std::ptr::eq(Arc::as_ptr(target_proc), proxy.owner.as_ptr()) {
-                                // The binder object belongs to the receiving process, so convert it
-                                // from a handle to a local object.
-                                SerializedBinderObject::Object { local: proxy.local, flags }
-                            } else {
-                                SerializedBinderObject::Handle { handle: new_handle, flags, cookie }
-                            }
+                            let mut actions = RefCountActions::default();
+                            release_after!(
+                                actions,
+                                (),
+                                || -> Result::<SerializedBinderObject, TransactionError> {
+                                    let source_proc = source_proc.lock();
+                                    let proxy = source_proc
+                                        .handles
+                                        .get(index)
+                                        .ok_or(TransactionError::Failure)?;
+                                    let binder_object = if std::ptr::eq(
+                                        Arc::as_ptr(target_proc),
+                                        proxy.owner.as_ptr(),
+                                    ) {
+                                        // The binder object belongs to the receiving process.
+
+                                        // 1. Add a guard on the object in the transaction to
+                                        //    ensures the receiving process keep it alive until the
+                                        //    transactions is finished
+                                        let guard = proxy.inc_strong(&mut actions);
+                                        transaction_state.state.add_guard(guard);
+
+                                        // 2. Convert the binder object from a handle to a local object.
+                                        SerializedBinderObject::Object { local: proxy.local, flags }
+                                    } else {
+                                        // The binder object does not belong to the receiving
+                                        // process.
+
+                                        // Insert the handle in the handle table of the receiving process
+                                        // and add a strong reference to it to ensure it survives for the
+                                        // lifetime of the transaction.
+                                        let new_handle = source_proc.insert_for_transaction(
+                                            target_proc,
+                                            proxy.clone(),
+                                            &mut actions,
+                                        );
+                                        // Tie this handle's strong reference to be held as long as this
+                                        // buffer.
+                                        transaction_state.push_handle(new_handle);
+                                        SerializedBinderObject::Handle {
+                                            handle: new_handle,
+                                            flags,
+                                            cookie,
+                                        }
+                                    };
+                                    Ok(binder_object)
+                                }
+                            )?
                         }
                     }
                 }
                 SerializedBinderObject::Object { local, flags } => {
-                    // We are passing a binder object across process boundaries. We need
-                    // to translate this address to some handle.
+                    let mut actions = RefCountActions::default();
+                    release_after!(actions, (), {
+                        // We are passing a binder object across process boundaries. We need
+                        // to translate this address to some handle.
 
-                    // Register this binder object if it hasn't already been registered.
-                    let mut source_proc = source_proc.lock();
-                    let object = source_proc.find_or_register_object(source_thread, local, flags);
-                    // Create a handle in the receiving process that references the binder object
-                    // in the sender's process.
-                    let handle = source_proc.insert_for_transaction(target_proc, object);
-                    // Tie this handle's strong reference to be held as long as this buffer.
-                    transaction_state.push_handle(handle);
+                        // Register this binder object if it hasn't already been registered.
+                        let mut source_proc = source_proc.lock();
+                        let object =
+                            source_proc.find_or_register_object(source_thread, local, flags);
+                        // Create a handle in the receiving process that references the binder object
+                        // in the sender's process.
+                        let handle =
+                            source_proc.insert_for_transaction(target_proc, object, &mut actions);
+                        // Tie this handle's strong reference to be held as long as this buffer.
+                        transaction_state.push_handle(handle);
 
-                    // Translate the serialized object into a handle.
-                    SerializedBinderObject::Handle { handle, flags, cookie: 0 }
+                        // Translate the serialized object into a handle.
+                        SerializedBinderObject::Handle { handle, flags, cookie: 0 }
+                    })
                 }
                 SerializedBinderObject::File { fd, flags, cookie } => {
                     let (file, fd_flags) = source_resource_accessor.get_file_with_flags(fd)?;

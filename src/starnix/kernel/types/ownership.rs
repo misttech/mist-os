@@ -595,9 +595,9 @@ macro_rules! release_on_error {
 
 /// Macro that ensure the releasable is released with the given context after the body returns.
 macro_rules! release_after {
-    ($releasable_name:ident, $context:expr, $body:block ) => {{
+    ($releasable_name:ident, $context:expr, $(|| -> $output_type:ty)? $body:block ) => {{
         #[allow(clippy::redundant_closure_call)]
-        let result = { (|| $body)() };
+        let result = { (|| $(-> $output_type)? { $body })() };
         $releasable_name.release($context);
         result
     }};
@@ -612,14 +612,9 @@ pub mod internal {
 /// Macro that ensure the releasable is released with the given context after the block terminates,
 /// whether there is an error or not.
 macro_rules! async_release_after {
-    ($releasable_name:ident, $context:expr, $body:block ) => {{
-        let result = crate::types::ownership::internal::async_try(async { $body }).await;
-        $releasable_name.release($context);
-        result
-    }};
-    ($releasable_name:ident, $context:expr, || -> $output_type:ty $body:block ) => {{
+    ($releasable_name:ident, $context:expr, $(|| -> $output_type:ty)? $body:block ) => {{
         let result =
-            crate::types::ownership::internal::async_try::<$output_type>(async { $body }).await;
+            crate::types::ownership::internal::async_try$(::<$output_type>)?(async { $body }).await;
         $releasable_name.release($context);
         result
     }};
