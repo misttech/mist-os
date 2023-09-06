@@ -413,8 +413,6 @@ pub struct BuiltinEnvironment {
     pub model: Arc<Model>,
 
     // Framework capabilities.
-    pub read_only_log: Option<Arc<ReadOnlyLog>>,
-    pub write_only_log: Option<Arc<WriteOnlyLog>>,
     pub mexec_resource: Option<Arc<MexecResource>>,
     pub mmio_resource: Option<Arc<MmioResource>>,
     pub power_resource: Option<Arc<PowerResource>>,
@@ -583,9 +581,9 @@ impl BuiltinEnvironment {
             })
             .flatten();
         if let Some(kernel_stats) = info_resource_handle.map(KernelStats::new) {
-            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::StatsMarker>(move |stream| {
-                kernel_stats.clone().serve(stream).boxed()
-            });
+            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::StatsMarker>(
+                move |stream| kernel_stats.clone().serve(stream).boxed(),
+            );
         }
 
         // Set up ReadOnlyLog service.
@@ -596,16 +594,20 @@ impl BuiltinEnvironment {
                     .expect("Failed to duplicate root resource handle"),
             )
         });
-        if let Some(read_only_log) = read_only_log.as_ref() {
-            model.root().hooks.install(read_only_log.hooks()).await;
+        if let Some(read_only_log) = read_only_log {
+            sandbox_builder.add_builtin_protocol_if_enabled::<fboot::ReadOnlyLogMarker>(
+                move |stream| read_only_log.clone().serve(stream).boxed(),
+            );
         }
 
         // Set up WriteOnlyLog service.
         let write_only_log = root_resource_handle.as_ref().map(|handle| {
             WriteOnlyLog::new(zx::DebugLog::create(handle, zx::DebugLogOpts::empty()).unwrap())
         });
-        if let Some(write_only_log) = write_only_log.as_ref() {
-            model.root().hooks.install(write_only_log.hooks()).await;
+        if let Some(write_only_log) = write_only_log {
+            sandbox_builder.add_builtin_protocol_if_enabled::<fboot::WriteOnlyLogMarker>(
+                move |stream| write_only_log.clone().serve(stream).boxed(),
+            );
         }
 
         // Register the UTC time maintainer.
@@ -938,8 +940,6 @@ impl BuiltinEnvironment {
 
         Ok(BuiltinEnvironment {
             model,
-            read_only_log,
-            write_only_log,
             mexec_resource,
             mmio_resource,
             power_resource,

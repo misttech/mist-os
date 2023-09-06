@@ -3,22 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    crate::builtin::capability::BuiltinCapability,
-    ::routing::capability_source::InternalCapability,
     anyhow::Error,
-    async_trait::async_trait,
-    cm_types::Name,
     fidl_fuchsia_boot as fboot,
     fuchsia_zircon::{self as zx, DebugLog, DebugLogOpts, HandleBased, Resource},
     futures::prelude::*,
-    lazy_static::lazy_static,
     std::sync::Arc,
 };
-
-lazy_static! {
-    static ref READ_ONLY_LOG_CAPABILITY_NAME: Name = "fuchsia.boot.ReadOnlyLog".parse().unwrap();
-    static ref WRITE_ONLY_LOG_CAPABILITY_NAME: Name = "fuchsia.boot.WriteOnlyLog".parse().unwrap();
-}
 
 /// An implementation of the `fuchsia.boot.ReadOnlyLog` protocol.
 pub struct ReadOnlyLog {
@@ -35,14 +25,8 @@ impl ReadOnlyLog {
     pub fn new(resource: Resource) -> Arc<Self> {
         Arc::new(Self { resource })
     }
-}
 
-#[async_trait]
-impl BuiltinCapability for ReadOnlyLog {
-    const NAME: &'static str = "ReadOnlyLog";
-    type Marker = fboot::ReadOnlyLogMarker;
-
-    async fn serve(
+    pub async fn serve(
         self: Arc<Self>,
         mut stream: fboot::ReadOnlyLogRequestStream,
     ) -> Result<(), Error> {
@@ -56,10 +40,6 @@ impl BuiltinCapability for ReadOnlyLog {
         }
         Ok(())
     }
-
-    fn matches_routed_capability(&self, capability: &InternalCapability) -> bool {
-        capability.matches_protocol(&READ_ONLY_LOG_CAPABILITY_NAME)
-    }
 }
 
 /// An implementation of the `fuchsia.boot.WriteOnlyLog` protocol.
@@ -71,14 +51,8 @@ impl WriteOnlyLog {
     pub fn new(debuglog: DebugLog) -> Arc<Self> {
         Arc::new(Self { debuglog })
     }
-}
 
-#[async_trait]
-impl BuiltinCapability for WriteOnlyLog {
-    const NAME: &'static str = "WriteOnlyLog";
-    type Marker = fboot::WriteOnlyLogMarker;
-
-    async fn serve(
+    pub async fn serve(
         self: Arc<Self>,
         mut stream: fboot::WriteOnlyLogRequestStream,
     ) -> Result<(), Error> {
@@ -87,31 +61,13 @@ impl BuiltinCapability for WriteOnlyLog {
         }
         Ok(())
     }
-
-    fn matches_routed_capability(&self, capability: &InternalCapability) -> bool {
-        capability.matches_protocol(&WRITE_ONLY_LOG_CAPABILITY_NAME)
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
-        crate::{
-            capability::CapabilitySource,
-            model::hooks::{Event, EventPayload, Hooks},
-        },
-        ::routing::capability_source::InternalCapability,
-        cm_util::TaskGroup,
-        fidl::endpoints::ClientEnd,
-        fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_component::client::connect_to_protocol,
-        fuchsia_zircon::sys,
+        super::*, fuchsia_async as fasync, fuchsia_component::client::connect_to_protocol,
         fuchsia_zircon::AsHandleRef,
-        futures::lock::Mutex,
-        moniker::{Moniker, MonikerBase},
-        std::path::PathBuf,
-        std::sync::Weak,
     };
 
     async fn get_root_resource() -> Result<zx::Resource, Error> {
@@ -140,47 +96,6 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn can_connect_to_read_only() -> Result<(), Error> {
-        let resource = get_root_resource().await?;
-        let read_only_log = ReadOnlyLog::new(resource);
-        let hooks = Hooks::new();
-        hooks.install(read_only_log.hooks()).await;
-
-        let provider = Arc::new(Mutex::new(None));
-        let source = CapabilitySource::Builtin {
-            capability: InternalCapability::Protocol(READ_ONLY_LOG_CAPABILITY_NAME.clone()),
-            top_instance: Weak::new(),
-        };
-
-        let event = Event::new_for_test(
-            Moniker::root(),
-            "fuchsia-pkg://root",
-            EventPayload::CapabilityRouted { source, capability_provider: provider.clone() },
-        );
-        hooks.dispatch(&event).await;
-
-        let (client, mut server) = zx::Channel::create();
-        let task_group = TaskGroup::new();
-        if let Some(provider) = provider.lock().await.take() {
-            provider
-                .open(task_group.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server)
-                .await?;
-        };
-
-        let client = ClientEnd::<fboot::ReadOnlyLogMarker>::new(client)
-            .into_proxy()
-            .expect("Failed to create proxy");
-        let handle = client.get().await?;
-        assert_ne!(handle.raw_handle(), sys::ZX_HANDLE_INVALID);
-
-        handle.read()?;
-        let message: [u8; 0] = [];
-        assert!(handle.write(&message).is_err());
-
-        Ok(())
-    }
-
-    #[fuchsia::test]
     async fn has_correct_rights_for_write_only() -> Result<(), Error> {
         // The kernel requires a valid `Resource` to be provided when creating a `Debuglog` that
         // can be read from, but not one that can be written to.  This may change in the future.
@@ -199,50 +114,6 @@ mod tests {
         let write_only_log = proxy.get().await?;
         let info = zx::Handle::from(write_only_log).basic_info()?;
         assert_eq!(info.rights, zx::Rights::BASIC | zx::Rights::WRITE | zx::Rights::SIGNAL);
-
-        Ok(())
-    }
-
-    #[fuchsia::test]
-    async fn can_connect_to_write_only() -> Result<(), Error> {
-        // The kernel requires a valid `Resource` to be provided when creating a `Debuglog` that
-        // can be read from, but not one that can be written to.  This may change in the future.
-        let resource = Resource::from(zx::Handle::invalid());
-        let write_only_log =
-            WriteOnlyLog::new(zx::DebugLog::create(&resource, zx::DebugLogOpts::empty()).unwrap());
-        let hooks = Hooks::new();
-        hooks.install(write_only_log.hooks()).await;
-
-        let provider = Arc::new(Mutex::new(None));
-        let source = CapabilitySource::Builtin {
-            capability: InternalCapability::Protocol(WRITE_ONLY_LOG_CAPABILITY_NAME.clone()),
-            top_instance: Weak::new(),
-        };
-
-        let event = Event::new_for_test(
-            Moniker::root(),
-            "fuchsia-pkg://root",
-            EventPayload::CapabilityRouted { source, capability_provider: provider.clone() },
-        );
-        hooks.dispatch(&event).await;
-
-        let (client, mut server) = zx::Channel::create();
-        let task_group = TaskGroup::new();
-        if let Some(provider) = provider.lock().await.take() {
-            provider
-                .open(task_group.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server)
-                .await?;
-        };
-
-        let client = ClientEnd::<fboot::WriteOnlyLogMarker>::new(client)
-            .into_proxy()
-            .expect("Failed to create proxy");
-        let handle = client.get().await?;
-        assert_ne!(handle.raw_handle(), sys::ZX_HANDLE_INVALID);
-
-        assert!(handle.read().is_err());
-        let message: [u8; 0] = [];
-        handle.write(&message)?;
 
         Ok(())
     }
