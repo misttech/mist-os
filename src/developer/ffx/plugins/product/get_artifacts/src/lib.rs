@@ -57,7 +57,7 @@ fn extract_flashing_artifacts(
         }
     };
 
-    let mut artifacts = Vec::new();
+    let mut artifacts = vec![Utf8PathBuf::from("product_bundle.json")];
     for part in &mut product_bundle.partitions.bootstrap_partitions {
         artifacts.push(compute_path(&part.image)?);
     }
@@ -153,6 +153,7 @@ mod tests {
         };
         let artifacts = extract_flashing_artifacts(pb.clone(), cmd).unwrap();
         let expected_artifacts = vec![
+            Utf8PathBuf::from("product_bundle.json"),
             Utf8PathBuf::from("bootloader/path"),
             Utf8PathBuf::from("credential/path"),
             Utf8PathBuf::from("zbi/path"),
