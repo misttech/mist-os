@@ -464,3 +464,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0223_zx_vmo_transfer_data.md
   - title: "RFC-0224: Userspace J-Extension Pointer Masking"
     path: /docs/contribute/governance/rfcs/0224_userspace_pointer_masking.md
+  - title: "RFC-0225: Fxblob: Storing blobs in Fxfs"
+    path: /docs/contribute/governance/rfcs/0225_fxblob.md

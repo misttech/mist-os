@@ -2931,3 +2931,16 @@
   reviewers: ['maniscalco@google.com', 'travisg@google.com', 'mvanotti@google.com', 'mcgrathr@google.com', 'phosek@google.com']
   submitted: '2023-03-09'
   reviewed: '2023-09-05'
+
+- name: 'RFC-0225'
+  title: 'Fxblob: Storing blobs in Fxfs'
+  short_description: 'Serve blobs from Fxfs, removing Blobfs and FVM from the system.'
+  authors: ['csuter@google.com', 'jfsulliv@google.com', 'nikitajindal@google.com', 'ripper@google.com']
+  file: '0225_fxblob.md'
+  area: ['Storage']
+  issue: ['122125']
+  gerrit_change_id: ['889932']
+  status: 'Accepted'
+  reviewers: ['abarth@google.com', 'cpu@google.com', 'joshlf@google.com', 'galbanum@google.com', 'csuter@google.com']
+  submitted: '2023-07-25'
+  reviewed: '2023-09-05'
