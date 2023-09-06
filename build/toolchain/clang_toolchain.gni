@@ -832,8 +832,24 @@ template("clang_toolchain") {
     tool("alink") {
       forward_variables_from(concurrent_jobs.local, "*")
       rspfile = "{{output}}.rsp"
-      command =
-          "rm -f {{output}} && $ar {{arflags}} rcsD {{output}} \"@$rspfile\""
+      linker_prefix = ""
+      if (link_rbe_enable) {  # Assume non-thin archives, the simplest case of
+                              # direct inclusion.
+        linker_prefix_list = [
+          rebase_path(python_exe_src, root_build_dir),
+          "-S",
+          rebase_path(prebuilt_tool_remote_wrapper, root_build_dir),
+          "--inputs",
+          "\"$rspfile\"",
+          "--input_list_paths",
+          "\"$rspfile\"",
+          "--output_files",
+          "{{output}}",
+          "--",
+        ]
+        linker_prefix = string_join(" ", linker_prefix_list)
+      }
+      command = "rm -f {{output}} && $linker_prefix $ar {{arflags}} rcsD {{output}} \"@$rspfile\""
       description = "AR {{output}}"
       rspfile_content = "{{inputs}}"
       outputs = [ "{{output_dir}}/{{target_output_name}}{{output_extension}}" ]
