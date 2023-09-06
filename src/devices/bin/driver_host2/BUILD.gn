@@ -21,9 +21,12 @@ source_set("driver") {
   sources = [
     "driver.cc",
     "driver.h",
+    "driver_client.cc",
+    "driver_client.h",
   ]
 
   deps = [
+    ":legacy_lifecycle_shim",
     "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
     "//sdk/lib/fit",
     "//src/devices/lib/log",
@@ -33,9 +36,25 @@ source_set("driver") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.driver.host:fuchsia.driver.host_cpp",
+    "//sdk/lib/async_patterns/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//zircon/system/ulib/async:async-cpp",
+  ]
+}
+
+source_set("legacy_lifecycle_shim") {
+  sources = [
+    "legacy_lifecycle_shim.cc",
+    "legacy_lifecycle_shim.h",
+  ]
+  deps = [
+    "//src/devices/lib/log",
+    "//zircon/system/ulib/async:async-cpp",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp_driver_wire",
+    "//sdk/lib/driver/symbols",
     "//zircon/system/ulib/fbl",
   ]
 }
@@ -48,6 +67,7 @@ source_set("lib") {
 
   public_deps = [
     ":driver",
+    ":legacy_lifecycle_shim",
     "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp_wire",
     "//sdk/fidl/fuchsia.driver.host:fuchsia.driver.host_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",

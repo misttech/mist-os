@@ -6,6 +6,7 @@
 #define SRC_DEVICES_BIN_DRIVER_HOST2_DRIVER_H_
 
 #include <fidl/fuchsia.driver.host/cpp/fidl.h>
+#include <lib/async_patterns/cpp/dispatcher_bound.h>
 #include <lib/driver/symbols/symbols.h>
 #include <lib/fdf/cpp/dispatcher.h>
 
@@ -15,7 +16,12 @@
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 
+#include "src/devices/bin/driver_host2/driver_client.h"
+#include "src/devices/bin/driver_host2/legacy_lifecycle_shim.h"
+
 namespace dfv2 {
+
+using DriverHooks = std::variant<const DriverRegistration*, std::unique_ptr<LegacyLifecycleShim>>;
 
 class Driver : public fidl::Server<fuchsia_driver_host::Driver>,
                public fbl::RefCounted<Driver>,
@@ -24,45 +30,56 @@ class Driver : public fidl::Server<fuchsia_driver_host::Driver>,
   static zx::result<fbl::RefPtr<Driver>> Load(std::string url, zx::vmo vmo,
                                               std::string_view relative_binary_path);
 
-  Driver(std::string url, void* library, const DriverLifecycle* lifecycle);
+  Driver(std::string url, void* library, DriverHooks hooks);
   ~Driver() override;
 
   const std::string& url() const { return url_; }
-  void set_binding(fidl::ServerBindingRef<fuchsia_driver_host::Driver> binding);
+  void set_binding(fidl::ServerBindingRef<fuchsia_driver_host::Driver> binding)
+      __TA_EXCLUDES(lock_);
 
   void Stop(StopCompleter::Sync& completer) override;
 
-  // Called by the driver to signal completion of the |prepare_stop| operation.
-  // |status| is the status of the prepare_stop operation sent from the driver.
-  void PrepareStopCompleted(zx_status_t status);
-
-  // Called by the driver to signal completion of the |start| operation.
-  // |status| is the status of the start operation sent from the driver.
-  void StartCompleted(zx_status_t status, void* opaque);
-
   // Starts the driver.
-  void Start(fuchsia_driver_framework::DriverStartArgs start_args, fdf::Dispatcher dispatcher,
-             fit::callback<void(zx::result<>)> cb);
+  void Start(fbl::RefPtr<Driver> self, fuchsia_driver_framework::DriverStartArgs start_args,
+             fdf::Dispatcher dispatcher, fit::callback<void(zx::result<>)> cb) __TA_EXCLUDES(lock_);
 
-  void ShutdownDispatcher() __TA_EXCLUDES(lock_) {
-    fbl::AutoLock al(&lock_);
-    initial_dispatcher_.ShutdownAsync();
-  }
+  // Resets the driver_client_ and begin shutting down the client_dispatcher_.
+  // Releases ownership of the client_dispatcher.
+  // The dispatcher will destroy itself once its shutdown has completed.
+  // This may be called from the context of the |client_dispatcher_|.
+  void ShutdownClient() __TA_EXCLUDES(lock_);
+
+  // Unbind the driver's `fuchsia_driver_host::Driver` binding. This will run the unbind handler
+  // that the driver host setup for us, which will initiate the dispatcher shutdown, after which
+  // this driver will be removed from the drivers list and destructed.
+  // This may be called from the context of the |client_dispatcher_|.
+  void Unbind() __TA_EXCLUDES(lock_);
 
  private:
   std::string url_;
   void* library_;
-  const DriverLifecycle* lifecycle_;
 
   fbl::Mutex lock_;
-  std::optional<void*> opaque_ __TA_GUARDED(lock_);
-  fit::callback<void(zx::result<>)> start_callback_ __TA_GUARDED(lock_);
 
+  // The hooks to initialize and destroy the driver. Currently backed by either the registration
+  // symbol or the legacy lifecycle shim.
+  DriverHooks hooks_ __TA_GUARDED(lock_);
+
+  // The binding is set from the driver_host using |set_binding|.
   std::optional<fidl::ServerBindingRef<fuchsia_driver_host::Driver>> binding_ __TA_GUARDED(lock_);
 
-  // The initial dispatcher passed to the driver.
-  // This must be shutdown by before this driver object is destructed.
+  // The initial dispatcher of the driver.
+  // This is where the initialize hook is called for the driver.
   fdf::Dispatcher initial_dispatcher_ __TA_GUARDED(lock_);
+
+  // This is the dispatcher used by this class for the driver_client_ object.
+  fdf::SynchronizedDispatcher client_dispatcher_ __TA_GUARDED(lock_);
+
+  // This is a wrapper for the client to the driver, it's bound to |client_dispatcher_|.
+  std::optional<async_patterns::DispatcherBound<DriverClient>> driver_client_ __TA_GUARDED(lock_);
+
+  // This is set through the initialize hook and passed into destroy.
+  std::optional<void*> token_ __TA_GUARDED(lock_);
 };
 
 // Extracts the default_dispatcher_opts from |program| and converts it to

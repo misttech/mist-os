@@ -16,8 +16,6 @@
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/dlfcn.h>
 
-#include "src/storage/lib/vfs/cpp/service.h"
-
 // The driver runtime libraries use the fdf namespace, but we would also like to use fdf
 // as an alias for the fdf FIDL library.
 namespace fdf {
@@ -129,26 +127,18 @@ void DriverHost::StartDriver(fbl::RefPtr<Driver> driver,
     std::lock_guard<std::mutex> lock(mutex_);
     drivers_.push_back(driver);
   }
+
   auto start_callback = [this, driver, cb = std::move(cb),
                          request = std::move(request)](zx::result<> status) mutable {
-    // Note: May be called from a random thread context, before `driver->Start` returns.
-    auto remove_driver = fit::defer([this, driver = driver.get()]() {
-      std::lock_guard<std::mutex> lock(mutex_);
-      drivers_.erase(*driver);
-    });
-
     if (status.is_error()) {
       FX_SLOG(ERROR, "Failed to start driver", KV("url", driver->url().data()),
               KV("status_str", status.status_string()));
-      // If we fail to start the driver, we need to initiate shutting down the
-      // dispatcher.
-      driver->ShutdownDispatcher();
-      // The dispatcher will be destroyed in the shutdown callback, when the last
-      // driver reference is released.
+      // If we fail to start the driver, we need to initiate shutting down the driver and
+      // dispatchers.
+      ShutdownDriver(driver.get(), {});
       cb(status);
       return;
     }
-    cb(zx::ok());
 
     FX_SLOG(INFO, "Started driver", KV("url", driver->url().data()));
     auto unbind_callback = [this](Driver* driver, fidl::UnbindInfo info,
@@ -162,12 +152,14 @@ void DriverHost::StartDriver(fbl::RefPtr<Driver> driver,
     auto binding = fidl::BindServer(loop_.dispatcher(), std::move(request), driver.get(),
                                     std::move(unbind_callback));
     driver->set_binding(std::move(binding));
-    remove_driver.cancel();
+    cb(zx::ok());
   };
-  driver->Start(std::move(start_args), std::move(dispatcher), std::move(start_callback));
+  driver->Start(driver, std::move(start_args), std::move(dispatcher), std::move(start_callback));
 }
 
 void DriverHost::ShutdownDriver(Driver* driver, fidl::ServerEnd<fdh::Driver> server) {
+  // This will begin shutdown of the driver's client.
+  driver->ShutdownClient();
   // Request the driver runtime shutdown all dispatchers owned by the driver.
   // Once we get the callback, we will stop the driver.
   auto driver_shutdown = std::make_unique<fdf_env::DriverShutdown>();
@@ -178,25 +170,28 @@ void DriverHost::ShutdownDriver(Driver* driver, fidl::ServerEnd<fdh::Driver> ser
 
     std::lock_guard<std::mutex> lock(mutex_);
     // This removes the driver's unique_ptr from the list, which will
-    // run the destructor and call the driver's Stop hook.
+    // run the destructor and call the driver's Destroy hook.
     drivers_.erase(*driver);
 
-    // Send the epitaph to the driver runner letting it know we stopped
-    // the driver correctly.
-    server.Close(ZX_OK);
+    // The server will not be valid when the shutdown is happening because of a start failure.
+    if (server.is_valid()) {
+      // Send the epitaph to the driver runner letting it know we stopped
+      // the driver correctly.
+      server.Close(ZX_OK);
 
-    // If this is the last driver, shutdown the driver host.
-    if (drivers_.is_empty()) {
-      // We only exit if we're not shutting down in order to match DFv1 behavior.
-      // TODO(http://fxbug.dev/124305): We should always exit driver hosts when we get down to 0
-      // drivers.
-      zx::result client = component::Connect<fuchsia_device_manager::SystemStateTransition>();
-      ZX_ASSERT_MSG(!client.is_error(), "Failed to connect to SystemStateTransition: %s",
-                    client.status_string());
-      fidl::WireResult result = fidl::WireCall(client.value())->GetTerminationSystemState();
-      if (result.ok() == false ||
-          result->state == fuchsia_device_manager::SystemPowerState::kFullyOn) {
-        loop_.Quit();
+      // If this is the last driver, shutdown the driver host.
+      if (drivers_.is_empty()) {
+        // We only exit if we're not shutting down in order to match DFv1 behavior.
+        // TODO(http://fxbug.dev/124305): We should always exit driver hosts when we get down to 0
+        // drivers.
+        zx::result client = component::Connect<fuchsia_device_manager::SystemStateTransition>();
+        ZX_ASSERT_MSG(!client.is_error(), "Failed to connect to SystemStateTransition: %s",
+                      client.status_string());
+        fidl::WireResult result = fidl::WireCall(client.value())->GetTerminationSystemState();
+        if (result.ok() == false ||
+            result->state == fuchsia_device_manager::SystemPowerState::kFullyOn) {
+          loop_.Quit();
+        }
       }
     }
   };

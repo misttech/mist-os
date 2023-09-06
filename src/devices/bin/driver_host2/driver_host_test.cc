@@ -200,18 +200,20 @@ class DriverHostTest : public testing::Test {
           .Then([&](auto result) {
             if (result.is_ok()) {
               epitaph = ZX_OK;
+              loop().Quit();
               return;
             }
             if (result.error_value().is_framework_error()) {
               epitaph = result.error_value().framework_error().status();
+              loop().Quit();
               return;
             }
             epitaph = result.error_value().domain_error();
+            loop().Quit();
           });
     }
-    EXPECT_EQ(ZX_OK, loop().RunUntilIdle());
-    fdf_internal_wait_until_all_dispatchers_idle();
-    EXPECT_EQ(ZX_OK, loop().RunUntilIdle());
+    EXPECT_EQ(ZX_ERR_CANCELED, loop().Run());
+    loop().ResetQuit();
     EXPECT_EQ(expected_epitaph, epitaph);
 
     return {
@@ -334,7 +336,7 @@ TEST_F(DriverHostTest, Start_ReturnError) {
 
   driver.reset();
   loop().RunUntilIdle();
-  fdf_internal_wait_until_all_dispatchers_idle();
+  fdf_internal_wait_until_all_dispatchers_destroyed();
   EXPECT_EQ(ZX_OK, loop().RunUntilIdle());
   // We never started our first driver, so the driver host would not attempt to
   // quit the loop after the last driver has stopped.

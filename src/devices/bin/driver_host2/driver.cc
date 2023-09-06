@@ -15,6 +15,7 @@
 #include <fbl/auto_lock.h>
 #include <fbl/string_printf.h>
 
+#include "src/devices/bin/driver_host2/legacy_lifecycle_shim.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/driver_symbols/symbols.h"
 
@@ -111,35 +112,64 @@ zx::result<fbl::RefPtr<Driver>> Driver::Load(std::string url, zx::vmo vmo,
     LOGF(ERROR, "Failed to start driver '%s', could not load library: %s", url.data(), dlerror());
     return zx::error(ZX_ERR_INTERNAL);
   }
-  auto lifecycle =
-      static_cast<const DriverLifecycle*>(dlsym(library, "__fuchsia_driver_lifecycle__"));
-  if (lifecycle == nullptr) {
-    LOGF(ERROR, "Failed to start driver '%s', driver lifecycle not found", url.data());
-    return zx::error(ZX_ERR_NOT_FOUND);
+
+  auto registration =
+      static_cast<const DriverRegistration*>(dlsym(library, "__fuchsia_driver_registration__"));
+
+  if (registration == nullptr) {
+    LOGF(
+        DEBUG,
+        "__fuchsia_driver_registration__ symbol not available, falling back to __fuchsia_driver_lifecycle__.",
+        url.data());
+    auto lifecycle =
+        static_cast<const DriverLifecycle*>(dlsym(library, "__fuchsia_driver_lifecycle__"));
+    if (lifecycle == nullptr) {
+      LOGF(ERROR, "Failed to start driver '%s', driver lifecycle not found", url.data());
+      return zx::error(ZX_ERR_NOT_FOUND);
+    }
+    if (lifecycle->version < 1 || lifecycle->version > DRIVER_LIFECYCLE_VERSION_MAX) {
+      LOGF(ERROR, "Failed to start driver '%s', unknown driver lifecycle version: %lu", url.data(),
+           lifecycle->version);
+      return zx::error(ZX_ERR_WRONG_TYPE);
+    }
+
+    auto legacy_lifecycle_shim = std::make_unique<LegacyLifecycleShim>(lifecycle, url);
+    return zx::ok(
+        fbl::MakeRefCounted<Driver>(std::move(url), library, std::move(legacy_lifecycle_shim)));
   }
-  if (lifecycle->version < 1 || lifecycle->version > DRIVER_LIFECYCLE_VERSION_MAX) {
-    LOGF(ERROR, "Failed to start driver '%s', unknown driver lifecycle version: %lu", url.data(),
-         lifecycle->version);
+
+  if (registration->version < 1 || registration->version > DRIVER_REGISTRATION_VERSION_MAX) {
+    LOGF(ERROR, "Failed to start driver '%s', unknown driver registration version: %lu", url.data(),
+         registration->version);
     return zx::error(ZX_ERR_WRONG_TYPE);
   }
-  return zx::ok(fbl::MakeRefCounted<Driver>(std::move(url), library, lifecycle));
+
+  return zx::ok(fbl::MakeRefCounted<Driver>(std::move(url), library, registration));
 }
 
-Driver::Driver(std::string url, void* library, const DriverLifecycle* lifecycle)
-    : url_(std::move(url)), library_(library), lifecycle_(lifecycle) {}
+Driver::Driver(std::string url, void* library, DriverHooks hooks)
+    : url_(std::move(url)), library_(library), hooks_(std::move(hooks)) {}
 
 Driver::~Driver() {
-  fbl::AutoLock al(&lock_);
-  if (opaque_.has_value()) {
-    void* opaque = *opaque_;
-    al.release();
-    zx_status_t status = lifecycle_->v1.stop(opaque);
-    if (status != ZX_OK) {
-      LOGF(ERROR, "Failed to stop driver '%s': %s", url_.data(), zx_status_get_string(status));
+  if (auto* registration = std::get_if<const DriverRegistration*>(&hooks_)) {
+    if (token_.has_value()) {
+      (*registration)->v1.destroy(token_.value());
+    } else {
+      LOGF(WARNING, "Failed to Destroy driver '%s', initialize was not completed.", url_.c_str());
     }
+  } else if (auto* legacy_lifecycle_shim =
+                 std::get_if<std::unique_ptr<LegacyLifecycleShim>>(&hooks_)) {
+    zx_status_t destroy_status = (*legacy_lifecycle_shim)->Destroy();
+    if (destroy_status != ZX_OK) {
+      LOGF(WARNING, "Failed to Destroy driver '%s', %s.", url_.c_str(),
+           zx_status_get_string(destroy_status));
+    }
+
+    (*legacy_lifecycle_shim).reset();
   } else {
-    al.release();
+    ZX_ASSERT_MSG(false, "Unknown hook variant, index %lu.", hooks_.index());
   }
+
   dlclose(library_);
 }
 
@@ -149,132 +179,71 @@ void Driver::set_binding(fidl::ServerBindingRef<fdh::Driver> binding) {
 }
 
 void Driver::Stop(StopCompleter::Sync& completer) {
-  // Prepare stop was added in version 2.
-  if (lifecycle_->version >= 2 && lifecycle_->v2.prepare_stop != nullptr) {
-    // We synchronize this task with start by posting it against the dispatcher used in Start.
-    async_dispatcher_t* dispatcher;
-    {
-      fbl::AutoLock al(&lock_);
-      dispatcher = initial_dispatcher_.async_dispatcher();
-    }
-    zx_status_t status = async::PostTask(dispatcher, [this]() {
-      void* opaque_driver;
-      {
-        fbl::AutoLock al(&lock_);
-        ZX_ASSERT(opaque_.has_value());
-        opaque_driver = opaque_.value();
-      }
-      lifecycle_->v2.prepare_stop(
-          opaque_driver,
-          [](void* cookie, zx_status_t status) {
-            static_cast<Driver*>(cookie)->PrepareStopCompleted(status);
-          },
-          this);
-    });
-    // It shouldn't be possible for this to fail as the dispatcher shouldn't be shutdown by anyone
-    // other than the driver host.
-    ZX_ASSERT(status == ZX_OK);
+  fbl::AutoLock al(&lock_);
+  if (driver_client_.has_value()) {
+    driver_client_.value().AsyncCall(&DriverClient::Stop);
   } else {
-    fbl::AutoLock al(&lock_);
-    binding_->Unbind();
+    LOGF(ERROR, "The driver_client_ is not available.");
   }
 }
 
-void Driver::PrepareStopCompleted(zx_status_t status) {
-  if (status != ZX_OK) {
-    LOGF(ERROR, "prepare_stop failed with status: %s", zx_status_get_string(status));
-  }
-  {
-    fbl::AutoLock al(&lock_);
-    if (!binding_.has_value()) {
-      LOGF(ERROR, "Driver::binding_ does not exist.");
-      return;
-    }
-
-    binding_->Unbind();
-  }
-}
-
-void Driver::StartCompleted(zx_status_t status, void* opaque) {
-  // Note: May be called from a random thread context, before `lifecycle_->v3.start` returns.
-  fit::callback<void(zx::result<>)> cb;
-  {
-    fbl::AutoLock al(&lock_);
-    cb = std::move(start_callback_);
-    if (!cb) {
-      LOGF(ERROR, "Start completed multiple times.");
-      return;
-    }
-    opaque_.emplace(opaque);
-  }
-
-  cb(zx::make_result(status));
-}
-
-void Driver::Start(fuchsia_driver_framework::DriverStartArgs start_args,
+void Driver::Start(fbl::RefPtr<Driver> self, fuchsia_driver_framework::DriverStartArgs start_args,
                    ::fdf::Dispatcher dispatcher, fit::callback<void(zx::result<>)> cb) {
-  fdf_dispatcher_t* initial_dispatcher = dispatcher.get();
-  {
-    fbl::AutoLock al(&lock_);
-    initial_dispatcher_ = std::move(dispatcher);
-  }
+  fbl::AutoLock al(&lock_);
+  initial_dispatcher_ = std::move(dispatcher);
 
-  fidl::OwnedEncodeResult encoded = fidl::StandaloneEncode(std::move(start_args));
-  if (!encoded.message().ok()) {
-    LOGF(ERROR, "Failed to start driver, could not encode start args: %s",
-         encoded.message().FormatDescription().data());
-    cb(zx::error(encoded.message().status()));
-    return;
-  }
-  fidl_opaque_wire_format_metadata_t wire_format_metadata =
-      encoded.wire_format_metadata().ToOpaque();
-
-  // We convert the outgoing message into an incoming message to provide to the
-  // driver on start.
-  fidl::OutgoingToEncodedMessage converted_message{encoded.message()};
-  if (!converted_message.ok()) {
-    LOGF(ERROR, "Failed to start driver, could not convert start args: %s",
-         converted_message.FormatDescription().data());
-    cb(zx::error(converted_message.status()));
+  zx::result endpoints = fdf::CreateEndpoints<fuchsia_driver_framework::Driver>();
+  if (endpoints.is_error()) {
+    cb(endpoints.take_error());
     return;
   }
 
-  // After calling |lifecycle_->start|, we assume it has taken ownership of
-  // the handles from |start_args|, and can therefore relinquish ownership.
-  auto [bytes, handles] = std::move(converted_message.message()).Release();
-  EncodedFidlMessage msg{
-      .bytes = bytes.data(),
-      .handles = handles.data(),
-      .num_bytes = static_cast<uint32_t>(bytes.size()),
-      .num_handles = static_cast<uint32_t>(handles.size()),
-  };
-  void* opaque = nullptr;
-
-  // Async start was added in version 3.
-  if (lifecycle_->version >= 3 && lifecycle_->v3.start != nullptr) {
-    {
-      fbl::AutoLock al(&lock_);
-      start_callback_ = std::move(cb);
-    }
-    lifecycle_->v3.start(
-        {msg, wire_format_metadata}, initial_dispatcher,
-        [](void* cookie, zx_status_t status, void* opaque) {
-          static_cast<Driver*>(cookie)->StartCompleted(status, opaque);
-        },
-        this);
-
+  if (auto* registration = std::get_if<const DriverRegistration*>(&hooks_)) {
+    async::PostTask(initial_dispatcher_.async_dispatcher(),
+                    [this, registration, server = std::move(endpoints->server)]() mutable {
+                      void* token = (*registration)->v1.initialize(server.TakeHandle().release());
+                      fbl::AutoLock al(&lock_);
+                      token_.emplace(token);
+                    });
+  } else if (auto* legacy_lifecycle_shim =
+                 std::get_if<std::unique_ptr<LegacyLifecycleShim>>(&hooks_)) {
+    (*legacy_lifecycle_shim)->Initialize(initial_dispatcher_.get(), std::move(endpoints->server));
   } else {
-    zx_status_t status =
-        lifecycle_->v1.start({msg, wire_format_metadata}, initial_dispatcher, &opaque);
-    if (status != ZX_OK) {
-      cb(zx::error(status));
-      return;
-    }
-    cb(zx::ok());
-    {
-      fbl::AutoLock al(&lock_);
-      opaque_.emplace(opaque);
-    }
+    ZX_ASSERT_MSG(false, "Unknown hook variant, index %lu.", hooks_.index());
+  }
+
+  zx::result client_dispatcher_result = fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
+      this, {}, "fdf-driver-client-dispatcher",
+      [](fdf_dispatcher_t* dispatcher) { fdf_dispatcher_destroy(dispatcher); });
+
+  ZX_ASSERT_MSG(client_dispatcher_result.is_ok(), "Failed to create driver client dispatcher: %s",
+                client_dispatcher_result.status_string());
+
+  client_dispatcher_ = std::move(client_dispatcher_result.value());
+  driver_client_.emplace(client_dispatcher_.async_dispatcher(), std::in_place, self, url_);
+  driver_client_.value().AsyncCall(&DriverClient::Bind, std::move(endpoints->client));
+  driver_client_.value().AsyncCall(&DriverClient::Start, std::move(start_args), std::move(cb));
+}
+
+void Driver::ShutdownClient() {
+  fbl::AutoLock al(&lock_);
+  driver_client_.reset();
+  client_dispatcher_.ShutdownAsync();
+  // client_dispatcher_ will destroy itself in the shutdown completion callback.
+  client_dispatcher_.release();
+}
+
+void Driver::Unbind() {
+  fbl::AutoLock al(&lock_);
+  if (binding_.has_value()) {
+    // The binding's unbind handler will begin shutting down all dispatchers belonging to this
+    // driver and when that is complete, it will remove this driver from its list causing this to
+    // destruct.
+    binding_->Unbind();
+
+    // ServerBindingRef does not have ownership so resetting this is fine to avoid calling Unbind
+    // multiple times.
+    binding_.reset();
   }
 }
 
