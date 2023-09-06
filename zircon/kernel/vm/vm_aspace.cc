@@ -57,6 +57,8 @@ namespace {
 KCOUNTER(vm_aspace_high_priority, "vm.aspace.high_priority")
 KCOUNTER(vm_aspace_accessed_harvests_performed, "vm.aspace.accessed_harvest.performed")
 KCOUNTER(vm_aspace_accessed_harvests_skipped, "vm.aspace.accessed_harvest.skipped")
+KCOUNTER(vm_aspace_last_fault_hit, "vm.aspace.last_fault.hit")
+KCOUNTER(vm_aspace_last_fault_miss, "vm.aspace.last_fault.miss")
 
 // the singleton kernel address space
 lazy_init::LazyInit<VmAspace, lazy_init::CheckType::None, lazy_init::Destructor::Disabled>
@@ -560,13 +562,16 @@ zx_status_t VmAspace::PageFault(vaddr_t va, uint flags) {
       if (likely(last_fault_)) {
         AssertHeld(last_fault_->lock_ref());
         if (last_fault_->is_in_range_locked(va, 1)) {
+          vm_aspace_last_fault_hit.Add(1);
           status = last_fault_->PageFault(va, flags, &page_request);
         } else {
           AssertHeld(root_vmar_->lock_ref());
+          vm_aspace_last_fault_miss.Add(1);
           status = root_vmar_->PageFault(va, flags, &page_request);
         }
       } else {
         AssertHeld(root_vmar_->lock_ref());
+        vm_aspace_last_fault_miss.Add(1);
         status = root_vmar_->PageFault(va, flags, &page_request);
       }
     }
