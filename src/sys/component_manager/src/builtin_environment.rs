@@ -413,7 +413,6 @@ pub struct BuiltinEnvironment {
     pub model: Arc<Model>,
 
     // Framework capabilities.
-    pub root_resource: Option<Arc<RootResource>>,
     #[cfg(target_arch = "aarch64")]
     pub smc_resource: Option<Arc<SmcResource>>,
     pub utc_time_maintainer: Option<Arc<UtcTimeMaintainer>>,
@@ -642,8 +641,10 @@ impl BuiltinEnvironment {
 
         // Set up RootResource service.
         let root_resource = root_resource_handle.map(RootResource::new);
-        if let Some(root_resource) = root_resource.as_ref() {
-            model.root().hooks.install(root_resource.hooks()).await;
+        if let Some(root_resource) = root_resource {
+            sandbox_builder.add_builtin_protocol_if_enabled::<fboot::RootResourceMarker>(
+                move |stream| root_resource.clone().serve(stream).boxed(),
+            );
         }
 
         // Set up the SMC resource.
@@ -949,7 +950,6 @@ impl BuiltinEnvironment {
             smc_resource: _smc_resource,
             vmex_resource,
             svc_stash_provider,
-            root_resource,
             utc_time_maintainer,
             binder_capability_host,
             realm_capability_host,
