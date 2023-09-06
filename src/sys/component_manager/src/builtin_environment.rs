@@ -413,7 +413,6 @@ pub struct BuiltinEnvironment {
     pub model: Arc<Model>,
 
     // Framework capabilities.
-    pub mexec_resource: Option<Arc<MexecResource>>,
     pub mmio_resource: Option<Arc<MmioResource>>,
     pub power_resource: Option<Arc<PowerResource>>,
     pub root_resource: Option<Arc<RootResource>>,
@@ -785,8 +784,10 @@ impl BuiltinEnvironment {
             })
             .map(MexecResource::new)
             .and_then(Result::ok);
-        if let Some(mexec_resource) = mexec_resource.as_ref() {
-            model.root().hooks.install(mexec_resource.hooks()).await;
+        if let Some(mexec_resource) = mexec_resource {
+            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::MexecResourceMarker>(
+                move |stream| mexec_resource.clone().serve(stream).boxed(),
+            );
         }
 
         // Set up the PowerResource service.
@@ -942,7 +943,6 @@ impl BuiltinEnvironment {
 
         Ok(BuiltinEnvironment {
             model,
-            mexec_resource,
             mmio_resource,
             power_resource,
             #[cfg(target_arch = "aarch64")]
