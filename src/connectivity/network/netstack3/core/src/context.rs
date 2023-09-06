@@ -361,6 +361,10 @@ pub mod testutil {
             self.offset.checked_sub(earlier.offset).unwrap()
         }
 
+        fn saturating_duration_since(&self, earlier: FakeInstant) -> Duration {
+            self.offset.saturating_sub(earlier.offset)
+        }
+
         fn checked_add(&self, duration: Duration) -> Option<FakeInstant> {
             self.offset.checked_add(duration).map(|offset| FakeInstant { offset })
         }

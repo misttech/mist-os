@@ -53,7 +53,7 @@ impl LinkAddress for Mac {
 ///
 /// `LinkDevice` is used to identify a particular link device implementation. It
 /// is only intended to exist at the type level, never instantiated at runtime.
-pub(crate) trait LinkDevice: Device + Debug {
+pub(crate) trait LinkDevice: Device + Debug + Eq {
     /// The type of address used to address link devices of this type.
     type Address: LinkAddress + UnicastAddress;
 }

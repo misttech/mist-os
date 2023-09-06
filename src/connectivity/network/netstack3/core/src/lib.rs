@@ -413,6 +413,10 @@ pub trait Instant: Sized + Ord + Copy + Clone + Debug + Send + Sync {
     /// This function will panic if `earlier` is later than `self`.
     fn duration_since(&self, earlier: Self) -> time::Duration;
 
+    /// Returns the amount of time elapsed from another instant to this one,
+    /// saturating at zero.
+    fn saturating_duration_since(&self, earlier: Self) -> time::Duration;
+
     /// Returns `Some(t)` where `t` is the time `self + duration` if `t` can be
     /// represented as `Instant` (which means it's inside the bounds of the
     /// underlying data structure), `None` otherwise.

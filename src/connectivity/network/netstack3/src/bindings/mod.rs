@@ -316,6 +316,15 @@ impl netstack3_core::Instant for StackTime {
         Duration::from_nanos(u64::try_from(self.0.into_nanos() - earlier.0.into_nanos()).unwrap())
     }
 
+    fn saturating_duration_since(&self, earlier: StackTime) -> Duration {
+        // Guaranteed not to panic because we are doing a saturating
+        // subtraction, which means the difference will be >= 0, and all i64
+        // values >=0 are also valid u64 values.
+        Duration::from_nanos(
+            u64::try_from(self.0.into_nanos().saturating_sub(earlier.0.into_nanos())).unwrap(),
+        )
+    }
+
     fn checked_add(&self, duration: Duration) -> Option<StackTime> {
         Some(StackTime(fasync::Time::from_nanos(
             self.0.into_nanos().checked_add(i64::try_from(duration.as_nanos()).ok()?)?,
