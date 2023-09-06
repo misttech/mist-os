@@ -2,22 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::common::fastboot_interface::{FastbootInterface, Variable};
 use crate::common::prepare;
 use anyhow::{anyhow, Result};
-use fidl::endpoints::{create_endpoints, ServerEnd};
-use fidl_fuchsia_developer_ffx::{FastbootProxy, VariableListenerMarker, VariableListenerRequest};
 use futures::{prelude::*, try_join};
 use std::io::Write;
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::{Receiver, Sender};
 
 /// Aggregates fastboot variables from a callback listener.
 async fn handle_variables_for_fastboot<W: Write>(
     writer: &mut W,
-    var_server: ServerEnd<VariableListenerMarker>,
+    mut var_server: Receiver<Variable>,
 ) -> Result<()> {
-    let mut stream = var_server.into_stream()?;
     loop {
-        match stream.try_next().await? {
-            Some(VariableListenerRequest::OnVariable { name, value, .. }) => {
+        match var_server.recv().await {
+            Some(Variable { name, value, .. }) => {
                 writeln!(writer, "{}: {}", name, value)?;
             }
             None => return Ok(()),
@@ -26,11 +26,14 @@ async fn handle_variables_for_fastboot<W: Write>(
 }
 
 #[tracing::instrument(skip(writer))]
-pub async fn info<W: Write>(writer: &mut W, fastboot_proxy: &FastbootProxy) -> Result<()> {
-    prepare(writer, &fastboot_proxy).await?;
-    let (var_client, var_server) = create_endpoints::<VariableListenerMarker>();
+pub async fn info<W: Write, F: FastbootInterface>(
+    writer: &mut W,
+    fastboot_interface: &F,
+) -> Result<()> {
+    prepare(writer, fastboot_interface).await?;
+    let (var_client, var_server): (Sender<Variable>, Receiver<Variable>) = mpsc::channel(1);
     let _ = try_join!(
-        fastboot_proxy.get_all_vars(var_client).map_err(|e| {
+        fastboot_interface.get_all_vars(var_client).map_err(|e| {
             tracing::error!("FIDL Communication error: {}", e);
             anyhow!(
                 "There was an error communicating with the daemon. Try running\n\

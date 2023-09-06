@@ -2,23 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::common::fastboot_interface::FastbootInterface;
 use crate::common::{crypto::unlock_device, is_locked, MISSING_CREDENTIALS};
 use crate::file_resolver::FileResolver;
 use anyhow::Result;
 use errors::ffx_bail;
-use fidl_fuchsia_developer_ffx::FastbootProxy;
 use std::io::Write;
 
 const UNLOCKED: &str = "Target is now unlocked.";
 const UNLOCKED_ERR: &str = "Target is already unlocked.";
 
-pub async fn unlock<W: Write, F: FileResolver + Sync>(
+pub async fn unlock<W: Write, F: FileResolver + Sync, T: FastbootInterface>(
     writer: &mut W,
     file_resolver: &mut F,
     credentials: &Vec<String>,
-    fastboot_proxy: &FastbootProxy,
+    fastboot_interface: &T,
 ) -> Result<()> {
-    if !is_locked(&fastboot_proxy).await? {
+    if !is_locked(fastboot_interface).await? {
         ffx_bail!("{}", UNLOCKED_ERR);
     }
 
@@ -26,7 +26,7 @@ pub async fn unlock<W: Write, F: FileResolver + Sync>(
         ffx_bail!("{}", MISSING_CREDENTIALS);
     }
 
-    unlock_device(writer, file_resolver, credentials, fastboot_proxy).await?;
+    unlock_device(writer, file_resolver, credentials, fastboot_interface).await?;
     writeln!(writer, "{}", UNLOCKED)?;
     Ok(())
 }

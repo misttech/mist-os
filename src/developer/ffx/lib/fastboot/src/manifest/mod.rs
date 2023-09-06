@@ -5,6 +5,7 @@
 use crate::{
     common::{
         cmd::{BootParams, Command, ManifestParams},
+        fastboot_interface::FastbootInterface,
         prepare, Boot, Flash, Unlock,
     },
     file_resolver::resolvers::{ArchiveResolver, Resolver, TarResolver},
@@ -21,7 +22,6 @@ use async_trait::async_trait;
 use camino::Utf8Path;
 use chrono::Utc;
 use errors::{ffx_bail, ffx_error};
-use fidl_fuchsia_developer_ffx::FastbootProxy;
 use fms::Entries;
 use pbms::{load_product_bundle, ListingMode};
 use sdk_metadata::{Metadata, ProductBundle, ProductBundleV2};
@@ -338,24 +338,26 @@ fn get_mapped_partitions(
 
 #[async_trait(?Send)]
 impl Flash for FlashManifestVersion {
-    async fn flash<W, F>(
+    #[tracing::instrument(skip(writer, cmd, file_resolver, self))]
+    async fn flash<W, F, T>(
         &self,
         writer: &mut W,
         file_resolver: &mut F,
-        fastboot_proxy: FastbootProxy,
+        fastboot_interface: T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
         W: Write,
         F: FileResolver + Sync,
+        T: FastbootInterface,
     {
         let total_time = Utc::now();
-        prepare(writer, &fastboot_proxy).await?;
+        prepare(writer, &fastboot_interface).await?;
         match self {
-            Self::V1(v) => v.flash(writer, file_resolver, fastboot_proxy, cmd).await?,
-            Self::V2(v) => v.flash(writer, file_resolver, fastboot_proxy, cmd).await?,
-            Self::V3(v) => v.flash(writer, file_resolver, fastboot_proxy, cmd).await?,
-            Self::Sdk(v) => v.flash(writer, file_resolver, fastboot_proxy, cmd).await?,
+            Self::V1(v) => v.flash(writer, file_resolver, fastboot_interface, cmd).await?,
+            Self::V2(v) => v.flash(writer, file_resolver, fastboot_interface, cmd).await?,
+            Self::V3(v) => v.flash(writer, file_resolver, fastboot_interface, cmd).await?,
+            Self::Sdk(v) => v.flash(writer, file_resolver, fastboot_interface, cmd).await?,
         };
         let duration = Utc::now().signed_duration_since(total_time);
         writeln!(
@@ -373,23 +375,24 @@ impl Flash for FlashManifestVersion {
 
 #[async_trait(?Send)]
 impl Unlock for FlashManifestVersion {
-    async fn unlock<W, F>(
+    async fn unlock<W, F, T>(
         &self,
         writer: &mut W,
         file_resolver: &mut F,
-        fastboot_proxy: FastbootProxy,
+        fastboot_interface: T,
     ) -> Result<()>
     where
         W: Write,
         F: FileResolver + Sync,
+        T: FastbootInterface,
     {
         let total_time = Utc::now();
-        prepare(writer, &fastboot_proxy).await?;
+        prepare(writer, &fastboot_interface).await?;
         match self {
-            Self::V1(v) => v.unlock(writer, file_resolver, fastboot_proxy).await?,
-            Self::V2(v) => v.unlock(writer, file_resolver, fastboot_proxy).await?,
-            Self::V3(v) => v.unlock(writer, file_resolver, fastboot_proxy).await?,
-            Self::Sdk(v) => v.unlock(writer, file_resolver, fastboot_proxy).await?,
+            Self::V1(v) => v.unlock(writer, file_resolver, fastboot_interface).await?,
+            Self::V2(v) => v.unlock(writer, file_resolver, fastboot_interface).await?,
+            Self::V3(v) => v.unlock(writer, file_resolver, fastboot_interface).await?,
+            Self::Sdk(v) => v.unlock(writer, file_resolver, fastboot_interface).await?,
         };
         let duration = Utc::now().signed_duration_since(total_time);
         writeln!(
@@ -407,25 +410,26 @@ impl Unlock for FlashManifestVersion {
 
 #[async_trait(?Send)]
 impl Boot for FlashManifestVersion {
-    async fn boot<W, F>(
+    async fn boot<W, F, T>(
         &self,
         writer: &mut W,
         file_resolver: &mut F,
         slot: String,
-        fastboot_proxy: FastbootProxy,
+        fastboot_interface: T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
         W: Write,
         F: FileResolver + Sync,
+        T: FastbootInterface,
     {
         let total_time = Utc::now();
-        prepare(writer, &fastboot_proxy).await?;
+        prepare(writer, &fastboot_interface).await?;
         match self {
-            Self::V1(v) => v.boot(writer, file_resolver, slot, fastboot_proxy, cmd).await?,
-            Self::V2(v) => v.boot(writer, file_resolver, slot, fastboot_proxy, cmd).await?,
-            Self::V3(v) => v.boot(writer, file_resolver, slot, fastboot_proxy, cmd).await?,
-            Self::Sdk(v) => v.boot(writer, file_resolver, slot, fastboot_proxy, cmd).await?,
+            Self::V1(v) => v.boot(writer, file_resolver, slot, fastboot_interface, cmd).await?,
+            Self::V2(v) => v.boot(writer, file_resolver, slot, fastboot_interface, cmd).await?,
+            Self::V3(v) => v.boot(writer, file_resolver, slot, fastboot_interface, cmd).await?,
+            Self::Sdk(v) => v.boot(writer, file_resolver, slot, fastboot_interface, cmd).await?,
         };
         let duration = Utc::now().signed_duration_since(total_time);
         writeln!(
@@ -441,10 +445,10 @@ impl Boot for FlashManifestVersion {
     }
 }
 
-pub async fn from_sdk<W: Write>(
+pub async fn from_sdk<W: Write, F: FastbootInterface>(
     sdk: &ffx_config::Sdk,
     writer: &mut W,
-    fastboot_proxy: FastbootProxy,
+    fastboot_interface: F,
     cmd: ManifestParams,
 ) -> Result<()> {
     tracing::debug!("fastboot manifest from_sdk");
@@ -458,7 +462,7 @@ pub async fn from_sdk<W: Write>(
                 resolver: Resolver::new(PathBuf::from(b))?,
                 version: FlashManifestVersion::from_product_bundle(&product_bundle)?,
             }
-            .flash(writer, fastboot_proxy, cmd)
+            .flash(writer, fastboot_interface, cmd)
             .await
         }
         None => ffx_bail!(
@@ -468,10 +472,10 @@ pub async fn from_sdk<W: Write>(
 }
 
 #[tracing::instrument(skip(writer, cmd))]
-pub async fn from_local_product_bundle<W: Write>(
+pub async fn from_local_product_bundle<W: Write, F: FastbootInterface>(
     writer: &mut W,
     path: PathBuf,
-    fastboot_proxy: FastbootProxy,
+    fastboot_interface: F,
     cmd: ManifestParams,
 ) -> Result<()> {
     tracing::debug!("fastboot manifest from_local_product_bundle");
@@ -480,35 +484,35 @@ pub async fn from_local_product_bundle<W: Write>(
         resolver: Resolver::new(path)?,
         version: FlashManifestVersion::from_product_bundle(&product_bundle)?,
     }
-    .flash(writer, fastboot_proxy, cmd)
+    .flash(writer, fastboot_interface, cmd)
     .await
 }
 
-pub async fn from_in_tree<W: Write>(
+pub async fn from_in_tree<W: Write, T: FastbootInterface>(
     sdk: &ffx_config::Sdk,
     writer: &mut W,
     path: PathBuf,
-    fastboot_proxy: FastbootProxy,
+    fastboot_interface: T,
     cmd: ManifestParams,
 ) -> Result<()> {
     tracing::debug!("fastboot manifest from_in_tree");
     if cmd.product_bundle.is_some() {
         tracing::debug!("in tree, but product bundle specified, use in-tree sdk");
-        from_sdk(sdk, writer, fastboot_proxy, cmd).await
+        from_sdk(sdk, writer, fastboot_interface, cmd).await
     } else {
         FlashManifest {
             resolver: Resolver::new(path.clone())?,
             version: FlashManifestVersion::from_in_tree(path.clone())?,
         }
-        .flash(writer, fastboot_proxy, cmd)
+        .flash(writer, fastboot_interface, cmd)
         .await
     }
 }
 
-pub async fn from_path<W: Write>(
+pub async fn from_path<W: Write, T: FastbootInterface>(
     writer: &mut W,
     path: PathBuf,
-    fastboot_proxy: FastbootProxy,
+    fastboot_interface: T,
     cmd: ManifestParams,
 ) -> Result<()> {
     tracing::debug!("fastboot manifest from_path");
@@ -516,15 +520,19 @@ pub async fn from_path<W: Write>(
         Some(ext) => {
             if ext == "zip" {
                 let r = ArchiveResolver::new(writer, path)?;
-                load_flash_manifest(r)?.flash(writer, fastboot_proxy, cmd).await
+                load_flash_manifest(r)?.flash(writer, fastboot_interface, cmd).await
             } else if ext == "tgz" || ext == "tar.gz" || ext == "tar" {
                 let r = TarResolver::new(writer, path)?;
-                load_flash_manifest(r)?.flash(writer, fastboot_proxy, cmd).await
+                load_flash_manifest(r)?.flash(writer, fastboot_interface, cmd).await
             } else {
-                load_flash_manifest(Resolver::new(path)?)?.flash(writer, fastboot_proxy, cmd).await
+                load_flash_manifest(Resolver::new(path)?)?
+                    .flash(writer, fastboot_interface, cmd)
+                    .await
             }
         }
-        _ => load_flash_manifest(Resolver::new(path)?)?.flash(writer, fastboot_proxy, cmd).await,
+        _ => {
+            load_flash_manifest(Resolver::new(path)?)?.flash(writer, fastboot_interface, cmd).await
+        }
     }
 }
 
@@ -541,24 +549,25 @@ pub struct FlashManifest<F: FileResolver + Sync> {
 }
 
 impl<F: FileResolver + Sync> FlashManifest<F> {
-    pub async fn flash<W: Write>(
+    #[tracing::instrument(skip(self, writer, cmd))]
+    pub async fn flash<W: Write, T: FastbootInterface>(
         &mut self,
         writer: &mut W,
-        fastboot_proxy: FastbootProxy,
+        fastboot_interface: T,
         cmd: ManifestParams,
     ) -> Result<()> {
         match &cmd.op {
             Command::Flash => {
-                self.version.flash(writer, &mut self.resolver, fastboot_proxy, cmd).await
+                self.version.flash(writer, &mut self.resolver, fastboot_interface, cmd).await
             }
             Command::Unlock(_) => {
                 // Using the manifest, don't need the unlock credential from the UnlockCommand
                 // here.
-                self.version.unlock(writer, &mut self.resolver, fastboot_proxy).await
+                self.version.unlock(writer, &mut self.resolver, fastboot_interface).await
             }
             Command::Boot(BootParams { slot, .. }) => {
                 self.version
-                    .boot(writer, &mut self.resolver, slot.to_owned(), fastboot_proxy, cmd)
+                    .boot(writer, &mut self.resolver, slot.to_owned(), fastboot_interface, cmd)
                     .await
             }
         }

@@ -69,11 +69,13 @@ impl Fastboot {
         }
     }
 
+    #[tracing::instrument(skip(self, stream))]
     pub async fn handle_fastboot_requests_from_stream(
         &mut self,
         mut stream: FastbootRequestStream,
     ) -> Result<()> {
         while let Some(req) = stream.try_next().await? {
+            tracing::debug!("Got fastboot request: {:#?}", req);
             if let Some((_, interface)) = self.target.fastboot_address() {
                 match interface {
                     FastbootInterface::Tcp => match self.tcp.handle_fastboot_request(req).await {

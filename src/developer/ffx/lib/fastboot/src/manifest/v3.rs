@@ -4,6 +4,7 @@
 
 use crate::{
     common::cmd::{ManifestParams, OemFile},
+    common::fastboot_interface::FastbootInterface,
     file_resolver::FileResolver,
     manifest::{
         v1::{FlashManifest as FlashManifestV1, Partition as PartitionV1, Product as ProductV1},
@@ -13,7 +14,6 @@ use crate::{
 };
 use anyhow::Result;
 use async_trait::async_trait;
-use fidl_fuchsia_developer_ffx::FastbootProxy;
 use serde::{Deserialize, Serialize};
 use std::{convert::From, io::Write};
 
@@ -101,55 +101,58 @@ impl From<&FlashManifest> for FlashManifestV2 {
 #[async_trait(?Send)]
 impl Flash for FlashManifest {
     #[tracing::instrument(skip(writer, file_resolver, cmd))]
-    async fn flash<W, F>(
+    async fn flash<W, F, T>(
         &self,
         writer: &mut W,
         file_resolver: &mut F,
-        fastboot_proxy: FastbootProxy,
+        fastboot_interface: T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
         W: Write,
         F: FileResolver + Sync,
+        T: FastbootInterface,
     {
         let v2: FlashManifestV2 = self.into();
-        v2.flash(writer, file_resolver, fastboot_proxy, cmd).await
+        v2.flash(writer, file_resolver, fastboot_interface, cmd).await
     }
 }
 
 #[async_trait(?Send)]
 impl Unlock for FlashManifest {
-    async fn unlock<W, F>(
+    async fn unlock<W, F, T>(
         &self,
         writer: &mut W,
         file_resolver: &mut F,
-        fastboot_proxy: FastbootProxy,
+        fastboot_interface: T,
     ) -> Result<()>
     where
         W: Write,
         F: FileResolver + Sync,
+        T: FastbootInterface,
     {
         let v2: FlashManifestV2 = self.into();
-        v2.unlock(writer, file_resolver, fastboot_proxy).await
+        v2.unlock(writer, file_resolver, fastboot_interface).await
     }
 }
 
 #[async_trait(?Send)]
 impl Boot for FlashManifest {
-    async fn boot<W, F>(
+    async fn boot<W, F, T>(
         &self,
         writer: &mut W,
         file_resolver: &mut F,
         slot: String,
-        fastboot_proxy: FastbootProxy,
+        fastboot_interface: T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
         W: Write,
         F: FileResolver + Sync,
+        T: FastbootInterface,
     {
         let v2: FlashManifestV2 = self.into();
-        v2.boot(writer, file_resolver, slot, fastboot_proxy, cmd).await
+        v2.boot(writer, file_resolver, slot, fastboot_interface, cmd).await
     }
 }
 

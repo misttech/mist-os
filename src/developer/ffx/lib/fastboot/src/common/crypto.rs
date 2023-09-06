@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::common::{done_time, handle_upload_progress_for_staging, is_locked, map_fidl_error};
+use crate::common::fastboot_interface::{FastbootInterface, UploadProgress};
+use crate::common::{done_time, handle_upload_progress_for_staging, is_locked};
 use crate::file_resolver::FileResolver;
 use anyhow::{anyhow, bail, Result};
 use async_fs::OpenOptions;
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::Utc;
 use errors::{ffx_bail, ffx_error};
-use fidl::endpoints::create_endpoints;
-use fidl_fuchsia_developer_ffx::{FastbootProxy, UploadProgressListenerMarker};
 use futures::{prelude::*, try_join};
 use ring::{
     rand,
@@ -22,6 +21,8 @@ use std::{
     path::{Path, PathBuf},
 };
 use tempfile::tempdir;
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::{Receiver, Sender};
 use zip::read::ZipArchive;
 
 const UNLOCK_CHALLENGE: &str = "vx-get-unlock-challenge";
@@ -51,18 +52,17 @@ impl UnlockChallenge {
     }
 }
 
-async fn get_unlock_challenge(fastboot_proxy: &FastbootProxy) -> Result<UnlockChallenge> {
+async fn get_unlock_challenge(fastboot_interface: &impl FastbootInterface) -> Result<UnlockChallenge> {
     let dir = tempdir()?;
     let path = dir.path().join("challenge");
     let filepath = path.to_str().ok_or(anyhow!("error getting tempfile path"))?;
-    fastboot_proxy
-        .oem(UNLOCK_CHALLENGE)
-        .await?
-        .map_err(|_| anyhow!("There was an error sending oem command \"{}\"", UNLOCK_CHALLENGE))?;
-    fastboot_proxy
+    fastboot_interface.oem(UNLOCK_CHALLENGE).await.map_err(|e| {
+        anyhow!("There was an error sending oem command \"{}\": {}", UNLOCK_CHALLENGE, e)
+    })?;
+    fastboot_interface
         .get_staged(filepath)
-        .await?
-        .map_err(|_| anyhow!("There was an error sending upload command"))?;
+        .await
+        .map_err(|e| anyhow!("There was an error sending upload command: {}", e))?;
     let mut file = OpenOptions::new().read(true).open(path.clone()).await?;
     let size = file.metadata().await?.len();
     if size != CHALLENGE_STRUCT_SIZE {
@@ -159,11 +159,11 @@ impl UnlockCredentials {
     }
 }
 
-pub async fn unlock_device<W: Write, F: FileResolver + Sync>(
+pub async fn unlock_device<W: Write, F: FileResolver + Sync, T: FastbootInterface>(
     writer: &mut W,
     file_resolver: &mut F,
     creds: &Vec<String>,
-    fastboot_proxy: &FastbootProxy,
+    fastboot_interface: &T,
 ) -> Result<()> {
     if creds.len() == 0 {
         ffx_bail!("No credentials given. Could not unlock device.")
@@ -171,24 +171,24 @@ pub async fn unlock_device<W: Write, F: FileResolver + Sync>(
     let search = Utc::now();
     write!(writer, "Looking for unlock credentials...")?;
     writer.flush()?;
-    let challenge = get_unlock_challenge(&fastboot_proxy).await?;
+    let challenge = get_unlock_challenge(fastboot_interface).await?;
     for cred in creds {
         let cred_file = file_resolver.get_file(writer, cred).await?;
         let unlock_creds = UnlockCredentials::new(&cred_file).await?;
         if challenge.product_id_hash[..] == *unlock_creds.get_atx_certificate_subject() {
             let d = Utc::now().signed_duration_since(search);
             done_time(writer, d)?;
-            return unlock_device_with_creds(writer, unlock_creds, challenge, fastboot_proxy).await;
+            return unlock_device_with_creds(writer, unlock_creds, challenge, fastboot_interface).await;
         }
     }
     ffx_bail!("Key mismatch. Credentials given could not unlock the device.")
 }
 
-async fn unlock_device_with_creds<W: Write>(
+async fn unlock_device_with_creds<W: Write, F: FastbootInterface>(
     writer: &mut W,
     unlock_creds: UnlockCredentials,
     challenge: UnlockChallenge,
-    fastboot_proxy: &FastbootProxy,
+    fastboot_interface: &F,
 ) -> Result<()> {
     let gen = Utc::now();
     write!(writer, "Generating unlock token...")?;
@@ -225,21 +225,24 @@ async fn unlock_device_with_creds<W: Write>(
     writeln!(writer, "Preparing to upload unlock token")?;
 
     let file_path = path.to_str().ok_or(anyhow!("Could not get path for temporary token file"))?;
-    let (prog_client, prog_server) = create_endpoints::<UploadProgressListenerMarker>();
+    let (prog_client, prog_server): (Sender<UploadProgress>, Receiver<UploadProgress>) =
+        mpsc::channel(1);
+    let path = file_path.to_string();
     try_join!(
-        fastboot_proxy.stage(&file_path.to_string(), prog_client).map_err(map_fidl_error),
+        fastboot_interface.stage(&path, prog_client).map_err(|e| anyhow!(
+            "There was an error staging {}: {:?}",
+            file_path,
+            e
+        )),
         handle_upload_progress_for_staging(writer, prog_server),
-    )
-    .and_then(|(stage, _)| {
-        stage.map_err(|e| anyhow!("There was an error staging {}: {:?}", file_path, e))
-    })?;
+    )?;
 
-    fastboot_proxy
+    fastboot_interface
         .oem("vx-unlock")
-        .await?
-        .map_err(|_| anyhow!("There was an error sending vx-unlock command"))?;
+        .await
+        .map_err(|e| anyhow!("There was an error sending vx-unlock command: {}", e))?;
 
-    match is_locked(fastboot_proxy).await {
+    match is_locked(fastboot_interface).await {
         Ok(true) => bail!("Could not unlock device."),
         Ok(false) => Ok(()),
         Err(e) => bail!("Could not verify unlocking worked: {}", e),

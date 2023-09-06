@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::common::{map_fidl_error, stage_file};
+use crate::common::fastboot_interface::FastbootInterface;
+use crate::common::stage_file;
 use crate::file_resolver::FileResolver;
 use anyhow::{anyhow, Result};
 use byteorder::{ByteOrder, LittleEndian};
-use fidl_fuchsia_developer_ffx::FastbootProxy;
 use std::{
     convert::TryInto,
     fs::{metadata, File},
@@ -64,12 +64,12 @@ async fn get_boot_image<W: Write, F: FileResolver + Sync>(
     }
 }
 
-pub async fn boot<W: Write, F: FileResolver + Sync>(
+pub async fn boot<W: Write, F: FileResolver + Sync, T: FastbootInterface>(
     writer: &mut W,
     file_resolver: &mut F,
     zbi: String,
     vbmeta: Option<String>,
-    fastboot_proxy: &FastbootProxy,
+    fastboot_interface: &T,
 ) -> Result<()> {
     writeln!(writer, "Creating boot image...")?;
     let temp_dir = tempdir()?;
@@ -109,15 +109,11 @@ pub async fn boot<W: Write, F: FileResolver + Sync>(
         file_resolver,
         false, /* resolve */
         path.to_str().ok_or(anyhow!("Could not get temp boot image path"))?,
-        fastboot_proxy,
+        fastboot_interface,
     )
     .await?;
 
-    fastboot_proxy
-        .boot()
-        .await
-        .map_err(map_fidl_error)?
-        .map_err(|e| anyhow!("Fastboot error: {:?}", e))?;
+    fastboot_interface.boot().await.map_err(|e| anyhow!("Fastboot error: {:?}", e))?;
 
     Ok(())
 }

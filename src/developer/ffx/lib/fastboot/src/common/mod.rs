@@ -4,28 +4,23 @@
 
 use crate::{
     common::cmd::{ManifestParams, OemFile},
+    common::fastboot_interface::{FastbootInterface, RebootEvent, UploadProgress},
     common::vars::{IS_USERSPACE_VAR, LOCKED_VAR, MAX_DOWNLOAD_SIZE_VAR, REVISION_VAR},
     file_resolver::FileResolver,
     manifest::{from_in_tree, from_local_product_bundle, from_path, from_sdk},
 };
-use anyhow::{anyhow, bail, Context, Error, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use errors::ffx_bail;
-use fidl::{
-    endpoints::{create_endpoints, ServerEnd},
-    Error as FidlError,
-};
-use fidl_fuchsia_developer_ffx::{
-    FastbootProxy, RebootError, RebootListenerMarker, RebootListenerRequest,
-    UploadProgressListenerMarker, UploadProgressListenerRequest,
-};
 use futures::{prelude::*, try_join};
 use pbms::is_local_product_bundle;
 use sdk::SdkVersion;
 use sparse::build_sparse_files;
 use std::{convert::Into, io::Write, path::PathBuf};
 use termion::{color, style};
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::{Receiver, Sender};
 
 pub const MISSING_CREDENTIALS: &str =
     "The flash manifest is missing the credential files to unlock this device.\n\
@@ -33,6 +28,8 @@ pub const MISSING_CREDENTIALS: &str =
 
 pub mod cmd;
 pub mod crypto;
+pub mod fastboot_interface;
+pub mod fidl_fastboot_compatibility;
 pub mod vars;
 
 pub trait Partition {
@@ -50,29 +47,31 @@ pub trait Product<P> {
 
 #[async_trait(?Send)]
 pub trait Flash {
-    async fn flash<W, F>(
+    async fn flash<W, F, T>(
         &self,
         writer: &mut W,
         file_resolver: &mut F,
-        fastboot_proxy: FastbootProxy,
+        fastboot_interface: T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
         W: Write,
-        F: FileResolver + Sync;
+        F: FileResolver + Sync,
+        T: FastbootInterface;
 }
 
 #[async_trait(?Send)]
 pub trait Unlock {
-    async fn unlock<W, F>(
+    async fn unlock<W, F, T>(
         &self,
         _writer: &mut W,
         _file_resolver: &mut F,
-        _fastboot_proxy: FastbootProxy,
+        _fastboot_interface: T,
     ) -> Result<()>
     where
         W: Write,
         F: FileResolver + Sync,
+        T: FastbootInterface,
     {
         ffx_bail!(
             "This manifest does not support unlocking target devices. \n\
@@ -83,17 +82,18 @@ pub trait Unlock {
 
 #[async_trait(?Send)]
 pub trait Boot {
-    async fn boot<W, F>(
+    async fn boot<W, F, T>(
         &self,
-        _writer: &mut W,
-        _file_resolver: &mut F,
-        _slot: String,
-        _fastboot_proxy: FastbootProxy,
-        _cmd: ManifestParams,
+        writer: &mut W,
+        file_resolver: &mut F,
+        slot: String,
+        fastboot_interface: T,
+        cmd: ManifestParams,
     ) -> Result<()>
     where
         W: Write,
-        F: FileResolver + Sync;
+        F: FileResolver + Sync,
+        T: FastbootInterface;
 }
 
 pub const MISSING_PRODUCT: &str = "Manifest does not contain product";
@@ -103,15 +103,6 @@ const LOCK_COMMAND: &str = "vx-lock";
 
 pub const UNLOCK_ERR: &str = "The product requires the target to be unlocked. \
                                      Please unlock target and try again.";
-
-pub fn map_fidl_error(e: FidlError) -> Error {
-    tracing::error!("FIDL Communication error: {}", e);
-    anyhow!(
-        "There was an error communicating with the daemon:\n{}\n\
-        Try running `ffx doctor` for further diagnositcs.",
-        e
-    )
-}
 
 pub fn done_time<W: Write>(writer: &mut W, duration: Duration) -> std::io::Result<()> {
     writeln!(
@@ -128,16 +119,15 @@ pub fn done_time<W: Write>(writer: &mut W, duration: Duration) -> std::io::Resul
 
 async fn handle_upload_progress_for_upload<W: Write>(
     writer: &mut W,
-    prog_server: ServerEnd<UploadProgressListenerMarker>,
+    mut prog_server: Receiver<UploadProgress>,
     mut on_large: impl FnMut() -> (),
     mut on_finished: impl FnMut(&mut W) -> Result<()>,
 ) -> Result<Option<DateTime<Utc>>> {
-    let mut stream = prog_server.into_stream()?;
     let mut start_time: Option<DateTime<Utc>> = None;
     let mut finish_time: Option<DateTime<Utc>> = None;
     loop {
-        match stream.try_next().await? {
-            Some(UploadProgressListenerRequest::OnStarted { size, .. }) => {
+        match prog_server.recv().await {
+            Some(UploadProgress::OnStarted { size, .. }) => {
                 start_time.replace(Utc::now());
                 tracing::debug!("Upload started: {}", size);
                 write!(writer, "Uploading... ")?;
@@ -147,7 +137,7 @@ async fn handle_upload_progress_for_upload<W: Write>(
                 }
                 writer.flush()?;
             }
-            Some(UploadProgressListenerRequest::OnFinished { .. }) => {
+            Some(UploadProgress::OnFinished { .. }) => {
                 if let Some(st) = start_time {
                     let d = Utc::now().signed_duration_since(st);
                     tracing::debug!("Upload duration: {:.2}s", (d.num_milliseconds() / 1000));
@@ -161,11 +151,11 @@ async fn handle_upload_progress_for_upload<W: Write>(
                 finish_time.replace(Utc::now());
                 tracing::debug!("Upload finished");
             }
-            Some(UploadProgressListenerRequest::OnError { error, .. }) => {
+            Some(UploadProgress::OnError { error, .. }) => {
                 tracing::error!("{}", error);
                 ffx_bail!("{}", error)
             }
-            Some(UploadProgressListenerRequest::OnProgress { bytes_written, .. }) => {
+            Some(UploadProgress::OnProgress { bytes_written, .. }) => {
                 tracing::debug!("Upload progress: {}", bytes_written);
             }
             None => return Ok(finish_time),
@@ -175,7 +165,7 @@ async fn handle_upload_progress_for_upload<W: Write>(
 
 async fn handle_upload_progress_for_staging<W: Write>(
     writer: &mut W,
-    prog_server: ServerEnd<UploadProgressListenerMarker>,
+    prog_server: Receiver<UploadProgress>,
 ) -> Result<Option<DateTime<Utc>>> {
     handle_upload_progress_for_upload(writer, prog_server, move || {}, move |_writer| Ok(())).await
 }
@@ -183,7 +173,7 @@ async fn handle_upload_progress_for_staging<W: Write>(
 async fn handle_upload_progress_for_flashing<W: Write>(
     name: &str,
     writer: &mut W,
-    prog_server: ServerEnd<UploadProgressListenerMarker>,
+    prog_server: Receiver<UploadProgress>,
 ) -> Result<Option<DateTime<Utc>>> {
     // Using a boolean results in a warning that the variable is never read.
     let mut is_large: Option<()> = None;
@@ -205,14 +195,15 @@ async fn handle_upload_progress_for_flashing<W: Write>(
     .await
 }
 
-pub async fn stage_file<W: Write, F: FileResolver + Sync>(
+pub async fn stage_file<W: Write, F: FileResolver + Sync, T: FastbootInterface>(
     writer: &mut W,
     file_resolver: &mut F,
     resolve: bool,
     file: &str,
-    fastboot_proxy: &FastbootProxy,
+    fastboot_interface: &T,
 ) -> Result<()> {
-    let (prog_client, prog_server) = create_endpoints::<UploadProgressListenerMarker>();
+    let (prog_client, prog_server): (Sender<UploadProgress>, Receiver<UploadProgress>) =
+        mpsc::channel(1);
     let file_to_upload = if resolve {
         file_resolver.get_file(writer, file).await.context("reconciling file for upload")?
     } else {
@@ -220,27 +211,32 @@ pub async fn stage_file<W: Write, F: FileResolver + Sync>(
     };
     writeln!(writer, "Preparing to stage {}", file_to_upload)?;
     try_join!(
-        fastboot_proxy.stage(&file_to_upload, prog_client).map_err(map_fidl_error),
+        fastboot_interface.stage(&file_to_upload, prog_client).map_err(|e| anyhow!(e)),
         handle_upload_progress_for_staging(writer, prog_server),
     )
-    .and_then(|(stage, _)| {
-        stage.map_err(|e| anyhow!("There was an error staging {}: {:?}", file_to_upload, e))
-    })
+    .map_err(|e| anyhow!("There was an error staging {}: {:?}", file_to_upload, e))?;
+    Ok(())
 }
 
 #[tracing::instrument(skip(writer))]
-async fn do_flash<W: Write>(
+async fn do_flash<W: Write, F: FastbootInterface>(
     writer: &mut W,
     name: &str,
-    fastboot_proxy: &FastbootProxy,
+    fastboot_interface: &F,
     file_to_upload: &str,
 ) -> Result<()> {
-    let (prog_client, prog_server) = create_endpoints::<UploadProgressListenerMarker>();
+    let (prog_client, prog_server): (Sender<UploadProgress>, Receiver<UploadProgress>) =
+        mpsc::channel(1);
     try_join!(
-        fastboot_proxy.flash(name, file_to_upload, prog_client).map_err(map_fidl_error),
+        fastboot_interface.flash(name, file_to_upload, prog_client).map_err(|e| anyhow!(
+            "There was an error flashing \"{}\" - {}: {:?}",
+            name,
+            file_to_upload,
+            e
+        )),
         handle_upload_progress_for_flashing(name, writer, prog_server),
     )
-    .and_then(|(flash, prog)| {
+    .and_then(|(_, prog)| {
         if let Some(p) = prog {
             let d = Utc::now().signed_duration_since(p);
             tracing::debug!("Partition duration: {:.2}s", (d.num_milliseconds() / 1000));
@@ -250,18 +246,16 @@ async fn do_flash<W: Write>(
             writeln!(writer, "{}Done{}", color::Fg(color::Green), style::Reset)?;
             writer.flush()?;
         }
-        flash.map_err(|e| {
-            anyhow!("There was an error flashing \"{}\" - {}: {:?}", name, file_to_upload, e)
-        })
+        Ok(())
     })
 }
 
 #[tracing::instrument(skip(writer))]
-async fn flash_partition_sparse<W: Write>(
+async fn flash_partition_sparse<W: Write, F: FastbootInterface>(
     writer: &mut W,
     name: &str,
     file_to_upload: &str,
-    fastboot_proxy: &FastbootProxy,
+    fastboot_interface: &F,
     max_download_size: u64,
 ) -> Result<()> {
     writeln!(writer, "Preparing to flash {} in sparse mode", file_to_upload)?;
@@ -277,19 +271,19 @@ async fn flash_partition_sparse<W: Write>(
         let tmp_file_name = tmp_file_path.to_str().unwrap();
         writeln!(writer, "For partition: {}, flashing sparse image file {}", name, tmp_file_name)?;
 
-        do_flash(writer, name, fastboot_proxy, tmp_file_name).await?;
+        do_flash(writer, name, fastboot_interface, tmp_file_name).await?;
     }
 
     Ok(())
 }
 
 #[tracing::instrument(skip(writer, file_resolver))]
-pub async fn flash_partition<W: Write, F: FileResolver + Sync>(
+pub async fn flash_partition<W: Write, F: FileResolver + Sync, T: FastbootInterface>(
     writer: &mut W,
     file_resolver: &mut F,
     name: &str,
     file: &str,
-    fastboot_proxy: &FastbootProxy,
+    fastboot_interface: &T,
 ) -> Result<()> {
     let file_to_upload =
         file_resolver.get_file(writer, file).await.context("reconciling file for upload")?;
@@ -308,10 +302,9 @@ pub async fn flash_partition<W: Write, F: FileResolver + Sync>(
         })?
         .len();
 
-    let max_download_size_var = fastboot_proxy
+    let max_download_size_var = fastboot_interface
         .get_var(MAX_DOWNLOAD_SIZE_VAR)
         .await
-        .map_err(map_fidl_error)?
         .map_err(|e| anyhow!("Communication error with the device: {:?}", e))?;
 
     tracing::trace!("Got max download size from device: {}", max_download_size_var);
@@ -334,19 +327,21 @@ pub async fn flash_partition<W: Write, F: FileResolver + Sync>(
             writer,
             name,
             &file_to_upload,
-            fastboot_proxy,
+            fastboot_interface,
             max_download_size,
         )
         .await;
     }
-    do_flash(writer, name, fastboot_proxy, &file_to_upload).await
+    do_flash(writer, name, fastboot_interface, &file_to_upload).await
 }
 
-pub async fn verify_hardware(revision: &String, fastboot_proxy: &FastbootProxy) -> Result<()> {
-    let rev = fastboot_proxy
+pub async fn verify_hardware(
+    revision: &String,
+    fastboot_interface: &impl FastbootInterface,
+) -> Result<()> {
+    let rev = fastboot_interface
         .get_var(REVISION_VAR)
         .await
-        .map_err(map_fidl_error)?
         .map_err(|e| anyhow!("Communication error with the device: {:?}", e))?;
     if let Some(r) = rev.split("-").next() {
         if r != *revision && rev != *revision {
@@ -365,140 +360,122 @@ pub async fn verify_hardware(revision: &String, fastboot_proxy: &FastbootProxy) 
 pub async fn verify_variable_value(
     var: &str,
     value: &str,
-    fastboot_proxy: &FastbootProxy,
+    fastboot_interface: &impl FastbootInterface,
 ) -> Result<bool> {
-    fastboot_proxy
+    fastboot_interface
         .get_var(var)
         .await
-        .map_err(map_fidl_error)?
         .map_err(|e| anyhow!("Communication error with the device: {:?}", e))
         .map(|res| res == value)
 }
 
 #[tracing::instrument(skip(writer))]
-pub async fn reboot_bootloader<W: Write>(
+pub async fn reboot_bootloader<W: Write, F: FastbootInterface>(
     writer: &mut W,
-    fastboot_proxy: &FastbootProxy,
+    fastboot_interface: &F,
 ) -> Result<()> {
     write!(writer, "Rebooting to bootloader... ")?;
     writer.flush()?;
-    let (reboot_client, reboot_server) = create_endpoints::<RebootListenerMarker>();
-    let mut stream = reboot_server.into_stream()?;
+    let (reboot_client, mut reboot_server): (Sender<RebootEvent>, Receiver<RebootEvent>) =
+        mpsc::channel(1);
     let start_time = Utc::now();
-    try_join!(fastboot_proxy.reboot_bootloader(reboot_client).map_err(map_fidl_error), async move {
-        if let Some(RebootListenerRequest::OnReboot { control_handle: _ }) =
-            stream.try_next().await?
-        {
-            Ok(())
-        } else {
-            bail!("Did not receive reboot signal");
+    try_join!(
+        fastboot_interface.reboot_bootloader(reboot_client).map_err(|e| anyhow!(e)),
+        async move {
+            match reboot_server.recv().await {
+                Some(RebootEvent::OnReboot) => {
+                    return Ok(());
+                }
+                None => {
+                    bail!("Did not receive reboot signal");
+                }
+            };
         }
-    })
-    .and_then(|(reboot, _)| {
-        let d = Utc::now().signed_duration_since(start_time);
-        tracing::debug!("Reboot duration: {:.2}s", (d.num_milliseconds() / 1000));
-        done_time(writer, d)?;
-        reboot.or_else(map_reboot_error)
-    })
+    )?;
+
+    let d = Utc::now().signed_duration_since(start_time);
+    tracing::debug!("Reboot duration: {:.2}s", (d.num_milliseconds() / 1000));
+    done_time(writer, d)?;
+    Ok(())
 }
 
-const REBOOT_MANUALLY: &str =
-    "\nIf the device did not reboot into the Fastboot state, try rebooting \n\
-     it manually and re-running the command. Otherwise, try re-running the \n\
-     command.";
-
-const TIMED_OUT: &str = "\nTimed out while waiting to rediscover device in Fastboot.";
-const SEND_TARGET_REBOOT: &str = "\nFailed while sending the target a reboot signal.";
-const SEND_ON_REBOOT: &str = "\nThere was an issue communication with the daemon.";
-const ZEDBOOT_COMMUNICATION: &str = "\nFailed to send the Zedboot reboot signal.";
-const NO_ZEDBOOT_ADDRESS: &str = "\nUnknown Zedboot address.";
-const TARGET_COMMUNICATION: &str = "\nThere was an issue communication with the target";
-const FASTBOOT_ERROR: &str = "\nThere was an issue sending the Fastboot reboot command";
-
-fn map_reboot_error(err: RebootError) -> Result<()> {
-    match err {
-        RebootError::TimedOut => ffx_bail!("{}{}", TIMED_OUT, REBOOT_MANUALLY),
-        RebootError::FailedToSendTargetReboot => {
-            ffx_bail!("{}{}", SEND_TARGET_REBOOT, REBOOT_MANUALLY)
-        }
-        RebootError::FailedToSendOnReboot => bail!("{}", SEND_ON_REBOOT),
-        RebootError::ZedbootCommunicationError => {
-            ffx_bail!("{}{}", ZEDBOOT_COMMUNICATION, REBOOT_MANUALLY)
-        }
-        RebootError::NoZedbootAddress => bail!("{}", NO_ZEDBOOT_ADDRESS),
-        RebootError::TargetCommunication => {
-            ffx_bail!("{}{}", TARGET_COMMUNICATION, REBOOT_MANUALLY)
-        }
-        RebootError::FastbootError => ffx_bail!("{}", FASTBOOT_ERROR),
-    }
-}
-
-pub async fn prepare<W: Write>(writer: &mut W, fastboot_proxy: &FastbootProxy) -> Result<()> {
-    let (reboot_client, reboot_server) = create_endpoints::<RebootListenerMarker>();
-    let mut stream = reboot_server.into_stream()?;
+pub async fn prepare<W: Write, F: FastbootInterface>(
+    writer: &mut W,
+    fastboot_interface: &F,
+) -> Result<()> {
+    let (reboot_client, mut reboot_server): (Sender<RebootEvent>, Receiver<RebootEvent>) =
+        mpsc::channel(1);
     let mut start_time = None;
     writer.flush()?;
-    try_join!(fastboot_proxy.prepare(reboot_client).map_err(map_fidl_error), async {
-        if let Some(RebootListenerRequest::OnReboot { control_handle: _ }) =
-            stream.try_next().await?
-        {
-            start_time.replace(Utc::now());
-            write!(writer, "Rebooting to bootloader... ")?;
-            writer.flush()?;
+
+    try_join!(fastboot_interface.prepare(reboot_client).map_err(|e| anyhow!(e)), async {
+        match reboot_server.recv().await {
+            Some(RebootEvent::OnReboot) => {
+                start_time.replace(Utc::now());
+                write!(writer, "Rebooting to bootloader... ")?;
+                writer.flush()?;
+                return Ok(());
+            }
+            None => {
+                return Ok(());
+            }
         }
-        Ok(())
-    })
-    .and_then(|(prepare, _)| {
-        if let Some(s) = start_time {
-            let d = Utc::now().signed_duration_since(s);
-            tracing::debug!("Reboot duration: {:.2}s", (d.num_milliseconds() / 1000));
-            done_time(writer, d)?;
-        }
-        prepare.or_else(map_reboot_error)
-    })
+    })?;
+
+    if let Some(s) = start_time {
+        let d = Utc::now().signed_duration_since(s);
+        tracing::debug!("Reboot duration: {:.2}s", (d.num_milliseconds() / 1000));
+        done_time(writer, d)?;
+    }
+    Ok(())
 }
 
-pub async fn stage_oem_files<W: Write, F: FileResolver + Sync>(
+pub async fn stage_oem_files<W: Write, F: FileResolver + Sync, T: FastbootInterface>(
     writer: &mut W,
     file_resolver: &mut F,
     resolve: bool,
     oem_files: &Vec<OemFile>,
-    fastboot_proxy: &FastbootProxy,
+    fastboot_interface: &T,
 ) -> Result<()> {
     for oem_file in oem_files {
-        stage_file(writer, file_resolver, resolve, oem_file.file(), &fastboot_proxy).await?;
+        stage_file(writer, file_resolver, resolve, oem_file.file(), fastboot_interface).await?;
         writeln!(writer, "Sending command \"{}\"", oem_file.command())?;
-        fastboot_proxy.oem(oem_file.command()).await?.map_err(|_| {
+        fastboot_interface.oem(oem_file.command()).await.map_err(|_| {
             anyhow!("There was an error sending oem command \"{}\"", oem_file.command())
         })?;
     }
     Ok(())
 }
 
-pub async fn set_slot_a_active(fastboot_proxy: &FastbootProxy) -> Result<()> {
-    if fastboot_proxy.erase("misc").await?.is_err() {
+pub async fn set_slot_a_active(fastboot_interface: &impl FastbootInterface) -> Result<()> {
+    if fastboot_interface.erase("misc").await.is_err() {
         tracing::debug!("Could not erase misc partition");
     }
-    fastboot_proxy.set_active("a").await?.map_err(|_| anyhow!("Could not set active slot"))
+    fastboot_interface.set_active("a").await.map_err(|_| anyhow!("Could not set active slot"))
 }
 
 #[tracing::instrument(skip(writer, file_resolver, partitions))]
-pub async fn flash_partitions<W: Write, F: FileResolver + Sync, P: Partition>(
+pub async fn flash_partitions<
+    W: Write,
+    F: FileResolver + Sync,
+    P: Partition,
+    T: FastbootInterface,
+>(
     writer: &mut W,
     file_resolver: &mut F,
     partitions: &Vec<P>,
-    fastboot_proxy: &FastbootProxy,
+    fastboot_interface: &T,
 ) -> Result<()> {
     for partition in partitions {
         match (partition.variable(), partition.variable_value()) {
             (Some(var), Some(value)) => {
-                if verify_variable_value(var, value, fastboot_proxy).await? {
+                if verify_variable_value(var, value, fastboot_interface).await? {
                     flash_partition(
                         writer,
                         file_resolver,
                         partition.name(),
                         partition.file(),
-                        fastboot_proxy,
+                        fastboot_interface,
                     )
                     .await?;
                 }
@@ -509,7 +486,7 @@ pub async fn flash_partitions<W: Write, F: FileResolver + Sync, P: Partition>(
                     file_resolver,
                     partition.name(),
                     partition.file(),
-                    fastboot_proxy,
+                    fastboot_interface,
                 )
                 .await?
             }
@@ -519,11 +496,11 @@ pub async fn flash_partitions<W: Write, F: FileResolver + Sync, P: Partition>(
 }
 
 #[tracing::instrument(skip(writer, file_resolver, product, cmd))]
-pub async fn flash<W, F, Part, P>(
+pub async fn flash<W, F, Part, P, T>(
     writer: &mut W,
     file_resolver: &mut F,
     product: &P,
-    fastboot_proxy: &FastbootProxy,
+    fastboot_interface: &T,
     cmd: ManifestParams,
 ) -> Result<()>
 where
@@ -531,24 +508,25 @@ where
     F: FileResolver + Sync,
     Part: Partition,
     P: Product<Part>,
+    T: FastbootInterface,
 {
-    flash_bootloader(writer, file_resolver, product, fastboot_proxy, &cmd).await?;
-    flash_product(writer, file_resolver, product, fastboot_proxy, &cmd).await
+    flash_bootloader(writer, file_resolver, product, fastboot_interface, &cmd).await?;
+    flash_product(writer, file_resolver, product, fastboot_interface, &cmd).await
 }
 
-pub async fn is_userspace_fastboot(fastboot_proxy: &FastbootProxy) -> Result<bool> {
-    match fastboot_proxy.get_var(IS_USERSPACE_VAR).await.map_err(map_fidl_error)? {
+pub async fn is_userspace_fastboot(fastboot_interface: &impl FastbootInterface) -> Result<bool> {
+    match fastboot_interface.get_var(IS_USERSPACE_VAR).await {
         Ok(rev) => Ok(rev == "yes"),
         _ => Ok(false),
     }
 }
 
 #[tracing::instrument(skip(file_resolver, writer, cmd, product))]
-pub async fn flash_bootloader<W, F, Part, P>(
+pub async fn flash_bootloader<W, F, Part, P, T>(
     writer: &mut W,
     file_resolver: &mut F,
     product: &P,
-    fastboot_proxy: &FastbootProxy,
+    fastboot_interface: &T,
     cmd: &ManifestParams,
 ) -> Result<()>
 where
@@ -556,25 +534,26 @@ where
     F: FileResolver + Sync,
     Part: Partition,
     P: Product<Part>,
+    T: FastbootInterface,
 {
-    flash_partitions(writer, file_resolver, product.bootloader_partitions(), fastboot_proxy)
+    flash_partitions(writer, file_resolver, product.bootloader_partitions(), fastboot_interface)
         .await?;
     if product.bootloader_partitions().len() > 0
         && !cmd.no_bootloader_reboot
-        && !is_userspace_fastboot(fastboot_proxy).await?
+        && !is_userspace_fastboot(fastboot_interface).await?
     {
-        set_slot_a_active(&fastboot_proxy).await?;
-        reboot_bootloader(writer, &fastboot_proxy).await?;
+        set_slot_a_active(fastboot_interface).await?;
+        reboot_bootloader(writer, fastboot_interface).await?;
     }
     Ok(())
 }
 
 #[tracing::instrument(skip(writer, file_resolver, cmd, product))]
-pub async fn flash_product<W, F, Part, P>(
+pub async fn flash_product<W, F, Part, P, T>(
     writer: &mut W,
     file_resolver: &mut F,
     product: &P,
-    fastboot_proxy: &FastbootProxy,
+    fastboot_interface: &T,
     cmd: &ManifestParams,
 ) -> Result<()>
 where
@@ -582,22 +561,23 @@ where
     F: FileResolver + Sync,
     Part: Partition,
     P: Product<Part>,
+    T: FastbootInterface,
 {
-    flash_partitions(writer, file_resolver, product.partitions(), fastboot_proxy).await?;
-    if !cmd.no_bootloader_reboot && is_userspace_fastboot(fastboot_proxy).await? {
+    flash_partitions(writer, file_resolver, product.partitions(), fastboot_interface).await?;
+    if !cmd.no_bootloader_reboot && is_userspace_fastboot(fastboot_interface).await? {
         write!(writer, "Rebooting into updated userspace fastboot...\n")?;
-        reboot_bootloader(writer, &fastboot_proxy).await?;
+        reboot_bootloader(writer, fastboot_interface).await?;
     }
-    stage_oem_files(writer, file_resolver, false, &cmd.oem_stage, fastboot_proxy).await?;
-    stage_oem_files(writer, file_resolver, true, product.oem_files(), fastboot_proxy).await
+    stage_oem_files(writer, file_resolver, false, &cmd.oem_stage, fastboot_interface).await?;
+    stage_oem_files(writer, file_resolver, true, product.oem_files(), fastboot_interface).await
 }
 
 #[tracing::instrument(skip(writer, file_resolver, cmd, product))]
-pub async fn flash_and_reboot<W, F, Part, P>(
+pub async fn flash_and_reboot<W, F, Part, P, T>(
     writer: &mut W,
     file_resolver: &mut F,
     product: &P,
-    fastboot_proxy: &FastbootProxy,
+    fastboot_interface: &T,
     cmd: ManifestParams,
 ) -> Result<()>
 where
@@ -605,34 +585,35 @@ where
     F: FileResolver + Sync,
     Part: Partition,
     P: Product<Part>,
+    T: FastbootInterface,
 {
-    flash(writer, file_resolver, product, fastboot_proxy, cmd).await?;
-    finish(writer, fastboot_proxy).await
+    flash(writer, file_resolver, product, fastboot_interface, cmd).await?;
+    finish(writer, fastboot_interface).await
 }
 
-pub async fn finish<W: Write>(writer: &mut W, fastboot_proxy: &FastbootProxy) -> Result<()> {
-    set_slot_a_active(&fastboot_proxy).await?;
-    fastboot_proxy.continue_boot().await?.map_err(|_| anyhow!("Could not reboot device"))?;
+pub async fn finish<W: Write, F: FastbootInterface>(
+    writer: &mut W,
+    fastboot_interface: &F,
+) -> Result<()> {
+    set_slot_a_active(fastboot_interface).await?;
+    fastboot_interface.continue_boot().await.map_err(|_| anyhow!("Could not reboot device"))?;
     writeln!(writer, "Continuing to boot - this could take awhile")?;
     Ok(())
 }
 
-pub async fn is_locked(fastboot_proxy: &FastbootProxy) -> Result<bool> {
-    verify_variable_value(LOCKED_VAR, "no", &fastboot_proxy).await.map(|l| !l)
+pub async fn is_locked(fastboot_interface: &impl FastbootInterface) -> Result<bool> {
+    verify_variable_value(LOCKED_VAR, "no", fastboot_interface).await.map(|l| !l)
 }
 
-pub async fn lock_device(fastboot_proxy: &FastbootProxy) -> Result<()> {
-    fastboot_proxy.oem(LOCK_COMMAND).await?.map_err(|_| anyhow!("Could not lock device"))
+pub async fn lock_device(fastboot_interface: &impl FastbootInterface) -> Result<()> {
+    fastboot_interface.oem(LOCK_COMMAND).await.map_err(|_| anyhow!("Could not lock device"))
 }
 
-pub async fn from_manifest<W, C>(
-    writer: &mut W,
-    input: C,
-    fastboot_proxy: FastbootProxy,
-) -> Result<()>
+pub async fn from_manifest<W, C, F>(writer: &mut W, input: C, fastboot_interface: F) -> Result<()>
 where
     W: Write,
     C: Into<ManifestParams>,
+    F: FastbootInterface,
 {
     let cmd: ManifestParams = input.into();
     match &cmd.manifest {
@@ -640,11 +621,12 @@ where
             if !manifest.is_file() {
                 ffx_bail!("Manifest \"{}\" is not a file.", manifest.display());
             }
-            from_path(writer, manifest.to_path_buf(), fastboot_proxy, cmd).await
+            from_path(writer, manifest.to_path_buf(), fastboot_interface, cmd).await
         }
         None => {
             if let Some(path) = cmd.product_bundle.as_ref().filter(|s| is_local_product_bundle(s)) {
-                from_local_product_bundle(writer, PathBuf::from(&*path), fastboot_proxy, cmd).await
+                from_local_product_bundle(writer, PathBuf::from(&*path), fastboot_interface, cmd)
+                    .await
             } else {
                 let sdk = ffx_config::global_env_context()
                     .context("loading global environment context")?
@@ -655,9 +637,9 @@ where
                 path.push("flash.json"); // Not actually used, placeholder value needed.
                 match sdk.get_version() {
                     SdkVersion::InTree => {
-                        from_in_tree(&sdk, writer, path, fastboot_proxy, cmd).await
+                        from_in_tree(&sdk, writer, path, fastboot_interface, cmd).await
                     }
-                    SdkVersion::Version(_) => from_sdk(&sdk, writer, fastboot_proxy, cmd).await,
+                    SdkVersion::Version(_) => from_sdk(&sdk, writer, fastboot_interface, cmd).await,
                     _ => ffx_bail!("Unknown SDK type"),
                 }
             }

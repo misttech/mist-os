@@ -4,9 +4,9 @@
 
 use crate::{
     common::{
-        cmd::ManifestParams, crypto::unlock_device, finish, flash_bootloader, flash_product,
-        is_locked, lock_device, verify_hardware, Boot, Flash, Unlock, MISSING_CREDENTIALS,
-        MISSING_PRODUCT,
+        cmd::ManifestParams, crypto::unlock_device, fastboot_interface::FastbootInterface, finish,
+        flash_bootloader, flash_product, is_locked, lock_device, verify_hardware, Boot, Flash,
+        Unlock, MISSING_CREDENTIALS, MISSING_PRODUCT,
     },
     file_resolver::FileResolver,
     manifest::v1::FlashManifest as FlashManifestV1,
@@ -15,7 +15,6 @@ use crate::{
 use anyhow::Result;
 use async_trait::async_trait;
 use errors::ffx_bail;
-use fidl_fuchsia_developer_ffx::FastbootProxy;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 
@@ -31,71 +30,75 @@ pub struct FlashManifest {
 #[async_trait(?Send)]
 impl Flash for FlashManifest {
     #[tracing::instrument(skip(self, writer, file_resolver, cmd))]
-    async fn flash<W, F>(
+    async fn flash<W, F, T>(
         &self,
         writer: &mut W,
         file_resolver: &mut F,
-        fastboot_proxy: FastbootProxy,
+        fastboot_interface: T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
         W: Write,
         F: FileResolver + Sync,
+        T: FastbootInterface,
     {
         if !cmd.skip_verify {
-            verify_hardware(&self.hw_revision, &fastboot_proxy).await?;
+            verify_hardware(&self.hw_revision, &fastboot_interface).await?;
         }
         let product = match self.v1.0.iter().find(|product| product.name == cmd.product) {
             Some(res) => res,
             None => ffx_bail!("{} {}", MISSING_PRODUCT, cmd.product),
         };
-        if product.requires_unlock && is_locked(&fastboot_proxy).await? {
+        if product.requires_unlock && is_locked(&fastboot_interface).await? {
             if self.credentials.len() == 0 {
                 ffx_bail!("{}", MISSING_CREDENTIALS);
             } else {
-                unlock_device(writer, file_resolver, &self.credentials, &fastboot_proxy).await?;
+                unlock_device(writer, file_resolver, &self.credentials, &fastboot_interface)
+                    .await?;
             }
         }
-        flash_bootloader(writer, file_resolver, product, &fastboot_proxy, &cmd).await?;
-        if product.requires_unlock && !is_locked(&fastboot_proxy).await? {
-            lock_device(&fastboot_proxy).await?;
+        flash_bootloader(writer, file_resolver, product, &fastboot_interface, &cmd).await?;
+        if product.requires_unlock && !is_locked(&fastboot_interface).await? {
+            lock_device(&fastboot_interface).await?;
         }
-        flash_product(writer, file_resolver, product, &fastboot_proxy, &cmd).await?;
-        finish(writer, &fastboot_proxy).await
+        flash_product(writer, file_resolver, product, &fastboot_interface, &cmd).await?;
+        finish(writer, &fastboot_interface).await
     }
 }
 
 #[async_trait(?Send)]
 impl Unlock for FlashManifest {
-    async fn unlock<W, F>(
+    async fn unlock<W, F, T>(
         &self,
         writer: &mut W,
         file_resolver: &mut F,
-        fastboot_proxy: FastbootProxy,
+        fastboot_interface: T,
     ) -> Result<()>
     where
         W: Write,
         F: FileResolver + Sync,
+        T: FastbootInterface,
     {
-        unlock(writer, file_resolver, &self.credentials, &fastboot_proxy).await
+        unlock(writer, file_resolver, &self.credentials, &fastboot_interface).await
     }
 }
 
 #[async_trait(?Send)]
 impl Boot for FlashManifest {
-    async fn boot<W, F>(
+    async fn boot<W, F, T>(
         &self,
         writer: &mut W,
         file_resolver: &mut F,
         slot: String,
-        fastboot_proxy: FastbootProxy,
+        fastboot_interface: T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
         W: Write,
         F: FileResolver + Sync,
+        T: FastbootInterface,
     {
-        self.v1.boot(writer, file_resolver, slot, fastboot_proxy, cmd).await
+        self.v1.boot(writer, file_resolver, slot, fastboot_interface, cmd).await
     }
 }
 

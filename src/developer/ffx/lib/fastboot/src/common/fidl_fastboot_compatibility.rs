@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::common::interface::RebootEvent;
-use crate::common::interface::UploadProgress;
-use crate::common::interface::*;
+use crate::common::fastboot_interface::RebootEvent;
+use crate::common::fastboot_interface::UploadProgress;
+use crate::common::fastboot_interface::*;
 use anyhow::{anyhow, bail, Error, Result};
 use async_trait::async_trait;
 use chrono::DateTime;

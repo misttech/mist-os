@@ -4,6 +4,7 @@
 
 use crate::{
     common::cmd::ManifestParams,
+    common::fastboot_interface::FastbootInterface,
     file_resolver::FileResolver,
     manifest::{
         v3::{
@@ -15,7 +16,6 @@ use crate::{
 };
 use anyhow::{bail, Result};
 use async_trait::async_trait;
-use fidl_fuchsia_developer_ffx::FastbootProxy;
 use fms::Entries;
 use sdk_metadata::{Metadata, OemFile, Partition, Product};
 use std::{
@@ -88,54 +88,57 @@ impl From<&OemFile> for OemFileV3 {
 
 #[async_trait(?Send)]
 impl Flash for SdkEntries {
-    async fn flash<W, F>(
+    async fn flash<W, F, T>(
         &self,
         writer: &mut W,
         file_resolver: &mut F,
-        fastboot_proxy: FastbootProxy,
+        fastboot_interface: T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
         W: Write,
         F: FileResolver + Sync,
+        T: FastbootInterface,
     {
         let v3: FlashManifestV3 = self.try_into()?;
-        v3.flash(writer, file_resolver, fastboot_proxy, cmd).await
+        v3.flash(writer, file_resolver, fastboot_interface, cmd).await
     }
 }
 
 #[async_trait(?Send)]
 impl Unlock for SdkEntries {
-    async fn unlock<W, F>(
+    async fn unlock<W, F, T>(
         &self,
         writer: &mut W,
         file_resolver: &mut F,
-        fastboot_proxy: FastbootProxy,
+        fastboot_interface: T,
     ) -> Result<()>
     where
         W: Write,
         F: FileResolver + Sync,
+        T: FastbootInterface,
     {
         let v3: FlashManifestV3 = self.try_into()?;
-        v3.unlock(writer, file_resolver, fastboot_proxy).await
+        v3.unlock(writer, file_resolver, fastboot_interface).await
     }
 }
 
 #[async_trait(?Send)]
 impl Boot for SdkEntries {
-    async fn boot<W, F>(
+    async fn boot<W, F, T>(
         &self,
         writer: &mut W,
         file_resolver: &mut F,
         slot: String,
-        fastboot_proxy: FastbootProxy,
+        fastboot_interface: T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
         W: Write,
         F: FileResolver + Sync,
+        T: FastbootInterface,
     {
         let v3: FlashManifestV3 = self.try_into()?;
-        v3.boot(writer, file_resolver, slot, fastboot_proxy, cmd).await
+        v3.boot(writer, file_resolver, slot, fastboot_interface, cmd).await
     }
 }

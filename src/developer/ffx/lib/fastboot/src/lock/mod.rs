@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::common::fastboot_interface::FastbootInterface;
 use crate::common::{is_locked, lock_device, prepare, verify_variable_value};
 use anyhow::Result;
 use errors::ffx_bail;
-use fidl_fuchsia_developer_ffx::FastbootProxy;
 use std::io::Write;
 
 const LOCKABLE_VAR: &str = "vx-unlockable";
@@ -14,15 +14,18 @@ const EPHEMERAL_ERR: &str = "Cannot lock ephemeral devices. Reboot the device to
 const LOCKED_ERR: &str = "Target is already locked.";
 const LOCKED: &str = "Target is now locked.";
 
-pub async fn lock<W: Write>(writer: &mut W, fastboot_proxy: &FastbootProxy) -> Result<()> {
-    prepare(writer, &fastboot_proxy).await?;
-    if is_locked(&fastboot_proxy).await? {
+pub async fn lock<W: Write, F: FastbootInterface>(
+    writer: &mut W,
+    fastboot_interface: &F,
+) -> Result<()> {
+    prepare(writer, fastboot_interface).await?;
+    if is_locked(fastboot_interface).await? {
         ffx_bail!("{}", LOCKED_ERR);
     }
-    if verify_variable_value(LOCKABLE_VAR, EPHEMERAL, &fastboot_proxy).await? {
+    if verify_variable_value(LOCKABLE_VAR, EPHEMERAL, fastboot_interface).await? {
         ffx_bail!("{}", EPHEMERAL_ERR);
     }
-    lock_device(&fastboot_proxy).await?;
+    lock_device(fastboot_interface).await?;
     writeln!(writer, "{}", LOCKED)?;
     Ok(())
 }

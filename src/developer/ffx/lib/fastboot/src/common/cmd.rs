@@ -37,17 +37,20 @@ impl Default for ManifestParams {
     }
 }
 
+#[derive(Debug)]
 pub enum Command {
     Flash,
     Unlock(UnlockParams),
     Boot(BootParams),
 }
 
+#[derive(Debug)]
 pub struct UnlockParams {
     pub cred: Option<String>,
     pub force: bool,
 }
 
+#[derive(Debug)]
 pub struct BootParams {
     pub zbi: Option<String>,
     pub vbmeta: Option<String>,
