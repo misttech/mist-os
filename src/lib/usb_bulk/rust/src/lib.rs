@@ -19,6 +19,7 @@ use futures::{
 };
 use lazy_static::lazy_static;
 use std::collections::HashMap;
+use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::future::Future;
 use std::io::{ErrorKind, Read, Write};
 use std::os::raw::c_void;
@@ -169,6 +170,12 @@ impl Write for Interface {
     }
 }
 
+impl Debug for AsyncInterface {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_struct("AsyncInterface").field("serial", &self.serial).finish()
+    }
+}
+
 impl Drop for AsyncInterface {
     fn drop(&mut self) {
         let mut write_guard =
@@ -299,15 +306,11 @@ impl AsyncRead for AsyncInterface {
                 Poll::Ready(s) => {
                     self.read_task = None;
                     match s {
-                        Ok(v) => {
-                            Poll::Ready(buf.write(&v))
-                        }
+                        Ok(v) => Poll::Ready(buf.write(&v)),
                         Err(e) => Poll::Ready(Err(e)),
                     }
                 }
-                Poll::Pending => {
-                    Poll::Pending
-                }
+                Poll::Pending => Poll::Pending,
             }
         } else {
             Poll::Ready(Err(std::io::Error::new(
