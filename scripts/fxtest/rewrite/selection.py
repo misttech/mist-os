@@ -9,6 +9,7 @@ dimensions. This module implements selection and provides data
 wrappers for the outcomes of the selection process.
 """
 
+import asyncio
 from collections import defaultdict
 from enum import Enum
 import re
@@ -16,8 +17,8 @@ import typing
 
 import jellyfish
 
-import selection_types
 import event
+import selection_types
 from test_list_file import Test
 
 
@@ -41,7 +42,7 @@ NO_MATCH_DISTANCE: int = 1000000
 PERFECT_MATCH_DISTANCE: int = 0
 
 
-def select_tests(
+async def select_tests(
     entries: typing.List[Test],
     selection: typing.List[str],
     mode: SelectionMode = SelectionMode.ANY,
@@ -255,46 +256,50 @@ def select_tests(
         if recorder is not None:
             id = recorder.emit_event_group(f"Matching {group}")
         matched: typing.List[str] = []
-        for entry in entries:
-            # Calculate the worst matching {name, package name, component name}
-            # for each value in the match group. Each matching
-            # element has a score >= this value.
-            name_worst = max(
-                [
-                    min([matcher(entry, name) for matcher in matchers])
-                    for name in group.names
-                ],
-                default=None,
-            )
-            package_worst = max(
-                [match_package(entry, name) for name in group.packages],
-                default=None,
-            )
-            component_worst = max(
-                [match_component(entry, name) for name in group.components],
-                default=None,
-            )
 
-            # The final score for a match group is the worst match
-            # out of the above sets of scores.
-            final_score = min(
-                [
-                    x
-                    for x in [name_worst, package_worst, component_worst]
-                    if x is not None
-                ]
-            )
+        def do_match():
+            for entry in entries:
+                # Calculate the worst matching {name, package name, component name}
+                # for each value in the match group. Each matching
+                # element has a score >= this value.
+                name_worst = max(
+                    [
+                        min([matcher(entry, name) for matcher in matchers])
+                        for name in group.names
+                    ],
+                    default=None,
+                )
+                package_worst = max(
+                    [match_package(entry, name) for name in group.packages],
+                    default=None,
+                )
+                component_worst = max(
+                    [match_component(entry, name) for name in group.components],
+                    default=None,
+                )
 
-            # Perform bookkeeping for debug output.
-            best_matches[entry.info.name] = max(
-                best_matches[entry.info.name], final_score
-            )
+                # The final score for a match group is the worst match
+                # out of the above sets of scores.
+                final_score = min(
+                    [
+                        x
+                        for x in [name_worst, package_worst, component_worst]
+                        if x is not None
+                    ]
+                )
 
-            # Record this test if it is now selected.
-            if final_score <= fuzzy_distance_threshold:
-                matched.append(entry.info.name)
-                tests_to_run.add(entry)
-        group_matches.append((group, matched))
+                # Perform bookkeeping for debug output.
+                best_matches[entry.info.name] = max(
+                    best_matches[entry.info.name], final_score
+                )
+
+                # Record this test if it is now selected.
+                if final_score <= fuzzy_distance_threshold:
+                    matched.append(entry.info.name)
+                    tests_to_run.add(entry)
+            group_matches.append((group, matched))
+
+        await asyncio.to_thread(do_match)
         if recorder is not None and id is not None:
             recorder.emit_end(id=id)
 

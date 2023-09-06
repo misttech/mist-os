@@ -144,7 +144,7 @@ class MatchGroupTest(unittest.TestCase):
         )
 
 
-class SelectTestsTest(unittest.TestCase):
+class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
     """Tests related to the selection of test entries to execute."""
 
     @staticmethod
@@ -205,21 +205,23 @@ class SelectTestsTest(unittest.TestCase):
             ),
         )
 
-    def test_select_all(self):
+    async def test_select_all(self):
         """Test that empty selection selects all mode-matching tests with perfect scores"""
         tests = [
             self._make_package_test("src/tests", "foo", "bar"),
             self._make_host_test("src/tests2", "baz"),
         ]
 
-        selected = selection.select_tests(tests, [])
+        selected = await selection.select_tests(tests, [])
 
         self.assertEqual(len(selected.selected), 2)
         for score in selected.best_score.values():
             self.assertEqual(score, selection.PERFECT_MATCH_DISTANCE)
         self.assertTrue(selected.has_device_test())
 
-        host_selected = selection.select_tests(tests, [], selection.SelectionMode.HOST)
+        host_selected = await selection.select_tests(
+            tests, [], selection.SelectionMode.HOST
+        )
         self.assertEqual(len(host_selected.selected), 1)
         self.assertEqual(
             host_selected.best_score["host_x64/baz"], selection.PERFECT_MATCH_DISTANCE
@@ -230,7 +232,7 @@ class SelectTestsTest(unittest.TestCase):
         )
         self.assertFalse(host_selected.has_device_test())
 
-        device_selected = selection.select_tests(
+        device_selected = await selection.select_tests(
             tests, [], selection.SelectionMode.DEVICE
         )
         self.assertEqual(len(device_selected.selected), 1)
@@ -243,19 +245,19 @@ class SelectTestsTest(unittest.TestCase):
         )
         self.assertTrue(device_selected.has_device_test())
 
-    def test_prefix_matches(self):
+    async def test_prefix_matches(self):
         """Test that selecting prefixes of tests results in a perfect match."""
 
         tests = [
             self._make_package_test("src/tests", "foo-pkg", "bar-test"),
             self._make_host_test("src/other-tests", "binary_test"),
         ]
-        select_path = selection.select_tests(tests, ["//src/tests"])
-        select_name1 = selection.select_tests(tests, ["foo-pkg"])
-        select_name2 = selection.select_tests(tests, ["bar-test"])
-        select_pkg = selection.select_tests(tests, ["--package", "foo-pkg"])
-        select_cm = selection.select_tests(tests, ["--component", "bar-test"])
-        url_prefix = selection.select_tests(
+        select_path = await selection.select_tests(tests, ["//src/tests"])
+        select_name1 = await selection.select_tests(tests, ["foo-pkg"])
+        select_name2 = await selection.select_tests(tests, ["bar-test"])
+        select_pkg = await selection.select_tests(tests, ["--package", "foo-pkg"])
+        select_cm = await selection.select_tests(tests, ["--component", "bar-test"])
+        url_prefix = await selection.select_tests(
             tests, ["fuchsia-pkg://fuchsia.com/foo-pkg"]
         )
 
@@ -268,17 +270,17 @@ class SelectTestsTest(unittest.TestCase):
         for _, matches in select_path.group_matches:
             self.assertEqual(len(matches), 1)
 
-        host_path = selection.select_tests(tests, ["binary_test"])
+        host_path = await selection.select_tests(tests, ["binary_test"])
         self.assertEqual(
             [s.info.name for s in host_path.selected], ["host_x64/binary_test"]
         )
 
-        full_path = selection.select_tests(tests, ["//src"])
+        full_path = await selection.select_tests(tests, ["//src"])
         self.assertEqual(
             [s.info.name for s in full_path.selected], [t.info.name for t in tests]
         )
 
-    def test_approximate_matches(self):
+    async def test_approximate_matches(self):
         """Test that fuzzy matching catches common issues."""
 
         tests = [
@@ -286,14 +288,14 @@ class SelectTestsTest(unittest.TestCase):
             self._make_host_test("src/other-tests", "binary_test"),
         ]
 
-        host_fuzzy = selection.select_tests(tests, ["binaryytest"])
+        host_fuzzy = await selection.select_tests(tests, ["binaryytest"])
         self.assertEqual(
             [s.info.name for s in host_fuzzy.selected], ["host_x64/binary_test"]
         )
         self.assertEqual(host_fuzzy.best_score["host_x64/binary_test"], 1)
         self.assertEqual(host_fuzzy.fuzzy_distance_threshold, 3)
 
-    def test_flag_mutation(self):
+    async def test_flag_mutation(self):
         """Test that we can apply command line flag behavior to selections"""
 
         tests = [
@@ -303,7 +305,7 @@ class SelectTestsTest(unittest.TestCase):
             self._make_host_test("src/other-tests", "script_test"),
         ]
 
-        select_all = selection.select_tests(tests, [])
+        select_all = await selection.select_tests(tests, [])
         select_all.apply_flags(args.parse_args(["--limit=3"]))
         self.assertEqual(len(select_all.selected), 3)
         self.assertEqual(len(select_all.selected_but_not_run), 1)
