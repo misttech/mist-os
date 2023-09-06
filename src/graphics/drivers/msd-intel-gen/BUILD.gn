@@ -109,8 +109,8 @@ source_set("msd_intel_test_entry") {
   deps += [
     "tests/unit_tests:hardware_tests",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:pci_driver_gtest",
+    "//src/graphics/lib/magma/tests/msd_conformance_tests",
     "//src/graphics/lib/magma/tests/unit_tests:magma_platform_pci_device_tests",
-    "//src/graphics/lib/magma/tests/unit_tests:msd_conformance_tests_cc",
   ]
 }
 

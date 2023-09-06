@@ -54,7 +54,7 @@ fuchsia_driver("msd_arm_test-driver") {
     "src",
     "tests/unit_tests:tests_requiring_hardware",
     "//src/graphics/lib/magma/src/magma_util/platform:logger_for_system_drivers",
-    "//src/graphics/lib/magma/tests/unit_tests:msd_conformance_tests_cc",
+    "//src/graphics/lib/magma/tests/msd_conformance_tests",
   ]
 }
 
@@ -124,7 +124,7 @@ source_set("msd_arm_test_entry_dfv2") {
            "tests/unit_tests:tests_requiring_hardware",
            "//src/graphics/lib/magma/src/sys_driver:magma_driver_base",
            "//src/graphics/lib/magma/tests/helper:platform_msd_device_helper",
-           "//src/graphics/lib/magma/tests/unit_tests:msd_conformance_tests_cc",
+           "//src/graphics/lib/magma/tests/msd_conformance_tests",
            "//third_party/googletest:gtest",
          ]
 }

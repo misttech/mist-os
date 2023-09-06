@@ -1,0 +1,32 @@
+# Copyright 2016 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//src/graphics/lib/magma/gnbuild/magma.gni")
+
+# Requires hardware
+source_set("msd_conformance_tests") {
+  testonly = true
+
+  sources = [
+    "test_magma_system_multithread_cc.cc",
+    "test_msd.cc",
+    "test_msd_buffer_cc.cc",
+    "test_msd_context_cc.cc",
+    "test_msd_device_cc.cc",
+    "test_msd_driver_cc.cc",
+    "test_msd_semaphore_cc.cc",
+  ]
+
+  deps = [
+    "$magma_build_root/include:msd",
+    "$magma_build_root/src/magma_util:short_macros",
+    "$magma_build_root/src/magma_util/platform:buffer",
+    "$magma_build_root/src/magma_util/platform:semaphore",
+    "$magma_build_root/src/sys_driver",
+    "$magma_build_root/tests/helper:msd_stubs",
+    "$magma_build_root/tests/helper:platform_msd_device_helper",
+    "//src/graphics/drivers/msd-intel-gen/include",
+    "//third_party/googletest:gtest",
+  ]
+}
