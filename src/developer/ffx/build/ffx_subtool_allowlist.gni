@@ -6,10 +6,6 @@
 # to be depended on by a ffx plugin/subtool.
 # TODO(fxb/130835): Add these to the SDK or remove the plugin from ffx.
 ffx_subtool_fidl_allowlist = [
-  # ffx audio
-  "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device",
-  "//sdk/fidl/fuchsia.audio:fuchsia.audio",
-
   # Used by RemoteControl
   "//sdk/fidl/fuchsia.boot:fuchsia.boot",
 
@@ -38,9 +34,6 @@ ffx_subtool_fidl_allowlist = [
   "//sdk/fidl/fuchsia.driver.playground:fuchsia.driver.playground",
   "//sdk/fidl/fuchsia.driver.registrar:fuchsia.driver.registrar",
 
-  # used by ffx audio
-  "//sdk/fidl/fuchsia.drm:fuchsia.drm",
-
   # used by ffx debug
   "//sdk/fidl/fuchsia.exception:fuchsia.exception",
 
@@ -55,9 +48,6 @@ ffx_subtool_fidl_allowlist = [
   # used by ffx driver
   "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock",
   "//sdk/fidl/fuchsia.hardware.usb.device:fuchsia.hardware.usb.device",
-
-  # used by ffx audio
-  "//sdk/fidl/fuchsia.media2:fuchsia.media2",
 
   # used by ffx profile memory
   "//sdk/fidl/fuchsia.memory:fuchsia.memory",
@@ -106,9 +96,6 @@ ffx_subtool_fidl_allowlist = [
 
   # used by ffx fuchsia.developer.ffx
   "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller",
-
-  # used by ffx audio
-  "//sdk/fidl/fuchsia.virtualaudio:fuchsia.virtualaudio",
 
   # used by ffx guest
   "//sdk/fidl/fuchsia.virtualization:fuchsia.virtualization",
