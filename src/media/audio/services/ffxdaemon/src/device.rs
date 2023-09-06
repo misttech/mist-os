@@ -8,7 +8,7 @@ use {
     fdio,
     fidl::endpoints::Proxy,
     fidl_fuchsia_audio_controller::{
-        AudioDaemonCancelerMarker, DeviceInfo, DeviceInfo::StreamConfig, DeviceSelector,
+        DeviceInfo, DeviceInfo::StreamConfig, DeviceSelector, RecordCancelerMarker,
         StreamConfigDeviceInfo,
     },
     fidl_fuchsia_hardware_audio::{GainState, StreamConfigProxy},
@@ -240,7 +240,7 @@ impl Device {
         format: format_utils::Format,
         mut data_socket: fasync::Socket,
         duration: Option<std::time::Duration>,
-        cancel_server: Option<fidl::endpoints::ServerEnd<AudioDaemonCancelerMarker>>,
+        cancel_server: Option<fidl::endpoints::ServerEnd<RecordCancelerMarker>>,
     ) -> Result<String, Error> {
         let mut socket = socket::Socket { socket: &mut data_socket };
 

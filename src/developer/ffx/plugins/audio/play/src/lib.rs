@@ -14,15 +14,16 @@ use {
         PlayCommand,
     },
     fho::{moniker, FfxMain, FfxTool, SimpleWriter},
-    fidl_fuchsia_audio_controller::{AudioDaemonPlayRequest, AudioDaemonProxy},
+    fidl_fuchsia_audio_controller::{PlayerPlayRequest, PlayerProxy},
 };
 
 #[derive(FfxTool)]
 pub struct PlayTool {
     #[command]
     cmd: PlayCommand,
+
     #[with(moniker("/core/audio_ffx_daemon"))]
-    audio_proxy: AudioDaemonProxy,
+    controller: PlayerProxy,
 }
 
 fho::embedded_plugin!(PlayTool);
@@ -37,7 +38,7 @@ impl FfxMain for PlayTool {
                     anyhow::anyhow!("Error trying to open file \"{input_file_path}\": {e}")
                 })?;
                 play_impl(
-                    self.audio_proxy,
+                    self.controller,
                     play_local,
                     play_remote,
                     self.cmd,
@@ -49,7 +50,7 @@ impl FfxMain for PlayTool {
                 .map_err(Into::into)
             }
             None => play_impl(
-                self.audio_proxy,
+                self.controller,
                 play_local,
                 play_remote,
                 self.cmd,
@@ -64,7 +65,7 @@ impl FfxMain for PlayTool {
 }
 
 async fn play_impl<R, W, E>(
-    audio_proxy: AudioDaemonProxy,
+    controller: PlayerProxy,
     play_local: fidl::Socket,
     play_remote: fidl::Socket,
     command: PlayCommand,
@@ -104,7 +105,7 @@ where
         .duplicate_handle(fidl::Rights::SAME_RIGHTS)
         .map_err(|e| anyhow::anyhow!("Error duplicating socket: {e}"))?;
 
-    let request = AudioDaemonPlayRequest {
+    let request = PlayerPlayRequest {
         socket: Some(daemon_request_socket),
         location: Some(fidl_fuchsia_audio_controller::PlayLocation::Renderer(renderer)),
         gain_settings: Some(fidl_fuchsia_audio_controller::GainSettings {
@@ -117,7 +118,7 @@ where
 
     ffx_audio_common::play(
         request,
-        audio_proxy,
+        controller,
         play_local,
         input_reader,
         output_writer,
@@ -141,7 +142,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     pub async fn test_play() -> Result<(), fho::Error> {
-        let audio_daemon = ffx_audio_common::tests::fake_audio_daemon();
+        let controller = ffx_audio_common::tests::fake_audio_player();
 
         let stdin_command = PlayCommand {
             usage: AudioRenderUsageExtended::Media(AudioRenderUsage::Media),
@@ -163,7 +164,7 @@ mod tests {
 
         async_play_local.write_all(ffx_audio_common::tests::WAV_HEADER_EXT).await.unwrap();
         let result = play_impl(
-            audio_daemon.clone(),
+            controller.clone(),
             play_local,
             play_remote,
             stdin_command,
@@ -216,7 +217,7 @@ mod tests {
         };
         let (play_remote, play_local) = fidl::Socket::create_datagram();
         let result = play_impl(
-            audio_daemon,
+            controller,
             play_local,
             play_remote,
             file_command,

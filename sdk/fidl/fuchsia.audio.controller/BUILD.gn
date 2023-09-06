@@ -5,7 +5,12 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.audio.controller") {
-  sources = [ "audio_proxy.fidl" ]
+  sources = [
+    "audio_proxy.fidl",
+    "play.fidl",
+    "record.fidl",
+    "settings.fidl",
+  ]
   sdk_category = "partner_internal"
 
   public_deps = [

@@ -11,7 +11,7 @@ use {
     ffx_audio_record_args::RecordCommand,
     fho::{moniker, FfxContext, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_audio_controller::{
-        AudioDaemonProxy, AudioDaemonRecordRequest, CapturerConfig, RecordLocation,
+        CapturerConfig, RecordLocation, RecorderProxy, RecorderRecordRequest,
         StandardCapturerConfig,
     },
     fidl_fuchsia_media::AudioStreamType,
@@ -21,8 +21,9 @@ use {
 pub struct RecordTool {
     #[command]
     cmd: RecordCommand,
+
     #[with(moniker("/core/audio_ffx_daemon"))]
-    audio_proxy: AudioDaemonProxy,
+    controller: RecorderProxy,
 }
 fho::embedded_plugin!(RecordTool);
 #[async_trait(?Send)]
@@ -60,10 +61,10 @@ impl FfxMain for RecordTool {
         };
 
         let (cancel_client, cancel_server) = fidl::endpoints::create_endpoints::<
-            fidl_fuchsia_audio_controller::AudioDaemonCancelerMarker,
+            fidl_fuchsia_audio_controller::RecordCancelerMarker,
         >();
 
-        let request = AudioDaemonRecordRequest {
+        let request = RecorderRecordRequest {
             location: Some(location),
             stream_type: Some(AudioStreamType::from(&self.cmd.format)),
             duration: self.cmd.duration.map(|duration| duration.as_nanos() as i64),
@@ -75,7 +76,7 @@ impl FfxMain for RecordTool {
 
         let (stdout_sock, stderr_sock) = {
             let response = self
-                .audio_proxy
+                .controller
                 .record(request)
                 .await
                 .user_message("Timeout awaiting record command response.")?

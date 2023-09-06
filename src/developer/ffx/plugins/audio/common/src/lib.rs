@@ -7,7 +7,7 @@ use {
     errors::ffx_bail,
     fidl::{endpoints::Proxy, Socket},
     fidl_fuchsia_audio_controller::{
-        AudioDaemonPlayRequest, AudioDaemonPlayResponse, AudioDaemonProxy, AudioDaemonRequest,
+        PlayerPlayRequest, PlayerPlayResponse, PlayerProxy, PlayerRequest, RecordCancelerMarker,
     },
     futures::{AsyncReadExt, FutureExt},
     std::borrow::BorrowMut,
@@ -54,8 +54,8 @@ impl std::io::Write for &'static STDERR {
 }
 
 pub async fn play<R, W, E>(
-    request: AudioDaemonPlayRequest,
-    audio_proxy: AudioDaemonProxy,
+    request: PlayerPlayRequest,
+    controller: PlayerProxy,
     play_local: Socket,        // Send data from ffx to target.
     input_reader: R,           // Input generalized to stdin or test buffer. Forward to socket.
     output_writer: &'static W, // Output generalized to stdout or a test buffer. Forward data
@@ -72,7 +72,7 @@ where
 {
     let futs = futures::future::try_join(
         async {
-            let (stdout_sock, stderr_sock) = match audio_proxy.play(request).await? {
+            let (stdout_sock, stderr_sock) = match controller.play(request).await? {
                 Ok(value) => (
                     value.stdout.ok_or(anyhow::anyhow!("No stdout socket"))?,
                     value.stderr.ok_or(anyhow::anyhow!("No stderr socket."))?,
@@ -106,7 +106,7 @@ where
 }
 
 pub async fn wait_for_keypress(
-    canceler: fidl::endpoints::ClientEnd<fidl_fuchsia_audio_controller::AudioDaemonCancelerMarker>,
+    canceler: fidl::endpoints::ClientEnd<RecordCancelerMarker>,
 ) -> Result<(), std::io::Error> {
     let stdin_waiter = blocking::unblock(move || {
         let mut line = String::new();
@@ -140,6 +140,8 @@ pub async fn wait_for_keypress(
 }
 
 pub mod tests {
+    use fidl_fuchsia_audio_controller::AudioDaemonProxy;
+
     use super::*;
     lazy_static::lazy_static! {
         pub static ref MOCK_STDOUT: Arc<Mutex<Vec<u8>>> = Arc::new(Mutex::new(Vec::<u8>::new()));
@@ -196,13 +198,20 @@ pub mod tests {
     }
 
     pub fn fake_audio_daemon() -> AudioDaemonProxy {
+        let callback = |req| match req {
+            _ => {}
+        };
+        fho::testing::fake_proxy(callback)
+    }
+
+    pub fn fake_audio_player() -> PlayerProxy {
         use futures::AsyncWriteExt;
 
         let callback = |req| match req {
-            AudioDaemonRequest::Play { payload, responder } => {
+            PlayerRequest::Play { payload, responder } => {
                 let (stdout_remote, stdout_local) = fidl::Socket::create_datagram();
                 let (stderr_remote, _stderr_local) = fidl::Socket::create_datagram();
-                let response = AudioDaemonPlayResponse {
+                let response = PlayerPlayResponse {
                     stdout: Some(stdout_remote),
                     stderr: Some(stderr_remote),
                     ..Default::default()

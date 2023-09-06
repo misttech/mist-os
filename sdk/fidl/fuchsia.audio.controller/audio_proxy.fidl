@@ -6,135 +6,12 @@
 @available(added=HEAD)
 library fuchsia.audio.controller;
 
-using fuchsia.media;
 using fuchsia.hardware.audio;
 using fuchsia.io;
 using zx;
 
 /// Maximum number of audio devices in the system at any time.
 const MAX_COUNT_DEVICES uint32 = 256;
-
-/// Where to output audio data supplied by an ffx client.
-type PlayLocation = flexible union {
-    /// Create an `AudioRenderer` using the audio_core API and play audio through it.
-    1: renderer RendererConfig;
-
-    /// Write audio data directly to a device ring buffer.
-    2: device_ring_buffer DeviceSelector;
-};
-
-/// Selection of the frequency range than an `AudioRenderer` can write.
-type RendererConfig = flexible union {
-    /// Renderer for standard frequencies.
-    1: standard_renderer StandardRendererConfig;
-
-    /// Renderer for ultrasonic frequencies.
-    2: ultrasound_renderer UltrasoundRendererConfig;
-};
-
-/// Configuration parameters for creating an `AudioRenderer` for the standard frequency range.
-type StandardRendererConfig = table {
-    /// The usage of the audio stream.
-    ///
-    /// Required.
-    1: usage fuchsia.media.AudioRenderUsage;
-
-    /// The reference clock type used by the stream. If unspecified, use the default
-    /// reference clock provided by the renderer.
-    ///
-    /// Optional.
-    2: clock ClockType;
-
-    /// How many packets to use when sending data to an `AudioRenderer`.
-    /// Optional. If not specified, AudioDaemon will use four packets.
-    3: packet_count uint32;
-};
-
-/// Configuration parameters for creating an `AudioRenderer` for the standard frequency range.
-type UltrasoundRendererConfig = table {
-    /// How many packets to use when sending data to an `AudioRenderer`.
-    /// Optional. If not specified, AudioDaemon will use four packets.
-    1: packet_count uint32;
-};
-
-/// Reference clock options for an `AudioRenderer` or `AudioCapturer`.
-type ClockType = flexible union {
-    /// Use a flexible clock.
-    1: flexible struct {};
-
-    /// Use the system monotonic clock.
-    2: monotonic struct {};
-
-    /// Use a monotonic clock with possible rate adjustment and offset relative to the system
-    /// monotonic clock.
-    3: custom CustomClockConfig;
-};
-
-/// Configuration for the custom reference clock passed to an `AudioRenderer` or `AudioCapturer`.
-type CustomClockConfig = table {
-    /// Frequency rate adjustment to a clone of the system monotonic clock.
-    /// Given in parts per million relative to the system monotonic rate.
-    /// Must fall within [ZX_CLOCK_UPDATE_MIN_RATE_ADJUST, ZX_CLOCK_UPDATE_MAX_RATE_ADJUST].
-    /// For more info, see `zx_clock_update`. If not specified, use the reference clock's
-    /// default rate.
-    ///
-    /// Optional.
-    1: rate_adjust int32;
-
-    /// Starting delta between the reference clock passed to AudioRenderer or Capturer
-    /// and the system monotonic clock. If not specified, do not adjust reference clock offset.
-    ///
-    /// Optional.
-    2: offset int32;
-};
-
-/// Where to read audio data from to send back to an ffx client.
-type RecordLocation = flexible union {
-    /// Create an audio_core `AudioCapturer` and record audio data from it.
-    1: capturer CapturerConfig;
-
-    /// Create an audio_core `AudioCapturer` with loopback and record audio data from it.
-    2: loopback struct {};
-
-    /// Raad audio data directly from a device ring buffer.
-    3: device_ring_buffer DeviceSelector;
-};
-
-/// Selection of the frequency range than an `AudioCapturer` can read.
-type CapturerConfig = flexible union {
-    /// AudioCapturer for standard frequencies.
-    1: standard_capturer StandardCapturerConfig;
-
-    /// AudioCapturer for ultrasonic frequencies.
-    2: ultrasound_capturer struct {};
-};
-
-/// Configuration parameters for creating an `AudioCapturer` for the standard frequency range.
-type StandardCapturerConfig = table {
-    /// The usage of the audio stream.
-    ///
-    /// Required.
-    1: usage fuchsia.media.AudioCaptureUsage;
-
-    /// The reference clock type used by the stream. If unspecified, use the default
-    /// reference clock provided by the capturer.
-    ///
-    /// Optional.
-    2: clock ClockType;
-};
-
-/// Gain settings.
-type GainSettings = table {
-    /// Whether to mute the audio stream. If unspecified, do not adjust the existing mute value.
-    ///
-    /// Optional.
-    1: mute bool;
-
-    /// Gain level in dB. If unspecified, do not adjust stream or device gain.
-    ///
-    /// Optional.
-    2: gain float32;
-};
 
 /// Information about a device.
 type DeviceInfo = flexible union {
@@ -182,89 +59,10 @@ type DeviceSelector = table {
     3: device_type fuchsia.hardware.audio.DeviceType;
 };
 
-/// Cancels an AudioDaemonRecordRequest if no duration was specified.
-closed protocol AudioDaemonCanceler {
-    /// Finish sending audio data back to the client.
-    strict Cancel() -> () error zx.Status;
-};
 
 /// The main entry point for ffx audio.
 @discoverable
-closed protocol AudioDaemon {
-    /// Plays audio data from socket on either an `AudioRenderer` or on device ring buffer.
-    /// Returns sockets for transmitting info back to stdout and stderr on host.
-    strict Play(resource table {
-        /// Socket for audio data. Should transmit entire file in WAV format.
-        ///
-        /// Required.
-        1: socket zx.Handle:SOCKET;
-
-        /// Play on device ring buffer or AudioRenderer.
-        ///
-        /// Required.
-        2: location PlayLocation;
-
-        /// Play settings.
-        ///
-        /// Required.
-        3: gain_settings GainSettings;
-    }) -> (resource table {
-        /// Information from daemon component for ffx plugin to display.
-        ///
-        /// Required.
-        1: stdout zx.Handle:SOCKET;
-
-        /// Errors from daemon component for ffx plugin to display.
-        ///
-        /// Required.
-        2: stderr zx.Handle:SOCKET;
-    }) error zx.Status;
-
-    /// Records audio data from either an `AudioCapturer` or device ring buffer.
-    /// Returns sockets containing audio data and errors back to host.
-    strict Record(resource table {
-        /// Record from `AudioCapturer` or ring buffer.
-        ///
-        /// Required.
-        1: location RecordLocation;
-
-        /// Streamtype.
-        ///
-        /// Required.
-        2: stream_type fuchsia.media.AudioStreamType;
-
-        /// Duration in nanoseconds to record audio data. If not specified, daemon will send
-        /// data back to ffx client until it receives a stop signal following a keypress.
-        /// If present, the record request is still cancelable via handle below.
-        ///
-        /// Optional.
-        3: duration zx.Duration;
-
-        /// Handle to signal when to stop sending data back to ffx client.
-        ///
-        /// Required.
-        4: canceler server_end:AudioDaemonCanceler;
-
-        /// Record gain settings. If not specified, AudioCapturer's defaults will apply.
-        ///
-        /// Optional.
-        5: gain_settings GainSettings;
-
-        /// Buffer size. If not specified, allocate enough to hold one second of audio data.
-        ///
-        /// Optional.
-        6: buffer_size uint64;
-    }) -> (resource table {
-        /// Contains audio data in the form of a complete WAV file.
-        ///
-        /// Required.
-        1: stdout zx.Handle:SOCKET;
-
-        /// Errors from daemon component for ffx plugin to display.
-        ///
-        /// Required.
-        2: stderr zx.Handle:SOCKET;
-    }) error zx.Status;
+open protocol AudioDaemon {
 
     /// Lists all available audio devices on target.
     strict ListDevices() -> (resource table {

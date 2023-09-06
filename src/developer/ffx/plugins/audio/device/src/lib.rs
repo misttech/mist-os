@@ -11,8 +11,9 @@ use {
     fho::{moniker, FfxMain, FfxTool, SimpleWriter},
     fidl::HandleBased,
     fidl_fuchsia_audio_controller::{
-        AudioDaemonDeviceInfoRequest, AudioDaemonDeviceSetGainStateRequest, AudioDaemonPlayRequest,
-        AudioDaemonProxy, AudioDaemonRecordRequest, DeviceInfo, DeviceSelector, RecordLocation,
+        AudioDaemonDeviceInfoRequest, AudioDaemonDeviceSetGainStateRequest, AudioDaemonProxy,
+        DeviceInfo, DeviceSelector, PlayerPlayRequest, PlayerProxy, RecordLocation, RecorderProxy,
+        RecorderRecordRequest,
     },
     fidl_fuchsia_hardware_audio::{PcmSupportedFormats, PlugDetectCapabilities},
     fidl_fuchsia_media::AudioStreamType,
@@ -27,6 +28,10 @@ pub struct DeviceTool {
     cmd: DeviceCommand,
     #[with(moniker("/core/audio_ffx_daemon"))]
     audio_proxy: AudioDaemonProxy,
+    #[with(moniker("/core/audio_ffx_daemon"))]
+    record_controller: RecorderProxy,
+    #[with(moniker("/core/audio_ffx_daemon"))]
+    play_controller: PlayerProxy,
 }
 
 fho::embedded_plugin!(DeviceTool);
@@ -49,6 +54,7 @@ impl FfxMain for DeviceTool {
 
                         device_play(
                             self.audio_proxy,
+                            self.play_controller,
                             self.cmd,
                             play_local,
                             play_remote,
@@ -61,6 +67,7 @@ impl FfxMain for DeviceTool {
                     }
                     None => device_play(
                         self.audio_proxy,
+                        self.play_controller,
                         self.cmd,
                         play_local,
                         play_remote,
@@ -73,7 +80,9 @@ impl FfxMain for DeviceTool {
                 }
             }
             SubCommand::Record(_) => {
-                device_record(self.audio_proxy, self.cmd).await.map_err(Into::into)
+                device_record(self.audio_proxy, self.record_controller, self.cmd)
+                    .await
+                    .map_err(Into::into)
             }
             SubCommand::Gain(_)
             | SubCommand::Mute(_)
@@ -516,6 +525,7 @@ async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
 
 async fn device_play<R, W, E>(
     audio_proxy: AudioDaemonProxy,
+    controller: PlayerProxy,
     cmd: DeviceCommand,
     play_local: fidl::Socket,
     play_remote: fidl::Socket,
@@ -548,7 +558,7 @@ where
         .duplicate_handle(fidl::Rights::SAME_RIGHTS)
         .map_err(|e| anyhow::anyhow!("Error duplicating socket: {e}"))?;
 
-    let request = AudioDaemonPlayRequest {
+    let request = PlayerPlayRequest {
         socket: Some(daemon_request_socket),
         location: Some(fidl_fuchsia_audio_controller::PlayLocation::DeviceRingBuffer(
             fidl_fuchsia_audio_controller::DeviceSelector {
@@ -570,7 +580,7 @@ where
 
     ffx_audio_common::play(
         request,
-        audio_proxy,
+        controller,
         play_local,
         input_reader,
         output_writer,
@@ -580,11 +590,15 @@ where
     Ok(())
 }
 
-async fn device_record(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Result<()> {
+async fn device_record(
+    daemon_proxy: AudioDaemonProxy,
+    controller: RecorderProxy,
+    cmd: DeviceCommand,
+) -> Result<()> {
     let device_id = match cmd.id {
         Some(id) => Ok(id),
         None => get_first_device(
-            &audio_proxy,
+            &daemon_proxy,
             fidl_fuchsia_hardware_audio::DeviceType::StreamConfig,
             true,
         )
@@ -597,11 +611,10 @@ async fn device_record(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Res
         _ => ffx_bail!("Unreachable"),
     };
 
-    let (cancel_client, cancel_server) = fidl::endpoints::create_endpoints::<
-        fidl_fuchsia_audio_controller::AudioDaemonCancelerMarker,
-    >();
+    let (cancel_client, cancel_server) =
+        fidl::endpoints::create_endpoints::<fidl_fuchsia_audio_controller::RecordCancelerMarker>();
 
-    let request = AudioDaemonRecordRequest {
+    let request = RecorderRecordRequest {
         location: Some(RecordLocation::DeviceRingBuffer(
             fidl_fuchsia_audio_controller::DeviceSelector {
                 is_input: Some(true),
@@ -617,7 +630,7 @@ async fn device_record(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Res
         ..Default::default()
     };
 
-    let (stdout_sock, stderr_sock) = match audio_proxy.record(request).await? {
+    let (stdout_sock, stderr_sock) = match controller.record(request).await? {
         Ok(value) => (
             value.stdout.ok_or(anyhow::anyhow!("No stdout socket"))?,
             value.stderr.ok_or(anyhow::anyhow!("No stderr socket"))?,
@@ -689,7 +702,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     pub async fn test_play_success() -> Result<(), fho::Error> {
         let audio_daemon = ffx_audio_common::tests::fake_audio_daemon();
-
+        let audio_player = ffx_audio_common::tests::fake_audio_player();
         let command = DeviceCommand {
             subcommand: ffx_audio_device_args::SubCommand::Play(DevicePlayCommand { file: None }),
             id: Some("abc123".to_string()),
@@ -706,6 +719,7 @@ mod tests {
 
         let result = device_play(
             audio_daemon.clone(),
+            audio_player.clone(),
             command,
             play_local,
             play_remote,
@@ -755,6 +769,7 @@ mod tests {
         let (play_remote, play_local) = fidl::Socket::create_datagram();
         let result = device_play(
             audio_daemon.clone(),
+            audio_player.clone(),
             file_command,
             play_local,
             play_remote,

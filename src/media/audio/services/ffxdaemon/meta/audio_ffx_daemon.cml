@@ -12,7 +12,13 @@
     },
     capabilities: [
         {
-            protocol: [ "fuchsia.audio.ffxdaemon.AudioDaemon" ],
+            protocol: [ "fuchsia.audio.controller.AudioDaemon" ],
+        },
+        {
+            protocol: [ "fuchsia.audio.controller.Player" ],
+        },
+        {
+            protocol: [ "fuchsia.audio.controller.Recorder" ],
         },
     ],
     use: [
@@ -37,7 +43,15 @@
     ],
     expose: [
         {
-            protocol: [ "fuchsia.audio.ffxdaemon.AudioDaemon" ],
+            protocol: [ "fuchsia.audio.controller.AudioDaemon" ],
+            from: "self",
+        },
+        {
+            protocol: [ "fuchsia.audio.controller.Player" ],
+            from: "self",
+        },
+        {
+            protocol: [ "fuchsia.audio.controller.Recorder" ],
             from: "self",
         },
     ],
