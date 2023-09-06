@@ -411,7 +411,6 @@ pub struct BuiltinEnvironment {
     pub model: Arc<Model>,
 
     // Framework capabilities.
-    pub info_resource: Option<Arc<InfoResource>>,
     #[cfg(target_arch = "x86_64")]
     pub ioport_resource: Option<Arc<IoportResource>>,
     pub irq_resource: Option<Arc<IrqResource>>,
@@ -764,8 +763,10 @@ impl BuiltinEnvironment {
             })
             .map(InfoResource::new)
             .and_then(Result::ok);
-        if let Some(info_resource) = info_resource.as_ref() {
-            model.root().hooks.install(info_resource.hooks()).await;
+        if let Some(info_resource) = info_resource {
+            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::InfoResourceMarker>(
+                move |stream| info_resource.clone().serve(stream).boxed(),
+            );
         }
 
         // Set up the MexecResource service.
@@ -942,7 +943,6 @@ impl BuiltinEnvironment {
             kernel_stats,
             read_only_log,
             write_only_log,
-            info_resource,
             #[cfg(target_arch = "x86_64")]
             ioport_resource: _ioport_resource,
             irq_resource,
