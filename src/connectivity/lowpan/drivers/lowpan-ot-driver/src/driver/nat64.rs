@@ -131,16 +131,16 @@ impl Nat64 {
         let masquerade_proxy = connect_to_protocol::<fidl_fuchsia_net_masquerade::FactoryMarker>()
             .context("error connecting to masquerade factory")?;
         let config = fidl_fuchsia_net_masquerade::ControlConfig {
-            /// The interface carrying the network to be masqueraded.[lowpan0]
+            // The interface carrying the network to be masqueraded.[lowpan0]
             input_interface: lowpan_nicid,
-            /// The network to be masqueraded.
+            // The network to be masqueraded.
             src_subnet: fidl_fuchsia_net::Subnet {
                 addr: fidl_fuchsia_net::IpAddress::Ipv4(fidl_fuchsia_net::Ipv4Address {
                     addr: cidr_addr,
                 }),
                 prefix_len: cidr_addr_prefix_len,
             },
-            /// The interface through which to masquerade.[Wlan Client]
+            // The interface through which to masquerade.[Wlan Client]
             output_interface: wlan_client_nicid,
         };
 
