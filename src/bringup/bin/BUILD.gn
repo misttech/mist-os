@@ -13,12 +13,4 @@ group("tests") {
     "pwrbtn-monitor:tests",
     "virtcon:tests",
   ]
-
-  if (current_cpu == "riscv64") {
-    deps -= [
-      # TODO(fxbug.dev/298437881): Make these tests depend on netstack3 on
-      # RISC-V and remove this.
-      "netsvc:tests",
-    ]
-  }
 }

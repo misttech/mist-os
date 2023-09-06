@@ -161,6 +161,12 @@ fuchsia_component("component-dropin") {
   manifest = "meta/netstack3.cml"
   deps = [ ":bin" ]
 }
+fuchsia_component("component-debug-dropin") {
+  component_name = "netstack-debug"
+  manifest = "meta/netstack3_debug.cml"
+  deps = [ ":bin-instrumented" ]
+  testonly = true
+}
 
 fuchsia_unittest_component("netstack3-bin_test") {
   deps = [

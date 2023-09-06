@@ -58,11 +58,18 @@ fuchsia_test_component("netsvc-integration-test") {
     "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
 
     # We inject a network stack to be able to communicate with netsvc.
-    "//src/connectivity/network/netstack:component-debug",
+    "//src/connectivity/network:netstack-debug-for-tests",
   ]
 }
 
 fuchsia_test_package("integration") {
   package_name = "netsvc-integration-test"
   test_components = [ ":netsvc-integration-test" ]
+
+  if (current_cpu == "riscv64") {
+    # TODO(fxbug.dev/297071481): This test fails when using Netstack3 on RISC-V
+    test_specs = {
+      environments = []
+    }
+  }
 }

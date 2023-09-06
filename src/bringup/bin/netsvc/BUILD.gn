@@ -208,6 +208,11 @@ fuchsia_test_package("netsvc-tests-package") {
       }
     }
   }
+  if (current_cpu == "riscv64") {
+    # TODO(fxbug.dev/297071481): This test runs extremely slowly on RISC-V and
+    # times out in CI/CQ.
+    test_components -= [ ":netsvc-stress-test-component" ]
+  }
 }
 
 # NB: These sources were historically part of a zircon library called inet6.

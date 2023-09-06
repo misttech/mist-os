@@ -52,22 +52,15 @@ fuchsia_test_component("fidl-fuchsia-posix-socket-ext-test") {
   ]
 
   if (current_cpu == "riscv64") {
-    # TODO(fxbug.dev/122609): Make this target depend on netstack3 on RISC-V
-    # and remove this.
+    # Netstack2 is not available on RISC-V, so it must be excluded for this
+    # test to build. The test cases only attempt to run against Netstack2
+    # when built for non-RISC-V architectures.
     deps -= [ "//src/connectivity/network/netstack:component-debug" ]
   }
 }
 
 fuchsia_test_package("fidl-fuchsia-posix-socket-ext-tests") {
   test_components = [ ":fidl-fuchsia-posix-socket-ext-test" ]
-
-  if (current_cpu == "riscv64") {
-    # TODO(fxbug.dev/298437881): Make this target depend on netstack3
-    # (see above) on RISC-V and remove these lines.
-    test_specs = {
-      environments = []
-    }
-  }
 }
 
 group("tests") {
