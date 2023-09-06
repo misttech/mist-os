@@ -15,8 +15,15 @@ library_headers("headers") {
   headers = []
   public_deps = []
   if (is_fuchsia) {
-    headers += [ "lib/ld/testing/test-processargs.h" ]
+    headers += [
+      "lib/ld/testing/mock-loader-service.h",
+      "lib/ld/testing/test-processargs.h",
+    ]
     public_deps += [
+      "//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc_cpp_wire",
+      "//third_party/googletest:gmock",
+      "//zircon/system/ulib/async-loop:async-loop-cpp",
+      "//zircon/system/ulib/async-loop:async-loop-default",
       "//zircon/system/ulib/fbl",
       "//zircon/system/ulib/zx",
     ]
@@ -31,7 +38,10 @@ static_library("ld-testing") {
   sources = []
   deps = []
   if (is_fuchsia) {
-    sources += [ "test-processargs.cc" ]
+    sources += [
+      "mock-loader-service.cc",
+      "test-processargs.cc",
+    ]
     deps += [
       "//sdk/lib/fdio",
       "//sdk/lib/stdcompat",

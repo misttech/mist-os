@@ -22,11 +22,15 @@ test("ld-unittests") {
   sources = [ "abi-tests.cc" ]
   deps = [
     "..:headers",
+    "../testing",
     "//src/lib/fxl/test:gtest_main",
   ]
 
   if (is_elf) {
     deps += [ ":load-tests" ]
+  }
+  if (is_fuchsia) {
+    sources += [ "mock-loader-service-tests.cc" ]
   }
 }
 
