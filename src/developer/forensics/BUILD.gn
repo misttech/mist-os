@@ -47,10 +47,6 @@ group("large_disk_configs") {
   deps = [ ":feedback_large_disk_product_config" ]
 }
 
-group("workstation_configs") {
-  deps = [ ":feedback_large_disk_product_config" ]
-}
-
 ###############################################################################
 # PACKAGES
 ###############################################################################
