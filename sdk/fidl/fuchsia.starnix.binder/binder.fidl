@@ -118,6 +118,7 @@ closed protocol RemoteController {
 
 /// Protocol that allows a Fuchsia component to interact with the Linux futexes
 /// of a process running inside starnix.
+@discoverable
 closed protocol LutexController {
     /// FUTEX_WAIT_BITSET command
     strict WaitBitset(@generated_name("WaitBitsetRequest") resource table {
