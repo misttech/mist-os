@@ -112,6 +112,33 @@ pub async fn create_ip_tun_port(
     .await
 }
 
+/// Add a pure IP interface to the given device/port, returning the created
+/// `fuchsia.net.interfaces.admin/Control` handle.
+pub async fn add_pure_ip_interface(
+    network_port: &fhardware_network::PortProxy,
+    admin_device_control: &fnet_interfaces_admin::DeviceControlProxy,
+    interface_name: &str,
+) -> fnet_interfaces_admin::ControlProxy {
+    let fhardware_network::PortInfo { id, .. } = network_port.get_info().await.expect("get info");
+    let port_id = id.expect("port id");
+
+    let (admin_control, server_end) =
+        fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
+            .expect("create proxy");
+
+    let () = admin_device_control
+        .create_interface(
+            &port_id,
+            server_end,
+            &fnet_interfaces_admin::Options {
+                name: Some(interface_name.to_string()),
+                ..Default::default()
+            },
+        )
+        .expect("create interface");
+    admin_control
+}
+
 /// Creates a port on the given Tun device that supports the Ethernet frame
 /// type.
 pub async fn create_eth_tun_port(

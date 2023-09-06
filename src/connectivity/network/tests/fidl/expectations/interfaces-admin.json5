@@ -22,6 +22,11 @@
                 "get_set_forwarding_ns3*multicast*",
                 "get_set_forwarding_loopback_ns3::set_ip_false_and_multicast_ip_true",
                 "get_set_forwarding_loopback_ns3::set_multicast*",
+
+                // TODO(https://fxbug.dev/133157): Expect pass once pure-L3
+                // interfaces are supported.
+                "add_address_removal_ns3::tun_removing_address_via_addressstateprovider_remove",
+                "add_address_removal_ns3::tun_removing_address_via_control_remove",
             ],
         },
     ],

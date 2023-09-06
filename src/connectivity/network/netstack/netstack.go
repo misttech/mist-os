@@ -917,6 +917,18 @@ func (ifs *ifState) setDNSServers(servers []tcpip.Address) bool {
 	return !sameDNS
 }
 
+// setDHCPStatusLocked updates the DHCP status on an interface and runs the DHCP
+// client if it should be enabled.
+//
+// Precondition: ifs.mu and ifs.dhcpLock is held.
+func (ifs *ifState) setDHCPStatusLocked(name string, enabled bool) {
+	ifs.mu.dhcp.enabled = enabled
+	ifs.mu.dhcp.cancelLocked()
+	if ifs.mu.dhcp.enabled && ifs.IsUpLocked() {
+		ifs.runDHCPLocked(name)
+	}
+}
+
 // setDHCPStatus updates the DHCP status on an interface and runs the DHCP
 // client if it should be enabled.
 //
@@ -929,11 +941,7 @@ func (ifs *ifState) setDHCPStatus(name string, enabled bool) {
 		ifs.mu.Unlock()
 		<-ifs.dhcpLock
 	}()
-	ifs.mu.dhcp.enabled = enabled
-	ifs.mu.dhcp.cancelLocked()
-	if ifs.mu.dhcp.enabled && ifs.IsUpLocked() {
-		ifs.runDHCPLocked(name)
-	}
+	ifs.setDHCPStatusLocked(name, enabled)
 }
 
 // Runs the DHCP client with a fresh context and initializes ifs.mu.dhcp.cancel.

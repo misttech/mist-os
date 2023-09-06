@@ -15,7 +15,7 @@ use fuchsia_zircon::{self as zx, AsHandleRef as _};
 use futures::TryStreamExt as _;
 use net_declare::fidl_mac;
 use netstack_testing_common::{
-    devices::{create_ip_tun_port, create_tun_device, install_device},
+    devices::{add_pure_ip_interface, create_ip_tun_port, create_tun_device, install_device},
     realms::{Netstack, TestRealmExt as _, TestSandboxExt as _},
 };
 use netstack_testing_macros::netstack_test;
@@ -135,33 +135,6 @@ async fn get_mac_loopback<N: Netstack>(name: &str) {
         get_mac(loopback_id, &root_interfaces).await,
         Ok(Some(fnet::MacAddress { octets: [0, 0, 0, 0, 0, 0] }))
     );
-}
-
-// Add a pure IP interface to the given device/port, returning the created
-// `fuchsia.net.interfaces.admin/Control` handle.
-async fn add_pure_ip_interface(
-    network_port: &fhardware_network::PortProxy,
-    admin_device_control: &fnet_interfaces_admin::DeviceControlProxy,
-    interface_name: &str,
-) -> fnet_interfaces_admin::ControlProxy {
-    let fhardware_network::PortInfo { id, .. } = network_port.get_info().await.expect("get info");
-    let port_id = id.expect("port id");
-
-    let (admin_control, server_end) =
-        fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
-            .expect("create proxy");
-
-    let () = admin_device_control
-        .create_interface(
-            &port_id,
-            server_end,
-            &fnet_interfaces_admin::Options {
-                name: Some(interface_name.to_string()),
-                ..Default::default()
-            },
-        )
-        .expect("create interface");
-    admin_control
 }
 
 #[netstack_test]

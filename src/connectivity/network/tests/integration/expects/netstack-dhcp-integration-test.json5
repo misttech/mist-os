@@ -25,5 +25,11 @@
                 "does_not_crash_with_overlapping_subnet_route_ns3_ns3_with_dhcp_out_of_stack",
             ],
         },
+        {
+            type: "expect_failure",
+            matchers: [
+                "removing_acquired_address_stops_dhcp_ns[23]_ns[23]_with_dhcp_out_of_stack::remove_non_dhcp_address",
+            ],
+        },
     ],
 }

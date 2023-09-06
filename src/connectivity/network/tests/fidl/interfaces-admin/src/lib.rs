@@ -27,7 +27,10 @@ use net_declare::{fidl_ip, fidl_mac, fidl_subnet, std_ip_v6, std_socket_addr};
 use net_types::ip::{IpAddress as _, IpVersion, Ipv4};
 use netemul::{InterfaceConfig, RealmUdpSocket as _};
 use netstack_testing_common::{
-    devices::create_tun_device,
+    devices::{
+        add_pure_ip_interface, create_ip_tun_port, create_tun_device, install_device,
+        TUN_DEFAULT_PORT_ID,
+    },
     interfaces,
     realms::{Netstack, NetstackVersion, TestRealmExt as _, TestSandboxExt as _},
     ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
@@ -457,25 +460,60 @@ enum AddressRemovalMethod {
 }
 
 #[netstack_test]
-#[test_case(AddressRemovalMethod::InterfaceControl ; "removing address via Control.Remove")]
-#[test_case(AddressRemovalMethod::AddressStateProviderExplicitRemove ; "removing address via AddressStateProvider.Remove")]
-async fn add_address_removal<N: Netstack>(name: &str, removal_method: AddressRemovalMethod) {
+#[test_case(false, AddressRemovalMethod::InterfaceControl ; "eth removing address via Control.Remove")]
+#[test_case(false, AddressRemovalMethod::AddressStateProviderExplicitRemove ; "eth removing address via AddressStateProvider.Remove")]
+#[test_case(true, AddressRemovalMethod::InterfaceControl ; "tun removing address via Control.Remove")]
+#[test_case(true, AddressRemovalMethod::AddressStateProviderExplicitRemove ; "tun removing address via AddressStateProvider.Remove")]
+async fn add_address_removal<N: Netstack>(
+    name: &str,
+    tun: bool,
+    removal_method: AddressRemovalMethod,
+) {
     let sandbox = netemul::TestSandbox::new().expect("new sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
-    let device = sandbox.create_endpoint(name).await.expect("create endpoint");
-    let interface = realm
-        .install_endpoint(device, InterfaceConfig::default())
-        .await
-        .expect("install interface");
-    let id = interface.id();
 
-    let root_control = realm
-        .connect_to_protocol::<fidl_fuchsia_net_root::InterfacesMarker>()
-        .expect(<fidl_fuchsia_net_root::InterfacesMarker as fidl::endpoints::DiscoverableProtocolMarker>::PROTOCOL_NAME);
+    enum InterfaceOrTun<'a> {
+        Interface(netemul::TestInterface<'a>),
+        Tun(
+            (
+                fidl_fuchsia_net_tun::DeviceProxy,
+                fidl_fuchsia_net_tun::PortProxy,
+                fidl_fuchsia_net_interfaces_admin::DeviceControlProxy,
+            ),
+        ),
+    }
 
-    let (control, server) = fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
-        .expect("create Control proxy");
-    let () = root_control.get_admin(id, server).expect("get admin");
+    let (interface_or_tun, control) = if tun {
+        let (tun_device, network_device) = create_tun_device();
+        let admin_device_control = install_device(&realm, network_device);
+        // Retain `_tun_port` to keep the FIDL channel open.
+        let (tun_port, network_port) = create_ip_tun_port(&tun_device, TUN_DEFAULT_PORT_ID).await;
+        tun_port.set_online(true).await.expect("set port online");
+        let admin_control =
+            add_pure_ip_interface(&network_port, &admin_device_control, "tunif").await;
+        let admin_control = fidl_fuchsia_net_interfaces_ext::admin::Control::new(admin_control);
+        assert!(admin_control
+            .enable()
+            .await
+            .expect("send enable tun interface request")
+            .expect("enable tun interface"));
+        (InterfaceOrTun::Tun((tun_device, tun_port, admin_device_control)), admin_control)
+    } else {
+        let device = sandbox.create_endpoint(name).await.expect("create endpoint");
+        let interface = realm
+            .install_endpoint(device, InterfaceConfig::default())
+            .await
+            .expect("install interface");
+        let id = interface.id();
+        let root_control = realm
+            .connect_to_protocol::<fidl_fuchsia_net_root::InterfacesMarker>()
+            .expect(<fidl_fuchsia_net_root::InterfacesMarker as fidl::endpoints::DiscoverableProtocolMarker>::PROTOCOL_NAME);
+        let (admin_control, server) =
+            fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
+                .expect("create Control proxy");
+        let () = root_control.get_admin(id, server).expect("get admin");
+        (InterfaceOrTun::Interface(interface), admin_control)
+    };
 
     let valid_address_parameters = fidl_fuchsia_net_interfaces_admin::AddressParameters::default();
 
@@ -536,8 +574,8 @@ async fn add_address_removal<N: Netstack>(name: &str, removal_method: AddressRem
         .await
         .expect("add address failed unexpectedly");
 
-        let (_netemul_endpoint, _device_control_handle) =
-            interface.remove().await.expect("failed to remove interface");
+        control.remove().await.expect("send remove interface request").expect("remove interface");
+        core::mem::drop(interface_or_tun);
         let event = address_state_provider
             .take_event_stream()
             .try_next()
