@@ -19,9 +19,10 @@ source "$script_dir"/common-setup.sh
 script_dir_abs="$(normalize_path "$script_dir")"
 project_root="$default_project_root"
 
-test -f "$script_dir"/proto/api/log/log_pb2.py || {
+generated_src=api/log/log_pb2.py
+test -f "$script_dir"/proto/"$generated_src" || {
   cat <<EOF
-Generated source $script_dir/proto/api/proxy/log_pb2.py not found.
+Generated source $script_dir/proto/$generated_src not found.
 Run $script_dir/proto/refresh.sh first.
 EOF
   exit 1

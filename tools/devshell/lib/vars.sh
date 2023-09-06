@@ -879,17 +879,21 @@ function fx-run-ninja {
   # the build, so that RBE-enabled build actions can operate through the proxy.
   #
   local rbe_wrapper=()
-  local user_env=()
+  local user_rbe_env=()
   if fx-rbe-enabled
   then
     rbe_wrapper=("FUCHSIA_BUILD_DIR=${FUCHSIA_BUILD_DIR}" "${RBE_WRAPPER[@]}")
-    # Automatic auth with gcert (from re-client bootstrap) needs $USER.
-    user_env=( "USER=${USER}" )
+    user_rbe_env=(
+      # Automatic auth with gcert (from re-client bootstrap) needs $USER.
+      "USER=${USER}"
+      # Honor environment variable to disable RBE build metrics.
+      "FX_REMOTE_BUILD_METRICS=${FX_REMOTE_BUILD_METRICS}"
+    )
   fi
 
   full_cmdline=(
     env -i
-    "${user_env[@]}"
+    "${user_rbe_env[@]}"
     "TERM=${TERM}"
     "PATH=${PATH}"
     # By default, also show the number of actively running actions.

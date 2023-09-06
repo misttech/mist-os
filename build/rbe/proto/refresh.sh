@@ -23,7 +23,13 @@ options:
   --googleapis-srcdir DIR : location of googleapis source
      If none is provided, then this will checkout the source into a temp dir.
 
-This populates the Fuchsia source tree with the following files:
+EOF
+  notice
+}
+
+function notice() {
+  cat <<EOF
+This populates the Fuchsia source tree with the following (gitignore'd) files:
 
   build/rbe/proto/:
     api/log/log.proto
@@ -43,6 +49,8 @@ EOF
 RECLIENT_SRCDIR=
 REMOTE_APIS_SRCDIR=
 GOOGLEAPIS_SRCDIR=
+
+yes_to_all=0
 
 prev_opt=
 # Extract script options before --
@@ -70,12 +78,25 @@ do
     --remote-apis-srcdir) prev_opt=REMOTE_APIS_SRCDIR ;;
     --googleapis-srcdir=*) GOOGLEAPIS_SRCDIR="$optarg" ;;
     --googleapis-srcdir) prev_opt=GOOGLEAPIS_SRCDIR ;;
+    -y ) yes_to_all=1 ;;
     *) echo "Unknown option: $opt" ; usage ; exit 1 ;;
   esac
   shift
 done
 
 readonly DESTDIR="$script_dir"
+
+# Prompt.
+test "$yes_to_all" = 1 || {
+  notice
+  echo
+  echo -n "Proceed? [y/n] "
+  read proceed
+  test "$proceed" = "y" || test "$proceed" = "Y" || {
+    echo "Stopping."
+    exit
+  }
+}
 
 # TODO(fangism): choose a deterministic cache dir,
 # and pull instead of re-cloning every time.
@@ -130,7 +151,9 @@ mkdir -p "$DESTDIR"/go/api/command
 curl https://raw.githubusercontent.com/bazelbuild/remote-apis-sdks/master/go/api/command/command.proto > "$DESTDIR"/go/api/command/command.proto
 
 cd "$project_root"
-protoc=(fx host-tool protoc)
+# Disable build metrics to avoid upload_reproxy_logs.sh before it is usable.
+protoc=(env FX_REMOTE_BUILD_METRICS=0 fx host-tool protoc)
+echo "Compiling protobufs with protoc: ${protoc[@]}"
 # TODO(fangism): provide prebuilt
 # Caveat: if fx build-metrics is already enabled with RBE, this fx build may
 # attempt to process and upload metrics before it is ready, and fail.

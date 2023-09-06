@@ -48,6 +48,11 @@ options:
   --cfg FILE: reclient config for reproxy
   --bindir DIR: location of reproxy tools
   All other flags before -- are forwarded to the reproxy bootstrap.
+
+environment variables:
+  FX_REMOTE_BUILD_METRICS: set to 0 to skip anything related to RBE metrics
+    This was easier than plumbing flags through all possible paths
+    that call 'fx build'.
 EOF
 }
 
@@ -177,8 +182,13 @@ fi
 
 # If configured, collect reproxy logs.
 BUILD_METRICS_ENABLED=0
-if [[ -f "$fx_build_metrics_config" ]]
-then source "$fx_build_metrics_config"
+if [[ "$FX_REMOTE_BUILD_METRICS" == 0 ]]
+then echo "Disabled RBE metrics for this run."
+else
+  if [[ -f "$fx_build_metrics_config" ]]
+  then source "$fx_build_metrics_config"
+    # This config sets BUILD_METRICS_ENABLED.
+  fi
 fi
 
 test "$BUILD_METRICS_ENABLED" = 0 || {
