@@ -14,7 +14,6 @@ import (
 
 	"go.fuchsia.dev/fuchsia/tools/lib/flagmisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/osmisc"
-	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 	"go.fuchsia.dev/fuchsia/tools/testing/tefmocheck"
 )
 
@@ -24,38 +23,6 @@ func usage() {
 Reads inputs from [flags] and writes a JSON formatted summary to stdout.
 The summary contains a synthetic test for each supported failure mode.
 `)
-}
-
-func loadSwarmingTaskSummary(path string) (*tefmocheck.SwarmingTaskSummary, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read swarming task summary file %q", path)
-	}
-
-	var ret tefmocheck.SwarmingTaskSummary
-	if err := json.Unmarshal(data, &ret); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal swarming task summary: %w", err)
-	}
-	if ret.Results == nil {
-		return nil, fmt.Errorf("swarming task summary did not contain top level `results`. Loaded from path: %s", path)
-	}
-	return &ret, nil
-}
-
-func loadTestSummary(path string) (*runtests.TestSummary, error) {
-	if path == "" {
-		return &runtests.TestSummary{}, nil
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read test summary file %q", path)
-	}
-
-	var ret runtests.TestSummary
-	if err := json.Unmarshal(data, &ret); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal test summary: %w", err)
-	}
-	return &ret, nil
 }
 
 func main() {
@@ -82,13 +49,13 @@ func main() {
 		os.Exit(64)
 	}
 
-	swarmingSummary, err := loadSwarmingTaskSummary(*swarmingSummaryPath)
+	swarmingSummary, err := tefmocheck.LoadSwarmingTaskSummary(*swarmingSummaryPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 	swarmingSummary.Host = *swarmingHost
 
-	inputSummary, err := loadTestSummary(*inputSummaryPath)
+	inputSummary, err := tefmocheck.LoadTestSummary(*inputSummaryPath)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-package main
+package tefmocheck
 
 import (
 	"encoding/json"
@@ -25,11 +25,11 @@ func TestLoadTestSummaryPassesInputSummaryThrough(t *testing.T) {
 	if err != nil {
 		t.Fatal("Marshal(inputSummary) failed:", err)
 	}
-	outputSummary, err := loadTestSummary(mkTempFile(t, summaryBytes))
+	outputSummary, err := LoadTestSummary(mkTempFile(t, summaryBytes))
 	if err != nil {
-		t.Errorf("loadSwarmingTaskSummary failed: %v", err)
+		t.Errorf("LoadSwarmingTaskSummary failed: %v", err)
 	} else if diff := cmp.Diff(outputSummary, &inputSummary); diff != "" {
-		t.Errorf("loadSwarmingTaskSummary reutrned wrong value (-got +want):\n%s", diff)
+		t.Errorf("LoadSwarmingTaskSummary reutrned wrong value (-got +want):\n%s", diff)
 	}
 }
 
