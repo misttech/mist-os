@@ -412,6 +412,15 @@ ElfLib::MemoryRegion ElfLib::GetSegmentData(size_t segment) {
   if (address_mode_ == AddressMode::kFile) {
     result.ptr = memory_->GetMemory(header->p_offset, header->p_filesz);
     result.size = header->p_filesz;
+  } else if (header_.e_type == ET_EXEC) {
+    // If a file type is ET_EXEC, then it was likely compiled with -fno-pie.
+    // These will be loaded directly at the address specified in p_vaddr, which
+    // will be equal to |load_address_| plus an offset. Most implementers of
+    // MemoryAccessor expect to receive an _offset_ in the first parameter of
+    // GetMemory calls, so we need to calculate the offset from |load_address_|
+    // explicitly.
+    result.ptr = memory_->GetMemory(header->p_vaddr - load_address_, header->p_memsz);
+    result.size = header->p_memsz;
   } else {
     result.ptr = memory_->GetMemory(header->p_vaddr, header->p_memsz);
     result.size = header->p_memsz;
@@ -440,7 +449,6 @@ std::optional<std::vector<uint8_t>> ElfLib::GetNote(const std::string& name, uin
 
     for (const uint8_t* pos = data.ptr; (pos + sizeof(Elf64_Nhdr)) < data.ptr + data.size;
          pos += sizeof(Elf64_Nhdr) + namesz_padded + descsz_padded) {
-
       header = bit_cast<Elf64_Nhdr, const uint8_t>(*pos);
 
       // Don't overflow the padded lengths.
