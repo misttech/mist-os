@@ -51,6 +51,40 @@ TEST(RobustFutexTest, FutexStateCheck) {
   });
 }
 
+// Tests that entries with a tid different than the current tid are ignored.
+TEST(RobustFutexTest, OtherTidsAreIgnored) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([] {
+    constexpr size_t kNumEntries = 3;
+    robust_list_entry entries[kNumEntries] = {};
+    robust_list_head head = {.list = {.next = nullptr},
+                             .futex_offset = offsetof(robust_list_entry, futex),
+                             .list_op_pending = nullptr};
+
+    head.list.next = reinterpret_cast<struct robust_list *>(&entries[0]);
+    for (size_t i = 0; i < kNumEntries - 1; i++) {
+      entries[i].next = reinterpret_cast<struct robust_list *>(&entries[i + 1]);
+    }
+    entries[kNumEntries - 1].next = reinterpret_cast<struct robust_list *>(&head);
+
+    int parent_tid = static_cast<int>(syscall(SYS_gettid));
+
+    std::thread t([&entries, &head, parent_tid]() {
+      EXPECT_EQ(0, syscall(SYS_set_robust_list, &head, sizeof(robust_list_head)));
+      int tid = static_cast<int>(syscall(SYS_gettid));
+      entries[0].futex = tid;
+      entries[1].futex = parent_tid;
+      entries[2].futex = tid;
+    });
+    t.join();
+    // We expect the first and list entries to be correctly modified.
+    // The second entry (wrong tid) should remain unchanged.
+    EXPECT_EQ(FUTEX_OWNER_DIED, entries[0].futex & FUTEX_OWNER_DIED);
+    EXPECT_EQ(FUTEX_OWNER_DIED, entries[2].futex & FUTEX_OWNER_DIED);
+    EXPECT_EQ(parent_tid, entries[1].futex);
+  });
+}
+
 // Tests that an entry with next = NULL doesn't cause issues.
 TEST(RobustFutexTest, NullEntryStopsProcessing) {
   test_helper::ForkHelper helper;

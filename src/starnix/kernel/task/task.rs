@@ -1890,14 +1890,18 @@ impl CurrentTask {
 
             let futex_ref = UserRef::<u32>::new(UserAddress::from(futex_base));
 
+            // TODO(b/299096230): Futex modification should be atomic.
             let futex = if let Ok(futex) = self.mm.read_object(futex_ref) {
                 futex
             } else {
                 return;
             };
-            let owner_died = FUTEX_OWNER_DIED | futex;
-            if self.write_object(futex_ref, &owner_died).is_err() {
-                return;
+
+            if (futex & FUTEX_TID_MASK) as i32 == self.id {
+                let owner_died = FUTEX_OWNER_DIED | futex;
+                if self.write_object(futex_ref, &owner_died).is_err() {
+                    return;
+                }
             }
             curr_ptr = curr.next;
         }
