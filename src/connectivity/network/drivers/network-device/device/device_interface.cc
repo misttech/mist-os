@@ -307,46 +307,43 @@ void DeviceInterface::NetworkDeviceIfcPortStatusChanged(uint8_t port_id,
   });
 }
 
-void DeviceInterface::NetworkDeviceIfcAddPort(uint8_t port_id,
-                                              const network_port_protocol_t* port_proto) {
+zx_status_t DeviceInterface::NetworkDeviceIfcAddPort(uint8_t port_id,
+                                                     const network_port_protocol_t* port_proto) {
   LOGF_TRACE("%s(%d)", __FUNCTION__, port_id);
   auto port_client = ddk::NetworkPortProtocolClient(port_proto);
-  auto release_port = fit::defer([&port_client]() {
-    if (port_client.is_valid()) {
-      port_client.Removed();
-    }
-  });
 
   // Creating a MacAddrDeviceInterface may interact with the device, do that without holding the
   // control lock to prevent deadlocks
   std::unique_ptr<MacAddrDeviceInterface> mac;
-  mac_addr_protocol_t mac_proto;
+  mac_addr_protocol_t* mac_proto = nullptr;
   port_client.GetMac(&mac_proto);
-  ddk::MacAddrProtocolClient mac_client(&mac_proto);
-  if (mac_client.is_valid()) {
-    zx::result status = MacAddrDeviceInterface::Create(mac_client);
-    if (status.is_error()) {
-      LOGF_ERROR("failed to instantiate MAC information for port %d: %s", port_id,
-                 status.status_string());
-      return;
+  if (mac_proto) {
+    ddk::MacAddrProtocolClient mac_client(mac_proto);
+    if (mac_client.is_valid()) {
+      zx::result status = MacAddrDeviceInterface::Create(mac_client);
+      if (status.is_error()) {
+        LOGF_ERROR("failed to instantiate MAC information for port %d: %s", port_id,
+                   status.status_string());
+        return status.status_value();
+      }
+      mac = std::move(status.value());
     }
-    mac = std::move(status.value());
   }
 
   fbl::AutoLock lock(&control_lock_);
   // Don't allow new ports if tearing down.
   if (teardown_state_ != TeardownState::RUNNING) {
     LOGF_WARN("port %d not added, teardown in progress", port_id);
-    return;
+    return ZX_ERR_BAD_STATE;
   }
   if (port_id >= ports_.size()) {
     LOGF_ERROR("port id %d out of allowed range: [0, %ld)", port_id, ports_.size());
-    return;
+    return ZX_ERR_INVALID_ARGS;
   }
   PortSlot& port_slot = ports_[port_id];
   if (port_slot.port != nullptr) {
     LOGF_ERROR("port %d already exists", port_id);
-    return;
+    return ZX_ERR_ALREADY_EXISTS;
   }
 
   fbl::AllocChecker checker;
@@ -360,7 +357,7 @@ void DeviceInterface::NetworkDeviceIfcAddPort(uint8_t port_id,
                                 fit::bind_member<&DeviceInterface::OnPortTeardownComplete>(this)));
   if (!checker.check()) {
     LOGF_ERROR("failed to allocate port memory");
-    return;
+    return ZX_ERR_NO_MEMORY;
   }
 
   // Clear port_client to prevent deferred call from notifying removal.
@@ -372,6 +369,7 @@ void DeviceInterface::NetworkDeviceIfcAddPort(uint8_t port_id,
   for (auto& watcher : port_watchers_) {
     watcher.PortAdded(salted_id);
   }
+  return ZX_OK;
 }
 
 void DeviceInterface::NetworkDeviceIfcRemovePort(uint8_t port_id) {

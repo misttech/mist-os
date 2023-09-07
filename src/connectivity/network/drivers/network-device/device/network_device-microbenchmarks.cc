@@ -32,7 +32,7 @@ class FakeDeviceImpl : public ddk::NetworkPortProtocol<FakeDeviceImpl>,
 
   zx_status_t NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface) {
     iface_ = ddk::NetworkDeviceIfcProtocolClient(iface);
-    iface_.AddPort(kPortId, this, &network_port_protocol_ops_);
+    ZX_ASSERT_OK(iface_.AddPort(kPortId, this, &network_port_protocol_ops_), "AddPort failed");
     return ZX_OK;
   }
   void NetworkDeviceImplStart(network_device_impl_start_callback callback, void* cookie) {
@@ -129,11 +129,12 @@ class FakeDeviceImpl : public ddk::NetworkPortProtocol<FakeDeviceImpl>,
     };
   }
   void NetworkPortSetActive(bool active) {}
-  void NetworkPortGetMac(mac_addr_protocol_t* out_mac_ifc) { *out_mac_ifc = {}; }
+  void NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc) { *out_mac_ifc = &mac_addr_proto_; }
   void NetworkPortRemoved() {}
 
  private:
   ddk::NetworkDeviceIfcProtocolClient iface_;
+  mac_addr_protocol_t mac_addr_proto_{};
   perftest::RepeatState* const perftest_state_;
 };
 

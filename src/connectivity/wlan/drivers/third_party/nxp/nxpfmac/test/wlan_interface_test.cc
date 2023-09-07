@@ -217,12 +217,13 @@ struct WlanInterfaceTest : public zxtest::Test,
         network_device_impl_init(&netdev_proto, netdev_ifc_proto_.ctx, netdev_ifc_proto_.ops));
   }
 
-  static void OnAddPort(void* ctx, uint8_t, const network_port_protocol_t* proto) {
+  static zx_status_t OnAddPort(void* ctx, uint8_t, const network_port_protocol_t* proto) {
     auto ifc = static_cast<WlanInterfaceTest*>(ctx);
     ifc->net_port_proto_ = *proto;
     EXPECT_NOT_NULL(proto->ctx);
     EXPECT_NOT_NULL(proto->ops);
     sync_completion_signal(&ifc->on_add_port_called_);
+    return ZX_OK;
   }
   static void OnRemovePort(void* ctx, uint8_t) {
     auto ifc = static_cast<WlanInterfaceTest*>(ctx);

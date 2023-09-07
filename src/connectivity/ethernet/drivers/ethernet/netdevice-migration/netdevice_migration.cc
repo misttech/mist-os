@@ -214,7 +214,11 @@ zx_status_t NetdeviceMigration::NetworkDeviceImplInit(const network_device_ifc_p
     return ZX_ERR_ALREADY_BOUND;
   }
   netdevice_ = ddk::NetworkDeviceIfcProtocolClient(iface);
-  netdevice_.AddPort(kPortId, this, &network_port_protocol_ops_);
+  zx_status_t status = netdevice_.AddPort(kPortId, this, &network_port_protocol_ops_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "failed to add port: %s", zx_status_get_string(status));
+    return status;
+  }
   return ZX_OK;
 }
 
@@ -272,6 +276,8 @@ void NetdeviceMigration::NetworkDeviceImplStop(network_device_impl_stop_callback
           .length = 0,
       };
       *rx_buffer_iter++ = {
+          .meta = {.frame_type =
+                       static_cast<uint8_t>(fuchsia_hardware_network::FrameType::kEthernet)},
           .data_list = &part,
           .data_count = 1,
       };
@@ -442,6 +448,8 @@ void NetdeviceMigration::NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* 
           .length = 0,
       };
       rx_buffer_t buf = {
+          .meta = {.frame_type =
+                       static_cast<uint8_t>(fuchsia_hardware_network::FrameType::kEthernet)},
           .data_list = &part,
           .data_count = 1,
       };
@@ -494,11 +502,10 @@ void NetdeviceMigration::NetworkPortGetStatus(port_status_t* out_status)
 
 void NetdeviceMigration::NetworkPortSetActive(bool active) {}
 
-void NetdeviceMigration::NetworkPortGetMac(mac_addr_protocol_t* out_mac_ifc) {
-  *out_mac_ifc = mac_addr_protocol_t{
-      .ops = &mac_addr_protocol_ops_,
-      .ctx = this,
-  };
+void NetdeviceMigration::NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc) {
+  if (out_mac_ifc) {
+    *out_mac_ifc = &mac_addr_proto_;
+  }
 }
 
 void NetdeviceMigration::NetworkPortRemoved() {

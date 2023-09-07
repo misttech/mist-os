@@ -25,13 +25,14 @@ class TestNetworkDeviceIfc : public ::ddk::NetworkDeviceIfcProtocol<TestNetworkD
       port_status_changed_.Call(id, new_status);
     }
   }
-  void NetworkDeviceIfcAddPort(uint8_t id, const network_port_protocol_t* port) {
+  zx_status_t NetworkDeviceIfcAddPort(uint8_t id, const network_port_protocol_t* port) {
     if (port) {
       port_proto_ = *port;
     }
     if (add_port_.HasExpectations()) {
-      add_port_.Call(id, port);
+      return add_port_.Call(id, port);
     }
+    return ZX_OK;
   }
   void NetworkDeviceIfcRemovePort(uint8_t id) {
     if (remove_port_.HasExpectations()) {
@@ -58,7 +59,7 @@ class TestNetworkDeviceIfc : public ::ddk::NetworkDeviceIfcProtocol<TestNetworkD
   }
 
   mock_function::MockFunction<void, uint8_t, const port_status_t*> port_status_changed_;
-  mock_function::MockFunction<void, uint8_t, const network_port_protocol_t*> add_port_;
+  mock_function::MockFunction<zx_status_t, uint8_t, const network_port_protocol_t*> add_port_;
   mock_function::MockFunction<void, uint8_t> remove_port_;
   mock_function::MockFunction<void, const rx_buffer_t*, size_t> complete_rx_;
   mock_function::MockFunction<void, const tx_result_t*, size_t> complete_tx_;

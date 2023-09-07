@@ -404,9 +404,9 @@ void DeviceAdapter::OnPortStatusChanged(uint8_t port_id, const port_status_t& ne
   device_iface_.PortStatusChanged(port_id, &new_status);
 }
 
-void DeviceAdapter::AddPort(PortAdapter& port) {
+zx_status_t DeviceAdapter::AddPort(PortAdapter& port) {
   network_port_protocol_t proto = port.proto();
-  device_iface_.AddPort(port.id(), proto.ctx, proto.ops);
+  return device_iface_.AddPort(port.id(), proto.ctx, proto.ops);
 }
 
 void DeviceAdapter::RemovePort(uint8_t port_id) { device_iface_.RemovePort(port_id); }

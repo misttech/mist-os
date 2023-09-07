@@ -365,7 +365,11 @@ zx::result<std::unique_ptr<TunDevice::Port>> TunDevice::Port::Create(
     mac = std::move(*status);
   }
   port->adapter_ = std::make_unique<PortAdapter>(port.get(), config, std::move(mac));
-  parent->device_->AddPort(port->adapter());
+  zx_status_t status = parent->device_->AddPort(port->adapter());
+  if (status != ZX_OK) {
+    FX_LOGF(ERROR, "tun", "Failed to add port: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
   port->SetOnline(config.online);
   return zx::ok(std::move(port));
 }

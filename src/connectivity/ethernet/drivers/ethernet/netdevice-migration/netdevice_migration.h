@@ -83,7 +83,7 @@ class NetdeviceMigration
   void NetworkPortGetInfo(port_base_info_t* out_info);
   void NetworkPortGetStatus(port_status_t* out_status) __TA_EXCLUDES(status_lock_);
   void NetworkPortSetActive(bool active);
-  void NetworkPortGetMac(mac_addr_protocol_t* out_mac_ifc);
+  void NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc);
   void NetworkPortRemoved();
 
   // For MacAddrProtocol.
@@ -98,6 +98,7 @@ class NetdeviceMigration
                      zx::bti eth_bti, vmo_store::Options opts, std::array<uint8_t, MAC_SIZE> mac,
                      size_t netbuf_size, NetbufPool netbuf_pool)
       : DeviceType(parent),
+        mac_addr_proto_({&mac_addr_protocol_ops_, this}),
         ethernet_(ethernet),
         ethernet_ifc_proto_({&ethernet_ifc_protocol_ops_, this}),
         eth_bti_(std::move(eth_bti)),
@@ -138,6 +139,7 @@ class NetdeviceMigration
   std::atomic<size_t> no_rx_space_ = 0;
 
   ddk::NetworkDeviceIfcProtocolClient netdevice_;
+  mac_addr_protocol_t mac_addr_proto_;
 
   const ddk::EthernetImplProtocolClient ethernet_;
   const ethernet_ifc_protocol_t ethernet_ifc_proto_;

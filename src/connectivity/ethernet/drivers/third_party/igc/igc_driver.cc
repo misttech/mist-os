@@ -43,7 +43,9 @@ constexpr static uint8_t kIgcRxHthresh = 8;
 constexpr static uint8_t kIgcRxWthresh = 4;
 
 IgcDriver::IgcDriver(zx_device_t* parent)
-    : parent_(parent), netdev_impl_proto_{&this->network_device_impl_protocol_ops_, this} {
+    : parent_(parent),
+      netdev_impl_proto_{&this->network_device_impl_protocol_ops_, this},
+      mac_addr_proto_{&this->mac_addr_protocol_ops_, this} {
   zx_status_t status = ZX_OK;
   adapter_ = std::make_shared<struct adapter>();
 
@@ -490,7 +492,11 @@ bool IgcDriver::OnlineStatusUpdate() {
 // NetworkDevice::Callbacks implementations
 zx_status_t IgcDriver::NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface) {
   adapter_->netdev_ifc = ::ddk::NetworkDeviceIfcProtocolClient(iface);
-  adapter_->netdev_ifc.AddPort(kPortId, this, &network_port_protocol_ops_);
+  zx_status_t status = adapter_->netdev_ifc.AddPort(kPortId, this, &network_port_protocol_ops_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to add port: %s", zx_status_get_string(status));
+    return status;
+  }
   return ZX_OK;
 }
 
@@ -719,11 +725,10 @@ void IgcDriver::NetworkPortGetStatus(port_status_t* out_status) {
 void IgcDriver::NetworkPortSetActive(bool active) { /* Do nothing here.*/
 }
 
-void IgcDriver::NetworkPortGetMac(mac_addr_protocol_t* out_mac_ifc) {
-  *out_mac_ifc = {
-      .ops = &mac_addr_protocol_ops_,
-      .ctx = this,
-  };
+void IgcDriver::NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc) {
+  if (out_mac_ifc) {
+    *out_mac_ifc = &mac_addr_proto_;
+  }
 }
 
 void IgcDriver::NetworkPortRemoved() { /* Do nothing here, we don't remove port in this driver.*/

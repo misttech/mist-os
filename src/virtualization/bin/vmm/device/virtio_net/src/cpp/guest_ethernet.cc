@@ -237,7 +237,11 @@ zx_status_t GuestEthernet::NetworkDeviceImplInit(const network_device_ifc_protoc
   parent_ = ddk::NetworkDeviceIfcProtocolClient(iface);
 
   // Create port.
-  parent_.AddPort(kPortId, this, &network_port_protocol_ops_);
+  zx_status_t status = parent_.AddPort(kPortId, this, &network_port_protocol_ops_);
+  if (status != ZX_OK) {
+    FX_LOGS(ERROR) << "Failed to add port: " << zx_status_get_string(status);
+    return status;
+  }
 
   // Inform our parent that the port is active.
   port_status_t port_status;
@@ -486,11 +490,10 @@ void GuestEthernet::NetworkPortGetStatus(port_status_t* out_status) {
   };
 }
 
-void GuestEthernet::NetworkPortGetMac(mac_addr_protocol_t* out_mac_ifc) {
-  *out_mac_ifc = {
-      .ops = &mac_addr_protocol_ops_,
-      .ctx = this,
-  };
+void GuestEthernet::NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc) {
+  if (out_mac_ifc) {
+    *out_mac_ifc = &mac_addr_proto_;
+  }
 }
 
 ddk::NetworkDeviceImplProtocolClient GuestEthernet::GetNetworkDeviceImplClient() {

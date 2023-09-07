@@ -57,7 +57,7 @@ class SimDataPath {
   // networks_device_ifc_protocol_ops callbacks
   void OnTxComplete(const tx_result_t* tx_list, size_t tx_count);
   void OnRxComplete(const rx_buffer_t* rx_list, size_t rx_count);
-  void OnAddPort(uint8_t id, const network_port_protocol_t* port);
+  zx_status_t OnAddPort(uint8_t id, const network_port_protocol_t* port);
   void OnRemovePort(uint8_t id);
 
  private:
@@ -92,7 +92,7 @@ class SimDataPath {
   network_device_ifc_protocol_ops_t ifc_ops_ = {
       .add_port =
           [](void* ctx, uint8_t id, const network_port_protocol_t* port) {
-            static_cast<SimDataPath*>(ctx)->OnAddPort(id, port);
+            return static_cast<SimDataPath*>(ctx)->OnAddPort(id, port);
           },
       .remove_port = [](void* ctx,
                         uint8_t id) { static_cast<SimDataPath*>(ctx)->OnRemovePort(id); },

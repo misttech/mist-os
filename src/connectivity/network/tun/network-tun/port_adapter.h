@@ -48,7 +48,7 @@ class PortAdapter : public ddk::NetworkPortProtocol<PortAdapter> {
   void NetworkPortGetInfo(port_base_info_t* out_info);
   void NetworkPortGetStatus(port_status_t* out_status);
   void NetworkPortSetActive(bool active);
-  void NetworkPortGetMac(mac_addr_protocol_t* out_mac_ifc);
+  void NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc);
   void NetworkPortRemoved();
 
   // Sets this port's emulated `online` status.

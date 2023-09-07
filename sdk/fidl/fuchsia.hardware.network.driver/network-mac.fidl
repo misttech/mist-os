@@ -35,18 +35,20 @@ type SupportedMacFilterMode = strict bits {
 // LINT.ThenChange(/sdk/fidl/fuchsia.hardware.network/mac.fidl)
 
 /// Device features reported by [`MacAddr.GetFeatures`].
-type Features = struct {
+type Features = table {
     /// The maximum number of multicast filtering entries available on this
     /// device.
     ///
     /// Implementations must set 0 if multicast filtering is not supported.
     /// Values will always be saturated to [`MAX_MAC_FILTER`].
-    multicast_filter_count uint32;
+    /// Optional, interpreted as zero if absent.
+    1: multicast_filter_count uint32;
     /// The filtering operating modes supported by this device.
     ///
     /// Bitfield of possible [`SupportedMacFilterMode`] values that can be passed to
     /// [`MacAddr.SetMode`].
-    supported_modes SupportedMacFilterMode;
+    // Optional, interpreted as an empty set if absent.
+    2: supported_modes SupportedMacFilterMode;
 };
 
 @transport("Driver")

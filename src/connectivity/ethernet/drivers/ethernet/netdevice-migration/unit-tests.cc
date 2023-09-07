@@ -82,7 +82,8 @@ class MockNetworkDeviceIfc : public ddk::Device<MockNetworkDeviceIfc>,
 
   MOCK_METHOD(void, NetworkDeviceIfcPortStatusChanged,
               (uint8_t id, const port_status_t* new_status));
-  MOCK_METHOD(void, NetworkDeviceIfcAddPort, (uint8_t id, const network_port_protocol_t* port));
+  MOCK_METHOD(zx_status_t, NetworkDeviceIfcAddPort,
+              (uint8_t id, const network_port_protocol_t* port));
   MOCK_METHOD(void, NetworkDeviceIfcRemovePort, (uint8_t id));
   MOCK_METHOD(void, NetworkDeviceIfcCompleteRx, (const rx_buffer_t* rx_list, size_t rx_count));
   MOCK_METHOD(void, NetworkDeviceIfcCompleteTx, (const tx_result_t* rx_list, size_t tx_count));
@@ -933,6 +934,10 @@ TEST_F(NetdeviceMigrationDefaultSetupTest, MacAddrSetMode) {
       .WillOnce([](uint32_t p, int32_t v, const uint8_t* data, size_t data_len) { return ZX_OK; });
   std::array<mac_address_t, netdevice_migration::NetdeviceMigration::kMulticastFilterMax>
       mac_filter;
+  for (size_t i = 0; i < mac_filter.size(); ++i) {
+    // Fill up each mac address with {i, i + 1, i + 2, ...} to have some distinct test data.
+    std::iota(std::begin(mac_filter[i].octets), std::end(mac_filter[i].octets), i);
+  }
   auto mcast_macs_match = [&](const uint8_t* data) -> bool {
     const uint8_t* addr = data;
     for (auto& mac : mac_filter) {
@@ -965,11 +970,12 @@ TEST_F(NetdeviceMigrationDefaultSetupTest, MacAddrSetMode) {
 }
 
 TEST_F(NetdeviceMigrationDefaultSetupTest, GetMac) {
-  mac_addr_protocol_t mac;
+  mac_addr_protocol_t* mac;
   Device().NetworkPortGetMac(&mac);
+  ASSERT_NE(mac, nullptr);
   netdevice_migration::NetdeviceMigrationTestHelper helper(Device());
   mac_address_t addr = {};
-  mac.ops->get_address(mac.ctx, &addr);
+  mac->ops->get_address(mac->ctx, &addr);
   for (size_t i = 0; i < MAC_SIZE; ++i) {
     EXPECT_EQ(addr.octets[i], helper.Mac()[i]);
   }

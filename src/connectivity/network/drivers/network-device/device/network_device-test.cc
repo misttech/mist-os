@@ -93,7 +93,7 @@ class NetworkDeviceTest : public ::testing::Test {
           [](void* ctx, features_t* out_features) {
             *out_features = {.supported_modes = SUPPORTED_MAC_FILTER_MODE_MULTICAST_FILTER};
           },
-      .set_mode = [](void* ctx, mode_t mode, const mac_address_t* multicast_macs_list,
+      .set_mode = [](void* ctx, mac_filter_mode_t mode, const mac_address_t* multicast_macs_list,
                      size_t multicast_macs_count) {},
   };
 
@@ -1621,16 +1621,18 @@ TEST_F(NetworkDeviceTest, RejectsInvalidPortIds) {
     // Add a port with an invalid ID.
     FakeNetworkPortImpl fake_port;
     network_port_protocol_t proto = fake_port.protocol();
-    impl_.client().AddPort(MAX_PORTS, proto.ctx, proto.ops);
-    ASSERT_TRUE(fake_port.removed());
+    ASSERT_EQ(impl_.client().AddPort(MAX_PORTS, proto.ctx, proto.ops), ZX_ERR_INVALID_ARGS);
+    // Port should NOT have been removed if AddPort fails.
+    ASSERT_FALSE(fake_port.removed());
   }
 
   {
     // Add a port with a duplicate ID.
     FakeNetworkPortImpl fake_port;
     network_port_protocol_t proto = fake_port.protocol();
-    impl_.client().AddPort(kPort13, proto.ctx, proto.ops);
-    ASSERT_TRUE(fake_port.removed());
+    ASSERT_EQ(impl_.client().AddPort(kPort13, proto.ctx, proto.ops), ZX_ERR_ALREADY_EXISTS);
+    // Port should NOT have been removed if AddPort fails.
+    ASSERT_FALSE(fake_port.removed());
   }
 }
 
@@ -2436,7 +2438,7 @@ TEST_F(NetworkDeviceTest, PortWatcherEnforcesQueueLimit) {
       port = nullptr;
     } else {
       port = std::make_unique<FakeNetworkPortImpl>();
-      port->AddPort((event_count / 2) % MAX_PORTS, impl_.client());
+      ASSERT_OK(port->AddPort((event_count / 2) % MAX_PORTS, impl_.client()));
     }
   }
   zx::result status = WaitClosedAndReadEpitaph(watcher.channel());

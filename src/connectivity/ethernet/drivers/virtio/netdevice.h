@@ -85,7 +85,7 @@ class NetworkDevice : public Device,
   void NetworkPortGetInfo(port_base_info_t* out_info);
   void NetworkPortGetStatus(port_status_t* out_status);
   void NetworkPortSetActive(bool active);
-  void NetworkPortGetMac(mac_addr_protocol_t* out_mac_ifc);
+  void NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc);
   void NetworkPortRemoved() { /* do nothing, we never remove our port */
   }
   // MacAddr protocol:
@@ -166,6 +166,7 @@ class NetworkDevice : public Device,
 
   ddk::NetworkDeviceIfcProtocolClient ifc_ __TA_GUARDED(state_lock_);
   VmoStore vmo_store_ __TA_GUARDED(state_lock_);
+  mac_addr_protocol_t mac_addr_proto_;
 };
 
 }  // namespace virtio

@@ -84,7 +84,7 @@ class IgcDriver : public ::ddk::NetworkDeviceImplProtocol<IgcDriver>,
   void NetworkPortGetInfo(port_base_info_t* out_info);
   void NetworkPortGetStatus(port_status_t* out_status);
   void NetworkPortSetActive(bool active);
-  void NetworkPortGetMac(mac_addr_protocol_t* out_mac_ifc);
+  void NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc);
   void NetworkPortRemoved();
 
   // MacAddr protocol:
@@ -169,6 +169,7 @@ class IgcDriver : public ::ddk::NetworkDeviceImplProtocol<IgcDriver>,
   bool started_ __TA_GUARDED(started_mutex_) = false;
 
   network_device_impl_protocol_t netdev_impl_proto_;
+  mac_addr_protocol_t mac_addr_proto_;
 
   // Lock for VMO changes.
   network::SharedLock vmo_lock_;

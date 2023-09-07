@@ -48,7 +48,8 @@ class Gvnic : public DeviceType,
               public ddk::NetworkPortProtocol<Gvnic>,
               public ddk::MacAddrProtocol<Gvnic> {
  public:
-  explicit Gvnic(zx_device_t* parent) : DeviceType(parent) {}
+  explicit Gvnic(zx_device_t* parent)
+      : DeviceType(parent), mac_addr_proto_({&mac_addr_protocol_ops_, this}) {}
   virtual ~Gvnic() = default;
 
   static __WARN_UNUSED_RESULT zx_status_t Bind(void* ctx, zx_device_t* dev);
@@ -74,7 +75,7 @@ class Gvnic : public DeviceType,
   void NetworkPortGetInfo(port_base_info_t* out_info);
   void NetworkPortGetStatus(port_status_t* out_status);
   void NetworkPortSetActive(bool active);
-  void NetworkPortGetMac(mac_addr_protocol_t* out_mac_ifc);
+  void NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc);
   void NetworkPortRemoved();
 
   // MacAddr protocol:
@@ -194,6 +195,7 @@ class Gvnic : public DeviceType,
 
   network::SharedLock ifc_lock_;
   ddk::NetworkDeviceIfcProtocolClient ifc_ __TA_GUARDED(ifc_lock_);
+  mac_addr_protocol_t mac_addr_proto_;
 
   // TODO(https://fxbug.dev/107757): Consider replacing with VmoStore when zerocopy is implemented.
   network::SharedLock vmo_lock_;

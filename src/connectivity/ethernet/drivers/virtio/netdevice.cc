@@ -74,7 +74,8 @@ NetworkDevice::NetworkDevice(zx_device_t* bus_device, zx::bti bti_handle,
                   .bti_pin_options = ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE,
                   .index = true,
               },
-      }) {}
+      }),
+      mac_addr_proto_({&mac_addr_protocol_ops_, this}) {}
 
 NetworkDevice::~NetworkDevice() {}
 
@@ -298,7 +299,11 @@ port_status_t NetworkDevice::ReadStatus() const {
 zx_status_t NetworkDevice::NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface) {
   fbl::AutoLock lock(&state_lock_);
   ifc_ = ddk::NetworkDeviceIfcProtocolClient(iface);
-  ifc_.AddPort(kPortId, this, &network_port_protocol_ops_);
+  zx_status_t status = ifc_.AddPort(kPortId, this, &network_port_protocol_ops_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "failed to add port: %s", zx_status_get_string(status));
+    return status;
+  }
   return ZX_OK;
 }
 
@@ -392,6 +397,8 @@ void NetworkDevice::NetworkDeviceImplStop(network_device_impl_stop_callback call
         while (!rx_in_flight_.Empty()) {
           Descriptor d = rx_in_flight_.Pop();
           *iter++ = {
+              .meta = {.frame_type =
+                           static_cast<uint8_t>(fuchsia_hardware_network::FrameType::kEthernet)},
               .data_list = &*parts_iter,
               .data_count = 1,
           };
@@ -583,11 +590,10 @@ void NetworkDevice::NetworkPortGetInfo(port_base_info_t* out_info) {
 void NetworkDevice::NetworkPortGetStatus(port_status_t* out_status) { *out_status = ReadStatus(); }
 
 void NetworkDevice::NetworkPortSetActive(bool active) {}
-void NetworkDevice::NetworkPortGetMac(mac_addr_protocol_t* out_mac_ifc) {
-  *out_mac_ifc = {
-      .ops = &mac_addr_protocol_ops_,
-      .ctx = this,
-  };
+void NetworkDevice::NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc) {
+  if (out_mac_ifc) {
+    *out_mac_ifc = &mac_addr_proto_;
+  }
 }
 
 void NetworkDevice::MacAddrGetAddress(mac_address_t* out_mac) {

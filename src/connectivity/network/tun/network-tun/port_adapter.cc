@@ -28,10 +28,10 @@ void PortAdapter::NetworkPortSetActive(bool active) {
     parent_->OnHasSessionsChanged(*this);
   }
 }
-void PortAdapter::NetworkPortGetMac(mac_addr_protocol_t* out_mac_ifc) {
-  if (mac_) {
+void PortAdapter::NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc) {
+  if (mac_ && out_mac_ifc) {
     *out_mac_ifc = mac_->proto();
-  } else {
+  } else if (out_mac_ifc) {
     *out_mac_ifc = {};
   }
 }

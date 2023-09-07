@@ -137,10 +137,11 @@ void SimDataPath::OnRxComplete(const rx_buffer_t* rx_list, size_t rx_count) {
   QueueRxBuffer();
 }
 
-void SimDataPath::OnAddPort(uint8_t id, const network_port_protocol_t* port) {
+zx_status_t SimDataPath::OnAddPort(uint8_t id, const network_port_protocol_t* port) {
   ZX_ASSERT(port && port->ctx && port->ops);
   ZX_ASSERT(port_clients_.find(id) == port_clients_.end());
   port_clients_.insert({id, ddk::NetworkPortProtocolClient(port)});
+  return ZX_OK;
 }
 
 void SimDataPath::OnRemovePort(uint8_t id) {

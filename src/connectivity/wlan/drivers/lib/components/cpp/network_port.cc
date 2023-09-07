@@ -11,18 +11,27 @@ NetworkPort::Callbacks::~Callbacks() = default;
 
 NetworkPort::NetworkPort(network_device_ifc_protocol_t netdev_ifc, Callbacks& iface,
                          uint8_t port_id)
-    : iface_(iface), netdev_ifc_(&netdev_ifc), port_id_(port_id) {}
+    : iface_(iface),
+      netdev_ifc_(&netdev_ifc),
+      port_id_(port_id),
+      mac_addr_proto_({&mac_addr_protocol_ops_, this}) {}
 
 NetworkPort::~NetworkPort() { RemovePort(); }
 
-void NetworkPort::Init(Role role) {
+zx_status_t NetworkPort::Init(Role role) {
   std::lock_guard lock(netdev_ifc_mutex_);
   role_ = role;
   if (!netdev_ifc_.is_valid()) {
     zxlogf(WARNING, "netdev_ifc_ invalid, port likely removed.");
-    return;
+    return ZX_ERR_BAD_STATE;
   }
-  netdev_ifc_.AddPort(port_id_, this, &network_port_protocol_ops_);
+  zx_status_t status = netdev_ifc_.AddPort(port_id_, this, &network_port_protocol_ops_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to add port: %s", zx_status_get_string(status));
+    netdev_ifc_.clear();
+    return status;
+  }
+  return ZX_OK;
 }
 
 void NetworkPort::RemovePort() {
@@ -90,11 +99,10 @@ void NetworkPort::NetworkPortGetStatus(port_status_t* out_status) {
 
 void NetworkPort::NetworkPortSetActive(bool active) {}
 
-void NetworkPort::NetworkPortGetMac(mac_addr_protocol_t* out_mac_ifc) {
-  *out_mac_ifc = {
-      .ops = &mac_addr_protocol_ops_,
-      .ctx = this,
-  };
+void NetworkPort::NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc) {
+  if (out_mac_ifc) {
+    *out_mac_ifc = &mac_addr_proto_;
+  }
 }
 
 void NetworkPort::NetworkPortRemoved() {

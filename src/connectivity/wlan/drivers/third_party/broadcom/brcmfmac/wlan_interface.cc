@@ -112,7 +112,11 @@ zx_status_t WlanInterface::Create(wlan::brcmfmac::Device* device, const char* na
       return ZX_ERR_INVALID_ARGS;
   }
 
-  interface->NetworkPort::Init(net_port_role);
+  zx_status_t status = interface->NetworkPort::Init(net_port_role);
+  if (status != ZX_OK) {
+    BRCMF_ERR("Failed to initialize port: %s", zx_status_get_string(status));
+    return status;
+  }
 
   *out_interface = interface.release();  // This now has its lifecycle managed by the devhost.
   return ZX_OK;

@@ -20,8 +20,8 @@ zx::result<std::unique_ptr<MacAdapter>> MacAdapter::Create(MacAdapterParent* par
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  mac_addr_protocol_t proto = adapter->proto();
-  zx::result device = MacAddrDeviceInterface::Create(ddk::MacAddrProtocolClient(&proto));
+  mac_addr_protocol_t* proto = adapter->proto();
+  zx::result device = MacAddrDeviceInterface::Create(ddk::MacAddrProtocolClient(proto));
   if (device.is_error()) {
     return device.take_error();
   }

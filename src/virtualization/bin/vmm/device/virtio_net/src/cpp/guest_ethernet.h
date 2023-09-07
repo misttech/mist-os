@@ -29,7 +29,8 @@ class GuestEthernet : public ddk::NetworkDeviceImplProtocol<GuestEthernet>,
                       ddk::NetworkPortProtocol<GuestEthernet> {
  public:
   GuestEthernet()
-      : loop_(&kAsyncLoopConfigAttachToCurrentThread),
+      : mac_addr_proto_({&mac_addr_protocol_ops_, this}),
+        loop_(&kAsyncLoopConfigAttachToCurrentThread),
         trace_provider_(loop_.dispatcher()),
         svc_(sys::ServiceDirectory::CreateFromNamespace()),
         tx_completion_queue_(kPortId, loop_.dispatcher(), &parent_),
@@ -76,7 +77,7 @@ class GuestEthernet : public ddk::NetworkDeviceImplProtocol<GuestEthernet>,
   // Methods implementing the `NetworkPort` banjo protocol.
   void NetworkPortGetInfo(port_base_info_t* out_info);
   void NetworkPortGetStatus(port_status_t* out_status);
-  void NetworkPortGetMac(mac_addr_protocol_t* out_mac_ifc);
+  void NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc);
   void NetworkPortSetActive(bool active) {}
   void NetworkPortRemoved() {}
 
@@ -121,6 +122,7 @@ class GuestEthernet : public ddk::NetworkDeviceImplProtocol<GuestEthernet>,
 
   std::mutex mutex_;
   ddk::NetworkDeviceIfcProtocolClient parent_;
+  mac_addr_protocol_t mac_addr_proto_;
 
   // Device state.
   State state_ __TA_GUARDED(mutex_) = State::kStopped;

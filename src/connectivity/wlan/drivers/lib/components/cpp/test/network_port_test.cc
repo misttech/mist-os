@@ -49,11 +49,51 @@ TEST(NetworkPortTest, Init) {
           EXPECT_EQ(port_id, kPortId);
           EXPECT_EQ(proto->ctx, &port_);
           EXPECT_NOT_NULL(proto->ops);
+          return ZX_OK;
         });
 
-    port_.Init(NetworkPort::Role::Client);
+    ASSERT_OK(port_.Init(NetworkPort::Role::Client));
     netdev_ifc.add_port_.VerifyAndClear();
     port_ifc.removed_.ExpectCall();
+  }
+  port_ifc.removed_.VerifyAndClear();
+}
+
+TEST(NetworkPortTest, InitInvalidIfc) {
+  TestNetworkPortInterface port_ifc;
+  {
+    TestNetworkDeviceIfc netdev_ifc;
+    constexpr uint8_t kPortId = 13;
+
+    NetworkPort port_({nullptr, nullptr}, port_ifc, kPortId);
+
+    // Should not be called because the ifc wasn't valid to begin with.
+    netdev_ifc.add_port_.ExpectNoCall();
+
+    ASSERT_EQ(port_.Init(NetworkPort::Role::Client), ZX_ERR_BAD_STATE);
+    netdev_ifc.add_port_.VerifyAndClear();
+    // Should not be called because the ifc wasn't valid to begin with.
+    port_ifc.removed_.ExpectNoCall();
+  }
+  port_ifc.removed_.VerifyAndClear();
+}
+
+TEST(NetworkPortTest, InitAddPortFails) {
+  TestNetworkPortInterface port_ifc;
+  {
+    TestNetworkDeviceIfc netdev_ifc;
+    constexpr uint8_t kPortId = 13;
+    constexpr zx_status_t kAddPortError = ZX_ERR_INTERNAL;
+
+    NetworkPort port_(netdev_ifc.GetProto(), port_ifc, kPortId);
+
+    netdev_ifc.add_port_.ExpectCallWithMatcher(
+        [&](uint8_t port_id, const network_port_protocol_t* proto) { return kAddPortError; });
+
+    ASSERT_EQ(port_.Init(NetworkPort::Role::Client), kAddPortError);
+    netdev_ifc.add_port_.VerifyAndClear();
+    // Should not be called because the port was not successfully added in the first place.
+    port_ifc.removed_.ExpectNoCall();
   }
   port_ifc.removed_.VerifyAndClear();
 }
@@ -68,7 +108,7 @@ TEST(NetworkPortTest, RemovePort) {
   netdev_ifc.remove_port_.ExpectCall(kPortId);
   port_ifc.removed_.ExpectCall();
 
-  port_.Init(NetworkPort::Role::Client);
+  ASSERT_OK(port_.Init(NetworkPort::Role::Client));
   port_.RemovePort();
 
   netdev_ifc.remove_port_.VerifyAndClear();
@@ -82,9 +122,10 @@ TEST(NetworkPortTest, Destructor) {
 
   auto port = std::make_unique<NetworkPort>(netdev_ifc.GetProto(), port_ifc, kPortId);
 
-  netdev_ifc.add_port_.ExpectCallWithMatcher([&](uint8_t, const network_port_protocol_t*) {});
+  netdev_ifc.add_port_.ExpectCallWithMatcher(
+      [&](uint8_t, const network_port_protocol_t*) { return ZX_OK; });
 
-  port->Init(NetworkPort::Role::Client);
+  ASSERT_OK(port->Init(NetworkPort::Role::Client));
   netdev_ifc.add_port_.VerifyAndClear();
 
   // When the port is destroyed it should call remove port which should call removed.
@@ -111,7 +152,7 @@ TEST(NetworkPortTest, GetInfoClient) {
 
     NetworkPort port(netdev_ifc.GetProto(), port_ifc, kPortId);
 
-    port.Init(NetworkPort::Role::Client);
+    ASSERT_OK(port.Init(NetworkPort::Role::Client));
 
     port_base_info_t info;
     port.NetworkPortGetInfo(&info);
@@ -131,7 +172,7 @@ TEST(NetworkPortTest, GetInfoAp) {
 
     NetworkPort port(netdev_ifc.GetProto(), port_ifc, kPortId);
 
-    port.Init(NetworkPort::Role::Ap);
+    ASSERT_OK(port.Init(NetworkPort::Role::Ap));
 
     port_base_info_t info;
     port.NetworkPortGetInfo(&info);
@@ -148,7 +189,7 @@ struct NetworkPortTestFixture : public ::zxtest::Test {
 
   NetworkPortTestFixture()
       : port_(std::make_unique<NetworkPort>(netdev_ifc_.GetProto(), port_ifc_, kPortId)) {
-    port_->Init(NetworkPort::Role::Client);
+    ASSERT_OK(port_->Init(NetworkPort::Role::Client));
   }
 
   void TearDown() override {
@@ -250,19 +291,19 @@ TEST_F(NetworkPortTestFixture, PortStatus) {
 }
 
 TEST_F(NetworkPortTestFixture, MacGetProto) {
-  mac_addr_protocol_t mac_ifc;
+  mac_addr_protocol_t* mac_ifc = nullptr;
   port_->NetworkPortGetMac(&mac_ifc);
-  EXPECT_EQ(mac_ifc.ctx, port_.get());
-  ASSERT_NOT_NULL(mac_ifc.ops);
+  EXPECT_EQ(mac_ifc->ctx, port_.get());
+  ASSERT_NOT_NULL(mac_ifc->ops);
 }
 
 struct NetworkPortMacTestFixture : public NetworkPortTestFixture {
   NetworkPortMacTestFixture() : mac_ifc_(GetMacProto()), mac_(&mac_ifc_) {}
 
   mac_addr_protocol_t GetMacProto() {
-    mac_addr_protocol_t mac_proto;
+    mac_addr_protocol_t* mac_proto = nullptr;
     port_->NetworkPortGetMac(&mac_proto);
-    return mac_proto;
+    return *mac_proto;
   }
 
   mac_addr_protocol_t mac_ifc_;

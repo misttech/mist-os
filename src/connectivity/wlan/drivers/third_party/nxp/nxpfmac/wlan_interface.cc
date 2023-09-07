@@ -84,7 +84,11 @@ zx_status_t WlanInterface::Create(zx_device_t* parent, uint32_t iface_index,
       return ZX_ERR_INVALID_ARGS;
   }
 
-  interface->NetworkPort::Init(net_port_role);
+  status = interface->NetworkPort::Init(net_port_role);
+  if (status != ZX_OK) {
+    NXPF_ERR("Failed to initialize port: %s", zx_status_get_string(status));
+    return status;
+  }
 
   *out_interface = interface.release();  // This now has its lifecycle managed by the devhost.
   return ZX_OK;

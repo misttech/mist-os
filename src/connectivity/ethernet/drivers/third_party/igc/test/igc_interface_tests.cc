@@ -99,7 +99,10 @@ class IgcInterfaceTest : public gtest::RealLoopFixture {
   }
 
   // network_device_ifc_protocol_ops_t implementations
-  void AddPort(uint8_t id, const network_port_protocol_t* port) { EXPECT_EQ(id, ei::kPortId); }
+  zx_status_t AddPort(uint8_t id, const network_port_protocol_t* port) {
+    EXPECT_EQ(id, ei::kPortId);
+    return ZX_OK;
+  }
 
   void CompleteRx(const rx_buffer_t* rx_list, size_t rx_count) {
     // Deep copy rx buffers.
@@ -136,7 +139,7 @@ class IgcInterfaceTest : public gtest::RealLoopFixture {
   network_device_ifc_protocol_ops_t ifc_ops_ = {
       .add_port =
           [](void* ctx, uint8_t id, const network_port_protocol_t* port) {
-            ((IgcInterfaceTest*)ctx)->AddPort(id, port);
+            return ((IgcInterfaceTest*)ctx)->AddPort(id, port);
           },
 
       .complete_rx =
@@ -492,15 +495,15 @@ TEST_F(IgcInterfaceTest, NetworkPortGetStatus) {
 }
 
 TEST_F(IgcInterfaceTest, NetworkPortGetMac) {
-  mac_addr_protocol_t mac_addr_proto_1;
-  mac_addr_protocol_t mac_addr_proto_2;
+  mac_addr_protocol_t* mac_addr_proto_1 = nullptr;
+  mac_addr_protocol_t* mac_addr_proto_2 = nullptr;
 
   // Verify that the ctx returns from NetworkPortGetMac() is this driver. Additionally, use this
   // driver to call NetworkPortGetMac() again and it returns the same ctx.
   driver_->NetworkPortGetMac(&mac_addr_proto_1);
-  ((ei::IgcDriver*)mac_addr_proto_1.ctx)->NetworkPortGetMac(&mac_addr_proto_2);
+  ((ei::IgcDriver*)mac_addr_proto_1->ctx)->NetworkPortGetMac(&mac_addr_proto_2);
 
-  EXPECT_EQ(mac_addr_proto_2.ctx, mac_addr_proto_1.ctx);
+  EXPECT_EQ(mac_addr_proto_2->ctx, mac_addr_proto_1->ctx);
 }
 
 constexpr uint8_t kFakeMacAddr[ei::kEtherAddrLen] = {7, 7, 8, 9, 3, 4};

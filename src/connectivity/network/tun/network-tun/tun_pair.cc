@@ -113,11 +113,19 @@ void TunPair::AddPort(AddPortRequestView request, AddPortCompleter::Sync& comple
       return right.status_value();
     }
 
+    zx_status_t status = left_->AddPort(left->adapter());
+    if (status != ZX_OK) {
+      FX_LOGF(ERROR, "tun", "failed to add left port: %s", zx_status_get_string(status));
+      return status;
+    }
+    status = right_->AddPort(right->adapter());
+    if (status != ZX_OK) {
+      FX_LOGF(ERROR, "tun", "failed to add right port: %s", zx_status_get_string(status));
+      return status;
+    }
+
     ports.left = std::move(*left);
     ports.right = std::move(*right);
-
-    left_->AddPort(ports.left->adapter());
-    right_->AddPort(ports.right->adapter());
     return ZX_OK;
   }();
 

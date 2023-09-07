@@ -65,7 +65,9 @@ class NetworkPort : public ::ddk::NetworkPortProtocol<NetworkPort>,
   NetworkPort(network_device_ifc_protocol_t netdev_ifc, Callbacks& iface, uint8_t port_id);
   virtual ~NetworkPort();
 
-  void Init(Role role);
+  // Must be called to make the port operational. If this fails the port object is no longer valid
+  // and no further operations on the port are valid.
+  [[nodiscard]] zx_status_t Init(Role role);
   // Remove the port, this synchronously waits for the close to complete. After this no further
   // operations on the port are valid.
   void RemovePort();
@@ -78,7 +80,7 @@ class NetworkPort : public ::ddk::NetworkPortProtocol<NetworkPort>,
   void NetworkPortGetInfo(port_base_info_t* out_info);
   void NetworkPortGetStatus(port_status_t* out_status) __TA_EXCLUDES(online_mutex_);
   void NetworkPortSetActive(bool active);
-  void NetworkPortGetMac(mac_addr_protocol_t* out_mac_ifc);
+  void NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc);
   void NetworkPortRemoved() __TA_EXCLUDES(netdev_ifc_mutex_);
 
   // MacAddrProtocol implementation
@@ -98,6 +100,7 @@ class NetworkPort : public ::ddk::NetworkPortProtocol<NetworkPort>,
   mutable std::mutex online_mutex_;
   bool online_ __TA_GUARDED(online_mutex_) = false;
   libsync::Completion port_removed_;
+  mac_addr_protocol_t mac_addr_proto_;
 };
 
 }  // namespace wlan::drivers::components

@@ -52,7 +52,9 @@ class NetDeviceDriverTest : public ::testing::Test {
         status != ZX_OK) {
       return status;
     }
-    port_impl_.AddPort(kPortId, device_impl_.client());
+    if (zx_status_t status = port_impl_.AddPort(kPortId, device_impl_.client()); status != ZX_OK) {
+      return status;
+    }
     return ZX_OK;
   }
 

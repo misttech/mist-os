@@ -119,7 +119,7 @@ class DeviceAdapter : public ddk::NetworkDeviceImplProtocol<DeviceAdapter> {
   // Handles status change notifications from port with `port_id`.
   void OnPortStatusChanged(uint8_t port_id, const port_status_t& new_status);
   // Adds |port| to the device.
-  void AddPort(PortAdapter& port);
+  zx_status_t AddPort(PortAdapter& port);
   // Removes port with |port_id|.
   void RemovePort(uint8_t port_id);
 

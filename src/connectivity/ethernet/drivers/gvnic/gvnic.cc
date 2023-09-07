@@ -729,7 +729,11 @@ zx_status_t Gvnic::NetworkDeviceImplInit(const network_device_ifc_protocol_t* if
 
   fbl::AutoLock lock(&ifc_lock_);
   ifc_ = ddk::NetworkDeviceIfcProtocolClient(iface);
-  ifc_.AddPort(kNetworkPortId, this, &network_port_protocol_ops_);
+  zx_status_t status = ifc_.AddPort(kNetworkPortId, this, &network_port_protocol_ops_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to add port: %s", zx_status_get_string(status));
+    return status;
+  }
   return ZX_OK;
 }
 
@@ -776,6 +780,8 @@ void Gvnic::AbortPendingRX() {
   for (uint32_t i = 0; i < rx_total_count; i++) {
     completed_rx_parts[i] = {.id = rx_space_buffer_queue_.Front().id};
     completed_rx[i] = {
+        .meta = {.frame_type =
+                     static_cast<uint8_t>(fuchsia_hardware_network::FrameType::kEthernet)},
         .data_list = &completed_rx_parts[i],
         .data_count = 1,
     };
@@ -973,10 +979,10 @@ void Gvnic::NetworkPortSetActive(bool active) {
   // Nohing to do.
 }
 
-void Gvnic::NetworkPortGetMac(mac_addr_protocol_t* out_mac_ifc) {
-  memset(out_mac_ifc, 0, sizeof(*out_mac_ifc));
-  out_mac_ifc->ops = &mac_addr_protocol_ops_;
-  out_mac_ifc->ctx = this;
+void Gvnic::NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc) {
+  if (out_mac_ifc) {
+    *out_mac_ifc = &mac_addr_proto_;
+  }
 }
 
 void Gvnic::NetworkPortRemoved() {

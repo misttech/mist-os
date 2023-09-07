@@ -140,12 +140,12 @@ class FakeNetworkPortImpl : public ddk::NetworkPortProtocol<FakeNetworkPortImpl>
   void NetworkPortGetInfo(port_base_info_t* out_info);
   void NetworkPortGetStatus(port_status_t* out_status);
   void NetworkPortSetActive(bool active);
-  void NetworkPortGetMac(mac_addr_protocol_t* out_mac_ifc);
+  void NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc);
   void NetworkPortRemoved();
 
   port_base_info_t& port_info() { return port_info_; }
   const port_status_t& status() const { return status_; }
-  void AddPort(uint8_t port_id, ddk::NetworkDeviceIfcProtocolClient ifc_client);
+  zx_status_t AddPort(uint8_t port_id, ddk::NetworkDeviceIfcProtocolClient ifc_client);
   void RemoveSync();
   void SetMac(mac_addr_protocol_t proto) { mac_proto_ = proto; }
   void SetOnSetActiveCallback(OnSetActiveCallback cb) { on_set_active_ = std::move(cb); }

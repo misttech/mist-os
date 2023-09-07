@@ -81,8 +81,10 @@ void FakeNetworkPortImpl::NetworkPortSetActive(bool active) {
   ASSERT_OK(event_.signal(0, kEventPortActiveChanged));
 }
 
-void FakeNetworkPortImpl::NetworkPortGetMac(mac_addr_protocol_t* out_mac_ifc) {
-  *out_mac_ifc = mac_proto_;
+void FakeNetworkPortImpl::NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc) {
+  if (out_mac_ifc) {
+    *out_mac_ifc = &mac_proto_;
+  }
 }
 
 void FakeNetworkPortImpl::NetworkPortRemoved() {
@@ -93,12 +95,19 @@ void FakeNetworkPortImpl::NetworkPortRemoved() {
   }
 }
 
-void FakeNetworkPortImpl::AddPort(uint8_t port_id, ddk::NetworkDeviceIfcProtocolClient ifc_client) {
-  ASSERT_FALSE(port_added_) << "can't add the same port object twice";
+zx_status_t FakeNetworkPortImpl::AddPort(uint8_t port_id,
+                                         ddk::NetworkDeviceIfcProtocolClient ifc_client) {
+  if (port_added_) {
+    return ZX_ERR_ALREADY_EXISTS;
+  }
+  zx_status_t status = ifc_client.AddPort(port_id, this, &network_port_protocol_ops_);
+  if (status != ZX_OK) {
+    return status;
+  }
   id_ = port_id;
   port_added_ = true;
   device_client_ = ifc_client;
-  ifc_client.AddPort(port_id, this, &network_port_protocol_ops_);
+  return ZX_OK;
 }
 
 void FakeNetworkPortImpl::RemoveSync() {
