@@ -25,6 +25,7 @@ pub mod realm_builder;
 pub mod root_job;
 pub mod root_resource;
 pub mod runner;
+#[cfg(target_arch = "aarch64")]
 pub mod smc_resource;
 pub mod svc_stash_provider;
 pub mod system_controller;

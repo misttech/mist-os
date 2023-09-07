@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#[cfg(target_arch = "aarch64")]
+use crate::builtin::smc_resource::SmcResource;
+
 #[cfg(target_arch = "x86_64")]
 use crate::builtin::ioport_resource::IoportResource;
 
@@ -33,7 +36,6 @@ use {
             root_job::RootJob,
             root_resource::RootResource,
             runner::{BuiltinRunner, BuiltinRunnerFactory},
-            smc_resource::SmcResource,
             svc_stash_provider::SvcStashCapability,
             system_controller::SystemController,
             time::{create_utc_clock, UtcTimeMaintainer},
@@ -413,8 +415,6 @@ pub struct BuiltinEnvironment {
     pub model: Arc<Model>,
 
     // Framework capabilities.
-    #[cfg(target_arch = "aarch64")]
-    pub smc_resource: Option<Arc<SmcResource>>,
     pub utc_time_maintainer: Option<Arc<UtcTimeMaintainer>>,
     pub vmex_resource: Option<Arc<VmexResource>>,
     pub svc_stash_provider: Option<Arc<SvcStashCapability>>,
@@ -648,15 +648,12 @@ impl BuiltinEnvironment {
         }
 
         // Set up the SMC resource.
-        let _smc_resource: Option<Arc<SmcResource>>;
         #[cfg(target_arch = "aarch64")]
-        {
-            let smc_resource_handle =
-                take_startup_handle(HandleType::SmcResource.into()).map(zx::Resource::from);
-            _smc_resource = smc_resource_handle.map(SmcResource::new);
-            if let Some(_smc_resource) = _smc_resource.as_ref() {
-                model.root().hooks.install(_smc_resource.hooks()).await;
-            }
+        if let Some(handle) = take_startup_handle(HandleType::SmcResource.into()) {
+            let smc_resource = SmcResource::new(handle.into());
+            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::SmcResourceMarker>(
+                move |stream| smc_resource.clone().serve(stream).boxed(),
+            );
         }
 
         // Set up the CpuResource service.
@@ -946,8 +943,6 @@ impl BuiltinEnvironment {
 
         Ok(BuiltinEnvironment {
             model,
-            #[cfg(target_arch = "aarch64")]
-            smc_resource: _smc_resource,
             vmex_resource,
             svc_stash_provider,
             utc_time_maintainer,
