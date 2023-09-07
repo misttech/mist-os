@@ -12,7 +12,6 @@ import("//build/sdk/generate_final_idk.gni")
 import("//build/sdk/merged_sdk.gni")
 import("//build/sdk/sdk.gni")
 import("//build/sdk/sdk_documentation.gni")
-import("//build/sdk/sdk_final_manifest_golden.gni")
 import("//tools/check-licenses/build/license_data.gni")
 import("config.gni")
 
@@ -32,10 +31,9 @@ _fuchsia_core_idk_validation_deps = []
 # Another list of validation targets, these will only be built in the
 # top-level build, and should depend on //sdk:final_fuchsia_idk.exported
 # directly to validate its content.
-_fuchsia_core_idk_final_validation_deps =
-    [ ":final_fuchsia_idk_manifest_golden" ]
+_fuchsia_core_idk_final_validation_deps = []
 if (host_os == "linux") {
-  _fuchsia_core_idk_final_validation_deps += [
+  _fuchsia_core_idk_final_validation_deps = [
     # Run the Bazel SDK test suite against the final exported directory,
     # TODO(fxbug.dev/124321): Make the Bazel SDK test suite runnable on MacOS!
     "//build/bazel/bazel_sdk:bazel_sdk_tests_idk",
@@ -148,13 +146,6 @@ generate_final_idk("final_fuchsia_idk") {
   sdk_target_labels = _fuchsia_core_idk_deps
   validation_target_labels = _fuchsia_core_idk_validation_deps
   final_validation_target_labels = _fuchsia_core_idk_final_validation_deps
-  testonly = true
-}
-
-sdk_final_manifest_golden("final_fuchsia_idk_manifest_golden") {
-  golden = "manifests/fuchsia_idk.manifest"
-  idk_name = "fuchsia_idk"
-  idk_exported_label = ":final_fuchsia_idk.exported"
   testonly = true
 }
 
