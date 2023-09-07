@@ -2,22 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load("./common.star", "FORMATTER_MSG", "cipd_platform_name")
+load("./go.star", "register_go_checks")
 load("./python.star", "register_python_checks")
-
-_FORMATTER_MSG = "File not formatted. Run `fx format-code` to fix."
-
-def _cipd_platform_name(ctx):
-    """Returns CIPD's name for the current host platform.
-
-    This is the platform name that appears in most prebuilt paths.
-    """
-    os = {
-        "darwin": "mac",
-    }.get(ctx.platform.os, ctx.platform.os)
-    arch = {
-        "amd64": "x64",
-    }.get(ctx.platform.arch, ctx.platform.arch)
-    return "%s-%s" % (os, arch)
 
 def _gn_format(ctx):
     """Runs gn format on .gn and .gni files.
@@ -33,7 +20,7 @@ def _gn_format(ctx):
     if not gn_files:
         return
 
-    gn = "prebuilt/third_party/gn/%s/gn" % _cipd_platform_name(ctx)
+    gn = "prebuilt/third_party/gn/%s/gn" % cipd_platform_name(ctx)
 
     unformatted_files = ctx.os.exec(
         [gn, "format", "--dry-run"] + gn_files,
@@ -47,7 +34,7 @@ def _gn_format(ctx):
         ).wait().stdout
         ctx.emit.finding(
             level = "error",
-            message = _FORMATTER_MSG,
+            message = FORMATTER_MSG,
             filepath = f,
             replacements = [formatted_contents],
         )
@@ -60,4 +47,5 @@ def register_all_checks():
     file.
     """
     shac.register_check(shac.check(_gn_format, formatter = True))
+    register_go_checks()
     register_python_checks()
