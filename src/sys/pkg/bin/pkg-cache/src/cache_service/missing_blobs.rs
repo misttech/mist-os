@@ -156,7 +156,7 @@ impl<'a> MissingBlobs<'a> {
                 .await
                 .map_err(ServeNeededBlobsError::RecordingSubpackageBlobs)?;
 
-            let mut missing = self.blobfs.filter_to_missing_blobs(&subpackages).await;
+            let mut missing = self.blobfs.filter_to_missing_blobs(&subpackages, None).await;
 
             for present in subpackages.difference(&missing) {
                 let () = self.visit(RootDirOrHash::Hash(*present)).await?;
@@ -192,7 +192,7 @@ impl<'a> MissingBlobs<'a> {
         for hash in &self.sent_hashes {
             to_send.remove(hash);
         }
-        let to_send = self.blobfs.filter_to_missing_blobs(&to_send).await;
+        let to_send = self.blobfs.filter_to_missing_blobs(&to_send, None).await;
         let () = self
             .sender
             .unbounded_send(to_sorted_vec(&to_send))

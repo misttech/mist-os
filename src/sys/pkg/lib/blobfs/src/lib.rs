@@ -436,7 +436,16 @@ impl Client {
 
     /// Determines which of candidate blobs exist and are readable in blobfs, returning the
     /// set difference of candidates and readable.
-    pub async fn filter_to_missing_blobs(&self, candidates: &HashSet<Hash>) -> HashSet<Hash> {
+    /// If provided, `all_known` should be a superset of all readable blobs in blobfs, i.e.
+    /// if a blob is readable it must be in `all_known`, but non-readable blobs may also be
+    /// included.
+    /// `all_known` is used to skip the expensive per-blob readable check for blobs that we are
+    /// sure are missing.
+    pub async fn filter_to_missing_blobs(
+        &self,
+        candidates: &HashSet<Hash>,
+        all_known: Option<&HashSet<Hash>>,
+    ) -> HashSet<Hash> {
         // This heuristic was taken from pkgfs. We are not sure how useful it is or why it was
         // added, however it is kept in out of an abundance of caution. We *suspect* the heuristic
         // is a performance optimization. Without the heuristic, we would always have to open every
@@ -452,17 +461,28 @@ impl Client {
         // If you wish to remove this heuristic or change the threshold, consider doing a trace on
         // packages with varying numbers of blobs present/missing.
         // TODO(fxbug.dev/77717) re-evaluate filter_to_missing_blobs heuristic.
-        let all_known_blobs =
-            if candidates.len() > 20 { self.list_known_blobs().await.ok() } else { None };
-        let all_known_blobs = Arc::new(all_known_blobs);
+        let all_known_storage;
+        let all_known = if let Some(all_known) = all_known {
+            Some(all_known)
+        } else {
+            if candidates.len() > 20 {
+                if let Some(all_known) = self.list_known_blobs().await.ok() {
+                    all_known_storage = all_known;
+                    Some(&all_known_storage)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        };
 
         stream::iter(candidates.clone())
             .map(move |blob| {
-                let all_known_blobs = Arc::clone(&all_known_blobs);
                 async move {
-                    // We still need to check `has_blob()` even if the blob is in `all_known_blobs`,
+                    // We still need to check `has_blob()` even if the blob is in `all_known`,
                     // because it might not have been fully written yet.
-                    if (*all_known_blobs).as_ref().map(|blobs| blobs.contains(&blob)) == Some(false)
+                    if all_known.map(|blobs| blobs.contains(&blob)) == Some(false)
                         || !self.has_blob(&blob).await
                     {
                         Some(blob)
@@ -755,7 +775,8 @@ mod tests {
                     // Pass in <= 20 candidates so the heuristic is not used.
                     &hashset! { missing_hash0, missing_hash1,
                         present_blob0.hash, present_blob1.hash
-                    }
+                    },
+                    None
                 )
                 .await,
             hashset! { missing_hash0, missing_hash1 }
@@ -784,9 +805,15 @@ mod tests {
 
         assert_eq!(
             client
-                .filter_to_missing_blobs(&hashset! {
-                    missing_blob0.hash, missing_blob1.hash, missing_blob2.hash, present_blob.hash
-                })
+                .filter_to_missing_blobs(
+                    &hashset! {
+                        missing_blob0.hash,
+                        missing_blob1.hash,
+                        missing_blob2.hash,
+                        present_blob.hash
+                    },
+                    None
+                )
                 .await,
             // All partially written blobs should count as missing.
             hashset! { missing_blob0.hash, missing_blob1.hash, missing_blob2.hash }
@@ -834,7 +861,8 @@ mod tests {
                         present_blob2.hash, present_blob3.hash, present_blob4.hash,
                         present_blob5.hash, present_blob6.hash, present_blob7.hash,
                         present_blob8.hash, present_blob9.hash, present_blob10.hash
-                    }
+                    },
+                    None
                 )
                 .await,
             hashset! { missing_hash0, missing_hash1, missing_hash2, missing_hash3,
@@ -894,7 +922,8 @@ mod tests {
                         present_blob4.hash, present_blob5.hash, present_blob6.hash,
                         present_blob7.hash, present_blob8.hash, present_blob9.hash,
                         present_blob10.hash
-                    }
+                    },
+                    None
                 )
                 .await,
             // All partially written blobs should count as missing.
@@ -1009,5 +1038,21 @@ mod tests {
                 assert_eq!(client.list_known_blobs().await.unwrap().len(), 256);
             })
             .await;
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn filter_to_missing_uses_provided_all_known() {
+        let blobfs = BlobfsRamdisk::builder().start().await.unwrap();
+        let client = Client::for_ramdisk(&blobfs);
+        let present_blob = fully_write_blob(&client, &[0; 1024]).await;
+
+        // Even though actually present, the written blob will be reported as missing because the
+        // provided `all_known` is empty.
+        assert_eq!(
+            client
+                .filter_to_missing_blobs(&HashSet::from([present_blob.hash]), Some(&HashSet::new()))
+                .await,
+            HashSet::from([present_blob.hash])
+        );
     }
 }
