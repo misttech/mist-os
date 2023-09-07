@@ -4,22 +4,13 @@
 
 use {
     crate::bootfs::BootfsSvc,
-    crate::builtin::capability::BuiltinCapability,
-    ::routing::capability_source::InternalCapability,
     anyhow::{anyhow, Context, Error},
-    async_trait::async_trait,
-    cm_types::Name,
     fidl_fuchsia_time as ftime,
     fuchsia_fs::{file, OpenFlags},
     fuchsia_zircon::{Clock, ClockOpts, HandleBased, Rights, Time},
     futures::prelude::*,
-    lazy_static::lazy_static,
     std::sync::Arc,
 };
-
-lazy_static! {
-    static ref TIME_MAINTENANCE_CAPABILITY_NAME: Name = "fuchsia.time.Maintenance".parse().unwrap();
-}
 
 /// An implementation of the `fuchsia.time.Maintenance` protocol, which
 /// maintains a UTC clock, vending out handles with write access.
@@ -33,14 +24,8 @@ impl UtcTimeMaintainer {
     pub fn new(utc_clock: Arc<Clock>) -> Self {
         UtcTimeMaintainer { utc_clock }
     }
-}
 
-#[async_trait]
-impl BuiltinCapability for UtcTimeMaintainer {
-    const NAME: &'static str = "TimeMaintenance";
-    type Marker = ftime::MaintenanceMarker;
-
-    async fn serve(
+    pub async fn serve(
         self: Arc<Self>,
         mut stream: ftime::MaintenanceRequestStream,
     ) -> Result<(), Error> {
@@ -50,10 +35,6 @@ impl BuiltinCapability for UtcTimeMaintainer {
             responder.send(self.utc_clock.duplicate_handle(Rights::SAME_RIGHTS)?)?;
         }
         Ok(())
-    }
-
-    fn matches_routed_capability(&self, capability: &InternalCapability) -> bool {
-        capability.matches_protocol(&TIME_MAINTENANCE_CAPABILITY_NAME)
     }
 }
 

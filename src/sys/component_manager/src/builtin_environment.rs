@@ -87,7 +87,7 @@ use {
     fidl_fuchsia_component_internal::BuiltinBootResolver,
     fidl_fuchsia_diagnostics_types::Task as DiagnosticsTask,
     fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fidl_fuchsia_process as fprocess,
-    fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
+    fidl_fuchsia_sys2 as fsys, fidl_fuchsia_time as ftime, fuchsia_async as fasync,
     fuchsia_component::server::*,
     fuchsia_inspect::{self as inspect, component, health::Reporter, Inspector},
     fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType},
@@ -415,7 +415,6 @@ pub struct BuiltinEnvironment {
     pub model: Arc<Model>,
 
     // Framework capabilities.
-    pub utc_time_maintainer: Option<Arc<UtcTimeMaintainer>>,
     pub vmex_resource: Option<Arc<VmexResource>>,
 
     pub binder_capability_host: Arc<BinderCapabilityHost>,
@@ -608,13 +607,12 @@ impl BuiltinEnvironment {
         }
 
         // Register the UTC time maintainer.
-        let utc_time_maintainer = if let Some(clock) = utc_clock {
+        if let Some(clock) = utc_clock {
             let utc_time_maintainer = Arc::new(UtcTimeMaintainer::new(clock));
-            model.root().hooks.install(utc_time_maintainer.hooks()).await;
-            Some(utc_time_maintainer)
-        } else {
-            None
-        };
+            sandbox_builder.add_builtin_protocol_if_enabled::<ftime::MaintenanceMarker>(
+                move |stream| utc_time_maintainer.clone().serve(stream).boxed(),
+            );
+        }
 
         // Set up the MmioResource service.
         let mmio_resource = mmio_resource_handle.map(MmioResource::new);
@@ -945,7 +943,6 @@ impl BuiltinEnvironment {
         Ok(BuiltinEnvironment {
             model,
             vmex_resource,
-            utc_time_maintainer,
             binder_capability_host,
             realm_capability_host,
             storage_admin_capability_host,
