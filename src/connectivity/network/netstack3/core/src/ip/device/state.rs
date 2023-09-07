@@ -34,7 +34,8 @@ use crate::{
 /// The default value for *RetransTimer* as defined in [RFC 4861 section 10].
 ///
 /// [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
-const RETRANS_TIMER_DEFAULT: NonZeroDuration = const_unwrap_option(NonZeroDuration::from_secs(1));
+pub(crate) const RETRANS_TIMER_DEFAULT: NonZeroDuration =
+    const_unwrap_option(NonZeroDuration::from_secs(1));
 
 /// The default value for the default hop limit to be used when sending IP
 /// packets.

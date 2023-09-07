@@ -481,8 +481,14 @@ fn handle_packet<
     }
 }
 
-// Currently at 20 seconds because that's what FreeBSD does.
-const DEFAULT_ARP_REQUEST_PERIOD: Duration = Duration::from_secs(20);
+// Use the same default retransmit timeout that is defined for NDP in
+// [RFC 4861 section 10], to align behavior between IPv4 and IPv6 and simplify
+// testing.
+//
+// TODO(https://fxbug.dev/124960): allow this default to be overridden.
+//
+// [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
+const DEFAULT_ARP_REQUEST_PERIOD: Duration = crate::ip::device::state::RETRANS_TIMER_DEFAULT.get();
 
 fn send_arp_request<D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpContext<D, C>>(
     sync_ctx: &mut SC,
