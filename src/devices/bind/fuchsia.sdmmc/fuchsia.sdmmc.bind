@@ -5,7 +5,6 @@
 library fuchsia.sdmmc;
 
 extend uint fuchsia.BIND_PROTOCOL {
-  SDHCI = 54,
-  SDMMC = 55,
-  SDIO = 56,
+  SDHCI = 0x36,
+  SDMMC = 0x37,
 };

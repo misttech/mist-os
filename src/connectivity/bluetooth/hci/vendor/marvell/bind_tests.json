@@ -3,7 +3,7 @@
         "name": "simple-match",
         "expected": "match",
         "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.sdmmc.BIND_PROTOCOL.SDIO",
+            "fuchsia.BIND_PROTOCOL": "fuchsia.sdio.BIND_PROTOCOL.DEVICE",
             "fuchsia.BIND_SDIO_VID": "fuchsia.bt.vendor.marvell.BIND_SDIO_VID.MARVELL",
             "fuchsia.BIND_SDIO_PID": "fuchsia.bt.vendor.marvell.BIND_SDIO_PID.SD88W8987"
         }
@@ -21,7 +21,7 @@
         "name": "missing-pid",
         "expected": "abort",
         "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.sdmmc.BIND_PROTOCOL.SDIO",
+            "fuchsia.BIND_PROTOCOL": "fuchsia.sdio.BIND_PROTOCOL.DEVICE",
             "fuchsia.BIND_SDIO_VID": "fuchsia.bt.vendor.marvell.BIND_SDIO_VID.MARVELL"
         }
     },
@@ -29,7 +29,7 @@
         "name": "wrong-vid",
         "expected": "abort",
         "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.sdmmc.BIND_PROTOCOL.SDIO",
+            "fuchsia.BIND_PROTOCOL": "fuchsia.sdio.BIND_PROTOCOL.DEVICE",
             "fuchsia.BIND_SDIO_VID": "0x0001",
             "fuchsia.BIND_SDIO_PID": "fuchsia.bt.vendor.marvell.BIND_SDIO_PID.SD88W8987"
         }

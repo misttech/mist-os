@@ -6,12 +6,12 @@ composite wifi;
 
 using fuchsia.amlogic.platform.s905d2;
 using fuchsia.gpio;
-using fuchsia.sdmmc;
+using fuchsia.sdio;
 using fuchsia.broadcom.platform;
 using fuchsia.platform;
 
 primary node "sdio-function-1" {
-  fuchsia.BIND_PROTOCOL == fuchsia.sdmmc.BIND_PROTOCOL.SDIO;
+  fuchsia.BIND_PROTOCOL == fuchsia.sdio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_SDIO_VID == 0x02d0;
   fuchsia.BIND_SDIO_FUNCTION == 1;
   accept fuchsia.BIND_SDIO_PID {
@@ -20,7 +20,7 @@ primary node "sdio-function-1" {
 }
 
 node "sdio-function-2" {
-  fuchsia.BIND_PROTOCOL == fuchsia.sdmmc.BIND_PROTOCOL.SDIO;
+  fuchsia.BIND_PROTOCOL == fuchsia.sdio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_SDIO_VID == 0x02d0;
   fuchsia.BIND_SDIO_FUNCTION == 2;
   accept fuchsia.BIND_SDIO_PID {

@@ -124,7 +124,7 @@ driver_bind_rules("nelson_wifi_bind") {
     "//src/devices/bind/fuchsia.broadcom.platform.sdio",
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.sdmmc",
+    "//src/devices/bind/fuchsia.sdio",
   ]
 }
 

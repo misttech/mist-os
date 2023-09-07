@@ -13,7 +13,7 @@ driver_bind_rules("bt_hci_marvell_bind") {
   tests = "bind_tests.json"
   deps = [
     ":fuchsia.bt.vendor.marvell",
-    "//src/devices/bind/fuchsia.sdmmc",
+    "//src/devices/bind/fuchsia.sdio",
   ]
 }
 

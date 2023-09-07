@@ -6,7 +6,7 @@
                 "name": "Match accept 0x4345",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.sdmmc.BIND_PROTOCOL.SDIO",
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.sdio.BIND_PROTOCOL.DEVICE",
                     "fuchsia.BIND_SDIO_PID": "0x4345",
                     "fuchsia.BIND_SDIO_FUNCTION": "1",
                     "fuchsia.BIND_SDIO_VID": "0x02d0"
@@ -16,7 +16,7 @@
                 "name": "Abort accept 0x4359",
                 "expected": "abort",
                 "device": {
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.sdmmc.BIND_PROTOCOL.SDIO",
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.sdio.BIND_PROTOCOL.DEVICE",
                     "fuchsia.BIND_SDIO_PID": "0x4359",
                     "fuchsia.BIND_SDIO_FUNCTION": "1",
                     "fuchsia.BIND_SDIO_VID": "0x02d0"
@@ -26,7 +26,7 @@
                 "name": "Abort mismatch value",
                 "expected": "abort",
                 "device": {
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.sdmmc.BIND_PROTOCOL.SDIO",
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.sdio.BIND_PROTOCOL.DEVICE",
                     "fuchsia.BIND_SDIO_VID": "0x02d0",
                     "fuchsia.BIND_SDIO_FUNCTION": "1"
                 }
@@ -42,7 +42,7 @@
                 "device": {
                     "fuchsia.BIND_SDIO_PID": "0x4345",
                     "fuchsia.BIND_SDIO_FUNCTION": "2",
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.sdmmc.BIND_PROTOCOL.SDIO",
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.sdio.BIND_PROTOCOL.DEVICE",
                     "fuchsia.BIND_SDIO_VID": "0x02d0"
                 }
             },
@@ -52,7 +52,7 @@
                 "device": {
                     "fuchsia.BIND_SDIO_PID": "0x4359",
                     "fuchsia.BIND_SDIO_FUNCTION": "2",
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.sdmmc.BIND_PROTOCOL.SDIO",
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.sdio.BIND_PROTOCOL.DEVICE",
                     "fuchsia.BIND_SDIO_VID": "0x02d0"
                 }
             },
@@ -61,7 +61,7 @@
                 "expected": "abort",
                 "device": {
                     "fuchsia.BIND_SDIO_FUNCTION": "2",
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.sdmmc.BIND_PROTOCOL.SDIO",
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.sdio.BIND_PROTOCOL.DEVICE",
                     "fuchsia.BIND_SDIO_VID": "0x02d0"
                 }
             }

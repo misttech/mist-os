@@ -178,7 +178,7 @@ driver_bind_rules("astro-wifi-bind") {
     "//src/devices/bind/fuchsia.broadcom.platform",
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.sdmmc",
+    "//src/devices/bind/fuchsia.sdio",
   ]
 }
 
