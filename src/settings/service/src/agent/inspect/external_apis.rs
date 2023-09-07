@@ -175,7 +175,6 @@ impl ExternalApiInspectAgent {
         let (_, message_rx) = context
             .delegate
             .create(MessengerType::Broker(Arc::new(move |message| {
-                // TODO(fxb/108370): Explore combining inspect agents.
                 // Only catch external api requests.
                 matches!(
                     message.payload(),
