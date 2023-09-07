@@ -898,8 +898,6 @@
                 "NetlinkRouteTest.RemoveLoopbackByIndex",
 
                 // These tests assume 2+ Inotify events are returned and crashes otherwise.
-                "Inotify.MoveGeneratesEvents",
-                "Inotify.MoveWatchedTargetGeneratesEvents",
                 "Inotify.GetdentsGeneratesAccessEvent",
 
                 // Breaks tests that run after it.
@@ -1059,6 +1057,7 @@
                 // exec_binary_test
                 // Passes on x86 and fails on arm.
                 "ElfTest.MissingText",
+
                 // Panics in process_builder.
                 "ElfTest.PIEOverflow",
             ],

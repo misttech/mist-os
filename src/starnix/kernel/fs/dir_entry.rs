@@ -817,6 +817,12 @@ impl DirEntry {
         // Renaming a file updates its ctime.
         renamed.node.update_ctime();
 
+        let mode = renamed.node.info().mode;
+        let cookie = current_task.kernel().get_next_inotify_cookie();
+        old_parent.node.watchers.notify(InotifyMask::MOVE_FROM, cookie, old_basename, mode);
+        new_parent.node.watchers.notify(InotifyMask::MOVE_TO, cookie, new_basename, mode);
+        renamed.node.watchers.notify(InotifyMask::MOVE_SELF, 0, b"", mode);
+
         Ok(())
     }
 
@@ -902,39 +908,39 @@ impl DirEntry {
     /// Notifies watchers on the current node and its parent about an event.
     pub fn notify(&self, event_mask: InotifyMask) {
         if let Some(parent) = self.parent() {
-            parent.node.watchers.notify(event_mask, &self.local_name(), self.node.info().mode);
+            parent.node.watchers.notify(event_mask, 0, &self.local_name(), self.node.info().mode);
         }
-        self.node.watchers.notify(event_mask, &FsString::default(), self.node.info().mode);
+        self.node.watchers.notify(event_mask, 0, b"", self.node.info().mode);
     }
 
     /// Notifies parents about creation, and notifies current node about link_count change.
-    pub fn notify_creation(&self) {
+    fn notify_creation(&self) {
         let mode = self.node.info().mode;
         if Arc::strong_count(&self.node) > 1 {
             // Notify about link change only if there is already a hardlink.
-            self.node.watchers.notify(InotifyMask::ATTRIB, &FsString::default(), mode);
+            self.node.watchers.notify(InotifyMask::ATTRIB, 0, b"", mode);
         }
         if let Some(parent) = self.parent() {
-            parent.node.watchers.notify(InotifyMask::CREATE, &self.local_name(), mode);
+            parent.node.watchers.notify(InotifyMask::CREATE, 0, &self.local_name(), mode);
         }
     }
 
     /// Notifies watchers on the current node about deletion if this is the
     /// last hardlink, and drops the DirEntryHandle kept by Inotify.
     /// Parent is also notified about deletion.
-    pub fn notify_deletion(&self) {
+    fn notify_deletion(&self) {
         let mode = self.node.info().mode;
         if !mode.is_dir() {
             // Linux notifies link count change for non-directories.
-            self.node.watchers.notify(InotifyMask::ATTRIB, &FsString::default(), mode);
+            self.node.watchers.notify(InotifyMask::ATTRIB, 0, b"", mode);
         }
 
         if let Some(parent) = self.parent() {
-            parent.node.watchers.notify(InotifyMask::DELETE, &self.local_name(), mode);
+            parent.node.watchers.notify(InotifyMask::DELETE, 0, &self.local_name(), mode);
         }
 
         if Arc::strong_count(&self.node) == 1 {
-            self.node.watchers.notify(InotifyMask::DELETE_SELF, &FsString::default(), mode);
+            self.node.watchers.notify(InotifyMask::DELETE_SELF, 0, b"", mode);
         }
     }
 }

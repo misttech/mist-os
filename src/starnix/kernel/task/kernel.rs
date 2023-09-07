@@ -13,7 +13,7 @@ use std::{
     collections::{BTreeMap, HashSet},
     iter::FromIterator,
     sync::{
-        atomic::{AtomicU16, AtomicU64},
+        atomic::{AtomicU16, AtomicU32, AtomicU64},
         Arc, Weak,
     },
 };
@@ -177,6 +177,9 @@ pub struct Kernel {
     pub next_mount_id: AtomicU64,
     pub next_peer_group_id: AtomicU64,
     pub next_namespace_id: AtomicU64,
+
+    /// Unique cookie used to link two inotify events, usually an IN_MOVE_FROM/IN_MOVE_TO pair.
+    pub next_inotify_cookie: AtomicU32,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -273,6 +276,7 @@ impl Kernel {
             next_mount_id: AtomicU64::new(1),
             next_peer_group_id: AtomicU64::new(1),
             next_namespace_id: AtomicU64::new(1),
+            next_inotify_cookie: AtomicU32::new(1),
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle
