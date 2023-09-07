@@ -5,6 +5,6 @@
   "pkg/sys_component_cpp_testing/include/lib/sys/component/cpp/testing/internal/local_component_runner.h": "b43e09ee96bd3ae8b7c9685288fdb215",
   "pkg/sys_component_cpp_testing/include/lib/sys/component/cpp/testing/internal/realm.h": "f5d013bb30b8b0fc483429b506299195",
   "pkg/sys_component_cpp_testing/include/lib/sys/component/cpp/testing/realm_builder.h": "d9a0a13ce7785100fb6eb065a0f41581",
-  "pkg/sys_component_cpp_testing/include/lib/sys/component/cpp/testing/realm_builder_types.h": "26823fbcb7bdd69da0781563e9a836ab",
+  "pkg/sys_component_cpp_testing/include/lib/sys/component/cpp/testing/realm_builder_types.h": "356c9976de92e1fe8d9f67efd5a19c05",
   "pkg/sys_component_cpp_testing/include/lib/sys/component/cpp/testing/scoped_child.h": "b0a2d5f2b9fd591452ede544e33a7290"
 }

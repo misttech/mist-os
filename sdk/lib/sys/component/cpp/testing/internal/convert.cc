@@ -65,6 +65,9 @@ fuchsia::component::decl::Ref ConvertToFidl(Ref ref) {
   if (auto _ = cpp17_get_if<FrameworkRef>(&ref)) {
     return fuchsia::component::decl::Ref::WithFramework(fuchsia::component::decl::FrameworkRef());
   }
+  if (auto _ = cpp17_get_if<VoidRef>(&ref)) {
+    return fuchsia::component::decl::Ref::WithVoidType(fuchsia::component::decl::VoidRef());
+  }
 
   ZX_PANIC("ConvertToFidl(Ref) reached unreachable block!");
 }
