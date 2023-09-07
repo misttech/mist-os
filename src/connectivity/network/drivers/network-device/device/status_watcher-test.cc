@@ -27,8 +27,8 @@ constexpr StatusFlags kStatusOffline = StatusFlags();
 
 port_status_t MakeStatus(StatusFlags status_flags, uint32_t mtu) {
   return {
-      .mtu = mtu,
       .flags = static_cast<uint32_t>(status_flags),
+      .mtu = mtu,
   };
 }
 

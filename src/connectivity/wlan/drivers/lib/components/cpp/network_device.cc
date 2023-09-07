@@ -137,7 +137,7 @@ void NetworkDevice::NetworkDeviceImplStop(network_device_impl_stop_callback call
   callbacks_->NetDevStop(Callbacks::StopTxn(callback, cookie));
 }
 
-void NetworkDevice::NetworkDeviceImplGetInfo(device_info_t* out_info) {
+void NetworkDevice::NetworkDeviceImplGetInfo(device_impl_info_t* out_info) {
   memset(out_info, 0, sizeof(*out_info));
   callbacks_->NetDevGetInfo(out_info);
 }

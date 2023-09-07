@@ -819,28 +819,31 @@ TEST_F(WlanInterfaceTest, WlanFullmacImplConnectRemoteDisconnectReq) {
 
 TEST_F(WlanInterfaceTest, MacSetMode) {
   // Test that MacSetMode actually sets the mac mode.
-  constexpr uint8_t kMacMulticastFilters[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
-                                              0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c};
+  constexpr mac_address_t kMacMulticastFilters[] = {
+      mac_address_t{{0x01, 0x02, 0x03, 0x04, 0x05, 0x06}},
+      mac_address_t{{0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c}}};
 
-  std::atomic<mode_t> mac_mode;
+  std::atomic<mac_filter_mode_t> mac_mode;
 
   mlan_mocks_.SetOnMlanIoctl([&](t_void*, pmlan_ioctl_req req) -> mlan_status {
     if (req->action == MLAN_ACT_SET && req->req_id == MLAN_IOCTL_BSS) {
       auto bss = reinterpret_cast<const mlan_ds_bss*>(req->pbuf);
       if (bss->sub_command == MLAN_OID_BSS_MULTICAST_LIST) {
         switch (mac_mode.load()) {
-          case MODE_MULTICAST_FILTER:
+          case MAC_FILTER_MODE_MULTICAST_FILTER:
             EXPECT_EQ(MLAN_MULTICAST_MODE, bss->param.multicast_list.mode);
-            EXPECT_EQ(sizeof(kMacMulticastFilters) / ETH_ALEN,
+            EXPECT_EQ(std::size(kMacMulticastFilters),
                       bss->param.multicast_list.num_multicast_addr);
-            EXPECT_BYTES_EQ(kMacMulticastFilters, bss->param.multicast_list.mac_list,
-                            sizeof(kMacMulticastFilters));
+            for (size_t i = 0; i < std::size(kMacMulticastFilters); ++i) {
+              EXPECT_BYTES_EQ(kMacMulticastFilters[i].octets, bss->param.multicast_list.mac_list[i],
+                              MAC_SIZE);
+            }
             break;
-          case MODE_MULTICAST_PROMISCUOUS:
+          case MAC_FILTER_MODE_MULTICAST_PROMISCUOUS:
             EXPECT_EQ(MLAN_ALL_MULTI_MODE, bss->param.multicast_list.mode);
             EXPECT_EQ(0, bss->param.multicast_list.num_multicast_addr);
             break;
-          case MODE_PROMISCUOUS:
+          case MAC_FILTER_MODE_PROMISCUOUS:
             EXPECT_EQ(MLAN_PROMISC_MODE, bss->param.multicast_list.mode);
             EXPECT_EQ(0, bss->param.multicast_list.num_multicast_addr);
             break;
@@ -864,8 +867,9 @@ TEST_F(WlanInterfaceTest, MacSetMode) {
                                   kClientMacAddress, std::move(in_mlme_channel)));
   WlanInterface* ifc = GetInterface();
 
-  constexpr mode_t kMacModes[] = {MODE_MULTICAST_FILTER, MODE_MULTICAST_PROMISCUOUS,
-                                  MODE_PROMISCUOUS};
+  constexpr mode_t kMacModes[] = {MAC_FILTER_MODE_MULTICAST_FILTER,
+                                  MAC_FILTER_MODE_MULTICAST_PROMISCUOUS,
+                                  MAC_FILTER_MODE_PROMISCUOUS};
   for (auto mode : kMacModes) {
     mac_mode = mode;
     ifc->MacSetMode(mode, kMacMulticastFilters);

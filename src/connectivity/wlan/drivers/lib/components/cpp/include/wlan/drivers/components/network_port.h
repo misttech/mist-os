@@ -45,7 +45,7 @@ class NetworkPort : public ::ddk::NetworkPortProtocol<NetworkPort>,
     virtual uint32_t PortGetMtu() = 0;
 
     // Called when the network device needs to know the MAC address of the port.
-    virtual void MacGetAddress(uint8_t out_mac[6]) = 0;
+    virtual void MacGetAddress(mac_address_t* out_mac) = 0;
 
     // Called when the network device needs to know about the features supported by the port. This
     // mostly relates to MAC filtering modes. See features_t for more details about possible
@@ -55,9 +55,9 @@ class NetworkPort : public ::ddk::NetworkPortProtocol<NetworkPort>,
     // Called when the network device needs to set one of the supported MAC filtering modes from the
     // features call. See features_t for the different modes. When multicast filtering is enabled
     // then the driver should only accept unicast frames and multicast frames from the MAC addresses
-    // specified in multicast_macs. Each 6-byte span in multicast_macs constitutes one MAC address
-    // for this filter.
-    virtual void MacSetMode(mode_t mode, cpp20::span<const uint8_t> multicast_macs) = 0;
+    // specified in multicast_macs.
+    virtual void MacSetMode(mac_filter_mode_t mode,
+                            cpp20::span<const mac_address_t> multicast_macs) = 0;
   };
 
   enum class Role { Client, Ap };
@@ -75,16 +75,17 @@ class NetworkPort : public ::ddk::NetworkPortProtocol<NetworkPort>,
   uint8_t PortId() const { return port_id_; }
 
   // NetworkPortProtocol implementation
-  void NetworkPortGetInfo(port_info_t* out_info);
+  void NetworkPortGetInfo(port_base_info_t* out_info);
   void NetworkPortGetStatus(port_status_t* out_status) __TA_EXCLUDES(online_mutex_);
   void NetworkPortSetActive(bool active);
   void NetworkPortGetMac(mac_addr_protocol_t* out_mac_ifc);
   void NetworkPortRemoved() __TA_EXCLUDES(netdev_ifc_mutex_);
 
   // MacAddrProtocol implementation
-  void MacAddrGetAddress(uint8_t out_mac[6]);
+  void MacAddrGetAddress(mac_address_t* out_mac);
   void MacAddrGetFeatures(features_t* out_features);
-  void MacAddrSetMode(mode_t mode, const uint8_t* multicast_macs_list, size_t multicast_macs_count);
+  void MacAddrSetMode(mac_filter_mode_t mode, const mac_address_t* multicast_macs_list,
+                      size_t multicast_macs_count);
 
  private:
   void GetPortStatusLocked(port_status_t* out_status) __TA_REQUIRES(online_mutex_);

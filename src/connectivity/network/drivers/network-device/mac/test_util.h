@@ -24,10 +24,11 @@ class FakeMacDeviceImpl : public ddk::MacAddrProtocol<FakeMacDeviceImpl> {
 
   zx::result<std::unique_ptr<MacAddrDeviceInterface>> CreateChild();
 
-  void MacAddrGetAddress(uint8_t out_mac[MAC_SIZE]);
+  void MacAddrGetAddress(mac_address_t* out_mac);
   void MacAddrGetFeatures(features_t* out_features);
 
-  void MacAddrSetMode(mode_t mode, const uint8_t* multicast_macs_list, size_t multicast_macs_count);
+  void MacAddrSetMode(mode_t mode, const mac_address_t* multicast_macs_list,
+                      size_t multicast_macs_count);
 
   zx_status_t WaitConfigurationChanged();
 
@@ -47,7 +48,7 @@ class FakeMacDeviceImpl : public ddk::MacAddrProtocol<FakeMacDeviceImpl> {
  private:
   fuchsia_net::wire::MacAddress mac_ = {0x00, 0x02, 0x03, 0x04, 0x05, 0x06};
   features_t features_{};
-  std::optional<mode_t> mode_ = std::nullopt;
+  std::optional<mac_filter_mode_t> mode_ = std::nullopt;
   std::vector<MacAddress> addresses_;
   zx::event event_;
 };

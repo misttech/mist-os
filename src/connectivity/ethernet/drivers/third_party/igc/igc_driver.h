@@ -71,7 +71,7 @@ class IgcDriver : public ::ddk::NetworkDeviceImplProtocol<IgcDriver>,
       __TA_EXCLUDES(started_mutex_);
   void NetworkDeviceImplStop(network_device_impl_stop_callback callback, void* cookie)
       __TA_EXCLUDES(started_mutex_);
-  void NetworkDeviceImplGetInfo(device_info_t* out_info);
+  void NetworkDeviceImplGetInfo(device_impl_info_t* out_info);
   void NetworkDeviceImplQueueTx(const tx_buffer_t* buffers_list, size_t buffers_count)
       __TA_EXCLUDES(started_mutex_);
   void NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buffers_list, size_t buffers_count);
@@ -81,16 +81,17 @@ class IgcDriver : public ::ddk::NetworkDeviceImplProtocol<IgcDriver>,
   void NetworkDeviceImplSetSnoop(bool snoop);
 
   // NetworkPort protocol implementation.
-  void NetworkPortGetInfo(port_info_t* out_info);
+  void NetworkPortGetInfo(port_base_info_t* out_info);
   void NetworkPortGetStatus(port_status_t* out_status);
   void NetworkPortSetActive(bool active);
   void NetworkPortGetMac(mac_addr_protocol_t* out_mac_ifc);
   void NetworkPortRemoved();
 
   // MacAddr protocol:
-  void MacAddrGetAddress(uint8_t* out_mac);
+  void MacAddrGetAddress(mac_address_t* out_mac);
   void MacAddrGetFeatures(features_t* out_features);
-  void MacAddrSetMode(mode_t mode, const uint8_t* multicast_macs_list, size_t multicast_macs_count);
+  void MacAddrSetMode(mac_filter_mode_t mode, const mac_address_t* multicast_macs_list,
+                      size_t multicast_macs_count);
 
   buffer_info* RxBuffer() { return rx_buffers_; }
   buffer_info* TxBuffer() { return tx_buffers_; }

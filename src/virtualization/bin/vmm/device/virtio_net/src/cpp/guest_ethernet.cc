@@ -280,7 +280,7 @@ void GuestEthernet::NetworkDeviceImplStop(network_device_impl_stop_callback call
   FinishShutdownIfRequired();
 }
 
-void GuestEthernet::NetworkDeviceImplGetInfo(device_info_t* out_info) {
+void GuestEthernet::NetworkDeviceImplGetInfo(device_impl_info_t* out_info) {
   *out_info = {
       // Allow at most kMaxTxDepth/kMaxRxDepth buffers in flight to TX/RX,
       // respectively.
@@ -433,8 +433,8 @@ void GuestEthernet::NetworkDeviceImplSetSnoop(bool snoop) {
   }
 }
 
-void GuestEthernet::MacAddrGetAddress(uint8_t out_mac[VIRTIO_ETH_MAC_SIZE]) {
-  std::memcpy(out_mac, mac_address_, VIRTIO_ETH_MAC_SIZE);
+void GuestEthernet::MacAddrGetAddress(mac_address_t* out_mac) {
+  std::memcpy(out_mac->octets, mac_address_, VIRTIO_ETH_MAC_SIZE);
 }
 
 void GuestEthernet::MacAddrGetFeatures(features_t* out_features) {
@@ -447,18 +447,18 @@ void GuestEthernet::MacAddrGetFeatures(features_t* out_features) {
   };
 }
 
-void GuestEthernet::MacAddrSetMode(mode_t mode, const uint8_t* multicast_macs_list,
+void GuestEthernet::MacAddrSetMode(mac_filter_mode_t mode, const mac_address_t* multicast_macs_list,
                                    size_t multicast_macs_count) {
   FX_LOGS(WARNING) << "MacAddrSetMode not implemented";
 }
 
-void GuestEthernet::NetworkPortGetInfo(port_info_t* out_info) {
+void GuestEthernet::NetworkPortGetInfo(port_base_info_t* out_info) {
   static constexpr std::array<uint8_t, 1> kRxTypes = {
       static_cast<uint8_t>(fuchsia_hardware_network::wire::FrameType::kEthernet),
   };
-  static const std::array<tx_support, 1> kTxTypes = {
-      tx_support{
-          .type = static_cast<uint8_t>(fuchsia_hardware_network::wire::FrameType::kEthernet),
+  static const std::array<frame_type_support_t, 1> kTxTypes = {
+      frame_type_support_t{
+          .type = static_cast<frame_type_t>(fuchsia_hardware_network::wire::FrameType::kEthernet),
           .features = static_cast<uint32_t>(fuchsia_hardware_network::wire::EthernetFeatures::kRaw),
       },
   };
@@ -476,13 +476,13 @@ void GuestEthernet::NetworkPortGetInfo(port_info_t* out_info) {
 
 void GuestEthernet::NetworkPortGetStatus(port_status_t* out_status) {
   *out_status = {
-      // Port's maximum transmission unit, in bytes.
-      .mtu = kMtu,
-
       // Port status flags.
       //
       // Status flags, as defined in [`fuchsia.hardware.network/Status`].
       .flags = static_cast<uint32_t>(::fuchsia_hardware_network::wire::StatusFlags::kOnline),
+
+      // Port's maximum transmission unit, in bytes.
+      .mtu = kMtu,
   };
 }
 

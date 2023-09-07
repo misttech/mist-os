@@ -69,7 +69,7 @@ FakeNetworkPortImpl::~FakeNetworkPortImpl() {
   }
 }
 
-void FakeNetworkPortImpl::NetworkPortGetInfo(port_info_t* out_info) { *out_info = port_info_; }
+void FakeNetworkPortImpl::NetworkPortGetInfo(port_base_info_t* out_info) { *out_info = port_info_; }
 
 void FakeNetworkPortImpl::NetworkPortGetStatus(port_status_t* out_status) { *out_status = status_; }
 
@@ -208,7 +208,9 @@ void FakeNetworkDeviceImpl::NetworkDeviceImplStop(network_device_impl_stop_callb
   EXPECT_OK(event_.signal(clear, kEventStop));
 }
 
-void FakeNetworkDeviceImpl::NetworkDeviceImplGetInfo(device_info_t* out_info) { *out_info = info_; }
+void FakeNetworkDeviceImpl::NetworkDeviceImplGetInfo(device_impl_info_t* out_info) {
+  *out_info = info_;
+}
 
 void FakeNetworkDeviceImpl::NetworkDeviceImplQueueTx(const tx_buffer_t* buf_list,
                                                      size_t buf_count) {

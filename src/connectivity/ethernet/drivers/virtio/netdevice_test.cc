@@ -275,9 +275,9 @@ TEST_F(NetworkDeviceTests, PortGetStatus) {
 }
 
 TEST_F(NetworkDeviceTests, MacGetAddr) {
-  fuchsia_net::wire::MacAddress addr;
-  mac().GetAddress(addr.octets.data());
-  EXPECT_BYTES_EQ(addr.octets.data(), FakeBackendForNetdeviceTest::kMac, addr.octets.size());
+  mac_address_t addr;
+  mac().GetAddress(&addr);
+  EXPECT_BYTES_EQ(addr.octets, FakeBackendForNetdeviceTest::kMac, MAC_SIZE);
 }
 
 TEST_P(VirtioVersionTests, Start) {

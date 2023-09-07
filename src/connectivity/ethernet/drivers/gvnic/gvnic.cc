@@ -797,7 +797,7 @@ void Gvnic::NetworkDeviceImplStop(network_device_impl_stop_callback callback, vo
   callback(cookie);
 }
 
-void Gvnic::NetworkDeviceImplGetInfo(device_info_t* out_info) {
+void Gvnic::NetworkDeviceImplGetInfo(device_impl_info_t* out_info) {
   memset(out_info, 0, sizeof(*out_info));  // Ensure unset fields are zero.
   out_info->tx_depth = tx_ring_len_;
   out_info->rx_depth = rx_ring_len_;
@@ -943,7 +943,7 @@ void Gvnic::NetworkDeviceImplSetSnoop(bool snoop) {
 
 // ------- NetworkPort -------
 
-void Gvnic::NetworkPortGetInfo(port_info_t* out_info) {
+void Gvnic::NetworkPortGetInfo(port_base_info_t* out_info) {
   memset(out_info, 0, sizeof(*out_info));  // Ensure unset fields are zero.
 
   constexpr uint8_t eth =
@@ -951,7 +951,7 @@ void Gvnic::NetworkPortGetInfo(port_info_t* out_info) {
   // It expects pointers to a list. These "lists" are only one element long. These are static so
   // that they continue to exist after this function returns.
   static const uint8_t rx_type = eth;
-  static const tx_support_t tx_type = {
+  static const frame_type_support_t tx_type = {
       .type = eth,
       .features = fuchsia_hardware_network::wire::kFrameFeaturesRaw,
   };
@@ -983,7 +983,9 @@ void Gvnic::NetworkPortRemoved() {
   // The port is never removed, there's no extra cleanup needed here.
 }
 
-void Gvnic::MacAddrGetAddress(uint8_t* out_mac) { memcpy(out_mac, dev_descr_.mac, ETH_ALEN); }
+void Gvnic::MacAddrGetAddress(mac_address_t* out_mac) {
+  memcpy(out_mac->octets, dev_descr_.mac, ETH_ALEN);
+}
 
 void Gvnic::MacAddrGetFeatures(features_t* out_features) {
   memset(out_features, 0, sizeof(*out_features));
@@ -993,9 +995,9 @@ void Gvnic::MacAddrGetFeatures(features_t* out_features) {
   out_features->supported_modes = SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS;
 }
 
-void Gvnic::MacAddrSetMode(mode_t mode, const uint8_t* multicast_macs_list,
+void Gvnic::MacAddrSetMode(mac_filter_mode_t mode, const mac_address_t* multicast_macs_list,
                            size_t multicast_macs_count) {
-  ZX_ASSERT_MSG(mode == MODE_PROMISCUOUS, "unsupported mode %d", mode);
+  ZX_ASSERT_MSG(mode == MAC_FILTER_MODE_PROMISCUOUS, "unsupported mode %d", mode);
   ZX_ASSERT_MSG(multicast_macs_count == 0, "unsupported multicast count %zu", multicast_macs_count);
 }
 

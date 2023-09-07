@@ -111,20 +111,20 @@ TEST_F(MacDeviceTest, EmptyMode) {
 
 TEST_F(MacDeviceTest, StartupModeFilter) {
   ASSERT_OK(CreateDevice());
-  ASSERT_EQ(impl_.mode(), MODE_MULTICAST_FILTER);
+  ASSERT_EQ(impl_.mode(), MAC_FILTER_MODE_MULTICAST_FILTER);
 }
 
 TEST_F(MacDeviceTest, StartupModeMcastPromiscuous) {
   impl_.features().supported_modes =
       SUPPORTED_MAC_FILTER_MODE_MULTICAST_PROMISCUOUS | SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS;
   ASSERT_OK(CreateDevice());
-  ASSERT_EQ(impl_.mode(), MODE_MULTICAST_PROMISCUOUS);
+  ASSERT_EQ(impl_.mode(), MAC_FILTER_MODE_MULTICAST_PROMISCUOUS);
 }
 
 TEST_F(MacDeviceTest, StartupModePromiscuous) {
   impl_.features().supported_modes = SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS;
   ASSERT_OK(CreateDevice());
-  ASSERT_EQ(impl_.mode(), MODE_PROMISCUOUS);
+  ASSERT_EQ(impl_.mode(), MAC_FILTER_MODE_PROMISCUOUS);
 }
 
 TEST_F(MacDeviceTest, SetBadMode) {
@@ -149,7 +149,7 @@ TEST_F(MacDeviceTest, SetPromiscuous) {
   ASSERT_OK(result.status());
   ASSERT_OK(result.value().status);
   ASSERT_OK(impl_.WaitConfigurationChanged());
-  ASSERT_EQ(impl_.mode(), MODE_PROMISCUOUS);
+  ASSERT_EQ(impl_.mode(), MAC_FILTER_MODE_PROMISCUOUS);
   ASSERT_TRUE(impl_.addresses().empty());
 }
 
@@ -163,7 +163,7 @@ TEST_F(MacDeviceTest, SetMulticastPromiscuous) {
   ASSERT_OK(result.status());
   ASSERT_OK(result.value().status);
   ASSERT_OK(impl_.WaitConfigurationChanged());
-  ASSERT_EQ(impl_.mode(), MODE_MULTICAST_PROMISCUOUS);
+  ASSERT_EQ(impl_.mode(), MAC_FILTER_MODE_MULTICAST_PROMISCUOUS);
   ASSERT_TRUE(impl_.addresses().empty());
 }
 
@@ -193,7 +193,7 @@ MATCHER(MacEq, "") {
 
 TEST_F(MacDeviceTest, AddRemoveMulticastFilter) {
   ASSERT_OK(CreateDevice());
-  ASSERT_EQ(impl_.mode(), MODE_MULTICAST_FILTER);
+  ASSERT_EQ(impl_.mode(), MAC_FILTER_MODE_MULTICAST_FILTER);
 
   zx::result open_result = OpenInstance();
   ASSERT_OK(open_result.status_value());
@@ -204,19 +204,19 @@ TEST_F(MacDeviceTest, AddRemoveMulticastFilter) {
   ASSERT_OK(add.status());
   ASSERT_OK(add.value().status);
   ASSERT_OK(impl_.WaitConfigurationChanged());
-  ASSERT_EQ(impl_.mode(), MODE_MULTICAST_FILTER);
+  ASSERT_EQ(impl_.mode(), MAC_FILTER_MODE_MULTICAST_FILTER);
   ASSERT_THAT(impl_.addresses(), ::testing::Pointwise(MacEq(), {addr}));
 
   fidl::WireResult remove = client->RemoveMulticastAddress(addr);
   ASSERT_OK(remove.status());
   ASSERT_OK(impl_.WaitConfigurationChanged());
-  ASSERT_EQ(impl_.mode(), MODE_MULTICAST_FILTER);
+  ASSERT_EQ(impl_.mode(), MAC_FILTER_MODE_MULTICAST_FILTER);
   ASSERT_TRUE(impl_.addresses().empty());
 }
 
 TEST_F(MacDeviceTest, OverflowsIntoMulticastPromiscuous) {
   ASSERT_OK(CreateDevice());
-  ASSERT_EQ(impl_.mode(), MODE_MULTICAST_FILTER);
+  ASSERT_EQ(impl_.mode(), MAC_FILTER_MODE_MULTICAST_FILTER);
 
   zx::result open_result = OpenInstance();
   ASSERT_OK(open_result.status_value());
@@ -229,13 +229,13 @@ TEST_F(MacDeviceTest, OverflowsIntoMulticastPromiscuous) {
     ASSERT_OK(result.value().status);
     ASSERT_OK(impl_.WaitConfigurationChanged());
   }
-  ASSERT_EQ(impl_.mode(), MODE_MULTICAST_PROMISCUOUS);
+  ASSERT_EQ(impl_.mode(), MAC_FILTER_MODE_MULTICAST_PROMISCUOUS);
   ASSERT_TRUE(impl_.addresses().empty());
 }
 
 TEST_F(MacDeviceTest, MostPermissiveClientWins) {
   ASSERT_OK(CreateDevice());
-  ASSERT_EQ(impl_.mode(), MODE_MULTICAST_FILTER);
+  ASSERT_EQ(impl_.mode(), MAC_FILTER_MODE_MULTICAST_FILTER);
 
   zx::result open_result1 = OpenInstance();
   ASSERT_OK(open_result1.status_value());
@@ -251,7 +251,7 @@ TEST_F(MacDeviceTest, MostPermissiveClientWins) {
     ASSERT_OK(result.status());
     ASSERT_OK(result.value().status);
     ASSERT_OK(impl_.WaitConfigurationChanged());
-    ASSERT_EQ(impl_.mode(), MODE_MULTICAST_FILTER);
+    ASSERT_EQ(impl_.mode(), MAC_FILTER_MODE_MULTICAST_FILTER);
     ASSERT_EQ(impl_.addresses().size(), 1ul);
   }
   {
@@ -259,19 +259,19 @@ TEST_F(MacDeviceTest, MostPermissiveClientWins) {
     ASSERT_OK(result.status());
     ASSERT_OK(result.value().status);
     ASSERT_OK(impl_.WaitConfigurationChanged());
-    ASSERT_EQ(impl_.mode(), MODE_PROMISCUOUS);
+    ASSERT_EQ(impl_.mode(), MAC_FILTER_MODE_PROMISCUOUS);
     ASSERT_TRUE(impl_.addresses().empty());
   }
   // Remove second instance and check that the mode fell back to the first one.
   cli2 = {};
   ASSERT_OK(impl_.WaitConfigurationChanged());
-  ASSERT_EQ(impl_.mode(), MODE_MULTICAST_FILTER);
+  ASSERT_EQ(impl_.mode(), MAC_FILTER_MODE_MULTICAST_FILTER);
   ASSERT_EQ(impl_.addresses().size(), 1ul);
 }
 
 TEST_F(MacDeviceTest, FallsBackToDefaultMode) {
   ASSERT_OK(CreateDevice());
-  ASSERT_EQ(impl_.mode(), MODE_MULTICAST_FILTER);
+  ASSERT_EQ(impl_.mode(), MAC_FILTER_MODE_MULTICAST_FILTER);
 
   zx::result open_result = OpenInstance();
   ASSERT_OK(open_result.status_value());
@@ -281,12 +281,12 @@ TEST_F(MacDeviceTest, FallsBackToDefaultMode) {
   ASSERT_OK(result.status());
   ASSERT_OK(result.value().status);
   ASSERT_OK(impl_.WaitConfigurationChanged());
-  ASSERT_EQ(impl_.mode(), MODE_PROMISCUOUS);
+  ASSERT_EQ(impl_.mode(), MAC_FILTER_MODE_PROMISCUOUS);
 
   // close the instance and check that we fell back to the default mode.
   client = {};
   ASSERT_OK(impl_.WaitConfigurationChanged());
-  ASSERT_EQ(impl_.mode(), MODE_MULTICAST_FILTER);
+  ASSERT_EQ(impl_.mode(), MAC_FILTER_MODE_MULTICAST_FILTER);
   ASSERT_TRUE(impl_.addresses().empty());
 }
 

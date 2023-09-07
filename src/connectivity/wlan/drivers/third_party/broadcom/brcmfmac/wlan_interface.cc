@@ -533,14 +533,14 @@ void WlanInterface::OnLinkStateChanged(OnLinkStateChangedRequestView request, fd
 
 uint32_t WlanInterface::PortGetMtu() { return kEthernetMtu; }
 
-void WlanInterface::MacGetAddress(uint8_t out_mac[MAC_SIZE]) {
+void WlanInterface::MacGetAddress(mac_address_t* out_mac) {
   std::shared_lock<std::shared_mutex> guard(lock_);
   if (wdev_ == nullptr) {
     BRCMF_WARN("Interface not available, returning empty MAC address");
     memset(out_mac, 0, MAC_SIZE);
     return;
   }
-  memcpy(out_mac, ndev_to_if(wdev_->netdev)->mac_addr, MAC_SIZE);
+  memcpy(out_mac->octets, ndev_to_if(wdev_->netdev)->mac_addr, MAC_SIZE);
 }
 
 void WlanInterface::MacGetFeatures(features_t* out_features) {
@@ -551,14 +551,14 @@ void WlanInterface::MacGetFeatures(features_t* out_features) {
   };
 }
 
-void WlanInterface::MacSetMode(mode_t mode, cpp20::span<const uint8_t> multicast_macs) {
+void WlanInterface::MacSetMode(mode_t mode, cpp20::span<const mac_address_t> multicast_macs) {
   zx_status_t status = ZX_OK;
   std::shared_lock<std::shared_mutex> guard(lock_);
   switch (mode) {
-    case MODE_MULTICAST_FILTER:
+    case MAC_FILTER_MODE_MULTICAST_FILTER:
       status = brcmf_if_set_multicast_promisc(wdev_->netdev, false);
       break;
-    case MODE_MULTICAST_PROMISCUOUS:
+    case MAC_FILTER_MODE_MULTICAST_PROMISCUOUS:
       status = brcmf_if_set_multicast_promisc(wdev_->netdev, true);
       break;
     default:

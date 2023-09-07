@@ -22,22 +22,21 @@ zx::result<std::unique_ptr<MacAddrDeviceInterface>> FakeMacDeviceImpl::CreateChi
   return MacAddrDeviceInterface::Create(ddk::MacAddrProtocolClient(&protocol));
 }
 
-void FakeMacDeviceImpl::MacAddrGetAddress(uint8_t* out_mac) {
-  std::copy(mac_.octets.begin(), mac_.octets.end(), out_mac);
+void FakeMacDeviceImpl::MacAddrGetAddress(mac_address_t* out_mac) {
+  std::copy(mac_.octets.begin(), mac_.octets.end(), out_mac->octets);
 }
 
 void FakeMacDeviceImpl::MacAddrGetFeatures(features_t* out_features) { *out_features = features_; }
 
-void FakeMacDeviceImpl::MacAddrSetMode(mode_t mode, const uint8_t* multicast_macs_list,
+void FakeMacDeviceImpl::MacAddrSetMode(mode_t mode, const mac_address_t* multicast_macs_list,
                                        size_t multicast_macs_count) {
   EXPECT_EQ(mode & kSupportedModesMask, mode);
-  std::optional<mode_t> old_mode = mode_;
+  std::optional<mac_filter_mode_t> old_mode = mode_;
   mode_ = mode;
   addresses_.clear();
   for (size_t i = 0; i < multicast_macs_count; i++) {
     MacAddress mac{};
-    memcpy(mac.octets.data(), multicast_macs_list, MAC_SIZE);
-    multicast_macs_list += MAC_SIZE;
+    memcpy(mac.octets.data(), multicast_macs_list[i].octets, MAC_SIZE);
     addresses_.push_back(mac);
   }
   // Signal only if this wasn't the first time, given we always get a SetMode on startup.

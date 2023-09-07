@@ -64,7 +64,7 @@ class DataPlane : public wlan::drivers::components::NetworkDevice::Callbacks {
   zx_status_t NetDevInit() override;
   void NetDevStart(StartTxn txn) override;
   void NetDevStop(StopTxn txn) override;
-  void NetDevGetInfo(device_info_t* out_info) override;
+  void NetDevGetInfo(device_impl_info_t* out_info) override;
   void NetDevQueueTx(cpp20::span<wlan::drivers::components::Frame> frames) override;
   void NetDevQueueRxSpace(const rx_space_buffer_t* buffers_list, size_t buffers_count,
                           uint8_t* vmo_addrs[]) override;

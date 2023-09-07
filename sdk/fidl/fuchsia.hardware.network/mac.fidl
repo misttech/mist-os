@@ -7,6 +7,7 @@ using zx;
 using fuchsia.net;
 
 /// The address filtering mode supported by MAC devices.
+// LINT.IfChange
 @available(added=HEAD)
 type MacFilterMode = strict enum {
     /// Device accepts only unicast frames addressed to its own unicast address,
@@ -18,7 +19,7 @@ type MacFilterMode = strict enum {
     /// Device accepts all frames.
     PROMISCUOUS = 2;
 };
-
+// LINT.ThenChange(/sdk/fidl/fuchsia.hardware.network.driver/network-mac.fidl)
 @available(added=HEAD)
 closed protocol MacAddressing {
     /// Gets the Device's current unicast MAC address.

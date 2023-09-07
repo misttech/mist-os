@@ -91,7 +91,7 @@ class Device : public DeviceType,
   void NetDevRelease() override;
   void NetDevStart(wlan::drivers::components::NetworkDevice::Callbacks::StartTxn txn) override;
   void NetDevStop(wlan::drivers::components::NetworkDevice::Callbacks::StopTxn txn) override;
-  void NetDevGetInfo(device_info_t* out_info) override;
+  void NetDevGetInfo(device_impl_info_t* out_info) override;
   void NetDevQueueTx(cpp20::span<wlan::drivers::components::Frame> frames) override;
   void NetDevQueueRxSpace(const rx_space_buffer_t* buffers_list, size_t buffers_count,
                           uint8_t* vmo_addrs[]) override;

@@ -544,7 +544,7 @@ void Device::NetDevStop(wlan::drivers::components::NetworkDevice::Callbacks::Sto
   txn.Reply();
 }
 
-void Device::NetDevGetInfo(device_info_t* out_info) {
+void Device::NetDevGetInfo(device_impl_info_t* out_info) {
   std::lock_guard<std::mutex> lock(lock_);
 
   memset(out_info, 0, sizeof(*out_info));

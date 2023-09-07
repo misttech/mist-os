@@ -96,7 +96,7 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
   SharedLock& control_lock() __TA_RETURN_CAPABILITY(control_lock_) { return control_lock_; }
   fbl::Mutex& rx_lock() __TA_RETURN_CAPABILITY(rx_lock_) { return rx_lock_; }
   fbl::Mutex& tx_lock() __TA_RETURN_CAPABILITY(tx_lock_) { return tx_lock_; }
-  const device_info_t& info() { return device_info_; }
+  const device_impl_info_t& info() { return device_info_; }
 
   // Loads rx path descriptors from the primary session into a session transaction.
   zx_status_t LoadRxDescriptors(RxSessionTransaction& transact) __TA_REQUIRES_SHARED(control_lock_);
@@ -274,7 +274,7 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
   void NotifyTxQueueAvailable() __TA_REQUIRES_SHARED(control_lock_);
 
   // Immutable information BEFORE initialization:
-  device_info_t device_info_{};
+  device_impl_info_t device_info_{};
   // dispatcher used for slow-path operations:
   async_dispatcher_t* const dispatcher_;
   DiagnosticsService diagnostics_;

@@ -752,8 +752,8 @@ void WlanInterface::OnStaDisconnectEvent(uint8_t* sta_mac_addr, uint16_t reason_
 }
 uint32_t WlanInterface::PortGetMtu() { return 1500u; }
 
-void WlanInterface::MacGetAddress(uint8_t out_mac[MAC_SIZE]) {
-  memcpy(out_mac, mac_address_, MAC_SIZE);
+void WlanInterface::MacGetAddress(mac_address_t* out_mac) {
+  memcpy(out_mac->octets, mac_address_, MAC_SIZE);
 }
 
 void WlanInterface::MacGetFeatures(features_t* out_features) {
@@ -765,27 +765,29 @@ void WlanInterface::MacGetFeatures(features_t* out_features) {
   };
 }
 
-void WlanInterface::MacSetMode(mode_t mode, cpp20::span<const uint8_t> multicast_macs) {
+void WlanInterface::MacSetMode(mode_t mode, cpp20::span<const mac_address_t> multicast_macs) {
   IoctlRequest<mlan_ds_bss> request(MLAN_IOCTL_BSS, MLAN_ACT_SET, PortId(),
                                     {.sub_command = MLAN_OID_BSS_MULTICAST_LIST});
 
   auto& multicast_list = request.UserReq().param.multicast_list;
 
   switch (mode) {
-    case MODE_MULTICAST_FILTER:
+    case MAC_FILTER_MODE_MULTICAST_FILTER:
       multicast_list.mode = MLAN_MULTICAST_MODE;
-      if (multicast_macs.size() > sizeof(multicast_list.mac_list)) {
-        NXPF_ERR("Number of multicast macs %zu exceeds maximum value of %zu",
-                 multicast_macs.size() / ETH_ALEN, std::size(multicast_list.mac_list));
+      if (multicast_macs.size() > std::size(multicast_list.mac_list)) {
+        NXPF_ERR("Number of multicast macs %zu exceeds maximum value of %zu", multicast_macs.size(),
+                 std::size(multicast_list.mac_list));
         return;
       }
-      memcpy(multicast_list.mac_list, multicast_macs.data(), multicast_macs.size());
-      multicast_list.num_multicast_addr = static_cast<uint32_t>(multicast_macs.size() / ETH_ALEN);
+      for (size_t i = 0; i < multicast_macs.size(); ++i) {
+        memcpy(multicast_list.mac_list[i], multicast_macs[i].octets, MAC_SIZE);
+      }
+      multicast_list.num_multicast_addr = static_cast<uint32_t>(multicast_macs.size());
       break;
-    case MODE_MULTICAST_PROMISCUOUS:
+    case MAC_FILTER_MODE_MULTICAST_PROMISCUOUS:
       multicast_list.mode = MLAN_ALL_MULTI_MODE;
       break;
-    case MODE_PROMISCUOUS:
+    case MAC_FILTER_MODE_PROMISCUOUS:
       multicast_list.mode = MLAN_PROMISC_MODE;
       break;
     default:

@@ -45,7 +45,7 @@ struct TestNetworkDevice : public NetworkDevice::Callbacks {
     txn.Reply();
     stop_.Call(std::move(txn));
   }
-  void NetDevGetInfo(device_info_t* out_info) override { get_info_.Call(out_info); }
+  void NetDevGetInfo(device_impl_info_t* out_info) override { get_info_.Call(out_info); }
   void NetDevQueueTx(cpp20::span<Frame> buffers) override { queue_tx_.Call(buffers); }
   void NetDevQueueRxSpace(const rx_space_buffer_t* buffers_list, size_t buffers_count,
                           uint8_t* vmo_addrs[]) override {
@@ -64,7 +64,7 @@ struct TestNetworkDevice : public NetworkDevice::Callbacks {
   mock_function::MockFunction<zx_status_t> init_;
   mock_function::MockFunction<void, NetworkDevice::Callbacks::StartTxn> start_;
   mock_function::MockFunction<void, NetworkDevice::Callbacks::StopTxn> stop_;
-  mock_function::MockFunction<void, device_info_t*> get_info_;
+  mock_function::MockFunction<void, device_impl_info_t*> get_info_;
   mock_function::MockFunction<void, cpp20::span<Frame>> queue_tx_;
   mock_function::MockFunction<void, const rx_space_buffer_t*, size_t, uint8_t**> queue_rx_space_;
   mock_function::MockFunction<void, uint8_t, zx::vmo&&, uint8_t*, size_t> prepare_vmo_;
@@ -421,7 +421,7 @@ TEST_F(NetworkDeviceTestFixture, CompleteRxEmptyFrames) {
 
 TEST_F(NetworkDeviceTestFixture, GetInfo) {
   // This call should just forward to the base object, the network device can't fill out this info.
-  device_info_t info;
+  device_impl_info_t info;
   device_.get_info_.ExpectCall(&info);
   device_.network_device_.NetworkDeviceImplGetInfo(&info);
   device_.get_info_.VerifyAndClear();

@@ -31,8 +31,8 @@ class NetdeviceMigrationTestHelper {
     return netdev_.rx_started_;
   }
   size_t netbuf_size() const { return netdev_.netbuf_size_; }
-  const device_info_t& Info() { return netdev_.info_; }
-  const port_info_t& PortInfo() { return netdev_.port_info_; }
+  const device_impl_info_t& Info() { return netdev_.info_; }
+  const port_base_info_t& PortInfo() { return netdev_.port_info_; }
   const ethernet_ifc_protocol_t& EthernetIfcProto() { return netdev_.ethernet_ifc_proto_; }
   const network_device_impl_protocol_ops_t& NetworkDeviceImplProtoOps() {
     return netdev_.network_device_impl_protocol_ops_;
@@ -297,7 +297,7 @@ TEST_P(DeviceClassSetupTest, DeviceClassTest) {
   const DeviceClassTestCase test_case = GetParam();
   SetUpWithFeatures(test_case.features);
   netdevice_migration::NetdeviceMigrationTestHelper helper(Device());
-  const port_info_t port_info = helper.PortInfo();
+  const port_base_info_t port_info = helper.PortInfo();
   ASSERT_EQ(static_cast<uint8_t>(test_case.expected_device_class), port_info.port_class);
 }
 
@@ -309,7 +309,7 @@ INSTANTIATE_TEST_SUITE_P(NetdeviceMigration, DeviceClassSetupTest,
 
 TEST_F(NetdeviceMigrationDefaultSetupTest, DeviceInfoPreconditions) {
   netdevice_migration::NetdeviceMigrationTestHelper helper(Device());
-  const device_info_t& info = helper.Info();
+  const device_impl_info_t& info = helper.Info();
   // buffer_alignment > max_buffer_length leads to either unnecessary wasting of contiguous memory,
   // or for the configuration to be rejected altogether.
   ASSERT_LE(info.buffer_alignment, info.max_buffer_length);
@@ -380,8 +380,8 @@ TEST_F(NetdeviceMigrationDefaultSetupTest, EthernetIfcStatus) {
               NetworkDeviceIfcPortStatusChanged(
                   netdevice_migration::NetdeviceMigration::kPortId,
                   testing::Pointee(testing::FieldsAre(
-                      ETH_MTU_SIZE, static_cast<uint32_t>(
-                                        fuchsia_hardware_network::wire::StatusFlags::kOnline)))))
+                      static_cast<uint32_t>(fuchsia_hardware_network::wire::StatusFlags::kOnline),
+                      ETH_MTU_SIZE))))
       .Times(1);
   Device().EthernetIfcStatus(ETHERNET_STATUS_ONLINE);
   Device().NetworkPortGetStatus(&status);
@@ -403,8 +403,8 @@ TEST_F(NetdeviceMigrationDefaultSetupTest, EthernetIfcStatusCalledFromEthernetIm
               NetworkDeviceIfcPortStatusChanged(
                   netdevice_migration::NetdeviceMigration::kPortId,
                   testing::Pointee(testing::FieldsAre(
-                      ETH_MTU_SIZE, static_cast<uint32_t>(
-                                        fuchsia_hardware_network::wire::StatusFlags::kOnline)))))
+                      static_cast<uint32_t>(fuchsia_hardware_network::wire::StatusFlags::kOnline),
+                      ETH_MTU_SIZE))))
       .Times(1);
   ASSERT_OK(MockEthernet().EthernetImplStart(&proto));
   port_status_t status;
@@ -868,11 +868,11 @@ INSTANTIATE_TEST_SUITE_P(
     });
 
 TEST_F(NetdeviceMigrationDefaultSetupTest, MacAddrGetAddress) {
-  uint8_t out[MAC_SIZE];
-  Device().MacAddrGetAddress(out);
+  mac_address_t out;
+  Device().MacAddrGetAddress(&out);
   uint8_t expected[] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
   for (size_t i = 0; i < MAC_SIZE; ++i) {
-    EXPECT_EQ(out[i], expected[i]);
+    EXPECT_EQ(out.octets[i], expected[i]);
   }
 }
 
@@ -887,7 +887,7 @@ TEST_F(NetdeviceMigrationDefaultSetupTest, MacAddrGetFeatures) {
 
 struct MacAddrSetModeFailedPreconditionInput {
   const char* name;
-  mode_t mode;
+  supported_mac_filter_mode_t mode;
   size_t mcast_macs;
 };
 
@@ -911,12 +911,13 @@ INSTANTIATE_TEST_SUITE_P(
     testing::Values(
         MacAddrSetModeFailedPreconditionInput{
             .name = "TooManyMulticastMacFilters",
-            .mode = MODE_MULTICAST_FILTER,
+            .mode = MAC_FILTER_MODE_MULTICAST_FILTER,
             .mcast_macs = netdevice_migration::NetdeviceMigration::kMulticastFilterMax + 1,
         },
         MacAddrSetModeFailedPreconditionInput{
             .name = "InvalidMode",
-            .mode = MODE_MULTICAST_FILTER | MODE_MULTICAST_PROMISCUOUS | MODE_PROMISCUOUS,
+            .mode = MAC_FILTER_MODE_MULTICAST_FILTER | MAC_FILTER_MODE_MULTICAST_PROMISCUOUS |
+                    MAC_FILTER_MODE_PROMISCUOUS,
             .mcast_macs = netdevice_migration::NetdeviceMigration::kMulticastFilterMax,
         }),
     [](const testing::TestParamInfo<MacAddrSetModeFailedPreconditionTest::ParamType>& info) {
@@ -930,14 +931,25 @@ TEST_F(NetdeviceMigrationDefaultSetupTest, MacAddrSetMode) {
       .WillOnce([](uint32_t p, int32_t v, const uint8_t* data, size_t data_len) { return ZX_OK; });
   EXPECT_CALL(MockEthernet(), EthernetImplSetParam(ETHERNET_SETPARAM_PROMISC, 0, nullptr, 0))
       .WillOnce([](uint32_t p, int32_t v, const uint8_t* data, size_t data_len) { return ZX_OK; });
-  std::array<uint8_t, netdevice_migration::NetdeviceMigration::kMulticastFilterMax * MAC_SIZE>
+  std::array<mac_address_t, netdevice_migration::NetdeviceMigration::kMulticastFilterMax>
       mac_filter;
-  EXPECT_CALL(MockEthernet(),
-              EthernetImplSetParam(ETHERNET_SETPARAM_MULTICAST_FILTER,
-                                   netdevice_migration::NetdeviceMigration::kMulticastFilterMax,
-                                   testing::Pointer(mac_filter.data()), mac_filter.size()))
+  auto mcast_macs_match = [&](const uint8_t* data) -> bool {
+    const uint8_t* addr = data;
+    for (auto& mac : mac_filter) {
+      if (std::memcmp(mac.octets, addr, MAC_SIZE) != 0) {
+        return false;
+      }
+      addr += MAC_SIZE;
+    }
+    return true;
+  };
+  EXPECT_CALL(
+      MockEthernet(),
+      EthernetImplSetParam(ETHERNET_SETPARAM_MULTICAST_FILTER,
+                           netdevice_migration::NetdeviceMigration::kMulticastFilterMax,
+                           testing::ResultOf(mcast_macs_match, true), mac_filter.size() * MAC_SIZE))
       .WillOnce([](uint32_t p, int32_t v, const uint8_t* data, size_t data_len) { return ZX_OK; });
-  Device().MacAddrSetMode(MODE_MULTICAST_FILTER, mac_filter.data(),
+  Device().MacAddrSetMode(MAC_FILTER_MODE_MULTICAST_FILTER, mac_filter.data(),
                           netdevice_migration::NetdeviceMigration::kMulticastFilterMax);
 
   EXPECT_CALL(MockEthernet(), EthernetImplSetParam(ETHERNET_SETPARAM_PROMISC, 0, nullptr, 0))
@@ -945,21 +957,21 @@ TEST_F(NetdeviceMigrationDefaultSetupTest, MacAddrSetMode) {
   EXPECT_CALL(MockEthernet(),
               EthernetImplSetParam(ETHERNET_SETPARAM_MULTICAST_PROMISC, 1, nullptr, 0))
       .WillOnce([](uint32_t p, int32_t v, const uint8_t* data, size_t data_len) { return ZX_OK; });
-  Device().MacAddrSetMode(MODE_MULTICAST_PROMISCUOUS, nullptr, 0u);
+  Device().MacAddrSetMode(MAC_FILTER_MODE_MULTICAST_PROMISCUOUS, nullptr, 0u);
 
   EXPECT_CALL(MockEthernet(), EthernetImplSetParam(ETHERNET_SETPARAM_PROMISC, 1, nullptr, 0))
       .WillOnce([](uint32_t p, int32_t v, const uint8_t* data, size_t data_len) { return ZX_OK; });
-  Device().MacAddrSetMode(MODE_PROMISCUOUS, nullptr, 0u);
+  Device().MacAddrSetMode(MAC_FILTER_MODE_PROMISCUOUS, nullptr, 0u);
 }
 
 TEST_F(NetdeviceMigrationDefaultSetupTest, GetMac) {
   mac_addr_protocol_t mac;
   Device().NetworkPortGetMac(&mac);
   netdevice_migration::NetdeviceMigrationTestHelper helper(Device());
-  std::array<uint8_t, MAC_SIZE> addr = {};
-  mac.ops->get_address(mac.ctx, addr.data());
-  for (size_t i = 0; i < addr.size(); ++i) {
-    EXPECT_EQ(addr[i], helper.Mac()[i]);
+  mac_address_t addr = {};
+  mac.ops->get_address(mac.ctx, &addr);
+  for (size_t i = 0; i < MAC_SIZE; ++i) {
+    EXPECT_EQ(addr.octets[i], helper.Mac()[i]);
   }
 }
 

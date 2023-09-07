@@ -49,7 +49,7 @@ class MacInterface : public ::network::MacAddrDeviceInterface {
 
   // Converts a fuchsia.hardware.network.MacFilterMode to a valid mode to be communicated to the
   // device implementation, taking into consideration the device's available operating modes.
-  std::optional<mode_t> ConvertMode(const netdev::wire::MacFilterMode& mode) const;
+  std::optional<mac_filter_mode_t> ConvertMode(const netdev::wire::MacFilterMode& mode) const;
 
  private:
   friend MacClientInstance;
@@ -65,7 +65,7 @@ class MacInterface : public ::network::MacAddrDeviceInterface {
 
   const ddk::MacAddrProtocolClient impl_;
   features_t features_{};
-  mode_t default_mode_{};
+  mac_filter_mode_t default_mode_{};
   fbl::Mutex lock_;
   fbl::DoublyLinkedList<std::unique_ptr<MacClientInstance>> clients_ __TA_GUARDED(lock_);
   fit::callback<void()> teardown_callback_ __TA_GUARDED(lock_);
@@ -98,9 +98,9 @@ class ClientState {
     }
   };
 
-  explicit ClientState(mode_t filter_mode) : filter_mode(filter_mode) {}
+  explicit ClientState(mac_filter_mode_t filter_mode) : filter_mode(filter_mode) {}
 
-  mode_t filter_mode;
+  mac_filter_mode_t filter_mode;
   std::unordered_set<Addr, MacHasher> addresses;
 };
 
@@ -111,7 +111,7 @@ class ClientState {
 class MacClientInstance : public fidl::WireServer<netdev::MacAddressing>,
                           public fbl::DoublyLinkedListable<std::unique_ptr<MacClientInstance>> {
  public:
-  explicit MacClientInstance(MacInterface* parent, mode_t default_mode);
+  explicit MacClientInstance(MacInterface* parent, mac_filter_mode_t default_mode);
 
   void GetUnicastAddress(GetUnicastAddressCompleter::Sync& _completer) override;
   void SetMode(SetModeRequestView request, SetModeCompleter::Sync& _completer) override;

@@ -85,15 +85,15 @@ class NetworkDeviceTest : public ::testing::Test {
   // A minimally valid mock MacAddressing implementation.
   static constexpr mac_addr_protocol_ops_t kMockMacOps = {
       .get_address =
-          [](void* ctx, uint8_t out_mac[6]) {
+          [](void* ctx, mac_address_t* out_mac) {
             constexpr uint8_t kMac[] = {1, 2, 3, 4, 5, 6};
-            std::copy(std::begin(kMac), std::end(kMac), out_mac);
+            std::copy(std::begin(kMac), std::end(kMac), out_mac->octets);
           },
       .get_features =
           [](void* ctx, features_t* out_features) {
             *out_features = {.supported_modes = SUPPORTED_MAC_FILTER_MODE_MULTICAST_FILTER};
           },
-      .set_mode = [](void* ctx, mode_t mode, const uint8_t* multicast_macs_list,
+      .set_mode = [](void* ctx, mode_t mode, const mac_address_t* multicast_macs_list,
                      size_t multicast_macs_count) {},
   };
 
@@ -1969,7 +1969,7 @@ TEST_F(NetworkDeviceTest, PortGetInfo) {
   fidl::WireResult result = port->GetInfo();
   ASSERT_OK(result.status());
   const netdev::wire::PortInfo& port_info = result.value().info;
-  const port_info_t& impl_info = port13_.port_info();
+  const port_base_info_t& impl_info = port13_.port_info();
   ASSERT_TRUE(port_info.has_id());
   const netdev::wire::PortId& port_id = port_info.id();
   EXPECT_EQ(port_id.base, kPort13);
@@ -2007,14 +2007,14 @@ TEST_F(NetworkDeviceTest, PortGetStatus) {
   } kTests[] = {
       {
           .name = "offline-1280",
-          .status = {.mtu = 1280, .flags = 0},
+          .status = {.flags = 0, .mtu = 1280},
       },
       {
           .name = "online-1500",
           .status =
               {
-                  .mtu = 1500,
                   .flags = static_cast<uint32_t>(netdev::wire::StatusFlags::kOnline),
+                  .mtu = 1500,
               },
       },
   };
@@ -2050,9 +2050,9 @@ TEST_F(NetworkDeviceTest, PortGetMac) {
   fidl::WireResult result = mac->GetUnicastAddress();
   ASSERT_OK(result.status());
   fuchsia_net::wire::MacAddress& addr = result.value().address;
-  decltype(addr.octets) octets;
-  kMockMacOps.get_address(nullptr, octets.data());
-  EXPECT_TRUE(std::equal(addr.octets.begin(), addr.octets.end(), octets.begin()));
+  mac_address_t out_mac{};
+  kMockMacOps.get_address(nullptr, &out_mac);
+  EXPECT_TRUE(std::equal(addr.octets.begin(), addr.octets.end(), out_mac.octets));
 }
 
 TEST_F(NetworkDeviceTest, PortGetMacFails) {

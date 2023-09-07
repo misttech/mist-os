@@ -20,7 +20,7 @@ DevicePort::DevicePort(DeviceInterface* parent, async_dispatcher_t* dispatcher,
       port_(port),
       mac_(std::move(mac)),
       on_teardown_(std::move(on_teardown)) {
-  port_info_t info;
+  port_base_info_t info;
   port.GetInfo(&info);
   ZX_ASSERT_MSG(info.rx_types_count <= netdev::wire::kMaxFrameTypes,
                 "too many port rx types: %ld > %d", info.rx_types_count,
@@ -37,7 +37,8 @@ DevicePort::DevicePort(DeviceInterface* parent, async_dispatcher_t* dispatcher,
     supported_rx_[supported_rx_count_++] = static_cast<netdev::wire::FrameType>(rx_support);
   }
   supported_tx_count_ = 0;
-  for (const tx_support_t& tx_support : cpp20::span(info.tx_types_list, info.tx_types_count)) {
+  for (const frame_type_support_t& tx_support :
+       cpp20::span(info.tx_types_list, info.tx_types_count)) {
     supported_tx_[supported_tx_count_++] = {
         .type = static_cast<netdev::wire::FrameType>(tx_support.type),
         .features = tx_support.features,

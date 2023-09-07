@@ -249,7 +249,7 @@ TEST_F(DataPlaneTest, CompleteRxEapolFrame) {
 TEST_F(DataPlaneTest, GetInfo) {
   // Test that NetDevGetInfo return some kind of reasonable values.
 
-  device_info_t info;
+  device_impl_info_t info;
   data_plane_->NetDevGetInfo(&info);
 
   ASSERT_GT(info.tx_depth, 0);

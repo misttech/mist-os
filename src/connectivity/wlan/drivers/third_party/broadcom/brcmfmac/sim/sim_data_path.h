@@ -77,7 +77,7 @@ class SimDataPath {
   cpp20::span<uint8_t> rx_span_{};
 
   // Used for head/tail length requested by the device for transmits.
-  device_info_t device_info_{};
+  device_impl_info_t device_info_{};
 
   // The list of tx results received during the lifetime of the class.
   // Populated during calls to OnTxComplete().

@@ -189,7 +189,7 @@ void DataPlane::NetDevStart(StartTxn txn) { txn.Reply(ZX_OK); }
 
 void DataPlane::NetDevStop(StopTxn txn) { txn.Reply(); }
 
-void DataPlane::NetDevGetInfo(device_info_t *out_info) {
+void DataPlane::NetDevGetInfo(device_impl_info_t *out_info) {
   // Query the bus for some if this information.
   const uint16_t rx_headroom = bus_->GetRxHeadroom();
   const uint16_t tx_headroom = bus_->GetTxHeadroom();

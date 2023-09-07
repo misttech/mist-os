@@ -20,16 +20,18 @@ class TestNetworkPortInterface : public NetworkPort::Callbacks {
   uint32_t PortGetMtu() override { return mtu_; }
   void PortGetStatus(port_status_t* out_status) override { port_get_status_.Call(out_status); }
   void PortRemoved() override { removed_.Call(); }
-  void MacGetAddress(uint8_t out_mac[6]) override { mac_get_address_.Call(out_mac); }
+  void MacGetAddress(mac_address_t* out_mac) override { mac_get_address_.Call(out_mac); }
   void MacGetFeatures(features_t* out_features) override { mac_get_features_.Call(out_features); }
-  void MacSetMode(mode_t mode, cpp20::span<const uint8_t> multicast_macs) override {
+  void MacSetMode(mac_filter_mode_t mode,
+                  cpp20::span<const mac_address_t> multicast_macs) override {
     mac_set_mode_.Call(mode, multicast_macs);
   }
   mock_function::MockFunction<void> removed_;
   mock_function::MockFunction<void, port_status_t*> port_get_status_;
-  mock_function::MockFunction<void, uint8_t*> mac_get_address_;
+  mock_function::MockFunction<void, mac_address_t*> mac_get_address_;
   mock_function::MockFunction<void, features_t*> mac_get_features_;
-  mock_function::MockFunction<void, mode_t, cpp20::span<const uint8_t>> mac_set_mode_;
+  mock_function::MockFunction<void, mac_filter_mode_t, cpp20::span<const mac_address_t>>
+      mac_set_mode_;
 
   uint32_t mtu_ = kTestMtu;
 };
@@ -111,7 +113,7 @@ TEST(NetworkPortTest, GetInfoClient) {
 
     port.Init(NetworkPort::Role::Client);
 
-    port_info_t info;
+    port_base_info_t info;
     port.NetworkPortGetInfo(&info);
 
     EXPECT_EQ(info.port_class,
@@ -131,7 +133,7 @@ TEST(NetworkPortTest, GetInfoAp) {
 
     port.Init(NetworkPort::Role::Ap);
 
-    port_info_t info;
+    port_base_info_t info;
     port.NetworkPortGetInfo(&info);
 
     EXPECT_EQ(info.port_class,
@@ -169,7 +171,7 @@ TEST_F(NetworkPortTestFixture, GetInfo) {
       static_cast<uint8_t>(fuchsia_hardware_network::wire::FrameType::kEthernet);
   constexpr uint32_t kRawFrameFeature = fuchsia_hardware_network::wire::kFrameFeaturesRaw;
 
-  port_info_t info;
+  port_base_info_t info;
   port_->NetworkPortGetInfo(&info);
   // Should be a WLAN port in the default setting
   EXPECT_EQ(info.port_class,
@@ -180,8 +182,8 @@ TEST_F(NetworkPortTestFixture, GetInfo) {
   EXPECT_NE(std::find(rx_types.begin(), rx_types.end(), kEthFrame), rx_types.end());
 
   // Must support at least transmission of raw ethernet frames
-  cpp20::span<const tx_support_t> tx_types(info.tx_types_list, info.tx_types_count);
-  auto is_raw_ethernet = [&](const tx_support_t& support) {
+  cpp20::span<const frame_type_support_t> tx_types(info.tx_types_list, info.tx_types_count);
+  auto is_raw_ethernet = [&](const frame_type_support_t& support) {
     return support.features == kRawFrameFeature && support.type == kEthFrame;
   };
   EXPECT_NE(std::find_if(tx_types.begin(), tx_types.end(), is_raw_ethernet), tx_types.end());
@@ -270,11 +272,11 @@ struct NetworkPortMacTestFixture : public NetworkPortTestFixture {
 TEST_F(NetworkPortMacTestFixture, MacGetAddress) {
   constexpr uint8_t kMacAddr[6] = {0x0C, 0x00, 0x0F, 0xF0, 0x0E, 0xE0};
   port_ifc_.mac_get_address_.ExpectCallWithMatcher(
-      [&](uint8_t* out_mac) { memcpy(out_mac, kMacAddr, sizeof(kMacAddr)); });
+      [&](mac_address_t* out_mac) { memcpy(out_mac->octets, kMacAddr, sizeof(kMacAddr)); });
 
-  uint8_t mac_addr[6];
-  mac_.GetAddress(mac_addr);
-  EXPECT_BYTES_EQ(mac_addr, kMacAddr, sizeof(kMacAddr));
+  mac_address_t mac_addr;
+  mac_.GetAddress(&mac_addr);
+  EXPECT_BYTES_EQ(mac_addr.octets, kMacAddr, sizeof(kMacAddr));
 }
 
 TEST_F(NetworkPortMacTestFixture, MacGetFeatures) {
@@ -294,15 +296,19 @@ TEST_F(NetworkPortMacTestFixture, MacGetFeatures) {
 }
 
 TEST_F(NetworkPortMacTestFixture, MacSetMode) {
-  constexpr std::array<uint8_t, 12> kMulticastMacs = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
-                                                      0x0F, 0x0E, 0x0D, 0x0C, 0x0B, 0x0A};
-  constexpr mode_t kMode = MODE_MULTICAST_FILTER;
-  port_ifc_.mac_set_mode_.ExpectCallWithMatcher([&](mode_t mode,
-                                                    cpp20::span<const uint8_t> multicast_macs) {
-    EXPECT_EQ(mode, kMode);
-    ASSERT_EQ(multicast_macs.size(), kMulticastMacs.size());
-    EXPECT_TRUE(std::equal(kMulticastMacs.begin(), kMulticastMacs.end(), multicast_macs.begin()));
-  });
+  constexpr std::array<mac_address_t, 2> kMulticastMacs = {
+      mac_address_t{{0x01, 0x02, 0x03, 0x04, 0x05, 0x06}},
+      mac_address_t{{0x0F, 0x0E, 0x0D, 0x0C, 0x0B, 0x0A}}};
+
+  constexpr mac_filter_mode_t kMode = MAC_FILTER_MODE_MULTICAST_FILTER;
+  port_ifc_.mac_set_mode_.ExpectCallWithMatcher(
+      [&](mac_filter_mode_t mode, cpp20::span<const mac_address_t> multicast_macs) {
+        EXPECT_EQ(mode, kMode);
+        ASSERT_EQ(multicast_macs.size(), kMulticastMacs.size());
+        for (size_t i = 0; i < multicast_macs.size(); ++i) {
+          EXPECT_BYTES_EQ(kMulticastMacs[i].octets, multicast_macs[i].octets, MAC_SIZE);
+        }
+      });
 
   mac_.SetMode(kMode, kMulticastMacs.data(), kMulticastMacs.size());
   port_ifc_.mac_set_mode_.VerifyAndClear();

@@ -297,7 +297,9 @@ void NetdeviceMigration::NetworkDeviceImplStop(network_device_impl_stop_callback
   callback(cookie);
 }
 
-void NetdeviceMigration::NetworkDeviceImplGetInfo(device_info_t* out_info) { *out_info = info_; }
+void NetdeviceMigration::NetworkDeviceImplGetInfo(device_impl_info_t* out_info) {
+  *out_info = info_;
+}
 
 void NetdeviceMigration::NetworkDeviceImplQueueTx(const tx_buffer_t* buffers_list,
                                                   size_t buffers_count)
@@ -479,14 +481,14 @@ void NetdeviceMigration::NetworkDeviceImplReleaseVmo(uint8_t id) __TA_EXCLUDES(v
 
 void NetdeviceMigration::NetworkDeviceImplSetSnoop(bool snoop) {}
 
-void NetdeviceMigration::NetworkPortGetInfo(port_info_t* out_info) { *out_info = port_info_; }
+void NetdeviceMigration::NetworkPortGetInfo(port_base_info_t* out_info) { *out_info = port_info_; }
 
 void NetdeviceMigration::NetworkPortGetStatus(port_status_t* out_status)
     __TA_EXCLUDES(status_lock_) {
   std::lock_guard lock(status_lock_);
   *out_status = {
-      .mtu = mtu_,
       .flags = static_cast<uint32_t>(port_status_flags_),
+      .mtu = mtu_,
   };
 }
 
@@ -503,9 +505,9 @@ void NetdeviceMigration::NetworkPortRemoved() {
   zxlogf(INFO, "removed event for port %d", kPortId);
 }
 
-void NetdeviceMigration::MacAddrGetAddress(uint8_t out_mac[MAC_SIZE]) {
-  static_assert(sizeof(mac_) == MAC_SIZE);
-  std::copy(mac_.begin(), mac_.end(), out_mac);
+void NetdeviceMigration::MacAddrGetAddress(mac_address_t* out_mac) {
+  static_assert(sizeof(mac_) == sizeof(out_mac->octets));
+  std::copy(mac_.begin(), mac_.end(), out_mac->octets);
 }
 
 void NetdeviceMigration::MacAddrGetFeatures(features_t* out_features) {
@@ -515,7 +517,8 @@ void NetdeviceMigration::MacAddrGetFeatures(features_t* out_features) {
   };
 }
 
-void NetdeviceMigration::MacAddrSetMode(mode_t mode, const uint8_t* multicast_macs_list,
+void NetdeviceMigration::MacAddrSetMode(mac_filter_mode_t mode,
+                                        const mac_address_t* multicast_macs_list,
                                         size_t multicast_macs_count) {
   if (multicast_macs_count > kMulticastFilterMax) {
     zxlogf(ERROR, "multicast macs count exceeds maximum: %zu > %du", multicast_macs_count,
@@ -524,17 +527,17 @@ void NetdeviceMigration::MacAddrSetMode(mode_t mode, const uint8_t* multicast_ma
     return;
   }
   switch (mode) {
-    case MODE_MULTICAST_FILTER:
+    case MAC_FILTER_MODE_MULTICAST_FILTER:
       SetMacParam(ETHERNET_SETPARAM_MULTICAST_PROMISC, 0, nullptr, 0);
       SetMacParam(ETHERNET_SETPARAM_PROMISC, 0, nullptr, 0);
       SetMacParam(ETHERNET_SETPARAM_MULTICAST_FILTER, static_cast<int32_t>(multicast_macs_count),
-                  multicast_macs_list, multicast_macs_count * MAC_SIZE);
+                  multicast_macs_list, multicast_macs_count);
       break;
-    case MODE_MULTICAST_PROMISCUOUS:
+    case MAC_FILTER_MODE_MULTICAST_PROMISCUOUS:
       SetMacParam(ETHERNET_SETPARAM_PROMISC, 0, nullptr, 0);
       SetMacParam(ETHERNET_SETPARAM_MULTICAST_PROMISC, 1, nullptr, 0);
       break;
-    case MODE_PROMISCUOUS:
+    case MAC_FILTER_MODE_PROMISCUOUS:
       SetMacParam(ETHERNET_SETPARAM_PROMISC, 1, nullptr, 0);
       break;
     default:
@@ -544,9 +547,15 @@ void NetdeviceMigration::MacAddrSetMode(mode_t mode, const uint8_t* multicast_ma
   }
 }
 
-void NetdeviceMigration::SetMacParam(uint32_t param, int32_t value, const uint8_t* data_buffer,
-                                     size_t data_size) const {
-  if (zx_status_t status = ethernet_.SetParam(param, value, data_buffer, data_size);
+void NetdeviceMigration::SetMacParam(uint32_t param, int32_t value,
+                                     const mac_address_t* data_buffer, size_t data_size) const {
+  uint8_t macs[kMulticastFilterMax * MAC_SIZE];
+  for (size_t i = 0; i < data_size && i < kMulticastFilterMax; ++i) {
+    memcpy(&macs[i * MAC_SIZE], data_buffer[i].octets, MAC_SIZE);
+  }
+
+  if (zx_status_t status =
+          ethernet_.SetParam(param, value, data_buffer ? macs : nullptr, data_size * MAC_SIZE);
       status != ZX_OK) {
     zxlogf(WARNING, "failed to set ethernet parameter %du to value %d: %s", param, value,
            zx_status_get_string(status));

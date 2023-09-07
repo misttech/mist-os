@@ -45,7 +45,7 @@ class PortAdapter : public ddk::NetworkPortProtocol<PortAdapter> {
   PortAdapter(PortAdapter&&) = delete;
 
   // NetworkPort protocol:
-  void NetworkPortGetInfo(port_info_t* out_info);
+  void NetworkPortGetInfo(port_base_info_t* out_info);
   void NetworkPortGetStatus(port_status_t* out_status);
   void NetworkPortSetActive(bool active);
   void NetworkPortGetMac(mac_addr_protocol_t* out_mac_ifc);
@@ -64,13 +64,13 @@ class PortAdapter : public ddk::NetworkPortProtocol<PortAdapter> {
 
  private:
   std::array<uint8_t, fuchsia_hardware_network::wire::kMaxFrameTypes> rx_types_;
-  std::array<tx_support_t, fuchsia_hardware_network::wire::kMaxFrameTypes> tx_types_;
+  std::array<frame_type_support_t, fuchsia_hardware_network::wire::kMaxFrameTypes> tx_types_;
   // Pointer to parent, not owned.
   PortAdapterParent* const parent_;
   const uint8_t port_id_;
   const uint32_t mtu_;
   const std::unique_ptr<MacAdapter> mac_;
-  const port_info_t port_info_;
+  const port_base_info_t port_info_;
 
   fbl::Mutex state_lock_;
   bool has_sessions_ __TA_GUARDED(state_lock_) = false;

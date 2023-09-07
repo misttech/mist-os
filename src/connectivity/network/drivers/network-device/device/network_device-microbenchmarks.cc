@@ -24,7 +24,7 @@ class FakeDeviceImpl : public ddk::NetworkPortProtocol<FakeDeviceImpl>,
   static constexpr uint8_t kRxFrameTypes[] = {
       static_cast<uint8_t>(netdev::wire::FrameType::kEthernet),
   };
-  static constexpr tx_support_t kTxFrameTypes[] = {
+  static constexpr frame_type_support_t kTxFrameTypes[] = {
       {.type = static_cast<uint8_t>(netdev::wire::FrameType::kEthernet)},
   };
 
@@ -41,7 +41,7 @@ class FakeDeviceImpl : public ddk::NetworkPortProtocol<FakeDeviceImpl>,
   void NetworkDeviceImplStop(network_device_impl_stop_callback callback, void* cookie) {
     callback(cookie);
   }
-  void NetworkDeviceImplGetInfo(device_info_t* out_info) {
+  void NetworkDeviceImplGetInfo(device_impl_info_t* out_info) {
     *out_info = {
         .tx_depth = kDepth,
         .rx_depth = kDepth,
@@ -113,7 +113,7 @@ class FakeDeviceImpl : public ddk::NetworkPortProtocol<FakeDeviceImpl>,
   }
   void NetworkDeviceImplReleaseVmo(uint8_t vmo_id) {}
   void NetworkDeviceImplSetSnoop(bool snoop) { ZX_PANIC("unexpected call to SetSnoop(%d)", snoop); }
-  void NetworkPortGetInfo(port_info_t* out_info) {
+  void NetworkPortGetInfo(port_base_info_t* out_info) {
     *out_info = {
         .port_class = static_cast<uint8_t>(netdev::wire::DeviceClass::kEthernet),
         .rx_types_list = kRxFrameTypes,
@@ -124,8 +124,8 @@ class FakeDeviceImpl : public ddk::NetworkPortProtocol<FakeDeviceImpl>,
   }
   void NetworkPortGetStatus(port_status_t* out_status) {
     *out_status = {
-        .mtu = kMtu,
         .flags = static_cast<uint32_t>(netdev::wire::StatusFlags::kOnline),
+        .mtu = kMtu,
     };
   }
   void NetworkPortSetActive(bool active) {}

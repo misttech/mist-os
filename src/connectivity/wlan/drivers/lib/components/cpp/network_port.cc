@@ -57,11 +57,11 @@ bool NetworkPort::IsOnline() const {
   return online_;
 }
 
-void NetworkPort::NetworkPortGetInfo(port_info_t* out_info) {
+void NetworkPort::NetworkPortGetInfo(port_base_info_t* out_info) {
   static constexpr uint8_t kSupportedRxTypes[] = {
       static_cast<uint8_t>(fuchsia_hardware_network::wire::FrameType::kEthernet)};
 
-  static constexpr tx_support_t kSupportedTxTypes[]{{
+  static constexpr frame_type_support_t kSupportedTxTypes[]{{
       .type = static_cast<uint8_t>(fuchsia_hardware_network::wire::FrameType::kEthernet),
       .features = fuchsia_hardware_network::wire::kFrameFeaturesRaw,
       .supported_flags = 0,
@@ -102,23 +102,24 @@ void NetworkPort::NetworkPortRemoved() {
   port_removed_.Signal();
 }
 
-void NetworkPort::MacAddrGetAddress(uint8_t out_mac[6]) { iface_.MacGetAddress(out_mac); }
+void NetworkPort::MacAddrGetAddress(mac_address_t* out_mac) { iface_.MacGetAddress(out_mac); }
 
 void NetworkPort::MacAddrGetFeatures(features_t* out_features) {
   iface_.MacGetFeatures(out_features);
 }
 
-void NetworkPort::MacAddrSetMode(mode_t mode, const uint8_t* multicast_macs_list,
+void NetworkPort::MacAddrSetMode(mac_filter_mode_t mode, const mac_address_t* multicast_macs_list,
                                  size_t multicast_macs_count) {
-  iface_.MacSetMode(mode, cpp20::span<const uint8_t>(multicast_macs_list, multicast_macs_count));
+  iface_.MacSetMode(mode,
+                    cpp20::span<const mac_address_t>(multicast_macs_list, multicast_macs_count));
 }
 
 void NetworkPort::GetPortStatusLocked(port_status_t* out_status) {
   // Provide a reasonable default status
   using fuchsia_hardware_network::wire::StatusFlags;
   *out_status = {
-      .mtu = iface_.PortGetMtu(),
       .flags = online_ ? static_cast<uint32_t>(StatusFlags::kOnline) : 0u,
+      .mtu = iface_.PortGetMtu(),
   };
 
   // Allow the interface implementation to modify the status if it wants to

@@ -288,10 +288,10 @@ port_status_t NetworkDevice::ReadStatus() const {
   virtio_net_config config;
   CopyDeviceConfig(&config, sizeof(config));
   return {
-      .mtu = kMtu,
-      .flags = IsLinkActive(config, is_status_supported_)
+      .flags = (config.status & VIRTIO_NET_S_LINK_UP)
                    ? static_cast<uint32_t>(fuchsia_hardware_network::wire::StatusFlags::kOnline)
                    : 0,
+      .mtu = kMtu,
   };
 }
 
@@ -407,7 +407,7 @@ void NetworkDevice::NetworkDeviceImplStop(network_device_impl_stop_callback call
   callback(cookie);
 }
 
-void NetworkDevice::NetworkDeviceImplGetInfo(device_info_t* out_info) {
+void NetworkDevice::NetworkDeviceImplGetInfo(device_impl_info_t* out_info) {
   *out_info = {
       .tx_depth = tx_depth_,
       .rx_depth = rx_depth_,
@@ -564,10 +564,10 @@ void NetworkDevice::NetworkDeviceImplReleaseVmo(uint8_t vmo_id) {
   }
 }
 
-void NetworkDevice::NetworkPortGetInfo(port_info_t* out_info) {
+void NetworkDevice::NetworkPortGetInfo(port_base_info_t* out_info) {
   static constexpr uint8_t kRxTypesList[] = {
       static_cast<uint8_t>(fuchsia_hardware_network::wire::FrameType::kEthernet)};
-  static constexpr tx_support_t kTxTypesList[] = {{
+  static constexpr frame_type_support_t kTxTypesList[] = {{
       .type = static_cast<uint8_t>(fuchsia_hardware_network::wire::FrameType::kEthernet),
       .features = fuchsia_hardware_network::wire::kFrameFeaturesRaw,
   }};
@@ -590,8 +590,8 @@ void NetworkDevice::NetworkPortGetMac(mac_addr_protocol_t* out_mac_ifc) {
   };
 }
 
-void NetworkDevice::MacAddrGetAddress(uint8_t* out_mac) {
-  std::copy(mac_.octets.begin(), mac_.octets.end(), out_mac);
+void NetworkDevice::MacAddrGetAddress(mac_address_t* out_mac) {
+  std::copy(mac_.octets.begin(), mac_.octets.end(), out_mac->octets);
 }
 
 void NetworkDevice::MacAddrGetFeatures(features_t* out_features) {
@@ -601,10 +601,10 @@ void NetworkDevice::MacAddrGetFeatures(features_t* out_features) {
   };
 }
 
-void NetworkDevice::MacAddrSetMode(mode_t mode, const uint8_t* multicast_macs_list,
+void NetworkDevice::MacAddrSetMode(mac_filter_mode_t mode, const mac_address_t* multicast_macs_list,
                                    size_t multicast_macs_count) {
   /* We only support promiscuous mode, nothing to do */
-  ZX_ASSERT_MSG(mode == MODE_PROMISCUOUS, "unsupported mode %d", mode);
+  ZX_ASSERT_MSG(mode == MAC_FILTER_MODE_PROMISCUOUS, "unsupported mode %d", mode);
   ZX_ASSERT_MSG(multicast_macs_count == 0, "unsupported multicast count %zu", multicast_macs_count);
 }
 

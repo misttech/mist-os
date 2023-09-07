@@ -129,9 +129,9 @@ class WlanInterface : public ddk::Device<WlanInterface, ddk::Unbindable>,
  protected:
   // NetworkPort::Callbacks implementation
   uint32_t PortGetMtu() override;
-  void MacGetAddress(uint8_t out_mac[6]) override;
+  void MacGetAddress(mac_address_t* out_mac) override;
   void MacGetFeatures(features_t* out_features) override;
-  void MacSetMode(mode_t mode, cpp20::span<const uint8_t> multicast_macs) override;
+  void MacSetMode(mac_filter_mode_t mode, cpp20::span<const mac_address_t> multicast_macs) override;
 
  private:
   WlanInterface(wlan::brcmfmac::Device* device, const network_device_ifc_protocol_t& proto,

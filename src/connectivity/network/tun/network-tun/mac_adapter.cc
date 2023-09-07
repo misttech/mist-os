@@ -44,8 +44,8 @@ void MacAdapter::TeardownSync() {
   sync_completion_wait_deadline(&completion, ZX_TIME_INFINITE);
 }
 
-void MacAdapter::MacAddrGetAddress(uint8_t* out_mac) {
-  std::copy(mac_.octets.begin(), mac_.octets.end(), out_mac);
+void MacAdapter::MacAddrGetAddress(mac_address_t* out_mac) {
+  std::copy(mac_.octets.begin(), mac_.octets.end(), out_mac->octets);
 }
 
 void MacAdapter::MacAddrGetFeatures(features_t* out_features) {
@@ -60,18 +60,18 @@ void MacAdapter::MacAddrGetFeatures(features_t* out_features) {
   }
 }
 
-void MacAdapter::MacAddrSetMode(mode_t mode, const uint8_t* multicast_macs_list,
+void MacAdapter::MacAddrSetMode(mac_filter_mode_t mode, const mac_address_t* multicast_macs_list,
                                 size_t multicast_macs_count) {
   fbl::AutoLock lock(&state_lock_);
   fuchsia_hardware_network::wire::MacFilterMode filter_mode;
   switch (mode) {
-    case MODE_PROMISCUOUS:
+    case MAC_FILTER_MODE_PROMISCUOUS:
       filter_mode = fuchsia_hardware_network::wire::MacFilterMode::kPromiscuous;
       break;
-    case MODE_MULTICAST_PROMISCUOUS:
+    case MAC_FILTER_MODE_MULTICAST_PROMISCUOUS:
       filter_mode = fuchsia_hardware_network::wire::MacFilterMode::kMulticastPromiscuous;
       break;
-    case MODE_MULTICAST_FILTER:
+    case MAC_FILTER_MODE_MULTICAST_FILTER:
       filter_mode = fuchsia_hardware_network::wire::MacFilterMode::kMulticastFilter;
       break;
     default:
@@ -82,8 +82,8 @@ void MacAdapter::MacAddrSetMode(mode_t mode, const uint8_t* multicast_macs_list,
   mac_state_.multicast_filters.reserve(multicast_macs_count);
   while (multicast_macs_count--) {
     auto& n = mac_state_.multicast_filters.emplace_back();
-    std::copy_n(multicast_macs_list, n.octets.size(), n.octets.begin());
-    multicast_macs_list += n.octets.size();
+    std::copy_n(multicast_macs_list->octets, n.octets.size(), n.octets.begin());
+    multicast_macs_list++;
   }
   parent_->OnMacStateChanged(this);
 }

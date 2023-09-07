@@ -61,9 +61,10 @@ class MacAdapter : public ddk::MacAddrProtocol<MacAdapter>, public MacAddrDevice
   const fuchsia_net::wire::MacAddress& mac() { return mac_; }
 
   // MacAddr protocol:
-  void MacAddrGetAddress(uint8_t out_mac[MAC_SIZE]);
+  void MacAddrGetAddress(mac_address_t* out_mac);
   void MacAddrGetFeatures(features_t* out_features);
-  void MacAddrSetMode(mode_t mode, const uint8_t* multicast_macs_list, size_t multicast_macs_count);
+  void MacAddrSetMode(mac_filter_mode_t mode, const mac_address_t* multicast_macs_list,
+                      size_t multicast_macs_count);
 
   MacState GetMacState();
   mac_addr_protocol_t proto() { return {.ops = &mac_addr_protocol_ops_, .ctx = this}; }

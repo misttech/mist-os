@@ -137,13 +137,13 @@ class FakeNetworkPortImpl : public ddk::NetworkPortProtocol<FakeNetworkPortImpl>
   FakeNetworkPortImpl();
   ~FakeNetworkPortImpl();
 
-  void NetworkPortGetInfo(port_info_t* out_info);
+  void NetworkPortGetInfo(port_base_info_t* out_info);
   void NetworkPortGetStatus(port_status_t* out_status);
   void NetworkPortSetActive(bool active);
   void NetworkPortGetMac(mac_addr_protocol_t* out_mac_ifc);
   void NetworkPortRemoved();
 
-  port_info_t& port_info() { return port_info_; }
+  port_base_info_t& port_info() { return port_info_; }
   const port_status_t& status() const { return status_; }
   void AddPort(uint8_t port_id, ddk::NetworkDeviceIfcProtocolClient ifc_client);
   void RemoveSync();
@@ -153,7 +153,7 @@ class FakeNetworkPortImpl : public ddk::NetworkPortProtocol<FakeNetworkPortImpl>
     rx_types_ = {static_cast<uint8_t>(frame_type)};
   }
   void SetSupportedTxType(netdev::wire::FrameType frame_type) {
-    tx_types_ = {tx_support_t{
+    tx_types_ = {frame_type_support_t{
         .type = static_cast<uint8_t>(frame_type),
         .features = netdev::wire::kFrameFeaturesRaw,
         .supported_flags = 0,
@@ -182,13 +182,13 @@ class FakeNetworkPortImpl : public ddk::NetworkPortProtocol<FakeNetworkPortImpl>
   DISALLOW_COPY_ASSIGN_AND_MOVE(FakeNetworkPortImpl);
 
   std::array<uint8_t, netdev::wire::kMaxFrameTypes> rx_types_;
-  std::array<tx_support_t, netdev::wire::kMaxFrameTypes> tx_types_;
+  std::array<frame_type_support_t, netdev::wire::kMaxFrameTypes> tx_types_;
   ddk::NetworkDeviceIfcProtocolClient device_client_;
   OnRemovedCallback on_removed_;
   OnSetActiveCallback on_set_active_;
   uint8_t id_;
   mac_addr_protocol_t mac_proto_{};
-  port_info_t port_info_{};
+  port_base_info_t port_info_{};
   std::atomic_bool port_active_ = false;
   port_status_t status_;
   zx::event event_;
@@ -208,7 +208,7 @@ class FakeNetworkDeviceImpl : public ddk::NetworkDeviceImplProtocol<FakeNetworkD
   zx_status_t NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface);
   void NetworkDeviceImplStart(network_device_impl_start_callback callback, void* cookie);
   void NetworkDeviceImplStop(network_device_impl_stop_callback callback, void* cookie);
-  void NetworkDeviceImplGetInfo(device_info_t* out_info);
+  void NetworkDeviceImplGetInfo(device_impl_info_t* out_info);
   void NetworkDeviceImplQueueTx(const tx_buffer_t* buf_list, size_t buf_count);
   void NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buf_list, size_t buf_count);
   void NetworkDeviceImplPrepareVmo(uint8_t vmo_id, zx::vmo vmo,
@@ -235,7 +235,7 @@ class FakeNetworkDeviceImpl : public ddk::NetworkDeviceImplProtocol<FakeNetworkD
 
   const zx::event& events() const { return event_; }
 
-  device_info_t& info() { return info_; }
+  device_impl_info_t& info() { return info_; }
 
   std::unique_ptr<RxBuffer> PopRxBuffer() __TA_EXCLUDES(lock_) {
     fbl::AutoLock lock(&lock_);
@@ -320,7 +320,7 @@ class FakeNetworkDeviceImpl : public ddk::NetworkDeviceImplProtocol<FakeNetworkD
 
   fbl::Mutex lock_;
   std::array<zx::vmo, MAX_VMOS> vmos_;
-  device_info_t info_{};
+  device_impl_info_t info_{};
   ddk::NetworkDeviceIfcProtocolClient device_client_;
   fbl::SizedDoublyLinkedList<std::unique_ptr<RxBuffer>> rx_buffers_ __TA_GUARDED(lock_);
   fbl::SizedDoublyLinkedList<std::unique_ptr<TxBuffer>> tx_buffers_ __TA_GUARDED(lock_);

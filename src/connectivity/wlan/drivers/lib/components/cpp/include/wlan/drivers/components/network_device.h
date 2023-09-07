@@ -64,19 +64,19 @@ class NetworkDevice final : public ::ddk::NetworkDeviceImplProtocol<NetworkDevic
     virtual void NetDevStop(StopTxn txn) = 0;
 
     // Get information from the device about the underlying device. This includes details such as RX
-    // depth, TX depths, features supported any many others. See the device_info_t struct for more
-    // information.
-    virtual void NetDevGetInfo(device_info_t* out_info) = 0;
+    // depth, TX depths, features supported any many others. See the device_impl_info_t struct for
+    // more information.
+    virtual void NetDevGetInfo(device_impl_info_t* out_info) = 0;
 
     // Enqueue frames for transmission. A span of frames is provided which represent all the frames
     // to be sent. These frames point to the payload to be transmitted and will have any additional
-    // headroom and tailspace specified in device_info_t available. So in order to populate headers
-    // for example the driver must first call GrowHead on a frame to place the data pointer at the
-    // location where the header should be, then populate the header. Note that the lifetime of the
-    // data pointed to by the span is limited to this method call. Once this method implementation
-    // returns, the frame objects (but not the underlying data) will be lost. The driver therefore
-    // needs to make a copy of these frame objects, for example by placing them in a queue or
-    // submitting them to hardware before the method returns.
+    // headroom and tailspace specified in device_impl_info_t available. So in order to populate
+    // headers for example the driver must first call GrowHead on a frame to place the data pointer
+    // at the location where the header should be, then populate the header. Note that the lifetime
+    // of the data pointed to by the span is limited to this method call. Once this method
+    // implementation returns, the frame objects (but not the underlying data) will be lost. The
+    // driver therefore needs to make a copy of these frame objects, for example by placing them in
+    // a queue or submitting them to hardware before the method returns.
     virtual void NetDevQueueTx(cpp20::span<Frame> frames) = 0;
 
     // Enqueue available space to the device, for receiving data into. The device will provide any
@@ -163,7 +163,7 @@ class NetworkDevice final : public ::ddk::NetworkDeviceImplProtocol<NetworkDevic
       __TA_EXCLUDES(started_mutex_);
   void NetworkDeviceImplStop(network_device_impl_stop_callback callback, void* cookie)
       __TA_EXCLUDES(started_mutex_);
-  void NetworkDeviceImplGetInfo(device_info_t* out_info);
+  void NetworkDeviceImplGetInfo(device_impl_info_t* out_info);
   void NetworkDeviceImplQueueTx(const tx_buffer_t* buffers_list, size_t buffers_count)
       __TA_EXCLUDES(started_mutex_);
   void NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buffers_list, size_t buffers_count);
