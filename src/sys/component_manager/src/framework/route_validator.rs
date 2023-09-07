@@ -1275,11 +1275,12 @@ mod tests {
             let target = model.look_up(&"target".try_into().unwrap()).await.unwrap();
             target.start(&StartReason::Debug, None, vec![], vec![]).await.unwrap();
             let ns = mock_runner.get_namespace("test:///target_resolved").unwrap();
-            let mut ns = ns.lock().await;
+            let ns = ns.lock().await;
             // /pkg and /svc
-            ns.entries.sort();
-            assert_eq!(ns.entries.len(), 2);
-            let ns = ns.entries.remove(1);
+            let mut ns = ns.clone().flatten();
+            ns.sort();
+            assert_eq!(ns.len(), 2);
+            let ns = ns.remove(1);
             assert_eq!(ns.path.as_str(), "/svc");
             let svc_dir = ns.directory.into_proxy().unwrap();
             fuchsia_fs::directory::open_directory(&svc_dir, "foo.bar", fio::OpenFlags::empty())

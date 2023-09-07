@@ -25,7 +25,7 @@ use {
     fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_zircon::{self as zx, HandleBased},
     sandbox::{Message, Open},
-    serve_processargs::Namespace,
+    serve_processargs::NamespaceBuilder,
     std::{collections::HashMap, sync::Arc},
     tracing::{error, warn},
     vfs::{
@@ -46,9 +46,9 @@ pub async fn create_namespace(
     component: &Arc<ComponentInstance>,
     decl: &ComponentDecl,
     additional_entries: Vec<NamespaceEntry>,
-) -> Result<Namespace, CreateNamespaceError> {
+) -> Result<NamespaceBuilder, CreateNamespaceError> {
     let not_found_sender = serve_processargs::ignore_not_found();
-    let mut namespace = Namespace::new(not_found_sender);
+    let mut namespace = NamespaceBuilder::new(not_found_sender);
     if let Some(package) = package {
         let pkg_dir = fuchsia_fs::directory::clone_no_describe(&package.package_dir, None)
             .map_err(CreateNamespaceError::ClonePkgDirFailed)?;
@@ -65,7 +65,7 @@ pub async fn create_namespace(
 
 /// Adds the package directory to the namespace under the path "/pkg".
 fn add_pkg_directory(
-    namespace: &mut Namespace,
+    namespace: &mut NamespaceBuilder,
     pkg_dir: fio::DirectoryProxy,
 ) -> Result<(), CreateNamespaceError> {
     // TODO(https://fxbug.dev/108786): Use Proxy::into_client_end when available.
@@ -80,7 +80,7 @@ fn add_pkg_directory(
 ///
 /// This also serves all service directories.
 async fn add_use_decls(
-    namespace: &mut Namespace,
+    namespace: &mut NamespaceBuilder,
     component: &Arc<ComponentInstance>,
     decl: &ComponentDecl,
 ) -> Result<(), CreateNamespaceError> {
@@ -134,7 +134,7 @@ async fn add_use_decls(
 /// is readable, the future calls `route_storage` to forward the channel to the source
 /// component's outgoing directory and terminates.
 async fn add_storage_use(
-    namespace: &mut Namespace,
+    namespace: &mut NamespaceBuilder,
     use_: &UseDecl,
     component: &Arc<ComponentInstance>,
 ) -> Result<(), CreateNamespaceError> {
@@ -172,7 +172,7 @@ async fn add_storage_use(
 /// waiting for channel readability to hold a strong pointer to this component lest it
 /// create a reference cycle.
 fn add_directory_helper(
-    namespace: &mut Namespace,
+    namespace: &mut NamespaceBuilder,
     use_: &UseDecl,
     component: WeakComponentInstance,
 ) -> Result<(), CreateNamespaceError> {
@@ -385,7 +385,7 @@ fn add_service_or_protocol_use(
 
 /// Serves the pseudo-directories in `svc_dirs` and adds their client ends to the namespace.
 fn serve_and_add_svc_dirs(
-    namespace: &mut Namespace,
+    namespace: &mut NamespaceBuilder,
     svc_dirs: HashMap<String, Directory>,
 ) -> Result<(), CreateNamespaceError> {
     for (target_dir_path, pseudo_dir) in svc_dirs {

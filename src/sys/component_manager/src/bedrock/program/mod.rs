@@ -15,7 +15,7 @@ use fuchsia_async as fasync;
 use fuchsia_async::Task;
 use fuchsia_zircon as zx;
 use futures::{channel::oneshot, future::BoxFuture};
-use serve_processargs::{Namespace, NamespaceError};
+use serve_processargs::{BuildNamespaceError, NamespaceBuilder};
 use std::sync::Mutex;
 use thiserror::Error;
 use zx::{AsHandleRef, Koid};
@@ -148,7 +148,7 @@ pub enum StopError {
 #[derive(Error, Debug, Clone)]
 pub enum StartError {
     #[error("failed to serve namespace: {0}")]
-    ServeNamespace(NamespaceError),
+    ServeNamespace(BuildNamespaceError),
 }
 
 /// Information and capabilities used to start a program.
@@ -185,7 +185,7 @@ pub struct StartInfo {
     /// invalid.
     ///
     /// TODO(b/298106231): eventually this should become a sandbox and delivery map.
-    pub namespace: Namespace,
+    pub namespace: NamespaceBuilder,
 
     /// The directory this component serves.
     pub outgoing_dir: Option<ServerEnd<fio::DirectoryMarker>>,
@@ -229,12 +229,11 @@ impl StartInfo {
         self,
     ) -> Result<(fcrunner::ComponentStartInfo, BoxFuture<'static, ()>), StartError> {
         let (ns, fut) = self.namespace.serve().map_err(StartError::ServeNamespace)?;
-        let ns: Vec<_> = ns.into_iter().map(Into::into).collect();
         Ok((
             fcrunner::ComponentStartInfo {
                 resolved_url: Some(self.resolved_url),
                 program: Some(self.program),
-                ns: Some(ns),
+                ns: Some(ns.into()),
                 outgoing_dir: self.outgoing_dir,
                 runtime_dir: self.runtime_dir,
                 numbered_handles: Some(self.numbered_handles),

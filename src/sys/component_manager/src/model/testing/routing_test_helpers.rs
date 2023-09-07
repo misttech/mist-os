@@ -486,9 +486,9 @@ impl RoutingTest {
             .expect("component not in namespace")
             .lock()
             .await
-            .entries
-            .iter()
-            .map(|entry| entry.path.clone().into())
+            .paths()
+            .into_iter()
+            .map(Into::into)
             .collect();
 
         expected_paths.sort_unstable();
@@ -969,6 +969,7 @@ impl RoutingTestModel for RoutingTest {
 /// Contains functions to use capabilities in routing tests.
 pub mod capability_util {
     use fuchsia_fs::node::OpenError;
+    use namespace::Path as NamespacePath;
 
     use {
         super::*,
@@ -1488,17 +1489,7 @@ pub mod capability_util {
         dir_path: &str,
     ) -> fio::DirectoryProxy {
         let mut ns = namespace.lock().await;
-
-        // Find the index of our directory in the namespace, and remove the directory and path. The
-        // path is removed so that the paths/dirs aren't shuffled in the namespace.
-        let index = ns
-            .entries
-            .iter()
-            .position(|entry| entry.path.as_str() == dir_path)
-            .unwrap_or_else(|| panic!("didn't find dir {}", dir_path));
-        let entry = ns.entries.remove(index);
-        let dir_proxy = entry.directory.into_proxy().unwrap();
-        dir_proxy
+        ns.remove(&NamespacePath::new(dir_path).unwrap()).unwrap().into_proxy().unwrap()
     }
 
     /// Adds `dir_proxy` back to the namespace. Useful for restoring the namespace after a call
@@ -1511,7 +1502,7 @@ pub mod capability_util {
         let mut ns = namespace.lock().await;
         // TODO(https://fxbug.dev/108786): Use Proxy::into_client_end when available.
         let client_end = ClientEnd::new(dir_proxy.into_channel().unwrap().into_zx_channel());
-        ns.add(dir_path.try_into().unwrap(), client_end);
+        ns.add(&NamespacePath::new(dir_path).unwrap(), client_end).unwrap();
     }
 
     /// Open the exposed dir for `moniker`.

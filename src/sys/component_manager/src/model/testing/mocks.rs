@@ -7,8 +7,8 @@ use {
         bedrock::program::Program,
         builtin::runner::BuiltinRunnerFactory,
         model::{component::WeakComponentInstance, resolver::Resolver, routing::RouteRequest},
-        runner::Namespace,
     },
+    ::namespace::Namespace,
     ::routing::{
         capability_source::ComponentCapability,
         policy::ScopedPolicyChecker,

@@ -3,6 +3,3 @@
 // found in the LICENSE file.
 
 pub mod builtin;
-pub mod namespace;
-
-pub use self::namespace::Namespace;

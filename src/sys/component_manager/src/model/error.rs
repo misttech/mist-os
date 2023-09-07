@@ -845,7 +845,7 @@ pub enum CreateNamespaceError {
     InstanceNotInInstanceIdIndex(#[source] RoutingError),
 
     #[error("namespace configuration error: {0}")]
-    NamespaceError(#[from] serve_processargs::NamespaceError),
+    NamespaceError(#[from] serve_processargs::BuildNamespaceError),
 }
 
 impl CreateNamespaceError {

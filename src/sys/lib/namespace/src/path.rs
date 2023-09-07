@@ -66,9 +66,14 @@ impl Path {
             Some(_) => return Err(PathError::EmbeddedNul(str.to_owned())),
             None => {}
         };
+        Ok(Self::new_unchecked(path))
+    }
+
+    fn new_unchecked(path: impl AsRef<str> + Into<String>) -> Self {
+        let str: &str = path.as_ref();
         let dirname_idx = str.rfind('/').expect("path validation is wrong");
         let path = FlyStr::new(path);
-        Ok(Self { path, dirname_idx })
+        Self { path, dirname_idx }
     }
 
     /// Splits the path according to "/".
@@ -88,6 +93,11 @@ impl Path {
         } else {
             &self.path[0..self.dirname_idx]
         }
+    }
+
+    /// Path to the containing directory, or "/" if the path is "/", as a [`Path`].
+    pub fn dirname_ns_path(&self) -> Self {
+        Self::new_unchecked(self.dirname())
     }
 
     /// The remainder of the path after `dirname`.
@@ -164,6 +174,12 @@ impl fmt::Display for Path {
         let str: &str = self.as_ref();
         str.fmt(f)
     }
+}
+
+/// Make a [`NamespacePath`] from a string in tests or crash if invalid.
+#[cfg(test)]
+pub fn ns_path(str: &str) -> Path {
+    Path::new(str).unwrap()
 }
 
 #[cfg(test)]

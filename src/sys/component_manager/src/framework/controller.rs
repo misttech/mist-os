@@ -51,7 +51,7 @@ pub async fn serve_controller(
                     stop_payload: None,
                 };
                 let numbered_handles = args.numbered_handles.take().unwrap_or_default();
-                let Ok(namespace): Result<crate::runner::Namespace, _> =
+                let Ok(namespace): Result<namespace::Namespace, _> =
                     args.namespace_entries.take().unwrap_or_default().try_into() else {
                         responder.send(Err(fcomponent::Error::InvalidArguments))?;
                         continue;

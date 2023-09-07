@@ -16,7 +16,7 @@ use {
 
 mod namespace;
 
-pub use crate::namespace::{ignore_not_found, Namespace, NamespaceError};
+pub use crate::namespace::{ignore_not_found, BuildNamespaceError, NamespaceBuilder};
 
 /// How to deliver a particular capability from a dict to an Elf process. Broadly speaking,
 /// one could either deliver a capability using namespace entries, or using numbered handles.
@@ -88,7 +88,7 @@ pub fn add_to_processargs(
     not_found: UnboundedSender<String>,
 ) -> Result<BoxFuture<'static, ()>, DeliveryError> {
     let mut futures: Vec<BoxFuture<'static, ()>> = Vec::new();
-    let mut namespace = Namespace::new(not_found);
+    let mut namespace = NamespaceBuilder::new(not_found);
 
     // Iterate over the delivery map.
     // Take entries away from dict and install them accordingly.
@@ -106,7 +106,7 @@ pub fn add_to_processargs(
     })?;
 
     let (namespace, namespace_fut) = namespace.serve().map_err(DeliveryError::NamespaceError)?;
-    let namespace: Vec<_> = namespace.into_iter().map(Into::into).collect();
+    let namespace: Vec<_> = namespace.into();
     processargs.namespace_entries.extend(namespace);
     futures.push(namespace_fut);
 
@@ -132,7 +132,7 @@ pub enum DeliveryError {
     UnsupportedHandleType(HandleType),
 
     #[error("namespace configuration error: `{0}`")]
-    NamespaceError(namespace::NamespaceError),
+    NamespaceError(namespace::BuildNamespaceError),
 }
 
 fn translate_handle(
@@ -243,7 +243,7 @@ mod tests {
 
     use {
         super::*,
-        crate::namespace::{ignore_not_found as ignore, NamespaceError},
+        crate::namespace::{ignore_not_found as ignore, BuildNamespaceError},
         anyhow::Result,
         assert_matches::assert_matches,
         fidl::endpoints::{Proxy, ServerEnd},
@@ -595,7 +595,7 @@ mod tests {
 
         assert_matches!(
             add_to_processargs(dict, &mut processargs, &delivery_map, ignore()).err().unwrap(),
-            DeliveryError::NamespaceError(NamespaceError::TryIntoDirectoryError {
+            DeliveryError::NamespaceError(BuildNamespaceError::TryIntoDirectoryError {
                 path, ..
             })
             if path.as_ref() == "/svc"

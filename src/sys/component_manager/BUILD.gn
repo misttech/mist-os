@@ -235,7 +235,6 @@ rustc_binary("bin") {
     "src/root_stop_notifier.rs",
     "src/runner/builtin.rs",
     "src/runner/mod.rs",
-    "src/runner/namespace.rs",
     "src/sandbox_util.rs",
     "src/startup.rs",
   ]

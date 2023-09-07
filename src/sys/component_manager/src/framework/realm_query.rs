@@ -492,9 +492,8 @@ async fn construct_namespace(
             let namespace =
                 create_namespace(r.package(), &instance, r.decl(), vec![]).await.unwrap();
             let (ns, fut) = namespace.serve().unwrap();
-            let ns: Vec<_> = ns.into_iter().map(Into::into).collect();
             instance.nonblocking_task_group().spawn(fut).await;
-            Ok(ns)
+            Ok(ns.into())
         }
         _ => Err(fsys::ConstructNamespaceError::InstanceNotResolved),
     }
