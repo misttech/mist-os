@@ -417,7 +417,6 @@ pub struct BuiltinEnvironment {
     // Framework capabilities.
     pub utc_time_maintainer: Option<Arc<UtcTimeMaintainer>>,
     pub vmex_resource: Option<Arc<VmexResource>>,
-    pub svc_stash_provider: Option<Arc<SvcStashCapability>>,
 
     pub binder_capability_host: Arc<BinderCapabilityHost>,
     pub realm_capability_host: Arc<RealmCapabilityHost>,
@@ -532,8 +531,10 @@ impl BuiltinEnvironment {
         let svc_stash_provider = take_startup_handle(HandleInfo::new(HandleType::User0, 0))
             .map(zx::Channel::from)
             .map(SvcStashCapability::new);
-        if let Some(svc_stash_provider) = svc_stash_provider.as_ref() {
-            model.root().hooks.install(svc_stash_provider.hooks()).await;
+        if let Some(svc_stash_provider) = svc_stash_provider {
+            sandbox_builder.add_builtin_protocol_if_enabled::<fboot::SvcStashProviderMarker>(
+                move |stream| svc_stash_provider.clone().serve(stream).boxed(),
+            );
         }
 
         // Set up BootArguments service.
@@ -944,7 +945,6 @@ impl BuiltinEnvironment {
         Ok(BuiltinEnvironment {
             model,
             vmex_resource,
-            svc_stash_provider,
             utc_time_maintainer,
             binder_capability_host,
             realm_capability_host,
