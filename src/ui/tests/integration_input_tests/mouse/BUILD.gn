@@ -77,7 +77,7 @@ fuchsia_test_package("mouse-input-test") {
 
     # Launched in the test realm for hermeticity.
     "//src/cobalt/bin/testing/mock_cobalt",
-    "//src/connectivity/network/netstack:component",
+    "//src/connectivity/network:netstack-for-tests",
     "//src/developer/build_info/testing:fake-build-info-component",
     "//src/developer/memory/monitor:component",
     "//src/fonts:font_provider_hermetic_for_test",
