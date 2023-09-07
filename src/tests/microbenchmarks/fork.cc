@@ -5,18 +5,17 @@
 #include <lib/syslog/cpp/macros.h>
 #include <stdlib.h>
 #include <sys/mman.h>
-#include <sys/syscall.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include <atomic>
-#include <new>
 #include <vector>
 
 #include <fbl/string_printf.h>
-#include <linux/futex.h>
 #include <perftest/perftest.h>
+
+#include "scoped_mapping.h"
+#include "simple_latch.h"
 
 namespace {
 
@@ -28,83 +27,13 @@ void WaitForChild(pid_t pid) {
   FX_CHECK(WEXITSTATUS(status) == 0);
 }
 
-// ScopedMapping returns an mmapped region of memory that gets unmapped when it
-// goes out of scope.
-class ScopedMapping {
- public:
-  ScopedMapping(size_t size, int flags) : size_(size) {
-    void* addr = mmap(NULL, size_, PROT_READ | PROT_WRITE, flags, -1, 0);
-    FX_CHECK(addr != MAP_FAILED);
-    base_ = reinterpret_cast<uintptr_t>(addr);
-  }
-
-  ~ScopedMapping() { reset(); }
-
-  ScopedMapping(const ScopedMapping&) = delete;
-  ScopedMapping& operator=(const ScopedMapping&) = delete;
-
-  uintptr_t base() const { return base_; }
-
-  size_t size() const { return size_; }
-
- private:
-  void reset() {
-    if (base_ != 0 && size_ != 0) {
-      FX_CHECK(munmap(reinterpret_cast<void*>(base_), size_) == 0);
-      base_ = 0;
-      size_ = 0;
-    }
-  }
-
-  uintptr_t base_;
-  size_t size_;
-};
-
-// A wrapper for the futex system call, that only supports FUTEX_WAIT and
-// FUTEX_WAKE, without timeout.
-long SimpleFutex(std::atomic<uint32_t>* uaddr, int futex_op, uint32_t val) {
-  return syscall(SYS_futex, reinterpret_cast<uint32_t*>(uaddr), futex_op, val, NULL, NULL, 0);
-}
-
-// A class similar to std::latch that works across processes.
-// std::latch is not guaranteed to work across processes.
-class Latch {
- public:
-  Latch(size_t expected) : pending_(expected), done_(0) { FX_CHECK(expected > 0); }
-
-  // Decrement the counter atomically, in a non-blocking manner.
-  void CountDown() {
-    if (pending_.fetch_sub(1) == 1) {
-      done_ = 1;
-      long res = SimpleFutex(&done_, FUTEX_WAKE, INT_MAX);
-      FX_CHECK(res >= 0);
-    }
-  }
-
-  // Blocks until the counter reaches 0.
-  void Wait() {
-    while (done_ == 0) {
-      long res = SimpleFutex(&done_, FUTEX_WAIT, 0);
-      FX_CHECK(res == 0 || (res == -1 && errno == EAGAIN));
-    }
-    FX_CHECK(pending_ == 0);
-  }
-
-  Latch(const Latch&) = delete;
-  Latch& operator=(const Latch&) = delete;
-
- private:
-  std::atomic<size_t> pending_;
-  std::atomic<uint32_t> done_;
-};
-
 class Sync {
  public:
   // main process will wait on pending_children
-  Latch pending_children;
+  SimpleLatch pending_children;
 
   // children will wait on parent_done before exiting.
-  Latch parent_done;
+  SimpleLatch parent_done;
 
   Sync(size_t expected_children) : pending_children(expected_children), parent_done(1) {}
 };
@@ -117,7 +46,8 @@ class Sync {
 // and signaling until the child process finishes.
 bool Fork(perftest::RepeatState* state) {
   // Use a shared mapping to synchronize with the parent process.
-  ScopedMapping mapping(sizeof(Sync), MAP_SHARED | MAP_ANONYMOUS | MAP_POPULATE);
+  ScopedMapping mapping(sizeof(Sync), PROT_READ | PROT_WRITE,
+                        MAP_SHARED | MAP_ANONYMOUS | MAP_POPULATE);
   state->DeclareStep("fork");
   state->DeclareStep("wait");
 
@@ -155,7 +85,8 @@ bool ForkMultiple(perftest::RepeatState* state, size_t n) {
   std::vector<pid_t> pids(n, -1);
 
   // Use a shared mapping to synchronize with the parent process.
-  ScopedMapping mapping(sizeof(Sync), MAP_SHARED | MAP_ANONYMOUS | MAP_POPULATE);
+  ScopedMapping mapping(sizeof(Sync), PROT_READ | PROT_WRITE,
+                        MAP_SHARED | MAP_ANONYMOUS | MAP_POPULATE);
 
   state->DeclareStep("fork");
   state->DeclareStep("wait");
@@ -224,7 +155,8 @@ pid_t ForkRecursive(Sync* sync, size_t n) {
 // and signaling until all the child processes have finished.
 bool ForkMultipleNested(perftest::RepeatState* state, size_t n) {
   // Use a shared mapping to synchronize with the parent process.
-  ScopedMapping mapping(sizeof(Sync), MAP_SHARED | MAP_ANONYMOUS | MAP_POPULATE);
+  ScopedMapping mapping(sizeof(Sync), PROT_READ | PROT_WRITE,
+                        MAP_SHARED | MAP_ANONYMOUS | MAP_POPULATE);
 
   state->DeclareStep("fork");
   state->DeclareStep("wait");
