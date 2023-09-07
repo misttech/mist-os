@@ -25,11 +25,6 @@
         moniker: "core/cobalt_system_metrics",
     },
     {
-        id: 108,
-        label: "App Manager",
-        moniker: "core/appmgr",
-    },
-    {
         id: 109,
         label: "Cobalt",
         moniker: "core/cobalt",
