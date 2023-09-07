@@ -153,17 +153,23 @@ where
         info!(tag = "api", "Got leave command");
 
         let task = async {
-            let driver_state = self.driver_state.lock();
-            let ot_instance = &driver_state.ot_instance;
+            {
+                let driver_state = self.driver_state.lock();
+                let ot_instance = &driver_state.ot_instance;
 
-            ot_instance.thread_set_enabled(false)?;
-            ot_instance.ip6_set_enabled(false)?;
-            ot_instance.dataset_set_active(&ot::OperationalDataset::empty())?;
-            ot_instance.erase_persistent_info()?;
+                ot_instance.thread_set_enabled(false)?;
+                ot_instance.ip6_set_enabled(false)?;
+                ot_instance.dataset_set_active(&ot::OperationalDataset::empty())?;
+                ot_instance.erase_persistent_info()?;
 
-            if ot_instance.is_commissioned() {
-                return Err(format_err!("Unable to fully clear dataset"));
+                if ot_instance.is_commissioned() {
+                    return Err(format_err!("Unable to fully clear dataset"));
+                }
             }
+
+            // Go ahead and make sure that the connectivity state is
+            // updated quickly so that we don't cause problems later on.
+            self.update_connectivity_state();
 
             Ok(())
         };
@@ -789,11 +795,16 @@ where
         );
         const DELAY_TIMER_MS: u32 = 300 * 1000;
 
-        let dataset_tlvs = ot::OperationalDatasetTlvs::try_from_slice(dataset_raw)
-            .map_err(|e| ZxStatus::from(ErrorAdapter(e)))?;
+        let dataset_tlvs =
+            ot::OperationalDatasetTlvs::try_from_slice(dataset_raw).map_err(|e| {
+                warn!(tag = "api", "attach_all_nodes_to: WrongSize");
+                ZxStatus::from(ErrorAdapter(e))
+            })?;
 
-        let mut dataset =
-            dataset_tlvs.try_to_dataset().map_err(|e| ZxStatus::from(ErrorAdapter(e)))?;
+        let mut dataset = dataset_tlvs.try_to_dataset().map_err(|e| {
+            warn!(tag = "api", "attach_all_nodes_to: Unable to parse: {e:?}");
+            ZxStatus::from(ErrorAdapter(e))
+        })?;
 
         if !dataset.is_complete() {
             warn!(tag = "api", "attach_all_nodes_to: Given dataset not complete: {:?}", dataset);
@@ -817,6 +828,7 @@ where
             let driver_state = self.driver_state.lock();
 
             if !driver_state.is_active() {
+                warn!(tag = "api", "attach_all_nodes_to: Driver is not active, cannot continue.");
                 return Err(ZxStatus::BAD_STATE);
             }
 
@@ -844,8 +856,14 @@ where
         future
             .map(|result| match result {
                 Ok(Ok(())) => Ok(i64::from(DELAY_TIMER_MS)),
-                Ok(Err(e)) => Err(ZxStatus::from(ErrorAdapter(e))),
-                Err(e) => Err(ZxStatus::from(ErrorAdapter(e))),
+                Ok(Err(e)) => {
+                    warn!(tag = "api", "attach_all_nodes_to: Error: {:?}", e);
+                    Err(ZxStatus::from(ErrorAdapter(e)))
+                }
+                Err(e) => {
+                    warn!(tag = "api", "attach_all_nodes_to: Error: {:?}", e);
+                    Err(ZxStatus::from(ErrorAdapter(e)))
+                }
             })
             .on_timeout(fasync::Time::after(DEFAULT_TIMEOUT), || {
                 error!(tag = "api", "attach_all_nodes_to: Timeout");
