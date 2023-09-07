@@ -1614,8 +1614,7 @@ impl ResolvedInstanceState {
             if let Ok(stream) = controller.into_stream() {
                 child
                     .nonblocking_task_group()
-                    .spawn(controller::run_controller(WeakComponentInstance::new(&child), stream))
-                    .await;
+                    .spawn(controller::run_controller(WeakComponentInstance::new(&child), stream));
             }
         }
         self.children.insert(child_moniker, child.clone());
@@ -1853,14 +1852,11 @@ impl Runtime {
                 let mut actions = component.lock_actions().await;
                 let stop_nf = actions.register_no_wait(&component, StopAction::new(false));
                 drop(actions);
-                component
-                    .nonblocking_task_group()
-                    .spawn(fasync::Task::spawn(async move {
-                        let _ = stop_nf.await.map_err(
-                            |err| warn!(%err, "Watching for program termination: Stop failed"),
-                        );
-                    }))
-                    .await;
+                component.nonblocking_task_group().spawn(fasync::Task::spawn(async move {
+                    let _ = stop_nf.await.map_err(
+                        |err| warn!(%err, "Watching for program termination: Stop failed"),
+                    );
+                }));
             }
         });
         self.exit_listener = Some(exit_listener);

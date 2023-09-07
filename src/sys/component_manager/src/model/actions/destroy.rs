@@ -516,7 +516,7 @@ pub mod tests {
             }
             task_done_tx.try_send(()).unwrap();
         };
-        component_a.blocking_task_group().spawn(fut).await;
+        component_a.blocking_task_group().spawn(fut);
 
         let mock_action_key = ActionKey::Start;
         let (mock_action, mut mock_action_unblocker) = MockAction::new(

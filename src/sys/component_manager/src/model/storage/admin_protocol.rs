@@ -193,13 +193,11 @@ impl CapabilityProvider for StorageAdminProtocolProvider {
         let storage_decl = self.storage_decl.clone();
         let component = self.component.clone();
         let storage_admin = self.storage_admin.clone();
-        task_group
-            .spawn(async move {
-                if let Err(error) = storage_admin.serve(storage_decl, component, server_end).await {
-                    warn!(?error, "failed to serve storage admin protocol");
-                }
-            })
-            .await;
+        task_group.spawn(async move {
+            if let Err(error) = storage_admin.serve(storage_decl, component, server_end).await {
+                warn!(?error, "failed to serve storage admin protocol");
+            }
+        });
         Ok(())
     }
 }

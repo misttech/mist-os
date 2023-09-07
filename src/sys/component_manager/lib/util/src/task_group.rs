@@ -4,20 +4,29 @@
 
 use {
     fuchsia_async as fasync,
-    futures::{lock::Mutex, Future},
-    std::sync::{Arc, Weak},
+    futures::Future,
+    std::{
+        fmt,
+        sync::{self, Arc, Weak},
+    },
 };
 
 /// A simple wrapper for `TaskGroup` that stores the `TaskGroup` in an `Arc` so it can be passed
 /// between threads.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct TaskGroup {
-    task_group: Arc<Mutex<Option<fasync::TaskGroup>>>,
+    task_group: Arc<sync::Mutex<Option<fasync::TaskGroup>>>,
+}
+
+impl fmt::Debug for TaskGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TaskGroup").finish()
+    }
 }
 
 impl TaskGroup {
     pub fn new() -> Self {
-        Self { task_group: Arc::new(Mutex::new(Some(fasync::TaskGroup::new()))) }
+        Self { task_group: Arc::new(sync::Mutex::new(Some(fasync::TaskGroup::new()))) }
     }
 
     /// Creates a new WeakTaskGroup from this group.
@@ -33,8 +42,8 @@ impl TaskGroup {
     ///
     /// `spawn` may panic if not called in the context of an executor (e.g.
     /// within a call to `run` or `run_singlethreaded`).
-    pub async fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) {
-        let mut task_group = self.task_group.lock().await;
+    pub fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) {
+        let mut task_group = self.task_group.lock().unwrap();
         if let Some(task_group) = task_group.as_mut() {
             task_group.spawn(future);
         }
@@ -43,9 +52,11 @@ impl TaskGroup {
     /// Waits for all Tasks in this TaskGroup to finish. Prevents future tasks from being spawned
     /// if there's another task that holds a clone of this TaskGroup.
     pub async fn join(self) {
-        let mut task_group_lock = self.task_group.lock().await;
-        if let Some(task_group) = task_group_lock.take() {
-            drop(task_group_lock);
+        let task_group = {
+            let mut task_group_lock = self.task_group.lock().unwrap();
+            task_group_lock.take()
+        };
+        if let Some(task_group) = task_group {
             task_group.join().await;
         }
     }
@@ -57,16 +68,16 @@ impl TaskGroup {
 /// between the task group and tasks on the task group.
 #[derive(Debug, Clone)]
 pub struct WeakTaskGroup {
-    task_group: Weak<Mutex<Option<fasync::TaskGroup>>>,
+    task_group: Weak<sync::Mutex<Option<fasync::TaskGroup>>>,
 }
 
 impl WeakTaskGroup {
     /// Adds a task to the group this WeakTaskGroup was created from. The task is dropped if there
     /// are no more strong references to the original task group.
-    pub async fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) {
+    pub fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) {
         if let Some(task_group) = self.task_group.upgrade() {
             let temp_task_group = TaskGroup { task_group };
-            temp_task_group.spawn(future).await;
+            temp_task_group.spawn(future);
         }
     }
 }

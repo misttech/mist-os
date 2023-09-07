@@ -312,11 +312,9 @@ impl CapabilityProvider for LifecycleControllerCapabilityProvider {
         let server_end = ServerEnd::<fsys::LifecycleControllerMarker>::new(server_end);
         let stream: fsys::LifecycleControllerRequestStream =
             server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
-        task_group
-            .spawn(async move {
-                self.control.serve(self.scope_moniker, stream).await;
-            })
-            .await;
+        task_group.spawn(async move {
+            self.control.serve(self.scope_moniker, stream).await;
+        });
 
         Ok(())
     }

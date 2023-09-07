@@ -418,11 +418,9 @@ impl CapabilityProvider for RouteValidatorCapabilityProvider {
         let server_end = ServerEnd::<fsys::RouteValidatorMarker>::new(server_end);
         let stream: fsys::RouteValidatorRequestStream =
             server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
-        task_group
-            .spawn(async move {
-                self.query.serve(self.scope_moniker, stream).await;
-            })
-            .await;
+        task_group.spawn(async move {
+            self.query.serve(self.scope_moniker, stream).await;
+        });
 
         Ok(())
     }

@@ -159,17 +159,15 @@ impl CapabilityProvider for EventSource {
         };
         let server_end = channel::take_channel(server_end);
         let stream = ServerEnd::<fcomponent::EventStreamMarker>::new(server_end);
-        task_group
-            .spawn(async move {
-                let moniker = self.subscriber.extended_moniker();
-                if let Ok(Some(event_stream)) = self
-                    .subscribe_all(moniker, relative_path.into_os_string().into_string().unwrap())
-                    .await
-                {
-                    serve_event_stream(event_stream, stream).await;
-                }
-            })
-            .await;
+        task_group.spawn(async move {
+            let moniker = self.subscriber.extended_moniker();
+            if let Ok(Some(event_stream)) = self
+                .subscribe_all(moniker, relative_path.into_os_string().into_string().unwrap())
+                .await
+            {
+                serve_event_stream(event_stream, stream).await;
+            }
+        });
         Ok(())
     }
 }

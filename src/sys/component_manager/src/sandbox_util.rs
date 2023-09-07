@@ -155,13 +155,11 @@ impl LaunchTaskOnReceive {
             let message = self.receiver.receive().await;
             let task_name = self.task_name.clone();
             let fut = (self.task_to_launch)(message);
-            self.task_group
-                .spawn(async move {
-                    if let Err(error) = fut.await {
-                        warn!(%error, "{} failed", task_name);
-                    }
-                })
-                .await;
+            self.task_group.spawn(async move {
+                if let Err(error) = fut.await {
+                    warn!(%error, "{} failed", task_name);
+                }
+            });
         }
     }
 }

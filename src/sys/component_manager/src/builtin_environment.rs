@@ -942,7 +942,7 @@ impl BuiltinEnvironment {
 
         let (sandbox, builtin_receivers_task) = sandbox_builder.build();
         let builtin_receivers_task_group = TaskGroup::new();
-        builtin_receivers_task_group.spawn(builtin_receivers_task).await;
+        builtin_receivers_task_group.spawn(builtin_receivers_task);
 
         Ok(BuiltinEnvironment {
             model,
@@ -991,14 +991,9 @@ impl BuiltinEnvironment {
                 let scope = scope.clone();
                 // Spawn a short-lived task that adds the lifecycle controller serve to
                 // component manager's task scope.
-                fasync::Task::spawn(async move {
-                    scope
-                        .spawn(async move {
-                            lifecycle_controller.serve(Moniker::root(), stream).await;
-                        })
-                        .await;
-                })
-                .detach();
+                scope.spawn(async move {
+                    lifecycle_controller.serve(Moniker::root(), stream).await;
+                });
             });
         }
 
@@ -1011,14 +1006,9 @@ impl BuiltinEnvironment {
                 let scope = scope.clone();
                 // Spawn a short-lived task that adds the realm query serve to
                 // component manager's task scope.
-                fasync::Task::spawn(async move {
-                    scope
-                        .spawn(async move {
-                            realm_query.serve(Moniker::root(), stream).await;
-                        })
-                        .await;
-                })
-                .detach();
+                scope.spawn(async move {
+                    realm_query.serve(Moniker::root(), stream).await;
+                });
             });
         }
 
@@ -1217,7 +1207,7 @@ impl BuiltinEnvironment {
             Box::new(move |message| task_to_launch(message.take_handle_as_stream::<P>()).boxed()),
         );
 
-        self._builtin_receivers_task_group.spawn(launch_task_on_receive.run()).await;
+        self._builtin_receivers_task_group.spawn(launch_task_on_receive.run());
     }
 
     #[cfg(test)]

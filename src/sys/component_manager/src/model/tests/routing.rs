@@ -97,14 +97,12 @@ async fn use_framework_service() {
                 .expect("could not convert channel into stream");
             let scope_moniker = self.scope_moniker.clone();
             let host = self.host.clone();
-            task_group
-                .spawn(async move {
-                    if let Err(e) = host.serve(scope_moniker, stream).await {
-                        // TODO: Set an epitaph to indicate this was an unexpected error.
-                        warn!("serve_realm failed: {}", e);
-                    }
-                })
-                .await;
+            task_group.spawn(async move {
+                if let Err(e) = host.serve(scope_moniker, stream).await {
+                    // TODO: Set an epitaph to indicate this was an unexpected error.
+                    warn!("serve_realm failed: {}", e);
+                }
+            });
             Ok(())
         }
     }

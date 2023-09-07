@@ -69,23 +69,21 @@ impl CapabilityProvider for RealmCapabilityProvider {
         let server_end = ServerEnd::<fcomponent::RealmMarker>::new(server_end);
         let stream: fcomponent::RealmRequestStream =
             server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
-        task_group
-            .spawn(async move {
-                // We only need to look up the component matching this scope.
-                // These operations should all work, even if the component is not running.
-                if let Some(model) = host.model.upgrade() {
-                    if let Ok(component) = model.look_up(&self.scope_moniker).await {
-                        let weak = WeakComponentInstance::new(&component);
-                        drop(component);
-                        let serve_result = host.serve(weak, stream).await;
-                        if let Err(error) = serve_result {
-                            // TODO: Set an epitaph to indicate this was an unexpected error.
-                            warn!(%error, "serve failed");
-                        }
+        task_group.spawn(async move {
+            // We only need to look up the component matching this scope.
+            // These operations should all work, even if the component is not running.
+            if let Some(model) = host.model.upgrade() {
+                if let Ok(component) = model.look_up(&self.scope_moniker).await {
+                    let weak = WeakComponentInstance::new(&component);
+                    drop(component);
+                    let serve_result = host.serve(weak, stream).await;
+                    if let Err(error) = serve_result {
+                        // TODO: Set an epitaph to indicate this was an unexpected error.
+                        warn!(%error, "serve failed");
                     }
                 }
-            })
-            .await;
+            }
+        });
         Ok(())
     }
 }

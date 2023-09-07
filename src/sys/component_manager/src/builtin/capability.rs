@@ -148,17 +148,15 @@ impl<B: 'static + BuiltinCapability + Sync + Send> CapabilityProvider
         let server_end = ServerEnd::<B::Marker>::new(server_end);
         let stream =
             server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
-        task_group
-            .spawn(async move {
-                if let Some(capability) = self.capability.upgrade() {
-                    if let Err(error) = capability.serve(stream).await {
-                        warn!(protocol=%B::NAME, %error, "open failed");
-                    }
-                } else {
-                    warn!(protocol=%B::NAME, "handle dropped");
+        task_group.spawn(async move {
+            if let Some(capability) = self.capability.upgrade() {
+                if let Err(error) = capability.serve(stream).await {
+                    warn!(protocol=%B::NAME, %error, "open failed");
                 }
-            })
-            .await;
+            } else {
+                warn!(protocol=%B::NAME, "handle dropped");
+            }
+        });
         Ok(())
     }
 }

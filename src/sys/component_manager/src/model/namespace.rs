@@ -189,7 +189,7 @@ fn add_directory_helper(
     let flags = flags | fio::OpenFlags::DIRECTORY;
 
     let use_ = use_.clone();
-    let open_fn = move |scope: vfs::execution_scope::ExecutionScope,
+    let open_fn = move |_scope: vfs::execution_scope::ExecutionScope,
                         flags: fio::OpenFlags,
                         relative_path: vfs::path::Path,
                         server_end: zx::Channel| {
@@ -207,18 +207,13 @@ fn add_directory_helper(
         let use_ = use_.clone();
         // Spawn a separate task to perform routing in the blocking scope. This way it won't
         // block namespace teardown, but it will block component destruction.
-        scope.spawn(async move {
-            target
-                .blocking_task_group()
-                .spawn(route_directory(
-                    target,
-                    use_.clone(),
-                    relative_path.into_string(),
-                    flags,
-                    server_end,
-                ))
-                .await
-        });
+        target.blocking_task_group().spawn(route_directory(
+            target,
+            use_.clone(),
+            relative_path.into_string(),
+            flags,
+            server_end,
+        ));
     };
 
     let open = Open::new(open_fn, fio::DirentType::Directory, flags);
@@ -276,7 +271,7 @@ fn add_service_or_protocol_use(
 ) {
     let not_found_component_copy = component.clone();
     let use_clone = use_.clone();
-    let route_open_fn = move |scope: ExecutionScope,
+    let route_open_fn = move |_scope: ExecutionScope,
                               flags: fio::OpenFlags,
                               relative_path: Path,
                               server_end: ServerEnd<fio::NodeMarker>| {
@@ -360,7 +355,7 @@ fn add_service_or_protocol_use(
                 .await;
             }
         };
-        scope.spawn(async move { component.blocking_task_group().spawn(task).await })
+        component.blocking_task_group().spawn(task)
     };
 
     let service_dir =

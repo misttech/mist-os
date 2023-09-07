@@ -306,14 +306,12 @@ impl CapabilityProvider for ComponentResolverCapabilityProvider {
         let server_end = ServerEnd::<fresolution::ResolverMarker>::new(server_end);
         let stream: fresolution::ResolverRequestStream =
             server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
-        task_group
-            .spawn(async move {
-                let result = self.component_resolver.serve(stream).await;
-                if let Err(error) = result {
-                    tracing::warn!(%error, "FuchsiaBootResolver::serve failed: {:?}", error);
-                }
-            })
-            .await;
+        task_group.spawn(async move {
+            let result = self.component_resolver.serve(stream).await;
+            if let Err(error) = result {
+                tracing::warn!(%error, "FuchsiaBootResolver::serve failed: {:?}", error);
+            }
+        });
         Ok(())
     }
 }

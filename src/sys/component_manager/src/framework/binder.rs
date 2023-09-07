@@ -62,30 +62,28 @@ impl CapabilityProvider for BinderCapabilityProvider {
         let source = self.source.clone();
         let server_end = channel::take_channel(server_end);
 
-        task_group
-            .spawn(async move {
-                let source = match source.upgrade().map_err(|e| ModelError::from(e)) {
-                    Ok(source) => source,
-                    Err(err) => {
-                        report_routing_failure_to_target(target, err, server_end).await;
-                        return;
-                    }
-                };
-
-                let start_reason = StartReason::AccessCapability {
-                    target: target.moniker.clone(),
-                    name: BINDER_SERVICE.clone(),
-                };
-                match source.start(&start_reason, None, vec![], vec![]).await {
-                    Ok(_) => {
-                        source.scope_to_runtime(server_end).await;
-                    }
-                    Err(err) => {
-                        report_routing_failure_to_target(target, err.into(), server_end).await;
-                    }
+        task_group.spawn(async move {
+            let source = match source.upgrade().map_err(|e| ModelError::from(e)) {
+                Ok(source) => source,
+                Err(err) => {
+                    report_routing_failure_to_target(target, err, server_end).await;
+                    return;
                 }
-            })
-            .await;
+            };
+
+            let start_reason = StartReason::AccessCapability {
+                target: target.moniker.clone(),
+                name: BINDER_SERVICE.clone(),
+            };
+            match source.start(&start_reason, None, vec![], vec![]).await {
+                Ok(_) => {
+                    source.scope_to_runtime(server_end).await;
+                }
+                Err(err) => {
+                    report_routing_failure_to_target(target, err.into(), server_end).await;
+                }
+            }
+        });
         Ok(())
     }
 }

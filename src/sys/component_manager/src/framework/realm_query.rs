@@ -262,11 +262,9 @@ impl CapabilityProvider for RealmQueryCapabilityProvider {
         let server_end = ServerEnd::<fsys::RealmQueryMarker>::new(server_end);
         let stream: fsys::RealmQueryRequestStream =
             server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
-        task_group
-            .spawn(async move {
-                self.query.serve(self.scope_moniker, stream).await;
-            })
-            .await;
+        task_group.spawn(async move {
+            self.query.serve(self.scope_moniker, stream).await;
+        });
 
         Ok(())
     }
@@ -362,7 +360,7 @@ pub async fn get_resolved_declaration(
 
     // Attach the iterator task to the scope root.
     let task_group = scope_root.nonblocking_task_group();
-    task_group.spawn(serve_manifest_bytes_iterator(server_end, bytes)).await;
+    task_group.spawn(serve_manifest_bytes_iterator(server_end, bytes));
 
     Ok(client_end)
 }
@@ -442,7 +440,7 @@ async fn resolve_declaration(
     // Attach the iterator task to the scope root.
     trace!("spawning bytes iterator task");
     let task_group = scope_root.nonblocking_task_group();
-    task_group.spawn(serve_manifest_bytes_iterator(server_end, bytes)).await;
+    task_group.spawn(serve_manifest_bytes_iterator(server_end, bytes));
     Ok(client_end)
 }
 
@@ -492,7 +490,7 @@ async fn construct_namespace(
             let namespace =
                 create_namespace(r.package(), &instance, r.decl(), vec![]).await.unwrap();
             let (ns, fut) = namespace.serve().unwrap();
-            instance.nonblocking_task_group().spawn(fut).await;
+            instance.nonblocking_task_group().spawn(fut);
             Ok(ns.into())
         }
         _ => Err(fsys::ConstructNamespaceError::InstanceNotResolved),
@@ -616,18 +614,16 @@ async fn connect_to_storage_admin(
         }
     };
 
-    task_group
-        .spawn(async move {
-            if let Err(error) = Arc::new(storage_admin)
-                .serve(storage_decl, instance.as_weak(), server_end.into_channel().into())
-                .await
-            {
-                warn!(
-                    %moniker, %error, "StorageAdmin created by LifecycleController failed to serve",
-                );
-            };
-        })
-        .await;
+    task_group.spawn(async move {
+        if let Err(error) = Arc::new(storage_admin)
+            .serve(storage_decl, instance.as_weak(), server_end.into_channel().into())
+            .await
+        {
+            warn!(
+                %moniker, %error, "StorageAdmin created by LifecycleController failed to serve",
+            );
+        };
+    });
     Ok(())
 }
 
@@ -659,7 +655,7 @@ async fn get_all_instances(
 
     // Attach the iterator task to the scope root.
     let task_group = scope_root.nonblocking_task_group();
-    task_group.spawn(serve_instance_iterator(server_end, instances)).await;
+    task_group.spawn(serve_instance_iterator(server_end, instances));
 
     Ok(client_end)
 }

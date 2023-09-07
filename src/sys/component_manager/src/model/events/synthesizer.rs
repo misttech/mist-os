@@ -130,25 +130,23 @@ impl SynthesisTask {
         if self.event_infos.is_empty() {
             return;
         }
-        scope
-            .spawn(async move {
-                // If we can't find the component then we can't synthesize events.
-                // This isn't necessarily an error as the model or component might've been
-                // destroyed in the intervening time, so we just exit early.
-                if let Some(model) = self.model.upgrade() {
-                    let sender = self.sender;
-                    let futs = self
-                        .event_infos
-                        .into_iter()
-                        .map(|event_info| Self::run(&model, sender.clone(), event_info));
-                    for result in join_all(futs).await {
-                        if let Err(error) = result {
-                            error!(?error, "Event synthesis failed");
-                        }
+        scope.spawn(async move {
+            // If we can't find the component then we can't synthesize events.
+            // This isn't necessarily an error as the model or component might've been
+            // destroyed in the intervening time, so we just exit early.
+            if let Some(model) = self.model.upgrade() {
+                let sender = self.sender;
+                let futs = self
+                    .event_infos
+                    .into_iter()
+                    .map(|event_info| Self::run(&model, sender.clone(), event_info));
+                for result in join_all(futs).await {
+                    if let Err(error) = result {
+                        error!(?error, "Event synthesis failed");
                     }
                 }
-            })
-            .await;
+            }
+        });
     }
 
     /// Performs a depth-first traversal of the component instance tree. It adds to the stream a

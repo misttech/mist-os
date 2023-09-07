@@ -336,7 +336,7 @@ impl CollectionServiceDirectory {
                 })
                 .await;
         };
-        task_group.spawn(add_instances_to_dir).await;
+        task_group.spawn(add_instances_to_dir);
         Ok(())
     }
 
