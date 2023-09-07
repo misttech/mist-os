@@ -138,9 +138,18 @@ pub fn do_mmap(
         file.mmap(current_task, addr, vmo_offset, length, prot_flags, options, file.name.clone())?
     };
 
-    if flags & MAP_POPULATE != 0 && prot & (PROT_READ | PROT_WRITE) != 0 {
+    if flags & MAP_POPULATE != 0 {
+        let op = if prot & PROT_WRITE != 0 {
+            // Requires ZX_RIGHT_WRITEABLE which we should expect when the mapping is writeable.
+            zx::VmoOp::COMMIT
+        } else {
+            // When we don't expect to have ZX_RIGHT_WRITEABLE, fall back to a VMO op that doesn't
+            // need it.
+            // TODO(https://fxbug.dev/132494) use a gentler signal when available
+            zx::VmoOp::ALWAYS_NEED
+        };
         trace_duration!(trace_category_starnix_mm!(), "MmapCommitPages");
-        let _result = vmo.op_range(zx::VmoOp::COMMIT, vmo_offset, length as u64);
+        let _result = vmo.op_range(op, vmo_offset, length as u64);
         // "The mmap() call doesn't fail if the mapping cannot be populated."
     }
 
