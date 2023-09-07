@@ -154,8 +154,11 @@ fn main() -> Result<(), Error> {
     info!("Starting account handler");
 
     let inspector = Inspector::default();
+    // must stay after initialization of `executor`, as a Task is spawned
+    let _inspect_server_task =
+        inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
+
     let mut fs = ServiceFs::new();
-    inspect_runtime::serve(&inspector, &mut fs)?;
 
     let account_handler = Arc::new(AccountHandler::new(
         lifetime,

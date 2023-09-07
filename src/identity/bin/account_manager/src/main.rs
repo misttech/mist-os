@@ -42,9 +42,9 @@ const DATA_DIR: &str = "/data";
 async fn main() -> Result<(), Error> {
     info!("Starting account manager");
 
-    let mut fs = ServiceFs::new();
     let inspector = Inspector::default();
-    inspect_runtime::serve(&inspector, &mut fs)?;
+    let _inspect_server_task =
+        inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
 
     let account_manager = Arc::new(
         AccountManager::<AccountHandlerConnectionImpl>::new(PathBuf::from(DATA_DIR), &inspector)
@@ -54,6 +54,7 @@ async fn main() -> Result<(), Error> {
             })?,
     );
 
+    let mut fs = ServiceFs::new();
     fs.dir("svc").add_fidl_service(move |stream| {
         let account_manager_clone = Arc::clone(&account_manager);
         fasync::Task::spawn(async move {
