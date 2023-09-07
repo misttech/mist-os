@@ -24,6 +24,15 @@ void FakeWlanix::GetWifi(fuchsia_wlan_wlanix::wire::WlanixGetWifiRequest* reques
   fidl::BindServer(dispatcher_, std::move(request->wifi()), this);
 }
 
+void FakeWlanix::GetSupplicant(fuchsia_wlan_wlanix::wire::WlanixGetSupplicantRequest* request,
+                               GetSupplicantCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kWlanixGetSupplicant});
+  if (!request->has_supplicant()) {
+    ZX_ASSERT_MSG(false, "expect `supplicant` to be present");
+  }
+  fidl::BindServer(dispatcher_, std::move(request->supplicant()), this);
+}
+
 void FakeWlanix::GetNl80211(fuchsia_wlan_wlanix::wire::WlanixGetNl80211Request* request,
                             GetNl80211Completer::Sync& completer) {
   AppendCommand(Command{.tag = CommandTag::kWlanixGetNl80211});
@@ -168,6 +177,58 @@ void FakeWlanix::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_wlan_wlanix::WifiStaIface> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
   AppendCommand(Command{.tag = CommandTag::kWifiStaIfaceUnknownMethod});
+}
+
+void FakeWlanix::AddStaInterface(
+    fuchsia_wlan_wlanix::wire::SupplicantAddStaInterfaceRequest* request,
+    AddStaInterfaceCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kSupplicantAddStaInterface});
+  if (!request->has_iface()) {
+    ZX_ASSERT_MSG(false, "expect `iface` to be present");
+  }
+  fidl::BindServer(dispatcher_, std::move(request->iface()), this);
+}
+
+void FakeWlanix::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_wlan_wlanix::Supplicant> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kSupplicantUnknownMethod});
+}
+
+void FakeWlanix::RegisterCallback(
+    fuchsia_wlan_wlanix::wire::SupplicantStaIfaceRegisterCallbackRequest* request,
+    RegisterCallbackCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kSupplicantStaIfaceRegisterCallback});
+}
+
+void FakeWlanix::AddNetwork(fuchsia_wlan_wlanix::wire::SupplicantStaIfaceAddNetworkRequest* request,
+                            AddNetworkCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kSupplicantStaIfaceAddNetwork});
+  if (!request->has_network()) {
+    ZX_ASSERT_MSG(false, "expect `network` to be present");
+  }
+  fidl::BindServer(dispatcher_, std::move(request->network()), this);
+}
+
+void FakeWlanix::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_wlan_wlanix::SupplicantStaIface> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kSupplicantStaIfaceUnknownMethod});
+}
+
+void FakeWlanix::SetSsid(fuchsia_wlan_wlanix::wire::SupplicantStaNetworkSetSsidRequest* request,
+                         SetSsidCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kSupplicantStaNetworkSetSsid});
+}
+
+void FakeWlanix::Select(SelectCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kSupplicantStaNetworkSelect});
+}
+
+void FakeWlanix::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_wlan_wlanix::SupplicantStaNetwork> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kSupplicantStaNetworkUnknownMethod});
 }
 
 }  // namespace wlanix_test

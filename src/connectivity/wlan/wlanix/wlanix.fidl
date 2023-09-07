@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 library fuchsia.wlan.wlanix;
 
+using fuchsia.wlan.ieee80211;
 using zx;
 
 /// Protocol used to proxy Wlanix requests from Starnix into Fuchsia.
@@ -11,6 +12,9 @@ open protocol Wlanix {
     /// Register the channel to make WiFi request to.
     flexible GetWifi(resource table {
         1: wifi server_end:Wifi;
+    });
+    flexible GetSupplicant(resource table {
+        1: supplicant server_end:Supplicant;
     });
     flexible GetNl80211(resource table {
         1: nl80211 server_end:Nl80211;
@@ -100,6 +104,51 @@ open protocol WifiStaIface {
     flexible GetName() -> (table {
         1: iface_name string:16;
     });
+};
+
+open protocol Supplicant {
+    flexible AddStaInterface(resource table {
+        1: iface server_end:SupplicantStaIface;
+        2: iface_name string:16;
+    });
+};
+
+open protocol SupplicantStaIface {
+    flexible RegisterCallback(resource table {
+        1: callback client_end:SupplicantStaIfaceCallback;
+    });
+    flexible AddNetwork(resource table {
+        1: network server_end:SupplicantStaNetwork;
+    });
+};
+
+open protocol SupplicantStaIfaceCallback {
+    flexible OnStateChanged(table {
+        1: new_state StaIfaceCallbackState;
+        2: bssid fuchsia.wlan.ieee80211.MacAddr;
+        3: id uint32;
+        4: ssid fuchsia.wlan.ieee80211.Ssid;
+    });
+};
+
+type StaIfaceCallbackState = flexible enum : uint32 {
+    DISCONNECTED = 0;
+    IFACE_DISABLED = 1;
+    INACTIVE = 2;
+    SCANNING = 3;
+    AUTHENTICATING = 4;
+    ASSOCIATING = 5;
+    ASSOCIATED = 6;
+    FOURWAY_HANDSHAKE = 7;
+    GROUP_HANDSHAKE = 8;
+    COMPLETED = 9;
+};
+
+open protocol SupplicantStaNetwork {
+    flexible SetSsid(table {
+        1: ssid fuchsia.wlan.ieee80211.Ssid;
+    });
+    flexible Select() -> () error zx.Status;
 };
 
 type Nl80211MessageType = flexible enum {

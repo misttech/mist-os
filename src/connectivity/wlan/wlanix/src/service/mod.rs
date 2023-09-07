@@ -8,14 +8,20 @@ use {
         nl80211::{Nl80211Attr, Nl80211Cmd},
         nl80211_message_resp, WifiState,
     },
-    anyhow::{Context, Error},
+    anyhow::{format_err, Context, Error},
     async_trait::async_trait,
     fidl_fuchsia_wlan_wlanix as fidl_wlanix,
+    ieee80211::Bssid,
     parking_lot::Mutex,
     std::sync::Arc,
 };
 
 pub mod sme;
+
+pub(crate) struct ConnectedResult {
+    pub ssid: Vec<u8>,
+    pub bssid: Bssid,
+}
 
 #[async_trait]
 /// This trait represents all wlanix behavior that may be served by a different
@@ -54,5 +60,9 @@ pub(crate) trait WlanixService: Send + Sync {
         responder
             .send(Ok(nl80211_message_resp(vec![build_nl80211_done()])))
             .context("Failed to send scan results")
+    }
+
+    async fn connect_to_network(&self, _ssid: &[u8]) -> Result<ConnectedResult, Error> {
+        Err(format_err!("not implemented"))
     }
 }

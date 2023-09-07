@@ -133,29 +133,27 @@ async fn serve_wifi_chip(_chip_id: u32, reqs: fidl_wlanix::WifiChipRequestStream
     .await;
 }
 
+fn run_callbacks<T>(
+    callback_fn: impl Fn(&T) -> Result<(), fidl::Error>,
+    callbacks: &[T],
+    ctx: &'static str,
+) {
+    let mut failed_callbacks = 0u32;
+    for callback in callbacks {
+        if let Err(_e) = callback_fn(callback) {
+            failed_callbacks += 1;
+        }
+    }
+    if failed_callbacks > 0 {
+        warn!("Failed sending {} event to {} subscribers", ctx, failed_callbacks);
+    }
+}
+
 #[derive(Default)]
 struct WifiState {
     started: bool,
     callbacks: Vec<fidl_wlanix::WifiEventCallbackProxy>,
     scan_multicast_proxy: Option<fidl_wlanix::Nl80211MulticastProxy>,
-}
-
-impl WifiState {
-    fn run_callbacks(
-        &self,
-        callback_fn: fn(&fidl_wlanix::WifiEventCallbackProxy) -> Result<(), fidl::Error>,
-        ctx: &'static str,
-    ) {
-        let mut failed_callbacks = 0u32;
-        for callback in &self.callbacks {
-            if let Err(_e) = callback_fn(callback) {
-                failed_callbacks += 1;
-            }
-        }
-        if failed_callbacks > 0 {
-            warn!("Failed sending {} event to {} subscribers", ctx, failed_callbacks);
-        }
-    }
 }
 
 async fn handle_wifi_request(
@@ -164,23 +162,35 @@ async fn handle_wifi_request(
 ) -> Result<(), Error> {
     match req {
         fidl_wlanix::WifiRequest::RegisterEventCallback { payload, .. } => {
+            info!("fidl_wlanix::WifiRequest::RegisterEventCallback");
             if let Some(callback) = payload.callback {
                 state.lock().callbacks.push(callback.into_proxy()?);
             }
         }
         fidl_wlanix::WifiRequest::Start { responder } => {
+            info!("fidl_wlanix::WifiRequest::Start");
             let mut state = state.lock();
             state.started = true;
             responder.send(Ok(())).context("send Start response")?;
-            state.run_callbacks(fidl_wlanix::WifiEventCallbackProxy::on_start, "OnStart");
+            run_callbacks(
+                fidl_wlanix::WifiEventCallbackProxy::on_start,
+                &state.callbacks[..],
+                "OnStart",
+            );
         }
         fidl_wlanix::WifiRequest::Stop { responder } => {
+            info!("fidl_wlanix::WifiRequest::Stop");
             let mut state = state.lock();
             state.started = false;
             responder.send(Ok(())).context("send Stop response")?;
-            state.run_callbacks(fidl_wlanix::WifiEventCallbackProxy::on_stop, "OnStop");
+            run_callbacks(
+                fidl_wlanix::WifiEventCallbackProxy::on_stop,
+                &state.callbacks[..],
+                "OnStop",
+            );
         }
         fidl_wlanix::WifiRequest::GetState { responder } => {
+            info!("fidl_wlanix::WifiRequest::GetState");
             let response = fidl_wlanix::WifiGetStateResponse {
                 is_started: Some(state.lock().started),
                 ..Default::default()
@@ -228,6 +238,195 @@ async fn serve_wifi(reqs: fidl_wlanix::WifiRequestStream, state: Arc<Mutex<WifiS
             }
             Err(e) => {
                 error!("Wifi request stream failed: {}", e);
+            }
+        }
+    })
+    .await;
+}
+
+#[derive(Default)]
+struct SupplicantStaNetworkState {
+    ssid: Option<Vec<u8>>,
+}
+
+#[derive(Default)]
+struct SupplicantStaIfaceState {
+    callbacks: Vec<fidl_wlanix::SupplicantStaIfaceCallbackProxy>,
+}
+
+async fn handle_supplicant_sta_network_request<S: WlanixService>(
+    req: fidl_wlanix::SupplicantStaNetworkRequest,
+    sta_network_state: Arc<Mutex<SupplicantStaNetworkState>>,
+    sta_iface_state: Arc<Mutex<SupplicantStaIfaceState>>,
+    service: &S,
+) -> Result<(), Error> {
+    match req {
+        fidl_wlanix::SupplicantStaNetworkRequest::SetSsid { payload, .. } => {
+            info!("fidl_wlanix::SupplicantStaNetworkRequest::SetSsid");
+            if let Some(ssid) = payload.ssid {
+                sta_network_state.lock().ssid.replace(ssid);
+            }
+        }
+        fidl_wlanix::SupplicantStaNetworkRequest::Select { responder } => {
+            info!("fidl_wlanix::SupplicantStaNetworkRequest::Select");
+            let ssid = sta_network_state.lock().ssid.clone();
+            let result = match ssid {
+                Some(ssid) => match service.connect_to_network(&ssid[..]).await {
+                    Ok(connected_result) => {
+                        info!("Connected to requested network");
+                        let event = fidl_wlanix::SupplicantStaIfaceCallbackOnStateChangedRequest {
+                            new_state: Some(fidl_wlanix::StaIfaceCallbackState::Completed),
+                            bssid: Some(connected_result.bssid.0),
+                            // TODO(fxbug.dev/128604): do we need to keep track of actual id?
+                            id: Some(1),
+                            ssid: Some(connected_result.ssid),
+                            ..Default::default()
+                        };
+                        run_callbacks(
+                            |callback_proxy| callback_proxy.on_state_changed(&event),
+                            &sta_iface_state.lock().callbacks[..],
+                            "on_state_changed",
+                        );
+                        Ok(())
+                    }
+                    Err(e) => {
+                        warn!("Connecting to network failed: {}", e);
+                        Err(zx::sys::ZX_ERR_INTERNAL)
+                    }
+                },
+                None => {
+                    warn!("No SSID set. fidl_wlanix::SupplicantStaNetworkRequest::Select ignored");
+                    Err(zx::sys::ZX_ERR_BAD_STATE)
+                }
+            };
+            responder.send(result).context("send Select response")?;
+        }
+        fidl_wlanix::SupplicantStaNetworkRequest::_UnknownMethod { ordinal, .. } => {
+            warn!("Unknown SupplicantStaNetworkRequest ordinal: {}", ordinal);
+        }
+    }
+    Ok(())
+}
+
+async fn serve_supplicant_sta_network<S: WlanixService>(
+    reqs: fidl_wlanix::SupplicantStaNetworkRequestStream,
+    sta_iface_state: Arc<Mutex<SupplicantStaIfaceState>>,
+    service: &S,
+) {
+    let sta_network_state = Arc::new(Mutex::new(SupplicantStaNetworkState::default()));
+    reqs.for_each_concurrent(None, |req| async {
+        match req {
+            Ok(req) => {
+                if let Err(e) = handle_supplicant_sta_network_request(
+                    req,
+                    Arc::clone(&sta_network_state),
+                    Arc::clone(&sta_iface_state),
+                    service,
+                )
+                .await
+                {
+                    warn!("Failed to handle SupplicantStaNetwork: {}", e);
+                }
+            }
+            Err(e) => {
+                error!("SupplicantStaNetwork request stream failed: {}", e);
+            }
+        }
+    })
+    .await;
+}
+
+async fn handle_supplicant_sta_iface_request<S: WlanixService>(
+    req: fidl_wlanix::SupplicantStaIfaceRequest,
+    sta_iface_state: Arc<Mutex<SupplicantStaIfaceState>>,
+    service: &S,
+) -> Result<(), Error> {
+    match req {
+        fidl_wlanix::SupplicantStaIfaceRequest::RegisterCallback { payload, .. } => {
+            info!("fidl_wlanix::SupplicantStaIfaceRequest::RegisterCallback");
+            if let Some(callback) = payload.callback {
+                sta_iface_state.lock().callbacks.push(callback.into_proxy()?);
+            }
+        }
+        fidl_wlanix::SupplicantStaIfaceRequest::AddNetwork { payload, .. } => {
+            info!("fidl_wlanix::SupplicantStaIfaceRequest::AddNetwork");
+            if let Some(supplicant_sta_network) = payload.network {
+                let supplicant_sta_network_stream = supplicant_sta_network
+                    .into_stream()
+                    .context("create SupplicantStaNetwork stream")?;
+                // TODO(fxbug.dev/128604): Should we return NetworkAdded event?
+                serve_supplicant_sta_network(
+                    supplicant_sta_network_stream,
+                    sta_iface_state,
+                    service,
+                )
+                .await;
+            }
+        }
+        fidl_wlanix::SupplicantStaIfaceRequest::_UnknownMethod { ordinal, .. } => {
+            warn!("Unknown SupplicantStaIfaceRequest ordinal: {}", ordinal);
+        }
+    }
+    Ok(())
+}
+
+async fn serve_supplicant_sta_iface<S: WlanixService>(
+    reqs: fidl_wlanix::SupplicantStaIfaceRequestStream,
+    service: &S,
+) {
+    let sta_iface_state = Arc::new(Mutex::new(SupplicantStaIfaceState::default()));
+    reqs.for_each_concurrent(None, |req| async {
+        match req {
+            Ok(req) => {
+                if let Err(e) =
+                    handle_supplicant_sta_iface_request(req, Arc::clone(&sta_iface_state), service)
+                        .await
+                {
+                    warn!("Failed to handle SupplicantRequest: {}", e);
+                }
+            }
+            Err(e) => {
+                error!("SupplicantStaIface request stream failed: {}", e);
+            }
+        }
+    })
+    .await;
+}
+
+async fn handle_supplicant_request<S: WlanixService>(
+    req: fidl_wlanix::SupplicantRequest,
+    service: &S,
+) -> Result<(), Error> {
+    match req {
+        fidl_wlanix::SupplicantRequest::AddStaInterface { payload, .. } => {
+            info!("fidl_wlanix::SupplicantRequest::AddStaInterface");
+            if let Some(supplicant_sta_iface) = payload.iface {
+                let supplicant_sta_iface_stream = supplicant_sta_iface
+                    .into_stream()
+                    .context("create SupplicantStaIface stream")?;
+                serve_supplicant_sta_iface(supplicant_sta_iface_stream, service).await;
+            }
+        }
+        fidl_wlanix::SupplicantRequest::_UnknownMethod { ordinal, .. } => {
+            warn!("Unknown SupplicantRequest ordinal: {}", ordinal);
+        }
+    }
+    Ok(())
+}
+
+async fn serve_supplicant<S: WlanixService>(
+    reqs: fidl_wlanix::SupplicantRequestStream,
+    service: &S,
+) {
+    reqs.for_each_concurrent(None, |req| async {
+        match req {
+            Ok(req) => {
+                if let Err(e) = handle_supplicant_request(req, service).await {
+                    warn!("Failed to handle SupplicantRequest: {}", e);
+                }
+            }
+            Err(e) => {
+                error!("Supplicant request stream failed: {}", e);
             }
         }
     })
@@ -415,6 +614,14 @@ async fn handle_wlanix_request<S: WlanixService>(
                 serve_wifi(wifi_stream, Arc::clone(&state)).await;
             }
         }
+        fidl_wlanix::WlanixRequest::GetSupplicant { payload, .. } => {
+            info!("fidl_wlanix::WlanixRequest::GetSupplicant");
+            if let Some(supplicant) = payload.supplicant {
+                let supplicant_stream =
+                    supplicant.into_stream().context("create Supplicant stream")?;
+                serve_supplicant(supplicant_stream, service).await;
+            }
+        }
         fidl_wlanix::WlanixRequest::GetNl80211 { payload, .. } => {
             info!("fidl_wlanix::WlanixRequest::GetNl80211");
             if let Some(nl80211) = payload.nl80211 {
@@ -480,22 +687,34 @@ async fn main() {
 mod tests {
     use {
         super::*,
+        crate::service::ConnectedResult,
+        async_trait::async_trait,
         fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream, Proxy},
         futures::{pin_mut, task::Poll, Future},
+        ieee80211::Bssid,
         std::pin::Pin,
         wlan_common::assert_variant,
     };
 
-    struct TestService {}
-    impl WlanixService for TestService {}
+    #[derive(Default)]
+    struct TestService {
+        connect_to_ssid: Mutex<Option<Vec<u8>>>,
+    }
+    #[async_trait]
+    impl WlanixService for TestService {
+        async fn connect_to_network(&self, ssid: &[u8]) -> Result<ConnectedResult, Error> {
+            self.connect_to_ssid.lock().replace(ssid.to_vec());
+            Ok(ConnectedResult { ssid: ssid.to_vec(), bssid: Bssid([42, 42, 42, 42, 42, 42]) })
+        }
+    }
 
     fn test_service() -> TestService {
-        TestService {}
+        TestService::default()
     }
 
     #[test]
     fn test_wifi_get_state_is_started_false_at_beginning() {
-        let (mut test_helper, mut test_fut) = setup_test();
+        let (mut test_helper, mut test_fut) = setup_wifi_test();
 
         let get_state_fut = test_helper.wifi_proxy.get_state();
         pin_mut!(get_state_fut);
@@ -510,7 +729,7 @@ mod tests {
 
     #[test]
     fn test_wifi_get_state_is_started_true_after_start() {
-        let (mut test_helper, mut test_fut) = setup_test();
+        let (mut test_helper, mut test_fut) = setup_wifi_test();
 
         let start_fut = test_helper.wifi_proxy.start();
         pin_mut!(start_fut);
@@ -529,7 +748,7 @@ mod tests {
 
     #[test]
     fn test_wifi_get_state_is_started_false_after_stop() {
-        let (mut test_helper, mut test_fut) = setup_test();
+        let (mut test_helper, mut test_fut) = setup_wifi_test();
 
         let start_fut = test_helper.wifi_proxy.start();
         pin_mut!(start_fut);
@@ -552,7 +771,7 @@ mod tests {
 
     #[test]
     fn test_wifi_get_chip_ids() {
-        let (mut test_helper, mut test_fut) = setup_test();
+        let (mut test_helper, mut test_fut) = setup_wifi_test();
 
         let get_chip_ids_fut = test_helper.wifi_proxy.get_chip_ids();
         pin_mut!(get_chip_ids_fut);
@@ -567,7 +786,7 @@ mod tests {
 
     #[test]
     fn test_wifi_chip_get_available_modes() {
-        let (mut test_helper, mut test_fut) = setup_test();
+        let (mut test_helper, mut test_fut) = setup_wifi_test();
 
         let get_available_modes_fut = test_helper.wifi_chip_proxy.get_available_modes();
         pin_mut!(get_available_modes_fut);
@@ -600,7 +819,7 @@ mod tests {
 
     #[test]
     fn test_wifi_chip_get_mode() {
-        let (mut test_helper, mut test_fut) = setup_test();
+        let (mut test_helper, mut test_fut) = setup_wifi_test();
 
         let get_mode_fut = test_helper.wifi_chip_proxy.get_mode();
         pin_mut!(get_mode_fut);
@@ -612,7 +831,7 @@ mod tests {
 
     #[test]
     fn test_wifi_chip_get_capabilities() {
-        let (mut test_helper, mut test_fut) = setup_test();
+        let (mut test_helper, mut test_fut) = setup_wifi_test();
 
         let get_capabilities_fut = test_helper.wifi_chip_proxy.get_capabilities();
         pin_mut!(get_capabilities_fut);
@@ -630,7 +849,7 @@ mod tests {
 
     #[test]
     fn test_wifi_sta_iface_get_name() {
-        let (mut test_helper, mut test_fut) = setup_test();
+        let (mut test_helper, mut test_fut) = setup_wifi_test();
 
         let get_name_fut = test_helper.wifi_sta_iface_proxy.get_name();
         pin_mut!(get_name_fut);
@@ -643,7 +862,7 @@ mod tests {
         assert_eq!(response.iface_name, Some("sta-iface-name".to_string()));
     }
 
-    struct TestHelper {
+    struct WifiTestHelper {
         _wlanix_proxy: fidl_wlanix::WlanixProxy,
         wifi_proxy: fidl_wlanix::WifiProxy,
         wifi_chip_proxy: fidl_wlanix::WifiChipProxy,
@@ -653,7 +872,7 @@ mod tests {
         exec: fasync::TestExecutor,
     }
 
-    fn setup_test() -> (TestHelper, Pin<Box<impl Future<Output = ()>>>) {
+    fn setup_wifi_test() -> (WifiTestHelper, Pin<Box<impl Future<Output = ()>>>) {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(0));
 
@@ -688,20 +907,127 @@ mod tests {
         pin_mut!(create_sta_iface_fut);
         assert_variant!(exec.run_until_stalled(&mut create_sta_iface_fut), Poll::Pending);
 
-        let state = Arc::new(Mutex::new(WifiState::default()));
+        let wifi_state = Arc::new(Mutex::new(WifiState::default()));
         let service = Arc::new(test_service());
-        let test_fut = serve_wlanix(wlanix_stream, state, service);
+        let test_fut = serve_wlanix(wlanix_stream, wifi_state, service);
         let mut test_fut = Box::pin(test_fut);
         assert_eq!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         assert_variant!(exec.run_until_stalled(&mut get_chip_fut), Poll::Ready(Ok(Ok(()))));
         assert_variant!(exec.run_until_stalled(&mut create_sta_iface_fut), Poll::Ready(Ok(Ok(()))));
 
-        let test_helper = TestHelper {
+        let test_helper = WifiTestHelper {
             _wlanix_proxy: wlanix_proxy,
             wifi_proxy,
             wifi_chip_proxy,
             wifi_sta_iface_proxy,
+            exec,
+        };
+        (test_helper, test_fut)
+    }
+
+    #[test]
+    fn test_supplicant_sta_network_connect_flow() {
+        let (mut test_helper, mut test_fut) = setup_supplicant_test();
+
+        let result = test_helper.supplicant_sta_network_proxy.set_ssid(
+            &fidl_wlanix::SupplicantStaNetworkSetSsidRequest {
+                ssid: Some(vec![b'f', b'o', b'o']),
+                ..Default::default()
+            },
+        );
+        assert_variant!(result, Ok(()));
+
+        let mut network_select_fut = test_helper.supplicant_sta_network_proxy.select();
+        assert_variant!(test_helper.exec.run_until_stalled(&mut network_select_fut), Poll::Pending);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(
+            test_helper.exec.run_until_stalled(&mut network_select_fut),
+            Poll::Ready(Ok(Ok(())))
+        );
+
+        assert_eq!(*test_helper.service.connect_to_ssid.lock(), Some(vec![b'f', b'o', b'o']));
+        let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
+        let on_state_changed = assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
+        assert_eq!(on_state_changed.new_state, Some(fidl_wlanix::StaIfaceCallbackState::Completed));
+        assert_eq!(on_state_changed.bssid, Some([42, 42, 42, 42, 42, 42]));
+        assert_eq!(on_state_changed.id, Some(1));
+        assert_eq!(on_state_changed.ssid, Some(vec![b'f', b'o', b'o']));
+    }
+
+    struct SupplicantTestHelper {
+        _wlanix_proxy: fidl_wlanix::WlanixProxy,
+        _supplicant_proxy: fidl_wlanix::SupplicantProxy,
+        _supplicant_sta_iface_proxy: fidl_wlanix::SupplicantStaIfaceProxy,
+        supplicant_sta_network_proxy: fidl_wlanix::SupplicantStaNetworkProxy,
+        supplicant_sta_iface_callback_stream: fidl_wlanix::SupplicantStaIfaceCallbackRequestStream,
+        service: Arc<TestService>,
+
+        // Note: keep the executor field last in the struct so it gets dropped last.
+        exec: fasync::TestExecutor,
+    }
+
+    fn setup_supplicant_test() -> (SupplicantTestHelper, Pin<Box<impl Future<Output = ()>>>) {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::Time::from_nanos(0));
+
+        let (wlanix_proxy, wlanix_stream) = create_proxy_and_stream::<fidl_wlanix::WlanixMarker>()
+            .expect("create Wlanix proxy should succeed");
+        let (supplicant_proxy, supplicant_server_end) =
+            create_proxy::<fidl_wlanix::SupplicantMarker>()
+                .expect("create Supplicant proxy should succeed");
+        let result = wlanix_proxy.get_supplicant(fidl_wlanix::WlanixGetSupplicantRequest {
+            supplicant: Some(supplicant_server_end),
+            ..Default::default()
+        });
+        assert_variant!(result, Ok(()));
+
+        let (supplicant_sta_iface_proxy, supplicant_sta_iface_server_end) =
+            create_proxy::<fidl_wlanix::SupplicantStaIfaceMarker>()
+                .expect("create SupplicantStaIface proxy should succeed");
+        let result =
+            supplicant_proxy.add_sta_interface(fidl_wlanix::SupplicantAddStaInterfaceRequest {
+                iface: Some(supplicant_sta_iface_server_end),
+                iface_name: Some("fake-iface-name".to_string()),
+                ..Default::default()
+            });
+        assert_variant!(result, Ok(()));
+
+        let (supplicant_sta_iface_callback_client_end, supplicant_sta_iface_callback_stream) =
+            create_request_stream::<fidl_wlanix::SupplicantStaIfaceCallbackMarker>()
+                .expect("create SupplicantStaIfaceCallback request stream should succeed");
+        let result = supplicant_sta_iface_proxy.register_callback(
+            fidl_wlanix::SupplicantStaIfaceRegisterCallbackRequest {
+                callback: Some(supplicant_sta_iface_callback_client_end),
+                ..Default::default()
+            },
+        );
+        assert_variant!(result, Ok(()));
+
+        let (supplicant_sta_network_proxy, supplicant_sta_network_server_end) =
+            create_proxy::<fidl_wlanix::SupplicantStaNetworkMarker>()
+                .expect("create SupplicantStaNetwork proxy should succeed");
+        let result = supplicant_sta_iface_proxy.add_network(
+            fidl_wlanix::SupplicantStaIfaceAddNetworkRequest {
+                network: Some(supplicant_sta_network_server_end),
+                ..Default::default()
+            },
+        );
+        assert_variant!(result, Ok(()));
+
+        let wifi_state = Arc::new(Mutex::new(WifiState::default()));
+        let service = Arc::new(test_service());
+        let test_fut = serve_wlanix(wlanix_stream, wifi_state, Arc::clone(&service));
+        let mut test_fut = Box::pin(test_fut);
+        assert_eq!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
+
+        let test_helper = SupplicantTestHelper {
+            _wlanix_proxy: wlanix_proxy,
+            _supplicant_proxy: supplicant_proxy,
+            _supplicant_sta_iface_proxy: supplicant_sta_iface_proxy,
+            supplicant_sta_network_proxy,
+            supplicant_sta_iface_callback_stream,
+            service,
             exec,
         };
         (test_helper, test_fut)

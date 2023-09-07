@@ -11,7 +11,10 @@ fidl("fuchsia.wlan.wlanix") {
 
   sources = [ "wlanix.fidl" ]
 
-  public_deps = [ "//zircon/vdso/zx" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.wlan.ieee80211",
+    "//zircon/vdso/zx",
+  ]
 }
 
 rustc_binary("wlanix_bin") {
@@ -22,9 +25,12 @@ rustc_binary("wlanix_bin") {
   deps = [
     ":fuchsia.wlan.wlanix_rust",
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_rust",
+    "//sdk/fidl/fuchsia.wlan.common.security:fuchsia.wlan.common.security_rust",
     "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service_rust",
+    "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_rust",
     "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_rust",
     "//src/connectivity/wlan/lib/common/rust:wlan-common",
+    "//src/connectivity/wlan/lib/ieee80211",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",

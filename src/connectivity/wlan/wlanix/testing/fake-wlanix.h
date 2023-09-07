@@ -12,10 +12,13 @@
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
 
+#include "fidl/fuchsia.wlan.wlanix/cpp/wire_types.h"
+
 namespace wlanix_test {
 
 enum class CommandTag {
   kWlanixGetWifi,
+  kWlanixGetSupplicant,
   kWlanixGetNl80211,
   kWlanixUnknownMethod,
   kWifiRegisterEventCallback,
@@ -32,6 +35,14 @@ enum class CommandTag {
   kWifiChipUnknownMethod,
   kWifiStaIfaceGetName,
   kWifiStaIfaceUnknownMethod,
+  kSupplicantAddStaInterface,
+  kSupplicantUnknownMethod,
+  kSupplicantStaIfaceRegisterCallback,
+  kSupplicantStaIfaceAddNetwork,
+  kSupplicantStaIfaceUnknownMethod,
+  kSupplicantStaNetworkSetSsid,
+  kSupplicantStaNetworkSelect,
+  kSupplicantStaNetworkUnknownMethod
 };
 
 struct Command {
@@ -46,7 +57,10 @@ struct Command {
 class FakeWlanix : public fidl::WireServer<fuchsia_wlan_wlanix::Wlanix>,
                    public fidl::WireServer<fuchsia_wlan_wlanix::Wifi>,
                    public fidl::WireServer<fuchsia_wlan_wlanix::WifiChip>,
-                   public fidl::WireServer<fuchsia_wlan_wlanix::WifiStaIface> {
+                   public fidl::WireServer<fuchsia_wlan_wlanix::WifiStaIface>,
+                   public fidl::WireServer<fuchsia_wlan_wlanix::Supplicant>,
+                   public fidl::WireServer<fuchsia_wlan_wlanix::SupplicantStaIface>,
+                   public fidl::WireServer<fuchsia_wlan_wlanix::SupplicantStaNetwork> {
  public:
   void Connect(async_dispatcher_t* dispatcher,
                fidl::ServerEnd<fuchsia_wlan_wlanix::Wlanix> server_end);
@@ -54,6 +68,8 @@ class FakeWlanix : public fidl::WireServer<fuchsia_wlan_wlanix::Wlanix>,
   // Wlanix methods
   void GetWifi(fuchsia_wlan_wlanix::wire::WlanixGetWifiRequest* request,
                GetWifiCompleter::Sync& completer) override;
+  void GetSupplicant(fuchsia_wlan_wlanix::wire::WlanixGetSupplicantRequest* request,
+                     GetSupplicantCompleter::Sync& completer) override;
   void GetNl80211(fuchsia_wlan_wlanix::wire::WlanixGetNl80211Request* request,
                   GetNl80211Completer::Sync& completer) override;
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_wlan_wlanix::Wlanix> metadata,
@@ -84,6 +100,30 @@ class FakeWlanix : public fidl::WireServer<fuchsia_wlan_wlanix::Wlanix>,
   void GetName(GetNameCompleter::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_wlan_wlanix::WifiStaIface> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
+
+  // Supplicant methods
+  void AddStaInterface(fuchsia_wlan_wlanix::wire::SupplicantAddStaInterfaceRequest* request,
+                       AddStaInterfaceCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_wlan_wlanix::Supplicant> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
+
+  // SupplicantStaIface methods
+  void RegisterCallback(
+      fuchsia_wlan_wlanix::wire::SupplicantStaIfaceRegisterCallbackRequest* request,
+      RegisterCallbackCompleter::Sync& completer) override;
+  void AddNetwork(fuchsia_wlan_wlanix::wire::SupplicantStaIfaceAddNetworkRequest* request,
+                  AddNetworkCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_wlan_wlanix::SupplicantStaIface> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
+
+  // SupplicantStaNetwork methods
+  void SetSsid(fuchsia_wlan_wlanix::wire::SupplicantStaNetworkSetSsidRequest* request,
+               SetSsidCompleter::Sync& completer) override;
+  void Select(SelectCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_wlan_wlanix::SupplicantStaNetwork> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // test methods

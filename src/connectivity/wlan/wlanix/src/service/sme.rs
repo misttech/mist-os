@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::service::WlanixService,
+    crate::service::{ConnectedResult, WlanixService},
     crate::{
         build_nl80211_ack, build_nl80211_done, build_nl80211_message,
         nl80211::{Nl80211Attr, Nl80211Cmd},
@@ -12,13 +12,17 @@ use {
     anyhow::{bail, format_err, Context, Error},
     async_trait::async_trait,
     fidl::endpoints::create_proxy,
-    fidl_fuchsia_wlan_common as fidl_common,
-    fidl_fuchsia_wlan_device_service as fidl_device_service, fidl_fuchsia_wlan_sme as fidl_sme,
-    fidl_fuchsia_wlan_wlanix as fidl_wlanix, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_common_security as fidl_security,
+    fidl_fuchsia_wlan_device_service as fidl_device_service,
+    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
+    fidl_fuchsia_wlan_wlanix as fidl_wlanix,
+    fuchsia_async::{self as fasync, TimeoutExt},
+    fuchsia_zircon as zx,
+    futures::TryStreamExt,
     parking_lot::Mutex,
     std::{convert::TryFrom, sync::Arc},
     tracing::{error, info},
-    wlan_common::channel::Channel,
+    wlan_common::{bss::BssDescription, channel::Channel},
 };
 
 // TODO(fxbug.dev/128604): Replace with real iface info from SME.
@@ -118,6 +122,95 @@ impl WlanixService for SmeService {
         }
         resp.push(build_nl80211_done());
         responder.send(Ok(nl80211_message_resp(resp))).context("Failed to send scan results")
+    }
+
+    async fn connect_to_network(&self, ssid: &[u8]) -> Result<ConnectedResult, Error> {
+        let selected_bss_description = self
+            .last_scan_results
+            .lock()
+            .iter()
+            .filter_map(|r| {
+                // TODO(fxbug.dev/128604): handle the case when there are multiple BSS candidates
+                BssDescription::try_from(r.bss_description.clone())
+                    .ok()
+                    .filter(|bss_description| bss_description.ssid == *ssid)
+            })
+            .next();
+
+        let bss_description = match selected_bss_description {
+            Some(bss_description) => bss_description,
+            None => {
+                return Err(format_err!("Requested network not found"));
+            }
+        };
+
+        info!("Selected BSS to connect to");
+        let sme_proxy = self.select_client_iface().await?;
+        let (connect_txn, remote) = create_proxy()?;
+        let bssid = bss_description.bssid;
+        let connect_req = fidl_sme::ConnectRequest {
+            ssid: bss_description.ssid.clone().into(),
+            bss_description: bss_description.into(),
+            multiple_bss_candidates: false,
+            authentication: fidl_security::Authentication {
+                protocol: fidl_security::Protocol::Open,
+                credentials: None,
+            },
+            deprecated_scan_type: fidl_common::ScanType::Passive,
+        };
+        sme_proxy.connect(&connect_req, Some(remote))?;
+
+        info!("Waiting for connect result from SME");
+        let stream = connect_txn.take_event_stream();
+        let sme_result = wait_for_connect_result(stream)
+            .on_timeout(zx::Duration::from_seconds(30), || {
+                Err(format_err!("Timed out waiting for connect result from SME."))
+            })
+            .await?;
+
+        info!("Received connect result from SME: {:?}", sme_result);
+        if sme_result.code == fidl_ieee80211::StatusCode::Success {
+            Ok(ConnectedResult { ssid: ssid.to_vec(), bssid })
+        } else {
+            Err(format_err!("Connect failed with status code: {:?}", sme_result.code))
+        }
+    }
+}
+
+/// Wait until stream returns an OnConnectResult event or None. Ignore other event types.
+async fn wait_for_connect_result(
+    mut stream: fidl_sme::ConnectTransactionEventStream,
+) -> Result<fidl_sme::ConnectResult, Error> {
+    loop {
+        let stream_fut = stream.try_next();
+        match stream_fut
+            .await
+            .map_err(|e| format_err!("Failed to receive connect result from sme: {:?}", e))?
+        {
+            Some(fidl_sme::ConnectTransactionEvent::OnConnectResult { result }) => {
+                return Ok(result)
+            }
+            Some(other) => {
+                info!(
+                    "Expected ConnectTransactionEvent::OnConnectResult, got {}. Ignoring.",
+                    connect_txn_event_name(&other)
+                );
+            }
+            None => {
+                return Err(format_err!(
+                    "Server closed the ConnectTransaction channel before sending a response"
+                ));
+            }
+        };
+    }
+}
+
+fn connect_txn_event_name(event: &fidl_sme::ConnectTransactionEvent) -> &'static str {
+    match event {
+        fidl_sme::ConnectTransactionEvent::OnConnectResult { .. } => "OnConnectResult",
+        fidl_sme::ConnectTransactionEvent::OnDisconnect { .. } => "OnDisconnect",
+        fidl_sme::ConnectTransactionEvent::OnSignalReport { .. } => "OnSignalReport",
+        fidl_sme::ConnectTransactionEvent::OnChannelSwitched { .. } => "OnChannelSwitched",
     }
 }
 
