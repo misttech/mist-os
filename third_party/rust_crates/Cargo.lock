@@ -1360,6 +1360,7 @@ dependencies = [
  "macro_rules_attribute",
  "maplit",
  "maybe-owned",
+ "md-5",
  "memchr",
  "memoffset 0.5.3",
  "miniz_oxide",
@@ -2224,6 +2225,15 @@ name = "maybe-uninit"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60302e4db3a61da70c0cb7991976248362f30319e88850c487b9b95bbf059e00"
+
+[[package]]
+name = "md-5"
+version = "0.10.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6365506850d44bff6e2fbcb5176cf63650e48bd45ef2fe2665ae1570e0f4b9ca"
+dependencies = [
+ "digest 0.10.7",
+]
 
 [[package]]
 name = "memchr"

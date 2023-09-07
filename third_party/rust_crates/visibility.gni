@@ -2,6 +2,22 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+md5_visibility = [
+  #  ________  _________  ________  ________
+  # |\   ____\|\___   ___\\   __  \|\   __  \
+  # \ \  \___|\|___ \  \_\ \  \|\  \ \  \|\  \
+  #  \ \_____  \   \ \  \ \ \  \\\  \ \   ____\
+  #   \|____|\  \   \ \  \ \ \  \\\  \ \  \___|
+  #     ____\_\  \   \ \__\ \ \_______\ \__\
+  #    |\_________\   \|__|  \|_______|\|__|
+  #    \|_________|
+  #
+  # This is an allowlist of targets that use the `md-5` Rust library, which
+  # implements the insecure and deprecated MD-5 hash function. Code should only
+  # use this if it's implementing legacy protocols that require MD-5; it should
+  # never be used for new cryptographic development.
+]
+
 sha1_visibility = [
   #  ________  _________  ________  ________
   # |\   ____\|\___   ___\\   __  \|\   __  \

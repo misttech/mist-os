@@ -464,6 +464,14 @@ group("maybe-owned") {
   public_deps = [ ":maybe-owned-v0_3_2" ]
 }
 
+import("//third_party/rust_crates/visibility.gni")
+
+group("md-5") {
+  public_deps = [ ":md-5-v0_10_5" ]
+
+  visibility = md5_visibility
+}
+
 group("memchr") {
   public_deps = [ ":memchr-v2_4_0" ]
 }
@@ -813,8 +821,6 @@ if (!(current_os == "fuchsia")) {
     public_deps = [ ":serial_test-v0_5_1" ]
   }
 }
-
-import("//third_party/rust_crates/visibility.gni")
 
 group("sha1") {
   public_deps = [ ":sha1-v0_10_5" ]
@@ -6018,6 +6024,29 @@ rust_library("maybe-uninit-v2_0_0") {
     "--cfg=derive_copy",
     "--cfg=repr_transparent",
     "--cfg=native_uninit",
+  ]
+
+  visibility = [ ":*" ]
+}
+
+rust_library("md-5-v0_10_5") {
+  crate_name = "md5"
+  crate_root = "//third_party/rust_crates/vendor/md-5-0.10.5/src/lib.rs"
+  output_name = "md5-ad61f69e6a163720"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":digest-v0_10_7" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=ad61f69e6a163720",
+    "-Cextra-filename=-ad61f69e6a163720",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
