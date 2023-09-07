@@ -50,7 +50,6 @@ assembly_input_groups("debug") {
     "//bundles/assembly:third_party_sbase_for_transition",
     "//src/diagnostics/log_listener:for_transition",
     "//src/connectivity/wlan/wlancfg/tool:for_transition",
-    "//build/info:build-info",
     "//src/factory/factory_store_providers",
   ]
   core_realm_shards =

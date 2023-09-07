@@ -150,7 +150,6 @@ if (is_fuchsia) {
   recovery_packages = board_recovery_package_labels + core_realm_aib_pkgs +
                       core_realm_network_aib_pkgs +
                       [
-                        ":build-info-recovery",
                         "//src/connectivity/network/netcfg:config-default",
                         "//src/recovery/factory_reset",
                         "//src/recovery/system:system_recovery",
@@ -296,7 +295,6 @@ if (is_fuchsia) {
     base_packages = core_realm_aib_pkgs + core_realm_eng_aib_pkgs +
                     core_realm_network_aib_pkgs +
                     [
-                      "//build/info:build-info",
                       "//src/connectivity/network/netcfg:config-default",
                       "//src/sys/core:component_id_index_no_restrict_storage",
                       "//src/firmware/fastboot-tcp",
@@ -435,50 +433,5 @@ if (is_fuchsia) {
     product_assembly_config_label = ":for-installer"
 
     core_realm_definition = ":core-installer"
-  }
-
-  recovery_build_info_product = "${target_gen_dir}/product.txt"
-
-  generated_file("recovery_build_info_product") {
-    outputs = [ recovery_build_info_product ]
-    contents = "${build_info_product}_recovery"
-  }
-
-  resource_group("build-info-resources") {
-    files = [
-      {
-        source = recovery_build_info_product
-        dest = "data/product"
-      },
-      {
-        source = build_info_files.board
-        dest = "data/board"
-      },
-      {
-        source = build_info_files.version
-        dest = "data/version"
-      },
-      {
-        source = build_info_files.jiri_snapshot
-        dest = "data/snapshot"
-      },
-      {
-        source = build_info_files.latest_commit_date
-        dest = "data/latest-commit-date"
-      },
-      {
-        source = build_info_files.minimum_utc_stamp
-        dest = "data/minimum-utc-stamp"
-      },
-    ]
-    deps = [
-      ":recovery_build_info_product",
-      "//build/info:latest-commit-date",
-    ]
-  }
-
-  fuchsia_package("build-info-recovery") {
-    package_name = "build-info"
-    deps = [ ":build-info-resources" ]
   }
 }

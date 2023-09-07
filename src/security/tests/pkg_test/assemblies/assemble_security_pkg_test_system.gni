@@ -14,9 +14,9 @@ import("//build/components/fuchsia_test_component.gni")
 import("//build/config.gni")
 import("//build/dist/resource.gni")
 import("//build/dist/zip_resource.gni")
+import("//build/info/info.gni")
 import("//build/packages/publish-archive.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/security/tests/pkg_test/assemblies/build_info.gni")
 
 # Construct a system assembly for use in product security tests.
 #
@@ -124,7 +124,6 @@ template("assemble_security_pkg_test_system") {
     product_config = "${assembly_name}_product_config"
     product_config_fxfs = "${assembly_name}_product_config_fxfs"
     board_config = "${assembly_name}_board_config"
-    build_info = "${assembly_name}_build_info"
     repository_config = "${assembly_name}_repository_config"
     packages_json = "${assembly_name}_packages_json"
     update_package = "${assembly_name}_update_package"
@@ -146,8 +145,6 @@ template("assemble_security_pkg_test_system") {
   directories = {
     assembly_out = get_label_info(":${labels.assembly}", "target_out_dir") +
                    "/${assembly_name}"
-    build_info_out = get_label_info(":${labels.assembly}", "target_out_dir") +
-                     "/${assembly_name}/build_info"
     update_out = get_label_info(":${labels.assembly}", "target_out_dir") +
                  "/${labels.update_package}"
     all_package_manifests_list_out =
@@ -166,19 +163,6 @@ template("assemble_security_pkg_test_system") {
     partitions_json = "${directories.assembly_out}_partitions.json"
     images_json = "${directories.assembly_out}/images.json"
     board_config = "${directories.assembly_out}/board_config.json"
-    build_info_version = invoker.system_version_file
-
-    # TODO(fxbug.dev/88453): These should be specified `invoker` to match the
-    # configured product.
-    build_info_product = build_info_files.product
-    build_info_jiri_snapshot = build_info_files.jiri_snapshot
-
-    build_info_board = "${directories.build_info_out}/board"
-    build_info_version = invoker.system_version_file
-    build_info_latest_commit_date =
-        "${directories.build_info_out}/latest-commit-date.txt"
-    build_info_minimum_utc_stamp =
-        "${directories.build_info_out}/minimum-utc-stamp.txt"
     base_package_manifests_list =
         "${target_out_dir}/${assembly_name}.base_packages.list"
     update_packages_manifests_list =
@@ -231,17 +215,11 @@ template("assemble_security_pkg_test_system") {
     deps = [ ":${labels.root_ssl_certificates_resource_group}" ]
   }
 
-  # Build info to be included in base packages.
-  write_file(files.build_info_board, invoker.board_name)
-  build_info(labels.build_info) {
-    testonly = true
-    product = files.build_info_product
-    board = files.build_info_board
-    version = files.build_info_version
-    jiri_snapshot = files.build_info_jiri_snapshot
-    latest_commit_date = files.build_info_latest_commit_date
-    minimum_utc_stamp = files.build_info_minimum_utc_stamp
-  }
+  # Collect the build-info files using the default, but override the version.
+  # TODO(fxbug.dev/88453): invoker should be able to override the product name
+  # to match the configured product.
+  _build_info = default_product_build_info
+  _build_info.version = rebase_path(invoker.system_version_file, root_build_dir)
 
   product_assembly_configuration(labels.product_config) {
     platform = {
@@ -269,7 +247,9 @@ template("assemble_security_pkg_test_system") {
       }
     }
     product = {
+      build_info = _build_info
     }
+    deps = [ "//build/info:build_info_files" ]
   }
 
   product_assembly_configuration(labels.product_config_fxfs) {
@@ -291,11 +271,12 @@ template("assemble_security_pkg_test_system") {
       }
     }
     product = {
+      build_info = _build_info
     }
+    deps = [ "//build/info:build_info_files" ]
   }
 
   packages_for_assembly = [
-                            ":${labels.build_info}",
                             ":${labels.root_ssl_certificates}",
 
                             # TODO(fxbug.dev/88453): There should be a contract for
@@ -306,7 +287,7 @@ template("assemble_security_pkg_test_system") {
                           ] + invoker.base_packages
 
   board_configuration(labels.board_config) {
-    name = "test"
+    name = invoker.board_name
     filesystems = {
       zbi = {
         compression = "zstd.max"
@@ -371,9 +352,6 @@ template("assemble_security_pkg_test_system") {
       deps += [ ":${labels.packages_json}" ]
     }
   }
-
-  # TODO(fxbug.dev/88453): Verify that contents of `files.build_info_board` and
-  # `files.update_board` are identical.
 
   # Get the base packages from the assembled_system()
   package_list_from_assembly(labels.base_package_manifests_list) {

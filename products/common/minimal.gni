@@ -27,9 +27,6 @@ sdk_archive_labels = []
 core_realm_shards = []
 
 legacy_base_package_labels += [
-  # TODO(http://fxb/91760): remove once build_info is supported in assembly_input_bundle()
-  "//build/info:build-info",
-
   # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
   "//src/sys/core:core_component_id_index",
 ]

@@ -10,16 +10,6 @@ import("//build/dist/resource.gni")
 import("//build/info/info.gni")
 
 if (current_toolchain == default_toolchain) {
-  generated_file("product") {
-    outputs = [ build_info_files.product ]
-    contents = build_info_product
-  }
-
-  generated_file("board") {
-    outputs = [ build_info_files.board ]
-    contents = board_name
-  }
-
   action("latest-commit-date") {
     # Ensure this action is invoked if integration HEAD moves
     inputs = [ "//integration/.git/HEAD" ]
@@ -72,51 +62,13 @@ if (current_toolchain == default_toolchain) {
 
   group("build_info_files") {
     public_deps = [
-      ":board",
       ":latest-commit-date",
       ":minimum_utc_stamp",
-      ":product",
       ":version",
     ]
   }
 } else {
   group("build_info_files") {
     public_deps = [ ":build_info_files($default_toolchain)" ]
-  }
-}
-
-if (is_fuchsia) {
-  resource_group("build-info-resources") {
-    files = [
-      {
-        source = build_info_files.product
-        dest = "data/product"
-      },
-      {
-        source = build_info_files.board
-        dest = "data/board"
-      },
-      {
-        source = build_info_files.version
-        dest = "data/version"
-      },
-      {
-        source = build_info_files.jiri_snapshot
-        dest = "data/snapshot"
-      },
-      {
-        source = build_info_files.latest_commit_date
-        dest = "data/latest-commit-date"
-      },
-      {
-        source = build_info_files.minimum_utc_stamp
-        dest = "data/minimum-utc-stamp"
-      },
-    ]
-    deps = [ ":build_info_files" ]
-  }
-
-  fuchsia_package("build-info") {
-    deps = [ ":build-info-resources" ]
   }
 }
