@@ -4,6 +4,7 @@
 
 use anyhow::{bail, Context};
 use assembly_config_schema::{AssemblyConfig, BoardInformation, BuildType, ExampleConfig};
+use camino::Utf8Path;
 
 use crate::common::{CompletedConfiguration, ConfigurationBuilderImpl};
 
@@ -57,6 +58,7 @@ pub fn define_configuration(
     config: &AssemblyConfig,
     board_info: &BoardInformation,
     ramdisk_image: bool,
+    gendir: impl AsRef<Utf8Path>,
 ) -> anyhow::Result<CompletedConfiguration> {
     let icu_config = &config.platform.icu;
     let mut builder = ConfigurationBuilderImpl::new(icu_config.clone());
@@ -70,11 +72,17 @@ pub fn define_configuration(
     // Only perform configuration if the feature_set_level is not None (ie, Empty).
     if let Some(feature_set_level) = &feature_set_level {
         let build_type = &config.platform.build_type;
+        let gendir = gendir.as_ref().to_path_buf();
 
         // Set up the context that's used by each subsystem to get the generally-
         // available platform information.
-        let context =
-            ConfigurationContext { feature_set_level, build_type, board_info, ramdisk_image };
+        let context = ConfigurationContext {
+            feature_set_level,
+            build_type,
+            board_info,
+            ramdisk_image,
+            gendir,
+        };
 
         // Call the configuration functions for each subsystem.
         configure_subsystems(&context, config, &mut builder)?;
@@ -326,7 +334,7 @@ mod tests {
 
         let mut cursor = std::io::Cursor::new(json5);
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
-        let result = define_configuration(&config, &BoardInformation::default(), false);
+        let result = define_configuration(&config, &BoardInformation::default(), false, "");
 
         assert!(result.is_err());
     }

@@ -45,9 +45,11 @@ rustc_library("platform_configuration") {
     "//src/lib/assembly/images_config",
     "//src/lib/assembly/util",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:camino",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:tempfile",
   ]
   test_deps = [
     "//src/lib/assembly/images_config",

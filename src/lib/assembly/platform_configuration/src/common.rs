@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Result};
+use camino::Utf8PathBuf;
 use serde::Serialize;
 use std::collections::{btree_map::Entry, BTreeSet};
+use tempfile::TempDir;
 
 use assembly_config_schema::platform_config::icu_config::{ICUMap, Revision, ICU_CONFIG_INFO};
 use assembly_config_schema::{BoardInformation, BuildType, FileEntry, ICUConfig};
@@ -99,6 +101,7 @@ pub(crate) struct ConfigurationContext<'a> {
     pub build_type: &'a BuildType,
     pub board_info: &'a BoardInformation,
     pub ramdisk_image: bool,
+    pub gendir: Utf8PathBuf,
 }
 
 /// A struct for collecting multiple kinds of platform configuration.
@@ -640,6 +643,20 @@ impl ICUMapGetExt for ICUMap {
     }
 }
 
+impl ConfigurationContext<'_> {
+    /// Return a new gendir that is nested under the top-level gendir
+    /// Subsystems can use this to generate files before adding them to the
+    /// builder.
+    #[allow(dead_code)]
+    pub fn get_gendir(&self) -> Result<Utf8PathBuf> {
+        let gendir =
+            TempDir::new_in(&self.gendir).map_err(|e| anyhow!("preparing new gendir: {}", e))?;
+        let gendir = Utf8PathBuf::from_path_buf(gendir.into_path())
+            .map_err(|_e| anyhow!("converting to utf8 path"))?;
+        Ok(gendir)
+    }
+}
+
 #[cfg(test)]
 impl ConfigurationContext<'_> {
     /// Use e.g. in tests that initialize only relevant fields.
@@ -660,6 +677,7 @@ impl ConfigurationContext<'_> {
             build_type: &BuildType::User,
             board_info: &tests::BOARD_INFORMATION_FOR_TESTS,
             ramdisk_image: false,
+            gendir: Utf8PathBuf::new(),
         }
     }
 }
