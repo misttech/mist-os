@@ -29,8 +29,25 @@ pub(crate) struct ConnectedResult {
 /// so that functionality can be added gradually to implementations.
 /// The scope of this trait will grow considerably as new functionality is added.
 pub(crate) trait WlanixService: Send + Sync {
+    async fn get_nl80211_interfaces(
+        &self,
+        responder: fidl_wlanix::Nl80211MessageResponder,
+    ) -> Result<(), Error> {
+        responder
+            .send(Ok(nl80211_message_resp(vec![build_nl80211_message(
+                Nl80211Cmd::NewInterface,
+                vec![
+                    Nl80211Attr::IfaceIndex(0),
+                    Nl80211Attr::IfaceName(crate::IFACE_NAME.to_string()),
+                    Nl80211Attr::Mac([1, 2, 3, 4, 5, 6]),
+                ],
+            )])))
+            .context("Failed to send NewInterface")
+    }
+
     async fn trigger_nl80211_scan(
         &self,
+        _req_attrs: Vec<Nl80211Attr>,
         responder: fidl_wlanix::Nl80211MessageResponder,
         state: Arc<Mutex<WifiState>>,
     ) -> Result<(), Error> {

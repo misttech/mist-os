@@ -9,7 +9,7 @@ use {
         nl80211::{Nl80211Attr, Nl80211Cmd},
         nl80211_message_resp, WifiState,
     },
-    anyhow::{bail, format_err, Context, Error},
+    anyhow::{format_err, Context, Error},
     async_trait::async_trait,
     fidl::endpoints::create_proxy,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_common_security as fidl_security,
@@ -20,17 +20,23 @@ use {
     fuchsia_zircon as zx,
     futures::TryStreamExt,
     parking_lot::Mutex,
-    std::{convert::TryFrom, sync::Arc},
+    std::{
+        convert::{TryFrom, TryInto},
+        sync::Arc,
+    },
     tracing::{error, info},
     wlan_common::{bss::BssDescription, channel::Channel},
 };
 
-// TODO(fxbug.dev/128604): Replace with real iface info from SME.
-const FAKE_IFACE_ID: u32 = 0;
+#[derive(Default, Clone)]
+struct LastScanResults {
+    iface_id: u16,
+    results: Vec<fidl_sme::ScanResult>,
+}
 
 pub(crate) struct SmeService {
     monitor_svc: fidl_device_service::DeviceMonitorProxy,
-    last_scan_results: Mutex<Vec<fidl_sme::ScanResult>>,
+    last_scan_results: Mutex<LastScanResults>,
 }
 
 impl SmeService {
@@ -39,11 +45,12 @@ impl SmeService {
             fidl_device_service::DeviceMonitorMarker,
         >()
         .context("failed to connect to device monitor")?;
-        Ok(Self { monitor_svc, last_scan_results: Mutex::new(vec![]) })
+        Ok(Self { monitor_svc, last_scan_results: Mutex::new(Default::default()) })
     }
 
-    async fn passive_scan(&self) -> Result<(), Error> {
-        let sme_proxy = self.select_client_iface().await?;
+    async fn passive_scan(&self, iface_id: u16) -> Result<(), Error> {
+        let (sme_proxy, server) = create_proxy::<fidl_sme::ClientSmeMarker>()?;
+        self.monitor_svc.get_client_sme(iface_id, server).await?.map_err(zx::Status::from_raw)?;
         let scan_request = fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest);
         let scan_result_vmo = sme_proxy
             .scan(&scan_request)
@@ -51,11 +58,19 @@ impl SmeService {
             .context("Failed to request scan")?
             .map_err(|e| format_err!("Scan ended with error: {:?}", e))?;
         info!("Got scan results from SME.");
-        *self.last_scan_results.lock() = wlan_common::scan::read_vmo(scan_result_vmo)?;
+        *self.last_scan_results.lock() =
+            LastScanResults { iface_id, results: wlan_common::scan::read_vmo(scan_result_vmo)? };
         Ok(())
     }
+}
 
-    async fn select_client_iface(&self) -> Result<fidl_sme::ClientSmeProxy, Error> {
+#[async_trait]
+impl WlanixService for SmeService {
+    async fn get_nl80211_interfaces(
+        &self,
+        responder: fidl_wlanix::Nl80211MessageResponder,
+    ) -> Result<(), Error> {
+        let mut resp = vec![];
         let ifaces = self.monitor_svc.list_ifaces().await?;
         for iface_id in ifaces {
             let iface_info = self
@@ -64,31 +79,40 @@ impl SmeService {
                 .await?
                 .map_err(zx::Status::from_raw)
                 .context("Could not query iface info")?;
-            if iface_info.role == fidl_common::WlanMacRole::Client {
-                let (proxy, server) = create_proxy::<fidl_sme::ClientSmeMarker>()?;
-                self.monitor_svc
-                    .get_client_sme(iface_id, server)
-                    .await?
-                    .map_err(zx::Status::from_raw)?;
-                return Ok(proxy);
-            }
+            resp.push(build_nl80211_message(
+                Nl80211Cmd::NewInterface,
+                vec![
+                    Nl80211Attr::IfaceIndex(iface_id.into()),
+                    // TODO(fxbug.dev/128604): Populate this with the real iface name assigned by netcfg.
+                    Nl80211Attr::IfaceName(crate::IFACE_NAME.to_string()),
+                    Nl80211Attr::Mac(iface_info.sta_addr),
+                ],
+            ));
         }
-        bail!("No client iface found for scanning");
+        resp.push(build_nl80211_done());
+        responder.send(Ok(nl80211_message_resp(resp))).context("Failed to send scan results")
     }
-}
 
-#[async_trait]
-impl WlanixService for SmeService {
     async fn trigger_nl80211_scan(
         &self,
+        req_attrs: Vec<Nl80211Attr>,
         responder: fidl_wlanix::Nl80211MessageResponder,
         state: Arc<Mutex<WifiState>>,
     ) -> Result<(), Error> {
+        let iface_id = req_attrs
+            .iter()
+            .filter_map(|attr| match attr {
+                Nl80211Attr::IfaceIndex(idx) => Some(idx),
+                _ => None,
+            })
+            .next()
+            .ok_or(format_err!("No iface id specified in NL80211 scan request"))?;
+
         responder
             .send(Ok(nl80211_message_resp(vec![build_nl80211_ack()])))
             .context("Failed to ack TriggerScan")?;
 
-        match self.passive_scan().await {
+        match self.passive_scan((*iface_id).try_into()?).await {
             Ok(()) => info!("Passive scan completed successfully"),
             Err(e) => error!("Failed to run passive scan: {:?}", e),
         }
@@ -98,7 +122,7 @@ impl WlanixService for SmeService {
                 .message(fidl_wlanix::Nl80211MulticastMessageRequest {
                     message: Some(build_nl80211_message(
                         Nl80211Cmd::NewScanResults,
-                        vec![Nl80211Attr::IfaceIndex(FAKE_IFACE_ID)],
+                        vec![Nl80211Attr::IfaceIndex(*iface_id)],
                     )),
                     ..Default::default()
                 })
@@ -111,13 +135,16 @@ impl WlanixService for SmeService {
         &self,
         responder: fidl_wlanix::Nl80211MessageResponder,
     ) -> Result<(), Error> {
-        let locked_results = self.last_scan_results.lock();
-        info!("Processing {} scan results", locked_results.len());
+        let locked_results = self.last_scan_results.lock().clone();
+        info!("Processing {} scan results", locked_results.results.len());
         let mut resp = vec![];
-        for result in locked_results.clone() {
+        for result in locked_results.results {
             resp.push(build_nl80211_message(
                 Nl80211Cmd::NewScanResults,
-                vec![Nl80211Attr::IfaceIndex(FAKE_IFACE_ID), convert_scan_result(result)],
+                vec![
+                    Nl80211Attr::IfaceIndex(locked_results.iface_id.into()),
+                    convert_scan_result(result),
+                ],
             ));
         }
         resp.push(build_nl80211_done());
@@ -125,9 +152,9 @@ impl WlanixService for SmeService {
     }
 
     async fn connect_to_network(&self, ssid: &[u8]) -> Result<ConnectedResult, Error> {
-        let selected_bss_description = self
-            .last_scan_results
-            .lock()
+        let last_scan_results = self.last_scan_results.lock().clone();
+        let selected_bss_description = last_scan_results
+            .results
             .iter()
             .filter_map(|r| {
                 // TODO(fxbug.dev/128604): handle the case when there are multiple BSS candidates
@@ -145,7 +172,9 @@ impl WlanixService for SmeService {
         };
 
         info!("Selected BSS to connect to");
-        let sme_proxy = self.select_client_iface().await?;
+        let iface_id = last_scan_results.iface_id;
+        let (sme_proxy, server) = create_proxy::<fidl_sme::ClientSmeMarker>()?;
+        self.monitor_svc.get_client_sme(iface_id, server).await?.map_err(zx::Status::from_raw)?;
         let (connect_txn, remote) = create_proxy()?;
         let bssid = bss_description.bssid;
         let connect_req = fidl_sme::ConnectRequest {
@@ -238,11 +267,16 @@ fn convert_scan_result(result: fidl_sme::ScanResult) -> Nl80211Attr {
 mod tests {
     use {
         super::*,
+        crate::Nl80211,
         fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_wlan_internal as fidl_internal,
         futures::{task::Poll, StreamExt},
+        netlink_packet_core::{NetlinkDeserializable, NetlinkHeader},
+        netlink_packet_generic::GenlMessage,
         wlan_common::assert_variant,
     };
+
+    const FAKE_MAC_ADDR: [u8; 6] = [1, 2, 3, 4, 5, 6];
 
     fn fake_scan_result() -> fidl_sme::ScanResult {
         fidl_sme::ScanResult {
@@ -299,32 +333,39 @@ mod tests {
         (message_fut, nl80211_responder)
     }
 
+    // This will only work if the message is a parseable nl80211 message. Some
+    // attributes are currently write only in our NL80211 implementation.
+    fn expect_nl80211_message(message: &fidl_wlanix::Nl80211Message) -> GenlMessage<Nl80211> {
+        assert_eq!(message.message_type, Some(fidl_wlanix::Nl80211MessageType::Message));
+        GenlMessage::deserialize(
+            &NetlinkHeader::default(),
+            &message.payload.as_ref().expect("Message should always have a payload")[..],
+        )
+        .expect("Failed to deserialize genetlink message")
+    }
+
     #[test]
-    fn test_trigger_nl80211_scan() {
+    fn test_get_nl80211_interfaces() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(0));
 
         let (monitor_svc, mut monitor_stream) =
             create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>()
                 .expect("Failed to create device monitor service");
-        let service = SmeService { monitor_svc, last_scan_results: Mutex::new(vec![]) };
+        let service = SmeService { monitor_svc, last_scan_results: Mutex::new(Default::default()) };
 
-        // Get a fake nl80211 responder.
+        // Query interfaces.
         let (mut message_fut, responder) = fake_nl80211_responder(&mut exec);
+        let mut fut = service.get_nl80211_interfaces(responder);
 
-        // Start the scan attempt.
-        let state = Arc::new(Mutex::new(WifiState::default()));
-        let mut fut = service.trigger_nl80211_scan(responder, state);
-
-        // SmeServer should ack the request and then discover a scannable interface.
+        // First query device monitor for the list of ifaces.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut message_fut), Poll::Ready(Ok(_)));
-
         let responder = assert_variant!(
             exec.run_until_stalled(&mut monitor_stream.select_next_some()),
             Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::ListIfaces { responder })) => responder);
         responder.send(&[1]).expect("Failed to respond to ListIfaces");
 
+        // Second query device monitor for more info on each iface.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         let responder = assert_variant!(
             exec.run_until_stalled(&mut monitor_stream.select_next_some()),
@@ -335,12 +376,45 @@ mod tests {
                 id: 1,
                 phy_id: 1,
                 phy_assigned_id: 1,
-                sta_addr: [1, 2, 3, 4, 5, 6],
+                sta_addr: FAKE_MAC_ADDR.clone(),
             }))
             .expect("Failed to respond to QueryIfaceResponse");
 
-        // SmeServer connects to the discovered interface.
+        // The iface should be sent in response.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        let responses = assert_variant!(
+            exec.run_until_stalled(&mut message_fut),
+            Poll::Ready(Ok(Ok(fidl_wlanix::Nl80211MessageResponse { responses: Some(responses), ..}))) => responses);
+        assert_eq!(responses.len(), 2);
+        let message = expect_nl80211_message(&responses[0]);
+        assert_eq!(message.payload.cmd, Nl80211Cmd::NewInterface);
+        assert!(message.payload.attrs.iter().any(|attr| *attr == Nl80211Attr::IfaceIndex(1)));
+        assert!(message.payload.attrs.iter().any(|attr| *attr == Nl80211Attr::Mac(FAKE_MAC_ADDR)));
+        assert_eq!(responses[1].message_type, Some(fidl_wlanix::Nl80211MessageType::Done));
+    }
+
+    #[test]
+    fn test_trigger_nl80211_scan() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::Time::from_nanos(0));
+
+        let (monitor_svc, mut monitor_stream) =
+            create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>()
+                .expect("Failed to create device monitor service");
+        let service = SmeService { monitor_svc, last_scan_results: Mutex::new(Default::default()) };
+
+        // Get a fake nl80211 responder.
+        let (mut message_fut, responder) = fake_nl80211_responder(&mut exec);
+
+        // Start the scan attempt.
+        let state = Arc::new(Mutex::new(WifiState::default()));
+        let mut fut =
+            service.trigger_nl80211_scan(vec![Nl80211Attr::IfaceIndex(1)], responder, state);
+
+        // SmeServer should ack the request and then connect to the iface.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut message_fut), Poll::Ready(Ok(_)));
+
         let (sme_server, responder) = assert_variant!(
             exec.run_until_stalled(&mut monitor_stream.select_next_some()),
             Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::GetClientSme { iface_id: 1, sme_server, responder })) => (sme_server, responder));
@@ -348,7 +422,7 @@ mod tests {
         responder.send(Ok(())).expect("Failed to respond to GetClientSme");
 
         // We should not yet have returned any scan results.
-        assert!(service.last_scan_results.lock().is_empty());
+        assert!(service.last_scan_results.lock().results.is_empty());
 
         // We should initiate an SME scan on the selected interface.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -362,7 +436,9 @@ mod tests {
 
         // Scan results are delivered and everything is cleaned up.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
-        assert_eq!(service.last_scan_results.lock().len(), 1);
+        let last_results = service.last_scan_results.lock().clone();
+        assert_eq!(last_results.results.len(), 1);
+        assert_eq!(last_results.iface_id, 1);
     }
 
     #[test]
@@ -373,8 +449,13 @@ mod tests {
         let (monitor_svc, _monitor_stream) =
             create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>()
                 .expect("Failed to create device monitor service");
-        let service =
-            SmeService { monitor_svc, last_scan_results: Mutex::new(vec![fake_scan_result()]) };
+        let service = SmeService {
+            monitor_svc,
+            last_scan_results: Mutex::new(LastScanResults {
+                iface_id: 1,
+                results: vec![fake_scan_result()],
+            }),
+        };
 
         // Get a fake nl80211 responder.
         let (mut message_fut, responder) = fake_nl80211_responder(&mut exec);

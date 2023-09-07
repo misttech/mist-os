@@ -518,16 +518,7 @@ async fn handle_nl80211_message<S: WlanixService>(
         }
         Nl80211Cmd::GetInterface => {
             info!("Nl80211Cmd::GetInterface");
-            responder
-                .send(Ok(nl80211_message_resp(vec![build_nl80211_message(
-                    Nl80211Cmd::NewInterface,
-                    vec![
-                        Nl80211Attr::IfaceIndex(0),
-                        Nl80211Attr::IfaceName(IFACE_NAME.to_string()),
-                        Nl80211Attr::Mac([1, 2, 3, 4, 5, 6]),
-                    ],
-                )])))
-                .context("Failed to send NewInterface")?;
+            service.get_nl80211_interfaces(responder).await?;
         }
         Nl80211Cmd::GetProtocolFeatures => {
             info!("Nl80211Cmd::GetProtocolFeatures");
@@ -540,7 +531,7 @@ async fn handle_nl80211_message<S: WlanixService>(
         }
         Nl80211Cmd::TriggerScan => {
             info!("Nl80211Cmd::TriggerScan");
-            service.trigger_nl80211_scan(responder, state).await?;
+            service.trigger_nl80211_scan(message.payload.attrs, responder, state).await?;
         }
         Nl80211Cmd::GetScan => {
             info!("Nl80211Cmd::GetScan");
