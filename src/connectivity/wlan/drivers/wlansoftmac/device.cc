@@ -485,11 +485,6 @@ void Device::ShutdownMainLoop() {
 void Device::EthUnbind() {
   ldebug(0, NULL, "Entering.");
   ShutdownMainLoop();
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    lerror("Arena creation failed: %s", arena.status_string());
-    return;
-  }
   client_dispatcher_.ShutdownAsync();
 }
 
