@@ -10,6 +10,8 @@
 #include <lib/async/dispatcher.h>
 #include <lib/zx/result.h>
 
+#include <string>
+
 #include "component_watcher.h"
 
 namespace profiler {
@@ -33,10 +35,18 @@ class Component {
   virtual ~Component();
 
  protected:
+  // Recursively call f on each component in the realm specified by `moniker`
+  static zx::result<> TraverseRealm(
+      std::string moniker, const fit::function<zx::result<>(const std::string& moniker)>& f);
+  static zx::result<fidl::Box<fuchsia_component_decl::Component>> GetResolvedDeclaration(
+      const std::string& moniker);
+  std::optional<ComponentWatcher::ComponentEventHandler> on_start_;
   std::string name_;
   std::string collection_;
   std::string parent_moniker_;
   std::string moniker_;
+  std::string url_;
+  std::vector<Component> children_;
 
   ComponentWatcher component_watcher_;
 

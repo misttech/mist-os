@@ -9,6 +9,7 @@ executable("profiler_integration_test_bin") {
   sources = [ "integration_test.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.cpu.profiler:fuchsia.cpu.profiler_cpp",
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fidl/cpp",
@@ -35,7 +36,10 @@ fuchsia_test_package("profiler_integration_test") {
     "//src/performance/experimental/profiler/tests/demo_target:bin",
     "//src/performance/experimental/profiler/tests/thread_spawner",
   ]
-  subpackages = [ "demo_target" ]
+  subpackages = [
+    "demo_target",
+    "component_with_children",
+  ]
 
   test_specs = {
     parallel = 1
