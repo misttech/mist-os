@@ -252,13 +252,13 @@ impl SignalInfo {
     // Linux side won't get an invalid siginfo_t.
     pub fn as_siginfo_bytes(&self) -> [u8; std::mem::size_of::<siginfo_t>()] {
         macro_rules! make_siginfo {
-            ($self:ident $(, $sifield:ident, $value:expr)?) => {
+            ($self:ident $(, $( $sifield:ident ).*, $value:expr)?) => {
                 struct_with_union_into_bytes!(siginfo_t {
                     __bindgen_anon_1.__bindgen_anon_1.si_signo: $self.signal.number() as i32,
                     __bindgen_anon_1.__bindgen_anon_1.si_errno: $self.errno,
                     __bindgen_anon_1.__bindgen_anon_1.si_code: $self.code,
                     $(
-                        __bindgen_anon_1.__bindgen_anon_1._sifields.$sifield: $value,
+                        __bindgen_anon_1.__bindgen_anon_1._sifields.$( $sifield ).*: $value,
                     )?
                 })
             };
@@ -276,6 +276,9 @@ impl SignalInfo {
                     ..Default::default()
                 }
             ),
+            SignalDetail::SigFault { addr } => {
+                make_siginfo!(self, _sigfault._addr, linux_uapi::uaddr { addr })
+            }
             SignalDetail::SigSys { call_addr, syscall, arch } => make_siginfo!(
                 self,
                 _sigsys,
@@ -320,6 +323,9 @@ pub enum SignalDetail {
         pid: pid_t,
         uid: uid_t,
         status: i32,
+    },
+    SigFault {
+        addr: u64,
     },
     SigSys {
         call_addr: UserAddress,

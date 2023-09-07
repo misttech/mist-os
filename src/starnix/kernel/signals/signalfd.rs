@@ -70,6 +70,9 @@ impl FileOps for SignalFd {
                         siginfo.ssi_uid = uid;
                         siginfo.ssi_status = status;
                     }
+                    SignalDetail::SigFault { addr } => {
+                        siginfo.ssi_addr = addr;
+                    }
                     SignalDetail::SigSys { call_addr, syscall, arch } => {
                         siginfo.ssi_call_addr = call_addr.into();
                         siginfo.ssi_syscall = syscall;

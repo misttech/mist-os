@@ -473,9 +473,7 @@ class MapGrowsdownTest : public testing::Test {
     helper.RunInForkedProcess([test_address, type] {
       struct sigaction segv_act;
       segv_act.sa_sigaction = [](int signo, siginfo_t* info, void* ucontext) {
-        // TODO(https://fxbug.dev/118860): si_addr is not populated in Starnix. Add this check when
-        // it's fixed.
-        if (signo == SIGSEGV /*&& info->si_addr == expected_fault_address*/) {
+        if (signo == SIGSEGV && info->si_addr == expected_fault_address) {
           _exit(EXIT_SUCCESS);
         }
         _exit(EXIT_FAILURE);
