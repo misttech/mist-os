@@ -38,7 +38,7 @@ def fuchsia_cc_driver(name, **kwargs):
         linkopts = linkopts,
         linkshared = True,
         visibility = ["//visibility:private"],
-        **kwargs,
+        **kwargs
     )
 
     fuchsia_wrap_cc_binary(

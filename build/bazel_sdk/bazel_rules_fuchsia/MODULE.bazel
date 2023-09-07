@@ -19,21 +19,17 @@ bazel_dep(name = "rules_python", version = "0.10.2")
 
 # Setup the cipd_tool repo for downloading content
 cipd_tool_ext = use_extension("//cipd:defs.bzl", "cipd_tool_ext")
-
 cipd_tool_ext.client(bin = "foo_tool")
-
 use_repo(cipd_tool_ext, "cipd_tool")
 
 # Declare the fuchsia sdk
 fuchsia_sdk_ext = use_extension("//fuchsia:deps.bzl", "fuchsia_sdk_ext")
-
 use_repo(fuchsia_sdk_ext, "fuchsia_sdk")
 
 register_toolchains("@fuchsia_sdk//:fuchsia_toolchain_sdk")
 
 # Declare clang
 fuchsia_clang_ext = use_extension("//fuchsia:deps.bzl", "fuchsia_clang_ext")
-
 use_repo(fuchsia_clang_ext, "fuchsia_clang")
 
 register_toolchains("@fuchsia_clang//:cc-x86_64")

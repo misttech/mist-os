@@ -24,16 +24,16 @@ ignore_policy = struct(
 
     # These targets will be ignored:
     targets = bool_dict([
-        "@fuchsia_sdk//:meta/manifest.json", # SDK metadata, not shipping to clients.
-        "@platforms//os:os", # Constraint
-        "@platforms//os:fuchsia", # Constraint
+        "@fuchsia_sdk//:meta/manifest.json",  # SDK metadata, not shipping to clients.
+        "@platforms//os:os",  # Constraint
+        "@platforms//os:fuchsia",  # Constraint
     ]),
 
     # Anything withing these workspaces will be ignored:
     workspaces = bool_dict([
         "bazel_tools",
-        "fuchsia_clang", # TODO(95670): clang bazel defs should provide licenses.
-        "fuchsia_sdk", # TODO(130784): sdk atoms should provide licenses.
+        "fuchsia_clang",  # TODO(95670): clang bazel defs should provide licenses.
+        "fuchsia_sdk",  # TODO(130784): sdk atoms should provide licenses.
     ]),
 
     # Anything withing these package will be ignored:

@@ -5,6 +5,7 @@
 load("./common.star", "FORMATTER_MSG", "cipd_platform_name")
 load("./go.star", "register_go_checks")
 load("./python.star", "register_python_checks")
+load("./starlark.star", "register_starlark_checks")
 
 def _gn_format(ctx):
     """Runs gn format on .gn and .gni files.
@@ -49,3 +50,4 @@ def register_all_checks():
     shac.register_check(shac.check(_gn_format, formatter = True))
     register_go_checks()
     register_python_checks()
+    register_starlark_checks()

@@ -16,7 +16,7 @@ def _gofmt(ctx):
 
     base_cmd = [
         "prebuilt/third_party/go/%s/bin/gofmt" % cipd_platform_name(ctx),
-        "-s", # simplify
+        "-s",  # simplify
     ]
 
     unformatted = ctx.os.exec(base_cmd + ["-l"] + go_files).wait().stdout.splitlines()

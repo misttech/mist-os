@@ -137,10 +137,6 @@ function format-file() {
   case "${filename}" in
     *.c | *.cc | *.cpp | *.h | *.hh | *.hpp | *.proto | *.ts)
       format-cc-file "$1" ;;
-
-    *.bazel| *.bzl| *.bzlmod| BUILD| WORKSPACE)
-      format-full-file "${BAZEL_FORMAT_CMD}" "$1" ;;
-
     *.cmx) format-full-file "${JSON_FMT_CMD}" "$1" ;;
     *.cml) format-full-file "${CML_FMT_CMD}"  "$1";;
     *.dart) format-full-file "${DART_CMD}"  "$1";;
@@ -297,7 +293,6 @@ PY_TOOL="fuchsia-vendored-python"
 declare -r PY_TOOL
 VPYTHON_TOOL="${FUCHSIA_DIR}/prebuilt/third_party/vpython/vpython3"
 declare -r VPYTHON_TOOL
-readonly BAZEL_FORMAT_CMD="${PREBUILT_BUILDIFIER} -lint=warn"
 readonly CLANG_CMD="${PREBUILT_CLANG_DIR}/bin/clang-format -style=file -fallback-style=Google -sort-includes -i"
 readonly CMC_TOOL="$( fx-command-run list-build-artifacts --expect-one --name cmc tools )"
 readonly CMC_TOOL_ABS="${FUCHSIA_BUILD_DIR}/${CMC_TOOL}"
@@ -355,7 +350,7 @@ for file in "${FILES[@]}"; do
     # TODO(fxbug.dev/82386): Move all formatters into SHAC to ensure parity
     # between the formatters enforced by the infrastructure and those enforced
     # locally.
-    *.gn | *.gni | *.go)
+    *.bazel | *.bzl | *.bzlmod | BUILD | WORKSPACE | *.gn | *.gni | *.go)
       shac_files+=("$file")
       ;;
     *)

@@ -178,5 +178,5 @@ def fuchsia_product_configuration(
         base_packages = base_packages,
         cache_packages = cache_packages,
         base_driver_packages = base_driver_packages,
-        **kwarg,
+        **kwarg
     )
