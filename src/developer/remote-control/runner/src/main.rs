@@ -5,19 +5,16 @@
 use {
     anyhow::{Context as _, Result},
     argh::FromArgs,
+    compat_info::{CompatibilityInfo, ConnectionInfo},
     fidl_fuchsia_developer_remotecontrol::RemoteControlMarker,
     fuchsia_component::client::connect_to_protocol,
     futures::future::select,
     futures::io::BufReader,
     futures::prelude::*,
     std::os::unix::io::{AsRawFd, FromRawFd},
+    version_history::{check_abi_revision, AbiRevision},
 };
 
-const VERSION_HISTORY_LEN: usize = version_history::VERSION_HISTORY.len();
-const COMPATIBLE_ABIS: [u64; 2] = [
-    version_history::VERSION_HISTORY[VERSION_HISTORY_LEN - 1].abi_revision.0,
-    version_history::VERSION_HISTORY[VERSION_HISTORY_LEN - 2].abi_revision.0,
-];
 const BUFFER_SIZE: usize = 65536;
 
 async fn buffered_copy<R, W>(mut from: R, mut to: W, buffer_size: usize) -> std::io::Result<u64>
@@ -35,6 +32,22 @@ fn zx_socket_from_fd(fd: i32) -> Result<fidl::AsyncSocket> {
         .context("making fidl::AsyncSocket from fidl::Socket")
 }
 
+fn print_prelude_info(message: String, status: String, platform_abi: u64) -> Result<()> {
+    let ssh_connection = std::env::var("SSH_CONNECTION")?;
+    let info = ConnectionInfo {
+        ssh_connection: ssh_connection.clone(),
+        compatibility: CompatibilityInfo {
+            status,
+            platform_abi: platform_abi.to_string(),
+            message: message.clone(),
+        },
+    };
+
+    let encoded_message = serde_json::to_string(&info)?;
+    println!("{encoded_message}");
+    Ok(())
+}
+
 /// Utility to bridge an overnet/RCS connection via SSH. If you're running this manually, you are
 /// probably doing something wrong.
 #[derive(FromArgs)]
@@ -42,6 +55,12 @@ struct Args {
     /// use circuit-switched connection
     #[argh(switch)]
     circuit: bool,
+
+    /// flag indicating compatibility checking should be performed.
+    /// This also has the side effect of returning the $SSH_CONNECTION value in the response.
+    /// This is done to keep the remote side response parsing simple and backwards compatible.
+    #[argh(option)]
+    abi_revision: Option<u64>,
 
     /// ID number. RCS will reproduce this number once you connect to it. This allows us to
     /// associate an Overnet connection with an RCS connection, in spite of the fuzziness of
@@ -53,19 +72,31 @@ struct Args {
 #[fuchsia::main(logging_tags = ["remote_control_runner"])]
 async fn main() -> Result<()> {
     let args: Args = argh::from_env();
-
-    // Ensure the invoking version of ffx supports compatibility checks.
-    let daemon_abi_revision = match std::env::var("FFX_DAEMON_ABI_REVISION") {
-        Ok(val) => val.parse::<u64>()?,
-        Err(_) => 0,
-    };
-
-    if daemon_abi_revision != 0 && !COMPATIBLE_ABIS.contains(&daemon_abi_revision) {
-        let warning = format!(
-            "ffx revision {:#X} is not compatible with the target. The target is compatible with ABIs [ {:#X}, {:#X} ]",
-            daemon_abi_revision, COMPATIBLE_ABIS[0], COMPATIBLE_ABIS[1]
-        );
-        tracing::warn!("{}", warning);
+    // Perform the compatibility checking between the caller (the daemon) and the platform (this program).
+    if let Some(abi) = args.abi_revision {
+        let daemon_revision = AbiRevision(abi);
+        let platform_abi = version_history::get_latest_abi_revision();
+        let status: String;
+        let message = match check_abi_revision(Some(daemon_revision)) {
+            Ok(_) => {
+                tracing::info!("Daemon is running supported revision: {daemon_revision}");
+                status = "OK".into();
+                "Daemon is running supported revision".to_string()
+            }
+            Err(e) => {
+                status = e.to_string();
+                let warning = format!("abi revision {daemon_revision} not supported: {e}");
+                tracing::warn!("{warning}");
+                eprintln!("{warning}");
+                warning
+            }
+        };
+        print_prelude_info(message, status, platform_abi)?;
+    } else {
+        // This is the legacy caller that does not support compatibility checking. Do not write anything
+        // to stdout.
+        // messages to stderr will cause the pipe to close as well.
+        tracing::warn!("--abi-revision not present. Compatibility checks are disabled.");
     }
 
     let rcs_proxy = connect_to_protocol::<RemoteControlMarker>()?;

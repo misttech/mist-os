@@ -1,0 +1,24 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/rust/rustc_library.gni")
+
+rustc_library("lib") {
+  name = "compat_info"
+  edition = "2021"
+  with_unit_tests = true
+
+  sources = [ "src/lib.rs" ]
+
+  deps = [ "//third_party/rust_crates:serde" ]
+}
+
+group("tests") {
+  testonly = true
+  public_deps = [ ":lib_test($host_toolchain)" ]
+}
+
+group("compat_info") {
+  deps = [ ":lib" ]
+}

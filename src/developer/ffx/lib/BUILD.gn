@@ -7,6 +7,7 @@ assert(is_host)
 libs = [
   "addr",
   "buildid",
+  "compat_info",
   "daemonize",
   "doctor_utils",
   "emulator_instance",
@@ -46,11 +47,9 @@ group("tests") {
   }
 }
 
-if (is_host) {
-  group("host_tests") {
-    testonly = true
-    deps = [ "e2e_emu:host_tests" ]
-  }
+group("host_tests") {
+  testonly = true
+  deps = [ "e2e_emu:host_tests" ]
 }
 
 group("lib") {
