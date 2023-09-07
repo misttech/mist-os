@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-min_shac_version: "0.1.0"
+min_shac_version: "0.1.2"
 allow_network: False
 # Some files under //third_party are actually first-party code (most notably
 # BUILD.gn files) so //third_party cannot be ignored in its entirety.

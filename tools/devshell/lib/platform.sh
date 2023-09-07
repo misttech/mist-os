@@ -65,6 +65,7 @@ readonly PREBUILT_RECLIENT_DIR="${FUCHSIA_DIR}/prebuilt/proprietary/third_party/
 readonly PREBUILT_RUST_BINDGEN_DIR="${PREBUILT_3P_DIR}/rust_bindgen/${HOST_PLATFORM}"
 readonly PREBUILT_RUST_CARGO_OUTDATED_DIR="${PREBUILT_3P_DIR}/rust_cargo_outdated/${HOST_PLATFORM}"
 readonly PREBUILT_RUST_DIR="${PREBUILT_3P_DIR}/rust/${HOST_PLATFORM}"
+readonly PREBUILT_SHAC="${FUCHSIA_DIR}/prebuilt/tools/shac/shac"
 readonly PREBUILT_VDL_DIR="${FUCHSIA_DIR}/prebuilt/vdl"
 
 # Used by //scripts/hermetic-env for portable shebang lines.
