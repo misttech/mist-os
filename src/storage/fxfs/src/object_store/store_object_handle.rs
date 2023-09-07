@@ -996,14 +996,32 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         self.update_allocated_size(transaction, allocated, deallocated).await
     }
 
-    /// Writes an entire attribute.
+    /// Writes an entire attribute. Returns whether or not the attribute needs to continue being
+    /// trimmed - if the new data is shorter than the old data, this will trim any extents beyond
+    /// the end of the new size, but if there were too many for a single transaction, a commit
+    /// needs to be made before trimming again, so the responsibility is left to the caller so as
+    /// to not accidentally split the transaction when it's not in a consistent state.
     pub async fn write_attr<'a>(
         &'a self,
         transaction: &mut Transaction<'a>,
         attribute_id: u64,
         data: &[u8],
-    ) -> Result<(), Error> {
+    ) -> Result<NeedsTrim, Error> {
         let rounded_len = round_up(data.len() as u64, self.block_size()).unwrap();
+        let store = self.store();
+        let tree = store.tree();
+        let should_trim = if let Some(item) = tree
+            .find(&ObjectKey::attribute(self.object_id(), attribute_id, AttributeKey::Attribute))
+            .await?
+        {
+            match item.value {
+                ObjectValue::None => false,
+                ObjectValue::Attribute { size } => (data.len() as u64) < size,
+                _ => bail!(FxfsError::Inconsistent),
+            }
+        } else {
+            false
+        };
         let mut buffer = self.store().device.allocate_buffer(rounded_len as usize);
         let slice = buffer.as_mut_slice();
         slice[..data.len()].copy_from_slice(data);
@@ -1016,7 +1034,11 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                 ObjectValue::attribute(data.len() as u64),
             ),
         );
-        Ok(())
+        if should_trim {
+            self.shrink(transaction, attribute_id, data.len() as u64).await
+        } else {
+            Ok(NeedsTrim(false))
+        }
     }
 
     pub async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, Error> {
@@ -1121,8 +1143,11 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
 
         if let Some(attribute_id) = existing_attribute_id {
             // If we already have an attribute id allocated for this extended attribute, we always
-            // use it, even if the value has shrunk enough to be stored inline.
-            self.write_attr(&mut transaction, attribute_id, &value).await?;
+            // use it, even if the value has shrunk enough to be stored inline. We don't need to
+            // worry about trimming here for the same reason we don't need to worry about it when
+            // we delete xattrs - they simply aren't large enough to ever need more than one
+            // transaction.
+            let _ = self.write_attr(&mut transaction, attribute_id, &value).await?;
         } else if value.len() <= MAX_INLINE_XATTR_SIZE {
             transaction.add(
                 self.store().store_object_id(),
@@ -1179,7 +1204,8 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                 iter.advance().await?;
             }
 
-            self.write_attr(&mut transaction, attribute_id, &value).await?;
+            // We know this won't need trimming because it's a new attribute.
+            let _ = self.write_attr(&mut transaction, attribute_id, &value).await?;
             transaction.add(
                 self.store().store_object_id(),
                 Mutation::replace_or_insert_object(
@@ -1295,9 +1321,9 @@ mod tests {
             filesystem::{Filesystem, FxFilesystem, OpenFxFilesystem},
             object_handle::ObjectHandle,
             object_store::{
-                transaction::{Options, TransactionHandler},
-                DataObjectHandle, Directory, HandleOptions, LockKey, ObjectStore,
-                SetExtendedAttributeMode, StoreObjectHandle,
+                transaction::{Mutation, Options, TransactionHandler},
+                AttributeKey, DataObjectHandle, Directory, HandleOptions, LockKey, ObjectKey,
+                ObjectStore, ObjectValue, SetExtendedAttributeMode, StoreObjectHandle,
             },
         },
         fuchsia_async as fasync,
@@ -1903,6 +1929,57 @@ mod tests {
             )
             .await
             .unwrap();
+
+        fs.close().await.expect("close failed");
+    }
+
+    #[fuchsia::test]
+    async fn write_attr_trims_beyond_new_end() {
+        // When writing, multi_write will deallocate old extents that overlap with the new data,
+        // but it doesn't trim anything beyond that, since it doesn't know what the total size will
+        // be. write_attr does know, because it writes the whole attribute at once, so we need to
+        // make sure it cleans up properly.
+        let (fs, object) = test_filesystem_and_empty_object().await;
+        let handle = object.handle();
+
+        let block_size = fs.block_size();
+        let buf_size = block_size * 2;
+        let attribute_id = 10;
+
+        let mut transaction = handle.new_transaction(attribute_id).await.unwrap();
+        let mut buffer = handle.allocate_buffer(buf_size as usize);
+        buffer.as_mut_slice().fill(3);
+        // Writing two separate ranges, even if they are contiguous, forces them to be separate
+        // extent records.
+        handle
+            .multi_write(
+                &mut transaction,
+                attribute_id,
+                &[0..block_size, block_size..block_size * 2],
+                buffer.as_mut(),
+            )
+            .await
+            .unwrap();
+        transaction.add(
+            handle.store().store_object_id,
+            Mutation::replace_or_insert_object(
+                ObjectKey::attribute(handle.object_id(), attribute_id, AttributeKey::Attribute),
+                ObjectValue::attribute(block_size * 2),
+            ),
+        );
+        transaction.commit().await.unwrap();
+
+        crate::fsck::fsck(fs.clone()).await.unwrap();
+
+        let mut transaction = handle.new_transaction(attribute_id).await.unwrap();
+        let needs_trim = handle
+            .write_attr(&mut transaction, attribute_id, &vec![3u8; block_size as usize])
+            .await
+            .unwrap();
+        assert!(!needs_trim.0);
+        transaction.commit().await.unwrap();
+
+        crate::fsck::fsck(fs.clone()).await.unwrap();
 
         fs.close().await.expect("close failed");
     }

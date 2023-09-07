@@ -836,8 +836,24 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     pub async fn write_attr(&self, attribute_id: u64, data: &[u8]) -> Result<(), Error> {
         // Must be different attribute otherwise cached size gets out of date.
         assert_ne!(attribute_id, self.attribute_id());
+        let store = self.store();
         let mut transaction = self.new_transaction().await?;
-        self.handle.write_attr(&mut transaction, attribute_id, data).await?;
+        if self.handle.write_attr(&mut transaction, attribute_id, data).await?.0 {
+            transaction.commit_and_continue().await?;
+            while matches!(
+                store
+                    .trim_some(
+                        &mut transaction,
+                        self.object_id(),
+                        attribute_id,
+                        TrimMode::FromOffset(data.len() as u64),
+                    )
+                    .await?,
+                TrimResult::Incomplete
+            ) {
+                transaction.commit_and_continue().await?;
+            }
+        }
         transaction.commit().await?;
         Ok(())
     }

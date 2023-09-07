@@ -2016,7 +2016,7 @@ mod tests {
                 )
                 .await
                 .expect("new transaction failed");
-            directory
+            let _ = directory
                 .handle
                 .write_attr(&mut transaction, 1, b"bar")
                 .await
