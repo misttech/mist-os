@@ -364,14 +364,23 @@ struct ActiveTransaction {
 
 /// State held for the duration of a transaction. When a transaction completes (or fails), this
 /// state is dropped, decrementing temporary strong references to binder objects.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct TransactionState {
+    kernel: Arc<Kernel>,
     /// The process whose handle table `handles` belong to.
     proc: Weak<BinderProcess>,
+    /// The pid of the target process.
+    pid: pid_t,
+    /// The remote resource accessor of the target process. This is None when the receiving process
+    /// is a local process.
+    remote_resource_accessor: Option<Arc<RemoteResourceAccessor>>,
     /// The objects to strongly owned for the duration of the transaction.
     guards: Vec<StrongRefGuard>,
     /// The handles to decrement their strong reference count.
     handles: Vec<Handle>,
+    /// The FDs of the target process that the kernel is responsible for closing, because they were
+    /// sent with BINDER_TYPE_FDA.
+    owned_fds: Vec<FdNumber>,
 }
 
 impl Drop for TransactionState {
@@ -401,6 +410,24 @@ impl Drop for TransactionState {
         }
         // Releasing action must be done without holding BinderProcess lock.
         drop_actions.release(());
+
+        // Close the owned fd.
+        if !self.owned_fds.is_empty() {
+            let weak_task = self.kernel.pids.read().get_task(self.pid);
+            if let Some(task) = weak_task.upgrade() {
+                let resource_accessor =
+                    get_resource_accessor(&task, &self.remote_resource_accessor);
+                for fd in &self.owned_fds {
+                    if let Err(error) = resource_accessor.close_fd(*fd) {
+                        log_warn!(
+                            "Error when dropping transaction state while closing fd for task {}: {:?}",
+                            self.pid,
+                            error
+                        );
+                    }
+                }
+            };
+        }
     }
 }
 
@@ -410,7 +437,7 @@ impl Drop for TransactionState {
 /// can be converted into a [`TransactionState`] to be held for the lifetime of the transaction.
 struct TransientTransactionState<'a> {
     /// The part of the transient state that will live for the lifetime of the transaction.
-    state: TransactionState,
+    state: Option<TransactionState>,
     /// The task to which the transient file descriptors belong.
     accessor: &'a dyn ResourceAccessor,
     /// The file descriptors to close in case of an error.
@@ -432,11 +459,15 @@ impl<'a> TransientTransactionState<'a> {
     /// `target_proc` for FDs and binder handles respectively.
     fn new(accessor: &'a dyn ResourceAccessor, target_proc: &Arc<BinderProcess>) -> Self {
         TransientTransactionState {
-            state: TransactionState {
+            state: Some(TransactionState {
+                kernel: accessor.kernel().clone(),
                 proc: Arc::downgrade(target_proc),
+                pid: target_proc.pid,
+                remote_resource_accessor: target_proc.remote_resource_accessor.clone(),
                 guards: vec![],
                 handles: vec![],
-            },
+                owned_fds: vec![],
+            }),
             accessor,
             transient_fds: vec![],
         }
@@ -445,17 +476,23 @@ impl<'a> TransientTransactionState<'a> {
     /// Schedule `handle` to have its strong reference count decremented when the transaction ends
     /// (both in case of success or failure).
     fn push_handle(&mut self, handle: Handle) {
-        self.state.handles.push(handle)
+        self.state.as_mut().unwrap().handles.push(handle)
     }
 
     /// Schedule `guard` to be released when the transaction ends (both in case of success or
     /// failure).
     fn push_guard(&mut self, guard: StrongRefGuard) {
-        self.state.guards.push(guard);
+        self.state.as_mut().unwrap().guards.push(guard);
+    }
+
+    /// Schedule `fd` to be removed from the file descriptor table when the transaction ends (both
+    /// in case of success or failure).
+    fn push_owned_fd(&mut self, fd: FdNumber) {
+        self.state.as_mut().unwrap().owned_fds.push(fd)
     }
 
     /// Schedule `fd` to be removed from the file descriptor table if the transaction fails.
-    fn push_fd(&mut self, fd: FdNumber) {
+    fn push_transient_fd(&mut self, fd: FdNumber) {
         self.transient_fds.push(fd)
     }
 }
@@ -472,8 +509,7 @@ impl<'a> From<TransientTransactionState<'a>> for TransactionState {
     fn from(mut transient: TransientTransactionState<'a>) -> Self {
         // Clear the transient FD list, so that these FDs no longer get closed.
         transient.transient_fds.clear();
-        // We cannot move out due to the Drop impl, so replace with a default one.
-        std::mem::take(&mut transient.state)
+        transient.state.take().unwrap()
     }
 }
 
@@ -500,7 +536,7 @@ struct BinderProcess {
 
     /// Resource accessor to access remote resource in case of a remote binder process. None in
     /// case of a local process.
-    remote_resource_accessor: Option<RemoteResourceAccessor>,
+    remote_resource_accessor: Option<Arc<RemoteResourceAccessor>>,
 
     // The mutable state of `BinderProcess` is protected by 3 locks. For ordering purpose, locks
     // must be taken in the order they are defined in this class, even across `BinderProcess`
@@ -529,7 +565,7 @@ impl BinderProcess {
     fn new(
         identifier: u64,
         pid: pid_t,
-        remote_resource_accessor: Option<RemoteResourceAccessor>,
+        remote_resource_accessor: Option<Arc<RemoteResourceAccessor>>,
     ) -> Arc<Self> {
         log_trace!("new BinderProcess id={}", identifier);
         let result = Arc::new(Self {
@@ -576,11 +612,7 @@ impl BinderProcess {
 
     /// Return the `ResourceAccessor` to use to access the resources of this process.
     fn get_resource_accessor<'a>(&'a self, task: &'a Task) -> &'a dyn ResourceAccessor {
-        if let Some(resource_accessor) = &self.remote_resource_accessor {
-            resource_accessor
-        } else {
-            task
-        }
+        get_resource_accessor(task, &self.remote_resource_accessor)
     }
 
     /// Enqueues `command` for the process and wakes up any thread that is waiting for commands.
@@ -2358,8 +2390,24 @@ trait ResourceAccessor: std::fmt::Debug + MemoryAccessor {
     fn get_file_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno>;
     fn add_file_with_flags(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno>;
 
+    // State related methods.
+    fn kernel(&self) -> &Arc<Kernel>;
+
     // Convenience method to allow passing a MemoryAccessor as a parameter.
     fn as_memory_accessor(&self) -> &dyn MemoryAccessor;
+}
+
+/// Return the `ResourceAccessor` to use to access the resources of `task`. If
+/// `remote_resource_accessor` is not empty, the task is remote, and it should be used instead.
+fn get_resource_accessor<'a>(
+    task: &'a Task,
+    remote_resource_accessor: &'a Option<Arc<RemoteResourceAccessor>>,
+) -> &'a dyn ResourceAccessor {
+    if let Some(resource_accessor) = remote_resource_accessor {
+        resource_accessor.as_ref()
+    } else {
+        task
+    }
 }
 
 impl MemoryAccessorExt for dyn ResourceAccessor + '_ {}
@@ -2496,6 +2544,10 @@ impl ResourceAccessor for RemoteResourceAccessor {
         error!(ENOENT)
     }
 
+    fn kernel(&self) -> &Arc<Kernel> {
+        &self.kernel
+    }
+
     fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
         self
     }
@@ -2516,6 +2568,10 @@ impl ResourceAccessor for CurrentTask {
         self.add_file(file, flags)
     }
 
+    fn kernel(&self) -> &Arc<Kernel> {
+        &(self as &CurrentTask).kernel()
+    }
+
     fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
         self
     }
@@ -2534,6 +2590,10 @@ impl ResourceAccessor for Task {
     fn add_file_with_flags(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno> {
         log_trace!("Adding file {:?} with flags {:?}", file, flags);
         self.add_file(file, flags)
+    }
+
+    fn kernel(&self) -> &Arc<Kernel> {
+        &self.thread_group.kernel
     }
 
     fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
@@ -2572,14 +2632,14 @@ impl BinderDriver {
         pid: pid_t,
         resource_accessor: RemoteResourceAccessor,
     ) -> Arc<BinderProcess> {
-        self.create_process(pid, Some(resource_accessor))
+        self.create_process(pid, Some(Arc::new(resource_accessor)))
     }
 
     /// Creates and register the binder process state to represent a process with `pid`.
     fn create_process(
         &self,
         pid: pid_t,
-        resource_accessor: Option<RemoteResourceAccessor>,
+        resource_accessor: Option<Arc<RemoteResourceAccessor>>,
     ) -> Arc<BinderProcess> {
         let identifier = self.get_next_identifier();
         let binder_process = BinderProcess::new(identifier, pid, resource_accessor);
@@ -3405,7 +3465,7 @@ impl BinderDriver {
                     let new_fd = target_resource_accessor.add_file_with_flags(file, fd_flags)?;
 
                     // Close this FD if the transaction fails.
-                    transaction_state.push_fd(new_fd);
+                    transaction_state.push_transient_fd(new_fd);
 
                     SerializedBinderObject::File { fd: new_fd, flags, cookie }
                 }
@@ -3504,8 +3564,8 @@ impl BinderDriver {
                             .get_file_with_flags(FdNumber::from_raw(*fd as i32))?;
                         let new_fd = target_resource_accessor.add_file_with_flags(file, flags)?;
 
-                        // Close this FD if the transaction fails.
-                        transaction_state.push_fd(new_fd);
+                        // Close this FD if the transaction ends either by success or failure.
+                        transaction_state.push_owned_fd(new_fd);
 
                         *fd = new_fd.raw() as u32;
                     }
@@ -3969,6 +4029,9 @@ pub mod tests {
         }
         fn add_file_with_flags(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno> {
             self.deref().add_file_with_flags(file, flags)
+        }
+        fn kernel(&self) -> &Arc<Kernel> {
+            &self.deref().kernel()
         }
         fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
             self.deref().as_memory_accessor()
@@ -5051,7 +5114,7 @@ pub mod tests {
 
         // Verify that the new handle was returned in `transaction_state` so that it gets dropped
         // at the end of the transaction.
-        assert_eq!(transaction_state.state.handles[0], EXPECTED_HANDLE);
+        assert_eq!(transaction_state.state.as_ref().unwrap().handles[0], EXPECTED_HANDLE);
 
         // Verify that the transaction data was mutated.
         let mut expected_transaction_data = vec![];
@@ -5203,7 +5266,7 @@ pub mod tests {
 
         // Verify that the new handle was returned in `transaction_state` so that it gets dropped
         // at the end of the transaction.
-        assert_eq!(transaction_state.state.handles[0], RECEIVING_HANDLE);
+        assert_eq!(transaction_state.state.as_ref().unwrap().handles[0], RECEIVING_HANDLE);
 
         // Verify that the transaction data was mutated.
         let mut expected_transaction_data = vec![];
@@ -5307,8 +5370,8 @@ pub mod tests {
 
         // Verify that the new handles were returned in `transaction_state` so that it gets dropped
         // at the end of the transaction.
-        assert_eq!(transaction_state.state.handles[0], RECEIVING_HANDLE_SENDER);
-        assert_eq!(transaction_state.state.handles[1], RECEIVING_HANDLE_OTHER);
+        assert_eq!(transaction_state.state.as_ref().unwrap().handles[0], RECEIVING_HANDLE_SENDER);
+        assert_eq!(transaction_state.state.as_ref().unwrap().handles[1], RECEIVING_HANDLE_OTHER);
 
         // Verify that the transaction data was mutated.
         let mut expected_transaction_data = vec![];
@@ -5627,6 +5690,15 @@ pub mod tests {
     async fn transaction_translate_fd_array() {
         let test = TranslateHandlesTestFixture::new();
 
+        // Insert a binder object for the receiver, and grab a handle to it in the sender.
+        const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
+        let object = register_binder_object(&test.receiver_proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+        let handle = test
+            .sender_proc
+            .lock()
+            .handles
+            .insert_for_transaction(object, &mut RefCountActions::default_released());
+
         // Open a file in the sender process that we won't be using. It is there to occupy a file
         // descriptor so that the translation doesn't happen to use the same FDs for receiver and
         // sender, potentially hiding a bug.
@@ -5714,7 +5786,7 @@ pub mod tests {
         // Construct the input for the binder driver to process.
         let input = binder_transaction_data_sg {
             transaction_data: binder_transaction_data {
-                target: binder_transaction_data__bindgen_ty_1 { handle: 1 },
+                target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
                 data_size: (offsets_addr - transaction_data_addr) as u64,
                 offsets_size: (end_data_addr - offsets_addr) as u64,
                 data: binder_transaction_data__bindgen_ty_2 {
@@ -5729,22 +5801,25 @@ pub mod tests {
         };
 
         // Perform the translation and copying.
-        let (buffers, transient_transaction_state) = test
-            .driver
-            .copy_transaction_buffers(
-                &test.sender_task,
-                &test.sender_proc,
-                &test.sender_thread,
-                &test.receiver_task,
-                &test.receiver_proc,
-                &input,
-                None,
-            )
-            .expect("copy_transaction_buffers");
-        let data_buffer = buffers.data;
+        test.driver
+            .handle_transaction(&test.sender_task, &test.sender_proc, &test.sender_thread, input)
+            .expect("transaction queued");
 
-        // Simulate a successful transaction by converting the transient state.
-        let _transaction_state: TransactionState = transient_transaction_state.into();
+        // Get the data buffer out of the receiver's queue.
+        let data_buffer = match test
+            .receiver_proc
+            .command_queue
+            .lock()
+            .commands
+            .pop_front()
+            .expect("the transaction should be queued on the process")
+        {
+            Command::Transaction {
+                sender: _,
+                data: TransactionData { buffers: TransactionBuffers { data, .. }, .. },
+            } => data,
+            _ => panic!("unexpected command in process queue"),
+        };
 
         // Start reading from the receiver's memory, which holds the translated transaction.
         let mut reader = UserMemoryCursor::new(
@@ -5787,6 +5862,282 @@ pub mod tests {
             "FD in receiver does not refer to the same file as sender"
         );
         assert_eq!(receiver_fd_flags, FdFlags::CLOEXEC);
+
+        // Release the buffer in the receiver and verify that the associated FDs have been closed.
+        test.receiver_proc.handle_free_buffer(data_buffer.address).expect("failed to free buffer");
+        assert!(
+            test.receiver_task
+                .files
+                .get(FdNumber::from_raw(translated_bar.fds[0] as i32))
+                .expect_err("file should be closed")
+                == EBADF
+        );
+        assert!(
+            test.receiver_task
+                .files
+                .get(FdNumber::from_raw(translated_bar.fds[1] as i32))
+                .expect_err("file should be closed")
+                == EBADF
+        );
+    }
+    #[fuchsia::test]
+    async fn transaction_receiver_exits_after_getting_fd_array() {
+        let test = TranslateHandlesTestFixture::new();
+
+        // Insert a binder object for the receiver, and grab a handle to it in the sender.
+        const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
+        let object = register_binder_object(&test.receiver_proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+        let handle = test
+            .sender_proc
+            .lock()
+            .handles
+            .insert_for_transaction(object, &mut RefCountActions::default_released());
+
+        // Open a file in the sender process that we won't be using. It is there to occupy a file
+        // descriptor so that the translation doesn't happen to use the same FDs for receiver and
+        // sender, potentially hiding a bug.
+        test.sender_task
+            .add_file(PanickingFile::new_file(&test.sender_task), FdFlags::empty())
+            .unwrap();
+
+        // Open two files in the sender process. These will be sent in the transaction.
+        let files = [
+            PanickingFile::new_file(&test.sender_task),
+            PanickingFile::new_file(&test.sender_task),
+        ];
+        let sender_fds = files
+            .iter()
+            .map(|file| {
+                test.sender_task.add_file(file.clone(), FdFlags::CLOEXEC).expect("add file")
+            })
+            .collect::<Vec<_>>();
+
+        // Ensure that the receiver task has no file descriptors.
+        assert!(test.receiver_task.files.get_all_fds().is_empty(), "receiver already has files");
+
+        // Allocate memory in the sender to hold all the buffers that will get submitted to the
+        // binder driver.
+        let sender_addr = map_memory(&test.sender_task, UserAddress::default(), *PAGE_SIZE);
+        let mut writer = UserMemoryWriter::new(&test.sender_task, sender_addr);
+
+        // Serialize a simple buffer. This will ensure that the FD array being translated is not at
+        // the beginning of the buffer, exercising the offset math.
+        let sender_padding_addr = writer.write(&[0; 8]);
+
+        // Serialize a C struct with an fd array.
+        #[repr(C)]
+        #[derive(AsBytes, FromBytes, FromZeroes)]
+        struct Bar {
+            len: u32,
+            fds: [u32; 2],
+            _padding: u32,
+        }
+        let sender_bar_addr = writer.write_object(&Bar {
+            len: 2,
+            fds: [sender_fds[0].raw() as u32, sender_fds[1].raw() as u32],
+            _padding: 0,
+        });
+
+        // Mark the start of the transaction data.
+        let transaction_data_addr = writer.current_address();
+
+        // Write the buffer object representing the padding.
+        let sender_padding_buffer_addr = writer.write_object(&binder_buffer_object {
+            hdr: binder_object_header { type_: BINDER_TYPE_PTR },
+            buffer: sender_padding_addr.ptr() as u64,
+            length: 8,
+            ..binder_buffer_object::default()
+        });
+
+        // Write the buffer object representing the C struct `Bar`.
+        let sender_buffer_addr = writer.write_object(&binder_buffer_object {
+            hdr: binder_object_header { type_: BINDER_TYPE_PTR },
+            buffer: sender_bar_addr.ptr() as u64,
+            length: std::mem::size_of::<Bar>() as u64,
+            ..binder_buffer_object::default()
+        });
+
+        // Write the fd array object that tells the kernel where the file descriptors are in the
+        // `Bar` buffer.
+        let sender_fd_array_addr = writer.write_object(&binder_fd_array_object {
+            hdr: binder_object_header { type_: BINDER_TYPE_FDA },
+            pad: 0,
+            num_fds: sender_fds.len() as u64,
+            // The index in the offsets array of the parent buffer.
+            parent: 1,
+            // The location in the parent buffer where the FDs are, which need to be duped.
+            parent_offset: offset_of!(Bar, fds) as u64,
+        });
+
+        // Write the offsets array.
+        let offsets_addr = writer.current_address();
+        writer.write_object(&((sender_padding_buffer_addr - transaction_data_addr) as u64));
+        writer.write_object(&((sender_buffer_addr - transaction_data_addr) as u64));
+        writer.write_object(&((sender_fd_array_addr - transaction_data_addr) as u64));
+
+        let end_data_addr = writer.current_address();
+
+        // Construct the input for the binder driver to process.
+        let input = binder_transaction_data_sg {
+            transaction_data: binder_transaction_data {
+                target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
+                data_size: (offsets_addr - transaction_data_addr) as u64,
+                offsets_size: (end_data_addr - offsets_addr) as u64,
+                data: binder_transaction_data__bindgen_ty_2 {
+                    ptr: binder_transaction_data__bindgen_ty_2__bindgen_ty_1 {
+                        buffer: transaction_data_addr.ptr() as u64,
+                        offsets: offsets_addr.ptr() as u64,
+                    },
+                },
+                ..binder_transaction_data::new_zeroed()
+            },
+            buffers_size: std::mem::size_of::<Bar>() as u64 + 8,
+        };
+
+        // Perform the translation and copying.
+        test.driver
+            .handle_transaction(&test.sender_task, &test.sender_proc, &test.sender_thread, input)
+            .expect("transaction queued");
+
+        // Clean up without calling BC_FREE_BUFFER. Should not panic.
+        std::mem::drop(test);
+    }
+
+    #[fuchsia::test]
+    async fn transaction_fd_array_sender_cancels() {
+        let test = TranslateHandlesTestFixture::new();
+
+        // Insert a binder object for the receiver, and grab a handle to it in the sender.
+        const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
+        let object = register_binder_object(&test.receiver_proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+        let handle = test
+            .sender_proc
+            .lock()
+            .handles
+            .insert_for_transaction(object, &mut RefCountActions::default_released());
+
+        // Open a file in the sender process that we won't be using. It is there to occupy a file
+        // descriptor so that the translation doesn't happen to use the same FDs for receiver and
+        // sender, potentially hiding a bug.
+        test.sender_task
+            .add_file(PanickingFile::new_file(&test.sender_task), FdFlags::empty())
+            .unwrap();
+
+        // Open two files in the sender process. These will be sent in the transaction.
+        let files = [
+            PanickingFile::new_file(&test.sender_task),
+            PanickingFile::new_file(&test.sender_task),
+        ];
+        let sender_fds = files
+            .iter()
+            .map(|file| {
+                test.sender_task.add_file(file.clone(), FdFlags::CLOEXEC).expect("add file")
+            })
+            .collect::<Vec<_>>();
+
+        // Ensure that the receiver task has no file descriptors.
+        assert!(test.receiver_task.files.get_all_fds().is_empty(), "receiver already has files");
+
+        // Allocate memory in the sender to hold all the buffers that will get submitted to the
+        // binder driver.
+        let sender_addr = map_memory(&test.sender_task, UserAddress::default(), *PAGE_SIZE);
+        let mut writer = UserMemoryWriter::new(&test.sender_task, sender_addr);
+
+        // Serialize a simple buffer. This will ensure that the FD array being translated is not at
+        // the beginning of the buffer, exercising the offset math.
+        let sender_padding_addr = writer.write(&[0; 8]);
+
+        // Serialize a C struct with an fd array.
+        #[repr(C)]
+        #[derive(AsBytes, FromBytes, FromZeroes)]
+        struct Bar {
+            len: u32,
+            fds: [u32; 2],
+            _padding: u32,
+        }
+        let sender_bar_addr = writer.write_object(&Bar {
+            len: 2,
+            fds: [sender_fds[0].raw() as u32, sender_fds[1].raw() as u32],
+            _padding: 0,
+        });
+
+        // Mark the start of the transaction data.
+        let transaction_data_addr = writer.current_address();
+
+        // Write the buffer object representing the padding.
+        let sender_padding_buffer_addr = writer.write_object(&binder_buffer_object {
+            hdr: binder_object_header { type_: BINDER_TYPE_PTR },
+            buffer: sender_padding_addr.ptr() as u64,
+            length: 8,
+            ..binder_buffer_object::default()
+        });
+
+        // Write the buffer object representing the C struct `Bar`.
+        let sender_buffer_addr = writer.write_object(&binder_buffer_object {
+            hdr: binder_object_header { type_: BINDER_TYPE_PTR },
+            buffer: sender_bar_addr.ptr() as u64,
+            length: std::mem::size_of::<Bar>() as u64,
+            ..binder_buffer_object::default()
+        });
+
+        // Write the fd array object that tells the kernel where the file descriptors are in the
+        // `Bar` buffer.
+        let sender_fd_array_addr = writer.write_object(&binder_fd_array_object {
+            hdr: binder_object_header { type_: BINDER_TYPE_FDA },
+            pad: 0,
+            num_fds: sender_fds.len() as u64,
+            // The index in the offsets array of the parent buffer.
+            parent: 1,
+            // The location in the parent buffer where the FDs are, which need to be duped.
+            parent_offset: offset_of!(Bar, fds) as u64,
+        });
+
+        // Write the offsets array.
+        let offsets_addr = writer.current_address();
+        writer.write_object(&((sender_padding_buffer_addr - transaction_data_addr) as u64));
+        writer.write_object(&((sender_buffer_addr - transaction_data_addr) as u64));
+        writer.write_object(&((sender_fd_array_addr - transaction_data_addr) as u64));
+
+        let end_data_addr = writer.current_address();
+
+        // Construct the input for the binder driver to process.
+        let input = binder_transaction_data_sg {
+            transaction_data: binder_transaction_data {
+                target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
+                data_size: (offsets_addr - transaction_data_addr) as u64,
+                offsets_size: (end_data_addr - offsets_addr) as u64,
+                data: binder_transaction_data__bindgen_ty_2 {
+                    ptr: binder_transaction_data__bindgen_ty_2__bindgen_ty_1 {
+                        buffer: transaction_data_addr.ptr() as u64,
+                        offsets: offsets_addr.ptr() as u64,
+                    },
+                },
+                ..binder_transaction_data::new_zeroed()
+            },
+            buffers_size: std::mem::size_of::<Bar>() as u64 + 8,
+        };
+
+        // Perform the translation and copying.
+        let (_, transient_state) = test
+            .driver
+            .copy_transaction_buffers(
+                &test.sender_task,
+                &test.sender_proc,
+                &test.sender_thread,
+                &test.receiver_task,
+                &test.receiver_proc,
+                &input,
+                None,
+            )
+            .expect("copy_transaction_buffers");
+
+        // The receiver should have the fd.
+        let fd = transient_state.state.as_ref().unwrap().owned_fds[0];
+        assert!(test.receiver_task.files.get(fd).is_ok(), "file should be translated");
+
+        // Drop the result, which should close the fds in the receiver.
+        std::mem::drop(transient_state);
+        assert!(test.receiver_task.files.get(fd).expect_err("file should be closed") == EBADF);
     }
 
     #[fuchsia::test]

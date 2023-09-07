@@ -453,3 +453,9 @@ impl Kernel {
         inspector
     }
 }
+
+impl std::fmt::Debug for Kernel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Kernel").finish()
+    }
+}
