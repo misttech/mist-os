@@ -5,7 +5,6 @@
 import("//build/config/build_api_module.gni")
 import("//build/testing/golden_files.gni")
 import("//sdk/ctf/build/ctf.gni")
-import("//sdk/ctf/build/verify_sdk_compatibility.gni")
 
 # Generates a manifest of CTF release artifacts to upload to remote storage.
 build_api_module("ctf_artifacts") {
@@ -24,7 +23,6 @@ group("ctf") {
     ":package_archive_manifest",
     ":test_manifest",
     ":tests",
-    ":verify_idk_deps",
   ]
 }
 
@@ -103,43 +101,9 @@ golden_files("golden_files") {
   }
 }
 
-_idks = [
-  "core",
-  "e2e_testing",
-]
-_verify_idk_deps = []
-foreach(idk, _idks) {
-  golden_file_target = "${idk}_sdk_layout"
-  generate_sdk_layout_golden_file(golden_file_target) {
-    testonly = true
-    sdk_archive = "$root_out_dir/sdk/archive/${idk}.tar.gz"
-    deps = [ "//sdk:${idk}_archive" ]
-  }
-
-  # TODO(fxb/112091): Re-enable when bug is fixed.
-  #verify_compatibility_target = "verify_${idk}_sdk_compatibility"
-  #
-  # verify_sdk_compatibility(verify_compatibility_target) {
-  #   testonly = true
-  #   sdk_archive = "$root_out_dir/sdk/archive/${idk}.tar.gz"
-  #   golden_file = "//sdk/manifests/layouts/${target_cpu}/sdk_directory_${idk}.golden_layout"
-  #   deps = [ "//sdk:${idk}_archive" ]
-  # }
-
-  _verify_idk_deps += [
-    ":$golden_file_target",
-    # ":$verify_compatibility_target",
-  ]
-}
-
-group("verify_idk_deps") {
-  testonly = true
-  deps = _verify_idk_deps
-}
-
 # Tests that we want to run in an FYI builder.
 # We do not want failures from these tests to break the tree.
 group("fyi") {
   testonly = true
-  deps = [ ":verify_idk_deps" ]
+  deps = []
 }
