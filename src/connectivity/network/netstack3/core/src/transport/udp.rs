@@ -14,7 +14,6 @@ use core::{
 };
 use lock_order::Locked;
 
-use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use either::Either;
 use net_types::{
@@ -424,7 +423,7 @@ impl DatagramSocketSpec for Udp {
     type SocketMapSpec<I: IpExt, D: WeakId> = (Self, I, D);
     type ListenerSharingState = Sharing;
 
-    type Serializer<I: Ip, B: BufferMut> = Nested<B, UdpPacketBuilder<I::Addr>>;
+    type Serializer<I: IpExt, B: BufferMut> = Nested<B, UdpPacketBuilder<I::Addr>>;
 
     fn make_receiving_map_id<I: IpExt, D: WeakId>(
         s: Self::SocketId<I>,
@@ -432,7 +431,7 @@ impl DatagramSocketSpec for Udp {
         I::dual_stack_receiver(s)
     }
 
-    fn make_packet<I: Ip, B: BufferMut>(
+    fn make_packet<I: IpExt, B: BufferMut>(
         body: B,
         addr: &ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
     ) -> Self::Serializer<I, B> {
@@ -737,7 +736,6 @@ fn try_alloc_listen_port<I: IpExt, D: WeakId>(
 
 impl<I: IpExt, D: WeakId> PortAllocImpl for UdpBoundSocketMap<I, D> {
     const EPHEMERAL_RANGE: RangeInclusive<u16> = 49152..=65535;
-    const TABLE_SIZE: NonZeroUsize = const_unwrap_option(NonZeroUsize::new(20));
     type Id = ProtocolFlowId<I::Addr>;
 
     fn is_port_available(&self, id: &Self::Id, port: u16) -> bool {

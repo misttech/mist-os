@@ -78,9 +78,7 @@ use crate::{
         reassembly::{
             FragmentCacheKey, FragmentHandler, FragmentProcessingState, IpPacketFragmentCache,
         },
-        socket::{
-            BufferIpSocketHandler, DefaultSendOptions, IpSock, IpSocketContext, IpSocketHandler,
-        },
+        socket::{BufferIpSocketHandler, IpSocketContext, IpSocketHandler},
         types::{Destination, NextHop, ResolvedRoute},
     },
     sync::{LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
@@ -1165,7 +1163,7 @@ impl Ipv6StateBuilder {
 
 pub(crate) struct Ipv4State<Instant: crate::Instant, StrongDeviceId: StrongId> {
     inner: IpStateInner<Ipv4, Instant, StrongDeviceId>,
-    icmp: Icmpv4State<Instant, IpSock<Ipv4, StrongDeviceId::Weak, DefaultSendOptions>>,
+    icmp: Icmpv4State<Instant, StrongDeviceId::Weak>,
     next_packet_id: AtomicU16,
 }
 
@@ -1190,7 +1188,7 @@ fn gen_ipv4_packet_id<C, SC: Ipv4StateContext<C>>(sync_ctx: &mut SC) -> u16 {
 
 pub(crate) struct Ipv6State<Instant: crate::Instant, StrongDeviceId: StrongId> {
     inner: IpStateInner<Ipv6, Instant, StrongDeviceId>,
-    icmp: Icmpv6State<Instant, IpSock<Ipv6, StrongDeviceId::Weak, DefaultSendOptions>>,
+    icmp: Icmpv6State<Instant, StrongDeviceId::Weak>,
 }
 
 impl<I: Instant, StrongDeviceId: StrongId> AsRef<IpStateInner<Ipv6, I, StrongDeviceId>>
@@ -1254,10 +1252,10 @@ impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::IpStateRoutingTable<Ipv4
 }
 
 impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::IcmpSockets<Ipv4>> for SyncCtx<C> {
-    type Data = IcmpSockets<Ipv4Addr, IpSock<Ipv4, WeakDeviceId<C>, DefaultSendOptions>>;
-    type ReadGuard<'l> = RwLockReadGuard<'l, IcmpSockets<Ipv4Addr, IpSock<Ipv4, WeakDeviceId<C>, DefaultSendOptions>>>
+    type Data = IcmpSockets<Ipv4, WeakDeviceId<C>>;
+    type ReadGuard<'l> = RwLockReadGuard<'l, IcmpSockets<Ipv4, WeakDeviceId<C>>>
         where Self: 'l;
-    type WriteGuard<'l> = RwLockWriteGuard<'l, IcmpSockets<Ipv4Addr, IpSock<Ipv4, WeakDeviceId<C>, DefaultSendOptions>>>
+    type WriteGuard<'l> = RwLockWriteGuard<'l, IcmpSockets<Ipv4, WeakDeviceId<C>>>
         where Self: 'l;
 
     fn read_lock(&self) -> Self::ReadGuard<'_> {
@@ -1280,10 +1278,10 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::IcmpTokenBucket<Ipv4>> for
 }
 
 impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::IcmpSockets<Ipv6>> for SyncCtx<C> {
-    type Data = IcmpSockets<Ipv6Addr, IpSock<Ipv6, WeakDeviceId<C>, DefaultSendOptions>>;
-    type ReadGuard<'l> = RwLockReadGuard<'l, IcmpSockets<Ipv6Addr, IpSock<Ipv6, WeakDeviceId<C>, DefaultSendOptions>>>
+    type Data = IcmpSockets<Ipv6, WeakDeviceId<C>>;
+    type ReadGuard<'l> = RwLockReadGuard<'l, IcmpSockets<Ipv6, WeakDeviceId<C>>>
         where Self: 'l;
-    type WriteGuard<'l> = RwLockWriteGuard<'l, IcmpSockets<Ipv6Addr, IpSock<Ipv6, WeakDeviceId<C>, DefaultSendOptions>>>
+    type WriteGuard<'l> = RwLockWriteGuard<'l, IcmpSockets<Ipv6, WeakDeviceId<C>>>
         where Self: 'l;
 
     fn read_lock(&self) -> Self::ReadGuard<'_> {
@@ -2703,6 +2701,7 @@ impl<
             + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4>>,
     > InnerIcmpContext<Ipv4, C> for Locked<&SyncCtx<C>, L>
 {
+    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::IcmpSockets<Ipv4>>;
     fn receive_icmp_error(
         &mut self,
         ctx: &mut C,
@@ -2764,26 +2763,23 @@ impl<
         }
     }
 
-    fn with_icmp_sockets<
-        O,
-        F: FnOnce(&IcmpSockets<Ipv4Addr, IpSock<Ipv4, Self::WeakDeviceId, DefaultSendOptions>>) -> O,
-    >(
+    fn with_icmp_sockets<O, F: FnOnce(&IcmpSockets<Ipv4, Self::WeakDeviceId>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
         cb(&self.read_lock::<crate::lock_ordering::IcmpSockets<Ipv4>>())
     }
 
-    fn with_icmp_sockets_mut<
+    fn with_icmp_ctx_and_sockets_mut<
         O,
-        F: FnOnce(
-            &mut IcmpSockets<Ipv4Addr, IpSock<Ipv4, Self::WeakDeviceId, DefaultSendOptions>>,
-        ) -> O,
+        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &mut IcmpSockets<Ipv4, Self::WeakDeviceId>) -> O,
     >(
         &mut self,
         cb: F,
     ) -> O {
-        cb(&mut self.write_lock::<crate::lock_ordering::IcmpSockets<Ipv4>>())
+        let (mut sockets, mut sync_ctx) =
+            self.write_lock_and::<crate::lock_ordering::IcmpSockets<Ipv4>>();
+        cb(&mut sync_ctx, &mut sockets)
     }
 
     fn with_error_send_bucket_mut<O, F: FnOnce(&mut TokenBucket<C::Instant>) -> O>(
@@ -2801,6 +2797,7 @@ impl<
             + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv6>>,
     > InnerIcmpContext<Ipv6, C> for Locked<&SyncCtx<C>, L>
 {
+    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::IcmpSockets<Ipv6>>;
     fn receive_icmp_error(
         &mut self,
         ctx: &mut C,
@@ -2862,26 +2859,23 @@ impl<
         }
     }
 
-    fn with_icmp_sockets<
-        O,
-        F: FnOnce(&IcmpSockets<Ipv6Addr, IpSock<Ipv6, Self::WeakDeviceId, DefaultSendOptions>>) -> O,
-    >(
+    fn with_icmp_sockets<O, F: FnOnce(&IcmpSockets<Ipv6, Self::WeakDeviceId>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
         cb(&self.read_lock::<crate::lock_ordering::IcmpSockets<Ipv6>>())
     }
 
-    fn with_icmp_sockets_mut<
+    fn with_icmp_ctx_and_sockets_mut<
         O,
-        F: FnOnce(
-            &mut IcmpSockets<Ipv6Addr, IpSock<Ipv6, Self::WeakDeviceId, DefaultSendOptions>>,
-        ) -> O,
+        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &mut IcmpSockets<Ipv6, Self::WeakDeviceId>) -> O,
     >(
         &mut self,
         cb: F,
     ) -> O {
-        cb(&mut self.write_lock::<crate::lock_ordering::IcmpSockets<Ipv6>>())
+        let (mut sockets, mut sync_ctx) =
+            self.write_lock_and::<crate::lock_ordering::IcmpSockets<Ipv6>>();
+        cb(&mut sync_ctx, &mut sockets)
     }
 
     fn with_error_send_bucket_mut<O, F: FnOnce(&mut TokenBucket<C::Instant>) -> O>(

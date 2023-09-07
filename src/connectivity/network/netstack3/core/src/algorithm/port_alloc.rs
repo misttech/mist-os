@@ -80,7 +80,7 @@ pub(crate) trait PortAllocImpl {
     /// 4.
     ///
     /// [RFC 6056]: https://tools.ietf.org/html/rfc6056
-    const TABLE_SIZE: NonZeroUsize;
+    const TABLE_SIZE: NonZeroUsize = const_unwrap::const_unwrap_option(NonZeroUsize::new(20));
     /// The range of ports that can be allocated by [`PortAlloc`].
     ///
     /// Local ports used in transport protocols are called [Ephemeral Ports].

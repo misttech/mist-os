@@ -8,7 +8,6 @@
 pub mod address;
 pub mod datagram;
 
-use alloc::collections::HashMap;
 use core::{
     convert::Infallible as Never, fmt::Debug, hash::Hash, marker::PhantomData, num::NonZeroUsize,
 };
@@ -21,7 +20,7 @@ use net_types::{
 
 use crate::{
     data_structures::{
-        id_map::{EntryKey, IdMap},
+        id_map::EntryKey,
         id_map_collection::IdMapCollectionKey,
         socketmap::{
             Entry, IterShadows, OccupiedEntry as SocketMapOccupiedEntry, SocketMap, Tagged,
@@ -86,47 +85,6 @@ pub(crate) fn try_into_null_zoned<A: IpAddress>(
         return None;
     }
     AddrAndZone::new(*addr, ())
-}
-
-/// A bidirectional map between connection sockets and addresses.
-///
-/// A `ConnSocketMap` keeps addresses mapped by integer indexes, and allows for
-/// constant-time mapping in either direction (though address -> index mappings
-/// are via a hash map, and thus slower).
-pub(crate) struct ConnSocketMap<A, S> {
-    id_to_sock: IdMap<ConnSocketEntry<S, A>>,
-    addr_to_id: HashMap<A, usize>,
-}
-
-/// An entry in a [`ConnSocketMap`].
-#[derive(Debug, Eq, PartialEq)]
-pub(crate) struct ConnSocketEntry<S, A> {
-    pub(crate) sock: S,
-    pub(crate) addr: A,
-}
-
-impl<A: Eq + Hash + Clone, S> ConnSocketMap<A, S> {
-    pub(crate) fn insert(&mut self, addr: A, sock: S) -> usize {
-        let id = self.id_to_sock.push(ConnSocketEntry { sock, addr: addr.clone() });
-        assert_eq!(self.addr_to_id.insert(addr, id), None);
-        id
-    }
-}
-
-impl<A: Eq + Hash, S> ConnSocketMap<A, S> {
-    pub(crate) fn get_id_by_addr(&self, addr: &A) -> Option<usize> {
-        self.addr_to_id.get(addr).cloned()
-    }
-
-    pub(crate) fn get_sock_by_id(&self, id: usize) -> Option<&ConnSocketEntry<S, A>> {
-        self.id_to_sock.get(id)
-    }
-}
-
-impl<A: Eq + Hash, S> Default for ConnSocketMap<A, S> {
-    fn default() -> ConnSocketMap<A, S> {
-        ConnSocketMap { id_to_sock: IdMap::default(), addr_to_id: HashMap::default() }
-    }
 }
 
 /// Specification for the identifiers in an [`AddrVec`].

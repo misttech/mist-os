@@ -64,8 +64,11 @@ impl<I: IpExt, NewIp: IpExt, D: device::WeakId, S: DatagramSocketSpec> GenericOv
     type Type = SocketsState<NewIp, D, S>;
 }
 
-pub(crate) trait IpExt: crate::ip::IpExt + DualStackIpExt {}
-impl<I: crate::ip::IpExt + DualStackIpExt> IpExt for I {}
+pub(crate) trait IpExt:
+    crate::ip::IpExt + DualStackIpExt + crate::ip::icmp::IcmpIpExt
+{
+}
+impl<I: crate::ip::IpExt + DualStackIpExt + crate::ip::icmp::IcmpIpExt> IpExt for I {}
 
 #[derive(Derivative, GenericOverIp)]
 #[derivative(Debug(bound = "D: Debug"))]
@@ -223,9 +226,9 @@ impl<I: IpExt, D: Debug + Hash + Eq, S: DatagramSocketSpec> AsRef<IpOptions<I, D
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug, O: Debug"))]
 pub(crate) struct ConnState<I: IpExt, D: Eq + Hash, S: DatagramSocketSpec + ?Sized, O> {
-    socket: IpSock<I, D, O>,
-    shutdown: Shutdown,
-    addr: ConnAddr<
+    pub(crate) socket: IpSock<I, D, O>,
+    pub(crate) shutdown: Shutdown,
+    pub(crate) addr: ConnAddr<
         I::Addr,
         D,
         <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
@@ -245,7 +248,7 @@ pub(crate) struct ConnState<I: IpExt, D: Eq + Hash, S: DatagramSocketSpec + ?Siz
     ///
     /// TODO(http://fxbug.dev/110370): Implement this by changing socket
     /// addresses.
-    clear_device_on_disconnect: bool,
+    pub(crate) clear_device_on_disconnect: bool,
 }
 
 impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec, O> AsRef<O> for ConnState<I, D, S, O> {
@@ -445,6 +448,7 @@ pub(crate) trait LocalIdentifierAllocator<
     ) -> Option<A::LocalIdentifier>;
 }
 
+#[derive(Hash)]
 pub(crate) struct DatagramFlowId<A: IpAddress, RI> {
     pub(crate) local_ip: SpecifiedAddr<A>,
     pub(crate) remote_ip: SpecifiedAddr<A>,
@@ -1327,8 +1331,8 @@ pub(crate) trait DatagramSocketSpec {
 
     /// The type of serializer returned by [`DatagramSocketSpec::make_packet`]
     /// for a given IP version and buffer type.
-    type Serializer<I: Ip, B: BufferMut>: Serializer<Buffer = B>;
-    fn make_packet<I: Ip, B: BufferMut>(
+    type Serializer<I: IpExt, B: BufferMut>: Serializer<Buffer = B>;
+    fn make_packet<I: IpExt, B: BufferMut>(
         body: B,
         addr: &ConnIpAddr<
             I::Addr,
@@ -3617,8 +3621,8 @@ mod test {
             s
         }
 
-        type Serializer<I: Ip, B: BufferMut> = B;
-        fn make_packet<I: Ip, B: BufferMut>(
+        type Serializer<I: IpExt, B: BufferMut> = B;
+        fn make_packet<I: IpExt, B: BufferMut>(
             body: B,
             _addr: &ConnIpAddr<
                 I::Addr,

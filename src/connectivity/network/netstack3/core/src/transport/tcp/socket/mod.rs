@@ -32,7 +32,6 @@ use core::{
 use lock_order::Locked;
 
 use assert_matches::assert_matches;
-use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use net_types::{
     ip::{
@@ -844,7 +843,6 @@ pub(crate) enum SocketState<I: IpExt, D: WeakId, C: NonSyncContext> {
 impl<I: IpExt, D: WeakId, C: NonSyncContext> PortAllocImpl
     for BoundSocketMap<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>
 {
-    const TABLE_SIZE: NonZeroUsize = const_unwrap_option(NonZeroUsize::new(20));
     const EPHEMERAL_RANGE: RangeInclusive<u16> = 49152..=65535;
     type Id = Option<SpecifiedAddr<I::Addr>>;
 
