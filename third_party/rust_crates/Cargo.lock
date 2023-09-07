@@ -1435,6 +1435,7 @@ dependencies = [
  "serde_repr",
  "serde_yaml",
  "serial_test",
+ "sha1",
  "sha2",
  "shared_child",
  "signal-hook 0.3.8",
@@ -3965,6 +3966,17 @@ dependencies = [
  "byte-tools",
  "digest 0.7.6",
  "fake-simd",
+]
+
+[[package]]
+name = "sha1"
+version = "0.10.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f04293dc80c3993519f2d7f6f511707ee7094fe0c6d3406feb330cdb3540eba3"
+dependencies = [
+ "cfg-if 1.0.0",
+ "cpufeatures",
+ "digest 0.10.7",
 ]
 
 [[package]]

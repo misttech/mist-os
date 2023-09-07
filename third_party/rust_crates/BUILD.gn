@@ -814,6 +814,14 @@ if (!(current_os == "fuchsia")) {
   }
 }
 
+import("//third_party/rust_crates/visibility.gni")
+
+group("sha1") {
+  public_deps = [ ":sha1-v0_10_5" ]
+
+  visibility = sha1_visibility
+}
+
 group("sha2") {
   public_deps = [ ":sha2-v0_10_6" ]
 }
@@ -10214,6 +10222,33 @@ rust_proc_macro("serial_test_derive-v0_5_1") {
     "--edition=2018",
     "-Cmetadata=349c76aef8defaba",
     "-Cextra-filename=-349c76aef8defaba",
+  ]
+
+  visibility = [ ":*" ]
+}
+
+rust_library("sha1-v0_10_5") {
+  crate_name = "sha1"
+  crate_root = "//third_party/rust_crates/vendor/sha1-0.10.5/src/lib.rs"
+  output_name = "sha1-22caac506c487eb"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":cfg-if-v1_0_0" ]
+  deps += [ ":digest-v0_10_7" ]
+  if (current_cpu == "arm64" || false || current_cpu == "x64") {
+    deps += [ ":cpufeatures-v0_2_1" ]
+  }
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=22caac506c487eb",
+    "-Cextra-filename=-22caac506c487eb",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
