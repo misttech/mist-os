@@ -4,7 +4,7 @@
 
 use {
     crate::{integrity::Algorithm, Error},
-    mundane::{hash::Digest, insecure::InsecureHmacMd5},
+    hmac::Mac as _,
 };
 
 pub struct HmacMd5;
@@ -17,9 +17,10 @@ impl HmacMd5 {
 
 impl Algorithm for HmacMd5 {
     fn compute(&self, key: &[u8], data: &[u8]) -> Result<Vec<u8>, Error> {
-        let mut hmac = InsecureHmacMd5::insecure_new(key);
-        hmac.insecure_update(data);
-        Ok(hmac.insecure_finish().bytes().into())
+        let mut hmac = hmac::Hmac::<md5::Md5>::new_from_slice(key).expect("construct new HmacMd5");
+        hmac.update(data);
+        let bytes: [u8; 16] = hmac.finalize().into_bytes().into();
+        Ok(bytes.into())
     }
 }
 

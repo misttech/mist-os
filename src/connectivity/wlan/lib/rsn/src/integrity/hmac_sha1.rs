@@ -5,8 +5,7 @@
 use super::Algorithm;
 use crate::Error;
 
-use mundane::hash::Digest;
-use mundane::insecure::InsecureHmacSha1;
+use hmac::Mac as _;
 
 pub struct HmacSha1;
 
@@ -18,9 +17,11 @@ impl HmacSha1 {
 
 impl Algorithm for HmacSha1 {
     fn compute(&self, key: &[u8], data: &[u8]) -> Result<Vec<u8>, Error> {
-        let mut hmac = InsecureHmacSha1::insecure_new(key);
-        hmac.insecure_update(data);
-        Ok(hmac.insecure_finish().bytes().into())
+        let mut hmac =
+            hmac::Hmac::<sha1::Sha1>::new_from_slice(key).expect("construct new HmacSha1");
+        hmac.update(data);
+        let bytes: [u8; 20] = hmac.finalize().into_bytes().into();
+        Ok(bytes.into())
     }
 }
 

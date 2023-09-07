@@ -16,6 +16,8 @@ md5_visibility = [
   # implements the insecure and deprecated MD-5 hash function. Code should only
   # use this if it's implementing legacy protocols that require MD-5; it should
   # never be used for new cryptographic development.
+
+  "//src/connectivity/wlan/lib/rsn:*",
 ]
 
 sha1_visibility = [
@@ -32,4 +34,6 @@ sha1_visibility = [
   # implements the insecure and deprecated SHA-1 hash function. Code should only
   # use this if it's implementing legacy protocols that require SHA-1; it should
   # never be used for new cryptographic development.
+
+  "//src/connectivity/wlan/lib/rsn:*",
 ]

@@ -5,27 +5,26 @@
 // Used in PRF as specified in IEEE Std 802.11-2016, 12.7.1.2.
 use crate::Error;
 use anyhow::ensure;
-use mundane::hash::Digest;
-#[allow(deprecated)]
-use mundane::insecure::InsecureHmacSha1;
+use hmac::Mac as _;
+
+type HmacSha1 = hmac::Hmac<sha1::Sha1>;
 
 const VALID_PRF_BIT_SIZES: [usize; 6] = [128, 192, 256, 384, 512, 704];
 
 // IEEE Std 802.11-2016, 12.7.1.2
 // HMAC-SHA1 is considered insecure but is required to be used in IEEE 802.11's PRF.
-#[allow(deprecated)]
 pub(crate) fn prf(k: &[u8], a: &str, b: &[u8], bits: usize) -> Result<Vec<u8>, anyhow::Error> {
     ensure!(VALID_PRF_BIT_SIZES.contains(&bits), Error::InvalidBitSize(bits));
 
     let mut result = Vec::with_capacity(bits / 8);
     let iterations = (bits + 159) / 160;
     for i in 0..iterations {
-        let mut hmac: InsecureHmacSha1 = InsecureHmacSha1::insecure_new(k);
-        hmac.insecure_update(a.as_bytes());
-        hmac.insecure_update(&[0u8]);
-        hmac.insecure_update(b);
-        hmac.insecure_update(&[i as u8]);
-        result.extend_from_slice(&hmac.insecure_finish().bytes()[..]);
+        let mut hmac = HmacSha1::new_from_slice(k).expect("create new HmacSha1");
+        hmac.update(a.as_bytes());
+        hmac.update(&[0u8]);
+        hmac.update(b);
+        hmac.update(&[i as u8]);
+        result.extend_from_slice(&hmac.finalize().into_bytes().as_ref());
     }
     result.resize(bits / 8, 0);
     Ok(result)
