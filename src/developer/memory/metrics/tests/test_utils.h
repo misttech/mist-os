@@ -8,6 +8,7 @@
 #include <zircon/types.h>
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 #include "src/developer/memory/metrics/capture.h"
@@ -73,6 +74,40 @@ class CaptureSupplier {
   size_t index_;
 };
 
+class MockOS : public OS {
+ public:
+  explicit MockOS(OsResponses responses);
+
+ private:
+  zx_status_t GetKernelStats(fidl::WireSyncClient<fuchsia_kernel::Stats>* stats) override;
+
+  zx_handle_t ProcessSelf() override;
+
+  zx_time_t GetMonotonic() override;
+
+  zx_status_t GetProcesses(
+      fit::function<zx_status_t(int, zx::handle, zx_koid_t, zx_koid_t)> cb) override;
+
+  zx_status_t GetProperty(zx_handle_t handle, uint32_t property, void* value,
+                          size_t name_len) override;
+
+  const GetInfoResponse* GetGetInfoResponse(zx_handle_t handle, uint32_t topic);
+
+  zx_status_t GetInfo(zx_handle_t handle, uint32_t topic, void* buffer, size_t buffer_size,
+                      size_t* actual, size_t* avail) override;
+
+  zx_status_t GetKernelMemoryStats(const fidl::WireSyncClient<fuchsia_kernel::Stats>& stats_client,
+                                   zx_info_kmem_stats_t* kmem) override;
+
+  zx_status_t GetKernelMemoryStatsExtended(
+      const fidl::WireSyncClient<fuchsia_kernel::Stats>& stats_client,
+      zx_info_kmem_stats_extended_t* kmem_ext, zx_info_kmem_stats_t* kmem) override;
+
+  OsResponses responses_;
+  uint32_t i_get_property_;
+  zx_time_t clock_;
+};
+
 class TestUtils {
  public:
   const static zx_handle_t kRootHandle;
@@ -81,8 +116,9 @@ class TestUtils {
 
   static void CreateCapture(Capture* capture, const CaptureTemplate& t,
                             CaptureLevel level = CaptureLevel::VMO);
+  static zx_status_t GetCapture(Capture* capture, CaptureLevel level, const OsResponses& r);
   static zx_status_t GetCapture(Capture* capture, CaptureLevel level, const OsResponses& r,
-                                CaptureFilter* filter = nullptr);
+                                std::unique_ptr<CaptureStrategy> strategy);
 
   // Sorted by koid.
   static std::vector<ProcessSummary> GetProcessSummaries(const Summary& summary);

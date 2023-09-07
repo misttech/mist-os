@@ -8,117 +8,109 @@
 #include <zircon/errors.h>
 #include <zircon/syscalls/object.h>
 
+#include <memory>
+
 #include <gtest/gtest.h>
 
 #include "src/developer/memory/metrics/capture.h"
+#include "src/developer/memory/metrics/capture_strategy.h"
 namespace memory {
 
 const zx_handle_t TestUtils::kRootHandle = 1;
 const zx_handle_t TestUtils::kSelfHandle = 2;
 const zx_koid_t TestUtils::kSelfKoid = 3;
 
-class MockOS : public OS {
- public:
-  explicit MockOS(OsResponses responses)
-      : responses_(std::move(responses)), i_get_property_(0), clock_(0) {}
+MockOS::MockOS(OsResponses responses)
+    : responses_(std::move(responses)), i_get_property_(0), clock_(0) {}
 
- private:
-  zx_status_t GetKernelStats(fidl::WireSyncClient<fuchsia_kernel::Stats>* stats) override {
-    return ZX_OK;
-  }
+zx_status_t MockOS::GetKernelStats(fidl::WireSyncClient<fuchsia_kernel::Stats>* stats) {
+  return ZX_OK;
+}
 
-  zx_handle_t ProcessSelf() override { return TestUtils::kSelfHandle; }
+zx_handle_t MockOS::ProcessSelf() { return TestUtils::kSelfHandle; }
 
-  zx_time_t GetMonotonic() override { return clock_++; }
+zx_time_t MockOS::GetMonotonic() { return clock_++; }
 
-  zx_status_t GetProcesses(
-      fit::function<zx_status_t(int, zx::handle, zx_koid_t, zx_koid_t)> cb) override {
-    const auto& r = responses_.get_processes;
-    for (const auto& c : r.callbacks) {
-      auto ret = cb(c.depth, zx::handle(c.handle), c.koid, c.parent_koid);
-      if (ret != ZX_OK) {
-        return ret;
-      }
+zx_status_t MockOS::GetProcesses(
+    fit::function<zx_status_t(int, zx::handle, zx_koid_t, zx_koid_t)> cb) {
+  const auto& r = responses_.get_processes;
+  for (const auto& c : r.callbacks) {
+    auto ret = cb(c.depth, zx::handle(c.handle), c.koid, c.parent_koid);
+    if (ret != ZX_OK) {
+      return ret;
     }
-    return r.ret;
   }
+  return r.ret;
+}
 
-  zx_status_t GetProperty(zx_handle_t handle, uint32_t property, void* value,
-                          size_t name_len) override {
-    const auto& r = responses_.get_property.at(i_get_property_++);
-    EXPECT_EQ(r.handle, handle);
-    EXPECT_EQ(r.property, property);
-    auto len = std::min(name_len, r.value_len);
-    memcpy(value, r.value, len);
-    return r.ret;
-  }
+zx_status_t MockOS::GetProperty(zx_handle_t handle, uint32_t property, void* value,
+                                size_t name_len) {
+  const auto& r = responses_.get_property.at(i_get_property_++);
+  EXPECT_EQ(r.handle, handle);
+  EXPECT_EQ(r.property, property);
+  auto len = std::min(name_len, r.value_len);
+  memcpy(value, r.value, len);
+  return r.ret;
+}
 
-  const GetInfoResponse* GetGetInfoResponse(zx_handle_t handle, uint32_t topic) {
-    for (const auto& resp : responses_.get_info) {
-      if (resp.handle == handle && resp.topic == topic) {
-        return &resp;
-      }
+const GetInfoResponse* MockOS::GetGetInfoResponse(zx_handle_t handle, uint32_t topic) {
+  for (const auto& resp : responses_.get_info) {
+    if (resp.handle == handle && resp.topic == topic) {
+      return &resp;
     }
-    EXPECT_TRUE(false) << "This should not be reached: handle " << handle << " topic " << topic;
-    return nullptr;
   }
+  EXPECT_TRUE(false) << "This should not be reached: handle " << handle << " topic " << topic;
+  return nullptr;
+}
 
-  zx_status_t GetInfo(zx_handle_t handle, uint32_t topic, void* buffer, size_t buffer_size,
-                      size_t* actual, size_t* avail) override {
-    const GetInfoResponse* r = GetGetInfoResponse(handle, topic);
-    if (r == nullptr) {
-      return ZX_ERR_INVALID_ARGS;
-    }
-    EXPECT_EQ(r->handle, handle);
-    EXPECT_EQ(r->topic, topic);
-    size_t num_copied = 0;
-    if (buffer != nullptr) {
-      num_copied = std::min(r->value_count, buffer_size / r->value_size);
-      memcpy(buffer, r->values, num_copied * r->value_size);
-    }
-    if (actual != nullptr) {
-      *actual = num_copied;
-    }
-    if (avail != nullptr) {
-      if (num_copied < r->value_count) {
-        *avail = r->value_count - num_copied;
-      } else {
-        *avail = 0;
-      }
-    }
-    return r->ret;
+zx_status_t MockOS::GetInfo(zx_handle_t handle, uint32_t topic, void* buffer, size_t buffer_size,
+                            size_t* actual, size_t* avail) {
+  const GetInfoResponse* r = GetGetInfoResponse(handle, topic);
+  if (r == nullptr) {
+    return ZX_ERR_INVALID_ARGS;
   }
-
-  zx_status_t GetKernelMemoryStats(const fidl::WireSyncClient<fuchsia_kernel::Stats>& stats_client,
-                                   zx_info_kmem_stats_t* kmem) override {
-    const GetInfoResponse* r =
-        GetGetInfoResponse(TestUtils::kRootHandle, ZX_INFO_KMEM_STATS_EXTENDED);
-    if (r == nullptr)
-      return ZX_ERR_INVALID_ARGS;
-    memcpy(kmem, r->values, r->value_size);
-    return r->ret;
+  EXPECT_EQ(r->handle, handle);
+  EXPECT_EQ(r->topic, topic);
+  size_t num_copied = 0;
+  if (buffer != nullptr) {
+    num_copied = std::min(r->value_count, buffer_size / r->value_size);
+    memcpy(buffer, r->values, num_copied * r->value_size);
   }
-
-  zx_status_t GetKernelMemoryStatsExtended(
-      const fidl::WireSyncClient<fuchsia_kernel::Stats>& stats_client,
-      zx_info_kmem_stats_extended_t* kmem_ext, zx_info_kmem_stats_t* kmem) override {
-    const GetInfoResponse* r1 =
-        GetGetInfoResponse(TestUtils::kRootHandle, ZX_INFO_KMEM_STATS_EXTENDED);
-    if (r1 == nullptr)
-      return ZX_ERR_INVALID_ARGS;
-    memcpy(kmem, r1->values, r1->value_size);
-    const GetInfoResponse* r2 =
-        GetGetInfoResponse(TestUtils::kRootHandle, ZX_INFO_KMEM_STATS_EXTENDED);
-    if (r2 == nullptr)
-      return ZX_ERR_INVALID_ARGS;
-    memcpy(kmem_ext, r2->values, r2->value_size);
-    return r2->ret;
+  if (actual != nullptr) {
+    *actual = num_copied;
   }
+  // avail is the number of total available elements that can be read.
+  if (avail != nullptr) {
+    *avail = r->value_count;
+  }
+  return r->ret;
+}
 
-  OsResponses responses_;
-  uint32_t i_get_property_;
-  zx_time_t clock_;
-};
+zx_status_t MockOS::GetKernelMemoryStats(
+    const fidl::WireSyncClient<fuchsia_kernel::Stats>& stats_client, zx_info_kmem_stats_t* kmem) {
+  const GetInfoResponse* r =
+      GetGetInfoResponse(TestUtils::kRootHandle, ZX_INFO_KMEM_STATS_EXTENDED);
+  if (r == nullptr)
+    return ZX_ERR_INVALID_ARGS;
+  memcpy(kmem, r->values, r->value_size);
+  return r->ret;
+}
+
+zx_status_t MockOS::GetKernelMemoryStatsExtended(
+    const fidl::WireSyncClient<fuchsia_kernel::Stats>& stats_client,
+    zx_info_kmem_stats_extended_t* kmem_ext, zx_info_kmem_stats_t* kmem) {
+  const GetInfoResponse* r1 =
+      GetGetInfoResponse(TestUtils::kRootHandle, ZX_INFO_KMEM_STATS_EXTENDED);
+  if (r1 == nullptr)
+    return ZX_ERR_INVALID_ARGS;
+  memcpy(kmem, r1->values, r1->value_size);
+  const GetInfoResponse* r2 =
+      GetGetInfoResponse(TestUtils::kRootHandle, ZX_INFO_KMEM_STATS_EXTENDED);
+  if (r2 == nullptr)
+    return ZX_ERR_INVALID_ARGS;
+  memcpy(kmem_ext, r2->values, r2->value_size);
+  return r2->ret;
+}
 
 // static.
 void TestUtils::CreateCapture(Capture* capture, const CaptureTemplate& t, CaptureLevel level) {
@@ -148,13 +140,18 @@ std::vector<ProcessSummary> TestUtils::GetProcessSummaries(const Summary& summar
   return summaries;
 }
 
+zx_status_t TestUtils::GetCapture(Capture* capture, CaptureLevel level, const OsResponses& r) {
+  return GetCapture(capture, level, r, std::make_unique<BaseCaptureStrategy>());
+}
+
 zx_status_t TestUtils::GetCapture(Capture* capture, CaptureLevel level, const OsResponses& r,
-                                  CaptureFilter* filter) {
+                                  std::unique_ptr<CaptureStrategy> strategy) {
   MockOS os(r);
   CaptureState state;
-  zx_status_t ret = Capture::GetCaptureState(&state, &os);
+  zx_status_t ret = Capture::GetCaptureState(&state, os);
   EXPECT_EQ(ZX_OK, ret);
-  return Capture::GetCapture(capture, state, level, filter, &os, Capture::kDefaultRootedVmoNames);
+  return Capture::GetCapture(capture, state, level, std::move(strategy), os,
+                             Capture::kDefaultRootedVmoNames);
 }
 
 zx_status_t CaptureSupplier::GetCapture(Capture* capture, CaptureLevel level,

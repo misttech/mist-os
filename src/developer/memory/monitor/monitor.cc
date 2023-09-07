@@ -32,7 +32,7 @@
 #include "lib/fpromise/result.h"
 #include "src/developer/memory/metrics/bucket_match.h"
 #include "src/developer/memory/metrics/capture.h"
-#include "src/developer/memory/metrics/filters.h"
+#include "src/developer/memory/metrics/capture_strategy.h"
 #include "src/developer/memory/metrics/printer.h"
 #include "src/developer/memory/monitor/high_water.h"
 #include "src/developer/memory/monitor/memory_metrics_registry.cb.h"
@@ -122,8 +122,6 @@ std::vector<memory::BucketMatch> CreateBucketMatchesFromConfigData() {
   return std::move(*bucket_matches);
 }
 
-const char STARNIX_KERNEL_PROCESS_NAME[] = "starnix_kernel.cm";
-
 }  // namespace
 
 Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
@@ -140,8 +138,8 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
       logger_(
           dispatcher_,
           [this](Capture* c) {
-            FilterJobWithProcess filter(STARNIX_KERNEL_PROCESS_NAME);
-            return GetCapture(c, &filter);
+            auto strategy = std::make_unique<StarnixCaptureStrategy>();
+            return GetCapture(c, std::move(strategy));
           },
           [this](const Capture& c, Digest* d) { GetDigest(c, d); }),
       level_(Level::kNumLevels) {
@@ -150,8 +148,8 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
   high_water_ = std::make_unique<HighWater>(
       "/cache", kHighWaterPollFrequency, kHighWaterThreshold, dispatcher,
       [this](Capture* c, CaptureLevel l) {
-        FilterJobWithProcess filter(STARNIX_KERNEL_PROCESS_NAME);
-        return Capture::GetCapture(c, capture_state_, l, &filter);
+        auto strategy = std::make_unique<StarnixCaptureStrategy>();
+        return Capture::GetCapture(c, capture_state_, l, std::move(strategy));
       },
       [this](const Capture& c, Digest* d) { digester_->Digest(c, d); });
   auto s = Capture::GetCaptureState(&capture_state_);
@@ -221,8 +219,8 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
   trace_observer_.Start(dispatcher_, [this] { UpdateState(); });
   if (logging_) {
     Capture capture;
-    FilterJobWithProcess filter(STARNIX_KERNEL_PROCESS_NAME);
-    auto s = Capture::GetCapture(&capture, capture_state_, CaptureLevel::KMEM, &filter);
+    auto strategy = std::make_unique<StarnixCaptureStrategy>();
+    auto s = Capture::GetCapture(&capture, capture_state_, CaptureLevel::KMEM, std::move(strategy));
     if (s != ZX_OK) {
       FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(s);
       exit(EXIT_FAILURE);
@@ -274,8 +272,8 @@ void Monitor::CreateMetrics(const std::vector<memory::BucketMatch>& bucket_match
   metrics_ = std::make_unique<Metrics>(
       bucket_matches, kMetricsPollFrequency, dispatcher_, &inspector_, metric_event_logger_.get(),
       [this](Capture* c) {
-        FilterJobWithProcess filter(STARNIX_KERNEL_PROCESS_NAME);
-        return GetCapture(c, &filter);
+        auto strategy = std::make_unique<StarnixCaptureStrategy>();
+        return GetCapture(c, std::move(strategy));
       },
       [this](const Capture& c, Digest* d) { GetDigest(c, d); });
 }
@@ -292,7 +290,8 @@ void Monitor::Watch(fidl::InterfaceHandle<fuchsia::memory::Watcher> watcher) {
 void Monitor::WriteJsonCapture(zx::socket socket) {
   // Capture state and store it in a string.
   Capture capture;
-  const zx_status_t capture_status = GetCapture(&capture, nullptr);
+  auto strategy = std::make_unique<StarnixCaptureStrategy>();
+  const zx_status_t capture_status = GetCapture(&capture, std::move(strategy));
   if (capture_status != ZX_OK) {
     FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(capture_status);
     return;
@@ -312,26 +311,21 @@ void Monitor::WriteJsonCaptureAndBuckets(zx::socket socket) { CollectJsonStats(s
 void Monitor::CollectJsonStats(zx::socket socket) {
   // We set |include_starnix_processes| to true to avoid any change of behavior to the current
   // clients.
-  CollectJsonStatsWithOptions(std::move(socket), false);
+  CollectJsonStatsWithOptions(std::move(socket));
 }
 
 void Monitor::CollectJsonStatsWithOptions(
     fuchsia::memory::inspection::CollectorCollectJsonStatsWithOptionsRequest request) {
-  CollectJsonStatsWithOptions(std::move(*request.mutable_socket()),
-                              request.include_starnix_processes());
+  CollectJsonStatsWithOptions(std::move(*request.mutable_socket()));
 }
 
-void Monitor::CollectJsonStatsWithOptions(zx::socket socket, bool include_starnix_processes) {
+void Monitor::CollectJsonStatsWithOptions(zx::socket socket) {
   // Capture state.
   Capture capture;
 
   zx_status_t capture_status;
-  if (include_starnix_processes) {
-    capture_status = GetCapture(&capture, nullptr);
-  } else {
-    FilterJobWithProcess filter(STARNIX_KERNEL_PROCESS_NAME);
-    capture_status = GetCapture(&capture, &filter);
-  }
+  auto strategy = std::make_unique<StarnixCaptureStrategy>();
+  capture_status = GetCapture(&capture, std::move(strategy));
 
   if (capture_status != ZX_OK) {
     FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(capture_status);
@@ -392,8 +386,8 @@ inspect::Inspector Monitor::Inspect(const std::vector<memory::BucketMatch>& buck
   inspect::Inspector inspector(inspect::InspectSettings{.maximum_size = 1024 * 1024});
   auto& root = inspector.GetRoot();
   Capture capture;
-  FilterJobWithProcess filter(STARNIX_KERNEL_PROCESS_NAME);
-  Capture::GetCapture(&capture, capture_state_, CaptureLevel::VMO, &filter);
+  auto strategy = std::make_unique<StarnixCaptureStrategy>();
+  Capture::GetCapture(&capture, capture_state_, CaptureLevel::VMO, std::move(strategy));
 
   Summary summary(capture, Summary::kNameMatches);
   std::ostringstream summary_stream;
@@ -450,8 +444,8 @@ inspect::Inspector Monitor::Inspect(const std::vector<memory::BucketMatch>& buck
 void Monitor::SampleAndPost() {
   if (logging_ || tracing_ || watchers_.size() > 0) {
     Capture capture;
-    FilterJobWithProcess filter(STARNIX_KERNEL_PROCESS_NAME);
-    auto s = Capture::GetCapture(&capture, capture_state_, CaptureLevel::KMEM, &filter);
+    auto strategy = std::make_unique<StarnixCaptureStrategy>();
+    auto s = Capture::GetCapture(&capture, capture_state_, CaptureLevel::KMEM, std::move(strategy));
     if (s != ZX_OK) {
       FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(s);
       return;
@@ -581,8 +575,9 @@ void Monitor::UpdateState() {
       FX_LOGS(INFO) << "Tracing started";
       if (!tracing_) {
         Capture capture;
-        FilterJobWithProcess filter(STARNIX_KERNEL_PROCESS_NAME);
-        auto s = Capture::GetCapture(&capture, capture_state_, CaptureLevel::KMEM, &filter);
+        auto strategy = std::make_unique<StarnixCaptureStrategy>();
+        auto s =
+            Capture::GetCapture(&capture, capture_state_, CaptureLevel::KMEM, std::move(strategy));
         if (s != ZX_OK) {
           FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(s);
           return;
@@ -607,8 +602,9 @@ void Monitor::UpdateState() {
   }
 }
 
-zx_status_t Monitor::GetCapture(memory::Capture* capture, CaptureFilter* filter) {
-  return Capture::GetCapture(capture, capture_state_, CaptureLevel::VMO, filter);
+zx_status_t Monitor::GetCapture(memory::Capture* capture,
+                                std::unique_ptr<CaptureStrategy> strategy) {
+  return Capture::GetCapture(capture, capture_state_, CaptureLevel::VMO, std::move(strategy));
 }
 
 void Monitor::GetDigest(const memory::Capture& capture, memory::Digest* digest) {
@@ -620,8 +616,8 @@ void Monitor::PressureLevelChanged(Level level) {
   if (level == kImminentOOM) {
     // Force the current state to be written as the high_waters. Later is better.
     memory::Capture c;
-    FilterJobWithProcess filter(STARNIX_KERNEL_PROCESS_NAME);
-    auto s = GetCapture(&c, &filter);
+    auto strategy = std::make_unique<StarnixCaptureStrategy>();
+    auto s = GetCapture(&c, std::move(strategy));
     if (s == ZX_OK) {
       high_water_->RecordHighWater(c);
       high_water_->RecordHighWaterDigest(c);

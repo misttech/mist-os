@@ -17,12 +17,6 @@ pub struct MemoryCommand {
     )]
     pub debug_json: bool,
 
-    #[argh(
-        switch,
-        description = "includes in the output all Starnix processes. Including Starnix processes makes the command much slower. Default: false (only include the Starnix kernel)."
-    )]
-    pub include_starnix_processes: bool,
-
     #[argh(option, description = "filters by process koids. Repeatable flag.")]
     pub process_koids: Vec<u64>,
 

@@ -72,7 +72,7 @@ class Monitor : public fuchsia::memory::Monitor, public fuchsia::memory::inspect
   static const char kTraceName[];
 
  private:
-  void CollectJsonStatsWithOptions(zx::socket socket, bool include_starnix_processes);
+  void CollectJsonStatsWithOptions(zx::socket socket);
 
   void PublishBucketConfiguration();
 
@@ -94,7 +94,7 @@ class Monitor : public fuchsia::memory::Monitor, public fuchsia::memory::inspect
   // Alerts all watchers when an update has occurred.
   void NotifyWatchers(const zx_info_kmem_stats_t& stats);
 
-  zx_status_t GetCapture(memory::Capture* capture, memory::CaptureFilter* filter);
+  zx_status_t GetCapture(memory::Capture* capture, std::unique_ptr<memory::CaptureStrategy> filter);
   void GetDigest(const memory::Capture& capture, memory::Digest* digest);
   void PressureLevelChanged(Level level);
 

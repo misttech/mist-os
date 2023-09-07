@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 
 #include "src/developer/memory/metrics/capture.h"
+#include "src/developer/memory/metrics/capture_strategy.h"
 #include "src/developer/memory/metrics/tests/test_utils.h"
 
 namespace memory {
@@ -22,7 +23,7 @@ TEST_F(CaptureSystemTest, KMEM) {
   auto ret = Capture::GetCaptureState(&state);
   ASSERT_EQ(ZX_OK, ret);
   Capture c;
-  ret = Capture::GetCapture(&c, state, CaptureLevel::KMEM, nullptr);
+  ret = Capture::GetCapture(&c, state, CaptureLevel::KMEM, std::make_unique<BaseCaptureStrategy>());
   ASSERT_EQ(ZX_OK, ret) << zx_status_get_string(ret);
   EXPECT_LT(0U, c.kmem().free_bytes);
   EXPECT_LT(0U, c.kmem().total_bytes);
@@ -34,7 +35,7 @@ TEST_F(CaptureSystemTest, DISABLED_VMO) {
   auto ret = Capture::GetCaptureState(&state);
   ASSERT_EQ(ZX_OK, ret) << zx_status_get_string(ret);
   Capture c;
-  ret = Capture::GetCapture(&c, state, CaptureLevel::VMO, nullptr);
+  ret = Capture::GetCapture(&c, state, CaptureLevel::VMO, std::make_unique<BaseCaptureStrategy>());
   ASSERT_EQ(ZX_OK, ret) << zx_status_get_string(ret);
   EXPECT_LT(0U, c.kmem().free_bytes);
   EXPECT_LT(0U, c.kmem().total_bytes);

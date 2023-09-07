@@ -26,7 +26,7 @@ use {
     fidl_fuchsia_developer_remotecontrol as rc,
     fidl_fuchsia_io::OpenFlags,
     fidl_fuchsia_memory::MonitorProxy,
-    fidl_fuchsia_memory_inspection::{CollectorCollectJsonStatsWithOptionsRequest, CollectorProxy},
+    fidl_fuchsia_memory_inspection::CollectorProxy,
     futures::AsyncReadExt,
     plugin_output::ProfileMemoryOutput,
     std::io::Write,
@@ -54,7 +54,7 @@ impl FfxMain for MemoryTool {
 
 /// Abstracts a JSON collector.
 pub trait JsonCollector {
-    fn collect_json_stats(&self, tx: Socket, include_starnix: bool) -> Result<()>;
+    fn collect_json_stats(&self, tx: Socket) -> Result<()>;
 }
 
 // Implements a JSON collector with CollectorProxy.
@@ -63,19 +63,8 @@ struct JsonCollectorImpl {
 }
 
 impl JsonCollector for JsonCollectorImpl {
-    fn collect_json_stats(&self, tx: Socket, include_starnix: bool) -> Result<()> {
-        // Use the old/deprecated call when `include_starnix` is not present to ensure compatibility with the old Fuchsia releases.
-        if include_starnix {
-            self.collector_proxy.collect_json_stats_with_options(
-                CollectorCollectJsonStatsWithOptionsRequest {
-                    socket: Some(tx),
-                    include_starnix_processes: Some(include_starnix),
-                    ..Default::default()
-                },
-            )?;
-        } else {
-            self.collector_proxy.collect_json_stats(tx)?;
-        }
+    fn collect_json_stats(&self, tx: Socket) -> Result<()> {
+        self.collector_proxy.collect_json_stats(tx)?;
         Ok(())
     }
 }
@@ -87,7 +76,7 @@ struct DeprecatedJsonCollectorImpl {
 }
 
 impl JsonCollector for DeprecatedJsonCollectorImpl {
-    fn collect_json_stats(&self, tx: Socket, _include_starnix: bool) -> Result<()> {
+    fn collect_json_stats(&self, tx: Socket) -> Result<()> {
         self.monitor_proxy.write_json_capture_and_buckets(tx)?;
         Ok(())
     }
@@ -164,11 +153,11 @@ pub async fn print_output(
     writer: &mut MachineWriter<ProfileMemoryOutput>,
 ) -> Result<()> {
     if cmd.debug_json {
-        let raw_data = get_raw_data(collector, cmd.include_starnix_processes).await?;
+        let raw_data = get_raw_data(collector).await?;
         writeln!(writer, "{}", String::from_utf8(raw_data)?)?;
         Ok(())
     } else {
-        let memory_monitor_output = get_output(collector, cmd.include_starnix_processes).await?;
+        let memory_monitor_output = get_output(collector).await?;
         let processed_digest =
             processed::digest_from_memory_monitor_output(memory_monitor_output, cmd.buckets);
         let output = if cmd.process_koids.is_empty() && cmd.process_names.is_empty() {
@@ -190,12 +179,12 @@ pub async fn print_output(
 }
 
 /// Returns a buffer containing the data that `JsonCollector` wrote.
-async fn get_raw_data(collector: &dyn JsonCollector, include_starnix: bool) -> Result<Vec<u8>> {
+async fn get_raw_data(collector: &dyn JsonCollector) -> Result<Vec<u8>> {
     // Create a socket.
     let (rx, tx) = fidl::Socket::create_stream();
 
     // Ask the collector to fill the socket with the data.
-    collector.collect_json_stats(tx, include_starnix)?;
+    collector.collect_json_stats(tx)?;
 
     // Read all the bytes sent from the other end of the socket.
     let mut rx_async = fidl::AsyncSocket::from_socket(rx)?;
@@ -206,11 +195,8 @@ async fn get_raw_data(collector: &dyn JsonCollector, include_starnix: bool) -> R
 }
 
 /// Returns the `MemoryMonitorOutput` obtained via the `MonitorProxyInterface`. Performs basic schema validation.
-async fn get_output(
-    collector: &dyn JsonCollector,
-    include_starnix: bool,
-) -> anyhow::Result<raw::MemoryMonitorOutput> {
-    let buffer = get_raw_data(collector, include_starnix).await?;
+async fn get_output(collector: &dyn JsonCollector) -> anyhow::Result<raw::MemoryMonitorOutput> {
+    let buffer = get_raw_data(collector).await?;
     Ok(serde_json::from_slice(&buffer)?)
 }
 
@@ -259,7 +245,7 @@ mod tests {
     struct TestJsonCollectorImpl {}
 
     impl JsonCollector for TestJsonCollectorImpl {
-        fn collect_json_stats(&self, socket: Socket, _include_starnix: bool) -> Result<()> {
+        fn collect_json_stats(&self, socket: Socket) -> Result<()> {
             let mut s = fidl::AsyncSocket::from_socket(socket).unwrap();
             fuchsia_async::Task::local(async move {
                 s.write_all(&DATA_WRITTEN_BY_MEMORY_MONITOR).await.unwrap();
@@ -273,7 +259,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn get_raw_data_test() {
         let collector = TestJsonCollectorImpl {};
-        let raw_data = get_raw_data(&collector, false).await.expect("failed to get raw data");
+        let raw_data = get_raw_data(&collector).await.expect("failed to get raw data");
         assert_eq!(raw_data, *DATA_WRITTEN_BY_MEMORY_MONITOR);
     }
 
@@ -281,7 +267,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn get_output_test() {
         let collector = TestJsonCollectorImpl {};
-        let output = get_output(&collector, false).await.expect("failed to get output");
+        let output = get_output(&collector).await.expect("failed to get output");
         assert_eq!(output, *EXPECTED_OUTPUT);
     }
 }

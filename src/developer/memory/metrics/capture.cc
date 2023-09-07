@@ -11,6 +11,7 @@
 #include <lib/trace/event.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/job.h>
+#include <zircon/errors.h>
 #include <zircon/process.h>
 #include <zircon/rights.h>
 #include <zircon/status.h>
@@ -159,18 +160,18 @@ const std::vector<std::string> Capture::kDefaultRootedVmoNames = {
 // static.
 zx_status_t Capture::GetCaptureState(CaptureState* state) {
   OSImpl osImpl;
-  return GetCaptureState(state, &osImpl);
+  return GetCaptureState(state, osImpl);
 }
 
-zx_status_t Capture::GetCaptureState(CaptureState* state, OS* os) {
+zx_status_t Capture::GetCaptureState(CaptureState* state, OS& os) {
   TRACE_DURATION("memory_metrics", "Capture::GetCaptureState");
-  zx_status_t err = os->GetKernelStats(&state->stats_client);
+  zx_status_t err = os.GetKernelStats(&state->stats_client);
   if (err != ZX_OK) {
     return err;
   }
 
   zx_info_handle_basic_t info;
-  err = os->GetInfo(os->ProcessSelf(), ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  err = os.GetInfo(os.ProcessSelf(), ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
   if (err != ZX_OK) {
     return err;
   }
@@ -181,118 +182,64 @@ zx_status_t Capture::GetCaptureState(CaptureState* state, OS* os) {
 
 // static.
 zx_status_t Capture::GetCapture(Capture* capture, const CaptureState& state, CaptureLevel level,
-                                CaptureFilter* filter,
+                                std::unique_ptr<CaptureStrategy> strategy,
                                 const std::vector<std::string>& rooted_vmo_names) {
   OSImpl osImpl;
-  return GetCapture(capture, state, level, filter, &osImpl, rooted_vmo_names);
+  return GetCapture(capture, state, level, std::move(strategy), osImpl, rooted_vmo_names);
 }
 
 zx_status_t Capture::GetCapture(Capture* capture, const CaptureState& state, CaptureLevel level,
-                                CaptureFilter* filter, OS* os,
+                                std::unique_ptr<CaptureStrategy> strategy, OS& os,
                                 const std::vector<std::string>& rooted_vmo_names) {
   TRACE_DURATION("memory_metrics", "Capture::GetCapture");
-  capture->time_ = os->GetMonotonic();
+  FX_CHECK(strategy);
+  capture->time_ = os.GetMonotonic();
 
   // Capture level KMEM only queries ZX_INFO_KMEM_STATS, as opposed to ZX_INFO_KMEM_STATS_EXTENDED
   // which queries a more detailed set of kernel metrics. KMEM capture level is used to poll the
   // free memory level every 10s in order to keep the highwater digest updated, so a lightweight
   // syscall is preferable.
   if (level == CaptureLevel::KMEM) {
-    return os->GetKernelMemoryStats(state.stats_client, &capture->kmem_);
+    return os.GetKernelMemoryStats(state.stats_client, &capture->kmem_);
   }
 
   // ZX_INFO_KMEM_STATS_EXTENDED is more expensive to collect than ZX_INFO_KMEM_STATS, so only query
   // it for the more detailed capture levels. Use kmem_extended_ to populate the shared fields in
   // kmem_ (kmem_extended_ is a superset of kmem_), avoiding the need for a redundant syscall.
-  zx_status_t err = os->GetKernelMemoryStatsExtended(state.stats_client, &capture->kmem_extended_,
-                                                     &capture->kmem_);
+  zx_status_t err = os.GetKernelMemoryStatsExtended(state.stats_client, &capture->kmem_extended_,
+                                                    &capture->kmem_);
   if (err != ZX_OK) {
     return err;
   }
 
-  std::vector<memory::Process> processes;
-  std::unordered_map<zx_koid_t, zx::handle> process_handles;
-
   // We don't have a guarantee on the iteration order of GetProcesses. To be able to filter jobs
   // correctly based on the name of their processes, we need to go through all processes first. We
   // extract the process handle and keep it to avoid walking the process tree a second time.
-  err = os->GetProcesses([&os, filter, &processes, &process_handles](
-                             int depth, zx::handle handle, zx_koid_t koid, zx_koid_t parent_koid) {
-    TRACE_DURATION("memory_metrics", "Capture::GetProcesses::Callback");
-    auto& process = processes.emplace_back();
-    process.koid = koid;
-    process.job = parent_koid;
+  err = os.GetProcesses(
+      [&os, &strategy](int depth, zx::handle handle, zx_koid_t koid, zx_koid_t parent_koid) {
+        TRACE_DURATION("memory_metrics", "Capture::GetProcesses::Callback");
+        Process process{.koid = koid, .job = parent_koid};
 
-    zx_status_t s = os->GetProperty(handle.get(), ZX_PROP_NAME, process.name, ZX_MAX_NAME_LEN);
-    if (s != ZX_OK) {
-      processes.pop_back();
-      return s == ZX_ERR_BAD_STATE ? ZX_OK : s;
-    }
+        zx_status_t s = os.GetProperty(handle.get(), ZX_PROP_NAME, process.name, ZX_MAX_NAME_LEN);
+        if (s != ZX_OK) {
+          return s == ZX_ERR_BAD_STATE ? ZX_OK : s;
+        }
 
-    process_handles[koid] = std::move(handle);
+        s = strategy->OnNewProcess(os, std::move(process), std::move(handle));
+        return s == ZX_ERR_BAD_STATE ? ZX_OK : s;
+      });
 
-    if (filter != nullptr) {
-      filter->OnNewProcess(parent_koid, koid, process.name);
-    }
-
-    return ZX_OK;
-  });
-
-  // To speed up collection of VMO information, we reuse the same vector between GetInfo calls.
-  auto vmos = std::vector<zx_info_vmo_t>();
-  for (auto& process : processes) {
-    if (filter != nullptr && !filter->ShouldCapture(process.job, process.koid)) {
-      continue;
-    }
-
-    TRACE_DURATION_BEGIN("memory_metrics", "Capture::GetProcesses::GetVMOs");
-    size_t num_vmos = 0, available_vmos = 0, iter = 0;
-    bool bad_state_error = false;
-    do {
-      if (vmos.size() < available_vmos) {
-        vmos = std::vector<zx_info_vmo_t>(available_vmos);
-      }
-      zx_status_t s =
-          os->GetInfo(process_handles[process.koid].get(), ZX_INFO_PROCESS_VMOS, vmos.data(),
-                      vmos.size() * sizeof(zx_info_vmo_t), &num_vmos, &available_vmos);
-      // We don't want to show processes for which we don't have data (e.g. because they exited).
-      if (s == ZX_ERR_BAD_STATE) {
-        bad_state_error = true;
-        break;
-      }
-      if (s != ZX_OK) {
-        return s;
-      }
-      // We limit at 2 iterations maximum, to avoid running this loop forever when a process is
-      // allocating lots of VMOs.
-      iter++;
-    } while (num_vmos != available_vmos && iter < 2);
-    TRACE_DURATION_END("memory_metrics", "Capture::GetProcesses::GetVMOs");
-
-    if (bad_state_error) {
-      continue;
-    }
-
-    TRACE_DURATION_BEGIN("memory_metrics", "Capture::GetProcesses::UniqueProcessVMOs");
-    std::unordered_map<zx_koid_t, const zx_info_vmo_t*> unique_vmos;
-    unique_vmos.reserve(num_vmos);
-    for (size_t i = 0; i < num_vmos; i++) {
-      const auto* vmo_info = vmos.data() + i;
-      unique_vmos.try_emplace(vmo_info->koid, vmo_info);
-    }
-    TRACE_DURATION_END("memory_metrics", "Capture::GetProcesses::UniqueProcessVMOs");
-
-    TRACE_DURATION_BEGIN("memory_metrics", "Capture::GetProcesses::UniqueVMOs");
-    process.vmos.reserve(unique_vmos.size());
-    for (const auto& [koid, vmo] : unique_vmos) {
-      capture->koid_to_vmo_.try_emplace(koid, *vmo);
-      process.vmos.push_back(koid);
-    }
-    TRACE_DURATION_END("memory_metrics", "Capture::GetProcesses::UniqueVMOs");
-
-    capture->koid_to_process_[process.koid] = std::move(process);
+  auto result = strategy->Finalize(os);
+  if (result.is_error()) {
+    return result.error_value();
   }
+  auto& [koid_to_process, koid_to_vmo] = result.value();
+  capture->koid_to_process_ = std::move(koid_to_process);
+  capture->koid_to_vmo_ = std::move(koid_to_vmo);
+
+  TRACE_DURATION_BEGIN("memory_metrics", "Capture::GetProcesses::ReallocateDescendents");
   capture->ReallocateDescendents(rooted_vmo_names);
+  TRACE_DURATION_END("memory_metrics", "Capture::GetProcesses::ReallocateDescendents");
   return err;
 }
 
