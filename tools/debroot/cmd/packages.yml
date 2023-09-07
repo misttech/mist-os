@@ -1,7 +1,6 @@
 dists:
   - jessie
   - jessie-backports
-  - jessie-updates
 architectures:
   - amd64
   - arm64
@@ -10,9 +9,7 @@ architectures:
 components:
   - main
 sources:
-  # http://http.us.debian.org/debian no longer contains arm64 packages
-  # for jessie so we instead use the last snapshot that still has them.
-  - https://snapshot.debian.org/archive/debian/20190324T093412Z
+  - https://archive.debian.org/debian-archive/debian
 keyring: debian-archive-keyring.gpg
 packages:
   - package: libasound2
@@ -64,4 +61,5 @@ packages:
   - package: x11proto-kb-dev
   - package: x11proto-randr-dev
   - package: x11proto-render-dev
+  - package: x11proto-scrnsaver-dev
   - package: x11proto-xext-dev

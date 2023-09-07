@@ -65,4 +65,5 @@ packages:
   - package: x11proto-kb-dev
   - package: x11proto-randr-dev
   - package: x11proto-render-dev
+  - package: x11proto-scrnsaver-dev
   - package: x11proto-xext-dev
