@@ -13,7 +13,6 @@ use {
         bootfs::BootfsSvc,
         builtin::{
             arguments::Arguments as BootArguments,
-            capability::BuiltinCapability,
             cpu_resource::CpuResource,
             crash_introspect::CrashIntrospectSvc,
             debug_resource::DebugResource,
@@ -413,9 +412,6 @@ impl BuiltinSandboxBuilder {
 ///   available.
 pub struct BuiltinEnvironment {
     pub model: Arc<Model>,
-
-    // Framework capabilities.
-    pub vmex_resource: Option<Arc<VmexResource>>,
 
     pub binder_capability_host: Arc<BinderCapabilityHost>,
     pub realm_capability_host: Arc<RealmCapabilityHost>,
@@ -825,8 +821,10 @@ impl BuiltinEnvironment {
             })
             .map(VmexResource::new)
             .and_then(Result::ok);
-        if let Some(vmex_resource) = vmex_resource.as_ref() {
-            model.root().hooks.install(vmex_resource.hooks()).await;
+        if let Some(vmex_resource) = vmex_resource {
+            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::VmexResourceMarker>(
+                move |stream| vmex_resource.clone().serve(stream).boxed(),
+            );
         }
 
         // Set up System Controller service.
@@ -942,7 +940,6 @@ impl BuiltinEnvironment {
 
         Ok(BuiltinEnvironment {
             model,
-            vmex_resource,
             binder_capability_host,
             realm_capability_host,
             storage_admin_capability_host,

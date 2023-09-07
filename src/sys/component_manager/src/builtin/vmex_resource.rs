@@ -3,21 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    crate::builtin::capability::BuiltinCapability,
-    ::routing::capability_source::InternalCapability,
     anyhow::{format_err, Error},
-    async_trait::async_trait,
-    cm_types::Name,
     fidl_fuchsia_kernel as fkernel,
     fuchsia_zircon::{self as zx, HandleBased, Resource},
     futures::prelude::*,
-    lazy_static::lazy_static,
     std::sync::Arc,
 };
-
-lazy_static! {
-    static ref VMEX_RESOURCE_CAPABILITY_NAME: Name = "fuchsia.kernel.VmexResource".parse().unwrap();
-}
 
 /// An implementation of fuchsia.kernel.VmexResource protocol.
 pub struct VmexResource {
@@ -36,14 +27,8 @@ impl VmexResource {
         }
         Ok(Arc::new(Self { resource }))
     }
-}
 
-#[async_trait]
-impl BuiltinCapability for VmexResource {
-    const NAME: &'static str = "VmexResource";
-    type Marker = fkernel::VmexResourceMarker;
-
-    async fn serve(
+    pub async fn serve(
         self: Arc<Self>,
         mut stream: fkernel::VmexResourceRequestStream,
     ) -> Result<(), Error> {
@@ -52,31 +37,13 @@ impl BuiltinCapability for VmexResource {
         }
         Ok(())
     }
-
-    fn matches_routed_capability(&self, capability: &InternalCapability) -> bool {
-        capability.matches_protocol(&VMEX_RESOURCE_CAPABILITY_NAME)
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
-        crate::{
-            builtin::capability::BuiltinCapability,
-            capability::CapabilitySource,
-            model::hooks::{Event, EventPayload, Hooks},
-        },
-        cm_util::TaskGroup,
-        fidl::endpoints::ClientEnd,
-        fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync,
+        super::*, fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync,
         fuchsia_component::client::connect_to_protocol,
-        fuchsia_zircon::sys,
-        fuchsia_zircon::AsHandleRef,
-        futures::lock::Mutex,
-        moniker::{Moniker, MonikerBase},
-        std::path::PathBuf,
-        std::sync::Weak,
     };
 
     async fn get_vmex_resource() -> Result<Resource, Error> {
@@ -108,41 +75,6 @@ mod tests {
         assert_eq!(resource_info.kind, zx::sys::ZX_RSRC_KIND_SYSTEM);
         assert_eq!(resource_info.base, zx::sys::ZX_RSRC_SYSTEM_VMEX_BASE);
         assert_eq!(resource_info.size, 1);
-        Ok(())
-    }
-
-    #[fuchsia::test]
-    async fn can_connect_to_vmex_service() -> Result<(), Error> {
-        let vmex_resource = VmexResource::new(get_vmex_resource().await?).unwrap();
-        let hooks = Hooks::new();
-        hooks.install(vmex_resource.hooks()).await;
-
-        let provider = Arc::new(Mutex::new(None));
-        let source = CapabilitySource::Builtin {
-            capability: InternalCapability::Protocol(VMEX_RESOURCE_CAPABILITY_NAME.clone()),
-            top_instance: Weak::new(),
-        };
-
-        let event = Event::new_for_test(
-            Moniker::root(),
-            "fuchsia-pkg://root",
-            EventPayload::CapabilityRouted { source, capability_provider: provider.clone() },
-        );
-        hooks.dispatch(&event).await;
-
-        let (client, mut server) = zx::Channel::create();
-        let task_group = TaskGroup::new();
-        if let Some(provider) = provider.lock().await.take() {
-            provider
-                .open(task_group.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server)
-                .await?;
-        };
-
-        let vmex_client = ClientEnd::<fkernel::VmexResourceMarker>::new(client)
-            .into_proxy()
-            .expect("failed to create launcher proxy");
-        let vmex_resource = vmex_client.get().await?;
-        assert_ne!(vmex_resource.raw_handle(), sys::ZX_HANDLE_INVALID);
         Ok(())
     }
 }
