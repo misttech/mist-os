@@ -31,6 +31,9 @@ pub enum BlobfsError {
     #[error("while opening blobfs dir")]
     OpenDir(#[from] fuchsia_fs::node::OpenError),
 
+    #[error("while cloning the blobfs dir")]
+    CloneDir(#[from] fuchsia_fs::node::CloneError),
+
     #[error("while listing blobfs dir")]
     ReadDir(#[source] fuchsia_fs::directory::EnumerateError),
 
@@ -299,10 +302,15 @@ impl Client {
 
     /// Returns the list of known blobs in blobfs.
     pub async fn list_known_blobs(&self) -> Result<HashSet<Hash>, BlobfsError> {
-        let entries =
-            fuchsia_fs::directory::readdir(&self.dir).await.map_err(BlobfsError::ReadDir)?;
-
-        entries
+        // fuchsia.io.Directory.ReadDirents uses a per-connection index into the array of
+        // directory entries. To prevent contention over this index by concurrent calls (either
+        // from concurrent calls to list_known_blobs on this object, or on clones of this object,
+        // or other clones of the DirectoryProxy this object was made from), create a new
+        // connection which will have its own index.
+        let private_connection = fuchsia_fs::directory::clone_no_describe(&self.dir, None)?;
+        fuchsia_fs::directory::readdir(&private_connection)
+            .await
+            .map_err(BlobfsError::ReadDir)?
             .into_iter()
             .filter(|entry| entry.kind == fuchsia_fs::directory::DirentKind::File)
             .map(|entry| entry.name.parse().map_err(BlobfsError::ParseHash))
@@ -719,8 +727,8 @@ mod tests {
         TestBlob { _blob, hash }
     }
 
-    async fn fully_write_blob(client: &Client, content: &[u8; 1024]) -> TestBlob {
-        let hash = MerkleTree::from_reader(&content[..]).unwrap().root();
+    async fn fully_write_blob(client: &Client, content: &[u8]) -> TestBlob {
+        let hash = MerkleTree::from_reader(content).unwrap().root();
         let _blob = client
             .open_blob_proxy_from_dir_for_write(&hash, fpkg::BlobType::Uncompressed)
             .await
@@ -978,5 +986,28 @@ mod tests {
             client.open_blob_for_write(&[0; 32].into(), fpkg::BlobType::Delivery).await,
             Err(CreateError::AlreadyExists)
         );
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn concurrent_list_known_blobs_all_return_full_contents() {
+        use futures::StreamExt;
+        let blobfs = BlobfsRamdisk::builder().start().await.unwrap();
+        let client = Client::for_ramdisk(&blobfs);
+
+        // ReadDirents returns an 8,192 byte buffer, and each entry is 74 bytes [0] (including 64
+        // bytes of filename), so use more than 110 entries to guarantee that listing all contents
+        // requires multiple ReadDirents calls. This isn't necessary to cause conflict, because
+        // each successful listing requires a call to Rewind as well, but it does make conflict
+        // more likely.
+        // [0] https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.io/directory.fidl;l=261;drc=9e84e19d3f42240c46d2b0c3c132c2f0b5a3343f
+        for i in 0..256u16 {
+            let _: TestBlob = fully_write_blob(&client, i.to_le_bytes().as_slice()).await;
+        }
+
+        let () = futures::stream::iter(0..100)
+            .for_each_concurrent(None, |_| async {
+                assert_eq!(client.list_known_blobs().await.unwrap().len(), 256);
+            })
+            .await;
     }
 }
