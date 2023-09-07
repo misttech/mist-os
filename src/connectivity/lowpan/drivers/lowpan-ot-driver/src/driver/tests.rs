@@ -73,6 +73,7 @@ where
     // If needed, it can be enabled in the individual tests.
     instance.trel_set_enabled(false);
     instance.srp_server_set_enabled(false);
+    instance.srp_server_set_auto_enable_mode(false);
 
     ot::set_logging_level(ot::LogLevel::Crit);
 

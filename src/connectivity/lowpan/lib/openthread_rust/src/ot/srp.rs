@@ -437,8 +437,15 @@ pub trait SrpServer {
     /// [`otsys::otSrpServerSetEnabled`](crate::otsys::otSrpServerSetEnabled).
     fn srp_server_set_enabled(&self, enabled: bool);
 
+    /// Functional equivalent of
+    /// [`otsys::otSrpServerSetEnabled`](crate::otsys::otSrpServerSetAutoEnableMode).
+    fn srp_server_set_auto_enable_mode(&self, enabled: bool);
+
     /// Returns true if the SRP server is enabled.
     fn srp_server_is_enabled(&self) -> bool;
+
+    /// Returns true if SRP server auto-enable mode is enabled.
+    fn srp_server_is_auto_enable_mode(&self) -> bool;
 
     /// Returns true if the SRP server is running, false if it is stopped or disabled.
     fn srp_server_is_running(&self) -> bool;
@@ -494,12 +501,20 @@ impl<T: SrpServer + Boxable> SrpServer for ot::Box<T> {
         self.as_ref().srp_server_get_port()
     }
 
+    fn srp_server_set_auto_enable_mode(&self, enabled: bool) {
+        self.as_ref().srp_server_set_auto_enable_mode(enabled)
+    }
+
     fn srp_server_set_enabled(&self, enabled: bool) {
         self.as_ref().srp_server_set_enabled(enabled)
     }
 
     fn srp_server_is_enabled(&self) -> bool {
         self.as_ref().srp_server_is_enabled()
+    }
+
+    fn srp_server_is_auto_enable_mode(&self) -> bool {
+        self.as_ref().srp_server_is_auto_enable_mode()
     }
 
     fn srp_server_is_running(&self) -> bool {
@@ -556,8 +571,12 @@ impl SrpServer for Instance {
         unsafe { otSrpServerGetPort(self.as_ot_ptr()) }
     }
 
-    fn srp_server_set_enabled(&self, enabled: bool) {
+    fn srp_server_set_auto_enable_mode(&self, enabled: bool) {
         unsafe { otSrpServerSetAutoEnableMode(self.as_ot_ptr(), enabled) }
+    }
+
+    fn srp_server_set_enabled(&self, enabled: bool) {
+        unsafe { otSrpServerSetEnabled(self.as_ot_ptr(), enabled) }
     }
 
     fn srp_server_is_enabled(&self) -> bool {
@@ -568,6 +587,10 @@ impl SrpServer for Instance {
             OT_SRP_SERVER_STATE_STOPPED => true,
             _ => panic!("Unexpected value from otSrpServerGetState"),
         }
+    }
+
+    fn srp_server_is_auto_enable_mode(&self) -> bool {
+        unsafe { otSrpServerIsAutoEnableMode(self.as_ot_ptr()) }
     }
 
     fn srp_server_is_running(&self) -> bool {

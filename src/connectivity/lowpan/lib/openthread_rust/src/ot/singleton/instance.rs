@@ -5,6 +5,7 @@
 use super::*;
 
 use std::marker::PhantomData;
+use std::mem::transmute;
 use std::task::{Context, Waker};
 
 /// OpenThread instance.
@@ -24,9 +25,30 @@ unsafe impl Send for Instance {}
 unsafe impl ot::Boxable for Instance {
     type OtType = otInstance;
     unsafe fn finalize(&mut self) {
-        trace!("Instance::finalize(): Finalizing otInstance");
-        self.srp_server_set_enabled(false);
+        if self.srp_server_is_enabled() {
+            debug!("Instance::finalize(): Turning off SRP server...");
+            self.srp_server_set_enabled(false);
+        }
+
+        // Make sure all of the UDP ports are closed. This shouldn't
+        // strictly be necessary, but we've seen some cases where it
+        // appears to not be happening in `otInstanceFinalize`, as
+        // seen here: <b/296886787#comment53>
+        debug!("Instance::finalize(): Forcing all remaining UDP sockets to close...");
+        for socket in self.udp_get_sockets() {
+            // SAFETY: We need to pass a mutable pointer to clean this up.
+            //         This is safe because we are the only thread interacting
+            //         with these objects and subsequent calls to any of the
+            //         `otPlatUdp*` methods will simply fail with an error,
+            //         including `otPlatUdpClose`. In general, we only get away
+            //         with this because we are finalizing.
+            otPlatUdpClose(transmute(socket.as_ot_ptr()));
+        }
+
+        debug!("Instance::finalize(): Finalizing otInstance...");
         otInstanceFinalize(self.as_ot_ptr());
+
+        debug!("Instance::finalize(): Dropping singleton backing...");
         InstanceBacking::drop_singleton();
     }
 }

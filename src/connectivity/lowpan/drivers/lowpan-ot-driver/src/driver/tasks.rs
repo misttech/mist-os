@@ -263,7 +263,7 @@ where
         driver_state.ot_instance.icmp6_set_echo_mode(ot::Icmp6EchoMode::HandleDisabled);
 
         // Enable SRP Server
-        driver_state.ot_instance.srp_server_set_enabled(true);
+        driver_state.ot_instance.srp_server_set_auto_enable_mode(true);
 
         // <b/293936909>: Make sure the TREL state matches what is expected.
         driver_state.check_trel();
