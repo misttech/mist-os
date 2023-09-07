@@ -58,6 +58,8 @@ rustc_binary("bin") {
     "//src/lib/zircon/rust:fuchsia-zircon-status",
     "//src/storage/lib/vfs/rust:vfs",
     "//src/sys/component_manager/lib/logger",
+    "//src/sys/component_manager/lib/sandbox",
+    "//src/sys/component_manager/lib/serve_processargs",
     "//src/sys/component_manager/lib/util",
     "//src/sys/lib/cm_fidl_validator",
     "//src/sys/lib/cm_moniker",

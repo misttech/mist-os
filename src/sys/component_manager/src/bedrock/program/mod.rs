@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::runner::{builtin::RemoteRunner, Namespace};
+use crate::runner::builtin::RemoteRunner;
 use fidl::endpoints;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_component_runner as fcrunner;
@@ -11,9 +11,12 @@ use fidl_fuchsia_diagnostics_types as fdiagnostics;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_mem as fmem;
 use fidl_fuchsia_process as fprocess;
+use fuchsia_async as fasync;
 use fuchsia_async::Task;
 use fuchsia_zircon as zx;
 use futures::{channel::oneshot, future::BoxFuture};
+use serve_processargs::{Namespace, NamespaceError};
+use std::sync::Mutex;
 use thiserror::Error;
 use zx::{AsHandleRef, Koid};
 
@@ -34,10 +37,17 @@ pub struct Program {
 
     // Only here to keep the diagnostics task alive. Never read.
     _send_diagnostics: Task<()>,
+
+    // Dropping the task will stop serving the namespace.
+    namespace_task: Mutex<Option<fasync::Task<()>>>,
 }
 
 impl Program {
     /// Starts running a program using the `runner`.
+    ///
+    /// After successfully starting the program, it will serve the namespace given to the
+    /// program. If [Program] is dropped or [Program::kill] is called, the namespace will no
+    /// longer be served.
     ///
     /// TODO(fxbug.dev/122024): Change `start_info` to a `Dict` and `DeliveryMap` as runners
     /// migrate to use sandboxes.
@@ -48,11 +58,11 @@ impl Program {
     ///
     /// TODO(fxbug.dev/122024): Since diagnostic information is only available once,
     /// the framework should be the one that get it. That's another reason to limit this API.
-    pub async fn start(
+    pub fn start(
         runner: &RemoteRunner,
         start_info: StartInfo,
         diagnostics_sender: oneshot::Sender<fdiagnostics::ComponentDiagnostics>,
-    ) -> Program {
+    ) -> Result<Program, StartError> {
         let (controller, server_end) =
             endpoints::create_proxy::<fcrunner::ComponentControllerMarker>()
                 .expect("creating FIDL proxy should not fail");
@@ -62,7 +72,9 @@ impl Program {
             .expect("basic info should not require any rights")
             .koid;
 
-        runner.start(start_info.into(), server_end).await;
+        let (start_info, fut) = start_info.into_fidl()?;
+
+        runner.start(start_info, server_end);
         let mut controller = ComponentController::new(controller);
         let diagnostics_receiver = controller.take_diagnostics_receiver().unwrap();
         let send_diagnostics = Task::spawn(async move {
@@ -71,18 +83,24 @@ impl Program {
                 _ = diagnostics_sender.send(diagnostics);
             }
         });
-        Program { controller, koid, _send_diagnostics: send_diagnostics }
+        Ok(Program {
+            controller,
+            koid,
+            _send_diagnostics: send_diagnostics,
+            namespace_task: Mutex::new(Some(fasync::Task::spawn(fut))),
+        })
     }
 
     /// Request to stop the program.
-    pub fn stop(&self) -> Result<(), Error> {
-        self.controller.stop().map_err(Error::Internal)?;
+    pub fn stop(&self) -> Result<(), StopError> {
+        self.controller.stop().map_err(StopError::Internal)?;
         Ok(())
     }
 
     /// Request to stop this program immediately.
-    pub fn kill(&self) -> Result<(), Error> {
-        self.controller.kill().map_err(Error::Internal)?;
+    pub fn kill(&self) -> Result<(), StopError> {
+        self.controller.kill().map_err(StopError::Internal)?;
+        _ = self.namespace_task.lock().unwrap().take();
         Ok(())
     }
 
@@ -111,15 +129,26 @@ impl Program {
 
         let controller = ComponentController::new(controller.into_proxy().unwrap());
         let send_diagnostics = Task::spawn(async {});
-        Program { controller, koid, _send_diagnostics: send_diagnostics }
+        Program {
+            controller,
+            koid,
+            _send_diagnostics: send_diagnostics,
+            namespace_task: Mutex::new(None),
+        }
     }
 }
 
-#[derive(Error, Debug)]
-pub enum Error {
+#[derive(Error, Debug, Clone)]
+pub enum StopError {
     /// Internal errors are not meant to be meaningfully handled by the user.
     #[error("internal error: {0}")]
     Internal(fidl::Error),
+}
+
+#[derive(Error, Debug, Clone)]
+pub enum StartError {
+    #[error("failed to serve namespace: {0}")]
+    ServeNamespace(NamespaceError),
 }
 
 /// Information and capabilities used to start a program.
@@ -154,6 +183,8 @@ pub struct StartInfo {
     /// The mount points specified in each entry must be unique and
     /// non-overlapping. For example, [{"/foo", ..}, {"/foo/bar", ..}] is
     /// invalid.
+    ///
+    /// TODO(b/298106231): eventually this should become a sandbox and delivery map.
     pub namespace: Namespace,
 
     /// The directory this component serves.
@@ -193,18 +224,25 @@ pub struct StartInfo {
     pub break_on_start: Option<zx::EventPair>,
 }
 
-impl From<StartInfo> for fcrunner::ComponentStartInfo {
-    fn from(start_info: StartInfo) -> Self {
-        Self {
-            resolved_url: Some(start_info.resolved_url),
-            program: Some(start_info.program),
-            ns: Some(start_info.namespace.into()),
-            outgoing_dir: start_info.outgoing_dir,
-            runtime_dir: start_info.runtime_dir,
-            numbered_handles: Some(start_info.numbered_handles),
-            encoded_config: start_info.encoded_config,
-            break_on_start: start_info.break_on_start,
-            ..Default::default()
-        }
+impl StartInfo {
+    pub fn into_fidl(
+        self,
+    ) -> Result<(fcrunner::ComponentStartInfo, BoxFuture<'static, ()>), StartError> {
+        let (ns, fut) = self.namespace.serve().map_err(StartError::ServeNamespace)?;
+        let ns: Vec<_> = ns.into_iter().map(Into::into).collect();
+        Ok((
+            fcrunner::ComponentStartInfo {
+                resolved_url: Some(self.resolved_url),
+                program: Some(self.program),
+                ns: Some(ns),
+                outgoing_dir: self.outgoing_dir,
+                runtime_dir: self.runtime_dir,
+                numbered_handles: Some(self.numbered_handles),
+                encoded_config: self.encoded_config,
+                break_on_start: self.break_on_start,
+                ..Default::default()
+            },
+            fut,
+        ))
     }
 }

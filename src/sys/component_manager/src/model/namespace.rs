@@ -10,7 +10,6 @@ use {
             error::CreateNamespaceError,
             routing::{self, route_and_open_capability, OpenOptions},
         },
-        runner::Namespace,
     },
     ::namespace::Entry as NamespaceEntry,
     ::routing::{
@@ -20,13 +19,13 @@ use {
     },
     cm_rust::{self, ComponentDecl, UseDecl},
     fidl::{
-        endpoints::{create_endpoints, ClientEnd, ServerEnd},
+        endpoints::{ClientEnd, ServerEnd},
         prelude::*,
     },
     fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_zircon::{self as zx, HandleBased},
-    futures::future::BoxFuture,
-    sandbox::Message,
+    sandbox::{Message, Open},
+    serve_processargs::Namespace,
     std::{collections::HashMap, sync::Arc},
     tracing::{error, warn},
     vfs::{
@@ -39,28 +38,42 @@ use {
 type Directory = Arc<pfs::Simple>;
 
 /// Creates a component's namespace.
+///
+/// TODO(b/298106231): eventually this should only build a delivery map as
+/// the program sandbox will be fetched from the resolved component state.
 pub async fn create_namespace(
     package: Option<&Package>,
     component: &Arc<ComponentInstance>,
     decl: &ComponentDecl,
     additional_entries: Vec<NamespaceEntry>,
 ) -> Result<Namespace, CreateNamespaceError> {
-    let mut namespace = Namespace::new();
+    let not_found_sender = serve_processargs::ignore_not_found();
+    let mut namespace = Namespace::new(not_found_sender);
     if let Some(package) = package {
         let pkg_dir = fuchsia_fs::directory::clone_no_describe(&package.package_dir, None)
             .map_err(CreateNamespaceError::ClonePkgDirFailed)?;
-        add_pkg_directory(&mut namespace, pkg_dir);
+        add_pkg_directory(&mut namespace, pkg_dir)?;
     }
     add_use_decls(&mut namespace, component, decl).await?;
-    namespace.merge(additional_entries).map_err(CreateNamespaceError::InvalidAdditionalEntries)?;
+    for entry in additional_entries {
+        let directory: sandbox::Directory = entry.directory.into();
+        let path = entry.path;
+        namespace.add_entry(Box::new(directory), &path)?;
+    }
     Ok(namespace)
 }
 
 /// Adds the package directory to the namespace under the path "/pkg".
-fn add_pkg_directory(namespace: &mut Namespace, pkg_dir: fio::DirectoryProxy) {
+fn add_pkg_directory(
+    namespace: &mut Namespace,
+    pkg_dir: fio::DirectoryProxy,
+) -> Result<(), CreateNamespaceError> {
     // TODO(https://fxbug.dev/108786): Use Proxy::into_client_end when available.
     let client_end = ClientEnd::new(pkg_dir.into_channel().unwrap().into_zx_channel());
-    namespace.add(PKG_PATH.to_str().unwrap().try_into().unwrap(), client_end);
+    let directory: sandbox::Directory = client_end.into();
+    let path = cm_types::Path::new(PKG_PATH.to_str().unwrap()).unwrap();
+    namespace.add_entry(Box::new(directory), path.as_ref())?;
+    Ok(())
 }
 
 /// Adds namespace entries for a component's use declarations.
@@ -76,14 +89,10 @@ async fn add_use_decls(
     // component's namespace and a directory that ComponentMgr will host for the component.
     let mut svc_dirs = HashMap::new();
 
-    // directory_waiters will hold Future<Output=()> objects that will wait for activity on
-    // a channel and then route the channel to the appropriate component's out directory.
-    let mut directory_waiters = Vec::new();
-
     for use_ in &decl.uses {
         match use_ {
             cm_rust::UseDecl::Directory(_) => {
-                add_directory_helper(namespace, &mut directory_waiters, &use_, component.as_weak());
+                add_directory_helper(namespace, &use_, component.as_weak())?;
             }
             cm_rust::UseDecl::Protocol(s) => {
                 add_service_or_protocol_use(
@@ -102,7 +111,7 @@ async fn add_use_decls(
                 );
             }
             cm_rust::UseDecl::Storage(_) => {
-                add_storage_use(namespace, &mut directory_waiters, &use_, component).await?;
+                add_storage_use(namespace, &use_, component).await?;
             }
             cm_rust::UseDecl::EventStream(s) => {
                 add_service_or_protocol_use(
@@ -116,32 +125,16 @@ async fn add_use_decls(
     }
 
     // Start hosting the services directories and add them to the namespace
-    serve_and_add_svc_dirs(namespace, svc_dirs);
-
-    // The directory waiter will run in the component's nonblocking task scope, but
-    // when it gets a readable signal it will spawn the routing task in the blocking scope as
-    // that it blocks destruction, like service and protocol routing.
-    //
-    // TODO(fxbug.dev/76579): It would probably be more correct to run this in an execution_scope
-    // attached to the namespace (but that requires a bigger refactor)
-    let task_group = component.nonblocking_task_group();
-    for waiter in directory_waiters {
-        // The future for a directory waiter will only terminate once the directory channel is
-        // first used. Run the future in a task bound to the component's scope instead of
-        // calling await on it directly.
-        task_group.spawn(waiter).await;
-    }
+    serve_and_add_svc_dirs(namespace, svc_dirs)?;
 
     Ok(())
 }
 
-/// Adds a directory waiter to `waiters` and updates `ns` to contain a handle for the
-/// storage described by `use_`. Once the channel is readable, the future calls
-/// `route_storage` to forward the channel to the source component's outgoing directory and
-/// terminates.
+/// Updates `ns` to contain a handle for the storage described by `use_`. Once the channel
+/// is readable, the future calls `route_storage` to forward the channel to the source
+/// component's outgoing directory and terminates.
 async fn add_storage_use(
     namespace: &mut Namespace,
-    waiters: &mut Vec<BoxFuture<'_, ()>>,
     use_: &UseDecl,
     component: &Arc<ComponentInstance>,
 ) -> Result<(), CreateNamespaceError> {
@@ -166,26 +159,24 @@ async fn add_storage_use(
         _ => unreachable!("unexpected storage decl"),
     }
 
-    add_directory_helper(namespace, waiters, use_, component.as_weak());
+    add_directory_helper(namespace, use_, component.as_weak())?;
 
     Ok(())
 }
 
-/// Adds a directory waiter to `waiters` and updates `ns` to contain a handle for the
-/// directory described by `use_`. Once the channel is readable, the future calls
-/// `route_directory` to forward the channel to the source component's outgoing directory and
-/// terminates.
+/// Updates `ns` to contain a handle for the directory described by `use_`. Once the
+/// channel is readable, the future calls `route_directory` to forward the channel to the
+/// source component's outgoing directory and terminates.
 ///
-/// `component` is a weak pointer, which is important because we don't want the directory waiter
-/// closure to hold a strong pointer to this component lest it create a reference cycle.
+/// `component` is a weak pointer, which is important because we don't want the task
+/// waiting for channel readability to hold a strong pointer to this component lest it
+/// create a reference cycle.
 fn add_directory_helper(
     namespace: &mut Namespace,
-    waiters: &mut Vec<BoxFuture<'_, ()>>,
     use_: &UseDecl,
     component: WeakComponentInstance,
-) {
-    let target_path =
-        use_.path().expect("use decl without path used in add_directory_helper").to_string();
+) -> Result<(), CreateNamespaceError> {
+    let target_path = use_.path().expect("use decl without path used in add_directory_helper");
     let flags = match use_ {
         UseDecl::Directory(dir) => Rights::from(dir.rights).into_legacy(),
         UseDecl::Storage(_) => fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
@@ -198,13 +189,10 @@ fn add_directory_helper(
     let flags = flags | fio::OpenFlags::DIRECTORY;
 
     let use_ = use_.clone();
-    let (client_end, server_end) = create_endpoints();
-    let route_on_usage = async move {
-        // Wait for the channel to become readable.
-        let server_end = fasync::Channel::from_channel(server_end.into_channel())
-            .expect("failed to convert server_end into async channel");
-        let on_signal_fut = fasync::OnSignals::new(&server_end, zx::Signals::CHANNEL_READABLE);
-        on_signal_fut.await.unwrap();
+    let open_fn = move |scope: vfs::execution_scope::ExecutionScope,
+                        flags: fio::OpenFlags,
+                        relative_path: vfs::path::Path,
+                        server_end: zx::Channel| {
         let target = match component.upgrade() {
             Ok(component) => component,
             Err(e) => {
@@ -216,19 +204,32 @@ fn add_directory_helper(
                 return;
             }
         };
-        let server_end = server_end.into_zx_channel();
+        let use_ = use_.clone();
         // Spawn a separate task to perform routing in the blocking scope. This way it won't
         // block namespace teardown, but it will block component destruction.
-        target.blocking_task_group().spawn(route_directory(target, use_, flags, server_end)).await;
+        scope.spawn(async move {
+            target
+                .blocking_task_group()
+                .spawn(route_directory(
+                    target,
+                    use_.clone(),
+                    relative_path.into_string(),
+                    flags,
+                    server_end,
+                ))
+                .await
+        });
     };
 
-    waiters.push(Box::pin(route_on_usage));
-    namespace.add(target_path.clone().try_into().unwrap(), client_end);
+    let open = Open::new(open_fn, fio::DirentType::Directory, flags);
+    namespace.add_entry(Box::new(open), target_path.as_ref())?;
+    Ok(())
 }
 
 async fn route_directory(
     target: Arc<ComponentInstance>,
     use_: UseDecl,
+    relative_path: String,
     flags: fio::OpenFlags,
     mut server_end: zx::Channel,
 ) {
@@ -237,7 +238,7 @@ async fn route_directory(
             RouteRequest::UseDirectory(use_dir_decl.clone()),
             OpenOptions {
                 flags: flags | fio::OpenFlags::DIRECTORY,
-                relative_path: String::new(),
+                relative_path,
                 server_chan: &mut server_end,
             },
         ),
@@ -245,7 +246,7 @@ async fn route_directory(
             RouteRequest::UseStorage(use_storage_decl.clone()),
             OpenOptions {
                 flags: flags | fio::OpenFlags::DIRECTORY,
-                relative_path: ".".into(),
+                relative_path,
                 server_chan: &mut server_end,
             },
         ),
@@ -383,20 +384,27 @@ fn add_service_or_protocol_use(
 }
 
 /// Serves the pseudo-directories in `svc_dirs` and adds their client ends to the namespace.
-fn serve_and_add_svc_dirs(namespace: &mut Namespace, svc_dirs: HashMap<String, Directory>) {
+fn serve_and_add_svc_dirs(
+    namespace: &mut Namespace,
+    svc_dirs: HashMap<String, Directory>,
+) -> Result<(), CreateNamespaceError> {
     for (target_dir_path, pseudo_dir) in svc_dirs {
-        let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
-        pseudo_dir.clone().open(
-            ExecutionScope::new(),
+        let open = Open::new(
+            move |scope: vfs::execution_scope::ExecutionScope,
+                  flags: fio::OpenFlags,
+                  relative_path: vfs::path::Path,
+                  server_end: zx::Channel| {
+                pseudo_dir.clone().open(scope, flags, relative_path, server_end.into());
+            },
+            fio::DirentType::Directory,
             // TODO(https://fxbug.dev/129636): Remove RIGHT_READABLE when `opendir` no longer
             // requires READABLE.
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            Path::dot(),
-            server_end.into_channel().into(),
         );
-
-        namespace.add(target_dir_path.try_into().unwrap(), client_end);
+        let path = cm_types::Path::new(&target_dir_path).unwrap();
+        namespace.add_entry(Box::new(open), path.as_ref())?;
     }
+    Ok(())
 }
 
 fn make_dir_with_not_found_logging(

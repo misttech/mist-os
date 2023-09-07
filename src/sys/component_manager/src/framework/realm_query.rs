@@ -491,7 +491,10 @@ async fn construct_namespace(
         InstanceState::Resolved(r) => {
             let namespace =
                 create_namespace(r.package(), &instance, r.decl(), vec![]).await.unwrap();
-            Ok(namespace.into())
+            let (ns, fut) = namespace.serve().unwrap();
+            let ns: Vec<_> = ns.into_iter().map(Into::into).collect();
+            instance.nonblocking_task_group().spawn(fut).await;
+            Ok(ns)
         }
         _ => Err(fsys::ConstructNamespaceError::InstanceNotResolved),
     }
@@ -1174,6 +1177,7 @@ mod tests {
         let mut ns = query.construct_namespace("./").await.unwrap().unwrap();
 
         assert_eq!(ns.len(), 2);
+        ns.sort_by_key(|entry| entry.path.as_ref().unwrap().clone());
 
         // Test resolvers provide a pkg dir with a fake file
         let pkg_entry = ns.remove(0);

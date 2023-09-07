@@ -215,7 +215,9 @@ async fn start_component(
     let StartContext { runner, start_info, diagnostics_sender } = start_context;
     if let Some(runner) = runner {
         pending_runtime.set_program(
-            Program::start(&runner, start_info, diagnostics_sender).await,
+            Program::start(&runner, start_info, diagnostics_sender).map_err(|err| {
+                StartActionError::StartProgramError { moniker: component.moniker.clone(), err }
+            })?,
             component.as_weak(),
         );
     }

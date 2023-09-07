@@ -646,6 +646,12 @@ pub enum StartActionError {
         #[source]
         err: CreateNamespaceError,
     },
+    #[error("Couldn't start `{moniker}` because we failed to start its program: {err}")]
+    StartProgramError {
+        moniker: Moniker,
+        #[source]
+        err: crate::bedrock::program::StartError,
+    },
     #[error("Couldn't start `{moniker}` due to a structured configuration error: {err}")]
     StructuredConfigError {
         moniker: Moniker,
@@ -838,8 +844,8 @@ pub enum CreateNamespaceError {
     #[error("{0}")]
     InstanceNotInInstanceIdIndex(#[source] RoutingError),
 
-    #[error("invalid additional namespace entries")]
-    InvalidAdditionalEntries(#[source] crate::runner::NamespaceError),
+    #[error("namespace configuration error: {0}")]
+    NamespaceError(#[from] serve_processargs::NamespaceError),
 }
 
 impl CreateNamespaceError {
@@ -847,7 +853,7 @@ impl CreateNamespaceError {
         match self {
             Self::ClonePkgDirFailed(_) => zx::Status::IO,
             Self::InstanceNotInInstanceIdIndex(e) => e.as_zx_status(),
-            Self::InvalidAdditionalEntries(_) => zx::Status::INVALID_ARGS,
+            Self::NamespaceError(_) => zx::Status::INVALID_ARGS,
         }
     }
 }

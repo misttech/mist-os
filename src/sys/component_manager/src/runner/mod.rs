@@ -5,4 +5,4 @@
 pub mod builtin;
 pub mod namespace;
 
-pub use self::namespace::{Namespace, NamespaceError};
+pub use self::namespace::Namespace;

@@ -1936,7 +1936,7 @@ async fn do_runner_stop<'a>(
     // Ask the controller to stop the component
     if let Err(e) = program.stop() {
         match e {
-            program::Error::Internal(e) => {
+            program::StopError::Internal(e) => {
                 // There was some problem sending the message, perhaps a
                 // protocol error, but there isn't really a way to recover.
                 return Some(Err(StopActionError::ControllerStopFidlError(e)));
@@ -1984,7 +1984,7 @@ async fn do_runner_kill<'a>(
         }
         Err(e) => {
             match e {
-                program::Error::Internal(e) => {
+                program::StopError::Internal(e) => {
                     // There was some problem sending the message, perhaps a
                     // protocol error, but there isn't really a way to recover.
                     Err(StopActionError::ControllerKillFidlError(e))

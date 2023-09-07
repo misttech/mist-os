@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{AnyCast, Capability, Remote},
+    crate::{AnyCast, Capability, Convert, Directory, Remote},
     core::fmt,
     fidl::endpoints::create_endpoints,
     fidl::endpoints::ServerEnd,
@@ -52,7 +52,7 @@ use {
 /// is equivalent to two agents each opening one capability through their respective
 /// clones of the open capability.
 #[derive(Capability, Clone)]
-#[capability(try_clone = "clone", convert = "to_self_only")]
+#[capability(try_clone = "clone")]
 pub struct Open {
     open: Arc<OpenFn>,
     entry_type: fio::DirentType,
@@ -117,6 +117,25 @@ impl Open {
             ),
             self.entry_type,
         )
+    }
+}
+
+impl From<Open> for Directory {
+    fn from(value: Open) -> Directory {
+        let (handle, fut) = value.to_zx_handle();
+        Directory::new(handle.into(), fut)
+    }
+}
+
+impl Convert for Open {
+    fn try_into_capability(self, type_id: std::any::TypeId) -> Result<Box<dyn std::any::Any>, ()> {
+        if type_id == std::any::TypeId::of::<Self>() {
+            return Ok(Box::new(self).into_any());
+        } else if type_id == std::any::TypeId::of::<Directory>() {
+            let directory: Directory = self.try_into().map_err(|_| ())?;
+            return Ok(Box::new(directory));
+        }
+        Err(())
     }
 }
 

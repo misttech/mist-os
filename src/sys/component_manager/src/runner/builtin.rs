@@ -35,7 +35,7 @@ impl RemoteRunner {
         RemoteRunner { client }
     }
 
-    pub async fn start(
+    pub fn start(
         &self,
         start_info: fcrunner::ComponentStartInfo,
         server_end: ServerEnd<fcrunner::ComponentControllerMarker>,

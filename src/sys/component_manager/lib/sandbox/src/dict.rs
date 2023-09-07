@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{AnyCapability, AnyCast, Capability, Convert, Open, Remote, TryClone},
+    crate::{AnyCapability, AnyCast, Capability, Convert, Directory, Open, Remote, TryClone},
     anyhow::{Context, Error},
     fidl::endpoints::create_request_stream,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync,
@@ -220,6 +220,10 @@ impl Convert for Dict {
         } else if type_id == std::any::TypeId::of::<Open>() {
             let open: Open = self.try_into().map_err(|_| ())?;
             return Ok(Box::new(open));
+        } else if type_id == std::any::TypeId::of::<Directory>() {
+            let open: Open = self.try_into().map_err(|_| ())?;
+            let directory: Directory = open.try_into().map_err(|_| ())?;
+            return Ok(Box::new(directory));
         }
         Err(())
     }

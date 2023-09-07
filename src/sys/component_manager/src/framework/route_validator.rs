@@ -1277,6 +1277,7 @@ mod tests {
             let ns = mock_runner.get_namespace("test:///target_resolved").unwrap();
             let mut ns = ns.lock().await;
             // /pkg and /svc
+            ns.entries.sort();
             assert_eq!(ns.entries.len(), 2);
             let ns = ns.entries.remove(1);
             assert_eq!(ns.path.as_str(), "/svc");

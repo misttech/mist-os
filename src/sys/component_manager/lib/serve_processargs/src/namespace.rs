@@ -9,13 +9,13 @@ use futures::{
     FutureExt, StreamExt,
 };
 use namespace::{Entry as NamespaceEntry, Path as NamespacePath, PathError};
-use sandbox::{AnyCapability, Dict, Open, Remote};
+use sandbox::{AnyCapability, Dict, Directory, Remote};
 use std::collections::HashMap;
 use thiserror::Error;
 
 /// A builder object for assembling a program's incoming namespace.
 pub struct Namespace {
-    /// Mapping from namespace path to capabilities that can be turned into `Open`.
+    /// Mapping from namespace path to capabilities that can be turned into `Directory`.
     entries: HashMap<NamespacePath, AnyCapability>,
 
     /// Path-not-found errors are sent here.
@@ -42,9 +42,9 @@ pub enum NamespaceError {
 
     #[error(
         "while installing capabilities within the namespace entry `{path}`, \
-        failed to convert the namespace entry to Open"
+        failed to convert the namespace entry to Directory"
     )]
-    TryIntoOpenError { path: NamespacePath },
+    TryIntoDirectoryError { path: NamespacePath },
 }
 
 impl Namespace {
@@ -118,10 +118,10 @@ impl Namespace {
         let mut futures = self.futures;
 
         for (path, cap) in self.entries {
-            let open: Open = cap
+            let directory: Directory = cap
                 .try_into()
-                .map_err(|_| NamespaceError::TryIntoOpenError { path: path.clone() })?;
-            let (client_end, fut) = Box::new(open).to_zx_handle();
+                .map_err(|_| NamespaceError::TryIntoDirectoryError { path: path.clone() })?;
+            let (client_end, fut) = Box::new(directory).to_zx_handle();
 
             ns.push(NamespaceEntry { path, directory: client_end.into() });
             if let Some(fut) = fut {
