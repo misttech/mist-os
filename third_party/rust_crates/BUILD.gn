@@ -219,6 +219,10 @@ group("difference") {
   public_deps = [ ":difference-v2_0_0" ]
 }
 
+group("digest") {
+  public_deps = [ ":digest-v0_10_7" ]
+}
+
 group("downcast-rs") {
   public_deps = [ ":downcast-rs-v1_2_0" ]
 }

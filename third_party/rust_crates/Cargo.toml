@@ -85,8 +85,9 @@ data-encoding = "2.1.2"
 derivative = { version = "2.2.0", features = ["use_core"] }
 derive_builder = "0.11.1"
 derp = "0.0.14"
-downcast-rs = "1.2.0"
 difference = "2.0.0"
+digest = "0.10.7"
+downcast-rs = "1.2.0"
 dyn-clone = "1.0.5"
 ecdsa = { version = "0.14.3", features = ["pkcs8"] }
 elliptic-curve = { version = "0.12.3", features = [ "ecdh" ] }
