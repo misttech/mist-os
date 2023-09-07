@@ -16,6 +16,7 @@ source_set("lib") {
     "symbolizer_markup.cc",
     "targets.cc",
     "taskfinder.cc",
+    "unowned_component.cc",
   ]
 
   public_deps = [

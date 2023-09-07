@@ -35,12 +35,14 @@
 #include <src/lib/fsl/socket/strings.h>
 #include <src/lib/unwinder/module.h>
 
+#include "component.h"
 #include "component_watcher.h"
 #include "sampler.h"
 #include "symbolization_context.h"
 #include "symbolizer_markup.h"
 #include "targets.h"
 #include "taskfinder.h"
+#include "unowned_component.h"
 
 zx::result<> PopulateTargets(profiler::TargetTree& tree, TaskFinder::FoundTasks&& tasks) {
   for (auto&& [koid, job] : tasks.jobs) {
@@ -271,17 +273,14 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
         }
         component_target_ = std::move(*res);
       } else if (request.config()->target()->component()->moniker()) {
-        // We've been asked to attach to an existing component by moniker. To do this, we ask
-        // RealmQuery to get the component's RuntimeDirectory, then read that to get the component's
-        // job id. Once we have the job id, we can add it to the TargetTree.
-        zx::result<zx_koid_t> job_id =
-            MonikerToJobId(*request.config()->target()->component()->moniker());
-        if (job_id.is_error()) {
+        zx::result<std::unique_ptr<profiler::Component>> res = profiler::UnownedComponent::Create(
+            dispatcher_, *request.config()->target()->component()->moniker());
+        if (res.is_error()) {
           completer.Reply(
               fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
           return;
         }
-        finder.AddJob(*job_id);
+        component_target_ = std::move(*res);
       } else {
         completer.Reply(
             fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
@@ -334,7 +333,7 @@ void profiler::ProfilerControllerImpl::Start(StartRequest& request,
   targets_.Clear();
   if (component_target_) {
     ComponentWatcher::ComponentEventHandler on_start_handler = [this](std::string moniker,
-                                                                      std::string url) {
+                                                                      std::string) {
       zx::result<zx_koid_t> job_id = MonikerToJobId(moniker);
       if (job_id.is_error()) {
         FX_PLOGS(ERROR, job_id.error_value()) << "Failed to get moniker from Job ID";

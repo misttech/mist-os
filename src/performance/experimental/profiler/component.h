@@ -13,6 +13,7 @@
 #include "component_watcher.h"
 
 namespace profiler {
+
 class Component {
  public:
   explicit Component(async_dispatcher_t* dispatcher) : component_watcher_(dispatcher) {}
@@ -22,26 +23,28 @@ class Component {
                                                        const std::string& url,
                                                        const std::string& moniker);
 
-  zx::result<> Start(ComponentWatcher::ComponentEventHandler on_start = nullptr);
-  zx::result<> Stop();
-  zx::result<> Destroy();
+  virtual zx::result<> Start(ComponentWatcher::ComponentEventHandler on_start = nullptr);
+  virtual zx::result<> Stop();
+  virtual zx::result<> Destroy();
 
   // Return the moniker the component was created at
   std::string Moniker() { return moniker_; }
 
-  ~Component();
+  virtual ~Component();
 
- private:
-  fidl::SyncClient<fuchsia_sys2::LifecycleController> lifecycle_controller_client_;
-
+ protected:
   std::string name_;
   std::string collection_;
   std::string parent_moniker_;
   std::string moniker_;
 
   ComponentWatcher component_watcher_;
-  bool destroyed_ = false;
+
+ private:
+  bool destroyed_ = true;
+  fidl::SyncClient<fuchsia_sys2::LifecycleController> lifecycle_controller_client_;
 };
+
 }  // namespace profiler
 
 #endif  // SRC_PERFORMANCE_EXPERIMENTAL_PROFILER_COMPONENT_H_
