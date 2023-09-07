@@ -34,6 +34,10 @@ var expectations map[parseoutput.CaseIdentifier]outcome.Outcome = func() map[par
 	addAllExpectations("arp", platform.NS2, arpExpectations)
 	addAllExpectations("dhcp-client", platform.NS2, dhcpClientExpectations)
 	addAllExpectations("dhcp-server", platform.NS2, dhcpServerExpectations)
+	// TODO(https://fxbug.dev/132770): Note that the PD suite only runs against
+	// NS3 in Infra, so these are not regularly exercised and may be stale (any
+	// divergence in expectation between NS2 and NS3 is a bug since DHCPv6 client
+	// is out-of-stack and should behave the same with both stacks).
 	addAllExpectations("dhcpv6-client-pd", platform.NS2, dhcpv6ClientPDExpectations)
 	addAllExpectations("dhcpv6-client", platform.NS2, dhcpv6ClientExpectations)
 	addAllExpectations("icmp", platform.NS2, icmpExpectations)
@@ -62,7 +66,7 @@ var expectations map[parseoutput.CaseIdentifier]outcome.Outcome = func() map[par
 	addAllExpectations("arp", platform.NS3, arpExpectationsNS3)
 	addAllExpectations("dhcp-client", platform.NS3, dhcpClientExpectationsNS3)
 	addAllExpectations("dhcp-server", platform.NS3, dhcpServerExpectationsNS3)
-	addAllExpectations("dhcpv6-client-pd", platform.NS3, dhcpv6ClientPDExpectationsNS3)
+	addAllExpectations("dhcpv6-client-pd", platform.NS3, dhcpv6ClientPDExpectations)
 	addAllExpectations("dhcpv6-client", platform.NS3, dhcpv6ClientExpectationsNS3)
 	addAllExpectations("icmp", platform.NS3, icmpExpectationsNS3)
 	addAllExpectations("icmpv6", platform.NS3, icmpv6ExpectationsNS3)
