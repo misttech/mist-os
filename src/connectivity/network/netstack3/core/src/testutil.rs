@@ -56,12 +56,15 @@ use crate::{
         CounterContext, EventContext, InstantContext, RngContext, TimerContext, TracingContext,
     },
     device::{
-        ethernet, loopback::LoopbackDeviceId, DeviceId, DeviceLayerEventDispatcher,
-        DeviceLayerStateTypes, DeviceSendFrameError, EthernetDeviceId, EthernetWeakDeviceId,
-        WeakDeviceId,
+        ethernet, link::LinkDevice, loopback::LoopbackDeviceId, DeviceId,
+        DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError, EthernetDeviceId,
+        EthernetWeakDeviceId, WeakDeviceId,
     },
     ip::{
-        device::{IpDeviceEvent, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate},
+        device::{
+            nud::{LinkResolutionContext, LinkResolutionNotifier},
+            IpDeviceEvent, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+        },
         icmp::{BufferIcmpContext, IcmpContext, IcmpIpExt},
         types::{AddableEntryEither, AddableMetric, Entry, RawMetric},
         IpLayerEvent,
@@ -447,6 +450,20 @@ impl NonSyncContext for FakeNonSyncCtx {
         // Use the test-only default impl.
         BufferSizes::default()
     }
+}
+
+impl<D: LinkDevice> LinkResolutionContext<D> for FakeNonSyncCtx {
+    type Notifier = ();
+}
+
+impl<D: LinkDevice> LinkResolutionNotifier<D> for () {
+    type Observer = ();
+
+    fn new() -> (Self, Self::Observer) {
+        ((), ())
+    }
+
+    fn notify(self, _result: Result<D::Address, crate::error::AddressResolutionFailed>) {}
 }
 
 /// A wrapper which implements `RngCore` and `CryptoRng` for any `RngCore`.

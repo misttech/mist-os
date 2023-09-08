@@ -58,8 +58,8 @@ use crate::{
         device::{
             integration::SyncCtxWithIpDeviceConfiguration,
             nud::{
-                BufferNudHandler, ConfirmationFlags, DynamicNeighborUpdateSource, NudHandler,
-                NudIpHandler,
+                BufferNudHandler, ConfirmationFlags, DynamicNeighborUpdateSource,
+                LinkResolutionContext, NudHandler, NudIpHandler,
             },
             state::{
                 AddrSubnetAndManualConfigEither, AssignedAddress as _, DualStackIpDeviceState,
@@ -83,7 +83,7 @@ use crate::{
 ///
 /// `Device` is used to identify a particular device implementation. It
 /// is only intended to exist at the type level, never instantiated at runtime.
-pub(crate) trait Device: 'static {}
+pub trait Device: 'static {}
 
 /// Marker type for a generic device.
 pub(crate) enum AnyDevice {}
@@ -1702,7 +1702,10 @@ impl From<MulticastAddr<Mac>> for FrameDestination {
 type EthernetReferenceState<C> = IpLinkDeviceState<
     C,
     <C as DeviceLayerStateTypes>::EthernetDeviceState,
-    EthernetDeviceState<<C as InstantContext>::Instant>,
+    EthernetDeviceState<
+        <C as InstantContext>::Instant,
+        <C as LinkResolutionContext<EthernetLinkDevice>>::Notifier,
+    >,
 >;
 type LoopbackReferenceState<C> =
     IpLinkDeviceState<C, <C as DeviceLayerStateTypes>::LoopbackDeviceState, LoopbackDeviceState>;
@@ -1872,8 +1875,17 @@ pub trait DeviceLayerStateTypes: InstantContext {
 /// This trait groups together state types used throughout the device layer. It
 /// is blanket-implemented for all types that implement
 /// [`socket::DeviceSocketTypes`] and [`DeviceLayerStateTypes`].
-pub trait DeviceLayerTypes: DeviceLayerStateTypes + socket::DeviceSocketTypes {}
-impl<C: DeviceLayerStateTypes + socket::DeviceSocketTypes> DeviceLayerTypes for C {}
+pub trait DeviceLayerTypes:
+    DeviceLayerStateTypes + socket::DeviceSocketTypes + LinkResolutionContext<EthernetLinkDevice>
+{
+}
+impl<
+        C: DeviceLayerStateTypes
+            + socket::DeviceSocketTypes
+            + LinkResolutionContext<EthernetLinkDevice>,
+    > DeviceLayerTypes for C
+{
+}
 
 /// An event dispatcher for the device layer.
 ///

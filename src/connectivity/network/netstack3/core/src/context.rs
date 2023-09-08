@@ -306,6 +306,7 @@ pub mod testutil {
         collections::{BinaryHeap, HashMap},
         format,
         string::String,
+        sync::Arc,
         vec::Vec,
     };
     use core::{
@@ -329,7 +330,9 @@ pub mod testutil {
     use crate::device::EthernetDeviceId;
     use crate::{
         data_structures::ref_counted_hash_map::{RefCountedHashSet, RemoveResult},
-        device::EthernetWeakDeviceId,
+        device::{link::LinkDevice, EthernetWeakDeviceId},
+        ip::device::nud::{LinkResolutionContext, LinkResolutionNotifier},
+        sync::Mutex,
         testutil::FakeCryptoRng,
         Instant,
     };
@@ -1250,6 +1253,34 @@ pub mod testutil {
         type DurationScope = ();
 
         fn duration(&self, _: &'static CStr) {}
+    }
+
+    impl<D: LinkDevice, Id, Event: Debug, State> LinkResolutionContext<D>
+        for FakeNonSyncCtx<Id, Event, State>
+    {
+        type Notifier = FakeLinkResolutionNotifier<D>;
+    }
+
+    #[derive(Debug)]
+    pub(crate) struct FakeLinkResolutionNotifier<D: LinkDevice>(
+        Arc<Mutex<Option<Result<D::Address, crate::error::AddressResolutionFailed>>>>,
+    );
+
+    impl<D: LinkDevice> LinkResolutionNotifier<D> for FakeLinkResolutionNotifier<D> {
+        type Observer =
+            Arc<Mutex<Option<Result<D::Address, crate::error::AddressResolutionFailed>>>>;
+
+        fn new() -> (Self, Self::Observer) {
+            let inner = Arc::new(Mutex::new(None));
+            (Self(inner.clone()), inner)
+        }
+
+        fn notify(self, result: Result<D::Address, crate::error::AddressResolutionFailed>) {
+            let Self(inner) = self;
+            let mut inner = inner.lock();
+            assert_eq!(*inner, None, "resolved link address was set more than once");
+            *inner = Some(result);
+        }
     }
 
     pub(crate) trait WithFakeTimerContext<TimerId> {

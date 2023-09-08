@@ -58,7 +58,7 @@ use crate::{
     context::{
         CounterContext, EventContext, InstantContext, RngContext, TimerContext, TracingContext,
     },
-    device::{DeviceId, DeviceLayerState, DeviceLayerTimerId},
+    device::{ethernet::EthernetLinkDevice, DeviceId, DeviceLayerState, DeviceLayerTimerId},
     ip::{
         device::{
             state::AddrSubnetAndManualConfigEither, DualStackDeviceHandler, Ipv4DeviceTimerId,
@@ -227,6 +227,7 @@ pub trait NonSyncContext: CounterContext
     + IcmpContext<Ipv4>
     + IcmpContext<Ipv6>
     + transport::tcp::socket::NonSyncContext
+    + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
     + device::DeviceLayerEventDispatcher
     + device::socket::NonSyncContext<DeviceId<Self>>
     + TracingContext
@@ -250,6 +251,7 @@ impl<
             + IcmpContext<Ipv4>
             + IcmpContext<Ipv6>
             + transport::tcp::socket::NonSyncContext
+            + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
             + device::DeviceLayerEventDispatcher
             + device::socket::NonSyncContext<DeviceId<Self>>
             + TracingContext

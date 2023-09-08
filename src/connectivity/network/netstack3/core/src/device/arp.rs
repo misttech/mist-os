@@ -22,7 +22,8 @@ use crate::{
     device::{link::LinkDevice, DeviceIdContext, FrameDestination},
     ip::device::nud::{
         BufferNudContext, BufferNudSenderContext, ConfirmationFlags, DynamicNeighborUpdateSource,
-        NudConfigContext, NudContext, NudHandler, NudState, NudTimerId,
+        LinkResolutionContext, LinkResolutionNotifier, NudConfigContext, NudContext, NudHandler,
+        NudState, NudTimerId,
     },
     Instant,
 };
@@ -104,13 +105,17 @@ pub(crate) trait BufferArpSenderContext<
 
 /// The non-synchronized execution context for the ARP protocol.
 pub(crate) trait ArpNonSyncCtx<D: ArpDevice, DeviceId>:
-    TimerContext<ArpTimerId<D, DeviceId>> + CounterContext + TracingContext
+    TimerContext<ArpTimerId<D, DeviceId>> + CounterContext + TracingContext + LinkResolutionContext<D>
 {
 }
+
 impl<
         DeviceId,
         D: ArpDevice,
-        C: TimerContext<ArpTimerId<D, DeviceId>> + CounterContext + TracingContext,
+        C: TimerContext<ArpTimerId<D, DeviceId>>
+            + CounterContext
+            + TracingContext
+            + LinkResolutionContext<D>,
     > ArpNonSyncCtx<D, DeviceId> for C
 {
 }
@@ -138,7 +143,7 @@ pub(crate) trait ArpContext<D: ArpDevice, C: ArpNonSyncCtx<D, Self::DeviceId>>:
     /// configuration context.
     fn with_arp_state_mut<
         O,
-        F: FnOnce(&mut ArpState<D, C::Instant>, &mut Self::ConfigCtx<'_>) -> O,
+        F: FnOnce(&mut ArpState<D, C::Instant, C::Notifier>, &mut Self::ConfigCtx<'_>) -> O,
     >(
         &mut self,
         device_id: &Self::DeviceId,
@@ -167,7 +172,7 @@ pub(crate) trait BufferArpContext<B: BufferMut, D: ArpDevice, C: ArpNonSyncCtx<D
     /// synchronized context.
     fn with_arp_state_mut_and_buf_ctx<
         O,
-        F: FnOnce(&mut ArpState<D, C::Instant>, &mut Self::BufferArpSenderCtx<'_>) -> O,
+        F: FnOnce(&mut ArpState<D, C::Instant, C::Notifier>, &mut Self::BufferArpSenderCtx<'_>) -> O,
     >(
         &mut self,
         device_id: &Self::DeviceId,
@@ -182,7 +187,7 @@ impl<D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpContext<D, C>> NudC
 
     fn with_nud_state_mut<
         O,
-        F: FnOnce(&mut NudState<Ipv4, D, C::Instant>, &mut Self::ConfigCtx<'_>) -> O,
+        F: FnOnce(&mut NudState<Ipv4, D, C::Instant, C::Notifier>, &mut Self::ConfigCtx<'_>) -> O,
     >(
         &mut self,
         device_id: &SC::DeviceId,
@@ -219,7 +224,10 @@ impl<
 
     fn with_nud_state_mut_and_buf_ctx<
         O,
-        F: FnOnce(&mut NudState<Ipv4, D, C::Instant>, &mut Self::BufferSenderCtx<'_>) -> O,
+        F: FnOnce(
+            &mut NudState<Ipv4, D, C::Instant, C::Notifier>,
+            &mut Self::BufferSenderCtx<'_>,
+        ) -> O,
     >(
         &mut self,
         device_id: &SC::DeviceId,
@@ -533,11 +541,11 @@ fn send_arp_request<D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpCont
 ///
 /// Each device will contain an `ArpState` object for each of the network
 /// protocols that it supports.
-pub(crate) struct ArpState<D: ArpDevice, I: Instant> {
-    nud: NudState<Ipv4, D, I>,
+pub(crate) struct ArpState<D: ArpDevice, I: Instant, N: LinkResolutionNotifier<D>> {
+    nud: NudState<Ipv4, D, I, N>,
 }
 
-impl<D: ArpDevice, I: Instant> Default for ArpState<D, I> {
+impl<D: ArpDevice, I: Instant, N: LinkResolutionNotifier<D>> Default for ArpState<D, I, N> {
     fn default() -> Self {
         ArpState { nud: Default::default() }
     }
@@ -556,7 +564,10 @@ mod tests {
     use super::*;
     use crate::{
         context::{
-            testutil::{FakeCtx, FakeInstant, FakeNetwork, FakeNonSyncCtx, FakeSyncCtx},
+            testutil::{
+                FakeCtx, FakeInstant, FakeLinkResolutionNotifier, FakeNetwork, FakeNonSyncCtx,
+                FakeSyncCtx,
+            },
             InstantContext as _, TimerHandler,
         },
         device::{
@@ -586,7 +597,11 @@ mod tests {
     struct FakeArpCtx {
         proto_addr: Option<Ipv4Addr>,
         hw_addr: UnicastAddr<Mac>,
-        arp_state: ArpState<EthernetLinkDevice, FakeInstant>,
+        arp_state: ArpState<
+            EthernetLinkDevice,
+            FakeInstant,
+            FakeLinkResolutionNotifier<EthernetLinkDevice>,
+        >,
         inner: FakeArpInnerCtx,
         config: FakeArpConfigCtx,
     }
@@ -674,7 +689,14 @@ mod tests {
 
         fn with_arp_state_mut<
             O,
-            F: FnOnce(&mut ArpState<EthernetLinkDevice, FakeInstant>, &mut Self::ConfigCtx<'_>) -> O,
+            F: FnOnce(
+                &mut ArpState<
+                    EthernetLinkDevice,
+                    FakeInstant,
+                    FakeLinkResolutionNotifier<EthernetLinkDevice>,
+                >,
+                &mut Self::ConfigCtx<'_>,
+            ) -> O,
         >(
             &mut self,
             FakeLinkDeviceId: &FakeLinkDeviceId,
@@ -695,7 +717,11 @@ mod tests {
         fn with_arp_state_mut_and_buf_ctx<
             O,
             F: FnOnce(
-                &mut ArpState<EthernetLinkDevice, FakeInstant>,
+                &mut ArpState<
+                    EthernetLinkDevice,
+                    FakeInstant,
+                    FakeLinkResolutionNotifier<EthernetLinkDevice>,
+                >,
                 &mut Self::BufferArpSenderCtx<'_>,
             ) -> O,
         >(

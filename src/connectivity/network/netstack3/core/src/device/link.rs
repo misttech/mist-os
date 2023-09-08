@@ -16,7 +16,7 @@ use crate::device::Device;
 
 /// The type of address used by a link device.
 pub trait LinkAddress:
-    'static + FromBytes + AsBytes + Unaligned + Copy + Clone + Debug + Eq
+    'static + FromBytes + AsBytes + Unaligned + Copy + Clone + Debug + Eq + Send
 {
     /// The length of the address in bytes.
     const BYTES_LENGTH: usize;
@@ -53,7 +53,7 @@ impl LinkAddress for Mac {
 ///
 /// `LinkDevice` is used to identify a particular link device implementation. It
 /// is only intended to exist at the type level, never instantiated at runtime.
-pub(crate) trait LinkDevice: Device + Debug + Eq {
+pub trait LinkDevice: Device + Debug {
     /// The type of address used to address link devices of this type.
     type Address: LinkAddress + UnicastAddress;
 }

@@ -168,3 +168,7 @@ pub enum SetIpAddressPropertiesError {
     #[error("tried to set properties on a non-manually-configured address")]
     NotManual,
 }
+
+/// Error when link address resolution failed for a neighbor.
+#[derive(Debug, PartialEq)]
+pub struct AddressResolutionFailed;
