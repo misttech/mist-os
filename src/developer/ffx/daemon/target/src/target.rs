@@ -833,12 +833,12 @@ impl Target {
 
     #[tracing::instrument]
     pub fn from_identify(identify: IdentifyHostResponse) -> Result<Rc<Self>, Error> {
-        // TODO(raggi): allow targets to truly be created without a nodename.
         let nodename = match identify.nodename {
             Some(n) => n,
             None => bail!("Target identification missing a nodename: {:?}", identify),
         };
 
+        tracing::debug!("Got nodename {nodename}");
         let target = Target::new_named(nodename);
         target.update_last_response(Utc::now().into());
         if let Some(ids) = identify.ids {
@@ -877,6 +877,7 @@ impl Target {
 
     #[tracing::instrument]
     pub async fn from_rcs_connection(rcs: RcsConnection) -> Result<Rc<Self>, RcsConnectionError> {
+        tracing::debug!("Requesting host identity from overnet id {}", rcs.overnet_id.id);
         let identify_result =
             timeout(Duration::from_millis(IDENTIFY_HOST_TIMEOUT_MILLIS), rcs.proxy.identify_host())
                 .await

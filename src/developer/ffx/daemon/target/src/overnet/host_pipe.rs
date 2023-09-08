@@ -11,6 +11,7 @@ use ffx_daemon_events::{HostPipeErr, TargetEvent};
 use ffx_ssh::ssh::build_ssh_command_with_ssh_path;
 use fuchsia_async::{unblock, Task, TimeoutExt, Timer};
 use futures::io::{copy_buf, AsyncBufRead, BufReader};
+use futures::AsyncReadExt;
 use futures_lite::{io::AsyncBufReadExt, stream::StreamExt};
 use shared_child::SharedChild;
 use std::{
@@ -212,10 +213,7 @@ impl HostPipeChild {
         let mut stdout = BufReader::with_capacity(BUFFER_SIZE, stdout);
 
         tracing::debug!("Awaiting client address from ssh connection");
-        let ssh_host_address = match parse_ssh_connection(&mut stdout)
-            .on_timeout(Duration::from_secs(ssh_timeout as u64), || {
-                Err(ParseSshConnectionError::Timeout)
-            })
+        let ssh_host_address = match parse_ssh_connection(&mut stdout, Some(ssh_timeout))
             .await
             .context("reading ssh connection")
         {
@@ -225,6 +223,7 @@ impl HostPipeChild {
                 None
             }
         };
+        tracing::debug!("Got ssh host address {ssh_host_address:?}");
 
         let copy_in = async move {
             if let Err(e) = copy_buf(stdout, &mut pipe_tx).await {
@@ -257,6 +256,7 @@ impl HostPipeChild {
             }
         };
 
+        tracing::debug!("Establishing host-pipe process to target");
         Ok((
             ssh_host_address,
             HostPipeChild {
@@ -287,18 +287,94 @@ enum ParseSshConnectionError {
     Timeout,
 }
 
+const BUFSIZE: usize = 1024;
+struct LineBuffer {
+    buffer: [u8; BUFSIZE],
+    pos: usize,
+}
+
+// 1K should be enough for the initial line, which just looks something like
+//    "++ 192.168.1.1 1234 10.0.0.1 22 ++\n"
+impl LineBuffer {
+    fn new() -> Self {
+        Self { buffer: [0; BUFSIZE], pos: 0 }
+    }
+    fn line(&self) -> &[u8] {
+        &self.buffer[..self.pos]
+    }
+}
+
+impl ToString for LineBuffer {
+    fn to_string(&self) -> String {
+        String::from_utf8_lossy(self.line()).into()
+    }
+}
+
+#[tracing::instrument(skip(lb, rdr))]
+async fn read_ssh_line<R: AsyncBufRead + Unpin>(
+    lb: &mut LineBuffer,
+    rdr: &mut R,
+) -> std::result::Result<String, ParseSshConnectionError> {
+    loop {
+        // rdr is buffered, so it's not terrible to read a byte at a time, for just one line
+        let mut b = [0u8];
+        let n = rdr.read(&mut b[..]).await.map_err(ParseSshConnectionError::Io)?;
+        let b = b[0];
+        if n == 0 {
+            return Err(ParseSshConnectionError::Parse(format!("No newline: {:?}", lb.line())));
+        }
+        lb.buffer[lb.pos] = b;
+        lb.pos += 1;
+        if lb.pos >= lb.buffer.len() {
+            return Err(ParseSshConnectionError::Parse(format!(
+                "Buffer full: {:?}...",
+                &lb.buffer[..64]
+            )));
+        }
+        if b == b'\n' {
+            return Ok(lb.to_string());
+        }
+    }
+}
+
+#[tracing::instrument(skip(rdr))]
+async fn read_ssh_line_with_timeouts<R: AsyncBufRead + Unpin>(
+    rdr: &mut R,
+    timeout: Option<u16>,
+) -> Result<String, ParseSshConnectionError> {
+    let mut time = 0;
+    let wait_time = 2;
+    let mut lb = LineBuffer::new();
+    loop {
+        match read_ssh_line(&mut lb, rdr)
+            .on_timeout(Duration::from_secs(wait_time), || Err(ParseSshConnectionError::Timeout))
+            .await
+        {
+            Ok(s) => {
+                return Ok(s);
+            }
+            Err(ParseSshConnectionError::Timeout) => {
+                tracing::debug!("No line after {time}, line so far: {:?}", lb.line());
+                time += wait_time;
+                if let Some(t) = timeout {
+                    if time > t.into() {
+                        return Err(ParseSshConnectionError::Timeout);
+                    }
+                }
+            }
+            Err(e) => {
+                return Err(e);
+            }
+        }
+    }
+}
+
 #[tracing::instrument(skip(rdr))]
 async fn parse_ssh_connection<R: AsyncBufRead + Unpin>(
     rdr: &mut R,
+    timeout: Option<u16>,
 ) -> std::result::Result<String, ParseSshConnectionError> {
-    let mut line = String::new();
-    // Note: if there is a failure due to _some_ data being sent, but no
-    // newline, then we'll simply timeout without any debugging about the data.
-    // If there is reason to think that situation is arising, it may be
-    // worth replacing this read_line() with a loop that capture the data
-    // as it comes in, terminating when a newline is reached.
-    rdr.read_line(&mut line).await.map_err(ParseSshConnectionError::Io)?;
-
+    let line = read_ssh_line_with_timeouts(rdr, timeout).await?;
     if line.is_empty() {
         tracing::error!("Failed to first line");
         return Err(ParseSshConnectionError::Parse(line));
@@ -745,7 +821,7 @@ mod test {
                 "fe80::111:2222:3333:444%ethxc2".to_string(),
             ),
         ] {
-            match parse_ssh_connection(&mut line.as_bytes()).await {
+            match parse_ssh_connection(&mut line.as_bytes(), None).await {
                 Ok(actual) => assert_eq!(expected, actual),
                 res => panic!(
                     "unexpected result for {:?}: expected {:?}, got {:?}",
@@ -759,12 +835,12 @@ mod test {
     async fn test_parse_ssh_connection_errors() {
         for line in [
             // Test for invalid anchors
-            &"192.168.1.1 1234 10.0.0.1 22"[..],
-            &"++192.168.1.1 1234 10.0.0.1 22++"[..],
-            &"++192.168.1.1 1234 10.0.0.1 22 ++"[..],
-            &"++ 192.168.1.1 1234 10.0.0.1 22++"[..],
-            &"++ ++"[..],
-            &"## 192.168.1.1 1234 10.0.0.1 22 ##"[..],
+            &"192.168.1.1 1234 10.0.0.1 22\n"[..],
+            &"++192.168.1.1 1234 10.0.0.1 22++\n"[..],
+            &"++192.168.1.1 1234 10.0.0.1 22 ++\n"[..],
+            &"++ 192.168.1.1 1234 10.0.0.1 22++\n"[..],
+            &"++ ++\n"[..],
+            &"## 192.168.1.1 1234 10.0.0.1 22 ##\n"[..],
             // Truncation
             &"++"[..],
             &"++ 192.168.1.1"[..],
@@ -775,12 +851,8 @@ mod test {
             &"++ 192.168.1.1 1234 10.0.0.1 22 "[..],
             &"++ 192.168.1.1 1234 10.0.0.1 22 ++"[..],
         ] {
-            match parse_ssh_connection(&mut line.as_bytes()).await {
-                Err(ParseSshConnectionError::Parse(actual)) => {
-                    assert_eq!(line, actual);
-                }
-                res => panic!("unexpected result for {:?}: {:?}", line, res),
-            }
+            let res = parse_ssh_connection(&mut line.as_bytes(), None).await;
+            assert_matches!(res, Err(ParseSshConnectionError::Parse(_)));
         }
     }
 
@@ -811,5 +883,41 @@ mod test {
         buf.clear();
 
         assert!(buf.lines().is_empty());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_read_ssh_line() {
+        // async fn read_ssh_line<R: AsyncBufRead + Unpin>(
+        //     lb: &mut LineBuffer,
+        //     rdr: &mut R,
+        // ) -> std::result::Result<bool, ParseSshConnectionError> {
+        let mut lb = LineBuffer::new();
+        let input = &"++ 192.168.1.1 1234 10.0.0.1 22 ++\n"[..];
+        match read_ssh_line(&mut lb, &mut input.as_bytes()).await {
+            Ok(s) => assert_eq!(s, String::from("++ 192.168.1.1 1234 10.0.0.1 22 ++\n")),
+            res => panic!("unexpected result: {res:?}"),
+        }
+
+        let mut lb = LineBuffer::new();
+        let input = &"no newline"[..];
+        let res = read_ssh_line(&mut lb, &mut input.as_bytes()).await;
+        assert_matches!(res, Err(ParseSshConnectionError::Parse(_)));
+
+        let mut lb = LineBuffer::new();
+        let input = [b'A'; 1024];
+        let res = read_ssh_line(&mut lb, &mut &input[..]).await;
+        assert_matches!(res, Err(ParseSshConnectionError::Parse(_)));
+
+        // Can continue after reading partial result
+        let mut lb = LineBuffer::new();
+        let input1 = &"foo"[..];
+        let _ = read_ssh_line(&mut lb, &mut input1.as_bytes()).await;
+        // We'll get a no-newline error, but it has the same semantics as
+        // being interrupted due to a timeout
+        let input2 = &"bar\n"[..];
+        match read_ssh_line(&mut lb, &mut input2.as_bytes()).await {
+            Ok(s) => assert_eq!(s, String::from("foobar\n")),
+            res => panic!("unexpected result: {res:?}"),
+        }
     }
 }

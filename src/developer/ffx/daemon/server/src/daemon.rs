@@ -107,6 +107,7 @@ impl DaemonEventHandler {
 
     #[tracing::instrument(skip(self))]
     async fn handle_overnet_peer(&self, node_id: u64) {
+        tracing::debug!("Got overnet peer {node_id}");
         let rcs = match RcsConnection::new(self.hoist.clone(), &mut NodeId { id: node_id }) {
             Ok(rcs) => rcs,
             Err(e) => {
@@ -677,6 +678,7 @@ impl Daemon {
         known_peers: HashSet<PeerSetElement>,
         peers: Vec<Peer>,
     ) -> HashSet<PeerSetElement> {
+        tracing::debug!("Got updated peer list {peers:?}");
         let mut new_peers: HashSet<PeerSetElement> = Default::default();
         for peer in peers {
             new_peers.insert(PeerSetElement(peer));
