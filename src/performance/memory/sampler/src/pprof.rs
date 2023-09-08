@@ -17,8 +17,11 @@
 //! ```
 pub use profile_rust_proto::perfetto::third_party::perftools::profiles as pproto;
 
-use std::collections::{BTreeMap, HashMap};
-use std::ops::Bound::{Excluded, Unbounded};
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    ops::Bound::{Excluded, Unbounded},
+    rc::Rc,
+};
 
 use fidl_fuchsia_memory_sampler::ModuleMap;
 use itertools::Itertools;
@@ -111,10 +114,11 @@ impl Mapping {
 
 /// Build a `pprof`-compatible profile from a program address mapping
 /// and its allocation/deallocation information.
-pub fn build_profile<'a, 'b, 'c>(
+pub fn build_profile<'a>(
     modules: impl Iterator<Item = &'a ModuleMap>,
-    live_allocations: impl Iterator<Item = &'b LiveAllocation> + Clone,
-    dead_allocations: impl Iterator<Item = &'c DeadAllocation> + Clone,
+    live_allocations: impl Iterator<Item = &'a LiveAllocation>,
+    dead_allocations: impl Iterator<Item = &'a DeadAllocation>,
+    stack_traces: &'a HashSet<Rc<Vec<u64>>>,
 ) -> pproto::Profile {
     let mut st = StringTable::new();
     let mut pprof = pproto::Profile {
@@ -144,34 +148,26 @@ pub fn build_profile<'a, 'b, 'c>(
         let (mp, mappings) = Mapping::build(modules, &mut st);
         pprof.mapping = mappings;
 
-        let live_locations = live_allocations
-            .clone()
-            .flat_map(|LiveAllocation { stack_trace: ast, .. }| ast.stack_frames.iter().flatten());
-        let dead_locations = dead_allocations.clone().flat_map(
-            |DeadAllocation { allocation_stack_trace: ast, .. }| ast.stack_frames.iter().flatten(),
-        );
-        let deallocations_locations = dead_allocations.clone().flat_map(
-            |DeadAllocation { deallocation_stack_trace: dst, .. }| {
-                dst.stack_frames.iter().flatten()
-            },
-        );
-        let all_locations =
-            live_locations.chain(dead_locations).chain(deallocations_locations).unique();
-
-        pprof.location.extend(all_locations.map(|&address| pproto::Location {
-            id: address,
-            mapping_id: mp.resolve(address),
-            address,
-            ..Default::default()
-        }));
+        pprof.location = stack_traces
+            .iter()
+            .flat_map(|st| st.iter())
+            .unique()
+            .map(|&address| pproto::Location {
+                id: address,
+                mapping_id: mp.resolve(address),
+                address,
+                ..Default::default()
+            })
+            .collect();
     }
 
     // Live allocations
     {
         let samples = live_allocations.filter_map(|LiveAllocation { size, stack_trace: ast }| {
+            let size = (*size) as i64;
             Some(pproto::Sample {
-                value: vec![1, *size, 1, *size, 0, 0],
-                location_id: ast.stack_frames.clone()?,
+                value: vec![1, size, 1, size, 0, 0],
+                location_id: ast.to_vec(),
                 ..Default::default()
             })
         });
@@ -186,17 +182,18 @@ pub fn build_profile<'a, 'b, 'c>(
                      allocation_stack_trace: ast,
                      deallocation_stack_trace: dst,
                  }| {
+                    let size = *size as i64;
                     Some(vec![
                         // Dead allocation
                         pproto::Sample {
-                            value: vec![0, 0, 1, *size, 0, 0],
-                            location_id: ast.stack_frames.clone()?,
+                            value: vec![0, 0, 1, size, 0, 0],
+                            location_id: ast.to_vec(),
                             ..Default::default()
                         },
                         // Deallocation
                         pproto::Sample {
-                            value: vec![0, 0, 0, 0, 1, *size],
-                            location_id: dst.stack_frames.clone()?,
+                            value: vec![0, 0, 0, 0, 1, size],
+                            location_id: dst.to_vec(),
                             ..Default::default()
                         },
                     ])
@@ -212,7 +209,7 @@ pub fn build_profile<'a, 'b, 'c>(
 
 #[cfg(test)]
 mod test {
-    use fidl_fuchsia_memory_sampler::{ExecutableSegment, ModuleMap, StackTrace};
+    use fidl_fuchsia_memory_sampler::{ExecutableSegment, ModuleMap};
 
     use super::build_profile;
     use crate::profile_builder::{DeadAllocation, LiveAllocation};
@@ -433,21 +430,19 @@ mod test {
             },
         ];
 
-        let live_allocations = vec![LiveAllocation {
-            size: 10,
-            stack_trace: StackTrace { stack_frames: Some(vec![]), ..Default::default() },
-        }];
+        let live_allocations = vec![LiveAllocation { size: 10, stack_trace: Default::default() }];
         let dead_allocations = vec![DeadAllocation {
             size: 20,
-            allocation_stack_trace: StackTrace { stack_frames: Some(vec![]), ..Default::default() },
-            deallocation_stack_trace: StackTrace {
-                stack_frames: Some(vec![]),
-                ..Default::default()
-            },
+            allocation_stack_trace: Default::default(),
+            deallocation_stack_trace: Default::default(),
         }];
 
-        let profile =
-            build_profile(modules.iter(), live_allocations.iter(), dead_allocations.iter());
+        let profile = build_profile(
+            modules.iter(),
+            live_allocations.iter(),
+            dead_allocations.iter(),
+            &Default::default(),
+        );
 
         // Check that the profile contains one mapping per segment.
         let segment_count: usize = modules

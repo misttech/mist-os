@@ -36,10 +36,10 @@ async fn process_sampler_request<'a>(
 ) -> Result<(&'a mut ProfileBuilder, &'a mut mpsc::Sender<ProfileReport>), Error> {
     match request {
         SamplerRequest::RecordAllocation { address, stack_trace, size, .. } => {
-            builder.allocate(address, stack_trace, size);
+            builder.allocate(address, stack_trace.stack_frames.unwrap_or_default(), size);
         }
         SamplerRequest::RecordDeallocation { address, stack_trace, .. } => {
-            builder.deallocate(address, stack_trace);
+            builder.deallocate(address, stack_trace.stack_frames.unwrap_or_default());
         }
         SamplerRequest::SetProcessInfo { payload, .. } => {
             let SamplerSetProcessInfoRequest { process_name, module_map, .. } = payload;
@@ -102,7 +102,7 @@ pub fn setup_sampler_service(
     let mut service_fs = ServiceFs::new();
     service_fs.dir("svc").add_fidl_service(IncomingServiceRequest::Sampler);
     service_fs.take_and_serve_directory_handle()?;
-    Ok(Task::spawn(
+    Ok(Task::local(
         service_fs
             .map(Ok)
             .try_for_each_concurrent(
@@ -205,8 +205,8 @@ mod test {
         builder.set_process_info(Some(TEST_NAME.to_string()), vec![].into_iter());
         let stack_trace = StackTrace { stack_frames: Some(vec![1000, 1500]), ..Default::default() };
         (0..DEAD_ALLOCATIONS_PROFILE_THRESHOLD as u64).for_each(|i| {
-            builder.allocate(i, stack_trace.clone(), 10);
-            builder.deallocate(i, stack_trace.clone());
+            builder.allocate(i, stack_trace.stack_frames.clone().unwrap(), 10);
+            builder.deallocate(i, stack_trace.stack_frames.clone().unwrap());
         });
         const TEST_INDEX: usize = 42;
         let profile_future = process_sampler_request(

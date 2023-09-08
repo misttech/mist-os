@@ -2,10 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use anyhow::Error;
-use fidl_fuchsia_memory_sampler::{ModuleMap, StackTrace};
+use fidl_fuchsia_memory_sampler::ModuleMap;
 use fuchsia_zircon::Vmo;
 use prost::Message;
 
@@ -15,17 +18,17 @@ use crate::pprof;
 /// reported.
 #[derive(Clone, Debug, PartialEq)]
 pub struct LiveAllocation {
-    pub size: i64,
-    pub stack_trace: StackTrace,
+    pub size: u64,
+    pub stack_trace: Rc<Vec<u64>>,
 }
 
 /// Represents an allocation for which a deallocation has been
 /// reported.
 #[derive(Clone, Debug, PartialEq)]
 pub struct DeadAllocation {
-    pub size: i64,
-    pub allocation_stack_trace: StackTrace,
-    pub deallocation_stack_trace: StackTrace,
+    pub size: u64,
+    pub allocation_stack_trace: Rc<Vec<u64>>,
+    pub deallocation_stack_trace: Rc<Vec<u64>>,
 }
 
 /// Accumulator for profiling information.
@@ -35,20 +38,38 @@ pub struct ProfileBuilder {
     module_map: Vec<ModuleMap>,
     live_allocations: HashMap<u64, LiveAllocation>,
     dead_allocations: Vec<DeadAllocation>,
+    stack_traces: HashSet<Rc<Vec<u64>>>,
 }
 
 impl ProfileBuilder {
+    /// Remove all stack traces that are not referenced outside of the
+    /// cache.
+    fn prune_cache(&mut self) {
+        self.stack_traces.retain(|st| Rc::strong_count(st) > 1);
+    }
+    /// Add the given stack_trace to the cache, if needed, then return
+    /// a reference to the cached value.
+    fn cache_stack_trace(&mut self, stack_trace: Vec<u64>) -> Rc<Vec<u64>> {
+        // Note: `Entry` on `HashSet` would save us from cloning the
+        // stack trace here.
+        if !self.stack_traces.contains(&stack_trace) {
+            self.stack_traces.insert(Rc::new(stack_trace.clone()));
+        };
+        self.stack_traces.get(&stack_trace).unwrap().clone()
+    }
     /// Register an allocation. It is considered live until a
     /// deallocation for the same address has been reported. Note that
     /// this assumes that allocations and deallocations at a given
     /// address are ordered.
-    pub fn allocate(&mut self, address: u64, stack_trace: StackTrace, size: u64) {
-        self.live_allocations.insert(address, LiveAllocation { size: size as i64, stack_trace });
+    pub fn allocate(&mut self, address: u64, stack_trace: Vec<u64>, size: u64) {
+        let stack_trace = self.cache_stack_trace(stack_trace);
+        self.live_allocations.insert(address, LiveAllocation { size, stack_trace });
     }
     /// Register a deallocation, if the corresponding allocation has
     /// been registered before.
-    pub fn deallocate(&mut self, address: u64, stack_trace: StackTrace) {
+    pub fn deallocate(&mut self, address: u64, stack_trace: Vec<u64>) {
         self.live_allocations.remove(&address).map(|allocation| {
+            let stack_trace = self.cache_stack_trace(stack_trace);
             self.dead_allocations.push(DeadAllocation {
                 deallocation_stack_trace: stack_trace,
                 size: allocation.size,
@@ -80,24 +101,31 @@ impl ProfileBuilder {
                 self.module_map.iter(),
                 self.live_allocations.values(),
                 self.dead_allocations.iter(),
+                &self.stack_traces,
             ),
         )
     }
     /// Produce a partial profile from a process that is still
-    /// live. Drop `dead_allocations` from `self`.
+    /// live. Drop `dead_allocations` from `self`, and prune the
+    /// cache.
     ///
-    /// Note: this lets one produce regular running profile from a
+    /// Note: this lets one produce regular running profiles from a
     /// long-lived process, while clearing from memory the state that
     /// will no longer be useful.
     pub fn build_partial_profile(&mut self) -> (String, pprof::pproto::Profile) {
-        (
+        let dead_allocations = std::mem::replace(&mut self.dead_allocations, vec![]);
+        let result = (
             self.process_name.clone(),
             pprof::build_profile(
                 self.module_map.iter(),
                 self.live_allocations.values(),
-                std::mem::replace(&mut self.dead_allocations, vec![]).iter(),
+                dead_allocations.iter(),
+                &self.stack_traces,
             ),
-        )
+        );
+        drop(dead_allocations);
+        self.prune_cache();
+        result
     }
 }
 
@@ -115,14 +143,14 @@ pub fn profile_to_vmo(profile: &pprof::pproto::Profile) -> Result<(Vmo, u64), Er
 mod test {
     use std::collections::HashMap;
 
-    use crate::profile_builder::{DeadAllocation, ModuleMap, ProfileBuilder, StackTrace};
+    use crate::profile_builder::{DeadAllocation, ModuleMap, ProfileBuilder};
     use fidl_fuchsia_memory_sampler::ExecutableSegment;
 
     #[fuchsia::test]
     fn test_allocate() {
         let mut builder = ProfileBuilder::default();
         let address = 0x1000;
-        let stack_trace = StackTrace { stack_frames: Some(vec![]), ..Default::default() };
+        let stack_trace = vec![];
         let size = 10;
 
         builder.allocate(address, stack_trace.clone(), size);
@@ -130,15 +158,15 @@ mod test {
         let allocation =
             builder.live_allocations.get(&address).expect("Could not retrieve live allocation.");
 
-        assert_eq!(size, allocation.size as u64);
-        assert_eq!(stack_trace, allocation.stack_trace);
+        assert_eq!(size, allocation.size);
+        assert_eq!(stack_trace, *(allocation.stack_trace));
     }
 
     #[fuchsia::test]
     fn test_deallocate_mismatch() {
         let mut builder = ProfileBuilder::default();
         let address = 0x1000;
-        let stack_trace = StackTrace { stack_frames: Some(vec![]), ..Default::default() };
+        let stack_trace = vec![];
 
         builder.deallocate(address, stack_trace);
 
@@ -151,10 +179,8 @@ mod test {
     fn test_deallocate_match() {
         let mut builder = ProfileBuilder::default();
         let address = 0x1000;
-        let allocation_stack_trace =
-            StackTrace { stack_frames: Some(vec![1, 2]), ..Default::default() };
-        let deallocation_stack_trace =
-            StackTrace { stack_frames: Some(vec![3, 4]), ..Default::default() };
+        let allocation_stack_trace = vec![1, 2];
+        let deallocation_stack_trace = vec![3, 4];
         let size = 10;
 
         builder.allocate(address, allocation_stack_trace.clone(), size);
@@ -169,8 +195,8 @@ mod test {
             deallocation_stack_trace: reported_deallocation_stack_trace,
         } = allocations.remove(0);
         assert_eq!(size, reported_size as u64);
-        assert_eq!(allocation_stack_trace, reported_allocation_stack_trace);
-        assert_eq!(deallocation_stack_trace, reported_deallocation_stack_trace);
+        assert_eq!(allocation_stack_trace, *(reported_allocation_stack_trace));
+        assert_eq!(deallocation_stack_trace, *(reported_deallocation_stack_trace));
     }
 
     #[fuchsia::test]
