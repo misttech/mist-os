@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-mod realm_factory;
-use crate::realm_factory::*;
-
 use {
     anyhow::{Error, Result},
-    fidl_test_examplecomponent::{RealmFactoryRequest, RealmFactoryRequestStream},
+    fidl_test_examplecomponent::*,
     fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
+    fuchsia_component_test::{Capability, ChildOptions, Ref, RealmBuilder, RealmInstance, Route},
     futures::{StreamExt, TryStreamExt},
     tracing::*,
 };
@@ -23,34 +21,53 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
-    let mut task_group = fasync::TaskGroup::new();
-    let mut factory = RealmFactory::new();
-    let result: Result<(), Error> = async move {
-        while let Ok(Some(request)) = stream.try_next().await {
-            match request {
-                RealmFactoryRequest::SetRealmOptions { options, responder } => {
-                    factory.set_realm_options(options)?;
-                    responder.send(Ok(()))?;
-                }
-
-                RealmFactoryRequest::CreateRealm { realm_server, responder } => {
-                    let realm = factory.create_realm().await?;
-                    let request_stream = realm_server.into_stream()?;
-                    task_group.spawn(async move {
-                        realm_proxy::service::serve(realm, request_stream).await.unwrap();
-                    });
-                    responder.send(Ok(()))?;
-                }
-            }
-        }
-
-        task_group.join().await;
-        Ok(())
-    }
-    .await;
-
-    if let Err(err) = result {
+async fn serve_realm_factory(stream: RealmFactoryRequestStream) {
+    if let Err(err) = handle_request_stream(stream).await {
         error!("{:?}", err);
     }
+}
+
+async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<()> {
+    let mut task_group = fasync::TaskGroup::new();
+    while let Ok(Some(request)) = stream.try_next().await {
+        match request {
+            RealmFactoryRequest::CreateRealm { options, realm_server, responder } => {
+                let realm = create_realm(options).await?;
+                let request_stream = realm_server.into_stream()?;
+                task_group.spawn(async move {
+                    realm_proxy::service::serve(realm, request_stream).await.unwrap();
+                });
+                responder.send(Ok(()))?;
+            }
+
+            RealmFactoryRequest::_UnknownMethod { .. } => unreachable!(),
+        }
+    }
+
+    task_group.join().await;
+    Ok(())
+}
+
+async fn create_realm(options: RealmOptions) -> Result<RealmInstance, Error> {
+    info!("building the realm using options {:?}", options);
+
+    let builder = RealmBuilder::new().await?;
+    let component_ref = builder.add_child(
+        "example-component",
+        "#meta/example-component.cm",
+        ChildOptions::new()
+    ).await?;
+
+    // Expose capabilities from example-component.
+    builder.add_route(
+        Route::new()
+            .capability(Capability::protocol_by_name("fuchsia.examples.Echo"))
+            .from(&component_ref)
+            .to(Ref::parent())
+    ).await?;
+
+    // FIXME: Route dependent capabilities to component_ref.
+
+    let realm = builder.build().await?;
+    Ok(realm)
 }

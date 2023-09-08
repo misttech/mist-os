@@ -9,10 +9,7 @@ rustc_binary("bin") {
   testonly = true
   edition = "2021"
   name = "{{ realm_factory_binary_name }}"
-  sources = [
-    "src/main.rs",
-    "src/realm_factory.rs",
-  ]
+  sources = [ "src/main.rs" ]
   deps = [
     "../fidl:{{ fidl_library_name }}_rust",
     "//src/lib/fuchsia",

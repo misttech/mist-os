@@ -102,8 +102,7 @@ impl IntegrationTestCmd {
             .with_template(hbrs_template_file!("integration_test", "testing/fidl/realm_factory.test.fidl"))
             .with_template(hbrs_template_file!("integration_test", "testing/realm-factory/BUILD.gn"))
             .with_template(hbrs_template_file!("integration_test", "testing/realm-factory/meta/default.cml"))
-            .with_template(hbrs_template_file!("integration_test", "testing/realm-factory/src/main.rs"))
-            .with_template(hbrs_template_file!("integration_test", "testing/realm-factory/src/realm_factory.rs"));
+            .with_template(hbrs_template_file!("integration_test", "testing/realm-factory/src/main.rs"));
         gen.generate(test_root)
     }
 }
