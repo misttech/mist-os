@@ -196,25 +196,6 @@ func execute(
 	)
 
 	if !opts.UseSerial && sshKeyFile != "" {
-		if opts.PrefetchPackages {
-			// TODO(rudymathu): Remove this prefetching of packages once package
-			// delivery is fast enough.
-			resolveCtx, cancel := context.WithCancel(ctx)
-			var wg sync.WaitGroup
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				resolveLog := filepath.Join(outDir, "resolve.log")
-				if err := ResolveTestPackages(resolveCtx, tests, addr, sshKeyFile, resolveLog); err != nil {
-					logger.Warningf(ctx, "package pre-fetching routine failed: %s", err)
-				}
-			}()
-			// We wait here to ensure that our log of resolved packages is
-			// correctly saved.
-			defer wg.Wait()
-			defer cancel()
-		}
-
 		ffx, err := ffxInstance(ctx, opts.FFX, opts.FFXExperimentLevel)
 		if err != nil {
 			return err
@@ -244,6 +225,26 @@ func execute(
 			}()
 			fuchsiaTester = ffxTester
 		}
+
+		if opts.PrefetchPackages {
+			// TODO(rudymathu): Remove this prefetching of packages once package
+			// delivery is fast enough.
+			resolveCtx, cancel := context.WithCancel(ctx)
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				resolveLog := filepath.Join(outDir, "resolve.log")
+				if err := ResolveTestPackages(resolveCtx, tests, addr, sshKeyFile, resolveLog); err != nil {
+					logger.Warningf(ctx, "package pre-fetching routine failed: %s", err)
+				}
+			}()
+			// We wait here to ensure that our log of resolved packages is
+			// correctly saved.
+			defer wg.Wait()
+			defer cancel()
+		}
+
 	}
 
 	// Function to select the tester to use for a test, along with destination
