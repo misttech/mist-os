@@ -59,12 +59,14 @@ impl Matchers {
         // If ramdisk_image is true but we don't actually have a ramdisk launching, we skip
         // making the fvm+blobfs+data or Fxblob matcher entirely.
         if !config.ramdisk_image || ramdisk_path.is_some() {
-            if !config.netboot && config.fxfs_blob {
-                matchers.push(Box::new(FxblobMatcher::new(if config.ramdisk_image {
-                    ramdisk_path
-                } else {
-                    None
-                })));
+            if config.fxfs_blob {
+                if !config.netboot {
+                    matchers.push(Box::new(FxblobMatcher::new(if config.ramdisk_image {
+                        ramdisk_path
+                    } else {
+                        None
+                    })));
+                }
             } else {
                 let ramdisk_required = if config.ramdisk_image { ramdisk_path } else { None };
                 let fvm_matcher = Box::new(FvmMatcher::new(
@@ -947,6 +949,39 @@ mod tests {
             .match_device(
                 &mut MockDevice::new().set_content_format(DiskFormat::Fvm),
                 &mut MockEnv::new().expect_bind_and_enumerate_fvm()
+            )
+            .await
+            .expect("match_device failed"));
+    }
+
+    #[fuchsia::test]
+    async fn test_netboot_flag_true_fxblob() {
+        let mut matchers = Matchers::new(
+            &fshost_config::Config {
+                data_filesystem_format: "fxfs".to_string(),
+                netboot: true,
+                fxfs_blob: true,
+                ..default_config()
+            },
+            None,
+        );
+
+        // FVM shouldn't match...
+        assert!(!matchers
+            .match_device(
+                &mut MockDevice::new().set_content_format(DiskFormat::Fvm),
+                &mut MockEnv::new()
+            )
+            .await
+            .expect("match_device failed"));
+        // And neither should Fxblob.
+        assert!(!matchers
+            .match_device(
+                &mut MockDevice::new()
+                    .set_content_format(DiskFormat::Fxfs)
+                    .set_partition_label(DATA_PARTITION_LABEL)
+                    .set_partition_type(&DATA_TYPE_GUID),
+                &mut MockEnv::new()
             )
             .await
             .expect("match_device failed"));
