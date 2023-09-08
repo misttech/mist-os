@@ -52,6 +52,7 @@
 #include <linux/pidfd.h>
 #include <linux/poll.h>
 #include <linux/prctl.h>
+#include <linux/ptrace.h>
 #include <linux/random.h>
 #include <linux/reboot.h>
 #include <linux/resource.h>

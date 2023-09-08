@@ -3676,6 +3676,145 @@ pub const PR_SME_VL_LEN_MASK: u32 = 65535;
 pub const PR_SME_VL_INHERIT: u32 = 131072;
 pub const PR_SET_VMA: u32 = 1398164801;
 pub const PR_SET_VMA_ANON_NAME: u32 = 0;
+pub const PTRACE_TRACEME: u32 = 0;
+pub const PTRACE_PEEKTEXT: u32 = 1;
+pub const PTRACE_PEEKDATA: u32 = 2;
+pub const PTRACE_PEEKUSR: u32 = 3;
+pub const PTRACE_POKETEXT: u32 = 4;
+pub const PTRACE_POKEDATA: u32 = 5;
+pub const PTRACE_POKEUSR: u32 = 6;
+pub const PTRACE_CONT: u32 = 7;
+pub const PTRACE_KILL: u32 = 8;
+pub const PTRACE_SINGLESTEP: u32 = 9;
+pub const PTRACE_ATTACH: u32 = 16;
+pub const PTRACE_DETACH: u32 = 17;
+pub const PTRACE_SYSCALL: u32 = 24;
+pub const PTRACE_SETOPTIONS: u32 = 16896;
+pub const PTRACE_GETEVENTMSG: u32 = 16897;
+pub const PTRACE_GETSIGINFO: u32 = 16898;
+pub const PTRACE_SETSIGINFO: u32 = 16899;
+pub const PTRACE_GETREGSET: u32 = 16900;
+pub const PTRACE_SETREGSET: u32 = 16901;
+pub const PTRACE_SEIZE: u32 = 16902;
+pub const PTRACE_INTERRUPT: u32 = 16903;
+pub const PTRACE_LISTEN: u32 = 16904;
+pub const PTRACE_PEEKSIGINFO: u32 = 16905;
+pub const PTRACE_GETSIGMASK: u32 = 16906;
+pub const PTRACE_SETSIGMASK: u32 = 16907;
+pub const PTRACE_SECCOMP_GET_FILTER: u32 = 16908;
+pub const PTRACE_SECCOMP_GET_METADATA: u32 = 16909;
+pub const PTRACE_GET_SYSCALL_INFO: u32 = 16910;
+pub const PTRACE_SYSCALL_INFO_NONE: u32 = 0;
+pub const PTRACE_SYSCALL_INFO_ENTRY: u32 = 1;
+pub const PTRACE_SYSCALL_INFO_EXIT: u32 = 2;
+pub const PTRACE_SYSCALL_INFO_SECCOMP: u32 = 3;
+pub const PTRACE_GET_RSEQ_CONFIGURATION: u32 = 16911;
+pub const PTRACE_EVENTMSG_SYSCALL_ENTRY: u32 = 1;
+pub const PTRACE_EVENTMSG_SYSCALL_EXIT: u32 = 2;
+pub const PTRACE_PEEKSIGINFO_SHARED: u32 = 1;
+pub const PTRACE_EVENT_FORK: u32 = 1;
+pub const PTRACE_EVENT_VFORK: u32 = 2;
+pub const PTRACE_EVENT_CLONE: u32 = 3;
+pub const PTRACE_EVENT_EXEC: u32 = 4;
+pub const PTRACE_EVENT_VFORK_DONE: u32 = 5;
+pub const PTRACE_EVENT_EXIT: u32 = 6;
+pub const PTRACE_EVENT_SECCOMP: u32 = 7;
+pub const PTRACE_EVENT_STOP: u32 = 128;
+pub const PTRACE_O_TRACESYSGOOD: u32 = 1;
+pub const PTRACE_O_TRACEFORK: u32 = 2;
+pub const PTRACE_O_TRACEVFORK: u32 = 4;
+pub const PTRACE_O_TRACECLONE: u32 = 8;
+pub const PTRACE_O_TRACEEXEC: u32 = 16;
+pub const PTRACE_O_TRACEVFORKDONE: u32 = 32;
+pub const PTRACE_O_TRACEEXIT: u32 = 64;
+pub const PTRACE_O_TRACESECCOMP: u32 = 128;
+pub const PTRACE_O_EXITKILL: u32 = 1048576;
+pub const PTRACE_O_SUSPEND_SECCOMP: u32 = 2097152;
+pub const PTRACE_O_MASK: u32 = 3145983;
+pub const FRAME_SIZE: u32 = 168;
+pub const PTRACE_GETREGS: u32 = 12;
+pub const PTRACE_SETREGS: u32 = 13;
+pub const PTRACE_GETFPREGS: u32 = 14;
+pub const PTRACE_SETFPREGS: u32 = 15;
+pub const PTRACE_GETFPXREGS: u32 = 18;
+pub const PTRACE_SETFPXREGS: u32 = 19;
+pub const PTRACE_OLDSETOPTIONS: u32 = 21;
+pub const PTRACE_GET_THREAD_AREA: u32 = 25;
+pub const PTRACE_SET_THREAD_AREA: u32 = 26;
+pub const PTRACE_ARCH_PRCTL: u32 = 30;
+pub const PTRACE_SYSEMU: u32 = 31;
+pub const PTRACE_SYSEMU_SINGLESTEP: u32 = 32;
+pub const PTRACE_SINGLEBLOCK: u32 = 33;
+pub const X86_EFLAGS_CF_BIT: u32 = 0;
+pub const X86_EFLAGS_FIXED_BIT: u32 = 1;
+pub const X86_EFLAGS_PF_BIT: u32 = 2;
+pub const X86_EFLAGS_AF_BIT: u32 = 4;
+pub const X86_EFLAGS_ZF_BIT: u32 = 6;
+pub const X86_EFLAGS_SF_BIT: u32 = 7;
+pub const X86_EFLAGS_TF_BIT: u32 = 8;
+pub const X86_EFLAGS_IF_BIT: u32 = 9;
+pub const X86_EFLAGS_DF_BIT: u32 = 10;
+pub const X86_EFLAGS_OF_BIT: u32 = 11;
+pub const X86_EFLAGS_IOPL_BIT: u32 = 12;
+pub const X86_EFLAGS_NT_BIT: u32 = 14;
+pub const X86_EFLAGS_RF_BIT: u32 = 16;
+pub const X86_EFLAGS_VM_BIT: u32 = 17;
+pub const X86_EFLAGS_AC_BIT: u32 = 18;
+pub const X86_EFLAGS_VIF_BIT: u32 = 19;
+pub const X86_EFLAGS_VIP_BIT: u32 = 20;
+pub const X86_EFLAGS_ID_BIT: u32 = 21;
+pub const X86_CR0_PE_BIT: u32 = 0;
+pub const X86_CR0_MP_BIT: u32 = 1;
+pub const X86_CR0_EM_BIT: u32 = 2;
+pub const X86_CR0_TS_BIT: u32 = 3;
+pub const X86_CR0_ET_BIT: u32 = 4;
+pub const X86_CR0_NE_BIT: u32 = 5;
+pub const X86_CR0_WP_BIT: u32 = 16;
+pub const X86_CR0_AM_BIT: u32 = 18;
+pub const X86_CR0_NW_BIT: u32 = 29;
+pub const X86_CR0_CD_BIT: u32 = 30;
+pub const X86_CR0_PG_BIT: u32 = 31;
+pub const X86_CR3_PWT_BIT: u32 = 3;
+pub const X86_CR3_PCD_BIT: u32 = 4;
+pub const X86_CR3_PCID_BITS: u32 = 12;
+pub const X86_CR3_PCID_NOFLUSH_BIT: u32 = 63;
+pub const X86_CR4_VME_BIT: u32 = 0;
+pub const X86_CR4_PVI_BIT: u32 = 1;
+pub const X86_CR4_TSD_BIT: u32 = 2;
+pub const X86_CR4_DE_BIT: u32 = 3;
+pub const X86_CR4_PSE_BIT: u32 = 4;
+pub const X86_CR4_PAE_BIT: u32 = 5;
+pub const X86_CR4_MCE_BIT: u32 = 6;
+pub const X86_CR4_PGE_BIT: u32 = 7;
+pub const X86_CR4_PCE_BIT: u32 = 8;
+pub const X86_CR4_OSFXSR_BIT: u32 = 9;
+pub const X86_CR4_OSXMMEXCPT_BIT: u32 = 10;
+pub const X86_CR4_UMIP_BIT: u32 = 11;
+pub const X86_CR4_LA57_BIT: u32 = 12;
+pub const X86_CR4_VMXE_BIT: u32 = 13;
+pub const X86_CR4_SMXE_BIT: u32 = 14;
+pub const X86_CR4_FSGSBASE_BIT: u32 = 16;
+pub const X86_CR4_PCIDE_BIT: u32 = 17;
+pub const X86_CR4_OSXSAVE_BIT: u32 = 18;
+pub const X86_CR4_SMEP_BIT: u32 = 20;
+pub const X86_CR4_SMAP_BIT: u32 = 21;
+pub const X86_CR4_PKE_BIT: u32 = 22;
+pub const X86_CR4_CET_BIT: u32 = 23;
+pub const CX86_PCR0: u32 = 32;
+pub const CX86_GCR: u32 = 184;
+pub const CX86_CCR0: u32 = 192;
+pub const CX86_CCR1: u32 = 193;
+pub const CX86_CCR2: u32 = 194;
+pub const CX86_CCR3: u32 = 195;
+pub const CX86_CCR4: u32 = 232;
+pub const CX86_CCR5: u32 = 233;
+pub const CX86_CCR6: u32 = 234;
+pub const CX86_CCR7: u32 = 235;
+pub const CX86_PCR1: u32 = 240;
+pub const CX86_DIR0: u32 = 254;
+pub const CX86_DIR1: u32 = 255;
+pub const CX86_ARR_BASE: u32 = 196;
+pub const CX86_RCR_BASE: u32 = 220;
 pub const GRND_NONBLOCK: u32 = 1;
 pub const GRND_RANDOM: u32 = 2;
 pub const GRND_INSECURE: u32 = 4;
@@ -11503,6 +11642,109 @@ impl Default for prctl_mm_map {
             s.assume_init()
         }
     }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct ptrace_peeksiginfo_args {
+    pub off: __u64,
+    pub flags: __u32,
+    pub nr: __s32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct seccomp_metadata {
+    pub filter_off: __u64,
+    pub flags: __u64,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct ptrace_syscall_info {
+    pub op: __u8,
+    pub pad: [__u8; 3usize],
+    pub arch: __u32,
+    pub instruction_pointer: __u64,
+    pub stack_pointer: __u64,
+    pub __bindgen_anon_1: ptrace_syscall_info__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union ptrace_syscall_info__bindgen_ty_1 {
+    pub entry: ptrace_syscall_info__bindgen_ty_1__bindgen_ty_1,
+    pub exit: ptrace_syscall_info__bindgen_ty_1__bindgen_ty_2,
+    pub seccomp: ptrace_syscall_info__bindgen_ty_1__bindgen_ty_3,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct ptrace_syscall_info__bindgen_ty_1__bindgen_ty_1 {
+    pub nr: __u64,
+    pub args: [__u64; 6usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct ptrace_syscall_info__bindgen_ty_1__bindgen_ty_2 {
+    pub rval: __s64,
+    pub is_error: __u8,
+    pub __bindgen_padding_0: [u8; 7usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct ptrace_syscall_info__bindgen_ty_1__bindgen_ty_3 {
+    pub nr: __u64,
+    pub args: [__u64; 6usize],
+    pub ret_data: __u32,
+    pub __bindgen_padding_0: [u8; 4usize],
+}
+impl Default for ptrace_syscall_info__bindgen_ty_1 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl Default for ptrace_syscall_info {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct ptrace_rseq_configuration {
+    pub rseq_abi_pointer: __u64,
+    pub rseq_abi_size: __u32,
+    pub signature: __u32,
+    pub flags: __u32,
+    pub pad: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct pt_regs {
+    pub r15: crate::types::c_ulong,
+    pub r14: crate::types::c_ulong,
+    pub r13: crate::types::c_ulong,
+    pub r12: crate::types::c_ulong,
+    pub rbp: crate::types::c_ulong,
+    pub rbx: crate::types::c_ulong,
+    pub r11: crate::types::c_ulong,
+    pub r10: crate::types::c_ulong,
+    pub r9: crate::types::c_ulong,
+    pub r8: crate::types::c_ulong,
+    pub rax: crate::types::c_ulong,
+    pub rcx: crate::types::c_ulong,
+    pub rdx: crate::types::c_ulong,
+    pub rsi: crate::types::c_ulong,
+    pub rdi: crate::types::c_ulong,
+    pub orig_rax: crate::types::c_ulong,
+    pub rip: crate::types::c_ulong,
+    pub cs: crate::types::c_ulong,
+    pub eflags: crate::types::c_ulong,
+    pub rsp: crate::types::c_ulong,
+    pub ss: crate::types::c_ulong,
 }
 #[repr(C)]
 #[derive(Debug, Default)]
