@@ -103,7 +103,7 @@ fn spawn_persist_services(config: Config, fs: &mut ServiceFs<ServiceObj<'static,
     let mut started_persist_services = 0;
     // We want fault tolerance if only a subset of the service configs fail to initialize.
     for (service_name, tags) in config.into_iter() {
-        info!("Launching persist service for {}, tags {:?}", service_name, tags);
+        info!("Launching persist service for {service_name}");
         match PersistServer::create(service_name.clone(), tags) {
             Ok(persist_service) => {
                 if let Err(e) = persist_service.launch_server(fs) {
