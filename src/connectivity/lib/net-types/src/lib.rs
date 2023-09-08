@@ -1110,12 +1110,12 @@ impl<A: IpAddress, I: Ip> GenericOverIp<I> for MulticastAddr<A> {
     type Type = MulticastAddr<I::Addr>;
 }
 
-impl<A: IpAddress, I: Ip, D> GenericOverIp<I> for ZonedAddr<A, D> {
-    type Type = ZonedAddr<I::Addr, D>;
+impl<A: GenericOverIp<I>, I: Ip, Z> GenericOverIp<I> for ZonedAddr<A, Z> {
+    type Type = ZonedAddr<A::Type, Z>;
 }
 
-impl<A: IpAddress, I: Ip, Z> GenericOverIp<I> for AddrAndZone<A, Z> {
-    type Type = AddrAndZone<I::Addr, Z>;
+impl<A: GenericOverIp<I>, I: Ip, Z> GenericOverIp<I> for AddrAndZone<A, Z> {
+    type Type = AddrAndZone<A::Type, Z>;
 }
 
 #[cfg(test)]
