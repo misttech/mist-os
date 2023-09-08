@@ -257,6 +257,10 @@ class ArmAddressTranslationDescriptor
            ap_table == ArmTableAccessPermissions::kNoWriteAccess;
   }
 
+  constexpr bool accessed() const {
+    return IsPage() ? AsPage().af() : IsBlock() ? AsBlock().af() : false;
+  }
+
   constexpr ArmMairAttribute Memory(const ArmSystemPagingState& state) const {
     auto memory = [&state](const auto& desc) {
       return *state.mair.GetAttribute(static_cast<unsigned int>(desc.attr_index()));
@@ -296,9 +300,9 @@ class ArmAddressTranslationDescriptor
         desc.set_attr_index(*index);
       };
       if (IsPage()) {
-        set_memory(AsPage());
+        set_memory(AsPage().set_af(settings.accessed));
       } else {
-        set_memory(AsBlock());
+        set_memory(AsBlock().set_af(settings.accessed));
       }
     } else {
       if constexpr (Table::kValid) {

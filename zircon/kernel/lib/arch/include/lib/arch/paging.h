@@ -127,6 +127,16 @@ struct ExamplePagingTraits {
     constexpr bool executable() const { return false; }
     constexpr bool user_accessible() const { return false; }
 
+    /// If terminal, whether the associated page was read from, written to, or
+    /// executed. If non-terminal, this *may* for certain implementations
+    /// indicate whether a page that maps through this entry was similarly
+    /// accessed; otherwise, this is expected to return false.
+    ///
+    /// Hardware may often be configured so as to manage this bit
+    /// automatically - but otherwise software must do so and contend with
+    /// access faults when unset.
+    constexpr bool accessed() const { return false; }
+
     /// Returns the memory type of the associated page, which may require
     /// access to system state to decode.
     ///
@@ -228,6 +238,7 @@ struct PagingSettings {
   /// value.
   std::optional<MemoryType> memory;
 
+  bool accessed = true;
   // TODO(fxbug.dev/129344): global.
 };
 
@@ -282,6 +293,7 @@ template <typename MemoryType>
 struct MapSettings {
   AccessPermissions access;
   std::optional<MemoryType> memory;
+  bool accessed = true;
   // TODO(fxbug.dev/129344): global.
 };
 
@@ -710,6 +722,7 @@ class Paging : public PagingTraits {
         settings.address = output_paddr_;
         settings.access = settings_.access;
         settings.memory = settings_.memory;
+        settings.accessed = settings_.accessed;
       } else {
         std::optional<uint64_t> new_table_paddr = allocator_(kTableSize<Level>, kTableAlignment);
         if (!new_table_paddr) {

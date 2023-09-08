@@ -176,6 +176,8 @@ class X86PagingStructure : public hwreg::RegisterBase<X86PagingStructure<Level>,
   constexpr bool executable() const { return !xd(); }
   constexpr bool user_accessible() const { return u_s(); }
 
+  constexpr bool accessed() const { return a(); }
+
   constexpr X86MemoryType Memory(const X86SystemPagingState& state) const { return {}; }
 
   constexpr SelfType& Set(const X86SystemPagingState& state,
@@ -195,7 +197,10 @@ class X86PagingStructure : public hwreg::RegisterBase<X86PagingStructure<Level>,
 
     const AccessPermissions& access = settings.access;
     ZX_DEBUG_ASSERT(X86IsValidPageAccess(state, access));
-    set_r_w(access.writable).set_xd(!access.executable).set_u_s(access.user_accessible);
+    set_r_w(access.writable)
+        .set_xd(!access.executable)
+        .set_u_s(access.user_accessible)
+        .set_a(settings.accessed);
 
     ZX_DEBUG_ASSERT_MSG((fbl::ExtractBits<63, 52, uint64_t>(settings.address) == 0), "%#" PRIx64,
                         settings.address);

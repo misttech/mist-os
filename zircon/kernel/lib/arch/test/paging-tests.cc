@@ -631,6 +631,38 @@ TEST(RiscvPagingTraitTests, GetSetMemory) {
   TestRiscvGetSetMemory<RiscvPagingLevel::k0>();
 }
 
+template <RiscvPagingLevel Level>
+void TestRiscvGetSetAccessed() {
+  //
+  // Whether the entry was 'accessed' is given via the A field.
+  //
+
+  arch::RiscvPageTableEntry<Level> entry;
+
+  for (bool t : kBools) {
+    for (bool a : kBools) {
+      entry.set_reg_value(0).set_r(t).set_a(a);
+      EXPECT_EQ(t && a, entry.accessed());
+
+      entry.set_reg_value(0).Set({}, RiscvPagingSettings{
+                                         .present = true,
+                                         .terminal = t,
+                                         .access = {.readable = true},
+                                         .accessed = a,
+                                     });
+      EXPECT_EQ(t && a, entry.accessed()) << "t = " << t << "; a = " << a;
+    }
+  }
+}
+
+TEST(RiscvPagingTraitTests, GetSetAccessed) {
+  TestRiscvGetSetAccessed<RiscvPagingLevel::k4>();
+  TestRiscvGetSetAccessed<RiscvPagingLevel::k3>();
+  TestRiscvGetSetAccessed<RiscvPagingLevel::k2>();
+  TestRiscvGetSetAccessed<RiscvPagingLevel::k1>();
+  TestRiscvGetSetAccessed<RiscvPagingLevel::k0>();
+}
+
 template <X86PagingLevel Level>
 void TestX86GetSetPresent() {
   // Presence is controlled by the P bit.
@@ -1022,6 +1054,57 @@ TEST(X86PagingTraitTests, GetSetAddress) {
   TestX86GetSetAddress<X86PagingLevel::kPageDirectoryPointerTable>();
   TestX86GetSetAddress<X86PagingLevel::kPageDirectory>();
   TestX86GetSetAddress<X86PagingLevel::kPageTable>();
+}
+
+template <X86PagingLevel Level>
+void TestX86GetSetAccessed() {
+  arch::X86PagingStructure<Level> entry;
+
+  entry.set_reg_value(0).set_a(false);
+  EXPECT_FALSE(entry.accessed());
+
+  entry.set_reg_value(0).set_a(true);
+  EXPECT_TRUE(entry.accessed());
+
+  if constexpr (kX86LevelCanBeNonTerminal<Level>) {
+    entry.set_reg_value(0).Set({}, X86PagingSettings{
+                                       .present = true,
+                                       .terminal = false,
+                                       .accessed = false,
+                                   });
+    EXPECT_FALSE(entry.accessed());
+
+    entry.set_reg_value(0).Set({}, X86PagingSettings{
+                                       .present = true,
+                                       .terminal = false,
+                                       .accessed = true,
+                                   });
+    EXPECT_TRUE(entry.accessed());
+  }
+
+  if constexpr (kX86LevelCanBeTerminal<Level>) {
+    entry.set_reg_value(0).Set({}, X86PagingSettings{
+                                       .present = true,
+                                       .terminal = true,
+                                       .accessed = false,
+                                   });
+    EXPECT_FALSE(entry.accessed());
+
+    entry.set_reg_value(0).Set({}, X86PagingSettings{
+                                       .present = true,
+                                       .terminal = true,
+                                       .accessed = true,
+                                   });
+    EXPECT_TRUE(entry.accessed());
+  }
+}
+
+TEST(X86PagingTraitTests, GetSetAccessed) {
+  TestX86GetSetAccessed<X86PagingLevel::kPml5Table>();
+  TestX86GetSetAccessed<X86PagingLevel::kPml4Table>();
+  TestX86GetSetAccessed<X86PagingLevel::kPageDirectoryPointerTable>();
+  TestX86GetSetAccessed<X86PagingLevel::kPageDirectory>();
+  TestX86GetSetAccessed<X86PagingLevel::kPageTable>();
 }
 
 template <ArmPagingLevel Level>
@@ -1638,6 +1721,74 @@ TEST(ArmPagingTraitTests, GetSetMemory) {
   TestArmGetSetMemory<ArmPagingLevel::k1>();
   TestArmGetSetMemory<ArmPagingLevel::k2>();
   TestArmGetSetMemory<ArmPagingLevel::k3>();
+}
+
+template <ArmPagingLevel Level>
+void TestArmGetSetAccessed() {
+  ArmTableEntry<Level> entry;
+
+  if constexpr (kArmLevelCanBeTable<Level>) {
+    entry.set_reg_value(0).SetAsTable();
+    EXPECT_FALSE(entry.accessed());
+  }
+  if constexpr (kArmLevelCanBePage<Level>) {
+    entry.set_reg_value(0).SetAsPage().set_af(0);
+    EXPECT_FALSE(entry.accessed());
+
+    entry.set_reg_value(0).SetAsPage().set_af(1);
+    EXPECT_TRUE(entry.accessed());
+  }
+  if constexpr (kArmLevelCanBeBlock<Level>) {
+    entry.set_reg_value(0).SetAsBlock().set_af(0);
+    EXPECT_FALSE(entry.accessed());
+
+    entry.set_reg_value(0).SetAsBlock().set_af(1);
+    EXPECT_TRUE(entry.accessed());
+  }
+
+  // Non-terminal entries never report 'accessed'.
+  if constexpr (kArmLevelCanBeNonTerminal<Level>) {
+    entry.set_reg_value(0).Set({}, ArmPagingSettings{
+                                       .present = true,
+                                       .terminal = false,
+                                       .access = {.readable = true},
+                                       .accessed = false,
+                                   });
+    EXPECT_FALSE(entry.accessed());
+
+    entry.set_reg_value(0).Set({}, ArmPagingSettings{
+                                       .present = true,
+                                       .terminal = false,
+                                       .access = {.readable = true},
+                                       .accessed = true,
+                                   });
+    EXPECT_FALSE(entry.accessed());
+  }
+
+  if constexpr (kArmLevelCanBeTerminal<Level>) {
+    entry.set_reg_value(0).Set({}, ArmPagingSettings{
+                                       .present = true,
+                                       .terminal = true,
+                                       .access = {.readable = true},
+                                       .accessed = false,
+                                   });
+    EXPECT_FALSE(entry.accessed());
+
+    entry.set_reg_value(0).Set({}, ArmPagingSettings{
+                                       .present = true,
+                                       .terminal = true,
+                                       .access = {.readable = true},
+                                       .accessed = true,
+                                   });
+    EXPECT_TRUE(entry.accessed());
+  }
+}
+
+TEST(ArmPagingTraitTests, GetSetAccessed) {
+  TestArmGetSetAccessed<ArmPagingLevel::k0>();
+  TestArmGetSetAccessed<ArmPagingLevel::k1>();
+  TestArmGetSetAccessed<ArmPagingLevel::k2>();
+  TestArmGetSetAccessed<ArmPagingLevel::k3>();
 }
 
 // Represents a 512 entry page table and owns its own storage.
