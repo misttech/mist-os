@@ -19,11 +19,7 @@ use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fidl_fuchsia_net_stack as fidl_net_stack;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fposix_socket;
-use futures::{
-    stream::{FusedStream, Stream},
-    task::AtomicWaker,
-    FutureExt as _,
-};
+use futures::{stream::Stream, task::AtomicWaker, FutureExt as _};
 use net_types::{
     ethernet::Mac,
     ip::{
@@ -134,13 +130,6 @@ impl Stream for NeedsDataWatcher {
                 std::task::Poll::Ready(Some(std::task::ready!(needs_data.poll_ready(cx))))
             }
         }
-    }
-}
-
-/// The watcher terminates when the underlying has been dropped by Core.
-impl FusedStream for NeedsDataWatcher {
-    fn is_terminated(&self) -> bool {
-        self.inner.strong_count() == 0
     }
 }
 

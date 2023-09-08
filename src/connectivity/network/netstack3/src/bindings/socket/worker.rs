@@ -278,16 +278,13 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         data.close(sync_ctx, non_sync_ctx);
 
+        // Join all tasks created by this socket.
+        std::mem::drop(spawners);
+        wait_group.await;
+
         if let Some(respond_close) = respond_close {
             respond_close();
         }
-
-        // Join all tasks created by this socket.
-        // TODO(https://fxbug.dev/132920): We should join all tasks before we
-        // respond to close for a stronger statement that we're not leaking
-        // these resources.
-        std::mem::drop(spawners);
-        wait_group.await;
 
         Ok(())
     }
