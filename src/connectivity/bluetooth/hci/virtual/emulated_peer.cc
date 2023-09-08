@@ -64,7 +64,8 @@ EmulatedPeer::Result EmulatedPeer::NewLowEnergy(
 
   // TODO(armansito): We should consider splitting bt::testing::FakePeer into separate types for
   // BR/EDR and LE transport emulation logic.
-  auto peer = std::make_unique<bt::testing::FakePeer>(address, connectable, scannable);
+  auto peer = std::make_unique<bt::testing::FakePeer>(address, fake_controller->pw_dispatcher(),
+                                                      connectable, scannable);
   peer->SetAdvertisingData(adv);
   if (scannable) {
     peer->SetScanResponse(/*should_batch_reports=*/false, scan_response);
@@ -98,7 +99,8 @@ EmulatedPeer::Result EmulatedPeer::NewBredr(
 
   // TODO(armansito): We should consider splitting bt::testing::FakePeer into separate types for
   // BR/EDR and LE transport emulation logic.
-  auto peer = std::make_unique<bt::testing::FakePeer>(address, connectable, false);
+  auto peer = std::make_unique<bt::testing::FakePeer>(address, fake_controller->pw_dispatcher(),
+                                                      connectable, false);
   if (parameters.has_device_class()) {
     peer->set_class_of_device(bt::DeviceClass(parameters.device_class().value));
   }

@@ -132,9 +132,11 @@ constexpr bt_hci_protocol_ops_t hci_protocol_ops = {
 
 EmulatorDevice::EmulatorDevice(zx_device_t* device)
     : loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
+      pw_dispatcher_(loop_.dispatcher()),
       parent_(device),
       hci_dev_(nullptr),
       emulator_dev_(nullptr),
+      fake_device_(pw_dispatcher_),
       binding_(this) {}
 
 zx_status_t EmulatorDevice::Bind(std::string_view name) {

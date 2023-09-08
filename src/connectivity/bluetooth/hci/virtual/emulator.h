@@ -107,6 +107,8 @@ class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator,
   // Unbind, and are shut down upon Release.
   async::Loop loop_;
 
+  pw::async::fuchsia::FuchsiaDispatcher pw_dispatcher_;
+
   zx_device_t* const parent_;
 
   // The device that implements the bt-hci protocol. |hci_dev_| will only be accessed on |loop_|,
