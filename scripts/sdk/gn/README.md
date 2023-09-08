@@ -26,29 +26,18 @@ instead.
 
 ## Generating
 
-1. Create the GN build rules to build the GN SDK:
-   `fx set core.x64 --with //scripts/sdk/gn:gn_sdk_test_workspace --args="build_sdk_archives=true"`
-1. Build the build rules to build the GN SDK:
-   `fx build`
-
-The built SDK will be in `//${ROOT_OUT_DIR}/sdk/gn/fuchsia-sdk` (usually `//out/default/sdk/gn/fuchsia-sdk`)
-
-### Manual generation steps
-
-The above instructions is not what is run during testing and CQ. The GN build step performs the following steps which is run in CQ:
-
 1. Generate a IDK/core SDK:
 
    ```
-   fx set core.x64 --with //sdk:core --args="build_sdk_archives=true"
-   fx build
+   fx set minimal.x64
+   fx build sdk:final_fuchsia_idk
    ```
 
 1. Run the generate script:
 
    ```sh
    $ fuchsia-vendored-python scripts/sdk/gn/generate.py \
-       --archive out/default/sdk/archive/core.tar.gz \
+       --archive out/default/sdk/archive/fuchsia_idk.tar.gz \
        --output gn_sdk_dir
    ```
 

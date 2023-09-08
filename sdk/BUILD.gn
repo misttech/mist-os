@@ -289,7 +289,7 @@ sdk_collection("e2e_testing") {
     "//sdk/testing/sl4f/client:client_sdk($dart_toolchain)",
   ]
 
-  # TODO(https://fxbug.dev/126262): Remove this.
+  # TODO(https://fxbug.dev/133353): Remove this.
   if (build_sdk_archives) {
     generate_archive = true
   }
@@ -525,7 +525,7 @@ sdk_collection("core") {
     deps += [ ":host_tools" ]
   }
 
-  # TODO(https://fxbug.dev/126262): Remove this.
+  # TODO(https://fxbug.dev/133353): Remove this.
   if (build_sdk_archives) {
     generate_archive = true
   }
@@ -693,6 +693,7 @@ sdk_collection("driver") {
     deps += [ ":driver_host_tools" ]
   }
 
+  # TODO(https://fxbug.dev/133353): Remove this.
   if (build_sdk_archives) {
     # TODO(fxbug.dev/116642): the driver SDK archive will soon be removed.
     generate_archive = true

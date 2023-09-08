@@ -12,7 +12,7 @@ import("//build/go/go_test.gni")
 #
 #   input_archive
 #     Path to IDK/core SDK tar archive to be used as a base for the GN SDK.
-#     Defaults to ${root_out_dir}/sdk/archive/core.tar.gz
+#     Defaults to ${root_out_dir}/sdk/archive/fuchsia_idk.tar.gz
 #
 #   output_archive
 #     Path to the file where a tarball of the GN SDK will be written.

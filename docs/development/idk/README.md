@@ -114,28 +114,27 @@ Internally these targets are all instances of the `sdk` GN template.
 
 ### Generating an IDK archive {#generating-an-idk-archive}
 
-The various targets representing SDKs are always included in the build graph.
-In order to build the contents of an SDK, [build][fx-build-target] one of the
+The various targets representing IDKs are always included in the build graph.
+In order to build the contents of an IDK, [build][fx-build-target] one of the
 targets above.
 
 Note that this will generate and verify IDK contents, but won't actually build
 an archive with these contents.
-To build the archive, add the GN argument `build_sdk_archives=true` [to your
-build configuration][fx-config] and run the build command again.
+
+To build the archive, run the following commands:
+
+    fx set minimal.x64
+    fx build sdk:final_fuchsia_idk
+
 The resulting archive will be located under
-`<outdir>/sdk/archive/<name>.tar.gz`.
+`<outdir>/sdk/archive/fuchsia_idk.tar.gz`.
 
-The `core` SDK includes host tools needed for Fuchsia development. By default, when
-the SDK is built locally, it only includes host tools for the current host architecture,
-either x64 or arm64. When building the SDK on x64 hosts, you can also include arm64
-host tools by setting optional attributes for `fx` and `jiri`.
+The IDK includes host tools needed for Fuchsia development. By default, when
+the IDK is built locally, it only includes host tools for the current host
+architecture, either x64 or arm64. When building the IDK on x64 hosts, you can
+also include arm64 host tools by setting:
 
-   1. Add the `arm-sdk-tools` attribute to the jiri configuration by running
-    `jiri init -fetch-optional=arm-sdk-tools`. This only needs to be done once.
-   2. Update the Fuchsia checkout by running `jiri update`.
-   3. Configure to build the core sdk.
-    `fx set core.x64 --with //sdk:core --args arm_sdk_tools=true --args build_sdk_archives=true`
-   4. Build `fx build`
+   fx set minimal.x64 --args=sdk_cross_compile_host_tools=true
 
 ### Adding content to an IDK {#adding-content-to-an-idk}
 

@@ -6,6 +6,7 @@ declare_args() {
   # Whether to build archives for certain sdk_collection() targets by default.
   # This is deprecated, archives should instead be created through
   # generate_final_idk().
+  # TODO(fxbug.dev/133353): Delete this.
   build_sdk_archives = false
 
   # Whether to only warn when an SDK has been modified.
@@ -29,3 +30,16 @@ idk_target_cpus = [
   "riscv64",
   "x64",
 ]
+
+if (build_sdk_archives) {
+  print(
+      "Warning: build_sdk_archives and the archives it creates are deprecated and will be")
+  print("Warning: removed soon. Instead, run:")
+  print("Warning: ")
+  print("Warning:     fx build sdk:final_fuchsia_idk")
+  print("Warning: ")
+  print("Warning: and then use out/default/sdk/archive/fuchsia_idk.tar.gz")
+  print("Warning: ")
+  print(
+      "Warning: If this will break you somehow, please comment on fxbug.dev/133353")
+}
