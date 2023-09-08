@@ -105,7 +105,8 @@ pub(crate) enum DynamicNeighborUpdateSource {
     Confirmation(ConfirmationFlags),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Derivative)]
+#[cfg_attr(test, derivative(PartialEq, Eq))]
 enum NeighborState<D: LinkDevice, I: Instant> {
     Dynamic(DynamicNeighborState<D, I>),
     Static(D::Address),
@@ -117,7 +118,8 @@ enum NeighborState<D: LinkDevice, I: Instant> {
 ///
 /// [RFC 4861 section 7.3.2]: https://tools.ietf.org/html/rfc4861#section-7.3.2
 /// [RFC 7048 section 3]: https://tools.ietf.org/html/rfc7048#section-3
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Derivative)]
+#[cfg_attr(test, derivative(PartialEq, Eq))]
 pub(crate) enum DynamicNeighborState<D: LinkDevice, I: Instant> {
     /// Address resolution is being performed on the entry.
     ///
@@ -203,7 +205,8 @@ where
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Derivative)]
+#[cfg_attr(test, derivative(PartialEq, Eq))]
 pub(crate) struct Incomplete {
     transmit_counter: Option<NonZeroU8>,
     pending_frames: VecDeque<Buf<Vec<u8>>>,
@@ -328,13 +331,15 @@ impl Incomplete {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Derivative)]
+#[cfg_attr(test, derivative(PartialEq, Eq))]
 pub(crate) struct Reachable<D: LinkDevice, I: Instant> {
     pub(crate) link_address: D::Address,
     pub(crate) last_confirmed_at: I,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Derivative)]
+#[cfg_attr(test, derivative(PartialEq, Eq))]
 pub(crate) struct Stale<D: LinkDevice> {
     pub(crate) link_address: D::Address,
 }
@@ -366,7 +371,8 @@ impl<D: LinkDevice> Stale<D> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Derivative)]
+#[cfg_attr(test, derivative(PartialEq, Eq))]
 pub(crate) struct Delay<D: LinkDevice> {
     link_address: D::Address,
 }
@@ -403,7 +409,8 @@ impl<D: LinkDevice> Delay<D> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Derivative)]
+#[cfg_attr(test, derivative(PartialEq, Eq))]
 pub(crate) struct Probe<D: LinkDevice> {
     link_address: D::Address,
     transmit_counter: Option<NonZeroU8>,
@@ -456,7 +463,8 @@ impl<D: LinkDevice> Probe<D> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Derivative)]
+#[cfg_attr(test, derivative(PartialEq, Eq))]
 pub(crate) struct Unreachable<D: LinkDevice> {
     link_address: D::Address,
     mode: UnreachableMode,
@@ -1870,46 +1878,52 @@ where
 
         *last_gc = Some(ctx.now());
 
-        #[derive(PartialEq, Eq)]
+        // Define an ordering by priority for garbage collection, such that lower
+        // numbers correspond to higher usefulness and therefore lower likelihood of
+        // being discarded.
+        //
+        // TODO(https://fxbug.dev/124960): once neighbor entries hold a timestamp
+        // tracking when they were last updated, consider using this timestamp to break
+        // ties between entries in the same state, so that we discard less recently
+        // updated entries before more recently updated ones.
+        fn gc_priority<D: LinkDevice, I: Instant>(state: &DynamicNeighborState<D, I>) -> usize {
+            match state {
+                DynamicNeighborState::Incomplete(_)
+                | DynamicNeighborState::Reachable(_)
+                | DynamicNeighborState::Delay(_)
+                | DynamicNeighborState::Probe(_) => unreachable!(
+                    "the netstack should only ever discard STALE or UNREACHABLE entries; \
+                        found {:?}",
+                    state,
+                ),
+                DynamicNeighborState::Stale(_) => 0,
+                DynamicNeighborState::Unreachable(Unreachable {
+                    link_address: _,
+                    mode: UnreachableMode::Backoff { probes_sent: _, packet_sent: _ },
+                }) => 1,
+                DynamicNeighborState::Unreachable(Unreachable {
+                    link_address: _,
+                    mode: UnreachableMode::WaitingForPacketSend,
+                }) => 2,
+            }
+        }
+
         struct SortEntry<'a, K: Eq, D: LinkDevice, I: Instant> {
             key: K,
             state: &'a mut DynamicNeighborState<D, I>,
         }
+        impl<K: Eq, D: LinkDevice, I: Instant> PartialEq for SortEntry<'_, K, D, I> {
+            fn eq(&self, other: &Self) -> bool {
+                self.key == other.key && gc_priority(self.state) == gc_priority(other.state)
+            }
+        }
+        impl<K: Eq, D: LinkDevice, I: Instant> Eq for SortEntry<'_, K, D, I> {}
         impl<K: Eq, D: LinkDevice, I: Instant> Ord for SortEntry<'_, K, D, I> {
             fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-                // Define an ordering by priority for garbage collection, such that lower
-                // numbers correspond to higher usefulness and therefore lower likelihood of
-                // being discarded.
-                //
-                // TODO(https://fxbug.dev/124960): once neighbor entries hold a timestamp
-                // tracking when they were last updated, consider using this timestamp to break
-                // ties between entries in the same state, so that we discard less recently
-                // updated entries before more recently updated ones.
-                let gc_preference = |state: &DynamicNeighborState<D, I>| match state {
-                    DynamicNeighborState::Incomplete(_)
-                    | DynamicNeighborState::Reachable(_)
-                    | DynamicNeighborState::Delay(_)
-                    | DynamicNeighborState::Probe(_) => unreachable!(
-                        "the netstack should only ever discard STALE or UNREACHABLE entries; \
-                        found {:?}",
-                        state,
-                    ),
-                    DynamicNeighborState::Stale(_) => 0,
-                    DynamicNeighborState::Unreachable(Unreachable {
-                        link_address: _,
-                        mode: UnreachableMode::Backoff { probes_sent: _, packet_sent: _ },
-                    }) => 1,
-                    DynamicNeighborState::Unreachable(Unreachable {
-                        link_address: _,
-                        mode: UnreachableMode::WaitingForPacketSend,
-                    }) => 2,
-                };
-                let ordering = gc_preference(self.state).cmp(&gc_preference(other.state));
-
                 // Sort in reverse order so `BinaryHeap` will function as a min-heap rather than
                 // a max-heap. This means it will maintain the minimum (i.e. most useful) entry
                 // at the top of the heap.
-                ordering.reverse()
+                gc_priority(self.state).cmp(&gc_priority(other.state)).reverse()
             }
         }
         impl<K: Eq, D: LinkDevice, I: Instant> PartialOrd for SortEntry<'_, K, D, I> {
