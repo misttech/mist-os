@@ -98,25 +98,6 @@ bazel_input_resource("element_manager_bazel_inputs") {
   outputs = [ "{{source_file_part}}" ]
 }
 
-# TODO(fxbug.dev/117065): Remove this once parents can configure their children.
-fuchsia_structured_config_values("sc_values_gazelle") {
-  cm_label = ":manifest"
-  values = {
-    url_to_collection = [
-      "fuchsia-pkg://fuchsia.com/shell_settings#meta/shell_settings.cm|shell_settings",
-      "fuchsia-pkg://fuchsia.com/terminal#meta/terminal.cm|terminal",
-    ]
-    default_collection = "elements"
-  }
-}
-
-fuchsia_package("element_manager_gazelle") {
-  deps = [
-    ":element_manager_comp",
-    ":sc_values_gazelle",
-  ]
-}
-
 fuchsia_unittest_package("element_manager_tests") {
   manifest = "meta/element_manager_bin_test.cml"
   deps = [ ":element_manager_bin_test" ]
