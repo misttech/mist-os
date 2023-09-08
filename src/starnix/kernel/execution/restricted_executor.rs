@@ -180,11 +180,8 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
     // We want to measure the task runtime in restricted mode ("user mode") separately from
     // normal mode ("kernel mode"), so we'll measure it once on each transition to/from user code
     // and record that delta.
-    let mut task_info_scope = trace_duration_begin_with_task_info!(
-        current_task,
-        trace_category_starnix!(),
-        trace_name_normal_mode!()
-    );
+    let mut task_info_scope =
+        trace_duration_begin_with_task_info!(trace_category_starnix!(), trace_name_normal_mode!());
 
     // This is the pointer that is passed to `restricted_enter`.
     let restricted_return_ptr = restricted_return as *const ();
@@ -225,7 +222,6 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
         // the task loop. Compute the task runtime delta here if enabled.
         trace_duration_end_with_task_info!(task_info_scope);
         task_info_scope = trace_duration_begin_with_task_info!(
-            current_task,
             trace_category_starnix!(),
             trace_name_restricted_mode!()
         );
@@ -256,7 +252,6 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
         // the task loop. Compute the task runtime delta here if enabled.
         trace_duration_end_with_task_info!(task_info_scope);
         task_info_scope = trace_duration_begin_with_task_info!(
-            current_task,
             trace_category_starnix!(),
             trace_name_normal_mode!()
         );

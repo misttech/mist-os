@@ -2,18 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::CurrentTask;
 use std::ffi::CStr;
 
 #[cfg(not(feature = "disable_tracing"))]
-use crate::{
-    task::Task,
-    types::{OwnedRef, WeakRef},
-};
-#[cfg(not(feature = "disable_tracing"))]
 use fuchsia_trace::{category_enabled, cstr};
 #[cfg(not(feature = "disable_tracing"))]
-use fuchsia_zircon as zx;
+use fuchsia_zircon::{self as zx, Task as _};
 
 // The trace category used for starnix-related traces.
 fuchsia_trace::string_name_macro!(trace_category_starnix, "starnix");
@@ -125,66 +119,53 @@ macro_rules! trace_duration_end {
 pub(crate) struct TaskInfoDurationScope {
     category: &'static CStr,
     name: &'static CStr,
-    start_time: i64,
-    task_and_start_runtime: Option<(WeakRef<Task>, zx::TaskRuntimeInfo)>,
+    start_ticks: i64,
+    start_runtime: Option<zx::TaskRuntimeInfo>,
 }
 
 impl TaskInfoDurationScope {
-    pub fn start(current_task: &CurrentTask, category: &'static CStr, name: &'static CStr) -> Self {
-        let task_and_start_runtime =
-            if category_enabled(cstr!(trace_category_starnix_task_runtime!())) {
-                let start_runtime = current_task
-                    .task
-                    .thread_runtime_info()
-                    .expect("should always be able to read runtime info for current task's thread");
-                Some((OwnedRef::downgrade(&current_task.task), start_runtime))
-            } else {
-                None
-            };
+    pub fn start(category: &'static CStr, name: &'static CStr) -> Self {
+        let start_ticks = zx::ticks_get();
+        let start_runtime = if category_enabled(cstr!(trace_category_starnix_task_runtime!())) {
+            let start_runtime = fuchsia_runtime::thread_self().get_runtime_info().unwrap();
+            Some(start_runtime)
+        } else {
+            None
+        };
 
-        Self { category, name, task_and_start_runtime, start_time: zx::ticks_get() }
+        Self { category, name, start_runtime, start_ticks }
     }
 
     pub fn finish(self) {
-        let delta = self.task_and_start_runtime.and_then(|(task, start_runtime)| {
-            task.upgrade().map(|task| {
-                let end_runtime = task
-                    .thread_runtime_info()
-                    .expect("should always be able to read runtime info for current task's thread");
-                end_runtime - start_runtime
-            })
-        });
-        if let Some(delta) = delta {
+        if let Some(start_runtime) = self.start_runtime {
+            let zx::TaskRuntimeInfo { cpu_time, queue_time, page_fault_time, lock_contention_time } =
+                fuchsia_runtime::thread_self().get_runtime_info().unwrap() - start_runtime;
             fuchsia_trace::complete_duration(
                 self.category,
                 self.name,
-                self.start_time,
+                self.start_ticks,
                 &[
-                    fuchsia_trace::ArgValue::of(trace_arg_cpu_time!(), delta.cpu_time),
-                    fuchsia_trace::ArgValue::of(trace_arg_queue_time!(), delta.queue_time),
-                    fuchsia_trace::ArgValue::of(
-                        trace_arg_page_fault_time!(),
-                        delta.page_fault_time,
-                    ),
+                    fuchsia_trace::ArgValue::of(trace_arg_cpu_time!(), cpu_time),
+                    fuchsia_trace::ArgValue::of(trace_arg_queue_time!(), queue_time),
+                    fuchsia_trace::ArgValue::of(trace_arg_page_fault_time!(), page_fault_time),
                     fuchsia_trace::ArgValue::of(
                         trace_arg_lock_contention_time!(),
-                        delta.lock_contention_time,
+                        lock_contention_time,
                     ),
                 ],
             );
         } else {
-            fuchsia_trace::complete_duration(self.category, self.name, self.start_time, &[]);
+            fuchsia_trace::complete_duration(self.category, self.name, self.start_ticks, &[]);
         }
     }
 }
 
 macro_rules! trace_duration_begin_with_task_info {
-    ($current_task:expr, $category:expr, $name:expr) => {
+    ($category:expr, $name:expr) => {
         if cfg!(not(feature = "disable_tracing")) {
             let category = fuchsia_trace::cstr!($category);
             if fuchsia_trace::category_enabled(category) {
                 Some(crate::trace::TaskInfoDurationScope::start(
-                    $current_task,
                     category,
                     fuchsia_trace::cstr!($name),
                 ))
