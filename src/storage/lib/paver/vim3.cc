@@ -45,15 +45,18 @@ zx::result<std::unique_ptr<DevicePartitioner>> Vim3Partitioner::Initialize(
 }
 
 bool Vim3Partitioner::SupportsPartition(const PartitionSpec& spec) const {
-  const PartitionSpec supported_specs[] = {PartitionSpec(paver::Partition::kBootloaderA),
-                                           PartitionSpec(paver::Partition::kZirconA),
-                                           PartitionSpec(paver::Partition::kZirconB),
-                                           PartitionSpec(paver::Partition::kZirconR),
-                                           PartitionSpec(paver::Partition::kVbMetaA),
-                                           PartitionSpec(paver::Partition::kVbMetaB),
-                                           PartitionSpec(paver::Partition::kVbMetaR),
-                                           PartitionSpec(paver::Partition::kAbrMeta),
-                                           PartitionSpec(paver::Partition::kFuchsiaVolumeManager)};
+  const PartitionSpec supported_specs[] = {
+      PartitionSpec(paver::Partition::kBootloaderA),
+      PartitionSpec(paver::Partition::kZirconA),
+      PartitionSpec(paver::Partition::kZirconB),
+      PartitionSpec(paver::Partition::kZirconR),
+      PartitionSpec(paver::Partition::kVbMetaA),
+      PartitionSpec(paver::Partition::kVbMetaB),
+      PartitionSpec(paver::Partition::kVbMetaR),
+      PartitionSpec(paver::Partition::kAbrMeta),
+      PartitionSpec(paver::Partition::kFuchsiaVolumeManager),
+      PartitionSpec(paver::Partition::kFuchsiaVolumeManager, kOpaqueVolumeContentType),
+  };
   return std::any_of(std::cbegin(supported_specs), std::cend(supported_specs),
                      [&](const PartitionSpec& supported) { return SpecMatches(spec, supported); });
 }
