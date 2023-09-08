@@ -205,6 +205,7 @@ static_assertions = "1.1.0"
 strsim = "0.10.0"
 structopt = "0.2.14"
 tempfile = "3.2"
+termtree = "0.4.1"
 tuf = { version = "0.3.0-beta11", default-features = false, features = ["hyper"] }
 termion = "1.5.3"
 test-case = "3.1.0"

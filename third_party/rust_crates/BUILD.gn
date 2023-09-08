@@ -928,6 +928,10 @@ if (!(current_os == "fuchsia")) {
   }
 }
 
+group("termtree") {
+  public_deps = [ ":termtree-v0_4_1" ]
+}
+
 group("test-case") {
   public_deps = [ ":test-case-v3_1_0" ]
 }
@@ -11130,6 +11134,26 @@ rust_library("termios-v0_3_2") {
     "--edition=2015",
     "-Cmetadata=ef75c1b73286d58d",
     "-Cextra-filename=-ef75c1b73286d58d",
+  ]
+
+  visibility = [ ":*" ]
+}
+
+rust_library("termtree-v0_4_1") {
+  crate_name = "termtree"
+  crate_root = "//third_party/rust_crates/vendor/termtree-0.4.1/src/lib.rs"
+  output_name = "termtree-5cf80b786490087d"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=5cf80b786490087d",
+    "-Cextra-filename=-5cf80b786490087d",
   ]
 
   visibility = [ ":*" ]
