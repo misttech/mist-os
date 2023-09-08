@@ -97,26 +97,24 @@ riscv_profiles = {
   }
 
   rva22 = {
-    u64 = {
-      base = "rv64gc"  # G = IMAFD + Zicsr + Zifencei
-      u64_mandatory = rva20.u64_mandatory + [
-                        "zihintpause",
-                        "zba",
-                        "zbb",
-                        "zbs",
-                        "zicbom",
-                        "zicbop",
-                        "zicboz",
-                        "zfhmin",
-                        "zkt",
-                      ]
-      u64_optional = rva20.u64_optional + u64_mandatory - u64_mandatory + [
-                       "zfh",
-                       "v",
-                       "zkn",
-                       "zks",
-                     ]
-    }
+    base = "rv64gc"  # G = IMAFD + Zicsr + Zifencei
+    u64_mandatory = rva20.u64_mandatory + [
+                      "zihintpause",
+                      "zba",
+                      "zbb",
+                      "zbs",
+                      "zicbom",
+                      "zicbop",
+                      "zicboz",
+                      "zfhmin",
+                      "zkt",
+                    ]
+    u64_optional = rva20.u64_optional + u64_mandatory - u64_mandatory + [
+                     "zfh",
+                     "v",
+                     "zkn",
+                     "zks",
+                   ]
     s64_mandatory = [
       "zifencei",
       "ss1p12",
