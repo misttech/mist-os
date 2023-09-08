@@ -1,0 +1,27 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "bt-snoop",
+            url: "fuchsia-pkg://fuchsia.com/bt-snoop#meta/bt-snoop.cm",
+            startup: "eager",
+            environment: "#core-env",
+        },
+    ],
+    offer: [
+        {
+            protocol: [ "fuchsia.logger.LogSink" ],
+            from: "parent",
+            to: [ "#bt-snoop" ],
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-bt-hci",
+            to: [ "#bt-snoop" ],
+            subdir: "bt-hci",
+        },
+    ],
+}

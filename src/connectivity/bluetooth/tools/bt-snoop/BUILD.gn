@@ -62,6 +62,12 @@ core_shard("bt-snoop-core-shard") {
   shard_file = "meta/bt-snoop.core_shard.cml"
 }
 
+# The core realm shard to be used by product integrators.
+# When this shard is included, `bt-snoop` will be started on device boot.
+core_shard("eager-core-shard") {
+  shard_file = "meta/bt-snoop.core_shard.cml"
+}
+
 fuchsia_unittest_package("bt-snoop-unittests") {
   deps = [ ":bin_test" ]
 }
