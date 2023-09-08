@@ -15,8 +15,6 @@ board_configuration_label = "//boards/vim3"
 board_name = "vim3"
 board_description = "A generic vim3 device"
 
-board_configs += [ "//build/config/arm64:cortex-a53" ]
-
 _common_bootfs_deps = [
   "//boards/kernel_cmdline:vim3",
   "//src/connectivity/ethernet/drivers/aml-ethernet",
