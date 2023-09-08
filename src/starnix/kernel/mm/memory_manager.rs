@@ -1171,6 +1171,23 @@ pub trait MemoryAccessor {
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno>;
 }
 
+fn object_as_mut_bytes<T: FromBytes + Sized>(object: &mut T) -> &mut [u8] {
+    // SAFETY: T is FromBytes, which means that any bit pattern is valid. Interpreting T as u8
+    // is safe because T's alignment requirements are larger than u8.
+    unsafe { std::slice::from_raw_parts_mut(object as *mut T as *mut u8, std::mem::size_of::<T>()) }
+}
+
+fn slice_as_mut_bytes<T: FromBytes + Sized>(slice: &mut [T]) -> &mut [u8] {
+    // SAFETY: T is FromBytes, which means that any bit pattern is valid. Interpreting T as u8
+    // is safe because T's alignment requirements are larger than u8.
+    unsafe {
+        std::slice::from_raw_parts_mut(
+            slice.as_mut_ptr() as *mut u8,
+            slice.len() * std::mem::size_of::<T>(),
+        )
+    }
+}
+
 pub trait MemoryAccessorExt: MemoryAccessor {
     /// Read exactly `len` bytes of memory, returning them as a a Vec.
     fn read_memory_to_vec(&self, addr: UserAddress, len: usize) -> Result<Vec<u8>, Errno> {
@@ -1205,16 +1222,8 @@ pub trait MemoryAccessorExt: MemoryAccessor {
 
     /// Read an instance of T from `user`.
     fn read_object<T: FromBytes>(&self, user: UserRef<T>) -> Result<T, Errno> {
-        // SAFETY: T is FromBytes, which means that any bit pattern is valid. Interpreting T as u8
-        // is safe because T's alignment requirements are larger than u8.
         let mut object = T::new_zeroed();
-        let buffer = unsafe {
-            std::slice::from_raw_parts_mut(
-                &mut object as *mut T as *mut u8,
-                std::mem::size_of::<T>(),
-            )
-        };
-        self.read_memory_to_slice(user.addr(), buffer)?;
+        self.read_memory_to_slice(user.addr(), object_as_mut_bytes(&mut object))?;
         Ok(object)
     }
 
@@ -1253,11 +1262,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         user: UserRef<T>,
         objects: &mut [T],
     ) -> Result<(), Errno> {
-        // TODO(b/287679867) make this a single read_memory call
-        for (index, object) in objects.iter_mut().enumerate() {
-            *object = self.read_object(user.at(index))?;
-        }
-        Ok(())
+        self.read_memory_to_slice(user.addr(), slice_as_mut_bytes(objects))
     }
 
     /// Read exactly `len` objects from `user`, returning them as a Vec.
