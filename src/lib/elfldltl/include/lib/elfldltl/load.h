@@ -93,9 +93,8 @@ constexpr auto LoadHeadersFromFile(Diagnostics& diagnostics, File& file,
 // to permit callbacks with either data format (byte order) as well as either
 // class.  The final optional argument gives the machine architecture to match,
 // and likewise can be std::nullopt to accept any machine.
-template <class Diagnostics, class File, class PhdrAllocator, typename Callback>
-constexpr bool WithLoadHeadersFromFile(Diagnostics& diagnostics, File& file,
-                                       PhdrAllocator&& phdr_allocator, Callback&& callback,
+template <template <typename> class PhdrAllocator, class Diagnostics, class File, typename Callback>
+constexpr bool WithLoadHeadersFromFile(Diagnostics& diagnostics, File& file, Callback&& callback,
                                        std::optional<ElfData> expected_data = ElfData::kNative,
                                        std::optional<ElfMachine> machine = ElfMachine::kNative) {
   using namespace std::literals::string_view_literals;
@@ -111,12 +110,12 @@ constexpr bool WithLoadHeadersFromFile(Diagnostics& diagnostics, File& file,
     if (!ehdr.Loadable(diagnostics, machine)) [[unlikely]] {
       return false;
     }
-    auto read_phdrs =
-        ReadPhdrsFromFile(diagnostics, file, std::forward<PhdrAllocator>(phdr_allocator), ehdr);
+    PhdrAllocator<Phdr> phdr_allocator;
+    auto read_phdrs = ReadPhdrsFromFile(diagnostics, file, phdr_allocator, ehdr);
     if (!read_phdrs) [[unlikely]] {
       return false;
     }
-    cpp20::span<const Phdr> phdrs = *read_phdrs;
+    cpp20::span<const Phdr> phdrs = read_phdrs->get();
     return std::invoke(std::forward<Callback>(callback), ehdr, phdrs);
   };
 

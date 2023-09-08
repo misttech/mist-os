@@ -46,6 +46,8 @@ class LdStartupCreateProcessTestsBase : public LdLoadZirconProcessTestsBase {
 
   void set_stack_size(std::optional<size_t> stack_size) { stack_size_ = stack_size; }
 
+  void FinishLoad(std::string_view executable_name);
+
  private:
   uintptr_t entry_ = 0;
   uintptr_t vdso_base_ = 0;
@@ -81,8 +83,7 @@ class LdStartupCreateProcessTests
     set_vdso_base(result->info.vaddr_start() + result->loader.load_bias());
     std::move(result->loader).Commit();
 
-    // Send the executable VMO.
-    ASSERT_NO_FATAL_FAILURE(bootstrap().AddExecutableVmo(executable_name));
+    ASSERT_NO_FATAL_FAILURE(FinishLoad(executable_name));
   }
 
  private:

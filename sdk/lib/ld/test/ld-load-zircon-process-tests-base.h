@@ -7,12 +7,12 @@
 
 #include <lib/zx/process.h>
 
-#include "ld-load-tests-base.h"
+#include "ld-load-zircon-ldsvc-tests-base.h"
 
 namespace ld::testing {
 
 // This is the common base class for test fixtures to launch a Zircon process.
-class LdLoadZirconProcessTestsBase : public LdLoadTestsBase {
+class LdLoadZirconProcessTestsBase : public LdLoadZirconLdsvcTestsBase {
  public:
   ~LdLoadZirconProcessTestsBase();
 

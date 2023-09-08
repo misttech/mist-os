@@ -10,15 +10,18 @@
 
 #include <gmock/gmock.h>
 
+namespace ld::testing {
+namespace {
+
 using ::testing::Return;
 
-namespace ld::testing {
+}  // namespace
 
 // A mock server implementation serving the fuchsia.ldsvc.Loader protocol. When
 // it receives a request, it will invoke the associated MOCK_METHOD. If the
 // test caller did not call Expect* for the request before it is made, then
 // the MockServer will fail the test.
-class MockServer : public fidl::WireServer<fuchsia_ldsvc::Loader> {
+class MockLoaderService::MockServer : public fidl::WireServer<fuchsia_ldsvc::Loader> {
  public:
   MockServer() = default;
 
@@ -35,9 +38,14 @@ class MockServer : public fidl::WireServer<fuchsia_ldsvc::Loader> {
     fidl::BindServer(backing_loop_->dispatcher(), std::move(server), this);
   }
 
-  MOCK_METHOD(zx::result<zx::vmo>, MockLoadObject, (std::string_view));
+  // Note the mocked methods take std::string, though the Expect* wrappers take
+  // std::string_view.  The std::string_view passed to the wrappers is not
+  // guaranteed to point to memory that's valid after the call, so they copy
+  // into a fresh std::string for EXPECT_CALL; those stay live in the mock.
 
-  MOCK_METHOD(zx::result<>, MockConfig, (std::string_view));
+  MOCK_METHOD(zx::result<zx::vmo>, MockLoadObject, (std::string));
+
+  MOCK_METHOD(zx::result<>, MockConfig, (std::string));
 
  private:
   // The fidl::WireServer<fuchsia_ldsvc::Loader> implementation, each FIDL
@@ -47,12 +55,12 @@ class MockServer : public fidl::WireServer<fuchsia_ldsvc::Loader> {
   void Done(DoneCompleter::Sync& completer) override { ADD_FAILURE() << "unexpected Done call"; }
 
   void LoadObject(LoadObjectRequestView request, LoadObjectCompleter::Sync& completer) override {
-    auto result = MockLoadObject(request->object_name.get());
+    auto result = MockLoadObject(std::string(request->object_name.get()));
     completer.Reply(result.status_value(), std::move(result).value_or(zx::vmo()));
   }
 
   void Config(ConfigRequestView request, ConfigCompleter::Sync& completer) override {
-    auto result = MockConfig(request->config.get());
+    auto result = MockConfig(std::string(request->config.get()));
     completer.Reply(result.status_value());
   }
 
@@ -78,11 +86,12 @@ void MockLoaderService::Init() {
 
 void MockLoaderService::ExpectLoadObject(std::string_view name,
                                          zx::result<zx::vmo> expected_result) {
-  EXPECT_CALL(*mock_server_, MockLoadObject(name)).WillOnce(Return(std::move(expected_result)));
+  EXPECT_CALL(*mock_server_, MockLoadObject(std::string{name}))
+      .WillOnce(Return(std::move(expected_result)));
 }
 
 void MockLoaderService::ExpectConfig(std::string_view name, zx::result<> expected_result) {
-  EXPECT_CALL(*mock_server_, MockConfig(name)).WillOnce(Return(expected_result));
+  EXPECT_CALL(*mock_server_, MockConfig(std::string{name})).WillOnce(Return(expected_result));
 }
 
 }  // namespace ld::testing

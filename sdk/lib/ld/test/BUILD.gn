@@ -79,6 +79,8 @@ source_set("load-tests") {
   ]
   if (is_fuchsia) {
     sources += [
+      "ld-load-zircon-ldsvc-tests-base.cc",
+      "ld-load-zircon-ldsvc-tests-base.h",
       "ld-load-zircon-process-tests-base.cc",
       "ld-load-zircon-process-tests-base.h",
       "ld-startup-create-process-tests.cc",

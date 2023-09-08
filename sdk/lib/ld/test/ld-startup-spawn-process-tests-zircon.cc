@@ -4,7 +4,11 @@
 
 #include "ld-startup-spawn-process-tests-zircon.h"
 
+#include <lib/elfldltl/load.h>
+#include <lib/elfldltl/memory.h>
+#include <lib/elfldltl/testing/diagnostics.h>
 #include <lib/elfldltl/testing/get-test-data.h>
+#include <lib/elfldltl/vmo.h>
 #include <lib/fdio/spawn.h>
 #include <lib/zx/job.h>
 #include <unistd.h>
@@ -92,6 +96,35 @@ class SpawnPlan {
   std::vector<fdio_spawn_action_t> actions_;
 };
 
+template <typename T>
+using NewArray = elfldltl::NewArrayFromFile<T>;
+
+std::string FindInterp(zx::unowned_vmo vmo) {
+  std::string result;
+  auto diag = elfldltl::testing::ExpectOkDiagnostics();
+  elfldltl::UnownedVmoFile file{vmo->borrow(), diag};
+  auto scan_phdrs = [&file, &result](const auto& ehdr, const auto& phdrs) -> bool {
+    for (const auto& phdr : phdrs) {
+      if (phdr.type == elfldltl::ElfPhdrType::kInterp) {
+        size_t len = phdr.filesz;
+        if (len > 0) {
+          auto read_chars = file.ReadArrayFromFile<char>(
+              phdr.offset, elfldltl::NewArrayFromFile<char>{}, len - 1);
+          if (read_chars) {
+            cpp20::span<const char> chars = read_chars->get();
+            result = std::string_view{chars.data(), chars.size()};
+            return true;
+          }
+        }
+        return false;
+      }
+    }
+    return true;
+  };
+  EXPECT_TRUE(elfldltl::WithLoadHeadersFromFile<NewArray>(diag, file, scan_phdrs));
+  return result;
+}
+
 }  // namespace
 
 LdStartupSpawnProcessTests::~LdStartupSpawnProcessTests() = default;
@@ -103,12 +136,25 @@ void LdStartupSpawnProcessTests::Init(std::initializer_list<std::string_view> ar
 void LdStartupSpawnProcessTests::Load(std::string_view executable_name) {
   const std::string executable_path = std::filesystem::path("test") / "bin" / executable_name;
   ASSERT_NO_FATAL_FAILURE(executable_ = elfldltl::testing::GetTestLibVmo(executable_path));
+
+  // The program launcher service first uses the loader service channel to look
+  // up the PT_INTERP and then transfers it to the new process to be used by
+  // the dynamic linker.  So inject an expectation before any from the test
+  // itself calling Needed.
+  std::string interp;
+  ASSERT_NO_FATAL_FAILURE(interp = FindInterp(executable_.borrow()));
+  if (!interp.empty()) {
+    ASSERT_NO_FATAL_FAILURE(LdsvcExpectLoadObject(interp));
+  }
 }
 
 int64_t LdStartupSpawnProcessTests::Run() {
   SpawnPlan spawn;
 
   spawn.Name(process_name());
+
+  // Pass in the mock loader service channel.
+  spawn.AddLdsvc(GetLdsvc());
 
   // Put the log pipe on stderr to collect any diagnostics.
   fbl::unique_fd log_fd;

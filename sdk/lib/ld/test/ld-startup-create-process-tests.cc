@@ -40,6 +40,17 @@ void LdStartupCreateProcessTestsBase::Init(std::initializer_list<std::string_vie
                               .SetArgs(args));
 }
 
+void LdStartupCreateProcessTestsBase::FinishLoad(std::string_view executable_name) {
+  // Send the executable VMO.
+  ASSERT_NO_FATAL_FAILURE(bootstrap().AddExecutableVmo(executable_name));
+
+  // If a mock loader service has been set up by calls to Needed() et al,
+  // send the client end over.
+  if (zx::channel ldsvc = GetLdsvc()) {
+    ASSERT_NO_FATAL_FAILURE(bootstrap().AddLdsvc(std::move(ldsvc)));
+  }
+}
+
 LdStartupCreateProcessTestsBase::~LdStartupCreateProcessTestsBase() = default;
 
 int64_t LdStartupCreateProcessTestsBase::Run() {

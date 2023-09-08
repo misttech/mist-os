@@ -13,7 +13,7 @@
 #include <initializer_list>
 #include <string_view>
 
-#include "ld-load-tests-base.h"
+#include "ld-load-zircon-ldsvc-tests-base.h"
 
 // The in-process tests here work by doing ELF loading approximately as the
 // system program loader would, but into this process that's running the test.
@@ -30,7 +30,7 @@ namespace ld::testing {
 // the vDSO.
 class LdStartupInProcessTests
     : public elfldltl::testing::LoadTests<elfldltl::testing::LocalVmarLoaderTraits>,
-      public LdLoadTestsBase {
+      public LdLoadZirconLdsvcTestsBase {
  public:
   void Init(std::initializer_list<std::string_view> args = {});
 

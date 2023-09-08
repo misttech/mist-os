@@ -14,8 +14,6 @@
 
 namespace ld::testing {
 
-class MockServer;
-
 // MockLoaderService is a mock interface for testing that specific requests
 // are made over the fuchsia.ldsvc.Loader protocol.
 //
@@ -47,7 +45,12 @@ class MockLoaderService {
 
   ~MockLoaderService();
 
+  // This must be called before other methods.
+  // It should be used inside ASSERT_NO_FATAL_FAILURE(...).
   void Init();
+
+  // Returns true if Init() has been called and succeeded.
+  bool Ready() const { return bool(mock_server_); }
 
   void ExpectLoadObject(std::string_view name, zx::result<zx::vmo> expected_result);
 
@@ -56,6 +59,8 @@ class MockLoaderService {
   fidl::ClientEnd<fuchsia_ldsvc::Loader>& client() { return mock_client_; }
 
  private:
+  class MockServer;
+
   std::unique_ptr<::testing::StrictMock<MockServer>> mock_server_;
   fidl::ClientEnd<fuchsia_ldsvc::Loader> mock_client_;
   // The sequence guard enforces the fuchsia.ldsvc.Loader requests are made in
