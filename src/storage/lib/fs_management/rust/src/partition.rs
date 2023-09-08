@@ -222,7 +222,7 @@ pub async fn fvm_allocate_partition(
         ..Default::default()
     };
 
-    find_partition(matcher, Duration::from_seconds(10)).await
+    find_partition(matcher, Duration::from_seconds(20)).await
 }
 
 #[cfg(test)]
