@@ -62,12 +62,10 @@ using WithAllDrivers = Template<
     Args...,
     // A default-constructed variant gets the null driver.
     null::Driver,
-    // This driver is potentially used on all machines.
-    ns8250::Mmio32Driver,
+    // These drivers are potentially used on all machines.
+    ns8250::Mmio32Driver, ns8250::Mmio8Driver,
 #if defined(__aarch64__) || UART_ALL_DRIVERS
     amlogic::Driver, motmot::Driver, ns8250::LegacyDw8250Driver, pl011::Driver, imx::Driver,
-#elif defined(__riscv) || UART_ALL_DRIVERS
-    ns8250::Mmio8Driver,
 #endif
 #if defined(__x86_64__) || defined(__i386__) || UART_ALL_DRIVERS
     ns8250::PioDriver,
@@ -129,9 +127,6 @@ class KernelDriver {
       const devicetree::PropertyDecoder& decoder) {
     return DoMatch(decoder);
   }
-
-  // After succesfully matching through |MatchDevicetree| the selected instance can be instantiated
-  // through this method.
 
   // This is like Match, but instead of matching a ZBI item, it matches a
   // string value for the "kernel.serial" boot option.

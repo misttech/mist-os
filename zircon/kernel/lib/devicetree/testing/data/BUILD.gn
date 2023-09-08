@@ -14,6 +14,7 @@ import("//build/testing/host_test_data.gni")
 # NOTE: Do NOT regenerate 'dtb' files from the dts file, this might change the structure of the blob obtained
 # from the device.
 dtb_real = [
+  "crosvm-arm.dtb",
   "muntjac.dtb",
   "qemu-arm-gic2.dtb",
   "qemu-arm-gic3.dtb",

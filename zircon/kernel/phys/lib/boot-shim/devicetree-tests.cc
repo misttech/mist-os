@@ -12,6 +12,7 @@
 #include <lib/fit/defer.h>
 #include <lib/memalloc/range.h>
 #include <lib/uart/all.h>
+#include <lib/uart/ns8250.h>
 #include <lib/zbi-format/cpu.h>
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zbi-format/internal/deprecated-cpu.h>
@@ -22,7 +23,6 @@
 #include <array>
 #include <cstdlib>
 #include <memory>
-#include <new>
 #include <optional>
 #include <type_traits>
 
@@ -36,7 +36,11 @@ using devicetree::testing::LoadedDtb;
 class ArmDevicetreeTest {
  public:
   static void SetUpTestSuite() {
-    auto loaded_dtb = LoadDtb("qemu-arm-gic3.dtb");
+    auto loaded_dtb = LoadDtb("crosvm-arm.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    crosvm_arm_ = std::move(loaded_dtb).value();
+
+    loaded_dtb = LoadDtb("qemu-arm-gic3.dtb");
     ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
     qemu_arm_gic3_ = std::move(loaded_dtb).value();
 
@@ -48,17 +52,22 @@ class ArmDevicetreeTest {
   static void TearDownTestSuite() {
     qemu_arm_gic3_ = std::nullopt;
     qemu_arm_gic2_ = std::nullopt;
+    crosvm_arm_ = std::nullopt;
   }
 
   devicetree::Devicetree qemu_arm_gic3() { return qemu_arm_gic3_->fdt(); }
 
   devicetree::Devicetree qemu_arm_gic2() { return qemu_arm_gic2_->fdt(); }
 
+  devicetree::Devicetree crosvm_arm() { return crosvm_arm_->fdt(); }
+
  private:
+  static std::optional<LoadedDtb> crosvm_arm_;
   static std::optional<LoadedDtb> qemu_arm_gic3_;
   static std::optional<LoadedDtb> qemu_arm_gic2_;
 };
 
+std::optional<LoadedDtb> ArmDevicetreeTest::crosvm_arm_ = std::nullopt;
 std::optional<LoadedDtb> ArmDevicetreeTest::qemu_arm_gic3_ = std::nullopt;
 std::optional<LoadedDtb> ArmDevicetreeTest::qemu_arm_gic2_ = std::nullopt;
 
@@ -1012,6 +1021,30 @@ TEST_F(ChosenNodeMatcherTest, ParseChosenWithRegOffset) {
                                  .irq = 33,
                              },
                          .uart_absolute_path = "/some-interrupt-controller/pl011uart@9000000",
+                     });
+}
+
+TEST_F(ChosenNodeMatcherTest, CrosVmArm) {
+  constexpr std::string_view kCmdline =
+      "panic=-1 kernel.experimental.serial_migration=true console.shell=true zircon.autorun.boot=/boot/bin/devicetree-extract";
+
+  auto fdt = crosvm_arm();
+  boot_shim::DevicetreeChosenNodeMatcher<AllUartDrivers> chosen_matcher("test", stdout);
+
+  ASSERT_TRUE(devicetree::Match(fdt, chosen_matcher));
+
+  CheckChosenMatcher(chosen_matcher,
+                     {
+                         .ramdisk_start = 0x81000000,
+                         .ramdisk_end = 0x82bd4e28,
+                         .cmdline = kCmdline,
+                         .uart_config_name = uart::ns8250::Mmio8Driver::config_name(),
+                         .uart_config =
+                             {
+                                 .mmio_phys = 0x3F8,
+                                 .irq = 32,
+                             },
+                         .uart_absolute_path = "/U6_16550A@3f8",
                      });
 }
 

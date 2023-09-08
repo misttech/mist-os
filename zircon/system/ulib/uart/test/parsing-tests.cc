@@ -292,6 +292,15 @@ TEST(ParsingTests, Ns8250MmioDriver) {
   CheckMaybeCreateFromAcpi<uart::ns8250::Mmio32Driver, false>(kPioDebugPort);
 }
 
+TEST(ParsingTests, Ns82508BMmioDriver) {
+  auto driver = uart::ns8250::Mmio8Driver::MaybeCreate("ns8250-8bit,0xa,0xb");
+  ASSERT_TRUE(driver.has_value());
+  EXPECT_STREQ("ns8250-8bit", driver->config_name());
+  const zbi_dcfg_simple_t& config = driver->config();
+  EXPECT_EQ(0xa, config.mmio_phys);
+  EXPECT_EQ(0xb, config.irq);
+}
+
 TEST(ParsingTests, Ns8250PioDriver) {
   auto driver = uart::ns8250::PioDriver::MaybeCreate("ioport,0xa,0xb");
   ASSERT_TRUE(driver.has_value());
