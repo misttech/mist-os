@@ -483,7 +483,7 @@ async fn add_address_removal<N: Netstack>(
         ),
     }
 
-    let (interface_or_tun, control) = if tun {
+    let (_interface_or_tun, control): (InterfaceOrTun<'_>, _) = if tun {
         let (tun_device, network_device) = create_tun_device();
         let admin_device_control = install_device(&realm, network_device);
         // Retain `_tun_port` to keep the FIDL channel open.
@@ -575,7 +575,6 @@ async fn add_address_removal<N: Netstack>(
         .expect("add address failed unexpectedly");
 
         control.remove().await.expect("send remove interface request").expect("remove interface");
-        core::mem::drop(interface_or_tun);
         let event = address_state_provider
             .take_event_stream()
             .try_next()
