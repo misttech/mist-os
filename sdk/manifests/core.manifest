@@ -270,6 +270,7 @@ sdk://tools/arm64/merkleroot
 sdk://tools/arm64/minfs
 sdk://tools/arm64/pm
 sdk://tools/arm64/qemu_internal
+sdk://tools/arm64/qemu_uefi_internal
 sdk://tools/arm64/symbolizer
 sdk://tools/arm64/zbi
 sdk://tools/arm64/zxdb
@@ -299,6 +300,7 @@ sdk://tools/x64/fssh
 sdk://tools/x64/fvm
 sdk://tools/x64/merkleroot
 sdk://tools/x64/minfs
+sdk://tools/x64/uefi_internal
 sdk://tools/x64/pm
 sdk://tools/x64/qemu_internal
 sdk://tools/x64/symbolizer

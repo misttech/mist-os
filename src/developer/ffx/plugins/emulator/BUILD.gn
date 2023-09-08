@@ -31,6 +31,7 @@ if (is_host) {
     deps = [
       ":aemu_internal",
       ":qemu_internal",
+      ":uefi_internal",
     ]
   }
 
@@ -57,9 +58,34 @@ if (is_host) {
       prebuilt_path = "//prebuilt/third_party/qemu/${current_os}-${current_cpu}"
       sdk_dest_path = "tools/${current_cpu}/qemu_internal"
     }
+    emu_companion("uefi_internal") {
+      prebuilt_path = "//prebuilt/third_party/edk2/qemu-${current_cpu}"
+      sdk_dest_path = "tools/${current_cpu}/qemu_uefi_internal"
+      if (current_cpu == "x64") {
+        default_binary =
+            "//prebuilt/third_party/edk2/qemu-${current_cpu}/OVMF_CODE.fd"
+        prebuilt_files = [
+          "//prebuilt/third_party/edk2/qemu-${current_cpu}/OVMF_CODE.fd",
+          "//prebuilt/third_party/edk2/qemu-${current_cpu}/OVMF_VARS.fd",
+        ]
+      }
+      if (current_cpu == "arm64") {
+        default_binary =
+            "//prebuilt/third_party/edk2/qemu-${current_cpu}/QEMU_EFI.fd"
+        prebuilt_files = [
+          "//prebuilt/third_party/edk2/qemu-${current_cpu}/QEMU_EFI.fd",
+          "//prebuilt/third_party/edk2/qemu-${current_cpu}/QEMU_VARS.fd",
+        ]
+      }
+    }
   } else {
     sdk_noop_atom("qemu_internal") {
       id = "sdk://tools/$current_cpu/qemu_internal"
+      category = "partner"
+      type = "companion_host_tool"
+    }
+    sdk_noop_atom("uefi_internal") {
+      id = "sdk://tools/$current_cpu/qemu_uefi_internal"
       category = "partner"
       type = "companion_host_tool"
     }

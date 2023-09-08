@@ -26,6 +26,11 @@ def main():
         '--meta_out', required=True, help='path to metadata for tool.')
     parser.add_argument(
         '--name', required=True, help='name of host tool in metadata.')
+    parser.add_argument(
+        '--include',
+        required=False,
+        nargs='*',
+        help='file to include in the output. Can be specified multiple times.')
 
     args = parser.parse_args()
 
@@ -36,15 +41,24 @@ def main():
     dest_files = [binary_path]
     with open(args.output, 'w') as f:
         print(f'{binary_path}={args.binary}', file=f)
-        for path, dirs, files in os.walk(os.path.abspath(directory)):
-            for filename in files:
-                source_filepath = os.path.join(path, filename)
-                filepath = os.path.join(
-                    args.dest_root, os.path.relpath(source_filepath, directory))
-                sourcepath = os.path.relpath(source_filepath)
+        if args.include:
+            for filename in args.include:
+                filepath = os.path.join(args.dest_root, filename)
+                sourcepath = os.path.join(directory, filename)
                 if binary_path != filepath:
                     dest_files += [filepath]
                     print(f'{filepath}={sourcepath}', file=f)
+        else:
+            for path, _dirs, files in os.walk(os.path.abspath(directory)):
+                for filename in files:
+                    source_filepath = os.path.join(path, filename)
+                    filepath = os.path.join(
+                        args.dest_root,
+                        os.path.relpath(source_filepath, directory))
+                    sourcepath = os.path.relpath(source_filepath)
+                    if binary_path != filepath:
+                        dest_files += [filepath]
+                        print(f'{filepath}={sourcepath}', file=f)
 
     metadata = {
         'files': dest_files,

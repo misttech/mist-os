@@ -18,9 +18,11 @@ declare_args() {
 #   default_binary - path to the binary that is run to run this tool.
 #       This path ends up being the first element in the files of the SDK
 #       atom metadata.
-#   prebuild_path - path to the directory to copy for this prebuilt tool.
+#   prebuilt_path - path to the directory to copy for this prebuilt tool.
 #       This should be an ancestor or the same as the directory of the
-#       default_binary.
+#       default_binary.'
+#   prebuilt_files - list of files to include in the SDK. If this is not
+#       specified, all files in the prebuild_path are included.
 #   sdk_dest_path - relative path for the destination of the companion tool
 #       in the SDK structure. A typical value is
 #       `tools/${current_cpu}/${target_name}`.
@@ -33,13 +35,25 @@ template("emu_companion") {
   assert(defined(invoker.sdk_dest_path),
          "Must define the destination path relative to SDK root")
 
+  source_files = [ invoker.default_binary ]
+  if (defined(invoker.prebuilt_files)) {
+    assert(
+        invoker.prebuilt_files != [],
+        "prebuild_files is optional, meaning all file in prebuilt_path, or if specified, a non-empty list of files")
+    included_files = []
+    foreach(f, invoker.prebuilt_files) {
+      included_files += [ rebase_path(f, invoker.prebuilt_path) ]
+    }
+    source_files += invoker.prebuilt_files
+  }
+
   create_data_action_name = "${target_name}_create_companion_data"
 
   action(create_data_action_name) {
     forward_variables_from(invoker, [ "testonly" ])
     visibility = [ ":*" ]
     script = "//src/developer/ffx/plugins/emulator/create_companion_data.py"
-    sources = [ invoker.default_binary ]
+    sources = source_files
     inputs = [ invoker.prebuilt_path ]
     outputs = [
       "$target_gen_dir/${target_name}.txt",
@@ -59,6 +73,10 @@ template("emu_companion") {
       "--meta_out",
       rebase_path(outputs[1], root_build_dir),
     ]
+    if (defined(included_files)) {
+      args += [ "--include" ]
+      args += included_files
+    }
   }
 
   sdk_atom(target_name) {

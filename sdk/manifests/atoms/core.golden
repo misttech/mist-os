@@ -218,6 +218,7 @@
 //src/developer/ffx/plugins/assembly:sdk
 //src/developer/ffx/plugins/emulator:aemu_internal
 //src/developer/ffx/plugins/emulator:qemu_internal
+//src/developer/ffx/plugins/emulator:uefi_internal
 //src/developer/ffx/plugins/package:sdk
 //src/developer/ffx/plugins/product:sdk
 //src/developer/ffx/plugins/scrutiny:sdk
