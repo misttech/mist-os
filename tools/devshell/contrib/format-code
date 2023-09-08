@@ -364,7 +364,7 @@ for file in "${FILES[@]}"; do
 done
 
 if [[ ${#shac_files[@]} -gt 0 ]]; then
-  print-and-execute "${PREBUILT_SHAC}" fmt --quiet "${shac_files[@]}"
+  print-and-execute "${PREBUILT_SHAC}" fmt --root "$FUCHSIA_DIR" --quiet "${shac_files[@]}"
 fi
 
 [[ -n "$PARALLEL" ]] && wait
