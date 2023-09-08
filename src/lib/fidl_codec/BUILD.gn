@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
-import("//build/sdk/sdk.gni")
 import("//build/test.gni")
 import("//build/testing/environments.gni")
 import("//third_party/protobuf/proto_library.gni")

@@ -217,17 +217,18 @@ def main():
     #
     #   $BUILD_DIR/fuchsia-idk-build-$CPU/
     #
-    # In each build, generating an exported sdk() target populates a directory
-    # like:
+    # In each build, generating an exported sdk_collection() target populates a
+    # directory like:
     #
     #   $BUILD_DIR/fuchsia-idk-build-$CPU/sdk/exported/<name>/
     #
-    # With a tree of symlinks to build artifacts that are in other parts
-    # of $BUILD_DIR/fuchsia-idk-sub-build-$CPU
+    # With a tree of symlinks to build artifacts that are in other parts of
+    # $BUILD_DIR/fuchsia-idk-sub-build-$CPU
     #
     # This script will merge all these into $OUTPUT_DIR.
     #
-    # Parse --sdk-targets GN labels and record related information for each entry.
+    # Parse --sdk-targets GN labels and record related information for each
+    # entry.
     def sdk_label_partition(target_label: str) -> Tuple[str, str]:
         """Split an SDK GN label into a (dir, name) pair."""
         # Expected format is //<dir>:<name>

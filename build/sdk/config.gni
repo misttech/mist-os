@@ -3,10 +3,9 @@
 # found in the LICENSE file.
 
 declare_args() {
-  # Whether to build archives for sdk() targets by default.
+  # Whether to build archives for certain sdk_collection() targets by default.
   # This is deprecated, archives should instead be created through
-  # generate_final_idk(). Moreover, the sdk() template is deprecated
-  # and its use replaced with sdk_collection() instead.
+  # generate_final_idk().
   build_sdk_archives = false
 
   # Whether to only warn when an SDK has been modified.

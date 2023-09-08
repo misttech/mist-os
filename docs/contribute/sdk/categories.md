@@ -97,7 +97,7 @@ when and how FIDL APIs change. The SDK category mechanism determines the
 
 [^1]: Currently, the set of partners is not public. As the project scales, we
       will likely need to revisit our approach to partnerships.
-      
+
 [fidl-versioning]: /docs/reference/fidl/language/versioning.md
 
 ## Categories
@@ -122,13 +122,13 @@ The `experimental` category does not make much sense because we have better
 mechanisms (e.g., GN `visibility`) to control use of code within the Fuchsia
 platform source tree. Perhaps this category will be removed soon.
 
-Each [`sdk`][gn-sdk] GN target also has a `category` parameter that defines the
-set of consumers to whom that SDK ships. The build system enforces that
-everything included in an SDK target has an SDK category that is acceptable for
-that audience. For example, an SDK for `partner` can include SDK Atoms
-authorized for `public` (because `public` comes after `partner` in this list
-above) but cannot include SDK Atoms authorized only for `internal` use (because
-`internal` comes before `partner` in this list).
+Each [`sdk_collection`][gn-sdk] GN target also has a `category` parameter that
+defines the set of consumers to whom that SDK ships. The build system enforces
+that everything included in an SDK target has an SDK category that is
+acceptable for that audience. For example, an SDK for `partner` can include SDK
+Atoms authorized for `public` (because `public` comes after `partner` in this
+list above) but cannot include SDK Atoms authorized only for `internal` use
+(because `internal` comes before `partner` in this list).
 
 The `partner_internal` SDK category is used to give some APIs the same
 compatibility constraints as `partner` APIs without exposing them to the SDK
@@ -140,7 +140,7 @@ documentation about that intent and is a hook for code reviewers to consider
 changes to that value carefully.
 
 [gn-sdk-atom]: /build/sdk/sdk_atom.gni
-[gn-sdk]: /build/sdk/sdk.gni
+[gn-sdk]: /build/sdk/sdk_collection.gni
 
 
 ## Change history

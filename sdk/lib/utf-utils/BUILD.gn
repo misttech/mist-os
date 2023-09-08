@@ -6,7 +6,6 @@ import("//build/components.gni")
 import("//build/cpp/cpp_fuzzer.gni")
 import("//build/cpp/sdk_source_set.gni")
 import("//build/fuzz.gni")
-import("//build/sdk/sdk.gni")
 import("//build/test.gni")
 
 sdk_source_set("utf-utils") {
