@@ -6,6 +6,7 @@
 
 #include <lib/arch/x86/descriptor.h>
 #include <lib/arch/x86/system.h>
+#include <zircon/compiler.h>
 
 #include <array>
 
@@ -34,15 +35,7 @@ constexpr auto MakePhys32Gdt() {
 
 }  // namespace
 
-#if __cplusplus > 201703L
-#define CONSTINIT constinit
-#elif defined(__clang__)
-#define CONSTINIT [[clang::require_constant_initialization]]
-#else
-#define CONSTINIT  // Cross fingers.
-#endif
-
-extern "C" CONSTINIT const auto gPhys32Gdt = MakePhys32Gdt();
+extern "C" __CONSTINIT const auto gPhys32Gdt = MakePhys32Gdt();
 
 #ifdef GENERATE
 #include <hwreg/asm.h>

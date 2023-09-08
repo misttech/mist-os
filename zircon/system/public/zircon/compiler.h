@@ -368,6 +368,16 @@
 #endif
 #endif
 
+#if defined(__cpp_constinit) && __cpp_constinit >= 201907L
+#define __CONSTINIT constinit
+#elif defined(__clang__)
+#define __CONSTINIT [[clang::require_constant_initialization]]
+#elif defined(__GNUC__) && __GNUC__ >= 9
+#define __CONSTINIT __constinit
+#else
+#define __CONSTINIT
+#endif
+
 #endif  // !defined(__ASSEMBLER__)
 
 #endif  // ZIRCON_COMPILER_H_

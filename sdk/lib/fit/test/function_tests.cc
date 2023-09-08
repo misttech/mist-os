@@ -4,6 +4,7 @@
 
 #include <lib/fit/function.h>
 #include <lib/stdcompat/bit.h>
+#include <zircon/compiler.h>
 
 #include <algorithm>
 
@@ -874,18 +875,8 @@ TEST(FunctionTests, callback_once) {
 #endif
 }
 
-#if defined(__cpp_constinit)
-#define CONSTINIT constinit
-#elif defined(__clang__)
-#define CONSTINIT [[clang::require_constant_initialization]]
-#else
-#define CONSTINIT
-#endif  // __cpp_constinit
-
-CONSTINIT const fit::function<void()> kDefaultConstructed;
-CONSTINIT const fit::function<void()> kNullptrConstructed(nullptr);
-
-#undef CONSTINIT
+__CONSTINIT const fit::function<void()> kDefaultConstructed;
+__CONSTINIT const fit::function<void()> kNullptrConstructed(nullptr);
 
 TEST(FunctionTests, null_constructors_are_constexpr) {
   EXPECT_EQ(kDefaultConstructed, nullptr);
