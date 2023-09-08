@@ -5,6 +5,7 @@
 // WARNING: THIS FILE IS MACHINE GENERATED. DO NOT EDIT.
 // Generated from the banjo.examples.protocolvector banjo file
 
+#![cfg_attr(rustfmt, rustfmt_skip)]
 #![allow(unused_imports, non_camel_case_types)]
 
 use fuchsia_zircon_types as zircon_types;

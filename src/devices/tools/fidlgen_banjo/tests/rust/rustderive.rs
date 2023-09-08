@@ -5,6 +5,7 @@
 // WARNING: THIS FILE IS MACHINE GENERATED. DO NOT EDIT.
 // Generated from the banjo.examples.rustderive banjo file
 
+#![cfg_attr(rustfmt, rustfmt_skip)]
 #![allow(unused_imports, non_camel_case_types)]
 
 
