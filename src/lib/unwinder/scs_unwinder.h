@@ -5,6 +5,7 @@
 #ifndef SRC_LIB_UNWINDER_SCS_UNWINDER_H_
 #define SRC_LIB_UNWINDER_SCS_UNWINDER_H_
 
+#include "src/lib/unwinder/cfi_unwinder.h"
 #include "src/lib/unwinder/memory.h"
 #include "src/lib/unwinder/registers.h"
 
@@ -19,7 +20,13 @@ namespace unwinder {
 //     SCS, and the unwinder has no way to detect; those frames will be dropped silently.
 class ShadowCallStackUnwinder {
  public:
+  // We need |CfiUnwinder::IsValidPC|.
+  explicit ShadowCallStackUnwinder(CfiUnwinder* cfi_unwinder) : cfi_unwinder_(cfi_unwinder) {}
+
   Error Step(Memory* scs, const Registers& current, Registers& next);
+
+ private:
+  CfiUnwinder* cfi_unwinder_;
 };
 
 }  // namespace unwinder

@@ -110,7 +110,7 @@ std::vector<Frame> Unwinder::Unwind(Memory* stack, const Registers& registers, s
 void Unwinder::Step(Memory* stack, Frame& current, Frame& next) {
   FramePointerUnwinder fp_unwinder(&cfi_unwinder_);
   PltUnwinder plt_unwinder(&cfi_unwinder_);
-  ShadowCallStackUnwinder scs_unwinder;
+  ShadowCallStackUnwinder scs_unwinder(&cfi_unwinder_);
 
   bool success = false;
   std::string err_msg;

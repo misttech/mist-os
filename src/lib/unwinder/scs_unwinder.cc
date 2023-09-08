@@ -15,7 +15,7 @@ Error ShadowCallStackUnwinder::Step(Memory* scs, const Registers& current, Regis
     return err;
   }
   if (!x18) {
-    return Error("No shadow call stack");
+    return Error("x18 is not available");
   }
 
   // The shadow call stack is pushed/popped via
@@ -31,10 +31,15 @@ Error ShadowCallStackUnwinder::Step(Memory* scs, const Registers& current, Regis
   }
 
   // A zero ra indicates the beginning of the shadow call stack.
-  if (ra) {
-    next.SetPC(ra);
-    next.Set(RegisterID::kArm64_x18, x18 - 8);
+  if (!ra) {
+    return Success();
   }
+  if (!cfi_unwinder_->IsValidPC(ra)) {
+    return Error("Invalid shadow call stack");
+  }
+
+  next.SetPC(ra);
+  next.Set(RegisterID::kArm64_x18, x18 - 8);
   return Success();
 }
 
