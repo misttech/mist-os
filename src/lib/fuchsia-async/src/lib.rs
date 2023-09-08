@@ -26,6 +26,8 @@
 //! ```
 
 #![warn(missing_docs)]
+#![deny(clippy::await_holding_lock)]
+#![deny(clippy::await_holding_refcell_ref)]
 
 mod runtime;
 pub use self::runtime::*;

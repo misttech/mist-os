@@ -554,31 +554,37 @@ impl Channel {
             return None;
         };
 
-        let mut object = object.lock().unwrap();
+        // this seemingly redundant block lets us avoid holding the object lock
+        // across the receiver await, potentially causing a deadlock.
+        let receiver = {
+            let mut object = object.lock().unwrap();
 
-        if !object.is_open() {
-            return None;
-        }
+            if !object.is_open() {
+                return None;
+            }
 
-        let KObjectEntry::Channel(object) = &mut *object else {
-            unreachable!("Channel handle wasn't a channel in the handle table!");
+            let KObjectEntry::Channel(object) = &mut *object else {
+                unreachable!("Channel handle wasn't a channel in the handle table!");
+            };
+
+            match &mut object.proxy_protocol_state {
+                ChannelProxyProtocolState::Set(state) => {
+                    return Some(*state);
+                }
+                ChannelProxyProtocolState::Unset => {
+                    let (sender, receiver) = oneshot::channel();
+                    object.proxy_protocol_state = ChannelProxyProtocolState::Waiting(vec![sender]);
+                    receiver
+                }
+                ChannelProxyProtocolState::Waiting(waiters) => {
+                    let (sender, receiver) = oneshot::channel();
+                    waiters.push(sender);
+                    receiver
+                }
+            }
         };
 
-        match &mut object.proxy_protocol_state {
-            ChannelProxyProtocolState::Set(state) => {
-                return Some(*state);
-            }
-            ChannelProxyProtocolState::Unset => {
-                let (sender, receiver) = oneshot::channel();
-                object.proxy_protocol_state = ChannelProxyProtocolState::Waiting(vec![sender]);
-                receiver.await.ok()
-            }
-            ChannelProxyProtocolState::Waiting(waiters) => {
-                let (sender, receiver) = oneshot::channel();
-                waiters.push(sender);
-                receiver.await.ok()
-            }
-        }
+        receiver.await.ok()
     }
 
     /// Read a message from a channel.
