@@ -22,11 +22,11 @@ TEST(ModuleTest, Identifier) {
     pc_table1.emplace_back(0x1000 + i * 0x10, (i % 8) == 0);
   }
   FakeRealmFuzzerModule module1(std::move(pc_table1));
-  // The fnv1a hash of `pc_table1` is 0x942bcbf83d06e325.
-  // The djb2a hash of `pc_table1` is 0x9e6b80d9266e0505.
+  // The fnv1a hash of `pc_table1` is 0x878da8387ebd1694.
+  // The djb2a hash of `pc_table1` is 0xdbb7e009aa4e7634.
   // The base-64 value can be obtained using:
-  //    `echo 942bcbf83d06e3259e6b80d9266e0505 | xxd -r -p | xxd -e -g8 | xxd -r | base64`
-  std::string expected = "JeMGPfjLK5QFBW4m2YBrng==";
+  //    `echo 878da8387ebd1694dbb7e009aa4e7634 | xxd -r -p | xxd -e -g8 | xxd -r | base64`
+  std::string expected = "lBa9fjiojYc0dk6qCeC32w==";
   EXPECT_EQ(module1.id(), expected);
 
   // Shifting all the PCs by a random basis does not affect the source ID, i.e., the ID is

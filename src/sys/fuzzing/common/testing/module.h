@@ -22,7 +22,7 @@ using Coverage = std::vector<std::pair<size_t, uint8_t>>;
 // Wraps a |Module| and automatically provides fake counters and PC tables based on a seed value.
 class FakeModule {
  public:
-  static constexpr size_t kNumPCs = 256;
+  static constexpr size_t kNumPCs = 257;
 
   // Make a fake module with randomized PCs.
   explicit FakeModule(uint32_t seed = 1);

@@ -31,7 +31,6 @@ class ModuleProxy final {
   ~ModuleProxy() = default;
 
   const std::string& id() const { return id_; }
-  size_t size() const { return num_u64s_ * sizeof(uint64_t); }
 
   // De/registers the shared memory as a source of counter values. This object does not take
   // ownership of the memory; it must remain valid between calls to |Add| and |Remove|.
@@ -59,7 +58,8 @@ class ModuleProxy final {
   size_t MeasureImpl(bool accumulate);
 
   const std::string id_;
-  const size_t num_u64s_;
+  const size_t features_len_;
+  const size_t extra_bytes_;
 
   std::vector<uint64_t*> counters_;
 
