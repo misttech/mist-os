@@ -71,7 +71,7 @@ impl api::Scrutiny for Scrutiny {
                     scrutiny_data.product_bundle_blob_set.blob(Box::new(Hash::from(url.hash())))?;
                 let package: Box<dyn api::Package> = Box::new(Package::new(
                     Some(scrutiny_data.product_bundle.data_source().clone()),
-                    api::PackageResolverUrl::Url,
+                    api::PackageResolverUrl::FuchsiaPkgUrl,
                     meta_far_blob,
                     scrutiny_data.product_bundle_blob_set.clone(),
                 )?);

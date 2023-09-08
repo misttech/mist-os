@@ -430,7 +430,7 @@ mod tests {
         // Construct package.
         let package = Package::new(
             Some(blob_set_data_source),
-            api::PackageResolverUrl::Url,
+            api::PackageResolverUrl::FuchsiaPkgUrl,
             meta_far_blob,
             Box::new(blob_set),
         )
@@ -540,7 +540,7 @@ mod tests {
             .expect("bad far blob");
         match Package::new(
             None,
-            api::PackageResolverUrl::Url,
+            api::PackageResolverUrl::FuchsiaPkgUrl,
             Box::new(bad_far_blob),
             Box::new(VerifiedMemoryBlobSet::new(iter::empty(), iter::empty::<&[u8]>())),
         ) {
@@ -577,7 +577,7 @@ mod tests {
         // Attempt to construct package; expect FarError due to missing meta/package.
         match Package::new(
             None,
-            api::PackageResolverUrl::Url,
+            api::PackageResolverUrl::FuchsiaPkgUrl,
             Box::new(far_blob),
             Box::new(blob_set),
         ) {
@@ -615,7 +615,7 @@ mod tests {
         // Attempt to construct package; expect FarError due to missing meta/package.
         match Package::new(
             None,
-            api::PackageResolverUrl::Url,
+            api::PackageResolverUrl::FuchsiaPkgUrl,
             Box::new(far_blob),
             Box::new(blob_set),
         ) {
@@ -677,7 +677,7 @@ mod tests {
         // should fail.
         match Package::new(
             None,
-            api::PackageResolverUrl::Url,
+            api::PackageResolverUrl::FuchsiaPkgUrl,
             Box::new(far_blob),
             Box::new(blob_set),
         ) {

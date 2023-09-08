@@ -4,6 +4,10 @@
 
 use super::blob::BlobDirectoryError;
 use super::blob::BlobOpenError;
+use super::bootfs::AdditionalBootConfigurationError;
+use super::bootfs::BootfsPackageError;
+use super::bootfs::BootfsPackageIndexError;
+use super::bootfs::ComponentManagerConfigurationError;
 use super::package::Error as PackageError;
 use dyn_clone::clone_trait_object;
 use dyn_clone::DynClone;
@@ -134,12 +138,6 @@ pub trait System: DynClone {
 
     /// Accessor for the system's Verified Boot Metadata (vbmeta).
     fn vb_meta(&self) -> Box<dyn VbMeta>;
-
-    /// Accessor for the system's additional boot configuration file.
-    fn additional_boot_configuration(&self) -> Box<dyn AdditionalBootConfiguration>;
-
-    /// Accessor for the system's component manager configuration.
-    fn component_manager_configuration(&self) -> Box<dyn ComponentManagerConfiguration>;
 }
 
 clone_trait_object!(System);
@@ -161,9 +159,8 @@ pub enum SystemVariant {
 /// Model of the system's Zircon Boot Image (ZBI) used for Zircon kernel to userspace bootstrapping
 /// (userboot). See https://fuchsia.dev/fuchsia-src/concepts/process/userboot for details.
 pub trait Zbi: DynClone {
-    /// Iterate over (path, contents) pairs of files in this ZBI's bootfs. See
-    /// https://fuchsia.dev/fuchsia-src/concepts/process/userboot#bootfs for details.
-    fn bootfs(&self) -> Result<Box<dyn Iterator<Item = (Box<dyn Path>, Box<dyn Blob>)>>, ZbiError>;
+    /// Accessor for bootfs.
+    fn bootfs(&self) -> Result<Box<dyn Bootfs>, ZbiError>;
 }
 
 clone_trait_object!(Zbi);
@@ -172,8 +169,55 @@ clone_trait_object!(Zbi);
 pub enum ZbiError {
     #[error("failed to hash blobfs blob at bootfs path {bootfs_path:?}: {error}")]
     Hash { bootfs_path: Box<dyn Path>, error: std::io::Error },
+    #[error("expected to find exactly 1 bootfs section in zbi, but found {num_sections}")]
+    BootfsSections { num_sections: usize },
     #[error("failed to parse bootfs image in zbi at path {path:?}: {error}")]
     ParseBootfs { path: Box<dyn Path>, error: anyhow::Error },
+}
+
+/// Model of the read-only boot filesystem, containing files needed in early boot.
+/// The filesystem is a list of filenames together with, for each filename, the size and
+/// offset of the file.
+/// See https://fuchsia.dev/fuchsia-src/concepts/process/userboot#bootfs for details.
+pub trait Bootfs: DynClone {
+    /// Iterator over all contents of bootfs by path, with each file delivered as a `Blob`
+    /// implementation.
+    ///
+    /// Some files are serialized instances of particular data types; for example,
+    /// configuration files or packages. This iterator provides those files in raw format
+    /// together with all other contents of bootfs, but other `Bootfs` trait methods may
+    /// provide an object-oriented view of the same files (after parsing and validating
+    /// the raw data). For example, the component manager configuration file is provided
+    /// in raw form via `content_blobs()`, and as an implementation of the
+    /// `ComponentManagerConfiguration` API via `compoennt_manager_configuration()`.
+    fn content_blobs(&self) -> Box<dyn Iterator<Item = (Box<dyn Path>, Box<dyn Blob>)>>;
+
+    /// Accessor for the system's additional boot configuration file.
+    fn additional_boot_configuration(
+        &self,
+    ) -> Result<Box<dyn AdditionalBootConfiguration>, BootfsError>;
+
+    /// Accessor for the system's component manager configuration.
+    fn component_manager_configuration(
+        &self,
+    ) -> Result<Box<dyn ComponentManagerConfiguration>, BootfsError>;
+
+    /// Iterate over all packages in bootfs.
+    fn packages(&self) -> Result<Box<dyn Iterator<Item = Box<dyn Package>>>, BootfsError>;
+}
+
+clone_trait_object!(Bootfs);
+
+#[derive(Debug, Error)]
+pub enum BootfsError {
+    #[error("failed to instantiate additional boot configuration: {0}")]
+    AdditionalBootConfiguration(#[from] AdditionalBootConfigurationError),
+    #[error("failed to instantiate component manager configuration: {0}")]
+    ComponentManagerConfiguration(#[from] ComponentManagerConfigurationError),
+    #[error("failed to read bootfs package index: {0}")]
+    PackageIndex(#[from] BootfsPackageIndexError),
+    #[error("failed to instantiate bootfs package: {0}")]
+    Packages(#[from] BootfsPackageError),
 }
 
 /// Kernel command-line flags. See https://fuchsia.dev/fuchsia-src/reference/kernel/kernel_cmdline
@@ -192,10 +236,14 @@ pub trait KernelFlags {
 /// Model of the Verified Boot Metadata (vbmeta).
 pub trait VbMeta {}
 
-/// Device manager configuration file key/value pairs. This configuration file is passed to the
-/// device manager during early boot, and is combined with configuration set in [`KernelFlags`] and
+/// Additional boot configuration file key/value pairs. This configuration file is passed to the
+/// component manager, and is combined with configuration set in [`KernelFlags`] and
 /// [`VbMeta`] to determine various configuration parameters for booting the Fuchsia system on the
 /// device.
+///
+/// See https://fuchsia.dev/fuchsia-src/reference/kernel/kernel_cmdline for more details about
+/// how the configuration is used, and see https://fuchsia.dev/fuchsia-src/gen/boot-options for
+/// the set of valid options.
 pub trait AdditionalBootConfiguration {
     /// Get the value associated with `key`, or `None` if the key does not exist in in the
     /// underlying device configuration file.
@@ -217,11 +265,23 @@ pub trait ComponentManager {
     fn builtin_capabilities(&self) -> Box<dyn Iterator<Item = Box<dyn ComponentCapability>>>;
 }
 
-// TODO(fxbug.dev/112121): What should this API look like?
+// TODO(fxbug.dev/112121): What should this API look like? This is just a starting point to
+// get something plumbed through from the data source.
 
-/// Model of the component manager configuration. For details about the role of component manager
+/// Model of the component manager configuration. This configuration file controls various
+/// aspects of component manager's execution, including capability routing policy and
+/// logging behavior.
+///
+/// For details about the role of component manager
 /// in the system, see https://fuchsia.dev/fuchsia-src/concepts/components/v2/component_manager.
-pub trait ComponentManagerConfiguration {}
+///
+/// See //sdk/fidl/fuchsia.component.internal/config.fidl for the (internal) FIDL format that
+/// should back implementations of this trait.
+pub trait ComponentManagerConfiguration {
+    /// Whether Component Manager will run in debug mode.
+    /// See //sdk/fidl/fuchsia.component.internal/config.fidl for details.
+    fn debug(&self) -> bool;
+}
 
 /// Model of a data source that a [`Scrutiny`] instance is using as a source of truth about the
 /// underlying system. This type is used for interrogating where a Fuchsia abstraction such as a
@@ -606,10 +666,14 @@ pub trait PackageResolver {
 }
 
 /// The variety of URLs that [`PackageResolver`] can resolve to package hashes.
+// TODO(fxbug.dev/112121): Define varieties of URL that PackageResolver supports, choose types
+// for those URLs, and have each of these variants wrap a representation of a URL.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PackageResolverUrl {
-    // TODO(fxbug.dev/112121): Define varieties of URL that PackageResolver supports.
-    Url,
+    /// A URL identifying a package in bootfs.
+    FuchsiaBootUrl,
+    /// A URL identifying a package in a repository.
+    FuchsiaPkgUrl,
 }
 
 /// Model for a Fuchsia component. Note that this model is of a component as described by a

@@ -14,6 +14,7 @@ if (is_host) {
     sources = [
       "src/api.rs",
       "src/blob.rs",
+      "src/bootfs.rs",
       "src/data_source.rs",
       "src/hash.rs",
       "src/lib.rs",
@@ -27,7 +28,10 @@ if (is_host) {
 
     deps = [
       "//build/sdk/meta:rust",
+      "//sdk/fidl/fuchsia.component.internal:fuchsia.component.internal_rust",
+      "//src/lib/fidl/rust/fidl",
       "//src/lib/fuchsia-url",
+      "//src/sys/lib/routing",
       "//src/sys/pkg/lib/far/rust:fuchsia-archive",
       "//src/sys/pkg/lib/fuchsia-hash",
       "//src/sys/pkg/lib/fuchsia-merkle",

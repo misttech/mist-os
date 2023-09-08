@@ -95,14 +95,6 @@ impl api::System for System {
     fn vb_meta(&self) -> Box<dyn api::VbMeta> {
         todo!()
     }
-
-    fn additional_boot_configuration(&self) -> Box<dyn api::AdditionalBootConfiguration> {
-        todo!()
-    }
-
-    fn component_manager_configuration(&self) -> Box<dyn api::ComponentManagerConfiguration> {
-        todo!()
-    }
 }
 
 struct SystemData {

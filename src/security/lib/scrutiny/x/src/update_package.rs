@@ -59,7 +59,7 @@ impl UpdatePackage {
 
         let package = Package::new(
             parent_data_source,
-            api::PackageResolverUrl::Url,
+            api::PackageResolverUrl::FuchsiaPkgUrl,
             update_package_blob,
             blob_set,
         )?;

@@ -68,7 +68,8 @@ fn run_smoke_test(args: Args) -> Result<()> {
     output_blobs(scrutiny.as_ref());
     output_packages(scrutiny.as_ref());
 
-    output_zbi_data(scrutiny.system().zbi().as_ref());
+    let bootfs = scrutiny.system().zbi().bootfs().expect("bootfs");
+    output_bootfs_data(bootfs.as_ref());
 
     if let (Some(depfile), Some(stamp)) = (depfile, stamp) {
         let depfile = File::create(depfile).context("creating depfile")?;
@@ -128,10 +129,46 @@ fn output_package(package: &dyn scrutiny::Package) {
     }
 }
 
-fn output_zbi_data(zbi: &dyn scrutiny::Zbi) {
-    for (path, blob) in zbi.bootfs().expect("bootfs") {
+fn output_bootfs_data(bootfs: &dyn scrutiny::Bootfs) {
+    for (path, blob) in bootfs.content_blobs() {
         debug!("Bootfs file: {:?} {:?}", path.as_ref(), blob.hash());
     }
+
+    for package in bootfs.packages().expect("bootfs packages") {
+        output_bootfs_package(package.as_ref());
+    }
+
+    let additional_boot_configuration =
+        bootfs.additional_boot_configuration().expect("additional boot configuration");
+    output_additional_boot_configuration(additional_boot_configuration.as_ref());
+
+    let component_manager_configuration =
+        bootfs.component_manager_configuration().expect("component manager configuration");
+    output_component_manager_configuration(component_manager_configuration.as_ref());
+}
+
+fn output_bootfs_package(package: &dyn scrutiny::Package) {
+    debug!("Bootfs package: {:?}", package.hash());
+    for (path, meta_blob) in package.meta_blobs() {
+        debug!("  Meta blob at {:?}: {:?}", path.as_ref(), meta_blob.hash());
+    }
+    for (path, content_blob) in package.content_blobs() {
+        debug!("  Content blob at {:?}: {:?}", path.as_ref(), content_blob.hash());
+    }
+}
+
+fn output_additional_boot_configuration(configuration: &dyn scrutiny::AdditionalBootConfiguration) {
+    debug!("Additional boot configuration:");
+    for (key, value) in configuration.iter() {
+        debug!("  {}: {}", key, value);
+    }
+}
+
+fn output_component_manager_configuration(
+    configuration: &dyn scrutiny::ComponentManagerConfiguration,
+) {
+    debug!("Component manager configuration:");
+    debug!("  Component manager in debug mode?: {}", configuration.debug());
 }
 
 #[tracing::instrument(level = "trace", skip_all)]
