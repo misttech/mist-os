@@ -1,8 +1,8 @@
 dists:
   - bionic
-  - bionic-backports
   - bionic-security
   - bionic-updates
+  - bionic-backports
 architectures:
   - amd64
   - arm64

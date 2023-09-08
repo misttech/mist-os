@@ -325,17 +325,15 @@ func downloadPackageList(config *Config, depends bool) ([]Lock, error) {
 	for len(queue) > 0 {
 		p := queue[0]
 		queue = queue[1:]
-		if lock, ok := locks[p.name]; ok {
-			if _, ok := lock[p.architecture]; ok {
-				continue
-			}
-		}
 		if ds, ok := descriptors[p.name]; ok {
 			if _, ok := locks[p.name]; !ok {
 				locks[p.name] = map[string]Lock{}
 			}
 			if d, ok := ds[p.architecture]; ok {
-				locks[p.name][p.architecture] = Lock{
+				if _, ok := locks[p.name][d.hash]; ok {
+					continue
+				}
+				locks[p.name][d.hash] = Lock{
 					Name:    d.name,
 					Version: d.version,
 					Url:     d.url,
@@ -360,18 +358,12 @@ func downloadPackageList(config *Config, depends bool) ([]Lock, error) {
 		return nil, errors.Join(errs...)
 	}
 
-	// Eliminate all duplicates.
-	hashes := map[string]Lock{}
-	for _, l := range locks {
-		for _, p := range l {
-			hashes[p.Hash] = p
-		}
-	}
-
 	// Flatten into a list.
 	var list []Lock
-	for _, p := range hashes {
-		list = append(list, p)
+	for _, l := range locks {
+		for _, p := range l {
+			list = append(list, p)
+		}
 	}
 
 	return list, nil

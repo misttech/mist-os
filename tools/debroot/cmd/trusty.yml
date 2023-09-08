@@ -1,8 +1,8 @@
 dists:
   - trusty
-  - trusty-backports
   - trusty-security
   - trusty-updates
+  - trusty-backports
 architectures:
   - amd64
   - arm64

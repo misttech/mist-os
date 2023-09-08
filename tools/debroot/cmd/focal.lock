@@ -1,5 +1,5 @@
-hash: 8cc806dbf34ae1b2849d0c8f18d94911abe3ecd449403cb053b5953b2535adc0
-updated: 2023-06-23T07:09:13.145479484Z
+hash: 759db5a44935cb1f0011a6976f90a5ed9a99f6b65c64e55f449cbdd42a92f94b
+updated: 2023-09-08T19:40:59.804345318Z
 packages:
 - package: libasound2
   version: 1.2.2-2.1ubuntu2.5
@@ -822,25 +822,25 @@ packages:
   url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libxxf86vm/libxxf86vm1_1.1.4-1build1_riscv64.deb
   hash: 9c9c57225d56889e24dfdfbbe1c466a22e53d1fae02bbd6f457effc43f282bac
 - package: linux-libc-dev
-  version: 5.4.0-152.169
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/l/linux/linux-libc-dev_5.4.0-152.169_amd64.deb
-  hash: 1ae91af8a52052dd2ee42aeead8727b54ae2f86e234a67d2fc1d4c9cf082de6a
+  version: 5.4.0-162.179
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/l/linux/linux-libc-dev_5.4.0-162.179_amd64.deb
+  hash: d1526a7a3d2b46ae06e8c1cb39c25f8209d2d53405a3c76d03cb8db132c68eaf
 - package: linux-libc-dev
-  version: 5.4.0-152.169
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/l/linux/linux-libc-dev_5.4.0-152.169_i386.deb
-  hash: d67094a1391df27317e7a0838a03b5da043fddb5b46cb8f7147134d7e55ed20b
+  version: 5.4.0-162.179
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/l/linux/linux-libc-dev_5.4.0-162.179_i386.deb
+  hash: 0920765155c8b3f076569ba683b0348ad10f227fbf26753f0e467839e2ee0b1f
 - package: linux-libc-dev
-  version: 5.4.0-152.169
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-libc-dev_5.4.0-152.169_arm64.deb
-  hash: 25ac93b43deea3e42a4b44bb0e3a8f014099519bda23a9636b3b6c14b25ed32d
+  version: 5.4.0-162.179
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-libc-dev_5.4.0-162.179_arm64.deb
+  hash: 473c8c31378a6d0b1af988d3355c73700f9fdd3dbbfd5affbc2945e8e5a47cf1
 - package: linux-libc-dev
-  version: 5.4.0-152.169
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-libc-dev_5.4.0-152.169_armhf.deb
-  hash: e9f4c4a7d3e573b4622e1ae9d67f107bdbf9e2634b74fa4c85972e904fef984f
+  version: 5.4.0-162.179
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-libc-dev_5.4.0-162.179_armhf.deb
+  hash: 91ed80fbdb950bcf67b3528c12dd613becee0f0d117d82b2cb85804a97b1b2d2
 - package: linux-libc-dev
-  version: 5.4.0-152.169
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-libc-dev_5.4.0-152.169_riscv64.deb
-  hash: 2df6b5e4d9d4c49b76c38551be3ef1b260d42ba1d5c6d8c4d30cccebcc6fb6d6
+  version: 5.4.0-162.179
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-libc-dev_5.4.0-162.179_riscv64.deb
+  hash: b9be14e2c2a5cdde86e6590830bd2701ac7317dc517da0973db9f64134bdfc7b
 - package: mesa-common-dev
   version: 21.2.6-0ubuntu0.1~20.04.2
   url: http://us.archive.ubuntu.com/ubuntu/pool/main/m/mesa/mesa-common-dev_21.2.6-0ubuntu0.1~20.04.2_amd64.deb
@@ -883,13 +883,13 @@ packages:
   hash: df8863856683375fb8631af100af6e2695e946731b1c32e5eca49005e2c22a49
 - package: x11proto-randr-dev
   version: 2019.2-1ubuntu1
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/x/xorgproto/x11proto-randr-dev_2019.2-1ubuntu1_all.deb
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/x/xorgproto/x11proto-randr-dev_2019.2-1ubuntu1_all.deb
   hash: b31f5ecc04c53d8d835ea11228d776e5d4e7c3c89c056581e213b9ab3da7bd4c
 - package: x11proto-render-dev
   version: 2:2019.2-1ubuntu1
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/x/xorgproto/x11proto-render-dev_2019.2-1ubuntu1_all.deb
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/x/xorgproto/x11proto-render-dev_2019.2-1ubuntu1_all.deb
   hash: cfaf2e81a90ba75ad9a38a74bb4bbb145424c4517a2814b2fe47d1d72d83302b
 - package: x11proto-xext-dev
   version: 2019.2-1ubuntu1
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/x/xorgproto/x11proto-xext-dev_2019.2-1ubuntu1_all.deb
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/x/xorgproto/x11proto-xext-dev_2019.2-1ubuntu1_all.deb
   hash: cacc37dc90541bc349160a378b1c48b27a1fe4251663565ef9cd96e7322335ea

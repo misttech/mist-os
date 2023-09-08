@@ -1,8 +1,8 @@
 dists:
   - jammy
-  - jammy-backports
   - jammy-security
   - jammy-updates
+  - jammy-backports
 architectures:
   - amd64
   - arm64

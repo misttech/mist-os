@@ -1,8 +1,8 @@
 dists:
   - focal
-  - focal-backports
   - focal-security
   - focal-updates
+  - focal-backports
 architectures:
   - amd64
   - arm64

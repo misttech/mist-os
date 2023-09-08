@@ -1,5 +1,5 @@
-hash: 33a84b8a929670bd562ac79da336988e3cf0751b9ec64f0ab1a34c17956c704c
-updated: 2023-06-23T07:15:20.001921808Z
+hash: 07b42005f1d849888244c14eece013edcf73ae4d50bc6f6c86d57fab0d2eb33d
+updated: 2023-09-08T19:39:15.080158484Z
 packages:
 - package: libasound2
   version: 1.1.0-0ubuntu1
@@ -703,5 +703,5 @@ packages:
   hash: 02080f5bb875bb1cd6e78a09e5b317ced150523596d4df47cc2767fc28fb5173
 - package: x11proto-xext-dev
   version: 7.3.0-1
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/x/x11proto-xext/x11proto-xext-dev_7.3.0-1_all.deb
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/x/x11proto-xext/x11proto-xext-dev_7.3.0-1_all.deb
   hash: 03d57b45dbf2bc58bcd99172c0fca7767bfca093204c30c9889d082af08ffbb7

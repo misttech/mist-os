@@ -1,8 +1,8 @@
 dists:
   - xenial
-  - xenial-backports
   - xenial-security
   - xenial-updates
+  - xenial-backports
 architectures:
   - amd64
   - arm64

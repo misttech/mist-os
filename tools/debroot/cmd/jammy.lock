@@ -1,5 +1,5 @@
-hash: 7c3776668cb557f7103e08e785ad6f85053afbb07e946a62dfef426cc31f8e9d
-updated: 2023-06-23T07:05:57.774543939Z
+hash: 275d74b095492443cb07f2a9b4717921dd5ca01df2d65d4708e38c6f15ff3197
+updated: 2023-09-08T19:43:28.495431784Z
 packages:
 - package: libasound2
   version: 1.2.6.1-1ubuntu1
@@ -102,45 +102,45 @@ packages:
   url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libg/libglvnd/libgl1_1.4.0-1_riscv64.deb
   hash: 3ea9be4e92c0a76f8a797f0cf41100b7e10ccb9faa7ea592cd63970f00758c5a
 - package: libgl1-mesa-dev
-  version: 22.2.5-0ubuntu0.1~22.04.3
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/m/mesa/libgl1-mesa-dev_22.2.5-0ubuntu0.1~22.04.3_amd64.deb
-  hash: a2fd60a1dbb76a003d6f5e972f5cb51956995cc61331e81cf1881f7550834535
+  version: 23.0.4-0ubuntu1~22.04.1
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/m/mesa/libgl1-mesa-dev_23.0.4-0ubuntu1~22.04.1_amd64.deb
+  hash: cff80cd120a44cc63a5c9444c4bfd2d975e8fb9203f0eff154d2e29b0105517d
 - package: libgl1-mesa-dev
-  version: 22.2.5-0ubuntu0.1~22.04.3
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/m/mesa/libgl1-mesa-dev_22.2.5-0ubuntu0.1~22.04.3_i386.deb
-  hash: bf8c3b5b6fe6612a1768fa142b5c294d96a8c71d5d5f30669895328531a614bc
+  version: 23.0.4-0ubuntu1~22.04.1
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/m/mesa/libgl1-mesa-dev_23.0.4-0ubuntu1~22.04.1_i386.deb
+  hash: c5de5c8356bfc1ae8cd92c4dd2aba217129e5105571b8ec9b3ab67707482c729
 - package: libgl1-mesa-dev
-  version: 22.2.5-0ubuntu0.1~22.04.3
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/m/mesa/libgl1-mesa-dev_22.2.5-0ubuntu0.1~22.04.3_arm64.deb
-  hash: 3f84a7f584d91a2fa0fa18a261f893b4b85b281f41efb61302a76702cbc105e5
+  version: 23.0.4-0ubuntu1~22.04.1
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/m/mesa/libgl1-mesa-dev_23.0.4-0ubuntu1~22.04.1_arm64.deb
+  hash: a934dca0dc1a3afc4ef290d9fd64d27a45e5d7027123556a1fdd43e799e02717
 - package: libgl1-mesa-dev
-  version: 22.2.5-0ubuntu0.1~22.04.3
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/m/mesa/libgl1-mesa-dev_22.2.5-0ubuntu0.1~22.04.3_armhf.deb
-  hash: 423ab77ef2233a50e4652c71ba992c0ae29638322d318510e3717aec460c9881
+  version: 23.0.4-0ubuntu1~22.04.1
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/m/mesa/libgl1-mesa-dev_23.0.4-0ubuntu1~22.04.1_armhf.deb
+  hash: ce432f858b389eb8ca33abfb50914b650ec4ae68eff4854d45da3e970da8c5cc
 - package: libgl1-mesa-dev
-  version: 22.2.5-0ubuntu0.1~22.04.3
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/m/mesa/libgl1-mesa-dev_22.2.5-0ubuntu0.1~22.04.3_riscv64.deb
-  hash: c38094912f23a84e2741972e8e889f23b0d1e8902d0344ec9bc70406c00a06a9
+  version: 23.0.4-0ubuntu1~22.04.1
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/m/mesa/libgl1-mesa-dev_23.0.4-0ubuntu1~22.04.1_riscv64.deb
+  hash: fb5c05d5be2b7dff02a81c4f87eb2fb9332010c5df71692272d8ef2f06440336
 - package: libglapi-mesa
-  version: 22.2.5-0ubuntu0.1~22.04.3
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/m/mesa/libglapi-mesa_22.2.5-0ubuntu0.1~22.04.3_amd64.deb
-  hash: 035914f234f8037329a551561019565c9187a90844e2c4155500615eaa231309
+  version: 23.0.4-0ubuntu1~22.04.1
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/m/mesa/libglapi-mesa_23.0.4-0ubuntu1~22.04.1_amd64.deb
+  hash: c62aafcd439764e398be1684f47b265a9b6e8e84bc455b912ffd844d27f01a01
 - package: libglapi-mesa
-  version: 22.2.5-0ubuntu0.1~22.04.3
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/m/mesa/libglapi-mesa_22.2.5-0ubuntu0.1~22.04.3_i386.deb
-  hash: a74caad97def10552cec172189f5b9c30df6607c6f0a6c11f9d732629390ebb7
+  version: 23.0.4-0ubuntu1~22.04.1
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/m/mesa/libglapi-mesa_23.0.4-0ubuntu1~22.04.1_i386.deb
+  hash: 0485f51e4362795c823936ff955bc46b47677df8d3554ef3cabf850eea25126e
 - package: libglapi-mesa
-  version: 22.2.5-0ubuntu0.1~22.04.3
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/m/mesa/libglapi-mesa_22.2.5-0ubuntu0.1~22.04.3_arm64.deb
-  hash: f646ff4e2e7ce83147824d8d9237d5b06c94c38d9b051988a8a7c8c5574b2e18
+  version: 23.0.4-0ubuntu1~22.04.1
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/m/mesa/libglapi-mesa_23.0.4-0ubuntu1~22.04.1_arm64.deb
+  hash: 6a603bbde0bfd13aa899a14015ca23d4248b7b3ba22d39361adf6ddc33bcc80c
 - package: libglapi-mesa
-  version: 22.2.5-0ubuntu0.1~22.04.3
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/m/mesa/libglapi-mesa_22.2.5-0ubuntu0.1~22.04.3_armhf.deb
-  hash: 974df8fa777a1d8b632d266a6542b870ed139927d0d5707113edc08ac9a74fd6
+  version: 23.0.4-0ubuntu1~22.04.1
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/m/mesa/libglapi-mesa_23.0.4-0ubuntu1~22.04.1_armhf.deb
+  hash: a0aee37d9bfe15b7cdaf3864ddb58a7cbcd363b135b0cc3fb7936c29c18cc2cb
 - package: libglapi-mesa
-  version: 22.2.5-0ubuntu0.1~22.04.3
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/m/mesa/libglapi-mesa_22.2.5-0ubuntu0.1~22.04.3_riscv64.deb
-  hash: 25009033185a022491f0b417c5ce0f5d50f6c8cf49cdf42328fdb95cce9b05ef
+  version: 23.0.4-0ubuntu1~22.04.1
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/m/mesa/libglapi-mesa_23.0.4-0ubuntu1~22.04.1_riscv64.deb
+  hash: 2c4371124fecddf82d631ba452de100cc382c090a8250ab758b1a61047f7646a
 - package: libglu1-mesa
   version: 9.0.2-1
   url: http://us.archive.ubuntu.com/ubuntu/pool/main/libg/libglu/libglu1-mesa_9.0.2-1_amd64.deb
@@ -182,45 +182,45 @@ packages:
   url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libg/libglu/libglu1-mesa-dev_9.0.2-1_riscv64.deb
   hash: 158859eb0f88148e1b6ee5971c88cbf2a173a7f6f9907cf5fda44a13d65f133a
 - package: libpython3.10
-  version: 3.10.6-1~22.04.2ubuntu1.1
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/p/python3.10/libpython3.10_3.10.6-1~22.04.2ubuntu1.1_amd64.deb
-  hash: 0536ac147c539924c824460f4def3d9f47625b9f04daaef0b87044096041dfbc
+  version: 3.10.12-1~22.04.2
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/p/python3.10/libpython3.10_3.10.12-1~22.04.2_amd64.deb
+  hash: acdefe2f01517c7bcc5951862e8d0fc6b3017aa4440e05434276b20fe7e09048
 - package: libpython3.10
-  version: 3.10.6-1~22.04.2ubuntu1.1
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/p/python3.10/libpython3.10_3.10.6-1~22.04.2ubuntu1.1_i386.deb
-  hash: 3ae160f6b42d49699b0849eea4b1489bd0123a332ecbfb16e17702dda352911f
+  version: 3.10.12-1~22.04.2
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/p/python3.10/libpython3.10_3.10.12-1~22.04.2_i386.deb
+  hash: 7e9e401b9226312d061960d8fc808a26b0c73fc620bd177431c034dfa34e52fe
 - package: libpython3.10
-  version: 3.10.6-1~22.04.2ubuntu1.1
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/p/python3.10/libpython3.10_3.10.6-1~22.04.2ubuntu1.1_arm64.deb
-  hash: 6e3e00fb4bb236659a912aa8419bdbb3544ca64c95879524de7c2c9ca6f6c12e
+  version: 3.10.12-1~22.04.2
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/p/python3.10/libpython3.10_3.10.12-1~22.04.2_arm64.deb
+  hash: 5a8f3d158371bcb47bfbce4813ed9bc6e30937dc4dbb6a33f6a786a707495245
 - package: libpython3.10
-  version: 3.10.6-1~22.04.2ubuntu1.1
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/p/python3.10/libpython3.10_3.10.6-1~22.04.2ubuntu1.1_armhf.deb
-  hash: cf3eac629cb805c6f3edc2729ad93349239c7022cef4103e5a72b2230656356b
+  version: 3.10.12-1~22.04.2
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/p/python3.10/libpython3.10_3.10.12-1~22.04.2_armhf.deb
+  hash: 8469c7aa42dce2c1a3ca7da2aa6db02348226586e35c11bddb412225f89b6966
 - package: libpython3.10
-  version: 3.10.6-1~22.04.2ubuntu1.1
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/p/python3.10/libpython3.10_3.10.6-1~22.04.2ubuntu1.1_riscv64.deb
-  hash: bc9f2ebe691823bd0df73c37e37ef7dfbfee56f737647567a2ec22c439356071
+  version: 3.10.12-1~22.04.2
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/p/python3.10/libpython3.10_3.10.12-1~22.04.2_riscv64.deb
+  hash: 677a8e2b42b4dc832e65d316f953264b5a9644672aa4054c9af6a8c1bed27412
 - package: libpython3.10-dev
-  version: 3.10.6-1~22.04.2ubuntu1.1
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/p/python3.10/libpython3.10-dev_3.10.6-1~22.04.2ubuntu1.1_amd64.deb
-  hash: 647d6566cc13ea31393842308d3b549609fd18e0a6ab4ae62474ef4e473e855d
+  version: 3.10.12-1~22.04.2
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/p/python3.10/libpython3.10-dev_3.10.12-1~22.04.2_amd64.deb
+  hash: d6f3180973f0225fc42735b1fe8bfcb3ff75eadba4b5698bae9c27a681b31967
 - package: libpython3.10-dev
-  version: 3.10.6-1~22.04.2ubuntu1.1
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/p/python3.10/libpython3.10-dev_3.10.6-1~22.04.2ubuntu1.1_i386.deb
-  hash: 15072f4047557c764c0ea9a67b792b86ad0266327bdf4389ab41edc7cb35664d
+  version: 3.10.12-1~22.04.2
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/p/python3.10/libpython3.10-dev_3.10.12-1~22.04.2_i386.deb
+  hash: d5a5ff76db1b5dd77678914b542de83eed0d7781fffe44bcec56b011a51e711d
 - package: libpython3.10-dev
-  version: 3.10.6-1~22.04.2ubuntu1.1
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/p/python3.10/libpython3.10-dev_3.10.6-1~22.04.2ubuntu1.1_arm64.deb
-  hash: ea79419a08164484b3a12da3519718e88417f32ce9216e29d72afb3c0a798396
+  version: 3.10.12-1~22.04.2
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/p/python3.10/libpython3.10-dev_3.10.12-1~22.04.2_arm64.deb
+  hash: cb7a831646e9b092e2990b4a22f13e08f6a9542c5f49115e343c0b3e0bf31d8d
 - package: libpython3.10-dev
-  version: 3.10.6-1~22.04.2ubuntu1.1
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/p/python3.10/libpython3.10-dev_3.10.6-1~22.04.2ubuntu1.1_armhf.deb
-  hash: fbcff5849a5a012d6cb009bce10418da8942971bfc08f3e6c7e231c4a12d2abb
+  version: 3.10.12-1~22.04.2
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/p/python3.10/libpython3.10-dev_3.10.12-1~22.04.2_armhf.deb
+  hash: 193186da04988f09463addaf35968f17e09d41762963f1e2a81ba604fef8462e
 - package: libpython3.10-dev
-  version: 3.10.6-1~22.04.2ubuntu1.1
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/p/python3.10/libpython3.10-dev_3.10.6-1~22.04.2ubuntu1.1_riscv64.deb
-  hash: b3406551689ce3dcf4b737f67bf63132b8dd16fbe2b82813327f8b0cea0ed8a7
+  version: 3.10.12-1~22.04.2
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/p/python3.10/libpython3.10-dev_3.10.12-1~22.04.2_riscv64.deb
+  hash: fd0e35ee5f60f42d0671fe55d4a58a801e76d044005c7d33e17237d0782a17df
 - package: libx11-6
   version: 2:1.7.5-1ubuntu0.2
   url: http://us.archive.ubuntu.com/ubuntu/pool/main/libx/libx11/libx11-6_1.7.5-1ubuntu0.2_amd64.deb
@@ -822,48 +822,48 @@ packages:
   url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libxxf86vm/libxxf86vm1_1.1.4-1build3_riscv64.deb
   hash: 1cdf3e624541360172e7f3c87a04c45578f388a2d42f8b6846f44764da530f6e
 - package: linux-libc-dev
-  version: 5.15.0-75.82
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/l/linux/linux-libc-dev_5.15.0-75.82_amd64.deb
-  hash: 244a3892ac09339a36c492e52b94f5d7c3c34d3b57a7c9e034f0ea109c7b2b07
+  version: 5.15.0-83.92
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/l/linux/linux-libc-dev_5.15.0-83.92_amd64.deb
+  hash: 48c1cdc832ae786bf686a3b63dca8f7f6e1eb989b01ced8a97ea0502471312b8
 - package: linux-libc-dev
-  version: 5.15.0-75.82
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/l/linux/linux-libc-dev_5.15.0-75.82_i386.deb
-  hash: 6a0c891feda1de3b54e446daa0137455caed6cc3409b933acf6d996f9a4f8a03
+  version: 5.15.0-83.92
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/l/linux/linux-libc-dev_5.15.0-83.92_i386.deb
+  hash: c612bdc8ae93602315b9e4024d2277a67f413eae700161b82da06b8e23e2a7cf
 - package: linux-libc-dev
-  version: 5.15.0-75.82
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-libc-dev_5.15.0-75.82_arm64.deb
-  hash: 965946e5ed9bfd174aad43955bc617e9e2adef5d250f4dd32201e0ac46d1177c
+  version: 5.15.0-83.92
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-libc-dev_5.15.0-83.92_arm64.deb
+  hash: a4acb81f4fca927eb245e5ae6498edb2c666ad05cac8cfd6527ba62ac45dbfac
 - package: linux-libc-dev
-  version: 5.15.0-75.82
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-libc-dev_5.15.0-75.82_armhf.deb
-  hash: eb704b2326561f8773a2f0dc9fc2ffc36989067face9edec9709fc09c6201c0f
+  version: 5.15.0-83.92
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-libc-dev_5.15.0-83.92_armhf.deb
+  hash: fe0e32e54d16636ec67c66c48c55403234d7e41cc6f94984cffd4bb8a9456a0b
 - package: linux-libc-dev
-  version: 5.15.0-75.82
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-libc-dev_5.15.0-75.82_riscv64.deb
-  hash: a029c97550d32a9681a49c378a7a20b1eb53a1fb1247c26f68a0d753b5856d4a
+  version: 5.15.0-83.92
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-libc-dev_5.15.0-83.92_riscv64.deb
+  hash: 384f1330a5d2f30598bf32d00d69f745b459278554da4f9b82d892669b3bfdcd
 - package: mesa-common-dev
-  version: 22.2.5-0ubuntu0.1~22.04.3
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/m/mesa/mesa-common-dev_22.2.5-0ubuntu0.1~22.04.3_amd64.deb
-  hash: 90c0e72667c4161390814d58e184a807a25049845d757d2a16733d3557228be9
+  version: 23.0.4-0ubuntu1~22.04.1
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/m/mesa/mesa-common-dev_23.0.4-0ubuntu1~22.04.1_amd64.deb
+  hash: 0e1727831fc87e80bd268c55488b6c22f6d306e70fcb26d4603bcda1834c02d1
 - package: mesa-common-dev
-  version: 22.2.5-0ubuntu0.1~22.04.3
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/m/mesa/mesa-common-dev_22.2.5-0ubuntu0.1~22.04.3_i386.deb
-  hash: e376c7c0c13e544b8e0aa306b373dab63c7f384a85e66107362a52ec609cc5df
+  version: 23.0.4-0ubuntu1~22.04.1
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/m/mesa/mesa-common-dev_23.0.4-0ubuntu1~22.04.1_i386.deb
+  hash: 8375f747ec649b77fbff651a837892cbdcb1c4e26c11fa591af0b3fde8725246
 - package: mesa-common-dev
-  version: 22.2.5-0ubuntu0.1~22.04.3
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/m/mesa/mesa-common-dev_22.2.5-0ubuntu0.1~22.04.3_arm64.deb
-  hash: 2d1e8ecad0e020c0127bb24756f7281344e33bfc8b9583324d9649aa9a4aca6f
+  version: 23.0.4-0ubuntu1~22.04.1
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/m/mesa/mesa-common-dev_23.0.4-0ubuntu1~22.04.1_arm64.deb
+  hash: cd0164ba164488fb08b622d9b7f2a9fc180a4f9184e17fbabc38680f923fe976
 - package: mesa-common-dev
-  version: 22.2.5-0ubuntu0.1~22.04.3
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/m/mesa/mesa-common-dev_22.2.5-0ubuntu0.1~22.04.3_armhf.deb
-  hash: fe225c3c64a48f551eecd3a7ff53edd6dc0f1c5f93d577baae21d813c1b49b45
+  version: 23.0.4-0ubuntu1~22.04.1
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/m/mesa/mesa-common-dev_23.0.4-0ubuntu1~22.04.1_armhf.deb
+  hash: 9ed40a7f80084143244b34bf02177f1c243099fade8a90653dab4ed79dd1e7b1
 - package: mesa-common-dev
-  version: 22.2.5-0ubuntu0.1~22.04.3
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/m/mesa/mesa-common-dev_22.2.5-0ubuntu0.1~22.04.3_riscv64.deb
-  hash: b413eeebe0ad85e96ed1d93138adae69a37887e28016c5b526b7df6437bedfd1
+  version: 23.0.4-0ubuntu1~22.04.1
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/m/mesa/mesa-common-dev_23.0.4-0ubuntu1~22.04.1_riscv64.deb
+  hash: bdccb4b48b36a105b4017ae6170362ed25707f894f4bfd2b91cf8361cdd659fb
 - package: x11proto-core-dev
   version: 2021.5-1
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/x/xorgproto/x11proto-core-dev_2021.5-1_all.deb
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/x/xorgproto/x11proto-core-dev_2021.5-1_all.deb
   hash: c610746103535f7dd7784920343eb75352cb20d3b4f8f90010e89dac0442ec82
 - package: x11proto-dev
   version: 2021.5-1
@@ -871,15 +871,15 @@ packages:
   hash: 7cb2471a23ea50e197cec019d0596840b6ddd714e8deb75e427472e820e83548
 - package: x11proto-gl-dev
   version: 2021.5-1
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/x/xorgproto/x11proto-gl-dev_2021.5-1_all.deb
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/x/xorgproto/x11proto-gl-dev_2021.5-1_all.deb
   hash: 3949732854767be487bd5b35db383601c439b1ba3c6d357426ddc38df4f1eb4f
 - package: x11proto-input-dev
   version: 2021.5-1
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/x/xorgproto/x11proto-input-dev_2021.5-1_all.deb
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/x/xorgproto/x11proto-input-dev_2021.5-1_all.deb
   hash: 2acdbeeadd1b0002b573f37e1c7c5782997e6e909caa322d185e2421219b23e4
 - package: x11proto-kb-dev
   version: 2021.5-1
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/x/xorgproto/x11proto-kb-dev_2021.5-1_all.deb
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/x/xorgproto/x11proto-kb-dev_2021.5-1_all.deb
   hash: fa2a2b77470bb4ff6e41c63df8bb97f9564eb6bd44b418ff4786d18c40ab4c5b
 - package: x11proto-randr-dev
   version: 2021.5-1
@@ -887,9 +887,9 @@ packages:
   hash: 7f5a5f0e34c0067a45b6c96e0f505a1de74943203d65e5940b6abfd6d967ad56
 - package: x11proto-render-dev
   version: 2:2021.5-1
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/x/xorgproto/x11proto-render-dev_2021.5-1_all.deb
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/x/xorgproto/x11proto-render-dev_2021.5-1_all.deb
   hash: 970932d0ba132b80549ef88e68d184c33c6a58e932d3487e792757ce570abd5c
 - package: x11proto-xext-dev
   version: 2021.5-1
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/x/xorgproto/x11proto-xext-dev_2021.5-1_all.deb
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/x/xorgproto/x11proto-xext-dev_2021.5-1_all.deb
   hash: 7941354e8bf7c4849652cfc3c519b6810c51d04d883861890f671a628c587157
