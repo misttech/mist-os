@@ -77,7 +77,7 @@ zx_status_t SdmmcBlockDevice::ProbeSd(const fuchsia_hardware_sdmmc::wire::SdmmcM
     zx::nanosleep(zx::deadline_after(zx::msec(5)));
   }
 
-  st = sdmmc_.host().SetBusFreq(25000000);
+  st = sdmmc_.SetBusFreq(25000000);
   if (st != ZX_OK) {
     // This is non-fatal but the card will run slowly.
     zxlogf(ERROR, "failed to increase bus frequency.");
@@ -169,7 +169,7 @@ zx_status_t SdmmcBlockDevice::ProbeSd(const fuchsia_hardware_sdmmc::wire::SdmmcM
         zxlogf(ERROR, "failed to set card bus width, retcode = %d", st);
         break;
       }
-      st = sdmmc_.host().SetBusWidth(SDMMC_BUS_WIDTH_FOUR);
+      st = sdmmc_.SetBusWidth(SDMMC_BUS_WIDTH_FOUR);
       if (st != ZX_OK) {
         zxlogf(ERROR, "failed to set host bus width, retcode = %d", st);
       }

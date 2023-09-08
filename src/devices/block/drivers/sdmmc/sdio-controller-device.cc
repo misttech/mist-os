@@ -164,7 +164,7 @@ zx_status_t SdioControllerDevice::ProbeLocked() {
   }
 
   const bool sdio_irq_supported =
-      sdmmc_.host().RegisterInBandInterrupt(this, &in_band_interrupt_protocol_ops_) == ZX_OK;
+      sdmmc_.RegisterInBandInterrupt(this, &in_band_interrupt_protocol_ops_) == ZX_OK;
 
   // 0 is the common function. Already initialized
   for (size_t i = 1; i < hw_info_.num_funcs; i++) {
@@ -540,7 +540,7 @@ void SdioControllerDevice::SdioAckInBandIntr(uint8_t fn_idx) {
   if (SdioFnIdxValid(fn_idx) && fn_idx != 0) {
     fbl::AutoLock lock(&lock_);
     interrupt_enabled_mask_ |= 1 << fn_idx;
-    sdmmc_.host().AckInBandInterrupt();
+    sdmmc_.AckInBandInterrupt();
   }
 }
 
@@ -630,7 +630,7 @@ zx_status_t SdioControllerDevice::SdioRegisterVmo(uint8_t fn_idx, uint32_t vmo_i
   }
 
   fbl::AutoLock lock(&lock_);
-  return sdmmc_.host().RegisterVmo(vmo_id, fn_idx, std::move(vmo), offset, size, vmo_rights);
+  return sdmmc_.RegisterVmo(vmo_id, fn_idx, std::move(vmo), offset, size, vmo_rights);
 }
 
 zx_status_t SdioControllerDevice::SdioUnregisterVmo(uint8_t fn_idx, uint32_t vmo_id,
@@ -643,7 +643,7 @@ zx_status_t SdioControllerDevice::SdioUnregisterVmo(uint8_t fn_idx, uint32_t vmo
   }
 
   fbl::AutoLock lock(&lock_);
-  return sdmmc_.host().UnregisterVmo(vmo_id, fn_idx, out_vmo);
+  return sdmmc_.UnregisterVmo(vmo_id, fn_idx, out_vmo);
 }
 
 void SdioControllerDevice::SdioRequestCardReset(sdio_request_card_reset_callback callback,
@@ -658,7 +658,7 @@ void SdioControllerDevice::SdioRequestCardReset(sdio_request_card_reset_callback
   funcs_ = {};
   hw_info_ = {};
 
-  sdmmc_.host().HwReset();
+  sdmmc_.HwReset();
 
   zx_status_t status = ProbeLocked();
   if (status == ZX_OK) {
@@ -685,7 +685,7 @@ void SdioControllerDevice::SdioPerformTuning(sdio_perform_tuning_callback callba
   }
 
   async::PostTask(dispatcher_, [this, cookie, callback]() {
-    zx_status_t status = sdmmc_.host().PerformTuning(SD_SEND_TUNING_BLOCK);
+    zx_status_t status = sdmmc_.PerformTuning(SD_SEND_TUNING_BLOCK);
     callback(cookie, status);
     tuning_in_progress_.store(false);
   });
@@ -1085,7 +1085,7 @@ zx_status_t SdioControllerDevice::InitFunc(uint8_t fn_idx) {
 
 zx_status_t SdioControllerDevice::SwitchFreq(uint32_t new_freq) {
   zx_status_t st;
-  if ((st = sdmmc_.host().SetBusFreq(new_freq)) != ZX_OK) {
+  if ((st = sdmmc_.SetBusFreq(new_freq)) != ZX_OK) {
     zxlogf(ERROR, "Error while switching host bus frequency, retcode = %d", st);
     return st;
   }
@@ -1113,7 +1113,7 @@ zx_status_t SdioControllerDevice::TrySwitchHs() {
     return st;
   }
   // Switch the host timing
-  if ((st = sdmmc_.host().SetTiming(SDMMC_TIMING_HS)) != ZX_OK) {
+  if ((st = sdmmc_.SetTiming(SDMMC_TIMING_HS)) != ZX_OK) {
     zxlogf(ERROR, "failed to switch to hs timing on host : %d", st);
     return st;
   }
@@ -1178,7 +1178,7 @@ zx_status_t SdioControllerDevice::TrySwitchUhs() {
     return st;
   }
   // Switch the host timing
-  if ((st = sdmmc_.host().SetTiming(timing)) != ZX_OK) {
+  if ((st = sdmmc_.SetTiming(timing)) != ZX_OK) {
     zxlogf(ERROR, "failed to switch to uhs timing on host : %d", st);
     return st;
   }
@@ -1192,7 +1192,7 @@ zx_status_t SdioControllerDevice::TrySwitchUhs() {
   if (timing == SDMMC_TIMING_SDR104 ||
       (timing == SDMMC_TIMING_SDR50 &&
        !(sdmmc_.host_info().caps & SDMMC_HOST_CAP_NO_TUNING_SDR50))) {
-    st = sdmmc_.host().PerformTuning(SD_SEND_TUNING_BLOCK);
+    st = sdmmc_.PerformTuning(SD_SEND_TUNING_BLOCK);
     if (st != ZX_OK) {
       zxlogf(ERROR, "tuning failed %d", st);
       return st;
@@ -1221,7 +1221,7 @@ zx_status_t SdioControllerDevice::Enable4BitBus() {
     zxlogf(ERROR, "Error while switching the bus width");
     return st;
   }
-  if ((st = sdmmc_.host().SetBusWidth(SDMMC_BUS_WIDTH_FOUR)) != ZX_OK) {
+  if ((st = sdmmc_.SetBusWidth(SDMMC_BUS_WIDTH_FOUR)) != ZX_OK) {
     zxlogf(ERROR, "failed to switch the host bus width to %d, retcode = %d", SDMMC_BUS_WIDTH_FOUR,
            st);
     return ZX_ERR_INTERNAL;

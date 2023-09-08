@@ -29,15 +29,12 @@ class SdmmcRootDevice : public SdmmcRootDeviceType {
   zx_status_t Init();
 
  private:
-  SdmmcRootDevice(zx_device_t* parent, const ddk::SdmmcProtocolClient& host)
-      : SdmmcRootDeviceType(parent), host_(host) {}
+  SdmmcRootDevice(zx_device_t* parent) : SdmmcRootDeviceType(parent) {}
 
   // Returns the SDMMC metadata with default values for any fields that are not present (or if the
   // metadata itself is not present). Returns an error if the metadata could not be decoded.
   zx::result<fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>> GetMetadata(
       fidl::AnyArena& allocator);
-
-  const ddk::SdmmcProtocolClient host_;
 };
 
 }  // namespace sdmmc

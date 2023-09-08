@@ -23,11 +23,13 @@ namespace sdmmc {
 // required.
 class SdmmcDevice {
  public:
+  explicit SdmmcDevice(zx_device_t* parent) : host_(parent), host_info_({}) {}
+
+  // For testing.
   explicit SdmmcDevice(const ddk::SdmmcProtocolClient& host) : host_(host), host_info_({}) {}
 
   zx_status_t Init();
 
-  const ddk::SdmmcProtocolClient& host() const { return host_; }
   const sdmmc_host_info_t& host_info() const { return host_info_; }
 
   bool UseDma() const { return host_info_.caps & SDMMC_HOST_CAP_DMA; }
@@ -79,6 +81,22 @@ class SdmmcDevice {
   zx_status_t MmcSendExtCsd(std::array<uint8_t, MMC_EXT_CSD_SIZE>& ext_csd);
   zx_status_t MmcSelectCard();
   zx_status_t MmcSwitch(uint8_t index, uint8_t value);
+
+  // TODO(b/299501583): Migrate these to use FIDL calls.
+  // Wraps ddk::SdmmcProtocolClient methods.
+  zx_status_t SetSignalVoltage(sdmmc_voltage_t voltage);
+  zx_status_t SetBusWidth(sdmmc_bus_width_t bus_width);
+  zx_status_t SetBusFreq(uint32_t bus_freq);
+  zx_status_t SetTiming(sdmmc_timing_t timing);
+  zx_status_t HwReset();
+  zx_status_t PerformTuning(uint32_t cmd_idx);
+  zx_status_t RegisterInBandInterrupt(void* interrupt_cb_ctx,
+                                      const in_band_interrupt_protocol_ops_t* interrupt_cb_ops);
+  void AckInBandInterrupt();
+  zx_status_t RegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo vmo, uint64_t offset,
+                          uint64_t size, uint32_t vmo_rights);
+  zx_status_t UnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo* out_vmo);
+  zx_status_t Request(const sdmmc_req_t* req, uint32_t out_response[4]);
 
  private:
   static constexpr uint32_t kTryAttempts = 10;  // 1 initial + 9 retries.

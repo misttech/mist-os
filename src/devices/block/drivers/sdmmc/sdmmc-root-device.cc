@@ -16,14 +16,8 @@
 namespace sdmmc {
 
 zx_status_t SdmmcRootDevice::Bind(void* ctx, zx_device_t* parent) {
-  ddk::SdmmcProtocolClient host(parent);
-  if (!host.is_valid()) {
-    zxlogf(ERROR, "failed to get sdmmc protocol");
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
   fbl::AllocChecker ac;
-  std::unique_ptr<SdmmcRootDevice> dev(new (&ac) SdmmcRootDevice(parent, host));
+  std::unique_ptr<SdmmcRootDevice> dev(new (&ac) SdmmcRootDevice(parent));
 
   if (!ac.check()) {
     zxlogf(ERROR, "Failed to allocate device");
@@ -100,7 +94,7 @@ SdmmcRootDevice::GetMetadata(fidl::AnyArena& allocator) {
 }
 
 void SdmmcRootDevice::DdkInit(ddk::InitTxn txn) {
-  SdmmcDevice sdmmc(host_);
+  SdmmcDevice sdmmc(parent());
   zx_status_t st = sdmmc.Init();
   if (st != ZX_OK) {
     zxlogf(ERROR, "failed to get host info");
@@ -118,7 +112,7 @@ void SdmmcRootDevice::DdkInit(ddk::InitTxn txn) {
   }
 
   // Reset the card.
-  sdmmc.host().HwReset();
+  sdmmc.HwReset();
 
   // No matter what state the card is in, issuing the GO_IDLE_STATE command will
   // put the card into the idle state.

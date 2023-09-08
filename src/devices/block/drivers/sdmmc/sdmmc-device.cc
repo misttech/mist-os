@@ -35,7 +35,14 @@ constexpr void UpdateBits(uint32_t* x, uint32_t mask, uint32_t loc, uint32_t val
 
 namespace sdmmc {
 
-zx_status_t SdmmcDevice::Init() { return host_.HostInfo(&host_info_); }
+zx_status_t SdmmcDevice::Init() {
+  if (!host_.is_valid()) {
+    zxlogf(ERROR, "failed to get sdmmc protocol");
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  return host_.HostInfo(&host_info_);
+}
 
 zx_status_t SdmmcDevice::Request(const sdmmc_req_t& req, uint32_t response[4], uint32_t retries,
                                  zx::duration wait_time) const {
@@ -577,6 +584,42 @@ zx_status_t SdmmcDevice::MmcSwitch(uint8_t index, uint8_t value) {
   req.cmd_flags = MMC_SWITCH_FLAGS;
   uint32_t unused_response[4];
   return Request(req, unused_response);
+}
+
+zx_status_t SdmmcDevice::SetSignalVoltage(sdmmc_voltage_t voltage) {
+  return host_.SetSignalVoltage(voltage);
+}
+
+zx_status_t SdmmcDevice::SetBusWidth(sdmmc_bus_width_t bus_width) {
+  return host_.SetBusWidth(bus_width);
+}
+
+zx_status_t SdmmcDevice::SetBusFreq(uint32_t bus_freq) { return host_.SetBusFreq(bus_freq); }
+
+zx_status_t SdmmcDevice::SetTiming(sdmmc_timing_t timing) { return host_.SetTiming(timing); }
+
+zx_status_t SdmmcDevice::HwReset() { return host_.HwReset(); }
+
+zx_status_t SdmmcDevice::PerformTuning(uint32_t cmd_idx) { return host_.PerformTuning(cmd_idx); }
+
+zx_status_t SdmmcDevice::RegisterInBandInterrupt(
+    void* interrupt_cb_ctx, const in_band_interrupt_protocol_ops_t* interrupt_cb_ops) {
+  return host_.RegisterInBandInterrupt(interrupt_cb_ctx, interrupt_cb_ops);
+}
+
+void SdmmcDevice::AckInBandInterrupt() { return host_.AckInBandInterrupt(); }
+
+zx_status_t SdmmcDevice::RegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo vmo,
+                                     uint64_t offset, uint64_t size, uint32_t vmo_rights) {
+  return host_.RegisterVmo(vmo_id, client_id, std::move(vmo), offset, size, vmo_rights);
+}
+
+zx_status_t SdmmcDevice::UnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo* out_vmo) {
+  return host_.UnregisterVmo(vmo_id, client_id, out_vmo);
+}
+
+zx_status_t SdmmcDevice::Request(const sdmmc_req_t* req, uint32_t out_response[4]) {
+  return host_.Request(req, out_response);
 }
 
 }  // namespace sdmmc

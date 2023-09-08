@@ -151,7 +151,7 @@ zx_status_t SdmmcBlockDevice::MmcSetBusWidth(sdmmc_bus_width_t bus_width,
 
   if (bus_width != bus_width_) {
     // Switch the host to the new bus width
-    if ((st = sdmmc_.host().SetBusWidth(bus_width)) != ZX_OK) {
+    if ((st = sdmmc_.SetBusWidth(bus_width)) != ZX_OK) {
       zxlogf(ERROR, "failed to switch the host bus width to %d: %s", bus_width,
              zx_status_get_string(st));
       return ZX_ERR_INTERNAL;
@@ -205,7 +205,7 @@ zx_status_t SdmmcBlockDevice::MmcSwitchTiming(sdmmc_timing_t new_timing) {
   }
 
   // Switch the host timing
-  if ((st = sdmmc_.host().SetTiming(new_timing)) != ZX_OK) {
+  if ((st = sdmmc_.SetTiming(new_timing)) != ZX_OK) {
     zxlogf(ERROR, "failed to switch host timing to %d", new_timing);
     return st;
   }
@@ -223,7 +223,7 @@ zx_status_t SdmmcBlockDevice::MmcSwitchTimingHs200ToHs() {
   }
 
   // The host must switch to HS timing/frequency before checking the status of MMC_SWITCH command.
-  if ((st = sdmmc_.host().SetTiming(SDMMC_TIMING_HS)) != ZX_OK) {
+  if ((st = sdmmc_.SetTiming(SDMMC_TIMING_HS)) != ZX_OK) {
     zxlogf(ERROR, "failed to switch host timing to %d", SDMMC_TIMING_HS);
     return st;
   }
@@ -242,7 +242,7 @@ zx_status_t SdmmcBlockDevice::MmcSwitchTimingHs200ToHs() {
 
 zx_status_t SdmmcBlockDevice::MmcSwitchFreq(uint32_t new_freq) {
   zx_status_t st;
-  if ((st = sdmmc_.host().SetBusFreq(new_freq)) != ZX_OK) {
+  if ((st = sdmmc_.SetBusFreq(new_freq)) != ZX_OK) {
     zxlogf(ERROR, "failed to set host bus frequency: %s", zx_status_get_string(st));
     return st;
   }
@@ -365,7 +365,7 @@ zx_status_t SdmmcBlockDevice::ProbeMmc(
   if (MmcSupportsHs() || MmcSupportsHsDdr() || MmcSupportsHs200()) {
     // Switch to 1.8V signal voltage
     sdmmc_voltage_t new_voltage = SDMMC_VOLTAGE_V180;
-    if ((st = sdmmc_.host().SetSignalVoltage(new_voltage)) != ZX_OK) {
+    if ((st = sdmmc_.SetSignalVoltage(new_voltage)) != ZX_OK) {
       zxlogf(ERROR, "failed to switch to 1.8V signalling: %s", zx_status_get_string(st));
       return st;
     }
@@ -383,7 +383,7 @@ zx_status_t SdmmcBlockDevice::ProbeMmc(
         return st;
       }
 
-      if ((st = sdmmc_.host().PerformTuning(MMC_SEND_TUNING_BLOCK)) != ZX_OK) {
+      if ((st = sdmmc_.PerformTuning(MMC_SEND_TUNING_BLOCK)) != ZX_OK) {
         zxlogf(ERROR, "tuning failed: %s", zx_status_get_string(st));
         return st;
       }
