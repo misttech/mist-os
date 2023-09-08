@@ -1,3 +1,5 @@
+//! [`Zeroize`] impls for x86 SIMD registers
+
 use crate::{atomic_fence, volatile_write, Zeroize};
 
 #[cfg(target_arch = "x86")]
