@@ -286,12 +286,14 @@ pub struct Merger<'a, K, V> {
 }
 
 impl<'a, K: Key + LayerKey + OrdLowerBound, V: Value> Merger<'a, K, V> {
-    pub(super) fn new(layers: &[&'a dyn Layer<K, V>], merge_fn: MergeFn<K, V>) -> Merger<'a, K, V> {
+    pub(super) fn new<I: Iterator<Item = &'a dyn Layer<K, V>>>(
+        layers: I,
+        merge_fn: MergeFn<K, V>,
+    ) -> Merger<'a, K, V> {
         Merger {
             iterators: layers
-                .iter()
                 .enumerate()
-                .map(|(index, layer)| MergeLayerIterator::new(index as u16, *layer))
+                .map(|(index, layer)| MergeLayerIterator::new(index as u16, layer))
                 .collect(),
             merge_fn: merge_fn,
             trace: false,
@@ -707,9 +709,10 @@ mod tests {
             lsm_tree::{
                 skip_list_layer::SkipListLayer,
                 types::{
-                    IntoLayerRefs, Item, ItemRef, Key, Layer, LayerIterator, LayerKey, MergeType,
-                    MutableLayer, OrdLowerBound, OrdUpperBound, SortByU64,
+                    Item, ItemRef, Key, Layer, LayerIterator, LayerKey, MergeType, MutableLayer,
+                    OrdLowerBound, OrdUpperBound, SortByU64,
                 },
+                Value,
             },
             serialized_types::{
                 versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
@@ -720,6 +723,7 @@ mod tests {
         std::{
             hash::Hash,
             ops::{Bound, Range},
+            sync::Arc,
         },
     };
 
@@ -766,6 +770,12 @@ mod tests {
         }
     }
 
+    fn layer_ref_iter<K: Key, V: Value>(
+        layers: &[Arc<SkipListLayer<K, V>>],
+    ) -> impl Iterator<Item = &dyn Layer<K, V>> {
+        layers.iter().map(|x| x.as_ref() as &dyn Layer<K, V>)
+    }
+
     #[fuchsia::test]
     async fn test_emit_left() {
         let skip_lists = [SkipListLayer::new(100), SkipListLayer::new(100)];
@@ -773,7 +783,7 @@ mod tests {
         skip_lists[0].insert(items[1].clone()).await.expect("insert error");
         skip_lists[1].insert(items[0].clone()).await.expect("insert error");
         let mut merger =
-            Merger::new(&skip_lists.into_layer_refs(), |_left, _right| MergeResult::EmitLeft);
+            Merger::new(layer_ref_iter(&skip_lists), |_left, _right| MergeResult::EmitLeft);
         let mut iter = merger.seek(Bound::Unbounded).await.expect("seek failed");
         let ItemRef { key, value, .. } = iter.get().expect("missing item");
         assert_eq!((key, value), (&items[0].key, &items[0].value));
@@ -791,7 +801,7 @@ mod tests {
         skip_lists[0].insert(items[1].clone()).await.expect("insert error");
         skip_lists[1].insert(items[0].clone()).await.expect("insert error");
         let mut merger =
-            Merger::new(&skip_lists.into_layer_refs(), |_left, _right| MergeResult::Other {
+            Merger::new(layer_ref_iter(&skip_lists), |_left, _right| MergeResult::Other {
                 emit: Some(Item::new(TestKey(3..3), 3)),
                 left: Discard,
                 right: Discard,
@@ -811,7 +821,7 @@ mod tests {
         skip_lists[0].insert(items[1].clone()).await.expect("insert error");
         skip_lists[1].insert(items[0].clone()).await.expect("insert error");
         let mut merger =
-            Merger::new(&skip_lists.into_layer_refs(), |_left, _right| MergeResult::Other {
+            Merger::new(layer_ref_iter(&skip_lists), |_left, _right| MergeResult::Other {
                 emit: None,
                 left: Replace(Item::new(TestKey(3..3), 3)),
                 right: Discard,
@@ -833,7 +843,7 @@ mod tests {
         skip_lists[0].insert(items[1].clone()).await.expect("insert error");
         skip_lists[1].insert(items[0].clone()).await.expect("insert error");
         let mut merger =
-            Merger::new(&skip_lists.into_layer_refs(), |_left, _right| MergeResult::Other {
+            Merger::new(layer_ref_iter(&skip_lists), |_left, _right| MergeResult::Other {
                 emit: None,
                 left: Discard,
                 right: Replace(Item::new(TestKey(3..3), 3)),
@@ -854,7 +864,7 @@ mod tests {
         let items = [Item::new(TestKey(1..1), 1), Item::new(TestKey(2..2), 2)];
         skip_lists[0].insert(items[1].clone()).await.expect("insert error");
         skip_lists[1].insert(items[0].clone()).await.expect("insert error");
-        let mut merger = Merger::new(&skip_lists.into_layer_refs(), |left, right| {
+        let mut merger = Merger::new(layer_ref_iter(&skip_lists), |left, right| {
             assert_eq!((left.key(), left.value()), (&TestKey(1..1), &1));
             assert_eq!((right.key(), right.value()), (&TestKey(2..2), &2));
             MergeResult::EmitLeft
@@ -868,7 +878,7 @@ mod tests {
         let item = Item::new(TestKey(1..1), 1);
         skip_lists[0].insert(item.clone()).await.expect("insert error");
         skip_lists[1].insert(item.clone()).await.expect("insert error");
-        let mut merger = Merger::new(&skip_lists.into_layer_refs(), |left, right| {
+        let mut merger = Merger::new(layer_ref_iter(&skip_lists), |left, right| {
             assert_eq!((left.key(), left.value()), (&TestKey(1..1), &1));
             assert_eq!((right.key(), right.value()), (&TestKey(1..1), &1));
             assert_eq!(left.layer_index, 0);
@@ -884,7 +894,7 @@ mod tests {
         let items = [Item::new(TestKey(1..1), 1), Item::new(TestKey(2..2), 2)];
         skip_lists[0].insert(items[1].clone()).await.expect("insert error");
         skip_lists[1].insert(items[0].clone()).await.expect("insert error");
-        let mut merger = Merger::new(&skip_lists.into_layer_refs(), |left, right| {
+        let mut merger = Merger::new(layer_ref_iter(&skip_lists), |left, right| {
             if left.key() == &TestKey(1..1) {
                 MergeResult::Other {
                     emit: None,
@@ -918,7 +928,7 @@ mod tests {
                 .expect("insert error");
         }
         let mut merger =
-            Merger::new(&skip_lists.into_layer_refs(), |_left, _right| MergeResult::EmitLeft);
+            Merger::new(layer_ref_iter(&skip_lists), |_left, _right| MergeResult::EmitLeft);
         let mut iter = merger.seek(Bound::Unbounded).await.expect("seek failed");
 
         for i in 0..100 {
@@ -936,7 +946,7 @@ mod tests {
         skip_lists[0].insert(items[1].clone()).await.expect("insert error");
         skip_lists[1].insert(items[0].clone()).await.expect("insert error");
         let mut merger =
-            Merger::new(&skip_lists.into_layer_refs(), |_left, _right| MergeResult::EmitLeft);
+            Merger::new(layer_ref_iter(&skip_lists), |_left, _right| MergeResult::EmitLeft);
         let mut iter = merger.seek(Bound::Unbounded).await.expect("seek failed");
 
         let ItemRef { key, value, .. } = iter.get().expect("missing item");
@@ -1218,7 +1228,7 @@ mod tests {
         let items = [Item::new(TestKey(1..1), 1), Item::new(TestKey(1..1), 2)];
         skip_lists[0].insert(items[0].clone()).await.expect("insert error");
         skip_lists[1].insert(items[1].clone()).await.expect("insert error");
-        let mut merger = Merger::new(&skip_lists.into_layer_refs(), |_left, _right| {
+        let mut merger = Merger::new(layer_ref_iter(&skip_lists), |_left, _right| {
             MergeResult::Other { emit: None, left: Discard, right: Keep }
         });
         let iter = merger.seek(Bound::Included(&items[0].key)).await.expect("seek failed");
@@ -1245,7 +1255,7 @@ mod tests {
             skip_lists.push(skip_list);
         }
         let mut merger =
-            Merger::new(&skip_lists.into_layer_refs(), |_left, _right| MergeResult::EmitLeft);
+            Merger::new(layer_ref_iter(&skip_lists), |_left, _right| MergeResult::EmitLeft);
         let mut iter = merger.seek(start).await.expect("seek failed");
         for (k, v) in expected {
             let ItemRef { key, value, .. } = iter.get().expect("get failed");
@@ -1389,7 +1399,7 @@ mod tests {
         skip_lists[1].insert(items[1].clone()).await.expect("insert error");
         skip_lists[2].insert(items[2].clone()).await.expect("insert error");
         skip_lists[2].insert(items[3].clone()).await.expect("insert error");
-        let mut merger = Merger::new(&skip_lists.into_layer_refs(), |left, right| {
+        let mut merger = Merger::new(layer_ref_iter(&skip_lists), |left, right| {
             // Sum matching keys.
             if left.key() == right.key() {
                 MergeResult::Other {
@@ -1514,7 +1524,7 @@ mod tests {
         skip_lists[0].insert(items[0].clone()).await.expect("insert error");
         skip_lists[1].insert(items[1].clone()).await.expect("insert error");
         let mut merger =
-            Merger::new(&skip_lists.into_layer_refs(), |_left, _right| MergeResult::EmitLeft);
+            Merger::new(layer_ref_iter(&skip_lists), |_left, _right| MergeResult::EmitLeft);
         let iter = merger.seek(Bound::Included(&items[1].key)).await.expect("seek failed");
 
         let ItemRef { key, value, .. } = iter.get().expect("missing item");
@@ -1530,7 +1540,7 @@ mod tests {
         ];
         skip_lists[0].insert(items[0].clone()).await.expect("insert error");
         skip_lists[1].insert(items[1].clone()).await.expect("insert error");
-        let mut merger = Merger::new(&skip_lists.into_layer_refs(), |_left, _right| {
+        let mut merger = Merger::new(layer_ref_iter(&skip_lists), |_left, _right| {
             MergeResult::Other { emit: None, left: Discard, right: Keep }
         });
         let iter = merger.seek(Bound::Included(&items[0].key)).await.expect("seek failed");
@@ -1548,7 +1558,7 @@ mod tests {
         skip_lists[0].insert(items[0].clone()).await.expect("insert error");
         skip_lists[1].insert(items[1].clone()).await.expect("insert error");
         // Search for a key before 1..1.
-        let mut merger = Merger::new(&skip_lists.into_layer_refs(), |_left, _right| {
+        let mut merger = Merger::new(layer_ref_iter(&skip_lists), |_left, _right| {
             MergeResult::Other { emit: None, left: Discard, right: Keep }
         });
         let iter = merger.seek(Bound::Included(&TestKey(0..0))).await.expect("seek failed");
@@ -1564,7 +1574,7 @@ mod tests {
         let items = [Item::new(TestKey(1..1), 1), Item::new(TestKey(2..2), 2)];
         skip_lists[0].insert(items[0].clone()).await.expect("insert error");
         skip_lists[1].insert(items[1].clone()).await.expect("insert error");
-        let mut merger = Merger::new(&skip_lists.into_layer_refs(), |_left, _right| {
+        let mut merger = Merger::new(layer_ref_iter(&skip_lists), |_left, _right| {
             MergeResult::Other { emit: None, left: Discard, right: Keep }
         });
         let iter = merger.seek(Bound::Included(&TestKey(3..3))).await.expect("seek failed");
@@ -1578,7 +1588,7 @@ mod tests {
         let items = [Item::new(TestKey(1..1), 1), Item::new(TestKey(2..2), 2)];
         skip_lists[0].insert(items[1].clone()).await.expect("insert error");
         skip_lists[1].insert(items[0].clone()).await.expect("insert error");
-        let mut merger = Merger::new(&skip_lists.into_layer_refs(), |_left, _right| {
+        let mut merger = Merger::new(layer_ref_iter(&skip_lists), |_left, _right| {
             MergeResult::Other { emit: None, left: Discard, right: Discard }
         });
         let iter = merger.seek(Bound::Unbounded).await.expect("seek failed");
@@ -1591,7 +1601,7 @@ mod tests {
         let items = [Item::new(TestKey(1..8), 1), Item::new(TestKey(2..10), 2)];
         skip_lists[0].insert(items[0].clone()).await.expect("insert error");
         skip_lists[1].insert(items[1].clone()).await.expect("insert error");
-        let mut merger = Merger::new(&skip_lists.into_layer_refs(), |left, _right| {
+        let mut merger = Merger::new(layer_ref_iter(&skip_lists), |left, _right| {
             if left.key() == &TestKey(1..8) {
                 MergeResult::Other {
                     emit: None,
@@ -1619,7 +1629,7 @@ mod tests {
         skip_lists[0].insert(items[0].clone()).await.expect("insert error");
         skip_lists[1].insert(items[1].clone()).await.expect("insert error");
         skip_lists[2].insert(items[2].clone()).await.expect("insert error");
-        let mut merger = Merger::new(&skip_lists.into_layer_refs(), |left, right| {
+        let mut merger = Merger::new(layer_ref_iter(&skip_lists), |left, right| {
             let result = if left.key().0.end <= right.key().0.start {
                 MergeResult::EmitLeft
             } else {

@@ -383,32 +383,6 @@ where
     async fn flush(&mut self) -> Result<(), Error>;
 }
 
-/// A helper trait that converts arrays of layers into arrays of references to layers.
-pub trait IntoLayerRefs<'a, K, V, T: AsRef<U> + 'a, U: ?Sized>
-where
-    Self: IntoIterator<Item = &'a T>,
-{
-    fn into_layer_refs(self) -> Box<[&'a dyn Layer<K, V>]>;
-}
-
-// Generic implementation where we need the cast to &dyn Layer.
-impl<'a, K, V, T: AsRef<U>, U: Layer<K, V> + 'a> IntoLayerRefs<'a, K, V, T, U> for &'a [T] {
-    fn into_layer_refs(self) -> Box<[&'a dyn Layer<K, V>]> {
-        let refs: Vec<_> = self.iter().map(|x| x.as_ref() as &dyn Layer<K, V>).collect();
-        refs.into_boxed_slice()
-    }
-}
-
-// Generic implementation where we already have &dyn Layer.
-impl<'a, K, V, T: AsRef<dyn Layer<K, V>>> IntoLayerRefs<'a, K, V, T, dyn Layer<K, V>>
-    for &'a [T]
-{
-    fn into_layer_refs(self) -> Box<[&'a dyn Layer<K, V>]> {
-        let refs: Vec<_> = self.iter().map(|x| x.as_ref()).collect();
-        refs.into_boxed_slice()
-    }
-}
-
 pub struct Filter<'a, K, V, P> {
     iter: BoxedLayerIterator<'a, K, V>,
     predicate: P,

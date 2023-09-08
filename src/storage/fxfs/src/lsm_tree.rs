@@ -26,8 +26,8 @@ use {
         sync::{Arc, RwLock},
     },
     types::{
-        IntoLayerRefs, Item, ItemRef, Key, Layer, LayerIterator, LayerKey, LayerWriter,
-        MergeableKey, MutableLayer, OrdLowerBound, Value,
+        Item, ItemRef, Key, Layer, LayerIterator, LayerKey, LayerWriter, MergeableKey,
+        MutableLayer, OrdLowerBound, Value,
     },
 };
 
@@ -349,7 +349,7 @@ pub struct LayerSet<K, V> {
 
 impl<K: Key + LayerKey + OrdLowerBound, V: Value> LayerSet<K, V> {
     pub fn merger(&self) -> merge::Merger<'_, K, V> {
-        merge::Merger::new(&self.layers.as_slice().into_layer_refs(), self.merge_fn)
+        merge::Merger::new(self.layers.iter().map(|x| x.as_ref()), self.merge_fn)
     }
 }
 
