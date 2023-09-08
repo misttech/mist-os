@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        data_buffer::DataBuffer,
+        data_buffer::MemDataBuffer,
         errors::FxfsError,
         filesystem::MAX_FILE_SIZE,
         object_handle::ReadObjectHandle,
@@ -175,9 +175,9 @@ impl Inner {
     }
 }
 
-pub struct WritebackCache<B> {
+pub struct WritebackCache {
     inner: Mutex<Inner>,
-    data: B,
+    data: MemDataBuffer,
 }
 
 #[derive(Debug)]
@@ -215,13 +215,13 @@ impl FlushableData<'_, '_> {
     }
 }
 
-pub struct Flushable<'a, 'b, B: DataBuffer> {
-    cache: &'a WritebackCache<B>,
+pub struct Flushable<'a, 'b> {
+    cache: &'a WritebackCache,
     pub metadata: Option<FlushableMetadata>,
     pub data: Option<FlushableData<'a, 'b>>,
 }
 
-impl<B: DataBuffer> std::fmt::Debug for Flushable<'_, '_, B> {
+impl std::fmt::Debug for Flushable<'_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Flushable")
             .field("metadata", &self.metadata)
@@ -230,7 +230,7 @@ impl<B: DataBuffer> std::fmt::Debug for Flushable<'_, '_, B> {
     }
 }
 
-impl<B: DataBuffer> Drop for Flushable<'_, '_, B> {
+impl Drop for Flushable<'_, '_> {
     fn drop(&mut self) {
         if self.metadata.is_none() && self.data.is_none() {
             return;
@@ -262,7 +262,7 @@ pub struct CachedMetadata {
     pub modification_time: Option<Duration>,
 }
 
-impl<B> Drop for WritebackCache<B> {
+impl Drop for WritebackCache {
     fn drop(&mut self) {
         let inner = self.inner.lock().unwrap();
         if inner.dirty_bytes > 0 {
@@ -271,8 +271,8 @@ impl<B> Drop for WritebackCache<B> {
     }
 }
 
-impl<B: DataBuffer> WritebackCache<B> {
-    pub fn new(data: B) -> Self {
+impl WritebackCache {
+    pub fn new(size: u64) -> Self {
         Self {
             inner: Mutex::new(Inner {
                 intervals: IntervalTree::new(),
@@ -280,7 +280,9 @@ impl<B: DataBuffer> WritebackCache<B> {
                 creation_time: None,
                 modification_time: None,
             }),
-            data,
+            // TODO(fxbug.dev/294052549): MemDataBuffer has size limits so we should check sizes
+            // before we use it.
+            data: MemDataBuffer::new(size),
         }
     }
 
@@ -360,8 +362,7 @@ impl<B: DataBuffer> WritebackCache<B> {
             }
         }
 
-        // VmoDataBuffer will page in the tail page, but DataBuffer won't do that, and since we want
-        // to mark it dirty we must make sure we read it in here.
+        // Read in the tail page so it can be marked dirty.
         if reservation_and_range.is_some() {
             let mut buf = [0];
             self.data.read(old_size - 1, &mut buf, source).await?;
@@ -373,7 +374,7 @@ impl<B: DataBuffer> WritebackCache<B> {
         // don't think that is problematic since there are no intervals (since we're expanding).
         // If that turns out to be problematic, we'll have to atomically update both the buffer and
         // the interval tree at once.
-        self.data.resize(size).await;
+        self.data.resize(size);
 
         if let Some((reservation, range)) = reservation_and_range {
             let mut inner = self.inner.lock().unwrap();
@@ -528,7 +529,7 @@ impl<B: DataBuffer> WritebackCache<B> {
         allocate_buffer: F,
         reserver: &'a dyn StorageReservation,
         reservation: &'a allocator::Reservation,
-    ) -> Flushable<'_, 'a, B>
+    ) -> Flushable<'_, 'a>
     where
         F: Fn(usize) -> Buffer<'a>,
     {
@@ -587,7 +588,7 @@ impl<B: DataBuffer> WritebackCache<B> {
     // Returns any cached metadata that needs to be flushed.  This will only capture changes in
     // content size that shrink the file from it's last recorded/uncached size; `take_flushable`
     // handles the case where the file has grown.
-    pub fn take_flushable_metadata<'a>(&'a self, last_known_size: u64) -> Flushable<'_, 'a, B> {
+    pub fn take_flushable_metadata<'a>(&'a self, last_known_size: u64) -> Flushable<'_, 'a> {
         let mut inner = self.inner.lock().unwrap();
         let size = self.data.size();
         Flushable {
@@ -598,7 +599,7 @@ impl<B: DataBuffer> WritebackCache<B> {
     }
 
     /// Indicates that a flush was successful.
-    pub fn complete_flush<'a>(&self, mut flushed: Flushable<'a, '_, B>) {
+    pub fn complete_flush<'a>(&self, mut flushed: Flushable<'a, '_>) {
         flushed.metadata.take();
         if let Some(data) = flushed.data.take() {
             self.inner.lock().unwrap().complete_flush(data, true);
@@ -620,11 +621,6 @@ impl<B: DataBuffer> WritebackCache<B> {
         inner.creation_time = creation_time.or(inner.creation_time);
         inner.modification_time = modification_time.or(inner.modification_time);
     }
-
-    /// Returns the data buffer.
-    pub fn data_buffer(&self) -> &B {
-        &self.data
-    }
 }
 
 #[cfg(test)]
@@ -632,7 +628,6 @@ mod tests {
     use {
         super::{Flushable, FlushableData, StorageReservation, WritebackCache},
         crate::{
-            data_buffer::MemDataBuffer,
             object_store::{
                 allocator::{Allocator, AllocatorInfo, Reservation, ReservationOwner},
                 transaction::Transaction,
@@ -848,7 +843,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_write_read() {
         let reserver = FakeReserver::new(8192, 1);
-        let cache = WritebackCache::new(MemDataBuffer::new(0));
+        let cache = WritebackCache::new(0);
         let mut buffer = vec![0u8; 8192];
         let source = FakeObjectHandle::new(Arc::new(FakeObject::new()));
 
@@ -867,7 +862,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_append() {
         let reserver = FakeReserver::new(8192, 1);
-        let cache = WritebackCache::new(MemDataBuffer::new(0));
+        let cache = WritebackCache::new(0);
         let source = FakeObjectHandle::new(Arc::new(FakeObject::new()));
         let mut buffer = vec![0u8; 8192];
 
@@ -895,7 +890,7 @@ mod tests {
         let allocator = BufferAllocator::new(512, Box::new(MemBufferSource::new(16384)));
         // We size the reserver so that only a one-block write can succeed.
         let reserver = FakeReserver::new(512, 512);
-        let cache = WritebackCache::new(MemDataBuffer::new(8192));
+        let cache = WritebackCache::new(8192);
         let source = FakeObjectHandle::new(Arc::new(FakeObject::new()));
 
         let buffer = vec![0u8; 8192];
@@ -946,7 +941,7 @@ mod tests {
     async fn test_resize_expand() {
         let allocator = BufferAllocator::new(512, Box::new(MemBufferSource::new(16384)));
         let reserver = FakeReserver::new(8192, 1);
-        let cache = WritebackCache::new(MemDataBuffer::new(0));
+        let cache = WritebackCache::new(0);
         let source = FakeObjectHandle::new(Arc::new(FakeObject::new()));
 
         let mut buffer = vec![0u8; 8192];
@@ -991,7 +986,7 @@ mod tests {
     async fn test_resize_shrink() {
         let allocator = BufferAllocator::new(512, Box::new(MemBufferSource::new(16384)));
         let reserver = FakeReserver::new(8192, 1);
-        let cache = WritebackCache::new(MemDataBuffer::new(0));
+        let cache = WritebackCache::new(0);
         let source = FakeObjectHandle::new(Arc::new(FakeObject::new()));
 
         let mut buffer = vec![0u8; 8192];
@@ -1031,7 +1026,7 @@ mod tests {
     async fn test_flush_no_data() {
         let allocator = BufferAllocator::new(512, Box::new(MemBufferSource::new(8192)));
         let reserver = FakeReserver::new(1, 1);
-        let cache = WritebackCache::new(MemDataBuffer::new(0));
+        let cache = WritebackCache::new(0);
 
         let reservation = reserver.wrap_reservation(0);
         assert_matches!(
@@ -1051,7 +1046,7 @@ mod tests {
     async fn test_flush_some_data() {
         let allocator = BufferAllocator::new(512, Box::new(MemBufferSource::new(65536)));
         let reserver = FakeReserver::new(65536, 512);
-        let cache = WritebackCache::new(MemDataBuffer::new(0));
+        let cache = WritebackCache::new(0);
         let source = FakeObjectHandle::new(Arc::new(FakeObject::new()));
 
         let mut buffer = vec![0u8; 8192];
@@ -1113,7 +1108,7 @@ mod tests {
         let allocator = BufferAllocator::new(512, Box::new(MemBufferSource::new(65536)));
         // Enough room for 2 flushes of 512 bytes each
         let reserver = FakeReserver::new_with_sync_overhead(2048, 512, 512, 1024);
-        let cache = WritebackCache::new(MemDataBuffer::new(0));
+        let cache = WritebackCache::new(0);
         let source = FakeObjectHandle::new(Arc::new(FakeObject::new()));
 
         let buffer = [0u8; 1];
@@ -1168,7 +1163,7 @@ mod tests {
     async fn test_flush_most_recent_write_timestamp() {
         let allocator = BufferAllocator::new(512, Box::new(MemBufferSource::new(65536)));
         let reserver = FakeReserver::new(65536, 4096);
-        let cache = WritebackCache::new(MemDataBuffer::new(0));
+        let cache = WritebackCache::new(0);
         let source = FakeObjectHandle::new(Arc::new(FakeObject::new()));
         let secs = AtomicU64::new(1);
         let current_time = || Some(Duration::new(secs.fetch_add(1, Ordering::SeqCst), 0));
@@ -1205,7 +1200,7 @@ mod tests {
     async fn test_flush_explicit_timestamps() {
         let allocator = BufferAllocator::new(512, Box::new(MemBufferSource::new(65536)));
         let reserver = FakeReserver::new(65536, 4096);
-        let cache = WritebackCache::new(MemDataBuffer::new(0));
+        let cache = WritebackCache::new(0);
         let source = FakeObjectHandle::new(Arc::new(FakeObject::new()));
 
         let buffer = vec![0u8; 8192];
@@ -1234,7 +1229,7 @@ mod tests {
     async fn test_resize_while_flushing() {
         let allocator = BufferAllocator::new(512, Box::new(MemBufferSource::new(8192)));
         let reserver = FakeReserver::new(65536, 512);
-        let cache = WritebackCache::new(MemDataBuffer::new(0));
+        let cache = WritebackCache::new(0);
         let source = FakeObjectHandle::new(Arc::new(FakeObject::new()));
 
         let mut buffer = vec![0u8; 512];

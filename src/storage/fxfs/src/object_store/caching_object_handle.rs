@@ -33,14 +33,13 @@ const FLUSH_BATCH_SIZE: u64 = 524_288;
 
 pub struct CachingObjectHandle<S: HandleOwner> {
     handle: DataObjectHandle<S>,
-    cache: WritebackCache<S::Buffer>,
+    cache: WritebackCache,
 }
 
 impl<S: HandleOwner> CachingObjectHandle<S> {
     pub fn new(handle: DataObjectHandle<S>) -> Self {
         let size = handle.get_size();
-        let buffer = handle.owner().create_data_buffer(handle.object_id(), size);
-        Self { handle, cache: WritebackCache::new(buffer) }
+        Self { handle, cache: WritebackCache::new(size) }
     }
 
     pub fn owner(&self) -> &Arc<S> {
@@ -49,10 +48,6 @@ impl<S: HandleOwner> CachingObjectHandle<S> {
 
     pub fn store(&self) -> &ObjectStore {
         self.handle.store()
-    }
-
-    pub fn data_buffer(&self) -> &S::Buffer {
-        &self.cache.data_buffer()
     }
 
     pub fn uncached_handle(&self) -> &DataObjectHandle<S> {

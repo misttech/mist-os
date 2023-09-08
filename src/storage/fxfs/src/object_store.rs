@@ -35,7 +35,6 @@ pub use store_object_handle::{
 
 use {
     crate::{
-        data_buffer::{DataBuffer, MemDataBuffer},
         debug_assert_not_too_long,
         errors::FxfsError,
         filesystem::{
@@ -112,12 +111,8 @@ const OBJECT_ID_HI_MASK: u64 = 0xffffffff00000000;
 const TRANSACTION_MUTATION_THRESHOLD: usize = 200;
 
 /// DataObjectHandle stores an owner that must implement this trait, which allows the handle to get
-/// back to an ObjectStore and provides a callback for creating a data buffer for the handle.
-pub trait HandleOwner: AsRef<ObjectStore> + Send + Sync + 'static {
-    type Buffer: DataBuffer;
-
-    fn create_data_buffer(&self, object_id: u64, initial_size: u64) -> Self::Buffer;
-}
+/// back to an ObjectStore.
+pub trait HandleOwner: AsRef<ObjectStore> + Send + Sync + 'static {}
 
 // StoreInfo stores information about the object store.  This is stored within the parent object
 // store, and is used, for example, to get the persistent layer objects.
@@ -2036,14 +2031,7 @@ impl JournalingObject for ObjectStore {
     }
 }
 
-// TODO(fxbug.dev/95980): MemDataBuffer has size limits so we should check sizes before we use it.
-impl HandleOwner for ObjectStore {
-    type Buffer = MemDataBuffer;
-
-    fn create_data_buffer(&self, _object_id: u64, initial_size: u64) -> Self::Buffer {
-        MemDataBuffer::new(initial_size)
-    }
-}
+impl HandleOwner for ObjectStore {}
 
 impl AsRef<ObjectStore> for ObjectStore {
     fn as_ref(&self) -> &ObjectStore {

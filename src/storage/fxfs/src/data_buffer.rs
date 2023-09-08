@@ -11,7 +11,6 @@ use {
         round::{round_down, round_up},
     },
     anyhow::Error,
-    async_trait::async_trait,
     either::Either::{Left, Right},
     futures::{
         future::try_join_all, pin_mut, stream::futures_unordered::FuturesUnordered, try_join,
@@ -145,38 +144,7 @@ fn copy_out(source_buf: &[u8], offset: u64, buf: &mut [u8]) -> usize {
     }
 }
 
-/// A readable, writable memory buffer that is not necessarily mapped into memory.
-/// Mainly serves as a portable abstraction over a VMO (see VmoDataBuffer).
-#[async_trait]
-pub trait DataBuffer: Send + Sync {
-    /// raw_read reads from the data buffer without reading any content from a data source if it is
-    /// not present.  Any data that is not present will likely be returned as zeroes, but the caller
-    /// should not rely on that behaviour; this function is intended to be used where the caller
-    /// knows the data is present.
-    fn raw_read(&self, offset: u64, buf: &mut [u8]);
-
-    /// Writes to the buffer.  If the writes are unaligned, data will be read from the source to
-    /// complete any unaligned pages.
-    async fn write(
-        &self,
-        offset: u64,
-        buf: &[u8],
-        source: &dyn ReadObjectHandle,
-    ) -> Result<(), Error>;
-
-    fn size(&self) -> u64;
-    async fn resize(&self, size: u64);
-
-    /// Read from the buffer but supply content from source where the data is not present.
-    async fn read(
-        &self,
-        offset: u64,
-        buf: &mut [u8],
-        source: &dyn ReadObjectHandle,
-    ) -> Result<usize, Error>;
-}
-
-/// A default implementation of a DataBuffer.
+/// A readable, writable memory buffer.
 pub struct MemDataBuffer(Mutex<Inner>);
 
 struct Inner {
@@ -513,11 +481,8 @@ impl MemDataBuffer {
             }
         }
     }
-}
 
-#[async_trait]
-impl DataBuffer for MemDataBuffer {
-    async fn write(
+    pub async fn write(
         &self,
         offset: u64,
         buf: &[u8],
@@ -560,19 +525,21 @@ impl DataBuffer for MemDataBuffer {
         inner.mark_present(offset..end);
         Ok(())
     }
-    fn size(&self) -> u64 {
+
+    pub fn size(&self) -> u64 {
         self.0.lock().unwrap().size
     }
-    async fn resize(&self, size: u64) {
+
+    pub fn resize(&self, size: u64) {
         self.0.lock().unwrap().resize(size);
     }
 
-    fn raw_read(&self, offset: u64, buf: &mut [u8]) {
+    pub fn raw_read(&self, offset: u64, buf: &mut [u8]) {
         let inner = self.0.lock().unwrap();
         buf.copy_from_slice(&inner.buf[offset as usize..offset as usize + buf.len()]);
     }
 
-    async fn read(
+    pub async fn read(
         &self,
         offset: u64,
         mut read_buf: &mut [u8],
@@ -834,7 +801,7 @@ impl AsRef<StackListChain<ReadKeys>> for ReadKeys {
 #[cfg(test)]
 mod tests {
     use {
-        super::{DataBuffer, MemDataBuffer, PAGE_SIZE, READ_SIZE},
+        super::{MemDataBuffer, PAGE_SIZE, READ_SIZE},
         crate::{
             errors::FxfsError,
             object_handle::{ObjectHandle, ReadObjectHandle},
@@ -1007,8 +974,8 @@ mod tests {
         let source = FakeSource::new(device.clone());
         let mut buf = [0; PAGE_SIZE as usize];
         let mut buf2 = [0; READ_SIZE as usize * 2];
-        let mut read_fut = data_buf.read(0, buf.as_mut(), &source);
-        let mut read_fut2 = data_buf.read(0, buf2.as_mut(), &source);
+        let mut read_fut = data_buf.read(0, buf.as_mut(), &source).boxed();
+        let mut read_fut2 = data_buf.read(0, buf2.as_mut(), &source).boxed();
         poll_fn(|ctx| {
             assert!(read_fut.poll_unpin(ctx).is_pending());
             source.start();
@@ -1059,8 +1026,8 @@ mod tests {
 
         let mut buf = [0; 10];
         let mut buf2 = [0; 10];
-        let mut read_fut = data_buf.read(10, &mut buf, &source);
-        let mut read_fut2 = data_buf.read(10, &mut buf2, &source);
+        let mut read_fut = data_buf.read(10, &mut buf, &source).boxed();
+        let mut read_fut2 = data_buf.read(10, &mut buf2, &source).boxed();
 
         poll_fn(|ctx| {
             assert!(read_fut.poll_unpin(ctx).is_pending());
@@ -1113,9 +1080,9 @@ mod tests {
         let mut buf = [0; PAGE_SIZE as usize];
         let mut buf2 = [0; PAGE_SIZE as usize * 2];
         let mut buf3 = [0; PAGE_SIZE as usize * 2];
-        let mut read_fut = data_buf.read(0, buf.as_mut(), &source);
-        let mut read_fut2 = data_buf.read(0, buf2.as_mut(), &source);
-        let mut read_fut3 = data_buf.read(PAGE_SIZE, buf3.as_mut(), &source);
+        let mut read_fut = data_buf.read(0, buf.as_mut(), &source).boxed();
+        let mut read_fut2 = data_buf.read(0, buf2.as_mut(), &source).boxed();
+        let mut read_fut3 = data_buf.read(PAGE_SIZE, buf3.as_mut(), &source).boxed();
 
         // Poll the futures once.
         poll_fn(|ctx| {
@@ -1127,8 +1094,8 @@ mod tests {
         .await;
 
         // Truncate the buffer.
-        data_buf.resize(20).await;
-        data_buf.resize(PAGE_SIZE + 10).await;
+        data_buf.resize(20);
+        data_buf.resize(PAGE_SIZE + 10);
 
         // Let the reads continue.
         source.start();

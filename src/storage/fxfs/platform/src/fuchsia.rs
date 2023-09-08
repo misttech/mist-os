@@ -14,7 +14,6 @@ mod paged_object_handle;
 pub mod pager;
 mod remote_crypt;
 mod symlink;
-pub mod vmo_data_buffer;
 pub mod volume;
 pub mod volumes_directory;
 

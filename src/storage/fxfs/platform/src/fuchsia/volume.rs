@@ -12,7 +12,6 @@ use {
         node::{FxNode, GetResult, NodeCache},
         pager::Pager,
         symlink::FxSymlink,
-        vmo_data_buffer::VmoDataBuffer,
         volumes_directory::VolumesDirectory,
     },
     anyhow::{bail, ensure, Error},
@@ -41,7 +40,6 @@ use {
     },
     std::{
         boxed::Box,
-        convert::TryInto,
         future::Future,
         marker::Unpin,
         sync::{Arc, Mutex, Weak},
@@ -367,13 +365,7 @@ impl FxVolume {
     }
 }
 
-impl HandleOwner for FxVolume {
-    type Buffer = VmoDataBuffer;
-
-    fn create_data_buffer(&self, object_id: u64, initial_size: u64) -> Self::Buffer {
-        self.pager.create_vmo(object_id, initial_size).unwrap().try_into().unwrap()
-    }
-}
+impl HandleOwner for FxVolume {}
 
 impl AsRef<ObjectStore> for FxVolume {
     fn as_ref(&self) -> &ObjectStore {

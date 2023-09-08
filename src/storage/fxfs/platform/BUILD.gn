@@ -33,7 +33,6 @@ rustc_library("platform") {
       "src/fuchsia/remote_crypt.rs",
       "src/fuchsia/symlink.rs",
       "src/fuchsia/testing.rs",
-      "src/fuchsia/vmo_data_buffer.rs",
       "src/fuchsia/volume.rs",
       "src/fuchsia/volumes_directory.rs",
     ]
