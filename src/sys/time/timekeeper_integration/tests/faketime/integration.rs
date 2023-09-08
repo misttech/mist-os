@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_fuchsia_time as fft;
 use {
     fidl_fuchsia_metrics_test::{LogMethod, MetricEventLoggerQuerierProxy},
     fidl_fuchsia_testing::Increment,
@@ -82,6 +83,12 @@ fn test_restart_inactive_time_source_that_claims_healthy() {
         fasync::OnSignals::new(&*clock, zx::Signals::CLOCK_STARTED)
             .await
             .expect("Failed to wait for CLOCK_STARTED");
+        fasync::OnSignals::new(
+            &*clock,
+            zx::Signals::from_bits(fft::SIGNAL_UTC_CLOCK_SYNCHRONIZED).unwrap(),
+        )
+        .await
+        .expect("Failed to wait for SIGNAL_UTC_CLOCK_SYNCHRONIZED");
 
         assert_eq!(push_source_controller.lifetime_served_connections(), 1);
 
@@ -136,6 +143,12 @@ fn test_dont_restart_inactive_time_source_with_unhealthy_dependency() {
         fasync::OnSignals::new(&*clock, zx::Signals::CLOCK_STARTED)
             .await
             .expect("Failed to wait for CLOCK_STARTED");
+        fasync::OnSignals::new(
+            &*clock,
+            zx::Signals::from_bits(fft::SIGNAL_UTC_CLOCK_SYNCHRONIZED).unwrap(),
+        )
+        .await
+        .unwrap();
         // Report unhealthy after first sample accepted.
         push_source_controller.set_status(Status::Network).await;
 

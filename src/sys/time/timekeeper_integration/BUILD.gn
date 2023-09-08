@@ -8,9 +8,15 @@ import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
 import("//build/testing/environments.gni")
 
+group("tests") {
+  testonly = true
+  deps = [ ":timekeeper_integration" ]
+}
+
 group("timekeeper_integration") {
   testonly = true
   deps = [
+    ":faketime-integration",
     ":timekeeper-integration",
     "//src/cobalt/bin/testing/mock_cobalt",
   ]
@@ -64,6 +70,7 @@ rustc_test("integration_test_bin") {
     ":timekeeper_integration_lib",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//sdk/fidl/fuchsia.metrics.test:fuchsia.metrics.test_rust",
+    "//sdk/fidl/fuchsia.time:fuchsia.time_rust",
     "//sdk/fidl/fuchsia.time.external:fuchsia.time.external_rust",
     "//src/lib/cobalt/rust/builders",
     "//src/lib/fuchsia",
@@ -87,6 +94,7 @@ rustc_test("faketime_integration_test_bin") {
   deps = [
     ":timekeeper_integration_lib",
     "//sdk/fidl/fuchsia.metrics.test:fuchsia.metrics.test_rust",
+    "//sdk/fidl/fuchsia.time:fuchsia.time_rust",
     "//sdk/fidl/fuchsia.time.external:fuchsia.time.external_rust",
     "//src/lib/fake-clock/fidl:fidl_rust",
     "//src/lib/fuchsia",
@@ -155,16 +163,29 @@ fidl("test.time") {
 }
 
 fuchsia_test_package("timekeeper-integration") {
-  test_components = [
-    ":faketime_integration_test",
-    ":timekeeper_integration_test",
-  ]
+  test_components = [ ":timekeeper_integration_test" ]
   deps = [
-    ":config-values-faketime",
     ":config-values-integration",
     ":timekeeper_for_integration",
+    "dev_time_source:dev_time_source",
+    "//src/cobalt/bin/testing/mock_cobalt:component_v2",
+    "//src/lib/fake-clock/svc",
+  ]
+
+  test_specs = {
+    environments = [ nuc_env ]
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
+fuchsia_test_package("faketime-integration") {
+  test_components = [ ":faketime_integration_test" ]
+  deps = [
+    ":config-values-faketime",
     ":timekeeper_with_fake_time",
-    "dev_time_source",
+    "dev_time_source:dev_time_source",
     "//src/cobalt/bin/testing/mock_cobalt:component_v2",
     "//src/lib/fake-clock/svc",
   ]

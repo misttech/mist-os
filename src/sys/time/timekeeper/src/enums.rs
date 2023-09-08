@@ -32,6 +32,11 @@ pub enum InitializeRtcOutcome {
     ReadFailed,
     InvalidBeforeBackstop,
     Succeeded,
+    /// The UTC clock was started from backstop, instead from RTC.
+    ///
+    /// This happens if RTC is not available, but we must move the UTC clock to support buggy old
+    /// programs that assume UTC is a monotonic clock.
+    StartedFromBackstop,
 }
 
 impl From<RtcCreationError> for InitializeRtcOutcome {
@@ -55,6 +60,7 @@ impl Into<CobaltRtcEvent> for InitializeRtcOutcome {
             Self::ReadNotAttempted => CobaltRtcEvent::ReadSucceeded,
             Self::InvalidBeforeBackstop => CobaltRtcEvent::ReadInvalidBeforeBackstop,
             Self::Succeeded => CobaltRtcEvent::ReadSucceeded,
+            Self::StartedFromBackstop => CobaltRtcEvent::StartedFromBackstop,
         }
     }
 }

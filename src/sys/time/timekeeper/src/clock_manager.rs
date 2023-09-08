@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_fuchsia_time as fft;
+use fuchsia_zircon::{self as zx, AsHandleRef};
 use {
     crate::{
         diagnostics::{Diagnostics, Event},
@@ -14,7 +16,7 @@ use {
         Config,
     },
     chrono::prelude::*,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync,
     std::{
         cmp,
         fmt::{self, Debug},
@@ -523,6 +525,14 @@ fn update_clock(clock: &Arc<zx::Clock>, track: &Track, update: impl Into<zx::Clo
         // serious bug in the generation of a time update). There isn't anything Timekeeper
         // could do to gracefully handle them.
         panic!("Failed to apply update to {:?} clock: {}", track, status);
+    }
+    // Signal any waiters that the UTC clock has been synchronized with an external
+    // time source.
+    if let Err(status) = clock.signal_handle(
+        zx::Signals::NONE,
+        zx::Signals::from_bits(fft::SIGNAL_UTC_CLOCK_SYNCHRONIZED).unwrap(),
+    ) {
+        panic!("Failed to signal clock synchronization to {:?} clock: {}", track, status);
     }
 }
 

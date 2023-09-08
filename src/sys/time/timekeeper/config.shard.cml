@@ -46,5 +46,12 @@
         // Flag for enabling usage of `PullSource` API for the primary track.
         // If set to false, `PullSource` is not used.
         primary_uses_pull: { type: "bool" },
+
+        // If set, the UTC clock is started at timekeeper startup, even if
+        // no reliable UTC estimate is available.
+        //
+        // This helps buggy programs which assume UTC clock is monotonic, and
+        // use it to measure time durations.
+        utc_start_at_startup: { type: "bool" },
     },
 }

@@ -32,7 +32,7 @@ pub const ANY_DURATION: zx::Duration = zx::Duration::from_nanos(i64::MIN);
 #[cfg(test)]
 pub const ANY_TIME: zx::Time = zx::Time::from_nanos(i64::MIN);
 
-/// An event that is potantialle worth recording in one or more diagnostics systems.
+/// An event that is potentially worth recording in one or more diagnostics systems.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
     /// Timekeeper has completed initialization.

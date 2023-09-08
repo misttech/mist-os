@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_fuchsia_time as fft;
 use {
     fidl_fuchsia_metrics::MetricEvent,
     fidl_fuchsia_metrics_test::{LogMethod, MetricEventLoggerQuerierProxy},
@@ -72,6 +73,14 @@ fn test_no_rtc_start_clock_from_time_source() {
 
         tracing::info!("[fxb/130140]: before CLOCK_STARTED");
         fasync::OnSignals::new(&*clock, zx::Signals::CLOCK_STARTED).await.unwrap();
+        tracing::info!("[fxb/130140]: before SIGNAL_UTC_CLOCK_SYNCHRONIZED");
+        fasync::OnSignals::new(
+            &*clock,
+            zx::Signals::from_bits(fft::SIGNAL_UTC_CLOCK_SYNCHRONIZED).unwrap(),
+        )
+        .await
+        .unwrap();
+        tracing::info!("[fxb/130140]: after SIGNAL_UTC_CLOCK_SYNCHRONIZED");
         let after_update_ticks = clock.get_details().unwrap().last_value_update_ticks;
         assert!(after_update_ticks > before_update_ticks);
 
@@ -85,29 +94,42 @@ fn test_no_rtc_start_clock_from_time_source() {
         let cobalt_event_stream =
             create_cobalt_event_stream(Arc::new(cobalt), LogMethod::LogMetricEvents);
         tracing::info!("[fxb/130140]: before cobalt_event_stream.take");
-        assert_eq!(
-            cobalt_event_stream.take(5).collect::<Vec<_>>().await,
-            vec![
-                MetricEvent::builder(REAL_TIME_CLOCK_EVENTS_MIGRATED_METRIC_ID)
+        let actual = cobalt_event_stream.take(6).collect::<Vec<_>>().await;
+        assert!(
+            actual.iter().any(|elem| *elem
+                == MetricEvent::builder(REAL_TIME_CLOCK_EVENTS_MIGRATED_METRIC_ID)
                     .with_event_codes(RtcEventType::NoDevices)
-                    .as_occurrence(1),
-                MetricEvent::builder(TIMEKEEPER_LIFECYCLE_EVENTS_MIGRATED_METRIC_ID)
+                    .as_occurrence(1)),
+            "got: {:#?}",
+            actual
+        );
+        assert!(
+            actual.iter().any(|elem| *elem
+                == MetricEvent::builder(TIMEKEEPER_LIFECYCLE_EVENTS_MIGRATED_METRIC_ID)
                     .with_event_codes(LifecycleEventType::InitializedBeforeUtcStart)
-                    .as_occurrence(1),
-                MetricEvent::builder(TIMEKEEPER_TRACK_EVENTS_MIGRATED_METRIC_ID)
+                    .as_occurrence(1)),
+            "got: {:#?}",
+            actual
+        );
+        assert!(
+            actual.iter().any(|elem| *elem
+                == MetricEvent::builder(TIMEKEEPER_SQRT_COVARIANCE_MIGRATED_METRIC_ID)
+                    .with_event_codes((Track::Primary, Experiment::None))
+                    .as_integer(STD_DEV.into_micros()),),
+            "got: {:#?}",
+            actual
+        );
+        assert!(
+            actual.iter().any(|elem| *elem
+                == MetricEvent::builder(TIMEKEEPER_TRACK_EVENTS_MIGRATED_METRIC_ID)
                     .with_event_codes((
                         TrackEvent::EstimatedOffsetUpdated,
                         Track::Primary,
-                        Experiment::None
+                        Experiment::None,
                     ))
-                    .as_occurrence(1),
-                MetricEvent::builder(TIMEKEEPER_SQRT_COVARIANCE_MIGRATED_METRIC_ID)
-                    .with_event_codes((Track::Primary, Experiment::None))
-                    .as_integer(STD_DEV.into_micros()),
-                MetricEvent::builder(TIMEKEEPER_LIFECYCLE_EVENTS_MIGRATED_METRIC_ID)
-                    .with_event_codes(LifecycleEventType::StartedUtcFromTimeSource)
-                    .as_occurrence(1),
-            ]
+                    .as_occurrence(1),),
+            "got: {:#?}",
+            actual
         );
     });
 }
@@ -149,6 +171,12 @@ fn test_invalid_rtc_start_clock_from_time_source() {
             // Timekeeper should accept the time from the time source.
             tracing::info!("[fxb/130140]: before CLOCK_STARTED");
             fasync::OnSignals::new(&*clock, zx::Signals::CLOCK_STARTED).await.unwrap();
+            fasync::OnSignals::new(
+                &*clock,
+                zx::Signals::from_bits(fft::SIGNAL_UTC_CLOCK_SYNCHRONIZED).unwrap(),
+            )
+            .await
+            .unwrap();
             // UTC time reported by the clock should be at least the time reported by the time
             // source, and no more than the UTC time reported by the time source + time elapsed
             // since the time was read.
@@ -340,8 +368,8 @@ fn test_reject_before_backstop() {
             })
             .collect::<Vec<_>>()
             .await;
-        // Clock should still read backstop.
-        assert_eq!(*BACKSTOP_TIME, clock.read().unwrap());
+        // Clock should not have been rewound to before backstop.
+        assert_leq!(*BACKSTOP_TIME, clock.read().unwrap());
     });
 }
 
@@ -373,6 +401,13 @@ fn test_slew_clock() {
         // the reference.
         tracing::info!("[fxb/130140]: before CLOCK_STARTED");
         fasync::OnSignals::new(&*clock, zx::Signals::CLOCK_STARTED).await.unwrap();
+        tracing::info!("[fxb/130140]: before SIGNAL_UTC_CLOCK_SYNCHRONIZED");
+        fasync::OnSignals::new(
+            &*clock,
+            zx::Signals::from_bits(fft::SIGNAL_UTC_CLOCK_SYNCHRONIZED).unwrap(),
+        )
+        .await
+        .unwrap();
         let clock_rate = clock.get_details().unwrap().mono_to_synthetic.rate;
         assert_eq!(clock_rate.reference_ticks, clock_rate.synthetic_ticks);
         let last_generation_counter = clock.get_details().unwrap().generation_counter;
@@ -419,10 +454,16 @@ fn test_step_clock() {
             })
             .await;
 
-        // After the first sample, the clock is started, and running at the same rate as
-        // the reference.
+        // Wait until the clock is running and synchronized before testing.
         tracing::info!("[fxb/130140]: before CLOCK_STARTED");
         fasync::OnSignals::new(&*clock, zx::Signals::CLOCK_STARTED).await.unwrap();
+        tracing::info!("[fxb/130140]: before SIGNAL_UTC_CLOCK_SYNCHRONIZED");
+        fasync::OnSignals::new(
+            &*clock,
+            zx::Signals::from_bits(fft::SIGNAL_UTC_CLOCK_SYNCHRONIZED).unwrap(),
+        )
+        .await
+        .unwrap();
         let utc_now = clock.read().unwrap();
         let monotonic_after = zx::Time::get_monotonic();
         assert_geq!(utc_now, sample_1_utc + BETWEEN_SAMPLES);

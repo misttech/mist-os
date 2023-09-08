@@ -38,11 +38,9 @@ use {
 };
 
 /// URL for timekeeper.
-const TIMEKEEPER_URL: &str =
-    "fuchsia-pkg://fuchsia.com/timekeeper-integration#meta/timekeeper_for_integration.cm";
+const TIMEKEEPER_URL: &str = "#meta/timekeeper_for_integration.cm";
 /// URL for timekeeper with fake time.
-const TIMEKEEPER_FAKE_TIME_URL: &str =
-    "fuchsia-pkg://fuchsia.com/timekeeper-integration#meta/timekeeper_with_fake_time.cm";
+const TIMEKEEPER_FAKE_TIME_URL: &str = "#meta/timekeeper_with_fake_time.cm";
 /// URL for fake cobalt.
 const COBALT_URL: &str = "#meta/mock_cobalt.cm";
 /// URL for the fake clock component.

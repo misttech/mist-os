@@ -21,6 +21,6 @@ group("tests") {
     "lib/push-source:tests",
     "lib/time-util:tests",
     "timekeeper:tests",
-    "timekeeper_integration",
+    "timekeeper_integration:tests",
   ]
 }
