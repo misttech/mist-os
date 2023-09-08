@@ -11,15 +11,15 @@ library fuchsia.usb;
 // acquire a single interface of the device (ZX_PROTOCOL_USB_INTERFACE). ZX_PROTOCOL_USB is still
 // used for the banjo protocol for both kinds of drivers.
 extend uint fuchsia.BIND_PROTOCOL {
-  DEVICE = 34,
-  BUS = 35,
-  COMPOSITE = 36,
-  DCI = 37,
-  INTERFACE = 38,
-  INTERFACE_ASSOCIATION = 166,
-  PERIPHERAL = 39,
-  FUNCTION = 40,
-  HCI = 42,
+  DEVICE = 0x22,
+  BUS = 0x23,
+  COMPOSITE = 0x24,
+  DCI = 0x25,
+  INTERFACE = 0x26,
+  INTERFACE_ASSOCIATION = 0xA6,
+  PERIPHERAL = 0x27,
+  FUNCTION = 0x28,
+  HCI = 0x2A,
 };
 
 extend uint fuchsia.BIND_USB_VID {
