@@ -75,12 +75,6 @@ executable("engine-bin") {
   deps = [ ":engine-lib" ]
 }
 
-fuchsia_component("engine") {
-  testonly = true
-  manifest = "meta/engine.cml"
-  deps = [ ":engine-bin" ]
-}
-
 # Tests and test support.
 
 source_set("testing") {

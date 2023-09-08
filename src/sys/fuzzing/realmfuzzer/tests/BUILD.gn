@@ -58,7 +58,6 @@ fuchsia_test_package("integration-tests-pkg") {
   deps = [
     ":fuzzer",
     "//src/sys/fuzzing/realmfuzzer/coverage",
-    "//src/sys/fuzzing/realmfuzzer/engine",
   ]
 }
 

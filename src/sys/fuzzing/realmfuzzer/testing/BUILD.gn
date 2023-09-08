@@ -45,25 +45,3 @@ executable("test-target") {
     "//zircon/system/ulib/zx",
   ]
 }
-
-# The test engine is used to drive the target adapter with fixed inputs from the seed corpus. This
-# is used to create fuzzer tests that can be run as part of CQ.
-executable("engine-bin") {
-  output_name = "realmfuzzer_test_engine"
-  testonly = true
-  sources = [ "engine.cc" ]
-  deps = [
-    "//sdk/lib/fidl/cpp",
-    "//sdk/lib/sys/cpp",
-    "//src/lib/fxl/test:gtest_main",
-    "//src/sys/fuzzing/common",
-    "//src/sys/fuzzing/common/testing",
-    "//src/sys/fuzzing/realmfuzzer/engine:engine-lib",
-    "//third_party/googletest:gtest",
-  ]
-}
-
-fuchsia_test_component("engine") {
-  manifest = "meta/engine.cml"
-  deps = [ ":engine-bin" ]
-}
