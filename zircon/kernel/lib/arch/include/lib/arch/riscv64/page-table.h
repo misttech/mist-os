@@ -9,6 +9,7 @@
 
 #include <inttypes.h>
 #include <lib/arch/paging.h>
+#include <lib/arch/sysreg.h>
 #include <lib/stdcompat/algorithm.h>
 #include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
@@ -20,6 +21,36 @@
 #include <hwreg/bitfields.h>
 
 namespace arch {
+
+struct RiscvSatp : public SysRegBase<RiscvSatp, uint64_t> {
+  enum class Mode : uint16_t {
+    kBare = 0,  // No translation or protection.
+    // 1-7 are reserved for standard use.
+    kSv39 = 8,
+    kSv48 = 9,
+    kSv57 = 10,
+    kSv64 = 11,
+    // 12-13 are reserved for standard use.
+    // 14-15 are reserved for custom use.
+  };
+
+  RiscvSatp& SetBareMode() {
+    // Apart from Mode::kBare, all other fields must be zeroed out.
+    return set_reg_value(0);
+  }
+
+  uint64_t root_address() const { return ppn() << 12; }
+
+  RiscvSatp& set_root_address(uint64_t addr) {
+    ZX_ASSERT((fbl::ExtractBits<11, 0, uint64_t>(addr) == 0));
+    return set_ppn(addr >> 12);
+  }
+
+  DEF_ENUM_FIELD(Mode, 63, 60, mode);
+  DEF_FIELD(59, 44, asid);
+  DEF_FIELD(43, 0, ppn);
+};
+ARCH_RISCV64_SYSREG(RiscvSatp, "satp");
 
 enum class RiscvPagingLevel {
   k4 = 4,
