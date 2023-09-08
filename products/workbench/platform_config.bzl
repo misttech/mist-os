@@ -26,6 +26,11 @@ workbench_platform_config = {
             "netcfg_config_path": "LABEL(//src/connectivity/network/netcfg/config:%s.json)" % ("delegated_network_provisioning" if delegated_network_provisioning else "default"),
         },
     },
+    "forensics": {
+        "feedback": {
+            "low_memory": True,
+        },
+    },
     "icu": {
         "revision": "default",
     },

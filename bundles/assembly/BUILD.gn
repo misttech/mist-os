@@ -945,6 +945,11 @@ assembly_input_bundle("radar_proxy_without_injector") {
   ]
 }
 
+assembly_input_bundle("feedback_low_memory_product_config") {
+  config_data_labels =
+      [ "//src/developer/forensics:feedback_low_memory_product_config" ]
+}
+
 ########
 #
 # The "minimal" AIBs

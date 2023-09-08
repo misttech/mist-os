@@ -31,6 +31,7 @@ mod diagnostics;
 mod driver_framework;
 mod example;
 mod fonts;
+mod forensics;
 mod graphics;
 mod hwinfo;
 mod identity;
@@ -303,6 +304,13 @@ fn configure_subsystems(
 
     setui::SetUiSubsystem::define_configuration(context, &config.platform.setui, builder)
         .context("Confguring the 'SetUI' subsystem")?;
+
+    forensics::ForensicsSubsystem::define_configuration(
+        context,
+        &config.platform.forensics,
+        builder,
+    )
+    .context("Configuring the 'Forensics' subsystem")?;
 
     Ok(())
 }

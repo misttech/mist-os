@@ -175,6 +175,9 @@ user_platform_aib_names =
 
       # Battery
       "battery_manager",
+
+      # Forensics
+      "feedback_low_memory_product_config",
     ]
 
 if (current_cpu != "riscv64") {

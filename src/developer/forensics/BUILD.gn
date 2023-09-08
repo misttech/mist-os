@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/config_data_for_assembly.gni")
 import("//build/components.gni")
 import("//build/config.gni")
 
@@ -132,6 +133,14 @@ config_data("feedback_large_disk_product_config") {
   for_pkg = "forensics"
 
   sources = [ "feedback/configs/product/large_disk.json" ]
+
+  outputs = [ "product/override_config.json" ]
+}
+
+config_data_for_assembly("feedback_low_memory_product_config") {
+  for_pkg = "forensics"
+
+  sources = [ "feedback/configs/product/low_memory.json" ]
 
   outputs = [ "product/override_config.json" ]
 }
