@@ -24,8 +24,6 @@ namespace memalloc {
 class Pool;
 }  // namespace memalloc
 
-class AddressSpace;
-
 // Perform architecture-specific address space set-up. The "Early" variant
 // assumes that only the boot conditions hold and is expected to be called
 // before "normal work" can proceed; otherwise, the "Late" variant assumes that
@@ -37,10 +35,6 @@ class AddressSpace;
 // practical sense, and the associated functions may be no-ops.
 void ArchSetUpAddressSpaceEarly();
 void ArchSetUpAddressSpaceLate();
-
-// Set up the identity-mapped address space. This is the main subroutine of
-// ArchSetUpAddressSpace* (when implemented).
-void ArchSetUpIdentityAddressSpace(AddressSpace& aspace);
 
 // A representation of a virtual address space.
 //
@@ -56,6 +50,8 @@ void ArchSetUpIdentityAddressSpace(AddressSpace& aspace);
 // Further, this type similarly relies on a function ArchCreatePagingState() to
 // be defined in the header, creating the paging traits' coincidental
 // SystemState specification. See Init() below.
+//
+// An AddressSpace must be manually installed (via Install()).
 class AddressSpace {
  public:
   using LowerPaging = arch::Paging<ArchLowerPagingTraits>;
@@ -141,9 +137,16 @@ class AddressSpace {
     return Map(addr, size, addr, settings);
   }
 
-  // Identity maps in the global UART's registers, assuming that they fit
-  // within a single page.
-  void IdentityMapUart();
+  // Identity maps in all RAM as RWX, as well as the global UART's registers
+  // (assuming that they fit within a single page).
+  void SetUpIdentityMappings() {
+    IdentityMapRam();
+    IdentityMapUart();
+  }
+
+  // Configures the hardware to install the address space (in an
+  // architecture-specific fashion).
+  void ArchInstall() const;
 
  private:
   static constexpr uint64_t kNumTableEntries =
@@ -168,6 +171,9 @@ class AddressSpace {
       *LowerPaging::kLowerVirtualAddressRangeEnd;
   static constexpr uint64_t kUpperVirtualAddressRangeStart =
       *UpperPaging::kUpperVirtualAddressRangeStart;
+
+  void IdentityMapRam();
+  void IdentityMapUart();
 
   fit::inline_function<decltype(Table{}.direct_io())(uint64_t)> paddr_to_io_ = [](uint64_t paddr) {
     return reinterpret_cast<Table*>(paddr)->direct_io();

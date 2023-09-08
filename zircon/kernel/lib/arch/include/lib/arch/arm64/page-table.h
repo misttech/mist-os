@@ -84,6 +84,9 @@ struct ArmSystemPagingState {
 
   ArmMemoryAttrIndirectionRegister mair;
   ArmShareabilityAttribute shareability = ArmShareabilityAttribute::kNone;
+
+  // TODO(fxbug.dev/131555): This is included only to account for the
+  // associated bug.
   bool el1 = true;
 };
 
@@ -368,6 +371,8 @@ class ArmAddressTranslationDescriptor
 
       auto set_xn = [&](auto& desc) {
         // We do not need to support user-executable pages at this time.
+        //
+        // TODO(fxbug.dev/131555): set UXN to false always.
         desc.set_uxn(state.el1).set_pxn(!access.executable);
       };
 
@@ -393,6 +398,8 @@ class ArmAddressTranslationDescriptor
       AsTable()
           .set_ap_table(ap_table)
           // We do not need to support user-executable pages at this time.
+          //
+          // TODO(fxbug.dev/131555): set UXN_TABLE to false always.
           .set_uxn_table(state.el1)
           .set_pxn_table(!access.executable);
     }

@@ -52,7 +52,8 @@ void ArchSetUpAddressSpaceLate() {
   // physical page allocator that respects explicitly reserved ranges.
   AddressSpace aspace;
   aspace.Init();
-  ArchSetUpIdentityAddressSpace(aspace);
+  aspace.SetUpIdentityMappings();
+  aspace.ArchInstall();
 
   // Now actually turn on paging.  This affects us immediately in 32-bit mode,
   // as well as being mandatory for 64-bit mode.

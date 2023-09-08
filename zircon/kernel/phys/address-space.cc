@@ -52,6 +52,50 @@ fit::result<AddressSpace::MapError> AddressSpace::Map(uint64_t vaddr, uint64_t s
                           size, paddr, settings);
 }
 
+void AddressSpace::IdentityMapRam() {
+  memalloc::Pool& pool = Allocation::GetPool();
+
+  // To account for the case of non-page-aligned RAM, we extend the mapped
+  // region to page-aligned boundaries, tracking the end of the last aligned
+  // range in the process. There should not be cases where both RAM and MMIO
+  // appear within the same page.
+  ktl::optional<uint64_t> last_aligned_end;
+  pool.NormalizeRam([&](const memalloc::Range& range) {
+    constexpr uint64_t kPageSize = ZX_PAGE_SIZE;
+
+    // If the end of the last page-aligned range overlaps with the current,
+    // take that to be the start of the current range.
+    uint64_t addr, size;
+    if (last_aligned_end && *last_aligned_end > range.addr) {
+      if (*last_aligned_end >= range.end()) {
+        return;
+      }
+      addr = *last_aligned_end;
+      size = range.end() - *last_aligned_end;
+    } else {
+      addr = range.addr & -kPageSize;
+      size = (range.addr - addr) + range.size;
+    }
+
+    // Now page-align up the size.
+    size = (size + kPageSize - 1) & ~(kPageSize - 1);
+
+    auto result = IdentityMap(addr, size,
+                              AddressSpace::NormalMapSettings({
+                                  .readable = true,
+                                  .writable = true,
+                                  .executable = true,
+                              }));
+    if (result.is_error()) {
+      ZX_PANIC("Failed to identity-map range [%#" PRIx64 ", %#" PRIx64
+               ") (page-aligned from [%#" PRIx64 ", %#" PRIx64 "))",
+               addr, addr + size, range.addr, range.end());
+    }
+
+    last_aligned_end = addr + size;
+  });
+}
+
 void AddressSpace::IdentityMapUart() {
   auto mapper = [this](uint64_t uart_mmio_base) -> volatile void* {
     uint64_t base = uart_mmio_base & ~(uint64_t{ZX_PAGE_SIZE} - 1);
