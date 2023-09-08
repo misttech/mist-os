@@ -11,7 +11,7 @@
 
 #include "src/stdio/printf_core/printf_main.h"
 
-namespace __llvm_libc::printf_core {
+namespace LIBC_NAMESPACE::printf_core {
 
 // This provides a handy generic wrapper for using the printf core with an
 // arbitrary int(std::string_view) callable object.
@@ -109,6 +109,6 @@ constexpr auto MakePrintf(T write) {
   };
 }
 
-}  // namespace __llvm_libc::printf_core
+}  // namespace LIBC_NAMESPACE::printf_core
 
 #endif  // ZIRCON_SYSTEM_ULIB_C_STDIO_PRINTF_CORE_WRAPPER_H_

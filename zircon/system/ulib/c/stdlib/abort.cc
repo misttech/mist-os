@@ -9,7 +9,7 @@
 
 #include "src/__support/common.h"
 
-namespace __llvm_libc {
+namespace LIBC_NAMESPACE {
 
 LLVM_LIBC_FUNCTION(void, abort, ()) {
   for (;;) {
@@ -18,4 +18,4 @@ LLVM_LIBC_FUNCTION(void, abort, ()) {
   }
 }
 
-}  // namespace __llvm_libc
+}  // namespace LIBC_NAMESPACE

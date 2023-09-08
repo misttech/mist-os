@@ -9,15 +9,15 @@
 
 #undef LLVM_LIBC_FUNCTION_IMPL
 
-#define LLVM_LIBC_FUNCTION_IMPL(type, name, arglist)                                      \
-  LLVM_LIBC_FUNCTION_ATTR decltype(__llvm_libc::name) __##name##_impl__ __asm__(#name);   \
-  decltype(__llvm_libc::name) name [[gnu::alias(#name)]];                                 \
-  MEM_INTERNAL_NAME(name, __libc_)                                                        \
-  MEM_INTERNAL_NAME(name, __asan_, gnu::weak)                                             \
-  MEM_INTERNAL_NAME(name, __hwasan_, gnu::weak)                                           \
-  IF_LIBC_UNSANITIZED(                                                                    \
-      extern "C" LLVM_LIBC_FUNCTION_ATTR decltype(__llvm_libc::name) __unsanitized_##name \
-      [[gnu::alias(#name)]];)                                                             \
+#define LLVM_LIBC_FUNCTION_IMPL(type, name, arglist)                                         \
+  LLVM_LIBC_FUNCTION_ATTR decltype(LIBC_NAMESPACE::name) __##name##_impl__ __asm__(#name);   \
+  decltype(LIBC_NAMESPACE::name) name [[gnu::alias(#name)]];                                 \
+  MEM_INTERNAL_NAME(name, __libc_)                                                           \
+  MEM_INTERNAL_NAME(name, __asan_, gnu::weak)                                                \
+  MEM_INTERNAL_NAME(name, __hwasan_, gnu::weak)                                              \
+  IF_LIBC_UNSANITIZED(                                                                       \
+      extern "C" LLVM_LIBC_FUNCTION_ATTR decltype(LIBC_NAMESPACE::name) __unsanitized_##name \
+      [[gnu::alias(#name)]];)                                                                \
   type __##name##_impl__ arglist
 
 // Since this code is built without sanitizers, it unconditionally defines the
@@ -26,7 +26,7 @@
 // exported so it doesn't matter that they're defined in unsanitized builds.
 
 #define MEM_INTERNAL_NAME(name, prefix, ...) \
-  extern "C" decltype(__llvm_libc::name) prefix##name [[gnu::alias(#name), ##__VA_ARGS__]];
+  extern "C" decltype(LIBC_NAMESPACE::name) prefix##name [[gnu::alias(#name), ##__VA_ARGS__]];
 
 #ifdef LIBC_UNSANITIZED
 #define IF_LIBC_UNSANITIZED(x) x
