@@ -24,14 +24,12 @@ use crate::{
 const DATA_SIZE: usize = size_of::<inotify_event>();
 
 // InotifyFileObject represents an inotify instance created by inotify_init(2) or inotify_init1(2).
-#[derive(Default)]
 pub struct InotifyFileObject {
     state: Mutex<InotifyState>,
 }
 
-#[derive(Default)]
 struct InotifyState {
-    events: VecDeque<InotifyEvent>,
+    events: InotifyEventQueue,
 
     watches: HashMap<WdNumber, DirEntryHandle>,
 
@@ -51,8 +49,21 @@ pub struct InotifyWatchers {
     watchers: Mutex<HashMap<WeakKey<FileObject>, InotifyWatcher>>,
 }
 
+#[derive(Default)]
+struct InotifyEventQueue {
+    // queue can contain max_queued_events inotify events, plus one optional IN_Q_OVERFLOW event
+    // if more events arrive.
+    queue: VecDeque<InotifyEvent>,
+
+    size_bytes: usize,
+
+    // This value is copied from /proc/sys/fs/inotify/max_queued_events on creation and is
+    // constant afterwards, even if the proc file is modified.
+    max_queued_events: usize,
+}
+
 // Serialized to inotify_event, see inotify(7).
-#[derive(PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 struct InotifyEvent {
     watch_id: WdNumber,
 
@@ -75,7 +86,20 @@ impl InotifyFileObject {
     pub fn new_file(current_task: &CurrentTask, non_blocking: bool) -> FileHandle {
         let flags =
             OpenFlags::RDONLY | if non_blocking { OpenFlags::NONBLOCK } else { OpenFlags::empty() };
-        Anon::new_file(current_task, Box::<InotifyFileObject>::default(), flags)
+        let max_queued_events =
+            current_task.kernel().inotify_max_queued_events.load(Ordering::Relaxed);
+        Anon::new_file(
+            current_task,
+            Box::new(InotifyFileObject {
+                state: InotifyState {
+                    events: InotifyEventQueue::new_with_max(max_queued_events),
+                    watches: Default::default(),
+                    last_watch_id: 0,
+                }
+                .into(),
+            }),
+            flags,
+        )
     }
 
     /// Adds a watch to the inotify instance.
@@ -111,7 +135,7 @@ impl InotifyFileObject {
         {
             let mut state = self.state.lock();
             dir_entry = state.watches.remove(&watch_id).ok_or_else(|| errno!(EINVAL))?;
-            state.events.push_back(InotifyEvent::new(
+            state.events.enqueue(InotifyEvent::new(
                 watch_id,
                 InotifyMask::IGNORED,
                 0,
@@ -134,14 +158,10 @@ impl InotifyFileObject {
         let _dir_entry: Option<DirEntryHandle>;
         {
             let mut state = self.state.lock();
-            let new_event = InotifyEvent::new(watch_id, event_mask, cookie, name.to_vec());
-            if Some(&new_event) == state.events.back() {
-                return;
-            }
-            state.events.push_back(new_event);
+            state.events.enqueue(InotifyEvent::new(watch_id, event_mask, cookie, name.to_vec()));
             if remove_watcher_after_notify {
                 _dir_entry = state.watches.remove(&watch_id);
-                state.events.push_back(InotifyEvent::new(
+                state.events.enqueue(InotifyEvent::new(
                     watch_id,
                     InotifyMask::IGNORED,
                     0,
@@ -153,7 +173,7 @@ impl InotifyFileObject {
 
     fn available(&self) -> usize {
         let state = self.state.lock();
-        state.events.iter().fold(0, |total, event| total.saturating_add(event.size()))
+        state.events.size_bytes
     }
 }
 
@@ -197,7 +217,7 @@ impl FileOps for InotifyFileObject {
             }
             // Linux always dequeues an available event as long as there's enough buffer space to
             // copy it out, even if the copy below fails. Emulate this behaviour.
-            bytes_read += state.events.pop_front().unwrap().write_to(data)?;
+            bytes_read += state.events.dequeue().unwrap().write_to(data)?;
         }
         Ok(bytes_read)
     }
@@ -248,6 +268,53 @@ impl FileOps for InotifyFileObject {
         for dir_entry in dir_entries {
             dir_entry.node.watchers.remove_by_ref(file);
         }
+    }
+}
+
+impl InotifyEventQueue {
+    fn new_with_max(max_queued_events: u64) -> Self {
+        InotifyEventQueue {
+            queue: Default::default(),
+            size_bytes: 0,
+            max_queued_events: max_queued_events as usize,
+        }
+    }
+
+    fn enqueue(&mut self, mut event: InotifyEvent) {
+        if self.queue.len() > self.max_queued_events {
+            return;
+        }
+        if self.queue.len() == self.max_queued_events {
+            // If this event will overflow the queue, discard it and enqueue IN_Q_OVERFLOW instead.
+            event = InotifyEvent::new(
+                WdNumber::from_raw(-1),
+                InotifyMask::Q_OVERFLOW,
+                0,
+                FsString::default(),
+            );
+        }
+        if Some(&event) == self.queue.back() {
+            // From https://man7.org/linux/man-pages/man7/inotify.7.html
+            // If successive output inotify events produced on the inotify file
+            // descriptor are identical (same wd, mask, cookie, and name), then
+            // they are coalesced into a single event if the older event has not
+            // yet been read.
+            return;
+        }
+        self.size_bytes += event.size();
+        self.queue.push_back(event);
+    }
+
+    fn front(&self) -> Option<&InotifyEvent> {
+        self.queue.front()
+    }
+
+    fn dequeue(&mut self) -> Option<InotifyEvent> {
+        let maybe_event = self.queue.pop_front();
+        if let Some(event) = maybe_event.as_ref() {
+            self.size_bytes -= event.size();
+        }
+        maybe_event
     }
 }
 
@@ -435,6 +502,100 @@ mod tests {
     }
 
     #[::fuchsia::test]
+    fn inotify_event_queue() {
+        let mut event_queue = InotifyEventQueue::new_with_max(10);
+
+        event_queue.enqueue(InotifyEvent::new(
+            WdNumber::from_raw(1),
+            InotifyMask::ACCESS,
+            0,
+            "".into(),
+        ));
+
+        assert_eq!(event_queue.queue.len(), 1);
+        assert_eq!(event_queue.size_bytes, DATA_SIZE);
+
+        let event = event_queue.dequeue();
+
+        assert_eq!(
+            event,
+            Some(InotifyEvent::new(WdNumber::from_raw(1), InotifyMask::ACCESS, 0, "".into()))
+        );
+        assert_eq!(event_queue.queue.len(), 0);
+        assert_eq!(event_queue.size_bytes, 0);
+    }
+
+    #[::fuchsia::test]
+    fn inotify_event_queue_coalesce_events() {
+        let mut event_queue = InotifyEventQueue::new_with_max(10);
+
+        // Generate 2 identical events. They should combine into 1.
+        event_queue.enqueue(InotifyEvent::new(
+            WdNumber::from_raw(1),
+            InotifyMask::ACCESS,
+            0,
+            "".into(),
+        ));
+        event_queue.enqueue(InotifyEvent::new(
+            WdNumber::from_raw(1),
+            InotifyMask::ACCESS,
+            0,
+            "".into(),
+        ));
+
+        assert_eq!(event_queue.queue.len(), 1);
+    }
+
+    #[::fuchsia::test]
+    fn inotify_event_queue_max_queued_events() {
+        let mut event_queue = InotifyEventQueue::new_with_max(1);
+
+        // Generate 2 events, but the second event overflows the queue.
+        event_queue.enqueue(InotifyEvent::new(
+            WdNumber::from_raw(1),
+            InotifyMask::ACCESS,
+            0,
+            "".into(),
+        ));
+        event_queue.enqueue(InotifyEvent::new(
+            WdNumber::from_raw(1),
+            InotifyMask::MODIFY,
+            0,
+            "".into(),
+        ));
+
+        assert_eq!(event_queue.queue.len(), 2);
+        assert_eq!(event_queue.queue.get(0).unwrap().mask, InotifyMask::ACCESS);
+        assert_eq!(event_queue.queue.get(1).unwrap().mask, InotifyMask::Q_OVERFLOW);
+
+        // More events cannot be added to the queue.
+        event_queue.enqueue(InotifyEvent::new(
+            WdNumber::from_raw(1),
+            InotifyMask::ATTRIB,
+            0,
+            "".into(),
+        ));
+        assert_eq!(event_queue.queue.len(), 2);
+        assert_eq!(event_queue.queue.get(0).unwrap().mask, InotifyMask::ACCESS);
+        assert_eq!(event_queue.queue.get(1).unwrap().mask, InotifyMask::Q_OVERFLOW);
+
+        // Dequeue 1 event.
+        let _event = event_queue.dequeue();
+        assert_eq!(event_queue.queue.len(), 1);
+
+        // More events still cannot make it to the queue. This is because they would cause an overflow,
+        // but there is already a Q_OVERFLOW event in the queue so we do not enqueue another one.
+        event_queue.enqueue(InotifyEvent::new(
+            WdNumber::from_raw(1),
+            InotifyMask::DELETE,
+            0,
+            "".into(),
+        ));
+        assert_eq!(event_queue.queue.len(), 1);
+        assert_eq!(event_queue.queue.get(0).unwrap().mask, InotifyMask::Q_OVERFLOW);
+    }
+
+    #[::fuchsia::test]
     async fn notify_from_watchers() {
         let (_kernel, current_task) = create_kernel_and_task();
 
@@ -458,7 +619,7 @@ mod tests {
         {
             let state = inotify.state.lock();
             assert_eq!(state.watches.len(), 1);
-            assert_eq!(state.events.len(), 1);
+            assert_eq!(state.events.queue.len(), 1);
         }
 
         // Generate another event.
@@ -467,7 +628,7 @@ mod tests {
         assert_eq!(inotify.available(), DATA_SIZE * 2);
         {
             let state = inotify.state.lock();
-            assert_eq!(state.events.len(), 2);
+            assert_eq!(state.events.queue.len(), 2);
         }
 
         // Read 1 event.
@@ -478,7 +639,7 @@ mod tests {
         assert_eq!(inotify.available(), DATA_SIZE);
         {
             let state = inotify.state.lock();
-            assert_eq!(state.events.len(), 1);
+            assert_eq!(state.events.queue.len(), 1);
         }
 
         // Read other event.
@@ -489,7 +650,7 @@ mod tests {
         assert_eq!(inotify.available(), 0);
         {
             let state = inotify.state.lock();
-            assert_eq!(state.events.len(), 0);
+            assert_eq!(state.events.queue.len(), 0);
         }
     }
 
@@ -520,10 +681,10 @@ mod tests {
         {
             let state = inotify.state.lock();
             assert_eq!(state.watches.len(), 0);
-            assert_eq!(state.events.len(), 2);
+            assert_eq!(state.events.queue.len(), 2);
 
-            assert_eq!(state.events.get(0).unwrap().mask, InotifyMask::DELETE_SELF);
-            assert_eq!(state.events.get(1).unwrap().mask, InotifyMask::IGNORED);
+            assert_eq!(state.events.queue.get(0).unwrap().mask, InotifyMask::DELETE_SELF);
+            assert_eq!(state.events.queue.get(1).unwrap().mask, InotifyMask::IGNORED);
         }
     }
 
@@ -606,7 +767,7 @@ mod tests {
         {
             let state = inotify.state.lock();
             assert_eq!(state.watches.len(), 1);
-            assert_eq!(state.events.len(), 1);
+            assert_eq!(state.events.queue.len(), 1);
         }
     }
 }

@@ -170,7 +170,7 @@ pub struct Kernel {
     // in a text form in the file /proc/sys/kernel/seccomp/actions_logged.
     pub actions_logged: AtomicU16,
 
-    /// The manger for power subsystems including reboot and suspend.
+    /// The manager for power subsystems including reboot and suspend.
     pub power_manager: PowerManager,
 
     /// Unique IDs for new mounts and mount namespaces.
@@ -180,6 +180,12 @@ pub struct Kernel {
 
     /// Unique cookie used to link two inotify events, usually an IN_MOVE_FROM/IN_MOVE_TO pair.
     pub next_inotify_cookie: AtomicU32,
+
+    /// Max inotify event queue size.
+    ///
+    /// This value is used during the creation of an inotify instance.
+    /// TODO(b/297439734): Link to /proc/sys/fs/inotify/max_queued_events.
+    pub inotify_max_queued_events: AtomicU64,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -277,6 +283,7 @@ impl Kernel {
             next_peer_group_id: AtomicU64::new(1),
             next_namespace_id: AtomicU64::new(1),
             next_inotify_cookie: AtomicU32::new(1),
+            inotify_max_queued_events: AtomicU64::new(16384),
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle
