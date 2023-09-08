@@ -13,16 +13,15 @@ pub mod queue;
 pub mod socket;
 mod state;
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{boxed::Box, collections::HashMap, vec::Vec};
 use core::{
     fmt::{self, Debug, Display, Formatter},
     hash::Hash,
     marker::PhantomData,
-    num::{NonZeroU8, NonZeroUsize},
+    num::NonZeroU8,
     ops::Deref as _,
 };
 
-use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use lock_order::{
     lock::{RwLockFor, UnlockedAccess},
@@ -40,10 +39,6 @@ use tracing::{debug, trace};
 
 use crate::{
     context::{InstantContext, RecvFrameContext, SendFrameContext},
-    data_structures::{
-        id_map::{self, IdMap},
-        id_map_collection::IdMapCollectionKey,
-    },
     device::{
         ethernet::{
             EthernetDeviceState, EthernetDeviceStateBuilder,
@@ -203,20 +198,13 @@ fn with_ethernet_state_and_sync_ctx<
     NonSyncCtx: NonSyncContext,
     O,
     F: FnOnce(
-        Locked<
-            &IpLinkDeviceState<
-                NonSyncCtx,
-                NonSyncCtx::EthernetDeviceState,
-                EthernetDeviceState<NonSyncCtx::Instant>,
-            >,
-            L,
-        >,
+        Locked<&EthernetReferenceState<NonSyncCtx>, L>,
         &mut Locked<&SyncCtx<NonSyncCtx>, L>,
     ) -> O,
     L,
 >(
     sync_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
-    EthernetDeviceId(_id, state): &EthernetDeviceId<NonSyncCtx>,
+    EthernetDeviceId(state): &EthernetDeviceId<NonSyncCtx>,
     cb: F,
 ) -> O {
     // Make sure that the pointer belongs to this `sync_ctx`.
@@ -234,16 +222,7 @@ fn with_ethernet_state_and_sync_ctx<
 fn with_ethernet_state<
     NonSyncCtx: NonSyncContext,
     O,
-    F: FnOnce(
-        Locked<
-            &IpLinkDeviceState<
-                NonSyncCtx,
-                NonSyncCtx::EthernetDeviceState,
-                EthernetDeviceState<NonSyncCtx::Instant>,
-            >,
-            L,
-        >,
-    ) -> O,
+    F: FnOnce(Locked<&EthernetReferenceState<NonSyncCtx>, L>) -> O,
     L,
 >(
     sync_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
@@ -258,12 +237,7 @@ fn with_ethernet_state<
 fn with_loopback_state<
     NonSyncCtx: NonSyncContext,
     O,
-    F: FnOnce(
-        Locked<
-            &'_ IpLinkDeviceState<NonSyncCtx, NonSyncCtx::LoopbackDeviceState, LoopbackDeviceState>,
-            L,
-        >,
-    ) -> O,
+    F: FnOnce(Locked<&'_ LoopbackReferenceState<NonSyncCtx>, L>) -> O,
     L,
 >(
     sync_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
@@ -420,14 +394,12 @@ impl<NonSyncCtx: NonSyncContext> DualStackDeviceContext<NonSyncCtx>
 /// and ethernet device ID iterators. This struct only exists as a named type
 /// so it can be an associated type on impls of the [`IpDeviceContext`] trait.
 pub(crate) struct DevicesIter<'s, C: NonSyncContext> {
-    ethernet: id_map::Iter<
+    ethernet: alloc::collections::hash_map::Values<
         's,
-        PrimaryRc<IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState<C::Instant>>>,
+        StrongRc<EthernetReferenceState<C>>,
+        PrimaryRc<EthernetReferenceState<C>>,
     >,
-    loopback: core::option::Iter<
-        's,
-        PrimaryRc<IpLinkDeviceState<C, C::LoopbackDeviceState, LoopbackDeviceState>>,
-    >,
+    loopback: core::option::Iter<'s, PrimaryRc<LoopbackReferenceState<C>>>,
 }
 
 impl<'s, C: NonSyncContext> Iterator for DevicesIter<'s, C> {
@@ -436,7 +408,7 @@ impl<'s, C: NonSyncContext> Iterator for DevicesIter<'s, C> {
     fn next(&mut self) -> Option<Self::Item> {
         let Self { ethernet, loopback } = self;
         ethernet
-            .map(|(id, state)| EthernetDeviceId(id, PrimaryRc::clone_strong(state)).into())
+            .map(|rc| EthernetDeviceId(PrimaryRc::clone_strong(rc)).into())
             .chain(
                 loopback.map(|state| {
                     DeviceId::Loopback(LoopbackDeviceId(PrimaryRc::clone_strong(state)))
@@ -535,9 +507,9 @@ impl<
         cb: F,
     ) -> O {
         let (devices, locked) = self.read_lock_and::<crate::lock_ordering::DeviceLayerState>();
-        let Devices { ethernet, loopback } = &*devices;
+        let Devices { ethernet_counter: _, ethernet, loopback } = &*devices;
 
-        cb(DevicesIter { ethernet: ethernet.iter(), loopback: loopback.iter() }, locked)
+        cb(DevicesIter { ethernet: ethernet.values(), loopback: loopback.iter() }, locked)
     }
 
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
@@ -952,9 +924,9 @@ impl<
         cb: F,
     ) -> O {
         let (devices, locked) = self.read_lock_and::<crate::lock_ordering::DeviceLayerState>();
-        let Devices { ethernet, loopback } = &*devices;
+        let Devices { ethernet_counter: _, ethernet, loopback } = &*devices;
 
-        cb(DevicesIter { ethernet: ethernet.iter(), loopback: loopback.iter() }, locked)
+        cb(DevicesIter { ethernet: ethernet.values(), loopback: loopback.iter() }, locked)
     }
 
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
@@ -1229,15 +1201,12 @@ impl<
 /// devices.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Hash(bound = ""))]
-pub struct EthernetWeakDeviceId<C: DeviceLayerTypes>(
-    usize,
-    WeakRc<IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState<C::Instant>>>,
-);
+pub struct EthernetWeakDeviceId<C: DeviceLayerTypes>(usize, WeakRc<EthernetReferenceState<C>>);
 
 impl<C: DeviceLayerTypes> PartialEq for EthernetWeakDeviceId<C> {
-    fn eq(&self, EthernetWeakDeviceId(other_id, other_ptr): &EthernetWeakDeviceId<C>) -> bool {
-        let EthernetWeakDeviceId(me_id, me_ptr) = self;
-        other_id == me_id && WeakRc::ptr_eq(me_ptr, other_ptr)
+    fn eq(&self, EthernetWeakDeviceId(_, other_ptr): &EthernetWeakDeviceId<C>) -> bool {
+        let EthernetWeakDeviceId(_, me_ptr) = self;
+        WeakRc::ptr_eq(me_ptr, other_ptr)
     }
 }
 
@@ -1282,8 +1251,8 @@ impl<C: DeviceLayerTypes> EthernetWeakDeviceId<C> {
     /// Attempts to upgrade the ID to an [`EthernetDeviceId`], failing if the
     /// device no longer exists.
     pub fn upgrade(&self) -> Option<EthernetDeviceId<C>> {
-        let Self(id, rc) = self;
-        rc.upgrade().map(|rc| EthernetDeviceId(*id, rc))
+        let Self(_id, rc) = self;
+        rc.upgrade().map(|rc| EthernetDeviceId(rc))
     }
 }
 
@@ -1291,27 +1260,15 @@ impl<C: DeviceLayerTypes> EthernetWeakDeviceId<C> {
 ///
 /// This device ID is like [`DeviceId`] but specifically for ethernet devices.
 #[derive(Derivative)]
-#[derivative(Clone(bound = ""), Hash(bound = ""))]
-pub struct EthernetDeviceId<C: DeviceLayerTypes>(
-    usize,
-    StrongRc<IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState<C::Instant>>>,
-);
-
-impl<C: DeviceLayerTypes> PartialEq for EthernetDeviceId<C> {
-    fn eq(&self, EthernetDeviceId(other_id, other_ptr): &EthernetDeviceId<C>) -> bool {
-        let EthernetDeviceId(me_id, me_ptr) = self;
-        other_id == me_id && StrongRc::ptr_eq(me_ptr, other_ptr)
-    }
-}
+#[derivative(Clone(bound = ""), Hash(bound = ""), Eq(bound = ""), PartialEq(bound = ""))]
+pub struct EthernetDeviceId<C: DeviceLayerTypes>(StrongRc<EthernetReferenceState<C>>);
 
 impl<C: DeviceLayerTypes> PartialEq<EthernetWeakDeviceId<C>> for EthernetDeviceId<C> {
-    fn eq(&self, EthernetWeakDeviceId(other_id, other_ptr): &EthernetWeakDeviceId<C>) -> bool {
-        let EthernetDeviceId(me_id, me_ptr) = self;
-        other_id == me_id && StrongRc::weak_ptr_eq(me_ptr, other_ptr)
+    fn eq(&self, EthernetWeakDeviceId(_id, other_ptr): &EthernetWeakDeviceId<C>) -> bool {
+        let EthernetDeviceId(me_ptr) = self;
+        StrongRc::weak_ptr_eq(me_ptr, other_ptr)
     }
 }
-
-impl<C: DeviceLayerTypes> Eq for EthernetDeviceId<C> {}
 
 impl<C: DeviceLayerTypes> PartialOrd for EthernetDeviceId<C> {
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
@@ -1321,10 +1278,10 @@ impl<C: DeviceLayerTypes> PartialOrd for EthernetDeviceId<C> {
 
 impl<C: DeviceLayerTypes> Ord for EthernetDeviceId<C> {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        let Self(me_id, me) = self;
-        let Self(other_id, other) = other;
+        let Self(me) = self;
+        let Self(other) = other;
 
-        me_id.cmp(other_id).then(StrongRc::ptr_cmp(me, other))
+        StrongRc::ptr_cmp(me, other)
     }
 }
 
@@ -1336,7 +1293,8 @@ impl<C: DeviceLayerTypes> Debug for EthernetDeviceId<C> {
 
 impl<C: DeviceLayerTypes> Display for EthernetDeviceId<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let Self(id, _ptr) = self;
+        let Self(rc) = self;
+        let id = rc.link.debug_id();
         write!(f, "Ethernet({id})")
     }
 }
@@ -1360,18 +1318,20 @@ where
 impl<C: DeviceLayerTypes> EthernetDeviceId<C> {
     /// Returns a reference to the external state for the device.
     pub fn external_state(&self) -> &C::EthernetDeviceState {
-        let Self(_id, rc) = self;
+        let Self(rc) = self;
         &rc.external_state
     }
 
     /// Downgrades the ID to an [`EthernetWeakDeviceId`].
     pub fn downgrade(&self) -> EthernetWeakDeviceId<C> {
-        let Self(id, rc) = self;
-        EthernetWeakDeviceId(*id, StrongRc::downgrade(rc))
+        let Self(rc) = self;
+        // When we downgrade an ethernet device reference we keep a copy of the
+        // debug ID to help debugging.
+        EthernetWeakDeviceId(rc.link.debug_id(), StrongRc::downgrade(rc))
     }
 
     fn removed(&self) -> bool {
-        let Self(_id, rc) = self;
+        let Self(rc) = self;
         StrongRc::marked_for_destruction(rc)
     }
 }
@@ -1682,24 +1642,6 @@ impl<C: DeviceLayerTypes> Debug for DeviceId<C> {
     }
 }
 
-impl<C: DeviceLayerTypes> IdMapCollectionKey for DeviceId<C> {
-    const VARIANT_COUNT: NonZeroUsize = const_unwrap_option(NonZeroUsize::new(2));
-
-    fn get_id(&self) -> usize {
-        match self {
-            DeviceId::Ethernet(EthernetDeviceId(id, _)) => *id,
-            DeviceId::Loopback(LoopbackDeviceId(_)) => 0,
-        }
-    }
-
-    fn get_variant(&self) -> usize {
-        match self {
-            DeviceId::Ethernet(_) => 0,
-            DeviceId::Loopback(LoopbackDeviceId(_)) => 1,
-        }
-    }
-}
-
 // TODO(joshlf): Does the IP layer ever need to distinguish between broadcast
 // and multicast frames?
 
@@ -1757,13 +1699,22 @@ impl From<MulticastAddr<Mac>> for FrameDestination {
     }
 }
 
+type EthernetReferenceState<C> = IpLinkDeviceState<
+    C,
+    <C as DeviceLayerStateTypes>::EthernetDeviceState,
+    EthernetDeviceState<<C as InstantContext>::Instant>,
+>;
+type LoopbackReferenceState<C> =
+    IpLinkDeviceState<C, <C as DeviceLayerStateTypes>::LoopbackDeviceState, LoopbackDeviceState>;
+
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 pub(crate) struct Devices<C: DeviceLayerTypes> {
-    ethernet: IdMap<
-        PrimaryRc<IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState<C::Instant>>>,
-    >,
-    loopback: Option<PrimaryRc<IpLinkDeviceState<C, C::LoopbackDeviceState, LoopbackDeviceState>>>,
+    // A monotonic counter to issue ethernet device IDs that are used for
+    // debugging.
+    ethernet_counter: usize,
+    ethernet: HashMap<StrongRc<EthernetReferenceState<C>>, PrimaryRc<EthernetReferenceState<C>>>,
+    loopback: Option<PrimaryRc<LoopbackReferenceState<C>>>,
 }
 
 /// The state associated with the device layer.
@@ -1862,17 +1813,21 @@ impl<C: DeviceLayerTypes + socket::NonSyncContext<DeviceId<C>>> DeviceLayerState
         metric: RawMetric,
         external_state: F,
     ) -> EthernetDeviceId<C> {
-        let Devices { ethernet, loopback: _ } = &mut *self.devices.write();
+        let Devices { ethernet_counter, ethernet, loopback: _ } = &mut *self.devices.write();
+
+        let id = *ethernet_counter;
+        *ethernet_counter += 1;
 
         let ptr = PrimaryRc::new(IpLinkDeviceState::new(
-            EthernetDeviceStateBuilder::new(mac, max_frame_size, metric).build(),
+            EthernetDeviceStateBuilder::new(id, mac, max_frame_size, metric).build(),
             external_state(),
             self.origin.clone(),
         ));
         let strong_ptr = PrimaryRc::clone_strong(&ptr);
-        let id = ethernet.push(ptr);
+
+        assert!(ethernet.insert(strong_ptr.clone(), ptr).is_none());
         debug!("adding Ethernet device with ID {} and MTU {:?}", id, max_frame_size);
-        EthernetDeviceId(id, strong_ptr)
+        EthernetDeviceId(strong_ptr)
     }
 
     /// Adds a new loopback device to the device layer.
@@ -1882,7 +1837,7 @@ impl<C: DeviceLayerTypes + socket::NonSyncContext<DeviceId<C>>> DeviceLayerState
         metric: RawMetric,
         external_state: F,
     ) -> Result<LoopbackDeviceId<C>, ExistsError> {
-        let Devices { ethernet: _, loopback } = &mut *self.devices.write();
+        let Devices { ethernet_counter: _, ethernet: _, loopback } = &mut *self.devices.write();
 
         if let Some(_) = loopback {
             return Err(ExistsError);
@@ -2040,20 +1995,20 @@ trait RemovableDeviceId<C: NonSyncContext>: Into<DeviceId<C>> + Clone {
 
 impl<C: NonSyncContext> RemovableDeviceId<C> for EthernetDeviceId<C> {
     type ExternalState = C::EthernetDeviceState;
-    type ReferenceState =
-        IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState<C::Instant>>;
+    type ReferenceState = EthernetReferenceState<C>;
 
     fn remove(
         self,
         sync_ctx: &SyncCtx<C>,
     ) -> (PrimaryRc<Self::ReferenceState>, StrongRc<Self::ReferenceState>) {
         let mut devices = sync_ctx.state.device.devices.write();
-        let EthernetDeviceId(id, rc) = self;
+        debug!("removing Ethernet device with ID {}", self);
+        let EthernetDeviceId(rc) = self;
         let removed = devices
             .ethernet
-            .remove(id)
-            .unwrap_or_else(|| panic!("no such Ethernet device: {}", id));
-        debug!("removing Ethernet device with ID {}", id);
+            .remove(&rc)
+            .unwrap_or_else(|| panic!("no such Ethernet device: {}", rc.link.debug_id()));
+
         (removed, rc)
     }
 
@@ -2064,7 +2019,7 @@ impl<C: NonSyncContext> RemovableDeviceId<C> for EthernetDeviceId<C> {
 
 impl<C: NonSyncContext> RemovableDeviceId<C> for LoopbackDeviceId<C> {
     type ExternalState = C::LoopbackDeviceState;
-    type ReferenceState = IpLinkDeviceState<C, C::LoopbackDeviceState, LoopbackDeviceState>;
+    type ReferenceState = LoopbackReferenceState<C>;
 
     fn remove(
         self,
@@ -2636,6 +2591,7 @@ pub(crate) mod testutil {
 mod tests {
     use alloc::vec::Vec;
 
+    use const_unwrap::const_unwrap_option;
     use net_declare::net_mac;
     use test_case::test_case;
 

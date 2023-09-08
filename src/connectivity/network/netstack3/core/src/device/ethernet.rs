@@ -468,6 +468,7 @@ impl MaxFrameSize {
 
 /// Builder for [`EthernetDeviceState`].
 pub(crate) struct EthernetDeviceStateBuilder {
+    debug_id: usize,
     mac: UnicastAddr<Mac>,
     max_frame_size: MaxFrameSize,
     metric: RawMetric,
@@ -476,6 +477,7 @@ pub(crate) struct EthernetDeviceStateBuilder {
 impl EthernetDeviceStateBuilder {
     /// Create a new `EthernetDeviceStateBuilder`.
     pub(crate) fn new(
+        debug_id: usize,
         mac: UnicastAddr<Mac>,
         max_frame_size: MaxFrameSize,
         metric: RawMetric,
@@ -493,14 +495,15 @@ impl EthernetDeviceStateBuilder {
         // A few questions:
         // - How do we wire error information back up the call stack? Should
         //   this just return a Result or something?
-        Self { mac, max_frame_size, metric }
+        Self { debug_id, mac, max_frame_size, metric }
     }
 
     /// Build the `EthernetDeviceState` from this builder.
     pub(super) fn build<I: Instant>(self) -> EthernetDeviceState<I> {
-        let Self { mac, max_frame_size, metric } = self;
+        let Self { debug_id, mac, max_frame_size, metric } = self;
 
         EthernetDeviceState {
+            debug_id,
             ipv4_arp: Default::default(),
             ipv6_nud: Default::default(),
             static_state: StaticEthernetDeviceState { mac, max_frame_size, metric },
@@ -542,6 +545,8 @@ pub(crate) struct StaticEthernetDeviceState {
 
 /// The state associated with an Ethernet device.
 pub(crate) struct EthernetDeviceState<I: Instant> {
+    debug_id: usize,
+
     /// IPv4 ARP state.
     ipv4_arp: Mutex<ArpState<EthernetLinkDevice, I>>,
 
@@ -553,6 +558,12 @@ pub(crate) struct EthernetDeviceState<I: Instant> {
     dynamic_state: RwLock<DynamicEthernetDeviceState>,
 
     tx_queue: TransmitQueue<(), Buf<Vec<u8>>, BufVecU8Allocator>,
+}
+
+impl<I: Instant> EthernetDeviceState<I> {
+    pub(crate) fn debug_id(&self) -> usize {
+        self.debug_id
+    }
 }
 
 impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::EthernetDeviceStaticState>
@@ -2575,13 +2586,15 @@ mod tests {
         let config = Ipv6::FAKE_CONFIG;
         let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
         let sync_ctx = &sync_ctx;
-        let device = crate::device::add_ethernet_device(
+
+        let eth_device = crate::device::add_ethernet_device(
             &sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
             DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
+        );
+        let device = eth_device.clone().into();
+        let EthernetDeviceId(eth_device) = eth_device;
 
         // Enable the device and configure it to generate a link-local address.
         let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
@@ -2603,14 +2616,7 @@ mod tests {
         .unwrap();
         // Verify that there is a single assigned address.
         assert_eq!(
-            sync_ctx
-                .state
-                .device
-                .devices
-                .read()
-                .ethernet
-                .get(0)
-                .unwrap()
+            eth_device
                 .ip
                 .ipv6
                 .ip_state
@@ -2629,14 +2635,7 @@ mod tests {
         )
         .unwrap();
         // Assert that the new address got added.
-        let addr_subs: Vec<_> = sync_ctx
-            .state
-            .device
-            .devices
-            .read()
-            .ethernet
-            .get(0)
-            .unwrap()
+        let addr_subs: Vec<_> = eth_device
             .ip
             .ipv6
             .ip_state

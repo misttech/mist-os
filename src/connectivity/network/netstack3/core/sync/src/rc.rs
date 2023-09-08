@@ -433,12 +433,12 @@ impl<T> Primary<T> {
 
 /// A strongly-held reference.
 ///
-/// Similar to an [`alloc::sync::Arc`] but holding a `Strong` acts as a
-/// witness to the live-ness of the underlying data. That is, holding a
-/// `Strong` implies that the underlying data has not yet been destroyed.
+/// Similar to an [`alloc::sync::Arc`] but holding a `Strong` acts as a witness
+/// to the live-ness of the underlying data. That is, holding a `Strong` implies
+/// that the underlying data has not yet been destroyed.
 ///
-/// Note that `Strong`'s implementation of [`Hash`] operates on the pointer
-/// itself and not the underlying data.
+/// Note that `Strong`'s implementation of [`Hash`] and [`PartialEq`] operate on
+/// the pointer itself and not the underlying data.
 #[derive(Debug, Derivative)]
 pub struct Strong<T> {
     inner: alloc::sync::Arc<Inner<T>>,
@@ -459,6 +459,14 @@ impl<T> Deref for Strong<T> {
         let Self { inner, name: _ } = self;
         let Inner { marked_for_destruction: _, data, strong_names: _ } = inner.deref();
         data
+    }
+}
+
+impl<T> core::cmp::Eq for Strong<T> {}
+
+impl<T> core::cmp::PartialEq for Strong<T> {
+    fn eq(&self, other: &Self) -> bool {
+        Self::ptr_eq(self, other)
     }
 }
 
@@ -535,10 +543,18 @@ impl<T> Strong<T> {
 /// Holders of a `Weak` must attempt to upgrade to a [`Strong`] through
 /// [`Weak::upgrade`] to access the underlying data.
 ///
-/// Note that `Weak`'s implementation of [`Hash`] operates on the pointer
-/// itself and not the underlying data.
+/// Note that `Weak`'s implementation of [`Hash`] and [`PartialEq`] operate on
+/// the pointer itself and not the underlying data.
 #[derive(Debug, Derivative)]
 pub struct Weak<T>(alloc::sync::Weak<Inner<T>>, named::WeakName);
+
+impl<T> core::cmp::Eq for Weak<T> {}
+
+impl<T> core::cmp::PartialEq for Weak<T> {
+    fn eq(&self, other: &Self) -> bool {
+        Self::ptr_eq(self, other)
+    }
+}
 
 impl<T> Hash for Weak<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
