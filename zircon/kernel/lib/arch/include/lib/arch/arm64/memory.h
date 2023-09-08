@@ -121,6 +121,21 @@ struct ArmMemoryAttrIndirectionRegister
     return SetAttributeValue(index, AttributeToValue(attr));
   }
 
+  // Returns the index associated with a given, configured attribute, if
+  // present.
+  constexpr std::optional<unsigned int> GetIndex(uint8_t value) const {
+    for (unsigned int i = 0; i < kNumAttributes; ++i) {
+      if (value == GetAttributeValue(i)) {
+        return i;
+      }
+    }
+    return {};
+  }
+
+  constexpr std::optional<unsigned int> GetIndex(const ArmMairAttribute& attr) const {
+    return GetIndex(AttributeToValue(attr));
+  }
+
   // Converts structured attribute to the associated raw value.
   static constexpr uint8_t AttributeToValue(const ArmMairAttribute& attr) {
     uint8_t value = 0;

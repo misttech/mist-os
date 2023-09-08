@@ -34,6 +34,10 @@ enum class X86PagingLevel {
   kPageTable,
 };
 
+// Memory configuration is not page-based for x86. Rather, it is managed
+// through the MTRR MSRs.
+struct X86MemoryType {};
+
 // Captures the system state influencing x86 paging.
 struct X86SystemPagingState {
   template <class MsrIo, class CpuidIo>
@@ -172,7 +176,10 @@ class X86PagingStructure : public hwreg::RegisterBase<X86PagingStructure<Level>,
   constexpr bool executable() const { return !xd(); }
   constexpr bool user_accessible() const { return u_s(); }
 
-  constexpr SelfType& Set(const X86SystemPagingState& state, const PagingSettings& settings) {
+  constexpr X86MemoryType Memory(const X86SystemPagingState& state) const { return {}; }
+
+  constexpr SelfType& Set(const X86SystemPagingState& state,
+                          const PagingSettings<X86MemoryType>& settings) {
     set_p(settings.present);
     if (!settings.present) {
       return *this;
@@ -229,6 +236,8 @@ struct X86PagingTraitsBase {
 
   template <X86PagingLevel Level>
   using TableEntry = X86PagingStructure<Level>;
+
+  using MemoryType = X86MemoryType;
 
   using SystemState = X86SystemPagingState;
 
