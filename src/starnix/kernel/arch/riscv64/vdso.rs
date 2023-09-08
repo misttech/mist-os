@@ -19,6 +19,8 @@ pub fn get_vvar_values() -> VvarInitialValues {
     VvarInitialValues::default()
 }
 
+// TODO(mariagl): This function is mostly the same as the arm64 version, except it uses a different
+// SIGRETURN_NAME. Move it to avoid duplicating this code.
 pub fn get_sigreturn_offset(vdso_vmo: &zx::Vmo) -> Result<Option<u64>, Errno> {
     let dyn_section = elf_parse::Elf64DynSection::from_vmo(vdso_vmo).map_err(|_| errno!(EINVAL))?;
     let symtab =
@@ -28,7 +30,7 @@ pub fn get_sigreturn_offset(vdso_vmo: &zx::Vmo) -> Result<Option<u64>, Errno> {
     let strsz =
         dyn_section.dynamic_entry_with_tag(elf_parse::Elf64DynTag::Strsz).ok_or(errno!(EINVAL))?;
 
-    const SIGRETURN_NAME: &str = "__kernel_rt_sigreturn";
+    const SIGRETURN_NAME: &str = "__vdso_rt_sigreturn";
 
     // Find the name of the signal trampoline in the string table and store the index.
     let mut strtab_bytes = vec![0u8; strsz.value as usize];

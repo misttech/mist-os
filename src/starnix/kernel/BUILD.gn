@@ -51,6 +51,7 @@ rustc_binary("starnix_kernel_bin") {
   source_root = "main.rs"
   deps = [
     ":starnix_kernel_config",
+    ":vdso-data($target_linux_toolchain)",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
@@ -149,11 +150,6 @@ rustc_binary("starnix_kernel_bin") {
     "//third_party/rust_crates:vk-sys",
     "//third_party/rust_crates:zerocopy",
   ]
-
-  # TODO(fxbug.dev/128554): Add VDSO for RISC-V.
-  if (current_cpu == "x64" || current_cpu == "arm64") {
-    deps += [ ":vdso-data($target_linux_toolchain)" ]
-  }
 
   if (is_debug) {
     deps += [ "//third_party/rust_crates:tracing-mutex" ]
@@ -452,9 +448,12 @@ config("vdso_config") {
     vdso_version_script = "vdso/vdso-x64.map"
     ldflags += [ "-Wl,--version-script," +
                  rebase_path(vdso_version_script, root_build_dir) ]
-  }
-  if (current_cpu == "arm64") {
+  } else if (current_cpu == "arm64") {
     vdso_version_script = "vdso/vdso-aarch64.map"
+    ldflags += [ "-Wl,--version-script," +
+                 rebase_path(vdso_version_script, root_build_dir) ]
+  } else if (current_cpu == "riscv64") {
+    vdso_version_script = "vdso/vdso-riscv64.map"
     ldflags += [ "-Wl,--version-script," +
                  rebase_path(vdso_version_script, root_build_dir) ]
   }
@@ -466,9 +465,10 @@ loadable_module("vdso") {
       "vdso/vdso-x64.cc",
       "vdso/vvar-data.h",
     ]
-  }
-  if (current_cpu == "arm64") {
+  } else if (current_cpu == "arm64") {
     sources = [ "vdso/vdso-aarch64.cc" ]
+  } else if (current_cpu == "riscv64") {
+    sources = [ "vdso/vdso-riscv64.cc" ]
   }
   output_name = "libvdso"
   configs += [ ":vdso_config" ]
@@ -482,10 +482,7 @@ loadable_module("vdso") {
 }
 
 resource("vdso-data") {
-  sources = []
-  if (current_cpu == "x64" || current_cpu == "arm64") {
-    sources += [ "$root_out_dir/libvdso.so" ]
-  }
+  sources = [ "$root_out_dir/libvdso.so" ]
   outputs = [ "data/libvdso.so" ]
   deps = [ ":vdso" ]
 }
