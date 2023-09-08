@@ -13,14 +13,14 @@ type ConsoleWindowSize = struct {
 };
 
 @discoverable
-closed protocol Controller {
+open protocol Controller {
     /// Connects `bridge_socket` to a vsocket at `port` in the container.
-    strict VsockConnect(resource struct {
+    flexible VsockConnect(resource struct {
         port uint32;
         bridge_socket zx.Handle:SOCKET;
     });
 
-    strict SpawnConsole(resource table {
+    flexible SpawnConsole(resource table {
         1: console_in zx.Handle:SOCKET;
         2: console_out zx.Handle:SOCKET;
         3: binary_path string:MAX;

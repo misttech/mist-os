@@ -126,6 +126,7 @@ pub async fn serve_container_controller(
                         responder.send(Err(zx::Status::INVALID_ARGS.into_raw()))?;
                     }
                 }
+                fstarcontainer::ControllerRequest::_UnknownMethod { .. } => (),
             }
             Ok(())
         })
