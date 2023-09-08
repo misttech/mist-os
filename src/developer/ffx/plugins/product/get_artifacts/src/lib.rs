@@ -29,9 +29,10 @@ pub async fn pb_get_artifacts(
         .context("Failed to load product bundle")?;
     let artifacts = match cmd.artifacts_group {
         Type::Flash => extract_flashing_artifacts(product_bundle, cmd)?,
+        Type::Bootloader => extract_bootloaders(product_bundle, cmd)?,
         _ => ffx_bail!("Only get flash artifacts is supported as of now"),
     };
-    let artifact_string = artifacts.iter().map(|x| x.to_string()).collect::<Vec<_>>().join("\n");
+    let artifact_string = artifacts.join("\n");
     if writer.is_machine() {
         writer.machine(&artifact_string)?;
     } else {
@@ -40,10 +41,47 @@ pub async fn pb_get_artifacts(
     Ok(())
 }
 
+/// Extract bootloaders will list all the bootloaders used by this product. It
+/// will list the bootloader type along with the path. Example output:
+///
+///   firmware_b12:path/to/bootloader
+///   firmware:path/to/bootloader2
+///
+fn extract_bootloaders(
+    product_bundle: ProductBundle,
+    cmd: GetArtifactsCommand,
+) -> Result<Vec<String>> {
+    let mut product_bundle = match product_bundle {
+        ProductBundle::V1(_) => ffx_bail!("Only v2 product bundles are supported"),
+        ProductBundle::V2(pb) => pb,
+    };
+
+    let compute_path = |path: &Utf8Path| -> Result<Utf8PathBuf> {
+        if cmd.relative_path {
+            path_relative_from(path, &cmd.product_bundle)
+        } else {
+            Ok(path.clone().into())
+        }
+    };
+
+    let mut artifacts = Vec::new();
+    for part in &mut product_bundle.partitions.bootloader_partitions {
+        let path = compute_path(&part.image)?;
+        let bootloader_string = if part.partition_type == "" {
+            format!("firmware:{}", &path)
+        } else {
+            format!("firmware_{}:{}", part.partition_type, &path)
+        };
+
+        artifacts.push(bootloader_string);
+    }
+    Ok(artifacts)
+}
+
 fn extract_flashing_artifacts(
     product_bundle: ProductBundle,
     cmd: GetArtifactsCommand,
-) -> Result<Vec<Utf8PathBuf>> {
+) -> Result<Vec<String>> {
     let mut product_bundle = match product_bundle {
         ProductBundle::V1(_) => ffx_bail!("Only v2 product bundles are supported"),
         ProductBundle::V2(pb) => pb,
@@ -80,7 +118,7 @@ fn extract_flashing_artifacts(
     collect_system_artifacts(&mut product_bundle.system_a)?;
     collect_system_artifacts(&mut product_bundle.system_b)?;
     collect_system_artifacts(&mut product_bundle.system_r)?;
-    Ok(artifacts)
+    Ok(artifacts.iter().map(|x| x.to_string()).collect::<Vec<_>>())
 }
 
 #[cfg(test)]
@@ -91,7 +129,7 @@ mod tests {
     use sdk_metadata::ProductBundleV2;
 
     #[test]
-    fn test_get_artifacts() {
+    fn test_get_flashing_artifacts() {
         let json = r#"
             {
                 bootloader_partitions: [
@@ -153,12 +191,63 @@ mod tests {
         };
         let artifacts = extract_flashing_artifacts(pb.clone(), cmd).unwrap();
         let expected_artifacts = vec![
-            Utf8PathBuf::from("product_bundle.json"),
-            Utf8PathBuf::from("bootloader/path"),
-            Utf8PathBuf::from("credential/path"),
-            Utf8PathBuf::from("zbi/path"),
-            Utf8PathBuf::from("/tmp/product_bundle/system_a/fvm.blk"),
-            Utf8PathBuf::from("qemu/path"),
+            String::from("product_bundle.json"),
+            String::from("bootloader/path"),
+            String::from("credential/path"),
+            String::from("zbi/path"),
+            String::from("/tmp/product_bundle/system_a/fvm.blk"),
+            String::from("qemu/path"),
+        ];
+        assert_eq!(expected_artifacts, artifacts);
+    }
+
+    #[test]
+    fn test_get_bootloaders() {
+        let json = r#"
+            {
+                bootloader_partitions: [
+                    {
+                        type: "",
+                        name: "firmware_tpl",
+                        image: "bootloader/path",
+                    },
+                    {
+                        type: "bl2",
+                        name: "firmware_tpl",
+                        image: "bootloader/path2",
+                    }
+                ],
+                partitions: [],
+                hardware_revision: "hw",
+                unlock_credentials: [
+                    "credential/path",
+                ],
+            }
+        "#;
+        let mut cursor = std::io::Cursor::new(json);
+        let config: PartitionsConfig = PartitionsConfig::from_reader(&mut cursor).unwrap();
+
+        let pb = ProductBundle::V2(ProductBundleV2 {
+            product_name: "".to_string(),
+            product_version: "".to_string(),
+            partitions: config,
+            sdk_version: "".to_string(),
+            system_a: None,
+            system_b: None,
+            system_r: None,
+            repositories: vec![],
+            update_package_hash: None,
+            virtual_devices_path: None,
+        });
+        let cmd = GetArtifactsCommand {
+            product_bundle: Utf8PathBuf::new(),
+            relative_path: false,
+            artifacts_group: Type::Bootloader,
+        };
+        let artifacts = extract_bootloaders(pb.clone(), cmd).unwrap();
+        let expected_artifacts = vec![
+            String::from("firmware:bootloader/path"),
+            String::from("firmware_bl2:bootloader/path2"),
         ];
         assert_eq!(expected_artifacts, artifacts);
     }

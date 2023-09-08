@@ -141,6 +141,7 @@ pub enum Type {
     Flash,
     Emu,
     Update,
+    Bootloader,
 }
 
 impl FromStr for Type {
@@ -150,7 +151,11 @@ impl FromStr for Type {
             "flash" => Ok(Type::Flash),
             "emu" => Ok(Type::Emu),
             "update" => Ok(Type::Update),
-            _ => Err(anyhow!("Invalid Type: {}. Expect one of : flash, emu, update", value)),
+            "bootloader" => Ok(Type::Bootloader),
+            _ => Err(anyhow!(
+                "Invalid Type: {}. Expect one of : flash, emu, update, bootloader",
+                value
+            )),
         }
     }
 }
