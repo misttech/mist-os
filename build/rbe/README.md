@@ -57,6 +57,8 @@ More details can be found by running with `--help`.
     *   `output_file_digest`: lookup the digest of a remote built artifact
     *   `bandwidth`: report total download and upload bytes from reproxy log
     *   `plot_download`: plot download demand over the course of a build
+*   `rpl_tool.sh`: tools that involve reproxy logs and remotetool together
+    *   `expand_to_rpl`: populate .rrpl with command and inputs -> .rpl
 
 All tools have more detailed usage with `--help`.
 
