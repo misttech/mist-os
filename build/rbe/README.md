@@ -45,6 +45,8 @@ More details can be found by running with `--help`.
     root-cause differences between output and intermediate artifacts.
     This is useful for examining unexpected digest differences and
     cache misses.
+*   `bbtool.py`: buildbucket related tools
+    *   `fetch_reproxy_log`: retrieve .rrpl log, possibly from subbuild.
 *   `bb_fetch_rbe_cas.sh`: retrieve a remote-built artifact from the
     RBE CAS using a buildbucket id and the path under the build output
     directory.

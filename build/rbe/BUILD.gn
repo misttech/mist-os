@@ -9,6 +9,7 @@ group("tests") {
   testonly = true
 
   deps = [
+    ":bbtool_test($host_toolchain)",
     ":cl_utils_test($host_toolchain)",
     ":cxx_remote_wrapper_test($host_toolchain)",
     ":cxx_test($host_toolchain)",
@@ -40,6 +41,7 @@ if (is_host) {
   _linker_sources = [ "linker.py" ] + _cl_utils_sources + _depfile_sources
   _textpb_sources = [ "textpb.py" ]
 
+  _bbtool_sources = [ "bbtool.py" ] + _fuchsia_sources + _cl_utils_sources
   _remotetool_sources =
       [ "remotetool.py" ] + _fuchsia_sources + _cl_utils_sources
   _remote_action_sources =
@@ -58,6 +60,14 @@ if (is_host) {
   _prebuilt_tool_remote_wrapper_sources =
       [ "prebuilt_tool_remote_wrapper.py" ] + _fuchsia_sources +
       _cl_utils_sources + _remote_action_sources
+
+  python_library("bbtool") {
+    sources = _bbtool_sources
+  }
+  python_host_test("bbtool_test") {
+    main_source = "bbtool_test.py"
+    sources = _bbtool_sources
+  }
 
   python_library("cl_utils") {
     sources = _cl_utils_sources
