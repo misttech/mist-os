@@ -1377,11 +1377,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
     }
 
     fn write_objects<T: AsBytes>(&self, user: UserRef<T>, objects: &[T]) -> Result<usize, Errno> {
-        let mut bytes_written = 0;
-        for (index, object) in objects.iter().enumerate() {
-            bytes_written += self.write_object(user.at(index), object)?;
-        }
-        Ok(bytes_written)
+        self.write_memory(user.addr(), objects.as_bytes())
     }
 }
 

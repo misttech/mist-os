@@ -1888,12 +1888,7 @@ fn do_epoll_pwait(
         epoll_file.wait(current_task, max_events, deadline)?
     };
 
-    let mut event_ref = events;
-    for event in active_events.iter() {
-        current_task.write_object(UserRef::new(event_ref.addr()), event)?;
-        event_ref = event_ref.next();
-    }
-
+    current_task.write_objects(events, &active_events)?;
     Ok(active_events.len())
 }
 
