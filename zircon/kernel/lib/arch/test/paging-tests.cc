@@ -1880,10 +1880,8 @@ TEST(PagingTests, Compilation) {
   static_assert(std::is_empty_v<arch::Paging<arch::RiscvSv57PagingTraits>>);
   static_assert(std::is_empty_v<arch::Paging<arch::X86FourLevelPagingTraits>>);
   static_assert(std::is_empty_v<arch::Paging<arch::X86FiveLevelPagingTraits>>);
-  static_assert(
-      std::is_empty_v<arch::Paging<arch::ArmPagingTraits<arch::ArmVirtualAddressRange::kLower>>>);
-  static_assert(
-      std::is_empty_v<arch::Paging<arch::ArmPagingTraits<arch::ArmVirtualAddressRange::kUpper>>>);
+  static_assert(std::is_empty_v<arch::Paging<arch::ArmLowerPagingTraits>>);
+  static_assert(std::is_empty_v<arch::Paging<arch::ArmUpperPagingTraits>>);
 }
 
 // The following macros are expected to be used on test cases given as
@@ -1899,14 +1897,12 @@ TEST(PagingTests, Compilation) {
   TEST_FOR_RISCV(name)            \
   TEST_FOR_X86(name)
 
-#define TEST_FOR_ARM(name)                                            \
-  TEST(PagingTests, ArmLower##name) {                                 \
-    name<arch::ArmPagingTraits<arch::ArmVirtualAddressRange::kLower>, \
-         /*VaddrHighBits=*/0x0000'0000'0000'0000u>({});               \
-  }                                                                   \
-  TEST(PagingTests, ArmUpper##name) {                                 \
-    name<arch::ArmPagingTraits<arch::ArmVirtualAddressRange::kUpper>, \
-         /*VaddrHighBits=*/0xffff'0000'0000'0000u>({});               \
+#define TEST_FOR_ARM(name)                                                          \
+  TEST(PagingTests, ArmLower##name) {                                               \
+    name<arch::ArmLowerPagingTraits, /*VaddrHighBits=*/0x0000'0000'0000'0000u>({}); \
+  }                                                                                 \
+  TEST(PagingTests, ArmUpper##name) {                                               \
+    name<arch::ArmUpperPagingTraits, /*VaddrHighBits=*/0xffff'0000'0000'0000u>({}); \
   }
 
 #define TEST_FOR_RISCV(name) \

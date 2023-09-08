@@ -55,7 +55,13 @@ class ArrayIo {
   }
 
  private:
-  constexpr Ref At(uint32_t offset) const { return Ref{array_[offset]}; }
+  constexpr Ref At(uint32_t offset) const {
+    if constexpr (std::is_reference_v<Ref>) {
+      return static_cast<Ref>(array_[offset]);
+    } else {
+      return Ref{array_[offset]};
+    }
+  }
 
   Span array_;
 };

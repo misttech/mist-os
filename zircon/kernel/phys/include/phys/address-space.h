@@ -7,15 +7,24 @@
 #ifndef ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_ADDRESS_SPACE_H_
 #define ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_ADDRESS_SPACE_H_
 
-#include <lib/page-table/builder.h>
-#include <lib/page-table/types.h>
+#include <zircon/assert.h>
 
+#include <hwreg/array.h>
 #include <ktl/byte.h>
+#include <ktl/integer_sequence.h>
+#include <ktl/move.h>
+#include <ktl/optional.h>
+#include <ktl/type_traits.h>
+#include <phys/arch/address-space.h>
+
+#include "allocation.h"
 
 // Forward-declared; fully declared in <lib/memalloc/pool.h>.
 namespace memalloc {
 class Pool;
 }  // namespace memalloc
+
+class AddressSpace;
 
 // Perform architecture-specific address space set-up. The "Early" variant
 // assumes that only the boot conditions hold and is expected to be called
@@ -31,31 +40,143 @@ void ArchSetUpAddressSpaceLate();
 
 // Set up the identity-mapped address space. This is the main subroutine of
 // ArchSetUpAddressSpace* (when implemented).
-void ArchSetUpIdentityAddressSpace(page_table::AddressSpaceBuilder& builder);
+void ArchSetUpIdentityAddressSpace(AddressSpace& aspace);
 
-// Maps in the global UART's registers, assuming that they fit within a single
-// page.
-void MapUart(page_table::AddressSpaceBuilder& builder);
-
-// A page_table::MemoryManager that allocates by way of Allocator.
-class AllocationMemoryManager final : public page_table::MemoryManager {
+// A representation of a virtual address space.
+//
+// This definition relies on two architecture-specific types being defined
+// within <phys/arch/address-space.h>: ArchLowerPagingTraits and
+// ArchUpperPagingTraits. These types are expected to be types meeting the
+// <lib/arch/paging.h> "PagingTraits" API and give the descriptions of the
+// upper and lower virtual address spaces. In the case of a unified address
+// space spanning both the upper and lower, the single corresponding trait
+// type is expected to be given as both ArchLowerPagingTraits and
+// ArchUpperPagingTraits.
+//
+// Further, this type similarly relies on a function ArchCreatePagingState() to
+// be defined in the header, creating the paging traits' coincidental
+// SystemState specification. See Init() below.
+class AddressSpace {
  public:
-  explicit AllocationMemoryManager(memalloc::Pool& pool) : pool_(pool) {}
+  using LowerPaging = arch::Paging<ArchLowerPagingTraits>;
+  using UpperPaging = arch::Paging<ArchUpperPagingTraits>;
 
-  ktl::byte* Allocate(size_t size, size_t alignment) final;
+  static_assert(ktl::is_same_v<typename LowerPaging::MemoryType, typename UpperPaging::MemoryType>);
+  static_assert(
+      ktl::is_same_v<typename LowerPaging::SystemState, typename UpperPaging::SystemState>);
+  using MemoryType = typename LowerPaging::MemoryType;
+  using SystemState = typename LowerPaging::SystemState;
 
-  page_table::Paddr PtrToPhys(ktl::byte* ptr) final {
-    // We have a 1:1 virtual/physical mapping.
-    return page_table::Paddr(reinterpret_cast<uintptr_t>(ptr));
+  using MapError = arch::MapError;
+  using MapSettings = arch::MapSettings<MemoryType>;
+
+  // An allocator of page tables, as expected by the libarch PagingTraits API.
+  using PageTableAllocator =
+      fit::inline_function<ktl::optional<uint64_t>(uint64_t size, uint64_t alignment)>;
+
+  // Whether the upper and lower virtual address spaces are configured and
+  // operated upon separately.
+  static constexpr bool kDualSpaces = !ktl::is_same_v<LowerPaging, UpperPaging>;
+
+  static constexpr MapSettings kMmioMapSettings = {
+      .access = {.readable = true, .writable = true},
+      .memory = kArchMmioMemoryType,
+  };
+
+  static constexpr MapSettings NormalMapSettings(arch::AccessPermissions access) {
+    return {.access = access, .memory = kArchNormalMemoryType};
   }
 
-  ktl::byte* PhysToPtr(page_table::Paddr phys) final {
-    // We have a 1:1 virtual/physical mapping.
-    return reinterpret_cast<ktl::byte*>(static_cast<uintptr_t>(phys.value()));
+  // Returns the main memalloc::Pool-backed allocator.
+  static PageTableAllocator PhysPageTableAllocator(memalloc::Pool& pool = Allocation::GetPool());
+
+  // Initializes the address space with a given page table allocator and the
+  // arguments specified by ArchCreatePagingState().
+  template <typename... PagingStateCreationArgs>
+  void Init(PageTableAllocator allocator, PagingStateCreationArgs&&... args) {
+    allocator_ = ktl::move(allocator);
+
+    ktl::optional<uint64_t> lower_root =
+        allocator_(LowerPaging::kTableSize<LowerPaging::kFirstLevel>, LowerPaging::kTableAlignment);
+    ZX_ASSERT_MSG(lower_root, "failed to allocate %sroot page table", kDualSpaces ? "lower " : "");
+    lower_root_paddr_ = *lower_root;
+
+    if constexpr (kDualSpaces) {
+      ktl::optional<uint64_t> upper_root = allocator_(
+          UpperPaging::kTableSize<UpperPaging::kFirstLevel>, UpperPaging::kTableAlignment);
+      ZX_ASSERT_MSG(upper_root, "failed to allocate upper root page table");
+      upper_root_paddr_ = *upper_root;
+    }
+
+    state_ = ArchCreatePagingState(ktl::forward<PagingStateCreationArgs>(args)...);
   }
+
+  // As above, but specifies PhysPageTableAllocator() for a page table
+  // allocator.
+  template <typename... Args>
+  void Init(Args&&... args) {
+    Init(PhysPageTableAllocator(), ktl::forward<Args>(args)...);
+  }
+
+  template <bool DualSpaces = kDualSpaces, typename = ktl::enable_if_t<DualSpaces>>
+  uint64_t lower_root_paddr() const {
+    return lower_root_paddr_;
+  }
+
+  template <bool DualSpaces = kDualSpaces, typename = ktl::enable_if_t<DualSpaces>>
+  uint64_t upper_root_paddr() const {
+    return upper_root_paddr_;
+  }
+
+  template <bool DualSpaces = kDualSpaces, typename = ktl::enable_if_t<!DualSpaces>>
+  uint64_t root_paddr() const {
+    return lower_root_paddr_;
+  }
+
+  const SystemState& state() const { return state_; }
+
+  fit::result<MapError> Map(uint64_t vaddr, uint64_t size, uint64_t paddr, MapSettings settings);
+
+  fit::result<MapError> IdentityMap(uint64_t addr, uint64_t size, MapSettings settings) {
+    return Map(addr, size, addr, settings);
+  }
+
+  // Identity maps in the global UART's registers, assuming that they fit
+  // within a single page.
+  void IdentityMapUart();
 
  private:
-  memalloc::Pool& pool_;
+  static constexpr uint64_t kNumTableEntries =
+      LowerPaging::kNumTableEntries<LowerPaging::kFirstLevel>;
+
+  template <typename Paging, size_t... LevelIndex>
+  static constexpr bool SameNumberOfEntries(ktl::index_sequence<LevelIndex...>) {
+    return ((Paging::template kNumTableEntries<Paging::kLevels[LevelIndex]> == kNumTableEntries) &&
+            ...);
+  }
+  // TODO(fxbug.dev/133357): Uncomment.
+  /*
+  static_assert(
+      SameNumberOfEntries<LowerPaging>(ktl::make_index_sequence<LowerPaging::kLevels.size()>()));
+  static_assert(
+      SameNumberOfEntries<UpperPaging>(ktl::make_index_sequence<UpperPaging::kLevels.size()>()));
+  */
+
+  using Table = hwreg::AlignedTableStorage<uint64_t, kNumTableEntries>;
+
+  static constexpr uint64_t kLowerVirtualAddressRangeEnd =
+      *LowerPaging::kLowerVirtualAddressRangeEnd;
+  static constexpr uint64_t kUpperVirtualAddressRangeStart =
+      *UpperPaging::kUpperVirtualAddressRangeStart;
+
+  fit::inline_function<decltype(Table{}.direct_io())(uint64_t)> paddr_to_io_ = [](uint64_t paddr) {
+    return reinterpret_cast<Table*>(paddr)->direct_io();
+  };
+
+  PageTableAllocator allocator_;
+  uint64_t lower_root_paddr_ = 0;
+  uint64_t upper_root_paddr_ = 0;
+  SystemState state_ = {};
 };
 
 #endif  // ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_ADDRESS_SPACE_H_
