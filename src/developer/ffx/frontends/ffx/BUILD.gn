@@ -83,7 +83,10 @@ host_test("ffx-e2e-without-target") {
          ]
 
   deps = [ ":ffx_bin" ]
-  data_deps = [ "//src/developer/ffx:suite_test_data" ]
+  data_deps = [
+    "//src/developer/ffx:suite_test_data",
+    "//src/developer/ffx/plugins/self-test:ffx_selftest_tool_test_data",
+  ]
 
   # TODO(fxbug.dev/126316) ffx self-test seems to be buggy, so let's at least
   # prevent it from affecting other tests by isolating it to its own shard.
@@ -105,6 +108,7 @@ host_test("ffx-e2e-with-target") {
   data_deps = [
     ":ffx-e2e-test-data",
     "//src/developer/ffx:suite_test_data",
+    "//src/developer/ffx/plugins/self-test:ffx_selftest_tool_test_data",
   ]
 
   # TODO(fxbug.dev/60683): split additional dimensions such as multi-device

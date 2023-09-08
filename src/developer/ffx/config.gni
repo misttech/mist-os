@@ -72,7 +72,6 @@ dual_mode_plugins = [
   "//src/developer/ffx/plugins/repository:ffx_repository",
   "//src/developer/ffx/plugins/scrutiny:ffx_scrutiny",
   "//src/developer/ffx/plugins/sdk:ffx_sdk",
-  "//src/developer/ffx/plugins/self-test:ffx_selftest",
   "//src/developer/ffx/plugins/session:ffx_session",
   "//src/developer/ffx/plugins/setui:ffx_setui",
   "//src/developer/ffx/plugins/test:ffx_test",
