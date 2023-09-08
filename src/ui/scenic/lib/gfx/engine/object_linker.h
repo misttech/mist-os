@@ -18,6 +18,7 @@
 #include <type_traits>
 #include <unordered_map>
 
+#include "lib/async/dispatcher.h"
 #include "src/lib/fxl/macros.h"
 #include "src/lib/fxl/memory/weak_ptr.h"
 #include "src/ui/scenic/lib/scenic/util/error_reporter.h"
@@ -69,12 +70,15 @@ class ObjectLinkerBase {
 
   // Information for one end of a Link registered with the linker.
   struct Endpoint {
-    Endpoint(zx_koid_t peer_endpoint_id, zx::handle token,
+    Endpoint(zx_koid_t peer_endpoint_id, zx::handle token, async_dispatcher_t* dispatcher,
              std::unique_ptr<async::Wait> peer_death_waiter)
         : peer_endpoint_id(peer_endpoint_id),
           link(nullptr),
           token(std::move(token)),
-          peer_death_waiter(std::move(peer_death_waiter)) {}
+          dispatcher(dispatcher),
+          peer_death_waiter(std::move(peer_death_waiter)) {
+      FX_DCHECK(dispatcher);
+    }
 
     Endpoint(Endpoint&&) = default;
 
@@ -95,7 +99,8 @@ class ObjectLinkerBase {
 
     zx_koid_t peer_endpoint_id;
     Link* link;
-    zx::handle token;                                // The token may be released by the link owner.
+    zx::handle token;  // The token may be released by the link owner.
+    async_dispatcher_t* dispatcher;
     std::unique_ptr<async::Wait> peer_death_waiter;  // Only non-null if the link is unresolved.
   };
 
@@ -118,17 +123,17 @@ class ObjectLinkerBase {
   // will not be linked until its peer is also initialized.
   void InitializeEndpoint(ObjectLinkerBase::Link* link, zx_koid_t endpoint_id, bool is_import);
 
-  // Attempts linking of the endpoints associated with |endpoint_id| and
-  // |peer_endpoint_id|.
+  // Attempts linking of the endpoints associated with |endpoint_id| and |peer_endpoint_id|.
   //
-  // The operation will only succeed if both endpoints have been initialized
-  // first.
+  // The operation will only succeed if both endpoints have been initialized first.
   void AttemptLinking(zx_koid_t endpoint_id, zx_koid_t peer_endpoint_id, bool is_import);
 
-  // Sets up an async::Wait on |Endpoint| that will fire a callback if the
-  // Endpoint peer's token is destroyed before a link has been established.
-  // All wait tasks run on the calling thread's dispatcher.
-  std::unique_ptr<async::Wait> WaitForPeerDeath(zx_handle_t endpoint_handle, zx_koid_t endpoint_id,
+  // Sets up an async::Wait on |Endpoint| that will fire a callback if the Endpoint peer's token is
+  // destroyed before a link has been established.
+  // All wait tasks run on the Endpoint's dispatcher, i.e. the default dispatcher at the Endpoint's
+  // construction time.
+  std::unique_ptr<async::Wait> WaitForPeerDeath(async_dispatcher_t* dispatcher,
+                                                zx_handle_t endpoint_handle, zx_koid_t endpoint_id,
                                                 bool is_import);
 
   // Releases the zx::handle for the Endpoint associated with |endpoint_id|, allowing the caller
@@ -205,7 +210,9 @@ class ObjectLinkerBase {
 // through cloned handles, will result in an error.
 // TODO(fxbug.dev/23989): Allow multiple Imports.
 //
-// This class is thread-safe. Links may be created and used on multiple threads.
+// Thread-safety: this class is thread-safe. Links may be created and used on multiple threads.
+// Links must be destroyed before their dispatcher is destroyed (i.e. the default dispatcher when
+// the Link is created).
 template <typename Export, typename Import>
 class ObjectLinker : public ObjectLinkerBase,
                      public std::enable_shared_from_this<ObjectLinker<Export, Import>> {
@@ -298,16 +305,14 @@ class ObjectLinker : public ObjectLinkerBase,
   }
   ~ObjectLinker() = default;
 
-  // Creates an outgoing cross-session ExportLink between two objects, which
-  // can be used to initiate and close the connection between them.
+  // Creates an outgoing cross-session ExportLink between two objects,
+  // which can be used to initiate and close the connection between them.
   //
   // The ObjectLinker uses the provided |token| to locate the paired ImportLink.
-  // |token| must reference a pairable kernel object type such as |zx::channel|
-  // or |zx::eventpair|.  |token| may not reference a kernel object that is in
-  // use by this ObjectLinker.
+  // |token| must reference a pairable kernel object type such as |zx::channel| or |zx::eventpair|.
+  // |token| may not reference a kernel object that is in use by this ObjectLinker.
   //
-  // If a link cannot be created, |error_reporter| will be used to flag an
-  // error.
+  // If a link cannot be created, |error_reporter| will be used to flag an error.
   //
   // The objects are linked as soon as the |Initialize()| method is called on
   // the links for both objects.
@@ -319,16 +324,16 @@ class ObjectLinker : public ObjectLinkerBase,
     return ExportLink(std::move(export_obj), endpoint_id, this->shared_from_this());
   }
 
-  // Creates an incoming cross-session ImportLink between two objects, which
-  // can be used to initiate and close the connection between them.
+  // Creates an incoming cross-session ImportLink between two objects,
+  // which can be used to initiate and close the connection between them.
   //
   // The ObjectLinker uses the provided |token| to locate the paired ExportLink.
-  // |token| must reference a pairable kernel object type such as |zx::channel|
-  // or |zx::eventpair|.  |token| may not reference a kernel object that is in
-  // use by this ObjectLinker.
+  // |token| must reference a pairable kernel object type such as |zx::channel| or |zx::eventpair|.
+  // |token| may not reference a kernel object that is in use by this ObjectLinker.
   //
-  // If a link cannot be created, |error_reporter| will be used to flag an
-
+  // If a link cannot be created, |error_reporter| will be used to flag an error.
+  //
+  // The objects are linked as soon as the |Initialize()| method is called on
   // the links for both objects.
   template <typename T, typename = std::enable_if_t<zx::object_traits<T>::has_peer_handle>>
   ImportLink CreateImport(Import import_obj, T token, ErrorReporter* error_reporter) {

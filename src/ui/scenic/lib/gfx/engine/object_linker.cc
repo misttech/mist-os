@@ -80,9 +80,10 @@ zx_koid_t ObjectLinkerBase::CreateEndpoint(zx::handle token, ErrorReporter* erro
   // until Initialize() is called on the endpoint to provide a link object and
   // handler callbacks.
   auto raw_token = token.get();  // Read handle before move()-ing into Endpoint.
-  auto emplaced_endpoint =
-      endpoints.emplace(endpoint_id, Endpoint(peer_endpoint_id, std::move(token),
-                                              WaitForPeerDeath(raw_token, endpoint_id, is_import)));
+  auto dispatcher = async_get_default_dispatcher();
+  auto emplaced_endpoint = endpoints.emplace(
+      endpoint_id, Endpoint(peer_endpoint_id, std::move(token), dispatcher,
+                            WaitForPeerDeath(dispatcher, raw_token, endpoint_id, is_import)));
   FX_DCHECK(emplaced_endpoint.second);
 
   return endpoint_id;
@@ -218,7 +219,8 @@ void ObjectLinkerBase::AttemptLinking(zx_koid_t endpoint_id, zx_koid_t peer_endp
   }
 }
 
-std::unique_ptr<async::Wait> ObjectLinkerBase::WaitForPeerDeath(zx_handle_t endpoint_handle,
+std::unique_ptr<async::Wait> ObjectLinkerBase::WaitForPeerDeath(async_dispatcher_t* dispatcher,
+                                                                zx_handle_t endpoint_handle,
                                                                 zx_koid_t endpoint_id,
                                                                 bool is_import) {
   auto access = GetScopedAccess();
@@ -276,7 +278,7 @@ std::unique_ptr<async::Wait> ObjectLinkerBase::WaitForPeerDeath(zx_handle_t endp
         }
       });
 
-  zx_status_t status = waiter->Begin(async_get_default_dispatcher());
+  zx_status_t status = waiter->Begin(dispatcher);
   FX_DCHECK(status == ZX_OK);
 
   return waiter;
@@ -300,12 +302,13 @@ zx::handle ObjectLinkerBase::ReleaseToken(zx_koid_t endpoint_id, bool is_import)
 
   // Signal that the link is now unresolved, then re-create the peer death waiter to flag the
   // endpoint as unresolved.
-  if (peer_endpoint_iter->second.link) {
-    peer_endpoint_iter->second.link->LinkUnresolvedLocked();
+  auto& peer_endpoint = peer_endpoint_iter->second;
+  if (peer_endpoint.link) {
+    peer_endpoint.link->LinkUnresolvedLocked();
   }
 
-  peer_endpoint_iter->second.peer_death_waiter =
-      WaitForPeerDeath(peer_endpoint_iter->second.token.get(), peer_endpoint_id, !is_import);
+  peer_endpoint.peer_death_waiter = WaitForPeerDeath(
+      peer_endpoint.dispatcher, peer_endpoint.token.get(), peer_endpoint_id, !is_import);
 
   return std::move(endpoint_iter->second.token);
 }
