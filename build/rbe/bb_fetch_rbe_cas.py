@@ -205,12 +205,6 @@ class BuildBucketTool(object):
         return rbe_build_id, rbe_build_json
 
 
-def rbe_downloader(cfg: Path) -> remotetool.RemoteTool:
-    with open(cfg) as f:
-        downloader = remotetool.RemoteTool(remotetool.read_config_file_lines(f))
-    return downloader
-
-
 def download_artifact(
         downloader: remotetool.RemoteTool, digest: str,
         destination: Path) -> int:
@@ -274,7 +268,7 @@ def fetch_artifact_from_reproxy_log(
     if verbose:
         msg(f"Digest of {artifact_path} is {digest}")
 
-    downloader = rbe_downloader(cfg)
+    downloader = remotetool.configure_remotetool(cfg)
 
     output = output or Path(artifact_path.name)
     exit_code = download_artifact(downloader, digest, output)

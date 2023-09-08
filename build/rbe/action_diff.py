@@ -328,8 +328,9 @@ def main(argv: Sequence[str]) -> int:
     logs = reproxy_logs.parse_logs(main_args.reproxy_logs)
     # len(logs) == 2, enforced by _MAIN_ARG_PARSER.
 
-    with open(remotetool._REPROXY_CFG) as cfg:
-        reproxy_cfg = remotetool.read_config_file_lines(cfg.readlines())
+    cfg_path = remotetool._REPROXY_CFG
+    reproxy_cfg = remotetool.read_config_file_lines(
+        cfg_path.read_text().splitlines())
 
     left, right = logs
     differ = ActionDiffer(left=left, right=right, reproxy_cfg=reproxy_cfg)

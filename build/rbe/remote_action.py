@@ -1465,9 +1465,8 @@ class RemoteAction(object):
         stub_info.create(self.working_dir)
 
     def downloader(self) -> remotetool.RemoteTool:
-        with open(self.exec_root / _REPROXY_CFG) as cfg:
-            return remotetool.RemoteTool(
-                reproxy_cfg=remotetool.read_config_file_lines(cfg))
+        cfg = self.exec_root / _REPROXY_CFG
+        return remotetool.configure_remotetool(cfg)
 
     def _cleanup(self):
         self.vmsg("Cleaning up temporary files.")

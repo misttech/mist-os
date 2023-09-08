@@ -335,12 +335,13 @@ class RustActionTests(unittest.TestCase):
     def test_soname(self):
         soname = 'foo.so'
         for opts in (
-                [f'-Clink-arg=--soname={soname}'],
-                ['-C', f'link-arg=--soname={soname}'],
+            [f'-Clink-arg=--soname={soname}'],
+            ['-C', f'link-arg=--soname={soname}'],
         ):
             r = rustc.RustAction(
-                [
-                    '../tools/rustc'] + opts + ['../foo/lib.rs', '-o',
+                ['../tools/rustc'] + opts + [
+                    '../foo/lib.rs',
+                    '-o',
                     'foo.rlib',
                 ])
             self.assertNotIn(soname, r.link_arg_files)

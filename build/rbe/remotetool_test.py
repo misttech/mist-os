@@ -245,18 +245,27 @@ class ReadConfigFileLinesTests(unittest.TestCase):
             {'key': 'value-2'})
 
 
+_TEST_CFG = {
+    'service': 'other.remote.service.com:443',
+    'instance': 'projects/your-project/instance/default',
+}
+
+
+class ConfigureRemotetoolTests(unittest.TestCase):
+
+    def test_configure(self):
+        with mock.patch.object(Path, 'read_text', return_value=''.join(
+            [f'{k}={v}\n' for k, v in _TEST_CFG.items()])) as mock_read:
+            tool = remotetool.configure_remotetool(Path('r.cfg'))
+        self.assertEqual(tool.config, _TEST_CFG)
+        mock_read.assert_called_once_with()
+
+
 class RemotetoolRunTests(unittest.TestCase):
 
     @property
-    def _cfg(self):
-        return {
-            'service': 'some.remote.service.com:443',
-            'instance': 'projects/my-project/instance/default',
-        }
-
-    @property
     def tool(self):
-        return remotetool.RemoteTool(reproxy_cfg=self._cfg)
+        return remotetool.RemoteTool(reproxy_cfg=_TEST_CFG)
 
     def test_missing_params(self):
         tool = remotetool.RemoteTool(reproxy_cfg={})

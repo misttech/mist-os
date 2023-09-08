@@ -240,7 +240,7 @@ class FetchArtifactFromReproxyLogTests(unittest.TestCase):
         with mock.patch.object(reproxy_logs, 'lookup_output_file_digest',
                                return_value=digest) as mock_lookup:
             with mock.patch.object(
-                    bb_fetch_rbe_cas, 'rbe_downloader',
+                    remotetool, 'configure_remotetool',
                     return_value=self.downloader) as mock_downloader:
                 with mock.patch.object(bb_fetch_rbe_cas, 'download_artifact',
                                        return_value=status) as mock_download:
@@ -279,7 +279,7 @@ class FetchArtifactFromReproxyLogTests(unittest.TestCase):
         with mock.patch.object(reproxy_logs, 'lookup_output_file_digest',
                                return_value=digest) as mock_lookup:
             with mock.patch.object(
-                    bb_fetch_rbe_cas, 'rbe_downloader',
+                    remotetool, 'configure_remotetool',
                     return_value=self.downloader) as mock_downloader:
                 with mock.patch.object(bb_fetch_rbe_cas, 'download_artifact',
                                        return_value=status) as mock_download:

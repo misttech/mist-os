@@ -115,8 +115,8 @@ class PrebuiltToolAction(object):
     @property
     def command_line_inputs_lists(self) -> Sequence[Path]:
         return [
-            Path(p)
-            for p in cl_utils.flatten_comma_list(self._main_args.input_list_paths)
+            Path(p) for p in cl_utils.flatten_comma_list(
+                self._main_args.input_list_paths)
         ]
 
     @property
@@ -170,8 +170,10 @@ class PrebuiltToolAction(object):
             exec_root=self.exec_root,
         )
         self.vprintlist('remote inputs', action.inputs_relative_to_project_root)
-        self.vprintlist('remote output files', action.output_files_relative_to_project_root)
-        self.vprintlist('remote output dirs', action.output_dirs_relative_to_project_root)
+        self.vprintlist(
+            'remote output files', action.output_files_relative_to_project_root)
+        self.vprintlist(
+            'remote output dirs', action.output_dirs_relative_to_project_root)
         self.vprintlist('rewrapper options', remote_options)
         return action
 

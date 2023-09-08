@@ -190,9 +190,8 @@ def _main(
 
 
 def main(argv: Sequence[str]) -> int:
-    with open(_PROJECT_ROOT_REL / remote_action._REPROXY_CFG) as cfg:
-        downloader = remotetool.RemoteTool(
-            reproxy_cfg=remotetool.read_config_file_lines(cfg))
+    cfg = _PROJECT_ROOT_REL / remote_action._REPROXY_CFG
+    downloader = remotetool.configure_remotetool(cfg)
     return _main(
         argv,
         downloader=downloader,

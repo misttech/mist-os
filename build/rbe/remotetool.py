@@ -29,6 +29,7 @@ _REPROXY_CFG = _SCRIPT_DIR / "fuchsia-reproxy.cfg"
 
 _HOST_REMOTETOOL = fuchsia.RECLIENT_BINDIR / 'remotetool'
 
+
 class ParseError(ValueError):
 
     def __init__(self, msg: str):
@@ -151,7 +152,8 @@ def parse_show_action_output(lines: Iterable[str]) -> ShowActionResult:
     platform_section, remainder = _must_partition_sequence(remainder, 'Inputs')
 
     # Could see 'Action Result' or 'No action result in cache.'.
-    inputs_section, result_sep, remainder = cl_utils.partition_sequence(remainder, 'Action Result')
+    inputs_section, result_sep, remainder = cl_utils.partition_sequence(
+        remainder, 'Action Result')
 
     # command_section has:
     # [0] '======='
@@ -199,8 +201,8 @@ def parse_show_action_output(lines: Iterable[str]) -> ShowActionResult:
         # [-1] <blank line>
         # Output file paths are relative to the working_dir (not exec_root).
         output_files = {
-            k: v for k, v in (
-                _parse_output_digest(line) for line in output_files_section[1:-1])
+            k: v for k, v in
+            (_parse_output_digest(line) for line in output_files_section[1:-1])
         }
 
     return ShowActionResult(
@@ -270,9 +272,11 @@ class RemoteTool(object):
         if gce_creds:
             auto_args.append(f'--use_gce_credentials={gce_creds}')
         else:
-            use_adc = self.config.get("use_application_default_credentials", None)
+            use_adc = self.config.get(
+                "use_application_default_credentials", None)
             if use_adc:
-                auto_args.append(f"--use_application_default_credentials={use_adc}")
+                auto_args.append(
+                    f"--use_application_default_credentials={use_adc}")
 
         command = [
             str(PROJECT_ROOT_REL / _HOST_REMOTETOOL),
@@ -349,10 +353,13 @@ class RemoteTool(object):
         return self.run(args, **final_kwargs)
 
 
+def configure_remotetool(cfg: Path) -> RemoteTool:
+    return RemoteTool(read_config_file_lines(cfg.read_text().splitlines()))
+
+
 def main(argv: Sequence[str]) -> int:
-    with open(_REPROXY_CFG) as cfg:
-        tool = RemoteTool(read_config_file_lines(cfg))
-    result = tool.run(argv, show_command=True, quiet=False)
+    rtool = configure_remotetool(_REPROXY_CFG)
+    result = rtool.run(argv, show_command=True, quiet=False)
     return result.returncode
 
 
