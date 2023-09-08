@@ -19,7 +19,7 @@ use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fidl_fuchsia_net_stack as fidl_net_stack;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fposix_socket;
-use futures::{stream::Stream, task::AtomicWaker, FutureExt as _};
+use futures::{task::AtomicWaker, FutureExt as _, Stream, StreamExt as _};
 use net_types::{
     ethernet::Mac,
     ip::{
@@ -241,6 +241,34 @@ impl TaskWaitGroupSpawner {
             std::mem::drop(spawner);
         }))
         .detach();
+    }
+}
+
+/// Extracts common bounded work operations performed on [`NeedsDataWatcher`].
+///
+/// Runs the watcher loop until `watcher` is finished or `f` returns `None`.
+pub(crate) async fn yielding_data_notifier_loop<
+    F: FnMut() -> Option<netstack3_core::WorkQueueReport>,
+>(
+    mut watcher: NeedsDataWatcher,
+    mut f: F,
+) {
+    let mut yield_fut = futures::future::OptionFuture::default();
+    loop {
+        // Loop while we are woken up to handle enqueued RX packets.
+        let r = futures::select! {
+            w = watcher.next().fuse() => w,
+            y = yield_fut => Some(y.expect("OptionFuture is only selected when non-empty")),
+        };
+
+        match r.and_then(|()| f()) {
+            Some(netstack3_core::WorkQueueReport::AllDone) => (),
+            Some(netstack3_core::WorkQueueReport::Pending) => {
+                // Yield the task to the executor once.
+                yield_fut = Some(async_utils::futures::YieldToExecutorOnce::new()).into();
+            }
+            None => break,
+        }
     }
 }
 
@@ -1554,17 +1582,7 @@ mod tests {
         // Yield this for a while to the executor while ensuring the wait group
         // hasn't finished.
         for _ in 0..50 {
-            let mut do_yield = true;
-            futures::future::poll_fn(|cx| {
-                if do_yield {
-                    do_yield = false;
-                    cx.waker().wake_by_ref();
-                    futures::task::Poll::Pending
-                } else {
-                    futures::task::Poll::Ready(())
-                }
-            })
-            .await;
+            async_utils::futures::YieldToExecutorOnce::new().await;
             assert_eq!(futures::poll!(&mut wait_group), futures::task::Poll::Pending);
         }
 

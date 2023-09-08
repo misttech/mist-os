@@ -521,6 +521,18 @@ pub fn del_route<NonSyncCtx: NonSyncContext>(
     .map_err(From::from)
 }
 
+/// A common type returned by functions that perform bounded amounts of work.
+///
+/// This exists so cooperative task execution and yielding can be sensibly
+/// performed when dealing with long work queues.
+#[derive(Debug, Eq, PartialEq)]
+pub enum WorkQueueReport {
+    /// All the available work was done.
+    AllDone,
+    /// There's still pending work to do, execution was cut short.
+    Pending,
+}
+
 #[cfg(test)]
 mod tests {
     use core::time::Duration;

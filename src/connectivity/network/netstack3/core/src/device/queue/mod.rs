@@ -9,6 +9,7 @@ pub(super) mod rx;
 pub mod tx;
 
 use alloc::collections::VecDeque;
+use core::convert::From;
 
 use crate::device::DeviceSendFrameError;
 
@@ -53,4 +54,13 @@ enum EnqueueResult {
 enum DequeueResult {
     MoreStillQueued,
     NoMoreLeft,
+}
+
+impl From<DequeueResult> for crate::WorkQueueReport {
+    fn from(value: DequeueResult) -> Self {
+        match value {
+            DequeueResult::MoreStillQueued => Self::Pending,
+            DequeueResult::NoMoreLeft => Self::AllDone,
+        }
+    }
 }

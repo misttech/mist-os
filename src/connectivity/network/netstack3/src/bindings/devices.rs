@@ -11,7 +11,6 @@ use std::{
 use assert_matches::assert_matches;
 use derivative::Derivative;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use futures::stream::StreamExt as _;
 use net_types::{
     ethernet::Mac,
     ip::{IpAddr, Mtu},
@@ -164,16 +163,18 @@ pub(crate) fn spawn_rx_task(
     mut ctx: Ctx,
     device_id: &LoopbackDeviceId<BindingsNonSyncCtxImpl>,
 ) -> fuchsia_async::Task<()> {
-    let mut watcher = notifier.watcher();
+    let watcher = notifier.watcher();
     let device_id = device_id.downgrade();
 
-    fuchsia_async::Task::spawn(async move {
-        // Loop while we are woken up to handle enqueued RX packets.
-        while let Some(device_id) = watcher.next().await.and_then(|()| device_id.upgrade()) {
+    fuchsia_async::Task::spawn(crate::bindings::util::yielding_data_notifier_loop(
+        watcher,
+        move || {
             let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-            handle_queued_rx_packets(sync_ctx, non_sync_ctx, &device_id)
-        }
-    })
+            device_id
+                .upgrade()
+                .map(|device_id| handle_queued_rx_packets(sync_ctx, non_sync_ctx, &device_id))
+        },
+    ))
 }
 
 pub(crate) fn spawn_tx_task(
@@ -181,24 +182,27 @@ pub(crate) fn spawn_tx_task(
     mut ctx: Ctx,
     device_id: DeviceId<BindingsNonSyncCtxImpl>,
 ) -> fuchsia_async::Task<()> {
-    let mut watcher = notifier.watcher();
+    let watcher = notifier.watcher();
     let device_id = device_id.downgrade();
 
-    fuchsia_async::Task::spawn(async move {
-        // Loop while we are woken up to handle enqueued TX frames.
-        while let Some(device_id) = watcher.next().await.and_then(|()| device_id.upgrade()) {
+    fuchsia_async::Task::spawn(crate::bindings::util::yielding_data_notifier_loop(
+        watcher,
+        move || {
             let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-            match transmit_queued_tx_frames(sync_ctx, non_sync_ctx, &device_id) {
-                Ok(()) => {}
-                Err(DeviceSendFrameError::DeviceNotReady(())) => {
-                    warn!(
-                        "TODO(https://fxbug.dev/105921): Support waiting for TX buffers to be available, dropping packet for now on device={}",
-                        device_id,
-                    )
-                }
-            }
-        }
-    })
+            device_id.upgrade().map(|device_id| {
+                transmit_queued_tx_frames(sync_ctx, non_sync_ctx, &device_id).unwrap_or_else(
+                    |DeviceSendFrameError::DeviceNotReady(())| {
+                        warn!(
+                            "TODO(https://fxbug.dev/105921): Support waiting for TX buffers to be \
+                            available, dropping packet for now on device={}",
+                            device_id,
+                        );
+                        netstack3_core::WorkQueueReport::AllDone
+                    },
+                )
+            })
+        },
+    ))
 }
 
 /// Static information common to all devices.

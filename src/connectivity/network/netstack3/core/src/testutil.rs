@@ -1155,7 +1155,12 @@ pub(crate) fn handle_queued_rx_packets(sync_ctx: &FakeSyncCtx, ctx: &mut FakeNon
         }
 
         for id in rx_available.into_iter() {
-            crate::device::handle_queued_rx_packets(sync_ctx, ctx, &id);
+            loop {
+                match crate::device::handle_queued_rx_packets(sync_ctx, ctx, &id) {
+                    crate::WorkQueueReport::AllDone => break,
+                    crate::WorkQueueReport::Pending => (),
+                }
+            }
         }
     }
 }

@@ -121,7 +121,7 @@ pub(crate) trait TransmitQueueHandler<D: Device, C>: TransmitQueueCommon<D, C> {
         &mut self,
         ctx: &mut C,
         device_id: &Self::DeviceId,
-    ) -> Result<(), DeviceSendFrameError<()>>;
+    ) -> Result<crate::WorkQueueReport, DeviceSendFrameError<()>>;
 
     /// Sets the queue configuration for the device.
     fn set_configuration(
@@ -156,7 +156,7 @@ impl<
         &mut self,
         ctx: &mut C,
         device_id: &SC::DeviceId,
-    ) -> Result<(), DeviceSendFrameError<()>> {
+    ) -> Result<crate::WorkQueueReport, DeviceSendFrameError<()>> {
         self.with_dequed_packets_and_tx_queue_ctx(
             device_id,
             |DequeueState { dequeued_frames: dequed_packets }, tx_queue_ctx| {
@@ -171,7 +171,10 @@ impl<
                         queue.as_mut().map(|q| q.dequeue_into(dequed_packets, MAX_BATCH_SIZE))
                     },
                 );
-                let Some(ret) = ret else { return Ok(()) };
+
+                // If we don't have a transmit queue installed, report no work
+                // left to be done.
+                let Some(ret) = ret else { return Ok(crate::WorkQueueReport::AllDone) };
 
                 while let Some((meta, p)) = dequed_packets.pop_front() {
                     deliver_to_device_sockets(tx_queue_ctx, ctx, device_id, &p);
@@ -193,16 +196,7 @@ impl<
                     }
                 }
 
-                match ret {
-                    DequeueResult::MoreStillQueued => ctx.wake_tx_task(device_id),
-                    DequeueResult::NoMoreLeft => {
-                        // There are no more frames left after the batch we
-                        // just handled. When the next TX frame gets enqueued,
-                        // the TX task will be woken up again.
-                    }
-                }
-
-                Ok(())
+                Ok(ret.into())
             },
         )
     }
@@ -545,7 +539,7 @@ mod tests {
                 &mut non_sync_ctx,
                 &FakeLinkDeviceId,
             ),
-            Ok(()),
+            Ok(crate::WorkQueueReport::AllDone),
         );
         assert_eq!(non_sync_ctx.state().woken_tx_tasks, []);
         assert_eq!(core::mem::take(&mut sync_ctx.get_mut().transmitted_packets), []);
@@ -609,19 +603,13 @@ mod tests {
                         &mut non_sync_ctx,
                         &FakeLinkDeviceId,
                     ),
-                    Ok(()),
+                    Ok(crate::WorkQueueReport::Pending),
                 );
                 assert_eq!(
                     core::mem::take(&mut sync_ctx.get_mut().transmitted_packets),
                     (i..i + MAX_BATCH_SIZE)
                         .map(|i| Buf::new(vec![i as u8], ..))
                         .collect::<Vec<_>>()
-                );
-                // We should get a wake up signal when packets remain after
-                // handling a batch of TX packets.
-                assert_eq!(
-                    core::mem::take(&mut non_sync_ctx.state_mut().woken_tx_tasks),
-                    [FakeLinkDeviceId]
                 );
             }
 
@@ -631,7 +619,7 @@ mod tests {
                     &mut non_sync_ctx,
                     &FakeLinkDeviceId,
                 ),
-                Ok(()),
+                Ok(crate::WorkQueueReport::AllDone),
             );
             assert_eq!(
                 core::mem::take(&mut sync_ctx.get_mut().transmitted_packets),
@@ -712,7 +700,7 @@ mod tests {
                 &mut non_sync_ctx,
                 &FakeLinkDeviceId,
             ),
-            Ok(()),
+            Ok(crate::WorkQueueReport::AllDone),
         );
         assert_eq!(non_sync_ctx.state().woken_tx_tasks, []);
         assert_eq!(core::mem::take(&mut sync_ctx.get_mut().transmitted_packets), [body]);

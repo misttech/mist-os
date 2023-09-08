@@ -1939,7 +1939,7 @@ pub fn transmit_queued_tx_frames<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
-) -> Result<(), DeviceSendFrameError<()>> {
+) -> Result<crate::WorkQueueReport, DeviceSendFrameError<()>> {
     let sync_ctx = &mut Locked::new(sync_ctx);
     match device {
         DeviceId::Ethernet(id) => {
@@ -1961,7 +1961,7 @@ pub fn handle_queued_rx_packets<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &LoopbackDeviceId<NonSyncCtx>,
-) {
+) -> crate::WorkQueueReport {
     ReceiveQueueHandler::<LoopbackDevice, _>::handle_queued_rx_frames(
         &mut Locked::new(sync_ctx),
         ctx,
@@ -2827,8 +2827,10 @@ mod tests {
                 core::mem::take(&mut non_sync_ctx.state_mut().tx_available),
                 [device.clone()]
             );
-            crate::device::transmit_queued_tx_frames(&sync_ctx, &mut non_sync_ctx, &device)
-                .unwrap();
+            assert_eq!(
+                crate::device::transmit_queued_tx_frames(&sync_ctx, &mut non_sync_ctx, &device),
+                Ok(crate::WorkQueueReport::AllDone)
+            );
         }
 
         check_transmitted(&mut non_sync_ctx, &device, 1);
