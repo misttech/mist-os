@@ -18,18 +18,9 @@ driver_bind_rules("intel_rtc_bind") {
   ]
 }
 
-fidl("fuchsia.hardware.adhoc.intelrtc") {
-  sources = [ "adhoc.fidl" ]
-  visibility = [ ":*" ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.hardware.nvram",
-    "//sdk/fidl/fuchsia.hardware.rtc",
-  ]
-}
-
 common_deps = [
-  ":fuchsia.hardware.adhoc.intelrtc_cpp_wire",
   ":intel_rtc_bind",
+  "//sdk/fidl/fuchsia.hardware.rtc:fuchsia.hardware.rtc_cpp_wire",
   "//src/devices/lib/acpi",
   "//src/devices/lib/driver",
   "//src/devices/rtc/lib/rtc:rtc",

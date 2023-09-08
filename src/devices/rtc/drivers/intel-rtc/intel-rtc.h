@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_RTC_DRIVERS_INTEL_RTC_INTEL_RTC_H_
 #define SRC_DEVICES_RTC_DRIVERS_INTEL_RTC_INTEL_RTC_H_
 
-#include <fidl/fuchsia.hardware.adhoc.intelrtc/cpp/wire.h>
+#include <fidl/fuchsia.hardware.rtc/cpp/wire.h>
 #include <lib/ddk/debug.h>
 #include <librtc_llcpp.h>
 
@@ -45,32 +45,22 @@ enum RegisterB {
 };
 
 class RtcDevice;
-using DeviceType =
-    ddk::Device<RtcDevice, ddk::Messageable<fuchsia_hardware_adhoc_intelrtc::Device>::Mixin>;
+using DeviceType = ddk::Device<RtcDevice, ddk::Messageable<FidlRtc::Device>::Mixin>;
 
 class RtcDevice : public DeviceType {
  public:
-  RtcDevice(zx_device_t* parent, zx::resource ioport, uint16_t port_base, uint16_t port_count);
+  RtcDevice(zx_device_t* parent, uint16_t port_base) : DeviceType(parent), port_base_(port_base) {}
+
   void DdkRelease() { delete this; }
 
   // fuchsia.hardware.rtc implementation.
   void Get(GetCompleter::Sync& completer) override;
   void Set(SetRequestView request, SetCompleter::Sync& completer) override;
 
-  // fuchsia.hardware.nvram implementation.
-  void GetSize(GetSizeCompleter::Sync& completer) override;
-  void Read(ReadRequestView request, ReadCompleter::Sync& completer) override;
-  void Write(WriteRequestView request, WriteCompleter::Sync& completer) override;
-
   FidlRtc::wire::Time ReadTime() __TA_EXCLUDES(time_lock_);
   void WriteTime(FidlRtc::wire::Time time) __TA_EXCLUDES(time_lock_);
 
  private:
-  // Read a byte from nvram. |offset| should be based on the start of nvram.
-  uint8_t ReadNvramReg(uint16_t offset) __TA_REQUIRES(time_lock_);
-  // Write a byte to nvram. |offset| should be based on the start of nvram.
-  void WriteNvramReg(uint16_t offset, uint8_t val) __TA_REQUIRES(time_lock_);
-
   // Read a register without doing any transformation of the value.
   uint8_t ReadRegRaw(Registers reg) __TA_REQUIRES(time_lock_);
   // Write a register without doing any transformation of the value.
@@ -89,10 +79,7 @@ class RtcDevice : public DeviceType {
   // Updates |is_24_hour_| and |is_bcd_|.
   void CheckRtcMode() __TA_REQUIRES(time_lock_);
 
-  zx::resource ioport_;
   uint16_t port_base_;
-  size_t bank_count_;
-  size_t nvram_size_;
 
   bool is_24_hour_;
   bool is_bcd_;
