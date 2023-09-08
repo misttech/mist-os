@@ -56,7 +56,8 @@ group("minimal") {
     # Additional non-test things to build:
     ":additional_build_targets",
 
-    # TODO(fxbug.dev/131001): Define the set of tests that should run on minimal.
+    # TODO(fxbug.dev/131001): Migrate from this list to ":hermetic_tests", which
+    # will include all hermetic tests, including those from the targets below.
     "//examples:tests",
     "//sdk:tests",
     "//src/connectivity/network:tests",
@@ -74,6 +75,7 @@ group("minimal") {
     "//src/power:tests",
     "//src/storage:tests",
     "//src/sys:tests",
+    "//src/ui:tests",
     "//src/zircon:tests",
   ]
 
@@ -94,6 +96,15 @@ group("minimal") {
       # Run a subset of the network tests until fxbug.dev/122609 is addressed
       # and all tests (removed above) can be built and run.
       "//src/connectivity/network/tests:tests",
+    ]
+  } else if (current_cpu == "x64") {
+    deps -= [
+      # The integration tests that require WebEngine fail when run. See
+      # https://fxbug.dev/133254. Since they are only run on x64 (the test spec
+      # requires AEMU), disable them only for that architecture
+      # TODO(fxbug.dev/131001): Remove once the corresponding entry above is
+      # replaced with a `hermetic_tests`.target.
+      "//src/ui:tests",
     ]
   }
 }
