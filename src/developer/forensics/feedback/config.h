@@ -31,8 +31,8 @@ enum class CrashReportUploadPolicy {
 };
 
 struct ProductConfig {
-  uint64_t persisted_logs_num_files;
-  StorageSize persisted_logs_total_size;
+  std::optional<uint64_t> persisted_logs_num_files;
+  std::optional<StorageSize> persisted_logs_total_size;
   std::optional<StorageSize> snapshot_persistence_max_tmp_size;
   std::optional<StorageSize> snapshot_persistence_max_cache_size;
 };

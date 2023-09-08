@@ -219,6 +219,19 @@ TEST_F(ProductConfigTest, PersistedLogsTotalSizeKibNotNumber) {
   EXPECT_FALSE(config.has_value());
 }
 
+TEST_F(ProductConfigTest, PersistedLogsBothNegative) {
+  const std::optional<ProductConfig> config = ParseConfig(R"({
+  "persisted_logs_num_files": -1,
+  "persisted_logs_total_size_kib": -1,
+  "snapshot_persistence_max_tmp_size_mib": 1,
+  "snapshot_persistence_max_cache_size_mib": 1
+})");
+
+  EXPECT_TRUE(config.has_value());
+  EXPECT_FALSE(config->persisted_logs_num_files.has_value());
+  EXPECT_FALSE(config->persisted_logs_total_size.has_value());
+}
+
 TEST_F(ProductConfigTest, SnapshotPersistenceMaxTmpSizeMibPositive) {
   const std::optional<ProductConfig> config = ParseConfig(R"({
   "persisted_logs_num_files": 1,
@@ -959,7 +972,7 @@ TEST_F(InspectConfigTest, ExposeConfig_PersistedLogsNumFiles) {
                    .persisted_logs_num_files = 1,
                });
 
-  EXPECT_THAT(InspectTree(), BuildConfigMatcher({UintIs(kPersistedLogsNumFilesKey, 1)}));
+  EXPECT_THAT(InspectTree(), BuildConfigMatcher({StringIs(kPersistedLogsNumFilesKey, "1")}));
 }
 
 TEST_F(InspectConfigTest, ExposeConfig_PersistedLogsTotalSize) {
@@ -967,7 +980,7 @@ TEST_F(InspectConfigTest, ExposeConfig_PersistedLogsTotalSize) {
                ProductConfig{
                    .persisted_logs_total_size = StorageSize::Kilobytes(1),
                });
-  EXPECT_THAT(InspectTree(), BuildConfigMatcher({UintIs(kPersistedLogsTotalSizeKey, 1)}));
+  EXPECT_THAT(InspectTree(), BuildConfigMatcher({StringIs(kPersistedLogsTotalSizeKey, "1")}));
 }
 
 TEST_F(InspectConfigTest, ExposeConfig_SnapshotPersistenceMaxTmpSizeNone) {
@@ -1020,8 +1033,8 @@ TEST_F(InspectConfigTest, ExposeConfig_ProductEnableAll) {
                });
 
   EXPECT_THAT(InspectTree(), BuildConfigMatcher({
-                                 UintIs(kPersistedLogsNumFilesKey, 1),
-                                 UintIs(kPersistedLogsTotalSizeKey, 1),
+                                 StringIs(kPersistedLogsNumFilesKey, "1"),
+                                 StringIs(kPersistedLogsTotalSizeKey, "1"),
                                  StringIs(kSnapshotPersistenceMaxTmpSizeKey, "1"),
                                  StringIs(kSnapshotPersistenceMaxCacheSizeKey, "1"),
                              }));
@@ -1049,8 +1062,8 @@ TEST_F(InspectConfigTest, ExposeConfig_EnableAll) {
                                  BoolIs(kEnableDataRedactionKey, true),
                                  BoolIs(kEnableHourlySnapshotsKey, true),
                                  BoolIs(kEnableLimitInspectDataKey, true),
-                                 UintIs(kPersistedLogsNumFilesKey, 1),
-                                 UintIs(kPersistedLogsTotalSizeKey, 1),
+                                 StringIs(kPersistedLogsNumFilesKey, "1"),
+                                 StringIs(kPersistedLogsTotalSizeKey, "1"),
                                  StringIs(kSnapshotPersistenceMaxTmpSizeKey, "1"),
                                  StringIs(kSnapshotPersistenceMaxCacheSizeKey, "1"),
                              }));

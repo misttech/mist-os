@@ -32,7 +32,9 @@ FeedbackData::FeedbackData(async_dispatcher_t* dispatcher,
                      options.config.annotation_allowlist, options.config.attachment_allowlist,
                      cobalt_, annotation_manager, attachment_providers_.GetAttachmentManager(),
                      &inspect_data_budget_) {
-  SpawnSystemLogRecorder();
+  if (options.run_log_persistence) {
+    SpawnSystemLogRecorder();
+  }
 }
 
 feedback_data::DataProvider* FeedbackData::DataProvider() { return &data_provider_; }

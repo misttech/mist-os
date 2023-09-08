@@ -22,6 +22,7 @@
 #include "src/developer/forensics/feedback/reboot_log/reboot_log.h"
 #include "src/developer/forensics/utils/cobalt/logger.h"
 #include "src/developer/forensics/utils/component/component.h"
+#include "src/developer/forensics/utils/storage_size.h"
 #include "src/lib/files/file.h"
 #include "src/lib/uuid/uuid.h"
 
@@ -52,9 +53,21 @@ int main() {
   std::unique_ptr<cobalt::Logger> cobalt = std::make_unique<cobalt::Logger>(
       component.Dispatcher(), component.Services(), component.Clock());
 
+  const bool run_log_persistence = product_config->persisted_logs_num_files.has_value() &&
+                                   product_config->persisted_logs_total_size.has_value();
+
   if (component.IsFirstInstance()) {
     MovePreviousRebootReason();
-    CreatePreviousLogsFile(cobalt.get(), product_config->persisted_logs_total_size);
+    if (run_log_persistence) {
+      CreatePreviousLogsFile(cobalt.get(), *product_config->persisted_logs_total_size);
+    } else {
+      // This is mostly done to preserve the previous boot logs when the device is migrating from
+      // "log persistence turned on" to "log persistence turned off" and then clean up the
+      // directory. It's a no-op if the directory doesn't exist in the first place.
+      // It does mean we need to give it a hint as to how large the total size now that the config
+      // no longer contains a number for it though.
+      CreatePreviousLogsFile(cobalt.get(), StorageSize::Kilobytes(512));
+    }
     MoveAndRecordBootId(uuid::Generate());
     if (std::string build_version; files::ReadFileToString(kBuildVersionPath, &build_version)) {
       MoveAndRecordBuildVersion(build_version);
@@ -103,6 +116,7 @@ int main() {
                                .config = *snapshot_config,
                                .is_first_instance = component.IsFirstInstance(),
                                .limit_inspect_data = build_type_config->enable_limit_inspect_data,
+                               .run_log_persistence = run_log_persistence,
                                .delete_previous_boot_logs_time = delete_previous_boot_logs_time,
                            }});
 

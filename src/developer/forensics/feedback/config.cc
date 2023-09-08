@@ -109,16 +109,19 @@ std::optional<ProductConfig> ParseProductConfig(const rapidjson::Document& json)
   if (const int64_t num_files = json[kPersistedLogsNumFilesKey].GetInt64(); num_files > 0) {
     config.persisted_logs_num_files = num_files;
   } else {
-    FX_LOGS(ERROR) << "Can't use non-positive number of files for system log persistence: "
-                   << num_files;
-    return std::nullopt;
+    config.persisted_logs_num_files = std::nullopt;
   }
 
   if (const int64_t total_size_kib = json[kPersistedLogsTotalSizeKey].GetInt64();
       total_size_kib > 0) {
     config.persisted_logs_total_size = StorageSize::Kilobytes(total_size_kib);
   } else {
-    FX_LOGS(ERROR) << "Can't use non-positive size for system log persistence: " << total_size_kib;
+    config.persisted_logs_total_size = std::nullopt;
+  }
+
+  if (config.persisted_logs_num_files.has_value() ^ config.persisted_logs_total_size.has_value()) {
+    FX_LOGS(ERROR)
+        << "Can't only have one of the two persisted_logs fields set to a positive value";
     return std::nullopt;
   }
 
@@ -264,6 +267,16 @@ void ExposeConfig(inspect::Node& inspect_root, const BuildTypeConfig& build_type
           ? std::to_string(*build_type_config.daily_per_product_crash_report_quota)
           : "none";
 
+  const std::string persisted_logs_num_files =
+      product_config.persisted_logs_num_files.has_value()
+          ? std::to_string(*product_config.persisted_logs_num_files)
+          : "none";
+
+  const std::string persisted_logs_total_size =
+      product_config.persisted_logs_total_size.has_value()
+          ? std::to_string(product_config.persisted_logs_total_size->ToKilobytes())
+          : "none";
+
   const std::string snapshot_persistence_tmp_size =
       product_config.snapshot_persistence_max_tmp_size.has_value()
           ? std::to_string(product_config.snapshot_persistence_max_tmp_size->ToMegabytes())
@@ -275,9 +288,9 @@ void ExposeConfig(inspect::Node& inspect_root, const BuildTypeConfig& build_type
           : "none";
 
   inspect_root.RecordChild(
-      kInspectConfigKey,
-      [&build_type_config, &product_config, &crash_report_quota, &snapshot_persistence_tmp_size,
-       &snapshot_persistence_cache_size](inspect::Node& node) {
+      kInspectConfigKey, [&build_type_config, &crash_report_quota, &persisted_logs_num_files,
+                          &persisted_logs_total_size, &snapshot_persistence_tmp_size,
+                          &snapshot_persistence_cache_size](inspect::Node& node) {
         node.RecordString(kCrashReportUploadPolicyKey,
                           ToString(build_type_config.crash_report_upload_policy));
         node.RecordString(kDailyPerProductCrashReportQuotaKey, crash_report_quota);
@@ -285,9 +298,8 @@ void ExposeConfig(inspect::Node& inspect_root, const BuildTypeConfig& build_type
         node.RecordBool(kEnableHourlySnapshotsKey, build_type_config.enable_hourly_snapshots);
         node.RecordBool(kEnableLimitInspectDataKey, build_type_config.enable_limit_inspect_data);
 
-        node.RecordUint(kPersistedLogsNumFilesKey, product_config.persisted_logs_num_files);
-        node.RecordUint(kPersistedLogsTotalSizeKey,
-                        product_config.persisted_logs_total_size.ToKilobytes());
+        node.RecordString(kPersistedLogsNumFilesKey, persisted_logs_num_files);
+        node.RecordString(kPersistedLogsTotalSizeKey, persisted_logs_total_size);
         node.RecordString(kSnapshotPersistenceMaxTmpSizeKey, snapshot_persistence_tmp_size);
         node.RecordString(kSnapshotPersistenceMaxCacheSizeKey, snapshot_persistence_cache_size);
       });
