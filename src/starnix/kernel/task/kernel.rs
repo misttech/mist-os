@@ -426,7 +426,7 @@ impl Kernel {
 
             let tg_node = thread_groups.create_child(format!("{}", thread_group.leader));
             tg_node.record_int("ppid", tg.get_ppid() as i64);
-            tg_node.record_bool("stopped", tg.stopped);
+            tg_node.record_bool("stopped", tg.stopped == StopState::GroupStopped);
 
             let tasks_node = tg_node.create_child("tasks");
             for task in tg.tasks() {

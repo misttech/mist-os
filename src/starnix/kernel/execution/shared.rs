@@ -231,7 +231,8 @@ pub fn block_while_stopped(current_task: &CurrentTask) {
     if current_task.read().exit_status.is_some() {
         return;
     }
-    if !current_task.thread_group.read().stopped {
+    // If we can't be upgraded from stopping to stopped, return.
+    if !current_task.thread_group.upgrade_stop_state() {
         return;
     }
 
@@ -239,12 +240,15 @@ pub fn block_while_stopped(current_task: &CurrentTask) {
     loop {
         current_task.thread_group.read().stopped_waiters.wait_async(&waiter);
         if current_task.read().exit_status.is_some() {
+            current_task.thread_group.set_stopped(StopState::Awake, None);
             return;
         }
-        if !current_task.thread_group.read().stopped {
+        if current_task.thread_group.read().stopped.is_waking_or_awake() {
+            current_task.thread_group.set_stopped(StopState::Awake, None);
             return;
         }
-        // Result is not needed, as this is not in a syscall.
+
+        // Do the wait. Result is not needed, as this is not in a syscall.
         let _: Result<(), Errno> = waiter.wait(current_task);
     }
 }
@@ -262,7 +266,7 @@ mod tests {
         block_while_stopped(&task);
 
         // Stop the task.
-        task.thread_group.set_stopped(true, SignalInfo::default(SIGSTOP));
+        task.thread_group.set_stopped(StopState::GroupStopping, Some(SignalInfo::default(SIGSTOP)));
 
         let thread = std::thread::spawn({
             let task = task.weak_task();
@@ -274,7 +278,8 @@ mod tests {
                 }
 
                 // Continue the task.
-                task.thread_group.set_stopped(false, SignalInfo::default(SIGCONT));
+                task.thread_group
+                    .set_stopped(StopState::Waking, Some(SignalInfo::default(SIGCONT)));
             }
         });
 
@@ -296,7 +301,7 @@ mod tests {
         block_while_stopped(&task);
 
         // Stop the task.
-        task.thread_group.set_stopped(true, SignalInfo::default(SIGSTOP));
+        task.thread_group.set_stopped(StopState::GroupStopping, Some(SignalInfo::default(SIGSTOP)));
 
         let thread = std::thread::spawn({
             let task = task.weak_task();

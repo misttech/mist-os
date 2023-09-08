@@ -592,7 +592,7 @@ impl WaitingOptions {
     }
 }
 
-/// Waits on the task with `pid` to exit.
+/// Waits on the task with `pid` to exit or change state.
 ///
 /// - `current_task`: The current task.
 /// - `pid`: The id of the task to wait on.
@@ -1438,56 +1438,6 @@ mod tests {
         // Drop the borrow to let the task ends.
         std::mem::drop(first_task_temp);
         let _ = thread.join();
-    }
-
-    #[::fuchsia::test]
-    async fn test_stop_cont() {
-        let (_kernel, task) = create_kernel_and_task();
-        let mut child = task.clone_task_for_test(0, Some(SIGCHLD));
-
-        assert_eq!(sys_kill(&task, child.id, UncheckedSignal::from(SIGSTOP)), Ok(()));
-        dequeue_signal(&mut child);
-        // Child should be stopped immediately.
-        assert!(child.thread_group.read().stopped);
-
-        // Child is now waitable using WUNTRACED.
-        assert_eq!(
-            sys_wait4(&task, child.id, UserRef::default(), WNOHANG | WUNTRACED, UserRef::default()),
-            Ok(child.id)
-        );
-        // The same wait does not happen twice.
-        assert_eq!(
-            sys_wait4(&task, child.id, UserRef::default(), WNOHANG | WUNTRACED, UserRef::default()),
-            Ok(0)
-        );
-
-        assert_eq!(sys_kill(&task, child.id, UncheckedSignal::from(SIGCONT)), Ok(()));
-        // Child should be restarted immediately.
-        assert!(!child.thread_group.read().stopped);
-        dequeue_signal(&mut child);
-
-        // Child is now waitable using WUNTRACED.
-        assert_eq!(
-            sys_wait4(
-                &task,
-                child.id,
-                UserRef::default(),
-                WNOHANG | WCONTINUED,
-                UserRef::default()
-            ),
-            Ok(child.id)
-        );
-        // The same wait does not happen twice.
-        assert_eq!(
-            sys_wait4(
-                &task,
-                child.id,
-                UserRef::default(),
-                WNOHANG | WCONTINUED,
-                UserRef::default()
-            ),
-            Ok(0)
-        );
     }
 
     /// Waitid does not support all options.

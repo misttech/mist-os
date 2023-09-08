@@ -75,7 +75,7 @@ pub struct ThreadGroupMutableState {
     pub did_exec: bool,
 
     /// Whether the process is currently stopped.
-    pub stopped: bool,
+    pub stopped: StopState,
 
     /// Wait queue for updates to `stopped`.
     pub stopped_waiters: WaitQueue,
@@ -267,7 +267,7 @@ impl ThreadGroup {
                 process_group: Arc::clone(&process_group),
                 timers,
                 did_exec: false,
-                stopped: false,
+                stopped: StopState::Awake,
                 stopped_waiters: WaitQueue::default(),
                 waitable: None,
                 zombie_leader: None,
@@ -573,22 +573,38 @@ impl ThreadGroup {
     }
 
     /// Set the stop status of the process.
-    pub fn set_stopped(self: &Arc<Self>, stopped: bool, siginfo: SignalInfo) {
-        let mut state = self.write();
-        if stopped != state.stopped {
-            // TODO(qsr): When task can be stopped inside user code, task will need to be
-            // either restarted or stopped here.
-            state.stopped = stopped;
-            state.waitable = Some(siginfo);
-            if !stopped {
-                state.stopped_waiters.notify_all();
+    pub fn set_stopped(self: &Arc<Self>, stopped: StopState, siginfo: Option<SignalInfo>) -> bool {
+        let mut changed = false;
+        {
+            let mut state = self.write();
+            if state.stopped != stopped && !state.stopped.is_downgrade(&stopped) {
+                changed = true;
+
+                // TODO(qsr): When task can be stopped inside user code, task will need to be
+                // either restarted or stopped here.
+                state.stopped = stopped;
+                if let Some(signal) = &siginfo {
+                    // We don't want waiters to think the process was unstopped
+                    // because of a sigkill.  They will get woken when the
+                    // process dies.
+                    if signal.signal != SIGKILL {
+                        state.waitable = siginfo;
+                    }
+                }
+                if state.stopped == StopState::Waking {
+                    state.stopped_waiters.notify_all();
+                };
             }
-            if let Some(parent) = state.parent.clone() {
-                // OK to drop state here since we don't access it anymore.
-                std::mem::drop(state);
+        }
+        // The reason for the |changed| variable is that we Have to acquire the
+        // lock on |parent| when task lock is released.
+        if changed && stopped.is_notification_worthy() {
+            let parent = self.read().parent.clone();
+            if let Some(parent) = parent {
                 parent.write().child_status_waiters.notify_all();
             }
         }
+        return changed;
     }
 
     /// Ensures |session| is the controlling session inside of |controlling_session|, and returns a
@@ -806,6 +822,18 @@ impl ThreadGroup {
             system_time: zx::Duration::default(),
         }
     }
+
+    pub fn upgrade_stop_state(self: &Arc<Self>) -> bool {
+        let state_stopped = self.read().stopped;
+        if state_stopped.stop_in_progress() {
+            if let Ok(state_stopped) = state_stopped.upgrade() {
+                self.set_stopped(state_stopped, None);
+            } else {
+                unreachable!("Trying to stop when stop state has not been set");
+            }
+        }
+        state_stopped.is_stopping_or_stopped()
+    }
 }
 
 #[apply(state_implementation!)]
@@ -956,18 +984,24 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
                     } else {
                         child.waitable.take().unwrap()
                     };
+                    let exit_status = if siginfo.signal == SIGKILL {
+                        // This overrides the stop/continue choice.
+                        ExitStatus::Kill(siginfo)
+                    } else {
+                        exit_status(siginfo)
+                    };
                     let info = child.tasks.values().next().unwrap().info();
                     ZombieProcess::new(
                         child.as_ref(),
                         info.creds(),
-                        exit_status(siginfo),
+                        exit_status,
                         *info.exit_signal(),
                     )
                 };
-                if !child.stopped && options.wait_for_continued {
+                if child.stopped == StopState::Awake && options.wait_for_continued {
                     return Ok(Some(build_zombie_process(child, &ExitStatus::Continue)));
                 }
-                if child.stopped && options.wait_for_stopped {
+                if child.stopped == StopState::GroupStopped && options.wait_for_stopped {
                     return Ok(Some(build_zombie_process(child, &ExitStatus::Stop)));
                 }
             }

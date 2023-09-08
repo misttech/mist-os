@@ -42,7 +42,7 @@ pub fn send_signal(task: &Task, siginfo: SignalInfo) {
     // Unstop the process for SIGCONT. Also unstop for SIGKILL, the only signal that can interrupt
     // a stopped process.
     if siginfo.signal == SIGCONT || siginfo.signal == SIGKILL {
-        task.thread_group.set_stopped(false, siginfo);
+        task.thread_group.set_stopped(StopState::Waking, Some(siginfo));
     }
 }
 
@@ -183,7 +183,7 @@ pub fn deliver_signal(task: &Task, mut siginfo: SignalInfo, registers: &mut Regi
             }
             DeliveryAction::Stop => {
                 drop(task_state);
-                task.thread_group.set_stopped(true, siginfo);
+                task.thread_group.set_stopped(StopState::GroupStopping, Some(siginfo));
             }
             DeliveryAction::Continue => {
                 // Nothing to do. Effect already happened when the signal was raised.

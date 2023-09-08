@@ -153,6 +153,62 @@ impl ExitStatus {
     }
 }
 
+/// This enum describes the state that a task or thread group can be in when being stopped.
+/// The names are taken from ptrace(2).
+#[derive(Clone, Copy, PartialEq)]
+pub enum StopState {
+    /// In this state, the process has been told to wake up, but has not yet been woken.
+    /// Individual threads may still be stopped.
+    Waking,
+    /// In this state, at least one thread is awake.
+    Awake,
+
+    /// In this state, the process has been told to stop via a signal, but has not yet stopped.
+    GroupStopping,
+    /// In this state, at least one thread of the process has stopped
+    GroupStopped,
+}
+
+impl StopState {
+    /// This means a stop is either in progress or we've stopped.
+    pub fn is_stopping_or_stopped(&self) -> bool {
+        *self == StopState::GroupStopped || self.stop_in_progress()
+    }
+
+    /// This means a stop is in progress.  Refers to any stop state ending in "ing".
+    pub fn stop_in_progress(&self) -> bool {
+        *self == StopState::GroupStopping
+    }
+
+    /// Returns the "ed" version of this StopState, if it is "ing".
+    pub fn upgrade(&self) -> Result<StopState, ()> {
+        match *self {
+            StopState::GroupStopping => Ok(StopState::GroupStopped),
+            StopState::Waking => Ok(StopState::Awake),
+            _ => Err(()),
+        }
+    }
+
+    pub fn is_downgrade(&self, new_state: &StopState) -> bool {
+        match *self {
+            StopState::GroupStopped => *new_state == StopState::GroupStopping,
+            StopState::Awake => *new_state == StopState::Waking,
+            _ => false,
+        }
+    }
+
+    pub fn is_waking_or_awake(&self) -> bool {
+        *self == StopState::Waking || *self == StopState::Awake
+    }
+
+    /// Whether to notify something waitpid'ing on this task
+    /// when a task changes to this state. Basically, this
+    /// includes the states where the transition to the state is finished.
+    pub fn is_notification_worthy(&self) -> bool {
+        *self == StopState::Awake || *self == StopState::GroupStopped
+    }
+}
+
 pub struct TaskMutableState {
     // See https://man7.org/linux/man-pages/man2/set_tid_address.2.html
     pub clear_child_tid: UserRef<pid_t>,
