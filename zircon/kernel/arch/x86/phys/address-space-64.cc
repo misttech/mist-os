@@ -6,16 +6,12 @@
 
 #include <lib/arch/x86/boot-cpuid.h>
 #include <lib/memalloc/pool.h>
-#include <lib/trivial-allocator/basic-leaky-allocator.h>
-#include <lib/trivial-allocator/single-heap-allocator.h>
+#include <lib/page-table/types.h>
 #include <stdio.h>
-#include <zircon/limits.h>
 
 #include <fbl/algorithm.h>
-#include <hwreg/x86msr.h>
 #include <ktl/array.h>
 #include <ktl/byte.h>
-#include <ktl/optional.h>
 #include <ktl/span.h>
 #include <phys/allocation.h>
 
@@ -42,39 +38,74 @@ constexpr size_t kBootstrapMemoryBytes = 512 * 1024;
 // Bootstrap memory pool.
 alignas(ZX_MIN_PAGE_SIZE) ktl::array<ktl::byte, kBootstrapMemoryBytes> gBootstrapMemory;
 
-void SetUpAddressSpace(AddressSpace::PageTableAllocator allocator) {
-  // Ensure that executable pages are allowed.
-  hwreg::X86MsrIo msr;
-  arch::X86ExtendedFeatureEnableRegisterMsr::Get().ReadFrom(&msr).set_nxe(1).WriteTo(&msr);
+// A page_table::MemoryManager that uses a fixed range of memory, and
+// assumes a 1:1 mapping from physical addresses to host virtual
+// addresses.
+class BootstrapMemoryManager final : public page_table::MemoryManager {
+ public:
+  explicit BootstrapMemoryManager(ktl::span<ktl::byte> memory) : memory_(memory) {}
 
-  AddressSpace aspace;
-  aspace.Init(ktl::move(allocator));
-  ArchSetUpIdentityAddressSpace(aspace);
+  ktl::byte* Allocate(size_t size, size_t alignment) final {
+    // Align up the next address.
+    auto next_addr = reinterpret_cast<uintptr_t>(memory_.data());
+    uintptr_t aligned_next_addr = fbl::round_up(next_addr, alignment);
+    size_t padding = aligned_next_addr - next_addr;
+
+    // Ensure there is enough space in the buffer.
+    if (padding + size > memory_.size()) {
+      printf("Cannot allocate %zu bytes @ %zu for bootstrap page tables!\n", size, alignment);
+      return nullptr;
+    }
+
+    // Reserve the memory, and return the pointer.
+    memory_ = memory_.subspan(alignment + padding);
+    return reinterpret_cast<ktl::byte*>(aligned_next_addr);
+  }
+
+  page_table::Paddr PtrToPhys(ktl::byte* ptr) final {
+    // We have a 1:1 virtual/physical mapping.
+    return page_table::Paddr(reinterpret_cast<uint64_t>(ptr));
+  }
+
+  ktl::byte* PhysToPtr(page_table::Paddr phys) final {
+    // We have a 1:1 virtual/physical mapping.
+    return reinterpret_cast<ktl::byte*>(phys.value());
+  }
+
+  // Release all remaining memory into the allocator.
+  void Release(memalloc::Pool& allocator) {
+    if (!memory_.empty()) {
+      if (allocator.Free(reinterpret_cast<uint64_t>(memory_.data()), memory_.size()).is_error()) {
+        printf("Failed to release .bss bootstrap memory\n");
+      }
+    }
+    memory_ = {};
+  }
+
+  ~BootstrapMemoryManager() { ZX_ASSERT(memory_.empty()); }
+
+ private:
+  ktl::span<ktl::byte> memory_;
+};
+
+void SetUpAddressSpace(page_table::MemoryManager& manager) {
+  ktl::optional builder =
+      page_table::x86::AddressSpaceBuilder::Create(manager, arch::BootCpuidIo{});
+  if (!builder.has_value()) {
+    ZX_PANIC("Failed to create an AddressSpaceBuilder.");
+  }
+  ArchSetUpIdentityAddressSpace(*builder);
 }
 
 }  // namespace
 
 void ArchSetUpAddressSpaceEarly() {
-  ktl::span<ktl::byte> memory{gBootstrapMemory};
-
-  trivial_allocator::BasicLeakyAllocator<trivial_allocator::SingleHeapAllocator> allocator(memory);
-  auto paging_allocator = [&allocator](uint64_t size,
-                                       uint64_t alignment) -> ktl::optional<uint64_t> {
-    void* allocated = allocator.allocate(size, alignment);
-    if (!allocated) {
-      return {};
-    }
-    return reinterpret_cast<uint64_t>(allocated);
-  };
-  SetUpAddressSpace(ktl::move(paging_allocator));
-
-  ktl::span<const ktl::byte> leftover = allocator.unallocated();
-  if (!leftover.empty()) {
-    if (Allocation::GetPool()
-            .Free(reinterpret_cast<uint64_t>(leftover.data()), leftover.size())
-            .is_error()) {
-      printf("Failed to release .bss bootstrap memory\n");
-    }
-  }
+  BootstrapMemoryManager manager(gBootstrapMemory);
+  SetUpAddressSpace(manager);
+  manager.Release(Allocation::GetPool());
 }
-void ArchSetUpAddressSpaceLate() { SetUpAddressSpace(AddressSpace::PhysPageTableAllocator()); }
+
+void ArchSetUpAddressSpaceLate() {
+  AllocationMemoryManager manager(Allocation::GetPool());
+  SetUpAddressSpace(manager);
+}

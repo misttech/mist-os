@@ -300,13 +300,13 @@ if (current_toolchain == default_toolchain) {
       sources += [ "address-space-64.cc" ]
     }
     deps = [
-      "//src/lib/trivial-allocator",
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/phys:address-space.header",
       "//zircon/kernel/phys:allocation",
       "//zircon/kernel/phys:symbolize",
       "//zircon/kernel/phys/lib/memalloc",
+      "//zircon/kernel/phys/lib/page-table",
     ]
     include_dirs = [ "//." ]
   }

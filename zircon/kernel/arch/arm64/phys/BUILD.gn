@@ -28,6 +28,7 @@ if (toolchain_environment == "kernel.phys" ||
       "//zircon/kernel/phys:address-space.header",
       "//zircon/kernel/phys:allocation",
       "//zircon/kernel/phys/lib/memalloc",
+      "//zircon/kernel/phys/lib/page-table",
     ]
   }
 

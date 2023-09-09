@@ -142,10 +142,6 @@ class BasicLeakyAllocator {
   AllocateFunction& allocate_function() { return allocate_; }
   const AllocateFunction& allocate_function() const { return allocate_; }
 
-  constexpr cpp20::span<const std::byte> unallocated() const {
-    return {reinterpret_cast<const std::byte*>(frontier_), space_};
-  }
-
  private:
   __NO_UNIQUE_ADDRESS AllocateFunction allocate_;
   void* frontier_ = nullptr;

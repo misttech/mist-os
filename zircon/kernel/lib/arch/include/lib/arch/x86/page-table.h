@@ -42,11 +42,10 @@ struct X86MemoryType {};
 struct X86SystemPagingState {
   template <class MsrIo, class CpuidIo>
   static X86SystemPagingState Create(MsrIo&& msr, CpuidIo&& cpuid) {
-    // NXE - the feature to mark pages as non-executable - should always be
-    // supported.
+    // Safety check; this should always be present.
     ZX_DEBUG_ASSERT(X86ExtendedFeatureEnableRegisterMsr::Get().ReadFrom(&msr).nxe());
 
-    return {.page1gb = cpuid.template Read<CpuidAmdFeatureFlagsD>().page1gb() == 1};
+    return {.page1gb = cpuid.template Read<CpuidAmdFeatureFlagsD>().page1gb()};
   }
 
   // Whether 1GiB pages are supported.

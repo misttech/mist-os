@@ -8,23 +8,34 @@
 
 #include <lib/arch/arm64/system.h>
 #include <lib/arch/cache.h>
-#include <lib/arch/paging.h>
 #include <lib/boot-options/boot-options.h>
 #include <lib/memalloc/pool.h>
 #include <lib/memalloc/range.h>
+#include <lib/page-table/arch/arm64/builder.h>
+#include <lib/page-table/builder.h>
+#include <lib/page-table/types.h>
 #include <lib/zbi-format/zbi.h>
-
-#include <cstdint>
 
 #include <ktl/byte.h>
 #include <ktl/optional.h>
-#include <ktl/type_traits.h>
 #include <phys/allocation.h>
-#include <phys/arch/address-space.h>
 
 #include <ktl/enforce.h>
 
 namespace {
+
+using page_table::AddressSpaceBuilder;
+using page_table::Paddr;
+using page_table::Vaddr;
+
+// Page table layout used by physboot.
+constexpr auto kDefaultPageTableLayout = page_table::arm64::PageTableLayout{
+    .granule_size = page_table::arm64::GranuleSize::k4KiB,
+    // Support up to 39-bits of addressable memory (2**39 == 512 GiB).
+    //
+    // 39 bits of memory with 4 kiB granule requires 3 levels of page table.
+    .region_size_bits = 39,
+};
 
 // Set the Intermediate Physical address Size (IPS) or Physical address Size (PS)
 // value of the ArmTcrElX register.
@@ -41,11 +52,8 @@ void SetPhysicalAddressSize(arch::ArmTcrEl2& tcr, arch::ArmPhysicalAddressSize s
 //
 // The template parameters indicate which hardware registers to use,
 // and will depend at which EL level we are running at.
-template <typename TcrReg, typename SctlrReg, typename Ttbr0Reg, typename Ttbr1Reg,
-          typename MairReg>
-void EnablePagingForEl(const AddressSpace& aspace) {
-  constexpr bool kConfigureUpper = !ktl::is_void_v<Ttbr1Reg>;
-
+template <typename TcrReg, typename SctlrReg, typename Ttbr0Reg, typename MairReg>
+void EnablePagingForEl(Paddr ttbr0_root) {
   // Ensure caches and MMU disabled.
   arch::ArmSystemControlRegister sctlr_reg = SctlrReg::Read();
   ZX_ASSERT(!sctlr_reg.m() && !sctlr_reg.c());
@@ -57,22 +65,15 @@ void EnablePagingForEl(const AddressSpace& aspace) {
   __isb(ARM_MB_SY);
 
   // Set up the Memory Attribute Indirection Register (MAIR).
-  MairReg::Write(aspace.state().mair.reg_value());
+  MairReg::Write(AddressSpaceBuilder::GetArmMemoryAttrIndirectionRegister().reg_value());
 
   // Configure the page table layout of TTBR0 and enable page table caching.
   TcrReg tcr;
-  tcr.set_tg0(arch::ArmTcrTg0Value::k4KiB)                            // Use 4 KiB granules.
-      .set_t0sz(64 - AddressSpace::LowerPaging::kVirtualAddressSize)  // Set region size.
-      .set_sh0(aspace.state().shareability)
-      .set_orgn0(kArchNormalMemoryType.outer)
-      .set_irgn0(kArchNormalMemoryType.inner);
-  if constexpr (kConfigureUpper) {
-    tcr.set_tg1(arch::ArmTcrTg1Value::k4KiB)
-        .set_t1sz(64 - AddressSpace::UpperPaging::kVirtualAddressSize)
-        .set_sh1(aspace.state().shareability)
-        .set_orgn1(kArchNormalMemoryType.outer)
-        .set_irgn1(kArchNormalMemoryType.inner);
-  }
+  tcr.set_tg0(arch::ArmTcrTg0Value::k4KiB)                      // Use 4 KiB granules.
+      .set_t0sz(64 - kDefaultPageTableLayout.region_size_bits)  // Set region size.
+      .set_sh0(arch::ArmShareabilityAttribute::kInner)
+      .set_orgn0(arch::ArmCacheabilityAttribute::kWriteBackReadWriteAllocate)
+      .set_irgn0(arch::ArmCacheabilityAttribute::kWriteBackReadWriteAllocate);
 
   // Allow the CPU to access all of its supported physical address space.
   // If the hardware declares it has support for 52bit PA addresses but we're only
@@ -89,10 +90,7 @@ void EnablePagingForEl(const AddressSpace& aspace) {
   __isb(ARM_MB_SY);
 
   // Set the root of the page table.
-  Ttbr0Reg::Write(Ttbr0Reg{}.set_addr(aspace.lower_root_paddr()));
-  if constexpr (kConfigureUpper) {
-    Ttbr1Reg::Write(Ttbr1Reg{}.set_addr(aspace.upper_root_paddr()));
-  }
+  Ttbr0Reg::Write(Ttbr0Reg{}.set_addr(ttbr0_root.value()));
   __isb(ARM_MB_SY);
 
   // Enable MMU and caches.
@@ -108,16 +106,16 @@ void EnablePagingForEl(const AddressSpace& aspace) {
 //
 // This will perform the correct operations based on the current exception level
 // of the processor.
-void EnablePaging(const AddressSpace& aspace) {
+void EnablePaging(Paddr root) {
   // Set up page table for EL1 or EL2, depending on which mode we are running in.
   const auto current_el = arch::ArmCurrentEl::Read().el();
   switch (current_el) {
     case 1:
       return EnablePagingForEl<arch::ArmTcrEl1, arch::ArmSctlrEl1, arch::ArmTtbr0El1,
-                               arch::ArmTtbr1El1, arch::ArmMairEl1>(aspace);
+                               arch::ArmMairEl1>(root);
     case 2:
       return EnablePagingForEl<arch::ArmTcrEl2, arch::ArmSctlrEl2, arch::ArmTtbr0El2,
-                               /*Ttbr1Reg=*/void, arch::ArmMairEl2>(aspace);
+                               arch::ArmMairEl2>(root);
     default:
       ZX_PANIC("Unsupported ARM64 exception level: %u", static_cast<uint8_t>(current_el));
   }
@@ -125,39 +123,35 @@ void EnablePaging(const AddressSpace& aspace) {
 
 }  // namespace
 
-void ArchSetUpIdentityAddressSpace(AddressSpace& aspace) {
-  aspace.IdentityMapUart();
+void ArchSetUpIdentityAddressSpace(page_table::AddressSpaceBuilder& builder) {
+  MapUart(builder);
 
   memalloc::Pool& pool = Allocation::GetPool();
-  pool.NormalizeRam([&aspace](const memalloc::Range& range) {
-    auto result = aspace.IdentityMap(range.addr, range.size,
-                                     AddressSpace::NormalMapSettings({
-                                         .readable = true,
-                                         .writable = true,
-                                         .executable = true,
-                                     }));
-    if (result.is_error()) {
+  pool.NormalizeRam([&builder](const memalloc::Range& range) {
+    auto status = builder.MapRegion(Vaddr(range.addr), Paddr(range.addr), range.size,
+                                    page_table::CacheAttributes::kNormal);
+    if (status != ZX_OK) {
       ZX_PANIC("Failed to identity-map range [%#" PRIx64 ", %#" PRIx64 ")", range.addr,
                range.end());
     }
   });
 
   // Enable the MMU and switch to the new page table.
-  EnablePaging(aspace);
+  EnablePaging(builder.root_paddr());
 }
 
 void ArchSetUpAddressSpaceEarly() {
   if (gBootOptions && !gBootOptions->phys_mmu) {
     return;
   }
-  auto mair = arch::ArmMemoryAttrIndirectionRegister::Get()
-                  .FromValue(0)
-                  .SetAttribute(0, kArchNormalMemoryType)
-                  .SetAttribute(1, kArchMmioMemoryType);
-
-  AddressSpace aspace;
-  aspace.Init(mair);
-  ArchSetUpIdentityAddressSpace(aspace);
+  AllocationMemoryManager manager(Allocation::GetPool());
+  // Create a page table data structure.
+  ktl::optional builder =
+      page_table::arm64::AddressSpaceBuilder::Create(manager, kDefaultPageTableLayout);
+  if (!builder.has_value()) {
+    ZX_PANIC("Failed to create an AddressSpaceBuilder.");
+  }
+  ArchSetUpIdentityAddressSpace(*builder);
 }
 
 void ArchSetUpAddressSpaceLate() {}
