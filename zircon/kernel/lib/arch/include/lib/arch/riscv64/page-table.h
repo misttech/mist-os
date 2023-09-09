@@ -112,8 +112,6 @@ class RiscvPageTableEntry : public hwreg::RegisterBase<RiscvPageTableEntry<Level
   constexpr bool executable() const { return terminal() ? x() : true; }
   constexpr bool user_accessible() const { return terminal() ? u() : true; }
 
-  constexpr bool accessed() const { return terminal() ? a() : false; }
-
   constexpr RiscvMemoryType Memory(const RiscvSystemPagingState& state) const { return pbmt(); }
 
   constexpr SelfType& Set(const RiscvSystemPagingState& state,
@@ -130,8 +128,7 @@ class RiscvPageTableEntry : public hwreg::RegisterBase<RiscvPageTableEntry<Level
           .set_w(access.writable)
           .set_x(access.executable)
           .set_u(access.user_accessible)
-          .set_pbmt(*settings.memory)
-          .set_a(settings.accessed);
+          .set_pbmt(*settings.memory);
     } else {
       // Since access permissions cannot be applied to non-terminal levels to
       // constrain later ones, the provided permissions here are expected to be
