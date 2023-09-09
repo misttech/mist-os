@@ -1024,6 +1024,19 @@ impl NamespaceNode {
         Ok(self.with_new_entry(self.entry.create_tmpfile(current_task, mode, owner, flags)?))
     }
 
+    pub fn link(
+        &self,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        child: &FsNodeHandle,
+    ) -> Result<NamespaceNode, Errno> {
+        let dir_entry = self.entry.create_entry(current_task, name, |dir, name| {
+            self.check_readonly_filesystem()?;
+            dir.link(current_task, name, child)
+        })?;
+        Ok(self.with_new_entry(dir_entry))
+    }
+
     pub fn bind_socket(
         &self,
         current_task: &CurrentTask,

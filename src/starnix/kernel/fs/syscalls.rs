@@ -768,8 +768,7 @@ pub fn sys_linkat(
         if !NamespaceNode::mount_eq(&target, &parent) {
             return error!(EXDEV);
         }
-        parent.check_readonly_filesystem()?;
-        parent.entry.link(current_task, basename, &target.entry.node)
+        parent.link(current_task, basename, &target.entry.node)
     })?;
 
     Ok(())

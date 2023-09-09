@@ -483,21 +483,6 @@ impl DirEntry {
         })
     }
 
-    pub fn link(
-        self: &DirEntryHandle,
-        current_task: &CurrentTask,
-        name: &FsStr,
-        child: &FsNodeHandle,
-    ) -> Result<DirEntryHandle, Errno> {
-        if child.is_dir() {
-            return error!(EPERM);
-        }
-        self.create_entry(current_task, name, |dir, name| {
-            dir.link(current_task, name, child)?;
-            Ok(child.clone())
-        })
-    }
-
     pub fn unlink(
         self: &DirEntryHandle,
         current_task: &CurrentTask,

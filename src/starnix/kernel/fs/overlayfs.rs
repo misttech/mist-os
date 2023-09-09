@@ -415,7 +415,9 @@ impl FsNodeOps for Arc<OverlayNode> {
         let child_overlay = OverlayNode::from_fs_node(child)?;
         let upper_child = child_overlay.ensure_upper(current_task)?;
         self.create_entry(current_task, name, |dir, temp_name| {
-            dir.link(current_task, temp_name, &upper_child.node)
+            dir.create_entry(current_task, temp_name, |dir_node, name| {
+                dir_node.link(current_task, name, &upper_child.node)
+            })
         })?;
         Ok(())
     }

@@ -1096,7 +1096,11 @@ impl FsNode {
         current_task: &CurrentTask,
         name: &FsStr,
         child: &FsNodeHandle,
-    ) -> Result<(), Errno> {
+    ) -> Result<FsNodeHandle, Errno> {
+        if child.is_dir() {
+            return error!(EPERM);
+        }
+
         self.check_access(current_task, Access::WRITE)?;
 
         if matches!(child.link_behavior.get(), Some(FsNodeLinkBehavior::Disallowed)) {
@@ -1142,7 +1146,8 @@ impl FsNode {
             };
         }
 
-        self.ops().link(self, current_task, name, child)
+        self.ops().link(self, current_task, name, child)?;
+        Ok(child.clone())
     }
 
     pub fn unlink(
