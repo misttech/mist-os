@@ -102,11 +102,6 @@ type DirEntryChildren = BTreeMap<FsString, Weak<DirEntry>>;
 
 pub type DirEntryHandle = Arc<DirEntry>;
 
-enum ExistsOption {
-    ReturnExisting,
-    DoNotReturnExisting,
-}
-
 impl DirEntry {
     #[allow(clippy::let_and_return)]
     pub fn new(
@@ -225,7 +220,7 @@ impl DirEntry {
         name: &FsStr,
     ) -> Result<DirEntryHandle, Errno> {
         let (node, _) =
-            self.get_or_create_child(current_task, name, || self.node.lookup(current_task, name))?;
+            self.get_or_create_child(current_task, name, |d, name| d.lookup(current_task, name))?;
         Ok(node)
     }
 
@@ -236,16 +231,37 @@ impl DirEntry {
     ///
     /// If the entry already exists, create_node_fn is not called, and EEXIST is
     /// returned.
-    fn create_entry<F>(
+    pub fn create_entry(
         self: &DirEntryHandle,
         current_task: &CurrentTask,
         name: &FsStr,
-        exists_option: ExistsOption,
-        create_node_fn: F,
-    ) -> Result<DirEntryHandle, Errno>
-    where
-        F: FnOnce() -> Result<FsNodeHandle, Errno>,
-    {
+        create_node_fn: impl FnOnce(&FsNodeHandle, &FsStr) -> Result<FsNodeHandle, Errno>,
+    ) -> Result<DirEntryHandle, Errno> {
+        let (entry, exists) = self.create_entry_internal(current_task, name, create_node_fn)?;
+        if exists {
+            return error!(EEXIST);
+        }
+        Ok(entry)
+    }
+
+    /// Creates a new DirEntry. Works just like create_entry, except if the entry already exists,
+    /// it is returned.
+    pub fn get_or_create_entry(
+        self: &DirEntryHandle,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        create_node_fn: impl FnOnce(&FsNodeHandle, &FsStr) -> Result<FsNodeHandle, Errno>,
+    ) -> Result<DirEntryHandle, Errno> {
+        let (entry, _exists) = self.create_entry_internal(current_task, name, create_node_fn)?;
+        Ok(entry)
+    }
+
+    fn create_entry_internal(
+        self: &DirEntryHandle,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        create_node_fn: impl FnOnce(&FsNodeHandle, &FsStr) -> Result<FsNodeHandle, Errno>,
+    ) -> Result<(DirEntryHandle, bool), Errno> {
         if DirEntry::is_reserved_name(name) {
             return error!(EEXIST);
         }
@@ -254,17 +270,12 @@ impl DirEntry {
             return error!(ENAMETOOLONG);
         }
         let (entry, exists) = self.get_or_create_child(current_task, name, create_node_fn)?;
-        if exists {
-            match exists_option {
-                ExistsOption::ReturnExisting => Ok(entry),
-                ExistsOption::DoNotReturnExisting => error!(EEXIST),
-            }
-        } else {
+        if !exists {
             // An entry was created. Update the ctime and mtime of this directory.
             self.node.update_ctime_mtime();
             entry.notify_creation();
-            Ok(entry)
         }
+        Ok((entry, exists))
     }
 
     /// Magically creates a node without asking the filesystem. All the other node creation
@@ -287,8 +298,8 @@ impl DirEntry {
         dev: DeviceType,
         ops: impl FsNodeOps,
     ) -> Result<DirEntryHandle, Errno> {
-        self.create_entry(current_task, name, ExistsOption::DoNotReturnExisting, || {
-            let node = self.node.fs().create_node(ops, |id| {
+        self.create_entry(current_task, name, |dir, _name| {
+            let node = dir.fs().create_node(ops, |id| {
                 let mut info = FsNodeInfo::new(id, mode, FsCred::root());
                 info.rdev = dev;
                 info
@@ -306,8 +317,8 @@ impl DirEntry {
         name: &FsStr,
     ) -> Result<DirEntryHandle, Errno> {
         // TODO: apply_umask
-        self.create_entry(current_task, name, ExistsOption::DoNotReturnExisting, || {
-            self.node.mkdir(current_task, name, mode!(IFDIR, 0o777), FsCred::root())
+        self.create_entry(current_task, name, |dir, name| {
+            dir.mkdir(current_task, name, mode!(IFDIR, 0o777), FsCred::root())
         })
     }
 
@@ -324,7 +335,7 @@ impl DirEntry {
         dev: DeviceType,
         owner: FsCred,
     ) -> Result<DirEntryHandle, Errno> {
-        self.create_entry(current_task, name, ExistsOption::DoNotReturnExisting, || {
+        self.create_entry(current_task, name, |_dir, name| {
             self.create_node_fn(current_task, name, mode, dev, owner)
         })
     }
@@ -343,14 +354,13 @@ impl DirEntry {
         owner: FsCred,
         flags: OpenFlags,
     ) -> Result<DirEntryHandle, Errno> {
-        let exists_option = if flags.contains(OpenFlags::EXCL) {
-            ExistsOption::DoNotReturnExisting
+        let create_fn =
+            |_dir: &_, name: &_| self.create_node_fn(current_task, name, mode, dev, owner);
+        if flags.contains(OpenFlags::EXCL) {
+            self.create_entry(current_task, name, create_fn)
         } else {
-            ExistsOption::ReturnExisting
-        };
-        self.create_entry(current_task, name, exists_option, || {
-            self.create_node_fn(current_task, name, mode, dev, owner)
-        })
+            self.get_or_create_entry(current_task, name, create_fn)
+        }
     }
 
     /// Creates an anonymous file.
@@ -467,8 +477,8 @@ impl DirEntry {
         mode: FileMode,
         owner: FsCred,
     ) -> Result<DirEntryHandle, Errno> {
-        self.create_entry(current_task, name, ExistsOption::DoNotReturnExisting, || {
-            let node = self.node.mknod(current_task, name, mode, DeviceType::NONE, owner)?;
+        self.create_entry(current_task, name, |dir, name| {
+            let node = dir.mknod(current_task, name, mode, DeviceType::NONE, owner)?;
             if let Some(unix_socket) = socket.downcast_socket::<UnixSocket>() {
                 unix_socket.bind_socket_to_node(&socket, socket_address, &node)?;
             } else {
@@ -488,8 +498,8 @@ impl DirEntry {
         target: &FsStr,
         owner: FsCred,
     ) -> Result<DirEntryHandle, Errno> {
-        self.create_entry(current_task, name, ExistsOption::DoNotReturnExisting, || {
-            self.node.create_symlink(current_task, name, target, owner)
+        self.create_entry(current_task, name, |dir, name| {
+            dir.create_symlink(current_task, name, target, owner)
         })
     }
 
@@ -502,8 +512,8 @@ impl DirEntry {
         if child.is_dir() {
             return error!(EPERM);
         }
-        self.create_entry(current_task, name, ExistsOption::DoNotReturnExisting, || {
-            self.node.link(current_task, name, child)?;
+        self.create_entry(current_task, name, |dir, name| {
+            dir.link(current_task, name, child)?;
             Ok(child.clone())
         })
     }
@@ -835,15 +845,12 @@ impl DirEntry {
         }
     }
 
-    fn get_or_create_child<F>(
+    fn get_or_create_child(
         self: &DirEntryHandle,
         current_task: &CurrentTask,
         name: &FsStr,
-        create_fn: F,
-    ) -> Result<(DirEntryHandle, bool), Errno>
-    where
-        F: FnOnce() -> Result<FsNodeHandle, Errno>,
-    {
+        create_fn: impl FnOnce(&FsNodeHandle, &FsStr) -> Result<FsNodeHandle, Errno>,
+    ) -> Result<(DirEntryHandle, bool), Errno> {
         assert!(!DirEntry::is_reserved_name(name));
         // Only directories can have children.
         if !self.node.is_dir() {
@@ -947,24 +954,21 @@ impl<'a> DirEntryLockedChildren<'a> {
         name: &FsStr,
     ) -> Result<DirEntryHandle, Errno> {
         assert!(!DirEntry::is_reserved_name(name));
-        let (node, _) = self.get_or_create_child(current_task, name, || error!(ENOENT))?;
+        let (node, _) = self.get_or_create_child(current_task, name, |_, _| error!(ENOENT))?;
         Ok(node)
     }
 
-    fn get_or_create_child<F>(
+    fn get_or_create_child(
         &mut self,
         current_task: &CurrentTask,
         name: &FsStr,
-        create_fn: F,
-    ) -> Result<(DirEntryHandle, bool), Errno>
-    where
-        F: FnOnce() -> Result<FsNodeHandle, Errno>,
-    {
+        create_fn: impl FnOnce(&FsNodeHandle, &FsStr) -> Result<FsNodeHandle, Errno>,
+    ) -> Result<(DirEntryHandle, bool), Errno> {
         let create_child = || {
             // Before creating the child, check for existence.
             let (node, exists) = match self.entry.node.lookup(current_task, name) {
                 Ok(node) => (node, true),
-                Err(e) if e == ENOENT => (create_fn()?, false),
+                Err(e) if e == ENOENT => (create_fn(&self.entry.node, name)?, false),
                 Err(e) => return Err(e),
             };
 
