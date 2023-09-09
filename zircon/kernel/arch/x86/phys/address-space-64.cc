@@ -49,8 +49,7 @@ void SetUpAddressSpace(AddressSpace::PageTableAllocator allocator) {
 
   AddressSpace aspace;
   aspace.Init(ktl::move(allocator));
-  aspace.SetUpIdentityMappings();
-  aspace.ArchInstall();
+  ArchSetUpIdentityAddressSpace(aspace);
 }
 
 }  // namespace

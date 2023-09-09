@@ -104,25 +104,46 @@ void EnablePagingForEl(const AddressSpace& aspace) {
   __isb(ARM_MB_SY);
 }
 
-}  // namespace
-
 // Set up the MMU, having it use the given page table root.
 //
 // This will perform the correct operations based on the current exception level
 // of the processor.
-void AddressSpace::ArchInstall() const {
+void EnablePaging(const AddressSpace& aspace) {
   // Set up page table for EL1 or EL2, depending on which mode we are running in.
   const auto current_el = arch::ArmCurrentEl::Read().el();
   switch (current_el) {
     case 1:
       return EnablePagingForEl<arch::ArmTcrEl1, arch::ArmSctlrEl1, arch::ArmTtbr0El1,
-                               arch::ArmTtbr1El1, arch::ArmMairEl1>(*this);
+                               arch::ArmTtbr1El1, arch::ArmMairEl1>(aspace);
     case 2:
       return EnablePagingForEl<arch::ArmTcrEl2, arch::ArmSctlrEl2, arch::ArmTtbr0El2,
-                               /*Ttbr1Reg=*/void, arch::ArmMairEl2>(*this);
+                               /*Ttbr1Reg=*/void, arch::ArmMairEl2>(aspace);
     default:
       ZX_PANIC("Unsupported ARM64 exception level: %u", static_cast<uint8_t>(current_el));
   }
+}
+
+}  // namespace
+
+void ArchSetUpIdentityAddressSpace(AddressSpace& aspace) {
+  aspace.IdentityMapUart();
+
+  memalloc::Pool& pool = Allocation::GetPool();
+  pool.NormalizeRam([&aspace](const memalloc::Range& range) {
+    auto result = aspace.IdentityMap(range.addr, range.size,
+                                     AddressSpace::NormalMapSettings({
+                                         .readable = true,
+                                         .writable = true,
+                                         .executable = true,
+                                     }));
+    if (result.is_error()) {
+      ZX_PANIC("Failed to identity-map range [%#" PRIx64 ", %#" PRIx64 ")", range.addr,
+               range.end());
+    }
+  });
+
+  // Enable the MMU and switch to the new page table.
+  EnablePaging(aspace);
 }
 
 void ArchSetUpAddressSpaceEarly() {
@@ -136,8 +157,7 @@ void ArchSetUpAddressSpaceEarly() {
 
   AddressSpace aspace;
   aspace.Init(mair);
-  aspace.SetUpIdentityMappings();
-  aspace.ArchInstall();
+  ArchSetUpIdentityAddressSpace(aspace);
 }
 
 void ArchSetUpAddressSpaceLate() {}
