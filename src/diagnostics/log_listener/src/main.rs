@@ -8,6 +8,7 @@
 //! writes them to disk.
 
 use anyhow::{format_err, Error};
+use argh::FromArgs;
 use async_trait::async_trait;
 use chrono::TimeZone;
 use diagnostics_data::LogTextColor;
@@ -35,6 +36,7 @@ use log_formatter::LogFormatterOptions;
 use log_formatter::Symbolize;
 use log_utils::filter::LogFilterCriteria;
 use log_utils::log_formatter::BootTimeAccessor;
+use log_utils::DumpCommand;
 use log_utils::LogCommand;
 use log_utils::LogSubCommand;
 use log_utils::TimeFormat;
@@ -1044,10 +1046,70 @@ impl Symbolize for Symbolizer {
     }
 }
 
+/// Converts raw process arguments (env::args()) into a LogCommand.
+fn log_command_from_args(raw_arguments: Vec<String>) -> (LogCommand, LogSubCommand) {
+    // Existing clients pass --dump_logs yes
+    // or --dump_logs to us sometimes. argh doesn't support
+    // underscores in flags so this is a hack to workaround
+    // that restriction.
+    // TODO(https://fxbug.dev/133105): Remove hack. This is needed
+    // because various things are calling log_listener
+    // with --dump_logs, so we need this hack to continue
+    // supporting the old flag in the rewrite until all usages
+    // of the old one can be removed.
+    let mut prev_was_dump_logs = false;
+    let mut should_dump_logs = false;
+    let args: Vec<&str> = raw_arguments
+        .iter()
+        .map(|value| value.as_str())
+        .skip(1)
+        .filter(|value| {
+            if *value == "--dump_logs" {
+                prev_was_dump_logs = true;
+                // This is true even if "yes" isn't passed
+                // to maintain previous behavior.
+                should_dump_logs = true;
+                return false;
+            }
+            if prev_was_dump_logs && *value == "yes" {
+                prev_was_dump_logs = false;
+                return false;
+            }
+            prev_was_dump_logs = false;
+            true
+        })
+        .collect();
+    let cmd = LogCommand::from_args(&[raw_arguments[0].as_str()], args.as_slice())
+        .unwrap_or_else(|early_exit| handle_early_exit(early_exit));
+    let sub_command = if should_dump_logs {
+        LogSubCommand::Dump(DumpCommand {})
+    } else {
+        cmd.sub_command.clone().unwrap_or(LogSubCommand::Watch(WatchCommand {}))
+    };
+    (cmd, sub_command)
+}
+
+// Pretty-prints an early exit and exits with an appropriate status code.
+fn handle_early_exit(early_exit: argh::EarlyExit) -> ! {
+    std::process::exit(match early_exit.status {
+        Ok(()) => {
+            println!("{}", early_exit.output);
+            0
+        }
+        Err(()) => {
+            eprintln!(
+                "{}\nRun {} --help for more information.",
+                early_exit.output,
+                env::args().next().unwrap()
+            );
+            1
+        }
+    })
+}
+
 /// Main entrypoint for the log_listener rewrite
 async fn new_log_main() -> Result<(), Error> {
-    let cmd: LogCommand = argh::from_env();
-    let sub_command = cmd.sub_command.unwrap_or(LogSubCommand::Watch(WatchCommand {}));
+    let (cmd, sub_command) = log_command_from_args(env::args().collect());
     let (sender, receiver) = fuchsia_zircon::Socket::create_stream();
     let proxy = connect_to_protocol::<ArchiveAccessorMarker>().unwrap();
     let is_json =
@@ -1219,6 +1281,30 @@ mod tests {
             dropped_logs: msg.dropped_logs,
             tags: msg.tags.clone(),
         }
+    }
+
+    #[fuchsia::test]
+    fn test_parse_args() {
+        let (_cmd, subcommand) =
+            log_command_from_args(vec!["log_listener".to_string(), "--dump_logs".to_string()]);
+        assert_eq!(subcommand, LogSubCommand::Dump(DumpCommand {}));
+
+        let (_cmd, subcommand) = log_command_from_args(vec![
+            "log_listener".to_string(),
+            "--dump_logs".to_string(),
+            "yes".to_string(),
+        ]);
+        assert_eq!(subcommand, LogSubCommand::Dump(DumpCommand {}));
+
+        let (cmd, subcommand) = log_command_from_args(vec![
+            "log_listener".to_string(),
+            "--dump_logs".to_string(),
+            "yes".to_string(),
+            "--tags".to_string(),
+            "yes".to_string(),
+        ]);
+        assert_eq!(subcommand, LogSubCommand::Dump(DumpCommand {}));
+        assert_eq!(cmd.tags, vec!["yes".to_string()]);
     }
 
     #[fuchsia::test]

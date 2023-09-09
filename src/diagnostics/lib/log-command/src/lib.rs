@@ -28,14 +28,7 @@ pub struct WatchCommand {}
 #[derive(FromArgs, Clone, PartialEq, Debug)]
 /// Dumps all log from a given target's session.
 #[argh(subcommand, name = "dump")]
-pub struct DumpCommand {
-    /// A specifier indicating which session you'd like to retrieve logs for.
-    /// For example, providing ~1 retrieves the most-recent session,
-    /// ~2 the second-most-recent, and so on.
-    /// Defaults to the most recent session.
-    #[argh(positional, default = "SessionSpec::Relative(0)", from_str_fn(parse_session_spec))]
-    pub session: SessionSpec,
-}
+pub struct DumpCommand {}
 
 pub fn parse_time(value: &str) -> Result<DetailedDateTime, String> {
     let d = parse_date_string(value, Local::now(), Dialect::Us)
@@ -44,50 +37,12 @@ pub fn parse_time(value: &str) -> Result<DetailedDateTime, String> {
     d
 }
 
-/// Specifies the session to subscribe to.
-/// This lets you get logs based on a specific absolute timestamp
-/// or relative time.
-#[derive(Debug, Clone, PartialEq)]
-pub enum SessionSpec {
-    TimestampNanos(u64),
-    Relative(u32),
-}
-
 /// Parses a duration from a string. The input is in seconds
 /// and the output is a Rust duration.
 pub fn parse_seconds_string_as_duration(value: &str) -> Result<Duration, String> {
     Ok(Duration::from_secs(
         value.parse().map_err(|e| format!("value '{}' is not a number: {}", value, e))?,
     ))
-}
-
-/// Parses a session spec from a string. The session spec is a number
-/// that can be either a relative timestamp or an absolute timestamp.
-/// Values starting with ~ are parsed as relative timestamps.
-/// Values starting without ~ are parsed as absolute timestamps.
-/// All timestamps are specified in nanoseconds.
-pub fn parse_session_spec(value: &str) -> Result<SessionSpec, String> {
-    if value.is_empty() {
-        return Err(String::from("session identifier cannot be empty"));
-    }
-
-    if value == "0" {
-        return Err(String::from("'0' is not a valid session specifier: use ~1 for the most recent session in `dump` mode."));
-    }
-
-    let split = value.split_once('~');
-    if let Some((_, val)) = split {
-        Ok(SessionSpec::Relative(val.parse().map_err(|e| {
-            format!(
-                "previous session provided with '~' but could not parse the rest as a number: {}",
-                e
-            )
-        })?))
-    } else {
-        Ok(SessionSpec::TimestampNanos(value.parse().map_err(|e| {
-            format!("session identifier was provided, but could not be parsed as a number: {}", e)
-        })?))
-    }
 }
 
 // Time format for displaying logs
@@ -347,22 +302,5 @@ mod test {
             res.date(),
             parse_date_string(date_string, Local::now(), Dialect::Us).unwrap().date()
         );
-    }
-
-    #[test]
-    fn test_session_spec_non_zero() {
-        assert_eq!(parse_session_spec("~1").unwrap(), SessionSpec::Relative(1));
-        assert_eq!(parse_session_spec("~15").unwrap(), SessionSpec::Relative(15));
-    }
-
-    #[test]
-    fn test_session_spec_absolute() {
-        assert_eq!(parse_session_spec("1234567").unwrap(), SessionSpec::TimestampNanos(1234567));
-    }
-
-    #[test]
-    fn test_session_spec_error() {
-        assert!(parse_session_spec("~abc").is_err());
-        assert!(parse_session_spec("abc").is_err());
     }
 }

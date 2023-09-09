@@ -219,7 +219,7 @@ mod test {
     use diagnostics_data::Timestamp;
     use std::time::Duration;
 
-    use crate::{log_formatter::EventType, DumpCommand, LogSubCommand, SessionSpec};
+    use crate::{log_formatter::EventType, DumpCommand, LogSubCommand};
 
     use super::*;
 
@@ -227,9 +227,7 @@ mod test {
 
     fn empty_dump_command() -> LogCommand {
         LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                session: SessionSpec::Relative(0),
-            })),
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             ..LogCommand::default()
         }
     }

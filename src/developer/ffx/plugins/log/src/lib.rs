@@ -322,9 +322,7 @@ mod tests {
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
         let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                session: log_command::SessionSpec::Relative(0),
-            })),
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             ..LogCommand::default()
         };
         let symbolizer = FakeSymbolizerForTest::new("prefix", vec![]);
@@ -401,9 +399,7 @@ mod tests {
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
         let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                session: log_command::SessionSpec::Relative(0),
-            })),
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
@@ -452,9 +448,7 @@ mod tests {
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
         let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                session: log_command::SessionSpec::Relative(0),
-            })),
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             since: Some(parse_time("now").unwrap()),
             ..LogCommand::default()
         };
@@ -487,9 +481,7 @@ mod tests {
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
         let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                session: log_command::SessionSpec::Relative(0),
-            })),
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
@@ -527,9 +519,7 @@ mod tests {
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
         let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                session: log_command::SessionSpec::Relative(0),
-            })),
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             no_color: true,
             ..LogCommand::default()
         };
@@ -568,9 +558,7 @@ mod tests {
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
         let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                session: log_command::SessionSpec::Relative(0),
-            })),
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             show_metadata: true,
             no_color: true,
             ..LogCommand::default()
@@ -610,9 +598,7 @@ mod tests {
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
         let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                session: log_command::SessionSpec::Relative(0),
-            })),
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             clock: TimeFormat::Utc,
             ..LogCommand::default()
         };
@@ -663,9 +649,7 @@ mod tests {
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
         let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                session: log_command::SessionSpec::Relative(0),
-            })),
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             clock: TimeFormat::Utc,
             severity: Severity::Error,
             ..LogCommand::default()
@@ -918,9 +902,7 @@ mod tests {
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
         let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                session: log_command::SessionSpec::Relative(0),
-            })),
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             clock: TimeFormat::Local,
             since: Some(parse_time("1980-01-01T00:00:01").unwrap()),
             until: Some(parse_time("1980-01-01T00:00:05").unwrap()),
@@ -1013,9 +995,7 @@ mod tests {
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
         let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                session: log_command::SessionSpec::Relative(0),
-            })),
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             clock: TimeFormat::Utc,
             since_monotonic: Some(parse_seconds_string_as_duration("1").unwrap()),
             until_monotonic: Some(parse_seconds_string_as_duration("5").unwrap()),
@@ -1090,9 +1070,7 @@ mod tests {
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
         let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                session: log_command::SessionSpec::Relative(0),
-            })),
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             clock: TimeFormat::Local,
             ..LogCommand::default()
         };
@@ -1146,9 +1124,7 @@ mod tests {
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
         let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                session: log_command::SessionSpec::Relative(0),
-            })),
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
@@ -1199,9 +1175,7 @@ mod tests {
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
         let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                session: log_command::SessionSpec::Relative(0),
-            })),
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
@@ -1252,9 +1226,7 @@ mod tests {
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
         let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                session: log_command::SessionSpec::Relative(0),
-            })),
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             show_full_moniker: true,
             ..LogCommand::default()
         };
@@ -1306,9 +1278,7 @@ mod tests {
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
         let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                session: log_command::SessionSpec::Relative(0),
-            })),
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             hide_tags: true,
             ..LogCommand::default()
         };
@@ -1361,9 +1331,7 @@ mod tests {
             create_proxy::<TargetCollectionMarker>().unwrap();
         let severity = vec![parse_log_interest_selector("archivist.cm#TRACE").unwrap()];
         let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                session: log_command::SessionSpec::Relative(0),
-            })),
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             select: severity.clone(),
             ..LogCommand::default()
         };
@@ -1403,9 +1371,7 @@ mod tests {
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
         let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                session: log_command::SessionSpec::Relative(0),
-            })),
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             ..LogCommand::default()
         };
         let symbolizer = NoOpSymbolizer::new();
@@ -1459,9 +1425,7 @@ mod tests {
         let (target_collection_proxy, target_collection_server) =
             create_proxy::<TargetCollectionMarker>().unwrap();
         let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {
-                session: log_command::SessionSpec::Relative(0),
-            })),
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             hide_file: true,
             ..LogCommand::default()
         };
