@@ -1036,28 +1036,34 @@ impl FsNode {
         &self,
         current_task: &CurrentTask,
         name: &FsStr,
-        mode: FileMode,
+        mut mode: FileMode,
         dev: DeviceType,
-        owner: FsCred,
+        mut owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         assert!(mode & FileMode::IFMT != FileMode::EMPTY, "mknod called without node type.");
         self.check_access(current_task, Access::WRITE)?;
-        self.ops().mknod(self, current_task, name, mode, dev, owner)
-    }
+        self.update_metadata_for_child(current_task, &mut mode, &mut owner);
 
-    pub fn mkdir(
-        &self,
-        current_task: &CurrentTask,
-        name: &FsStr,
-        mode: FileMode,
-        owner: FsCred,
-    ) -> Result<FsNodeHandle, Errno> {
-        assert!(
-            mode & FileMode::IFMT == FileMode::IFDIR,
-            "mkdir called without directory node type."
-        );
-        self.check_access(current_task, Access::WRITE)?;
-        self.ops().mkdir(self, current_task, name, mode, owner)
+        if mode.is_dir() {
+            self.ops().mkdir(self, current_task, name, mode, owner)
+        } else {
+            // https://man7.org/linux/man-pages/man2/mknod.2.html says:
+            //
+            //   mode requested creation of something other than a regular
+            //   file, FIFO (named pipe), or UNIX domain socket, and the
+            //   caller is not privileged (Linux: does not have the
+            //   CAP_MKNOD capability); also returned if the filesystem
+            //   containing pathname does not support the type of node
+            //   requested.
+            let creds = current_task.creds();
+            if !creds.has_capability(CAP_MKNOD) {
+                if !matches!(mode.fmt(), FileMode::IFREG | FileMode::IFIFO | FileMode::IFSOCK) {
+                    return error!(EPERM);
+                }
+            }
+
+            self.ops().mknod(self, current_task, name, mode, dev, owner)
+        }
     }
 
     pub fn create_symlink(
@@ -1074,11 +1080,12 @@ impl FsNode {
     pub fn create_tmpfile(
         &self,
         current_task: &CurrentTask,
-        mode: FileMode,
-        owner: FsCred,
+        mut mode: FileMode,
+        mut owner: FsCred,
         link_behavior: FsNodeLinkBehavior,
     ) -> Result<FsNodeHandle, Errno> {
         self.check_access(current_task, Access::WRITE)?;
+        self.update_metadata_for_child(current_task, &mut mode, &mut owner);
         let node = self.ops().create_tmpfile(self, current_task, mode, owner)?;
         node.link_behavior.set(link_behavior).unwrap();
         Ok(node)
@@ -1229,6 +1236,43 @@ impl FsNode {
         self.ops().allocate(self, current_task, mode, offset, length)?;
         self.update_ctime_mtime();
         Ok(())
+    }
+
+    fn update_metadata_for_child(
+        &self,
+        current_task: &CurrentTask,
+        mode: &mut FileMode,
+        owner: &mut FsCred,
+    ) {
+        // The setgid bit on a directory causes the gid to be inherited by new children and the
+        // setgid bit to be inherited by new child directories. See SetgidDirTest in gvisor.
+        {
+            let self_info = self.info();
+            if self_info.mode.contains(FileMode::ISGID) {
+                owner.gid = self_info.gid;
+                if mode.is_dir() {
+                    *mode |= FileMode::ISGID;
+                }
+            }
+        }
+
+        if !mode.is_dir() {
+            // https://man7.org/linux/man-pages/man7/inode.7.html says:
+            //
+            //   For an executable file, the set-group-ID bit causes the
+            //   effective group ID of a process that executes the file to change
+            //   as described in execve(2).
+            //
+            // We need to check whether the current task has permission to create such a file.
+            // See a similar check in `FsNode::chmod`.
+            let creds = current_task.creds();
+            if !creds.has_capability(CAP_FOWNER)
+                && owner.gid != creds.fsgid
+                && !creds.is_in_group(owner.gid)
+            {
+                *mode &= !FileMode::ISGID;
+            }
+        }
     }
 
     /// Check whether the node can be accessed in the current context with the specified access

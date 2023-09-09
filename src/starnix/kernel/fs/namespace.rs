@@ -962,17 +962,18 @@ impl NamespaceNode {
         dev: DeviceType,
         flags: OpenFlags,
     ) -> Result<NamespaceNode, Errno> {
-        self.check_readonly_filesystem()?;
         let owner = current_task.as_fscred();
         let mode = current_task.fs().apply_umask(mode);
-        Ok(self.with_new_entry(self.entry.open_create_node(
-            current_task,
-            name,
-            mode,
-            dev,
-            owner,
-            flags,
-        )?))
+        let create_fn = |dir: &FsNodeHandle, name: &_| {
+            self.check_readonly_filesystem()?;
+            dir.mknod(current_task, name, mode, dev, owner)
+        };
+        let entry = if flags.contains(OpenFlags::EXCL) {
+            self.entry.create_entry(current_task, name, create_fn)
+        } else {
+            self.entry.get_or_create_entry(current_task, name, create_fn)
+        }?;
+        Ok(self.with_new_entry(entry))
     }
 
     /// Create a node in the file system.

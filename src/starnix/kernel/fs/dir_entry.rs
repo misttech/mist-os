@@ -318,7 +318,7 @@ impl DirEntry {
     ) -> Result<DirEntryHandle, Errno> {
         // TODO: apply_umask
         self.create_entry(current_task, name, |dir, name| {
-            dir.mkdir(current_task, name, mode!(IFDIR, 0o777), FsCred::root())
+            dir.mknod(current_task, name, mode!(IFDIR, 0o777), DeviceType::NONE, FsCred::root())
         })
     }
 
@@ -335,32 +335,9 @@ impl DirEntry {
         dev: DeviceType,
         owner: FsCred,
     ) -> Result<DirEntryHandle, Errno> {
-        self.create_entry(current_task, name, |_dir, name| {
-            self.create_node_fn(current_task, name, mode, dev, owner)
+        self.create_entry(current_task, name, |dir, name| {
+            dir.mknod(current_task, name, mode, dev, owner)
         })
-    }
-
-    /// Create or open a node in the file system.
-    ///
-    /// Works for any type of node other than a symlink.
-    ///
-    /// Will return an existing node unless `flags` contains `OpenFlags::EXCL`.
-    pub fn open_create_node(
-        self: &DirEntryHandle,
-        current_task: &CurrentTask,
-        name: &FsStr,
-        mode: FileMode,
-        dev: DeviceType,
-        owner: FsCred,
-        flags: OpenFlags,
-    ) -> Result<DirEntryHandle, Errno> {
-        let create_fn =
-            |_dir: &_, name: &_| self.create_node_fn(current_task, name, mode, dev, owner);
-        if flags.contains(OpenFlags::EXCL) {
-            self.create_entry(current_task, name, create_fn)
-        } else {
-            self.get_or_create_entry(current_task, name, create_fn)
-        }
     }
 
     /// Creates an anonymous file.
@@ -371,8 +348,8 @@ impl DirEntry {
     pub fn create_tmpfile(
         self: &DirEntryHandle,
         current_task: &CurrentTask,
-        mut mode: FileMode,
-        mut owner: FsCred,
+        mode: FileMode,
+        owner: FsCred,
         flags: OpenFlags,
     ) -> Result<DirEntryHandle, Errno> {
         // Only directories can have children.
@@ -380,7 +357,6 @@ impl DirEntry {
             return error!(ENOTDIR);
         }
         assert!(mode.is_reg());
-        self.update_metadata_for_child(current_task, &mut mode, &mut owner);
 
         // From <https://man7.org/linux/man-pages/man2/open.2.html>:
         //
@@ -397,75 +373,6 @@ impl DirEntry {
 
         let node = self.node.create_tmpfile(current_task, mode, owner, link_behavior)?;
         Ok(DirEntry::new_unrooted(node))
-    }
-
-    fn update_metadata_for_child(
-        &self,
-        current_task: &CurrentTask,
-        mode: &mut FileMode,
-        owner: &mut FsCred,
-    ) {
-        // The setgid bit on a directory causes the gid to be inherited by new children and the
-        // setgid bit to be inherited by new child directories. See SetgidDirTest in gvisor.
-        {
-            let self_info = self.node.info();
-            if self_info.mode.contains(FileMode::ISGID) {
-                owner.gid = self_info.gid;
-                if mode.is_dir() {
-                    *mode |= FileMode::ISGID;
-                }
-            }
-        }
-
-        if !mode.is_dir() {
-            // https://man7.org/linux/man-pages/man7/inode.7.html says:
-            //
-            //   For an executable file, the set-group-ID bit causes the
-            //   effective group ID of a process that executes the file to change
-            //   as described in execve(2).
-            //
-            // We need to check whether the current task has permission to create such a file.
-            // See a similar check in `FsNode::chmod`.
-            let creds = current_task.creds();
-            if !creds.has_capability(CAP_FOWNER)
-                && owner.gid != creds.fsgid
-                && !creds.is_in_group(owner.gid)
-            {
-                *mode &= !FileMode::ISGID;
-            }
-        }
-    }
-
-    fn create_node_fn(
-        self: &DirEntryHandle,
-        current_task: &CurrentTask,
-        name: &FsStr,
-        mut mode: FileMode,
-        dev: DeviceType,
-        mut owner: FsCred,
-    ) -> Result<FsNodeHandle, Errno> {
-        self.update_metadata_for_child(current_task, &mut mode, &mut owner);
-
-        if mode.is_dir() {
-            self.node.mkdir(current_task, name, mode, owner)
-        } else {
-            // https://man7.org/linux/man-pages/man2/mknod.2.html says:
-            //
-            //   mode requested creation of something other than a regular
-            //   file, FIFO (named pipe), or UNIX domain socket, and the
-            //   caller is not privileged (Linux: does not have the
-            //   CAP_MKNOD capability); also returned if the filesystem
-            //   containing pathname does not support the type of node
-            //   requested.
-            let creds = current_task.creds();
-            if !creds.has_capability(CAP_MKNOD) {
-                if !matches!(mode.fmt(), FileMode::IFREG | FileMode::IFIFO | FileMode::IFSOCK) {
-                    return error!(EPERM);
-                }
-            }
-
-            self.node.mknod(current_task, name, mode, dev, owner)
-        }
     }
 
     /// Create a symlink in the file system.
