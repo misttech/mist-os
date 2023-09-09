@@ -145,7 +145,9 @@ impl OverlayNode {
                     SymlinkTarget::Node(_) => return error!(EIO),
                     SymlinkTarget::Path(path) => path,
                 };
-                parent_upper.create_symlink(current_task, &name, link_path, info.cred())
+                parent_upper.create_entry(current_task, &name, |dir, name| {
+                    dir.create_symlink(current_task, name, link_path, info.cred())
+                })
             } else if info.mode.is_reg() && copy_mode == UpperCopyMode::CopyAll {
                 // Regular files need to be copied from lower FS to upper FS.
                 self.fs.create_upper_entry(
@@ -396,7 +398,9 @@ impl FsNodeOps for Arc<OverlayNode> {
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         let new_upper_node = self.create_entry(current_task, name, |dir, temp_name| {
-            dir.create_symlink(current_task, temp_name, target, owner.clone())
+            dir.create_entry(current_task, temp_name, |dir_node, name| {
+                dir_node.create_symlink(current_task, name, target, owner.clone())
+            })
         })?;
         Ok(self.init_fs_node_for_child(node, None, Some(new_upper_node)))
     }

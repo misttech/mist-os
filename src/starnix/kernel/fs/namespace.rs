@@ -1003,9 +1003,12 @@ impl NamespaceNode {
         name: &FsStr,
         target: &FsStr,
     ) -> Result<NamespaceNode, Errno> {
-        self.check_readonly_filesystem()?;
         let owner = current_task.as_fscred();
-        Ok(self.with_new_entry(self.entry.create_symlink(current_task, name, target, owner)?))
+        let entry = self.entry.create_entry(current_task, name, |dir, name| {
+            self.check_readonly_filesystem()?;
+            dir.create_symlink(current_task, name, target, owner)
+        })?;
+        Ok(self.with_new_entry(entry))
     }
 
     /// Creates an anonymous file.

@@ -375,21 +375,6 @@ impl DirEntry {
         Ok(DirEntry::new_unrooted(node))
     }
 
-    /// Create a symlink in the file system.
-    ///
-    /// To create another type of node, use `create_node`.
-    pub fn create_symlink(
-        self: &DirEntryHandle,
-        current_task: &CurrentTask,
-        name: &FsStr,
-        target: &FsStr,
-        owner: FsCred,
-    ) -> Result<DirEntryHandle, Errno> {
-        self.create_entry(current_task, name, |dir, name| {
-            dir.create_symlink(current_task, name, target, owner)
-        })
-    }
-
     pub fn unlink(
         self: &DirEntryHandle,
         current_task: &CurrentTask,

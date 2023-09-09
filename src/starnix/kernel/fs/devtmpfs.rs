@@ -31,10 +31,7 @@ fn init_devtmpfs(kernel: &Arc<Kernel>) -> FileSystemHandle {
     };
 
     mkdir(b"shm");
-
-    root.create_symlink(kernel.kthreads.system_task(), b"fd", b"/proc/self/fd", FsCred::root())
-        .unwrap();
-
+    create_symlink(kernel, root, b"fd", b"/proc/self/fd").unwrap();
     fs
 }
 
@@ -74,10 +71,17 @@ pub fn devtmpfs_create_symlink(
     name: &FsStr,
     target: &FsStr,
 ) -> Result<DirEntryHandle, Errno> {
-    dev_tmp_fs(kernel).root().create_symlink(
-        kernel.kthreads.system_task(),
-        name,
-        target,
-        FsCred::root(),
-    )
+    create_symlink(kernel, dev_tmp_fs(kernel).root(), name, target)
+}
+
+fn create_symlink(
+    kernel: &Arc<Kernel>,
+    entry: &DirEntryHandle,
+    name: &FsStr,
+    target: &FsStr,
+) -> Result<DirEntryHandle, Errno> {
+    let current_task = kernel.kthreads.system_task();
+    entry.create_entry(current_task, name, |dir, name| {
+        dir.create_symlink(current_task, name, target, FsCred::root())
+    })
 }
