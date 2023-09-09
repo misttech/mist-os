@@ -27,8 +27,6 @@ namespace arch {
 
 // Forward-declared; defined below.
 struct AccessPermissions;
-
-template <typename MemoryType>
 struct PagingSettings;
 
 /// Parameterizes the unaddressable bits of a virtual address.
@@ -77,10 +75,6 @@ struct ExamplePagingTraits {
   ///
   enum class LevelType { kExampleLevel };
 
-  /// A type describing 'memory' configuration (both RAM and MMIO). This might
-  /// encode cache coherence policy or similar architecture-specific details.
-  enum class MemoryType {};
-
   /// Captures runtime system information that feeds into translation or
   /// mapping considerations. The construction of this information is
   /// context-dependent and so is left to the user of the API.
@@ -127,15 +121,6 @@ struct ExamplePagingTraits {
     constexpr bool executable() const { return false; }
     constexpr bool user_accessible() const { return false; }
 
-    /// Returns the memory type of the associated page, which may require
-    /// access to system state to decode.
-    ///
-    /// This method may only be called on a terminal entry.
-    constexpr MemoryType Memory(const SystemState& state) const {
-      assert(terminal());
-      return MemoryType{};
-    }
-
     /// Bulk-apply paging settings to the entry. This is done in one go as
     /// there can be interdependicies among the different aspects of entry
     /// state: these could not otherwise be captured by individual setters with
@@ -152,10 +137,7 @@ struct ExamplePagingTraits {
     /// before making this call; otherwise if
     /// `!Traits::kNonTerminalAccessPermissions` then the provided access
     /// permissions are expected to be maximally permissive.
-    constexpr TableEntry& Set(const SystemState& state,
-                              const PagingSettings<MemoryType>& settings) {
-      return *this;
-    }
+    constexpr TableEntry& Set(const PagingSettings& settings) { return *this; }
   };
 
   /// The maximum number of addressable physical address bits permitted by the
@@ -216,19 +198,12 @@ struct AccessPermissions {
 };
 
 /// As described by `ExamplePagingTraits::TableEntry<Level>::Set()`.
-template <typename MemoryType>
 struct PagingSettings {
   uint64_t address = 0u;
   bool present = false;
   bool terminal = false;
   AccessPermissions access;
-
-  /// This field is wrapped with `std::optional` only so that is has a safe
-  /// default-constructed value; if passed to `Set()` this must have a non-null
-  /// value.
-  std::optional<MemoryType> memory;
-
-  // TODO(fxbug.dev/129344): global.
+  // TODO(fxbug.dev/129344): global, memory type.
 };
 
 /// A range of (zero-indexed) bits within a virtual address.
@@ -278,11 +253,9 @@ struct MapError {
 
 /// The settings to apply to each page mapped in the context of the mapping
 /// utilities below.
-template <typename MemoryType>
 struct MapSettings {
   AccessPermissions access;
-  std::optional<MemoryType> memory;
-  // TODO(fxbug.dev/129344): global.
+  // TODO(fxbug.dev/129344): global, memory type.
 };
 
 /// Paging provides paging-related operations for a given a set of paging
@@ -296,7 +269,6 @@ class Paging : public PagingTraits {
   template <LevelType Level>
   using TableEntry = typename PagingTraits::template TableEntry<Level>;
 
-  using typename PagingTraits::MemoryType;
   using typename PagingTraits::SystemState;
 
   using PagingTraits::kLevels;
@@ -470,7 +442,7 @@ class Paging : public PagingTraits {
                                    uint64_t input_vaddr,             //
                                    uint64_t size,                    //
                                    uint64_t output_paddr,            //
-                                   const MapSettings<MemoryType>& settings) {    //
+                                   const MapSettings& settings) {    //
     static_assert(
         std::is_invocable_r_v<std::optional<uint64_t>, PageTableAllocator, uint64_t, uint64_t>);
 
@@ -603,7 +575,7 @@ class Paging : public PagingTraits {
         : on_terminal_(std::move(on_terminal)) {}
 
     template <class TableIo, LevelType Level>
-    std::optional<value_type> operator()(TableIo& io, TableEntry<Level>& entry, uint64_t vaddr) {
+    std::optional<value_type> operator()(TableIo & io, TableEntry<Level>& entry, uint64_t vaddr) {
       if (!entry.present()) {
         return fit::failed();
       }
@@ -655,7 +627,7 @@ class Paging : public PagingTraits {
                    uint64_t input_vaddr,                     //
                    uint64_t size,                            //
                    uint64_t output_paddr,                    //
-                   const MapSettings<MemoryType>& settings)              //
+                   const MapSettings& settings)              //
         : allocator_(std::move(page_table_allocator)),
           state_(state),
           input_vaddr_(input_vaddr),
@@ -670,7 +642,7 @@ class Paging : public PagingTraits {
     uint64_t next_vaddr() const { return input_vaddr_; }
 
     template <typename TableIo, LevelType Level>
-    std::optional<fit::result<MapError>> operator()(TableIo&& io, TableEntry<Level>& entry,
+    std::optional<fit::result<MapError>> operator()(TableIo && io, TableEntry<Level>& entry,
                                                     uint64_t table_paddr) {
       auto to_error = [entry_paddr = table_paddr + kEntrySize<Level> * entry.reg_addr(),
                        vaddr = input_vaddr_](MapError::Type type) -> MapError {
@@ -702,16 +674,15 @@ class Paging : public PagingTraits {
 
       // At this point, the entry is not present. Unless we intend to terminate
       // at this level, we will need to allocate the next level table.
-      PagingSettings<MemoryType> settings{
+      PagingSettings settings{
           .present = true,
           .terminal = terminal,
       };
       if (terminal) {
         settings.address = output_paddr_;
         settings.access = settings_.access;
-        settings.memory = settings_.memory;
       } else {
-        std::optional<uint64_t> new_table_paddr = allocator_(kTableSize<Level>, kTableAlignment);
+        std::optional<uint64_t> new_table_paddr = allocator_(kTableAlignment, kTableSize<Level>);
         if (!new_table_paddr) {
           return fit::error(to_error(MapError::Type::kAllocationFailure));
         }
@@ -736,7 +707,7 @@ class Paging : public PagingTraits {
     uint64_t input_vaddr_;
     uint64_t size_;
     uint64_t output_paddr_;
-    const MapSettings<MemoryType> settings_;
+    const MapSettings settings_;
   };
 
   template <typename PageTableAllocator>

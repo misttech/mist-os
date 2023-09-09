@@ -71,10 +71,7 @@ enum class ArmAddressTranslationTableAccessPermissions {
 };
 
 // Captures the system state influencing ARM paging.
-struct ArmSystemPagingState {
-  ArmMemoryAttrIndirectionRegister mair;
-  ArmShareabilityAttribute shareability = ArmShareabilityAttribute::kNone;
-};
+struct ArmSystemPagingState {};
 
 //
 // Forward declarations of the different descriptor layouts; defined below.
@@ -257,21 +254,7 @@ class ArmAddressTranslationDescriptor
            ap_table == ArmTableAccessPermissions::kNoWriteAccess;
   }
 
-  constexpr ArmMairAttribute Memory(const ArmSystemPagingState& state) const {
-    auto memory = [&state](const auto& desc) {
-      return *state.mair.GetAttribute(static_cast<unsigned int>(desc.attr_index()));
-    };
-    if (IsPage()) {
-      return memory(AsPage());
-    }
-    if (IsBlock()) {
-      return memory(AsBlock());
-    }
-    ZX_PANIC("Memory() cannot be called on a non-terminal entry");
-  }
-
-  constexpr SelfType& Set(const ArmSystemPagingState& state,
-                          const PagingSettings<ArmMairAttribute>& settings) {
+  constexpr SelfType& Set(const ArmSystemPagingState& state, const PagingSettings& settings) {
     set_valid(settings.present);
     if (!settings.present) {
       return *this;
@@ -284,21 +267,6 @@ class ArmAddressTranslationDescriptor
         SetAsBlock();
       } else {
         ZX_PANIC("level cannot be terminal");
-      }
-
-      auto set_memory = [&](auto& desc) {
-        desc.set_sh(state.shareability);
-        std::optional<unsigned int> index = state.mair.GetIndex(*settings.memory);
-        ZX_DEBUG_ASSERT_MSG(index,
-                            "memory attribute %#" PRIx8 " not configured in MAIR (%#" PRIx64 ")",
-                            ArmMemoryAttrIndirectionRegister::AttributeToValue(*settings.memory),
-                            state.mair.reg_value());
-        desc.set_attr_index(*index);
-      };
-      if (IsPage()) {
-        set_memory(AsPage());
-      } else {
-        set_memory(AsBlock());
       }
     } else {
       if constexpr (Table::kValid) {
@@ -717,8 +685,6 @@ enum class ArmVirtualAddressRange {
 template <ArmVirtualAddressRange Range, unsigned int VirtualAddressSize = 48>
 struct ArmPagingTraits {
   using LevelType = ArmAddressTranslationLevel;
-
-  using MemoryType = ArmMairAttribute;
 
   using SystemState = ArmSystemPagingState;
 

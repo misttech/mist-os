@@ -29,16 +29,6 @@ enum class RiscvPagingLevel {
   k0 = 0,
 };
 
-// When the Svpbmt extension is available, a page table entry's pbmt field
-// determines the physical memory type being accessed.  Without that extension,
-// those bits must be all zero, which is also the PMA type (meaning the memory
-// type is controlled by the Physical Memory Attributes specification instead).
-enum class RiscvMemoryType {
-  kPma = 0,  // None
-  kNc = 1,   // Non-cacheable, idempotent, weakly-ordered (RVWMO), main memory
-  kIo = 2,   // Non-cacheable, non-idempotent, strongly-ordered (I/O ordering), I/O
-};
-
 // Captures the system state influencing RISC-V paging.
 struct RiscvSystemPagingState {};
 
@@ -57,6 +47,16 @@ class RiscvPageTableEntry : public hwreg::RegisterBase<RiscvPageTableEntry<Level
   using SelfType = RiscvPageTableEntry;
 
  public:
+  // When the Svpbmt extension is available, the pbmt field determines the
+  // physical memory type being accessed.  Without that extension, those bits
+  // must be all zero, which is also the PMA type (meaning the memory type is
+  // controlled by the Physical Memory Attributes specification instead).
+  enum class MemoryType : uint64_t {
+    kPma = 0,  // None
+    kNc = 1,   // Non-cacheable, idempotent, weakly-ordered (RVWMO), main memory
+    kIo = 2,   // Non-cacheable, non-idempotent, strongly-ordered (I/O ordering), I/O
+  };
+
   // When the Svnapot extension is available, setting the N bit means that
   // this PTE is part of a larger Naturally Aligned Power-of-2 (NAPOT) range.
   // The low bits of PPN indicate what power of 2 is the actual granularity of
@@ -68,7 +68,7 @@ class RiscvPageTableEntry : public hwreg::RegisterBase<RiscvPageTableEntry<Level
 
   // These bits are always RES0 in non-leaf PTEs.  When the Svpbmt extension
   // is available, in leaf PTEs they set the type of physical memory access.
-  DEF_ENUM_FIELD(RiscvMemoryType, 62, 61, pbmt);  // RES0 without Svpbmt extension
+  DEF_ENUM_FIELD(MemoryType, 62, 61, pbmt);  // RES0 without Svpbmt extension
 
   // Bits [60: 54] are reserved.
 
@@ -112,10 +112,7 @@ class RiscvPageTableEntry : public hwreg::RegisterBase<RiscvPageTableEntry<Level
   constexpr bool executable() const { return terminal() ? x() : true; }
   constexpr bool user_accessible() const { return terminal() ? u() : true; }
 
-  constexpr RiscvMemoryType Memory(const RiscvSystemPagingState& state) const { return pbmt(); }
-
-  constexpr SelfType& Set(const RiscvSystemPagingState& state,
-                          const PagingSettings<RiscvMemoryType>& settings) {
+  constexpr SelfType& Set(const RiscvSystemPagingState& state, const PagingSettings& settings) {
     set_v(settings.present);
     if (!settings.present) {
       return *this;
@@ -127,8 +124,7 @@ class RiscvPageTableEntry : public hwreg::RegisterBase<RiscvPageTableEntry<Level
       set_r(access.readable)
           .set_w(access.writable)
           .set_x(access.executable)
-          .set_u(access.user_accessible)
-          .set_pbmt(*settings.memory);
+          .set_u(access.user_accessible);
     } else {
       // Since access permissions cannot be applied to non-terminal levels to
       // constrain later ones, the provided permissions here are expected to be
@@ -169,8 +165,6 @@ struct RiscvPagingTraitsBase {
 
   template <RiscvPagingLevel Level>
   using TableEntry = RiscvPageTableEntry<Level>;
-
-  using MemoryType = RiscvMemoryType;
 
   using SystemState = RiscvSystemPagingState;
 
