@@ -214,7 +214,7 @@ pub async fn main() -> Result<(), Error> {
 
     let selectors = triage_engine.selectors();
     let mut diagnostic_source = diagnostics::DiagnosticFetcher::create(selectors)?;
-    let snapshot_service = snapshot::CrashReportHandlerBuilder::new().build().await?;
+    let snapshot_service = snapshot::CrashReportHandlerBuilder::default().build().await?;
     let system_time = MonotonicTime::new();
     let mut delay_tracker = DelayTracker::new(&system_time, &mode);
 

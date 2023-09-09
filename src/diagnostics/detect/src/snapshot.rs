@@ -2,8 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// Triggers a snapshot via FIDL
-
+use anyhow::{anyhow, format_err, Error};
+use fidl_fuchsia_feedback as fidl_feedback;
+use fuchsia_async as fasync;
+use fuchsia_component::client::connect_to_protocol;
+use futures::channel::mpsc;
+use futures::stream::StreamExt;
+use std::cell::RefCell;
+use std::rc::Rc;
 use tracing::{error, warn};
 
 // Name of the crash-report product we're filing against.
@@ -30,35 +36,6 @@ impl SnapshotRequest {
     }
 }
 
-// Code shamelessly stolen and slightly adapted from
-// garnet/bin/power_manager/src/crash_report_handler.rs
-
-use anyhow::{anyhow, format_err, Error};
-//use async_trait::async_trait;
-use fidl_fuchsia_feedback as fidl_feedback;
-use fuchsia_async as fasync;
-use futures::channel::mpsc;
-use futures::stream::StreamExt;
-use std::cell::RefCell;
-use std::rc::Rc;
-
-/// CrashReportHandler
-///
-/// Summary: Provides a mechanism for filing crash reports.
-///
-/// FIDL dependencies:
-///     - fuchsia.feedback.CrashReporter: CrashReportHandler uses this protocol to communicate
-///       with the CrashReporter service in order to file crash reports.
-///     - fuchsia.feedback.CrashReportingProductRegister: CrashReportHandler uses this protocol
-///       to communicate with the CrashReportingProductRegister service in order to configure
-///       the crash reporting product it will be filing on.
-///
-
-/// Path to the CrashReporter service.
-const CRASH_REPORTER_SVC: &'static str = "/svc/fuchsia.feedback.CrashReporter";
-/// Path to the CrashReportingProductRegister service.
-const CRASH_REGISTER_SVC: &'static str = "/svc/fuchsia.feedback.CrashReportingProductRegister";
-
 /// The maximum number of pending crash report requests. This is needed because the FIDL API to file
 /// a crash report does not return until the crash report has been fully generated, which can take
 /// many seconds. Supporting pending crash reports means Detect can file
@@ -72,19 +49,6 @@ pub struct CrashReportHandlerBuilder {
     max_pending_crash_reports: usize,
 }
 
-// This function is from fuchsia-mirror/garnet/bin/power_manager/src/utils.rs
-/// Create and connect a FIDL proxy to the service at `path`
-fn connect_proxy<T: fidl::endpoints::ProtocolMarker>(
-    path: &String,
-) -> Result<T::Proxy, anyhow::Error> {
-    let (proxy, server) = fidl::endpoints::create_proxy::<T>()
-        .map_err(|e| anyhow::format_err!("Failed to create proxy: {}", e))?;
-
-    fdio::service_connect(path, server.into_channel())
-        .map_err(|s| anyhow::format_err!("Failed to connect to service at {}: {}", path, s))?;
-    Ok(proxy)
-}
-
 /// Logs an error message if the passed in `result` is an error.
 #[macro_export]
 macro_rules! log_if_err {
@@ -95,60 +59,79 @@ macro_rules! log_if_err {
     };
 }
 
-impl CrashReportHandlerBuilder {
-    pub fn new() -> Self {
+impl Default for CrashReportHandlerBuilder {
+    fn default() -> Self {
         Self { proxy: None, max_pending_crash_reports: MAX_PENDING_CRASH_REPORTS }
     }
+}
 
-    #[cfg(test)]
-    pub fn with_proxy(mut self, proxy: fidl_feedback::CrashReporterProxy) -> Self {
-        self.proxy = Some(proxy);
-        self
-    }
-
-    #[cfg(test)]
-    pub fn with_max_pending_crash_reports(mut self, max: usize) -> Self {
-        self.max_pending_crash_reports = max;
-        self
-    }
-
+impl CrashReportHandlerBuilder {
     pub async fn build(self) -> Result<Rc<CrashReportHandler>, Error> {
         // Proxy is only pre-set for tests. If a proxy was not specified,
         // this is a good time to configure for our crash reporting product.
         if matches!(self.proxy, None) {
-            let config_proxy = connect_proxy::<fidl_feedback::CrashReportingProductRegisterMarker>(
-                &CRASH_REGISTER_SVC.to_string(),
-            )?;
+            let config_proxy =
+                connect_to_protocol::<fidl_feedback::CrashReportingProductRegisterMarker>()?;
             let product_config = fidl_feedback::CrashReportingProduct {
                 name: Some(CRASH_PRODUCT_NAME.to_string()),
                 ..Default::default()
             };
             config_proxy.upsert_with_ack(&CRASH_PROGRAM_NAME.to_string(), &product_config).await?;
         }
-        // Connect to the CrashReporter service if a proxy wasn't specified
-        let proxy = self.proxy.unwrap_or(connect_proxy::<fidl_feedback::CrashReporterMarker>(
-            &CRASH_REPORTER_SVC.to_string(),
-        )?);
-
-        // Set up the crash report sender that runs asynchronously
-        let (channel, receiver) = mpsc::channel(self.max_pending_crash_reports);
-        CrashReportHandler::begin_crash_report_sender(proxy, receiver);
-
-        Ok(Rc::new(CrashReportHandler {
-            channel_size: self.max_pending_crash_reports,
-            crash_report_sender: RefCell::new(channel),
-        }))
+        let handler = CrashReportHandler::new(self.proxy, self.max_pending_crash_reports)?;
+        Ok(Rc::new(handler))
     }
 }
 
+#[cfg(test)]
+impl CrashReportHandlerBuilder {
+    fn with_proxy(mut self, proxy: fidl_feedback::CrashReporterProxy) -> Self {
+        self.proxy = Some(proxy);
+        self
+    }
+
+    fn with_max_pending_crash_reports(mut self, max: usize) -> Self {
+        self.max_pending_crash_reports = max;
+        self
+    }
+}
+
+/// CrashReportHandler
+/// Triggers a snapshot via FIDL
+///
+/// Summary: Provides a mechanism for filing crash reports.
+///
+/// FIDL dependencies:
+///     - fuchsia.feedback.CrashReporter: CrashReportHandler uses this protocol to communicate
+///       with the CrashReporter service in order to file crash reports.
+///     - fuchsia.feedback.CrashReportingProductRegister: CrashReportHandler uses this protocol
+///       to communicate with the CrashReportingProductRegister service in order to configure
+///       the crash reporting product it will be filing on.
 pub struct CrashReportHandler {
     /// The channel to send new crash report requests to the asynchronous crash report sender
     /// future. The maximum pending crash reports are implicitly enforced by the channel length.
     crash_report_sender: RefCell<mpsc::Sender<SnapshotRequest>>,
     channel_size: usize,
+    _server_task: fasync::Task<()>,
 }
 
 impl CrashReportHandler {
+    fn new(
+        proxy: Option<fidl_feedback::CrashReporterProxy>,
+        channel_size: usize,
+    ) -> Result<Self, Error> {
+        // Connect to the CrashReporter service if a proxy wasn't specified
+        let proxy = proxy.unwrap_or(connect_to_protocol::<fidl_feedback::CrashReporterMarker>()?);
+        // Set up the crash report sender that runs asynchronously
+        let (channel, receiver) = mpsc::channel(channel_size);
+        let server_task = Self::begin_crash_report_sender(proxy, receiver);
+        Ok(Self {
+            channel_size,
+            crash_report_sender: RefCell::new(channel),
+            _server_task: server_task,
+        })
+    }
+
     /// Handle a FileCrashReport message by sending the specified crash report signature over the
     /// channel to the crash report sender.
     pub fn request_snapshot(&self, request: SnapshotRequest) -> Result<(), Error> {
@@ -157,23 +140,23 @@ impl CrashReportHandler {
         match self.crash_report_sender.borrow_mut().try_send(request) {
             Ok(()) => Ok(()),
             Err(e) if e.is_full() => {
-                warn!("Too many crash reports pending: {}", e);
+                warn!("Too many crash reports pending: {e}");
                 Err(anyhow!("Pending crash reports exceeds max ({})", self.channel_size))
             }
             Err(e) => {
-                warn!("Error sending crash report: {}", e);
-                Err(anyhow!("{}", e))
+                warn!("Error sending crash report: {e}");
+                Err(anyhow!("{e}"))
             }
         }
     }
 
-    /// Spawn and detach a future that receives crash report signatures over the channel and uses
+    /// Spawn a Task that receives crash report signatures over the channel and uses
     /// the proxy to send a File FIDL request to the CrashReporter service with the specified
     /// signatures.
     fn begin_crash_report_sender(
         proxy: fidl_feedback::CrashReporterProxy,
         mut receive_channel: mpsc::Receiver<SnapshotRequest>,
-    ) {
+    ) -> fasync::Task<()> {
         fasync::Task::local(async move {
             while let Some(request) = receive_channel.next().await {
                 log_if_err!(
@@ -183,7 +166,6 @@ impl CrashReportHandler {
             }
             error!("Crash reporter task ended. Crash reports will no longer be filed. This should not happen.")
         })
-        .detach();
     }
 
     /// Send a File request to the CrashReporter service with the specified crash report signature.
@@ -199,9 +181,8 @@ impl CrashReportHandler {
             ..Default::default()
         };
 
-        let result =
-            proxy.file_report(report).await.map_err(|e| format_err!("IPC error: {}", e))?;
-        result.map_err(|e| format_err!("Service error: {:?}", e))
+        let result = proxy.file_report(report).await.map_err(|e| format_err!("IPC error: {e}"))?;
+        result.map_err(|e| format_err!("Service error: {e:?}"))
     }
 }
 
@@ -223,7 +204,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fidl_feedback::CrashReporterMarker>()
                 .unwrap();
         let crash_report_handler =
-            CrashReportHandlerBuilder::new().with_proxy(proxy).build().await.unwrap();
+            CrashReportHandlerBuilder::default().with_proxy(proxy).build().await.unwrap();
 
         // File a crash report
         crash_report_handler
@@ -256,7 +237,7 @@ mod tests {
         let (proxy, mut stream) =
             fidl::endpoints::create_proxy_and_stream::<fidl_feedback::CrashReporterMarker>()
                 .unwrap();
-        let crash_report_handler = CrashReportHandlerBuilder::new()
+        let crash_report_handler = CrashReportHandlerBuilder::default()
             .with_proxy(proxy)
             .with_max_pending_crash_reports(1)
             .build()
