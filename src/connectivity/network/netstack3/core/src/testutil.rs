@@ -65,7 +65,7 @@ use crate::{
             IpDeviceEvent, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
         },
         icmp::{BufferIcmpContext, IcmpContext, IcmpIpExt},
-        types::{AddableEntryEither, AddableMetric, Entry, RawMetric},
+        types::{AddableEntry, AddableMetric, RawMetric},
         IpLayerEvent,
     },
     sync::Mutex,
@@ -777,7 +777,6 @@ pub struct FakeEventDispatcherBuilder {
     ndp_table_entries: Vec<(usize, UnicastAddr<Ipv6Addr>, UnicastAddr<Mac>)>,
     // usize refers to index into devices Vec.
     device_routes: Vec<(SubnetEither, usize)>,
-    routes: Vec<AddableEntryEither<DeviceId<FakeNonSyncCtx>>>,
 }
 
 impl FakeEventDispatcherBuilder {
@@ -928,6 +927,7 @@ impl FakeEventDispatcherBuilder {
     }
 
     /// Builds a `Ctx` from the present configuration with a default dispatcher.
+    #[cfg(any(test, feature = "testutils"))]
     pub fn build(self) -> (FakeCtx, Vec<EthernetDeviceId<FakeNonSyncCtx>>) {
         self.build_with_modifications(|_| {})
     }
@@ -935,6 +935,7 @@ impl FakeEventDispatcherBuilder {
     /// `build_with_modifications` is equivalent to `build`, except that after
     /// the `StackStateBuilder` is initialized, it is passed to `f` for further
     /// modification before the `Ctx` is constructed.
+    #[cfg(any(test, feature = "testutils"))]
     pub(crate) fn build_with_modifications<F: FnOnce(&mut StackStateBuilder)>(
         self,
         f: F,
@@ -946,6 +947,7 @@ impl FakeEventDispatcherBuilder {
 
     /// Build a `Ctx` from the present configuration with a caller-provided
     /// dispatcher and `StackStateBuilder`.
+    #[cfg(any(test, feature = "testutils"))]
     pub(crate) fn build_with(
         self,
         state_builder: StackStateBuilder,
@@ -958,7 +960,6 @@ impl FakeEventDispatcherBuilder {
             arp_table_entries,
             ndp_table_entries,
             device_routes,
-            routes,
         } = self;
         let idx_to_device_id: Vec<_> = devices
             .into_iter()
@@ -1025,21 +1026,19 @@ impl FakeEventDispatcherBuilder {
             )
             .expect("error inserting static NDP entry");
         }
+
         for (subnet, idx) in device_routes {
             let device = &idx_to_device_id[idx];
-            crate::add_route(
+            crate::testutil::add_route(
                 sync_ctx,
                 non_sync_ctx,
-                AddableEntryEither::without_gateway(
+                crate::ip::types::AddableEntryEither::without_gateway(
                     subnet,
                     device.clone().into(),
                     AddableMetric::ExplicitMetric(RawMetric(0)),
                 ),
             )
             .expect("add device route");
-        }
-        for entry in routes {
-            crate::add_route(sync_ctx, non_sync_ctx, entry).expect("add remote route");
         }
 
         (ctx, idx_to_device_id)
@@ -1245,22 +1244,24 @@ impl<I: Ip> From<IpLayerEvent<DeviceId<FakeNonSyncCtx>, I>>
         e: IpLayerEvent<DeviceId<FakeNonSyncCtx>, I>,
     ) -> IpLayerEvent<WeakDeviceId<FakeNonSyncCtx>, I> {
         match e {
-            IpLayerEvent::RouteAdded(Entry { subnet, device, gateway, metric }) => {
-                IpLayerEvent::RouteAdded(Entry {
+            IpLayerEvent::AddRoute(AddableEntry { subnet, device, gateway, metric }) => {
+                IpLayerEvent::AddRoute(AddableEntry {
                     subnet,
                     device: device.downgrade(),
                     gateway,
                     metric,
                 })
             }
-            IpLayerEvent::RouteRemoved(Entry { subnet, device, gateway, metric }) => {
-                IpLayerEvent::RouteRemoved(Entry {
-                    subnet,
-                    device: device.downgrade(),
-                    gateway,
-                    metric,
-                })
+            IpLayerEvent::RemoveRoutes { subnet, device, gateway } => {
+                IpLayerEvent::RemoveRoutes { subnet, device: device.downgrade(), gateway }
             }
+            IpLayerEvent::DeviceRemoved(device_id, removed) => IpLayerEvent::DeviceRemoved(
+                device_id.downgrade(),
+                removed
+                    .into_iter()
+                    .map(|entry| entry.map_device_id(|d| d.downgrade()))
+                    .collect::<Vec<_>>(),
+            ),
         }
     }
 }
@@ -1312,6 +1313,49 @@ pub(crate) fn handle_timer(
 
 pub(crate) const IPV6_MIN_IMPLIED_MAX_FRAME_SIZE: ethernet::MaxFrameSize =
     const_unwrap::const_unwrap_option(ethernet::MaxFrameSize::from_mtu(Ipv6::MINIMUM_LINK_MTU));
+
+/// Add a route directly to the forwarding table.
+#[cfg(any(test, feature = "testutils"))]
+pub fn add_route<NonSyncCtx: crate::NonSyncContext>(
+    sync_ctx: &crate::SyncCtx<NonSyncCtx>,
+    ctx: &mut NonSyncCtx,
+    entry: crate::ip::types::AddableEntryEither<crate::device::DeviceId<NonSyncCtx>>,
+) -> Result<(), crate::ip::forwarding::AddRouteError> {
+    let mut sync_ctx = crate::Locked::new(sync_ctx);
+    match entry {
+        crate::ip::types::AddableEntryEither::V4(entry) => {
+            crate::ip::forwarding::testutil::add_route::<Ipv4, _, _>(&mut sync_ctx, ctx, entry)
+        }
+        crate::ip::types::AddableEntryEither::V6(entry) => {
+            crate::ip::forwarding::testutil::add_route::<Ipv6, _, _>(&mut sync_ctx, ctx, entry)
+        }
+    }
+}
+
+/// Delete a route from the forwarding table, returning `Err` if no route was
+/// found to be deleted.
+#[cfg(any(test, feature = "testutils"))]
+pub fn del_routes_to_subnet<NonSyncCtx: crate::NonSyncContext>(
+    sync_ctx: &crate::SyncCtx<NonSyncCtx>,
+    ctx: &mut NonSyncCtx,
+    subnet: net_types::ip::SubnetEither,
+) -> crate::error::Result<()> {
+    let mut sync_ctx = crate::Locked::new(sync_ctx);
+
+    match subnet {
+        SubnetEither::V4(subnet) => crate::ip::forwarding::testutil::del_routes_to_subnet::<
+            Ipv4,
+            _,
+            _,
+        >(&mut sync_ctx, ctx, subnet),
+        SubnetEither::V6(subnet) => crate::ip::forwarding::testutil::del_routes_to_subnet::<
+            Ipv6,
+            _,
+            _,
+        >(&mut sync_ctx, ctx, subnet),
+    }
+    .map_err(From::from)
+}
 
 #[cfg(test)]
 mod tests {

@@ -1807,7 +1807,8 @@ mod tests {
                 panic!("remote_ip_type cannot be unspecified")
             }
             AddressType::Unroutable => {
-                crate::del_route(&sync_ctx, &mut non_sync_ctx, subnet.into()).unwrap();
+                crate::testutil::del_routes_to_subnet(&sync_ctx, &mut non_sync_ctx, subnet.into())
+                    .unwrap();
                 remote_ip
             }
         };
@@ -1904,7 +1905,7 @@ mod tests {
             AddrSubnet::new(remote_ip.get(), 16).unwrap(),
         )
         .unwrap();
-        crate::add_route(
+        crate::testutil::add_route(
             &sync_ctx,
             &mut non_sync_ctx,
             AddableEntryEither::without_gateway(
@@ -2108,7 +2109,7 @@ mod tests {
         assert_matches!(res, Err((_, IpSockSendError::Mtu)));
 
         // Make sure that sending on an unroutable socket fails.
-        crate::ip::forwarding::del_subnet_route::<I, _, _>(
+        crate::ip::forwarding::testutil::del_routes_to_subnet::<I, _, _>(
             &mut Locked::new(sync_ctx),
             &mut non_sync_ctx,
             subnet,
@@ -2168,7 +2169,7 @@ mod tests {
 
         // Use multicast remote addresses since unicast addresses would trigger
         // ARP/NDP requests.
-        crate::add_route(
+        crate::testutil::add_route(
             &sync_ctx,
             &mut non_sync_ctx,
             AddableEntryEither::without_gateway(
@@ -2290,7 +2291,7 @@ mod tests {
             AddrSubnet::new(local_ip.get(), 16).unwrap(),
         )
         .unwrap();
-        crate::add_route(
+        crate::testutil::add_route(
             &sync_ctx,
             &mut non_sync_ctx,
             AddableEntryEither::without_gateway(

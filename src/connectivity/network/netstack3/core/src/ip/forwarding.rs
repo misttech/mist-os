@@ -5,7 +5,7 @@
 //! IP forwarding definitions.
 
 use alloc::vec::Vec;
-use core::{fmt::Debug, slice::Iter};
+use core::fmt::Debug;
 
 use lock_order::Locked;
 use net_types::{
@@ -17,11 +17,10 @@ use tracing::debug;
 
 use crate::{
     device::DeviceLayerTypes,
-    error::NotFoundError,
     ip::{
         types::{
-            AddableEntry, AddableMetric, DecomposedAddableEntry, Destination, Entry, Metric,
-            NextHop, RawMetric,
+            AddableEntry, AddableEntryAndGeneration, AddableMetric, Destination, Entry,
+            EntryAndGeneration, EntryUpgrader, Generation, Metric, NextHop, RawMetric,
         },
         AnyDevice, DeviceIdContext, IpExt, IpLayerEvent, IpLayerIpExt, IpLayerNonSyncContext,
         IpStateContext,
@@ -86,87 +85,80 @@ fn select_device_for_gateway_using_table<
     )
 }
 
-/// Add a route to the forwarding table.
-pub(crate) fn add_route<
-    I: IpLayerIpExt,
-    C: IpLayerNonSyncContext<I, SC::DeviceId>,
-    SC: IpStateContext<I, C>,
->(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
-    entry: AddableEntry<I::Addr, SC::DeviceId>,
-) -> Result<(), AddRouteError> {
-    let DecomposedAddableEntry { subnet, device, gateway, metric } = entry.decompose();
-    sync_ctx.with_ip_routing_table_mut(|sync_ctx, table| {
-        let (device, gateway) = match (device, gateway) {
-            (None, None) => unreachable!("AddableEntry must have device or gateway set"),
-            (Some(device), gateway) => (device, gateway),
-            (None, Some(gateway)) => {
-                // Find an on-link route to the gateway when the device is not
-                // specified.
-                (
-                    select_device_for_gateway_using_table::<I, C, SC>(sync_ctx, table, gateway)
-                        .ok_or(AddRouteError::GatewayNotNeighbor)?,
-                    Some(gateway),
-                )
-            }
-        };
-        let metric = observe_metric(sync_ctx, &device, metric);
-        let entry = table.add_entry(Entry { subnet, device, gateway, metric })?;
-        Ok(ctx.on_event(IpLayerEvent::RouteAdded(entry.clone())))
-    })
-}
-
-fn del_entries<
-    I: IpLayerIpExt,
-    C: IpLayerNonSyncContext<I, SC::DeviceId>,
-    SC: IpStateContext<I, C>,
-    F: Fn(&Entry<I::Addr, SC::DeviceId>) -> bool,
->(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
-    predicate: F,
-) -> Result<(), NotFoundError> {
-    sync_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
-        let removed = table.del_entries(predicate);
-        if removed.is_empty() {
-            Err(NotFoundError)
-        } else {
-            Ok(removed
-                .into_iter()
-                .for_each(|entry| ctx.on_event(IpLayerEvent::RouteRemoved(entry))))
-        }
-    })
-}
-
-/// Delete all routes to a subnet, returning `Err` if no route was found to
-/// be deleted.
+/// Set the routes in the routing table.
 ///
-/// Note, `del_subnet_routes` will remove *all* routes to a `subnet`,
-/// including routes that consider `subnet` on-link for some device and
-/// routes that require packets destined to a node within `subnet` to be
-/// routed through some next-hop node.
-// TODO(https://fxbug.dev/126729): Unify this with other route removal methods.
-pub(crate) fn del_subnet_route<
+/// While doing a full `set` of the routing table with each modification is
+/// suboptimal for performance, it simplifies the API exposed by core for route
+/// table modifications to allow for evolution of the routing table in the
+/// future.
+///
+/// Rather than passing a list of routing table Entries, callers pass a closure
+/// that produces such a list, given a closure that allows upgrading a
+/// `AddableEntry` holding a `WeakDeviceId` to an `Entry` holding a strong
+/// `DeviceId`.
+// TODO(https://fxbug.dev/132990): Once we can await device teardown, we can
+// hold strong DeviceIds instead and get rid of this complicated closure.
+pub(crate) fn set_routes<
     I: IpLayerIpExt,
     C: IpLayerNonSyncContext<I, SC::DeviceId>,
     SC: IpStateContext<I, C>,
+    T,
 >(
     sync_ctx: &mut SC,
-    ctx: &mut C,
-    del_subnet: Subnet<I::Addr>,
-) -> Result<(), NotFoundError> {
-    debug!("deleting routes to subnet: {del_subnet}");
-    del_entries(sync_ctx, ctx, |Entry { subnet, device: _, gateway: _, metric: _ }| {
-        subnet == &del_subnet
+    _ctx: &mut C,
+    entries: impl FnOnce(
+        EntryUpgrader<'_, I::Addr, SC::DeviceId, SC::WeakDeviceId>,
+    ) -> (Vec<EntryAndGeneration<I::Addr, SC::DeviceId>>, T),
+) -> T
+where
+    SC::DeviceId: Ord,
+{
+    sync_ctx.with_ip_routing_table_mut(|sync_ctx, table| {
+        let (mut entries, result) =
+            entries(EntryUpgrader(&mut |AddableEntryAndGeneration {
+                                            entry: AddableEntry { subnet, device, gateway, metric },
+                                            generation,
+                                        }| {
+                let device = match sync_ctx.upgrade_weak_device_id(&device) {
+                    None => {
+                        tracing::warn!(
+                            "tried to set entry {subnet:?} {device:?} {gateway:?} {metric:?} \
+                             for no-longer-existent device"
+                        );
+                        None
+                    }
+                    Some(d) => Some(d),
+                }?;
+                let metric = observe_metric(sync_ctx, &device, metric);
+                Some(EntryAndGeneration {
+                    entry: Entry { subnet, device, gateway, metric },
+                    generation,
+                })
+            }));
+        // Sorting unstably is OK here because there's no meaningful preexisting
+        // order to preserve -- the table is being fully overwritten.
+        entries.sort_unstable_by(|a, b| {
+            OrderedEntry::<'_, _, _>::from(a).cmp(&OrderedEntry::<'_, _, _>::from(b))
+        });
+        table.table = entries;
+        result
     })
+}
+
+pub(crate) fn request_context_add_route<
+    I: IpLayerIpExt,
+    DeviceId,
+    C: IpLayerNonSyncContext<I, DeviceId>,
+>(
+    ctx: &mut C,
+    entry: AddableEntry<I::Addr, DeviceId>,
+) {
+    ctx.on_event(IpLayerEvent::AddRoute(entry))
 }
 
 /// Delete all routes on a device.
-///
-/// Unlike ['del_subnet_routes'], this function always succeeds, even if
-/// there are no device routes.
-// TODO(https://fxbug.dev/126729): Unify this with other route removal methods.
+// TODO(https://fxbug.dev/132990): Once we can await device teardown, we can
+// hold strong DeviceIds instead and get rid of this.
 pub(crate) fn del_device_routes<
     I: IpLayerIpExt,
     SC: IpStateContext<I, C>,
@@ -177,32 +169,27 @@ pub(crate) fn del_device_routes<
     del_device: &SC::DeviceId,
 ) {
     debug!("deleting routes on device: {del_device:?}");
-    let _: Result<(), NotFoundError> =
-        del_entries(sync_ctx, ctx, |Entry { subnet: _, device, gateway: _, metric: _ }| {
-            device == del_device
-        });
+
+    let removed = sync_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
+        table.del_entries(|Entry { subnet: _, device, gateway: _, metric: _ }| device == del_device)
+    });
+    ctx.on_event(IpLayerEvent::DeviceRemoved(del_device.clone(), removed));
 }
 
-/// Deletes all routes matching the provided specifiers exactly.
-///
-/// Returns all the deleted routes, or an error if no routes were deleted.
-// TODO(https://fxbug.dev/126729): Unify this with other route removal methods.
-pub(super) fn del_specific_routes<
+pub(crate) fn request_context_del_routes<
     I: IpLayerIpExt,
-    C: IpLayerNonSyncContext<I, SC::DeviceId>,
-    SC: IpStateContext<I, C>,
+    DeviceId,
+    C: IpLayerNonSyncContext<I, DeviceId>,
 >(
-    sync_ctx: &mut SC,
     ctx: &mut C,
     del_subnet: Subnet<I::Addr>,
-    del_device: &SC::DeviceId,
+    del_device: DeviceId,
     del_gateway: Option<SpecifiedAddr<I::Addr>>,
-) -> Result<(), NotFoundError> {
-    debug!(
-        "deleting routes with subnet={del_subnet} device={del_device:?} gateway={del_gateway:?}",
-    );
-    del_entries(sync_ctx, ctx, |Entry { subnet, device, gateway, metric: _ }| {
-        device == del_device && subnet == &del_subnet && gateway == &del_gateway
+) {
+    ctx.on_event(IpLayerEvent::RemoveRoutes {
+        subnet: del_subnet,
+        device: del_device,
+        gateway: del_gateway,
     })
 }
 
@@ -274,7 +261,7 @@ pub struct ForwardingTable<I: Ip, D> {
     /// Preference is determined first by longest prefix, then by lowest metric,
     /// then by locality (prefer on-link routes over off-link routes), and
     /// finally by the entry's tenure in the table.
-    table: Vec<Entry<I::Addr, D>>,
+    table: Vec<EntryAndGeneration<I::Addr, D>>,
 }
 
 impl<I: Ip, D> Default for ForwardingTable<I, D> {
@@ -283,14 +270,74 @@ impl<I: Ip, D> Default for ForwardingTable<I, D> {
     }
 }
 
+// `OrderedLocality` provides an implementation of
+// `core::cmp::PartialOrd` for a routes "locality". Define an enum, so
+// that `OnLink` routes are sorted before `OffLink` routes. See
+// https://doc.rust-lang.org/std/cmp/trait.PartialOrd.html#derivable
+// for more details.
+#[derive(PartialEq, PartialOrd, Eq, Ord)]
+enum OrderedLocality {
+    // The route does not have a gateway.
+    OnLink,
+    // The route does have a gateway.
+    OffLink,
+}
+
+// `OrderedRoute` provides an implementation of `std::cmp::PartialOrd`
+// for routes. Note that the fields are consulted in the order they are
+// declared. For more details, see
+// https://doc.rust-lang.org/std/cmp/trait.PartialOrd.html#derivable.
+#[derive(PartialEq, PartialOrd, Eq, Ord)]
+struct OrderedEntry<'a, A: net_types::ip::IpAddress, D> {
+    // Order longer prefixes before shorter prefixes.
+    prefix_len: core::cmp::Reverse<u8>,
+    // Order lower metrics before larger metrics.
+    metric: u32,
+    // Order `OnLink` routes before `OffLink` routes.
+    locality: OrderedLocality,
+    // Earlier-added routes should come before later ones.
+    generation: Generation,
+    // To provide a consistent ordering, tiebreak using the remaining fields
+    // of the entry.
+    subnet_addr: A,
+    device: &'a D,
+    // Note that while this appears to duplicate the ordering provided by
+    // `locality`, it's important that we sort above on presence of the gateway
+    // and not on the actual address of the gateway. The latter is only used
+    // for tiebreaking at the end to provide a total order. Duplicating it this
+    // way allows us to avoid writing a manual `PartialOrd` impl.
+    gateway: Option<SpecifiedAddr<A>>,
+}
+
+impl<'a, A: net_types::ip::IpAddress, D> From<&'a EntryAndGeneration<A, D>>
+    for OrderedEntry<'a, A, D>
+{
+    fn from(entry: &'a EntryAndGeneration<A, D>) -> OrderedEntry<'a, A, D> {
+        let EntryAndGeneration { entry: Entry { subnet, device, gateway, metric }, generation } =
+            entry;
+        OrderedEntry {
+            prefix_len: core::cmp::Reverse(subnet.prefix()),
+            metric: metric.value().into(),
+            locality: gateway.map_or(OrderedLocality::OnLink, |_gateway| OrderedLocality::OffLink),
+            generation: *generation,
+            subnet_addr: subnet.network(),
+            device: &device,
+            gateway: *gateway,
+        }
+    }
+}
+
 impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
     /// Adds `entry` to the forwarding table if it does not already exist.
     ///
     /// On success, a reference to the inserted entry is returned.
-    fn add_entry(
+    pub fn add_entry(
         &mut self,
-        entry: Entry<I::Addr, D>,
-    ) -> Result<&Entry<I::Addr, D>, crate::error::ExistsError> {
+        entry: EntryAndGeneration<I::Addr, D>,
+    ) -> Result<&EntryAndGeneration<I::Addr, D>, crate::error::ExistsError>
+    where
+        D: PartialOrd,
+    {
         debug!("adding route: {}", entry);
         let Self { table } = self;
 
@@ -299,44 +346,7 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
             return Err(crate::error::ExistsError);
         }
 
-        // `OrderedLocality` provides an implementation of
-        // `core::cmp::PartialOrd` for a routes "locality". Define an enum, so
-        // that `OnLink` routes are sorted before `OffLink` routes. See
-        // https://doc.rust-lang.org/std/cmp/trait.PartialOrd.html#derivable
-        // for more details.
-        #[derive(PartialEq, PartialOrd)]
-        enum OrderedLocality {
-            // The route does not have a gateway.
-            OnLink,
-            // The route does have a gateway.
-            OffLink,
-        }
-        // `OrderedRoute` provides an implementation of `std::cmp::PartialOrd`
-        // for routes. Note that the fields are consulted in the order they are
-        // declared. For more details, see
-        // https://doc.rust-lang.org/std/cmp/trait.PartialOrd.html#derivable.
-        #[derive(PartialEq, PartialOrd)]
-        struct OrderedEntry {
-            // Order longer prefixes before shorter prefixes.
-            prefix_len: core::cmp::Reverse<u8>,
-            // Order lower metrics before larger metrics.
-            metric: u32,
-            // Order `OnLink` routes before `OffLink` routes.
-            locality: OrderedLocality,
-        }
-        impl<A: net_types::ip::IpAddress, D> From<&Entry<A, D>> for OrderedEntry {
-            fn from(entry: &Entry<A, D>) -> OrderedEntry {
-                let Entry { subnet, device: _, gateway, metric } = entry;
-                OrderedEntry {
-                    prefix_len: core::cmp::Reverse(subnet.prefix()),
-                    metric: metric.value().into(),
-                    locality: gateway
-                        .map_or(OrderedLocality::OnLink, |_gateway| OrderedLocality::OffLink),
-                }
-            }
-        }
-
-        let ordered_entry: OrderedEntry = (&entry).into();
+        let ordered_entry: OrderedEntry<'_, _, _> = (&entry).into();
         // Note, compare with "greater than or equal to" here, to ensure
         // that existing entries are preferred over new entries.
         let index = table.partition_point(|entry| ordered_entry.ge(&entry.into()));
@@ -357,15 +367,16 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
         // drain_filter to avoid extra allocation.
         let Self { table } = self;
         let owned_table = core::mem::replace(table, Vec::new());
-        let (removed, owned_table) = owned_table.into_iter().partition(|entry| predicate(entry));
+        let (removed, owned_table) =
+            owned_table.into_iter().partition(|entry| predicate(&entry.entry));
         *table = owned_table;
-        removed
+        removed.into_iter().map(|entry| entry.entry).collect()
     }
 
     /// Get an iterator over all of the forwarding entries ([`Entry`]) this
     /// `ForwardingTable` knows about.
-    pub(crate) fn iter_table(&self) -> Iter<'_, Entry<I::Addr, D>> {
-        self.table.iter()
+    pub(crate) fn iter_table(&self) -> impl Iterator<Item = &Entry<I::Addr, D>> {
+        self.table.iter().map(|entry| &entry.entry)
     }
 
     /// Look up the forwarding entry for an address in the table.
@@ -402,7 +413,10 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
         let Self { table } = self;
         // Get all potential routes we could take to reach `address`.
         table.iter().filter_map(move |entry| {
-            let Entry { subnet, device, gateway, metric: _ } = entry;
+            let EntryAndGeneration {
+                entry: Entry { subnet, device, gateway, metric: _ },
+                generation: _,
+            } = entry;
             if !subnet.contains(&address) {
                 return None;
             }
@@ -426,8 +440,83 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
+    // This allows us to conveniently define testutils available only within
+    // tests in this crate, as well as testutils available for use by tests that
+    // build this crate with the testutils feature enabled. (Morally, all such
+    // tests are actually tests of this crate -- this is a quirk of the GN build
+    // system for the netstack3-core loom tests.)
+    #[cfg(test)]
+    pub(crate) use super::testutil_testonly::*;
+
+    use net_types::ip::Subnet;
+
+    use crate::ip::{
+        types::{Entry, EntryAndGeneration, Generation},
+        IpLayerIpExt, IpLayerNonSyncContext, IpStateContext,
+    };
+
+    use super::{observe_metric, AddRouteError};
+
+    /// Add a route directly to the forwarding table, instead of merely
+    /// dispatching an event requesting that the route be added.
+    pub(crate) fn add_route<
+        I: IpLayerIpExt,
+        C: IpLayerNonSyncContext<I, SC::DeviceId>,
+        SC: IpStateContext<I, C>,
+    >(
+        sync_ctx: &mut SC,
+        _ctx: &mut C,
+        entry: crate::ip::types::AddableEntry<I::Addr, SC::DeviceId>,
+    ) -> Result<(), AddRouteError>
+    where
+        SC::DeviceId: PartialOrd,
+    {
+        let crate::ip::types::AddableEntry { subnet, device, gateway, metric } = entry;
+        sync_ctx.with_ip_routing_table_mut(|sync_ctx, table| {
+            let metric = observe_metric(sync_ctx, &device, metric);
+            let _entry = table.add_entry(EntryAndGeneration {
+                entry: Entry { subnet, device, gateway, metric },
+                generation: Generation::initial(),
+            })?;
+            Ok(())
+        })
+    }
+
+    /// Delete all routes to a subnet, returning `Err` if no route was found to
+    /// be deleted.
+    ///
+    /// Note, `del_routes_to_subnet` will remove *all* routes to a
+    /// `subnet`, including routes that consider `subnet` on-link for some device
+    /// and routes that require packets destined to a node within `subnet` to be
+    /// routed through some next-hop node.
+    // TODO(https://fxbug.dev/126729): Unify this with other route removal methods.
+    pub(crate) fn del_routes_to_subnet<
+        I: IpLayerIpExt,
+        C: IpLayerNonSyncContext<I, SC::DeviceId>,
+        SC: IpStateContext<I, C>,
+    >(
+        sync_ctx: &mut SC,
+        _ctx: &mut C,
+        del_subnet: Subnet<I::Addr>,
+    ) -> Result<(), crate::error::NotFoundError> {
+        sync_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
+            let removed =
+                table.del_entries(|Entry { subnet, device: _, gateway: _, metric: _ }| {
+                    subnet == &del_subnet
+                });
+            if removed.is_empty() {
+                return Err(crate::error::NotFoundError);
+            } else {
+                Ok(())
+            }
+        })
+    }
+}
+
+#[cfg(test)]
+mod testutil_testonly {
     use alloc::collections::HashSet;
 
     use derivative::Derivative;
@@ -441,7 +530,7 @@ pub(crate) mod testutil {
     };
 
     /// Adds an on-link forwarding entry for the specified address and device.
-    pub(crate) fn add_on_link_forwarding_entry<A: IpAddress, D: Clone + Debug + PartialEq>(
+    pub(crate) fn add_on_link_forwarding_entry<A: IpAddress, D: Clone + Debug + PartialEq + Ord>(
         table: &mut ForwardingTable<A::Version, D>,
         ip: SpecifiedAddr<A>,
         device: D,
@@ -453,11 +542,13 @@ pub(crate) mod testutil {
     }
 
     // Provide tests with access to the private `ForwardingTable.add_entry` fn.
-    pub(crate) fn add_entry<I: Ip, D: Clone + Debug + PartialEq>(
+    pub(crate) fn add_entry<I: Ip, D: Clone + Debug + PartialEq + Ord>(
         table: &mut ForwardingTable<I, D>,
         entry: Entry<I::Addr, D>,
     ) -> Result<&Entry<I::Addr, D>, crate::error::ExistsError> {
-        table.add_entry(entry)
+        table
+            .add_entry(EntryAndGeneration { entry, generation: Generation::initial() })
+            .map(|entry| &entry.entry)
     }
 
     #[derive(Derivative)]
@@ -641,27 +732,33 @@ mod tests {
 
         // Should add the route successfully.
         let entry = Entry { subnet, device: device.clone(), gateway: None, metric };
-        assert_eq!(table.add_entry(entry.clone()), Ok(&entry));
+        assert_eq!(super::testutil::add_entry(&mut table, entry.clone()), Ok(&entry));
         assert_eq!(table.iter_table().collect::<Vec<_>>(), &[&entry]);
 
         // Attempting to add the route again should fail.
-        assert_eq!(table.add_entry(entry.clone()).unwrap_err(), crate::error::ExistsError);
+        assert_eq!(
+            super::testutil::add_entry(&mut table, entry.clone()).unwrap_err(),
+            crate::error::ExistsError
+        );
         assert_eq!(table.iter_table().collect::<Vec<_>>(), &[&entry]);
 
         // Add the route but as a next hop route.
         let entry2 =
             Entry { subnet: next_hop_subnet, device: device.clone(), gateway: None, metric };
-        assert_eq!(table.add_entry(entry2.clone()), Ok(&entry2));
+        assert_eq!(super::testutil::add_entry(&mut table, entry2.clone()), Ok(&entry2));
         let entry3 =
             Entry { subnet: subnet, device: device.clone(), gateway: Some(next_hop), metric };
-        assert_eq!(table.add_entry(entry3.clone()), Ok(&entry3));
+        assert_eq!(super::testutil::add_entry(&mut table, entry3.clone()), Ok(&entry3));
         assert_eq!(
             table.iter_table().collect::<HashSet<_>>(),
             HashSet::from([&entry, &entry2, &entry3])
         );
 
         // Attempting to add the route again should fail.
-        assert_eq!(table.add_entry(entry3.clone()).unwrap_err(), crate::error::ExistsError);
+        assert_eq!(
+            super::testutil::add_entry(&mut table, entry3.clone()).unwrap_err(),
+            crate::error::ExistsError
+        );
         assert_eq!(
             table.iter_table().collect::<HashSet<_>>(),
             HashSet::from([&entry, &entry2, &entry3,])
@@ -678,9 +775,9 @@ mod tests {
         // Delete all routes to subnet.
         assert_eq!(
             table
-                .del_entries(
-                    |Entry { subnet, device: _, gateway: _, metric: _ }| subnet == &config.subnet
-                )
+                .del_entries(|Entry { subnet, device: _, gateway: _, metric: _ }| {
+                    subnet == &config.subnet
+                })
                 .into_iter()
                 .collect::<HashSet<_>>(),
             HashSet::from([
@@ -689,7 +786,7 @@ mod tests {
                     subnet: config.subnet,
                     device: device.clone(),
                     gateway: Some(next_hop),
-                    metric
+                    metric,
                 }
             ])
         );
@@ -725,9 +822,9 @@ mod tests {
         // to destinations in the subnet.
         assert_eq!(
             table
-                .del_entries(
-                    |Entry { subnet, device: _, gateway: _, metric: _ }| subnet == &config.subnet
-                )
+                .del_entries(|Entry { subnet, device: _, gateway: _, metric: _ }| {
+                    subnet == &config.subnet
+                })
                 .into_iter()
                 .collect::<HashSet<_>>(),
             HashSet::from([
@@ -736,7 +833,7 @@ mod tests {
                     subnet: config.subnet,
                     device: device.clone(),
                     gateway: Some(next_hop),
-                    metric
+                    metric,
                 }
             ])
         );
@@ -754,7 +851,10 @@ mod tests {
             gateway: Some(next_hop),
             metric: Metric::ExplicitMetric(RawMetric(0)),
         };
-        assert_eq!(table.add_entry(gateway_entry.clone()), Ok(&gateway_entry));
+        assert_eq!(
+            super::testutil::add_entry(&mut table, gateway_entry.clone()),
+            Ok(&gateway_entry)
+        );
         assert_eq!(
             table.lookup(&mut sync_ctx, None, *next_hop),
             Some(Destination { next_hop: NextHop::RemoteAsNeighbor, device: device.clone() })
@@ -786,7 +886,7 @@ mod tests {
         //  sub1 -> device0
 
         let entry = Entry { subnet: sub1, device: device0.clone(), gateway: None, metric };
-        assert_eq!(table.add_entry(entry.clone()), Ok(&entry));
+        assert_eq!(super::testutil::add_entry(&mut table, entry.clone()), Ok(&entry));
         table.print_table();
         assert_eq!(
             table.lookup(&mut sync_ctx, None, *addr1).unwrap(),
@@ -804,7 +904,10 @@ mod tests {
         let default_entry =
             Entry { subnet: default_sub, device: device0.clone(), gateway: Some(addr1), metric };
 
-        assert_eq!(table.add_entry(default_entry.clone()), Ok(&default_entry));
+        assert_eq!(
+            super::testutil::add_entry(&mut table, default_entry.clone()),
+            Ok(&default_entry)
+        );
         assert_eq!(
             table.lookup(&mut sync_ctx, None, *addr1).unwrap(),
             Destination { next_hop: NextHop::RemoteAsNeighbor, device: device0.clone() }
@@ -843,7 +946,10 @@ mod tests {
             gateway: None,
             metric,
         };
-        assert_eq!(table.add_entry(less_specific_entry.clone()), Ok(&less_specific_entry));
+        assert_eq!(
+            super::testutil::add_entry(&mut table, less_specific_entry.clone()),
+            Ok(&less_specific_entry)
+        );
         assert_eq!(
             table.lookup(&mut sync_ctx, None, *remote),
             Some(Destination {
@@ -872,7 +978,10 @@ mod tests {
             gateway: None,
             metric,
         };
-        assert_eq!(table.add_entry(more_specific_entry.clone()), Ok(&more_specific_entry));
+        assert_eq!(
+            super::testutil::add_entry(&mut table, more_specific_entry.clone()),
+            Ok(&more_specific_entry)
+        );
         assert_eq!(
             table.lookup(&mut sync_ctx, None, *remote).unwrap(),
             Destination {
@@ -920,7 +1029,8 @@ mod tests {
                 gateway: None,
                 metric,
             };
-            let _: &_ = table.add_entry(more_specific_entry).expect("was added");
+            let _: &_ =
+                super::testutil::add_entry(&mut table, more_specific_entry).expect("was added");
         }
         // B and C have the same route but with different metrics.
         for (device, metric) in [(MultipleDevicesId::B, 100), (MultipleDevicesId::C, 200)] {
@@ -930,7 +1040,8 @@ mod tests {
                 gateway: None,
                 metric: Metric::ExplicitMetric(RawMetric(metric)),
             };
-            let _: &_ = table.add_entry(less_specific_entry).expect("was added");
+            let _: &_ =
+                super::testutil::add_entry(&mut table, less_specific_entry).expect("was added");
         }
 
         fn lookup_with_devices<I: Ip>(
@@ -998,9 +1109,9 @@ mod tests {
         let metric = Metric::ExplicitMetric(RawMetric(0));
 
         let entry1 = Entry { subnet: sub, device: DEVICE1.clone(), gateway: None, metric };
-        assert_eq!(table.add_entry(entry1.clone()), Ok(&entry1));
+        assert_eq!(super::testutil::add_entry(&mut table, entry1.clone()), Ok(&entry1));
         let entry2 = Entry { subnet: sub, device: DEVICE2.clone(), gateway: None, metric };
-        assert_eq!(table.add_entry(entry2.clone()), Ok(&entry2));
+        assert_eq!(super::testutil::add_entry(&mut table, entry2.clone()), Ok(&entry2));
         let lookup = table.lookup(&mut sync_ctx, None, *remote);
         assert!(
             [
@@ -1058,7 +1169,10 @@ mod tests {
             gateway: None,
             metric,
         };
-        assert_eq!(table.add_entry(less_specific_entry.clone()), Ok(&less_specific_entry));
+        assert_eq!(
+            super::testutil::add_entry(&mut table, less_specific_entry.clone()),
+            Ok(&less_specific_entry)
+        );
         for (device_unusable, expected) in [
             // If the device is unusable, then we cannot use routes through it.
             (true, None),
@@ -1085,7 +1199,10 @@ mod tests {
             gateway: None,
             metric,
         };
-        assert_eq!(table.add_entry(more_specific_entry.clone()), Ok(&more_specific_entry));
+        assert_eq!(
+            super::testutil::add_entry(&mut table, more_specific_entry.clone()),
+            Ok(&more_specific_entry)
+        );
         for (device_unusable, expected) in [
             (
                 false,
@@ -1185,7 +1302,7 @@ mod tests {
         for insertion_order in device_a_routes.iter().permutations(device_a_routes.len()) {
             let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
             for entry in insertion_order.into_iter().chain(device_b_routes.iter()) {
-                assert_eq!(table.add_entry(entry.clone()), Ok(entry));
+                assert_eq!(super::testutil::add_entry(&mut table, entry.clone()), Ok(entry));
             }
             assert_eq!(table.iter_table().cloned().collect::<Vec<_>>(), expected_table);
         }

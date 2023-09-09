@@ -48,7 +48,10 @@ use core::{fmt::Debug, time};
 use derivative::Derivative;
 use lock_order::Locked;
 use net_types::{
-    ip::{AddrSubnetEither, IpAddr, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, SubnetEither},
+    ip::{
+        AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
+        Subnet,
+    },
     SpecifiedAddr,
 };
 use packet::{Buf, BufferMut, EmptyBuf};
@@ -58,7 +61,9 @@ use crate::{
     context::{
         CounterContext, EventContext, InstantContext, RngContext, TimerContext, TracingContext,
     },
-    device::{ethernet::EthernetLinkDevice, DeviceId, DeviceLayerState, DeviceLayerTimerId},
+    device::{
+        ethernet::EthernetLinkDevice, DeviceId, DeviceLayerState, DeviceLayerTimerId, WeakDeviceId,
+    },
     ip::{
         device::{
             state::AddrSubnetAndManualConfigEither, DualStackDeviceHandler, Ipv4DeviceTimerId,
@@ -488,37 +493,81 @@ pub fn select_device_for_gateway<NonSyncCtx: NonSyncContext>(
     )
 }
 
-/// Adds a route to the forwarding table.
-pub fn add_route<NonSyncCtx: NonSyncContext>(
+/// Set the routes in the routing table.
+///
+/// While doing a full `set` of the routing table with each modification is
+/// suboptimal for performance, it simplifies the API exposed by core for route
+/// table modifications to allow for evolution of the routing table in the
+/// future.
+///
+/// Rather than passing a list of routing table Entries, callers pass a closure
+/// that produces such a list, given a closure that allows upgrading a
+/// `AddableEntry` holding a `WeakDeviceId` to an `Entry` holding a strong
+/// `DeviceId`.
+// TODO(https://fxbug.dev/132990): Once we can await device teardown, we can
+// hold strong DeviceIds instead and get rid of this complicated closure.
+pub fn set_routes<I: Ip, T, NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
+    entries: &mut dyn FnMut(
+        ip::types::EntryUpgrader<'_, I::Addr, DeviceId<NonSyncCtx>, WeakDeviceId<NonSyncCtx>>,
+    ) -> (
+        Vec<ip::types::EntryAndGeneration<I::Addr, DeviceId<NonSyncCtx>>>,
+        T,
+    ),
+) -> T {
+    #[derive(GenericOverIp)]
+    struct Wrap<'a, I: Ip, NonSyncCtx: NonSyncContext, T>(
+        &'a mut dyn FnMut(
+            ip::types::EntryUpgrader<'_, I::Addr, DeviceId<NonSyncCtx>, WeakDeviceId<NonSyncCtx>>,
+        ) -> (
+            Vec<ip::types::EntryAndGeneration<I::Addr, DeviceId<NonSyncCtx>>>,
+            T,
+        ),
+    );
+
+    let IpInvariant(t) = I::map_ip(
+        (IpInvariant((sync_ctx, ctx)), Wrap(entries)),
+        |(IpInvariant((sync_ctx, ctx)), Wrap(entries))| {
+            let mut sync_ctx = Locked::new(sync_ctx);
+            IpInvariant(ip::forwarding::set_routes::<Ipv4, _, _, _>(&mut sync_ctx, ctx, entries))
+        },
+        |(IpInvariant((sync_ctx, ctx)), Wrap(entries))| {
+            let mut sync_ctx = Locked::new(sync_ctx);
+            IpInvariant(ip::forwarding::set_routes::<Ipv6, _, _, _>(&mut sync_ctx, ctx, entries))
+        },
+    );
+    t
+}
+
+/// Requests that a route be added to the forwarding table.
+pub(crate) fn request_context_add_route<NonSyncCtx: NonSyncContext>(
+    ctx: &mut NonSyncCtx,
     entry: ip::types::AddableEntryEither<DeviceId<NonSyncCtx>>,
-) -> Result<(), ip::forwarding::AddRouteError> {
-    let mut sync_ctx = Locked::new(sync_ctx);
+) {
     match entry {
         ip::types::AddableEntryEither::V4(entry) => {
-            ip::forwarding::add_route::<Ipv4, _, _>(&mut sync_ctx, ctx, entry)
+            ip::forwarding::request_context_add_route::<Ipv4, _, _>(ctx, entry)
         }
         ip::types::AddableEntryEither::V6(entry) => {
-            ip::forwarding::add_route::<Ipv6, _, _>(&mut sync_ctx, ctx, entry)
+            ip::forwarding::request_context_add_route::<Ipv6, _, _>(ctx, entry)
         }
     }
 }
 
-/// Delete a route from the forwarding table, returning `Err` if no
-/// route was found to be deleted.
-pub fn del_route<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
+/// Requests that routes matching these specifiers be removed from the forwarding table.
+pub(crate) fn request_context_del_routes_v6<NonSyncCtx: NonSyncContext>(
     ctx: &mut NonSyncCtx,
-    subnet: SubnetEither,
-) -> error::Result<()> {
-    let mut sync_ctx = Locked::new(sync_ctx);
-    map_addr_version!(
-        subnet: SubnetEither;
-        crate::ip::forwarding::del_subnet_route::<Ipv4, _, _>(&mut sync_ctx, ctx, subnet),
-        crate::ip::forwarding::del_subnet_route::<Ipv6, _, _>(&mut sync_ctx, ctx, subnet)
+    subnet: Subnet<Ipv6Addr>,
+    del_device: &DeviceId<NonSyncCtx>,
+    del_gateway: Option<SpecifiedAddr<Ipv6Addr>>,
+) {
+    crate::ip::forwarding::request_context_del_routes::<Ipv6, _, _>(
+        ctx,
+        subnet,
+        del_device.clone(),
+        del_gateway,
     )
-    .map_err(From::from)
 }
 
 /// A common type returned by functions that perform bounded amounts of work.
@@ -661,7 +710,6 @@ mod tests {
     }
 
     struct AddGatewayRouteTestCase {
-        should_specify_device: bool,
         enable_before_final_route_add: bool,
         expected_first_result: Result<(), AddRouteError>,
         expected_second_result: Result<(), AddRouteError>,
@@ -669,32 +717,17 @@ mod tests {
 
     #[ip_test]
     #[test_case(AddGatewayRouteTestCase {
-        should_specify_device: false,
-        enable_before_final_route_add: false,
-        expected_first_result: Err(AddRouteError::GatewayNotNeighbor),
-        expected_second_result: Err(AddRouteError::GatewayNotNeighbor),
-    }; "without_specified_device_no_enable")]
-    #[test_case(AddGatewayRouteTestCase {
-        should_specify_device: true,
         enable_before_final_route_add: false,
         expected_first_result: Ok(()),
         expected_second_result: Ok(()),
     }; "with_specified_device_no_enable")]
     #[test_case(AddGatewayRouteTestCase {
-        should_specify_device: false,
-        enable_before_final_route_add: true,
-        expected_first_result: Err(AddRouteError::GatewayNotNeighbor),
-        expected_second_result: Ok(()),
-    }; "without_specified_device_enabled")]
-    #[test_case(AddGatewayRouteTestCase {
-        should_specify_device: true,
         enable_before_final_route_add: true,
         expected_first_result: Ok(()),
         expected_second_result: Ok(()),
     }; "with_specified_device_enabled")]
     fn add_gateway_route<I: Ip + TestIpExt>(test_case: AddGatewayRouteTestCase) {
         let AddGatewayRouteTestCase {
-            should_specify_device,
             enable_before_final_route_add,
             expected_first_result,
             expected_second_result,
@@ -716,12 +749,12 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         )
         .into();
-        let gateway_device = should_specify_device.then_some(device_id.clone());
+        let gateway_device = device_id.clone();
 
         // Attempt to add the gateway route when there is no known route to the
         // gateway.
         assert_eq!(
-            crate::add_route(
+            crate::testutil::add_route(
                 &sync_ctx,
                 &mut non_sync_ctx,
                 AddableEntryEither::from(AddableEntry::with_gateway(
@@ -735,13 +768,17 @@ mod tests {
         );
 
         assert_eq!(
-            crate::del_route(&sync_ctx, &mut non_sync_ctx, gateway_subnet.into()),
+            crate::testutil::del_routes_to_subnet(
+                &sync_ctx,
+                &mut non_sync_ctx,
+                gateway_subnet.into()
+            ),
             expected_first_result.map_err(|_: AddRouteError| error::NetstackError::NotFound),
         );
 
         // Then, add a route to the gateway, and try again, expecting success.
         assert_eq!(
-            crate::add_route(
+            crate::testutil::add_route(
                 &sync_ctx,
                 &mut non_sync_ctx,
                 AddableEntryEither::from(AddableEntry::without_gateway(
@@ -757,7 +794,7 @@ mod tests {
             crate::device::testutil::enable_device(&sync_ctx, &mut non_sync_ctx, &device_id);
         }
         assert_eq!(
-            crate::add_route(
+            crate::testutil::add_route(
                 &sync_ctx,
                 &mut non_sync_ctx,
                 AddableEntryEither::from(AddableEntry::with_gateway(
@@ -820,13 +857,13 @@ mod tests {
         } else {
             AddableEntryEither::from(AddableEntry::with_gateway(
                 I::FAKE_CONFIG.subnet,
-                Some(device_id.clone()),
+                device_id.clone(),
                 I::FAKE_CONFIG.remote_ip,
                 AddableMetric::ExplicitMetric(RawMetric(0)),
             ))
         };
 
-        assert_eq!(crate::add_route(&sync_ctx, &mut non_sync_ctx, route_to_add), Ok(()));
+        assert_eq!(crate::testutil::add_route(&sync_ctx, &mut non_sync_ctx, route_to_add), Ok(()));
 
         // It still won't resolve successfully because the device is not enabled yet.
         assert_eq!(crate::select_device_for_gateway(&sync_ctx, gateway), None);
@@ -855,7 +892,7 @@ mod tests {
             metric,
         );
         assert_eq!(
-            crate::add_route(
+            crate::testutil::add_route(
                 &sync_ctx,
                 &mut non_sync_ctx,
                 AddableEntryEither::from(AddableEntry::without_gateway(

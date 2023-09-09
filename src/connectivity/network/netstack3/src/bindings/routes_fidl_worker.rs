@@ -520,7 +520,7 @@ mod tests {
     }
 
     // Tests that `RouteUpdateDispatcher` returns an error when it receives a
-    // `RemoveRoute` update for a non-existent route.
+    // `RouteRemoved` update for a non-existent route.
     #[ip_test]
     fn dispatcher_fails_to_remove_non_existent<I: Ip>() {
         let route = arbitrary_route_on_interface::<I>(1);

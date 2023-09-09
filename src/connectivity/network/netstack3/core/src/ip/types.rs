@@ -47,36 +47,37 @@ pub enum AddableMetric {
     ExplicitMetric(RawMetric),
 }
 
+impl From<Metric> for AddableMetric {
+    fn from(metric: Metric) -> AddableMetric {
+        match metric {
+            Metric::MetricTracksInterface(_) => AddableMetric::MetricTracksInterface,
+            Metric::ExplicitMetric(metric) => AddableMetric::ExplicitMetric(metric),
+        }
+    }
+}
+
 /// `AddableEntry` is a routing entry that may be used to add a new entry to the
 /// forwarding table.
 ///
 /// See [`Entry`] for the type used to represent a route in the forwarding
 /// table.
-///
-/// `AddableEntry` guarantees that at least one of the egress device or
-/// gateway is set.
 #[derive(Debug, Copy, Clone, Eq, GenericOverIp, PartialEq, Hash)]
 pub struct AddableEntry<A: IpAddress, D> {
-    subnet: Subnet<A>,
-    device: Option<D>,
-    gateway: Option<SpecifiedAddr<A>>,
-    metric: AddableMetric,
-}
-
-// A mirror image of `AddableEntry` whose fields are public, allowing the entry
-// to be decomposed into its constituent parts.
-pub(super) struct DecomposedAddableEntry<A: IpAddress, D> {
-    pub(super) subnet: Subnet<A>,
-    pub(super) device: Option<D>,
-    pub(super) gateway: Option<SpecifiedAddr<A>>,
-    pub(super) metric: AddableMetric,
+    /// The destination subnet.
+    pub subnet: Subnet<A>,
+    /// The outgoing interface.
+    pub device: D,
+    /// Next hop.
+    pub gateway: Option<SpecifiedAddr<A>>,
+    /// Route metric.
+    pub metric: AddableMetric,
 }
 
 impl<D, A: IpAddress> AddableEntry<A, D> {
     /// Creates a new [`AddableEntry`] with a specified gateway.
     pub fn with_gateway(
         subnet: Subnet<A>,
-        device: Option<D>,
+        device: D,
         gateway: SpecifiedAddr<A>,
         metric: AddableMetric,
     ) -> Self {
@@ -85,13 +86,32 @@ impl<D, A: IpAddress> AddableEntry<A, D> {
 
     /// Creates a new [`AddableEntry`] with a specified device.
     pub fn without_gateway(subnet: Subnet<A>, device: D, metric: AddableMetric) -> Self {
-        Self { subnet, device: Some(device), gateway: None, metric }
+        Self { subnet, device, gateway: None, metric }
     }
 
-    /// Convert the [`AddableEntry`] into a [`DecomposedAddableEntry`].
-    pub(super) fn decompose(self) -> DecomposedAddableEntry<A, D> {
-        let AddableEntry { subnet, device, gateway, metric } = self;
-        DecomposedAddableEntry { subnet, device, gateway, metric }
+    /// Converts the `AddableEntry` to an `Entry`.
+    pub fn resolve_metric(self, device_metric: RawMetric) -> Entry<A, D> {
+        let Self { subnet, device, gateway, metric } = self;
+        let metric = match metric {
+            AddableMetric::MetricTracksInterface => Metric::MetricTracksInterface(device_metric),
+            AddableMetric::ExplicitMetric(metric) => Metric::ExplicitMetric(metric),
+        };
+        Entry { subnet, device, gateway, metric }
+    }
+
+    /// Maps the device ID held by this `AddableEntry`.
+    pub fn map_device_id<D2>(self, f: impl FnOnce(D) -> D2) -> AddableEntry<A, D2> {
+        AddableEntry {
+            subnet: self.subnet,
+            device: f(self.device),
+            gateway: self.gateway,
+            metric: self.metric,
+        }
+    }
+
+    /// Sets the generation on an entry.
+    pub fn with_generation(self, generation: Generation) -> AddableEntryAndGeneration<A, D> {
+        AddableEntryAndGeneration { entry: self, generation }
     }
 }
 
@@ -122,6 +142,37 @@ impl<A: IpAddress, D> From<AddableEntry<A, D>> for AddableEntryEither<D> {
     fn from(entry: AddableEntry<A, D>) -> AddableEntryEither<D> {
         A::Version::map_ip(entry, AddableEntryEither::V4, AddableEntryEither::V6)
     }
+}
+
+/// A routing table entry together with the generation it was created in.
+#[derive(Debug, Copy, Clone, GenericOverIp)]
+pub struct AddableEntryAndGeneration<A: IpAddress, D> {
+    /// The entry.
+    pub entry: AddableEntry<A, D>,
+    /// The generation in which it was created.
+    pub generation: Generation,
+}
+
+/// Wraps a callback to upgrade a "stored" entry to a "live" entry.
+#[derive(GenericOverIp)]
+pub struct EntryUpgrader<'a, A: IpAddress, DeviceId, WeakDeviceId>(
+    pub  &'a mut dyn FnMut(
+        AddableEntryAndGeneration<A, WeakDeviceId>,
+    ) -> Option<EntryAndGeneration<A, DeviceId>>,
+);
+
+impl<A: IpAddress, D> From<Entry<A, D>> for AddableEntry<A, D> {
+    fn from(Entry { subnet, device, gateway, metric }: Entry<A, D>) -> Self {
+        Self { subnet: subnet, device: device, gateway: gateway, metric: metric.into() }
+    }
+}
+
+/// An IPv4 addable entry or an IPv6 addable entry, with a generation.
+#[allow(missing_docs)]
+#[derive(Debug, Copy, Clone, GenericOverIp)]
+pub enum AddableEntryAndGenerationEither<D> {
+    V4(AddableEntryAndGeneration<Ipv4Addr, D>),
+    V6(AddableEntryAndGeneration<Ipv6Addr, D>),
 }
 
 /// The metric for an [`Entry`].
@@ -158,6 +209,51 @@ pub struct Entry<A: IpAddress, D> {
     pub gateway: Option<SpecifiedAddr<A>>,
     /// The metric of the entry.
     pub metric: Metric,
+}
+
+/// A forwarding entry with the generation it was created in.
+#[derive(Debug, Copy, Clone, GenericOverIp, PartialEq, Eq)]
+pub struct EntryAndGeneration<A: IpAddress, D> {
+    /// The entry.
+    pub entry: Entry<A, D>,
+    /// The generation.
+    pub generation: Generation,
+}
+
+impl<A: IpAddress, D: Debug> Display for EntryAndGeneration<A, D> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
+        let EntryAndGeneration { entry, generation: Generation(generation) } = self;
+        write!(f, "{} (generation = {})", entry, generation)
+    }
+}
+
+/// Used to compare routes for how early they were added to the table.
+///
+/// If two routes have the same prefix length and metric, and are both on-link
+/// or are both-off-link, then the route with the earlier generation will be
+/// preferred.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Generation(u64);
+
+impl Generation {
+    /// Returns the initial generation.
+    pub fn initial() -> Self {
+        Self(0)
+    }
+
+    /// Returns the next generation.
+    pub fn next(&self) -> Generation {
+        let Self(n) = self;
+        Generation(n + 1)
+    }
+}
+
+impl<A: IpAddress, D> Entry<A, D> {
+    /// Maps the device ID held by this `Entry`.
+    pub fn map_device_id<D2>(self, f: impl FnOnce(D) -> D2) -> Entry<A, D2> {
+        let Self { subnet, device, gateway, metric } = self;
+        Entry { subnet, device: f(device), gateway, metric }
+    }
 }
 
 impl<A: IpAddress, D: Debug> Display for Entry<A, D> {

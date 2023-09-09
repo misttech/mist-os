@@ -259,12 +259,12 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
         let (FakeCtx { sync_ctx, mut non_sync_ctx }, indexes_to_device_ids) = builder.build();
         let device = indexes_to_device_ids.into_iter().nth(dev_index).unwrap();
 
-        netstack3_core::add_route(
+        netstack3_core::testutil::add_route(
             &sync_ctx,
             &mut non_sync_ctx,
             AddableEntry::with_gateway(
                 I::DEVICE_GATEWAY,
-                Some(device.clone().into()),
+                device.clone().into(),
                 SpecifiedAddr::new(I::NEIGHBOR_ADDR).unwrap(),
                 AddableMetric::ExplicitMetric(RawMetric(0)),
             )
@@ -389,12 +389,12 @@ fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
         let (FakeCtx { sync_ctx, mut non_sync_ctx }, indexes_to_device_ids) = builder.build();
         let device = indexes_to_device_ids.into_iter().nth(dev_index).unwrap();
 
-        netstack3_core::add_route(
+        netstack3_core::testutil::add_route(
             &sync_ctx,
             &mut non_sync_ctx,
             AddableEntry::with_gateway(
                 I::DEVICE_GATEWAY,
-                Some(device.clone().into()),
+                device.clone().into(),
                 SpecifiedAddr::new(I::NEIGHBOR_ADDR).unwrap(),
                 AddableMetric::ExplicitMetric(RawMetric(0)),
             )

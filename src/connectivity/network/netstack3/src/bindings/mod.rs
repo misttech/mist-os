@@ -20,6 +20,7 @@ mod interfaces_watcher;
 mod neighbor_worker;
 mod netdevice_worker;
 mod root_fidl_worker;
+mod routes;
 mod routes_fidl_worker;
 mod socket;
 mod stack_fidl_worker;
@@ -40,7 +41,6 @@ use std::{
     time::Duration,
 };
 
-use either::{self, Either};
 use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream};
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fuchsia_async as fasync;
@@ -122,9 +122,10 @@ mod ctx {
     }
 
     impl Ctx {
-        fn new() -> Self {
-            let mut non_sync_ctx =
-                BindingsNonSyncCtxImpl(Arc::new(BindingsNonSyncCtxImplInner::new()));
+        fn new(routes_change_sink: crate::bindings::routes::ChangeSink) -> Self {
+            let mut non_sync_ctx = BindingsNonSyncCtxImpl(Arc::new(
+                BindingsNonSyncCtxImplInner::new(routes_change_sink),
+            ));
             let sync_ctx = Arc::new(SyncCtx::new(&mut non_sync_ctx));
             Self { non_sync_ctx, sync_ctx }
         }
@@ -185,19 +186,22 @@ mod ctx {
 
     /// Contains the information needed to start serving a network stack over FIDL.
     pub(crate) struct NetstackSeed {
-        pub(super) netstack: Netstack,
-        pub(super) interfaces_worker: interfaces_watcher::Worker,
-        pub(super) interfaces_watcher_sink: interfaces_watcher::WorkerWatcherSink,
+        pub(crate) netstack: Netstack,
+        pub(crate) interfaces_worker: interfaces_watcher::Worker,
+        pub(crate) interfaces_watcher_sink: interfaces_watcher::WorkerWatcherSink,
+        pub(crate) routes_change_runner: routes::ChangeRunner,
     }
 
     impl Default for NetstackSeed {
         fn default() -> Self {
             let (interfaces_worker, interfaces_watcher_sink, interfaces_event_sink) =
                 interfaces_watcher::Worker::new();
+            let (routes_change_sink, routes_change_runner) = routes::create_sink_and_runner();
             Self {
-                netstack: Netstack { ctx: Ctx::new(), interfaces_event_sink },
+                netstack: Netstack { ctx: Ctx::new(routes_change_sink), interfaces_event_sink },
                 interfaces_worker,
                 interfaces_watcher_sink,
+                routes_change_runner,
             }
         }
     }
@@ -205,9 +209,7 @@ mod ctx {
 
 pub(crate) use ctx::{BindingsNonSyncCtxImpl, Ctx, NetstackSeed};
 
-use crate::bindings::{
-    interfaces_watcher::AddressPropertiesUpdate, util::TryIntoFidlWithContext as _,
-};
+use crate::bindings::interfaces_watcher::AddressPropertiesUpdate;
 
 /// Extends the methods available to [`DeviceId`].
 trait DeviceIdExt {
@@ -273,16 +275,18 @@ pub(crate) struct BindingsNonSyncCtxImplInner {
     devices: Devices<DeviceId<BindingsNonSyncCtxImpl>>,
     udp_sockets: UdpSockets,
     route_update_dispatcher: CoreMutex<routes_fidl_worker::RouteUpdateDispatcher>,
+    routes: routes::ChangeSink,
 }
 
 impl BindingsNonSyncCtxImplInner {
-    pub(crate) fn new() -> Self {
+    fn new(routes_change_sink: routes::ChangeSink) -> Self {
         Self {
             rng: Default::default(),
             timers: Default::default(),
             devices: Default::default(),
             udp_sockets: Default::default(),
             route_update_dispatcher: Default::default(),
+            routes: routes_change_sink,
         }
     }
 }
@@ -616,38 +620,31 @@ impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<BindingsNonSy
         &mut self,
         event: netstack3_core::ip::IpLayerEvent<DeviceId<BindingsNonSyncCtxImpl>, I>,
     ) {
-        let (entry, is_route_present, route_update_fn) = match event {
-            netstack3_core::ip::IpLayerEvent::RouteAdded(entry) => {
-                (entry, true, Either::Left(routes_fidl_worker::RoutingTableUpdate::<I>::RouteAdded))
+        // Core dispatched a routes-change request but has no expectation of
+        // observing the result, so we just discard the result receiver.
+        match event {
+            netstack3_core::ip::IpLayerEvent::AddRoute(entry) => {
+                self.routes.fire_change_and_forget(routes::Change::Add(
+                    entry.map_device_id(|d| d.downgrade()),
+                ))
             }
-            netstack3_core::ip::IpLayerEvent::RouteRemoved(entry) => (
-                entry,
-                false,
-                Either::Right(routes_fidl_worker::RoutingTableUpdate::<I>::RouteRemoved),
-            ),
+            netstack3_core::ip::IpLayerEvent::RemoveRoutes { subnet, device, gateway } => {
+                self.routes.fire_change_and_forget(routes::Change::RemoveMatching {
+                    subnet,
+                    device: device.downgrade(),
+                    gateway,
+                })
+            }
+            netstack3_core::ip::IpLayerEvent::DeviceRemoved(device, routes_removed) => {
+                // TODO(https://fxbug.dev/132990): When we can properly wait for
+                // reference-y devices to be cleaned up, we can move this to
+                // bindings rather than needing to dispatch the event here.
+                crate::bindings::routes::notify_removed_routes::<I>(self, routes_removed);
+                self.routes.fire_change_and_forget(routes::Change::<I::Addr>::DeviceRemoved(
+                    device.downgrade(),
+                ))
+            }
         };
-
-        // Maybe publish the event to the interface watchers (which only care
-        // about changes to the default route).
-        let netstack3_core::ip::types::Entry { subnet, device, gateway: _, metric: _ } = &entry;
-        if subnet.prefix() == 0 {
-            self.notify_interface_update(
-                device,
-                InterfaceUpdate::DefaultRouteChanged {
-                    version: I::VERSION,
-                    has_default_route: is_route_present,
-                },
-            )
-        }
-
-        // Publish the event to the routes watchers.
-        let installed_route =
-            entry.try_into_fidl_with_ctx(self).expect("failed to convert route to FIDL");
-        let route_update = either::for_both!(route_update_fn, f => f(installed_route));
-        self.route_update_dispatcher
-            .lock()
-            .notify(route_update)
-            .expect("failed to notify route update dispatcher");
     }
 }
 
@@ -698,6 +695,23 @@ impl BindingsNonSyncCtxImpl {
             }
         })
     }
+
+    pub(crate) async fn apply_route_change<I: Ip>(
+        &self,
+        change: routes::Change<I::Addr>,
+    ) -> Result<(), routes::Error> {
+        self.routes.send_change(change).await
+    }
+
+    pub(crate) async fn apply_route_change_either(
+        &self,
+        change: routes::ChangeEither,
+    ) -> Result<(), routes::Error> {
+        match change {
+            routes::ChangeEither::V4(change) => self.apply_route_change::<Ipv4>(change).await,
+            routes::ChangeEither::V6(change) => self.apply_route_change::<Ipv6>(change).await,
+        }
+    }
 }
 
 fn add_loopback_ip_addrs<NonSyncCtx: NonSyncContext>(
@@ -722,45 +736,55 @@ fn add_loopback_ip_addrs<NonSyncCtx: NonSyncContext>(
 
 /// Adds the IPv4 and IPv6 Loopback and multicast subnet routes, and the IPv4
 /// limited broadcast subnet route.
-///
-/// Note that if an error is encountered while installing a route, any routes
-/// that were successfully installed prior to the error will not be removed.
-fn add_loopback_routes<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    non_sync_ctx: &mut NonSyncCtx,
-    loopback: &DeviceId<NonSyncCtx>,
-) -> Result<(), netstack3_core::ip::forwarding::AddRouteError> {
-    use netstack3_core::ip::types::{AddableEntry, AddableEntryEither, AddableMetric};
-    for entry in [
-        AddableEntryEither::from(AddableEntry::without_gateway(
+async fn add_loopback_routes(
+    non_sync_ctx: &mut BindingsNonSyncCtxImpl,
+    loopback: &DeviceId<BindingsNonSyncCtxImpl>,
+) {
+    use netstack3_core::ip::types::{AddableEntry, AddableMetric};
+
+    let v4_changes = [
+        AddableEntry::without_gateway(
             Ipv4::LOOPBACK_SUBNET,
-            loopback.clone(),
+            loopback.downgrade(),
             AddableMetric::MetricTracksInterface,
-        )),
-        AddableEntryEither::from(AddableEntry::without_gateway(
-            Ipv6::LOOPBACK_SUBNET,
-            loopback.clone(),
-            AddableMetric::MetricTracksInterface,
-        )),
-        AddableEntryEither::from(AddableEntry::without_gateway(
+        ),
+        AddableEntry::without_gateway(
             Ipv4::MULTICAST_SUBNET,
-            loopback.clone(),
+            loopback.downgrade(),
             AddableMetric::MetricTracksInterface,
-        )),
-        AddableEntryEither::from(AddableEntry::without_gateway(
-            Ipv6::MULTICAST_SUBNET,
-            loopback.clone(),
-            AddableMetric::MetricTracksInterface,
-        )),
-        AddableEntryEither::from(AddableEntry::without_gateway(
+        ),
+        AddableEntry::without_gateway(
             IPV4_LIMITED_BROADCAST_SUBNET,
-            loopback.clone(),
+            loopback.downgrade(),
             AddableMetric::ExplicitMetric(RawMetric(DEFAULT_LOW_PRIORITY_METRIC)),
-        )),
-    ] {
-        netstack3_core::add_route(sync_ctx, non_sync_ctx, entry)?;
+        ),
+    ]
+    .into_iter()
+    .map(routes::Change::Add)
+    .map(Into::into);
+
+    let v6_changes = [
+        AddableEntry::without_gateway(
+            Ipv6::LOOPBACK_SUBNET,
+            loopback.downgrade(),
+            AddableMetric::MetricTracksInterface,
+        ),
+        AddableEntry::without_gateway(
+            Ipv6::MULTICAST_SUBNET,
+            loopback.downgrade(),
+            AddableMetric::MetricTracksInterface,
+        ),
+    ]
+    .into_iter()
+    .map(routes::Change::Add)
+    .map(Into::into);
+
+    for change in v4_changes.chain(v6_changes) {
+        non_sync_ctx
+            .apply_route_change_either(change)
+            .await
+            .expect("adding loopback routes should succeed");
     }
-    Ok(())
 }
 
 /// The netstack.
@@ -790,7 +814,7 @@ impl Netstack {
         create_interface_event_producer(&self.interfaces_event_sink, id, properties)
     }
 
-    fn add_loopback(
+    async fn add_loopback(
         &mut self,
     ) -> (
         futures::channel::oneshot::Sender<fnet_interfaces_admin::InterfaceRemovedReason>,
@@ -892,8 +916,7 @@ impl Netstack {
         .unwrap();
         add_loopback_ip_addrs(sync_ctx, non_sync_ctx, &loopback)
             .expect("error adding loopback addresses");
-        add_loopback_routes(sync_ctx, non_sync_ctx, &loopback)
-            .expect("error adding loopback routes");
+        add_loopback_routes(non_sync_ctx, &loopback).await;
 
         let (stop_sender, stop_receiver) = futures::channel::oneshot::channel();
 
@@ -997,17 +1020,28 @@ impl NetstackSeed {
     ) {
         info!("serving netstack with netstack3");
 
-        let Self { mut netstack, interfaces_worker, interfaces_watcher_sink } = self;
+        let Self {
+            mut netstack,
+            interfaces_worker,
+            interfaces_watcher_sink,
+            mut routes_change_runner,
+        } = self;
 
         // Start servicing timers.
         let timers_task =
             NamedTask::new("timers", netstack.ctx.non_sync_ctx().timers.spawn(netstack.clone()));
 
+        // Start executing routes changes.
+        let routes_change_task = NamedTask::spawn("routes_changes", {
+            let ctx = netstack.ctx.clone();
+            async move { routes_change_runner.run(ctx).await }
+        });
+
         let (loopback_stopper, _, loopback_tasks): (
             futures::channel::oneshot::Sender<_>,
             BindingId,
             _,
-        ) = netstack.add_loopback();
+        ) = netstack.add_loopback().await;
 
         let interfaces_worker_task = NamedTask::spawn("interfaces worker", async move {
             let result = interfaces_worker.run().await;
@@ -1027,8 +1061,11 @@ impl NetstackSeed {
             info!("all interface watchers closed, interfaces worker shutdown is complete");
         });
 
-        let no_finish_tasks =
-            loopback_tasks.into_iter().chain([interfaces_worker_task, timers_task]);
+        let no_finish_tasks = loopback_tasks.into_iter().chain([
+            interfaces_worker_task,
+            timers_task,
+            routes_change_task,
+        ]);
         let no_finish_tasks = no_finish_tasks.map(NamedTask::into_future);
         let mut no_finish_tasks = futures::stream::FuturesUnordered::from_iter(no_finish_tasks);
         let mut no_finish_tasks_fut = no_finish_tasks
@@ -1204,6 +1241,8 @@ impl NetstackSeed {
         ctx.non_sync_ctx().timers.stop();
         // Stop the interfaces watcher worker.
         std::mem::drop(interfaces_watcher_sink);
+        // Stop the routes change runner.
+        ctx.non_sync_ctx().routes.close_senders();
 
         // We've signalled all long running tasks, now we can collect them.
         no_finish_tasks.map(|name| info!("{name} finished")).collect::<()>().await;

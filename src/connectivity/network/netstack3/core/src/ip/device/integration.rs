@@ -57,7 +57,6 @@ use crate::{
             DelIpv6Addr, IpAddressId, IpDeviceIpExt, IpDeviceNonSyncContext, IpDeviceStateContext,
             RemovedReason,
         },
-        forwarding::AddRouteError,
         gmp::{
             self,
             igmp::{IgmpContext, IgmpGroupState, IgmpPacketMetadata, IgmpStateContext},
@@ -65,9 +64,9 @@ use crate::{
             GmpHandler, GmpQueryHandler, GmpState, MulticastGroupSet,
         },
         socket::ipv6_source_address_selection::SasCandidate,
-        types::{AddableEntry, AddableMetric},
-        AddressStatus, IpLayerIpExt, Ipv4PresentAddressStatus, Ipv6PresentAddressStatus,
-        NonSyncContext, SyncCtx, DEFAULT_TTL,
+        types::AddableMetric,
+        AddressStatus, IpLayerIpExt, IpStateContext, Ipv4PresentAddressStatus,
+        Ipv6PresentAddressStatus, NonSyncContext, SyncCtx, DEFAULT_TTL,
     },
     DeviceId,
 };
@@ -991,23 +990,32 @@ impl<C: NonSyncContext> Ipv6DiscoveredRoutesContext<C>
         ctx: &mut C,
         device_id: &Self::DeviceId,
         Ipv6DiscoveredRoute { subnet, gateway }: Ipv6DiscoveredRoute,
-    ) -> Result<(), AddRouteError> {
+    ) -> Result<(), crate::error::ExistsError> {
         let device_id = device_id.clone();
-        let entry = match gateway {
-            Some(gateway) => AddableEntry::with_gateway(
-                subnet,
-                Some(device_id),
-                (*gateway).into_specified(),
-                AddableMetric::MetricTracksInterface,
-            ),
-            None => AddableEntry::without_gateway(
-                subnet,
-                device_id,
-                AddableMetric::MetricTracksInterface,
-            ),
+        let entry = crate::ip::types::AddableEntry {
+            subnet,
+            device: device_id,
+            gateway: gateway.map(|g| (*g).into_specified()),
+            metric: AddableMetric::MetricTracksInterface,
         };
 
-        crate::ip::forwarding::add_route::<Ipv6, _, _>(self, ctx, entry)
+        // TODO(https://fxbug.dev/129219): Rather than perform a synchronous
+        // check for whether the route already exists, use a routes-admin
+        // RouteSet to track the NDP-added route.
+        let already_exists = self.with_ip_routing_table(
+            |_sync_ctx, table: &crate::ip::forwarding::ForwardingTable<Ipv6, _>| {
+                table.iter_table().any(|table_entry: &crate::ip::types::Entry<Ipv6Addr, _>| {
+                    &crate::ip::types::AddableEntry::from(table_entry.clone()) == &entry
+                })
+            },
+        );
+
+        if already_exists {
+            return Err(crate::error::ExistsError);
+        }
+
+        crate::request_context_add_route(ctx, entry.into());
+        Ok(())
     }
 
     fn del_discovered_ipv6_route(
@@ -1015,14 +1023,13 @@ impl<C: NonSyncContext> Ipv6DiscoveredRoutesContext<C>
         ctx: &mut C,
         device_id: &Self::DeviceId,
         Ipv6DiscoveredRoute { subnet, gateway }: Ipv6DiscoveredRoute,
-    ) -> Result<(), NotFoundError> {
-        crate::ip::forwarding::del_specific_routes::<Ipv6, _, _>(
-            self,
+    ) {
+        crate::request_context_del_routes_v6(
             ctx,
             subnet,
             device_id,
             gateway.map(|g| (*g).into_specified()),
-        )
+        );
     }
 }
 

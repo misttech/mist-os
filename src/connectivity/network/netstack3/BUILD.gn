@@ -84,6 +84,7 @@ common_sources = [
   "src/bindings/neighbor_worker.rs",
   "src/bindings/netdevice_worker.rs",
   "src/bindings/root_fidl_worker.rs",
+  "src/bindings/routes/mod.rs",
   "src/bindings/routes_fidl_worker.rs",
   "src/bindings/socket/datagram.rs",
   "src/bindings/socket/mod.rs",

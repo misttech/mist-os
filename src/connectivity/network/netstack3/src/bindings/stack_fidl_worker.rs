@@ -2,14 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::util::{IntoFidl, TryFromFidlWithContext as _, TryIntoCore as _};
+use super::{
+    util::{TryFromFidlWithContext as _, TryIntoCore as _},
+    Ctx,
+};
 
 use fidl_fuchsia_net as fidl_net;
 use fidl_fuchsia_net_stack::{
     self as fidl_net_stack, ForwardingEntry, StackRequest, StackRequestStream,
 };
 use futures::{TryFutureExt as _, TryStreamExt as _};
-use netstack3_core::{add_route, del_route, ip::types::AddableEntryEither};
+use net_types::ip::{Ip, Ipv4, Ipv6};
+use netstack3_core::ip::types::{AddableEntry, AddableEntryEither};
 use tracing::{debug, error};
 
 pub(crate) struct StackFidlWorker {
@@ -26,7 +30,7 @@ impl StackFidlWorker {
                 match req {
                     StackRequest::AddForwardingEntry { entry, responder } => {
                         responder.send(
-                            worker.fidl_add_forwarding_entry(entry)
+                            worker.fidl_add_forwarding_entry(entry).await
                         ).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
                     }
                     StackRequest::DelForwardingEntry {
@@ -40,7 +44,7 @@ impl StackFidlWorker {
                         responder,
                     } => {
                         responder.send(
-                            worker.fidl_del_forwarding_entry(subnet)
+                            worker.fidl_del_forwarding_entry(subnet).await
                         ).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
                     }
                     StackRequest::SetInterfaceIpForwardingDeprecated {
@@ -82,25 +86,95 @@ impl StackFidlWorker {
             .await
     }
 
-    fn fidl_add_forwarding_entry(
+    async fn fidl_add_forwarding_entry(
         &mut self,
         entry: ForwardingEntry,
     ) -> Result<(), fidl_net_stack::Error> {
-        let (sync_ctx, non_sync_ctx) = self.netstack.ctx.contexts_mut();
-        let entry = match AddableEntryEither::try_from_fidl_with_ctx(&non_sync_ctx, entry) {
+        let non_sync_ctx = self.netstack.ctx.non_sync_ctx();
+        let entry = match AddableEntryEither::try_from_fidl_with_ctx(non_sync_ctx, entry) {
             Ok(entry) => entry,
             Err(e) => return Err(e.into()),
         };
-        add_route(sync_ctx, non_sync_ctx, entry).map_err(IntoFidl::into_fidl)
+
+        type DeviceId = netstack3_core::device::DeviceId<crate::bindings::BindingsNonSyncCtxImpl>;
+        fn try_to_storable_entry<I: Ip>(
+            ctx: &mut Ctx,
+            entry: AddableEntry<I::Addr, Option<DeviceId>>,
+        ) -> Option<AddableEntry<I::Addr, DeviceId>> {
+            let AddableEntry { subnet, device, gateway, metric } = entry;
+            let sync_ctx = ctx.sync_ctx();
+            let (device, gateway) = match (device, gateway) {
+                (Some(device), gateway) => (device, gateway),
+                (None, gateway) => {
+                    let gateway = gateway?;
+                    let device =
+                        netstack3_core::select_device_for_gateway(sync_ctx, gateway.into())?;
+                    (device, Some(gateway))
+                }
+            };
+            Some(AddableEntry { subnet, device, gateway, metric })
+        }
+
+        let entry = match entry {
+            AddableEntryEither::V4(entry) => {
+                try_to_storable_entry::<Ipv4>(&mut self.netstack.ctx, entry)
+                    .ok_or(fidl_net_stack::Error::BadState)?
+                    .map_device_id(|d| d.downgrade())
+                    .into()
+            }
+            AddableEntryEither::V6(entry) => {
+                try_to_storable_entry::<Ipv6>(&mut self.netstack.ctx, entry)
+                    .ok_or(fidl_net_stack::Error::BadState)?
+                    .map_device_id(|d| d.downgrade())
+                    .into()
+            }
+        };
+
+        self.netstack
+            .ctx
+            .non_sync_ctx()
+            .apply_route_change_either(crate::bindings::routes::ChangeEither::add(entry))
+            .await
+            .map_err(|err| match err {
+                crate::bindings::routes::Error::AlreadyExists => {
+                    fidl_net_stack::Error::AlreadyExists
+                }
+                crate::bindings::routes::Error::NotFound => fidl_net_stack::Error::NotFound,
+                crate::bindings::routes::Error::DeviceRemoved => fidl_net_stack::Error::InvalidArgs,
+                crate::bindings::routes::Error::ShuttingDown => panic!(
+                    "can't apply route change because route change runner has been shut down"
+                ),
+            })
     }
 
-    fn fidl_del_forwarding_entry(
+    async fn fidl_del_forwarding_entry(
         &mut self,
         subnet: fidl_net::Subnet,
     ) -> Result<(), fidl_net_stack::Error> {
-        let (sync_ctx, non_sync_ctx) = self.netstack.ctx.contexts_mut();
+        let non_sync_ctx = self.netstack.ctx.non_sync_ctx_mut();
         if let Ok(subnet) = subnet.try_into_core() {
-            del_route(sync_ctx, non_sync_ctx, subnet).map_err(IntoFidl::into_fidl)
+            non_sync_ctx
+                .apply_route_change_either(match subnet {
+                    net_types::ip::SubnetEither::V4(subnet) => {
+                        crate::bindings::routes::Change::RemoveToSubnet(subnet).into()
+                    }
+                    net_types::ip::SubnetEither::V6(subnet) => {
+                        crate::bindings::routes::Change::RemoveToSubnet(subnet).into()
+                    }
+                })
+                .await
+                .map_err(|err| match err {
+                    crate::bindings::routes::Error::AlreadyExists => {
+                        fidl_net_stack::Error::AlreadyExists
+                    }
+                    crate::bindings::routes::Error::NotFound => fidl_net_stack::Error::NotFound,
+                    crate::bindings::routes::Error::DeviceRemoved => {
+                        fidl_net_stack::Error::InvalidArgs
+                    }
+                    crate::bindings::routes::Error::ShuttingDown => panic!(
+                        "can't apply route change because route change runner has been shut down"
+                    ),
+                })
         } else {
             Err(fidl_net_stack::Error::InvalidArgs)
         }

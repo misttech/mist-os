@@ -1104,15 +1104,17 @@ impl From<ForwardingConversionError> for fidl_net_stack::Error {
 }
 
 impl TryFromFidlWithContext<fidl_net_stack::ForwardingEntry>
-    for AddableEntryEither<DeviceId<BindingsNonSyncCtxImpl>>
+    for AddableEntryEither<Option<DeviceId<BindingsNonSyncCtxImpl>>>
 {
     type Error = ForwardingConversionError;
 
     fn try_from_fidl_with_ctx<C: ConversionContext>(
         ctx: &C,
         fidl: fidl_net_stack::ForwardingEntry,
-    ) -> Result<AddableEntryEither<DeviceId<BindingsNonSyncCtxImpl>>, ForwardingConversionError>
-    {
+    ) -> Result<
+        AddableEntryEither<Option<DeviceId<BindingsNonSyncCtxImpl>>>,
+        ForwardingConversionError,
+    > {
         let fidl_net_stack::ForwardingEntry { subnet, device_id, next_hop, metric } = fidl;
         let subnet = subnet.try_into_core()?;
         let device =
@@ -1126,7 +1128,7 @@ impl TryFromFidlWithContext<fidl_net_stack::ForwardingEntry>
         };
 
         Ok(match (subnet, device, next_hop.map(Into::into)) {
-            (subnet, Some(device), None) => Self::without_gateway(subnet, device, metric),
+            (subnet, device, None) => Self::without_gateway(subnet, device, metric),
             (SubnetEither::V4(subnet), device, Some(IpAddr::V4(gateway))) => {
                 AddableEntry::with_gateway(subnet, device, gateway, metric).into()
             }
@@ -1134,8 +1136,9 @@ impl TryFromFidlWithContext<fidl_net_stack::ForwardingEntry>
                 AddableEntry::with_gateway(subnet, device, gateway, metric).into()
             }
             (SubnetEither::V4(_), _, Some(IpAddr::V6(_)))
-            | (SubnetEither::V6(_), _, Some(IpAddr::V4(_)))
-            | (_, None, None) => return Err(ForwardingConversionError::TypeMismatch),
+            | (SubnetEither::V6(_), _, Some(IpAddr::V4(_))) => {
+                return Err(ForwardingConversionError::TypeMismatch)
+            }
         })
     }
 }

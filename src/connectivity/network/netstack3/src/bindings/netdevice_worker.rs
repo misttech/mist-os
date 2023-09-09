@@ -35,8 +35,7 @@ use rand::Rng as _;
 
 use crate::bindings::{
     devices, interfaces_admin, trace_duration, BindingId, BindingsNonSyncCtxImpl, Ctx, DeviceId,
-    DeviceIdExt as _, Ipv6DeviceConfiguration, Netstack, NonSyncContext, SyncCtx,
-    DEFAULT_INTERFACE_METRIC,
+    DeviceIdExt as _, Ipv6DeviceConfiguration, Netstack, DEFAULT_INTERFACE_METRIC,
 };
 
 #[derive(Clone)]
@@ -344,7 +343,7 @@ impl DeviceHandler {
             &core_id,
             netstack3_core::device::queue::tx::TransmitQueueConfiguration::Fifo,
         );
-        add_initial_routes(sync_ctx, non_sync_ctx, &core_id).expect("failed to add default routes");
+        add_initial_routes(non_sync_ctx, &core_id).await;
 
         // TODO(https://fxbug.dev/69644): Use a different secret key (not this
         // one) to generate stable opaque interface identifiers.
@@ -397,38 +396,51 @@ impl DeviceHandler {
 ///
 /// Note that if an error is encountered while installing a route, any routes
 /// that were successfully installed prior to the error will not be removed.
-fn add_initial_routes<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    non_sync_ctx: &mut NonSyncCtx,
-    device: &DeviceId<NonSyncCtx>,
-) -> Result<(), netstack3_core::ip::forwarding::AddRouteError> {
-    use netstack3_core::ip::types::{AddableEntry, AddableEntryEither, AddableMetric};
+async fn add_initial_routes(
+    non_sync_ctx: &mut BindingsNonSyncCtxImpl,
+    device: &DeviceId<BindingsNonSyncCtxImpl>,
+) {
+    use netstack3_core::ip::types::{AddableEntry, AddableMetric};
     const LINK_LOCAL_SUBNET: Subnet<Ipv6Addr> = net_declare::net_subnet_v6!("fe80::/64");
-    for entry in [
-        AddableEntryEither::from(AddableEntry::without_gateway(
-            LINK_LOCAL_SUBNET,
-            device.clone(),
-            AddableMetric::MetricTracksInterface,
-        )),
-        AddableEntryEither::from(AddableEntry::without_gateway(
+
+    let v4_changes = [
+        AddableEntry::without_gateway(
             Ipv4::MULTICAST_SUBNET,
-            device.clone(),
+            device.downgrade(),
             AddableMetric::MetricTracksInterface,
-        )),
-        AddableEntryEither::from(AddableEntry::without_gateway(
-            Ipv6::MULTICAST_SUBNET,
-            device.clone(),
-            AddableMetric::MetricTracksInterface,
-        )),
-        AddableEntryEither::from(AddableEntry::without_gateway(
+        ),
+        AddableEntry::without_gateway(
             crate::bindings::IPV4_LIMITED_BROADCAST_SUBNET,
-            device.clone(),
+            device.downgrade(),
             AddableMetric::ExplicitMetric(RawMetric(crate::bindings::DEFAULT_LOW_PRIORITY_METRIC)),
-        )),
-    ] {
-        netstack3_core::add_route(sync_ctx, non_sync_ctx, entry)?;
+        ),
+    ]
+    .into_iter()
+    .map(crate::bindings::routes::Change::Add)
+    .map(Into::into);
+
+    let v6_changes = [
+        AddableEntry::without_gateway(
+            LINK_LOCAL_SUBNET,
+            device.downgrade(),
+            AddableMetric::MetricTracksInterface,
+        ),
+        AddableEntry::without_gateway(
+            Ipv6::MULTICAST_SUBNET,
+            device.downgrade(),
+            AddableMetric::MetricTracksInterface,
+        ),
+    ]
+    .into_iter()
+    .map(crate::bindings::routes::Change::Add)
+    .map(Into::into);
+
+    for change in v4_changes.chain(v6_changes) {
+        non_sync_ctx
+            .apply_route_change_either(change)
+            .await
+            .expect("adding initial routes should succeed");
     }
-    Ok(())
 }
 
 pub(crate) struct PortHandler {

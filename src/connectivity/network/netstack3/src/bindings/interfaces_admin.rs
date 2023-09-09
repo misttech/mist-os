@@ -45,7 +45,10 @@ use futures::{
     future::FusedFuture as _, stream::FusedStream as _, FutureExt as _, SinkExt as _,
     StreamExt as _, TryFutureExt as _, TryStreamExt as _,
 };
-use net_types::{ip::AddrSubnetEither, ip::IpAddr, SpecifiedAddr, Witness};
+use net_types::{
+    ip::{AddrSubnetEither, IpAddr},
+    SpecifiedAddr, Witness,
+};
 use netstack3_core::{
     device::{update_ipv4_configuration, update_ipv6_configuration, DeviceId},
     ip::device::{
@@ -1072,25 +1075,42 @@ async fn run_address_state_provider(
         }
         Ok(()) => {
             let state_to_remove = if add_subnet_route {
-                let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
+                let non_sync_ctx = ctx.non_sync_ctx();
                 let core_id = non_sync_ctx
                     .devices
                     .get_core_id(id)
-                    .expect("missing device info for interface");
-                match netstack3_core::add_route(
-                    sync_ctx,
-                    non_sync_ctx,
-                    netstack3_core::ip::types::AddableEntryEither::without_gateway(
-                        subnet,
-                        core_id,
-                        netstack3_core::ip::types::AddableMetric::MetricTracksInterface,
-                    ),
-                ) {
-                    Ok(()) => StateInCore { address: true, subnet_route: true },
+                    .expect("missing device info for interface")
+                    .downgrade();
+
+                let add_route_result = non_sync_ctx.apply_route_change_either(
+                    crate::bindings::routes::ChangeEither::add(
+                        match subnet {
+                            net_types::ip::SubnetEither::V4(subnet) => {
+                                netstack3_core::ip::types::AddableEntry {
+                                    subnet,
+                                    device: core_id,
+                                    metric: netstack3_core::ip::types::AddableMetric::MetricTracksInterface,
+                                    gateway: None,
+                                }.into()
+                            }
+                            net_types::ip::SubnetEither::V6(subnet) => {
+                                netstack3_core::ip::types::AddableEntry {
+                                    subnet,
+                                    device: core_id,
+                                    metric: netstack3_core::ip::types::AddableMetric::MetricTracksInterface,
+                                    gateway: None,
+                                }.into()
+                            }
+                        }
+                    )
+                ).await;
+
+                match add_route_result {
                     Err(e) => {
-                        tracing::warn!("failed to add subnet route {}: {}", addr_subnet_either, e);
+                        tracing::warn!("failed to add subnet route {:?}: {:?}", subnet, e);
                         StateInCore { address: true, subnet_route: false }
                     }
+                    Ok(()) => StateInCore { address: true, subnet_route: true },
                 }
             } else {
                 StateInCore { address: true, subnet_route: false }
@@ -1168,13 +1188,20 @@ async fn run_address_state_provider(
         // API is implemented, the flag will be removed and its usages
         // will be migrated. Until then, provide best-effort support
         // without complex reference counting.
-        netstack3_core::del_route(sync_ctx, non_sync_ctx, subnet).unwrap_or_else(|e| {
-            tracing::warn!(
-                "failed to remove route for {} added via add_subnet_route: {}",
-                addr_subnet_either,
-                e
+        match non_sync_ctx
+            .apply_route_change_either(
+                crate::bindings::routes::ChangeEither::remove_matching_without_gateway(
+                    subnet,
+                    device_id.downgrade(),
+                ),
             )
-        })
+            .await
+        {
+            Ok(()) => {}
+            Err(e) => {
+                tracing::error!("error removing subnet route {subnet:?}: {e:?}");
+            }
+        }
     }
     if remove_address {
         assert_matches!(

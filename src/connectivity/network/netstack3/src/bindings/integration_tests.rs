@@ -710,33 +710,45 @@ async fn test_list_del_routes() {
     let sub1 = net_subnet_v4!("192.168.0.0/24");
     let route1: AddableEntryEither<_> = AddableEntry::without_gateway(
         sub1,
-        device.clone(),
+        device.downgrade(),
         AddableMetric::ExplicitMetric(RawMetric(0)),
     )
     .into();
     let sub10 = net_subnet_v4!("10.0.0.0/24");
     let route2: AddableEntryEither<_> = AddableEntry::without_gateway(
         sub10,
-        device.clone(),
+        device.downgrade(),
         AddableMetric::ExplicitMetric(RawMetric(0)),
     )
     .into();
     let sub10_gateway = SpecifiedAddr::new(net_ip_v4!("10.0.0.1")).unwrap().into();
-    let route3 = AddableEntry::with_gateway(
+    let route3: AddableEntryEither<_> = AddableEntry::with_gateway(
         sub10,
-        None,
+        device.downgrade(),
         sub10_gateway,
         AddableMetric::ExplicitMetric(RawMetric(0)),
     )
     .into();
 
-    let () = test_stack.with_ctx(|ctx| {
-        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-        // add a couple of routes directly into core:
-        netstack3_core::add_route(sync_ctx, non_sync_ctx, route1).unwrap();
-        netstack3_core::add_route(sync_ctx, non_sync_ctx, route2).unwrap();
-        netstack3_core::add_route(sync_ctx, non_sync_ctx, route3).unwrap();
-    });
+    for route in [route1, route2, route3] {
+        test_stack
+            .ctx()
+            .non_sync_ctx()
+            .apply_route_change_either(match route.into() {
+                netstack3_core::ip::types::AddableEntryEither::V4(entry) => {
+                    crate::bindings::routes::ChangeEither::V4(crate::bindings::routes::Change::Add(
+                        entry,
+                    ))
+                }
+                netstack3_core::ip::types::AddableEntryEither::V6(entry) => {
+                    crate::bindings::routes::ChangeEither::V6(crate::bindings::routes::Change::Add(
+                        entry,
+                    ))
+                }
+            })
+            .await
+            .expect("add route should succeed");
+    }
 
     let route1_fwd_entry = fidl_net_stack::ForwardingEntry {
         subnet: sub1.into_ext(),
@@ -888,6 +900,7 @@ async fn test_add_remote_routes() {
         stack.add_forwarding_entry(&fwd_entry).await.unwrap(),
         Err(fidl_net_stack::Error::BadState)
     );
+
     let device_fwd_entry = fidl_net_stack::ForwardingEntry {
         subnet: fwd_entry.subnet,
         device_id,
