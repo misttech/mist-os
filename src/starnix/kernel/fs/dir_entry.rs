@@ -322,24 +322,6 @@ impl DirEntry {
         })
     }
 
-    /// Create a node in the file system.
-    ///
-    /// Works for any type of node other than a symlink.
-    ///
-    /// Does not return an existing node.
-    pub fn create_node(
-        self: &DirEntryHandle,
-        current_task: &CurrentTask,
-        name: &FsStr,
-        mode: FileMode,
-        dev: DeviceType,
-        owner: FsCred,
-    ) -> Result<DirEntryHandle, Errno> {
-        self.create_entry(current_task, name, |dir, name| {
-            dir.mknod(current_task, name, mode, dev, owner)
-        })
-    }
-
     /// Creates an anonymous file.
     ///
     /// The FileMode::IFMT of the FileMode is always FileMode::IFREG.

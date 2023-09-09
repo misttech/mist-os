@@ -155,13 +155,17 @@ impl OverlayNode {
                     parent_upper,
                     &name,
                     |dir, name| {
-                        dir.create_node(current_task, name, info.mode, DeviceType::NONE, cred)
+                        dir.create_entry(current_task, name, |dir_node, name| {
+                            dir_node.mknod(current_task, name, info.mode, DeviceType::NONE, cred)
+                        })
                     },
                     |entry| copy_file_content(current_task, lower, &entry),
                 )
             } else {
                 // TODO(sergeyu): create_node() checks access, but we don't need that here.
-                parent_upper.create_node(current_task, &name, info.mode, info.rdev, cred)
+                parent_upper.create_entry(current_task, &name, |dir, name| {
+                    dir.mknod(current_task, name, info.mode, info.rdev, cred)
+                })
             }
 
             // TODO(sergeyu): Copy xattrs to the new node.
@@ -363,7 +367,9 @@ impl FsNodeOps for Arc<OverlayNode> {
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         let new_upper_node = self.create_entry(current_task, name, |dir, temp_name| {
-            dir.create_node(current_task, temp_name, mode, dev, owner.clone())
+            dir.create_entry(current_task, temp_name, |dir_node, name| {
+                dir_node.mknod(current_task, name, mode, dev, owner.clone())
+            })
         })?;
         Ok(self.init_fs_node_for_child(node, None, Some(new_upper_node)))
     }
@@ -377,8 +383,9 @@ impl FsNodeOps for Arc<OverlayNode> {
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         let new_upper_node = self.create_entry(current_task, name, |dir, temp_name| {
-            let entry =
-                dir.create_node(current_task, temp_name, mode, DeviceType::NONE, owner.clone())?;
+            let entry = dir.create_entry(current_task, temp_name, |dir_node, name| {
+                dir_node.mknod(current_task, name, mode, DeviceType::NONE, owner.clone())
+            })?;
 
             // Set opaque attribute to ensure the new directory is not merged with lower.
             set_opaque_xattr(current_task, &entry)?;
@@ -851,7 +858,9 @@ fn create_whiteout(
     parent: &DirEntryHandle,
     name: &FsStr,
 ) -> Result<DirEntryHandle, Errno> {
-    parent.create_node(current_task, name, FileMode::IFCHR, DeviceType::NONE, FsCred::root())
+    parent.create_entry(current_task, name, |dir, name| {
+        dir.mknod(current_task, name, FileMode::IFCHR, DeviceType::NONE, FsCred::root())
+    })
 }
 
 /// Returns `true` if the `entry` is a "whiteout.

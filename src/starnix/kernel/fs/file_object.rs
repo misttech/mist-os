@@ -1401,13 +1401,15 @@ mod tests {
         let root_fs = TmpFs::new_fs(&kernel);
         let root_node = Arc::clone(root_fs.root());
         let file = root_node
-            .create_node(
-                &current_task,
-                b"test",
-                FileMode::IFREG | FileMode::ALLOW_ALL,
-                DeviceType::NONE,
-                FsCred::root(),
-            )
+            .create_entry(&current_task, b"test", |dir, name| {
+                dir.mknod(
+                    &current_task,
+                    name,
+                    FileMode::IFREG | FileMode::ALLOW_ALL,
+                    DeviceType::NONE,
+                    FsCred::root(),
+                )
+            })
             .expect("create_node failed");
         let file_handle = file
             .open_anonymous(&current_task, OpenFlags::APPEND | OpenFlags::RDWR)

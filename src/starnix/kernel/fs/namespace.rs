@@ -988,10 +988,13 @@ impl NamespaceNode {
         mode: FileMode,
         dev: DeviceType,
     ) -> Result<NamespaceNode, Errno> {
-        self.check_readonly_filesystem()?;
         let owner = current_task.as_fscred();
         let mode = current_task.fs().apply_umask(mode);
-        Ok(self.with_new_entry(self.entry.create_node(current_task, name, mode, dev, owner)?))
+        let entry = self.entry.create_entry(current_task, name, |dir, name| {
+            self.check_readonly_filesystem()?;
+            dir.mknod(current_task, name, mode, dev, owner)
+        })?;
+        Ok(self.with_new_entry(entry))
     }
 
     /// Create a symlink in the file system.

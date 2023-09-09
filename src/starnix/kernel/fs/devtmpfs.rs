@@ -18,15 +18,12 @@ pub fn dev_tmp_fs(kernel: &Arc<Kernel>) -> &FileSystemHandle {
 fn init_devtmpfs(kernel: &Arc<Kernel>) -> FileSystemHandle {
     let fs = TmpFs::new_fs(kernel);
     let root = fs.root();
+    let current_task = kernel.kthreads.system_task();
 
     let mkdir = |name| {
-        root.create_node(
-            kernel.kthreads.system_task(),
-            name,
-            mode!(IFDIR, 0o755),
-            DeviceType::NONE,
-            FsCred::root(),
-        )
+        root.create_entry(current_task, name, |dir, name| {
+            dir.mknod(current_task, name, mode!(IFDIR, 0o755), DeviceType::NONE, FsCred::root())
+        })
         .unwrap();
     };
 
@@ -39,27 +36,21 @@ pub fn devtmpfs_create_device(
     kernel: &Arc<Kernel>,
     device: DeviceMetadata,
 ) -> Result<DirEntryHandle, Errno> {
+    let current_task = kernel.kthreads.system_task();
     let mode = match device.mode {
         DeviceMode::Char => mode!(IFCHR, 0o666),
         DeviceMode::Block => mode!(IFBLK, 0o666),
     };
-    dev_tmp_fs(kernel).root().create_node(
-        kernel.kthreads.system_task(),
-        &device.name,
-        mode,
-        device.device_type,
-        FsCred::root(),
-    )
+    dev_tmp_fs(kernel).root().create_entry(current_task, &device.name, |dir, name| {
+        dir.mknod(current_task, name, mode, device.device_type, FsCred::root())
+    })
 }
 
 pub fn devtmpfs_mkdir(kernel: &Arc<Kernel>, name: &FsStr) -> Result<DirEntryHandle, Errno> {
-    dev_tmp_fs(kernel).root().create_node(
-        kernel.kthreads.system_task(),
-        name,
-        mode!(IFDIR, 0o755),
-        DeviceType::NONE,
-        FsCred::root(),
-    )
+    let current_task = kernel.kthreads.system_task();
+    dev_tmp_fs(kernel).root().create_entry(current_task, name, |dir, name| {
+        dir.mknod(current_task, name, mode!(IFDIR, 0o755), DeviceType::NONE, FsCred::root())
+    })
 }
 
 pub fn devtmpfs_remove_child(kernel: &Arc<Kernel>, name: &FsStr) {

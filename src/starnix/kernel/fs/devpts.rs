@@ -714,13 +714,15 @@ mod tests {
         let fs = TmpFs::new_fs(&kernel);
         let pts = fs
             .root()
-            .create_node(
-                &task,
-                b"custom_pts",
-                mode!(IFCHR, 0o666),
-                DeviceType::new(DEVPTS_FIRST_MAJOR, 0),
-                FsCred::root(),
-            )
+            .create_entry(&task, b"custom_pts", |dir, name| {
+                dir.mknod(
+                    &task,
+                    name,
+                    mode!(IFCHR, 0o666),
+                    DeviceType::new(DEVPTS_FIRST_MAJOR, 0),
+                    FsCred::root(),
+                )
+            })
             .expect("custom_pts");
         let node = NamespaceNode::new_anonymous(pts.clone());
         assert!(node.open(&task, OpenFlags::RDONLY, true).is_err());
