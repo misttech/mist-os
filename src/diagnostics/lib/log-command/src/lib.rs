@@ -162,7 +162,7 @@ pub struct LogCommand {
 
     /// filter for only logs with a given tag. May be repeated.
     #[argh(option)]
-    pub tags: Vec<String>,
+    pub tag: Vec<String>,
 
     /// exclude logs with a given tag. May be repeated.
     #[argh(option)]
@@ -250,7 +250,7 @@ impl Default for LogCommand {
             filter: vec![],
             moniker: vec![],
             exclude: vec![],
-            tags: vec![],
+            tag: vec![],
             exclude_tags: vec![],
             hide_tags: false,
             hide_file: false,

@@ -57,7 +57,7 @@ impl TryFrom<&LogCommand> for LogFilterCriteria {
         Ok(Self {
             min_severity: cmd.severity,
             filters: cmd.filter.clone(),
-            tags: cmd.tags.clone(),
+            tags: cmd.tag.clone(),
             excludes: cmd.exclude.clone(),
             moniker_filters: if cmd.kernel { vec!["klog".into()] } else { cmd.moniker.clone() },
             exclude_tags: cmd.exclude_tags.clone(),
@@ -243,7 +243,57 @@ mod test {
     #[fuchsia::test]
     async fn test_criteria_tag_filter() {
         let cmd = LogCommand {
-            tags: vec!["tag1".to_string()],
+            tag: vec!["tag1".to_string()],
+            exclude_tags: vec!["tag3".to_string()],
+            ..empty_dump_command()
+        };
+        let criteria = LogFilterCriteria::try_from(&cmd).unwrap();
+
+        assert!(criteria.matches(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp_nanos: 0.into(),
+                component_url: Some(String::default()),
+                moniker: String::default(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("included")
+            .add_tag("tag1")
+            .add_tag("tag2")
+            .build()
+            .into()
+        )));
+
+        assert!(!criteria.matches(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp_nanos: 0.into(),
+                component_url: Some(String::default()),
+                moniker: String::default(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("included")
+            .add_tag("tag2")
+            .build()
+            .into()
+        )));
+        assert!(!criteria.matches(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp_nanos: 0.into(),
+                component_url: Some(String::default()),
+                moniker: String::default(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("included")
+            .add_tag("tag1")
+            .add_tag("tag3")
+            .build()
+            .into()
+        )));
+    }
+
+    #[fuchsia::test]
+    async fn test_criteria_tag_filter_legacy() {
+        let cmd = LogCommand {
+            tag: vec!["tag1".to_string()],
             exclude_tags: vec!["tag3".to_string()],
             ..empty_dump_command()
         };

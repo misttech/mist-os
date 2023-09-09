@@ -1304,7 +1304,7 @@ mod tests {
             "yes".to_string(),
         ]);
         assert_eq!(subcommand, LogSubCommand::Dump(DumpCommand {}));
-        assert_eq!(cmd.tags, vec!["yes".to_string()]);
+        assert_eq!(cmd.tag, vec!["yes".to_string()]);
     }
 
     #[fuchsia::test]
