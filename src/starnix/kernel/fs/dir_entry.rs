@@ -11,7 +11,7 @@ use std::{
 
 use crate::{
     auth::FsCred,
-    fs::{socket::*, *},
+    fs::*,
     lock::{RwLock, RwLockWriteGuard},
     task::CurrentTask,
     types::*,
@@ -466,26 +466,6 @@ impl DirEntry {
 
             self.node.mknod(current_task, name, mode, dev, owner)
         }
-    }
-
-    pub fn bind_socket(
-        self: &DirEntryHandle,
-        current_task: &CurrentTask,
-        name: &FsStr,
-        socket: SocketHandle,
-        socket_address: SocketAddress,
-        mode: FileMode,
-        owner: FsCred,
-    ) -> Result<DirEntryHandle, Errno> {
-        self.create_entry(current_task, name, |dir, name| {
-            let node = dir.mknod(current_task, name, mode, DeviceType::NONE, owner)?;
-            if let Some(unix_socket) = socket.downcast_socket::<UnixSocket>() {
-                unix_socket.bind_socket_to_node(&socket, socket_address, &node)?;
-            } else {
-                return error!(ENOTSUP);
-            }
-            Ok(node)
-        })
     }
 
     /// Create a symlink in the file system.

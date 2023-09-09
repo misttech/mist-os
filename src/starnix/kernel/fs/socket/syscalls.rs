@@ -165,16 +165,13 @@ pub fn sys_bind(
                     &name,
                 )?;
 
-                parent.check_readonly_filesystem()?;
-                let _dir_entry = parent
-                    .entry
+                parent
                     .bind_socket(
                         current_task,
                         basename,
                         socket.clone(),
                         SocketAddress::Unix(name.clone()),
                         mode,
-                        current_task.as_fscred(),
                     )
                     .map_err(|errno| if errno == EEXIST { errno!(EADDRINUSE) } else { errno })?;
             }

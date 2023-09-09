@@ -6,9 +6,18 @@ use crate::{
     bpf::BpfFs,
     device::BinderFs,
     fs::{
-        buffers::InputBuffer, devpts::dev_pts_fs, devtmpfs::dev_tmp_fs, ext4::ExtFilesystem,
-        fuse::new_fuse_fs, overlayfs::OverlayFs, proc::proc_fs, sysfs::sys_fs, tmpfs::TmpFs,
-        tracefs::trace_fs, FileSystemOptions, FsStr,
+        buffers::InputBuffer,
+        devpts::dev_pts_fs,
+        devtmpfs::dev_tmp_fs,
+        ext4::ExtFilesystem,
+        fuse::new_fuse_fs,
+        overlayfs::OverlayFs,
+        proc::proc_fs,
+        socket::{SocketAddress, SocketHandle, UnixSocket},
+        sysfs::sys_fs,
+        tmpfs::TmpFs,
+        tracefs::trace_fs,
+        FileSystemOptions, FsStr,
     },
     lock::{Mutex, RwLock},
     mutable_state::*,
@@ -1013,6 +1022,28 @@ impl NamespaceNode {
         let owner = current_task.as_fscred();
         let mode = current_task.fs().apply_umask(mode);
         Ok(self.with_new_entry(self.entry.create_tmpfile(current_task, mode, owner, flags)?))
+    }
+
+    pub fn bind_socket(
+        &self,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        socket: SocketHandle,
+        socket_address: SocketAddress,
+        mode: FileMode,
+    ) -> Result<NamespaceNode, Errno> {
+        let dir_entry = self.entry.create_entry(current_task, name, |dir, name| {
+            self.check_readonly_filesystem()?;
+            let node =
+                dir.mknod(current_task, name, mode, DeviceType::NONE, current_task.as_fscred())?;
+            if let Some(unix_socket) = socket.downcast_socket::<UnixSocket>() {
+                unix_socket.bind_socket_to_node(&socket, socket_address, &node)?;
+            } else {
+                return error!(ENOTSUP);
+            }
+            Ok(node)
+        })?;
+        Ok(self.with_new_entry(dir_entry))
     }
 
     pub fn unlink(
