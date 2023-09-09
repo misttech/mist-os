@@ -1701,97 +1701,95 @@ mod enabled {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
 
-    use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
     use net_declare::fidl_subnet;
-    use netstack3_core::ip::types::RawMetric;
 
     use crate::bindings::{
-        interfaces_watcher::InterfaceEvent, interfaces_watcher::InterfaceUpdate, util::IntoFidl,
-        Ctx, InterfaceEventProducer, DEFAULT_INTERFACE_METRIC, DEFAULT_LOOPBACK_MTU,
+        integration_tests::{StackSetupBuilder, TestSetup, TestSetupBuilder},
+        interfaces_watcher::InterfaceEvent,
+        interfaces_watcher::InterfaceUpdate,
+        util::IntoFidl,
     };
 
     // Verifies that when an an interface is removed, its addresses are
     // implicitly removed, rather then explicitly removed one-by-one. Explicit
     // removal would be redundant and is unnecessary.
+    #[fixture::teardown(TestSetup::shutdown)]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn implicit_address_removal_on_interface_removal() {
-        crate::bindings::integration_tests::set_logger_for_test();
-        let mut ctx: Ctx = Default::default();
-        let (control_client_end, control_server_end) =
-            fnet_interfaces_ext::admin::Control::create_endpoints().expect("create control proxy");
-        let (control_sender, control_receiver) =
-            OwnedControlHandle::new_channel_with_owned_handle(control_server_end).await;
-        let (event_sender, event_receiver) = futures::channel::mpsc::unbounded();
+        const ENDPOINT: &'static str = "endpoint";
 
-        // Add the interface.
-        let binding_id = {
-            let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-            let binding_id = non_sync_ctx.devices.alloc_new_id();
-            let core_id = netstack3_core::device::add_loopback_device_with_state(
-                sync_ctx,
-                DEFAULT_LOOPBACK_MTU,
-                RawMetric(DEFAULT_INTERFACE_METRIC),
-                || {
-                    const LOOPBACK_NAME: &'static str = "lo";
-                    devices::LoopbackInfo {
-                        static_common_info: devices::StaticCommonInfo {
-                            binding_id,
-                            name: LOOPBACK_NAME.to_string(),
-                            tx_notifier: Default::default(),
-                        },
-                        dynamic_common_info: devices::DynamicCommonInfo {
-                            mtu: DEFAULT_LOOPBACK_MTU,
-                            admin_enabled: true,
-                            events: InterfaceEventProducer::new(binding_id, event_sender),
-                            control_hook: control_sender,
-                            addresses: HashMap::new(),
-                        }
-                        .into(),
-                        rx_notifier: Default::default(),
-                    }
-                },
+        let (spy_sink, event_receiver) = futures::channel::mpsc::unbounded();
+        let mut t = TestSetupBuilder::new()
+            .add_named_endpoint(ENDPOINT)
+            .add_stack(StackSetupBuilder::new().spy_interface_events(spy_sink))
+            .build()
+            .await;
+
+        // We just want to add and remove an interface from the stack. Since loopback interfaces
+        // are never removed (except for during stack teardown), it's better to use a netdevice
+        // interface instead.
+        let (endpoint, port_id) = t.get_endpoint(ENDPOINT).await;
+
+        let test_stack = t.get(0);
+
+        let (device_control_proxy, device_control_request_stream) =
+            fidl::endpoints::create_proxy_and_stream::<fnet_interfaces_admin::DeviceControlMarker>(
             )
-            .expect("failed to add loopback to core");
-            non_sync_ctx.devices.add_device(binding_id, core_id.into());
-            binding_id
-        };
+            .expect("create address proxy and stream");
 
-        // Start the interface control worker.
-        let (_stop_sender, stop_receiver) = futures::channel::oneshot::channel();
-        let removable = false;
-        let interface_control_fut = run_interface_control(
-            ctx.clone(),
-            binding_id,
-            stop_receiver,
-            control_receiver,
-            removable,
-            futures::stream::pending(),
-        );
+        let device_control_task = fuchsia_async::Task::spawn(run_device_control(
+            test_stack.netstack(),
+            endpoint,
+            device_control_request_stream,
+        ));
+
+        let (interface_control, control_server_end) =
+            fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
+                .expect("create interface control proxy");
+
+        device_control_proxy
+            .create_interface(
+                &port_id,
+                control_server_end,
+                &fnet_interfaces_admin::Options::default(),
+            )
+            .expect("create interface");
+
+        let binding_id = interface_control.get_id().await.expect("get ID");
+
+        // Filter for only events on this interface.
+        let event_receiver = event_receiver
+            .filter(|event| match event {
+                InterfaceEvent::Added { id, properties: _ }
+                | InterfaceEvent::Changed { id, event: _ }
+                | InterfaceEvent::Removed(id) => futures::future::ready(id.get() == binding_id),
+            })
+            .fuse();
+        futures::pin_mut!(event_receiver);
+
+        // We should see the interface get added.
+        let event = event_receiver.next().await;
+        assert_matches!(event, Some(InterfaceEvent::Added {
+            id,
+            properties: _,
+         }) if id.get() == binding_id);
 
         // Add an address.
         let (asp_client_end, asp_server_end) =
             fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>()
                 .expect("create ASP proxy");
-        let mut addr = fidl_subnet!("1.1.1.1/32");
-        control_client_end
+        let addr = fidl_subnet!("1.1.1.1/32");
+        interface_control
             .add_address(
-                &mut addr,
-                fnet_interfaces_admin::AddressParameters::default(),
+                &addr,
+                &fnet_interfaces_admin::AddressParameters::default(),
                 asp_server_end,
             )
             .expect("failed to add address");
 
         // Observe the `AddressAdded` event.
-        let event_receiver = event_receiver.fuse();
-        let interface_control_fut = interface_control_fut.fuse();
-        futures::pin_mut!(event_receiver);
-        futures::pin_mut!(interface_control_fut);
-        let event = futures::select!(
-            _cleanup = interface_control_fut => panic!("interface control unexpectedly ended"),
-            event = event_receiver.next() => event
-        );
+        let event = event_receiver.next().await;
         assert_matches!(event, Some(InterfaceEvent::Changed {
             id,
             event: InterfaceUpdate::AddressAdded {
@@ -1799,7 +1797,7 @@ mod tests {
                 assignment_state: _,
                 valid_until: _,
             }
-        }) if (id == binding_id && address.into_fidl() == addr ));
+        }) if (id.get() == binding_id && address.into_fidl() == addr ));
         let mut asp_event_stream = asp_client_end.take_event_stream();
         let event = asp_event_stream
             .try_next()
@@ -1808,16 +1806,16 @@ mod tests {
             .expect("AddressStateProvider event stream unexpectedly empty");
         assert_matches!(event, fnet_interfaces_admin::AddressStateProviderEvent::OnAddressAdded {});
 
-        // Drop the control handle and expect interface control to exit
-        drop(control_client_end);
-        interface_control_fut.await;
+        // Drop the device control handle and expect the device task to exit.
+        // This will cause the interface to be removed as well.
+        drop(device_control_proxy);
+        device_control_task.await.expect("should not get error");
 
-        // Expect that the event receiver has closed, and that it does not
-        // contain, an `AddressRemoved` event, which would indicate the address
-        // was explicitly removed.
+        // Expect that the event receiver observes the interface being removed
+        // without ever seeing an `AddressRemoved` event, which would indicate
+        // the address was explicitly removed.
         assert_matches!(event_receiver.next().await,
-            Some(InterfaceEvent::Removed( id)) if id == binding_id);
-        assert_matches!(event_receiver.next().await, None);
+        Some(InterfaceEvent::Removed(id)) if id.get() == binding_id);
 
         // Verify the ASP closed for the correct reason.
         let event = asp_event_stream
@@ -1831,7 +1829,7 @@ mod tests {
                 assert_eq!(error, fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved)
             }
         );
-        // Make sure the context lives all the way through the end of the test.
-        std::mem::drop(ctx);
+
+        t
     }
 }

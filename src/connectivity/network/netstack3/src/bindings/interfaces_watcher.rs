@@ -381,9 +381,17 @@ enum ChangedAddressProperties {
     },
 }
 
+#[derive(Default)]
+pub(crate) struct RunOptions {
+    #[cfg(test)]
+    pub(crate) spy_interface_events:
+        Option<futures::channel::mpsc::UnboundedSender<InterfaceEvent>>,
+}
+
 pub(crate) struct Worker {
     events: mpsc::UnboundedReceiver<InterfaceEvent>,
     watchers: mpsc::Receiver<NewWatcher>,
+    pub(crate) run_options: RunOptions,
 }
 /// Arbitrarily picked constant to force backpressure on FIDL requests.
 const WATCHER_CHANNEL_CAPACITY: usize = 32;
@@ -400,7 +408,11 @@ impl Worker {
         let (events_sender, events_receiver) = mpsc::unbounded();
         let (watchers_sender, watchers_receiver) = mpsc::channel(WATCHER_CHANNEL_CAPACITY);
         (
-            Worker { events: events_receiver, watchers: watchers_receiver },
+            Worker {
+                events: events_receiver,
+                watchers: watchers_receiver,
+                run_options: RunOptions::default(),
+            },
             WorkerWatcherSink { sender: watchers_sender },
             WorkerInterfaceSink { sender: events_sender },
         )
@@ -414,7 +426,7 @@ impl Worker {
     pub(crate) async fn run(
         self,
     ) -> Result<futures::stream::FuturesUnordered<Watcher>, WorkerError> {
-        let Self { events, watchers: watchers_stream } = self;
+        let Self { events, watchers: watchers_stream, run_options } = self;
         let mut current_watchers = futures::stream::FuturesUnordered::<Watcher>::new();
         let mut interface_state = HashMap::new();
 
@@ -486,6 +498,21 @@ impl Worker {
                 }
                 Action::Sink(Some(SinkAction::Event(e))) => {
                     tracing::debug!("consuming event {:?}", e);
+
+                    #[cfg(test)]
+                    {
+                        let RunOptions { spy_interface_events } = &run_options;
+                        match spy_interface_events {
+                            Some(sink) => sink.unbounded_send(e.clone()).unwrap_or(
+                                // To simplify teardown, we allow tests to
+                                // drop the spy receiver.
+                                (),
+                            ),
+                            None => (),
+                        };
+                    }
+                    #[cfg(not(test))]
+                    let RunOptions {} = &run_options;
 
                     let is_address_visible = |involves_assigned, include_non_assigned_addresses| {
                         // The address is visible if the change involves an

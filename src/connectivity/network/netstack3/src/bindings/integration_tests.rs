@@ -247,8 +247,14 @@ impl TestStack {
     }
 
     /// Creates a new `TestStack`.
-    pub(crate) fn new() -> Self {
-        let seed = crate::bindings::NetstackSeed::default();
+    pub(crate) fn new(
+        spy_interface_event_sink: Option<
+            mpsc::UnboundedSender<crate::bindings::interfaces_watcher::InterfaceEvent>,
+        >,
+    ) -> Self {
+        let mut seed = crate::bindings::NetstackSeed::default();
+        seed.interfaces_worker.run_options.spy_interface_events = spy_interface_event_sink;
+
         let (services_sink, services) = mpsc::unbounded();
         let inspector = Arc::new(fuchsia_inspect::Inspector::default());
         let netstack = seed.netstack.clone();
@@ -275,6 +281,11 @@ impl TestStack {
     /// Acquire this `TestStack`'s context.
     pub(crate) fn ctx(&self) -> Ctx {
         self.netstack.ctx.clone()
+    }
+
+    /// Acquire this `TestStack`'s netstack.
+    pub(crate) fn netstack(&self) -> crate::bindings::Netstack {
+        self.netstack.clone()
     }
 
     /// Synchronously shutdown the running stack.
@@ -307,7 +318,7 @@ impl TestSetup {
         &mut self.stacks[i]
     }
 
-    async fn get_endpoint(
+    pub(crate) async fn get_endpoint(
         &mut self,
         ep_name: &str,
     ) -> (
@@ -435,11 +446,12 @@ impl TestSetupBuilder {
         // configure all the stacks:
         for stack_cfg in self.stacks.into_iter() {
             println!("Adding stack: {:?}", stack_cfg);
-            let mut stack = TestStack::new();
+            let StackSetupBuilder { spy_interface_event_sink, endpoints } = stack_cfg;
+            let mut stack = TestStack::new(spy_interface_event_sink);
             let binding_id = stack.wait_for_loopback_id().await;
             assert_eq!(stack.endpoint_ids.insert(LOOPBACK_NAME.to_string(), binding_id), None);
 
-            for (ep_name, addr) in stack_cfg.endpoints.into_iter() {
+            for (ep_name, addr) in endpoints.into_iter() {
                 // get the endpoint from the sandbox config:
                 let (endpoint, port_id) = setup.get_endpoint(&ep_name).await;
 
@@ -541,12 +553,14 @@ impl TestSetupBuilder {
 #[derive(Debug)]
 pub(crate) struct StackSetupBuilder {
     endpoints: Vec<(String, Option<AddrSubnetEither>)>,
+    spy_interface_event_sink:
+        Option<mpsc::UnboundedSender<crate::bindings::interfaces_watcher::InterfaceEvent>>,
 }
 
 impl StackSetupBuilder {
     /// Creates a new empty stack (no endpoints) configuration.
     pub(crate) fn new() -> Self {
-        Self { endpoints: Vec::new() }
+        Self { endpoints: Vec::new(), spy_interface_event_sink: None }
     }
 
     /// Adds endpoint number  `index` with optional address configuration
@@ -563,6 +577,22 @@ impl StackSetupBuilder {
         address: Option<AddrSubnetEither>,
     ) -> Self {
         self.endpoints.push((name.into(), address));
+        self
+    }
+
+    /// Adds a "spy" sink to which
+    /// [`crate::bindings::interfaces_watcher::InterfaceEvent`]s will be copied.
+    /// Panics if called more than once.
+    pub(crate) fn spy_interface_events(
+        mut self,
+        spy_interface_event_sink: mpsc::UnboundedSender<
+            crate::bindings::interfaces_watcher::InterfaceEvent,
+        >,
+    ) -> Self {
+        assert_matches::assert_matches!(
+            self.spy_interface_event_sink.replace(spy_interface_event_sink),
+            None
+        );
         self
     }
 }
