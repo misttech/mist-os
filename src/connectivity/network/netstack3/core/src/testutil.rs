@@ -13,7 +13,6 @@ use core::{
     cell::RefCell,
     ffi::CStr,
     fmt::Debug,
-    marker::PhantomData,
     ops::{Deref, DerefMut},
 };
 
@@ -88,7 +87,6 @@ use crate::{
 pub(crate) const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
 
 /// Context available during the execution of the netstack.
-#[derive(Default)]
 pub struct Ctx<NonSyncCtx: crate::NonSyncContext> {
     /// The synchronized context.
     pub sync_ctx: SyncCtx<NonSyncCtx>,
@@ -104,11 +102,17 @@ pub struct Ctx<NonSyncCtx: crate::NonSyncContext> {
     pub non_sync_ctx: NonSyncCtx,
 }
 
+impl<NonSyncCtx: crate::NonSyncContext + Default> Default for Ctx<NonSyncCtx> {
+    fn default() -> Self {
+        Self::new_with_builder(StackStateBuilder::default())
+    }
+}
+
 impl<NonSyncCtx: crate::NonSyncContext + Default> Ctx<NonSyncCtx> {
     pub(crate) fn new_with_builder(builder: StackStateBuilder) -> Self {
         let mut non_sync_ctx = Default::default();
         let state = builder.build_with_ctx(&mut non_sync_ctx);
-        Self { sync_ctx: SyncCtx { state, non_sync_ctx_marker: PhantomData }, non_sync_ctx }
+        Self { sync_ctx: SyncCtx { state }, non_sync_ctx }
     }
 }
 

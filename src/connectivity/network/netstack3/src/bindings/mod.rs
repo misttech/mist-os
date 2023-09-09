@@ -94,7 +94,6 @@ mod ctx {
     use super::*;
 
     /// Provides an implementation of [`NonSyncContext`].
-    #[derive(Default)]
     pub(crate) struct BindingsNonSyncCtxImpl(Arc<BindingsNonSyncCtxImplInner>);
 
     impl Deref for BindingsNonSyncCtxImpl {
@@ -106,7 +105,6 @@ mod ctx {
         }
     }
 
-    #[derive(Default)]
     pub(crate) struct Ctx {
         // `non_sync_ctx` is the first member so all strongly-held references are
         // dropped before primary references held in `sync_ctx` are dropped. Note
@@ -124,6 +122,13 @@ mod ctx {
     }
 
     impl Ctx {
+        fn new() -> Self {
+            let mut non_sync_ctx =
+                BindingsNonSyncCtxImpl(Arc::new(BindingsNonSyncCtxImplInner::new()));
+            let sync_ctx = Arc::new(SyncCtx::new(&mut non_sync_ctx));
+            Self { non_sync_ctx, sync_ctx }
+        }
+
         pub(crate) fn sync_ctx(&self) -> &Arc<SyncCtx<BindingsNonSyncCtxImpl>> {
             &self.sync_ctx
         }
@@ -177,9 +182,28 @@ mod ctx {
             }
         }
     }
+
+    /// Contains the information needed to start serving a network stack over FIDL.
+    pub(crate) struct NetstackSeed {
+        pub(super) netstack: Netstack,
+        pub(super) interfaces_worker: interfaces_watcher::Worker,
+        pub(super) interfaces_watcher_sink: interfaces_watcher::WorkerWatcherSink,
+    }
+
+    impl Default for NetstackSeed {
+        fn default() -> Self {
+            let (interfaces_worker, interfaces_watcher_sink, interfaces_event_sink) =
+                interfaces_watcher::Worker::new();
+            Self {
+                netstack: Netstack { ctx: Ctx::new(), interfaces_event_sink },
+                interfaces_worker,
+                interfaces_watcher_sink,
+            }
+        }
+    }
 }
 
-pub(crate) use ctx::{BindingsNonSyncCtxImpl, Ctx};
+pub(crate) use ctx::{BindingsNonSyncCtxImpl, Ctx, NetstackSeed};
 
 use crate::bindings::{
     interfaces_watcher::AddressPropertiesUpdate, util::TryIntoFidlWithContext as _,
@@ -243,13 +267,24 @@ const DEFAULT_INTERFACE_METRIC: u32 = 100;
 
 type UdpSockets = socket::datagram::SocketCollectionPair<socket::datagram::Udp>;
 
-#[derive(Default)]
 pub(crate) struct BindingsNonSyncCtxImplInner {
     rng: RngImpl,
     timers: timers::TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>>,
     devices: Devices<DeviceId<BindingsNonSyncCtxImpl>>,
     udp_sockets: UdpSockets,
     route_update_dispatcher: CoreMutex<routes_fidl_worker::RouteUpdateDispatcher>,
+}
+
+impl BindingsNonSyncCtxImplInner {
+    pub(crate) fn new() -> Self {
+        Self {
+            rng: Default::default(),
+            timers: Default::default(),
+            devices: Default::default(),
+            udp_sockets: Default::default(),
+            route_update_dispatcher: Default::default(),
+        }
+    }
 }
 
 impl AsRef<timers::TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>>> for BindingsNonSyncCtxImpl {
@@ -736,25 +771,6 @@ fn add_loopback_routes<NonSyncCtx: NonSyncContext>(
 pub(crate) struct Netstack {
     ctx: Ctx,
     interfaces_event_sink: interfaces_watcher::WorkerInterfaceSink,
-}
-
-/// Contains the information needed to start serving a network stack over FIDL.
-pub(crate) struct NetstackSeed {
-    netstack: Netstack,
-    interfaces_worker: interfaces_watcher::Worker,
-    interfaces_watcher_sink: interfaces_watcher::WorkerWatcherSink,
-}
-
-impl Default for NetstackSeed {
-    fn default() -> Self {
-        let (interfaces_worker, interfaces_watcher_sink, interfaces_event_sink) =
-            interfaces_watcher::Worker::new();
-        Self {
-            netstack: Netstack { ctx: Default::default(), interfaces_event_sink },
-            interfaces_worker,
-            interfaces_watcher_sink,
-        }
-    }
 }
 
 fn create_interface_event_producer(

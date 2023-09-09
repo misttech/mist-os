@@ -1218,81 +1218,40 @@ impl<I: Ip> TryIntoFidlWithContext<fnet_routes_ext::InstalledRoute<I>>
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
     use std::fmt::Debug;
 
     use fidl_fuchsia_net as fidl_net;
     use fidl_fuchsia_net_ext::IntoExt;
-    use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
+
     use net_declare::{net_ip_v4, net_ip_v6};
     use net_types::ip::{Ipv4Addr, Ipv6Addr};
     use test_case::test_case;
 
-    use crate::bindings::{
-        devices, interfaces_admin::OwnedControlHandle, Ctx, DeviceIdExt as _,
-        InterfaceEventProducer, DEFAULT_INTERFACE_METRIC, DEFAULT_LOOPBACK_MTU,
-    };
+    use crate::bindings::{integration_tests::TestStack, DeviceIdExt as _};
 
     use super::*;
 
     struct FakeConversionContext {
         binding: BindingId,
         core: DeviceId<BindingsNonSyncCtxImpl>,
-        // We hold the netstack even though it is unused because we create
-        // a device in the Netstack to get a device ID.
-        //
-        // Netstack requires that all strongly-referenced IDs are dropped before
-        // the internal reference to the device is dropped. We include netstack
-        // here (at the bottom of this struct) to make sure it is only dropped
-        // after the device IDs are dropped.
-        _netstack: Ctx,
+        test_stack: TestStack,
     }
 
     impl FakeConversionContext {
+        async fn shutdown(self) {
+            let Self { binding, core, test_stack } = self;
+            std::mem::drop((binding, core));
+            test_stack.shutdown().await
+        }
+
         async fn new() -> Self {
-            // We need a valid context to be able to create DeviceIds, so
-            // we just create it, get the device id, and then destroy
-            // everything.
-            let ctx = Ctx::default();
+            // Create a test stack to get a valid device ID.
+            let mut test_stack = TestStack::new(None);
             let binding = BindingId::MIN;
-            let core = {
-                let (_control_client_end, control_server_end) =
-                    fnet_interfaces_ext::admin::Control::create_endpoints()
-                        .expect("create control proxy");
-                let (control_sender, _control_receiver) =
-                    OwnedControlHandle::new_channel_with_owned_handle(control_server_end).await;
-                let (event_sender, _event_receiver) = futures::channel::mpsc::unbounded();
-
-                netstack3_core::device::add_loopback_device_with_state(
-                    ctx.sync_ctx(),
-                    DEFAULT_LOOPBACK_MTU,
-                    RawMetric(DEFAULT_INTERFACE_METRIC),
-                    || {
-                        const LOOPBACK_NAME: &'static str = "lo";
-
-                        devices::LoopbackInfo {
-                            static_common_info: devices::StaticCommonInfo {
-                                binding_id: binding,
-                                name: LOOPBACK_NAME.to_string(),
-                                tx_notifier: Default::default(),
-                            },
-                            dynamic_common_info: devices::DynamicCommonInfo {
-                                mtu: DEFAULT_LOOPBACK_MTU,
-                                admin_enabled: true,
-                                events: InterfaceEventProducer::new(binding, event_sender),
-                                control_hook: control_sender,
-                                addresses: HashMap::new(),
-                            }
-                            .into(),
-                            rx_notifier: Default::default(),
-                        }
-                    },
-                )
-                .expect("failed to add loopback to core")
-                .into()
-            };
-
-            Self { binding, core, _netstack: ctx }
+            test_stack.wait_for_interface_online(binding).await;
+            let ctx = test_stack.ctx();
+            let core = ctx.non_sync_ctx().get_core_id(binding).expect("should get core ID");
+            Self { binding, core, test_stack }
         }
     }
 
@@ -1422,6 +1381,7 @@ mod tests {
         assert_eq!(IpAddressState::Assigned.into_fidl(), AddressAssignmentState::Assigned);
     }
 
+    #[fixture::teardown(FakeConversionContext::shutdown)]
     #[test_case(
         fidl_net::Ipv6SocketAddress {
             address: net_ip_v6!("1:2:3:4::").into_ext(),
@@ -1448,15 +1408,16 @@ mod tests {
             TryFromFidlWithContext<A::Zone, Error = DeviceNotFoundError>,
     {
         let ctx = FakeConversionContext::new().await;
-
         let result: Result<(Option<_>, _), _> = addr.try_into_core_with_ctx(&ctx);
         assert_eq!(result.expect_err("should fail"), expected);
+        ctx
     }
 
     /// Placeholder for an ID that should be replaced with the real `DeviceId`
     /// from the `FakeConversionContext`.
     struct ReplaceWithCoreId;
 
+    #[fixture::teardown(FakeConversionContext::shutdown)]
     #[test_case(
         fidl_net::Ipv4SocketAddress {address: net_ip_v4!("192.168.0.0").into_ext(), port: 8080},
         (Some(ZonedAddr::Unzoned(SpecifiedAddr::new(net_ip_v4!("192.168.0.0")).unwrap())), 8080);
@@ -1517,7 +1478,8 @@ mod tests {
         assert_eq!(result, (zoned, port));
 
         let result = result.try_into_fidl_with_ctx(&ctx).expect("reverse should succeed");
-        assert_eq!(result, addr)
+        assert_eq!(result, addr);
+        ctx
     }
 
     #[test]
@@ -1536,16 +1498,17 @@ mod tests {
         );
     }
 
+    #[fixture::teardown(FakeConversionContext::shutdown)]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn device_id_from_bindings_id() {
         let ctx = FakeConversionContext::new().await;
-
         let id = ctx.binding;
         let device_id: DeviceId<_> = id.try_into_core_with_ctx(&ctx).unwrap();
         assert_eq!(device_id, ctx.core);
 
         let bad_id = id.checked_add(1).unwrap();
         assert_eq!(bad_id.try_into_core_with_ctx(&ctx), Err::<DeviceId<_>, _>(DeviceNotFoundError));
+        ctx
     }
 
     #[test]

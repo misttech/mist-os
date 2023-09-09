@@ -43,7 +43,7 @@ mod trace;
 pub mod transport;
 
 use alloc::vec::Vec;
-use core::{fmt::Debug, marker::PhantomData, time};
+use core::{fmt::Debug, time};
 
 use derivative::Derivative;
 use lock_order::Locked;
@@ -181,12 +181,6 @@ pub struct StackState<C: NonSyncContext> {
     device: DeviceLayerState<C>,
 }
 
-impl<C: NonSyncContext + Default> Default for StackState<C> {
-    fn default() -> StackState<C> {
-        StackStateBuilder::default().build_with_ctx(&mut Default::default())
-    }
-}
-
 /// The non synchronized context for the stack with a buffer.
 pub trait BufferNonSyncContextInner<B: BufferMut>:
     transport::udp::BufferNonSyncContext<Ipv4, B>
@@ -261,12 +255,16 @@ impl<
 }
 
 /// The synchronized context.
-#[derive(Default)]
 pub struct SyncCtx<NonSyncCtx: NonSyncContext> {
     /// Contains the state of the stack.
     pub state: StackState<NonSyncCtx>,
-    /// A marker for the non-synchronized context type.
-    pub non_sync_ctx_marker: PhantomData<NonSyncCtx>,
+}
+
+impl<NonSyncCtx: NonSyncContext> SyncCtx<NonSyncCtx> {
+    /// Create a new `SyncCtx`.
+    pub fn new(non_sync_ctx: &mut NonSyncCtx) -> SyncCtx<NonSyncCtx> {
+        SyncCtx { state: StackStateBuilder::default().build_with_ctx(non_sync_ctx) }
+    }
 }
 
 /// The identifier for any timer event.

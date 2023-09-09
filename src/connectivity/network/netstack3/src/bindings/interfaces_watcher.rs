@@ -323,14 +323,6 @@ impl InterfaceEventProducer {
             }
         })
     }
-
-    #[cfg(test)]
-    pub(crate) fn new(
-        id: BindingId,
-        channel: mpsc::UnboundedSender<InterfaceEvent>,
-    ) -> InterfaceEventProducer {
-        InterfaceEventProducer { id, channel }
-    }
 }
 
 impl Drop for InterfaceEventProducer {
