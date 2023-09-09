@@ -1300,7 +1300,7 @@ mod tests {
             "log_listener".to_string(),
             "--dump_logs".to_string(),
             "yes".to_string(),
-            "--tags".to_string(),
+            "--tag".to_string(),
             "yes".to_string(),
         ]);
         assert_eq!(subcommand, LogSubCommand::Dump(DumpCommand {}));
