@@ -31,13 +31,4 @@
             to: "#trace_manager",
         },
     ],
-    expose: [
-        {
-            protocol: [
-                "fuchsia.tracing.controller.Controller",
-                "fuchsia.tracing.provider.Registry",
-            ],
-            from: "#trace_manager",
-        },
-    ],
 }

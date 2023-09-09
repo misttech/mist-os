@@ -697,5 +697,14 @@
             from: "#zircon-guest-manager",
             source_availability: "unknown",
         },
+        {
+            protocol: [
+                "fuchsia.tracing.controller.Controller",
+                "fuchsia.tracing.perfetto.ProducerConnector",
+                "fuchsia.tracing.provider.Registry",
+            ],
+            from: "#trace_manager",
+            source_availability: "unknown",
+        },
     ],
 }

@@ -1095,14 +1095,6 @@ assembly_input_bundle("common_minimal") {
                     # TODO(fxbug.dev/80375): only include in eng builds
                     "//src/sys/test_manager/meta/test_manager.core_shard.cml",
                     "//src/sys/testing/meta/test_realm.core_shard.cml",
-
-                    # TODO(fxbug.dev/112433): The trace manager core shard should only
-                    # appear in eng builds, however, many components do not properly
-                    # declare their route dependencies on it as optional causing scrutiny
-                    # to fail route checking. Once the all of the component routes are
-                    # properly declared optional, this shard should be removed from here
-                    # and added in "common_minimal_eng" instead.
-                    "//src/performance/trace_manager/meta/trace_manager.core_shard.cml",
                   ],
                   root_build_dir)
         },
@@ -1209,6 +1201,7 @@ assembly_input_bundle("minimal_eng") {
                     "//src/developer/process_explorer/meta/process_explorer.core_shard.cml",
                     "//src/devices/bin/driver_playground/meta/driver_playground.core_shard.cml",
                     "//src/testing/metrics-logger/meta/metrics-logger.core_shard.cml",
+                    "//src/performance/trace_manager/meta/trace_manager.core_shard.cml",
                   ],
                   root_build_dir)
         },
