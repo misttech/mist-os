@@ -345,19 +345,11 @@
                 "MMapFileTest.MapFirstNegativePage",
                 "MMapFileTest.MapLastNegativePage",
                 "MMapFileTest.MapLastPositivePage",
-                "MMapFileTest.MapOffsetBeyondEnd",
                 "MMapFileTest.MapSecondToLastNegativePage",
-                "MMapFileTest.ReadSharedTruncateSIGBUS",
-                "MMapFileTest.WriteSharedTruncateSIGBUS",
                 "MMapTest.ExceedLimitAS",
                 "MMapTest.ExceedLimitDataPrlimitPID",
                 "MMapTest.MapLocked",
                 "MMapTest.MprotectHugeLength",
-                "ReadWriteSharedPrivate/MMapFileParamTest.SigBusDeath/*",
-
-                // mremap_test - https://fxbug.dev/79303
-                // Fails because Starnix currently doesn't distinguish SIGSEGV and SIGBUS.
-                "MremapDeathTest.SharedAnon",
 
                 // mount_test
                 "MountTest.ActiveSubmountBusy",

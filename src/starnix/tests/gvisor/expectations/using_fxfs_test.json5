@@ -14,6 +14,12 @@
             matchers: [
                 // fallocate_test
                 "AllocateTest.Fallocate",
+
+                // mmap_test
+                // These test cases fail with pager-backed filesystems currently.
+                // TODO(https://fxbug.dev/133371): Re-enable once these pass on fxfs.
+                "MMapFileTest.ReadSharedTruncateSIGBUS",
+                "MMapFileTest.WriteSharedTruncateSIGBUS",
             ],
         },
         {

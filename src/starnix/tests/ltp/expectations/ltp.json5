@@ -182,7 +182,6 @@
                 "mlockall02",
                 "mlockall03",
                 "mmap12",
-                "mmap13",
                 "mmap14",
                 "mmapstress07",
                 "mount02",
