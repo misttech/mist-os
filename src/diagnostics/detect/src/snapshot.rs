@@ -8,6 +8,7 @@ use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use futures::channel::mpsc;
 use futures::stream::StreamExt;
+use injectable_time::TimeSource;
 use std::cell::RefCell;
 use std::rc::Rc;
 use tracing::{error, warn};
@@ -44,9 +45,10 @@ impl SnapshotRequest {
 const MAX_PENDING_CRASH_REPORTS: usize = 10;
 
 /// A builder for constructing the CrashReportHandler node.
-pub struct CrashReportHandlerBuilder {
+pub struct CrashReportHandlerBuilder<T: TimeSource> {
     proxy: Option<fidl_feedback::CrashReporterProxy>,
     max_pending_crash_reports: usize,
+    time_source: T,
 }
 
 /// Logs an error message if the passed in `result` is an error.
@@ -59,13 +61,14 @@ macro_rules! log_if_err {
     };
 }
 
-impl Default for CrashReportHandlerBuilder {
-    fn default() -> Self {
-        Self { proxy: None, max_pending_crash_reports: MAX_PENDING_CRASH_REPORTS }
+impl<T> CrashReportHandlerBuilder<T>
+where
+    T: TimeSource + 'static,
+{
+    pub fn new(time_source: T) -> Self {
+        Self { time_source, max_pending_crash_reports: MAX_PENDING_CRASH_REPORTS, proxy: None }
     }
-}
 
-impl CrashReportHandlerBuilder {
     pub async fn build(self) -> Result<Rc<CrashReportHandler>, Error> {
         // Proxy is only pre-set for tests. If a proxy was not specified,
         // this is a good time to configure for our crash reporting product.
@@ -78,13 +81,22 @@ impl CrashReportHandlerBuilder {
             };
             config_proxy.upsert_with_ack(&CRASH_PROGRAM_NAME.to_string(), &product_config).await?;
         }
-        let handler = CrashReportHandler::new(self.proxy, self.max_pending_crash_reports)?;
-        Ok(Rc::new(handler))
+        // Connect to the CrashReporter service if a proxy wasn't specified
+        let proxy =
+            self.proxy.unwrap_or(connect_to_protocol::<fidl_feedback::CrashReporterMarker>()?);
+        Ok(Rc::new(CrashReportHandler::new(
+            proxy,
+            self.time_source,
+            self.max_pending_crash_reports,
+        )))
     }
 }
 
 #[cfg(test)]
-impl CrashReportHandlerBuilder {
+impl<T> CrashReportHandlerBuilder<T>
+where
+    T: TimeSource,
+{
     fn with_proxy(mut self, proxy: fidl_feedback::CrashReporterProxy) -> Self {
         self.proxy = Some(proxy);
         self
@@ -116,20 +128,14 @@ pub struct CrashReportHandler {
 }
 
 impl CrashReportHandler {
-    fn new(
-        proxy: Option<fidl_feedback::CrashReporterProxy>,
-        channel_size: usize,
-    ) -> Result<Self, Error> {
-        // Connect to the CrashReporter service if a proxy wasn't specified
-        let proxy = proxy.unwrap_or(connect_to_protocol::<fidl_feedback::CrashReporterMarker>()?);
+    fn new<T>(proxy: fidl_feedback::CrashReporterProxy, time_source: T, channel_size: usize) -> Self
+    where
+        T: TimeSource + 'static,
+    {
         // Set up the crash report sender that runs asynchronously
         let (channel, receiver) = mpsc::channel(channel_size);
-        let server_task = Self::begin_crash_report_sender(proxy, receiver);
-        Ok(Self {
-            channel_size,
-            crash_report_sender: RefCell::new(channel),
-            _server_task: server_task,
-        })
+        let server_task = Self::begin_crash_report_sender(proxy, receiver, time_source);
+        Self { channel_size, crash_report_sender: RefCell::new(channel), _server_task: server_task }
     }
 
     /// Handle a FileCrashReport message by sending the specified crash report signature over the
@@ -153,14 +159,18 @@ impl CrashReportHandler {
     /// Spawn a Task that receives crash report signatures over the channel and uses
     /// the proxy to send a File FIDL request to the CrashReporter service with the specified
     /// signatures.
-    fn begin_crash_report_sender(
+    fn begin_crash_report_sender<T>(
         proxy: fidl_feedback::CrashReporterProxy,
         mut receive_channel: mpsc::Receiver<SnapshotRequest>,
-    ) -> fasync::Task<()> {
+        time_source: T,
+    ) -> fasync::Task<()>
+    where
+        T: TimeSource + 'static,
+    {
         fasync::Task::local(async move {
             while let Some(request) = receive_channel.next().await {
                 log_if_err!(
-                    Self::send_crash_report(&proxy, request).await,
+                    Self::send_crash_report(&proxy, request, &time_source).await,
                     "Failed to file crash report"
                 );
             }
@@ -169,13 +179,15 @@ impl CrashReportHandler {
     }
 
     /// Send a File request to the CrashReporter service with the specified crash report signature.
-    async fn send_crash_report(
+    async fn send_crash_report<T: TimeSource>(
         proxy: &fidl_feedback::CrashReporterProxy,
         payload: SnapshotRequest,
+        time_source: &T,
     ) -> Result<fidl_feedback::FileReportResults, Error> {
         warn!("Filing crash report, signature '{}'", payload.signature);
         let report = fidl_feedback::CrashReport {
             program_name: Some(CRASH_PROGRAM_NAME.to_string()),
+            program_uptime: Some(time_source.now()),
             crash_signature: Some(payload.signature),
             is_fatal: Some(false),
             ..Default::default()
@@ -191,6 +203,7 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use futures::TryStreamExt;
+    use injectable_time::{FakeTime, IncrementingFakeTime};
 
     /// Tests that the node responds to the FileCrashReport message and that the expected crash
     /// report is received by the CrashReporter service.
@@ -203,8 +216,10 @@ mod tests {
         let (proxy, mut stream) =
             fidl::endpoints::create_proxy_and_stream::<fidl_feedback::CrashReporterMarker>()
                 .unwrap();
+        let fake_time = FakeTime::new();
+        fake_time.set_ticks(9876);
         let crash_report_handler =
-            CrashReportHandlerBuilder::default().with_proxy(proxy).build().await.unwrap();
+            CrashReportHandlerBuilder::new(fake_time).with_proxy(proxy).build().await.unwrap();
 
         // File a crash report
         crash_report_handler
@@ -219,6 +234,7 @@ mod tests {
                 report,
                 fidl_feedback::CrashReport {
                     program_name: Some(CRASH_PROGRAM_NAME.to_string()),
+                    program_uptime: Some(9876),
                     crash_signature: Some(crash_report_signature.to_string()),
                     is_fatal: Some(false),
                     ..Default::default()
@@ -237,7 +253,8 @@ mod tests {
         let (proxy, mut stream) =
             fidl::endpoints::create_proxy_and_stream::<fidl_feedback::CrashReporterMarker>()
                 .unwrap();
-        let crash_report_handler = CrashReportHandlerBuilder::default()
+        let fake_time = IncrementingFakeTime::new(1000, std::time::Duration::from_nanos(1000));
+        let crash_report_handler = CrashReportHandlerBuilder::new(fake_time)
             .with_proxy(proxy)
             .with_max_pending_crash_reports(1)
             .build()
@@ -278,6 +295,7 @@ mod tests {
                 report,
                 fidl_feedback::CrashReport {
                     program_name: Some(CRASH_PROGRAM_NAME.to_string()),
+                    program_uptime: Some(1000),
                     crash_signature: Some("TestCrash1".to_string()),
                     is_fatal: Some(false),
                     ..Default::default()
@@ -297,6 +315,7 @@ mod tests {
                 report,
                 fidl_feedback::CrashReport {
                     program_name: Some(CRASH_PROGRAM_NAME.to_string()),
+                    program_uptime: Some(2000),
                     crash_signature: Some("TestCrash2".to_string()),
                     is_fatal: Some(false),
                     ..Default::default()
