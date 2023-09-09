@@ -7,17 +7,18 @@
 #ifndef ZIRCON_KERNEL_ARCH_RISCV64_PHYS_INCLUDE_PHYS_ARCH_ADDRESS_SPACE_H_
 #define ZIRCON_KERNEL_ARCH_RISCV64_PHYS_INCLUDE_PHYS_ARCH_ADDRESS_SPACE_H_
 
-#include <lib/arch/riscv64/page-table.h>
+#include <lib/arch/paging.h>
 
-using ArchLowerPagingTraits = arch::RiscvSv39PagingTraits;
+//
+// TODO(fxbug.dev/91187): Wire up actual RISC-V traits
+//
+
+using ArchLowerPagingTraits = arch::ExamplePagingTraits;
 using ArchUpperPagingTraits = ArchLowerPagingTraits;
 
-inline constexpr auto kArchNormalMemoryType = arch::RiscvMemoryType::kPma;
+inline constexpr arch::ExamplePagingTraits::MemoryType kArchNormalMemoryType = {};
+inline constexpr arch::ExamplePagingTraits::MemoryType kArchMmioMemoryType = {};
 
-// TODO(fxbug.dev/129979): Conditionally set to kIo once we can determine
-// whether the svpbmt extension is supported.
-inline constexpr auto kArchMmioMemoryType = arch::RiscvMemoryType::kPma;
-
-inline arch::RiscvSystemPagingState ArchCreatePagingState() { return {}; }
+inline arch::ExamplePagingTraits::SystemState ArchCreatePagingState() { return {}; }
 
 #endif  // ZIRCON_KERNEL_ARCH_RISCV64_PHYS_INCLUDE_PHYS_ARCH_ADDRESS_SPACE_H_

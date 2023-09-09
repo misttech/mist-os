@@ -8,8 +8,6 @@
 #define ZIRCON_KERNEL_LIB_ARCH_RISCV64_INCLUDE_LIB_ARCH_CACHE_H_
 
 #ifndef __ASSEMBLER__
-#include <lib/arch/riscv64/page-table.h>
-#include <zircon/assert.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -30,9 +28,7 @@ class GlobalCacheConsistencyContext {
 };
 
 // arch::DisableMmu() is a common name between a few architectures.
-inline void DisableMmu() { RiscvSatp::Write(uint64_t{0}); }
-
-inline void InvalidateLocalTlbs() { __asm__ volatile("sfence.vma zero, zero" ::: "memory"); }
+inline void DisableMmu() { __asm__ volatile("csrw satp, zero" : : : "memory"); }
 
 }  // namespace arch
 
