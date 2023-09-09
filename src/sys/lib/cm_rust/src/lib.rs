@@ -13,6 +13,7 @@ use {
     fidl_fuchsia_process as fprocess,
     flyweights::FlyStr,
     from_enum::FromEnum,
+    std::collections::hash_map::Entry,
     std::collections::{BTreeMap, HashMap},
     std::convert::{From, TryFrom},
     std::fmt,
@@ -391,6 +392,22 @@ pub struct OfferEventStreamDecl {
 pub struct NameMapping {
     pub source_name: String,
     pub target_name: String,
+}
+
+pub fn name_mappings_to_map(name_mappings: Vec<NameMapping>) -> HashMap<String, Vec<String>> {
+    let mut m = HashMap::<String, Vec<String>>::new();
+    for mapping in name_mappings.iter() {
+        match m.entry(mapping.clone().source_name) {
+            Entry::Occupied(mut entry) => {
+                let val = entry.get_mut();
+                val.push(mapping.clone().target_name);
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(vec![mapping.clone().target_name]);
+            }
+        }
+    }
+    m
 }
 
 impl NativeIntoFidl<fdecl::NameMapping> for NameMapping {

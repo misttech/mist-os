@@ -34,7 +34,6 @@ use {
     routing::{
         capability_source::{
             AggregateCapability, CapabilitySource, ComponentCapability, InternalCapability,
-            OfferAggregateCapabilityRouteData,
         },
         component_id_index::ComponentInstanceId,
         component_instance::ComponentInstanceInterface,
@@ -47,7 +46,7 @@ use {
         route_capability, RouteRequest, RouteSource,
     },
     std::{
-        collections::HashSet,
+        collections::{HashMap, HashSet},
         convert::TryInto,
         marker::PhantomData,
         path::{Path, PathBuf},
@@ -4700,8 +4699,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Service(OfferServiceDecl {
                         source: OfferSource::static_child("c".parse().unwrap()),
                         source_name: "foo".parse().unwrap(),
-                        source_instance_filter,
-                        renamed_instances,
+                        source_instance_filter: source_instance_filter,
+                        renamed_instances: renamed_instances,
                         target_name: "foo".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         availability: Availability::Required,
@@ -4731,6 +4730,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         let b_component =
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+        let c_component =
+            model.look_up_instance(&vec!["c"].try_into().unwrap()).await.expect("c instance");
         let source = route_capability(
             RouteRequest::UseService(use_decl),
             &b_component,
@@ -4745,40 +4746,24 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 source:
                     CapabilitySource::<
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-                    >::OfferAggregate {
-                        capability: AggregateCapability::Service(name),
+                    >::FilteredService {
+                        capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
                         component,
-                        capability_provider,
+                        source_instance_filter,
+                        instance_name_source_to_target,
                     },
                 relative_path,
             } if relative_path == PathBuf::new() => {
                 assert_eq!(name, "foo");
-                assert_eq!(component.moniker, "c".parse().unwrap());
-                let mut data = capability_provider.route_instances();
-                assert_eq!(data.len(), 1);
-                let data = data.remove(0).await.unwrap();
-                assert_matches!(
-                    data,
-                    OfferAggregateCapabilityRouteData {
-                        capability_source: CapabilitySource::Component {
-                            component,
-                            capability,
-                        },
-                        instance_filter,
-                    }
-                    if component.moniker == "c".parse().unwrap() &&
-                        capability == ComponentCapability::Service(ServiceDecl {
-                            name: "foo".parse().unwrap(),
-                            source_path: Some("/svc/foo".parse().unwrap()),
-                        }) &&
-                        instance_filter == vec![
-                            NameMapping {
-                                source_name: "service_instance_0".parse().unwrap(),
-                                target_name: "service_instance_0".parse().unwrap(),
-                            }
-                        ]
+                assert_eq!(
+                    source_path.expect("missing source path"),
+                    "/svc/foo".parse::<cm_types::Path>().unwrap()
                 );
-           }
+                assert_eq!(source_instance_filter, vec!["service_instance_0".to_string()]);
+                assert_eq!(instance_name_source_to_target, HashMap::new());
+
+                assert!(Arc::ptr_eq(&component.upgrade().unwrap(), &c_component));
+            }
             _ => panic!("bad capability source"),
         };
     }
@@ -4803,6 +4788,11 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             source_name: "instance_0".to_string(),
             target_name: "renamed_instance_0".to_string(),
         }]);
+        let expected_rename_map = {
+            let mut m = HashMap::new();
+            m.insert("instance_0".to_string(), vec!["renamed_instance_0".to_string()]);
+            m
+        };
 
         let components = vec![
             (
@@ -4811,8 +4801,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Service(OfferServiceDecl {
                         source: OfferSource::static_child("c".parse().unwrap()),
                         source_name: "foo".parse().unwrap(),
-                        source_instance_filter,
-                        renamed_instances,
+                        source_instance_filter: source_instance_filter,
+                        renamed_instances: renamed_instances,
                         target_name: "foo".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         availability: Availability::Required,
@@ -4842,6 +4832,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         let b_component =
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+        let c_component =
+            model.look_up_instance(&vec!["c"].try_into().unwrap()).await.expect("c instance");
         let source = route_capability(
             RouteRequest::UseService(use_decl),
             &b_component,
@@ -4856,39 +4848,23 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 source:
                     CapabilitySource::<
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-                    >::OfferAggregate {
-                        capability: AggregateCapability::Service(name),
+                    >::FilteredService {
+                        capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
                         component,
-                        capability_provider,
+                        source_instance_filter,
+                        instance_name_source_to_target,
                     },
                 relative_path,
             } if relative_path == PathBuf::new() => {
                 assert_eq!(name, "foo");
-                assert_eq!(component.moniker, "c".parse().unwrap());
-                let mut data = capability_provider.route_instances();
-                assert_eq!(data.len(), 1);
-                let data = data.remove(0).await.unwrap();
-                assert_matches!(
-                    data,
-                    OfferAggregateCapabilityRouteData {
-                        capability_source: CapabilitySource::Component {
-                            component,
-                            capability,
-                        },
-                        instance_filter,
-                    }
-                    if component.moniker == "c".parse().unwrap() &&
-                        capability == ComponentCapability::Service(ServiceDecl {
-                            name: "foo".parse().unwrap(),
-                            source_path: Some("/svc/foo".parse().unwrap()),
-                        }) &&
-                        instance_filter == vec![
-                            NameMapping {
-                                source_name: "instance_0".parse().unwrap(),
-                                target_name: "renamed_instance_0".parse().unwrap(),
-                            }
-                        ]
+                assert_eq!(
+                    source_path.expect("missing source path"),
+                    "/svc/foo".parse::<cm_types::Path>().unwrap()
                 );
+                assert_eq!(source_instance_filter, Vec::<String>::new());
+                assert_eq!(instance_name_source_to_target, expected_rename_map);
+
+                assert!(Arc::ptr_eq(&component.upgrade().unwrap(), &c_component));
             }
             _ => panic!("bad capability source"),
         };

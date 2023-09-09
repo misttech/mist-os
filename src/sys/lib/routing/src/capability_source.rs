@@ -14,18 +14,18 @@ use {
     cm_rust::{
         CapabilityDecl, CapabilityTypeName, DirectoryDecl, EventStreamDecl, ExposeDecl,
         ExposeDirectoryDecl, ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl,
-        ExposeServiceDecl, ExposeSource, NameMapping, OfferDecl, OfferDirectoryDecl,
-        OfferEventStreamDecl, OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl,
-        OfferServiceDecl, OfferSource, OfferStorageDecl, ProtocolDecl, RegistrationSource,
-        ResolverDecl, RunnerDecl, ServiceDecl, StorageDecl, UseDecl, UseDirectoryDecl,
-        UseProtocolDecl, UseServiceDecl, UseSource, UseStorageDecl,
+        ExposeServiceDecl, ExposeSource, OfferDecl, OfferDirectoryDecl, OfferEventStreamDecl,
+        OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl, OfferSource,
+        OfferStorageDecl, ProtocolDecl, RegistrationSource, ResolverDecl, RunnerDecl, ServiceDecl,
+        StorageDecl, UseDecl, UseDirectoryDecl, UseProtocolDecl, UseServiceDecl, UseSource,
+        UseStorageDecl,
     },
     cm_types::{Name, Path},
     derivative::Derivative,
     from_enum::FromEnum,
     futures::future::BoxFuture,
     moniker::ChildName,
-    std::{fmt, sync::Weak},
+    std::{collections::HashMap, fmt, sync::Weak},
     thiserror::Error,
 };
 
@@ -72,6 +72,12 @@ pub enum CapabilitySource<C: ComponentInstanceInterface> {
         capability_provider: Box<dyn OfferAggregateCapabilityProvider<C>>,
         component: WeakComponentInstanceInterface<C>,
     },
+    FilteredService {
+        capability: ComponentCapability,
+        component: WeakComponentInstanceInterface<C>,
+        source_instance_filter: Vec<String>,
+        instance_name_source_to_target: HashMap<String, Vec<String>>,
+    },
 }
 
 impl<C: ComponentInstanceInterface> CapabilitySource<C> {
@@ -86,6 +92,7 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
             Self::Capability { .. } => true,
             Self::CollectionAggregate { capability, .. } => capability.can_be_in_namespace(),
             Self::OfferAggregate { capability, .. } => capability.can_be_in_namespace(),
+            Self::FilteredService { capability, .. } => capability.can_be_in_namespace(),
         }
     }
 
@@ -98,6 +105,7 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
             Self::Capability { .. } => None,
             Self::CollectionAggregate { capability, .. } => Some(capability.source_name()),
             Self::OfferAggregate { capability, .. } => Some(capability.source_name()),
+            Self::FilteredService { capability, .. } => capability.source_name(),
         }
     }
 
@@ -110,6 +118,7 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
             Self::Capability { source_capability, .. } => source_capability.type_name(),
             Self::CollectionAggregate { capability, .. } => capability.type_name(),
             Self::OfferAggregate { capability, .. } => capability.type_name(),
+            Self::FilteredService { capability, .. } => capability.type_name(),
         }
     }
 
@@ -118,6 +127,7 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
             Self::Component { component, .. }
             | Self::Framework { component, .. }
             | Self::Capability { component, .. }
+            | Self::FilteredService { component, .. }
             | Self::CollectionAggregate { component, .. }
             | Self::OfferAggregate { component, .. } => {
                 WeakExtendedInstanceInterface::Component(component.clone())
@@ -135,21 +145,30 @@ impl<C: ComponentInstanceInterface> fmt::Display for CapabilitySource<C> {
             f,
             "{}",
             match self {
-                Self::Component { capability, component } => {
+                CapabilitySource::Component { capability, component } => {
                     format!("{} '{}'", capability, component.moniker)
                 }
-                Self::Framework { capability, .. } => capability.to_string(),
-                Self::Builtin { capability, .. } => capability.to_string(),
-                Self::Namespace { capability, .. } => capability.to_string(),
-                Self::OfferAggregate { capability, .. } => capability.to_string(),
-                Self::Capability { source_capability, .. } => format!("{}", source_capability),
-                Self::CollectionAggregate { capability, collections, component, .. } => {
+                CapabilitySource::Framework { capability, .. } => capability.to_string(),
+                CapabilitySource::Builtin { capability, .. } => capability.to_string(),
+                CapabilitySource::Namespace { capability, .. } => capability.to_string(),
+                CapabilitySource::OfferAggregate { capability, .. } => capability.to_string(),
+                CapabilitySource::Capability { source_capability, .. } =>
+                    format!("{}", source_capability),
+                CapabilitySource::CollectionAggregate {
+                    capability,
+                    collections,
+                    component,
+                    ..
+                } => {
                     format!(
                         "{} from collections '{}' of component '{}'",
                         capability,
                         collections.iter().map(|c| c.as_str()).collect::<Vec<_>>().join(","),
                         &component.moniker
                     )
+                }
+                Self::FilteredService { capability, component, .. } => {
+                    format!("{} '{}'", capability, component.moniker)
                 }
             }
         )
@@ -191,21 +210,6 @@ impl<C> fmt::Debug for Box<dyn CollectionAggregateCapabilityProvider<C>> {
     }
 }
 
-/// The return value of the routing future returned by
-/// `OfferAggregateCapabilityProvider::route_instances`, which contains information about the
-/// source of the route.
-#[derive(Debug)]
-pub struct OfferAggregateCapabilityRouteData<C>
-where
-    C: ComponentInstanceInterface,
-{
-    /// The source of the capability.
-    pub capability_source: CapabilitySource<C>,
-    /// The filter to apply to service instances, as defined by
-    /// [`fuchsia.component.decl/OfferService.renamed_instances`](https://fuchsia.dev/reference/fidl/fuchsia.component.decl#OfferService).
-    pub instance_filter: Vec<NameMapping>,
-}
-
 /// A provider of a capability from an aggregation of zero or more offered instances of a capability.
 ///
 /// This trait type-erases the capability type, so it can be handled and hosted generically.
@@ -214,7 +218,7 @@ pub trait OfferAggregateCapabilityProvider<C: ComponentInstanceInterface>: Send 
     /// result is paired with the list of instances to include in the source.
     fn route_instances(
         &self,
-    ) -> Vec<BoxFuture<'_, Result<OfferAggregateCapabilityRouteData<C>, RoutingError>>>;
+    ) -> Vec<BoxFuture<'_, Result<(CapabilitySource<C>, Vec<String>), RoutingError>>>;
 
     /// Trait-object compatible clone.
     fn clone_boxed(&self) -> Box<dyn OfferAggregateCapabilityProvider<C>>;
