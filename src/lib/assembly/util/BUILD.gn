@@ -18,6 +18,7 @@ rustc_library("util") {
   ]
   test_deps = [ "//third_party/rust_crates:tempfile" ]
   sources = [
+    "src/fast_copy.rs",
     "src/insert_unique.rs",
     "src/lib.rs",
     "src/named_map.rs",

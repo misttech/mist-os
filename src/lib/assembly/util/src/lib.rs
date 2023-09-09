@@ -5,12 +5,12 @@
 #![deny(missing_docs)]
 
 //! Utility methods and traits used throughout assembly.
-
+mod fast_copy;
 mod insert_unique;
-
 mod named_map;
 mod paths;
 
+pub use fast_copy::fast_copy;
 pub use insert_unique::{
     BTreeMapDuplicateKeyError, DuplicateKeyError, InsertAllUniqueExt, InsertUniqueExt, MapEntry,
 };
