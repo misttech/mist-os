@@ -286,7 +286,7 @@ fn try_handle_incoming_for_connection<I, SC, C, B>(
     ip_transport_ctx: &mut SC,
     ctx: &mut C,
     sockets: &mut Sockets<I, SC::WeakDeviceId, C>,
-    conn_addr: ConnAddr<I::Addr, SC::WeakDeviceId, NonZeroU16, NonZeroU16>,
+    conn_addr: ConnAddr<ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>, SC::WeakDeviceId>,
     conn_id: SocketId<I>,
     incoming: Segment<&[u8]>,
     now: C::Instant,

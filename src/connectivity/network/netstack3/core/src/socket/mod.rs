@@ -28,7 +28,7 @@ use crate::{
     },
     device::{Id, StrongId, WeakId},
     error::{ExistsError, NotFoundError},
-    socket::address::{AddrVecIter, ConnAddr, ListenerAddr, ListenerIpAddr},
+    socket::address::{AddrVecIter, ConnAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr},
 };
 
 /// Describes which direction(s) of the data path should be shut down.
@@ -288,7 +288,7 @@ pub(crate) enum Bound<S: SocketMapStateSpec + ?Sized> {
 )]
 pub(crate) enum AddrVec<I: Ip, D, A: SocketMapAddrSpec + ?Sized> {
     Listen(ListenerAddr<ListenerIpAddr<I::Addr, A::LocalIdentifier>, D>),
-    Conn(ConnAddr<I::Addr, D, A::LocalIdentifier, A::RemoteIdentifier>),
+    Conn(ConnAddr<ConnIpAddr<I::Addr, A::LocalIdentifier, A::RemoteIdentifier>, D>),
 }
 
 impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: SocketMapStateSpec + ?Sized> Tagged<AddrVec<I, D, A>>
@@ -360,10 +360,8 @@ impl<'a, A: IpAddress, D, LI, S> From<(&'a ListenerAddr<ListenerIpAddr<A, LI>, D
     }
 }
 
-impl<'a, A: IpAddress, D, LI, RI, S> From<(&'a ConnAddr<A, D, LI, RI>, S)>
-    for SocketAddrTypeTag<S>
-{
-    fn from((addr, sharing): (&'a ConnAddr<A, D, LI, RI>, S)) -> Self {
+impl<'a, A, D, S> From<(&'a ConnAddr<A, D>, S)> for SocketAddrTypeTag<S> {
+    fn from((addr, sharing): (&'a ConnAddr<A, D>, S)) -> Self {
         let ConnAddr { ip: _, device } = addr;
         SocketAddrTypeTag {
             has_device: device.is_some(),
@@ -754,7 +752,7 @@ where
     pub(crate) fn conns(&self) -> Sockets<&SocketMap<AddrVec<I, D, A>, Bound<S>>, Connection>
     where
         S: SocketMapConflictPolicy<
-            ConnAddr<I::Addr, D, A::LocalIdentifier, A::RemoteIdentifier>,
+            ConnAddr<ConnIpAddr<I::Addr, A::LocalIdentifier, A::RemoteIdentifier>, D>,
             <S as SocketMapStateSpec>::ConnSharingState,
             I,
             D,
@@ -772,7 +770,7 @@ where
     ) -> Sockets<&mut SocketMap<AddrVec<I, D, A>, Bound<S>>, Connection>
     where
         S: SocketMapConflictPolicy<
-            ConnAddr<I::Addr, D, A::LocalIdentifier, A::RemoteIdentifier>,
+            ConnAddr<ConnIpAddr<I::Addr, A::LocalIdentifier, A::RemoteIdentifier>, D>,
             <S as SocketMapStateSpec>::ConnSharingState,
             I,
             D,
@@ -873,7 +871,7 @@ impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: SocketMapStateSpec> ConvertSocketMap
 {
     type Id = S::ConnId;
     type SharingState = S::ConnSharingState;
-    type Addr = ConnAddr<I::Addr, D, A::LocalIdentifier, A::RemoteIdentifier>;
+    type Addr = ConnAddr<ConnIpAddr<I::Addr, A::LocalIdentifier, A::RemoteIdentifier>, D>;
     type AddrState = S::ConnAddrState;
     fn to_addr_vec(addr: &Self::Addr) -> AddrVec<I, D, A> {
         AddrVec::Conn(addr.clone())
@@ -1161,15 +1159,16 @@ mod tests {
         device: None,
     };
 
-    const CONN_ADDR: ConnAddr<Ipv4Addr, FakeWeakDeviceId<FakeDeviceId>, u16, ()> = ConnAddr {
-        ip: unsafe {
-            ConnIpAddr {
-                local: (SpecifiedAddr::new_unchecked(net_ip_v4!("5.6.7.8")), 0),
-                remote: (SpecifiedAddr::new_unchecked(net_ip_v4!("8.7.6.5")), ()),
-            }
-        },
-        device: None,
-    };
+    const CONN_ADDR: ConnAddr<ConnIpAddr<Ipv4Addr, u16, ()>, FakeWeakDeviceId<FakeDeviceId>> =
+        ConnAddr {
+            ip: unsafe {
+                ConnIpAddr {
+                    local: (SpecifiedAddr::new_unchecked(net_ip_v4!("5.6.7.8")), 0),
+                    remote: (SpecifiedAddr::new_unchecked(net_ip_v4!("8.7.6.5")), ()),
+                }
+            },
+            device: None,
+        };
 
     #[test]
     fn bound_insert_get_remove_listener() {

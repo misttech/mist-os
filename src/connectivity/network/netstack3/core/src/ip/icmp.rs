@@ -791,8 +791,22 @@ impl DatagramSocketSpec for Icmp {
 
     type ListenerIpAddr<I: datagram::IpExt> = socket::address::ListenerIpAddr<I::Addr, NonZeroU16>;
 
-    type ConnState<I: datagram::DualStackIpExt, D: Debug + Eq + core::hash::Hash> =
+    type ConnIpAddr<I: datagram::IpExt> = ConnIpAddr<
+        I::Addr,
+        <Self::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+        <Self::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
+    >;
+
+    type ConnState<I: datagram::IpExt, D: Debug + Eq + core::hash::Hash> =
         datagram::ConnState<I, D, Self, datagram::IpOptions<I, D, Self>>;
+
+    fn conn_addr_from_state<I: datagram::IpExt, D: Clone + Debug + Eq + core::hash::Hash>(
+        state: &Self::ConnState<I, D>,
+    ) -> ConnAddr<Self::ConnIpAddr<I>, D> {
+        let datagram::ConnState { shutdown: _, socket: _, addr, clear_device_on_disconnect: _ } =
+            state;
+        addr.clone()
+    }
 }
 
 /// Uninstantiatable type for implementing [`SocketMapAddrSpec`].

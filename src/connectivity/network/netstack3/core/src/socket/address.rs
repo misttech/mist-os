@@ -64,8 +64,8 @@ pub(crate) struct ConnIpAddr<A: IpAddress, LI, RI> {
 
 /// The address of a connected socket.
 #[derive(Copy, Clone, Debug, Eq, GenericOverIp, Hash, PartialEq)]
-pub(crate) struct ConnAddr<A: IpAddress, D, LI, RI> {
-    pub(crate) ip: ConnIpAddr<A, LI, RI>,
+pub(crate) struct ConnAddr<A, D> {
+    pub(crate) ip: A,
     pub(crate) device: Option<D>,
 }
 
@@ -90,6 +90,16 @@ where
 {
     ThisStack(Option<SpecifiedAddr<A>>),
     OtherStack(Option<SpecifiedAddr<<<A::Version as DualStackIpExt>::OtherVersion as Ip>::Addr>>),
+}
+
+/// The IP address and identifiers (ports) of a dual-stack connected socket.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) enum DualStackConnIpAddr<A: IpAddress, LI, RI>
+where
+    A::Version: DualStackIpExt,
+{
+    ThisStack(ConnIpAddr<A, LI, RI>),
+    OtherStack(ConnIpAddr<<<A::Version as DualStackIpExt>::OtherVersion as Ip>::Addr, LI, RI>),
 }
 
 /// Uninstantiable type used to implement [`SocketMapAddrSpec`] for addresses
@@ -126,9 +136,12 @@ impl<I: Ip, D, A: SocketMapAddrSpec>
 }
 
 impl<I: Ip, D, A: SocketMapAddrSpec>
-    From<ConnAddr<I::Addr, D, A::LocalIdentifier, A::RemoteIdentifier>> for AddrVec<I, D, A>
+    From<ConnAddr<ConnIpAddr<I::Addr, A::LocalIdentifier, A::RemoteIdentifier>, D>>
+    for AddrVec<I, D, A>
 {
-    fn from(conn: ConnAddr<I::Addr, D, A::LocalIdentifier, A::RemoteIdentifier>) -> Self {
+    fn from(
+        conn: ConnAddr<ConnIpAddr<I::Addr, A::LocalIdentifier, A::RemoteIdentifier>, D>,
+    ) -> Self {
         AddrVec::Conn(conn)
     }
 }

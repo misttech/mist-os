@@ -367,7 +367,7 @@ pub(crate) enum BoundSocketState<I: IpExt, D: Id, C: NonSyncContext> {
                 C::ListenerNotifierOrProvidedBuffers,
             >,
             SharingState,
-            ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>,
+            ConnAddr<ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>, D>,
         ),
     ),
 }
@@ -742,7 +742,7 @@ impl<I: IpExt, D: WeakId, C: NonSyncContext>
 
 impl<I: IpExt, D: WeakId, C: NonSyncContext>
     SocketMapConflictPolicy<
-        ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>,
+        ConnAddr<ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>, D>,
         SharingState,
         I,
         D,
@@ -751,7 +751,7 @@ impl<I: IpExt, D: WeakId, C: NonSyncContext>
 {
     fn check_insert_conflicts(
         _sharing: &SharingState,
-        addr: &ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>,
+        addr: &ConnAddr<ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>, D>,
         socketmap: &SocketMap<AddrVec<I, D, IpPortSpec>, Bound<Self>>,
     ) -> Result<(), InsertError> {
         // We need to make sure there are no present sockets that have the same
@@ -2052,7 +2052,7 @@ fn do_send_inner<I, SC, C>(
         C::SendBuffer,
         C::ListenerNotifierOrProvidedBuffers,
     >,
-    addr: &ConnAddr<I::Addr, SC::WeakDeviceId, NonZeroU16, NonZeroU16>,
+    addr: &ConnAddr<ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>, SC::WeakDeviceId>,
     ip_transport_ctx: &mut SC,
     ctx: &mut C,
 ) where
@@ -2722,8 +2722,10 @@ impl<A: IpAddress, D: Clone> From<ListenerAddr<ListenerIpAddr<A, NonZeroU16>, D>
     }
 }
 
-impl<A: IpAddress, D: Clone> From<ConnAddr<A, D, NonZeroU16, NonZeroU16>> for ConnectionInfo<A, D> {
-    fn from(addr: ConnAddr<A, D, NonZeroU16, NonZeroU16>) -> Self {
+impl<A: IpAddress, D: Clone> From<ConnAddr<ConnIpAddr<A, NonZeroU16, NonZeroU16>, D>>
+    for ConnectionInfo<A, D>
+{
+    fn from(addr: ConnAddr<ConnIpAddr<A, NonZeroU16, NonZeroU16>, D>) -> Self {
         let ConnAddr { ip: ConnIpAddr { local, remote }, device } = addr;
         let convert = |(ip, port): (SpecifiedAddr<A>, NonZeroU16)| SocketAddr {
             ip: maybe_zoned(ip, &device),

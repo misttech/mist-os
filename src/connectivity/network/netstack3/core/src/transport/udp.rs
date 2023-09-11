@@ -52,13 +52,14 @@ use crate::{
     },
     socket::{
         address::{
-            ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr, SocketZonedIpAddr,
+            ConnAddr, ConnIpAddr, DualStackConnIpAddr, DualStackIpAddr, DualStackListenerIpAddr,
+            IpPortSpec, ListenerAddr, ListenerIpAddr, SocketZonedIpAddr,
         },
         datagram::{
             self, AddrEntry, BoundSocketState as DatagramBoundSocketState,
             BoundSockets as DatagramBoundSockets, ConnectError, DatagramBoundStateContext,
             DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSpec, DatagramStateContext,
-            DualStackConnState, DualStackDatagramBoundStateContext, EitherIpSocket,
+            DualStackConnState, DualStackDatagramBoundStateContext, DualStackIpExt, EitherIpSocket,
             ExpectedConnError, ExpectedUnboundError, FoundSockets, InUseError, IpOptions,
             LocalIdentifierAllocator, MaybeDualStack, MulticastMembershipInterfaceSelector,
             NonDualStackDatagramBoundStateContext, SendError as DatagramSendError,
@@ -418,6 +419,7 @@ impl DatagramSocketSpec for Udp {
     type SocketId<I: IpExt> = SocketId<I>;
     type OtherStackIpOptions<I: IpExt> = I::OtherStackIpOptions<DualStackSocketState>;
     type ListenerIpAddr<I: IpExt> = I::DualStackListenerIpAddr<NonZeroU16>;
+    type ConnIpAddr<I: IpExt> = I::DualStackConnIpAddr<Self>;
     type ConnState<I: IpExt, D: Debug + Eq + Hash> = I::DualStackConnState<D, Self>;
     type UnboundSharingState<I: IpExt> = Sharing;
     type SocketMapSpec<I: IpExt, D: WeakId> = (Self, I, D);
@@ -450,6 +452,12 @@ impl DatagramSocketSpec for Udp {
     ) -> Option<NonZeroU16> {
         try_alloc_listen_port::<I, D>(rng, is_available)
     }
+
+    fn conn_addr_from_state<I: IpExt, D: Clone + Debug + Eq + Hash>(
+        state: &Self::ConnState<I, D>,
+    ) -> ConnAddr<Self::ConnIpAddr<I>, D> {
+        I::conn_addr_from_state(state)
+    }
 }
 
 impl<I: IpExt, D: WeakId> DatagramSocketMapSpec<I, D, IpPortSpec> for (Udp, I, D) {
@@ -457,7 +465,10 @@ impl<I: IpExt, D: WeakId> DatagramSocketMapSpec<I, D, IpPortSpec> for (Udp, I, D
 }
 
 enum LookupResult<'a, I: IpExt, D: Id> {
-    Conn(&'a I::DualStackReceivingId<Udp>, ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>),
+    Conn(
+        &'a I::DualStackReceivingId<Udp>,
+        ConnAddr<ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>, D>,
+    ),
     Listener(
         &'a I::DualStackReceivingId<Udp>,
         ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>,
@@ -767,14 +778,46 @@ pub struct ConnInfo<A: IpAddress, D> {
     pub remote_port: NonZeroU16,
 }
 
-impl<A: IpAddress, D: Clone + Debug> From<ConnAddr<A, D, NonZeroU16, NonZeroU16>>
-    for ConnInfo<A, D>
+impl<A: IpAddress, D: Clone + Debug>
+    From<ConnAddr<<A::Version as DualStackIpExt>::DualStackConnIpAddr<Udp>, D>> for ConnInfo<A, D>
+where
+    A::Version: DualStackIpExt,
 {
-    fn from(c: ConnAddr<A, D, NonZeroU16, NonZeroU16>) -> Self {
-        let ConnAddr {
-            device,
-            ip: ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) },
-        } = c;
+    fn from(c: ConnAddr<<A::Version as DualStackIpExt>::DualStackConnIpAddr<Udp>, D>) -> Self {
+        fn to_ipv6_mapped(a: SpecifiedAddr<Ipv4Addr>) -> SpecifiedAddr<Ipv6Addr> {
+            // Safe to unwrap; ipv4-mapped-ipv6 addresses are always specified.
+            SpecifiedAddr::new(a.get().to_ipv6_mapped()).unwrap()
+        }
+
+        let ConnAddr { ip, device } = c;
+        #[derive(GenericOverIp)]
+        struct Wrapper<I: Ip + DualStackIpExt>(I::DualStackConnIpAddr<Udp>);
+        let (local_ip, IpInvariant(local_port), remote_ip, IpInvariant(remote_port)) =
+            A::Version::map_ip(
+                Wrapper(ip),
+                |Wrapper(ConnIpAddr {
+                     local: (local_ip, local_id),
+                     remote: (remote_ip, remote_id),
+                 })| {
+                    (local_ip, IpInvariant(local_id), remote_ip, IpInvariant(remote_id))
+                },
+                |Wrapper(dual_stack_conn_ip_addr)| match dual_stack_conn_ip_addr {
+                    DualStackConnIpAddr::ThisStack(ConnIpAddr {
+                        local: (local_ip, local_id),
+                        remote: (remote_ip, remote_id),
+                    }) => (local_ip, IpInvariant(local_id), remote_ip, IpInvariant(remote_id)),
+                    DualStackConnIpAddr::OtherStack(ConnIpAddr {
+                        local: (local_ip, local_id),
+                        remote: (remote_ip, remote_id),
+                    }) => (
+                        to_ipv6_mapped(local_ip),
+                        IpInvariant(local_id),
+                        to_ipv6_mapped(remote_ip),
+                        IpInvariant(remote_id),
+                    ),
+                },
+            );
+
         Self {
             local_ip: transport::maybe_with_zone(local_ip, &device),
             local_port,
@@ -795,13 +838,34 @@ pub struct ListenerInfo<A: IpAddress, D> {
     pub local_port: NonZeroU16,
 }
 
-impl<A: IpAddress, D> From<ListenerAddr<ListenerIpAddr<A, NonZeroU16>, D>> for ListenerInfo<A, D> {
+impl<A: IpAddress, D>
+    From<ListenerAddr<<A::Version as DualStackIpExt>::DualStackListenerIpAddr<NonZeroU16>, D>>
+    for ListenerInfo<A, D>
+where
+    A::Version: DualStackIpExt,
+{
     fn from(
-        ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device }: ListenerAddr<
-            ListenerIpAddr<A, NonZeroU16>,
+        ListenerAddr { ip, device }: ListenerAddr<
+            <A::Version as DualStackIpExt>::DualStackListenerIpAddr<NonZeroU16>,
             D,
         >,
     ) -> Self {
+        #[derive(GenericOverIp)]
+        struct Wrapper<I: Ip + DualStackIpExt>(I::DualStackListenerIpAddr<NonZeroU16>);
+        let (addr, IpInvariant(identifier)): (Option<SpecifiedAddr<A>>, _) = A::Version::map_ip(
+            Wrapper(ip),
+            |Wrapper(ListenerIpAddr { addr, identifier })| (addr, IpInvariant(identifier)),
+            |Wrapper(DualStackListenerIpAddr { addr, identifier })| {
+                let addr = match addr {
+                    DualStackIpAddr::ThisStack(addr) => addr,
+                    DualStackIpAddr::OtherStack(addr) => SpecifiedAddr::new(
+                        addr.map_or(Ipv4::UNSPECIFIED_ADDRESS, |a| a.get()).to_ipv6_mapped(),
+                    ),
+                };
+                (addr, IpInvariant(identifier))
+            },
+        );
+
         let local_ip = addr.map(|addr| transport::maybe_with_zone(addr, device));
         Self { local_ip, local_port: identifier }
     }
@@ -2417,8 +2481,8 @@ pub enum SocketInfo<A: IpAddress, D> {
     Connected(ConnInfo<A, D>),
 }
 
-impl<I: IpExt, D: WeakId> From<DatagramSocketInfo<I, D, IpPortSpec>> for SocketInfo<I::Addr, D> {
-    fn from(value: DatagramSocketInfo<I, D, IpPortSpec>) -> Self {
+impl<I: IpExt, D: WeakId> From<DatagramSocketInfo<I, D, Udp>> for SocketInfo<I::Addr, D> {
+    fn from(value: DatagramSocketInfo<I, D, Udp>) -> Self {
         match value {
             DatagramSocketInfo::Unbound => Self::Unbound,
             DatagramSocketInfo::Listener(addr) => Self::Listener(addr.into()),
@@ -7380,7 +7444,7 @@ where {
     {
         enum Socket<A: IpAddress, D, LI, RI> {
             Listener(SocketId<A::Version>, ListenerAddr<ListenerIpAddr<A, LI>, D>),
-            Conn(SocketId<A::Version>, ConnAddr<A, D, LI, RI>),
+            Conn(SocketId<A::Version>, ConnAddr<ConnIpAddr<A, LI, RI>, D>),
         }
         let spec = spec.into_iter();
         let spec_len = spec.len();
