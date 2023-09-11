@@ -815,6 +815,9 @@ assembly_input_bundle("core_realm_development_access") {
 
     # The developer snapshot tool.
     "//src/developer/forensics/snapshot:pkg",
+
+    # log_listener shell tool.
+    "//src/diagnostics/log_listener:log_listener_shell_pkg",
   ]
   config_data_labels = [ "//src/developer/sshd-host:config" ]
   compiled_packages = [
@@ -827,9 +830,11 @@ assembly_input_bundle("core_realm_development_access") {
           component_name = "core"
           shards = rebase_path(
                   [
-                    "//src/developer/sshd-host/meta/sshd-host.core_shard.cml",
-                    "//src/developer/remote-control/meta/remote-control-base.core_shard.cml",
                     "//src/developer/debug/debug_agent/meta/debug_agent.core_shard.cml",
+                    "//src/developer/meta/default-laboratory-env.core_shard.cml",
+                    "//src/developer/remote-control/meta/laboratory.core_shard.cml",
+                    "//src/developer/remote-control/meta/remote-control-base.core_shard.cml",
+                    "//src/developer/sshd-host/meta/sshd-host.core_shard.cml",
                     "//src/developer/toolbox/meta/toolbox.core_shard.cml",
                   ],
                   root_build_dir)
@@ -858,6 +863,10 @@ assembly_input_bundle("core_realm_development_access") {
     {
       package = "snapshot"
       components = [ "snapshot" ]
+    },
+    {
+      package = "log_listener_shell"
+      components = [ "log_listener" ]
     },
   ]
 }

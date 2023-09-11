@@ -19,14 +19,9 @@ core_realm_shards += [
 
   # TODO(fxbug.dev/80375): only include in eng builds
   "//src/sys/fuzzing:fuzzing-core-shard",
-  "//src/developer:default-laboratory-env-core-shard",
-  "//src/developer/remote-control:laboratory-core-shard",
 ]
 
-legacy_base_package_labels += [
-  "//src/diagnostics/log_listener:log_listener_shell",
-  "//src/connectivity/bluetooth:core",
-]
+legacy_base_package_labels += [ "//src/connectivity/bluetooth:core" ]
 
 # Add the cache storage manager.
 legacy_base_package_labels += [ "//src/sys/cache_manager" ]

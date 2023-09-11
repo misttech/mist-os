@@ -46,13 +46,12 @@ rustc_binary("bin") {
   sources = [ "src/main.rs" ]
 }
 
-# Enabling a soft-transition, remove when complete
 # TODO(122864) Remove transitional labels
-group("for_transition") {
-  public_deps = [ ":log_listener_shell" ]
+group("log_listener_shell") {
 }
 
-fuchsia_shell_package("log_listener_shell") {
+fuchsia_shell_package("log_listener_shell_pkg") {
+  package_name = "log_listener_shell"
   deps = [
     ":bin",
     "//build/validate:non_production_tag",

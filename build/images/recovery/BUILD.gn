@@ -98,7 +98,6 @@ if (is_fuchsia) {
 
     # Basic command-line tools:
     "//bundles/assembly:third_party_sbase_for_transition",
-    "//src/diagnostics/log_listener:for_transition",
 
     # Command-line interface to wlan stack:
     "//src/connectivity/wlan/wlancfg/tool:for_transition",

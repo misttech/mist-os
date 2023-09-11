@@ -2,8 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//src/sys/core/build/core_shard.gni")
-
 group("developer") {
   testonly = true
   deps = [
@@ -43,6 +41,6 @@ group("e2e_tests") {
   deps = [ "ffx:e2e_tests" ]
 }
 
-core_shard("default-laboratory-env-core-shard") {
-  shard_file = "meta/default-laboratory-env.core_shard.cml"
+# TODO(122864) Remove transitional labels
+group("default-laboratory-env-core-shard") {
 }

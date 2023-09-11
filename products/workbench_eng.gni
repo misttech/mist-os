@@ -68,10 +68,7 @@ assembly_fshost = true
 #
 # TODO(fxbug.dev/121402): Delete this section and do the equivalent via
 # assembly.
-legacy_base_package_labels += [
-  "//src/connectivity:tools",
-  "//src/diagnostics/log_listener:log_listener_shell",
-]
+legacy_base_package_labels += [ "//src/connectivity:tools" ]
 
 # Debugging support
 discoverable_package_labels += [ "//src/developer/debug/debug_agent" ]
