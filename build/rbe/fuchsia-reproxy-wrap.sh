@@ -108,7 +108,10 @@ then
 fi
 readonly logs_root="$project_root/$build_subdir/.reproxy_logs"
 mkdir -p "$logs_root"
-readonly reproxy_logdir="$(mktemp -d -t "reproxy.$date.XXXX" -p "$logs_root")"
+
+# 'mktemp -p' still yields to TMPDIR in the environment (bug?),
+# so override TMPDIR instead.
+readonly reproxy_logdir="$(env TMPDIR="$logs_root" mktemp -d -t "reproxy.$date.XXXX")"
 readonly log_base="$(basename "$reproxy_logdir")"
 
 readonly _tmpdir="$(dirname "$(mktemp -u)")"
