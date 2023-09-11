@@ -133,16 +133,6 @@ declare_args() {
 }
 
 declare_args() {
-  # TODO(fxbug.dev/60238): For use while the related RFC is in iterate and can
-  # be removed once the RFC is finalized.
-  # Controls kernel page compression and the linking and instantiation of its
-  # dependencies.
-  # Defaults to true only when the kernel_debug_level is high enough to enable
-  # in testing but disable for production.
-  page_compression_enabled = kernel_debug_level >= 2
-}
-
-declare_args() {
   # Enable kernel lock dependency tracking tests.  By default this is
   # enabled when tracking is enabled, but can also be eanbled independently
   # to assess whether the tests build and *fail correctly* when lockdep is

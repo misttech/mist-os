@@ -17,7 +17,6 @@ namespace vm_unittest {
 
 namespace {
 
-#if PAGE_COMPRESSION
 bool lz4_compress_smoke_test() {
   BEGIN_TEST;
 
@@ -75,7 +74,6 @@ bool lz4_zero_dedupe_test() {
 
   END_TEST;
 }
-#endif
 
 void write_pattern(vm_page_t* page, size_t len, uint64_t offset) {
   DEBUG_ASSERT(page);
@@ -387,10 +385,8 @@ bool tri_page_storage_small_storage() {
 }  // namespace
 
 UNITTEST_START_TESTCASE(compression_tests)
-#if PAGE_COMPRESSION
 VM_UNITTEST(lz4_compress_smoke_test)
 VM_UNITTEST(lz4_zero_dedupe_test)
-#endif
 VM_UNITTEST(tri_page_storage_smoke_test)
 VM_UNITTEST(tri_page_storage_packing)
 VM_UNITTEST(tri_page_storage_reuse_after_free)

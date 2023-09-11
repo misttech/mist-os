@@ -255,7 +255,6 @@ if (is_kernel) {
       ":standalone",
       ":warnings",
       ":kernel_based_memory_attribution",
-      ":page_compression",
       "arch/$zircon_cpu:abi",
       "arch/$zircon_cpu:kernel",
       "//build/config:no-finite-loops",
@@ -384,16 +383,6 @@ if (is_kernel) {
       defines += [ "KERNEL_BASED_MEMORY_ATTRIBUTION=1" ]
     } else {
       defines += [ "KERNEL_BASED_MEMORY_ATTRIBUTION=0" ]
-    }
-  }
-
-  config("page_compression") {
-    visibility = [ ":*" ]
-    defines = []
-    if (page_compression_enabled) {
-      defines += [ "PAGE_COMPRESSION=1" ]
-    } else {
-      defines += [ "PAGE_COMPRESSION=0" ]
     }
   }
 

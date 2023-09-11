@@ -211,11 +211,6 @@ fbl::RefPtr<VmCompression> VmCompression::CreateDefault() {
     return nullptr;
   }
 
-  if constexpr (!PAGE_COMPRESSION) {
-    panic(
-        "ERROR: A kernel compression strategy was declared, but kernel compression was not enabled in the build");
-  }
-
   fbl::AllocChecker ac;
   fbl::RefPtr<VmCompressedStorage> storage;
   switch (gBootOptions->compression_storage_strategy) {

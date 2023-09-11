@@ -7,10 +7,6 @@
 #ifndef ZIRCON_KERNEL_VM_INCLUDE_VM_LZ4_COMPRESSOR_H_
 #define ZIRCON_KERNEL_VM_INCLUDE_VM_LZ4_COMPRESSOR_H_
 
-// The lz4 library is not included as a dependency if PAGE_COMPRESSION is not enabled and so the
-// includes and the entire class definition need to be skipped.
-#if PAGE_COMPRESSION
-
 #include <fbl/array.h>
 #include <kernel/mutex.h>
 #include <lz4/lz4.h>
@@ -49,7 +45,5 @@ class VmLz4Compressor final : public VmCompressionStrategy {
   // The LZ4_stream_t used to hold compression state.
   LZ4_stream_t stream_ TA_GUARDED(compress_lock_);
 };
-
-#endif  // PAGE_COMPRESSION
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_LZ4_COMPRESSOR_H_

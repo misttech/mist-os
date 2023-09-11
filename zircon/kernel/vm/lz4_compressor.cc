@@ -10,8 +10,6 @@
 #include <vm/lz4_compressor.h>
 #include <vm/physmap.h>
 
-#if PAGE_COMPRESSION
-
 VmLz4Compressor::CompressResult VmLz4Compressor::Compress(const void *src, void *dst,
                                                           size_t dst_limit) {
   int compressed_result;
@@ -93,5 +91,3 @@ fbl::RefPtr<VmLz4Compressor> VmLz4Compressor::Create() {
 
   return lz4;
 }
-
-#endif

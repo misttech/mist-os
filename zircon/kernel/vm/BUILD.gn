@@ -64,20 +64,16 @@ zx_library("vm") {
     "//zircon/kernel/lib/userabi",
     "//zircon/system/ulib/affine",
     "//zircon/system/ulib/pretty",
+    "//zircon/third_party/ulib/lz4",
 
     # TODO: testonly
     ":tests",
   ]
 
-  # TODO(fxbug.dev/60238): Inclusion of the lz4 library is guarded while the RFC
-  # is in iterate.
-  if (page_compression_enabled) {
-    deps += [ "//zircon/third_party/ulib/lz4" ]
-    defines = [
-      "LZ4_STATIC_LINKING_ONLY",
-      "LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION",
-    ]
-  }
+  defines = [
+    "LZ4_STATIC_LINKING_ONLY",
+    "LZ4_STATIC_LINKING_ONLY_DISABLE_MEMORY_ALLOCATION",
+  ]
 
   public_deps = [
     # <vm/vm_page_list.h> has #include <ktl/unique_ptr.h>.
