@@ -1687,6 +1687,7 @@ impl<
         link_address: D::Address,
         source: DynamicNeighborUpdateSource,
     ) {
+        tracing::debug!("received neighbor {:?} from {}", source, neighbor);
         self.with_nud_state_mut_and_buf_ctx(
             device_id,
             |NudState { neighbors, last_gc }, sync_ctx| {
