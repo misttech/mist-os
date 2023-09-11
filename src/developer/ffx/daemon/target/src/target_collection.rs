@@ -1112,7 +1112,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_match_serial() {
         let string = "turritopsis-dohrnii-is-an-immortal-jellyfish";
-        let t = Target::new_with_serial(string);
+        let t = Target::new_for_usb(string);
         let tc = TargetCollection::new_with_queue();
         tc.merge_insert(clone_target(&t));
         let found_target = tc.get(string).expect("target serial should match");

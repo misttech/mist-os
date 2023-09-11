@@ -929,7 +929,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_open_rcs_on_fastboot_error() {
         let (_proxy, daemon, _task) = spawn_test_daemon();
-        let target = Target::new_with_serial("abc");
+        let target = Target::new_for_usb("abc");
         daemon.target_collection.merge_insert(target);
         let result = daemon.open_remote_control(None).await;
         assert!(result.is_err());

@@ -276,9 +276,12 @@ impl Target {
         target
     }
 
-    pub fn new_with_serial(serial: &str) -> Rc<Self> {
+    /// Constructs a Target based on the given serial number.
+    /// Assumes the Target is in Fastboot mode and connected via USB
+    pub fn new_for_usb(serial: &str) -> Rc<Self> {
         let target = Self::new();
         target.serial.replace(Some(serial.to_string()));
+        target.fastboot_interface.replace(Some(FastbootInterface::Usb));
         target.update_connection_state(|_| TargetConnectionState::Fastboot(Instant::now()));
         target
     }
@@ -298,7 +301,7 @@ impl Target {
 
     pub fn from_target_info(mut t: TargetInfo) -> Rc<Self> {
         if let Some(s) = t.serial {
-            Self::new_with_serial(&s)
+            Self::new_for_usb(&s)
         } else {
             let res = Self::new_with_addrs(t.nodename.take(), t.addresses.drain(..).collect());
             *res.ssh_host_address.borrow_mut() = t.ssh_host_address.take().map(HostAddr::from);
@@ -1122,6 +1125,12 @@ impl From<&Target> for ffx::TargetInfo {
             // TODO(awdavies): Gather more information here when possible.
             target_type: Some(ffx::TargetType::Unknown),
             ssh_host_address: target.ssh_host_address_info(),
+            fastboot_interface: match target.fastboot_interface() {
+                None => None,
+                Some(FastbootInterface::Usb) => Some(ffx::FastbootInterface::Usb),
+                Some(FastbootInterface::Udp) => Some(ffx::FastbootInterface::Udp),
+                Some(FastbootInterface::Tcp) => Some(ffx::FastbootInterface::Tcp),
+            },
             ..Default::default()
         }
     }
@@ -1201,7 +1210,10 @@ mod test {
     use fuchsia_async::Timer;
     use futures::{channel, prelude::*};
     use hoist::Hoist;
-    use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
+    use std::{
+        borrow::Borrow,
+        net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
+    };
 
     const DEFAULT_PRODUCT_CONFIG: &str = "core";
     const DEFAULT_BOARD_CONFIG: &str = "x64";
@@ -2106,5 +2118,34 @@ mod test {
         target.update_connection_state(|_| TargetConnectionState::Disconnected);
         done_send.send(()).expect("send failed")
         // No assertion -- we are making sure run_host_pipe() doesn't panic
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_from_target_for_targetinfo() {
+        {
+            let target = Target::new_for_usb("IANTHE");
+
+            let info: ffx::TargetInfo = ffx::TargetInfo::from(target.borrow());
+            assert_eq!(info.fastboot_interface, Some(ffx::FastbootInterface::Usb));
+        }
+        {
+            let mut addrs = BTreeSet::new();
+            addrs.insert(TargetAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0, 0));
+            let interface = FastbootInterface::Tcp;
+            let target = Target::new_with_fastboot_addrs(Some("Babs"), None, addrs, interface);
+
+            let info: ffx::TargetInfo = ffx::TargetInfo::from(target.borrow());
+            assert_eq!(info.fastboot_interface, Some(ffx::FastbootInterface::Tcp));
+        }
+        {
+            let mut addrs = BTreeSet::new();
+            addrs.insert(TargetAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0, 0));
+            let interface = FastbootInterface::Udp;
+            let target =
+                Target::new_with_fastboot_addrs(Some("Coronabeth"), None, addrs, interface);
+
+            let info: ffx::TargetInfo = ffx::TargetInfo::from(target.borrow());
+            assert_eq!(info.fastboot_interface, Some(ffx::FastbootInterface::Udp));
+        }
     }
 }
