@@ -93,6 +93,7 @@ template("generate_final_idk") {
     }
     _output_archive = root_build_dir + "/sdk/archive/${_output_name}.tar.gz"
     _exported_dir = root_build_dir + "/sdk/exported/${_output_name}"
+    _exported_dir_manifest = "${_exported_dir}/meta/manifest.json"
     _exported_dir_stamp = _exported_dir + ".stamp"
 
     # Compute sdk target labels to pass to the script
@@ -118,7 +119,10 @@ template("generate_final_idk") {
     # a full archive.
     action(_exported_dir_target) {
       script = "//build/sdk/build_final_idk.py"
-      outputs = [ _exported_dir_stamp ]
+      outputs = [
+        _exported_dir_stamp,
+        _exported_dir_manifest,
+      ]
 
       inputs = [
         # Invoked at runtime by this action's script.
