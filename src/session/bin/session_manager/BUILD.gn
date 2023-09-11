@@ -8,10 +8,6 @@ import("//build/rust/rustc_library.gni")
 import("//src/sys/core/build/core_shard.gni")
 import("//third_party/cobalt/metrics_registry.gni")
 
-core_shard("workstation_core_shard") {
-  shard_file = "meta/workstation.core_shard.cml"
-}
-
 core_shard("minimal_core_shard") {
   shard_file = "meta/minimal.core_shard.cml"
 }
