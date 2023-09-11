@@ -31,6 +31,7 @@
 //sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_sdk
 //sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_sdk
 //sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_sdk
+//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_sdk
 //sdk/fidl/fuchsia.component.test:fuchsia.component.test_sdk
 //sdk/fidl/fuchsia.component.types:fuchsia.component.types_sdk
 //sdk/fidl/fuchsia.component:fuchsia.component_sdk

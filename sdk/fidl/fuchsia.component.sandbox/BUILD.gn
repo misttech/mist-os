@@ -4,14 +4,14 @@
 
 import("//build/fidl/fidl.gni")
 
-visibility = [ "//src/sys/component_manager/*" ]
-
 fidl("fuchsia.component.sandbox") {
-  sdk_category = "internal"
+  sdk_category = "partner"
 
   sources = [
     "overview.fidl",
     "sandbox.fidl",
   ]
   public_deps = [ "//zircon/vdso/zx" ]
+
+  enable_hlcpp = true
 }

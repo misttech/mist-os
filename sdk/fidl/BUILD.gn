@@ -40,6 +40,7 @@ sdk_fidl_targets = [
   "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl",
   "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution",
   "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner",
+  "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox",
   "//sdk/fidl/fuchsia.component.test:fuchsia.component.test",
   "//sdk/fidl/fuchsia.component.types:fuchsia.component.types",
   "//sdk/fidl/fuchsia.data:fuchsia.data",
