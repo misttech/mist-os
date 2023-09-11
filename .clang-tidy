@@ -39,7 +39,6 @@ Checks: >
   -readability-named-parameter,
 
 WarningsAsErrors: false
-AnalyzeTemporaryDtors: false
 FormatStyle:     file
 CheckOptions:
   - key:             bugprone-signed-char-misuse.CharTypdefsToIgnore
