@@ -60,6 +60,7 @@ pub fn define_configuration(
     board_info: &BoardInformation,
     ramdisk_image: bool,
     gendir: impl AsRef<Utf8Path>,
+    resource_dir: impl AsRef<Utf8Path>,
 ) -> anyhow::Result<CompletedConfiguration> {
     let icu_config = &config.platform.icu;
     let mut builder = ConfigurationBuilderImpl::new(icu_config.clone());
@@ -74,6 +75,7 @@ pub fn define_configuration(
     if let Some(feature_set_level) = &feature_set_level {
         let build_type = &config.platform.build_type;
         let gendir = gendir.as_ref().to_path_buf();
+        let resource_dir = resource_dir.as_ref().to_path_buf();
 
         // Set up the context that's used by each subsystem to get the generally-
         // available platform information.
@@ -83,6 +85,7 @@ pub fn define_configuration(
             board_info,
             ramdisk_image,
             gendir,
+            resource_dir,
         };
 
         // Call the configuration functions for each subsystem.
@@ -342,7 +345,7 @@ mod tests {
 
         let mut cursor = std::io::Cursor::new(json5);
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
-        let result = define_configuration(&config, &BoardInformation::default(), false, "");
+        let result = define_configuration(&config, &BoardInformation::default(), false, "", "");
 
         assert!(result.is_err());
     }

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Result};
-use camino::Utf8PathBuf;
+use camino::{Utf8Path, Utf8PathBuf};
 use serde::Serialize;
 use std::collections::{btree_map::Entry, BTreeSet};
 use tempfile::TempDir;
@@ -102,6 +102,7 @@ pub(crate) struct ConfigurationContext<'a> {
     pub board_info: &'a BoardInformation,
     pub ramdisk_image: bool,
     pub gendir: Utf8PathBuf,
+    pub resource_dir: Utf8PathBuf,
 }
 
 /// A struct for collecting multiple kinds of platform configuration.
@@ -655,6 +656,13 @@ impl ConfigurationContext<'_> {
             .map_err(|_e| anyhow!("converting to utf8 path"))?;
         Ok(gendir)
     }
+
+    /// Retrieve the full path to a platform resource identified by a path into
+    /// the resource directory.
+    #[allow(dead_code)]
+    pub fn get_resource(&self, path: impl AsRef<Utf8Path>) -> Utf8PathBuf {
+        self.resource_dir.join(path.as_ref())
+    }
 }
 
 #[cfg(test)]
@@ -678,6 +686,7 @@ impl ConfigurationContext<'_> {
             board_info: &tests::BOARD_INFORMATION_FOR_TESTS,
             ramdisk_image: false,
             gendir: Utf8PathBuf::new(),
+            resource_dir: Utf8PathBuf::new(),
         }
     }
 }

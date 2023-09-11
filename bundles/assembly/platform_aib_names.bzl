@@ -26,6 +26,7 @@ BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
     "paravirtualization_support",
     "kernel_args_user",
     "live_usb",
+    "resources",
     "virtcon",
 ]
 

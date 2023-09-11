@@ -213,6 +213,9 @@ template("assembly_input_bundle") {
     bundle_name = invoker.bundle_name
   }
 
+  assert(bundle_name != "resources",
+         "The bundle name 'resources' is reserved for internal use")
+
   labels = {
     # The AIB itself
     assembly_input_bundle = "$target_name.bundle"

@@ -29,6 +29,9 @@ bootstrap_user_platform_aib_names = [
   "empty_live_usb",
   "live_usb",
 
+  # Static resource files.
+  "resources",
+
   # Emulator Support
   "emulator_support",
   "paravirtualization_support",

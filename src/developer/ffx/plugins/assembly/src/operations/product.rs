@@ -53,11 +53,13 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
 
     // Get platform configuration based on the AssemblyConfig and the BoardInformation.
     let ramdisk_image = mode == PackageMode::DiskImageInZbi;
+    let resource_dir = input_bundles_dir.join("resources");
     let configuration = assembly_platform_configuration::define_configuration(
         &config,
         &board_info,
         ramdisk_image,
         &outdir,
+        &resource_dir,
     )?;
 
     // Set the configuration for the rest of the packages.
