@@ -790,7 +790,7 @@ mod test {
         formatter.push_log(log_entry()).await.unwrap();
         drop(formatter);
         assert_eq!(
-            buffers.stdout.clone().into_string(),
+            buffers.into_stdout_str(),
             "[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: message\n"
         );
     }
@@ -807,7 +807,7 @@ mod test {
         formatter.push_log(log_entry()).await.unwrap();
         drop(formatter);
         assert_eq!(
-            buffers.stdout.clone().into_string(),
+            buffers.into_stdout_str(),
             "[1615535969.000000][some/moniker][tag1,tag2] WARN: message\n"
         );
     }
@@ -823,7 +823,7 @@ mod test {
             formatter.push_log(log_entry()).await.unwrap();
         }
         assert_eq!(
-            serde_json::from_str::<LogEntry>(&buffers.stdout.clone().into_string()).unwrap(),
+            serde_json::from_str::<LogEntry>(&buffers.into_stdout_str()).unwrap(),
             log_entry()
         );
     }
@@ -839,7 +839,7 @@ mod test {
         formatter.push_log(entry).await.unwrap();
         drop(formatter);
         assert_eq!(
-            buffers.stdout.clone().into_string(),
+            buffers.into_stdout_str(),
             "[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: symbolized\n"
         );
     }
@@ -870,10 +870,7 @@ mod test {
         entry.data = assert_matches!(entry.data.clone(), LogData::TargetLog(d)=>LogData::SymbolizedTargetLog(d, "symbolized".to_string()));
         formatter.push_log(entry.clone()).await.unwrap();
         drop(formatter);
-        assert_eq!(
-            serde_json::from_str::<LogEntry>(&buffers.stdout.clone().into_string()).unwrap(),
-            entry
-        );
+        assert_eq!(serde_json::from_str::<LogEntry>(&buffers.into_stdout_str()).unwrap(), entry);
     }
 
     #[fuchsia::test]
@@ -886,7 +883,7 @@ mod test {
         entry.data = assert_matches!(entry.data.clone(), LogData::TargetLog(d)=>LogData::SymbolizedTargetLog(d, "".to_string()));
         formatter.push_log(entry.clone()).await.unwrap();
         drop(formatter);
-        assert_eq!(buffers.stdout.clone().into_string().is_empty(), true);
+        assert_eq!(buffers.into_stdout_str().is_empty(), true);
     }
 
     #[fuchsia::test]
@@ -901,7 +898,7 @@ mod test {
         formatter.push_log(entry).await.unwrap();
         drop(formatter);
         assert_eq!(
-            buffers.stdout.clone().into_string(),
+            buffers.into_stdout_str(),
             format!("[1970-01-01 00:00:00.000][<ffx>]: {LOGGER_DISCONNECTED}\n")
         );
     }
@@ -1045,7 +1042,7 @@ mod test {
         formatter.push_log(entry).await.unwrap();
         drop(formatter);
         assert_eq!(
-            buffers.stdout.clone().into_string(),
+            buffers.into_stdout_str(),
             "[1970-01-01 00:00:00.000][<ffx>]: logger started.\n"
         );
     }
@@ -1062,7 +1059,7 @@ mod test {
         formatter.push_log(entry).await.unwrap();
         drop(formatter);
         assert_eq!(
-            buffers.stdout.clone().into_string(),
+            buffers.into_stdout_str(),
             format!("[1970-01-01 00:00:00.000][<ffx>]: {MALFORMED_TARGET_LOG}Invalid log\n")
         );
     }
