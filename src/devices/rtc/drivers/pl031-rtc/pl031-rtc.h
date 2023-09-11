@@ -38,6 +38,8 @@ class Pl031 : public RtcDeviceType {
   // fidl::WireServer<FidlRtc::Device>:
   void Get(GetCompleter::Sync& completer) override;
   void Set(SetRequestView request, SetCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<FidlRtc::Device> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}  // No-op
 
   // DDK bindings.
   void DdkRelease();

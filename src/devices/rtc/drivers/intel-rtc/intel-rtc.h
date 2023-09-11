@@ -56,6 +56,8 @@ class RtcDevice : public DeviceType {
   // fuchsia.hardware.rtc implementation.
   void Get(GetCompleter::Sync& completer) override;
   void Set(SetRequestView request, SetCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<FidlRtc::Device> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}  // No-op
 
   FidlRtc::wire::Time ReadTime() __TA_EXCLUDES(time_lock_);
   void WriteTime(FidlRtc::wire::Time time) __TA_EXCLUDES(time_lock_);

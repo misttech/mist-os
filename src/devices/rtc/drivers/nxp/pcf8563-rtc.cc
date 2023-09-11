@@ -21,6 +21,9 @@ class pcf8563 : public DeviceType {
   pcf8563(zx_device_t* parent, ddk::I2cChannel i2c) : DeviceType(parent), i2c_(std::move(i2c)) {}
   void DdkRelease() { delete this; }
 
+  void handle_unknown_method(fidl::UnknownMethodMetadata<FidlRtc::Device> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}  // No-op
+
   zx::result<FidlRtc::wire::Time> Read() {
     uint8_t write_buf[] = {0x02};
     uint8_t read_buf[7];

@@ -58,6 +58,7 @@
 //sdk/fidl/fuchsia.hardware.power.sensor:fuchsia.hardware.power.sensor_sdk
 //sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_sdk
 //sdk/fidl/fuchsia.hardware.radar:fuchsia.hardware.radar_sdk
+//sdk/fidl/fuchsia.hardware.rtc:fuchsia.hardware.rtc_sdk
 //sdk/fidl/fuchsia.hardware.temperature:fuchsia.hardware.temperature_sdk
 //sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_sdk
 //sdk/fidl/fuchsia.images:fuchsia.images_sdk

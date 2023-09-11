@@ -450,6 +450,7 @@ async fn serve_fake_rtc(
                 rtc_updates.0.lock().push(rtc);
                 responder.send(zx::Status::OK.into_raw()).unwrap();
             }
+            DeviceRequest::_UnknownMethod { .. } => {}
         }
     }
 }

@@ -66,6 +66,7 @@ sdk_fidl_targets = [
   "//sdk/fidl/fuchsia.hardware.power.sensor:fuchsia.hardware.power.sensor",
   "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol",
   "//sdk/fidl/fuchsia.hardware.radar:fuchsia.hardware.radar",
+  "//sdk/fidl/fuchsia.hardware.rtc:fuchsia.hardware.rtc",
   "//sdk/fidl/fuchsia.hardware.temperature:fuchsia.hardware.temperature",
   "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo",
   "//sdk/fidl/fuchsia.images:fuchsia.images",
