@@ -1861,7 +1861,12 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
     // From this point on, we should ensure that the slot gets used to hold a page, or it is
     // returned if empty.
     VmPageOrMarker* cur_page = slot;
-    auto page_is_used = fit::defer([&cur_page] { DEBUG_ASSERT(!cur_page || cur_page->IsPage()); });
+    auto page_is_used = fit::defer([&cur_page] {
+      // TODO(johngro): remove this explicit unused-capture warning suppression
+      // when https://bugs.llvm.org/show_bug.cgi?id=35450 gets fixed.
+      (void)cur_page;  // used only in DEBUG_ASSERT
+      DEBUG_ASSERT(!cur_page || cur_page->IsPage());
+    });
 
     if (target_page_owner->IsUniAccessibleLocked(target_page, target_page_offset)) {
       // If the page we're covering in the parent is uni-accessible, then we
@@ -2188,6 +2193,9 @@ zx_status_t VmCowPages::PrepareForWriteLocked(uint64_t offset, uint64_t len,
   if (!page_source_->ShouldTrapDirtyTransitions()) {
     zx_status_t status = page_list_.ForEveryPageAndGapInRange(
         [this, &dirty_len, start_offset](const VmPageOrMarker* p, uint64_t off) {
+          // TODO(johngro): remove this explicit unused-capture warning suppression
+          // when https://bugs.llvm.org/show_bug.cgi?id=35450 gets fixed.
+          (void)start_offset;  // used only in DEBUG_ASSERT
           if (p->IsMarker() || p->IsIntervalZero()) {
             // Found a marker or zero interval. End the traversal.
             return ZX_ERR_STOP;
@@ -3509,6 +3517,9 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
   // This is a lambda as it only makes sense to talk about parent mutability when we have a parent
   // for the offset being considered.
   auto parent_immutable = [can_see_parent, this](uint64_t offset) TA_REQ(lock()) {
+    // TODO(johngro): remove this explicit unused-capture warning suppression
+    // when https://bugs.llvm.org/show_bug.cgi?id=35450 gets fixed.
+    (void)can_see_parent;  // used only in DEBUG_ASSERT
     DEBUG_ASSERT(can_see_parent(offset));
     AssertHeld(parent_->lock_ref());
     return parent_->is_hidden_locked();
@@ -3527,6 +3538,10 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
   } initial_content_;
   auto get_initial_page_content = [&initial_content_, can_see_parent, this](uint64_t offset)
                                       TA_REQ(lock()) -> const InitialPageContent& {
+    // TODO(johngro): remove this explicit unused-capture warning suppression
+    // when https://bugs.llvm.org/show_bug.cgi?id=35450 gets fixed.
+    (void)can_see_parent;  // used only in DEBUG_ASSERT
+
     // If there is no cached page content or if we're looking up a different offset from the cached
     // one, perform the lookup.
     if (!initial_content_.inited || offset != initial_content_.cached_offset) {
@@ -6641,7 +6656,6 @@ bool VmCowPages::DebugValidateBacklinksLocked() const {
 }
 
 bool VmCowPages::DebugValidateVmoPageBorrowingLocked() const {
-  DEBUG_ASSERT(this);
   canary_.Assert();
   // Skip checking larger VMOs to avoid slowing things down too much, since the things being
   // verified will typically assert from incorrect behavior on smaller VMOs (and we can always

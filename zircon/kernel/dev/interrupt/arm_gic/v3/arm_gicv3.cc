@@ -386,7 +386,7 @@ static void gic_shutdown() {
 }
 
 // Returns true if any PPIs are enabled on the calling CPU.
-static bool is_ppi_enabled() {
+[[maybe_unused]] static bool is_ppi_enabled() {
   DEBUG_ASSERT(arch_ints_disabled());
 
   // PPIs are 16-31.
@@ -402,7 +402,7 @@ static bool is_ppi_enabled() {
 }
 
 // Returns true if any SPIs are enabled on the calling CPU.
-static bool is_spi_enabled() {
+[[maybe_unused]] static bool is_spi_enabled() {
   DEBUG_ASSERT(arch_ints_disabled());
 
   cpu_num_t cpu_num = arch_curr_cpu_num();

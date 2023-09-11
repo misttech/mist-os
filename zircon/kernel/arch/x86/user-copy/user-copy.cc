@@ -40,7 +40,7 @@ extern "C" X64CopyToFromUserRet _x86_copy_to_or_from_user(void* dst, const void*
 
 enum class CopyDirection { ToUser, FromUser };
 
-static inline bool ac_flag(void) { return x86_save_flags() & X86_FLAGS_AC; }
+[[maybe_unused]] static inline bool ac_flag(void) { return x86_save_flags() & X86_FLAGS_AC; }
 
 static bool can_access(const void* base, size_t len) {
   LTRACEF("can_access: base %p, len %zu\n", base, len);

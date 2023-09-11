@@ -849,6 +849,11 @@ static bool vmo_contiguous_decommit_enabled_test() {
     bool page_absent = true;
     status = vmo->Lookup(offset, PAGE_SIZE,
                          [base_pa, offset, &page_absent](uint64_t lookup_offset, paddr_t pa) {
+                           // TODO(johngro): remove this explicit unused-capture warning suppression
+                           // when https://bugs.llvm.org/show_bug.cgi?id=35450 gets fixed.
+                           (void)base_pa;
+                           (void)offset;
+
                            page_absent = false;
                            DEBUG_ASSERT(offset == lookup_offset);
                            DEBUG_ASSERT(base_pa + lookup_offset == pa);
