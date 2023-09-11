@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/compiled_action.gni")
+import("//build/config/fuchsia/platform_version.gni")
 import("//build/json/validate_json.gni")
 import("config.gni")
 import("meta/version.gni")
@@ -122,7 +123,7 @@ template("sdk_collection") {
   # Generates an internal molecule target, which creates an internal SDK
   # manifest file describing all atoms in it.
   sdk_molecule(labels.local_manifest) {
-    # Do not expose this molecule to other targets. Depending directly on the
+    # Do not expose this molecule to other labels. Depending directly on the
     # contents of an SDK foregoes API verification, which is not desirable.
     visibility = [ ":*" ]
 
@@ -143,11 +144,12 @@ template("sdk_collection") {
     deps += [ "//build/sdk/meta" ]
   }
 
-  _verify_api = defined(invoker.api)
+  _verify_api = defined(invoker.api) && override_target_api_level == -1
   if (_verify_api) {
-    base_reference_manifest = ""
-    api_reference = invoker.api
+    base_reference_manifest = invoker.api
     api_deps = []
+    api_reference = invoker.api
+
     if (defined(invoker.filter_api_host_tools) &&
         invoker.filter_api_host_tools) {
       # Remove any host tools that does not belong to the current
@@ -192,8 +194,7 @@ template("sdk_collection") {
       if (sdk_no_host_tools) {
         args += [ "--ensure-no-host-tools" ]
       }
-
-      if (defined(invoker.api)) {
+      if (_verify_api) {
         inputs += [ api_reference ]
         args += [
           "--reference",
@@ -215,6 +216,12 @@ template("sdk_collection") {
 
       public_deps = [ ":${labels.local_manifest}" ]
     }
+  } else {
+    not_needed(invoker,
+               [
+                 "api",
+                 "filter_api_host_tools",
+               ])
   }
 
   # Copies the manifest to a central location + verify the collection API if

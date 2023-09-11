@@ -4,6 +4,7 @@
 
 import("//build/config/fuchsia/platform_version.gni")
 import("//build/sdk/sdk_atom.gni")
+import("//build/sdk/sdk_noop_atom.gni")
 import("//tools/cmc/build/expect_includes.gni")
 
 # Defines an in-tree package for distribution in the SDK, landing
@@ -72,9 +73,24 @@ import("//tools/cmc/build/expect_includes.gni")
 #     manifest will cause an error during checklist file generation.
 #     Type: list of relative package paths.
 #
-
 template("sdk_fuchsia_package") {
-  if (current_toolchain == target_toolchain) {
+  if (defined(invoker.api_level)) {
+    assert(invoker.api_level == platform_version.in_development_api_level,
+           "Only the current development API level is supported.")
+    api_level = invoker.api_level
+  } else {
+    api_level = platform_version.in_development_api_level
+  }
+
+  # Determine whether this package can be built for the current API level.
+  if (override_target_api_level != -1) {
+    current_api_level = override_target_api_level
+  } else {
+    current_api_level = platform_version.in_development_api_level
+  }
+  current_api_level_supported = current_api_level >= api_level
+
+  if (current_api_level_supported && current_toolchain == target_toolchain) {
     assert(defined(invoker.package_label),
            "Must define a package to distribute.")
     assert(defined(invoker.distribution_name),
@@ -95,13 +111,6 @@ template("sdk_fuchsia_package") {
             valid_categories,
         "Invalid SDK category ${invoker.category}, must be one of ${valid_categories}")
 
-    if (defined(invoker.api_level)) {
-      assert(invoker.api_level == platform_version.in_development_api_level,
-             "Only the current development API level is supported.")
-      api_level = invoker.api_level
-    } else {
-      api_level = platform_version.in_development_api_level
-    }
     if (defined(invoker.expected_files_exact)) {
       expected_files_exact = invoker.expected_files_exact
     } else {
@@ -263,6 +272,18 @@ template("sdk_fuchsia_package") {
         package_barrier = []
       }
     }
+  } else if (!current_api_level_supported) {
+    # Current API level is not supported, so create an empty atom.
+    sdk_noop_atom(target_name) {
+      forward_variables_from(invoker, [ "testonly" ])
+
+      id = "sdk://packages/${invoker.distribution_name}"
+      category = invoker.category
+      type = "fuchsia_package"
+    }
+
+    # Suppress unused variable warnings.
+    not_needed(invoker, "*")
   } else {
     # Fuchsia SDK packages should only be built with target_toolchain. However, it
     # is possible for package targets to be expanded in other toolchains (host,

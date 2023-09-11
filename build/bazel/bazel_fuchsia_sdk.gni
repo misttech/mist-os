@@ -10,7 +10,7 @@ declare_args() {
   # Fuchsia Bazel DDK are in place.
   bazel_fuchsia_sdk_content = "driver"
 
-  # Set to true to populage the @fuchsia_sdk external repository with prebuilt
+  # Set to true to populate the @fuchsia_sdk external repository with prebuilt
   # binaries for all supported target CPU architectures. By default, only those
   # for the current build configuration's `target_cpu` value will be generated
   # to save about 3 minutes of build time when they are not needed.

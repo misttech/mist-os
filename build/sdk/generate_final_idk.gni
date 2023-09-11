@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/config/compiler.gni")
+import("//build/config/fuchsia/platform_version.gni")
 import("//build/sdk/config.gni")
 import("//build/toolchain/goma.gni")
 import("//build/toolchain/rbe.gni")
@@ -49,6 +50,13 @@ import("//sdk/config.gni")
 #      in the top-level build. These targets should only depend on
 #      the ${target_name}.exported target, not the main one which builds
 #      the compressed archive.
+#
+#    extra_api_levels: (optional)
+#      List of extra API levels, as integers, to build prebuilts for, in
+#      addition to the current (HEAD) one. The default value depends on the
+#      global sdk_with_all_supported_api_levels variable. If true, then
+#      the default will be platform_version.supported_fuchsia_api_levels,
+#      otherwise it will be empty.
 #
 #    output_name: (optional)
 #      Name of the archive, without a .tar.gz suffix. Default is target_name
@@ -113,6 +121,14 @@ template("generate_final_idk") {
       }
     }
 
+    if (defined(invoker.extra_api_levels)) {
+      _extra_api_levels = invoker.extra_api_levels
+    } else if (sdk_with_all_supported_api_levels) {
+      _extra_api_levels = platform_version.supported_fuchsia_api_levels
+    } else {
+      _extra_api_levels = []
+    }
+
     # Run the script to generate the exported directory.
     # This only contains symlinks to the real files, but can
     # be used by other targets that need to use it without
@@ -170,6 +186,13 @@ template("generate_final_idk") {
         "--compress-debuginfo",
         compress_debuginfo,
       ]
+
+      if (_extra_api_levels != []) {
+        args += [ "--extra-api-levels" ]
+        foreach(api_level, _extra_api_levels) {
+          args += [ "${api_level}" ]
+        }
+      }
 
       forward_variables_from(invoker,
                              [

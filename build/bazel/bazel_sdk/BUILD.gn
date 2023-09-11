@@ -21,6 +21,14 @@ generate_final_idk("idk") {
   output_name = "bazel_fuchsia_sdk_idk"
   sdk_target_labels = bazel_fuchsia_sdk_deps
   target_cpus = _fuchsia_sdk_target_cpus
+
+  if (bazel_fuchsia_sdk_content != "core") {
+    # Never include binaries from previous API levels when not using the
+    # "core" set of SDK atom collections to generate this IDK. This is
+    # necessary because many atoms in the "driver" set cannot compile
+    # on older API levels.
+    extra_api_levels = []
+  }
 }
 
 # Run the //build/bazel_sdk/tests/scripts/bazel_test.sh

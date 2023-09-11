@@ -11,4 +11,9 @@ declare_args() {
   # For example, if this is true then for instance if building on linux x64 then
   # you'll also build SDK host tools for linux arm64.
   sdk_cross_compile_host_tools = false
+
+  # Set to true to build IDK atoms for all supported API levels that are
+  # listed in fuchsia_platform.supported_fuchsia_api_levels. This impacts
+  # the behavior of the generate_final_idk() template.
+  sdk_with_all_supported_api_levels = false
 }

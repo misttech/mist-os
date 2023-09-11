@@ -7,6 +7,7 @@ top-level IDK build with those of extra CPU-specific sub-builds."""
 
 import argparse
 import collections
+import json
 import os
 import shlex
 import shutil
@@ -152,6 +153,11 @@ def main():
         nargs="+",
         default=[],
         help="List of extra target CPU names.")
+    parser.add_argument(
+        "--extra-api-levels",
+        nargs="+",
+        default=[],
+        help="List of extra API levels.")
     parser.add_argument("--stamp-file", help="Optional output stamp file.")
     parser.add_argument(
         "--fuchsia-dir", help="Specify Fuchsia source directory.")
@@ -213,17 +219,23 @@ def main():
 
     base_build_dir = Path(args.base_build_dir)
 
+    # Extract base target_cpu value that is not in args.extra_target_cpus.
+    base_args_json = json.load((base_build_dir / 'args.json').open())
+    base_target_cpu = base_args_json['target_cpu']
+
     # This script creates CPU-specific sub-builds under:
     #
-    #   $BUILD_DIR/fuchsia-idk-build-$CPU/
+    #   $BUILD_DIR/fuchsia-idk-build-$SUBTYPE/
+    #
+    # Where SUBTYPE corresponds to a CPU architecture and optional API level.
     #
     # In each build, generating an exported sdk_collection() target populates a
     # directory like:
     #
-    #   $BUILD_DIR/fuchsia-idk-build-$CPU/sdk/exported/<name>/
+    #   $BUILD_DIR/fuchsia-idk-build-$SUBTYPE/sdk/exported/<name>/
     #
     # With a tree of symlinks to build artifacts that are in other parts of
-    # $BUILD_DIR/fuchsia-idk-sub-build-$CPU
+    # $BUILD_DIR/fuchsia-idk-build-$SUBTYPE
     #
     # This script will merge all these into $OUTPUT_DIR.
     #
@@ -265,59 +277,81 @@ def main():
                 f'Required base directory does not exist: {base_exported_dir}')
         all_input_dirs.append(str(base_exported_dir))
 
-    for target_cpu in args.extra_target_cpus:
-        build_dir = Path(build_dir_prefix + target_cpu)
-        build_dir.mkdir(exist_ok=True, parents=True)
-        log(
-            f'{build_dir}: Preparing sub-build, directory: {build_dir.resolve()}'
-        )
+    for api_level in [0] + args.extra_api_levels:
+        # The base target cpu binaries were already built for the head API
+        # level, so there is no need to create a subtype directory and build
+        # for them.
+        if api_level == 0:
+            target_cpus = args.extra_target_cpus
+        else:
+            target_cpus = [base_target_cpu] + args.extra_target_cpus
 
-        if args.clean and build_dir.exists():
-            log(f'{build_dir}: Cleaning build directory')
-            run_command([ninja_path, "-C", build_dir, "-t", "clean"])
+        for target_cpu in target_cpus:
+            if api_level != 0:
+                subtype = f'api{api_level}-{target_cpu}'
+            else:
+                subtype = target_cpu
 
-        log(f'{build_dir}: Generating GN/Ninja build plan.')
+            build_dir = Path(build_dir_prefix + subtype)
+            build_dir.mkdir(exist_ok=True, parents=True)
+            log(
+                f'{build_dir}: Preparing sub-build, directory: {build_dir.resolve()}'
+            )
 
-        args_gn_content = _ARGS_GN_TEMPLATE.format(
-            cpu=target_cpu,
-            cxx_rbe_enable="true" if args.cxx_rbe_enable else "false",
-            rust_rbe_enable="true" if args.rust_rbe_enable else "false",
-            use_goma="true" if args.use_goma else "false",
-            sdk_labels_list=', '.join(f'"{l}"' for l in args.sdk_targets),
-        )
-        if args.use_goma and args.goma_dir:
-            args_gn_content += f'goma_dir = "{args.goma_dir}"\n'
-        if args.sdk_id:
-            args_gn_content += f'sdk_id = "{args.sdk_id}"\n'
+            if args.clean and build_dir.exists():
+                log(f'{build_dir}: Cleaning build directory')
+                run_command([ninja_path, "-C", build_dir, "-t", "clean"])
 
-        if args.compress_debuginfo:
-            args_gn_content += f'compress_debuginfo = "{args.compress_debuginfo}"\n'
+            args_gn_content = _ARGS_GN_TEMPLATE.format(
+                cpu=target_cpu,
+                cxx_rbe_enable="true" if args.cxx_rbe_enable else "false",
+                rust_rbe_enable="true" if args.rust_rbe_enable else "false",
+                use_goma="true" if args.use_goma else "false",
+                sdk_labels_list=', '.join(f'"{l}"' for l in args.sdk_targets),
+            )
+            if args.use_goma and args.goma_dir:
+                args_gn_content += f'goma_dir = "{args.goma_dir}"\n'
+            if args.sdk_id:
+                args_gn_content += f'sdk_id = "{args.sdk_id}"\n'
 
-        # Only build host tools in the x64 sub-build, to save
-        # considerable time.
-        args_gn_content += "sdk_no_host_tools = true\n"
-        args_gn_content += "sdk_inside_idk_sub_build = true\n"
+            if args.compress_debuginfo:
+                args_gn_content += f'compress_debuginfo = "{args.compress_debuginfo}"\n'
 
-        # Reuse host tools from the top-level build. This assumes that
-        # sub-builds cannot use host tools that were not already built by
-        # the top-level build, as there is no way to inject dependencies
-        # between the two build graphs.
-        relative_top_build_dir = ".."
-        args_gn_content += f'use_prebuilt_host_tools_from_build_dir = "{relative_top_build_dir}"'
+            # Only build host tools in the x64 sub-build, to save
+            # considerable time.
+            args_gn_content += "sdk_no_host_tools = true\n"
+            args_gn_content += "sdk_inside_idk_sub_build = true\n"
 
-        if write_file_if_unchanged(build_dir / 'args.gn', args_gn_content):
-            if run_checked_command([gn_path,
-                                    "--root=%s" % fuchsia_dir.resolve(), "gen",
-                                    build_dir]):
+            # Reuse host tools from the top-level build. This assumes that
+            # sub-builds cannot use host tools that were not already built by
+            # the top-level build, as there is no way to inject dependencies
+            # between the two build graphs.
+            relative_top_build_dir = ".."
+            args_gn_content += f'use_prebuilt_host_tools_from_build_dir = "{relative_top_build_dir}"'
+
+            if api_level != 0:
+                args_gn_content += f"override_target_api_level = {api_level}\n"
+
+            if write_file_if_unchanged(build_dir / 'args.gn', args_gn_content) or \
+               not (build_dir / 'build.ninja').exists():
+                if run_checked_command([gn_path,
+                                        "--root=%s" % fuchsia_dir.resolve(),
+                                        "gen", build_dir]):
+                    return 1
+
+            log(f'{build_dir}: Generating IDK sub-targets')
+            if run_checked_command([ninja_path, "-C", build_dir] +
+                                   ninja_targets):
                 return 1
 
-        log(f'{build_dir}: Generating IDK sub-targets')
-        if run_checked_command([ninja_path, "-C", build_dir] + ninja_targets):
-            return 1
+            # Since the merge script does not understand API levels yet,
+            # ignore the results of extra API levels.
+            if api_level != 0:
+                continue
 
-        for sdk_target in args.sdk_targets:
-            all_input_dirs.append(
-                sdk_label_to_exported_dir(sdk_target, build_dir))
+            for sdk_target in args.sdk_targets:
+                all_input_dirs.append(
+                    sdk_label_to_exported_dir(sdk_target, build_dir))
 
     # Merge everything into the final directory (or archive).
     merge_cmd_args = [

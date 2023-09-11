@@ -392,8 +392,6 @@ sdk_molecule("core_lib") {
     "//sdk/lib/input_report_reader:input_report_reader_sdk",
     "//sdk/lib/inspect",
     "//sdk/lib/inspect/service/cpp:cpp_sdk",
-    "//sdk/lib/magma_client:magma_client_sdk",
-    "//sdk/lib/magma_common:magma_common_sdk",
     "//sdk/lib/media/cpp:cpp_sdk",
     "//sdk/lib/stdcompat:stdcompat_sdk",
     "//sdk/lib/svc:svc_sdk",
@@ -406,7 +404,6 @@ sdk_molecule("core_lib") {
     "//sdk/lib/trace",
     "//sdk/lib/ui/scenic/cpp:cpp_sdk",
     "//sdk/lib/vfs/cpp:cpp_sdk",
-    "//sdk/lib/vulkan",
     "//src/devices/bin/driver_runtime:driver_runtime_sdk",
     "//src/lib/fidl/cpp:cpp_sdk",
     "//src/lib/fidl/cpp:hlcpp_conversion_sdk",
@@ -424,6 +421,16 @@ sdk_molecule("core_lib") {
     "//zircon/system/ulib/trace-engine:trace-engine_sdk",
     "//zircon/system/ulib/trace-provider:trace-provider-so_sdk",
   ]
+
+  # TODO(https://fxbug.dev/132284): Fix compilation of the following atoms
+  # when targeting older API levels, or remove them from the IDK entirely.
+  if (override_target_api_level == -1) {
+    deps += [
+      "//sdk/lib/magma_client:magma_client_sdk",
+      "//sdk/lib/magma_common:magma_common_sdk",
+      "//sdk/lib/vulkan",
+    ]
+  }
 }
 
 # Pieces of the IDK sans host tools (which are in ":host_tools").
