@@ -5301,7 +5301,7 @@ mod tests {
                     { "protocol": "foo", "path": "" },
                 ]
             }),
-            Err(Error::Parse { err, .. }) if &err == "invalid length 0, expected a non-empty path no more than 1024 characters in length"
+            Err(Error::Parse { err, .. }) if &err == "invalid length 0, expected a non-empty path no more than fuchsia.io/MAX_PATH_LENGTH characters in length"
         ),
         test_cml_path_invalid_root(
             json!({
@@ -5330,10 +5330,10 @@ mod tests {
         test_cml_path_too_long(
             json!({
                 "capabilities": [
-                    { "protocol": "foo", "path": format!("/{}", "a".repeat(1024)) },
+                    { "protocol": "foo", "path": format!("/{}", "a".repeat(4095)) },
                 ]
             }),
-            Err(Error::Parse { err, .. }) if &err == "invalid length 1025, expected a non-empty path no more than 1024 characters in length"
+            Err(Error::Parse { err, .. }) if &err == "invalid length 4096, expected a non-empty path no more than fuchsia.io/MAX_PATH_LENGTH characters in length"
         ),
         test_cml_relative_path(
             json!({
@@ -5359,7 +5359,7 @@ mod tests {
                     },
                 ]
             }),
-            Err(Error::Parse { err, .. }) if &err == "invalid length 0, expected a non-empty path no more than 1024 characters in length"
+            Err(Error::Parse { err, .. }) if &err == "invalid length 0, expected a non-empty path no more than fuchsia.io/MAX_PATH_LENGTH characters in length"
         ),
         test_cml_relative_path_invalid_root(
             json!({
@@ -5407,11 +5407,11 @@ mod tests {
                         "directory": "foo",
                         "path": "/foo",
                         "rights": ["r*"],
-                        "subdir": format!("{}", "a".repeat(1025)),
+                        "subdir": format!("{}", "a".repeat(4096)),
                     },
                 ]
             }),
-            Err(Error::Parse { err, .. }) if &err == "invalid length 1025, expected a non-empty path no more than 1024 characters in length"
+            Err(Error::Parse { err, .. }) if &err == "invalid length 4096, expected a non-empty path no more than fuchsia.io/MAX_PATH_LENGTH characters in length"
         ),
         test_cml_relative_ref_too_long(
             json!({

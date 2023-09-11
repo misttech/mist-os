@@ -528,8 +528,8 @@
     {
         "kind": "const",
         "name": "fuchsia.component/MAX_PATH_LENGTH",
-        "type": "uint32",
-        "value": "1024"
+        "type": "uint64",
+        "value": "4095"
     },
     {
         "kind": "const",
@@ -553,7 +553,7 @@
         "kind": "table/member",
         "name": "fuchsia.component/NamespaceEntry.path",
         "ordinal": "1",
-        "type": "string:1024"
+        "type": "string:4095"
     },
     {
         "kind": "table",

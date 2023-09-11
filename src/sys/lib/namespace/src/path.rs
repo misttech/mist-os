@@ -2,13 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_fuchsia_io as fio;
 use flyweights::FlyStr;
+use static_assertions::assert_eq_size;
 use std::{
     borrow::Borrow,
     ffi::{CString, IntoStringError},
     fmt,
 };
 use thiserror::Error;
+
+/// The maximum length, in bytes, of a namespace path.
+///
+/// It is defined to be the same as [`fio::MAX_PATH_LENGTH`] to reduce the distinction
+/// between namespaces and remote filesystems.
+pub const MAX_PATH_LENGTH: usize = fio::MAX_PATH_LENGTH as usize;
+assert_eq_size!(u64, usize);
 
 /// [Path] represents the path of a Zircon process namespace entry.
 ///
@@ -17,8 +26,15 @@ use thiserror::Error;
 /// - Never empty
 /// - Always start with "/"
 /// - Contains no empty path segments
-/// - Does not have embedded NULs
 /// - Valid UTF-8
+/// - Never longer than [`MAX_PATH_LENGTH`]
+/// - Each segment must be a valid [`name::Name`], meaning:
+///   * It cannot be longer than [`fio::MAX_NAME_LENGTH`].
+///   * It cannot be empty.
+///   * It cannot be ".." (dot-dot).
+///   * It cannot be "." (single dot).
+///   * It cannot contain "/".
+///   * It cannot contain embedded NUL.
 ///
 /// [Path] is both a valid C string, and a valid UTF-8 string. It takes on both
 /// constraints because namespace paths are sent via FIDL types which use UTF-8 [String]s,
@@ -37,8 +53,8 @@ pub enum PathError {
     #[error("path cannot be empty")]
     Empty,
 
-    #[error("path `{0}` has an embedded nul")]
-    EmbeddedNul(String),
+    #[error("path `{0}` must not be longer than fuchsia.io/MAX_PATH_LENGTH")]
+    TooLong(String),
 
     #[error("path is not UTF8: `{0}`")]
     NotUtf8(#[from] IntoStringError),
@@ -46,8 +62,8 @@ pub enum PathError {
     #[error("path `{0}` must start with a slash")]
     NoLeadingSlash(String),
 
-    #[error("path `{0}` must not have empty segments")]
-    EmptySegment(String),
+    #[error("path has an invalid path segment: {0}")]
+    InvalidSegment(#[from] name::ParseNameError),
 }
 
 impl Path {
@@ -56,24 +72,23 @@ impl Path {
         if str.is_empty() {
             return Err(PathError::Empty);
         }
+        if str.len() > MAX_PATH_LENGTH {
+            return Err(PathError::TooLong(str.to_owned()));
+        }
         if !str.starts_with('/') {
             return Err(PathError::NoLeadingSlash(str.to_owned()));
         }
-        if str != "/" && !str[1..].split('/').all(|part| !part.is_empty()) {
-            return Err(PathError::EmptySegment(str.to_owned()));
+        // A single slash is always valid, but splitting a slash using a slash
+        // would produce an empty substring.
+        if str != "/" {
+            for segment in str[1..].split('/') {
+                name::validate_name(segment)?;
+            }
         }
-        match memchr::memchr(0, str.as_bytes()) {
-            Some(_) => return Err(PathError::EmbeddedNul(str.to_owned())),
-            None => {}
-        };
-        Ok(Self::new_unchecked(path))
-    }
-
-    fn new_unchecked(path: impl AsRef<str> + Into<String>) -> Self {
         let str: &str = path.as_ref();
         let dirname_idx = str.rfind('/').expect("path validation is wrong");
         let path = FlyStr::new(path);
-        Self { path, dirname_idx }
+        Ok(Self { path, dirname_idx })
     }
 
     /// Splits the path according to "/".
@@ -97,7 +112,9 @@ impl Path {
 
     /// Path to the containing directory, or "/" if the path is "/", as a [`Path`].
     pub fn dirname_ns_path(&self) -> Self {
-        Self::new_unchecked(self.dirname())
+        // Unwrapping is safe because the original path has been validated so that means the
+        // dirname substring should still be a valid path.
+        Self::new(self.dirname()).unwrap()
     }
 
     /// The remainder of the path after `dirname`.
@@ -188,6 +205,12 @@ mod test {
 
     fn path(path: &str) -> Path {
         Path::new(path.to_owned()).unwrap()
+    }
+
+    #[test]
+    fn test_embedded_nul() {
+        assert!(Path::new("/foo/bar").is_ok());
+        assert!(Path::new("/foo\0b/bar").is_err());
     }
 
     #[test]

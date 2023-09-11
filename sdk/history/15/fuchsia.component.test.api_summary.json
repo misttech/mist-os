@@ -121,7 +121,7 @@
         "kind": "table/member",
         "name": "fuchsia.component.test/Directory.path",
         "ordinal": "6",
-        "type": "string:1024"
+        "type": "string:4095"
     },
     {
         "kind": "table/member",
@@ -133,7 +133,7 @@
         "kind": "table/member",
         "name": "fuchsia.component.test/Directory.subdir",
         "ordinal": "4",
-        "type": "string:1024"
+        "type": "string:4095"
     },
     {
         "kind": "table/member",
@@ -223,7 +223,7 @@
         "kind": "table/member",
         "name": "fuchsia.component.test/EventStream.path",
         "ordinal": "3",
-        "type": "string:1024"
+        "type": "string:4095"
     },
     {
         "kind": "table/member",
@@ -269,7 +269,7 @@
         "kind": "table/member",
         "name": "fuchsia.component.test/Protocol.path",
         "ordinal": "4",
-        "type": "string:1024"
+        "type": "string:4095"
     },
     {
         "kind": "table/member",
@@ -858,7 +858,7 @@
         "kind": "table/member",
         "name": "fuchsia.component.test/Service.path",
         "ordinal": "3",
-        "type": "string:1024"
+        "type": "string:4095"
     },
     {
         "kind": "table",

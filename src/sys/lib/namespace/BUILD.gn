@@ -20,8 +20,9 @@ rustc_library("namespace") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/flyweights",
-    "//third_party/rust_crates:memchr",
+    "//src/storage/lib/vfs/rust/name",
     "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:thiserror",
   ]
 

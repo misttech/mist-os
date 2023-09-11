@@ -3,9 +3,16 @@
 // found in the LICENSE file.
 library fuchsia.component;
 
+using fuchsia.io;
+
 const MAX_NAME_LENGTH uint32 = 100;
 const MAX_CHILD_NAME_LENGTH uint32 = 1024;
+
+@available(removed=15)
 const MAX_PATH_LENGTH uint32 = 1024;
+@available(added=15)
+const MAX_PATH_LENGTH uint64 = fuchsia.io.MAX_PATH_LENGTH;
+
 const MAX_MONIKER_LENGTH uint32 = 4096;
 const MAX_URL_SCHEME_LENGTH uint32 = 100;
 

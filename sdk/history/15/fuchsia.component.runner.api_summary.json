@@ -48,7 +48,7 @@
         "kind": "table/member",
         "name": "fuchsia.component.runner/ComponentNamespaceEntry.path",
         "ordinal": "1",
-        "type": "string:1024"
+        "type": "string:4095"
     },
     {
         "kind": "table",

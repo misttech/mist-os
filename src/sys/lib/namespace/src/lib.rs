@@ -12,7 +12,7 @@ use thiserror::Error;
 
 mod path;
 mod tree;
-pub use path::{Path, PathError};
+pub use path::{Path, PathError, MAX_PATH_LENGTH};
 pub use tree::Tree;
 
 /// The namespace of a component instance.

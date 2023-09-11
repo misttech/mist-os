@@ -99,7 +99,7 @@ pub enum ParseError {
 
 pub const MAX_NAME_LENGTH: usize = 100;
 pub const MAX_LONG_NAME_LENGTH: usize = 1024;
-pub const MAX_PATH_LENGTH: usize = 1024;
+pub const MAX_PATH_LENGTH: usize = namespace::MAX_PATH_LENGTH;
 pub const MAX_URL_LENGTH: usize = 4096;
 
 /// A name that can refer to a component, collection, or other entity in the
@@ -267,15 +267,13 @@ impl ser::Serialize for Path {
 impl Path {
     /// Creates a [`Path`] from a [`String`], returning an `Err` if the string fails
     /// validation. The string must be non-empty, no more than [`MAX_PATH_LENGTH`] bytes
-    /// in length, start with a leading `/`, not be exactly `/`, contain no empty path
-    /// segments, and not have embedded NULs. As a result, [`Path`]s are always valid
+    /// in length, start with a leading `/`, not be exactly `/`, not have embedded NULs,
+    /// and be made up of valid fuchsia.io names. As a result, [`Path`]s are always valid
     /// [`NamespacePath`]s.
     pub fn new(path: impl AsRef<str> + Into<String>) -> Result<Self, ParseError> {
         match NamespacePath::new(path) {
             Ok(path) => {
-                if path.as_ref().len() > MAX_PATH_LENGTH {
-                    Err(ParseError::TooLong)
-                } else if path.as_ref() == "/" {
+                if path.as_ref() == "/" {
                     // The `/` is a valid [`NamespacePath`], but the way capabilities
                     // are installed into namespaces require [`Path`]s to always have
                     // a parent, so `/` is an invalid [`Path`].
@@ -286,10 +284,13 @@ impl Path {
             }
             Err(e) => match e {
                 PathError::Empty => Err(ParseError::Empty),
-                PathError::EmbeddedNul(_)
-                | PathError::NotUtf8(_)
+                PathError::TooLong(_) => Err(ParseError::TooLong),
+                PathError::InvalidSegment(name::ParseNameError::TooLong(_)) => {
+                    Err(ParseError::TooLong)
+                }
+                PathError::NotUtf8(_)
                 | PathError::NoLeadingSlash(_)
-                | PathError::EmptySegment(_) => Err(ParseError::InvalidValue),
+                | PathError::InvalidSegment(_) => Err(ParseError::InvalidValue),
             },
         }
     }
@@ -354,7 +355,7 @@ impl<'de> de::Deserialize<'de> for Path {
 
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 f.write_str(
-                    "a non-empty path no more than 1024 characters \
+                    "a non-empty path no more than fuchsia.io/MAX_PATH_LENGTH characters \
                      in length, with a leading `/`, and containing no \
                      empty path segments",
                 )
@@ -371,7 +372,8 @@ impl<'de> de::Deserialize<'de> for Path {
                     ),
                     ParseError::TooLong | ParseError::Empty => E::invalid_length(
                         s.len(),
-                        &"a non-empty path no more than 1024 characters in length",
+                        &"a non-empty path no more than fuchsia.io/MAX_PATH_LENGTH characters \
+                        in length",
                     ),
                     e => {
                         panic!("unexpected parse error: {:?}", e);
@@ -389,8 +391,8 @@ pub struct RelativePath(FlyStr);
 
 impl RelativePath {
     /// Creates a `RelativePath` from a `String`, returning an `Err` if the string fails
-    /// validation. The string must be non-empty, no more than 1024 characters in length, not start
-    /// with a `/`, and contain no empty path segments.
+    /// validation. The string must be non-empty, no more than [`MAX_PATH_LENGTH`] characters
+    /// in length, not start with a `/`, and contain no empty path segments.
     pub fn new(path: impl AsRef<str> + Into<String>) -> Result<Self, ParseError> {
         let p = path.as_ref();
         if p.is_empty() {
@@ -436,7 +438,7 @@ impl<'de> de::Deserialize<'de> for RelativePath {
 
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 f.write_str(
-                    "a non-empty path no more than 1024 characters \
+                    "a non-empty path no more than fuchsia.io/MAX_PATH_LENGTH characters \
                      in length, not starting with `/`, and containing no \
                      empty path segments",
                 )
@@ -453,7 +455,8 @@ impl<'de> de::Deserialize<'de> for RelativePath {
                     ),
                     ParseError::TooLong | ParseError::Empty => E::invalid_length(
                         s.len(),
-                        &"a non-empty path no more than 1024 characters in length",
+                        &"a non-empty path no more than fuchsia.io/MAX_PATH_LENGTH characters \
+                        in length",
                     ),
                     e => {
                         panic!("unexpected parse error: {:?}", e);
@@ -877,7 +880,9 @@ mod tests {
     fn test_valid_path() {
         expect_ok!(Path, "/foo");
         expect_ok!(Path, "/foo/bar");
-        expect_ok!(Path, &format!("/{}", repeat("x").take(1023).collect::<String>()));
+        expect_ok!(Path, &format!("/{}", repeat("x").take(255).collect::<String>()));
+        // 2047 * 2 characters per repeat = 4094
+        expect_ok!(Path, &repeat("/x").take(2047).collect::<String>());
     }
 
     #[test]
@@ -889,7 +894,9 @@ mod tests {
         expect_err!(Path, "/foo/");
         expect_err!(Path, "/foo//bar");
         expect_err!(Path, "/fo\0b/bar");
-        expect_err!(Path, &format!("/{}", repeat("x").take(1024).collect::<String>()));
+        expect_err!(Path, &format!("/{}", repeat("x").take(256).collect::<String>()));
+        // 2048 * 2 characters per repeat = 4096
+        expect_err!(Path, &repeat("/x").take(2048).collect::<String>());
     }
 
     #[test]
@@ -906,7 +913,7 @@ mod tests {
     fn test_valid_relative_path() {
         expect_ok!(RelativePath, "foo");
         expect_ok!(RelativePath, "foo/bar");
-        expect_ok!(RelativePath, &format!("{}", repeat("x").take(1024).collect::<String>()));
+        expect_ok!(RelativePath, &format!("{}", repeat("x").take(4095).collect::<String>()));
     }
 
     #[test]
@@ -917,7 +924,7 @@ mod tests {
         expect_err!(RelativePath, "foo/");
         expect_err!(RelativePath, "/foo/");
         expect_err!(RelativePath, "foo//bar");
-        expect_err!(RelativePath, &format!("{}", repeat("x").take(1025).collect::<String>()));
+        expect_err!(RelativePath, &format!("{}", repeat("x").take(4096).collect::<String>()));
     }
 
     #[test]

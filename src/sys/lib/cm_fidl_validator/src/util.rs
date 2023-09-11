@@ -172,19 +172,51 @@ mod tests {
 
     use {
         super::*,
-        cm_types::{MAX_LONG_NAME_LENGTH, MAX_NAME_LENGTH, MAX_PATH_LENGTH},
+        cm_types::{MAX_LONG_NAME_LENGTH, MAX_NAME_LENGTH},
         lazy_static::lazy_static,
         proptest::prelude::*,
         regex::Regex,
         url::Url,
     };
 
-    const PATH_REGEX_STR: &str = "(/[^/\0]+)+";
+    mod path {
+        use cm_types::{MAX_NAME_LENGTH, MAX_PATH_LENGTH};
+        use lazy_static::lazy_static;
+        use proptest::prelude::*;
+        use regex::Regex;
+
+        pub fn is_path_valid(s: &str) -> bool {
+            if !ROUGH_PATH_REGEX.is_match(s) {
+                return false;
+            }
+            check_segment_and_length(s)
+        }
+
+        pub fn path_strategy() -> SBoxedStrategy<String> {
+            ROUGH_PATH_REGEX_STR
+                .prop_filter("Length and segment must be valid", check_segment_and_length)
+                .sboxed()
+        }
+
+        fn check_segment_and_length(s: &(impl AsRef<str> + ?Sized)) -> bool {
+            let s: &str = s.as_ref();
+            if s.len() > MAX_PATH_LENGTH {
+                return false;
+            }
+            s.split("/").all(|v| v != "." && v != ".." && v.len() <= MAX_NAME_LENGTH)
+        }
+
+        const ROUGH_PATH_REGEX_STR: &str = "(/[^/\0]+)+";
+
+        lazy_static! {
+            static ref ROUGH_PATH_REGEX: Regex =
+                Regex::new(&("^".to_string() + ROUGH_PATH_REGEX_STR + "$")).unwrap();
+        }
+    }
+
     const NAME_REGEX_STR: &str = r"[0-9a-zA-Z_][0-9a-zA-Z_\-\.]*";
 
     lazy_static! {
-        static ref PATH_REGEX: Regex =
-            Regex::new(&("^".to_string() + PATH_REGEX_STR + "$")).unwrap();
         static ref NAME_REGEX: Regex =
             Regex::new(&("^".to_string() + NAME_REGEX_STR + "$")).unwrap();
         static ref A_BASE_URL: Url = Url::parse("relative:///").unwrap();
@@ -192,16 +224,14 @@ mod tests {
 
     proptest! {
         #[test]
-        fn check_path_matches_regex(s in PATH_REGEX_STR) {
-            if s.len() < MAX_PATH_LENGTH {
-                let mut errors = vec![];
-                prop_assert!(check_path(Some(&s), DeclType::Child, "", &mut errors));
-                prop_assert!(errors.is_empty());
-            }
+        fn check_path_matches_regex(s in path::path_strategy()) {
+            let mut errors = vec![];
+            prop_assert!(check_path(Some(&s), DeclType::Child, "", &mut errors));
+            prop_assert!(errors.is_empty());
         }
         #[test]
         fn check_name_matches_regex(s in NAME_REGEX_STR) {
-            if s.len() < MAX_NAME_LENGTH {
+            if s.len() <= MAX_NAME_LENGTH {
                 let mut errors = vec![];
                 prop_assert!(check_name(Some(&s), DeclType::Child, "", &mut errors));
                 prop_assert!(errors.is_empty());
@@ -209,7 +239,7 @@ mod tests {
         }
         #[test]
         fn check_path_fails_invalid_input(s in ".*") {
-            if !PATH_REGEX.is_match(&s) {
+            if !path::is_path_valid(&s) {
                 let mut errors = vec![];
                 prop_assert!(!check_path(Some(&s), DeclType::Child, "", &mut errors));
                 prop_assert!(!errors.is_empty());
@@ -313,9 +343,15 @@ mod tests {
             input = "/foo/bar/",
             result = Err(ErrorList::new(vec![Error::invalid_field(DeclType::Child, "foo")])),
         },
+        test_identifier_path_segment_too_long => {
+            check_fn = check_path,
+            input = &format!("/{}", "a".repeat(256)),
+            result = Err(ErrorList::new(vec![Error::field_too_long(DeclType::Child, "foo")])),
+        },
         test_identifier_path_too_long => {
             check_fn = check_path,
-            input = &format!("/{}", "a".repeat(1024)),
+            // 2048 * 2 characters per repeat = 4096
+            input = &"/a".repeat(2048),
             result = Err(ErrorList::new(vec![Error::field_too_long(DeclType::Child, "foo")])),
         },
 
