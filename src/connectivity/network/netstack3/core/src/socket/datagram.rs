@@ -321,6 +321,7 @@ pub(crate) struct IpOptions<I: Ip + IpExt, D, S: DatagramSocketSpec + ?Sized> {
     multicast_memberships: MulticastMemberships<I::Addr, D>,
     hop_limits: SocketHopLimits,
     other_stack: S::OtherStackIpOptions<I>,
+    transparent: bool,
 }
 
 impl<I: IpExt, D, S: DatagramSocketSpec> AsRef<Self> for IpOptions<I, D, S> {
@@ -1610,9 +1611,8 @@ where
             },
         };
 
-        let IpOptions { multicast_memberships, hop_limits: _, other_stack: _ } = ip_options;
         DatagramBoundStateContext::<I, _, _>::with_transport_context(sync_ctx, |sync_ctx| {
-            leave_all_joined_groups(sync_ctx, ctx, multicast_memberships)
+            leave_all_joined_groups(sync_ctx, ctx, ip_options.multicast_memberships)
         });
         info
     })
@@ -3294,8 +3294,8 @@ pub(crate) fn set_multicast_membership<
             return Err(SetMulticastMembershipError::DeviceDoesNotExist);
         };
 
-        let IpOptions { multicast_memberships, hop_limits: _, other_stack: _ } = ip_options;
-        let change = multicast_memberships
+        let change = ip_options
+            .multicast_memberships
             .apply_membership_change(multicast_group, &interface.as_weak(sync_ctx), want_membership)
             .ok_or(SetMulticastMembershipError::NoMembershipChange)?;
 
@@ -3442,10 +3442,9 @@ pub(crate) fn get_ip_hop_limits<
     sync_ctx.with_sockets_state(|sync_ctx, state| {
         let (options, device) =
             get_options_device(sync_ctx, state.get(id.get_key_index()).expect("socket not found"));
-        let IpOptions { hop_limits, multicast_memberships: _, other_stack: _ } = options;
         let device = device.as_ref().and_then(|d| sync_ctx.upgrade_weak_device_id(d));
         DatagramBoundStateContext::<I, _, _>::with_transport_context(sync_ctx, |sync_ctx| {
-            hop_limits.get_limits_with_defaults(
+            options.hop_limits.get_limits_with_defaults(
                 &TransportIpContext::<I, _>::get_default_hop_limits(sync_ctx, device.as_ref()),
             )
         })
@@ -3540,6 +3539,37 @@ where
             },
         }
         .clone()
+    })
+}
+
+pub(crate) fn set_ip_transparent<
+    I: IpExt,
+    SC: DatagramStateContext<I, C, S>,
+    C: DatagramStateNonSyncContext<I, S>,
+    S: DatagramSocketSpec,
+>(
+    sync_ctx: &mut SC,
+    id: S::SocketId<I>,
+    value: bool,
+) {
+    sync_ctx.with_sockets_state_mut(|sync_ctx, state| {
+        get_options_mut(sync_ctx, state, id).transparent = value;
+    })
+}
+
+pub(crate) fn get_ip_transparent<
+    I: IpExt,
+    SC: DatagramStateContext<I, C, S>,
+    C: DatagramStateNonSyncContext<I, S>,
+    S: DatagramSocketSpec,
+>(
+    sync_ctx: &mut SC,
+    id: S::SocketId<I>,
+) -> bool {
+    sync_ctx.with_sockets_state(|sync_ctx, state| {
+        let (options, _device) =
+            get_options_device(sync_ctx, state.get(id.get_key_index()).expect("missing socket"));
+        options.transparent
     })
 }
 
@@ -4250,5 +4280,32 @@ mod test {
                 addr,
             );
         }
+    }
+
+    #[ip_test]
+    fn set_get_transparent<I: Ip + DatagramIpExt + IpLayerIpExt>() {
+        let mut sync_ctx = FakeSyncCtx::<I, _> {
+            outer: FakeSocketsState::default(),
+            inner: WrappedFakeSyncCtx::with_inner_and_outer_state(
+                FakeDualStackIpSocketCtx::new([FakeDeviceConfig::<_, SpecifiedAddr<I::Addr>> {
+                    device: FakeDeviceId,
+                    local_ips: Default::default(),
+                    remote_ips: Default::default(),
+                }]),
+                Default::default(),
+            ),
+        };
+
+        let unbound = create(&mut sync_ctx);
+
+        assert!(!get_ip_transparent(&mut sync_ctx, unbound.clone()));
+
+        set_ip_transparent(&mut sync_ctx, unbound.clone(), true);
+
+        assert!(get_ip_transparent(&mut sync_ctx, unbound.clone()));
+
+        set_ip_transparent(&mut sync_ctx, unbound.clone(), false);
+
+        assert!(!get_ip_transparent(&mut sync_ctx, unbound.clone()));
     }
 }

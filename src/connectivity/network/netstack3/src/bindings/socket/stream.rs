@@ -1211,6 +1211,12 @@ where
                     .send(Err(fposix::Errno::Eopnotsupp))
                     .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
+            fposix_socket::StreamSocketRequest::GetOriginalDestination { responder } => {
+                // When we support NAT, we should return the original address.
+                responder
+                    .send(Err(fposix::Errno::Enoent))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+            }
             fposix_socket::StreamSocketRequest::Disconnect { responder } => {
                 responder
                     .send(Err(fposix::Errno::Eopnotsupp))
@@ -1324,6 +1330,32 @@ where
                     .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::DropIpMembership { membership: _, responder } => {
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+            }
+            fposix_socket::StreamSocketRequest::SetIpTransparent { value: _, responder } => {
+                // In theory this can be used on stream sockets, but we don't need it right now.
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+            }
+            fposix_socket::StreamSocketRequest::GetIpTransparent { responder } => {
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+            }
+            fposix_socket::StreamSocketRequest::SetIpReceiveOriginalDestinationAddress {
+                value: _,
+                responder,
+            } => {
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+            }
+            fposix_socket::StreamSocketRequest::GetIpReceiveOriginalDestinationAddress {
+                responder,
+            } => {
                 responder
                     .send(Err(fposix::Errno::Eopnotsupp))
                     .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));

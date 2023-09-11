@@ -1495,6 +1495,10 @@ pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
 
     fn get_udp_multicast_hop_limit(&mut self, ctx: &C, id: SocketId<I>) -> NonZeroU8;
 
+    fn get_udp_transparent(&mut self, id: SocketId<I>) -> bool;
+
+    fn set_udp_transparent(&mut self, id: SocketId<I>, value: bool);
+
     fn disconnect_connected(
         &mut self,
         ctx: &mut C,
@@ -1673,6 +1677,14 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
 
     fn get_udp_multicast_hop_limit(&mut self, ctx: &C, id: SocketId<I>) -> NonZeroU8 {
         crate::socket::datagram::get_ip_hop_limits(self, ctx, id).multicast
+    }
+
+    fn get_udp_transparent(&mut self, id: SocketId<I>) -> bool {
+        crate::socket::datagram::get_ip_transparent(self, id)
+    }
+
+    fn set_udp_transparent(&mut self, id: SocketId<I>, value: bool) {
+        crate::socket::datagram::set_ip_transparent(self, id, value)
     }
 
     fn disconnect_connected(
@@ -2363,9 +2375,9 @@ pub fn get_udp_unicast_hop_limit<I: Ip, C: crate::NonSyncContext>(
     hop_limit
 }
 
-/// Sets the hop limit for packets sent by the socket to a multicast destination.
+/// Gets the hop limit for packets sent by the socket to a multicast destination.
 ///
-/// Sets the hop limit (IPv6) or TTL (IPv4) for outbound packets going to a
+/// Gets the hop limit (IPv6) or TTL (IPv4) for outbound packets going to a
 /// unicast address.
 pub fn get_udp_multicast_hop_limit<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
@@ -2384,6 +2396,35 @@ pub fn get_udp_multicast_hop_limit<I: Ip, C: crate::NonSyncContext>(
         },
     );
     hop_limit
+}
+
+/// Gets the transparent option.
+pub fn get_udp_transparent<I: Ip, C: crate::NonSyncContext>(
+    sync_ctx: &SyncCtx<C>,
+    id: &SocketId<I>,
+) -> bool {
+    I::map_ip(
+        (IpInvariant(&mut Locked::new(sync_ctx)), id.clone()),
+        |(IpInvariant(sync_ctx), id)| sync_ctx.get_udp_transparent(id.clone()),
+        |(IpInvariant(sync_ctx), id)| sync_ctx.get_udp_transparent(id.clone()),
+    )
+}
+
+/// Sets the transparent option.
+pub fn set_udp_transparent<I: Ip, C: crate::NonSyncContext>(
+    sync_ctx: &SyncCtx<C>,
+    id: &SocketId<I>,
+    value: bool,
+) {
+    I::map_ip::<_, ()>(
+        (IpInvariant(&mut Locked::new(sync_ctx)), id.clone(), value),
+        |(IpInvariant(sync_ctx), id, value)| {
+            SocketHandler::set_udp_transparent(sync_ctx, id, value)
+        },
+        |(IpInvariant(sync_ctx), id, value)| {
+            SocketHandler::set_udp_transparent(sync_ctx, id, value)
+        },
+    );
 }
 
 /// Disconnects a connected UDP socket.

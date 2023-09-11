@@ -1068,6 +1068,22 @@ func (ep *endpointWithMutators) DropIpMembership(_ fidl.Context, membership sock
 	return socket.BaseNetworkSocketDropIpMembershipResultWithResponse(socket.BaseNetworkSocketDropIpMembershipResponse{}), nil
 }
 
+func (ep *endpointWithMutators) SetIpTransparent(_ fidl.Context, _ bool) (socket.BaseNetworkSocketSetIpTransparentResult, error) {
+	return socket.BaseNetworkSocketSetIpTransparentResultWithErr(posix.ErrnoEnoprotoopt), nil
+}
+
+func (ep *endpoint) GetIpTransparent(_ fidl.Context) (socket.BaseNetworkSocketGetIpTransparentResult, error) {
+	return socket.BaseNetworkSocketGetIpTransparentResultWithErr(posix.ErrnoEnoprotoopt), nil
+}
+
+func (ep *endpointWithMutators) SetIpReceiveOriginalDestinationAddress(_ fidl.Context, _ bool) (socket.BaseNetworkSocketSetIpReceiveOriginalDestinationAddressResult, error) {
+	return socket.BaseNetworkSocketSetIpReceiveOriginalDestinationAddressResultWithErr(posix.ErrnoEnoprotoopt), nil
+}
+
+func (ep *endpoint) GetIpReceiveOriginalDestinationAddress(_ fidl.Context) (socket.BaseNetworkSocketGetIpReceiveOriginalDestinationAddressResult, error) {
+	return socket.BaseNetworkSocketGetIpReceiveOriginalDestinationAddressResultWithErr(posix.ErrnoEnoprotoopt), nil
+}
+
 func (ep *endpointWithMutators) AddIpv6Membership(_ fidl.Context, membership socket.Ipv6MulticastMembership) (socket.BaseNetworkSocketAddIpv6MembershipResult, error) {
 	ep.ep.sockOptStats.AddIpv6Membership.Add(1)
 	opt := tcpip.AddMembershipOption{
@@ -1138,6 +1154,10 @@ func (ep *endpoint) GetIpv6ReceivePacketInfo(fidl.Context) (socket.BaseNetworkSo
 	ep.sockOptStats.GetIpv6ReceivePacketInfo.Add(1)
 	value := ep.ep.SocketOptions().GetIPv6ReceivePacketInfo()
 	return socket.BaseNetworkSocketGetIpv6ReceivePacketInfoResultWithResponse(socket.BaseNetworkSocketGetIpv6ReceivePacketInfoResponse{Value: value}), nil
+}
+
+func (ep *endpoint) GetOriginalDestination(_ fidl.Context) (socket.BaseNetworkSocketGetOriginalDestinationResult, error) {
+	return socket.BaseNetworkSocketGetOriginalDestinationResultWithErr(posix.ErrnoEnoprotoopt), nil
 }
 
 func (ep *endpoint) setIpReceiveTypeOfService(value bool) {
@@ -2606,6 +2626,14 @@ func (s *datagramSocketImpl) DropIpMembership(ctx fidl.Context, membership socke
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketDropIpMembershipResult, error) {
 		return ewm.DropIpMembership(ctx, membership)
 	})
+}
+
+func (s *datagramSocketImpl) SetIpTransparent(_ fidl.Context, _ bool) (socket.BaseNetworkSocketSetIpTransparentResult, error) {
+	return socket.BaseNetworkSocketSetIpTransparentResultWithErr(posix.ErrnoEopnotsupp), nil
+}
+
+func (s *datagramSocketImpl) SetIpReceiveOriginalDestinationAddress(_ fidl.Context, _ bool) (socket.BaseNetworkSocketSetIpReceiveOriginalDestinationAddressResult, error) {
+	return socket.BaseNetworkSocketSetIpReceiveOriginalDestinationAddressResultWithErr(posix.ErrnoEopnotsupp), nil
 }
 
 func (s *datagramSocketImpl) AddIpv6Membership(ctx fidl.Context, membership socket.Ipv6MulticastMembership) (socket.BaseNetworkSocketAddIpv6MembershipResult, error) {

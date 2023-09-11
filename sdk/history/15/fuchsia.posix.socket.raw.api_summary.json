@@ -291,6 +291,15 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetIpReceiveOriginalDestinationAddress",
+        "strictness": "strict",
+        "ordinal": "3030497887931850729",
+        "direction": "two_way",
+        "response": "fuchsia.posix.socket/BaseNetworkSocket_GetIpReceiveOriginalDestinationAddress_Response",
+        "error": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.posix.socket.raw/Socket.GetIpReceiveTtl",
         "strictness": "strict",
         "ordinal": "7461863537816252085",
@@ -305,6 +314,15 @@
         "ordinal": "4708718459712264544",
         "direction": "two_way",
         "response": "fuchsia.posix.socket/BaseNetworkSocket_GetIpReceiveTypeOfService_Response",
+        "error": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetIpTransparent",
+        "strictness": "strict",
+        "ordinal": "5896397828232495029",
+        "direction": "two_way",
+        "response": "fuchsia.posix.socket/BaseNetworkSocket_GetIpTransparent_Response",
         "error": "fuchsia.posix/Errno"
     },
     {
@@ -440,6 +458,15 @@
         "ordinal": "3230247044467750548",
         "direction": "two_way",
         "response": "fuchsia.posix.socket/BaseSocket_GetNoCheck_Response",
+        "error": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.GetOriginalDestination",
+        "strictness": "strict",
+        "ordinal": "4089032001607023296",
+        "direction": "two_way",
+        "response": "fuchsia.posix.socket/BaseNetworkSocket_GetOriginalDestination_Response",
         "error": "fuchsia.posix/Errno"
     },
     {
@@ -624,6 +651,16 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetIpReceiveOriginalDestinationAddress",
+        "strictness": "strict",
+        "ordinal": "320366132759328832",
+        "direction": "two_way",
+        "request": "fuchsia.posix.socket/BaseNetworkSocketSetIpReceiveOriginalDestinationAddressRequest",
+        "response": "fuchsia.posix.socket/BaseNetworkSocket_SetIpReceiveOriginalDestinationAddress_Response",
+        "error": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.posix.socket.raw/Socket.SetIpReceiveTtl",
         "strictness": "strict",
         "ordinal": "5111968073129834539",
@@ -640,6 +677,16 @@
         "direction": "two_way",
         "request": "fuchsia.posix.socket/BaseNetworkSocketSetIpReceiveTypeOfServiceRequest",
         "response": "fuchsia.posix.socket/BaseNetworkSocket_SetIpReceiveTypeOfService_Response",
+        "error": "fuchsia.posix/Errno"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.posix.socket.raw/Socket.SetIpTransparent",
+        "strictness": "strict",
+        "ordinal": "1938010949376467872",
+        "direction": "two_way",
+        "request": "fuchsia.posix.socket/BaseNetworkSocketSetIpTransparentRequest",
+        "response": "fuchsia.posix.socket/BaseNetworkSocket_SetIpTransparent_Response",
         "error": "fuchsia.posix/Errno"
     },
     {

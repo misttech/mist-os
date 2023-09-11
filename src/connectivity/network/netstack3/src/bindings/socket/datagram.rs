@@ -335,6 +335,14 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
         ctx: &C,
         id: &Self::SocketId,
     ) -> NonZeroU8;
+
+    fn set_ip_transparent<C: NonSyncContext>(
+        sync_ctx: &SyncCtx<C>,
+        id: &Self::SocketId,
+        value: bool,
+    );
+
+    fn get_ip_transparent<C: NonSyncContext>(sync_ctx: &SyncCtx<C>, id: &Self::SocketId) -> bool;
 }
 
 /// An abstraction over transport protocols that allows data to be sent via the Core.
@@ -539,6 +547,18 @@ impl<I: IpExt> TransportState<I> for Udp {
         id: &Self::SocketId,
     ) -> NonZeroU8 {
         udp::get_udp_multicast_hop_limit(sync_ctx, ctx, id)
+    }
+
+    fn set_ip_transparent<C: NonSyncContext>(
+        sync_ctx: &SyncCtx<C>,
+        id: &Self::SocketId,
+        value: bool,
+    ) {
+        udp::set_udp_transparent(sync_ctx, id, value);
+    }
+
+    fn get_ip_transparent<C: NonSyncContext>(sync_ctx: &SyncCtx<C>, id: &Self::SocketId) -> bool {
+        udp::get_udp_transparent(sync_ctx, id)
     }
 }
 
@@ -919,6 +939,13 @@ where
                     .send(Err(fposix::Errno::Eopnotsupp))
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
+            fposix_socket::SynchronousDatagramSocketRequest::GetOriginalDestination {
+                responder
+            } => {
+                responder
+                    .send(Err(fposix::Errno::Enoprotoopt))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+            }
             fposix_socket::SynchronousDatagramSocketRequest::GetError { responder } => {
                 responder
                     .send(Err(fposix::Errno::Eopnotsupp))
@@ -1228,6 +1255,37 @@ where
             } => {
                 responder
                     .send(self.set_multicast_membership(membership, false))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+            }
+            fposix_socket::SynchronousDatagramSocketRequest::SetIpTransparent {
+                value,
+                responder,
+            } => {
+                self.set_ip_transparent(value);
+                responder
+                    .send(Ok(()))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+            }
+            fposix_socket::SynchronousDatagramSocketRequest::GetIpTransparent {
+                responder,
+            } => {
+                responder
+                    .send(Ok(self.get_ip_transparent()))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+            }
+            fposix_socket::SynchronousDatagramSocketRequest::SetIpReceiveOriginalDestinationAddress {
+                value: _,
+                responder,
+            } => {
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+            }
+            fposix_socket::SynchronousDatagramSocketRequest::GetIpReceiveOriginalDestinationAddress {
+                responder,
+            } => {
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::AddIpv6Membership {
@@ -1818,7 +1876,26 @@ where
 
         Ok(T::get_multicast_hop_limit(sync_ctx, non_sync_ctx, id).get())
     }
+
+    fn set_ip_transparent(self, value: bool) {
+        let Self {
+            ctx,
+            data:
+                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+        } = self;
+        T::set_ip_transparent(ctx.sync_ctx(), id, value)
+    }
+
+    fn get_ip_transparent(self) -> bool {
+        let Self {
+            ctx,
+            data:
+                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+        } = self;
+        T::get_ip_transparent(ctx.sync_ctx(), id)
+    }
 }
+
 impl IntoErrno for ExpectedUnboundError {
     fn into_errno(self) -> fposix::Errno {
         let ExpectedUnboundError = self;

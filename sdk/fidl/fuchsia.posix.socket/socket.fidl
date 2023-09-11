@@ -289,6 +289,28 @@ closed protocol BaseNetworkSocket {
         membership IpMulticastMembership;
     }) -> () error fuchsia.posix.Errno;
 
+    /// Set `SOL_IP` -> `IP_TRANSPARENT`
+    @available(added=15)
+    strict SetIpTransparent(struct {
+        value bool;
+    }) -> () error fuchsia.posix.Errno;
+    /// Get `SOL_IP` -> `IP_TRANSPARENT`
+    @available(added=15)
+    strict GetIpTransparent() -> (struct {
+        value bool;
+    }) error fuchsia.posix.Errno;
+
+    /// Set `SOL_IP` -> `IP_RECVORIGDSTADDR`
+    @available(added=15)
+    strict SetIpReceiveOriginalDestinationAddress(struct {
+        value bool;
+    }) -> () error fuchsia.posix.Errno;
+    /// Get `SOL_IP` -> `IP_RECVORIGDSTADDR`
+    @available(added=15)
+    strict GetIpReceiveOriginalDestinationAddress() -> (struct {
+        value bool;
+    }) error fuchsia.posix.Errno;
+
     /// Set `SOL_IPV6` -> `IPV6_ADD_MEMBERSHIP`.
     strict AddIpv6Membership(struct {
         membership Ipv6MulticastMembership;
@@ -388,6 +410,13 @@ closed protocol BaseNetworkSocket {
     /// Get `SOL_IPV6` -> `IPV6_RECVPKTINFO`.
     strict GetIpv6ReceivePacketInfo() -> (struct {
         value bool;
+    }) error fuchsia.posix.Errno;
+
+    /// Get `SOL_IP` -> `SO_ORIGINAL_DST`.
+    // Return the original destination for the socket (as it was before NAT translation).
+    @available(added=15)
+    strict GetOriginalDestination() -> (struct {
+        value fuchsia.net.SocketAddress;
     }) error fuchsia.posix.Errno;
 };
 
