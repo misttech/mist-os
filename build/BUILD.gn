@@ -289,8 +289,6 @@ group("deprecated_zx_wrapper_allowlist") {
     "//zircon/system/ulib/lazy_init:*",
     "//zircon/system/ulib/ldmsg:*",
     "//zircon/system/ulib/lockdep:*",
-    "//zircon/system/ulib/log-writer-logger:*",
-    "//zircon/system/ulib/log-writer-textfile:*",
     "//zircon/system/ulib/mbr:*",
     "//zircon/system/ulib/mini-process:*",
     "//zircon/system/ulib/mmio-ptr:*",

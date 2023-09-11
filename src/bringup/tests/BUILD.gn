@@ -88,7 +88,6 @@ group("bootfs-tests") {
     "//zircon/system/utest/debugger:debugger-bootfs-test",
     "//zircon/system/utest/device-enumeration:device-enumeration-bootfs-test",
     "//zircon/system/utest/dlfcn:dlfcn-bootfs-test",
-    "//zircon/system/utest/log:log-bootfs-test",
     "//zircon/system/utest/miscsvc:miscsvc-bootfs-test",
     "//zircon/system/utest/namespace:namespace-bootfs-test",
     "//zircon/system/utest/psutils:ps-bootfs-test",
