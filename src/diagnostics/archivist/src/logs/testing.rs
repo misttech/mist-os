@@ -502,7 +502,14 @@ impl TestDebugEntry {
         rec.pid = TEST_KLOG_PID;
         rec.tid = TEST_KLOG_TID;
         rec.data[..len].copy_from_slice(&log_data[..len]);
+        rec.severity = 0x30 /* info */;
         TestDebugEntry { record: rec }
+    }
+
+    pub fn new_with_severity(log_data: &[u8], severity: u8) -> Self {
+        let mut this = Self::new(log_data);
+        this.record.severity = severity;
+        this
     }
 }
 

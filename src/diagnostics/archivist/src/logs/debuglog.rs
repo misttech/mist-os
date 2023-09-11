@@ -137,12 +137,25 @@ pub fn convert_debuglog_to_log_message(record: &zx::sys::zx_log_record_t) -> Opt
     // of the substring search operation.
     let early_contents = &contents[..last];
 
-    let severity = if early_contents.contains("ERROR:") {
-        Severity::Error
-    } else if early_contents.contains("WARNING:") {
-        Severity::Warn
-    } else {
-        Severity::Info
+    let severity = match record.severity {
+        0x10 => Severity::Trace,
+        0x20 => Severity::Debug,
+        0x40 => Severity::Warn,
+        0x50 => Severity::Error,
+        0x60 => Severity::Fatal,
+        _ => {
+            // By default `zx_log_record_t` carry INFO severity. Since `zx_debuglog_write` doesn't
+            // support setting a severity, historically logs have been tagged and annotated with
+            // their severity in the message. If we get here attempt to use the severity in the
+            // message, otherwise fallback to INFO.
+            if early_contents.contains("ERROR:") {
+                Severity::Error
+            } else if early_contents.contains("WARNING:") {
+                Severity::Warn
+            } else {
+                Severity::Info
+            }
+        }
     };
 
     Some(
@@ -321,6 +334,12 @@ mod tests {
         debug_log.enqueue_read_entry(&TestDebugEntry::new("WARNING: second log".as_bytes())).await;
         debug_log.enqueue_read_entry(&TestDebugEntry::new("INFO: third log".as_bytes())).await;
         debug_log.enqueue_read_entry(&TestDebugEntry::new("fourth log".as_bytes())).await;
+        debug_log
+            .enqueue_read_entry(&TestDebugEntry::new_with_severity(
+                "ERROR: severity takes precedence over msg when not info".as_bytes(),
+                0x40, /* warn */
+            ))
+            .await;
         // Create a string prefixed with multi-byte UTF-8 characters. This entry will be labeled as
         // Info rather than Error because the string "ERROR:" only appears after the
         // MAX_STRING_SEARCH_SIZE. It's crucial that we use multi-byte UTF-8 characters because we
@@ -354,6 +373,13 @@ mod tests {
         let log_message = log_stream.try_next().await.unwrap().unwrap();
         assert_eq!(log_message.msg().unwrap(), "fourth log");
         assert_eq!(log_message.metadata.severity, Severity::Info);
+
+        let log_message = log_stream.try_next().await.unwrap().unwrap();
+        assert_eq!(
+            log_message.msg().unwrap(),
+            "ERROR: severity takes precedence over msg when not info"
+        );
+        assert_eq!(log_message.metadata.severity, Severity::Warn);
 
         // TODO(fxbug.dev/74601): Once 74601 is resolved, uncomment the lines below. Prior to 74601
         // being resolved, the follow case may fail because the line is very long, may be truncated,
