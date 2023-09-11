@@ -8,6 +8,7 @@
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/devfs/cpp/connector.h>
 
+#include "control.h"
 #include "temperature_driver.h"
 
 namespace fake_driver {
@@ -20,16 +21,31 @@ class Driver : public fdf::DriverBase {
 
  private:
   // Add a child device node and offer the service capabilities.
-  zx::result<> AddChild(std::string_view node_name, std::string_view class_name);
+  template <typename A, typename B>
+  zx::result<> AddDriverAndControl(fidl::ClientEnd<fuchsia_driver_framework::Node>* parent,
+                                   std::string_view driver_node_name,
+                                   std::string_view driver_class_name,
+                                   driver_devfs::Connector<A>& driver_devfs_connector,
+                                   driver_devfs::Connector<B>& control_devfs_connector);
+  template <typename T>
+  zx::result<fidl::ClientEnd<fuchsia_driver_framework::Node>*> AddChild(
+      fidl::ClientEnd<fuchsia_driver_framework::Node>* parent, std::string_view node_name,
+      std::string_view class_name, driver_devfs::Connector<T>& devfs_connector);
 
   // Start serving Protocol (to be called by the devfs connector when a connection is established).
-  void Serve(fidl::ServerEnd<fuchsia_hardware_temperature::Device> server);
+  void ServeTemperature(fidl::ServerEnd<fuchsia_hardware_temperature::Device> server);
+  void ServeControl(fidl::ServerEnd<fuchsia_powermanager_driver_temperaturecontrol::Device> server);
 
-  driver_devfs::Connector<fuchsia_hardware_temperature::Device> devfs_connector_;
-  fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
-  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
+  driver_devfs::Connector<fuchsia_hardware_temperature::Device> temperature_connector_;
+  driver_devfs::Connector<fuchsia_powermanager_driver_temperaturecontrol::Device>
+      control_connector_;
+
+  std::vector<fidl::ClientEnd<fuchsia_driver_framework::Node>> nodes_;
+  std::vector<fidl::WireSyncClient<fuchsia_driver_framework::NodeController>> controllers_;
 
   TemperatureDeviceProtocolServer temperature_server_;
+  ControlDeviceProtocolServer control_server_;
+
   float temperature_;
 };
 

@@ -11,24 +11,51 @@ namespace fake_driver {
 Driver::Driver(fdf::DriverStartArgs start_args,
                fdf::UnownedSynchronizedDispatcher driver_dispatcher)
     : DriverBase("fake-driver", std::move(start_args), std::move(driver_dispatcher)),
-      devfs_connector_(fit::bind_member<&Driver::Serve>(this)),
-      temperature_server_(&temperature_) {}
+      temperature_connector_(fit::bind_member<&Driver::ServeTemperature>(this)),
+      control_connector_(fit::bind_member<&Driver::ServeControl>(this)),
+      temperature_server_(&temperature_),
+      control_server_(&temperature_) {}
 
 zx::result<> Driver::Start() {
-  node_.Bind(std::move(node()));
-  auto result = AddChild(name(), "temperature");
+  auto* node_ptr = &node();
+  auto result = AddDriverAndControl(node_ptr, "soc_thermal", "thermal", temperature_connector_,
+                                    control_connector_);
   if (result.is_error()) {
-    FDF_SLOG(ERROR, "Failed to add child node", KV("status", result.status_string()));
+    FDF_SLOG(ERROR, "Failed to add driver and its control", KV("status", result.status_string()));
     return result.take_error();
   }
 
   return zx::ok();
 }
 
+template <typename A, typename B>
+zx::result<> Driver::AddDriverAndControl(fidl::ClientEnd<fuchsia_driver_framework::Node>* parent,
+                                         std::string_view driver_node_name,
+                                         std::string_view driver_class_name,
+                                         driver_devfs::Connector<A>& driver_devfs_connector,
+                                         driver_devfs::Connector<B>& control_devfs_connector) {
+  // Create driver with topo suffix `/soc_thermal` and class path `/dev/class/thermal/000
+  zx::result<fidl::ClientEnd<fuchsia_driver_framework::Node>*> add_child_result =
+      AddChild(parent, driver_node_name, driver_class_name, driver_devfs_connector);
+  if (add_child_result.is_error()) {
+    return add_child_result.take_error();
+  }
+  // Create control driver with topo suffix `/soc_thermal/control` and class path
+  // `/dev/class/test/000
+  auto result = AddChild(add_child_result.value(), "control", "test", control_devfs_connector);
+  if (result.is_error()) {
+    return result.take_error();
+  }
+  return zx::ok();
+}
+
 // Add a child device node and offer the service capabilities.
-zx::result<> Driver::AddChild(std::string_view node_name, std::string_view class_name) {
+template <typename T>
+zx::result<fidl::ClientEnd<fuchsia_driver_framework::Node>*> Driver::AddChild(
+    fidl::ClientEnd<fuchsia_driver_framework::Node>* parent, std::string_view node_name,
+    std::string_view class_name, driver_devfs::Connector<T>& devfs_connector) {
   fidl::Arena arena;
-  zx::result connector = devfs_connector_.Bind(dispatcher());
+  zx::result connector = devfs_connector.Bind(dispatcher());
 
   if (connector.is_error()) {
     return connector.take_error();
@@ -44,23 +71,39 @@ zx::result<> Driver::AddChild(std::string_view node_name, std::string_view class
                   .Build();
 
   // Create endpoints of the `NodeController` for the node.
-  auto endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  if (endpoints.is_error()) {
-    FDF_SLOG(ERROR, "Failed to create endpoint", KV("status", endpoints.status_string()));
-    return zx::error(endpoints.status_value());
+  auto controller_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+  if (controller_endpoints.is_error()) {
+    FDF_SLOG(ERROR, "Failed to create node controller endpoint",
+             KV("status", controller_endpoints.status_string()));
+    return zx::error(controller_endpoints.status_value());
   }
-  auto result = node_->AddChild(args, std::move(endpoints->server), {});
 
+  zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
+  if (node_endpoints.is_error()) {
+    FDF_SLOG(ERROR, "Failed to create node endpoint", KV("status", node_endpoints.status_string()));
+    return zx::error(node_endpoints.status_value());
+  }
+
+  auto result = fidl::WireCall(*parent)->AddChild(args, std::move(controller_endpoints->server),
+                                                  std::move(node_endpoints->server));
   if (!result.ok()) {
     FDF_SLOG(ERROR, "Failed to add child", KV("status", result.status_string()));
     return zx::error(result.status());
   }
-  controller_.Bind(std::move(endpoints->client));
-  return zx::ok();
+
+  controllers_.emplace_back(std::move(controller_endpoints->client));
+  nodes_.emplace_back(std::move(node_endpoints->client));
+
+  return zx::ok(&nodes_.back());
 }
 
-void Driver::Serve(fidl::ServerEnd<fuchsia_hardware_temperature::Device> server) {
+void Driver::ServeTemperature(fidl::ServerEnd<fuchsia_hardware_temperature::Device> server) {
   temperature_server_.Serve(dispatcher(), std::move(server));
+}
+
+void Driver::ServeControl(
+    fidl::ServerEnd<fuchsia_powermanager_driver_temperaturecontrol::Device> server) {
+  control_server_.Serve(dispatcher(), std::move(server));
 }
 
 }  // namespace fake_driver

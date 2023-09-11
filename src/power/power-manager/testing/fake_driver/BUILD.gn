@@ -14,11 +14,13 @@ driver_bind_rules("power-manager-fake-bind") {
 
 source_set("power-manager-fake-driver-lib") {
   sources = [
+    "control.cc",
     "driver.cc",
     "temperature_driver.cc",
   ]
 
   public_deps = [
+    "../fuchsia.powermanager.driver:fuchsia.powermanager.driver.temperaturecontrol_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.temperature:fuchsia.hardware.temperature_cpp_wire",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/devfs/cpp",
