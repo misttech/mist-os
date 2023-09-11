@@ -22,8 +22,10 @@
 // per numa node collection of pmm arenas and worker threads
 class PmmNode {
  public:
-  PmmNode();
-  ~PmmNode();
+  // This constructor may be called early in the boot sequence so make sure it does not do any "real
+  // work" or depend on any globals.
+  PmmNode() : evictor_(this) {}
+  ~PmmNode() = default;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(PmmNode);
 
@@ -234,15 +236,15 @@ class PmmNode {
   // the OOM state, or if |never_return_should_wait_| is true.
   Event free_pages_evt_;
 
-  uint64_t mem_avail_state_watermarks_[MAX_WATERMARK_COUNT] TA_GUARDED(lock_);
-  uint8_t mem_avail_state_watermark_count_ TA_GUARDED(lock_);
-  uint8_t mem_avail_state_cur_index_ TA_GUARDED(lock_);
-  uint64_t mem_avail_state_debounce_ TA_GUARDED(lock_);
-  uint64_t mem_avail_state_upper_bound_ TA_GUARDED(lock_);
-  uint64_t mem_avail_state_lower_bound_ TA_GUARDED(lock_);
-  void* mem_avail_state_context_ TA_GUARDED(lock_);
-  mem_avail_state_updated_callback_t mem_avail_state_callback_ TA_GUARDED(lock_);
-
+  uint64_t mem_avail_state_watermarks_[MAX_WATERMARK_COUNT] TA_GUARDED(lock_) = {};
+  uint8_t mem_avail_state_watermark_count_ TA_GUARDED(lock_) = {};
+  uint8_t mem_avail_state_cur_index_ TA_GUARDED(lock_) = {};
+  uint64_t mem_avail_state_debounce_ TA_GUARDED(lock_) = {};
+  uint64_t mem_avail_state_upper_bound_ TA_GUARDED(lock_) = {};
+  uint64_t mem_avail_state_lower_bound_ TA_GUARDED(lock_) = {};
+  void* mem_avail_state_context_ TA_GUARDED(lock_) = {};
+  mem_avail_state_updated_callback_t mem_avail_state_callback_ TA_GUARDED(lock_) = [](void*,
+                                                                                      uint8_t) {};
   PageQueues page_queues_;
 
   Evictor evictor_;

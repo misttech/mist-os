@@ -41,8 +41,6 @@ KCOUNTER(pmm_alloc_delayed, "vm.pmm.alloc.delayed")
 
 namespace {
 
-void noop_callback(void* context, uint8_t idx) {}
-
 // Indicates whether a PMM alloc call has ever failed with ZX_ERR_NO_MEMORY.  Used to trigger an OOM
 // response.  See |MemoryWatchdog::WorkerThread|.
 ktl::atomic<bool> alloc_failed_no_mem;
@@ -63,15 +61,6 @@ void AsanUnpoisonPage(vm_page_t* p) {
 }
 
 }  // namespace
-
-PmmNode::PmmNode() : evictor_(this) {
-  // Initialize the reclamation watermarks such that system never
-  // falls into a low memory state.
-  uint64_t default_watermark = 0;
-  InitReclamation(&default_watermark, 1, 0, nullptr, noop_callback);
-}
-
-PmmNode::~PmmNode() {}
 
 // We disable thread safety analysis here, since this function is only called
 // during early boot before threading exists.
