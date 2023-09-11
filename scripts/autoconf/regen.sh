@@ -43,21 +43,12 @@ EOF
     esac
 done
 
-fx set core.qemu-x64 --auto-dir --args=build_sdk_archives=true $FXSET_WITH_ADDITIONAL
+fx set core.qemu-x64 --auto-dir $FXSET_WITH_ADDITIONAL
 fx build sdk:zircon_sysroot $FXBUILD_WITH_ADDITIONAL
 
-SYSROOT_ROOT="$(mktemp -d)"
-readonly SYSROOT_ROOT
-cleanup() {
-  rm -rf "$SYSROOT_ROOT"
-}
-trap cleanup EXIT
-
 readonly BUILD_DIR="$FUCHSIA_OUT_DIR/core.qemu-x64"
-readonly SYSROOT_DIR="$SYSROOT_ROOT/arch/x64/sysroot"
+readonly SYSROOT_DIR="$BUILD_DIR/sdk/exported/zircon_sysroot/arch/x64/sysroot"
 readonly TARGET=x86_64-unknown-fuchsia
-
-tar -C "$SYSROOT_ROOT" -xf "$BUILD_DIR/sdk/archive/zircon_sysroot.tar.gz" || true
 
 TMP_REPO="$(mktemp -d)"
 readonly TMP_REPO
