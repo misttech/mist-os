@@ -226,6 +226,11 @@ if (is_fuchsia) {
       "kernel.vdso.always_use_next=true",
       "kernel.enable-debugging-syscalls=true",
       "kernel.test.ram.reserve=0x8000",
+      "kernel.compression.strategy=lz4",
+      "kernel.compression.storage-strategy=tri_page",
+      "kernel.compression.reclaim_anonymous=true",
+      "kernel.compression.reclaim_zero_forks=true",
+      "kernel.compression.random-debug-compress=true",
     ]
 
     # Only add this switch if we're building with ZX_DEBUG_ASSERT enabled
