@@ -146,8 +146,3 @@ fuchsia_test_package("wlandevicemonitor-tests") {
     }
   }
 }
-
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("wlandevicemonitor-core-shard") {
-}

@@ -190,11 +190,6 @@ fuchsia_package("wlancfg") {
   deps = [ ":service" ]
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("wlancfg-core-shard") {
-}
-
 fuchsia_component("wlancfg_lib_test") {
   testonly = true
   manifest = "meta/wlancfg_lib_test.cml"

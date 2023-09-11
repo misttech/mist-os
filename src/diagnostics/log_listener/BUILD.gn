@@ -46,10 +46,6 @@ rustc_binary("bin") {
   sources = [ "src/main.rs" ]
 }
 
-# TODO(122864) Remove transitional labels
-group("log_listener_shell") {
-}
-
 fuchsia_shell_package("log_listener_shell_pkg") {
   package_name = "log_listener_shell"
   deps = [

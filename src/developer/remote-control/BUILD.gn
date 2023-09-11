@@ -165,7 +165,3 @@ fuchsia_package("remote-control-package") {
 fuchsia_package_archive("remote-control-archive") {
   package = ":remote-control-package"
 }
-
-# TODO(122864) Remove transitional labels
-group("laboratory-core-shard") {
-}

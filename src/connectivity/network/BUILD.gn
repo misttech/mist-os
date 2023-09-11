@@ -34,11 +34,6 @@ fuchsia_component("component-basic") {
 group("for_transition") {
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("basic-for_transition") {
-}
-
 # Some tests depend on Netstack, but don't exercise its functionality and
 # don't care between Netstack 2 and 3. These tests currently use NS2,
 # which is unavailable on RISC-V. Instead, use NS3 there. Once NS3 is

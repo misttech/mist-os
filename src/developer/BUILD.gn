@@ -40,7 +40,3 @@ group("e2e_tests") {
   testonly = true
   deps = [ "ffx:e2e_tests" ]
 }
-
-# TODO(122864) Remove transitional labels
-group("default-laboratory-env-core-shard") {
-}
