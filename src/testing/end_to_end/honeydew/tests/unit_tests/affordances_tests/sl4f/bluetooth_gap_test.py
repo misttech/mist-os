@@ -10,7 +10,7 @@ from unittest import mock
 
 from parameterized import parameterized
 
-from honeydew.affordances.sl4f.bluetooth import \
+from honeydew.affordances.sl4f.bluetooth.profiles import \
     bluetooth_gap as sl4f_bluetooth_gap
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import sl4f as sl4f_transport

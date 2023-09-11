@@ -6,7 +6,7 @@
 
 import unittest
 
-from honeydew.affordances.fuchsia_controller.bluetooth import \
+from honeydew.affordances.fuchsia_controller.bluetooth.profiles import \
     bluetooth_gap as fc_bluetooth_gap
 
 

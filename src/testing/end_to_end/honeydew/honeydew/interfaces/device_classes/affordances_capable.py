@@ -9,7 +9,7 @@ from typing import Callable
 
 from honeydew.interfaces.affordances import session
 from honeydew.interfaces.affordances import tracing
-from honeydew.interfaces.affordances.bluetooth import bluetooth_gap
+from honeydew.interfaces.affordances.bluetooth.profiles import bluetooth_gap
 from honeydew.interfaces.affordances.ui import screenshot
 from honeydew.interfaces.affordances.ui import user_input
 from honeydew.interfaces.device_classes import fuchsia_device

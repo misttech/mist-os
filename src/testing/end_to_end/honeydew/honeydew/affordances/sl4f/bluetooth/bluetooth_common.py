@@ -2,11 +2,11 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Bluetooth affordance implementation using SL4F."""
+"""Bluetooth Common affordance implementation using SL4F."""
 
 from typing import Dict
 
-from honeydew.interfaces.affordances.bluetooth import bluetooth_gap
+from honeydew.interfaces.affordances.bluetooth import bluetooth_common
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import sl4f as sl4f_transport
 
@@ -17,8 +17,8 @@ _SL4F_METHODS: Dict[str, str] = {
 }
 
 
-class BluetoothGap(bluetooth_gap.BluetoothGap):
-    """BluetoothGap affordance implementation using SL4F.
+class BluetoothCommon(bluetooth_common.BluetoothCommon):
+    """Bluetooth Common affordance implementation using SL4F.
 
     Args:
         device_name: Device name returned by `ffx target list`.

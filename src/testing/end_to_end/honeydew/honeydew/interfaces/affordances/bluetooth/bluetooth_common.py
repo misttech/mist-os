@@ -2,13 +2,13 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Abstract base class for Bluetooth affordance."""
+"""Abstract base class for Bluetooth Common affordance."""
 
 import abc
 
 
-class BluetoothGap(abc.ABC):
-    """Abstract base class for BluetoothGap affordance."""
+class BluetoothCommon(abc.ABC):
+    """Abstract base class for BluetoothCommon affordance."""
 
     # List all the public methods in alphabetical order
     @abc.abstractmethod

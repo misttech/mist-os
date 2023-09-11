@@ -11,13 +11,13 @@ from typing import Any, Dict, Optional
 
 from honeydew import custom_types
 from honeydew.affordances.sl4f import tracing as tracing_sl4f
-from honeydew.affordances.sl4f.bluetooth import \
+from honeydew.affordances.sl4f.bluetooth.profiles import \
     bluetooth_gap as bluetooth_gap_sl4f
 from honeydew.affordances.sl4f.ui import screenshot as screenshot_sl4f
 from honeydew.affordances.sl4f.ui import user_input as user_input_sl4f
 from honeydew.device_classes import base_fuchsia_device
 from honeydew.interfaces.affordances import tracing as tracing_interface
-from honeydew.interfaces.affordances.bluetooth import \
+from honeydew.interfaces.affordances.bluetooth.profiles import \
     bluetooth_gap as bluetooth_gap_interface
 from honeydew.interfaces.affordances.ui import \
     screenshot as screenshot_interface
