@@ -265,7 +265,7 @@ impl Default for LogListenerOptions {
             filter: LogFilterOptions {
                 filter_by_pid: false,
                 pid: 0,
-                min_severity: LogLevelFilter::Info,
+                min_severity: LogLevelFilter::None,
                 verbosity: 0,
                 filter_by_tid: false,
                 tid: 0,
