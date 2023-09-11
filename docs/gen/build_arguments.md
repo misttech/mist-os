@@ -223,7 +223,7 @@ AVB metadata which will be used to validate public key
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/android/platform/external/avb/test/data/atx_metadata.bin"`
 
-From //boards/arm64.gni:41
+From //boards/arm64.gni:40
 
 **Overridden from the default:** `""`
 
@@ -243,7 +243,7 @@ a key which will be used to sign VBMETA and images for AVB
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"`
 
-From //boards/arm64.gni:43
+From //boards/arm64.gni:42
 
 **Overridden from the default:** `""`
 
@@ -313,7 +313,7 @@ From //build/testing/environments.gni:9
 
 ### bazel_fuchsia_sdk_all_cpus
 
-Set to true to populage the @fuchsia_sdk external repository with prebuilt
+Set to true to populate the @fuchsia_sdk external repository with prebuilt
 binaries for all supported target CPU architectures. By default, only those
 for the current build configuration's `target_cpu` value will be generated
 to save about 3 minutes of build time when they are not needed.
@@ -392,7 +392,7 @@ False means no limit.
 
 **Current value for `target_cpu = "arm64"`:** `10485760000`
 
-From //boards/common/arm64-common.gni:14
+From //boards/common/arm64-common.gni:11
 
 **Overridden from the default:** `false`
 
@@ -447,7 +447,7 @@ A list of binary labels to include in the ZBI.
 
 **Current value for `target_cpu = "arm64"`:** `["//src/devices/bus/drivers/pci:bus-pci", "//src/devices/usb/drivers/xhci", "//src/power/power-manager:base_config", "//src/security/policy/zxcrypt:null", "//src/devices/block/drivers/nvme", "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice", "//src/devices/block/drivers/virtio:virtio_block", "//src/devices/block/drivers/virtio:virtio_scsi", "//src/devices/misc/drivers/virtio-rng:virtio_rng", "//src/devices/misc/drivers/virtio-socket:virtio_socket", "//src/devices/serial/drivers/virtio-console:virtio_console", "//src/graphics/drivers/misc:goldfish_fuchsia_drivers", "//src/graphics/display/drivers/goldfish-display", "//src/graphics/display/drivers/virtio-guest:virtio_gpu", "//src/ui/input/drivers/virtio:virtio_input", "//src/ui/input/drivers/goldfish_sensor:sensor_driver", "//src/devices/block/drivers/ahci", "//src/devices/board/drivers/acpi-arm64", "//src/devices/board/drivers/qemu-arm64", "//src/devices/rtc/drivers/pl031-rtc"]`
 
-From //boards/arm64.gni:28
+From //boards/arm64.gni:27
 
 **Overridden from the default:** `[]`
 
@@ -455,7 +455,7 @@ From //build/board.gni:54
 
 **Current value for `target_cpu = "x64"`:** `["//src/devices/block/drivers/ahci", "//src/devices/block/drivers/mbr", "//src/devices/block/drivers/nvme", "//src/devices/block/drivers/pci-sdhci", "//src/devices/block/drivers/sdhci", "//src/devices/block/drivers/ufs", "//src/devices/board/drivers/x86:platform-bus-x86", "//src/devices/bus/drivers/pci:bus-pci", "//src/devices/i2c/drivers/intel-i2c", "//src/devices/rtc/drivers/intel-rtc", "//src/devices/spi/drivers/intel-gspi", "//src/devices/tpm/drivers/tpm", "//src/devices/usb/drivers/xhci", "//src/graphics/display/drivers/intel-i915", "//src/media/audio/drivers/codecs/alc5514", "//src/media/audio/drivers/codecs/alc5663", "//src/media/audio/drivers/codecs/max98373", "//src/media/audio/drivers/codecs/max98927", "//src/media/audio/drivers/intel-hda/codecs/hdmi:hdmi-audio-codec", "//src/media/audio/drivers/intel-hda/codecs/realtek:realtek-audio-codec", "//src/media/audio/drivers/intel-hda/controller:intel-hda", "//src/ui/input/drivers/ctaphid", "//src/ui/input/drivers/i2c-hid", "//src/ui/input/drivers/pc-ps2", "//src/devices/pci/bin:bootfs", "//src/media/audio/bin/ihda", "//src/power/power-manager:base_config", "//src/security/policy/zxcrypt:null", "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice", "//src/devices/block/drivers/virtio:virtio_block", "//src/devices/block/drivers/virtio:virtio_scsi", "//src/devices/misc/drivers/virtio-rng:virtio_rng", "//src/devices/misc/drivers/virtio-socket:virtio_socket", "//src/devices/serial/drivers/virtio-console:virtio_console", "//src/graphics/drivers/misc:goldfish_fuchsia_drivers", "//src/graphics/display/drivers/goldfish-display", "//src/graphics/display/drivers/virtio-guest:virtio_gpu", "//src/ui/input/drivers/virtio:virtio_input", "//src/ui/input/drivers/goldfish_sensor:sensor_driver", "//src/connectivity/ethernet/drivers/third_party/igc", "//src/graphics/display/drivers/simple:simple.bochs", "//src/graphics/display/drivers/simple:simple.gga", "//src/graphics/display/drivers/simple:simple.intel", "//src/graphics/display/drivers/simple:simple.vmware", "//src/media/audio/drivers/intel-hda/codecs/qemu:qemu-audio-codec", "//zircon/third_party/dev/ethernet/e1000", "//boards/kernel_cmdline:enable-suspend-from-board", "//src/connectivity/ethernet/drivers/gvnic", "//src/connectivity/ethernet/drivers/realtek-8111", "//src/devices/serial/drivers/uart16550", "//src/graphics/display/drivers/simple:simple.amd-kaveri", "//src/graphics/display/drivers/simple:simple.nv", "//boards/kernel_cmdline:serial-legacy", "//src/devices/block/drivers/abr-shim"]`
 
-From //boards/x64.gni:29
+From //boards/x64.gni:28
 
 **Overridden from the default:** `[]`
 
@@ -475,19 +475,19 @@ The label for the board configuration target to use with Product Assembly
 
 **Current value for `target_cpu = "arm64"`:** `"//boards/arm64"`
 
-From //boards/arm64.gni:13
+From //boards/arm64.gni:12
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:104
+From //build/board.gni:101
 
 **Current value for `target_cpu = "x64"`:** `"//boards/x64"`
 
-From //boards/x64.gni:9
+From //boards/x64.gni:8
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:104
+From //build/board.gni:101
 
 ### board_core_realm_shards
 
@@ -504,7 +504,7 @@ Human readable board description corresponding to the board name.
 
 **Current value for `target_cpu = "arm64"`:** `"A generic emulated arm64 device."`
 
-From //boards/arm64.gni:16
+From //boards/arm64.gni:15
 
 **Overridden from the default:** `""`
 
@@ -512,7 +512,7 @@ From //build/board.gni:14
 
 **Current value for `target_cpu = "x64"`:** `"A generic x64 device"`
 
-From //boards/x64.gni:12
+From //boards/x64.gni:11
 
 **Overridden from the default:** `""`
 
@@ -577,26 +577,6 @@ A list of binary host tool labels to also build.
 
 From //build/board.gni:57
 
-### board_information_for_assembly
-
-BoardInformation file for use with Product Assembly
-
-**Current value for `target_cpu = "arm64"`:** `"//boards/arm64/board_information.json5"`
-
-From //boards/arm64.gni:12
-
-**Overridden from the default:** `false`
-
-From //build/board.gni:101
-
-**Current value for `target_cpu = "x64"`:** `"//boards/x64/board_information.json5"`
-
-From //boards/x64.gni:8
-
-**Overridden from the default:** `false`
-
-From //build/board.gni:101
-
 ### board_is_emu
 
 Whether or not the board supports emulator/physical devices.
@@ -605,33 +585,33 @@ physical/virtual device spec or both.
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //boards/arm64.gni:33
+From //boards/arm64.gni:32
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:109
+From //build/board.gni:106
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:42
+From //boards/x64.gni:41
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:109
+From //build/board.gni:106
 
 ### board_is_phys
 
 **Current value for `target_cpu = "arm64"`:** `false`
 
-From //boards/arm64.gni:34
+From //boards/arm64.gni:33
 
 **Overridden from the default:** `true`
 
-From //build/board.gni:110
+From //build/board.gni:107
 
 **Current value (from the default):** `true`
 
-From //build/board.gni:110
+From //build/board.gni:107
 
 ### board_name
 
@@ -639,7 +619,7 @@ Board name used for paving and amber updates.
 
 **Current value for `target_cpu = "arm64"`:** `"arm64"`
 
-From //boards/arm64.gni:15
+From //boards/arm64.gni:14
 
 **Overridden from the default:** `""`
 
@@ -647,7 +627,7 @@ From //build/board.gni:11
 
 **Current value for `target_cpu = "x64"`:** `"x64"`
 
-From //boards/x64.gni:11
+From //boards/x64.gni:10
 
 **Overridden from the default:** `""`
 
@@ -660,7 +640,7 @@ board definition rather than the product definition.
 
 **Current value for `target_cpu = "arm64"`:** `["//src/hwinfo:default_board_config", "//src/graphics/bin/vulkan_loader"]`
 
-From //boards/common/arm64-common.gni:32
+From //boards/common/arm64-common.gni:29
 
 **Overridden from the default:** `[]`
 
@@ -711,7 +691,7 @@ A list of binary labels to include in the recovery ZBI.
 
 **Current value for `target_cpu = "arm64"`:** `["//src/devices/bus/drivers/pci:bus-pci", "//src/devices/usb/drivers/xhci", "//src/power/power-manager:base_config", "//src/security/policy/zxcrypt:null", "//src/devices/block/drivers/nvme", "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice", "//src/devices/block/drivers/virtio:virtio_block", "//src/devices/block/drivers/virtio:virtio_scsi", "//src/devices/misc/drivers/virtio-rng:virtio_rng", "//src/devices/misc/drivers/virtio-socket:virtio_socket", "//src/devices/serial/drivers/virtio-console:virtio_console", "//src/graphics/drivers/misc:goldfish_fuchsia_drivers", "//src/graphics/display/drivers/goldfish-display", "//src/graphics/display/drivers/virtio-guest:virtio_gpu", "//src/ui/input/drivers/virtio:virtio_input", "//src/ui/input/drivers/goldfish_sensor:sensor_driver", "//src/devices/block/drivers/ahci", "//src/devices/board/drivers/acpi-arm64", "//src/devices/board/drivers/qemu-arm64", "//src/devices/rtc/drivers/pl031-rtc"]`
 
-From //boards/arm64.gni:29
+From //boards/arm64.gni:28
 
 **Overridden from the default:** `[]`
 
@@ -719,7 +699,7 @@ From //build/board.gni:68
 
 **Current value for `target_cpu = "x64"`:** `["//src/devices/block/drivers/ahci", "//src/devices/block/drivers/mbr", "//src/devices/block/drivers/nvme", "//src/devices/block/drivers/pci-sdhci", "//src/devices/block/drivers/sdhci", "//src/devices/block/drivers/ufs", "//src/devices/board/drivers/x86:platform-bus-x86", "//src/devices/bus/drivers/pci:bus-pci", "//src/devices/i2c/drivers/intel-i2c", "//src/devices/rtc/drivers/intel-rtc", "//src/devices/spi/drivers/intel-gspi", "//src/devices/tpm/drivers/tpm", "//src/devices/usb/drivers/xhci", "//src/graphics/display/drivers/intel-i915", "//src/media/audio/drivers/codecs/alc5514", "//src/media/audio/drivers/codecs/alc5663", "//src/media/audio/drivers/codecs/max98373", "//src/media/audio/drivers/codecs/max98927", "//src/media/audio/drivers/intel-hda/codecs/hdmi:hdmi-audio-codec", "//src/media/audio/drivers/intel-hda/codecs/realtek:realtek-audio-codec", "//src/media/audio/drivers/intel-hda/controller:intel-hda", "//src/ui/input/drivers/ctaphid", "//src/ui/input/drivers/i2c-hid", "//src/ui/input/drivers/pc-ps2", "//src/devices/pci/bin:bootfs", "//src/media/audio/bin/ihda", "//src/power/power-manager:base_config", "//src/security/policy/zxcrypt:null", "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice", "//src/devices/block/drivers/virtio:virtio_block", "//src/devices/block/drivers/virtio:virtio_scsi", "//src/devices/misc/drivers/virtio-rng:virtio_rng", "//src/devices/misc/drivers/virtio-socket:virtio_socket", "//src/devices/serial/drivers/virtio-console:virtio_console", "//src/graphics/drivers/misc:goldfish_fuchsia_drivers", "//src/graphics/display/drivers/goldfish-display", "//src/graphics/display/drivers/virtio-guest:virtio_gpu", "//src/ui/input/drivers/virtio:virtio_input", "//src/ui/input/drivers/goldfish_sensor:sensor_driver", "//src/connectivity/ethernet/drivers/third_party/igc", "//src/graphics/display/drivers/simple:simple.bochs", "//src/graphics/display/drivers/simple:simple.gga", "//src/graphics/display/drivers/simple:simple.intel", "//src/graphics/display/drivers/simple:simple.vmware", "//src/media/audio/drivers/intel-hda/codecs/qemu:qemu-audio-codec", "//zircon/third_party/dev/ethernet/e1000", "//src/connectivity/ethernet/drivers/gvnic", "//src/connectivity/ethernet/drivers/realtek-8111", "//src/devices/serial/drivers/uart16550", "//src/graphics/display/drivers/simple:simple.amd-kaveri", "//src/graphics/display/drivers/simple:simple.nv", "//boards/kernel_cmdline:serial-legacy", "//src/devices/block/drivers/abr-shim"]`
 
-From //boards/x64.gni:30
+From //boards/x64.gni:29
 
 **Overridden from the default:** `[]`
 
@@ -772,7 +752,7 @@ A list of binary labels to include in the zedboot ZBI.
 
 **Current value for `target_cpu = "arm64"`:** `["//src/devices/bus/drivers/pci:bus-pci", "//src/devices/usb/drivers/xhci", "//src/power/power-manager:base_config", "//src/security/policy/zxcrypt:null", "//src/devices/block/drivers/nvme", "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice", "//src/devices/block/drivers/virtio:virtio_block", "//src/devices/block/drivers/virtio:virtio_scsi", "//src/devices/misc/drivers/virtio-rng:virtio_rng", "//src/devices/misc/drivers/virtio-socket:virtio_socket", "//src/devices/serial/drivers/virtio-console:virtio_console", "//src/graphics/drivers/misc:goldfish_fuchsia_drivers", "//src/graphics/display/drivers/goldfish-display", "//src/graphics/display/drivers/virtio-guest:virtio_gpu", "//src/ui/input/drivers/virtio:virtio_input", "//src/ui/input/drivers/goldfish_sensor:sensor_driver", "//src/devices/block/drivers/ahci", "//src/devices/board/drivers/acpi-arm64", "//src/devices/board/drivers/qemu-arm64", "//src/devices/rtc/drivers/pl031-rtc"]`
 
-From //boards/arm64.gni:30
+From //boards/arm64.gni:29
 
 **Overridden from the default:** `[]`
 
@@ -780,7 +760,7 @@ From //build/board.gni:65
 
 **Current value for `target_cpu = "x64"`:** `["//src/devices/block/drivers/ahci", "//src/devices/block/drivers/mbr", "//src/devices/block/drivers/nvme", "//src/devices/block/drivers/pci-sdhci", "//src/devices/block/drivers/sdhci", "//src/devices/block/drivers/ufs", "//src/devices/board/drivers/x86:platform-bus-x86", "//src/devices/bus/drivers/pci:bus-pci", "//src/devices/i2c/drivers/intel-i2c", "//src/devices/rtc/drivers/intel-rtc", "//src/devices/spi/drivers/intel-gspi", "//src/devices/tpm/drivers/tpm", "//src/devices/usb/drivers/xhci", "//src/graphics/display/drivers/intel-i915", "//src/media/audio/drivers/codecs/alc5514", "//src/media/audio/drivers/codecs/alc5663", "//src/media/audio/drivers/codecs/max98373", "//src/media/audio/drivers/codecs/max98927", "//src/media/audio/drivers/intel-hda/codecs/hdmi:hdmi-audio-codec", "//src/media/audio/drivers/intel-hda/codecs/realtek:realtek-audio-codec", "//src/media/audio/drivers/intel-hda/controller:intel-hda", "//src/ui/input/drivers/ctaphid", "//src/ui/input/drivers/i2c-hid", "//src/ui/input/drivers/pc-ps2", "//src/devices/pci/bin:bootfs", "//src/media/audio/bin/ihda", "//src/power/power-manager:base_config", "//src/security/policy/zxcrypt:null", "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice", "//src/devices/block/drivers/virtio:virtio_block", "//src/devices/block/drivers/virtio:virtio_scsi", "//src/devices/misc/drivers/virtio-rng:virtio_rng", "//src/devices/misc/drivers/virtio-socket:virtio_socket", "//src/devices/serial/drivers/virtio-console:virtio_console", "//src/graphics/drivers/misc:goldfish_fuchsia_drivers", "//src/graphics/display/drivers/goldfish-display", "//src/graphics/display/drivers/virtio-guest:virtio_gpu", "//src/ui/input/drivers/virtio:virtio_input", "//src/ui/input/drivers/goldfish_sensor:sensor_driver", "//src/connectivity/ethernet/drivers/third_party/igc", "//src/graphics/display/drivers/simple:simple.bochs", "//src/graphics/display/drivers/simple:simple.gga", "//src/graphics/display/drivers/simple:simple.intel", "//src/graphics/display/drivers/simple:simple.vmware", "//src/media/audio/drivers/intel-hda/codecs/qemu:qemu-audio-codec", "//zircon/third_party/dev/ethernet/e1000", "//src/connectivity/ethernet/drivers/gvnic", "//src/connectivity/ethernet/drivers/realtek-8111", "//src/devices/serial/drivers/uart16550", "//src/graphics/display/drivers/simple:simple.amd-kaveri", "//src/graphics/display/drivers/simple:simple.nv", "//boards/kernel_cmdline:serial-legacy", "//src/devices/block/drivers/abr-shim"]`
 
-From //boards/x64.gni:31
+From //boards/x64.gni:30
 
 **Overridden from the default:** `[]`
 
@@ -981,7 +961,7 @@ Generate a UEFI disk image
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //boards/arm64.gni:37
+From //boards/arm64.gni:36
 
 **Overridden from the default:** `false`
 
@@ -2403,6 +2383,15 @@ From //.gn:87
 **Overridden from the default:** `""`
 
 From //third_party/pigweed/src/third_party/emboss/emboss.gni:20
+
+### dir_pw_third_party_fuchsia
+
+Path to the Fuchsia sources to use in Pigweed's build. Defaults to Pigweed's
+mirror of the few Fuchsia source files it uses.
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/fuchsia/repo"`
+
+From //third_party/pigweed/src/third_party/fuchsia/fuchsia.gni:20
 
 ### dir_pw_third_party_fuzztest
 
@@ -4538,7 +4527,7 @@ of how they are stored).
 
 **Current value for `target_cpu = "arm64"`:** `5216665600`
 
-From //boards/common/arm64-common.gni:16
+From //boards/common/arm64-common.gni:13
 
 **Overridden from the default:** `false`
 
@@ -4560,7 +4549,7 @@ TODO(b/291953514): Enforce this by implementing an image size checker.
 
 **Current value for `target_cpu = "arm64"`:** `16777216`
 
-From //boards/common/arm64-common.gni:37
+From //boards/common/arm64-common.gni:34
 
 **Overridden from the default:** `0`
 
@@ -4583,7 +4572,7 @@ From //src/diagnostics/log_listener/BUILD.gn:11
 
 **Current value for `target_cpu = "arm64"`:** `16777216`
 
-From //boards/common/arm64-common.gni:38
+From //boards/common/arm64-common.gni:35
 
 **Overridden from the default:** `0`
 
@@ -5353,11 +5342,11 @@ From //zircon/kernel/params.gni:142
 
 **Current value for `target_cpu = "arm64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/arm64.gni:46
+From //boards/arm64.gni:45
 
 **Overridden from the default:** `[]`
 
-From //build/board.gni:115
+From //build/board.gni:112
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
@@ -5365,7 +5354,7 @@ From //boards/common/x64-common.gni:100
 
 **Overridden from the default:** `[]`
 
-From //build/board.gni:115
+From //build/board.gni:112
 
 ### partitions_config_label
 
@@ -5374,11 +5363,11 @@ product bundle.
 
 **Current value for `target_cpu = "arm64"`:** `"//boards/partitions:arm64"`
 
-From //boards/arm64.gni:45
+From //boards/arm64.gni:44
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:114
+From //build/board.gni:111
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
@@ -5386,7 +5375,7 @@ From //boards/common/x64-common.gni:99
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:114
+From //build/board.gni:111
 
 ### perfetto_build_with_android
 
@@ -7621,6 +7610,16 @@ Whether to omit host tools from the generated IDKs.
 
 From //build/sdk/config.gni:17
 
+### sdk_with_all_supported_api_levels
+
+Set to true to build IDK atoms for all supported API levels that are
+listed in fuchsia_platform.supported_fuchsia_api_levels. This impacts
+the behavior of the generate_final_idk() template.
+
+**Current value (from the default):** `false`
+
+From //sdk/config.gni:18
+
 ### select_variant
 
 List of "selectors" to request variant builds of certain targets.
@@ -8406,7 +8405,7 @@ Build the gigaboot bootloader.
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //boards/arm64.gni:38
+From //boards/arm64.gni:37
 
 **Overridden from the default:** `false`
 
@@ -8585,7 +8584,7 @@ and the paving script will pave vbmeta images to the target device.
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //boards/arm64.gni:39
+From //boards/arm64.gni:38
 
 **Overridden from the default:** `false`
 
