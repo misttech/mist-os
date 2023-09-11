@@ -86,7 +86,7 @@ impl MemfsInstance {
 
 #[async_trait]
 impl Filesystem for MemfsInstance {
-    async fn shutdown(self) {
+    async fn shutdown(&mut self) {
         let admin = connect_to_childs_protocol::<AdminMarker>("memfs".to_string(), None)
             .await
             .expect("Failed to connect to memfs Admin");
@@ -118,7 +118,7 @@ mod tests {
     async fn start_memfs() {
         const FILE_CONTENTS: &str = "file-contents";
         let block_device_factory = PanickingBlockDeviceFactory::new();
-        let fs = Memfs.start_filesystem(&block_device_factory).await;
+        let mut fs = Memfs.start_filesystem(&block_device_factory).await;
 
         let file_path = fs.benchmark_dir().join("filename");
         {

@@ -6,10 +6,10 @@ use {
     crate::{
         blob_benchmarks::{
             PageInBlobRandomCompressed, PageInBlobSequentialCompressed,
-            PageInBlobSequentialUncompressed, WriteBlob, WriteRealisticBlobs,
+            PageInBlobSequentialUncompressed, TimeToFirstByte, WriteBlob, WriteRealisticBlobs,
         },
         block_devices::{FvmVolumeFactory, RamdiskFactory},
-        filesystems::{Blobfs, F2fs, Fxblob, Fxfs, Memfs, Minfs},
+        filesystems::{Blobfs, F2fs, Fxblob, Fxfs, Memfs, Minfs, PkgDirTest},
     },
     regex::{Regex, RegexSetBuilder},
     std::{fs::File, path::PathBuf, vec::Vec},
@@ -125,6 +125,14 @@ fn add_blob_benchmarks(benchmark_set: &mut BenchmarkSet) {
             WriteRealisticBlobs::new(),
         ],
         [Blobfs, Fxblob]
+    );
+    add_benchmarks!(
+        benchmark_set,
+        [
+            TimeToFirstByte::new("data/foo".to_string()),
+            TimeToFirstByte::new("meta/bar".to_string()),
+        ],
+        [PkgDirTest::new_fxblob(), PkgDirTest::new_blobfs()]
     );
 }
 

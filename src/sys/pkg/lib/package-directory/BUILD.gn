@@ -11,6 +11,7 @@ rustc_library("package-directory") {
   with_unit_tests = true
   visibility = [
     ":*",
+    "//src/storage/benchmarks/*",
     "//src/sys/base-resolver:*",
     "//src/sys/component_manager:*",
     "//src/sys/pkg/*",

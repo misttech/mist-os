@@ -21,7 +21,7 @@ async fn blobfs_static_child() {
 
     blobfs.format().await.unwrap();
     blobfs.fsck().await.unwrap();
-    let fs = blobfs.serve().await.unwrap();
+    let mut fs = blobfs.serve().await.unwrap();
     fs.shutdown().await.unwrap();
 
     ramdisk.destroy().await.unwrap();
@@ -37,7 +37,7 @@ async fn minfs_static_child() {
 
     minfs.format().await.unwrap();
     minfs.fsck().await.unwrap();
-    let fs = minfs.serve().await.unwrap();
+    let mut fs = minfs.serve().await.unwrap();
     fs.shutdown().await.unwrap();
 
     ramdisk.destroy().await.unwrap();

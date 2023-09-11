@@ -3,9 +3,11 @@
 // found in the LICENSE file.
 
 use {
-    crate::filesystems::{BlobFilesystem, DeliveryBlob},
+    crate::filesystems::{BlobFilesystem, DeliveryBlob, PkgDirInstance},
     async_trait::async_trait,
     delivery_blob::CompressionMode,
+    fidl_fuchsia_io as fio,
+    fuchsia_pkg_testing::PackageBuilder,
     fuchsia_runtime, fuchsia_zircon as zx,
     futures::stream::{self, StreamExt},
     rand::{
@@ -23,6 +25,67 @@ use {
 };
 
 const RNG_SEED: u64 = 0xda782a0c3ce1819a;
+
+#[derive(Clone)]
+pub struct TimeToFirstByte {
+    resource_path: String,
+}
+
+impl TimeToFirstByte {
+    pub fn new(resource_path: String) -> Self {
+        Self { resource_path }
+    }
+}
+
+#[async_trait]
+impl Benchmark<PkgDirInstance> for TimeToFirstByte {
+    async fn run(&self, fs: &mut PkgDirInstance) -> Vec<OperationDuration> {
+        if self.resource_path.starts_with("meta") {
+            trace_duration!("benchmark", "TimeToFirstByteMetaFarBlob");
+        } else {
+            trace_duration!("benchmark", "TimeToFirstByteContentBlob");
+        }
+        let package = PackageBuilder::new("pkg")
+            .add_resource_at(&self.resource_path, "data".as_bytes())
+            .build()
+            .await
+            .unwrap();
+        let (meta, map) = package.contents();
+
+        fs.write_blob(&DeliveryBlob::new(meta.contents, CompressionMode::Always)).await;
+        for (_, content) in map.clone() {
+            fs.write_blob(&DeliveryBlob::new(content, CompressionMode::Always)).await;
+        }
+
+        let pkgdir_client_end =
+            fs.pkgdir_proxy().open_package_directory(&meta.merkle).await.unwrap().unwrap();
+        let mut durations = Vec::with_capacity(map.len());
+        let pkgdir = pkgdir_client_end.into_proxy().unwrap();
+
+        let mut buf = vec![0; 1];
+        let timer = OperationTimer::start();
+        let file = fuchsia_fs::directory::open_file(
+            &pkgdir,
+            &self.resource_path,
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .await
+        .expect("failed to open blob");
+        let vmo = file.get_backing_memory(fio::VmoFlags::READ).await.unwrap().unwrap();
+        vmo.read(&mut buf[..], 0).unwrap();
+        durations.push(timer.stop());
+
+        durations
+    }
+
+    fn name(&self) -> String {
+        if self.resource_path.starts_with("meta") {
+            "TimeToFirstByteMetaFarBlob".to_string()
+        } else {
+            "TimeToFirstByteContentBlob".to_string()
+        }
+    }
+}
 
 macro_rules! page_in_benchmark {
     ($benchmark:ident, $data_gen_fn:ident, $page_iter_gen_fn:ident) => {
@@ -282,7 +345,7 @@ mod tests {
         super::*,
         crate::{
             block_devices::RamdiskFactory,
-            filesystems::{Blobfs, Fxblob},
+            filesystems::{Blobfs, Fxblob, PkgDirTest},
         },
         storage_benchmarks::FilesystemConfig,
         test_util::assert_lt,
@@ -365,6 +428,18 @@ mod tests {
     #[fuchsia::test]
     async fn write_realistic_blobs_fxblob_test() {
         check_benchmark(WriteRealisticBlobs::new(), Fxblob, 1).await;
+    }
+
+    #[fuchsia::test]
+    async fn time_to_first_byte_blobfs_test() {
+        check_benchmark(TimeToFirstByte::new("meta/bar".to_string()), PkgDirTest::new_blobfs(), 1)
+            .await;
+    }
+
+    #[fuchsia::test]
+    async fn time_to_first_byte_fxblob_test() {
+        check_benchmark(TimeToFirstByte::new("data/foo".to_string()), PkgDirTest::new_fxblob(), 1)
+            .await;
     }
 
     #[fuchsia::test]

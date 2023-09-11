@@ -64,6 +64,13 @@ fast updates in production and development workflows.
   concurrently writes 2 blobs to a blob filesystem. This ideally mimics how pkg-cache writes blobs.
   The benchmark measure how long it takes to write all of the blobs.
 
+The `TimeToFirstByte` benchmarks measure how long it takes to open and read the first byte off a
+blob. Notably, `TimeToFirstByte` goes through the package directory as opposed to directly opening
+the blob through Blobfs/Fxblob, and thus allows us to more accurately measure open times via SWD.
+* `TimeToFirstByteMetafarBlob` creates and opens a metafile (prefix "meta/" in the resource path).
+* `TimeToFirstByteContentBlob` creates and opens a content blob (non-"meta" prefix in the
+resource path i.e. "data/").
+
 ## "Cold" Benchmarks
 At the beginning of most benchmarks is a setup phase that creates files within the filesystem.
 Simply closing all handles to those files doesn't guarantee that the filesystem will immediately

@@ -384,7 +384,7 @@ async fn write_data_file(
     write(&file_proxy, &contents).await.context("writing file contents")?;
 
     data.shutdown(filesystem.as_mut()).await.context("shutting down data")?;
-    if let Some(fs) = filesystem {
+    if let Some(mut fs) = filesystem {
         fs.shutdown().await.context("shutting down filesystem")?;
     }
     return Ok(());

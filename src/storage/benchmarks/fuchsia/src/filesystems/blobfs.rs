@@ -55,7 +55,7 @@ pub struct BlobfsInstance {
 
 #[async_trait]
 impl Filesystem for BlobfsInstance {
-    async fn shutdown(self) {
+    async fn shutdown(&mut self) {
         self.blobfs.shutdown().await
     }
 
@@ -112,6 +112,10 @@ impl BlobFilesystem for BlobfsInstance {
             assert_eq!(bytes_written, bytes_to_write);
             written += bytes_written as usize;
         }
+    }
+
+    fn exposed_dir(&self) -> &fio::DirectoryProxy {
+        self.blobfs.exposed_dir()
     }
 }
 

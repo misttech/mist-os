@@ -1,0 +1,38 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//sdk/lib/syslog/client.shard.cml",
+        "//src/storage/lib/fs_management/client.shard.cml",
+    ],
+    program: {
+        runner: "elf",
+        binary: "bin/pkgdir",
+    },
+    capabilities: [
+        {
+            protocol: [ "test.pkgdir.PkgDir" ],
+        },
+    ],
+    use: [
+        {
+            directory: "blob-exec",
+            rights: [ "r*" ],
+            path: "/blob",
+        },
+        {
+            protocol: "fuchsia.fxfs.BlobReader",
+            availability: "optional",
+        },
+    ],
+    expose: [
+        {
+            protocol: [ "test.pkgdir.PkgDir" ],
+            from: "self",
+        },
+    ],
+    config: {
+        use_fxblob: { type: "bool" },
+    },
+}

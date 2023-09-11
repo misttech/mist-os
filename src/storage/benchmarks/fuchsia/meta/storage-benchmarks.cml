@@ -4,10 +4,12 @@
 {
     include: [
         "//sdk/lib/inspect/client.shard.cml",
+        "//sdk/lib/sys/component/realm_builder.shard.cml",
         "//sdk/lib/sys/testing/elf_test_runner.shard.cml",
         "//sdk/lib/syslog/client.shard.cml",
         "//src/storage/fs_test/meta/fxfs_crypt_test.shard.cml",
         "//src/storage/lib/fs_management/client.shard.cml",
+        "//src/sys/test_runners/tmp_storage.shard.cml",
         "inspect/offer.shard.cml",
     ],
     program: {

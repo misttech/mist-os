@@ -444,7 +444,7 @@ impl DiskBuilder {
         let mut blobfs = Blobfs::new(blobfs_controller);
         blobfs.format().await.expect("format failed");
         blobfs.fsck().await.expect("failed to fsck blobfs");
-        let serving_blobfs = blobfs.serve().await.expect("failed to serve blobfs");
+        let mut serving_blobfs = blobfs.serve().await.expect("failed to serve blobfs");
         self.blob_hash =
             Some(self.write_test_blob(serving_blobfs.root(), &BLOB_CONTENTS, false).await);
         serving_blobfs.shutdown().await.expect("shutdown failed");
@@ -539,7 +539,7 @@ impl DiskBuilder {
 
         let mut minfs = fs_management::Minfs::new(data_device);
         minfs.format().await.expect("format failed");
-        let fs = minfs.serve().await.expect("serve_single_volume failed");
+        let mut fs = minfs.serve().await.expect("serve_single_volume failed");
         self.write_test_data(&fs.root()).await;
         fs.shutdown().await.expect("shutdown failed");
     }
@@ -555,7 +555,7 @@ impl DiskBuilder {
 
         let mut f2fs = fs_management::F2fs::new(data_device);
         f2fs.format().await.expect("format failed");
-        let fs = f2fs.serve().await.expect("serve_single_volume failed");
+        let mut fs = f2fs.serve().await.expect("serve_single_volume failed");
         self.write_test_data(&fs.root()).await;
         fs.shutdown().await.expect("shutdown failed");
     }

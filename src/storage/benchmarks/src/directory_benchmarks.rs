@@ -517,7 +517,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn create_directory_tree_with_depth_of_zero_test() {
-        let test_fs = Box::new(TestFilesystem::new());
+        let mut test_fs = Box::new(TestFilesystem::new());
         let dts = DirectoryTreeStructure {
             files_per_directory: 3,
             directories_per_directory: 2,
@@ -533,7 +533,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn create_directory_tree_with_depth_of_two_test() {
-        let test_fs = Box::new(TestFilesystem::new());
+        let mut test_fs = Box::new(TestFilesystem::new());
         let dts = DirectoryTreeStructure {
             files_per_directory: 4,
             directories_per_directory: 2,

@@ -7,6 +7,7 @@ use {
     async_trait::async_trait,
     blob_writer::BlobWriter,
     fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobCreatorProxy, BlobReaderMarker, BlobReaderProxy},
+    fidl_fuchsia_io as fio,
     fuchsia_component::client::connect_to_protocol_at_dir_svc,
     fuchsia_zircon as zx,
     std::path::Path,
@@ -61,7 +62,7 @@ pub struct FxblobInstance {
 
 #[async_trait]
 impl Filesystem for FxblobInstance {
-    async fn shutdown(self) {
+    async fn shutdown(&mut self) {
         self.fxblob.shutdown().await
     }
 
@@ -102,6 +103,10 @@ impl BlobFilesystem for FxblobInstance {
             .await
             .expect("failed to create BlobWriter");
         blob_writer.write(&blob.data).await.unwrap();
+    }
+
+    fn exposed_dir(&self) -> &fio::DirectoryProxy {
+        self.fxblob.exposed_dir()
     }
 }
 

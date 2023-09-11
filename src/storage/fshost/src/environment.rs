@@ -193,8 +193,8 @@ impl Filesystem {
         let old = std::mem::replace(self, Filesystem::Shutdown);
         match old {
             Filesystem::Queue(_) => Ok(()),
-            Filesystem::Serving(fs) => fs.shutdown().await.context("shutdown failed"),
-            Filesystem::ServingMultiVolume(_, fs, _) => {
+            Filesystem::Serving(mut fs) => fs.shutdown().await.context("shutdown failed"),
+            Filesystem::ServingMultiVolume(_, mut fs, _) => {
                 fs.shutdown().await.context("shutdown failed")
             }
             Filesystem::ServingVolumeInFxblob(_, volume_name) => {
@@ -854,7 +854,7 @@ impl Environment for FshostEnvironment {
         self.data.shutdown(self.fxblob.as_mut()).await.unwrap_or_else(|error| {
             tracing::error!(?error, "failed to shut down data");
         });
-        if let Some(fxfs) = self.fxblob.take() {
+        if let Some(mut fxfs) = self.fxblob.take() {
             fxfs.shutdown().await.unwrap_or_else(|error| {
                 tracing::error!(?error, "failed to shut down fxfs");
             })

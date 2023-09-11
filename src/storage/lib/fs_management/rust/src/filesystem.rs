@@ -368,7 +368,7 @@ impl ServingSingleVolumeFilesystem {
     /// # Errors
     ///
     /// Returns [`Err`] if the shutdown failed or the filesystem process did not terminate.
-    pub async fn shutdown(mut self) -> Result<(), ShutdownError> {
+    pub async fn shutdown(&mut self) -> Result<(), ShutdownError> {
         async fn do_shutdown(exposed_dir: &fio::DirectoryProxy) -> Result<(), Error> {
             connect_to_protocol_at_dir_root::<fidl_fuchsia_fs::AdminMarker>(exposed_dir)?
                 .shutdown()
@@ -667,7 +667,7 @@ impl ServingMultiVolumeFilesystem {
     /// # Errors
     ///
     /// Returns [`Err`] if the shutdown failed.
-    pub async fn shutdown(mut self) -> Result<(), ShutdownError> {
+    pub async fn shutdown(&mut self) -> Result<(), ShutdownError> {
         connect_to_protocol_at_dir_root::<fidl_fuchsia_fs::AdminMarker>(
             // Take exposed_dir so we don't attempt to shut down again in Drop.
             &self.exposed_dir.take().unwrap(),
@@ -752,7 +752,7 @@ mod tests {
 
         blobfs.format().await.expect("failed to format blobfs");
 
-        let serving = blobfs.serve().await.expect("failed to serve blobfs the first time");
+        let mut serving = blobfs.serve().await.expect("failed to serve blobfs the first time");
 
         // snapshot of FilesystemInfo
         let fs_info1 =
@@ -792,7 +792,7 @@ mod tests {
         );
 
         serving.shutdown().await.expect("failed to shutdown blobfs the first time");
-        let serving = blobfs.serve().await.expect("failed to serve blobfs the second time");
+        let mut serving = blobfs.serve().await.expect("failed to serve blobfs the second time");
         {
             let test_file = fuchsia_fs::directory::open_file(
                 serving.root(),
@@ -887,7 +887,7 @@ mod tests {
         let mut minfs = new_fs(&mut ramdisk, Minfs::default()).await;
 
         minfs.format().await.expect("failed to format minfs");
-        let serving = minfs.serve().await.expect("failed to serve minfs the first time");
+        let mut serving = minfs.serve().await.expect("failed to serve minfs the first time");
 
         // snapshot of FilesystemInfo
         let fs_info1 =
@@ -920,7 +920,7 @@ mod tests {
         );
 
         serving.shutdown().await.expect("failed to shutdown minfs the first time");
-        let serving = minfs.serve().await.expect("failed to serve minfs the second time");
+        let mut serving = minfs.serve().await.expect("failed to serve minfs the second time");
 
         {
             let test_file = fuchsia_fs::directory::open_file(
@@ -995,7 +995,7 @@ mod tests {
         let mut f2fs = new_fs(&mut ramdisk, F2fs::default()).await;
 
         f2fs.format().await.expect("failed to format f2fs");
-        let serving = f2fs.serve().await.expect("failed to serve f2fs the first time");
+        let mut serving = f2fs.serve().await.expect("failed to serve f2fs the first time");
 
         // snapshot of FilesystemInfo
         let fs_info1 =
@@ -1030,7 +1030,7 @@ mod tests {
         assert_eq!(fs_info2.used_bytes - fs_info1.used_bytes, expected_size2 as u64);
 
         serving.shutdown().await.expect("failed to shutdown f2fs the first time");
-        let serving = f2fs.serve().await.expect("failed to serve f2fs the second time");
+        let mut serving = f2fs.serve().await.expect("failed to serve f2fs the second time");
 
         {
             let test_file = fuchsia_fs::directory::open_file(

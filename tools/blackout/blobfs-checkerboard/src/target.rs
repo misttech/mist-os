@@ -89,7 +89,7 @@ impl Test for BlobfsCheckerboard {
         blobfs.format().await.context("failed to format blobfs")?;
 
         tracing::info!("starting blobfs");
-        let blobfs = blobfs.serve().await.context("failed to mount blobfs")?;
+        let mut blobfs = blobfs.serve().await.context("failed to mount blobfs")?;
 
         // Normally these tests just format in the setup, but I want a pile of files that I'm never
         // going to touch again, so this is the best place to set them up. Each file has a number

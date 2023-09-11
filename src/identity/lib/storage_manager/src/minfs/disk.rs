@@ -426,7 +426,7 @@ impl Minfs for DevMinfs {
         self.serving_fs.root()
     }
 
-    async fn shutdown(self) {
+    async fn shutdown(mut self) {
         if let Err(err) = self.serving_fs.shutdown().await {
             error!("failed to shutdown minfs: {}", err);
         }

@@ -221,8 +221,10 @@ enum ServingFilesystem {
 impl ServingFilesystem {
     async fn shutdown(self) -> Result<(), Error> {
         match self {
-            Self::SingleVolume(fs) => fs.shutdown().await.context("shutting down single volume"),
-            Self::MultiVolume(fs) => fs.shutdown().await.context("shutting down multi volume"),
+            Self::SingleVolume(mut fs) => {
+                fs.shutdown().await.context("shutting down single volume")
+            }
+            Self::MultiVolume(mut fs) => fs.shutdown().await.context("shutting down multi volume"),
         }
     }
 

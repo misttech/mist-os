@@ -28,8 +28,8 @@ pub trait FilesystemConfig: Send + Sync {
 /// A trait representing a mounted filesystem that benchmarks will be run against.
 #[async_trait]
 pub trait Filesystem: Send + Sync {
-    /// Cleans up the filesystem after a benchmark has run.
-    async fn shutdown(self);
+    /// Cleans up the filesystem after a benchmark has run. Filesystem is unusable after this call.
+    async fn shutdown(&mut self);
 
     /// Path to where the filesystem is located in the current process's namespace. All benchmark
     /// operations should happen within this directory.
@@ -95,8 +95,8 @@ impl MountedFilesystemInstance {
 
 #[async_trait]
 impl Filesystem for MountedFilesystemInstance {
-    async fn shutdown(self) {
-        std::fs::remove_dir_all(self.dir).expect("Failed to remove benchmark directory");
+    async fn shutdown(&mut self) {
+        std::fs::remove_dir_all(self.dir.clone()).expect("Failed to remove benchmark directory");
     }
 
     fn benchmark_dir(&self) -> &Path {

@@ -97,7 +97,7 @@ impl FsRealmState {
 
     async fn unmount(&self, mount_name: &str) -> Result<(), Error> {
         let mut locked_running_filesystems = self.running_filesystems.lock().await;
-        if let Some(fs) = locked_running_filesystems.remove(mount_name) {
+        if let Some(mut fs) = locked_running_filesystems.remove(mount_name) {
             self.mnt.remove_entry(mount_name, true)?;
             fs.shutdown().await?;
             Ok(())
@@ -108,7 +108,7 @@ impl FsRealmState {
 
     async fn shutdown(&self) -> Result<(), Error> {
         let mut locked_running_filesystems = self.running_filesystems.lock().await;
-        for (_mount_name, fs) in locked_running_filesystems.drain() {
+        for (_mount_name, mut fs) in locked_running_filesystems.drain() {
             fs.shutdown().await?;
         }
         Ok(())

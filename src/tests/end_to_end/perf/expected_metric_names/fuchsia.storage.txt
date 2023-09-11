@@ -55,6 +55,10 @@ fuchsia.storage: WriteRandomWarm/8192/memfs
 fuchsia.storage: WriteRandomWarm/8192/minfs
 fuchsia.storage: WriteRealisticBlobs/blobfs
 fuchsia.storage: WriteRealisticBlobs/fxblob
+fuchsia.storage: TimeToFirstByteMetaFarBlob/blobfs-pkgdir
+fuchsia.storage: TimeToFirstByteMetaFarBlob/fxblob-pkgdir
+fuchsia.storage: TimeToFirstByteContentBlob/blobfs-pkgdir
+fuchsia.storage: TimeToFirstByteContentBlob/fxblob-pkgdir
 fuchsia.storage: WriteSequentialCold/8192/f2fs
 fuchsia.storage: WriteSequentialCold/8192/fxfs
 fuchsia.storage: WriteSequentialCold/8192/memfs
