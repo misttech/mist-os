@@ -5,9 +5,19 @@
 composite audio_tas5720_woofer;
 
 using fuchsia.i2c;
+using fuchsia.platform;
+using fuchsia.ti.platform;
 
 primary node "i2c" {
     fuchsia.BIND_FIDL_PROTOCOL == fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE;
     fuchsia.BIND_I2C_BUS_ID == 0; // SHERLOCK_I2C_A0_0
     fuchsia.BIND_I2C_ADDRESS == 0x6f;
+}
+
+node "pdev" {
+  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.ti.platform.BIND_PLATFORM_DEV_VID.TI;
+  fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC;
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.ti.platform.BIND_PLATFORM_DEV_DID.TAS5720;
+  fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID == 1;
 }

@@ -42,6 +42,43 @@ using namespace fuchsia_driver_framework;
 namespace sherlock {
 namespace fpbus = fuchsia_hardware_platform_bus;
 
+zx_status_t AddTas5720Device(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus,
+                             const char* device_name, uint32_t device_instance_id,
+                             cpp20::span<const device_fragment_t> device_fragments,
+                             const uint32_t* instance_count) {
+  fpbus::Node dev;
+  dev.name() = device_name;
+  dev.pid() = PDEV_PID_GENERIC;
+  dev.vid() = PDEV_VID_TI;
+  dev.did() = PDEV_DID_TI_TAS5720;
+  dev.instance_id() = device_instance_id;
+  dev.metadata() = std::vector<fpbus::Metadata>{
+      {{
+          .type = DEVICE_METADATA_PRIVATE,
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(instance_count),
+              reinterpret_cast<const uint8_t*>(instance_count) + sizeof(*instance_count)),
+      }},
+  };
+
+  fidl::Arena<> fidl_arena;
+  fdf::Arena arena('5720');
+  auto fragments = platform_bus_composite::MakeFidlFragment(fidl_arena, device_fragments.data(),
+                                                            device_fragments.size());
+  fdf::WireUnownedResult result =
+      pbus.buffer(arena)->AddComposite(fidl::ToWire(fidl_arena, dev), fragments, "i2c");
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send AddComposite request: %s", result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to add composite: %s", zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
+
+  return ZX_OK;
+}
+
 zx_status_t Sherlock::AudioInit() {
   uint8_t tdm_instance_id = 1;
   static const std::vector<fpbus::Mmio> audio_mmios{
@@ -193,50 +230,30 @@ zx_status_t Sherlock::AudioInit() {
   // Add TDM OUT to the codecs.
   {
     gpio_impl_.ConfigOut(T931_GPIOH(7), 1);  // SOC_AUDIO_EN.
-    zx_device_prop_t props[] = {{BIND_PLATFORM_DEV_VID, 0, PDEV_VID_TI},
-                                {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_TI_TAS5720},
-                                {BIND_CODEC_INSTANCE, 0, 1}};
-    uint32_t instance_count = 1;
-    const device_metadata_t codec_metadata[] = {
-        {
-            .type = DEVICE_METADATA_PRIVATE,
-            .data = &instance_count,
-            .length = sizeof(instance_count),
-        },
-    };
 
-    composite_device_desc_t comp_desc = {};
-    comp_desc.props = props;
-    comp_desc.props_count = std::size(props);
-    comp_desc.spawn_colocated = false;
-    comp_desc.fragments = audio_tas5720_woofer_fragments;
-    comp_desc.fragments_count = std::size(audio_tas5720_woofer_fragments);
-    comp_desc.primary_fragment = "i2c";
-    comp_desc.metadata_list = codec_metadata;
-    comp_desc.metadata_count = std::size(codec_metadata);
-    status = DdkAddComposite("audio-tas5720-woofer", &comp_desc);
+    constexpr uint32_t woofer_instance_count = 1;
+    status = AddTas5720Device(pbus_, "audio-tas5720-woofer", woofer_instance_count,
+                              audio_tas5720_woofer_fragments, &woofer_instance_count);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "%s DdkAddComposite woofer failed %d", __FILE__, status);
+      zxlogf(ERROR, "Failed to add woofer composite device: %s", zx_status_get_string(status));
       return status;
     }
 
-    instance_count = 2;
-    props[2].value = 2;
-    comp_desc.fragments = audio_tas5720_tweeter_left_fragments;
-    comp_desc.fragments_count = std::size(audio_tas5720_tweeter_left_fragments);
-    status = DdkAddComposite("audio-tas5720-left-tweeter", &comp_desc);
+    constexpr uint32_t left_tweeter_instance_count = 2;
+    status = AddTas5720Device(pbus_, "audio-tas5720-left-tweeter", left_tweeter_instance_count,
+                              audio_tas5720_tweeter_left_fragments, &left_tweeter_instance_count);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "%s DdkAddComposite left tweeter failed %d", __FILE__, status);
+      zxlogf(ERROR, "Failed to add left tweeter composite device: %s",
+             zx_status_get_string(status));
       return status;
     }
 
-    instance_count = 3;
-    props[2].value = 3;
-    comp_desc.fragments = audio_tas5720_tweeter_right_fragments;
-    comp_desc.fragments_count = std::size(audio_tas5720_tweeter_right_fragments);
-    status = DdkAddComposite("audio-tas5720-right-tweeter", &comp_desc);
+    constexpr uint32_t right_tweeter_instance_count = 3;
+    status = AddTas5720Device(pbus_, "audio-tas5720-right-tweeter", right_tweeter_instance_count,
+                              audio_tas5720_tweeter_right_fragments, &right_tweeter_instance_count);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "%s DdkAddComposite right tweeter failed %d", __FILE__, status);
+      zxlogf(ERROR, "Failed to add right tweeter composite device: %s",
+             zx_status_get_string(status));
       return status;
     }
   }

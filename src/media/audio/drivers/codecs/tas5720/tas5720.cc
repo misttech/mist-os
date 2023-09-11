@@ -192,9 +192,14 @@ zx::result<DriverIds> Tas5720::Initialize() {
   size_t actual = 0;
   auto status = device_get_metadata(parent(), DEVICE_METADATA_PRIVATE, &instance_count_,
                                     sizeof(instance_count_), &actual);
-  if (status != ZX_OK || sizeof(instance_count_) != actual) {
-    zxlogf(ERROR, "device_get_metadata failed %d", status);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to get metadata: %s", zx_status_get_string(status));
     return zx::error(status);
+  }
+  if (sizeof(instance_count_) != actual) {
+    zxlogf(ERROR, "Metadata size is incorrect: Expected %lu bytes but actual is %lu bytes",
+           sizeof(instance_count_), actual);
+    return zx::error(ZX_ERR_INTERNAL);
   }
 
   status = Reset();
