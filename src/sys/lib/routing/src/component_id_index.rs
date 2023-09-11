@@ -114,7 +114,7 @@ impl PartialEq for ComponentIdIndexError {
 }
 
 /// ComponentIdIndex parses a given index and provides methods to look up instance IDs.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct ComponentIdIndex {
     /// Map of a moniker from the index to its instance ID.
     ///

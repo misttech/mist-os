@@ -122,7 +122,7 @@ pub enum ValidationError {
 // - Use MergeContext::new() to create a MergeContext.
 // - Call MergeContext::merge() to merge an index. Can be called multiple times.
 // - Call MergeContext::output() to access the merged index.
-struct MergeContext {
+pub struct MergeContext {
     output_index: Index,
     // MergeConetext::merge() will accumulate the instance IDs which have been merged so far, along with the index source file which they came from.
     // This is used to validate that all instance IDs are unique and provide helpful error messages.
@@ -131,7 +131,7 @@ struct MergeContext {
 }
 
 impl MergeContext {
-    fn new() -> MergeContext {
+    pub fn new() -> MergeContext {
         MergeContext {
             output_index: Index { instances: vec![] },
             accumulated_instance_ids: HashMap::new(),
@@ -141,7 +141,7 @@ impl MergeContext {
     // merge() merges `index` into the MergeContext.
     // This method can be called multiple times to merge multiple indicies.
     // The accumulated index can be accessed with output().
-    fn merge(&mut self, source_index_path: &str, index: &Index) -> Result<(), ValidationError> {
+    pub fn merge(&mut self, source_index_path: &str, index: &Index) -> Result<(), ValidationError> {
         let mut missing_instance_ids = vec![];
         for entry in &index.instances {
             match entry.instance_id.as_ref() {
@@ -179,7 +179,7 @@ impl MergeContext {
     }
 
     // Access the accumulated index from calls to merge().
-    fn output(self) -> Index {
+    pub fn output(self) -> Index {
         self.output_index
     }
 }

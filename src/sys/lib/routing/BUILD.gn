@@ -12,6 +12,7 @@ rustc_library("routing") {
   edition = "2021"
 
   visibility = [
+    "//src/lib/assembly/component_id_index/*",
     "//src/security/lib/scrutiny/plugins/*",
     "//src/security/lib/scrutiny/x/*",
     "//src/sys/component_manager/*",

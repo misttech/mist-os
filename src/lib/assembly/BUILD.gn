@@ -10,6 +10,7 @@ if (is_host) {
       "base_package:host_tests",
       "blobfs:host_tests",
       "bootfs_file_map:host_tests",
+      "component_id_index:host_tests",
       "components:host_tests",
       "config_data:host_tests",
       "config_schema:host_tests",

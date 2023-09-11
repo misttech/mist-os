@@ -18,6 +18,7 @@ rustc_library("moniker") {
     "//src/diagnostics/archivist/*",
     "//src/diagnostics/iquery/*",
     "//src/diagnostics/lib/log-command/*",
+    "//src/lib/assembly/component_id_index/*",
     "//src/security/lib/scrutiny/*",
     "//src/sys/component_manager/*",
     "//src/sys/lib/cm_moniker/*",
