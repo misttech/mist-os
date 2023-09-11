@@ -35,7 +35,6 @@
                 "fuchsia.session.scene.Manager",
                 "fuchsia.tracing.provider.Registry",
                 "fuchsia.ui.composition.Flatland",
-                "fuchsia.ui.scenic.Scenic",
             ],
         },
         {
