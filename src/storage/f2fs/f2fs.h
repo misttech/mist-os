@@ -95,15 +95,15 @@ class F2fs final {
   F2fs(F2fs &&) = delete;
   F2fs &operator=(F2fs &&) = delete;
 
-  explicit F2fs(FuchsiaDispatcher dispatcher, std::unique_ptr<f2fs::Bcache> bc,
+  explicit F2fs(FuchsiaDispatcher dispatcher, std::unique_ptr<f2fs::BcacheMapper> bc,
                 std::unique_ptr<Superblock> sb, const MountOptions &mount_options,
                 PlatformVfs *vfs);
 
   static zx::result<std::unique_ptr<F2fs>> Create(FuchsiaDispatcher dispatcher,
-                                                  std::unique_ptr<f2fs::Bcache> bc,
+                                                  std::unique_ptr<f2fs::BcacheMapper> bc,
                                                   const MountOptions &options, PlatformVfs *vfs);
 
-  static zx::result<std::unique_ptr<Superblock>> LoadSuperblock(f2fs::Bcache &bc);
+  static zx::result<std::unique_ptr<Superblock>> LoadSuperblock(f2fs::BcacheMapper &bc);
 
   zx::result<fs::FilesystemInfo> GetFilesystemInfo();
   DirEntryCache &GetDirEntryCache() { return dir_entry_cache_; }
@@ -117,14 +117,14 @@ class F2fs final {
     return vnode_cache_.Lookup(ino, out);
   }
 
-  zx::result<std::unique_ptr<f2fs::Bcache>> TakeBc() {
+  zx::result<std::unique_ptr<f2fs::BcacheMapper>> TakeBc() {
     if (!bc_) {
       return zx::error(ZX_ERR_UNAVAILABLE);
     }
     return zx::ok(std::move(bc_));
   }
 
-  Bcache &GetBc() const {
+  BcacheMapper &GetBc() const {
     ZX_DEBUG_ASSERT(bc_ != nullptr);
     return *bc_;
   }
@@ -323,7 +323,7 @@ class F2fs final {
 
   FuchsiaDispatcher dispatcher_;
   PlatformVfs *const vfs_ = nullptr;
-  std::unique_ptr<f2fs::Bcache> bc_;
+  std::unique_ptr<f2fs::BcacheMapper> bc_;
   // for unittest
   std::unique_ptr<PlatformVfs> vfs_for_tests_;
 

@@ -171,7 +171,7 @@ void MountTestActiveLogs(F2fs *fs, MountOptions options) {
 }
 
 void MountTestMain(MountOptions &options, uint32_t test, uint32_t priv) {
-  std::unique_ptr<f2fs::Bcache> bc;
+  std::unique_ptr<f2fs::BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;
@@ -224,7 +224,7 @@ TEST(MountTest, ActiveLogsOptions) {
 }
 
 TEST(MountTest, EnableDiscardOptions) {
-  std::unique_ptr<f2fs::Bcache> bc;
+  std::unique_ptr<f2fs::BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;

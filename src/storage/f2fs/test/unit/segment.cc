@@ -304,7 +304,7 @@ TEST_F(SegmentManagerTest, DirtySegments) {
 }
 
 TEST(SegmentManagerOptionTest, Section) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   MkfsOptions mkfs_options{};
   mkfs_options.segs_per_sec = 4;
   FileTester::MkfsOnFakeDevWithOptions(&bc, mkfs_options);
@@ -351,7 +351,7 @@ TEST(SegmentManagerOptionTest, Section) {
 }
 
 TEST(SegmentManagerOptionTest, GetNewSegmentHeap) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   MkfsOptions mkfs_options{};
   mkfs_options.heap_based_allocation = true;
   mkfs_options.segs_per_sec = 4;
@@ -403,7 +403,7 @@ TEST(SegmentManagerOptionTest, GetNewSegmentHeap) {
 }
 
 TEST(SegmentManagerOptionTest, GetNewSegmentNoHeap) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   MkfsOptions mkfs_options{};
   mkfs_options.heap_based_allocation = false;
   mkfs_options.segs_per_sec = 4;
@@ -449,7 +449,7 @@ TEST(SegmentManagerOptionTest, GetNewSegmentNoHeap) {
 }
 
 TEST(SegmentManagerOptionTest, DestroySegmentManagerExceptionCase) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   MkfsOptions mkfs_options{};
   FileTester::MkfsOnFakeDevWithOptions(&bc, mkfs_options);
 
@@ -484,7 +484,7 @@ TEST(SegmentManagerOptionTest, DestroySegmentManagerExceptionCase) {
 }
 
 TEST(SegmentManagerOptionTest, ModeLfs) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   MkfsOptions mkfs_options{};
   mkfs_options.segs_per_sec = 4;
   FileTester::MkfsOnFakeDevWithOptions(&bc, mkfs_options);
@@ -543,7 +543,7 @@ TEST(SegmentManagerOptionTest, ModeLfs) {
 }
 
 TEST(SegmentManagerExceptionTest, BuildSitEntriesDiskFail) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDevWithOptions(&bc, MkfsOptions{});
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);

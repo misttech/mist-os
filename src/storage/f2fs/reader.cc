@@ -6,7 +6,7 @@
 
 namespace f2fs {
 
-Reader::Reader(Bcache *bc, size_t capacity) : transaction_handler_(bc) {
+Reader::Reader(BcacheMapper *bc, size_t capacity) : bc_(bc) {
   buffer_ = std::make_unique<StorageBuffer>(bc, capacity, kBlockSize, "ReadBuffer",
                                             kDefaultAllocationUnit_);
 }
@@ -87,7 +87,7 @@ zx::result<> Reader::ReadBlocks(std::vector<LockedPage> &pages, std::vector<bloc
 zx_status_t Reader::RunIO(StorageOperations &operation, OperationCallback callback) {
   zx_status_t ret = ZX_OK;
   if (!operation.IsEmpty()) {
-    ret = transaction_handler_->RunRequests(operation.TakeOperations());
+    ret = bc_->RunRequests(operation.TakeOperations());
   }
   return operation.Completion(ret, std::move(callback));
 }

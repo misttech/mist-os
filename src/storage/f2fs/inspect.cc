@@ -58,9 +58,26 @@ void InspectTree::UpdateUsage() {
 }
 
 void InspectTree::UpdateFvmSizeInfo() {
-  zx::result<fs_inspect::FvmData::SizeInfo> size_info = zx::error(ZX_ERR_BAD_HANDLE);
+  zx::result<fs_inspect::FvmData::SizeInfo> size_info = zx::ok(fs_inspect::FvmData::SizeInfo{
+      .size_bytes = 0, .size_limit_bytes = 0, .available_space_bytes = 0});
+
   {
-    size_info = fs_inspect::FvmData::GetSizeInfoFromDevice(*fs_->GetBc().GetDevice());
+    fs_->GetBc().ForEachBcache([&size_info](Bcache* bc) {
+      if (size_info.is_error()) {
+        return;
+      }
+
+      auto info = fs_inspect::FvmData::GetSizeInfoFromDevice(*bc->GetDevice());
+      if (info.is_error()) {
+        size_info = info.take_error();
+        return;
+      }
+
+      size_info.value().size_bytes += info->size_bytes;
+      size_info.value().size_limit_bytes += info->size_limit_bytes;
+      size_info.value().available_space_bytes += info->available_space_bytes;
+    });
+
     if (size_info.is_error()) {
       FX_LOGS(WARNING) << "Failed to obtain size information from block device: "
                        << size_info.status_string();

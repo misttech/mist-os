@@ -14,7 +14,7 @@ namespace f2fs {
 namespace {
 
 TEST(InlineDirTest, InlineDirCreation) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;
@@ -79,7 +79,7 @@ TEST(InlineDirTest, InlineDirCreation) {
 }
 
 TEST(InlineDirTest, InlineDirConvert) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;
@@ -148,7 +148,7 @@ TEST(InlineDirTest, InlineDirConvert) {
 }
 
 TEST(InlineDirTest, InlineDentryOps) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;
@@ -249,7 +249,7 @@ TEST(InlineDirTest, InlineDentryOps) {
 TEST(InlineDirTest, NestedInlineDirectories) {
   // There was a reported malfunction of inline-directories when the volume size is small.
   // This test evaluates such case.
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc, 102400, 512);
 
   std::unique_ptr<F2fs> fs;
@@ -286,7 +286,7 @@ TEST(InlineDirTest, NestedInlineDirectories) {
 }
 
 TEST(InlineDirTest, InlineDirPino) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;
@@ -371,7 +371,7 @@ TEST(InlineDirTest, InlineDirPino) {
 }
 
 TEST(InlineDataTest, InlineRegFileCreation) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;
@@ -438,7 +438,7 @@ TEST(InlineDataTest, InlineRegFileCreation) {
 TEST(InlineDataTest, InlineRegFileIO) {
   srand(testing::UnitTest::GetInstance()->random_seed());
 
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;
@@ -519,7 +519,7 @@ TEST(InlineDataTest, InlineRegFileIO) {
 TEST(InlineDataTest, InlineRegFileConvert) {
   srand(testing::UnitTest::GetInstance()->random_seed());
 
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;
@@ -609,7 +609,7 @@ TEST(InlineDataTest, InlineRegFileConvert) {
 TEST(InlineDataTest, InlineRegFileTruncate) {
   srand(testing::UnitTest::GetInstance()->random_seed());
 
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;
@@ -720,7 +720,7 @@ TEST(InlineDataTest, InlineRegFileTruncate) {
 }
 
 TEST(InlineDataTest, DataExistFlag) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;

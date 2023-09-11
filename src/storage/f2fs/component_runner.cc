@@ -30,7 +30,7 @@ ComponentRunner::ComponentRunner(async_dispatcher_t* dispatcher)
 
   FX_LOGS(INFO) << "setting up startup service";
   auto startup_svc = fbl::MakeRefCounted<StartupService>(
-      dispatcher_, [this](std::unique_ptr<Bcache> device, const MountOptions& options) {
+      dispatcher_, [this](std::unique_ptr<BcacheMapper> device, const MountOptions& options) {
         return Configure(std::move(device), options);
       });
   startup->AddEntry(fidl::DiscoverableProtocolName<fuchsia_fs_startup::Startup>, startup_svc);
@@ -76,7 +76,7 @@ zx::result<> ComponentRunner::ServeRoot(
   return zx::ok();
 }
 
-zx::result<> ComponentRunner::Configure(std::unique_ptr<Bcache> bcache,
+zx::result<> ComponentRunner::Configure(std::unique_ptr<BcacheMapper> bcache,
                                         const MountOptions& options) {
   // Create Pager and PagerPool
   if (auto status = Init(); status.is_error()) {

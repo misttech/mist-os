@@ -45,12 +45,12 @@ void F2fsFakeDevTestFixture::TearDown() {
   }
 }
 
-void FileTester::MkfsOnFakeDev(std::unique_ptr<Bcache> *bc, uint64_t block_count,
+void FileTester::MkfsOnFakeDev(std::unique_ptr<BcacheMapper> *bc, uint64_t block_count,
                                uint32_t block_size, bool btrim) {
   auto device = std::make_unique<FakeBlockDevice>(FakeBlockDevice::Config{
       .block_count = block_count, .block_size = block_size, .supports_trim = btrim});
   bool readonly_device = false;
-  auto bc_or = CreateBcache(std::move(device), &readonly_device);
+  auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
   ASSERT_TRUE(bc_or.is_ok());
 
   MkfsOptions options;
@@ -60,12 +60,13 @@ void FileTester::MkfsOnFakeDev(std::unique_ptr<Bcache> *bc, uint64_t block_count
   *bc = std::move(*ret);
 }
 
-void FileTester::MkfsOnFakeDevWithOptions(std::unique_ptr<Bcache> *bc, const MkfsOptions &options,
-                                          uint64_t block_count, uint32_t block_size, bool btrim) {
+void FileTester::MkfsOnFakeDevWithOptions(std::unique_ptr<BcacheMapper> *bc,
+                                          const MkfsOptions &options, uint64_t block_count,
+                                          uint32_t block_size, bool btrim) {
   auto device = std::make_unique<FakeBlockDevice>(FakeBlockDevice::Config{
       .block_count = block_count, .block_size = block_size, .supports_trim = btrim});
   bool readonly_device = false;
-  auto bc_or = CreateBcache(std::move(device), &readonly_device);
+  auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
   ASSERT_TRUE(bc_or.is_ok());
 
   MkfsWorker mkfs(std::move(*bc_or), options);
@@ -75,7 +76,7 @@ void FileTester::MkfsOnFakeDevWithOptions(std::unique_ptr<Bcache> *bc, const Mkf
 }
 
 void FileTester::MountWithOptions(async_dispatcher_t *dispatcher, const MountOptions &options,
-                                  std::unique_ptr<Bcache> *bc, std::unique_ptr<F2fs> *fs) {
+                                  std::unique_ptr<BcacheMapper> *bc, std::unique_ptr<F2fs> *fs) {
   // Create a vfs object for unit tests.
   auto vfs_or = Runner::CreateRunner(dispatcher);
   ASSERT_TRUE(vfs_or.is_ok());
@@ -89,7 +90,7 @@ void FileTester::MountWithOptions(async_dispatcher_t *dispatcher, const MountOpt
   *fs = std::move(*fs_or);
 }
 
-void FileTester::Unmount(std::unique_ptr<F2fs> fs, std::unique_ptr<Bcache> *bc) {
+void FileTester::Unmount(std::unique_ptr<F2fs> fs, std::unique_ptr<BcacheMapper> *bc) {
   fs->SyncFs(true);
   fs->PutSuper();
   auto vfs_or = fs->TakeVfsForTests();
@@ -102,7 +103,7 @@ void FileTester::Unmount(std::unique_ptr<F2fs> fs, std::unique_ptr<Bcache> *bc) 
   (*vfs_or).reset();
 }
 
-void FileTester::SuddenPowerOff(std::unique_ptr<F2fs> fs, std::unique_ptr<Bcache> *bc) {
+void FileTester::SuddenPowerOff(std::unique_ptr<F2fs> fs, std::unique_ptr<BcacheMapper> *bc) {
   fs->GetVCache().ForDirtyVnodesIf([&](fbl::RefPtr<VnodeF2fs> &vnode) {
     vnode->ClearDirty();
     return ZX_OK;
@@ -504,7 +505,7 @@ zx_status_t MkfsTester::InitAndGetDeviceInfo(MkfsWorker &mkfs) {
   return mkfs.GetDeviceInfo();
 }
 
-zx::result<std::unique_ptr<Bcache>> MkfsTester::FormatDevice(MkfsWorker &mkfs) {
+zx::result<std::unique_ptr<BcacheMapper>> MkfsTester::FormatDevice(MkfsWorker &mkfs) {
   if (zx_status_t ret = mkfs.FormatDevice(); ret != ZX_OK)
     return zx::error(ret);
   return zx::ok(std::move(mkfs.bc_));
@@ -516,9 +517,15 @@ zx_status_t GcTester::DoGarbageCollect(GcManager &manager, uint32_t segno, GcTyp
 }
 
 void DeviceTester::SetHook(F2fs *fs, DeviceTester::Hook hook) {
-  static_cast<block_client::FakeBlockDevice *>(fs->GetBc().GetDevice())->Pause();
-  static_cast<block_client::FakeBlockDevice *>(fs->GetBc().GetDevice())->set_hook(std::move(hook));
-  static_cast<block_client::FakeBlockDevice *>(fs->GetBc().GetDevice())->Resume();
+  fs->GetBc().ForEachBcache([](Bcache *f2fs_device) {
+    static_cast<block_client::FakeBlockDevice *>(f2fs_device->GetDevice())->Pause();
+  });
+  fs->GetBc().ForEachBcache([hook](Bcache *f2fs_device) {
+    static_cast<block_client::FakeBlockDevice *>(f2fs_device->GetDevice())->set_hook(hook);
+  });
+  fs->GetBc().ForEachBcache([](Bcache *f2fs_device) {
+    static_cast<block_client::FakeBlockDevice *>(f2fs_device->GetDevice())->Resume();
+  });
 }
 
 }  // namespace f2fs

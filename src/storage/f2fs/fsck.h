@@ -90,7 +90,8 @@ class FsckWorker {
   FsckWorker &operator=(const FsckWorker &) = delete;
   FsckWorker(FsckWorker &&) = delete;
   FsckWorker &operator=(FsckWorker &&) = delete;
-  FsckWorker(std::unique_ptr<Bcache> bc, const FsckOptions &options) : fsck_options_(options) {
+  FsckWorker(std::unique_ptr<BcacheMapper> bc, const FsckOptions &options)
+      : fsck_options_(options) {
     bc_ = std::move(bc);
   }
   ~FsckWorker() { DoUmount(); }
@@ -250,7 +251,7 @@ class FsckWorker {
   int dump_inode_from_blkaddr(SuperblockInfo *sbi, uint32_t blk_addr);
 #endif
 
-  std::unique_ptr<Bcache> Destroy() {
+  std::unique_ptr<BcacheMapper> Destroy() {
     DoUmount();
     return std::move(bc_);
   }
@@ -278,7 +279,7 @@ class FsckWorker {
   SuperblockInfo superblock_info_;
   std::unique_ptr<NodeManager> node_manager_;
   std::unique_ptr<SegmentManager> segment_manager_;
-  std::unique_ptr<Bcache> bc_;
+  std::unique_ptr<BcacheMapper> bc_;
 
   bool mounted_ = false;
 
@@ -286,8 +287,8 @@ class FsckWorker {
   uint32_t sit_area_bitmap_size_ = 0;
 };
 
-zx_status_t Fsck(std::unique_ptr<Bcache> bc, const FsckOptions &options,
-                 std::unique_ptr<Bcache> *out = nullptr);
+zx_status_t Fsck(std::unique_ptr<BcacheMapper> bc, const FsckOptions &options,
+                 std::unique_ptr<BcacheMapper> *out = nullptr);
 
 }  // namespace f2fs
 

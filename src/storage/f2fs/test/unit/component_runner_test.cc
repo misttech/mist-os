@@ -25,8 +25,7 @@ class F2fsComponentRunnerTest : public testing::Test {
   void SetUp() override {
     constexpr uint64_t kBlockCount = 409600;
     auto device = std::make_unique<block_client::FakeBlockDevice>(kBlockCount, kBlockSize);
-    auto bc_or = Bcache::Create(std::move(device), kBlockCount, kBlockSize);
-    ASSERT_TRUE(bc_or.is_ok());
+    auto bc_or = CreateBcacheMapper(std::move(device));
     bc_or = Mkfs(MkfsOptions{}, std::move(*bc_or));
     ASSERT_TRUE(bc_or.is_ok());
     bcache_ = std::move(*bc_or);
@@ -69,7 +68,7 @@ class F2fsComponentRunnerTest : public testing::Test {
 
  protected:
   async::Loop loop_;
-  std::unique_ptr<Bcache> bcache_;
+  std::unique_ptr<BcacheMapper> bcache_;
   std::unique_ptr<ComponentRunner> runner_;
   fidl::ClientEnd<fuchsia_io::Directory> root_;
   fidl::ServerEnd<fuchsia_io::Directory> server_end_;

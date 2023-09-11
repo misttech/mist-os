@@ -24,39 +24,31 @@
 
 namespace f2fs {
 
-class Bcache;
-zx::result<std::unique_ptr<Bcache>> CreateBcache(
+class BcacheMapper;
+// This function is called at startup to serve the actual working f2fs.
+zx::result<std::unique_ptr<BcacheMapper>> CreateBcacheMapper(
     fidl::ClientEnd<fuchsia_hardware_block::Block> device, bool* out_readonly = nullptr);
-zx::result<std::unique_ptr<Bcache>> CreateBcache(std::unique_ptr<block_client::BlockDevice> device,
-                                                 bool* out_readonly = nullptr);
+// This function is used to create a f2fs instance for test.
+zx::result<std::unique_ptr<BcacheMapper>> CreateBcacheMapper(
+    std::unique_ptr<block_client::BlockDevice> device, bool* out_readonly = nullptr);
+// This function is used to test the multi device support of f2fs.
+zx::result<std::unique_ptr<BcacheMapper>> CreateBcacheMapper(
+    std::vector<std::unique_ptr<block_client::BlockDevice>> devices, bool* out_readonly = nullptr);
+
 class Bcache : public fs::DeviceTransactionHandler, public storage::VmoidRegistry {
  public:
-  // Not copyable or movable
   Bcache(const Bcache&) = delete;
   Bcache& operator=(const Bcache&) = delete;
   Bcache(Bcache&&) = delete;
   Bcache& operator=(Bcache&&) = delete;
 
-  // Make a read/write operation from/to a 4KiB block at |bno|.
-  // |buffer_| is used as a block buffer.
-  zx_status_t Readblk(block_t bno, void* data) __TA_EXCLUDES(buffer_mutex_);
-  zx_status_t Writeblk(block_t bno, const void* data) __TA_EXCLUDES(buffer_mutex_);
-  zx_status_t Trim(block_t start, block_t num);
-
-  // Blocks all I/O operations to the underlying device (that go via the RunRequests method). This
-  // does *not* block operations that go directly to the device.
-  // TODO(fxbug.dev/130250): change this to __TA_ACQUIRE(mutex_) after clang roll.
-  void Pause() __TA_NO_THREAD_SAFETY_ANALYSIS { mutex_.lock(); }
-  // Resumes all I/O operations paused by the Pause method.
-  // TODO(fxbug.dev/130250): change this to __TA_RELEASE(mutex_) after clang roll.
-  void Resume() __TA_NO_THREAD_SAFETY_ANALYSIS { mutex_.unlock(); }
-
   uint64_t Maxblk() const { return max_blocks_; }
   block_t BlockSize() const { return block_size_; }
 
-  zx_status_t RunRequests(const std::vector<storage::BufferedOperation>& operations) override;
-  // This factory allows building this object from a BlockDevice. Bcache can take ownership of the
-  // device (the first Create method), or not (the second Create method).
+  zx_status_t RunRequests(const std::vector<storage::BufferedOperation>& operations) override {
+    return DeviceTransactionHandler::RunRequests(operations);
+  }
+
   static zx::result<std::unique_ptr<Bcache>> Create(
       std::unique_ptr<block_client::BlockDevice> device, uint64_t max_blocks, block_t block_size);
 
@@ -65,45 +57,82 @@ class Bcache : public fs::DeviceTransactionHandler, public storage::VmoidRegistr
   zx_status_t BlockAttachVmo(const zx::vmo& vmo, storage::Vmoid* out) final;
   zx_status_t BlockDetachVmo(storage::Vmoid vmoid) final;
 
-  zx_status_t CreateVmoBuffer() __TA_EXCLUDES(buffer_mutex_) {
-    std::lock_guard lock(buffer_mutex_);
-    return buffer_.Initialize(this, 1, block_size_, "scratch-block");
-  }
-
-  void DestroyVmoBuffer() __TA_EXCLUDES(buffer_mutex_) {
-    std::lock_guard lock(buffer_mutex_);
-    [[maybe_unused]] auto unused = std::move(buffer_);
-  }
-
   uint64_t BlockNumberToDevice(uint64_t block_num) const final {
     return block_num * BlockSize() / info_.block_size;
   }
 
-  uint64_t DeviceBlockSize() const { return info_.block_size; }
-
   block_client::BlockDevice* GetDevice() final { return device_.get(); }
 
-  // Destroys a "bcache" object, but take back ownership of the underlying block device.
-  static std::unique_ptr<block_client::BlockDevice> Destroy(std::unique_ptr<Bcache> bcache);
-
  private:
-  friend class BlockNode;
+  Bcache(std::unique_ptr<block_client::BlockDevice> device, uint64_t max_blocks,
+         block_t block_size);
 
   // Used during initialization of this object.
   zx_status_t VerifyDeviceInfo();
 
   const uint64_t max_blocks_;
-  std::mutex buffer_mutex_;
-  std::shared_mutex mutex_;
-
-  Bcache(std::unique_ptr<block_client::BlockDevice> device, uint64_t max_blocks,
-         block_t block_size);
-
   const block_t block_size_;
   fuchsia_hardware_block::wire::BlockInfo info_ = {};
   std::unique_ptr<block_client::BlockDevice> device_;  // The device, if owned.
+};
+
+class BcacheMapper : public storage::VmoidRegistry {
+ public:
+  BcacheMapper(const BcacheMapper&) = delete;
+  BcacheMapper& operator=(const BcacheMapper&) = delete;
+  BcacheMapper(BcacheMapper&&) = delete;
+  BcacheMapper& operator=(BcacheMapper&&) = delete;
+  static zx::result<std::unique_ptr<BcacheMapper>> Create(
+      std::vector<std::unique_ptr<Bcache>> bcaches);
+
+  // Make a read/write operation from/to a 4KiB block at |bno|.
+  // |buffer_| is used as a block buffer.
+  zx_status_t Readblk(block_t bno, void* data) __TA_EXCLUDES(buffer_mutex_);
+  zx_status_t Writeblk(block_t bno, const void* data) __TA_EXCLUDES(buffer_mutex_);
+
+  zx_status_t Trim(block_t start, block_t num);
+  uint64_t Maxblk() const { return max_blocks_; }
+  block_t BlockSize() const { return block_size_; }
+  zx_status_t BlockGetInfo(fuchsia_hardware_block::wire::BlockInfo* out_info) const;
+
+  zx_status_t RunRequests(const std::vector<storage::BufferedOperation>& operations);
+  zx_status_t Flush();
+
+  zx_status_t BlockAttachVmo(const zx::vmo& vmo, storage::Vmoid* out) override;
+  zx_status_t BlockDetachVmo(storage::Vmoid vmoid) override;
+
+  // This function is only used for test and InspectTree purposes.
+  void ForEachBcache(fit::function<void(Bcache*)> func) {
+    for (auto& bcache : bcaches_) {
+      func(bcache.get());
+    }
+  }
+
+ private:
+  explicit BcacheMapper(std::vector<std::unique_ptr<Bcache>> bcaches, uint64_t max_blocks,
+                        block_t block_size);
+
+  zx::result<vmoid_t> FindFreeVmoId();
+
+  zx_status_t CreateVmoBuffer() __TA_EXCLUDES(buffer_mutex_) {
+    std::lock_guard lock(buffer_mutex_);
+    return buffer_.Initialize(this, 1, info_.block_size, "scratch-block");
+  }
+
+  const std::vector<std::unique_ptr<Bcache>> bcaches_;
+
+  // |vmoid_tree_| is a map between the virtual vmoid seen by F2FS and the vmoid actually registered
+  // on the underlying device.
+  std::map<vmoid_t, std::vector<storage::Vmoid>> vmoid_tree_;
+  vmoid_t last_id_ = BLOCK_VMOID_INVALID + 1;
+
+  std::mutex buffer_mutex_;
   // |buffer_| and |buffer_mutex_| are used in the "Readblk/Writeblk" methods.
   storage::VmoBuffer buffer_ __TA_GUARDED(buffer_mutex_);
+
+  fuchsia_hardware_block::wire::BlockInfo info_ = {};
+  const block_t block_size_;
+  const uint64_t max_blocks_;
 };
 
 }  // namespace f2fs

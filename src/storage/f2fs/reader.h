@@ -9,7 +9,7 @@ namespace f2fs {
 
 class Reader {
  public:
-  Reader(Bcache *bc, size_t capacity);
+  Reader(BcacheMapper *bc, size_t capacity);
   Reader() = delete;
   Reader(const Reader &) = delete;
   Reader &operator=(const Reader &) = delete;
@@ -24,7 +24,7 @@ class Reader {
  private:
   zx_status_t RunIO(StorageOperations &operation, OperationCallback callback);
 
-  fs::TransactionHandler *transaction_handler_ = nullptr;
+  BcacheMapper *bc_ = nullptr;
   std::unique_ptr<StorageBuffer> buffer_;
   static constexpr uint32_t kDefaultAllocationUnit_ = kDefaultReadaheadSize;
 };

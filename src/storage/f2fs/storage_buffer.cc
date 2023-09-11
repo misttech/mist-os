@@ -6,8 +6,8 @@
 
 namespace f2fs {
 
-StorageBuffer::StorageBuffer(Bcache *bc, size_t blocks, uint32_t block_size, std::string_view label,
-                             uint32_t allocation_unit)
+StorageBuffer::StorageBuffer(BcacheMapper *bc, size_t blocks, uint32_t block_size,
+                             std::string_view label, uint32_t allocation_unit)
     : max_blocks_(bc->Maxblk()), allocation_unit_(allocation_unit) {
   ZX_DEBUG_ASSERT(allocation_unit >= 1 && allocation_unit <= blocks);
   blocks = fbl::round_up(blocks, allocation_unit);

@@ -15,7 +15,7 @@
 
 namespace f2fs {
 
-zx::result<std::unique_ptr<Bcache>> MkfsWorker::DoMkfs() {
+zx::result<std::unique_ptr<BcacheMapper>> MkfsWorker::DoMkfs() {
   InitGlobalParameters();
 
   if (zx_status_t ret = GetDeviceInfo(); ret != ZX_OK)
@@ -61,7 +61,7 @@ void MkfsWorker::InitGlobalParameters() {
 zx_status_t MkfsWorker::GetDeviceInfo() {
   fuchsia_hardware_block::wire::BlockInfo info;
 
-  bc_->GetDevice()->BlockGetInfo(&info);
+  bc_->BlockGetInfo(&info);
 
   params_.sector_size = info.block_size;
   params_.sectors_per_blk = kBlockSize / info.block_size;
@@ -846,7 +846,8 @@ zx_status_t ParseOptions(const MkfsOptions &options) {
   return ZX_OK;
 }
 
-zx::result<std::unique_ptr<Bcache>> Mkfs(const MkfsOptions &options, std::unique_ptr<Bcache> bc) {
+zx::result<std::unique_ptr<BcacheMapper>> Mkfs(const MkfsOptions &options,
+                                               std::unique_ptr<BcacheMapper> bc) {
   MkfsWorker mkfs(std::move(bc), options);
   return mkfs.DoMkfs();
 }

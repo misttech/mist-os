@@ -23,7 +23,7 @@ class ComponentRunner final : public PlatformVfs {
 
   zx::result<> ServeRoot(fidl::ServerEnd<fuchsia_io::Directory> root,
                          fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle> lifecycle);
-  zx::result<> Configure(std::unique_ptr<Bcache> bcache, const MountOptions& options);
+  zx::result<> Configure(std::unique_ptr<BcacheMapper> bcache, const MountOptions& options);
 
   // fs::PagedVfs interface
   void Shutdown(fs::FuchsiaVfs::ShutdownCallback cb) final;

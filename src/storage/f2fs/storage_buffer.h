@@ -33,7 +33,7 @@ class StorageBuffer {
   // bigger than the number of pages requested in |ReserveWriteOperation| or |ReserveReadOperations|
   // to get the maximum performance. It should be also smaller than |blocks|, because |blocks| is
   // the total size of vmo buffers.
-  StorageBuffer(Bcache *bc, size_t blocks, uint32_t block_size, std::string_view label,
+  StorageBuffer(BcacheMapper *bc, size_t blocks, uint32_t block_size, std::string_view label,
                 uint32_t allocation_unit = 1);
   StorageBuffer() = delete;
   StorageBuffer(const StorageBuffer &) = delete;

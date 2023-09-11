@@ -20,10 +20,10 @@ constexpr uint32_t kMkfsBlockSize = 512;
 
 const MkfsOptions default_option;
 
-void DoMkfs(std::unique_ptr<Bcache> bcache, const MkfsOptions &options, bool expect_success,
-            std::unique_ptr<Bcache> *out) {
+void DoMkfs(std::unique_ptr<BcacheMapper> bcache, const MkfsOptions &options, bool expect_success,
+            std::unique_ptr<BcacheMapper> *out) {
   zx_status_t status = ZX_ERR_INVALID_ARGS;
-  zx::result<std::unique_ptr<Bcache>> make_return;
+  zx::result<std::unique_ptr<BcacheMapper>> make_return;
 
   if (status = ParseOptions(options); status == ZX_OK) {
     make_return = Mkfs(options, std::move(bcache));
@@ -39,19 +39,19 @@ void DoMkfs(std::unique_ptr<Bcache> bcache, const MkfsOptions &options, bool exp
   }
 }
 
-void ReadSuperblock(Bcache &bc, std::unique_ptr<Superblock> *out) {
+void ReadSuperblock(BcacheMapper &bc, std::unique_ptr<Superblock> *out) {
   auto sb_or = F2fs::LoadSuperblock(bc);
   ASSERT_TRUE(sb_or.is_ok());
   *out = std::move(*sb_or);
 }
 
-zx::result<std::unique_ptr<Superblock>> ReadSuperblock(Bcache &bc) {
+zx::result<std::unique_ptr<Superblock>> ReadSuperblock(BcacheMapper &bc) {
   std::unique_ptr<Superblock> sb;
   ReadSuperblock(bc, &sb);
   return zx::ok(std::move(sb));
 }
 
-void ReadCheckpoint(Bcache *bc, Superblock &sb, Checkpoint *ckp) {
+void ReadCheckpoint(BcacheMapper *bc, Superblock &sb, Checkpoint *ckp) {
   char buf[4096];
   ASSERT_EQ(bc->Readblk(sb.segment0_blkaddr, buf), ZX_OK);
   memcpy(ckp, buf, sizeof(Checkpoint));
@@ -150,14 +150,14 @@ void VerifyOP(Superblock &sb, Checkpoint &ckp, uint32_t op_ratio) {
 TEST(FormatFilesystemTest, MkfsOptionsLabel) {
   auto device = std::make_unique<FakeBlockDevice>(kMkfsBlockCount, kMkfsBlockSize);
   bool readonly_device = false;
-  auto bc_or = CreateBcache(std::move(device), &readonly_device);
+  auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
   ASSERT_TRUE(bc_or.is_ok());
 
   char label[20];
   const char *default_label = "F2FS";
 
   // Check default label is written when there is no arg for label
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   MkfsOptions options;
   DoMkfs(std::move(*bc_or), options, true, &bc);
 
@@ -181,11 +181,11 @@ TEST(FormatFilesystemTest, MkfsOptionsLabel) {
 TEST(FormatFilesystemTest, MkfsOptionsSegsPerSec) {
   auto device = std::make_unique<FakeBlockDevice>(kMkfsBlockCount, kMkfsBlockSize);
   bool readonly_device = false;
-  auto bc_or = CreateBcache(std::move(device), &readonly_device);
+  auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
   ASSERT_TRUE(bc_or.is_ok());
 
   // Check default value
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   MkfsOptions options;
   DoMkfs(std::move(*bc_or), options, true, &bc);
   auto sb_or = ReadSuperblock(*bc);
@@ -208,9 +208,9 @@ TEST(FormatFilesystemTest, MkfsOptionsSegsPerSec) {
 
 TEST(FormatFilesystemTest, MkfsOptionsSecsPerZone) {
   auto device = std::make_unique<FakeBlockDevice>(kMkfsBlockCount, kMkfsBlockSize);
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   bool readonly_device = false;
-  auto bc_or = CreateBcache(std::move(device), &readonly_device);
+  auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
   ASSERT_TRUE(bc_or.is_ok());
 
   // Check default value
@@ -236,9 +236,9 @@ TEST(FormatFilesystemTest, MkfsOptionsSecsPerZone) {
 
 TEST(FormatFilesystemTest, MkfsOptionsExtensions) {
   auto device = std::make_unique<FakeBlockDevice>(kMkfsBlockCount, kMkfsBlockSize);
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   bool readonly_device = false;
-  auto bc_or = CreateBcache(std::move(device), &readonly_device);
+  auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
   ASSERT_TRUE(bc_or.is_ok());
 
   // Check default
@@ -271,9 +271,9 @@ TEST(FormatFilesystemTest, MkfsOptionsExtensions) {
 
 TEST(FormatFilesystemTest, MkfsOptionsHeapBasedAlloc) {
   auto device = std::make_unique<FakeBlockDevice>(kMkfsBlockCount, kMkfsBlockSize);
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   bool readonly_device = false;
-  auto bc_or = CreateBcache(std::move(device), &readonly_device);
+  auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
   ASSERT_TRUE(bc_or.is_ok());
 
   // Check default
@@ -316,11 +316,11 @@ TEST(FormatFilesystemTest, MkfsOptionsHeapBasedAlloc) {
 TEST(FormatFilesystemTest, MkfsOptionsOverprovision) {
   auto device = std::make_unique<FakeBlockDevice>(kMkfsBlockCount, kMkfsBlockSize);
   bool readonly_device = false;
-  auto bc_or = CreateBcache(std::move(device), &readonly_device);
+  auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
   ASSERT_TRUE(bc_or.is_ok());
 
   // Check default
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   MkfsOptions options;
   DoMkfs(std::move(*bc_or), options, true, &bc);
   auto sb_or = ReadSuperblock(*bc);
@@ -341,9 +341,9 @@ TEST(FormatFilesystemTest, MkfsOptionsOverprovision) {
 TEST(FormatFilesystemTest, MkfsOptionsMixed) {
   auto device = std::make_unique<FakeBlockDevice>(kMkfsBlockCount, kMkfsBlockSize);
   bool readonly_device = false;
-  auto bc_or = CreateBcache(std::move(device), &readonly_device);
+  auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
   ASSERT_TRUE(bc_or.is_ok());
-  std::unique_ptr<Bcache> bc = std::move(*bc_or);
+  std::unique_ptr<BcacheMapper> bc = std::move(*bc_or);
 
   const char *label_list[] = {"aa", "bbbbb"};
   const uint32_t segs_per_sec_list[] = {2, 4};
@@ -404,7 +404,7 @@ TEST(FormatFilesystemTest, BlockSize) {
     auto device = std::make_unique<FakeBlockDevice>(FakeBlockDevice::Config{
         .block_count = block_count, .block_size = block_size, .supports_trim = true});
     bool readonly_device = false;
-    auto bc_or = CreateBcache(std::move(device), &readonly_device);
+    auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
     if (block_size > (1 << kMaxLogSectorSize)) {
       ASSERT_EQ(bc_or.status_value(), ZX_ERR_BAD_STATE);
     } else if (block_size < (1 << kMinLogSectorSize)) {
@@ -457,7 +457,7 @@ TEST(FormatFilesystemTest, MkfsSmallVolume) {
     auto device = std::make_unique<FakeBlockDevice>(FakeBlockDevice::Config{
         .block_count = block_count, .block_size = block_size, .supports_trim = true});
     bool readonly_device = false;
-    auto bc_or = CreateBcache(std::move(device), &readonly_device);
+    auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
     ASSERT_TRUE(bc_or.is_ok());
 
     MkfsOptions mkfs_options;
@@ -492,7 +492,7 @@ TEST(FormatFilesystemTest, PrepareSuperblockExceptionCase) {
       .block_count = kMkfsBlockCount, .block_size = kDefaultSectorSize, .supports_trim = true});
   bool readonly_device = false;
 
-  auto bc_or = CreateBcache(std::move(device), &readonly_device);
+  auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
   ASSERT_TRUE(bc_or.is_ok());
 
   MkfsWorker mkfs(std::move(*bc_or), mkfs_options);
@@ -551,7 +551,7 @@ TEST(FormatFilesystemTest, DeviceFailure) {
   auto device = std::make_unique<FakeBlockDevice>(FakeBlockDevice::Config{
       .block_count = kBlockCount, .block_size = kBlockSize, .supports_trim = true});
   bool readonly_device = false;
-  auto bc_or = CreateBcache(std::move(device), &readonly_device);
+  auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
   ASSERT_TRUE(bc_or.is_ok());
 
   uint32_t bad_block = std::numeric_limits<uint32_t>::max();
@@ -566,9 +566,17 @@ TEST(FormatFilesystemTest, DeviceFailure) {
     }
     return ZX_OK;
   };
-  static_cast<FakeBlockDevice *>(bc_or->GetDevice())->Pause();
-  static_cast<FakeBlockDevice *>(bc_or->GetDevice())->set_hook(std::move(hook));
-  static_cast<FakeBlockDevice *>(bc_or->GetDevice())->Resume();
+
+  bc_or->ForEachBcache([](Bcache *f2fs_device) {
+    static_cast<block_client::FakeBlockDevice *>(f2fs_device->GetDevice())->Pause();
+  });
+  bc_or->ForEachBcache([hook](Bcache *f2fs_device) {
+    static_cast<block_client::FakeBlockDevice *>(f2fs_device->GetDevice())->set_hook(hook);
+  });
+  bc_or->ForEachBcache([](Bcache *f2fs_device) {
+    static_cast<block_client::FakeBlockDevice *>(f2fs_device->GetDevice())->Resume();
+  });
+
   MkfsOptions mkfs_options;
   MkfsWorker mkfs(std::move(*bc_or), mkfs_options);
 

@@ -23,7 +23,7 @@ namespace {
 constexpr uint32_t kOrphanCnt = 10;
 
 TEST(OrphanInode, RecoverOrphanInode) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;

@@ -140,7 +140,7 @@ void CheckFsyncedFile(F2fs *fs, ino_t ino, pgoff_t data_page_count, pgoff_t node
 }
 
 TEST(FsyncRecoveryTest, FsyncInode) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;
@@ -207,7 +207,7 @@ TEST(FsyncRecoveryTest, FsyncInode) {
 }
 
 TEST(FsyncRecoveryTest, FsyncDnode) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;
@@ -274,7 +274,7 @@ TEST(FsyncRecoveryTest, FsyncDnode) {
 }
 
 TEST(FsyncRecoveryTest, FsyncIndirectDnode) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;
@@ -342,7 +342,7 @@ TEST(FsyncRecoveryTest, FsyncIndirectDnode) {
 }
 
 TEST(FsyncRecoveryTest, FsyncCheckpoint) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;
@@ -472,7 +472,7 @@ TEST(FsyncRecoveryTest, FsyncCheckpoint) {
 }
 
 TEST(FsyncRecoveryTest, FsyncRecoveryIndirectDnode) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;
@@ -545,7 +545,7 @@ TEST(FsyncRecoveryTest, FsyncRecoveryIndirectDnode) {
 }
 
 TEST(FsyncRecoveryTest, FsyncRecoveryMultipleFiles) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;
@@ -657,7 +657,7 @@ TEST(FsyncRecoveryTest, FsyncRecoveryMultipleFiles) {
 TEST(FsyncRecoveryTest, FsyncRecoveryInlineData) {
   srand(testing::UnitTest::GetInstance()->random_seed());
 
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;
@@ -773,7 +773,7 @@ TEST(FsyncRecoveryTest, FsyncRecoveryInlineData) {
 }
 
 TEST(FsyncRecoveryTest, RecoveryWithoutFsync) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;
@@ -825,7 +825,7 @@ TEST(FsyncRecoveryTest, RecoveryWithoutFsync) {
 }
 
 TEST(FsyncRecoveryTest, RenameFileWithStrictFsync) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;
@@ -939,7 +939,7 @@ TEST(FsyncRecoveryTest, RenameFileWithStrictFsync) {
 }
 
 TEST(FsyncRecoveryTest, RenameFileToOtherDirWithStrictFsync) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;
@@ -1068,7 +1068,7 @@ TEST(FsyncRecoveryTest, RenameFileToOtherDirWithStrictFsync) {
 }
 
 TEST(FsyncRecoveryTest, RenameDirectoryWithStrictFsync) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;
@@ -1176,7 +1176,7 @@ TEST(FsyncRecoveryTest, RenameDirectoryWithStrictFsync) {
 }
 
 TEST(FsyncRecoveryTest, AtomicFsync) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   std::unique_ptr<F2fs> fs;

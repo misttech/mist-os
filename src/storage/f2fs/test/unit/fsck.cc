@@ -8,7 +8,7 @@ namespace f2fs {
 namespace {
 
 TEST(FsckTest, InvalidSuperblockMagic) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
   FsckWorker fsck(std::move(bc), FsckOptions{.repair = false});
 
@@ -36,7 +36,7 @@ TEST(FsckTest, InvalidSuperblockMagic) {
 }
 
 TEST(FsckTest, InvalidCheckpointCrc) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
   FsckWorker fsck(std::move(bc), FsckOptions{.repair = false});
 
@@ -97,7 +97,7 @@ TEST(FsckTest, UnreachableNatEntry) {
   constexpr uint32_t fake_ino = 7u;
   constexpr uint32_t fake_block_addr = 123u;
 
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
   FsckWorker fsck(std::move(bc), FsckOptions{.repair = false});
 
@@ -149,7 +149,7 @@ TEST(FsckTest, UnreachableNatEntryInJournal) {
   constexpr uint32_t fake_ino = 7u;
   constexpr uint32_t fake_block_addr = 123u;
 
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
   FsckWorker fsck(std::move(bc), FsckOptions{.repair = false});
 
@@ -219,7 +219,7 @@ TEST(FsckTest, UnreachableSitEntry) {
   constexpr uint32_t target_segment = 7u;
   constexpr uint32_t target_offset = 123u;
 
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
   FsckWorker fsck(std::move(bc), FsckOptions{.repair = false});
 
@@ -269,7 +269,7 @@ TEST(FsckTest, UnreachableSitEntryInJournal) {
   constexpr uint32_t target_entry_index = 3u;
   constexpr uint32_t target_offset = 123u;
 
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
   FsckWorker fsck(std::move(bc), FsckOptions{.repair = false});
 
@@ -324,7 +324,7 @@ TEST(FsckTest, UnreachableSitEntryInJournal) {
 }
 
 TEST(FsckTest, OrphanNodes) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   // Preconditioning
@@ -367,7 +367,7 @@ TEST(FsckTest, OrphanNodes) {
 }
 
 TEST(FsckTest, InvalidBlockAddress) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   FsckWorker fsck(std::move(bc), FsckOptions{.repair = false});
@@ -377,7 +377,7 @@ TEST(FsckTest, InvalidBlockAddress) {
 }
 
 TEST(FsckTest, InvalidNatEntry) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   block_t data_blkaddr;
@@ -460,7 +460,7 @@ TEST(FsckTest, InvalidNatEntry) {
 }
 
 TEST(FsckTest, InvalidSsaEntry) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   block_t data_blkaddr;
@@ -527,7 +527,7 @@ TEST(FsckTest, InvalidSsaEntry) {
 }
 
 TEST(FsckTest, WrongInodeHardlinkCount) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   nid_t ino;
   uint32_t links;
   FileTester::MkfsOnFakeDev(&bc);
@@ -606,7 +606,7 @@ TEST(FsckTest, WrongInodeHardlinkCount) {
 }
 
 TEST(FsckTest, InconsistentCheckpointNodeCount) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
   FsckWorker fsck(std::move(bc), FsckOptions{.repair = false});
 
@@ -667,7 +667,7 @@ TEST(FsckTest, InconsistentCheckpointNodeCount) {
 }
 
 TEST(FsckTest, InconsistentInodeFooter) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   nid_t ino;
   FileTester::MkfsOnFakeDev(&bc);
 
@@ -725,7 +725,7 @@ TEST(FsckTest, InconsistentInodeFooter) {
 }
 
 TEST(FsckTest, InodeLinkCountAndBlockCount) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   nid_t ino;
   FileTester::MkfsOnFakeDev(&bc);
 
@@ -782,7 +782,7 @@ TEST(FsckTest, InodeLinkCountAndBlockCount) {
 }
 
 TEST(FsckTest, InvalidNextOffsetInCurseg) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
   FsckWorker fsck(std::move(bc), FsckOptions{.repair = false});
 
@@ -842,7 +842,7 @@ TEST(FsckTest, InvalidNextOffsetInCurseg) {
 }
 
 TEST(FsckTest, WrongDataExistFlag) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   nid_t ino;
   FileTester::MkfsOnFakeDev(&bc);
 
@@ -918,7 +918,7 @@ TEST(FsckTest, WrongDataExistFlag) {
 }
 
 TEST(FsckTest, AllocateFreeSegmapInfoAfterSPO) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   {

@@ -15,7 +15,7 @@ namespace {
 using Runner = ComponentRunner;
 
 TEST(SuperblockTest, SanityCheckRawSuper) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDevWithOptions(&bc, MkfsOptions{});
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
@@ -51,7 +51,7 @@ TEST(SuperblockTest, SanityCheckRawSuper) {
 }
 
 TEST(SuperblockTest, GetValidCheckpoint) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDevWithOptions(&bc, MkfsOptions{});
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
@@ -78,7 +78,7 @@ TEST(SuperblockTest, GetValidCheckpoint) {
 }
 
 TEST(SuperblockTest, SanityCheckCkpt) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDevWithOptions(&bc, MkfsOptions{});
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
@@ -108,7 +108,7 @@ TEST(SuperblockTest, SanityCheckCkpt) {
 }
 
 TEST(SuperblockTest, Reset) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDevWithOptions(&bc, MkfsOptions{});
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
@@ -147,9 +147,9 @@ TEST(SuperblockTest, Reset) {
 }
 
 TEST(F2fsTest, TakeBc) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDevWithOptions(&bc, MkfsOptions{});
-  Bcache *bcache_ptr = bc.get();
+  BcacheMapper *bcache_ptr = bc.get();
 
   std::unique_ptr<F2fs> fs;
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
@@ -191,7 +191,7 @@ TEST(F2fsTest, FsBlock) {
 }
 
 TEST(F2fsTest, GetFilesystemInfo) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDevWithOptions(&bc, MkfsOptions{});
 
   std::unique_ptr<F2fs> fs;

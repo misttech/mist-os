@@ -164,7 +164,7 @@ class FuchsiaOperator : public CompatibilityTestOperator {
     auto fd = fbl::unique_fd(open(test_device_.c_str(), O_RDWR));
     auto device = std::make_unique<FileBackedBlockDevice>(std::move(fd), block_count_, block_size_);
     bool read_only = false;
-    auto bc_or = CreateBcache(std::move(device), &read_only);
+    auto bc_or = CreateBcacheMapper(std::move(device), &read_only);
     if (bc_or.is_ok()) {
       bc_ = std::move(*bc_or);
     }
@@ -199,7 +199,7 @@ class FuchsiaOperator : public CompatibilityTestOperator {
 
   size_t block_count_;
   size_t block_size_;
-  std::unique_ptr<Bcache> bc_;
+  std::unique_ptr<BcacheMapper> bc_;
   async::Loop loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   std::unique_ptr<F2fs> fs_;
   fbl::RefPtr<VnodeF2fs> root_;

@@ -882,7 +882,7 @@ TEST_F(CheckpointTest, NatJournal) {
 }
 
 TEST(CheckpointUnmountTest, UmountFlag) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   // create f2fs and root dir

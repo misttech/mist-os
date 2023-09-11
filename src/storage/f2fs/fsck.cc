@@ -2126,8 +2126,8 @@ zx_status_t FsckWorker::Run() {
   return status;
 }
 
-zx_status_t Fsck(std::unique_ptr<Bcache> bc, const FsckOptions &options,
-                 std::unique_ptr<Bcache> *out) {
+zx_status_t Fsck(std::unique_ptr<BcacheMapper> bc, const FsckOptions &options,
+                 std::unique_ptr<BcacheMapper> *out) {
   zx_status_t status;
   FsckWorker fsck(std::move(bc), options);
   status = fsck.Run();

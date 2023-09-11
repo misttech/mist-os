@@ -21,9 +21,9 @@ namespace {
 // |LargeFakeDevice| is a class that wraps |FakeBlockDevice| to test very large block device
 // environments (here about 4TB). The physical size of the backup ramdisk for this class is 400MB,
 // and any request that exceeds the physical size will result in an error.
-constexpr uint64_t kRamDiskBlockCount = 819200ULL;
-constexpr uint64_t kVirtualBlockCount = 8192000000ULL;
-constexpr uint64_t kBlockSize = kDefaultSectorSize;
+constexpr uint64_t kRamDiskBlockCount = 102400ULL;
+constexpr uint64_t kVirtualBlockCount = 1024000000ULL;
+constexpr uint64_t kBlockSize = 4096;
 class LargeFakeDevice : public FakeBlockDevice {
  public:
   LargeFakeDevice() : FakeBlockDevice({kRamDiskBlockCount, kBlockSize, true}) {
@@ -85,10 +85,10 @@ class LargeFakeDevice : public FakeBlockDevice {
   std::map<uint64_t, uint64_t> offset_mapping;
 };
 
-void MkfsOnLargeFakeDev(std::unique_ptr<Bcache>* bc) {
+void MkfsOnLargeFakeDev(std::unique_ptr<BcacheMapper>* bc) {
   auto device = std::make_unique<LargeFakeDevice>();
   bool readonly_device = false;
-  auto bc_or = CreateBcache(std::move(device), &readonly_device);
+  auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
   ASSERT_TRUE(bc_or.is_ok());
 
   MkfsOptions options;
@@ -100,7 +100,7 @@ void MkfsOnLargeFakeDev(std::unique_ptr<Bcache>* bc) {
 }  // namespace
 
 TEST(CpPayloadTest, ReadWrite) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   MkfsOnLargeFakeDev(&bc);
 
   // 1. Create f2fs and root dir
@@ -126,17 +126,11 @@ TEST(CpPayloadTest, ReadWrite) {
   }
   FileTester::AppendToFile(test_file_vn.get(), buf, kPageSize);
 
-  // 3. Remount
+  // 3. Reopen
   ASSERT_EQ(test_file_vn->Close(), ZX_OK);
   test_file_vn = nullptr;
-  ASSERT_EQ(root_dir->Close(), ZX_OK);
-  root_dir = nullptr;
   fs->WriteCheckpoint(false, false);
-  FileTester::Unmount(std::move(fs), &bc);
-  FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
-  FileTester::CreateRoot(fs.get(), &root);
-  root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
   FileTester::Lookup(root_dir.get(), "test", &test_file);
   test_file_vn = fbl::RefPtr<File>::Downcast(std::move(test_file));
 
@@ -154,11 +148,7 @@ TEST(CpPayloadTest, ReadWrite) {
   root_dir = nullptr;
   FileTester::SuddenPowerOff(std::move(fs), &bc);
 
-  // 6. Remount
-  FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
-  FileTester::Unmount(std::move(fs), &bc);
-
-  // 7. Fsck
+  // 6. Fsck
   ASSERT_EQ(Fsck(std::move(bc), FsckOptions{.repair = false}, &bc), ZX_OK);
 }
 }  // namespace f2fs

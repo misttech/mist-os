@@ -19,7 +19,7 @@ constexpr int kMaxDirtyDataPages = 51200;
 // those background threads.
 class Writer final {
  public:
-  Writer(Bcache *bc, size_t capacity);
+  Writer(BcacheMapper *bcache_mapper, size_t capacity);
   Writer() = delete;
   Writer(const Writer &) = delete;
   Writer &operator=(const Writer &) = delete;
@@ -48,7 +48,7 @@ class Writer final {
   std::mutex mutex_;
   PageList pages_ __TA_GUARDED(mutex_);
   std::unique_ptr<StorageBuffer> write_buffer_;
-  fs::TransactionHandler *transaction_handler_ = nullptr;
+  BcacheMapper *bcache_mapper_ = nullptr;
   fpromise::sequencer sequencer_;
   // An executor to run tasks for disk write IOs.
   fs::BackgroundExecutor executor_;

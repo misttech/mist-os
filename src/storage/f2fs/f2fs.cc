@@ -14,7 +14,7 @@
 
 namespace f2fs {
 
-F2fs::F2fs(FuchsiaDispatcher dispatcher, std::unique_ptr<f2fs::Bcache> bc,
+F2fs::F2fs(FuchsiaDispatcher dispatcher, std::unique_ptr<f2fs::BcacheMapper> bc,
            std::unique_ptr<Superblock> sb, const MountOptions& mount_options, PlatformVfs* vfs)
     : dispatcher_(dispatcher),
       vfs_(vfs),
@@ -41,7 +41,7 @@ void F2fs::StartMemoryPressureWatcher() {
 }
 
 zx::result<std::unique_ptr<F2fs>> F2fs::Create(FuchsiaDispatcher dispatcher,
-                                               std::unique_ptr<f2fs::Bcache> bc,
+                                               std::unique_ptr<f2fs::BcacheMapper> bc,
                                                const MountOptions& options, PlatformVfs* vfs) {
   zx::result<std::unique_ptr<Superblock>> superblock_or;
   if (superblock_or = LoadSuperblock(*bc); superblock_or.is_error()) {
@@ -61,7 +61,7 @@ zx::result<std::unique_ptr<F2fs>> F2fs::Create(FuchsiaDispatcher dispatcher,
   return zx::ok(std::move(fs));
 }
 
-zx::result<std::unique_ptr<Superblock>> F2fs::LoadSuperblock(f2fs::Bcache& bc) {
+zx::result<std::unique_ptr<Superblock>> F2fs::LoadSuperblock(f2fs::BcacheMapper& bc) {
   FsBlock<> block;
   constexpr int kSuperblockCount = 2;
   zx_status_t status;

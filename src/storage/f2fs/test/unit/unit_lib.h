@@ -37,7 +37,7 @@ class F2fsFakeDevTestFixture : public testing::Test {
   MkfsOptions mkfs_options_{};
   MountOptions mount_options_{};
   bool run_fsck_;
-  std::unique_ptr<f2fs::Bcache> bc_;
+  std::unique_ptr<f2fs::BcacheMapper> bc_;
   std::unique_ptr<F2fs> fs_;
   fbl::RefPtr<Dir> root_dir_;
   async::Loop loop_ = async::Loop(&kAsyncLoopConfigAttachToCurrentThread);
@@ -85,15 +85,15 @@ class SingleFileTest : public F2fsFakeDevTestFixture {
 
 class FileTester {
  public:
-  static void MkfsOnFakeDev(std::unique_ptr<Bcache> *bc, uint64_t block_count = 819200,
+  static void MkfsOnFakeDev(std::unique_ptr<BcacheMapper> *bc, uint64_t block_count = 819200,
                             uint32_t block_size = kDefaultSectorSize, bool btrim = true);
-  static void MkfsOnFakeDevWithOptions(std::unique_ptr<Bcache> *bc, const MkfsOptions &options,
-                                       uint64_t block_count = 819200,
+  static void MkfsOnFakeDevWithOptions(std::unique_ptr<BcacheMapper> *bc,
+                                       const MkfsOptions &options, uint64_t block_count = 819200,
                                        uint32_t block_size = kDefaultSectorSize, bool btrim = true);
   static void MountWithOptions(async_dispatcher_t *dispatcher, const MountOptions &options,
-                               std::unique_ptr<Bcache> *bc, std::unique_ptr<F2fs> *fs);
-  static void Unmount(std::unique_ptr<F2fs> fs, std::unique_ptr<Bcache> *bc);
-  static void SuddenPowerOff(std::unique_ptr<F2fs> fs, std::unique_ptr<Bcache> *bc);
+                               std::unique_ptr<BcacheMapper> *bc, std::unique_ptr<F2fs> *fs);
+  static void Unmount(std::unique_ptr<F2fs> fs, std::unique_ptr<BcacheMapper> *bc);
+  static void SuddenPowerOff(std::unique_ptr<F2fs> fs, std::unique_ptr<BcacheMapper> *bc);
 
   static void CreateRoot(F2fs *fs, fbl::RefPtr<VnodeF2fs> *out);
   static void Lookup(VnodeF2fs *parent, std::string_view name, fbl::RefPtr<fs::Vnode> *out);
@@ -175,7 +175,7 @@ class MkfsTester {
   static GlobalParameters &GetGlobalParameters(MkfsWorker &mkfs) { return mkfs.params_; }
 
   static zx_status_t InitAndGetDeviceInfo(MkfsWorker &mkfs);
-  static zx::result<std::unique_ptr<Bcache>> FormatDevice(MkfsWorker &mkfs);
+  static zx::result<std::unique_ptr<BcacheMapper>> FormatDevice(MkfsWorker &mkfs);
 };
 
 class GcTester {

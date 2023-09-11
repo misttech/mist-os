@@ -491,7 +491,7 @@ TEST_F(FileTest, Readahead) {
 }
 
 TEST(FileTest2, FailedNidReuse) {
-  std::unique_ptr<Bcache> bc;
+  std::unique_ptr<BcacheMapper> bc;
   constexpr uint64_t kBlockCount = 409600;
   FileTester::MkfsOnFakeDevWithOptions(&bc, MkfsOptions(), kBlockCount);
 

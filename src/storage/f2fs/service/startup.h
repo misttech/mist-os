@@ -13,7 +13,8 @@
 
 namespace f2fs {
 
-using ConfigureCallback = fit::callback<zx::result<>(std::unique_ptr<Bcache>, const MountOptions&)>;
+using ConfigureCallback =
+    fit::callback<zx::result<>(std::unique_ptr<BcacheMapper>, const MountOptions&)>;
 
 class StartupService final : public fidl::WireServer<fuchsia_fs_startup::Startup>,
                              public fs::Service {

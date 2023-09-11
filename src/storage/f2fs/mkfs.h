@@ -29,7 +29,7 @@ struct MkfsOptions {
 
 class MkfsWorker {
  public:
-  explicit MkfsWorker(std::unique_ptr<Bcache> bc, MkfsOptions options)
+  explicit MkfsWorker(std::unique_ptr<BcacheMapper> bc, MkfsOptions options)
       : bc_(std::move(bc)), mkfs_options_(std::move(options)) {}
 
   // Not copyable or moveable
@@ -38,13 +38,13 @@ class MkfsWorker {
   MkfsWorker(const MkfsWorker&&) = delete;
   MkfsWorker& operator=(const MkfsWorker&&) = delete;
 
-  zx::result<std::unique_ptr<Bcache>> DoMkfs();
+  zx::result<std::unique_ptr<BcacheMapper>> DoMkfs();
 
-  std::unique_ptr<Bcache> Destroy() { return std::move(bc_); }
+  std::unique_ptr<BcacheMapper> Destroy() { return std::move(bc_); }
 
  private:
   friend class MkfsTester;
-  std::unique_ptr<Bcache> bc_;
+  std::unique_ptr<BcacheMapper> bc_;
   MkfsOptions mkfs_options_{};
 
   // F2FS Parameter
@@ -78,7 +78,8 @@ class MkfsWorker {
 
 zx_status_t ParseOptions(const MkfsOptions& options);
 
-zx::result<std::unique_ptr<Bcache>> Mkfs(const MkfsOptions& options, std::unique_ptr<Bcache> bc);
+zx::result<std::unique_ptr<BcacheMapper>> Mkfs(const MkfsOptions& options,
+                                               std::unique_ptr<BcacheMapper> bc);
 
 void AsciiToUnicode(std::string_view in_string, std::u16string& out_string);
 

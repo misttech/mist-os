@@ -24,7 +24,7 @@ void StartupService::Start(StartRequestView request, StartCompleter::Sync& compl
     if (!configure_)
       return zx::error(ZX_ERR_BAD_STATE);
 
-    auto bc_or = f2fs::CreateBcache(std::move(request->device));
+    auto bc_or = f2fs::CreateBcacheMapper(std::move(request->device));
     if (bc_or.is_error()) {
       return bc_or.take_error();
     }
@@ -36,7 +36,7 @@ void StartupService::Start(StartRequestView request, StartCompleter::Sync& compl
 
 void StartupService::Format(FormatRequestView request, FormatCompleter::Sync& completer) {
   completer.Reply([&]() -> zx::result<> {
-    auto bc_or = f2fs::CreateBcache(std::move(request->device));
+    auto bc_or = f2fs::CreateBcacheMapper(std::move(request->device));
     if (bc_or.is_error()) {
       return bc_or.take_error();
     }
@@ -54,7 +54,7 @@ void StartupService::Format(FormatRequestView request, FormatCompleter::Sync& co
 void StartupService::Check(CheckRequestView request, CheckCompleter::Sync& completer) {
   completer.Reply([&]() -> zx::result<> {
     bool readonly_device = false;
-    auto bc_or = f2fs::CreateBcache(std::move(request->device), &readonly_device);
+    auto bc_or = f2fs::CreateBcacheMapper(std::move(request->device), &readonly_device);
     if (bc_or.is_error()) {
       return bc_or.take_error();
     }

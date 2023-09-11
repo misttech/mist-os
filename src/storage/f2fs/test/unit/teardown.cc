@@ -54,7 +54,7 @@ class AsyncTearDownVnode : public Dir {
 };
 
 TEST(Teardown, ShutdownOnNoConnections) {
-  std::unique_ptr<f2fs::Bcache> bc;
+  std::unique_ptr<f2fs::BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
