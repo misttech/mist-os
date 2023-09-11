@@ -32,7 +32,7 @@ enum IsRetained {
 // Does a Get and Open of `pkg` and compares the handle's flags to `expected_flags`.
 async fn verify_package_executability(
     pkg: Package,
-    system_image: SystemImageBuilder<'_>,
+    system_image: SystemImageBuilder,
     is_retained: IsRetained,
     expected_flags: fio::OpenFlags,
 ) {
