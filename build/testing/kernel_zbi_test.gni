@@ -72,7 +72,6 @@ template("_cuckoo_kernel_zbi_test") {
     cmdline_deps = []
     system_image_deps = board_system_image_deps
     core_realm_definition = "//build/testing:cuckoo-core-realm"
-    board_config = board_information_for_assembly
     board_config_label = board_configuration_label
     allow_eng_platform_bundle_use = true
 

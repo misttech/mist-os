@@ -97,9 +97,6 @@ declare_args() {
   # any kind of stable contract for users of the archive.
   board_tools = []
 
-  # BoardInformation file for use with Product Assembly
-  board_information_for_assembly = false
-
   # The label for the board configuration target to use with Product Assembly
   board_configuration_label = false
 

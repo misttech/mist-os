@@ -4,8 +4,7 @@
 
 import("common/x64-common.gni")
 
-# BoardInformation for Product Assembly
-board_information_for_assembly = "//boards/qemu-x64/board_information.json5"
+# Board configuration for Product Assembly
 board_configuration_label = "//boards/qemu-x64"
 
 board_name = "qemu-x64"

@@ -96,7 +96,6 @@ if (labels.images == "//build/images/bringup") {
     namespace = "guest"
     image_name = "fuchsia"
     product_assembly_config_label = ":product_assembly_config"
-    board_config = board_information_for_assembly
     board_config_label = board_configuration_label
 
     # As `:product_assembly_config` specifies an `eng` build-type, the assembly

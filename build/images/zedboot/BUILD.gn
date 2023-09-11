@@ -33,7 +33,6 @@ assembled_system("zedboot_assembly") {
   generate_vbmeta = use_vbmeta
   use_bringup_platform_bundles_only = true
   product_assembly_config_label = _product_config
-  board_config = board_information_for_assembly
   board_config_label = board_configuration_label
 
   base_packages = []

@@ -28,6 +28,3 @@ board_bootfs_labels += _common_bootfs_deps
 
 kernel_zbi_extra_deps =
     [ "//src/devices/board/drivers/vim3-devicetree:vim3-dtb-item" ]
-
-# BoardInformation for Product Assembly
-board_information_for_assembly = "//boards/vim3/board_information.json5"

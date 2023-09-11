@@ -49,9 +49,6 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #
 # Product Assembly parameters:
 #
-#   board_config (deprecated; required if board_config_label is not used)
-#     [GN file path] A board config file.
-#
 #   board_config_label (required if board_config is not used)
 #     [label] The board_configuration() target to use as the board to assemble the
 #     product for.
@@ -225,17 +222,16 @@ template("assembled_system") {
                "skip_fshost_validator",
              ])
 
-  # One of these is necessary in order to _run_ assembly, but some of the
-  # builders have configurations that don't define any board, yet also end up
-  # with targets that are defined, but unbuilt, which depend on assembly.  So we
-  # skip the assert in that situation, and try to make this template tolerant of
-  # being processed in a case where a board isn't defined, but we know that it
-  # will fail at build time.
+  # This is necessary in order to _run_ assembly, but some of the builders have
+  # configurations that don't define any board, yet also end up with targets
+  # that are defined, but unbuilt, which depend on assembly.  So we skip the
+  # assert in that situation, and try to make this template tolerant of being
+  # processed in a case where a board isn't defined, but we know that it will
+  # fail at build time.
   if (has_board) {
-    assert((defined(invoker.board_config) && invoker.board_config != false) ||
-               (defined(invoker.board_config_label) &&
-                    invoker.board_config_label != false),
-           "One of 'board_config' or 'board_config_label' must be defined.")
+    assert(defined(invoker.board_config_label) &&
+               invoker.board_config_label != false,
+           "'board_config_label' must be defined.")
   }
   _generate_fvm = false
   if (defined(invoker.generate_fvm)) {
@@ -409,9 +405,6 @@ template("assembled_system") {
           get_label_info(labels.board_config_label, "target_out_dir") + "/" +
           get_label_info(labels.board_config_label, "name") +
           "/board_configuration.json"
-    } else if (defined(invoker.board_config) && invoker.board_config != false) {
-      # Only consider board_config if board_config_label is not provided.
-      board_config = invoker.board_config
     }
 
     outdir = "$target_out_dir/$_namespace"

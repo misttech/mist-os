@@ -90,7 +90,6 @@ bringup_base = {
   }
 
   product_assembly_config_label = ":product_assembly_config"
-  board_config = board_information_for_assembly
   board_config_label = board_configuration_label
   use_bringup_platform_bundles_only = true
 

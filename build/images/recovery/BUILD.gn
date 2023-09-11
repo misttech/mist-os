@@ -51,7 +51,6 @@ if (is_fuchsia) {
     } else {
       generate_fxfs = !bootfs_only
     }
-    board_config = board_information_for_assembly
     board_config_label = board_configuration_label
 
     include_component_id_index = true
@@ -373,7 +372,6 @@ if (is_fuchsia) {
     cmdline = []
 
     product_assembly_config_label = ":for-fdr"
-    board_config = board_information_for_assembly
     board_config_label = board_configuration_label
 
     bootfs_labels = [ "//build/input:recovery_bootfs" ]

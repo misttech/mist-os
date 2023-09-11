@@ -145,7 +145,6 @@ if (is_fuchsia) {
     include_shell_commands = include_shell_commands_package
 
     product_assembly_config_label = fuchsia_product_assembly_config_label
-    board_config = board_information_for_assembly
     board_config_label = board_configuration_label
     cmdline_deps = [ "//build/input:bootfs" ]
 
@@ -440,7 +439,7 @@ if (is_fuchsia) {
     forward_variables_from(fuchsia_base, "*")
     ramdisk_in_zbi = true
 
-    board_config = board_information_for_assembly
+    board_config_label = board_configuration_label
     image_metadata_overrides = {
       zbi = {
         name = "netboot"
