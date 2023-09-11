@@ -8,7 +8,7 @@
     },
     {
         "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.pciroot.BIND_PROTOCOL.DEVICE"
+            "fuchsia.BIND_PROTOCOL": "fuchsia.pci.BIND_PROTOCOL.ROOT"
         },
         "expected": "match",
         "name": "PciRoot"

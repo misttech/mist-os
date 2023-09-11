@@ -78,7 +78,6 @@ driver_bind_rules("pci_bind") {
   tests = "pci_bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.pci",
-    "//src/devices/bind/fuchsia.pciroot",
     "//src/devices/bind/fuchsia.platform",
   ]
 }

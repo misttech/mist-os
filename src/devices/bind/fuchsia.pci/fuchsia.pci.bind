@@ -5,11 +5,12 @@
 library fuchsia.pci;
 
 extend uint fuchsia.BIND_PROTOCOL {
-  DEVICE = 31,
+  DEVICE = 0x1F,
+  ROOT = 0x20
 };
 
 extend uint fuchsia.BIND_FIDL_PROTOCOL {
-  DEVICE = 4,
+  DEVICE = 0x04,
 };
 
 extend uint fuchsia.BIND_PCI_VID {
