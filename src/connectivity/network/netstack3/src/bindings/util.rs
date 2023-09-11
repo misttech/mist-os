@@ -231,6 +231,10 @@ impl Drop for TaskWaitGroupSpawner {
 
 impl TaskWaitGroupSpawner {
     /// Spawns the future `fut` in this wait group.
+    // fuchsia_async::Task::spawn tracks the caller and adds trace-level logging
+    // when tasks start and finish, allow track_caller here in instrumented
+    // builds so we can see who the real caller is.
+    #[cfg_attr(feature = "instrumented", track_caller)]
     pub(crate) fn spawn<F: futures::Future<Output = ()> + Send + 'static>(&self, fut: F) {
         let spawner = self.clone();
         // Spawn the task and detach. The executor will take care of it but
