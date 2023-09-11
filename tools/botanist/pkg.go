@@ -72,10 +72,11 @@ type cachedPkgRepo struct {
 	repoURL          *url.URL
 	blobURL          *url.URL
 
-	totalBytesServed  int
-	serveTimeSec      float64
-	totalBytesFetched int
-	gcsFetchTimeSec   float64
+	totalBytesServed    int
+	serveTimeSec        float64
+	totalBytesFetched   int
+	gcsFetchTimeSec     float64
+	totalRequestsServed int
 }
 
 func newCachedPkgRepo(ctx context.Context, repoPath, repoURL, blobURL string) (*cachedPkgRepo, error) {
@@ -129,6 +130,7 @@ func (c *cachedPkgRepo) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			c.logf("failed to convert content length %s to integer: %s", length, err)
 		} else {
 			c.totalBytesServed += l
+			c.totalRequestsServed += 1
 		}
 	}
 	c.serveTimeSec += time.Since(startTime).Seconds()
@@ -254,6 +256,7 @@ func (p *PackageServer) Close() error {
 	logger.Debugf(p.loggerCtx, "----------------------------------------------------")
 	logger.Debugf(p.loggerCtx, "Package server data")
 	logger.Debugf(p.loggerCtx, "----------------------------------------------------")
+	logger.Debugf(p.loggerCtx, "Total requests served: %d", p.c.totalRequestsServed)
 	logger.Debugf(p.loggerCtx, "Total data served (bytes): %d", p.c.totalBytesServed)
 	logger.Debugf(p.loggerCtx, "Total time spent serving (seconds): %f", p.c.serveTimeSec)
 	logger.Debugf(p.loggerCtx, "Bandwidth using local package serving (bytes per second): %f", localServingBandwitdh)
