@@ -79,7 +79,7 @@
     },
     {
         "name": "Archivist",
-        "process": "archivist\\.cm|sampler\\.cm",
+        "process": "archivist\\.cm|sampler\\.cm|diagnostics-persistence\\.cm",
         "vmo": "",
         "event_code": 22
     },
