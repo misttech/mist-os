@@ -26,7 +26,6 @@ rustc_library("component_debug") {
     "//src/sys/lib/cm_rust",
     "//src/sys/lib/cm_types",
     "//src/sys/lib/moniker",
-    "//src/sys/lib/routing",
     "//src/sys/lib/socket-to-stdio",
     "//third_party/rust_crates:ansi_term",
     "//third_party/rust_crates:anyhow",
@@ -39,6 +38,15 @@ rustc_library("component_debug") {
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:url",
     "//tools/lib/config_value_file",
+  ]
+
+  assert_no_deps = [
+    # The component internal API should not be exposed to this library
+    "//sdk/fidl/fuchsia.component.internal:fuchsia.component.internal_rust",
+
+    # Should not need to bring in the entire routing crate. This crate is used
+    # by the client, the backend is responsible for routing
+    "//src/sys/lib/routing",
   ]
 
   # Some host tools use serde to serialize/deserialize types. This

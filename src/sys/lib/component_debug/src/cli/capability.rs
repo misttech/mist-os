@@ -22,7 +22,6 @@ pub async fn capability_cmd<W: std::io::Write>(
             RouteSegment::ExposeBy { .. } => exposes.push(s),
             RouteSegment::OfferBy { .. } => offers.push(s),
             RouteSegment::UseBy { .. } => uses.push(s),
-            _ => {}
         }
     }
 

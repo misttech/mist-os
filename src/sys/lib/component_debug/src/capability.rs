@@ -6,14 +6,14 @@ use {
     crate::realm::{
         get_all_instances, get_resolved_declaration, GetAllInstancesError, GetDeclarationError,
     },
-    cm_rust::{ComponentDecl, SourceName},
+    cm_rust::{
+        CapabilityDecl, ComponentDecl, ExposeDecl, ExposeDeclCommon, OfferDecl, OfferDeclCommon,
+        SourceName, UseDecl, UseDeclCommon,
+    },
     fidl_fuchsia_sys2 as fsys,
     moniker::Moniker,
     thiserror::Error,
 };
-
-// Export so it is easier for others to use.
-pub use routing::mapper::RouteSegment;
 
 #[derive(Debug, Error)]
 pub enum FindInstancesError {
@@ -28,6 +28,58 @@ pub enum FindInstancesError {
     },
 }
 
+pub enum RouteSegment {
+    /// The capability was used by a component instance in its manifest.
+    UseBy { moniker: Moniker, capability: UseDecl },
+
+    /// The capability was offered by a component instance in its manifest.
+    OfferBy { moniker: Moniker, capability: OfferDecl },
+
+    /// The capability was exposed by a component instance in its manifest.
+    ExposeBy { moniker: Moniker, capability: ExposeDecl },
+
+    /// The capability was declared by a component instance in its manifest.
+    DeclareBy { moniker: Moniker, capability: CapabilityDecl },
+}
+
+impl std::fmt::Display for RouteSegment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UseBy { moniker, capability } => {
+                write!(
+                    f,
+                    "`{}` used `{}` from {}",
+                    moniker,
+                    capability.source_name(),
+                    capability.source()
+                )
+            }
+            Self::OfferBy { moniker, capability } => {
+                write!(
+                    f,
+                    "`{}` offered `{}` from {} to {}",
+                    moniker,
+                    capability.source_name(),
+                    capability.source(),
+                    capability.target()
+                )
+            }
+            Self::ExposeBy { moniker, capability } => {
+                write!(
+                    f,
+                    "`{}` exposed `{}` from {} to {}",
+                    moniker,
+                    capability.source_name(),
+                    capability.source(),
+                    capability.target()
+                )
+            }
+            Self::DeclareBy { moniker, capability } => {
+                write!(f, "`{}` declared capability `{}`", moniker, capability.name())
+            }
+        }
+    }
+}
 /// Find components that reference a capability matching the given |query|.
 pub async fn get_all_route_segments(
     query: String,
@@ -230,7 +282,6 @@ mod tests {
                         })
                     );
                 }
-                _ => panic!("unexpected segment"),
             }
         }
 
