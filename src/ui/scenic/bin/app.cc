@@ -68,7 +68,6 @@ scenic_structured_config::Config GetConfig() {
 
   FX_LOGS(INFO) << "Scenic min_predicted_frame_duration(us): "
                 << values.frame_scheduler_min_predicted_frame_duration_in_us();
-  FX_LOGS(INFO) << "enable_allocator_for_flatland: " << values.enable_allocator_for_flatland();
   FX_LOGS(INFO) << "Scenic pointer auto focus: " << values.pointer_auto_focus();
   FX_LOGS(INFO) << "flatland_enable_display_composition: "
                 << values.flatland_enable_display_composition();
@@ -486,8 +485,7 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     screen_capture_importers.push_back(screen_capture_buffer_collection_importer);
 
     std::vector<std::shared_ptr<allocation::BufferCollectionImporter>> default_importers;
-    if (config_values_.enable_allocator_for_flatland() && flatland_compositor_)
-      default_importers.push_back(flatland_compositor_);
+    default_importers.push_back(flatland_compositor_);
 
     allocator_ = std::make_shared<allocation::Allocator>(
         app_context_.get(), default_importers, screen_capture_importers,
