@@ -16,6 +16,7 @@ ffx_plugin("ffx_product") {
     "get:ffx_product_get",
     "get_artifacts:ffx_product_get_artifacts",
     "get_image_path:ffx_product_get_image_path",
+    "list:ffx_product_list",
     "lookup:ffx_product_lookup",
     "show:ffx_product_show",
   ]

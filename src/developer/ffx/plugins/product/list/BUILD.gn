@@ -1,0 +1,33 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//src/developer/ffx/build/ffx_plugin.gni")
+
+ffx_plugin("ffx_product_list") {
+  version = "0.1.0"
+  edition = "2021"
+  with_unit_tests = true
+
+  args_deps = [ "//src/developer/ffx/lib/pbms:lib" ]
+  args_sources = [ "src/args.rs" ]
+  sources = [ "src/lib.rs" ]
+
+  deps = [
+    "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
+    "//src/developer/ffx/lib/pbms:lib",
+    "//src/developer/ffx/lib/writer:lib",
+    "//src/lib/gcs",
+    "//src/lib/structured_ui",
+    "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:url",
+  ]
+
+  test_deps = [
+    "//src/lib/fuchsia-async",
+    "//src/lib/testing/temp_test_env",
+  ]
+}
