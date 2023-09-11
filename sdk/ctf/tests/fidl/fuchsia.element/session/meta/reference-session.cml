@@ -44,11 +44,6 @@
             to: "#element_manager",
         },
         {
-            protocol: [ "fuchsia.ui.scenic.Scenic" ],
-            from: "#reference-scenic",
-            to: "#element_manager",
-        },
-        {
             protocol: "fuchsia.component.Realm",
             from: "framework",
             to: "#element_manager",

@@ -14,10 +14,7 @@
     ],
     use: [
         {
-            protocol: [
-                "fuchsia.element.GraphicalPresenter",
-                "fuchsia.ui.scenic.Scenic",
-            ],
+            protocol: [ "fuchsia.element.GraphicalPresenter" ],
         },
         {
             protocol: "fuchsia.component.Realm",

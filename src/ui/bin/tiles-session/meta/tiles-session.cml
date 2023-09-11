@@ -100,11 +100,6 @@
 
         // Dependencies for element_manager
         {
-            protocol: [ "fuchsia.ui.scenic.Scenic" ],
-            from: "parent",
-            to: [ "#element_manager" ],
-        },
-        {
             protocol: [ "fuchsia.element.GraphicalPresenter" ],
             from: "self",
             to: [ "#element_manager" ],
