@@ -33,6 +33,7 @@ class Flags:
     random: bool
     count: int
     limit: int | None
+    min_severity_logs: typing.List[str]
     timeout: float | None
     fail: bool
     use_package_hash: bool
@@ -224,6 +225,15 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
         action=argparse.BooleanOptionalAction,
         help="If False, do not limit maximum log severity regardless of the test's configuration. Default is True.",
         default=True,
+    )
+    execution.add_argument(
+        "--min-severity-logs",
+        nargs="*",
+        help="""Modifies the minimum log severity level emitted by components during the test execution.
+        Specify using the format <component-selector>#<log-level>, or just <log-level> (in which
+        case the severity will apply to all components under the test, including the test component
+        itself) with level as one of FATAL|ERROR|WARN|INFO|DEBUG|TRACE.""",
+        default=[],
     )
     execution.add_argument(
         "--also-run-disabled-tests",

@@ -110,13 +110,20 @@ class TestExecution:
                         f"Could not load a Merkle hash for this test ({str(e)})\nTry running with --no-use-package-hash or rebuild your package repository."
                     )
 
+            min_severity_logs: typing.List[str] = []
+            if self._flags.min_severity_logs:
+                min_severity_logs = self._flags.min_severity_logs
+            elif execution.min_severity_logs is not None:
+                min_severity_logs = [execution.min_severity_logs]
+
             extra_args = []
             if execution.realm:
                 extra_args += ["--realm", execution.realm]
             if execution.max_severity_logs and self._flags.restrict_logs:
                 extra_args += ["--max-severity-logs", execution.max_severity_logs]
-            if execution.min_severity_logs:
-                extra_args += ["--min-severity-logs", execution.min_severity_logs]
+            if min_severity_logs:
+                for min_severity_log in min_severity_logs:
+                    extra_args += ["--min-severity-logs", min_severity_log]
             if self._test.build.test.parallel is not None:
                 extra_args += ["--parallel", str(self._test.build.test.parallel)]
             if self._flags.also_run_disabled_tests:

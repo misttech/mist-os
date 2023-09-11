@@ -85,21 +85,27 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                 [],
             ),
             (
+                "with min log severity override",
+                ["--min-severity-logs", "DEBUG"],
+                [["--min-severity-logs", "DEBUG"]],
+                [],
+            ),
+            (
                 "without log restriction",
                 ["--no-restrict-logs"],
-                [],
+                [["--min-severity-logs", "TRACE"]],
                 ["--max-severity-logs"],
             ),
             (
                 "with default to not run disabled tests",
                 [],
-                [],
+                [["--min-severity-logs", "TRACE"]],
                 ["--run-disabled"],
             ),
             (
                 "with disabled tests running",
                 ["--also-run-disabled-tests"],
-                [["--run-disabled"]],
+                [["--run-disabled"], ["--min-severity-logs", "TRACE"]],
                 [],
             ),
         ]
@@ -141,7 +147,6 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
         self.assertContainsSublist(
             ["fx", "ffx", "test", "run", "--realm", "foo_tests"], command_line
         )
-        self.assertContainsSublist(["--min-severity-logs", "TRACE"], command_line)
         self.assertContainsSublist(
             ["fuchsia-pkg://fuchsia.com/foo#meta/foo_test.cm"], command_line
         )

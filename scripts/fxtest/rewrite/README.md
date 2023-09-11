@@ -84,11 +84,11 @@ This avoids a full build.
 ### Include and run tests
 
 To test the new implementation's libraries, include
-`--with //scripts/tools/fxtest/rewrite:tests` in your `fx set`.
+`--with //scripts/fxtest/rewrite:tests` in your `fx set`.
 For example:
 
 ```bash
-fx set core.x64 --with //scripts/tools/fxtest/rewrite:tests
+fx set core.x64 --with //scripts/fxtest/rewrite:tests
 
 # This, ironically, does not yet work with the new implementation!
 fx test --host
@@ -101,16 +101,16 @@ environment and rapidly iterate on the code:
 
 ```bash
 # Install a development environment.
-$FUCHSIA_DIR/scripts/tools/fxtest/rewrite/scripts/install.sh
+$FUCHSIA_DIR/scripts/fxtest/rewrite/scripts/install.sh
 
 # Format all code for fx test. Run this before uploading a CL!
-$FUCHSIA_DIR/scripts/tools/fxtest/rewrite/scripts/format.sh
+$FUCHSIA_DIR/scripts/fxtest/rewrite/scripts/format.sh
 
 # Run all tests and generate coverage. It is much faster than going through
 # the whole build process, and you can output HTML using the --html-dir
 # parameter.
-$FUCHSIA_DIR/scripts/tools/fxtest/rewrite/scripts/coverage.sh --html-dir ~/fxtest-python-coverage
+$FUCHSIA_DIR/scripts/fxtest/rewrite/scripts/coverage.sh --html-dir ~/fxtest-python-coverage
 
 # Clean up by running uninstall.
-$FUCHSIA_DIR/scripts/tools/fxtest/rewrite/scripts/uninstall.sh
+$FUCHSIA_DIR/scripts/fxtest/rewrite/scripts/uninstall.sh
 ```
