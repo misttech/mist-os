@@ -19,6 +19,6 @@ use netstack3_sync_not_instrumented as netstack3_sync;
 use netstack3_sync_loom as netstack3_sync;
 
 pub use netstack3_sync::{
-    rc::{NamedClone, Primary as PrimaryRc, Strong as StrongRc, Weak as WeakRc},
+    rc::{Primary as PrimaryRc, Strong as StrongRc, Weak as WeakRc},
     LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
 };
