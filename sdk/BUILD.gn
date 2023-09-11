@@ -291,8 +291,6 @@ sdk_collection("e2e_testing") {
 
   category = "partner"
 
-  api = "manifests/e2e_testing.manifest"
-
   deps = [
     ":e2e_testing_tools",
     "//sdk/testing/sl4f/client:client_sdk($dart_toolchain)",
@@ -522,10 +520,6 @@ sdk_collection("core") {
 
   category = "partner"
 
-  api = "manifests/core.manifest"
-
-  filter_api_host_tools = !sdk_cross_compile_host_tools
-
   deps = [
     ":core_deps",
     ":core_packages",
@@ -559,7 +553,6 @@ if (is_host) {
   sdk_collection("host_tools.internal") {
     id = sdk_id
     category = "partner"
-    api = "manifests/host_tools_${current_os}_${current_cpu}.manifest"
 
     deps = [
       "//src/developer/debug/zxdb:zxdb_sdk",
@@ -673,10 +666,6 @@ sdk_collection("driver") {
   id = sdk_id
 
   category = "experimental"
-
-  api = "manifests/driver.manifest"
-
-  filter_api_host_tools = !sdk_cross_compile_host_tools
 
   deps = [
     ":bind",

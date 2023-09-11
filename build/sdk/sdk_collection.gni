@@ -37,11 +37,10 @@ import("sdk_molecule.gni")
 #     An opaque identifier for the SDK.
 #     Defaults to the empty string.
 #
-#   api (required)
+#   api (optional)
 #     Path to the file representing the canonical contents of this SDK.
 #     This file is used to ensure modifications to the SDK contents are
 #     explicitly acknowledged.
-#     Mandatory for "public" or "partner" SDKs.
 #
 #   category (required)
 #     Describes the minimum category that atoms in this SDK must have.
@@ -67,10 +66,6 @@ import("sdk_molecule.gni")
 #
 template("sdk_collection") {
   assert(defined(invoker.category), "Must define an SDK category")
-
-  if (invoker.category == "public" || invoker.category == "partner") {
-    assert(defined(invoker.api), "API file required for public/partner SDKs")
-  }
 
   # Compute target and host triples, which will be written to the
   # top-level meta/manifest.json file for this collection.
