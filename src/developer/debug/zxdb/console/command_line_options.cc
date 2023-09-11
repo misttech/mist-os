@@ -62,7 +62,7 @@ const char kExecuteCommandHelp[] = R"(  --execute=<command>
 
 const char kSymbolIndexHelp[] = R"(  --symbol-index=<path>
       Populates --ids-txt and --build-id-dir using the given symbol-index file,
-      which defaults to ~/.fuchsia/debug/symbol-index. The file should be
+      which defaults to ~/.fuchsia/debug/symbol-index.json. The file should be
       created and maintained by the "symbol-index" host tool.)";
 
 const char kSymbolPathHelp[] = R"(  --symbol-path=<path>
@@ -170,12 +170,10 @@ cmdline::Status ParseCommandLine(int argc, const char* argv[], CommandLineOption
       options->symbol_cache = home_str + "/.fuchsia/debug/symbol-cache";
     }
     if (options->symbol_index_files.empty()) {
-      for (const auto& path : {home_str + "/.fuchsia/debug/symbol-index.json",
-                               home_str + "/.fuchsia/debug/symbol-index"}) {
-        std::error_code ec;
-        if (std::filesystem::exists(path, ec)) {
-          options->symbol_index_files.push_back(path);
-        }
+      std::error_code ec;
+      std::string symbol_index = home_str + "/.fuchsia/debug/symbol-index.json";
+      if (std::filesystem::exists(symbol_index, ec)) {
+        options->symbol_index_files.push_back(symbol_index);
       }
     }
     std::string zxdbrc = home_str + "/.fuchsia/debug/zxdbrc";
