@@ -62,7 +62,7 @@ use fidl_fuchsia_logger::{
 };
 
 const DEFAULT_FILE_CAPACITY: u64 = 64000;
-const ENABLE_REWRITE: bool = false;
+const ENABLE_REWRITE: bool = true;
 
 type Color = &'static str;
 static ANSI_RESET: &str = "\x1B[1;0m";
