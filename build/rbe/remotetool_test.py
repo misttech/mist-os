@@ -5,6 +5,7 @@
 
 import shlex
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -298,20 +299,55 @@ class RemotetoolRunTests(unittest.TestCase):
                     ])
         mock_call.assert_called_once()
 
-    def test_show_action(self):
+    def test_show_action_uncached(self):
         exit_code = 0
         action_result = remotetool.ShowActionResult(
             command=[], platform=dict(), inputs=dict(), output_files=dict())
-        with mock.patch.object(
-                cl_utils, 'subprocess_call',
-                return_value=cl_utils.SubprocessResult(exit_code)) as mock_call:
-            with mock.patch.object(remotetool, 'parse_show_action_output',
-                                   return_value=action_result) as mock_parse:
-                result = self.tool.show_action(
-                    digest='0abb771b3198273aaabbef87/323')
+        with tempfile.TemporaryDirectory() as td:
+            # Use a temporary directory for the cache, not the real cache dir.
+            with mock.patch.object(tempfile, 'gettempdir',
+                                   return_value=td) as mock_tempdir:
+
+                with mock.patch.object(cl_utils, 'subprocess_call',
+                                       return_value=cl_utils.SubprocessResult(
+                                           exit_code)) as mock_call:
+                    with mock.patch.object(
+                            remotetool, 'parse_show_action_output',
+                            return_value=action_result) as mock_parse:
+                        with mock.patch.object(
+                                Path, 'exists',
+                                return_value=False) as mock_exists:
+                            result = self.tool.show_action(
+                                digest='0abb771b3198273aaabbef87/323')
         self.assertEqual(result, action_result)
+        mock_tempdir.assert_called_once_with()
         mock_call.assert_called_once()
         mock_parse.assert_called_once()
+        mock_exists.assert_called_once_with()
+
+    def test_show_action_cached(self):
+        exit_code = 0
+        action_result = remotetool.ShowActionResult(
+            command=[], platform=dict(), inputs=dict(), output_files=dict())
+        with tempfile.TemporaryDirectory() as td:
+            # Use a temporary directory for the cache, not the real cache dir.
+            with mock.patch.object(tempfile, 'gettempdir',
+                                   return_value=td) as mock_tempdir:
+
+                with mock.patch.object(
+                        remotetool, 'parse_show_action_output',
+                        return_value=action_result) as mock_parse:
+                    with mock.patch.object(Path, 'exists',
+                                           return_value=True) as mock_exists:
+                        with mock.patch.object(Path, 'read_text',
+                                               return_value='\n') as mock_read:
+                            result = self.tool.show_action(
+                                digest='cc8a65a0abb771b3143abbef87/997')
+        self.assertEqual(result, action_result)
+        mock_tempdir.assert_called_once_with()
+        mock_parse.assert_called_once()
+        mock_exists.assert_called_once_with()
+        mock_read.assert_called_once_with()
 
     def test_download_blob(self):
         exit_code = 0

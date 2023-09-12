@@ -13,6 +13,7 @@ import os
 import shlex
 import subprocess
 import sys
+import tempfile
 
 from pathlib import Path
 from typing import Any, Dict, Iterable, Sequence, Tuple
@@ -285,6 +286,8 @@ class RemoteTool(object):
         if show_command:
             print(command_str)
 
+        # TODO: cache 'show_action' results from this execution path
+        # This requires parsing the args before passing them straight through.
         result = cl_utils.subprocess_call(command, **kwargs)
         if result.returncode != 0:
             for line in result.stderr:
@@ -292,8 +295,16 @@ class RemoteTool(object):
             raise subprocess.CalledProcessError(result.returncode, command)
         return result
 
+    def _show_action(self, digest: str, **kwargs) -> cl_utils.SubprocessResult:
+        args = ['--operation', 'show_action', '--digest', digest]
+        final_kwargs = kwargs
+        final_kwargs["quiet"] = True
+        return self.run(args, **final_kwargs)
+
     def show_action(self, digest: str, **kwargs) -> ShowActionResult:
         """Reads parameters of a remote action using `remotetool`.
+
+        Results of querying 'show_action' are cached.
 
         Args:
           digest: the hash/size of the action to lookup.
@@ -302,11 +313,23 @@ class RemoteTool(object):
         Returns:
           ShowActionResult describing command, inputs, outputs.
         """
-        args = ['--operation', 'show_action', '--digest', digest]
-        final_kwargs = kwargs
-        final_kwargs["quiet"] = True
-        result = self.run(args, **final_kwargs)
-        return parse_show_action_output(result.stdout)
+        hash, sep, size = digest.partition(
+            '/')  # actions all have the same "size" 147
+        tempdir = Path(tempfile.gettempdir())
+        cache_dir = tempdir / _SCRIPT_BASENAME / 'show_action_cache'
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_file = cache_dir / (hash + '.stdout')
+
+        if cache_file.exists():
+            show_action_output = cache_file.read_text().splitlines()
+        else:
+            result = self._show_action(digest, **kwargs)
+
+            show_action_output = result.stdout
+            cache_file.write_text(
+                ''.join(line + '\n' for line in show_action_output))
+
+        return parse_show_action_output(show_action_output)
 
     def download_blob(
             self, path: Path, digest: str,
