@@ -22,7 +22,7 @@ Examples:
   fx test
 
   - Execute the test component available at this URL
-  fx test fuchsia-pkg://fuchsia.com/myPackageName/#meta/componentName.cmx
+  fx test fuchsia-pkg://fuchsia.com/myPackageName/#meta/componentName.cm
 
   - Execute the test whose package URL's `package-name` component matches
     the value. Runs all tests contained in this package.

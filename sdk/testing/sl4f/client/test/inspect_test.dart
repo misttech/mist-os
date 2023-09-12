@@ -24,10 +24,10 @@ void main(List<String> args) {
   });
 
   test('snapshot inspect', () async {
-    final selectors = ['test.cmx:root', 'other.cmx:root/node:prop'];
+    final selectors = ['test:root', 'other:root/node:prop'];
     final expectedHierarchies = [
       {
-        'moniker': 'test.cmx',
+        'moniker': 'test',
         'version': 1,
         'data_source': 'Inspect',
         'payload': {
@@ -40,7 +40,7 @@ void main(List<String> args) {
         }
       },
       {
-        'moniker': 'other.cmx',
+        'moniker': 'other',
         'version': 1,
         'data_source': 'Inspect',
         'payload': {
@@ -78,7 +78,7 @@ void main(List<String> args) {
   test('snapshot inspect all', () async {
     final expectedHierarchies = [
       {
-        'moniker': 'test.cmx',
+        'moniker': 'test',
         'version': 1,
         'data_source': 'Inspect',
         'payload': {
@@ -91,7 +91,7 @@ void main(List<String> args) {
         }
       },
       {
-        'moniker': 'other.cmx',
+        'moniker': 'other',
         'version': 1,
         'data_source': 'Inspect',
         'payload': {
@@ -130,7 +130,7 @@ void main(List<String> args) {
   test('snapshot inspect root', () async {
     final resultHierarchies = [
       {
-        'moniker': 'test.cmx',
+        'moniker': 'test',
         'version': 1,
         'data_source': 'Inspect',
         'payload': {
@@ -143,7 +143,7 @@ void main(List<String> args) {
         }
       },
       {
-        'moniker': 'other.cmx',
+        'moniker': 'other',
         'version': 1,
         'data_source': 'Inspect',
         'payload': {
@@ -161,7 +161,7 @@ void main(List<String> args) {
       expect(req.contentLength, greaterThan(0));
       final body = jsonDecode(await utf8.decoder.bind(req).join());
       expect(body['method'], 'diagnostics_facade.SnapshotInspect');
-      expect(body['params']['selectors'], ['test.cmx:root']);
+      expect(body['params']['selectors'], ['test:root']);
       req.response.write(jsonEncode({
         'id': body['id'],
         'result': resultHierarchies,
@@ -172,7 +172,7 @@ void main(List<String> args) {
 
     fakeServer.listen(handler);
 
-    final result = await Inspect(sl4f).snapshotRoot('test.cmx');
+    final result = await Inspect(sl4f).snapshotRoot('test');
     expect(result, equals({'a': 1}));
   });
 
@@ -183,7 +183,7 @@ void main(List<String> args) {
       expect(req.contentLength, greaterThan(0));
       final body = jsonDecode(await utf8.decoder.bind(req).join());
       expect(body['method'], 'diagnostics_facade.SnapshotInspect');
-      expect(body['params']['selectors'], ['test.cmx:root']);
+      expect(body['params']['selectors'], ['test:root']);
       req.response.write(jsonEncode({
         'id': body['id'],
         'result': resultHierarchies,
@@ -194,14 +194,14 @@ void main(List<String> args) {
 
     fakeServer.listen(handler);
 
-    final result = await Inspect(sl4f).snapshotRoot('test.cmx');
+    final result = await Inspect(sl4f).snapshotRoot('test');
     expect(result, isNull);
   });
 
   test('snapshot inspect root no payload', () async {
     final resultHierarchies = [
       {
-        'moniker': 'test.cmx',
+        'moniker': 'test',
         'version': 1,
         'data_source': 'Inspect',
         'payload': null,
@@ -212,7 +212,7 @@ void main(List<String> args) {
         }
       },
       {
-        'moniker': 'other.cmx',
+        'moniker': 'other',
         'version': 1,
         'data_source': 'Inspect',
         'payload': null,
@@ -228,7 +228,7 @@ void main(List<String> args) {
       expect(req.contentLength, greaterThan(0));
       final body = jsonDecode(await utf8.decoder.bind(req).join());
       expect(body['method'], 'diagnostics_facade.SnapshotInspect');
-      expect(body['params']['selectors'], ['test.cmx:root']);
+      expect(body['params']['selectors'], ['test:root']);
       req.response.write(jsonEncode({
         'id': body['id'],
         'result': resultHierarchies,
@@ -239,7 +239,7 @@ void main(List<String> args) {
 
     fakeServer.listen(handler);
 
-    final result = await Inspect(sl4f).snapshotRoot('test.cmx');
+    final result = await Inspect(sl4f).snapshotRoot('test');
     expect(result, isNull);
   });
 }

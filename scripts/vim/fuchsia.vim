@@ -96,8 +96,6 @@ if jiri_manifest != ""
     autocmd BufRead,BufNewFile * call FuchsiaBuffer()
     autocmd Filetype cpp call FuchsiaCppBuffer()
 
-    " .cmx files are JSON
-    autocmd BufRead,BufNewFile *.cmx set syntax=json
     " .cml files are JSON5
     autocmd BufRead,BufNewFile *.cml set syntax=json5
 

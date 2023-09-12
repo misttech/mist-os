@@ -23,12 +23,12 @@ Undigested:
 	memory_monitor.cm[26140]: 3.965MiB
 	remote-diagnostics-bridge.cm[32269]: 1.938MiB
 	system_log_recorder[28290]: 1.758MiB
-	overnetstack.cmx[31842]: 1.496MiB
+	overnetstack.cm[31842]: 1.496MiB
 	pkg-cache.cm[23195]: 1.496MiB
 	log-stats.cm[16363]: 1.445MiB
-	intl_services.cmx[28808]: 1.344MiB
+	intl_services.cm[28808]: 1.344MiB
 	http-client.cm[28897]: 1.285MiB
-	httpsdate_time_source.cmx[28030]: 1.285MiB
+	httpsdate_time_source.cm[28030]: 1.285MiB
 	appmgr.cm[16544]: 1.27MiB
 	triage-detect.cm[17305]: 1.258MiB
 	setui_service.cm[30119]: 1.008MiB
@@ -38,8 +38,8 @@ Undigested:
 	remote-control.cm[31648]: 772KiB
 	system-update-committer.cm[17181]: 744KiB
 	last_reboot.cm[21678]: 656KiB
-	crash_reports.cmx[27019]: 652KiB
-	feedback_data.cmx[27319]: 644KiB
+	crash_reports.cm[27019]: 652KiB
+	feedback_data.cm[27319]: 644KiB
 	exceptions.cm[17142]: 640KiB
 	system-updater.cm[17201]: 628KiB
 	diagnostics-kcounter.cm[16092]: 564KiB
@@ -48,10 +48,10 @@ Undigested:
 	decompressor-sandbox.cm[9898]: 540KiB
 	wlanstack.cm[17115]: 484KiB
 	power-manager.cm[4810]: 480KiB
-	sshd-host.cmx[26602]: 464KiB
+	sshd-host.cm[26602]: 464KiB
 	console.cm[2206]: 424KiB
-	timekeeper.cmx[26846]: 420KiB
-	cobalt_system_metrics.cmx[26282]: 416KiB
+	timekeeper.cm[26846]: 420KiB
+	cobalt_system_metrics.cm[26282]: 416KiB
 	mdns.cm[17229]: 412KiB
 	reachability.cm[17991]: 404KiB
 	ptysvc.cm[24449]: 396KiB

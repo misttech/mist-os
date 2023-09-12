@@ -134,41 +134,6 @@ void main() {
       expect(tds[0].testType, TestType.suite);
     });
 
-    test('for unsupported tests', () {
-      TestsManifestReader tr = TestsManifestReader();
-      List<dynamic> testJson = [
-        {
-          'environments': [],
-          'test': {
-            'cpu': 'arm64',
-            'name': '//src/sys/component/test:component_test',
-            'os': 'fuchsia',
-          }
-        },
-        {
-          'environments': [],
-          'test': {
-            'cpu': 'arm64',
-            'path': '/pkgfs/packages/component_test/0/test/component_test',
-            'name': '//src/sys/component/test:component_test',
-            'os': 'fuchsia',
-            'package_url':
-                'fuchsia-pkg://fuchsia.com/component_test#meta/component_test.cmx',
-          }
-        },
-      ];
-      List<TestDefinition> tds = tr.parseManifest(
-        testJson: testJson,
-        testComponentMap: {},
-        buildDir: FakeFxEnv.shared.outputDir,
-        fxLocation: FakeFxEnv.shared.fx,
-      );
-      expect(tds, hasLength(2));
-      expect(tds[0].path, '');
-      expect(tds[0].testType, TestType.unsupported);
-      expect(tds[1].testType, TestType.unsupportedDeviceTest);
-    });
-
     test('for unsupported device tests', () {
       TestsManifestReader tr = TestsManifestReader();
       List<dynamic> testJson = [

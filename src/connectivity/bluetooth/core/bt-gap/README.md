@@ -25,7 +25,6 @@ implementation are:
     - Other APIs are proxied directly to their private API counterparts.
   - Instantiates the `/dev/class/bt-host`-monitoring future from HostDispatcher.
   - Configures an Executor to process API events and `/dev/class/bt-host` VFS events.
-  - Serves `bt-gap` Inspect file at `/hub/c/bt-gap.cmx/{pid}/out/diagnostics/root.inspect`.
 
 ## Tests
 ### Unit Tests

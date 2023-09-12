@@ -15,7 +15,7 @@ Please see the debugger [setup](../../../../docs/development/debugger/running.md
 When changing anything related to process launching:
 
   * `run /boot/bin/ps`
-  * `run -c fuchsia-pkg://fuchsia.com/debug_agent#meta/debug_agent.cmx` _or some other component
+  * `run -c fuchsia-pkg://fuchsia.com/debug_agent#meta/debug_agent.cm` _or some other component
      URL._
   * `attach some_filter`  _When a process by that name already exists._
   * A new process caught by filter (technically 2 handles this, but it's good to be explicit).

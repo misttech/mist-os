@@ -137,10 +137,10 @@ type TreeSelector = flexible union {
 ///         <component_moniker>:<node_selector>:<property_selector>
 /// Examples:
 ///    Property selection:
-///         realm1/realm2/echo.cmx:root/active_users:user_count
+///         realm1/realm2/echo:root/active_users:user_count
 ///
 ///    Subtree selection:
-///         realm1/realm2/echo.cmx:root/active_users
+///         realm1/realm2/echo:root/active_users
 type Selector = table {
     /// The selector defining a pattern of component monikers to match
     /// against.

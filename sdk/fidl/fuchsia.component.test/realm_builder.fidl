@@ -395,8 +395,7 @@ closed protocol Realm {
     /// Errors:
     /// - `CHILD_ALREADY_EXISTS`: this realm already contains a child with the
     ///   given name.
-    /// - `INVALID_MANIFEST_EXTENSION`: `url` ends with `.cmx`, and thus should
-    ///   be used with `AddLegacyChild` instead of `AddChild`.
+    /// - `INVALID_MANIFEST_EXTENSION`: `url` does not end with `.cm`
     /// - `DECL_NOT_FOUND`: The test package does not contain the component
     ///   declaration referenced by a fragment-only component URL.
     /// - `DECL_READ_ERROR`: Encountered an I/O error when attempting to read a

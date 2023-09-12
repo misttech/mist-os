@@ -46,7 +46,7 @@ pub struct LowpanCtlInvocation {
         option,
         long = "server",
         description = "package URL",
-        default = "\"fuchsia-pkg://fuchsia.com/lowpanservice#meta/lowpanservice.cmx\".to_string()"
+        default = "\"fuchsia-pkg://fuchsia.com/lowpanservice#meta/lowpanservice.cm\".to_string()"
     )]
     pub server_url: String,
 

@@ -54,8 +54,6 @@ def main():
                 original = json_file.read()
                 data = json.loads(original)
                 (root, ext) = os.path.splitext(json_file.name)
-                if ext == '.cmx':
-                    data = sort(data)
                 formatted = json.dumps(
                     data,
                     indent=4,

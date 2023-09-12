@@ -16,7 +16,7 @@ inline constexpr const char* kFilename = "/frame_";
 // An ImageIOUtil object that writes frames from a stream to an on-device partition.
 // If the files are accessed via `fx shell` they will appear at the following path:
 //
-//  [PARTITION]/r/sys/fuchsia.com:[PKG NAME]:0#meta:[COMPONENT NAME].cmx
+//  [PARTITION]/r/sys/fuchsia.com:[PKG NAME]:0#meta:[COMPONENT NAME].cm
 class ImageIOUtil {
  public:
   // Constructor.

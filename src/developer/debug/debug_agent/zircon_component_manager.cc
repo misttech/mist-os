@@ -482,10 +482,6 @@ debug::Status ZirconComponentManager::LaunchTest(std::string url, std::optional<
 }
 
 debug::Status ZirconComponentManager::LaunchComponent(std::string url) {
-  if (cpp20::ends_with(std::string_view{url}, ".cmx")) {
-    return debug::Status("V1 components are no longer supported.");
-  }
-
   constexpr char kParentMoniker[] = "core";
   constexpr char kCollection[] = "ffx-laboratory";
 

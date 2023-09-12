@@ -128,7 +128,7 @@ number of dependencies which will be included in the final package.
         ),
         "manifest": attr.label(
             doc = "The component manifest file",
-            allow_single_file = [".cm", ".cmx"],
+            allow_single_file = [".cm"],
             mandatory = True,
         ),
         "component_name": attr.string(

@@ -6,7 +6,7 @@ is allowed to access or interact with them without an explicit exception.
 
 ## host.fidl
 
-This protocol is used between the core bt-gap.cmx component and the bt-host devices that it
+This protocol is used between the core bt-gap component and the bt-host devices that it
 manages.
 
 ## lifecycle.fidl

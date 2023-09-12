@@ -47,7 +47,7 @@ void main(List<String> args) {
       final body = jsonDecode(await utf8.decoder.bind(req).join());
       expect(body['method'], 'component_facade.Search');
       expect(body['params'], {
-        'name': 'running_comp.cmx',
+        'name': 'running_comp.cm',
       });
       req.response.write(
           jsonEncode({'id': body['id'], 'result': 'Success', 'error': null}));
@@ -56,15 +56,14 @@ void main(List<String> args) {
 
     fakeServer.listen(handler);
 
-    expect(
-        Component(sl4f).search('running_comp.cmx'), completion(equals(true)));
+    expect(Component(sl4f).search('running_comp.cm'), completion(equals(true)));
   });
 
   test('call List to list running component', () {
     const expectedList = [
-      'component1.cmx',
-      'component2.cmx',
-      'component3.cmx',
+      'component1.cm',
+      'component2.cm',
+      'component3.cm',
     ];
     void handler(HttpRequest req) async {
       expect(req.contentLength, greaterThan(0));
@@ -85,7 +84,7 @@ void main(List<String> args) {
       final body = jsonDecode(await utf8.decoder.bind(req).join());
       expect(body['method'], 'component_facade.Launch');
       expect(body['params'], {
-        'url': 'fuchsia-pkg://fuchsia.com/fake_url#meta/fake_url.cmx',
+        'url': 'fuchsia-pkg://fuchsia.com/fake_url#meta/fake_url.cm',
         'wait_until_stop': true
       });
       req.response.write(
@@ -96,7 +95,7 @@ void main(List<String> args) {
     fakeServer.listen(handler);
     expect(
         Component(sl4f)
-            .launch('fuchsia-pkg://fuchsia.com/fake_url#meta/fake_url.cmx'),
+            .launch('fuchsia-pkg://fuchsia.com/fake_url#meta/fake_url.cm'),
         completion(equals('Success')));
   });
 
@@ -106,7 +105,7 @@ void main(List<String> args) {
       final body = jsonDecode(await utf8.decoder.bind(req).join());
       expect(body['method'], 'component_facade.Launch');
       expect(body['params'], {
-        'url': 'fuchsia-pkg://fuchsia.com/fake_url#meta/fake_url.cmx',
+        'url': 'fuchsia-pkg://fuchsia.com/fake_url#meta/fake_url.cm',
         'wait_until_stop': false
       });
       req.response.write(
@@ -117,7 +116,7 @@ void main(List<String> args) {
     fakeServer.listen(handler);
     expect(
         Component(sl4f).launchAndDetach(
-            'fuchsia-pkg://fuchsia.com/fake_url#meta/fake_url.cmx'),
+            'fuchsia-pkg://fuchsia.com/fake_url#meta/fake_url.cm'),
         completion(equals('Success')));
   });
 }

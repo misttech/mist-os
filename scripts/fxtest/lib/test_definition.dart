@@ -129,14 +129,10 @@ class TestDefinition {
     } else if (packageUrl != null) {
       // The order of `component` / `suite` does not currently matter
 
-      if (packageUrl!.fullComponentName?.endsWith('.cmx') ?? false) {
-        // We don't support cmx anymore, return unsupported explicitly
-        // for a clearer message than malformed
-        return TestType.unsupportedDeviceTest;
-      } else if (packageUrl!.fullComponentName?.endsWith('.cm') ?? false) {
+      if (packageUrl!.fullComponentName?.endsWith('.cm') ?? false) {
         return TestType.suite;
       }
-      // Package Urls must end with either ".cmx" or ".cm"
+      // Component Urls must end with ".cm"
       throw MalformedFuchsiaUrlException(packageUrl.toString());
     } else if (path != null && path!.isNotEmpty) {
       // As per above, `host` must be checked after `command`

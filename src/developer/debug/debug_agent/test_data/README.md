@@ -19,7 +19,7 @@ There are some constructs in this directory:
   See src/developer/debug/debug_agent/integration_tests/breakpoint_test.cc for an example.
 - Test utilities: These are various one-off programs that are meant to be run manually, either as a
   shell program ($ /pkgfs/packages/debug_agent_helpers/0/bin/program) or as a component
-  ($ run this_component.cmx... See limbo caller as an example, as you do need the .cmx setup).
+  ($ run this_component.cm... See limbo caller as an example).
 
 ## Deploying
 
@@ -36,26 +36,20 @@ The process to add a new executable is to:
 3. In the debug agent BUILD.gn (src/developer/debug/debug_agent/BUILD.gn), you need to specify that
    the `debug_agent_helpers package exports this new executable. For that, look for the `binaries`
    array and add the exported name of the executable in (1) and add it there.
-4. If there is a .cmx file (meant to be run as a component), remember to also add the meta file
+4. If there is a .cml file (meant to be run as a component), remember to also add the meta file
    translation in there. See `limbo_caller` or `test_suite` as an example of a test executable that
    also can get called as a component.
-5. If your .cmx file requires the fuchsia.kernel.RootJob service, update the
+5. If your .cml file requires the fuchsia.kernel.RootJob service, update the
    policy file at //src/security/policy/root_job_allowlist_eng.txt file,
    otherwise it will fail to launch at runtime with a mysterious error like the
    one below (and nothing in the system log!):
 
-     fuchsia-pkg://fuchsia.com/...#meta/your.cmx: failed to create component (8)
+     fuchsia-pkg://fuchsia.com/...#meta/your.cm: failed to create component (8)
 
 ## Test Suite
 
 The "Debug Agent Test Suite" is a more elaborate program that is used to create more complicated
 scenerios, such as adding several watchpoints on another process, send multiple channel calls, etc.
-
-To build an update and run:
-
-```
-fx run debug_agent_test_suite.cmx
-```
 
 The suite has CLI instructions about to execute the different test cases. Each test case is
 documented so you can refer to the source to see what each test case is supposed to do.
@@ -66,6 +60,4 @@ a behaviour, it's very probable that adding it to the test suite is the easiest 
 developing and deploying it, as adding a new test case is very easy (see the last part of
 test_suite.cc).
 
-The test suite can be run directly (/pkgfs/packages/debug_agent_helpers/bin/test_suite) or as a
-component (run debug_agent_test_suite.cmx).
-
+The test suite can be run directly: `ffx component explore /core/debug_agent -c /pkg/bin/test_suite`.

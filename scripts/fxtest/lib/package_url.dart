@@ -15,7 +15,7 @@ class PackageUrl {
   /// from
   ///
   /// ```
-  /// fuchsia-pkg://fuchsia.com/pkg-name/variant?hash=1234#meta/component-name.cmx
+  /// fuchsia-pkg://fuchsia.com/pkg-name/variant?hash=1234#meta/component-name.cm
   /// ```
   final String host;
 
@@ -28,7 +28,7 @@ class PackageUrl {
   /// from
   ///
   /// ```
-  /// fuchsia-pkg://fuchsia.com/pkg-name/variant?hash=1234#meta/component-name.cmx
+  /// fuchsia-pkg://fuchsia.com/pkg-name/variant?hash=1234#meta/component-name.cm
   /// ```
   final String packageName;
 
@@ -41,7 +41,7 @@ class PackageUrl {
   /// from
   ///
   /// ```
-  /// fuchsia-pkg://fuchsia.com/pkg-name/variant?hash=1234#meta/component-name.cmx
+  /// fuchsia-pkg://fuchsia.com/pkg-name/variant?hash=1234#meta/component-name.cm
   /// ```
   final String? packageVariant;
 
@@ -54,20 +54,20 @@ class PackageUrl {
   /// from
   ///
   /// ```
-  /// fuchsia-pkg://fuchsia.com/pkg-name/variant?hash=1234#meta/component-name.cmx
+  /// fuchsia-pkg://fuchsia.com/pkg-name/variant?hash=1234#meta/component-name.cm
   /// ```
   final String? hash;
 
   /// Component name with the extension.
   ///
   /// ```
-  /// component-name.cmx
+  /// component-name.cm
   /// ```
   ///
   /// from
   ///
   /// ```
-  /// fuchsia-pkg://fuchsia.com/pkg-name/variant?hash=1234#meta/component-name.cmx
+  /// fuchsia-pkg://fuchsia.com/pkg-name/variant?hash=1234#meta/component-name.cm
   /// ```
   final String? fullComponentName;
 
@@ -80,7 +80,7 @@ class PackageUrl {
   /// from
   ///
   /// ```
-  /// fuchsia-pkg://fuchsia.com/pkg-name/variant?hash=1234#meta/component-name.cmx
+  /// fuchsia-pkg://fuchsia.com/pkg-name/variant?hash=1234#meta/component-name.cm
   /// ```
   final String? componentName;
 
@@ -107,7 +107,7 @@ class PackageUrl {
   /// Breaks out a canonical Fuchsia URL into its constituent parts.
   ///
   /// Parses something like
-  /// `fuchsia-pkg://host/package_name/variant?hash=1234#PATH.cmx` into:
+  /// `fuchsia-pkg://host/package_name/variant?hash=1234#PATH.cm` into:
   ///
   /// ```dart
   /// PackageUrl(
@@ -115,7 +115,7 @@ class PackageUrl {
   ///   'packageName': 'package_name',
   ///   'packageVariant': 'variant',
   ///   'hash': '1234',
-  ///   'fullComponentName': 'PATH.cmx',
+  ///   'fullComponentName': 'PATH.cm',
   ///   'componentName': 'PATH',
   /// );
   /// ```
@@ -140,7 +140,7 @@ class PackageUrl {
   }
 
   /// Returns something like
-  /// `fuchsia-pkg://host/package_name/variant?hash=1234#PATH.cmx`
+  /// `fuchsia-pkg://host/package_name/variant?hash=1234#PATH.cm`
   @override
   String toString() {
     if (_stringifed == null) {

@@ -20,7 +20,7 @@ class Component {
 
   /// Returns true if the component [name] is currently running.
   ///
-  /// [name] is the exact name of the component, like 'component.cmx'.
+  /// [name] is the exact name of the component, like 'component.cm'.
   Future<bool> search(String name) async {
     final result =
         await _sl4f.request('component_facade.Search', {'name': name});

@@ -128,27 +128,6 @@ template("config_package") {
     file = config_package_entries
   }
 
-  validate_sysmgr_config_target = "${target_name}_validate_sysmgr_config"
-  merged_sysmgr_config = "$target_gen_dir/${target_name}_merged_sysmgr_config"
-  action(validate_sysmgr_config_target) {
-    forward_variables_from(invoker, [ "testonly" ])
-    visibility = [ ":*" ]
-    deps = [ ":$config_package_entries_target" ]
-    script = "//build/tools/validate_sysmgr_config.py"
-    inputs = [ config_package_entries ]
-    depfile = "$target_out_dir/$target_name.d"
-    outputs = [ merged_sysmgr_config ]
-
-    args = [
-      "--config-entries",
-      rebase_path(config_package_entries, root_build_dir),
-      "--depfile",
-      rebase_path(depfile, root_build_dir),
-      "--merged",
-      rebase_path(merged_sysmgr_config, root_build_dir),
-    ]
-  }
-
   fuchsia_package(target_name) {
     forward_variables_from(invoker,
                            [
@@ -156,10 +135,7 @@ template("config_package") {
                              "testonly",
                              "visibility",
                            ])
-    deps = [
-      ":$distribution_entries_target",
-      ":$validate_sysmgr_config_target",
-    ]
+    deps = [ ":$distribution_entries_target" ]
 
     if (defined(golden_file_target)) {
       deps += [ ":$golden_file_target" ]

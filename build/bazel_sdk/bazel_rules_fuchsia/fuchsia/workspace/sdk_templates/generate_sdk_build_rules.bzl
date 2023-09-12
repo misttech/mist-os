@@ -342,7 +342,7 @@ def _generate_component_manifest_rules(ctx, meta, relative_dir, build_file, proc
                 parts = f.partition("/%s/" % lib_name)
                 include_path = parts[0]
                 shard_name = parts[2]
-                name = shard_name.removesuffix(".cml").removesuffix(".cmx").removesuffix(".shard")
+                name = shard_name.removesuffix(".cml").removesuffix(".shard")
 
                 # Keep track of all the labels that we create to add to the toolchain
                 target_label = "//{}/{}:{}".format(include_path, lib_name, name)

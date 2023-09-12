@@ -287,7 +287,7 @@ void WebUI::RequestCapture(FILE* fp, WriteFlags flags, bool saveToStorage) {
     FX_LOGS(INFO) << "crop: " << crop.x << "," << crop.y << "," << crop.width << "," << crop.height;
     if (filefp != fp2) {
       fputs("Frame saved to local storage.<br>", fp2);
-      std::string real = "/data/r/sys/fuchsia.com:camera-factory:0#meta:camera-factory.cmx/" + file;
+      std::string real = "/data/r/sys/fuchsia.com:camera-factory:0#meta:camera-factory.cm/" + file;
       fprintf(fp2, "Wrote %s, which is likely %s<br>", path.c_str(), real.c_str());
       fclose(filefp);
     }

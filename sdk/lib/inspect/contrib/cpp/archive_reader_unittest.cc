@@ -19,10 +19,10 @@ TEST(InspectDataTest, ComponentNameExtraction) {
   {
     std::vector<inspect::contrib::InspectData> data;
     rapidjson::Document doc;
-    doc.Parse(R"({"moniker": "root/hub/my_component.cmx"})");
+    doc.Parse(R"({"moniker": "root/hub/my_component"})");
     inspect::contrib::EmplaceInspect(std::move(doc), &data);
     InspectData &datum = data[0];
-    EXPECT_EQ("root/hub/my_component.cmx", datum.moniker());
+    EXPECT_EQ("root/hub/my_component", datum.moniker());
   }
   {
     std::vector<inspect::contrib::InspectData> data;
@@ -66,7 +66,7 @@ TEST(InspectDataTest, ContentExtraction) {
     // Content is missing, return nullptr.
     std::vector<inspect::contrib::InspectData> data;
     rapidjson::Document doc;
-    doc.Parse(R"({"moniker": "root/hub/my_component.cmx"})");
+    doc.Parse(R"({"moniker": "root/hub/my_component"})");
     inspect::contrib::EmplaceInspect(std::move(doc), &data);
     InspectData &datum = data[0];
     EXPECT_EQ(rapidjson::Value(), datum.GetByPath({"value"}));

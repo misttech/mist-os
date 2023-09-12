@@ -48,8 +48,8 @@ class Inspect {
   /// or property.
   /// It accepts wildcards.
   /// For example:
-  ///   a/*/test.cmx:path/to/*/node:prop
-  ///   a/*/test.cmx:root
+  ///   a/*/test:path/to/*/node:prop
+  ///   a/*/test:root
   ///
   /// See: https://fuchsia.googlesource.com/fuchsia/+/HEAD/sdk/fidl/fuchsia.diagnostics/selector.fidl
   ///
