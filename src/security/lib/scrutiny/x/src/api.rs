@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::blob::BlobDirectoryError;
 use super::blob::BlobOpenError;
 use super::bootfs::AdditionalBootConfigurationError;
 use super::bootfs::BootfsPackageError;
@@ -75,7 +74,7 @@ pub trait Scrutiny {
     fn data_sources(&self) -> Box<dyn Iterator<Item = Box<dyn DataSource>>>;
 
     /// Iterate over all blobs from all system data sources.
-    fn blobs(&self) -> Result<Box<dyn Iterator<Item = Box<dyn Blob>>>, ScrutinyBlobsError>;
+    fn blobs(&self) -> Box<dyn Iterator<Item = Box<dyn Blob>>>;
 
     /// Iterate over all packages from all system data sources.
     fn packages(&self)
@@ -101,12 +100,6 @@ pub trait Scrutiny {
     fn component_instance_capabilities(
         &self,
     ) -> Box<dyn Iterator<Item = Box<dyn ComponentInstanceCapability>>>;
-}
-
-#[derive(Debug, Error)]
-pub enum ScrutinyBlobsError {
-    #[error("error iterating over blobs in directory: {0}")]
-    Directory(#[from] BlobDirectoryError),
 }
 
 #[derive(Debug, Error)]

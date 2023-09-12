@@ -66,8 +66,14 @@ impl System {
             variant,
             build_dir,
             update_package: Box::new(update_package),
-            zbi: Box::new(zbi),
+            zbi,
         })))
+    }
+
+    /// Returns borrow of [`super::zbi::Zbi`] *implementation* to client that has access to a
+    /// [`System`] *implementation*.
+    pub fn zbi(&self) -> &Zbi {
+        &self.0.zbi
     }
 }
 
@@ -81,7 +87,7 @@ impl api::System for System {
     }
 
     fn zbi(&self) -> Box<dyn api::Zbi> {
-        self.0.zbi.clone()
+        Box::new(self.0.zbi.clone())
     }
 
     fn update_package(&self) -> Box<dyn api::UpdatePackage> {
@@ -101,7 +107,7 @@ struct SystemData {
     variant: api::SystemVariant,
     build_dir: Box<dyn api::Path>,
     update_package: Box<dyn api::UpdatePackage>,
-    zbi: Box<dyn api::Zbi>,
+    zbi: Zbi,
 }
 
 #[cfg(test)]

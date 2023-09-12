@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 use super::api;
+use super::api::System as _;
 use super::blob::BlobDirectoryError;
 use super::blob::BlobSet;
+use super::blob::CompositeBlobSet;
 use super::hash::Hash;
 use super::package::Package;
 use super::product_bundle as pb;
@@ -21,6 +23,8 @@ pub enum Error {
     BlobDirectory(#[from] BlobDirectoryError),
     #[error("failed to construct system from product bundle: {0}")]
     System(#[from] SystemError),
+    #[error("failed to construct bootfs from system's zbi: {0}")]
+    Zbi(#[from] api::ZbiError),
 }
 
 pub(crate) struct Scrutiny(Rc<ScrutinyData>);
@@ -33,15 +37,19 @@ impl Scrutiny {
         variant: api::SystemVariant,
     ) -> Result<Self, Error> {
         let product_bundle = pb::ProductBundle::new(product_bundle_path)?;
-        let product_bundle_blob_set = product_bundle.blob_set()?;
-        let system: Box<dyn api::System> = Box::new(System::new(product_bundle.clone(), variant)?);
-        Ok(Self(Rc::new(ScrutinyData { product_bundle, product_bundle_blob_set, system })))
+
+        let system: System = System::new(product_bundle.clone(), variant)?;
+
+        let blob_set: Box<dyn BlobSet> = Box::new(CompositeBlobSet::new(
+            [product_bundle.blob_set()?, Box::new(system.zbi().bootfs()?.clone())].into_iter(),
+        ));
+        Ok(Self(Rc::new(ScrutinyData { product_bundle, blob_set, system })))
     }
 }
 
 impl api::Scrutiny for Scrutiny {
     fn system(&self) -> Box<dyn api::System> {
-        self.0.system.clone()
+        Box::new(self.0.system.clone()) as Box<dyn api::System>
     }
 
     fn component_manager(&self) -> Box<dyn api::ComponentManager> {
@@ -54,10 +62,8 @@ impl api::Scrutiny for Scrutiny {
         Box::new([data_source].into_iter())
     }
 
-    fn blobs(
-        &self,
-    ) -> Result<Box<dyn Iterator<Item = Box<dyn api::Blob>>>, api::ScrutinyBlobsError> {
-        Ok(self.0.product_bundle.blob_set()?.iter())
+    fn blobs(&self) -> Box<dyn Iterator<Item = Box<dyn api::Blob>>> {
+        self.0.blob_set.iter()
     }
 
     #[tracing::instrument(level = "trace", skip_all)]
@@ -68,12 +74,12 @@ impl api::Scrutiny for Scrutiny {
         Box::new(scrutiny_data.system.update_package().packages().clone().into_iter().map(
             move |url| {
                 let meta_far_blob: Box<dyn api::Blob> =
-                    scrutiny_data.product_bundle_blob_set.blob(Box::new(Hash::from(url.hash())))?;
+                    scrutiny_data.blob_set.blob(Box::new(Hash::from(url.hash())))?;
                 let package: Box<dyn api::Package> = Box::new(Package::new(
                     Some(scrutiny_data.product_bundle.data_source().clone()),
                     api::PackageResolverUrl::FuchsiaPkgUrl,
                     meta_far_blob,
-                    scrutiny_data.product_bundle_blob_set.clone(),
+                    scrutiny_data.blob_set.clone(),
                 )?);
                 Ok(package)
             },
@@ -111,6 +117,6 @@ impl api::Scrutiny for Scrutiny {
 
 struct ScrutinyData {
     product_bundle: pb::ProductBundle,
-    product_bundle_blob_set: Box<dyn BlobSet>,
-    system: Box<dyn api::System>,
+    blob_set: Box<dyn BlobSet>,
+    system: System,
 }

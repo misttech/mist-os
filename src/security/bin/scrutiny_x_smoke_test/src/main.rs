@@ -8,6 +8,7 @@ use anyhow::Context as _;
 use anyhow::Result;
 use argh::FromArgs;
 use scrutiny_x as scrutiny;
+use std::collections::HashSet;
 use std::fs::read_dir;
 use std::fs::write;
 use std::fs::File;
@@ -71,6 +72,8 @@ fn run_smoke_test(args: Args) -> Result<()> {
     let bootfs = scrutiny.system().zbi().bootfs().expect("bootfs");
     output_bootfs_data(bootfs.as_ref());
 
+    check_bootfs_blobs(scrutiny.as_ref());
+
     if let (Some(depfile), Some(stamp)) = (depfile, stamp) {
         let depfile = File::create(depfile).context("creating depfile")?;
         write_depfile(depfile, &product_bundle, &stamp).context("writing depfile")?;
@@ -104,7 +107,7 @@ fn output_data_source(data_source: Box<dyn scrutiny::DataSource>, prefix: String
 
 #[tracing::instrument(level = "trace", skip_all)]
 fn output_blobs(scrutiny: &dyn scrutiny::Scrutiny) {
-    for blob in scrutiny.blobs().expect("scrutiny blobs") {
+    for blob in scrutiny.blobs() {
         debug!("Blob: {:?}", blob.hash());
     }
 }
@@ -169,6 +172,36 @@ fn output_component_manager_configuration(
 ) {
     debug!("Component manager configuration:");
     debug!("  Component manager in debug mode?: {}", configuration.debug());
+}
+
+#[tracing::instrument(level = "trace", skip_all)]
+fn check_bootfs_blobs(scrutiny: &dyn scrutiny::Scrutiny) {
+    let bootfs_blob_hashes = scrutiny
+        .system()
+        .zbi()
+        .bootfs()
+        .expect("bootfs")
+        .content_blobs()
+        .map(|(_path, blob)| blob.hash())
+        .collect::<HashSet<_>>();
+
+    for blob in scrutiny.blobs() {
+        if bootfs_blob_hashes.contains(&blob.hash()) {
+            // Check that blob shipped in zbi/bootfs lists (at least) zbi as a data source.
+            let data_sources = blob.data_sources().collect::<Vec<_>>();
+            let zbi_bootfs_data_sources = data_sources
+                .into_iter()
+                .filter(|data_source| data_source.kind() == scrutiny_x::DataSourceKind::Zbi)
+                .collect::<Vec<_>>();
+            if zbi_bootfs_data_sources.len() != 1 {
+                panic!(
+                    "Expected exactly one zbi/bootfs data source for blob {:?}, but got {}",
+                    blob.hash(),
+                    zbi_bootfs_data_sources.len()
+                );
+            }
+        }
+    }
 }
 
 #[tracing::instrument(level = "trace", skip_all)]

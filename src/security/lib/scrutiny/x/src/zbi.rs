@@ -55,6 +55,12 @@ impl Zbi {
         Ok(Self(Rc::new(ZbiData { data_source, sections: zbi_sections, bootfs: OnceCell::new() })))
     }
 
+    /// Returns borrow of [`super::bootfs::Bootfs`] *implementation* to client that has access to a
+    /// [`Zbi`] *implementation*.
+    pub fn bootfs(&self) -> Result<&Bootfs, api::ZbiError> {
+        self.0.bootfs.get_or_try_init(|| self.init_bootfs())
+    }
+
     fn init_bootfs(&self) -> Result<Bootfs, api::ZbiError> {
         let bootfs_sections = self
             .0
