@@ -289,7 +289,7 @@ port_status_t NetworkDevice::ReadStatus() const {
   virtio_net_config config;
   CopyDeviceConfig(&config, sizeof(config));
   return {
-      .flags = (config.status & VIRTIO_NET_S_LINK_UP)
+      .flags = IsLinkActive(config, is_status_supported_)
                    ? static_cast<uint32_t>(fuchsia_hardware_network::wire::StatusFlags::kOnline)
                    : 0,
       .mtu = kMtu,
