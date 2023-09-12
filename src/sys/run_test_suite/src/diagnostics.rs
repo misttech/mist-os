@@ -124,7 +124,7 @@ pub fn get_type() -> LogsIteratorOption {
 
 #[cfg(not(target_os = "fuchsia"))]
 pub fn get_type() -> LogsIteratorOption {
-    LogsIteratorOption::ArchiveIterator
+    LogsIteratorOption::SocketBatchIterator
 }
 
 #[cfg(test)]
