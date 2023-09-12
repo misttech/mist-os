@@ -42,7 +42,7 @@ func RunChecks() error {
 		return err
 	}
 	if err := AllReadmeFuchsiaFilesMustBeFormattedCorrectly(); err != nil {
-		return err
+		fmt.Printf("========\nWarning: this will soon become an error\n\n%v\n========\n", err)
 	}
 	return nil
 }
