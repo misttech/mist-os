@@ -345,7 +345,14 @@ def main():
     # output.
     print(proc.stdout, end='')
 
-    proc.check_returncode()
+    if proc.returncode:
+        if not proc.stdout:
+            raise Exception(
+                'go build had an exit code of %d but did not print any output' %
+                proc.returncode)
+        # Don't raise an exception because that would add a noisy Python
+        # traceback that clutters up the relevant output from `go build`.
+        return proc.returncode
 
     # If the package contains no *_test.go files `go test -c` will exit with a
     # retcode of zero, but not produce the expected output file. Instead it will
