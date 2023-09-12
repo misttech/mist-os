@@ -41,9 +41,21 @@ static bool DrawFrame(const vkp::Device& vkp_device, const vkp::Swapchain& swap_
 static bool DrawOffscreenFrame(const vkp::Device& vkp_device,
                                const vkp::CommandBuffers& command_buffers, const vk::Fence& fence);
 
+#if USE_GLFW
 void glfwErrorCallback(int error, const char* description) {
   fprintf(stderr, "glfwErrorCallback: %d : %s\n", error, description);
 }
+
+static void glfwFramebufferResizeCallback(GLFWwindow* window, int width, int height) {
+  // TODO(rosasco): Add ability to recreate swapchain here. Define new struct with all
+  //                required dependencies to rebuild the swapchain called SwapchainDeps.
+  //                Call glfwSetWindowUserPointer(window, swapchain_deps) in main below, then:
+  //                auto swapchain_deps =
+  //                    reinterpret_cast<SwapchainDeps*>(glfwGetWindowUserPointer(window));
+  fprintf(stderr, "ERROR: Window resize not implemented.\n");
+  exit(1);
+}
+#endif
 
 int main(int argc, char* argv[]) {
   const bool offscreen = (argc == 2 && !strcmp(argv[1], "-offscreen"));
@@ -68,6 +80,7 @@ int main(int argc, char* argv[]) {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     window = glfwCreateWindow(1024, 768, "VkProto", nullptr, nullptr);
     RTN_IF_MSG(1, !window, "glfwCreateWindow failed.\n");
+    glfwSetFramebufferSizeCallback(window, glfwFramebufferResizeCallback);
   }
 #endif
 
