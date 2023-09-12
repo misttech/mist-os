@@ -35,20 +35,20 @@ zx_status_t SdmmcRootDevice::Bind(void* ctx, zx_device_t* parent) {
 }
 
 // TODO(hanbinyoon): Simplify further using templated lambda come C++20.
-// Returns true if device was successfully added. Returns false if the probe failed (i.e., no
-// eligible device present).
+// Returns nullptr if device was successfully added. Returns the SdmmcDevice if the probe failed
+// (i.e., no eligible device present).
 template <class DeviceType>
-static zx::result<bool> MaybeAddDevice(
-    const std::string& name, zx_device_t* zxdev, SdmmcDevice& sdmmc,
+static zx::result<std::unique_ptr<SdmmcDevice>> MaybeAddDevice(
+    const std::string& name, zx_device_t* zxdev, std::unique_ptr<SdmmcDevice> sdmmc,
     const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata) {
   std::unique_ptr<DeviceType> device;
-  if (zx_status_t st = DeviceType::Create(zxdev, sdmmc, &device) != ZX_OK) {
+  if (zx_status_t st = DeviceType::Create(zxdev, std::move(sdmmc), &device) != ZX_OK) {
     zxlogf(ERROR, "Failed to create %s device, retcode = %d", name.c_str(), st);
     return zx::error(st);
   }
 
   if (zx_status_t st = device->Probe(metadata); st != ZX_OK) {
-    return zx::ok(false);
+    return zx::ok(std::move(device->TakeSdmmcDevice()));
   }
 
   if (zx_status_t st = device->AddDevice(); st != ZX_OK) {
@@ -56,7 +56,7 @@ static zx::result<bool> MaybeAddDevice(
   }
 
   [[maybe_unused]] auto* placeholder = device.release();
-  return zx::ok(true);
+  return zx::ok(nullptr);
 }
 
 zx::result<fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>>
@@ -94,16 +94,16 @@ SdmmcRootDevice::GetMetadata(fidl::AnyArena& allocator) {
 }
 
 void SdmmcRootDevice::DdkInit(ddk::InitTxn txn) {
-  SdmmcDevice sdmmc(parent());
-  zx_status_t st = sdmmc.Init();
+  auto sdmmc = std::make_unique<SdmmcDevice>(parent());
+  zx_status_t st = sdmmc->Init();
   if (st != ZX_OK) {
     zxlogf(ERROR, "failed to get host info");
     return txn.Reply(st);
   }
 
   zxlogf(DEBUG, "host caps dma %d 8-bit bus %d max_transfer_size %" PRIu64 "",
-         sdmmc.UseDma() ? 1 : 0, (sdmmc.host_info().caps & SDMMC_HOST_CAP_BUS_WIDTH_8) ? 1 : 0,
-         sdmmc.host_info().max_transfer_size);
+         sdmmc->UseDma() ? 1 : 0, (sdmmc->host_info().caps & SDMMC_HOST_CAP_BUS_WIDTH_8) ? 1 : 0,
+         sdmmc->host_info().max_transfer_size);
 
   fidl::Arena arena;
   const zx::result metadata = GetMetadata(arena);
@@ -112,27 +112,27 @@ void SdmmcRootDevice::DdkInit(ddk::InitTxn txn) {
   }
 
   // Reset the card.
-  sdmmc.HwReset();
+  sdmmc->HwReset();
 
   // No matter what state the card is in, issuing the GO_IDLE_STATE command will
   // put the card into the idle state.
-  if ((st = sdmmc.SdmmcGoIdle()) != ZX_OK) {
+  if ((st = sdmmc->SdmmcGoIdle()) != ZX_OK) {
     zxlogf(ERROR, "SDMMC_GO_IDLE_STATE failed, retcode = %d", st);
     return txn.Reply(st);
   }
 
   // Probe for SDIO first, then SD/MMC.
-  zx::result<bool> result =
-      MaybeAddDevice<SdioControllerDevice>("sdio", zxdev(), sdmmc, **metadata);
+  zx::result<std::unique_ptr<SdmmcDevice>> result =
+      MaybeAddDevice<SdioControllerDevice>("sdio", zxdev(), std::move(sdmmc), **metadata);
   if (result.is_error()) {
     return txn.Reply(result.status_value());
-  } else if (*result) {
+  } else if (*result == nullptr) {
     return txn.Reply(ZX_OK);
   }
-  result = MaybeAddDevice<SdmmcBlockDevice>("block", zxdev(), sdmmc, **metadata);
+  result = MaybeAddDevice<SdmmcBlockDevice>("block", zxdev(), std::move(*result), **metadata);
   if (result.is_error()) {
     return txn.Reply(result.status_value());
-  } else if (*result) {
+  } else if (*result == nullptr) {
     return txn.Reply(ZX_OK);
   }
 

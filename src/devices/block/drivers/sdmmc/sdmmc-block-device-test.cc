@@ -32,9 +32,9 @@ namespace sdmmc {
 
 class SdmmcBlockDeviceTest : public zxtest::Test {
  public:
-  SdmmcBlockDeviceTest()
-      : dut_(std::make_unique<SdmmcBlockDevice>(parent_.get(), SdmmcDevice(sdmmc_.GetClient()))),
-        loop_(&kAsyncLoopConfigAttachToCurrentThread) {
+  SdmmcBlockDeviceTest() : loop_(&kAsyncLoopConfigAttachToCurrentThread) {
+    auto sdmmc = std::make_unique<SdmmcDevice>(sdmmc_.GetClient());
+    dut_ = std::make_unique<SdmmcBlockDevice>(parent_.get(), std::move(sdmmc));
     dut_->SetBlockInfo(FakeSdmmcDevice::kBlockSize, FakeSdmmcDevice::kBlockCount);
     for (size_t i = 0; i < (FakeSdmmcDevice::kBlockSize / sizeof(kTestData)); i++) {
       test_block_.insert(test_block_.end(), kTestData, kTestData + sizeof(kTestData));
@@ -842,7 +842,8 @@ TEST_F(SdmmcBlockDeviceTest, CompleteTransactions) {
   CallbackContext ctx(5);
 
   {
-    auto dut = std::make_unique<SdmmcBlockDevice>(parent_.get(), SdmmcDevice(sdmmc_.GetClient()));
+    auto sdmmc = std::make_unique<SdmmcDevice>(sdmmc_.GetClient());
+    auto dut = std::make_unique<SdmmcBlockDevice>(parent_.get(), std::move(sdmmc));
     dut->SetBlockInfo(FakeSdmmcDevice::kBlockSize, FakeSdmmcDevice::kBlockCount);
     EXPECT_OK(dut->AddDevice());
     [[maybe_unused]] auto ptr = dut.release();
@@ -963,7 +964,8 @@ TEST_F(SdmmcBlockDeviceTest, ProbeMmcSendStatusRetry) {
     }
   });
 
-  SdmmcBlockDevice dut(parent_.get(), SdmmcDevice(sdmmc_.GetClient()));
+  auto sdmmc = std::make_unique<SdmmcDevice>(sdmmc_.GetClient());
+  SdmmcBlockDevice dut(parent_.get(), std::move(sdmmc));
   EXPECT_OK(dut.ProbeMmc(CreateMetadata()));
 }
 
@@ -980,7 +982,8 @@ TEST_F(SdmmcBlockDeviceTest, ProbeMmcSendStatusFail) {
   sdmmc_.set_command_callback(SDMMC_SEND_STATUS,
                               [](const sdmmc_req_t& req) { return ZX_ERR_IO_DATA_INTEGRITY; });
 
-  SdmmcBlockDevice dut(parent_.get(), SdmmcDevice(sdmmc_.GetClient()));
+  auto sdmmc = std::make_unique<SdmmcDevice>(sdmmc_.GetClient());
+  SdmmcBlockDevice dut(parent_.get(), std::move(sdmmc));
   EXPECT_NOT_OK(dut.ProbeMmc(CreateMetadata()));
 }
 
@@ -1195,7 +1198,8 @@ TEST_F(SdmmcBlockDeviceTest, ProbeUsesPrefsHs) {
                SDMMC_HOST_PREFS_DISABLE_HSDDR,
   });
 
-  SdmmcBlockDevice dut(parent_.get(), SdmmcDevice(sdmmc_.GetClient()));
+  auto sdmmc = std::make_unique<SdmmcDevice>(sdmmc_.GetClient());
+  SdmmcBlockDevice dut(parent_.get(), std::move(sdmmc));
   EXPECT_OK(dut.Init());
   EXPECT_OK(dut.ProbeMmc(CreateMetadata()));
 
@@ -1218,7 +1222,8 @@ TEST_F(SdmmcBlockDeviceTest, ProbeUsesPrefsHsDdr) {
       .prefs = SDMMC_HOST_PREFS_DISABLE_HS200 | SDMMC_HOST_PREFS_DISABLE_HS400,
   });
 
-  SdmmcBlockDevice dut(parent_.get(), SdmmcDevice(sdmmc_.GetClient()));
+  auto sdmmc = std::make_unique<SdmmcDevice>(sdmmc_.GetClient());
+  SdmmcBlockDevice dut(parent_.get(), std::move(sdmmc));
   EXPECT_OK(dut.Init());
   EXPECT_OK(dut.ProbeMmc(CreateMetadata()));
 
@@ -1260,7 +1265,8 @@ TEST_F(SdmmcBlockDeviceTest, ProbeHs400) {
 
   sdmmc_.set_host_info({.prefs = 0});
 
-  SdmmcBlockDevice dut(parent_.get(), SdmmcDevice(sdmmc_.GetClient()));
+  auto sdmmc = std::make_unique<SdmmcDevice>(sdmmc_.GetClient());
+  SdmmcBlockDevice dut(parent_.get(), std::move(sdmmc));
   EXPECT_OK(dut.Init());
   EXPECT_OK(dut.ProbeMmc(CreateMetadata()));
 

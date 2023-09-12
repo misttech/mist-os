@@ -31,19 +31,19 @@ constexpr uint8_t kCsdStructV2 = 0x1;
 namespace sdmmc {
 
 zx_status_t SdmmcBlockDevice::ProbeSd(const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata) {
-  sdmmc_.SetRequestRetries(0);
+  sdmmc_->SetRequestRetries(0);
 
   // Issue the SEND_IF_COND command, this will tell us that we can talk to
   // the card correctly and it will also tell us if the voltage range that we
   // have supplied has been accepted.
-  zx_status_t st = sdmmc_.SdSendIfCond();
+  zx_status_t st = sdmmc_->SdSendIfCond();
   if (st != ZX_OK) {
     return st;
   }
 
   // Get the operating conditions from the card.
   uint32_t ocr;
-  if ((st = sdmmc_.SdSendOpCond(0, &ocr)) != ZX_OK) {
+  if ((st = sdmmc_->SdSendOpCond(0, &ocr)) != ZX_OK) {
     zxlogf(ERROR, "SDMMC_SD_SEND_OP_COND failed, retcode = %d", st);
     return st;
   }
@@ -54,7 +54,7 @@ zx_status_t SdmmcBlockDevice::ProbeSd(const fuchsia_hardware_sdmmc::wire::SdmmcM
   while (true) {
     const uint32_t flags = kAcmd41FlagSdhcSdxcSupport | kAcmd41FlagVoltageWindowAll;
     uint32_t ocr;
-    if ((st = sdmmc_.SdSendOpCond(flags, &ocr)) != ZX_OK) {
+    if ((st = sdmmc_->SdSendOpCond(flags, &ocr)) != ZX_OK) {
       zxlogf(ERROR, "SD_SEND_OP_COND failed with retcode = %d", st);
       return st;
     }
@@ -77,7 +77,7 @@ zx_status_t SdmmcBlockDevice::ProbeSd(const fuchsia_hardware_sdmmc::wire::SdmmcM
     zx::nanosleep(zx::deadline_after(zx::msec(5)));
   }
 
-  st = sdmmc_.SetBusFreq(25000000);
+  st = sdmmc_->SetBusFreq(25000000);
   if (st != ZX_OK) {
     // This is non-fatal but the card will run slowly.
     zxlogf(ERROR, "failed to increase bus frequency.");
@@ -104,13 +104,13 @@ zx_status_t SdmmcBlockDevice::ProbeSd(const fuchsia_hardware_sdmmc::wire::SdmmcM
   //     }
   // }
 
-  if ((st = sdmmc_.MmcAllSendCid(raw_cid_)) != ZX_OK) {
+  if ((st = sdmmc_->MmcAllSendCid(raw_cid_)) != ZX_OK) {
     zxlogf(ERROR, "ALL_SEND_CID failed with retcode = %d", st);
     return st;
   }
 
   uint16_t card_status;
-  if ((st = sdmmc_.SdSendRelativeAddr(&card_status)) != ZX_OK) {
+  if ((st = sdmmc_->SdSendRelativeAddr(&card_status)) != ZX_OK) {
     zxlogf(ERROR, "SEND_RELATIVE_ADDR failed with retcode = %d", st);
     return st;
   }
@@ -125,7 +125,7 @@ zx_status_t SdmmcBlockDevice::ProbeSd(const fuchsia_hardware_sdmmc::wire::SdmmcM
   }
 
   // Determine the size of the card.
-  if ((st = sdmmc_.MmcSendCsd(raw_csd_)) != ZX_OK) {
+  if ((st = sdmmc_->MmcSendCsd(raw_csd_)) != ZX_OK) {
     zxlogf(ERROR, "failed to send app cmd, retcode = %d", st);
     return st;
   }
@@ -147,13 +147,13 @@ zx_status_t SdmmcBlockDevice::ProbeSd(const fuchsia_hardware_sdmmc::wire::SdmmcM
   zxlogf(INFO, "found card with capacity = %" PRIu64 "B",
          block_info_.block_count * block_info_.block_size);
 
-  if ((st = sdmmc_.SdSelectCard()) != ZX_OK) {
+  if ((st = sdmmc_->SdSelectCard()) != ZX_OK) {
     zxlogf(ERROR, "SELECT_CARD failed with retcode = %d", st);
     return st;
   }
 
   std::array<uint8_t, 8> scr;
-  if ((st = sdmmc_.SdSendScr(scr)) != ZX_OK) {
+  if ((st = sdmmc_->SdSendScr(scr)) != ZX_OK) {
     zxlogf(ERROR, "SEND_SCR failed with retcode = %d", st);
     return st;
   }
@@ -165,11 +165,11 @@ zx_status_t SdmmcBlockDevice::ProbeSd(const fuchsia_hardware_sdmmc::wire::SdmmcM
   if (supported_bus_widths & 0x4) {
     do {
       // First tell the card to go into four bit mode:
-      if ((st = sdmmc_.SdSetBusWidth(SDMMC_BUS_WIDTH_FOUR)) != ZX_OK) {
+      if ((st = sdmmc_->SdSetBusWidth(SDMMC_BUS_WIDTH_FOUR)) != ZX_OK) {
         zxlogf(ERROR, "failed to set card bus width, retcode = %d", st);
         break;
       }
-      st = sdmmc_.SetBusWidth(SDMMC_BUS_WIDTH_FOUR);
+      st = sdmmc_->SetBusWidth(SDMMC_BUS_WIDTH_FOUR);
       if (st != ZX_OK) {
         zxlogf(ERROR, "failed to set host bus width, retcode = %d", st);
       }

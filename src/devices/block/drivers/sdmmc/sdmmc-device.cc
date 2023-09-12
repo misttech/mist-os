@@ -41,7 +41,7 @@ zx_status_t SdmmcDevice::Init() {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  return host_.HostInfo(&host_info_);
+  return HostInfo(&host_info_);
 }
 
 zx_status_t SdmmcDevice::Request(const sdmmc_req_t& req, uint32_t response[4], uint32_t retries,
@@ -51,7 +51,7 @@ zx_status_t SdmmcDevice::Request(const sdmmc_req_t& req, uint32_t response[4], u
   }
 
   zx_status_t st;
-  while (((st = host_.Request(&req, response)) != ZX_OK) && retries > 0) {
+  while (((st = Request(&req, response)) != ZX_OK) && retries > 0) {
     retries--;
     if (wait_time.get() > 0) {
       zx::nanosleep(zx::deadline_after(wait_time));
@@ -330,12 +330,12 @@ zx_status_t SdmmcDevice::SdSwitchUhsVoltage(uint32_t ocr) {
     return st;
   }
 
-  if ((st = host_.SetBusFreq(0)) != ZX_OK) {
+  if ((st = SetBusFreq(0)) != ZX_OK) {
     zxlogf(DEBUG, "SD_VOLTAGE_SWITCH failed, retcode = %d", st);
     return st;
   }
 
-  if ((st = host_.SetSignalVoltage(SDMMC_VOLTAGE_V180)) != ZX_OK) {
+  if ((st = SetSignalVoltage(SDMMC_VOLTAGE_V180)) != ZX_OK) {
     zxlogf(DEBUG, "SD_VOLTAGE_SWITCH failed, retcode = %d", st);
     return st;
   }
@@ -343,7 +343,7 @@ zx_status_t SdmmcDevice::SdSwitchUhsVoltage(uint32_t ocr) {
   // Wait 5ms for the voltage to stabilize. See section 3.6.1. in the SDHCI specification.
   zx::nanosleep(zx::deadline_after(kVoltageStabilizationTime));
 
-  if ((st = host_.SetBusFreq(kInitializationFrequencyHz)) != ZX_OK) {
+  if ((st = SetBusFreq(kInitializationFrequencyHz)) != ZX_OK) {
     zxlogf(DEBUG, "SD_VOLTAGE_SWITCH failed, retcode = %d", st);
     return st;
   }
@@ -456,7 +456,7 @@ zx_status_t SdmmcDevice::SdioIoRwExtended(uint32_t caps, bool write, uint8_t fn_
   req.buffers_count = buffers.size();
 
   uint32_t response[4] = {};
-  zx_status_t st = host_.Request(&req, response);
+  zx_status_t st = Request(&req, response);
   if (st != ZX_OK) {
     zxlogf(ERROR, "SDIO_IO_RW_DIRECT_EXTENDED failed, retcode = %d", st);
     return st;
@@ -586,6 +586,8 @@ zx_status_t SdmmcDevice::MmcSwitch(uint8_t index, uint8_t value) {
   return Request(req, unused_response);
 }
 
+zx_status_t SdmmcDevice::HostInfo(sdmmc_host_info_t* info) { return host_.HostInfo(info); }
+
 zx_status_t SdmmcDevice::SetSignalVoltage(sdmmc_voltage_t voltage) {
   return host_.SetSignalVoltage(voltage);
 }
@@ -618,7 +620,7 @@ zx_status_t SdmmcDevice::UnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::v
   return host_.UnregisterVmo(vmo_id, client_id, out_vmo);
 }
 
-zx_status_t SdmmcDevice::Request(const sdmmc_req_t* req, uint32_t out_response[4]) {
+zx_status_t SdmmcDevice::Request(const sdmmc_req_t* req, uint32_t out_response[4]) const {
   return host_.Request(req, out_response);
 }
 

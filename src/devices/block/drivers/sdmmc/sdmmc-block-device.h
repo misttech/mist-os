@@ -37,14 +37,17 @@ using SdmmcBlockDeviceType = ddk::Device<SdmmcBlockDevice, ddk::Unbindable, ddk:
 
 class SdmmcBlockDevice : public SdmmcBlockDeviceType {
  public:
-  SdmmcBlockDevice(zx_device_t* parent, const SdmmcDevice& sdmmc)
-      : SdmmcBlockDeviceType(parent), sdmmc_(sdmmc) {
-    block_info_.max_transfer_size = static_cast<uint32_t>(sdmmc_.host_info().max_transfer_size);
+  SdmmcBlockDevice(zx_device_t* parent, std::unique_ptr<SdmmcDevice> sdmmc)
+      : SdmmcBlockDeviceType(parent), sdmmc_(std::move(sdmmc)) {
+    block_info_.max_transfer_size = static_cast<uint32_t>(sdmmc_->host_info().max_transfer_size);
   }
   ~SdmmcBlockDevice() { txn_list_.CompleteAll(ZX_ERR_INTERNAL); }
 
-  static zx_status_t Create(zx_device_t* parent, const SdmmcDevice& sdmmc,
+  static zx_status_t Create(zx_device_t* parent, std::unique_ptr<SdmmcDevice> sdmmc,
                             std::unique_ptr<SdmmcBlockDevice>* out_dev);
+  // Returns the SdmmcDevice. Used if this SdmmcBlockDevice fails to probe (i.e., no eligible device
+  // present).
+  std::unique_ptr<SdmmcDevice> TakeSdmmcDevice() { return std::move(sdmmc_); }
 
   // Probe for SD first, then MMC.
   zx_status_t Probe(const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata) {
@@ -67,7 +70,7 @@ class SdmmcBlockDevice : public SdmmcBlockDeviceType {
   void RpmbQueue(RpmbRequestInfo info) TA_EXCL(lock_);
 
   // Visible for testing.
-  zx_status_t Init() { return sdmmc_.Init(); }
+  zx_status_t Init() { return sdmmc_->Init(); }
   void StopWorkerThread() TA_EXCL(lock_);
   void SetBlockInfo(uint32_t block_size, uint64_t block_count);
 
@@ -109,7 +112,7 @@ class SdmmcBlockDevice : public SdmmcBlockDeviceType {
   bool MmcSupportsHs400();
   void MmcSetInspectProperties();
 
-  SdmmcDevice sdmmc_;  // Only accessed by ProbeSd, ProbeMmc, and WorkerThread.
+  std::unique_ptr<SdmmcDevice> sdmmc_;  // Only accessed by ProbeSd, ProbeMmc, and WorkerThread.
 
   sdmmc_bus_width_t bus_width_;
   sdmmc_timing_t timing_;

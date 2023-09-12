@@ -33,15 +33,18 @@ using SdioControllerDeviceType = ddk::Device<SdioControllerDevice, ddk::Unbindab
 class SdioControllerDevice : public SdioControllerDeviceType,
                              public ddk::InBandInterruptProtocol<SdioControllerDevice> {
  public:
-  SdioControllerDevice(zx_device_t* parent, const SdmmcDevice& sdmmc)
-      : SdioControllerDeviceType(parent), sdmmc_(sdmmc) {
+  SdioControllerDevice(zx_device_t* parent, std::unique_ptr<SdmmcDevice> sdmmc)
+      : SdioControllerDeviceType(parent), sdmmc_(std::move(sdmmc)) {
     for (size_t i = 0; i < funcs_.size(); i++) {
       funcs_[i] = {};
     }
   }
 
-  static zx_status_t Create(zx_device_t* parent, const SdmmcDevice& sdmmc,
+  static zx_status_t Create(zx_device_t* parent, std::unique_ptr<SdmmcDevice> sdmmc,
                             std::unique_ptr<SdioControllerDevice>* out_dev);
+  // Returns the SdmmcDevice. Used if this SdioControllerDevice fails to probe (i.e., no eligible
+  // device present).
+  std::unique_ptr<SdmmcDevice> TakeSdmmcDevice() { return std::move(sdmmc_); }
 
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
@@ -76,7 +79,7 @@ class SdioControllerDevice : public SdioControllerDeviceType,
   // Visible for testing.
   zx_status_t Init() TA_EXCL(lock_) {
     fbl::AutoLock _(&lock_);
-    return sdmmc_.Init();
+    return sdmmc_->Init();
   }
 
   zx_status_t StartSdioIrqThreadIfNeeded() TA_EXCL(irq_thread_lock_);
@@ -152,7 +155,7 @@ class SdioControllerDevice : public SdioControllerDeviceType,
   sync_completion_t irq_signal_;
 
   fbl::Mutex lock_;
-  SdmmcDevice sdmmc_;
+  std::unique_ptr<SdmmcDevice> sdmmc_;
   std::atomic<bool> dead_ = false;
   std::array<zx::interrupt, SDIO_MAX_FUNCS> sdio_irqs_;
   std::array<SdioFunction, SDIO_MAX_FUNCS> funcs_ TA_GUARDED(lock_);

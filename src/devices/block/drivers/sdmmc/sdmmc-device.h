@@ -84,6 +84,7 @@ class SdmmcDevice {
 
   // TODO(b/299501583): Migrate these to use FIDL calls.
   // Wraps ddk::SdmmcProtocolClient methods.
+  zx_status_t HostInfo(sdmmc_host_info_t* info);
   zx_status_t SetSignalVoltage(sdmmc_voltage_t voltage);
   zx_status_t SetBusWidth(sdmmc_bus_width_t bus_width);
   zx_status_t SetBusFreq(uint32_t bus_freq);
@@ -96,7 +97,7 @@ class SdmmcDevice {
   zx_status_t RegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo vmo, uint64_t offset,
                           uint64_t size, uint32_t vmo_rights);
   zx_status_t UnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo* out_vmo);
-  zx_status_t Request(const sdmmc_req_t* req, uint32_t out_response[4]);
+  zx_status_t Request(const sdmmc_req_t* req, uint32_t out_response[4]) const;
 
  private:
   static constexpr uint32_t kTryAttempts = 10;  // 1 initial + 9 retries.

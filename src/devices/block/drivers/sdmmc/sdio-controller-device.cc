@@ -58,10 +58,10 @@ inline uint8_t GetBitsU8(uint8_t x, uint8_t mask, uint8_t loc) {
 
 namespace sdmmc {
 
-zx_status_t SdioControllerDevice::Create(zx_device_t* parent, const SdmmcDevice& sdmmc,
+zx_status_t SdioControllerDevice::Create(zx_device_t* parent, std::unique_ptr<SdmmcDevice> sdmmc,
                                          std::unique_ptr<SdioControllerDevice>* out_dev) {
   fbl::AllocChecker ac;
-  out_dev->reset(new (&ac) SdioControllerDevice(parent, sdmmc));
+  out_dev->reset(new (&ac) SdioControllerDevice(parent, std::move(sdmmc)));
   if (!ac.check()) {
     zxlogf(ERROR, "failed to allocate device memory");
     return ZX_ERR_NO_MEMORY;
@@ -79,22 +79,22 @@ zx_status_t SdioControllerDevice::Probe(
 zx_status_t SdioControllerDevice::ProbeLocked() {
   zx_status_t st = SdioReset();
 
-  if ((st = sdmmc_.SdmmcGoIdle()) != ZX_OK) {
+  if ((st = sdmmc_->SdmmcGoIdle()) != ZX_OK) {
     zxlogf(ERROR, "SDMMC_GO_IDLE_STATE failed, retcode = %d", st);
     return st;
   }
 
-  sdmmc_.SdSendIfCond();
+  sdmmc_->SdSendIfCond();
 
   uint32_t ocr;
-  if ((st = sdmmc_.SdioSendOpCond(0, &ocr)) != ZX_OK) {
+  if ((st = sdmmc_->SdioSendOpCond(0, &ocr)) != ZX_OK) {
     zxlogf(DEBUG, "SDIO_SEND_OP_COND failed, retcode = %d", st);
     return st;
   }
   // Select voltage 3.3 V. Also request for 1.8V. Section 3.2 SDIO spec
   if (ocr & SDIO_SEND_OP_COND_IO_OCR_33V) {
     uint32_t new_ocr = SDIO_SEND_OP_COND_IO_OCR_33V | SDIO_SEND_OP_COND_CMD_S18R;
-    if ((st = sdmmc_.SdioSendOpCond(new_ocr, &ocr)) != ZX_OK) {
+    if ((st = sdmmc_->SdioSendOpCond(new_ocr, &ocr)) != ZX_OK) {
       zxlogf(ERROR, "SDIO_SEND_OP_COND failed, retcode = %d", st);
       return st;
     }
@@ -109,24 +109,24 @@ zx_status_t SdioControllerDevice::ProbeLocked() {
     return ZX_ERR_IO;
   }
   if (ocr & SDIO_SEND_OP_COND_RESP_S18A) {
-    if ((st = sdmmc_.SdSwitchUhsVoltage(ocr)) != ZX_OK) {
+    if ((st = sdmmc_->SdSwitchUhsVoltage(ocr)) != ZX_OK) {
       zxlogf(ERROR, "Failed to switch voltage to 1.8V");
       return st;
     }
   }
   hw_info_.num_funcs =
       GetBits(ocr, SDIO_SEND_OP_COND_RESP_NUM_FUNC_MASK, SDIO_SEND_OP_COND_RESP_NUM_FUNC_LOC);
-  if ((st = sdmmc_.SdSendRelativeAddr(nullptr)) != ZX_OK) {
+  if ((st = sdmmc_->SdSendRelativeAddr(nullptr)) != ZX_OK) {
     zxlogf(ERROR, "SD_SEND_RELATIVE_ADDR failed, retcode = %d", st);
     return st;
   }
 
-  if ((st = sdmmc_.MmcSelectCard()) != ZX_OK) {
+  if ((st = sdmmc_->MmcSelectCard()) != ZX_OK) {
     zxlogf(ERROR, "MMC_SELECT_CARD failed, retcode = %d", st);
     return st;
   }
 
-  sdmmc_.SetRequestRetries(10);
+  sdmmc_->SetRequestRetries(10);
 
   if ((st = ProcessCccr()) != ZX_OK) {
     zxlogf(ERROR, "Read CCCR failed, retcode = %d", st);
@@ -164,7 +164,7 @@ zx_status_t SdioControllerDevice::ProbeLocked() {
   }
 
   const bool sdio_irq_supported =
-      sdmmc_.RegisterInBandInterrupt(this, &in_band_interrupt_protocol_ops_) == ZX_OK;
+      sdmmc_->RegisterInBandInterrupt(this, &in_band_interrupt_protocol_ops_) == ZX_OK;
 
   // 0 is the common function. Already initialized
   for (size_t i = 1; i < hw_info_.num_funcs; i++) {
@@ -180,7 +180,7 @@ zx_status_t SdioControllerDevice::ProbeLocked() {
     }
   }
 
-  sdmmc_.SetRequestRetries(0);
+  sdmmc_->SetRequestRetries(0);
 
   zxlogf(INFO, "sdio device initialized successfully");
   zxlogf(INFO, "          Manufacturer: 0x%x", funcs_[0].hw_info.manufacturer_id);
@@ -288,7 +288,8 @@ zx_status_t SdioControllerDevice::SdioGetDevHwInfo(uint8_t fn_idx, sdio_hw_info_
 
   memcpy(&out_hw_info->dev_hw_info, &hw_info_, sizeof(sdio_device_hw_info_t));
   memcpy(&out_hw_info->func_hw_info, &funcs_[fn_idx].hw_info, sizeof(sdio_func_hw_info_t));
-  out_hw_info->host_max_transfer_size = static_cast<uint32_t>(sdmmc_.host_info().max_transfer_size);
+  out_hw_info->host_max_transfer_size =
+      static_cast<uint32_t>(sdmmc_->host_info().max_transfer_size);
   return ZX_OK;
 }
 
@@ -516,7 +517,7 @@ zx_status_t SdioControllerDevice::SdioDoRwByteLocked(bool write, uint8_t fn_idx,
 
   out_read_byte = write ? nullptr : out_read_byte;
   write_byte = write ? write_byte : 0;
-  return sdmmc_.SdioIoRwDirect(write, fn_idx, addr, write_byte, out_read_byte);
+  return sdmmc_->SdioIoRwDirect(write, fn_idx, addr, write_byte, out_read_byte);
 }
 
 zx_status_t SdioControllerDevice::SdioGetInBandIntr(uint8_t fn_idx, zx::interrupt* out_irq) {
@@ -540,7 +541,7 @@ void SdioControllerDevice::SdioAckInBandIntr(uint8_t fn_idx) {
   if (SdioFnIdxValid(fn_idx) && fn_idx != 0) {
     fbl::AutoLock lock(&lock_);
     interrupt_enabled_mask_ |= 1 << fn_idx;
-    sdmmc_.AckInBandInterrupt();
+    sdmmc_->AckInBandInterrupt();
   }
 }
 
@@ -630,7 +631,7 @@ zx_status_t SdioControllerDevice::SdioRegisterVmo(uint8_t fn_idx, uint32_t vmo_i
   }
 
   fbl::AutoLock lock(&lock_);
-  return sdmmc_.RegisterVmo(vmo_id, fn_idx, std::move(vmo), offset, size, vmo_rights);
+  return sdmmc_->RegisterVmo(vmo_id, fn_idx, std::move(vmo), offset, size, vmo_rights);
 }
 
 zx_status_t SdioControllerDevice::SdioUnregisterVmo(uint8_t fn_idx, uint32_t vmo_id,
@@ -643,7 +644,7 @@ zx_status_t SdioControllerDevice::SdioUnregisterVmo(uint8_t fn_idx, uint32_t vmo
   }
 
   fbl::AutoLock lock(&lock_);
-  return sdmmc_.UnregisterVmo(vmo_id, fn_idx, out_vmo);
+  return sdmmc_->UnregisterVmo(vmo_id, fn_idx, out_vmo);
 }
 
 void SdioControllerDevice::SdioRequestCardReset(sdio_request_card_reset_callback callback,
@@ -658,7 +659,7 @@ void SdioControllerDevice::SdioRequestCardReset(sdio_request_card_reset_callback
   funcs_ = {};
   hw_info_ = {};
 
-  sdmmc_.HwReset();
+  sdmmc_->HwReset();
 
   zx_status_t status = ProbeLocked();
   if (status == ZX_OK) {
@@ -685,7 +686,7 @@ void SdioControllerDevice::SdioPerformTuning(sdio_perform_tuning_callback callba
   }
 
   async::PostTask(dispatcher_, [this, cookie, callback]() {
-    zx_status_t status = sdmmc_.PerformTuning(SD_SEND_TUNING_BLOCK);
+    zx_status_t status = sdmmc_->PerformTuning(SD_SEND_TUNING_BLOCK);
     callback(cookie, status);
     tuning_in_progress_.store(false);
   });
@@ -749,17 +750,17 @@ zx::result<SdioControllerDevice::SdioTxnPosition> SdioControllerDevice::DoOneRwT
     // least the block size. The first buffer may have had the size adjusted, so use the local
     // buffers array.
     cpp20::span txn_buffers(buffers, current_position.buffers.size());
-    status = sdmmc_.SdioIoRwExtended(hw_info_.caps, txn.write, fn_idx, current_position.address,
-                                     txn.incr, 1, static_cast<uint32_t>(total_size), txn_buffers);
+    status = sdmmc_->SdioIoRwExtended(hw_info_.caps, txn.write, fn_idx, current_position.address,
+                                      txn.incr, 1, static_cast<uint32_t>(total_size), txn_buffers);
     last_block_buffer_index = current_position.buffers.size();
   } else {
     txn_size = static_cast<uint32_t>(block_count * func_blk_size);
 
     cpp20::span txn_buffers(buffers, last_block_buffer_index + 1);
     txn_buffers[last_block_buffer_index].size = last_block_buffer_size;
-    status = sdmmc_.SdioIoRwExtended(hw_info_.caps, txn.write, fn_idx, current_position.address,
-                                     txn.incr, static_cast<uint32_t>(block_count), func_blk_size,
-                                     txn_buffers);
+    status = sdmmc_->SdioIoRwExtended(hw_info_.caps, txn.write, fn_idx, current_position.address,
+                                      txn.incr, static_cast<uint32_t>(block_count), func_blk_size,
+                                      txn_buffers);
 
     if (last_block_buffer_index == 0) {
       last_block_buffer_size += current_position.first_buffer_offset;
@@ -993,7 +994,7 @@ zx_status_t SdioControllerDevice::ParseFuncExtTuple(uint8_t fn_idx, const SdioFu
     func->hw_info.max_blk_size =
         SdioReadTupleBody(tup.tuple_body, SDIO_CIS_TPL_FUNCE_FUNC0_MAX_BLK_SIZE_LOC, 2);
     func->hw_info.max_blk_size = static_cast<uint32_t>(
-        std::min<uint64_t>(sdmmc_.host_info().max_transfer_size, func->hw_info.max_blk_size));
+        std::min<uint64_t>(sdmmc_->host_info().max_transfer_size, func->hw_info.max_blk_size));
 
     if (func->hw_info.max_blk_size == 0) {
       zxlogf(ERROR, "Invalid max block size for function 0");
@@ -1085,7 +1086,7 @@ zx_status_t SdioControllerDevice::InitFunc(uint8_t fn_idx) {
 
 zx_status_t SdioControllerDevice::SwitchFreq(uint32_t new_freq) {
   zx_status_t st;
-  if ((st = sdmmc_.SetBusFreq(new_freq)) != ZX_OK) {
+  if ((st = sdmmc_->SetBusFreq(new_freq)) != ZX_OK) {
     zxlogf(ERROR, "Error while switching host bus frequency, retcode = %d", st);
     return st;
   }
@@ -1113,7 +1114,7 @@ zx_status_t SdioControllerDevice::TrySwitchHs() {
     return st;
   }
   // Switch the host timing
-  if ((st = sdmmc_.SetTiming(SDMMC_TIMING_HS)) != ZX_OK) {
+  if ((st = sdmmc_->SetTiming(SDMMC_TIMING_HS)) != ZX_OK) {
     zxlogf(ERROR, "failed to switch to hs timing on host : %d", st);
     return st;
   }
@@ -1149,16 +1150,17 @@ zx_status_t SdioControllerDevice::TrySwitchUhs() {
     return st;
   }
 
-  if ((sdmmc_.host_info().caps & SDMMC_HOST_CAP_SDR104) && (hw_info_.caps & SDIO_CARD_UHS_SDR104)) {
+  if ((sdmmc_->host_info().caps & SDMMC_HOST_CAP_SDR104) &&
+      (hw_info_.caps & SDIO_CARD_UHS_SDR104)) {
     select_speed = SDIO_BUS_SPEED_SDR104;
     timing = SDMMC_TIMING_SDR104;
     new_freq = SDIO_UHS_SDR104_MAX_FREQ;
-  } else if ((sdmmc_.host_info().caps & SDMMC_HOST_CAP_SDR50) &&
+  } else if ((sdmmc_->host_info().caps & SDMMC_HOST_CAP_SDR50) &&
              (hw_info_.caps & SDIO_CARD_UHS_SDR50)) {
     select_speed = SDIO_BUS_SPEED_SDR50;
     timing = SDMMC_TIMING_SDR50;
     new_freq = SDIO_UHS_SDR50_MAX_FREQ;
-  } else if ((sdmmc_.host_info().caps & SDMMC_HOST_CAP_DDR50) &&
+  } else if ((sdmmc_->host_info().caps & SDMMC_HOST_CAP_DDR50) &&
              (hw_info_.caps & SDIO_CARD_UHS_DDR50)) {
     select_speed = SDIO_BUS_SPEED_DDR50;
     timing = SDMMC_TIMING_DDR50;
@@ -1178,7 +1180,7 @@ zx_status_t SdioControllerDevice::TrySwitchUhs() {
     return st;
   }
   // Switch the host timing
-  if ((st = sdmmc_.SetTiming(timing)) != ZX_OK) {
+  if ((st = sdmmc_->SetTiming(timing)) != ZX_OK) {
     zxlogf(ERROR, "failed to switch to uhs timing on host : %d", st);
     return st;
   }
@@ -1191,8 +1193,8 @@ zx_status_t SdioControllerDevice::TrySwitchUhs() {
   // Only tune for SDR50 if the host requires it.
   if (timing == SDMMC_TIMING_SDR104 ||
       (timing == SDMMC_TIMING_SDR50 &&
-       !(sdmmc_.host_info().caps & SDMMC_HOST_CAP_NO_TUNING_SDR50))) {
-    st = sdmmc_.PerformTuning(SD_SEND_TUNING_BLOCK);
+       !(sdmmc_->host_info().caps & SDMMC_HOST_CAP_NO_TUNING_SDR50))) {
+    st = sdmmc_->PerformTuning(SD_SEND_TUNING_BLOCK);
     if (st != ZX_OK) {
       zxlogf(ERROR, "tuning failed %d", st);
       return st;
@@ -1221,7 +1223,7 @@ zx_status_t SdioControllerDevice::Enable4BitBus() {
     zxlogf(ERROR, "Error while switching the bus width");
     return st;
   }
-  if ((st = sdmmc_.SetBusWidth(SDMMC_BUS_WIDTH_FOUR)) != ZX_OK) {
+  if ((st = sdmmc_->SetBusWidth(SDMMC_BUS_WIDTH_FOUR)) != ZX_OK) {
     zxlogf(ERROR, "failed to switch the host bus width to %d, retcode = %d", SDMMC_BUS_WIDTH_FOUR,
            st);
     return ZX_ERR_INTERNAL;

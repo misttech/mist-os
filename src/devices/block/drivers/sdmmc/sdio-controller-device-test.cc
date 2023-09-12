@@ -31,7 +31,8 @@ namespace sdmmc {
 class SdioControllerDeviceTest : public zxtest::Test {
  public:
   SdioControllerDeviceTest() {
-    dut_ = std::make_unique<SdioControllerDevice>(parent_.get(), SdmmcDevice(sdmmc_.GetClient()));
+    auto sdmmc = std::make_unique<SdmmcDevice>(sdmmc_.GetClient());
+    dut_ = std::make_unique<SdioControllerDevice>(parent_.get(), std::move(sdmmc));
   }
 
   void SetUp() override {
@@ -88,7 +89,8 @@ class SdioControllerDeviceTest : public zxtest::Test {
 class SdioScatterGatherTest : public zxtest::Test {
  public:
   SdioScatterGatherTest() {
-    dut_ = std::make_unique<SdioControllerDevice>(parent_.get(), SdmmcDevice(sdmmc_.GetClient()));
+    auto sdmmc = std::make_unique<SdmmcDevice>(sdmmc_.GetClient());
+    dut_ = std::make_unique<SdioControllerDevice>(parent_.get(), std::move(sdmmc));
   }
 
   void SetUp() override { sdmmc_.Reset(); }

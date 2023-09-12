@@ -42,10 +42,10 @@ inline void BlockComplete(sdmmc::BlockOperation& txn, zx_status_t status) {
 
 namespace sdmmc {
 
-zx_status_t SdmmcBlockDevice::Create(zx_device_t* parent, const SdmmcDevice& sdmmc,
+zx_status_t SdmmcBlockDevice::Create(zx_device_t* parent, std::unique_ptr<SdmmcDevice> sdmmc,
                                      std::unique_ptr<SdmmcBlockDevice>* out_dev) {
   fbl::AllocChecker ac;
-  out_dev->reset(new (&ac) SdmmcBlockDevice(parent, sdmmc));
+  out_dev->reset(new (&ac) SdmmcBlockDevice(parent, std::move(sdmmc)));
   if (!ac.check()) {
     zxlogf(ERROR, "failed to allocate device memory");
     return ZX_ERR_NO_MEMORY;
@@ -239,7 +239,7 @@ zx_status_t SdmmcBlockDevice::ReadWrite(const std::vector<BlockOperation>& btxns
       }
     }
   } else {
-    if (sdmmc_.host_info().caps & SDMMC_HOST_CAP_AUTO_CMD12) {
+    if (sdmmc_->host_info().caps & SDMMC_HOST_CAP_AUTO_CMD12) {
       cmd_flags |= SDMMC_CMD_AUTO12;
     } else {
       manual_stop_transmission = true;
@@ -334,8 +334,8 @@ zx_status_t SdmmcBlockDevice::ReadWrite(const std::vector<BlockOperation>& btxns
   }
 
   uint32_t retries = 0;
-  st = sdmmc_.SdmmcIoRequestWithRetries(req, &retries, set_block_count, set_block_count_for_header,
-                                        write_header);
+  st = sdmmc_->SdmmcIoRequestWithRetries(req, &retries, set_block_count, set_block_count_for_header,
+                                         write_header);
   properties_.io_retries_.Add(retries);
   if (st != ZX_OK) {
     zxlogf(ERROR, "do_txn error %d", st);
@@ -346,7 +346,7 @@ zx_status_t SdmmcBlockDevice::ReadWrite(const std::vector<BlockOperation>& btxns
   // needs to be sent here if SET_BLOCK_COUNT isn't used, the request succeeded, and the controller
   // doesn't support auto cmd12.
   if (st == ZX_OK && manual_stop_transmission) {
-    zx_status_t stop_st = sdmmc_.SdmmcStopTransmission();
+    zx_status_t stop_st = sdmmc_->SdmmcStopTransmission();
     if (stop_st != ZX_OK) {
       zxlogf(WARNING, "do_txn stop transmission error %d", stop_st);
       properties_.io_errors_.Add(1);
@@ -396,7 +396,7 @@ zx_status_t SdmmcBlockDevice::Trim(const block_trim_t& txn, const EmmcPartition 
       .arg = static_cast<uint32_t>(txn.offset_dev),
   };
   uint32_t response[4] = {};
-  if ((status = sdmmc_.Request(&discard_start, response)) != ZX_OK) {
+  if ((status = sdmmc_->Request(&discard_start, response)) != ZX_OK) {
     zxlogf(ERROR, "failed to set discard group start: %d", status);
     properties_.io_errors_.Add(1);
     return status;
@@ -412,7 +412,7 @@ zx_status_t SdmmcBlockDevice::Trim(const block_trim_t& txn, const EmmcPartition 
       .cmd_flags = MMC_ERASE_GROUP_END_FLAGS,
       .arg = static_cast<uint32_t>(txn.offset_dev + txn.length - 1),
   };
-  if ((status = sdmmc_.Request(&discard_end, response)) != ZX_OK) {
+  if ((status = sdmmc_->Request(&discard_end, response)) != ZX_OK) {
     zxlogf(ERROR, "failed to set discard group end: %d", status);
     properties_.io_errors_.Add(1);
     return status;
@@ -428,7 +428,7 @@ zx_status_t SdmmcBlockDevice::Trim(const block_trim_t& txn, const EmmcPartition 
       .cmd_flags = SDMMC_ERASE_FLAGS,
       .arg = MMC_ERASE_DISCARD_ARG,
   };
-  if ((status = sdmmc_.Request(&discard, response)) != ZX_OK) {
+  if ((status = sdmmc_->Request(&discard, response)) != ZX_OK) {
     zxlogf(ERROR, "discard failed: %d", status);
     properties_.io_errors_.Add(1);
     return status;
@@ -462,7 +462,7 @@ zx_status_t SdmmcBlockDevice::RpmbRequest(const RpmbRequestInfo& request) {
       .arg = MMC_SET_BLOCK_COUNT_RELIABLE_WRITE | static_cast<uint32_t>(tx_frame_count),
   };
   uint32_t unused_response[4];
-  if ((status = sdmmc_.Request(&set_tx_block_count, unused_response)) != ZX_OK) {
+  if ((status = sdmmc_->Request(&set_tx_block_count, unused_response)) != ZX_OK) {
     zxlogf(ERROR, "failed to set block count for RPMB request: %d", status);
     properties_.io_errors_.Add(1);
     return status;
@@ -482,7 +482,7 @@ zx_status_t SdmmcBlockDevice::RpmbRequest(const RpmbRequestInfo& request) {
       .buffers_list = &write_region,
       .buffers_count = 1,
   };
-  if ((status = sdmmc_.Request(&write_tx_frames, unused_response)) != ZX_OK) {
+  if ((status = sdmmc_->Request(&write_tx_frames, unused_response)) != ZX_OK) {
     zxlogf(ERROR, "failed to write RPMB frames: %d", status);
     properties_.io_errors_.Add(1);
     return status;
@@ -497,7 +497,7 @@ zx_status_t SdmmcBlockDevice::RpmbRequest(const RpmbRequestInfo& request) {
       .cmd_flags = SDMMC_SET_BLOCK_COUNT_FLAGS,
       .arg = static_cast<uint32_t>(rx_frame_count),
   };
-  if ((status = sdmmc_.Request(&set_rx_block_count, unused_response)) != ZX_OK) {
+  if ((status = sdmmc_->Request(&set_rx_block_count, unused_response)) != ZX_OK) {
     zxlogf(ERROR, "failed to set block count for RPMB request: %d", status);
     properties_.io_errors_.Add(1);
     return status;
@@ -517,7 +517,7 @@ zx_status_t SdmmcBlockDevice::RpmbRequest(const RpmbRequestInfo& request) {
       .buffers_list = &read_region,
       .buffers_count = 1,
   };
-  if ((status = sdmmc_.Request(&read_rx_frames, unused_response)) != ZX_OK) {
+  if ((status = sdmmc_->Request(&read_rx_frames, unused_response)) != ZX_OK) {
     zxlogf(ERROR, "failed to read RPMB frames: %d", status);
     properties_.io_errors_.Add(1);
     return status;
@@ -786,7 +786,7 @@ zx_status_t SdmmcBlockDevice::WaitForTran() {
   size_t attempt = 0;
   for (; attempt <= kTranMaxAttempts; attempt++) {
     uint32_t response;
-    zx_status_t st = sdmmc_.SdmmcSendStatus(&response);
+    zx_status_t st = sdmmc_->SdmmcSendStatus(&response);
     if (st != ZX_OK) {
       zxlogf(ERROR, "SDMMC_SEND_STATUS error, retcode = %d", st);
       return st;
@@ -794,7 +794,7 @@ zx_status_t SdmmcBlockDevice::WaitForTran() {
 
     current_state = MMC_STATUS_CURRENT_STATE(response);
     if (current_state == MMC_STATUS_CURRENT_STATE_RECV) {
-      st = sdmmc_.SdmmcStopTransmission();
+      st = sdmmc_->SdmmcStopTransmission();
       continue;
     } else if (current_state == MMC_STATUS_CURRENT_STATE_TRAN) {
       break;
