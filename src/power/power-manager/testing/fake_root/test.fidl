@@ -2,4 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-fuchsia.BIND_PROTOCOL == 0x0001;
+library fuchsia.powermanager.root.test;
+
+@discoverable
+closed protocol Device {
+    strict Ping() -> ();
+};

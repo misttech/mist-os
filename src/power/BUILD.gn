@@ -27,6 +27,7 @@ group("drivers") {
   deps = [
     "fake-battery/:fake_battery_component",
     "power-manager/testing/fake_driver:component",
+    "power-manager/testing/fake_root:root",
   ]
 }
 

@@ -19,7 +19,7 @@ async fn thermal_client_service_test() {
         .await;
 
     // Check the device has finished enumerating before proceeding with the test
-    env.wait_for_device("/dev/sys/test/soc_thermal").await;
+    env.wait_for_device("/dev/sys/platform/soc_thermal").await;
 
     // The client name here ('client0') must match the name of the client from the thermal
     // configuration file (../config_files/thermal_config.json5)
@@ -31,13 +31,13 @@ async fn thermal_client_service_test() {
     // Set temperature to 80 which is above the configured "onset" temperature of 50 (see the
     // `temperature_input_configs` section in ../config_files/node_config.json5), causing thermal
     // load to be nonzero
-    env.set_temperature("/dev/sys/test/soc_thermal", 80.0).await;
+    env.set_temperature("/dev/sys/platform/soc_thermal", 80.0).await;
 
     // Verify thermal state for client0 is now 1
     assert_eq!(client0.get_thermal_state().await.unwrap(), 1);
 
     // Set temperature back below the onset threshold
-    env.set_temperature("/dev/sys/test/soc_thermal", 40.0).await;
+    env.set_temperature("/dev/sys/platform/soc_thermal", 40.0).await;
 
     // Verify client0 thermal state goes back to 0
     assert_eq!(client0.get_thermal_state().await.unwrap(), 0);
@@ -57,7 +57,7 @@ async fn shutdown_test() {
         .await;
 
     // Check the device has finished enumerating before proceeding with the test
-    env.wait_for_device("/dev/sys/test/soc_thermal").await;
+    env.wait_for_device("/dev/sys/platform/soc_thermal").await;
 
     let mut reboot_watcher = RebootWatcherClient::new(&env).await;
 

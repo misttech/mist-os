@@ -1,5 +1,5 @@
 {
-    "short_description": "Test drivers for power manager integration tests",
+    "short_description": "Test root driver for power manager integration tests",
     "manufacturer": "",
     "families": [],
     "models": [],

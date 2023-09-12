@@ -5,7 +5,7 @@
                 state: 1,
                 trip_points: [
                     {
-                        sensor: '/dev/sys/test/soc_thermal',
+                        sensor: '/dev/sys/platform/soc_thermal',
                         activate_at: 1,
                         deactivate_below: 1,
                     },

@@ -188,6 +188,7 @@ group("tests") {
     "integration:tests",
     "rkf45:rkf45-tests",
     "system_power_mode_config:tests",
+    "testing/fake_root:tests",
     "thermal_config:tests",
   ]
 }
