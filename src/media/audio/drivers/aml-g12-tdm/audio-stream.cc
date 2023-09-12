@@ -188,7 +188,7 @@ zx_status_t AmlG12TdmStream::InitPDev() {
   for (size_t i = 0; i < metadata_.codecs.number_of_codecs; ++i) {
     auto info = codecs_[i]->GetInfo();
     if (info.is_error()) {
-      zxlogf(ERROR, "could get codec info %d", status);
+      zxlogf(ERROR, "Failed to get codec info: %s", info.status_string());
       return info.error_value();
     }
 
