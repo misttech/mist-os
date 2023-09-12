@@ -833,6 +833,7 @@
             to: [
                 "#console-launcher",
                 "#netsvc",
+                "#pkg-cache",
                 "#pwrbtn-monitor",
                 "#svchost",
                 "#virtual_console",

@@ -13,6 +13,7 @@ rustc_test("driver") {
   deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_rust",
+    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
@@ -44,6 +45,7 @@ rustc_test("driver") {
     "//src/sys/pkg/testing/mock-boot-arguments:lib",
     "//src/sys/pkg/testing/mock-metrics",
     "//src/sys/pkg/testing/mock-paver",
+    "//src/sys/pkg/testing/mock-reboot",
     "//src/sys/pkg/testing/mock-verifier:lib",
     "//third_party/cobalt/src/lib/client/rust:cobalt-client",
     "//third_party/rust_crates:anyhow",
@@ -64,6 +66,7 @@ rustc_test("driver") {
     "src/pkgfs.rs",
     "src/retained_packages.rs",
     "src/space.rs",
+    "src/startup.rs",
     "src/sync.rs",
   ]
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]

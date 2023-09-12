@@ -25,6 +25,7 @@ use {
     mock_boot_arguments::MockBootArgumentsService,
     mock_metrics::MockMetricEventLoggerFactory,
     mock_paver::{MockPaverService, MockPaverServiceBuilder},
+    mock_reboot::{MockRebootService, RebootReason},
     mock_verifier::MockVerifierService,
     parking_lot::Mutex,
     std::{collections::HashMap, sync::Arc, time::Duration},
@@ -40,6 +41,7 @@ mod inspect;
 mod pkgfs;
 mod retained_packages;
 mod space;
+mod startup;
 mod sync;
 
 static SHELL_COMMANDS_BIN_PATH: &'static str = "shell-commands-bin";
@@ -456,6 +458,28 @@ where
                 .unwrap();
         }
 
+        let reboot_reasons = Arc::new(Mutex::new(vec![]));
+        let reboot_service = Arc::new(MockRebootService::new(Box::new({
+            let reboot_reasons = Arc::clone(&reboot_reasons);
+            move |reason| {
+                reboot_reasons.lock().push(reason);
+                Ok(())
+            }
+        })));
+        {
+            let reboot_service = Arc::clone(&reboot_service);
+            local_child_svc_dir
+                .add_entry(
+                    fidl_fuchsia_hardware_power_statecontrol::AdminMarker::PROTOCOL_NAME,
+                    vfs::service::host(move |stream| {
+                        Arc::clone(&reboot_service).run_reboot_service(stream).unwrap_or_else(|e| {
+                            panic!("error running reboot service: {:#}", anyhow!(e))
+                        })
+                    }),
+                )
+                .unwrap();
+        }
+
         // Paver service, so we can verify that we submit the expected requests and so that
         // we can verify if the paver service returns errors, that we handle them correctly.
         let paver_service = Arc::new(
@@ -606,6 +630,9 @@ where
                     .capability(
                         Capability::protocol::<fidl_fuchsia_tracing_provider::RegistryMarker>(),
                     )
+                    .capability(Capability::protocol::<
+                        fidl_fuchsia_hardware_power_statecontrol::AdminMarker,
+                    >())
                     .capability(
                         Capability::directory("blob-exec")
                             .path("/blob")
@@ -717,9 +744,11 @@ where
             apps: Apps { realm_instance },
             blobfs,
             system_image,
+            reboot_reasons,
             proxies,
             mocks: Mocks {
                 logger_factory,
+                reboot_service,
                 _paver_service: paver_service,
                 _verifier_service: verifier_service,
             },
@@ -738,6 +767,7 @@ struct Proxies {
 
 pub struct Mocks {
     pub logger_factory: Arc<MockMetricEventLoggerFactory>,
+    pub reboot_service: Arc<MockRebootService>,
     _paver_service: Arc<MockPaverService>,
     _verifier_service: Arc<MockVerifierService>,
 }
@@ -750,6 +780,7 @@ struct TestEnv<B = BlobfsRamdisk> {
     apps: Apps,
     blobfs: B,
     system_image: Option<Hash>,
+    reboot_reasons: Arc<Mutex<Vec<RebootReason>>>,
     proxies: Proxies,
     pub mocks: Mocks,
 }
@@ -854,5 +885,9 @@ impl<B: Blobfs> TestEnv<B> {
         )
         .await
         .unwrap();
+    }
+
+    fn take_reboot_reasons(&self) -> Vec<RebootReason> {
+        std::mem::replace(&mut *self.reboot_reasons.lock(), vec![])
     }
 }

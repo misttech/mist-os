@@ -72,6 +72,7 @@
         {
             protocol: [
                 "fuchsia.boot.Arguments",
+                "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.update.CommitStatusProvider",

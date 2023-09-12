@@ -43,6 +43,7 @@ mod context_authenticator;
 mod gc_service;
 mod index;
 mod package;
+mod reboot;
 mod required_blobs;
 mod retained_packages_service;
 
@@ -99,11 +100,17 @@ pub fn main() -> Result<(), Error> {
     fuchsia_trace_provider::trace_provider_create_with_fdio();
 
     let mut executor = fasync::LocalExecutor::new();
-    executor.run_singlethreaded(main_inner().map_err(|err| {
-        let err = anyhow!(err);
-        error!("error running pkg-cache: {:#}", err);
-        err
-    }))
+    executor.run_singlethreaded(async move {
+        match main_inner().await {
+            Err(err) => {
+                let err = anyhow!(err);
+                error!("error running pkg-cache: {:#}", err);
+                let () = reboot::reboot().await;
+                Err(err)
+            }
+            ok => ok,
+        }
+    })
 }
 
 async fn main_inner() -> Result<(), Error> {
