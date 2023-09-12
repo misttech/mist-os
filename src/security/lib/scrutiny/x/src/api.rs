@@ -584,10 +584,20 @@ pub trait Package: DynClone {
     fn meta_blobs(&self) -> Box<dyn Iterator<Item = (Box<dyn Path>, Box<dyn Blob>)>>;
 
     /// Constructs iterator over blobs that appear to be component manifests.
-    fn components(&self) -> Box<dyn Iterator<Item = (Box<dyn Path>, Box<dyn Component>)>>;
+    fn components(
+        &self,
+    ) -> Result<Box<dyn Iterator<Item = (Box<dyn Path>, Box<dyn Component>)>>, PackageComponentsError>;
 }
 
 clone_trait_object!(Package);
+
+#[derive(Debug, Error)]
+pub enum PackageComponentsError {
+    #[error("failed open blob for parsing as component: {0}")]
+    Open(#[from] BlobError),
+    #[error("failed read blob for parsing as component: {0}")]
+    Read(#[from] std::io::Error),
+}
 
 // TODO(fxbug.dev/112121): Define API consistent with fuchsia_pkg::MetaPackage.
 

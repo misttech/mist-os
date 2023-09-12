@@ -9,9 +9,12 @@
 use super::api;
 use super::blob::BlobOpenError;
 use super::blob::BlobSet;
+use super::component::Component;
 use super::data_source as ds;
 use super::hash::Hash;
 use super::DataSource;
+use cm_rust::FidlIntoNative as _;
+use fidl_fuchsia_component_decl as fdecl;
 use fuchsia_archive::Error as FarError;
 use fuchsia_archive::Utf8Reader as FarReader;
 use fuchsia_merkle::MerkleTree as FuchsiaMerkleTree;
@@ -256,8 +259,34 @@ impl api::Package for Package {
 
     fn components(
         &self,
-    ) -> Box<dyn Iterator<Item = (Box<dyn api::Path>, Box<dyn api::Component>)>> {
-        todo!("TODO(fxbug.dev/111245): Implement component-finding over meta and content blobs");
+    ) -> Result<
+        Box<dyn Iterator<Item = (Box<dyn api::Path>, Box<dyn api::Component>)>>,
+        api::PackageComponentsError,
+    > {
+        let mut components = vec![];
+        for (path, meta_blob) in self.meta_blobs() {
+            let mut meta_blob_reader = meta_blob.reader_seeker()?;
+            let mut bytes = vec![];
+            meta_blob_reader.read_to_end(&mut bytes)?;
+            if let Ok(manifest) = fidl::unpersist::<fdecl::Component>(bytes.as_slice()) {
+                let manifest = manifest.fidl_into_native();
+                let component: Box<dyn api::Component> = Box::new(Component::new(manifest));
+                components.push((path, component));
+            }
+        }
+
+        for (path, content_blob) in self.content_blobs() {
+            let mut content_blob_reader = content_blob.reader_seeker()?;
+            let mut bytes = vec![];
+            content_blob_reader.read_to_end(&mut bytes)?;
+            if let Ok(manifest) = fidl::unpersist::<fdecl::Component>(bytes.as_slice()) {
+                let manifest = manifest.fidl_into_native();
+                let component: Box<dyn api::Component> = Box::new(Component::new(manifest));
+                components.push((path, component));
+            }
+        }
+
+        Ok(Box::new(components.into_iter()))
     }
 }
 

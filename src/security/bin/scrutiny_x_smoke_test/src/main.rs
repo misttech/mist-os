@@ -130,6 +130,14 @@ fn output_package(package: &dyn scrutiny::Package) {
     for (path, content_blob) in package.content_blobs() {
         debug!("  Content blob at {:?}: {:?}", path.as_ref(), content_blob.hash());
     }
+    output_package_components(package);
+}
+
+fn output_package_components(package: &dyn scrutiny::Package) {
+    for (path, _component) in package.components().expect("package components") {
+        // TODO(111243): Exercise `Component` API once it is implemented.
+        debug!("  Component at {:?}", path);
+    }
 }
 
 fn output_bootfs_data(bootfs: &dyn scrutiny::Bootfs) {

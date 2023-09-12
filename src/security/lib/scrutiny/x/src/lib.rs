@@ -5,6 +5,7 @@
 pub(crate) mod api;
 pub(crate) mod blob;
 pub(crate) mod bootfs;
+pub(crate) mod component;
 pub(crate) mod data_source;
 pub(crate) mod hash;
 pub(crate) mod package;

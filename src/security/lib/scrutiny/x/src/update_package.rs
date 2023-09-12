@@ -108,7 +108,10 @@ impl api::Package for UpdatePackage {
 
     fn components(
         &self,
-    ) -> Box<dyn Iterator<Item = (Box<dyn api::Path>, Box<dyn api::Component>)>> {
+    ) -> Result<
+        Box<dyn Iterator<Item = (Box<dyn api::Path>, Box<dyn api::Component>)>>,
+        api::PackageComponentsError,
+    > {
         self.package.components()
     }
 }
