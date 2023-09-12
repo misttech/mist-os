@@ -23,11 +23,19 @@ namespace {
 
 class Transaction : public fidl::Transaction {
  public:
-  Transaction() = default;
-  explicit Transaction(sync_completion_t* wait, sync_completion_t* signal)
-      : wait_(wait), signal_(signal) {}
+  Transaction() : Transaction(nullptr, nullptr) {}
 
-  std::unique_ptr<fidl::Transaction> TakeOwnership() override { ZX_ASSERT(false); }
+  explicit Transaction(sync_completion_t* wait, sync_completion_t* signal)
+      : Transaction(wait, signal, std::make_shared<std::optional<fidl::UnbindInfo>>(std::nullopt)) {
+  }
+
+  explicit Transaction(sync_completion_t* wait, sync_completion_t* signal,
+                       const std::shared_ptr<std::optional<fidl::UnbindInfo>>& error)
+      : wait_(wait), signal_(signal), error_(error) {}
+
+  std::unique_ptr<fidl::Transaction> TakeOwnership() override {
+    return std::make_unique<Transaction>(wait_, signal_, error_);
+  }
 
   zx_status_t Reply(fidl::OutgoingMessage* message, fidl::WriteOptions write_options) override {
     if (wait_ && signal_) {
@@ -40,18 +48,18 @@ class Transaction : public fidl::Transaction {
   void Close(zx_status_t epitaph) override {}
 
   void InternalError(fidl::UnbindInfo error, fidl::ErrorOrigin origin) override {
-    error_.emplace(error);
+    error_->emplace(error);
     fidl::Transaction::InternalError(error, origin);
   }
 
   ~Transaction() override = default;
 
-  const std::optional<fidl::UnbindInfo>& error() const { return error_; }
+  const std::optional<fidl::UnbindInfo>& error() const { return *error_; }
 
  private:
   sync_completion_t* wait_;
   sync_completion_t* signal_;
-  std::optional<fidl::UnbindInfo> error_ = std::nullopt;
+  std::shared_ptr<std::optional<fidl::UnbindInfo>> error_;
 };
 
 using OneWayCompleter = fidl::WireServer<::test_basic_protocol::Values>::OneWayCompleter::Sync;
@@ -62,24 +70,35 @@ TEST(LlcppTransaction, one_way_completer_reply_not_needed) {
   EXPECT_FALSE(completer.is_reply_needed());
 }
 
-using Completer = fidl::WireServer<::test_basic_protocol::ValueEcho>::EchoCompleter::Sync;
+using SyncCompleter = fidl::WireServer<::test_basic_protocol::ValueEcho>::EchoCompleter::Sync;
+using AsyncCompleter = fidl::WireServer<::test_basic_protocol::ValueEcho>::EchoCompleter::Async;
 
-// A completer being destroyed without replying (but needing one) should crash
+// A sync completer being destroyed without replying (but needing one) should crash
 TEST(LlcppTransaction, no_reply_asserts) {
   Transaction txn{};
-  ASSERT_DEATH([&] { Completer completer(&txn); }, "no reply should crash");
+  ASSERT_DEATH([&] { SyncCompleter completer(&txn); }, "no reply should crash");
 }
 
-// A completer being destroyed without replying (but needing one) should crash
+// A completer being destroyed without replying (but not needing one) should not crash
 TEST(LlcppTransaction, no_expected_reply_doesnt_assert) {
   Transaction txn{};
   fidl::Completer<fidl::CompleterBase>::Sync completer(&txn);
 }
 
+// An async completer being destroyed without replying (but needing one) should error
+TEST(LlcppTransaction, async_no_reply_errors) {
+  Transaction txn{};
+  SyncCompleter sync_completer(&txn);
+  AsyncCompleter async_completer = sync_completer.ToAsync();
+  EXPECT_EQ(txn.error(), std::nullopt);
+  { AsyncCompleter abandoned = std::move(async_completer); }
+  EXPECT_EQ(txn.error().value().reason(), fidl::Reason::kAbandonedAsyncReply);
+}
+
 // A completer replying twice should crash
 TEST(LlcppTransaction, double_reply_asserts) {
   Transaction txn{};
-  Completer completer(&txn);
+  SyncCompleter completer(&txn);
   completer.Reply("");
   ASSERT_DEATH([&] { fidl_testing::RunWithLsanDisabled([&] { completer.Reply(""); }); },
                "second reply should crash");
@@ -88,7 +107,7 @@ TEST(LlcppTransaction, double_reply_asserts) {
 // It is allowed to reply and then close
 TEST(LlcppTransaction, reply_then_close_doesnt_assert) {
   Transaction txn{};
-  Completer completer(&txn);
+  SyncCompleter completer(&txn);
   EXPECT_TRUE(completer.is_reply_needed());
   completer.Reply("");
   EXPECT_FALSE(completer.is_reply_needed());
@@ -99,7 +118,7 @@ TEST(LlcppTransaction, reply_then_close_doesnt_assert) {
 // It is not allowed to close then reply
 TEST(LlcppTransaction, close_then_reply_asserts) {
   Transaction txn{};
-  Completer completer(&txn);
+  SyncCompleter completer(&txn);
   EXPECT_TRUE(completer.is_reply_needed());
   completer.Close(ZX_ERR_INVALID_ARGS);
   EXPECT_FALSE(completer.is_reply_needed());
@@ -111,7 +130,7 @@ TEST(LlcppTransaction, close_then_reply_asserts) {
 TEST(LlcppTransaction, concurrent_access_asserts) {
   sync_completion_t signal, wait;
   Transaction txn{&signal, &wait};
-  Completer completer(&txn);
+  SyncCompleter completer(&txn);
   std::thread t([&] { completer.Reply(""); });
   sync_completion_wait(&wait, ZX_TIME_INFINITE);
   // TODO(fxbug.dev/54499): Hide assertion failed messages from output - they are confusing.
@@ -138,7 +157,7 @@ TEST(LlcppTransaction, transaction_error) {
 
 TEST(CompleterResultOfReply, CalledWithoutMakingAReply) {
   Transaction txn{};
-  Completer completer(&txn);
+  SyncCompleter completer(&txn);
   ASSERT_DEATH([&] { (void)completer.result_of_reply(); });
   // Passivate the completer.
   completer.Close(ZX_OK);
@@ -146,7 +165,7 @@ TEST(CompleterResultOfReply, CalledWithoutMakingAReply) {
 
 TEST(CompleterResultOfReply, Ok) {
   Transaction txn{};
-  Completer completer(&txn);
+  SyncCompleter completer(&txn);
   completer.Reply("");
   EXPECT_OK(completer.result_of_reply().status());
 }
@@ -175,7 +194,7 @@ TEST(CompleterResultOfReply, TransportError) {
   };
 
   FakeTransportErrorTransaction txn{};
-  Completer completer(&txn);
+  SyncCompleter completer(&txn);
   completer.Reply("");
   fidl::Status result = completer.result_of_reply();
   EXPECT_EQ(fidl::Reason::kTransportError, result.reason());
@@ -192,7 +211,7 @@ struct test<T, std::void_t<decltype(std::declval<T>().EnableNextDispatch())>> : 
 // Invoking `FooCompleter::Async::EnableNextDispatch` should be a compile-time error.
 TEST(LlcppCompleter, AsyncCompleterCannotEnableNextDispatch) {
   Transaction txn{};
-  Completer completer(&txn);
+  SyncCompleter completer(&txn);
   static_assert(test<decltype(completer)>::value);
   static_assert(!test<decltype(completer.ToAsync())>::value);
 
@@ -217,7 +236,7 @@ struct test<T, std::void_t<decltype(TryToMove<T>(std::declval<T>()))>> : std::tr
 // Invoking move construction on `FooCompleter::Sync` should be a compile-time error.
 TEST(LlcppCompleter, SyncCompleterCannotBeMoved) {
   Transaction txn{};
-  Completer completer(&txn);
+  SyncCompleter completer(&txn);
 
   // Sync one cannot be moved.
   static_assert(!test<decltype(completer)>::value);

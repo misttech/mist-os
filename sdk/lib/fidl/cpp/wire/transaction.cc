@@ -55,7 +55,13 @@ CompleterBase::CompleterBase(CompleterBase&& other) noexcept
 }
 
 CompleterBase::~CompleterBase() {
-  ZX_ASSERT_MSG(!is_reply_needed(), "Completer expected a Reply to be sent.");
+  if (!owned_) {
+    ZX_ASSERT_MSG(!is_reply_needed(), "Completer expected a Reply to be sent.");
+  } else {
+    if (is_reply_needed()) {
+      transaction_->InternalError(UnbindInfo::AbandonedAsyncReply(), ErrorOrigin::kReceive);
+    }
+  }
   DropTransaction();
 }
 

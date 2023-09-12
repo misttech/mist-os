@@ -136,6 +136,10 @@ enum class Reason : uint16_t {
   // the channel will remain open unless the user explicitly decides to close
   // it.
   kUnknownMethod,
+
+  // This error is used on the server to report when an async completer to a
+  // two-way method is discarded without a reply.
+  kAbandonedAsyncReply,
 };
 
 // |ErrorOrigin| indicates in which part of request/response processing did a
@@ -525,6 +529,12 @@ class UnbindInfo : private Status {
   // an error |status|.
   constexpr static UnbindInfo DispatcherError(zx_status_t status) {
     return UnbindInfo{Status(status, ::fidl::Reason::kDispatcherError, nullptr)};
+  }
+
+  // Constructs an |UnbindInfo| indicating the user discarded an async completer
+  // that was expecting a reply.
+  constexpr static UnbindInfo AbandonedAsyncReply() {
+    return UnbindInfo{Status(ZX_ERR_BAD_STATE, ::fidl::Reason::kAbandonedAsyncReply, nullptr)};
   }
 
   UnbindInfo(const UnbindInfo&) = default;

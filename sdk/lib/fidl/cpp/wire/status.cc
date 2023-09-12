@@ -47,6 +47,7 @@ bool IsFatalErrorUniversal(fidl::Reason error) {
     case Reason::kUnexpectedMessage:
     case Reason::kEncodeError:
     case Reason::kDecodeError:
+    case Reason::kAbandonedAsyncReply:
       return false;
   }
 }
@@ -101,6 +102,8 @@ constexpr const char* DescribeReason(Reason reason) {
       return "unexpected message";
     case Reason::kUnknownMethod:
       return "unknown interaction";
+    case Reason::kAbandonedAsyncReply:
+      return "(server) async completer is discarded without a reply";
   }
 }
 
