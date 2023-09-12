@@ -3,24 +3,30 @@
 // found in the LICENSE file.
 
 use crate::mocks;
-
-use {
-    anyhow::*,
-    fidl_fuchsia_testing_harness::OperationError,
-    fidl_test_sampler as ftest,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{
-        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmBuilderParams,
-        RealmInstance, Ref, Route,
-    },
-    futures::{channel::mpsc, lock::Mutex, StreamExt},
-    std::sync::Arc,
+use anyhow::*;
+use fidl_fuchsia_component as fcomponent;
+use fidl_fuchsia_diagnostics as fdiagnostics;
+use fidl_fuchsia_hardware_power_statecontrol as fpower;
+use fidl_fuchsia_logger as flogger;
+use fidl_fuchsia_metrics as fmetrics;
+use fidl_fuchsia_metrics_test as fmetrics_test;
+use fidl_fuchsia_mockrebootcontroller as fmockrebootcontroller;
+use fidl_fuchsia_samplertestcontroller as fsamplertestcontroller;
+use fidl_fuchsia_testing_harness::OperationError;
+use fidl_test_sampler as ftest;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{
+    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmBuilderParams,
+    RealmInstance, Ref, Route,
 };
+use futures::{channel::mpsc, lock::Mutex, StreamExt};
+use std::sync::Arc;
 
 const MOCK_COBALT_URL: &str = "#meta/mock_cobalt.cm";
 const SINGLE_COUNTER_URL: &str = "#meta/single_counter_test_component.cm";
 const SAMPLER_URL: &str = "#meta/sampler.cm";
 const ARCHIVIST_URL: &str = "#meta/archivist-for-embedding.cm";
+const SAMPLER_BINDER_ALIAS: &str = "fuchsia.component.SamplerBinder";
 
 pub(crate) struct SamplerRealmFactory {
     realm_options: Option<ftest::RealmOptions>,
@@ -73,9 +79,9 @@ impl SamplerRealmFactory {
         wrapper_realm
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name(
-                        "fuchsia.metrics.test.MetricEventLoggerQuerier",
-                    ))
+                    .capability(
+                        Capability::protocol::<fmetrics_test::MetricEventLoggerQuerierMarker>(),
+                    )
                     .from(&mock_cobalt)
                     .to(Ref::parent()),
             )
@@ -83,9 +89,9 @@ impl SamplerRealmFactory {
         wrapper_realm
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name(
-                        "fuchsia.samplertestcontroller.SamplerTestController",
-                    ))
+                    .capability(Capability::protocol::<
+                        fsamplertestcontroller::SamplerTestControllerMarker,
+                    >())
                     .from(&single_counter)
                     .to(Ref::parent()),
             )
@@ -93,12 +99,12 @@ impl SamplerRealmFactory {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name(
-                        "fuchsia.metrics.test.MetricEventLoggerQuerier",
-                    ))
-                    .capability(Capability::protocol_by_name(
-                        "fuchsia.samplertestcontroller.SamplerTestController",
-                    ))
+                    .capability(
+                        Capability::protocol::<fmetrics_test::MetricEventLoggerQuerierMarker>(),
+                    )
+                    .capability(Capability::protocol::<
+                        fsamplertestcontroller::SamplerTestControllerMarker,
+                    >())
                     .from(&wrapper_realm)
                     .to(Ref::parent()),
             )
@@ -107,9 +113,7 @@ impl SamplerRealmFactory {
         wrapper_realm
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name(
-                        "fuchsia.metrics.MetricEventLoggerFactory",
-                    ))
+                    .capability(Capability::protocol::<fmetrics::MetricEventLoggerFactoryMarker>())
                     .from(&mock_cobalt)
                     .to(&sampler),
             )
@@ -117,9 +121,7 @@ impl SamplerRealmFactory {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name(
-                        "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
-                    ))
+                    .capability(Capability::protocol::<fpower::RebootMethodsWatcherRegisterMarker>())
                     .from(&mocks_server)
                     .to(&wrapper_realm),
             )
@@ -127,9 +129,7 @@ impl SamplerRealmFactory {
         wrapper_realm
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name(
-                        "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
-                    ))
+                    .capability(Capability::protocol::<fpower::RebootMethodsWatcherRegisterMarker>())
                     .from(Ref::parent())
                     .to(&sampler),
             )
@@ -137,9 +137,9 @@ impl SamplerRealmFactory {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name(
-                        "fuchsia.mockrebootcontroller.MockRebootController",
-                    ))
+                    .capability(Capability::protocol::<
+                        fmockrebootcontroller::MockRebootControllerMarker,
+                    >())
                     .from(&mocks_server)
                     .to(Ref::parent()),
             )
@@ -147,7 +147,7 @@ impl SamplerRealmFactory {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                    .capability(Capability::protocol::<flogger::LogSinkMarker>())
                     .from(Ref::parent())
                     .to(&wrapper_realm),
             )
@@ -155,7 +155,7 @@ impl SamplerRealmFactory {
         wrapper_realm
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                    .capability(Capability::protocol::<flogger::LogSinkMarker>())
                     .from(Ref::parent())
                     .to(&test_case_archivist)
                     .to(&mock_cobalt)
@@ -192,8 +192,8 @@ impl SamplerRealmFactory {
         wrapper_realm
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.diagnostics.ArchiveAccessor"))
-                    .capability(Capability::protocol_by_name("fuchsia.logger.Log"))
+                    .capability(Capability::protocol::<fdiagnostics::ArchiveAccessorMarker>())
+                    .capability(Capability::protocol::<flogger::LogMarker>())
                     .from(&test_case_archivist)
                     .to(&sampler),
             )
@@ -212,8 +212,8 @@ impl SamplerRealmFactory {
             .add_route(
                 Route::new()
                     .capability(
-                        Capability::protocol_by_name("fuchsia.component.Binder")
-                            .as_("fuchsia.component.SamplerBinder"),
+                        Capability::protocol::<fcomponent::BinderMarker>()
+                            .as_(SAMPLER_BINDER_ALIAS),
                     )
                     .from(&sampler)
                     .to(Ref::parent()),
@@ -222,7 +222,7 @@ impl SamplerRealmFactory {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.component.SamplerBinder"))
+                    .capability(Capability::protocol_by_name(SAMPLER_BINDER_ALIAS))
                     .from(&wrapper_realm)
                     .to(Ref::parent()),
             )
