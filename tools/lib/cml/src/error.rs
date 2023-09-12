@@ -274,6 +274,7 @@ impl From<ParseError> for Error {
             }
             ParseError::TooLong => Self::internal("too long"),
             ParseError::Empty => Self::internal("empty"),
+            ParseError::InvalidSegment => Self::internal("invalid path segment"),
         }
     }
 }

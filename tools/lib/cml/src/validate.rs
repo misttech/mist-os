@@ -2587,7 +2587,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"my_stream\", expected a path with leading `/` and non-empty segments"
+            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"my_stream\", expected a path with leading `/` and non-empty segments, where each segment is no more than fuchsia.io/MAX_NAME_LENGTH bytes in length, cannot be . or .., and cannot contain embedded NULs"
         ),
         test_cml_use_event_stream_self_ref(
             json!({
@@ -5301,7 +5301,7 @@ mod tests {
                     { "protocol": "foo", "path": "" },
                 ]
             }),
-            Err(Error::Parse { err, .. }) if &err == "invalid length 0, expected a non-empty path no more than fuchsia.io/MAX_PATH_LENGTH characters in length"
+            Err(Error::Parse { err, .. }) if &err == "invalid length 0, expected a non-empty path no more than fuchsia.io/MAX_PATH_LENGTH bytes in length"
         ),
         test_cml_path_invalid_root(
             json!({
@@ -5309,7 +5309,7 @@ mod tests {
                     { "protocol": "foo", "path": "/" },
                 ]
             }),
-            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"/\", expected a path with leading `/` and non-empty segments"
+            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"/\", expected a path with leading `/` and non-empty segments, where each segment is no more than fuchsia.io/MAX_NAME_LENGTH bytes in length, cannot be . or .., and cannot contain embedded NULs"
         ),
         test_cml_path_invalid_absolute_is_relative(
             json!({
@@ -5317,7 +5317,7 @@ mod tests {
                     { "protocol": "foo", "path": "foo/bar" },
                 ]
             }),
-            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"foo/bar\", expected a path with leading `/` and non-empty segments"
+            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"foo/bar\", expected a path with leading `/` and non-empty segments, where each segment is no more than fuchsia.io/MAX_NAME_LENGTH bytes in length, cannot be . or .., and cannot contain embedded NULs"
         ),
         test_cml_path_invalid_trailing(
             json!({
@@ -5325,7 +5325,7 @@ mod tests {
                     { "protocol": "foo", "path":"/foo/bar/" },
                 ]
             }),
-            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"/foo/bar/\", expected a path with leading `/` and non-empty segments"
+            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"/foo/bar/\", expected a path with leading `/` and non-empty segments, where each segment is no more than fuchsia.io/MAX_NAME_LENGTH bytes in length, cannot be . or .., and cannot contain embedded NULs"
         ),
         test_cml_path_too_long(
             json!({
@@ -5333,7 +5333,15 @@ mod tests {
                     { "protocol": "foo", "path": format!("/{}", "a".repeat(4095)) },
                 ]
             }),
-            Err(Error::Parse { err, .. }) if &err == "invalid length 4096, expected a non-empty path no more than fuchsia.io/MAX_PATH_LENGTH characters in length"
+            Err(Error::Parse { err, .. }) if &err == "invalid length 4096, expected a non-empty path no more than fuchsia.io/MAX_PATH_LENGTH bytes in length"
+        ),
+        test_cml_path_invalid_segment(
+            json!({
+                "capabilities": [
+                    { "protocol": "foo", "path": "/foo/../bar" },
+                ]
+            }),
+            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"/foo/../bar\", expected a path with leading `/` and non-empty segments, where each segment is no more than fuchsia.io/MAX_NAME_LENGTH bytes in length, cannot be . or .., and cannot contain embedded NULs"
         ),
         test_cml_relative_path(
             json!({

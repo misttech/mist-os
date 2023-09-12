@@ -95,6 +95,9 @@ pub enum ParseError {
     /// The string was too long.
     #[error("too long")]
     TooLong,
+    /// The path segment is invalid.
+    #[error("invalid path segment")]
+    InvalidSegment,
 }
 
 pub const MAX_NAME_LENGTH: usize = 100;
@@ -288,9 +291,10 @@ impl Path {
                 PathError::InvalidSegment(name::ParseNameError::TooLong(_)) => {
                     Err(ParseError::TooLong)
                 }
-                PathError::NotUtf8(_)
-                | PathError::NoLeadingSlash(_)
-                | PathError::InvalidSegment(_) => Err(ParseError::InvalidValue),
+                PathError::InvalidSegment(_) => Err(ParseError::InvalidSegment),
+                PathError::NotUtf8(_) | PathError::NoLeadingSlash(_) => {
+                    Err(ParseError::InvalidValue)
+                }
             },
         }
     }
@@ -365,19 +369,23 @@ impl<'de> de::Deserialize<'de> for Path {
             where
                 E: de::Error,
             {
-                s.parse().map_err(|err| match err {
-                    ParseError::InvalidValue => E::invalid_value(
+                s.parse().map_err(|err| {
+                    match err {
+                    ParseError::InvalidValue | ParseError::InvalidSegment => E::invalid_value(
                         de::Unexpected::Str(s),
-                        &"a path with leading `/` and non-empty segments",
+                        &"a path with leading `/` and non-empty segments, where each segment is no \
+                        more than fuchsia.io/MAX_NAME_LENGTH bytes in length, cannot be . or .., \
+                        and cannot contain embedded NULs",
                     ),
                     ParseError::TooLong | ParseError::Empty => E::invalid_length(
                         s.len(),
-                        &"a non-empty path no more than fuchsia.io/MAX_PATH_LENGTH characters \
+                        &"a non-empty path no more than fuchsia.io/MAX_PATH_LENGTH bytes \
                         in length",
                     ),
                     e => {
                         panic!("unexpected parse error: {:?}", e);
                     }
+                }
                 })
             }
         }
@@ -980,8 +988,10 @@ mod tests {
         let err = serde_json::from_str::<Path>(input).expect_err("must fail");
         assert_eq!(
             err.to_string(),
-            "invalid value: string \"foo\", expected a path with leading `/` \
-             and non-empty segments at line 2 column 17"
+            "invalid value: string \"foo\", expected a path with leading `/` and non-empty \
+            segments, where each segment is no \
+            more than fuchsia.io/MAX_NAME_LENGTH bytes in length, cannot be . or .., \
+            and cannot contain embedded NULs at line 2 column 17"
         );
 
         assert_eq!(err.line(), 2);

@@ -28,6 +28,9 @@ pub enum Error {
     #[error("Field `{}` for {} is too long.", .0.field, .0.decl)]
     FieldTooLong(DeclField),
 
+    #[error("Field `{}` for {} has an invalid path segment.", .0.field, .0.decl)]
+    FieldInvalidSegment(DeclField),
+
     #[error("\"{0}\" capabilities must be offered as a built-in capability.")]
     CapabilityMustBeBuiltin(DeclType),
 
@@ -135,6 +138,10 @@ impl Error {
 
     pub fn field_too_long(decl_type: DeclType, keyword: impl Into<String>) -> Self {
         Error::FieldTooLong(DeclField { decl: decl_type, field: keyword.into() })
+    }
+
+    pub fn field_invalid_segment(decl_type: DeclType, keyword: impl Into<String>) -> Self {
+        Error::FieldInvalidSegment(DeclField { decl: decl_type, field: keyword.into() })
     }
 
     pub fn offer_target_equals_source(decl: DeclType, target: impl Into<String>) -> Self {
@@ -510,6 +517,10 @@ mod tests {
         assert_eq!(
             format!("{}", Error::field_too_long(DeclType::Child, "keyword")),
             "Field `keyword` for Child is too long."
+        );
+        assert_eq!(
+            format!("{}", Error::field_invalid_segment(DeclType::Child, "keyword")),
+            "Field `keyword` for Child has an invalid path segment."
         );
         assert_eq!(
             format!("{}", Error::invalid_child(DeclType::Child, "source", "child")),

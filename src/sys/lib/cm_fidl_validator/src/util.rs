@@ -102,6 +102,9 @@ fn check_identifier(
             Err(ParseError::InvalidValue) => {
                 errors.push(Error::invalid_field(decl_type, keyword));
             }
+            Err(ParseError::InvalidSegment) => {
+                errors.push(Error::field_invalid_segment(decl_type, keyword));
+            }
         }
     } else {
         errors.push(Error::missing_field(decl_type, keyword));
@@ -341,7 +344,7 @@ mod tests {
         test_identifier_path_invalid_trailing => {
             check_fn = check_path,
             input = "/foo/bar/",
-            result = Err(ErrorList::new(vec![Error::invalid_field(DeclType::Child, "foo")])),
+            result = Err(ErrorList::new(vec![Error::field_invalid_segment(DeclType::Child, "foo")])),
         },
         test_identifier_path_segment_too_long => {
             check_fn = check_path,
