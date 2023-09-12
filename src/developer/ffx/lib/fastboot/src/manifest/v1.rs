@@ -89,7 +89,7 @@ impl Flash for FlashManifest {
         &self,
         writer: &mut W,
         file_resolver: &mut F,
-        fastboot_interface: T,
+        fastboot_interface: &mut T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
@@ -101,10 +101,10 @@ impl Flash for FlashManifest {
             Some(res) => res,
             None => ffx_bail!("{} {}", MISSING_PRODUCT, cmd.product),
         };
-        if product.requires_unlock && is_locked(&fastboot_interface).await? {
+        if product.requires_unlock && is_locked(fastboot_interface).await? {
             ffx_bail!("{}", UNLOCK_ERR);
         }
-        flash_and_reboot(writer, file_resolver, product, &fastboot_interface, cmd).await
+        flash_and_reboot(writer, file_resolver, product, fastboot_interface, cmd).await
     }
 }
 
@@ -118,7 +118,7 @@ impl Boot for FlashManifest {
         writer: &mut W,
         file_resolver: &mut F,
         slot: String,
-        fastboot_interface: T,
+        fastboot_interface: &mut T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
@@ -140,7 +140,7 @@ impl Boot for FlashManifest {
         let vbmeta =
             partitions.iter().find(|p| p.name().contains("vbmeta")).map(|p| p.file().to_string());
         match zbi {
-            Some(z) => boot(writer, file_resolver, z, vbmeta, &fastboot_interface).await,
+            Some(z) => boot(writer, file_resolver, z, vbmeta, fastboot_interface).await,
             None => ffx_bail!("Could not find matching partitions for slot {}", slot),
         }
     }
@@ -251,13 +251,13 @@ mod test {
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
         let v: FlashManifest = from_str(MANIFEST)?;
-        let (_, proxy) = setup();
+        let (_, mut proxy) = setup();
         let mut writer = Vec::<u8>::new();
         assert!(v
             .flash(
                 &mut writer,
                 &mut TestResolver::new(),
-                proxy,
+                &mut proxy,
                 ManifestParams {
                     manifest: Some(PathBuf::from(tmp_file_name)),
                     product: "Unknown".to_string(),
@@ -314,7 +314,7 @@ mod test {
 
         let v: FlashManifest = from_str(&manifest.to_string())?;
 
-        let (state, proxy) = setup();
+        let (state, mut proxy) = setup();
         {
             let mut state = state.lock().unwrap();
             state.set_var(IS_USERSPACE_VAR.to_string(), "yes".to_string());
@@ -324,7 +324,7 @@ mod test {
         v.flash(
             &mut writer,
             &mut TestResolver::new(),
-            proxy,
+            &mut proxy,
             ManifestParams {
                 manifest: Some(PathBuf::from(tmp_file_name)),
                 product: "fuchsia".to_string(),
@@ -374,7 +374,7 @@ mod test {
         ]);
 
         let v: FlashManifest = from_str(&manifest.to_string())?;
-        let (state, proxy) = setup();
+        let (state, mut proxy) = setup();
         {
             let mut state = state.lock().unwrap();
             state.set_var(IS_USERSPACE_VAR.to_string(), "yes".to_string());
@@ -384,7 +384,7 @@ mod test {
         v.flash(
             &mut writer,
             &mut TestResolver::new(),
-            proxy,
+            &mut proxy,
             ManifestParams {
                 manifest: Some(PathBuf::from(manifest_file_name)),
                 product: "fuchsia".to_string(),
@@ -422,7 +422,7 @@ mod test {
         ]);
         let v: FlashManifest = from_str(&manifest.to_string())?;
 
-        let (state, proxy) = setup();
+        let (state, mut proxy) = setup();
         {
             let mut state = state.lock().unwrap();
             state.set_var(IS_USERSPACE_VAR.to_string(), "no".to_string());
@@ -435,7 +435,7 @@ mod test {
         v.flash(
             &mut writer,
             &mut TestResolver::new(),
-            proxy,
+            &mut proxy,
             ManifestParams {
                 manifest: Some(PathBuf::from(tmp_file_name)),
                 product: "zedboot".to_string(),
@@ -498,7 +498,7 @@ mod test {
         );
 
         let v: FlashManifest = from_str(&manifest.to_string())?;
-        let (state, proxy) = setup();
+        let (state, mut proxy) = setup();
         {
             let mut state = state.lock().unwrap();
             state.set_var(IS_USERSPACE_VAR.to_string(), "no".to_string());
@@ -509,7 +509,7 @@ mod test {
         v.flash(
             &mut writer,
             &mut TestResolver::new(),
-            proxy,
+            &mut proxy,
             ManifestParams {
                 manifest: Some(PathBuf::from(tmp_file_name)),
                 product: "fuchsia".to_string(),
@@ -528,7 +528,7 @@ mod test {
         let v: FlashManifest = from_str(LOCKED_MANIFEST)?;
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
-        let (state, proxy) = setup();
+        let (state, mut proxy) = setup();
         {
             let mut state = state.lock().unwrap();
             state.set_var(LOCKED_VAR.to_string(), "vx-locked".to_string());
@@ -539,7 +539,7 @@ mod test {
             .flash(
                 &mut writer,
                 &mut TestResolver::new(),
-                proxy,
+                &mut proxy,
                 ManifestParams {
                     manifest: Some(PathBuf::from(tmp_file_name)),
                     product: "zedboot".to_string(),

@@ -35,7 +35,7 @@ impl FfxMain for FlashTool {
 
 #[tracing::instrument(skip(fastboot_proxy, writer))]
 pub async fn flash_plugin_impl<W: Write>(
-    fastboot_proxy: FastbootProxy,
+    mut fastboot_proxy: FastbootProxy,
     mut cmd: FlashCommand,
     writer: &mut W,
 ) -> Result<()> {
@@ -82,7 +82,7 @@ pub async fn flash_plugin_impl<W: Write>(
         }
     }
 
-    from_manifest(writer, cmd, fastboot_proxy).await
+    from_manifest(writer, cmd, &mut fastboot_proxy).await
 }
 
 ////////////////////////////////////////////////////////////////////////////////

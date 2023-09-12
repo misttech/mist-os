@@ -343,7 +343,7 @@ impl Flash for FlashManifestVersion {
         &self,
         writer: &mut W,
         file_resolver: &mut F,
-        fastboot_interface: T,
+        fastboot_interface: &mut T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
@@ -352,7 +352,7 @@ impl Flash for FlashManifestVersion {
         T: FastbootInterface,
     {
         let total_time = Utc::now();
-        prepare(writer, &fastboot_interface).await?;
+        prepare(writer, fastboot_interface).await?;
         match self {
             Self::V1(v) => v.flash(writer, file_resolver, fastboot_interface, cmd).await?,
             Self::V2(v) => v.flash(writer, file_resolver, fastboot_interface, cmd).await?,
@@ -379,7 +379,7 @@ impl Unlock for FlashManifestVersion {
         &self,
         writer: &mut W,
         file_resolver: &mut F,
-        fastboot_interface: T,
+        fastboot_interface: &mut T,
     ) -> Result<()>
     where
         W: Write,
@@ -387,7 +387,7 @@ impl Unlock for FlashManifestVersion {
         T: FastbootInterface,
     {
         let total_time = Utc::now();
-        prepare(writer, &fastboot_interface).await?;
+        prepare(writer, fastboot_interface).await?;
         match self {
             Self::V1(v) => v.unlock(writer, file_resolver, fastboot_interface).await?,
             Self::V2(v) => v.unlock(writer, file_resolver, fastboot_interface).await?,
@@ -415,7 +415,7 @@ impl Boot for FlashManifestVersion {
         writer: &mut W,
         file_resolver: &mut F,
         slot: String,
-        fastboot_interface: T,
+        fastboot_interface: &mut T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
@@ -424,7 +424,7 @@ impl Boot for FlashManifestVersion {
         T: FastbootInterface,
     {
         let total_time = Utc::now();
-        prepare(writer, &fastboot_interface).await?;
+        prepare(writer, fastboot_interface).await?;
         match self {
             Self::V1(v) => v.boot(writer, file_resolver, slot, fastboot_interface, cmd).await?,
             Self::V2(v) => v.boot(writer, file_resolver, slot, fastboot_interface, cmd).await?,
@@ -448,7 +448,7 @@ impl Boot for FlashManifestVersion {
 pub async fn from_sdk<W: Write, F: FastbootInterface>(
     sdk: &ffx_config::Sdk,
     writer: &mut W,
-    fastboot_interface: F,
+    fastboot_interface: &mut F,
     cmd: ManifestParams,
 ) -> Result<()> {
     tracing::debug!("fastboot manifest from_sdk");
@@ -475,7 +475,7 @@ pub async fn from_sdk<W: Write, F: FastbootInterface>(
 pub async fn from_local_product_bundle<W: Write, F: FastbootInterface>(
     writer: &mut W,
     path: PathBuf,
-    fastboot_interface: F,
+    fastboot_interface: &mut F,
     cmd: ManifestParams,
 ) -> Result<()> {
     tracing::debug!("fastboot manifest from_local_product_bundle");
@@ -492,7 +492,7 @@ pub async fn from_in_tree<W: Write, T: FastbootInterface>(
     sdk: &ffx_config::Sdk,
     writer: &mut W,
     path: PathBuf,
-    fastboot_interface: T,
+    fastboot_interface: &mut T,
     cmd: ManifestParams,
 ) -> Result<()> {
     tracing::debug!("fastboot manifest from_in_tree");
@@ -512,7 +512,7 @@ pub async fn from_in_tree<W: Write, T: FastbootInterface>(
 pub async fn from_path<W: Write, T: FastbootInterface>(
     writer: &mut W,
     path: PathBuf,
-    fastboot_interface: T,
+    fastboot_interface: &mut T,
     cmd: ManifestParams,
 ) -> Result<()> {
     tracing::debug!("fastboot manifest from_path");
@@ -553,7 +553,7 @@ impl<F: FileResolver + Sync> FlashManifest<F> {
     pub async fn flash<W: Write, T: FastbootInterface>(
         &mut self,
         writer: &mut W,
-        fastboot_interface: T,
+        fastboot_interface: &mut T,
         cmd: ManifestParams,
     ) -> Result<()> {
         match &cmd.op {

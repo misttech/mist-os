@@ -105,7 +105,7 @@ impl Flash for FlashManifest {
         &self,
         writer: &mut W,
         file_resolver: &mut F,
-        fastboot_interface: T,
+        fastboot_interface: &mut T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
@@ -124,7 +124,7 @@ impl Unlock for FlashManifest {
         &self,
         writer: &mut W,
         file_resolver: &mut F,
-        fastboot_interface: T,
+        fastboot_interface: &mut T,
     ) -> Result<()>
     where
         W: Write,
@@ -143,7 +143,7 @@ impl Boot for FlashManifest {
         writer: &mut W,
         file_resolver: &mut F,
         slot: String,
-        fastboot_interface: T,
+        fastboot_interface: &mut T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
@@ -204,7 +204,7 @@ mod test {
         });
 
         let v: FlashManifest = from_str(&manifest.to_string())?;
-        let (state, proxy) = setup();
+        let (state, mut proxy) = setup();
         {
             let mut state = state.lock().unwrap();
             state.set_var(REVISION_VAR.to_string(), "rev_test-b4".to_string());
@@ -216,7 +216,7 @@ mod test {
         v.flash(
             &mut writer,
             &mut TestResolver::new(),
-            proxy,
+            &mut proxy,
             ManifestParams {
                 manifest: Some(PathBuf::from(tmp_file_name)),
                 product: "zedboot".to_string(),
@@ -273,7 +273,7 @@ mod test {
         });
 
         let v: FlashManifest = from_str(&manifest.to_string())?;
-        let (state, proxy) = setup();
+        let (state, mut proxy) = setup();
         {
             let mut state = state.lock().unwrap();
             state.set_var("var".to_string(), "val".to_string());
@@ -285,7 +285,7 @@ mod test {
         v.flash(
             &mut writer,
             &mut TestResolver::new(),
-            proxy,
+            &mut proxy,
             ManifestParams {
                 manifest: Some(PathBuf::from(tmp_file_name)),
                 product: "zedboot".to_string(),

@@ -44,15 +44,15 @@ impl FfxMain for BootloaderTool {
 }
 
 pub async fn bootloader_impl<W: Write>(
-    fastboot_proxy: FastbootProxy,
+    mut fastboot_proxy: FastbootProxy,
     cmd: BootloaderCommand,
     writer: &mut W,
 ) -> fho::Result<()> {
     // SubCommands can overwrite the manifest with their own parameters, so check for those
     // conditions before continuing through to check the flash manifest.
     match &cmd.subcommand {
-        Info(_) => return info(writer, &fastboot_proxy).await.map_err(fho::Error::from),
-        Lock(_) => return lock(writer, &fastboot_proxy).await.map_err(fho::Error::from),
+        Info(_) => return info(writer, &mut fastboot_proxy).await.map_err(fho::Error::from),
+        Lock(_) => return lock(writer, &mut fastboot_proxy).await.map_err(fho::Error::from),
         Unlock(UnlockCommand { cred, force }) => {
             if !force {
                 writeln!(writer, "{}", WARNING).bug_context("failed to write")?;
@@ -71,12 +71,12 @@ pub async fn bootloader_impl<W: Write>(
             }
             match cred {
                 Some(cred_file) => {
-                    prepare(writer, &fastboot_proxy).await?;
+                    prepare(writer, &mut fastboot_proxy).await?;
                     return unlock(
                         writer,
                         &mut EmptyResolver::new()?,
                         &vec![cred_file.to_string()],
-                        &fastboot_proxy,
+                        &mut fastboot_proxy,
                     )
                     .await
                     .map_err(fho::Error::from);
@@ -90,13 +90,13 @@ pub async fn bootloader_impl<W: Write>(
             }
             match zbi {
                 Some(z) => {
-                    prepare(writer, &fastboot_proxy).await?;
+                    prepare(writer, &mut fastboot_proxy).await?;
                     return boot(
                         writer,
                         &mut EmptyResolver::new()?,
                         z.to_owned(),
                         vbmeta.to_owned(),
-                        &fastboot_proxy,
+                        &mut fastboot_proxy,
                     )
                     .await
                     .map_err(fho::Error::from);
@@ -106,7 +106,7 @@ pub async fn bootloader_impl<W: Write>(
         }
     }
 
-    from_manifest(writer, cmd, fastboot_proxy).await.map_err(fho::Error::from)
+    from_manifest(writer, cmd, &mut fastboot_proxy).await.map_err(fho::Error::from)
 }
 
 ////////////////////////////////////////////////////////////////////////////////

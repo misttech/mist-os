@@ -69,7 +69,7 @@ pub async fn boot<W: Write, F: FileResolver + Sync, T: FastbootInterface>(
     file_resolver: &mut F,
     zbi: String,
     vbmeta: Option<String>,
-    fastboot_interface: &T,
+    fastboot_interface: &mut T,
 ) -> Result<()> {
     writeln!(writer, "Creating boot image...")?;
     let temp_dir = tempdir()?;

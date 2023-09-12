@@ -52,7 +52,9 @@ impl UnlockChallenge {
     }
 }
 
-async fn get_unlock_challenge(fastboot_interface: &impl FastbootInterface) -> Result<UnlockChallenge> {
+async fn get_unlock_challenge(
+    fastboot_interface: &mut impl FastbootInterface,
+) -> Result<UnlockChallenge> {
     let dir = tempdir()?;
     let path = dir.path().join("challenge");
     let filepath = path.to_str().ok_or(anyhow!("error getting tempfile path"))?;
@@ -163,7 +165,7 @@ pub async fn unlock_device<W: Write, F: FileResolver + Sync, T: FastbootInterfac
     writer: &mut W,
     file_resolver: &mut F,
     creds: &Vec<String>,
-    fastboot_interface: &T,
+    fastboot_interface: &mut T,
 ) -> Result<()> {
     if creds.len() == 0 {
         ffx_bail!("No credentials given. Could not unlock device.")
@@ -178,7 +180,8 @@ pub async fn unlock_device<W: Write, F: FileResolver + Sync, T: FastbootInterfac
         if challenge.product_id_hash[..] == *unlock_creds.get_atx_certificate_subject() {
             let d = Utc::now().signed_duration_since(search);
             done_time(writer, d)?;
-            return unlock_device_with_creds(writer, unlock_creds, challenge, fastboot_interface).await;
+            return unlock_device_with_creds(writer, unlock_creds, challenge, fastboot_interface)
+                .await;
         }
     }
     ffx_bail!("Key mismatch. Credentials given could not unlock the device.")
@@ -188,7 +191,7 @@ async fn unlock_device_with_creds<W: Write, F: FastbootInterface>(
     writer: &mut W,
     unlock_creds: UnlockCredentials,
     challenge: UnlockChallenge,
-    fastboot_interface: &F,
+    fastboot_interface: &mut F,
 ) -> Result<()> {
     let gen = Utc::now();
     write!(writer, "Generating unlock token...")?;

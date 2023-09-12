@@ -51,7 +51,7 @@ pub trait Flash {
         &self,
         writer: &mut W,
         file_resolver: &mut F,
-        fastboot_interface: T,
+        fastboot_interface: &mut T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
@@ -66,7 +66,7 @@ pub trait Unlock {
         &self,
         _writer: &mut W,
         _file_resolver: &mut F,
-        _fastboot_interface: T,
+        _fastboot_interface: &mut T,
     ) -> Result<()>
     where
         W: Write,
@@ -87,7 +87,7 @@ pub trait Boot {
         writer: &mut W,
         file_resolver: &mut F,
         slot: String,
-        fastboot_interface: T,
+        fastboot_interface: &mut T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
@@ -200,7 +200,7 @@ pub async fn stage_file<W: Write, F: FileResolver + Sync, T: FastbootInterface>(
     file_resolver: &mut F,
     resolve: bool,
     file: &str,
-    fastboot_interface: &T,
+    fastboot_interface: &mut T,
 ) -> Result<()> {
     let (prog_client, prog_server): (Sender<UploadProgress>, Receiver<UploadProgress>) =
         mpsc::channel(1);
@@ -222,7 +222,7 @@ pub async fn stage_file<W: Write, F: FileResolver + Sync, T: FastbootInterface>(
 async fn do_flash<W: Write, F: FastbootInterface>(
     writer: &mut W,
     name: &str,
-    fastboot_interface: &F,
+    fastboot_interface: &mut F,
     file_to_upload: &str,
 ) -> Result<()> {
     let (prog_client, prog_server): (Sender<UploadProgress>, Receiver<UploadProgress>) =
@@ -255,7 +255,7 @@ async fn flash_partition_sparse<W: Write, F: FastbootInterface>(
     writer: &mut W,
     name: &str,
     file_to_upload: &str,
-    fastboot_interface: &F,
+    fastboot_interface: &mut F,
     max_download_size: u64,
 ) -> Result<()> {
     writeln!(writer, "Preparing to flash {} in sparse mode", file_to_upload)?;
@@ -283,7 +283,7 @@ pub async fn flash_partition<W: Write, F: FileResolver + Sync, T: FastbootInterf
     file_resolver: &mut F,
     name: &str,
     file: &str,
-    fastboot_interface: &T,
+    fastboot_interface: &mut T,
 ) -> Result<()> {
     let file_to_upload =
         file_resolver.get_file(writer, file).await.context("reconciling file for upload")?;
@@ -337,7 +337,7 @@ pub async fn flash_partition<W: Write, F: FileResolver + Sync, T: FastbootInterf
 
 pub async fn verify_hardware(
     revision: &String,
-    fastboot_interface: &impl FastbootInterface,
+    fastboot_interface: &mut impl FastbootInterface,
 ) -> Result<()> {
     let rev = fastboot_interface
         .get_var(REVISION_VAR)
@@ -360,7 +360,7 @@ pub async fn verify_hardware(
 pub async fn verify_variable_value(
     var: &str,
     value: &str,
-    fastboot_interface: &impl FastbootInterface,
+    fastboot_interface: &mut impl FastbootInterface,
 ) -> Result<bool> {
     fastboot_interface
         .get_var(var)
@@ -372,7 +372,7 @@ pub async fn verify_variable_value(
 #[tracing::instrument(skip(writer))]
 pub async fn reboot_bootloader<W: Write, F: FastbootInterface>(
     writer: &mut W,
-    fastboot_interface: &F,
+    fastboot_interface: &mut F,
 ) -> Result<()> {
     write!(writer, "Rebooting to bootloader... ")?;
     writer.flush()?;
@@ -401,7 +401,7 @@ pub async fn reboot_bootloader<W: Write, F: FastbootInterface>(
 
 pub async fn prepare<W: Write, F: FastbootInterface>(
     writer: &mut W,
-    fastboot_interface: &F,
+    fastboot_interface: &mut F,
 ) -> Result<()> {
     let (reboot_client, mut reboot_server): (Sender<RebootEvent>, Receiver<RebootEvent>) =
         mpsc::channel(1);
@@ -435,7 +435,7 @@ pub async fn stage_oem_files<W: Write, F: FileResolver + Sync, T: FastbootInterf
     file_resolver: &mut F,
     resolve: bool,
     oem_files: &Vec<OemFile>,
-    fastboot_interface: &T,
+    fastboot_interface: &mut T,
 ) -> Result<()> {
     for oem_file in oem_files {
         stage_file(writer, file_resolver, resolve, oem_file.file(), fastboot_interface).await?;
@@ -447,7 +447,7 @@ pub async fn stage_oem_files<W: Write, F: FileResolver + Sync, T: FastbootInterf
     Ok(())
 }
 
-pub async fn set_slot_a_active(fastboot_interface: &impl FastbootInterface) -> Result<()> {
+pub async fn set_slot_a_active(fastboot_interface: &mut impl FastbootInterface) -> Result<()> {
     if fastboot_interface.erase("misc").await.is_err() {
         tracing::debug!("Could not erase misc partition");
     }
@@ -464,7 +464,7 @@ pub async fn flash_partitions<
     writer: &mut W,
     file_resolver: &mut F,
     partitions: &Vec<P>,
-    fastboot_interface: &T,
+    fastboot_interface: &mut T,
 ) -> Result<()> {
     for partition in partitions {
         match (partition.variable(), partition.variable_value()) {
@@ -500,7 +500,7 @@ pub async fn flash<W, F, Part, P, T>(
     writer: &mut W,
     file_resolver: &mut F,
     product: &P,
-    fastboot_interface: &T,
+    fastboot_interface: &mut T,
     cmd: ManifestParams,
 ) -> Result<()>
 where
@@ -514,7 +514,9 @@ where
     flash_product(writer, file_resolver, product, fastboot_interface, &cmd).await
 }
 
-pub async fn is_userspace_fastboot(fastboot_interface: &impl FastbootInterface) -> Result<bool> {
+pub async fn is_userspace_fastboot(
+    fastboot_interface: &mut impl FastbootInterface,
+) -> Result<bool> {
     match fastboot_interface.get_var(IS_USERSPACE_VAR).await {
         Ok(rev) => Ok(rev == "yes"),
         _ => Ok(false),
@@ -526,7 +528,7 @@ pub async fn flash_bootloader<W, F, Part, P, T>(
     writer: &mut W,
     file_resolver: &mut F,
     product: &P,
-    fastboot_interface: &T,
+    fastboot_interface: &mut T,
     cmd: &ManifestParams,
 ) -> Result<()>
 where
@@ -553,7 +555,7 @@ pub async fn flash_product<W, F, Part, P, T>(
     writer: &mut W,
     file_resolver: &mut F,
     product: &P,
-    fastboot_interface: &T,
+    fastboot_interface: &mut T,
     cmd: &ManifestParams,
 ) -> Result<()>
 where
@@ -577,7 +579,7 @@ pub async fn flash_and_reboot<W, F, Part, P, T>(
     writer: &mut W,
     file_resolver: &mut F,
     product: &P,
-    fastboot_interface: &T,
+    fastboot_interface: &mut T,
     cmd: ManifestParams,
 ) -> Result<()>
 where
@@ -593,7 +595,7 @@ where
 
 pub async fn finish<W: Write, F: FastbootInterface>(
     writer: &mut W,
-    fastboot_interface: &F,
+    fastboot_interface: &mut F,
 ) -> Result<()> {
     set_slot_a_active(fastboot_interface).await?;
     fastboot_interface.continue_boot().await.map_err(|_| anyhow!("Could not reboot device"))?;
@@ -601,15 +603,19 @@ pub async fn finish<W: Write, F: FastbootInterface>(
     Ok(())
 }
 
-pub async fn is_locked(fastboot_interface: &impl FastbootInterface) -> Result<bool> {
+pub async fn is_locked(fastboot_interface: &mut impl FastbootInterface) -> Result<bool> {
     verify_variable_value(LOCKED_VAR, "no", fastboot_interface).await.map(|l| !l)
 }
 
-pub async fn lock_device(fastboot_interface: &impl FastbootInterface) -> Result<()> {
+pub async fn lock_device(fastboot_interface: &mut impl FastbootInterface) -> Result<()> {
     fastboot_interface.oem(LOCK_COMMAND).await.map_err(|_| anyhow!("Could not lock device"))
 }
 
-pub async fn from_manifest<W, C, F>(writer: &mut W, input: C, fastboot_interface: F) -> Result<()>
+pub async fn from_manifest<W, C, F>(
+    writer: &mut W,
+    input: C,
+    fastboot_interface: &mut F,
+) -> Result<()>
 where
     W: Write,
     C: Into<ManifestParams>,

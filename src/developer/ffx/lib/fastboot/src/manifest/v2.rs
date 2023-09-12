@@ -34,7 +34,7 @@ impl Flash for FlashManifest {
         &self,
         writer: &mut W,
         file_resolver: &mut F,
-        fastboot_interface: T,
+        fastboot_interface: &mut T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
@@ -43,26 +43,25 @@ impl Flash for FlashManifest {
         T: FastbootInterface,
     {
         if !cmd.skip_verify {
-            verify_hardware(&self.hw_revision, &fastboot_interface).await?;
+            verify_hardware(&self.hw_revision, fastboot_interface).await?;
         }
         let product = match self.v1.0.iter().find(|product| product.name == cmd.product) {
             Some(res) => res,
             None => ffx_bail!("{} {}", MISSING_PRODUCT, cmd.product),
         };
-        if product.requires_unlock && is_locked(&fastboot_interface).await? {
+        if product.requires_unlock && is_locked(fastboot_interface).await? {
             if self.credentials.len() == 0 {
                 ffx_bail!("{}", MISSING_CREDENTIALS);
             } else {
-                unlock_device(writer, file_resolver, &self.credentials, &fastboot_interface)
-                    .await?;
+                unlock_device(writer, file_resolver, &self.credentials, fastboot_interface).await?;
             }
         }
-        flash_bootloader(writer, file_resolver, product, &fastboot_interface, &cmd).await?;
-        if product.requires_unlock && !is_locked(&fastboot_interface).await? {
-            lock_device(&fastboot_interface).await?;
+        flash_bootloader(writer, file_resolver, product, fastboot_interface, &cmd).await?;
+        if product.requires_unlock && !is_locked(fastboot_interface).await? {
+            lock_device(fastboot_interface).await?;
         }
-        flash_product(writer, file_resolver, product, &fastboot_interface, &cmd).await?;
-        finish(writer, &fastboot_interface).await
+        flash_product(writer, file_resolver, product, fastboot_interface, &cmd).await?;
+        finish(writer, fastboot_interface).await
     }
 }
 
@@ -72,14 +71,14 @@ impl Unlock for FlashManifest {
         &self,
         writer: &mut W,
         file_resolver: &mut F,
-        fastboot_interface: T,
+        fastboot_interface: &mut T,
     ) -> Result<()>
     where
         W: Write,
         F: FileResolver + Sync,
         T: FastbootInterface,
     {
-        unlock(writer, file_resolver, &self.credentials, &fastboot_interface).await
+        unlock(writer, file_resolver, &self.credentials, fastboot_interface).await
     }
 }
 
@@ -90,7 +89,7 @@ impl Boot for FlashManifest {
         writer: &mut W,
         file_resolver: &mut F,
         slot: String,
-        fastboot_interface: T,
+        fastboot_interface: &mut T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
@@ -187,7 +186,7 @@ mod test {
         });
         let v: FlashManifest = from_str(&manifest.to_string())?;
 
-        let (state, proxy) = setup();
+        let (state, mut proxy) = setup();
         {
             let mut state = state.lock().unwrap();
             state.set_var(IS_USERSPACE_VAR.to_string(), "yes".to_string());
@@ -198,7 +197,7 @@ mod test {
         v.flash(
             &mut writer,
             &mut TestResolver::new(),
-            proxy,
+            &mut proxy,
             ManifestParams {
                 manifest: Some(PathBuf::from(tmp_file_name)),
                 product: "zedboot".to_string(),
@@ -213,7 +212,7 @@ mod test {
         let v: FlashManifest = from_str(MISMATCH_MANIFEST)?;
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
-        let (state, proxy) = setup();
+        let (state, mut proxy) = setup();
         {
             let mut state = state.lock().unwrap();
             state.set_var(IS_USERSPACE_VAR.to_string(), "yes".to_string());
@@ -224,7 +223,7 @@ mod test {
             .flash(
                 &mut writer,
                 &mut TestResolver::new(),
-                proxy,
+                &mut proxy,
                 ManifestParams {
                     manifest: Some(PathBuf::from(tmp_file_name)),
                     product: "zedboot".to_string(),
@@ -241,7 +240,7 @@ mod test {
         let v: FlashManifest = from_str(NO_CREDS_MANIFEST)?;
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
-        let (state, proxy) = setup();
+        let (state, mut proxy) = setup();
         {
             let mut state = state.lock().unwrap();
             state.set_var(IS_USERSPACE_VAR.to_string(), "no".to_string());
@@ -253,7 +252,7 @@ mod test {
             .flash(
                 &mut writer,
                 &mut TestResolver::new(),
-                proxy,
+                &mut proxy,
                 ManifestParams {
                     manifest: Some(PathBuf::from(tmp_file_name)),
                     product: "zedboot".to_string(),
@@ -295,7 +294,7 @@ mod test {
         });
 
         let v: FlashManifest = from_str(&manifest.to_string())?;
-        let (state, proxy) = setup();
+        let (state, mut proxy) = setup();
         {
             let mut state = state.lock().unwrap();
             state.set_var(IS_USERSPACE_VAR.to_string(), "yes".to_string());
@@ -306,7 +305,7 @@ mod test {
         v.flash(
             &mut writer,
             &mut TestResolver::new(),
-            proxy,
+            &mut proxy,
             ManifestParams {
                 manifest: Some(PathBuf::from(tmp_file_name)),
                 product: "zedboot".to_string(),

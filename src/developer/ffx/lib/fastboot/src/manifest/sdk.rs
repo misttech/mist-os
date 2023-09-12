@@ -92,7 +92,7 @@ impl Flash for SdkEntries {
         &self,
         writer: &mut W,
         file_resolver: &mut F,
-        fastboot_interface: T,
+        fastboot_interface: &mut T,
         cmd: ManifestParams,
     ) -> Result<()>
     where
@@ -111,7 +111,7 @@ impl Unlock for SdkEntries {
         &self,
         writer: &mut W,
         file_resolver: &mut F,
-        fastboot_interface: T,
+        fastboot_interface: &mut T,
     ) -> Result<()>
     where
         W: Write,
@@ -130,7 +130,7 @@ impl Boot for SdkEntries {
         writer: &mut W,
         file_resolver: &mut F,
         slot: String,
-        fastboot_interface: T,
+        fastboot_interface: &mut T,
         cmd: ManifestParams,
     ) -> Result<()>
     where

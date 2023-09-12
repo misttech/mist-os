@@ -8,38 +8,38 @@ use tokio::sync::mpsc::Sender;
 
 pub trait FastbootInterface: std::fmt::Debug + Fastboot {}
 
-#[async_trait]
+#[async_trait(?Send)]
 pub trait Fastboot {
-    async fn prepare(&self, listener: Sender<RebootEvent>) -> Result<()>;
+    async fn prepare(&mut self, listener: Sender<RebootEvent>) -> Result<()>;
 
-    async fn get_var(&self, name: &str) -> Result<String>;
+    async fn get_var(&mut self, name: &str) -> Result<String>;
 
-    async fn get_all_vars(&self, listener: Sender<Variable>) -> Result<()>;
+    async fn get_all_vars(&mut self, listener: Sender<Variable>) -> Result<()>;
 
     async fn flash(
-        &self,
+        &mut self,
         partition_name: &str,
         path: &str,
         listener: Sender<UploadProgress>,
     ) -> Result<()>;
 
-    async fn erase(&self, partition_name: &str) -> Result<()>;
+    async fn erase(&mut self, partition_name: &str) -> Result<()>;
 
     async fn boot(&self) -> Result<()>;
 
     async fn reboot(&self) -> Result<()>;
 
-    async fn reboot_bootloader(&self, listener: Sender<RebootEvent>) -> Result<()>;
+    async fn reboot_bootloader(&mut self, listener: Sender<RebootEvent>) -> Result<()>;
 
     async fn continue_boot(&self) -> Result<()>;
 
-    async fn get_staged(&self, path: &str) -> Result<()>;
+    async fn get_staged(&mut self, path: &str) -> Result<()>;
 
-    async fn stage(&self, path: &str, listener: Sender<UploadProgress>) -> Result<()>;
+    async fn stage(&mut self, path: &str, listener: Sender<UploadProgress>) -> Result<()>;
 
-    async fn set_active(&self, slot: &str) -> Result<()>;
+    async fn set_active(&mut self, slot: &str) -> Result<()>;
 
-    async fn oem(&self, command: &str) -> Result<()>;
+    async fn oem(&mut self, command: &str) -> Result<()>;
 }
 
 #[derive(Debug)]

@@ -16,7 +16,7 @@ const LOCKED: &str = "Target is now locked.";
 
 pub async fn lock<W: Write, F: FastbootInterface>(
     writer: &mut W,
-    fastboot_interface: &F,
+    fastboot_interface: &mut F,
 ) -> Result<()> {
     prepare(writer, fastboot_interface).await?;
     if is_locked(fastboot_interface).await? {
@@ -40,21 +40,21 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_locked_device_throws_err() -> Result<()> {
-        let (state, proxy) = setup();
+        let (state, mut proxy) = setup();
         {
             let mut state = state.lock().unwrap();
             // is_locked
             state.set_var(LOCKED_VAR.to_string(), "yes".to_string());
         }
         let mut writer = Vec::<u8>::new();
-        let result = lock(&mut writer, &proxy).await;
+        let result = lock(&mut writer, &mut proxy).await;
         assert!(result.is_err());
         Ok(())
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_ephemeral_locked_throws_err() -> Result<()> {
-        let (state, proxy) = setup();
+        let (state, mut proxy) = setup();
         {
             let mut state = state.lock().unwrap();
             state.set_var(LOCKABLE_VAR.to_string(), EPHEMERAL.to_string());
@@ -62,14 +62,14 @@ mod test {
             state.set_var(LOCKED_VAR.to_string(), "no".to_string());
         }
         let mut writer = Vec::<u8>::new();
-        let result = lock(&mut writer, &proxy).await;
+        let result = lock(&mut writer, &mut proxy).await;
         assert!(result.is_err());
         Ok(())
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_lock_succeeds() -> Result<()> {
-        let (state, proxy) = setup();
+        let (state, mut proxy) = setup();
         {
             let mut state = state.lock().unwrap();
             // ephemeral
@@ -78,7 +78,7 @@ mod test {
             state.set_var(LOCKED_VAR.to_string(), "no".to_string());
         }
         let mut writer = Vec::<u8>::new();
-        lock(&mut writer, &proxy).await?;
+        lock(&mut writer, &mut proxy).await?;
         let state = state.lock().unwrap();
         assert_eq!(1, state.oem_commands.len());
         assert_eq!("vx-lock", state.oem_commands[0]);

@@ -28,7 +28,7 @@ async fn handle_variables_for_fastboot<W: Write>(
 #[tracing::instrument(skip(writer))]
 pub async fn info<W: Write, F: FastbootInterface>(
     writer: &mut W,
-    fastboot_interface: &F,
+    fastboot_interface: &mut F,
 ) -> Result<()> {
     prepare(writer, fastboot_interface).await?;
     let (var_client, var_server): (Sender<Variable>, Receiver<Variable>) = mpsc::channel(1);
@@ -55,9 +55,9 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_showing_variables() -> Result<()> {
-        let (_, proxy) = setup();
+        let (_, mut proxy) = setup();
         let mut writer = Vec::<u8>::new();
-        info(&mut writer, &proxy).await?;
+        info(&mut writer, &mut proxy).await?;
         let output = String::from_utf8(writer).expect("utf-8 string");
         assert!(output.contains("test: test"));
         Ok(())
