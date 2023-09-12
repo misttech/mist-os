@@ -2,16 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "fidl/fidl.clientsuite/cpp/common_types.h"
-#include "fidl/fidl.clientsuite/cpp/natural_types.h"
+#include <fidl/fidl.clientsuite/cpp/common_types.h>
+#include <fidl/fidl.clientsuite/cpp/natural_types.h>
+
 #include "src/tests/fidl/channel_util/bytes.h"
 #include "src/tests/fidl/channel_util/channel.h"
 #include "src/tests/fidl/client_suite/harness/harness.h"
 #include "src/tests/fidl/client_suite/harness/ordinals.h"
 
-using namespace channel_util;
-
 namespace client_suite {
+namespace {
+
+using namespace ::channel_util;
 
 // The client should tear down when it receives an event with an invalid magic number.
 CLIENT_TEST(ReceiveEventBadMagicNumber) {
@@ -213,4 +215,5 @@ CLIENT_TEST(ReceiveResponseWrongOrdinalUnknown) {
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
+}  // namespace
 }  // namespace client_suite

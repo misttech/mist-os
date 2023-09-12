@@ -5,9 +5,10 @@
 #include "src/tests/fidl/server_suite/harness/harness.h"
 #include "src/tests/fidl/server_suite/harness/ordinals.h"
 
-using namespace channel_util;
-
 namespace server_suite {
+namespace {
+
+using namespace ::channel_util;
 
 // The server should be able to send an epitaph.
 CLOSED_SERVER_TEST(ServerSendsEpitaph) {
@@ -41,4 +42,5 @@ CLOSED_SERVER_TEST(ServerReceivesEpitaphInvalid) {
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
 }
 
+}  // namespace
 }  // namespace server_suite

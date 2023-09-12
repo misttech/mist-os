@@ -2,16 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fidl.clientsuite/cpp/markers.h>
 #include <zircon/fidl.h>
 
-#include "fidl/fidl.clientsuite/cpp/markers.h"
 #include "src/tests/fidl/channel_util/bytes.h"
 #include "src/tests/fidl/client_suite/harness/harness.h"
 #include "src/tests/fidl/client_suite/harness/ordinals.h"
 
-using namespace channel_util;
-
 namespace client_suite {
+namespace {
+
+using namespace ::channel_util;
 
 // The client should reject V1 messages (no payload).
 CLIENT_TEST(V1TwoWayNoPayload) {
@@ -90,4 +91,5 @@ CLIENT_TEST(V1TwoWayStructPayload) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+}  // namespace
 }  // namespace client_suite

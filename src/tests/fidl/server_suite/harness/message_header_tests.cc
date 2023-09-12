@@ -7,9 +7,10 @@
 #include "src/tests/fidl/server_suite/harness/harness.h"
 #include "src/tests/fidl/server_suite/harness/ordinals.h"
 
-using namespace channel_util;
-
 namespace server_suite {
+namespace {
+
+using namespace ::channel_util;
 
 // The server should tear down when it receives a one-way request with nonzero txid.
 CLOSED_SERVER_TEST(OneWayWithNonZeroTxid) {
@@ -102,4 +103,5 @@ CLOSED_SERVER_TEST(IgnoresUnrecognizedDynamicFlags) {
   ASSERT_OK(client_end().read_and_check(bytes_out));
 }
 
+}  // namespace
 }  // namespace server_suite

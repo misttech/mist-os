@@ -2,16 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fidl.clientsuite/cpp/common_types.h>
+#include <fidl/fidl.clientsuite/cpp/natural_types.h>
+
 #include <memory>
 
-#include "fidl/fidl.clientsuite/cpp/common_types.h"
-#include "fidl/fidl.clientsuite/cpp/natural_types.h"
 #include "src/tests/fidl/client_suite/harness/harness.h"
 #include "src/tests/fidl/client_suite/harness/ordinals.h"
 
-using namespace channel_util;
-
 namespace client_suite {
+namespace {
+
+using namespace ::channel_util;
 
 // The client should call a strict one-way method.
 CLIENT_TEST(OneWayStrictSend) {
@@ -960,4 +962,5 @@ CLIENT_TEST(UnknownFlexibleServerInitiatedTwoWay) {
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
+}  // namespace
 }  // namespace client_suite

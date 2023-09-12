@@ -6,9 +6,10 @@
 #include "src/tests/fidl/server_suite/harness/harness.h"
 #include "src/tests/fidl/server_suite/harness/ordinals.h"
 
-using namespace channel_util;
-
 namespace server_suite {
+namespace {
+
+using namespace ::channel_util;
 
 // The server should tear down when it fails to decode a request.
 CLOSED_SERVER_TEST(BadPayloadEncoding) {
@@ -66,4 +67,5 @@ CLOSED_SERVER_TEST(V1TwoWayStructPayload) {
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
 }
 
+}  // namespace
 }  // namespace server_suite

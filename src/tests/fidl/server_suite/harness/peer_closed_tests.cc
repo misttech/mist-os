@@ -5,9 +5,10 @@
 #include "src/tests/fidl/server_suite/harness/harness.h"
 #include "src/tests/fidl/server_suite/harness/ordinals.h"
 
-using namespace channel_util;
-
 namespace server_suite {
+namespace {
+
+using namespace ::channel_util;
 
 // When sending an event, if channel_write returns PEER_CLOSED, the bindings
 // should hide it and return successfully. This helps prevent race conditions.
@@ -57,4 +58,5 @@ CLOSED_SERVER_TEST(ServerTearsDownWhenPeerClosed) {
   EXPECT_TEARDOWN_REASON(fidl_serversuite::TeardownReason::kChannelPeerClosed);
 }
 
+}  // namespace
 }  // namespace server_suite

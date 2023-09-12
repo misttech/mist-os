@@ -8,9 +8,10 @@
 #include "src/tests/fidl/server_suite/harness/harness.h"
 #include "src/tests/fidl/server_suite/harness/ordinals.h"
 
-using namespace channel_util;
-
 namespace server_suite {
+namespace {
+
+using namespace ::channel_util;
 
 const fidl_xunion_tag_t kResultUnionSuccess = 1;
 const fidl_xunion_tag_t kResultUnionError = 2;
@@ -573,4 +574,5 @@ CLOSED_SERVER_TEST(UnknownFlexibleTwoWayClosedProtocol) {
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
 }
 
+}  // namespace
 }  // namespace server_suite

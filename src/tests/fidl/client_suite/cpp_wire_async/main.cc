@@ -2,20 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fidl.clientsuite/cpp/common_types.h>
 #include <fidl/fidl.clientsuite/cpp/markers.h>
 #include <fidl/fidl.clientsuite/cpp/wire_messaging.h>
+#include <fidl/fidl.clientsuite/cpp/wire_types.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fidl/cpp/wire/internal/transport.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
+#include <lib/fidl/cpp/wire_natural_conversions.h>
 
 #include <iostream>
 
-#include "fidl/fidl.clientsuite/cpp/common_types.h"
-#include "fidl/fidl.clientsuite/cpp/wire_types.h"
-#include "lib/fidl/cpp/wire_natural_conversions.h"
 #include "src/tests/fidl/client_suite/cpp_util/error_util.h"
 
 class RunnerServer : public fidl::WireServer<fidl_clientsuite::Runner> {

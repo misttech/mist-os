@@ -8,12 +8,11 @@
 #include <lib/async/cpp/task.h>
 #include <lib/async/default.h>
 #include <lib/fidl/cpp/binding.h>
+#include <lib/fidl/cpp/unknown_interactions_hlcpp.h>
 #include <lib/sys/cpp/component_context.h>
-#include <stdio.h>
 
 #include <iostream>
 
-#include "lib/fidl/cpp/unknown_interactions_hlcpp.h"
 #include "src/tests/fidl/client_suite/hlcpp_util/error_util.h"
 
 class RunnerServer : public fidl::clientsuite::Runner {

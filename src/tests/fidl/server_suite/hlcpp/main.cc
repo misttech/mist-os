@@ -8,14 +8,12 @@
 #include <lib/async/cpp/task.h>
 #include <lib/async/default.h>
 #include <lib/fidl/cpp/binding.h>
+#include <lib/fidl/cpp/interface_request.h>
 #include <lib/fidl/cpp/synchronous_interface_ptr.h>
 #include <lib/sys/cpp/component_context.h>
-#include <stdio.h>
 
 #include <iostream>
 #include <memory>
-
-#include "lib/fidl/cpp/interface_request.h"
 
 template <fidl::serversuite::AnyTarget::Tag TARGET>
 struct TargetTypes;

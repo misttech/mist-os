@@ -2,14 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "fidl/fidl.clientsuite/cpp/common_types.h"
-#include "fidl/fidl.clientsuite/cpp/natural_types.h"
+#include <fidl/fidl.clientsuite/cpp/common_types.h>
+#include <fidl/fidl.clientsuite/cpp/natural_types.h>
+
 #include "src/tests/fidl/channel_util/channel.h"
 #include "src/tests/fidl/client_suite/harness/harness.h"
 
-using namespace channel_util;
-
 namespace client_suite {
+namespace {
+
+using namespace ::channel_util;
 
 // When making a one-way call, if channel_write returns PEER_CLOSED, the bindings
 // should hide it and return successfully. This helps prevent race conditions.
@@ -25,4 +27,5 @@ CLIENT_TEST(OneWayCallDoNotReportPeerClosed) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+}  // namespace
 }  // namespace client_suite

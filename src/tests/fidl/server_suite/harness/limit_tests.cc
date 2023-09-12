@@ -5,9 +5,10 @@
 #include "src/tests/fidl/server_suite/harness/harness.h"
 #include "src/tests/fidl/server_suite/harness/ordinals.h"
 
-using namespace channel_util;
-
 namespace server_suite {
+namespace {
+
+using namespace ::channel_util;
 
 constexpr uint32_t maxVecBytesInMsg =
     ZX_CHANNEL_MAX_MSG_BYTES - sizeof(fidl_message_header_t) - sizeof(fidl_vector_t);
@@ -145,4 +146,5 @@ CLOSED_SERVER_TEST(ResponseExceedsHandleLimit) {
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
 }
 
+}  // namespace
 }  // namespace server_suite

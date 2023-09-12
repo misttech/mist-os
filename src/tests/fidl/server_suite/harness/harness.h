@@ -6,15 +6,15 @@
 #define SRC_TESTS_FIDL_SERVER_SUITE_HARNESS_HARNESS_H_
 
 #include <fidl/fidl.serversuite/cpp/fidl.h>
+#include <fidl/fidl.serversuite/cpp/markers.h>
+#include <fidl/fidl.serversuite/cpp/natural_types.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/fidl/cpp/client.h>
 
 #include <optional>
 
 #include <gtest/gtest.h>
 
-#include "fidl/fidl.serversuite/cpp/markers.h"
-#include "fidl/fidl.serversuite/cpp/natural_types.h"
-#include "lib/fidl/cpp/client.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/lib/testing/predicates/status.h"
 #include "src/tests/fidl/channel_util/channel.h"

@@ -5,9 +5,10 @@
 #include "src/tests/fidl/server_suite/harness/harness.h"
 #include "src/tests/fidl/server_suite/harness/ordinals.h"
 
-using namespace channel_util;
-
 namespace server_suite {
+namespace {
+
+using namespace ::channel_util;
 
 // Check that the test runner is set up correctly without doing anything else.
 CLOSED_SERVER_TEST(Setup) {}
@@ -135,4 +136,5 @@ CLOSED_SERVER_TEST(TwoWayResultWithError) {
   ASSERT_OK(client_end().read_and_check(bytes_out));
 }
 
+}  // namespace
 }  // namespace server_suite

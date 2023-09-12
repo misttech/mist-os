@@ -2,16 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "fidl/fidl.clientsuite/cpp/common_types.h"
-#include "fidl/fidl.clientsuite/cpp/natural_types.h"
+#include <fidl/fidl.clientsuite/cpp/common_types.h>
+#include <fidl/fidl.clientsuite/cpp/natural_types.h>
+
 #include "src/tests/fidl/channel_util/bytes.h"
 #include "src/tests/fidl/channel_util/channel.h"
 #include "src/tests/fidl/client_suite/harness/harness.h"
 #include "src/tests/fidl/client_suite/harness/ordinals.h"
 
-using namespace channel_util;
-
 namespace client_suite {
+namespace {
+
+using namespace ::channel_util;
 
 // Check that the test runner is set up correctly without doing anything else.
 CLIENT_TEST(Setup) {}
@@ -484,4 +486,5 @@ CLIENT_TEST(GracefulFailureDuringCallAfterPeerClose) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+}  // namespace
 }  // namespace client_suite
