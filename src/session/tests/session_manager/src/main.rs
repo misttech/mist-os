@@ -5,6 +5,10 @@
 #[cfg(test)]
 mod tests {
     use {
+        component_events::{
+            events::{EventStream, Started},
+            matcher::EventMatcher,
+        },
         diagnostics_hierarchy::DiagnosticsHierarchy,
         diagnostics_reader::{ArchiveReader, Inspect},
         fidl::endpoints::create_proxy,
@@ -73,6 +77,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_autolaunch_launches() -> anyhow::Result<()> {
+        let mut event_stream = EventStream::open().await?;
         let builder = RealmBuilder::new().await?;
 
         add_session_manager(
@@ -84,10 +89,15 @@ mod tests {
 
         let realm = builder.build().await?;
 
-        // NOTE(hjfreyer): In theory there's a race condition here if
-        // session_manager exports inspect data before launching the session.
-        // I've run this many times and haven't seen it flake, but if it starts
-        // flaking, it may have to do with that.
+        // Wait for the session component to start.
+        let _ = EventMatcher::ok()
+            .moniker(format!(
+                "./realm_builder:{}/session-manager/session:session",
+                realm.root.child_name()
+            ))
+            .wait::<Started>(&mut event_stream)
+            .await;
+
         let inspect = get_session_manager_inspect(&realm, "root/session_started_at").await?;
 
         // Assert the session has been launched once.

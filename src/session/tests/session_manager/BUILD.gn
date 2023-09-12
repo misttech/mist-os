@@ -26,6 +26,7 @@ rustc_test("test") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
     "//src/session/bin/session_manager:lib",
+    "//src/sys/lib/component-events",
     "//third_party/rust_crates:anyhow",
   ]
 
