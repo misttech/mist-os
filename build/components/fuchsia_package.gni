@@ -384,6 +384,7 @@ template("fuchsia_package") {
           },
         ]
         system_image_package_barrier = []
+        component_id_index_barrier = []
 
         system_image_extra_package_manifest_barrier = []
         test_component_manifest_barrier = []

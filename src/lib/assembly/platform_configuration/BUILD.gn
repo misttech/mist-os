@@ -42,6 +42,7 @@ rustc_library("platform_configuration") {
   ]
   deps = [
     "//src/developer/ffx/config:lib",
+    "//src/lib/assembly/component_id_index",
     "//src/lib/assembly/config_schema",
     "//src/lib/assembly/images_config",
     "//src/lib/assembly/util",

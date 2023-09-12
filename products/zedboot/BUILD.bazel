@@ -23,6 +23,9 @@ fuchsia_product_configuration(
             "build_type": BUILD_TYPES.ENG,
             "feature_set_level": "bootstrap",
             "storage": {
+                "component_id_index": {
+                    "exclude_default_platform_ids": True,
+                },
                 "configure_fshost": True,
                 "filesystems": {
                     "image_name": "zedboot",

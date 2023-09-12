@@ -428,6 +428,10 @@ template("product_assembly_configuration") {
       fields = [ "registry" ]
     },
     {
+      node_path = "platform.storage.component_id_index"
+      fields = [ "product_index" ]
+    },
+    {
       node_path = "product.build_info"
       fields = [
         "version",

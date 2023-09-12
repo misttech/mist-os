@@ -97,6 +97,9 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     // Set the Structured Configuration for the components in Bootfs
     builder.set_bootfs_structured_config(configuration.bootfs.components);
 
+    // Add the bootfs files.
+    builder.add_bootfs_files(&configuration.bootfs.files).context("Adding bootfs files")?;
+
     // Add product-specified packages and configuration
     builder
         .add_product_packages(config.product.packages)

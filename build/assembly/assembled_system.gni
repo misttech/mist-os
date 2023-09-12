@@ -1173,6 +1173,7 @@ template("assembled_system") {
       # Assembly does not emit information about the packages that it includes
       # via metadata, but via its own output files.
       distribution_entries_barrier = []
+      component_id_index_barrier = []
       package_barrier = []
       assembly_package_barrier = []
       driver_package_barrier = []

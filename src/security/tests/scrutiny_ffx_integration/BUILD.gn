@@ -42,6 +42,9 @@ if (is_fuchsia) {
       build_type = "eng"
       feature_set_level = "bootstrap"
       storage = {
+        component_id_index = {
+          exclude_default_platform_ids = true
+        }
         configure_fshost = true
         filesystems = {
           image_name = _assemble_system_target_name
@@ -65,6 +68,9 @@ if (is_fuchsia) {
       build_type = "eng"
       feature_set_level = "bootstrap"
       storage = {
+        component_id_index = {
+          exclude_default_platform_ids = true
+        }
         configure_fshost = true
         filesystems = {
           image_name = _assemble_system_recovery_target_name

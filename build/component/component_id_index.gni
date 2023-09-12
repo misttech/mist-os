@@ -73,6 +73,7 @@ template("component_id_index_config") {
                              "testonly",
                            ])
     visibility = [ ":*" ]
+    walk_keys = [ "component_id_index_barrier" ]
     data_keys = [ "component_id_index" ]
     outputs = [ component_id_index_input_manifest_path ]
   }

@@ -232,6 +232,9 @@ template("assemble_security_pkg_test_system") {
       # code from the "main" assembly.
       feature_set_level = "bootstrap"
       storage = {
+        component_id_index = {
+          exclude_default_platform_ids = true
+        }
         configure_fshost = true
         filesystems = {
           image_name = labels.assembly
@@ -263,6 +266,9 @@ template("assemble_security_pkg_test_system") {
       # code from the "main" assembly.
       feature_set_level = "bootstrap"
       storage = {
+        component_id_index = {
+          exclude_default_platform_ids = true
+        }
         configure_fshost = true
         filesystems = {
           image_name = labels.assembly

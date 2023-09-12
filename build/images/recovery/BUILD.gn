@@ -202,6 +202,9 @@ if (is_fuchsia) {
   if (!fxfs_blob) {
     _storage_config = {
       storage = {
+        component_id_index = {
+          exclude_default_platform_ids = true
+        }
         configure_fshost = true
         filesystems = {
           volume = {
@@ -219,6 +222,9 @@ if (is_fuchsia) {
   } else {
     _storage_config = {
       storage = {
+        component_id_index = {
+          exclude_default_platform_ids = true
+        }
         configure_fshost = true
         filesystems = {
           volume = "fxfs"

@@ -68,6 +68,9 @@ if (labels.images == "//build/images/bringup") {
       build_type = "eng"
       feature_set_level = "utility"
       storage = {
+        component_id_index = {
+          exclude_default_platform_ids = true
+        }
         configure_fshost = true
         filesystems = {
           no_zxcrypt = true

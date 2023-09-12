@@ -157,6 +157,9 @@ pub(crate) trait ConfigurationBuilder {
 pub(crate) trait BootfsConfigBuilder {
     /// Add configuration to the builder for a component within a package.
     fn component(&mut self, pkg_path: &str) -> Result<&mut dyn ComponentConfigBuilder>;
+
+    /// Add a file to bootfs.
+    fn file(&mut self, file_entry: FileEntry) -> Result<&mut dyn BootfsConfigBuilder>;
 }
 
 /// The interface for specifying the configuration to provide for a package.
@@ -517,11 +520,17 @@ pub struct BootfsConfig {
     /// A map from manifest paths within bootfs to the configuration values for
     /// the component.
     pub components: ComponentConfigs,
+
+    /// A map from bootfs destination to bootfs file entry.
+    pub files: NamedMap<FileEntry>,
 }
 
 impl Default for BootfsConfig {
     fn default() -> Self {
-        Self { components: ComponentConfigs::new("component configs") }
+        Self {
+            components: ComponentConfigs::new("component configs"),
+            files: NamedMap::new("bootfs files"),
+        }
     }
 }
 
@@ -545,6 +554,20 @@ impl BootfsConfigBuilder for BootfsConfig {
                     })
                     .context("Setting configuration in bootfs")
             }
+        }
+    }
+
+    /// Add a file to bootfs.
+    fn file(&mut self, file_entry: FileEntry) -> Result<&mut dyn BootfsConfigBuilder> {
+        match self.files.entry(file_entry.destination.to_owned()) {
+            entry @ Entry::Vacant(_) => {
+                entry.or_insert(file_entry);
+                Ok(self)
+            }
+            Entry::Occupied(_) => Err(anyhow!(
+                "A bootfs destination may only be used once: {}",
+                file_entry.destination
+            )),
         }
     }
 }

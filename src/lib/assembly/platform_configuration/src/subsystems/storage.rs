@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
+use anyhow::Context;
+use assembly_component_id_index::ComponentIdIndexBuilder;
 use assembly_config_schema::platform_config::storage_config::StorageConfig;
+use assembly_config_schema::FileEntry;
 use assembly_images_config::{
     BlobfsLayout, DataFilesystemFormat, DataFvmVolumeConfig, FvmVolumeConfig, VolumeConfig,
 };
@@ -20,6 +23,38 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
         } else {
             builder.platform_bundle("empty_live_usb");
         }
+
+        // Build and add the component id index.
+        let mut index_builder = ComponentIdIndexBuilder::default();
+
+        // If the product requests the platform id index, then find it in the
+        // "resources" directory and add it to the builder. The "resources"
+        // directory is built and shipped alonside the platform AIBs which is
+        // how it becomes available to subsystems.
+        if !storage_config.component_id_index.exclude_default_platform_ids {
+            let core_index = context.get_resource("core_component_id_index.json5");
+            index_builder.index(core_index);
+        }
+
+        // If the product provided their own index, add it to the builder.
+        if let Some(product_index) = &storage_config.component_id_index.product_index {
+            index_builder.index(product_index);
+        }
+
+        // Fetch a custom gen directory for placing temporary files. We get this
+        // from the context, so that it can create unique gen directories for
+        // each subsystem under the top-level assembly gen directory.
+        let gendir = context.get_gendir().context("Getting gendir for storage subsystem")?;
+
+        // Build the component id index and add it as a bootfs file.
+        let index_path = index_builder.build(&gendir).context("Building component id index")?;
+        builder
+            .bootfs()
+            .file(FileEntry {
+                destination: "config/component_id_index".to_string(),
+                source: index_path.clone(),
+            })
+            .with_context(|| format!("Adding bootfs file {}", &index_path))?;
 
         if storage_config.configure_fshost {
             // Collect the arguments from the board.

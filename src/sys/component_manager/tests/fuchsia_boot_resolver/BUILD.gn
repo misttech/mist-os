@@ -42,6 +42,9 @@ if (current_toolchain == default_toolchain) {
       build_type = "eng"
       feature_set_level = "bootstrap"
       storage = {
+        component_id_index = {
+          exclude_default_platform_ids = true
+        }
         configure_fshost = true
         filesystems = {
           image_name = "test_zbi"

@@ -9,6 +9,7 @@ use camino::Utf8PathBuf;
 use fuchsia_merkle::Hash;
 use fuchsia_pkg::BlobInfo;
 use serde::Serialize;
+use utf8_path::path_relative_from_current_dir;
 
 /// A paired source and optional merkle for a bootfs file.
 #[derive(Debug, Serialize, PartialEq)]
@@ -29,6 +30,12 @@ impl From<FileEntry> for SourceMerklePair {
     }
 }
 
+fn relativize_entry(entry: FileEntry) -> Result<FileEntry> {
+    let source = path_relative_from_current_dir(&entry.source)
+        .with_context(|| format!("relativizing path {}", entry.source))?;
+    Ok(FileEntry { source, destination: entry.destination })
+}
+
 /// A named set of file entries, keyed by file destination.
 #[derive(Debug, Serialize)]
 pub struct BootfsFileMap {
@@ -44,9 +51,28 @@ impl BootfsFileMap {
     /// Add a single FileEntry to the map, if the 'destination' path is a
     /// duplicate, return an error, otherwise add the entry.
     pub fn add_entry(&mut self, entry: FileEntry) -> Result<()> {
+        let entry = relativize_entry(entry)?;
         self.map
             .try_insert_unique(entry.destination.clone(), entry.into())
             .with_context(|| format!("Adding entry to set: {}", self.map.name))
+    }
+
+    /// Add a single FileEntry to the map by first computing the merkle hash
+    /// then calling add_blob. This is helpful because it allows FileEntries
+    /// to be de-duplicated.
+    pub fn add_entry_as_blob(&mut self, entry: FileEntry) -> Result<()> {
+        let entry = relativize_entry(entry)?;
+        let mut file = std::fs::File::open(&entry.source)
+            .with_context(|| format!("Opening file {}", &entry.source))?;
+        let merkle_tree = fuchsia_merkle::MerkleTree::from_reader(&mut file)
+            .with_context(|| format!("Constructing merkle for file {}", &entry.source))?;
+        let blob = BlobInfo {
+            source_path: entry.source.to_string(),
+            path: entry.destination,
+            merkle: merkle_tree.root(),
+            size: 0,
+        };
+        self.add_blob(blob)
     }
 
     /// Add a single blob to the map. If the 'destination' path is a

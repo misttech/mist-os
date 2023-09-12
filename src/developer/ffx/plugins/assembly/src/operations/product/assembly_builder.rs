@@ -299,6 +299,14 @@ impl ImageAssemblyConfigBuilder {
         Ok(())
     }
 
+    /// Add all the bootfs file entries to the builder.
+    pub fn add_bootfs_files(&mut self, files: &NamedMap<FileEntry>) -> Result<()> {
+        for (_, entry) in files {
+            self.bootfs_files.add_entry_as_blob(entry.to_owned())?;
+        }
+        Ok(())
+    }
+
     fn add_bootfs_files_from_path(
         &mut self,
         bundle_path: impl AsRef<Utf8Path>,
