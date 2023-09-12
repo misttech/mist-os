@@ -128,7 +128,7 @@ impl ProcessGroup {
             state.orphaned = true;
             state.thread_groups().collect::<Vec<_>>()
         };
-        if thread_groups.iter().any(|tg| tg.read().stopped == StopState::GroupStopped) {
+        if thread_groups.iter().any(|tg| tg.read().stopped.is_stopping_or_stopped()) {
             Self::send_signals_to_thread_groups(&[SIGHUP, SIGCONT], thread_groups);
         }
     }

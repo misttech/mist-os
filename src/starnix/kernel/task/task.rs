@@ -172,21 +172,12 @@ pub enum StopState {
 impl StopState {
     /// This means a stop is either in progress or we've stopped.
     pub fn is_stopping_or_stopped(&self) -> bool {
-        *self == StopState::GroupStopped || self.stop_in_progress()
+        *self == StopState::GroupStopped || self.is_stopping()
     }
 
     /// This means a stop is in progress.  Refers to any stop state ending in "ing".
-    pub fn stop_in_progress(&self) -> bool {
+    pub fn is_stopping(&self) -> bool {
         *self == StopState::GroupStopping
-    }
-
-    /// Returns the "ed" version of this StopState, if it is "ing".
-    pub fn upgrade(&self) -> Result<StopState, ()> {
-        match *self {
-            StopState::GroupStopping => Ok(StopState::GroupStopped),
-            StopState::Waking => Ok(StopState::Awake),
-            _ => Err(()),
-        }
     }
 
     pub fn is_downgrade(&self, new_state: &StopState) -> bool {
@@ -201,11 +192,9 @@ impl StopState {
         *self == StopState::Waking || *self == StopState::Awake
     }
 
-    /// Whether to notify something waitpid'ing on this task
-    /// when a task changes to this state. Basically, this
-    /// includes the states where the transition to the state is finished.
-    pub fn is_notification_worthy(&self) -> bool {
-        *self == StopState::Awake || *self == StopState::GroupStopped
+    /// Indicate if the transition to the stopped / awake state is not finished.
+    pub fn is_in_progress(&self) -> bool {
+        *self == StopState::Waking || *self == StopState::GroupStopping
     }
 }
 

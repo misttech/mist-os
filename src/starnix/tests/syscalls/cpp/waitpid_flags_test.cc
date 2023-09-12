@@ -125,7 +125,7 @@ TEST_F(WaitpidFlagsTest, waitPidStopContinue) {
   // Structure of this test:
   // - One process (the grandchild) is just spinning.
   // - Another process (the child) is waiting for the grandchild to change state.
-  // - A third process (the main process) is change the state of the grandchild.
+  // - A third process (the main process) changes the state of the grandchild.
   // The child and the main process communicate their readiness to move to the next
   // check via the shared memory:
 

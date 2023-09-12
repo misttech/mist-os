@@ -572,39 +572,37 @@ impl ThreadGroup {
         })
     }
 
-    /// Set the stop status of the process.
+    /// Set the stop status of the process.  If you pass |siginfo| of |None|,
+    /// does not update the signal.
     pub fn set_stopped(self: &Arc<Self>, stopped: StopState, siginfo: Option<SignalInfo>) -> bool {
-        let mut changed = false;
         {
             let mut state = self.write();
-            if state.stopped != stopped && !state.stopped.is_downgrade(&stopped) {
-                changed = true;
-
-                // TODO(qsr): When task can be stopped inside user code, task will need to be
-                // either restarted or stopped here.
-                state.stopped = stopped;
-                if let Some(signal) = &siginfo {
-                    // We don't want waiters to think the process was unstopped
-                    // because of a sigkill.  They will get woken when the
-                    // process dies.
-                    if signal.signal != SIGKILL {
-                        state.waitable = siginfo;
-                    }
-                }
-                if state.stopped == StopState::Waking {
-                    state.stopped_waiters.notify_all();
-                };
+            if state.stopped == stopped || state.stopped.is_downgrade(&stopped) {
+                return false;
             }
+
+            // TODO(qsr): When task can be stopped inside user code, task will need to be
+            // either restarted or stopped here.
+            state.stopped = stopped;
+            if let Some(signal) = &siginfo {
+                // We don't want waiters to think the process was unstopped
+                // because of a sigkill.  They will get woken when the
+                // process dies.
+                if signal.signal != SIGKILL {
+                    state.waitable = siginfo;
+                }
+            }
+            if state.stopped == StopState::Waking {
+                state.stopped_waiters.notify_all();
+            };
         }
-        // The reason for the |changed| variable is that we Have to acquire the
-        // lock on |parent| when task lock is released.
-        if changed && stopped.is_notification_worthy() {
+        if !stopped.is_in_progress() {
             let parent = self.read().parent.clone();
             if let Some(parent) = parent {
                 parent.write().child_status_waiters.notify_all();
             }
         }
-        return changed;
+        return true;
     }
 
     /// Ensures |session| is the controlling session inside of |controlling_session|, and returns a
@@ -821,18 +819,6 @@ impl ThreadGroup {
             // TODO(fxbug.dev/127682): How can we calculate system time?
             system_time: zx::Duration::default(),
         }
-    }
-
-    pub fn upgrade_stop_state(self: &Arc<Self>) -> bool {
-        let state_stopped = self.read().stopped;
-        if state_stopped.stop_in_progress() {
-            if let Ok(state_stopped) = state_stopped.upgrade() {
-                self.set_stopped(state_stopped, None);
-            } else {
-                unreachable!("Trying to stop when stop state has not been set");
-            }
-        }
-        state_stopped.is_stopping_or_stopped()
     }
 }
 

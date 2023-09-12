@@ -231,14 +231,20 @@ pub fn block_while_stopped(current_task: &CurrentTask) {
     if current_task.read().exit_status.is_some() {
         return;
     }
-    // If we can't be upgraded from stopping to stopped, return.
-    if !current_task.thread_group.upgrade_stop_state() {
+
+    // Upgrade the state from stopping to stopped if needed. Return if the task
+    // should not be stopped.
+    if current_task.thread_group.read().stopped.is_stopping_or_stopped() {
+        current_task.thread_group.set_stopped(StopState::GroupStopped, None);
+    } else {
         return;
     }
 
     let waiter = Waiter::new_ignoring_signals();
     loop {
         current_task.thread_group.read().stopped_waiters.wait_async(&waiter);
+
+        // If we've exited, unstop the threads and return without notifying waiters.
         if current_task.read().exit_status.is_some() {
             current_task.thread_group.set_stopped(StopState::Awake, None);
             return;
@@ -250,6 +256,10 @@ pub fn block_while_stopped(current_task: &CurrentTask) {
 
         // Do the wait. Result is not needed, as this is not in a syscall.
         let _: Result<(), Errno> = waiter.wait(current_task);
+
+        if current_task.thread_group.read().stopped.is_stopping() {
+            current_task.thread_group.set_stopped(StopState::GroupStopped, None);
+        }
     }
 }
 
