@@ -445,7 +445,11 @@
 
         // Media
         {
-            protocol: "fuchsia.audio.ffxdaemon.AudioDaemon",
+            protocol: [
+                "fuchsia.audio.ffxdaemon.DeviceControl",
+                "fuchsia.audio.ffxdaemon.Player",
+                "fuchsia.audio.ffxdaemon.Recorder",
+            ],
             from: "#audio_ffx_daemon",
             to: "#sshd-host",
             source_availability: "unknown",

@@ -8,7 +8,7 @@ using fuchsia.media;
 using zx;
 
 /// Where to read audio data from to send back to an ffx client.
-type RecordLocation = flexible union {
+type RecordSource = flexible union {
     /// Create an audio_core `AudioCapturer` and record audio data from it.
     1: capturer CapturerConfig;
 
@@ -56,7 +56,7 @@ open protocol Recorder {
         /// Record from `AudioCapturer` or ring buffer.
         ///
         /// Required.
-        1: location RecordLocation;
+        1: source RecordSource;
 
         /// Streamtype.
         ///
@@ -88,7 +88,7 @@ open protocol Recorder {
         /// Contains audio data in the form of a complete WAV file.
         ///
         /// Required.
-        1: stdout zx.Handle:SOCKET;
+        1: wav_data zx.Handle:SOCKET;
 
         /// Errors from daemon component for ffx plugin to display.
         ///

@@ -140,7 +140,7 @@ pub async fn wait_for_keypress(
 }
 
 pub mod tests {
-    use fidl_fuchsia_audio_controller::AudioDaemonProxy;
+    use fidl_fuchsia_audio_controller::DeviceControlProxy;
 
     use super::*;
     lazy_static::lazy_static! {
@@ -197,7 +197,7 @@ pub mod tests {
         }
     }
 
-    pub fn fake_audio_daemon() -> AudioDaemonProxy {
+    pub fn fake_audio_daemon() -> DeviceControlProxy {
         let callback = |req| match req {
             _ => {}
         };
@@ -218,7 +218,7 @@ pub mod tests {
                 };
 
                 let data_socket =
-                    payload.socket.ok_or(anyhow::anyhow!("Socket argument missing.")).unwrap();
+                    payload.wav_socket.ok_or(anyhow::anyhow!("Socket argument missing.")).unwrap();
 
                 let mut socket = fidl::AsyncSocket::from_socket(data_socket).unwrap();
                 let mut wav_file = vec![0u8; 11];

@@ -60,12 +60,12 @@ type DeviceSelector = table {
 };
 
 
-/// The main entry point for ffx audio.
+/// Enumerate, query, and control audio devices from clients.
 @discoverable
-open protocol AudioDaemon {
+open protocol DeviceControl {
 
     /// Lists all available audio devices on target.
-    strict ListDevices() -> (resource table {
+    flexible ListDevices() -> (resource table {
         /// List of available devices, sorted by name.
         ///
         /// Required.
@@ -73,7 +73,7 @@ open protocol AudioDaemon {
     }) error zx.Status;
 
     /// Returns details about a specific audio device.
-    strict DeviceInfo(resource table {
+    flexible GetDeviceInfo(resource table {
         /// Id of device to retrieve information about, and
         /// whether it is an input or output device.
         ///
@@ -87,7 +87,7 @@ open protocol AudioDaemon {
     }) error zx.Status;
 
     /// Sets the gain of the stream in decibels.
-    strict DeviceSetGainState(resource table {
+    flexible DeviceSetGainState(resource table {
         /// Id of the device to set the gain state.
         ///
         /// Required.

@@ -23,7 +23,7 @@ type ClockType = flexible union {
     1: flexible struct {};
 
     /// Use the system monotonic clock.
-    2: monotonic struct {};
+    2: system_monotonic struct {};
 
     /// Use a monotonic clock with possible rate adjustment and offset relative to the system
     /// monotonic clock.

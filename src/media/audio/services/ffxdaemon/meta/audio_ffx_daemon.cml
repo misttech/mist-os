@@ -12,7 +12,7 @@
     },
     capabilities: [
         {
-            protocol: [ "fuchsia.audio.controller.AudioDaemon" ],
+            protocol: [ "fuchsia.audio.controller.DeviceControl" ],
         },
         {
             protocol: [ "fuchsia.audio.controller.Player" ],
@@ -43,7 +43,7 @@
     ],
     expose: [
         {
-            protocol: [ "fuchsia.audio.controller.AudioDaemon" ],
+            protocol: [ "fuchsia.audio.controller.DeviceControl" ],
             from: "self",
         },
         {

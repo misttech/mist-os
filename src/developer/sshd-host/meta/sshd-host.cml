@@ -185,7 +185,9 @@
         // Optional protocols in shell namespace that are not available on all builds.
         {
             protocol: [
-                "fuchsia.audio.ffxdaemon.AudioDaemon",
+                "fuchsia.audio.ffxdaemon.DeviceControl",
+                "fuchsia.audio.ffxdaemon.Player",
+                "fuchsia.audio.ffxdaemon.Recorder",
                 "fuchsia.bluetooth.a2dp.AudioMode",
                 "fuchsia.bluetooth.avdtp.test.PeerManager",
                 "fuchsia.bluetooth.avrcp.PeerManager",

@@ -332,8 +332,8 @@ pub fn str_to_clock(src: &str) -> Result<fidl_fuchsia_audio_controller::ClockTyp
         "flexible" => Ok(fidl_fuchsia_audio_controller::ClockType::Flexible(
             fidl_fuchsia_audio_controller::Flexible,
         )),
-        "monotonic" => Ok(fidl_fuchsia_audio_controller::ClockType::Monotonic(
-            fidl_fuchsia_audio_controller::Monotonic,
+        "monotonic" => Ok(fidl_fuchsia_audio_controller::ClockType::SystemMonotonic(
+            fidl_fuchsia_audio_controller::SystemMonotonic,
         )),
         _ => {
             let splits: Vec<&str> = src.split(",").collect();

@@ -7,7 +7,7 @@ use {
     async_trait::async_trait,
     ffx_audio_listdevices_args::ListDevicesCommand,
     fho::{moniker, FfxMain, FfxTool, MachineWriter},
-    fidl_fuchsia_audio_controller::AudioDaemonProxy,
+    fidl_fuchsia_audio_controller::DeviceControlProxy,
     fuchsia_zircon_status::Status,
     itertools::Itertools,
     serde::{Deserialize, Serialize},
@@ -38,7 +38,7 @@ pub struct ListDevicesTool {
     #[command]
     _cmd: ListDevicesCommand,
     #[with(moniker("/core/audio_ffx_daemon"))]
-    audio_proxy: AudioDaemonProxy,
+    audio_proxy: DeviceControlProxy,
 }
 
 fho::embedded_plugin!(ListDevicesTool);
@@ -51,7 +51,7 @@ impl FfxMain for ListDevicesTool {
 }
 
 async fn list_devices_impl(
-    audio_proxy: AudioDaemonProxy,
+    audio_proxy: DeviceControlProxy,
     mut writer: MachineWriter<ListDeviceResult>,
 ) -> Result<(), anyhow::Error> {
     let response = audio_proxy
@@ -112,11 +112,11 @@ mod tests {
     use super::*;
     use ffx_writer::{Format, TestBuffers};
     use fidl_fuchsia_audio_controller::{
-        AudioDaemonListDevicesResponse, AudioDaemonProxy, AudioDaemonRequest, DeviceSelector,
+        DeviceControlListDevicesResponse, DeviceControlProxy, DeviceControlRequest, DeviceSelector,
     };
     use fidl_fuchsia_hardware_audio::DeviceType;
 
-    fn fake_audio_daemon() -> AudioDaemonProxy {
+    fn fake_audio_daemon() -> DeviceControlProxy {
         let devices = vec![
             DeviceSelector {
                 is_input: Some(true),
@@ -132,8 +132,8 @@ mod tests {
             },
         ];
         let callback = move |req| match req {
-            AudioDaemonRequest::ListDevices { responder, .. } => {
-                let response = AudioDaemonListDevicesResponse {
+            DeviceControlRequest::ListDevices { responder, .. } => {
+                let response = DeviceControlListDevicesResponse {
                     devices: Some(devices.clone()),
                     ..Default::default()
                 };

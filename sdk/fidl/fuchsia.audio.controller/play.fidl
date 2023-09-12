@@ -8,7 +8,7 @@ using fuchsia.media;
 using zx;
 
 /// Where to output audio data supplied by an ffx client.
-type PlayLocation = flexible union {
+type PlayDestination = flexible union {
     /// Create an `AudioRenderer` using the audio_core API and play audio through it.
     1: renderer RendererConfig;
 
@@ -58,12 +58,12 @@ open protocol Player {
         /// Socket for audio data. Should transmit entire file in WAV format.
         ///
         /// Required.
-        1: socket zx.Handle:SOCKET;
+        1: wav_socket zx.Handle:SOCKET;
 
         /// Play on device ring buffer or AudioRenderer.
         ///
         /// Required.
-        2: location PlayLocation;
+        2: destination PlayDestination;
 
         /// Play settings.
         ///

@@ -11,9 +11,9 @@ use {
     fho::{moniker, FfxMain, FfxTool, SimpleWriter},
     fidl::HandleBased,
     fidl_fuchsia_audio_controller::{
-        AudioDaemonDeviceInfoRequest, AudioDaemonDeviceSetGainStateRequest, AudioDaemonProxy,
-        DeviceInfo, DeviceSelector, PlayerPlayRequest, PlayerProxy, RecordLocation, RecorderProxy,
-        RecorderRecordRequest,
+        DeviceControlDeviceSetGainStateRequest, DeviceControlGetDeviceInfoRequest,
+        DeviceControlProxy, DeviceInfo, DeviceSelector, PlayerPlayRequest, PlayerProxy,
+        RecordSource, RecorderProxy, RecorderRecordRequest,
     },
     fidl_fuchsia_hardware_audio::{PcmSupportedFormats, PlugDetectCapabilities},
     fidl_fuchsia_media::AudioStreamType,
@@ -27,7 +27,7 @@ pub struct DeviceTool {
     #[command]
     cmd: DeviceCommand,
     #[with(moniker("/core/audio_ffx_daemon"))]
-    audio_proxy: AudioDaemonProxy,
+    device_controller: DeviceControlProxy,
     #[with(moniker("/core/audio_ffx_daemon"))]
     record_controller: RecorderProxy,
     #[with(moniker("/core/audio_ffx_daemon"))]
@@ -41,7 +41,7 @@ impl FfxMain for DeviceTool {
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
         match &self.cmd.subcommand {
             SubCommand::Info(_) => {
-                device_info(self.audio_proxy, self.cmd).await.map_err(Into::into)
+                device_info(self.device_controller, self.cmd).await.map_err(Into::into)
             }
 
             SubCommand::Play(play_command) => {
@@ -53,7 +53,7 @@ impl FfxMain for DeviceTool {
                         })?;
 
                         device_play(
-                            self.audio_proxy,
+                            self.device_controller,
                             self.play_controller,
                             self.cmd,
                             play_local,
@@ -66,7 +66,7 @@ impl FfxMain for DeviceTool {
                         .map_err(Into::into)
                     }
                     None => device_play(
-                        self.audio_proxy,
+                        self.device_controller,
                         self.play_controller,
                         self.cmd,
                         play_local,
@@ -80,7 +80,7 @@ impl FfxMain for DeviceTool {
                 }
             }
             SubCommand::Record(_) => {
-                device_record(self.audio_proxy, self.record_controller, self.cmd)
+                device_record(self.device_controller, self.record_controller, self.cmd)
                     .await
                     .map_err(Into::into)
             }
@@ -94,7 +94,7 @@ impl FfxMain for DeviceTool {
                     .ok_or(anyhow::anyhow!("Missing device direction argument"))?;
                 let id = self.cmd.id.unwrap_or(
                     get_first_device(
-                        &self.audio_proxy,
+                        &self.device_controller,
                         fidl_fuchsia_hardware_audio::DeviceType::StreamConfig,
                         direction == DeviceDirection::Input,
                     )
@@ -103,7 +103,7 @@ impl FfxMain for DeviceTool {
                     .ok_or(anyhow::anyhow!("ID missing from default device."))?,
                 );
                 let mut request_info = DeviceGainStateRequest {
-                    audio_proxy: self.audio_proxy,
+                    device_controller: self.device_controller,
                     device_id: id,
                     device_direction: direction,
                     gain_db: None,
@@ -176,11 +176,11 @@ pub struct JsonPcmFormats {
 }
 
 async fn get_first_device(
-    audio_proxy: &AudioDaemonProxy,
+    device_controller: &DeviceControlProxy,
     device_type: fidl_fuchsia_hardware_audio::DeviceType,
     is_input: bool,
 ) -> Result<DeviceSelector> {
-    let list_devices_response = audio_proxy
+    let list_devices_response = device_controller
         .list_devices()
         .await?
         .map_err(|e| anyhow::anyhow!("Could not retrieve available devices. {e}"))?;
@@ -197,7 +197,7 @@ async fn get_first_device(
     }
 }
 
-async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Result<()> {
+async fn device_info(device_control_proxy: DeviceControlProxy, cmd: DeviceCommand) -> Result<()> {
     let device_direction = cmd
         .device_direction
         .ok_or(anyhow::anyhow!("Device direction not passed to info request."))?;
@@ -220,7 +220,7 @@ async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
 
         None => (
             get_first_device(
-                &audio_proxy,
+                &device_control_proxy,
                 fidl_fuchsia_hardware_audio::DeviceType::StreamConfig,
                 device_direction == DeviceDirection::Input,
             )
@@ -233,11 +233,11 @@ async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
         .clone()
         .ok_or(anyhow::anyhow!("Could not get id of requested device."))?;
 
-    let request = AudioDaemonDeviceInfoRequest {
+    let request = DeviceControlGetDeviceInfoRequest {
         device: Some(device_selector.clone()),
         ..Default::default()
     };
-    let info = match audio_proxy.device_info(request).await? {
+    let info = match device_control_proxy.get_device_info(request).await? {
         Ok(value) => value,
         Err(err) => ffx_bail!("Device info failed with error: {}", Status::from_raw(err)),
     };
@@ -524,8 +524,8 @@ async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
 }
 
 async fn device_play<R, W, E>(
-    audio_proxy: AudioDaemonProxy,
-    controller: PlayerProxy,
+    device_controller: DeviceControlProxy,
+    player_controller: PlayerProxy,
     cmd: DeviceCommand,
     play_local: fidl::Socket,
     play_remote: fidl::Socket,
@@ -545,7 +545,7 @@ where
     let device_id = match cmd.id {
         Some(id) => Ok(id),
         None => get_first_device(
-            &audio_proxy,
+            &device_controller,
             fidl_fuchsia_hardware_audio::DeviceType::StreamConfig,
             false,
         )
@@ -559,8 +559,8 @@ where
         .map_err(|e| anyhow::anyhow!("Error duplicating socket: {e}"))?;
 
     let request = PlayerPlayRequest {
-        socket: Some(daemon_request_socket),
-        location: Some(fidl_fuchsia_audio_controller::PlayLocation::DeviceRingBuffer(
+        wav_socket: Some(daemon_request_socket),
+        destination: Some(fidl_fuchsia_audio_controller::PlayDestination::DeviceRingBuffer(
             fidl_fuchsia_audio_controller::DeviceSelector {
                 is_input: Some(false),
                 id: Some(device_id),
@@ -580,7 +580,7 @@ where
 
     ffx_audio_common::play(
         request,
-        controller,
+        player_controller,
         play_local,
         input_reader,
         output_writer,
@@ -591,7 +591,7 @@ where
 }
 
 async fn device_record(
-    daemon_proxy: AudioDaemonProxy,
+    daemon_proxy: DeviceControlProxy,
     controller: RecorderProxy,
     cmd: DeviceCommand,
 ) -> Result<()> {
@@ -615,7 +615,7 @@ async fn device_record(
         fidl::endpoints::create_endpoints::<fidl_fuchsia_audio_controller::RecordCancelerMarker>();
 
     let request = RecorderRecordRequest {
-        location: Some(RecordLocation::DeviceRingBuffer(
+        source: Some(RecordSource::DeviceRingBuffer(
             fidl_fuchsia_audio_controller::DeviceSelector {
                 is_input: Some(true),
                 id: Some(device_id),
@@ -632,7 +632,7 @@ async fn device_record(
 
     let (stdout_sock, stderr_sock) = match controller.record(request).await? {
         Ok(value) => (
-            value.stdout.ok_or(anyhow::anyhow!("No stdout socket"))?,
+            value.wav_data.ok_or(anyhow::anyhow!("No stdout socket"))?,
             value.stderr.ok_or(anyhow::anyhow!("No stderr socket"))?,
         ),
         Err(err) => ffx_bail!("Record failed with err: {}", err),
@@ -652,7 +652,7 @@ async fn device_record(
 }
 
 struct DeviceGainStateRequest {
-    audio_proxy: AudioDaemonProxy,
+    device_controller: DeviceControlProxy,
     device_id: String,
     device_direction: DeviceDirection,
     muted: Option<bool>,
@@ -675,8 +675,8 @@ async fn device_set_gain_state(request: DeviceGainStateRequest) -> Result<()> {
     };
 
     request
-        .audio_proxy
-        .device_set_gain_state(AudioDaemonDeviceSetGainStateRequest {
+        .device_controller
+        .device_set_gain_state(DeviceControlDeviceSetGainStateRequest {
             device: Some(dev_selector),
             gain_state: Some(gain_state),
             ..Default::default()

@@ -11,8 +11,7 @@ use {
     ffx_audio_record_args::RecordCommand,
     fho::{moniker, FfxContext, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_audio_controller::{
-        CapturerConfig, RecordLocation, RecorderProxy, RecorderRecordRequest,
-        StandardCapturerConfig,
+        CapturerConfig, RecordSource, RecorderProxy, RecorderRecordRequest, StandardCapturerConfig,
     },
     fidl_fuchsia_media::AudioStreamType,
 };
@@ -40,18 +39,19 @@ impl FfxMain for RecordTool {
 
         let (location, gain_settings) = match self.cmd.usage {
             AudioCaptureUsageExtended::Loopback => {
-                (RecordLocation::Loopback(fidl_fuchsia_audio_controller::Loopback {}), None)
+                (RecordSource::Loopback(fidl_fuchsia_audio_controller::Loopback {}), None)
             }
             AudioCaptureUsageExtended::Ultrasound => (
-                RecordLocation::Capturer(CapturerConfig::UltrasoundCapturer(
+                RecordSource::Capturer(CapturerConfig::UltrasoundCapturer(
                     fidl_fuchsia_audio_controller::UltrasoundCapturer {},
                 )),
                 None,
             ),
             _ => (
-                RecordLocation::Capturer(CapturerConfig::StandardCapturer(
-                    StandardCapturerConfig { usage: capturer_usage, ..Default::default() },
-                )),
+                RecordSource::Capturer(CapturerConfig::StandardCapturer(StandardCapturerConfig {
+                    usage: capturer_usage,
+                    ..Default::default()
+                })),
                 Some(fidl_fuchsia_audio_controller::GainSettings {
                     mute: Some(self.cmd.mute),
                     gain: Some(self.cmd.gain),
@@ -65,7 +65,7 @@ impl FfxMain for RecordTool {
         >();
 
         let request = RecorderRecordRequest {
-            location: Some(location),
+            source: Some(location),
             stream_type: Some(AudioStreamType::from(&self.cmd.format)),
             duration: self.cmd.duration.map(|duration| duration.as_nanos() as i64),
             canceler: Some(cancel_server),
@@ -88,7 +88,7 @@ impl FfxMain for RecordTool {
                 })?;
 
             (
-                response.stdout.ok_or(anyhow::anyhow!("No stdout socket."))?,
+                response.wav_data.ok_or(anyhow::anyhow!("No socket for wav data."))?,
                 response.stderr.ok_or(anyhow::anyhow!("No stderr socket."))?,
             )
         };

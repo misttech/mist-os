@@ -106,8 +106,8 @@ where
         .map_err(|e| anyhow::anyhow!("Error duplicating socket: {e}"))?;
 
     let request = PlayerPlayRequest {
-        socket: Some(daemon_request_socket),
-        location: Some(fidl_fuchsia_audio_controller::PlayLocation::Renderer(renderer)),
+        wav_socket: Some(daemon_request_socket),
+        destination: Some(fidl_fuchsia_audio_controller::PlayDestination::Renderer(renderer)),
         gain_settings: Some(fidl_fuchsia_audio_controller::GainSettings {
             mute: Some(command.mute),
             gain: Some(command.gain),
