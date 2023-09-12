@@ -18,8 +18,8 @@ driver_bind_rules("camera_controller_bind") {
   rules = "camera_controller.bind"
   tests = "bind_tests.json"
   deps = [
-    "//src/devices/bind/fuchsia.gdc",
-    "//src/devices/bind/fuchsia.ge2d",
+    "//src/devices/bind/fuchsia.camera",
+    "//src/devices/bind/fuchsia.camera",
     "//src/devices/bind/fuchsia.isp",
     "//src/devices/bind/fuchsia.sysmem",
   ]

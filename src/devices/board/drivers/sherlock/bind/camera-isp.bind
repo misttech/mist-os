@@ -6,12 +6,12 @@ composite isp;
 
 using fuchsia.amlogic.platform;
 using fuchsia.arm.platform;
-using fuchsia.camerasensor2;
+using fuchsia.camera;
 using fuchsia.platform;
 using fuchsia.register;
 
 primary node "camera-sensor" {
-  fuchsia.BIND_PROTOCOL == fuchsia.camerasensor2.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.camera.BIND_PROTOCOL.CAMERA_SENSOR_2;
 }
 
 node "pdev" {

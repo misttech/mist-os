@@ -5,8 +5,8 @@
 composite camera_controller;
 
 using fuchsia.isp;
-using fuchsia.gdc;
-using fuchsia.ge2d;
+using fuchsia.camera;
+using fuchsia.camera;
 using fuchsia.sysmem;
 
 primary node "isp" {
@@ -14,11 +14,11 @@ primary node "isp" {
 }
 
 node "gdc" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gdc.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.camera.BIND_PROTOCOL.GDC;
 }
 
 node "ge2d" {
-  fuchsia.BIND_PROTOCOL == fuchsia.ge2d.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.camera.BIND_PROTOCOL.GE2D;
 }
 
 node "sysmem" {

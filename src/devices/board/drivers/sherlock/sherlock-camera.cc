@@ -17,16 +17,13 @@
 #include <bind/fuchsia/amlogic/platform/meson/cpp/bind.h>
 #include <bind/fuchsia/amlogic/platform/t931/cpp/bind.h>
 #include <bind/fuchsia/arm/platform/cpp/bind.h>
-#include <bind/fuchsia/camerasensor2/cpp/bind.h>
+#include <bind/fuchsia/camera/cpp/bind.h>
 #include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
-#include <bind/fuchsia/gdc/cpp/bind.h>
-#include <bind/fuchsia/ge2d/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/amlogiccanvas/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/isp/cpp/bind.h>
-#include <bind/fuchsia/mipicsi/cpp/bind.h>
 #include <bind/fuchsia/sony/platform/cpp/bind.h>
 #include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <soc/aml-common/aml-registers.h>
@@ -256,9 +253,9 @@ zx_status_t Sherlock::CameraInit() {
 
   auto imx227_sensor_mipicsi_spec = fuchsia_driver_framework::ParentSpec{{
       .bind_rules = std::vector{fdf::MakeAcceptBindRule(
-          bind_fuchsia::PROTOCOL, bind_fuchsia_mipicsi::BIND_PROTOCOL_DEVICE)},
+          bind_fuchsia::PROTOCOL, bind_fuchsia_camera::BIND_PROTOCOL_MIPICSI)},
       .properties = {fdf::MakeProperty(bind_fuchsia::PROTOCOL,
-                                       bind_fuchsia_mipicsi::BIND_PROTOCOL_DEVICE)},
+                                       bind_fuchsia_camera::BIND_PROTOCOL_MIPICSI)},
   }};
 
   auto imx227_sensor_i2c_spec = fuchsia_driver_framework::ParentSpec{{
@@ -374,11 +371,11 @@ zx_status_t Sherlock::CameraInit() {
 
   auto bind_rules = std::vector{
       fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                              bind_fuchsia_camerasensor2::BIND_PROTOCOL_DEVICE),
+                              bind_fuchsia_camera::BIND_PROTOCOL_CAMERA_SENSOR_2),
   };
 
   auto properties = std::vector{
-      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_camerasensor2::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_camera::BIND_PROTOCOL_CAMERA_SENSOR_2),
   };
 
   auto parents = std::vector{
@@ -407,12 +404,12 @@ zx_status_t Sherlock::CameraInit() {
       .bind_rules =
           {
               fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                                      bind_fuchsia_camerasensor2::BIND_PROTOCOL_DEVICE),
+                                      bind_fuchsia_camera::BIND_PROTOCOL_CAMERA_SENSOR_2),
           },
       .properties =
           {
               fdf::MakeProperty(bind_fuchsia::PROTOCOL,
-                                bind_fuchsia_camerasensor2::BIND_PROTOCOL_DEVICE),
+                                bind_fuchsia_camera::BIND_PROTOCOL_CAMERA_SENSOR_2),
           },
   }};
 
@@ -469,12 +466,12 @@ zx_status_t Sherlock::CameraInit() {
   };
 
   const ddk::BindRule kGdcRules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gdc::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_camera::BIND_PROTOCOL_GDC),
 
   };
 
   const ddk::BindRule kGe2dRules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_ge2d::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_camera::BIND_PROTOCOL_GE2D),
 
   };
 
@@ -489,11 +486,11 @@ zx_status_t Sherlock::CameraInit() {
   };
 
   const device_bind_prop_t kGdcProperties[] = {
-      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gdc::BIND_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_camera::BIND_PROTOCOL_GDC),
   };
 
   const device_bind_prop_t kGe2dProperties[] = {
-      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_ge2d::BIND_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_camera::BIND_PROTOCOL_GE2D),
   };
 
   const device_bind_prop_t kSysmemProperties[] = {

@@ -24,7 +24,7 @@ driver_bind_rules("ge2d_bind") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.camerasensor2",
+    "//src/devices/bind/fuchsia.camera",
     "//src/devices/bind/fuchsia.platform",
   ]
 }
