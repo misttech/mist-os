@@ -21,6 +21,10 @@
             protocol: "fuchsia.tracing.provider.Registry",
             from: "parent",
             to: "#font-server",
+
+            // Tracing is not available in bringup or non-eng builds, so must
+            // be optional.
+            availability: "optional",
         },
         {
             // Logging.
