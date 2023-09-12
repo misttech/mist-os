@@ -14,7 +14,7 @@ const FLASH_SCRIPT_TEMPLATE: &str = r#"#!/bin/sh
 DIR="$(dirname "$0")"
 set -e
 
-ZIRCON_IMAGE=zircon-a.signed.zbi.signed
+ZIRCON_IMAGE=zircon-a.zbi
 ZIRCON_VBMETA=zircon-a.vbmeta
 RECOVERY_IMAGE=zircon-r.zbi
 RECOVERY_VBMETA=zircon-r.vbmeta
@@ -141,11 +141,8 @@ impl GenerateBuildArchive {
             } else {
                 format!("{}_{}.img", "firmware", part.partition_type)
             };
-            let bootloader_type = match name.as_str() {
-                "firmware.img" | "firmware_tpl.img" => "tpl",
-                _ => "bootloader",
-            };
-            let bootloader_str = BOOTLOADER_STR.replace("TYPE", bootloader_type);
+            let bootloader_type = part.name.clone().unwrap();
+            let bootloader_str = BOOTLOADER_STR.replace("TYPE", &bootloader_type);
             bootloader_string.push_str(&bootloader_str.replace("BOOTLOADER_NAME", &name));
             copy_artifact(&part.image, &name)?;
         }
@@ -393,7 +390,7 @@ mod tests {
 DIR="$(dirname "$0")"
 set -e
 
-ZIRCON_IMAGE=zircon-a.signed.zbi.signed
+ZIRCON_IMAGE=zircon-a.zbi
 ZIRCON_VBMETA=zircon-a.vbmeta
 RECOVERY_IMAGE=zircon-r.zbi
 RECOVERY_VBMETA=zircon-r.vbmeta
