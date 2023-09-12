@@ -239,17 +239,12 @@ fbl::RefPtr<VmCompression> VmCompression::CreateDefault() {
   fbl::RefPtr<VmCompressionStrategy> strategy;
   switch (gBootOptions->compression_strategy) {
     case CompressionStrategy::kLz4:
-      // Although we checked earlier that the kernel is built with page compression, the
-      // VmLz4Compressor is not declared as a type when this is not enabled, and so we must guard
-      // this block separately.
-#if PAGE_COMPRESSION
       strategy = VmLz4Compressor::Create();
       if (!strategy) {
         printf("[ZRAM]: Failed to create lz4 compressor\n");
         return nullptr;
       }
       printf("[ZRAM]: Using compression strategy: lz4\n");
-#endif
       break;
     case CompressionStrategy::kNone:
       // Original check should have handled this.
