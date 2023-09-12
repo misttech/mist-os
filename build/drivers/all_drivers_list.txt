@@ -377,6 +377,7 @@
 //src/media/audio/drivers/virtual_audio:virtual_audio_driver-driver
 //src/power/fake-battery:fake_battery_driver
 //src/power/power-manager/testing/fake_driver:power-manager-fake-driver
+//src/power/power-manager/testing/fake_driver:power-manager-nelson-fake-driver
 //src/power/power-manager/testing/fake_root:root_driver
 //src/storage/fvm/driver:fuchsia_driver
 //src/sys/component_manager/tests/structured_config/client_integration/cpp_driver:receiver_driver

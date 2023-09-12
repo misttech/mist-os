@@ -6,16 +6,9 @@ import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
 
-driver_bind_rules("power-manager-fake-bind") {
-  rules = "power-manager-fake-bind.bind"
-  bind_output = "power-manager-fake-bind.bindbc"
-  deps = [ "../fuchsia.powermanager.driver.bind:powermanager_bindlib" ]
-}
-
-source_set("power-manager-fake-driver-lib") {
+source_set("lib") {
   sources = [
     "control.cc",
-    "driver.cc",
     "temperature_driver.cc",
   ]
 
@@ -27,12 +20,19 @@ source_set("power-manager-fake-driver-lib") {
   ]
 }
 
+driver_bind_rules("power-manager-fake-bind") {
+  rules = "power-manager-fake-bind.bind"
+  bind_output = "power-manager-fake-bind.bindbc"
+  deps = [ "../fuchsia.powermanager.driver.bind:powermanager_bindlib" ]
+}
+
 fuchsia_driver("power-manager-fake-driver") {
   output_name = "power-manager-fake-driver"
+  sources = [ "driver.cc" ]
 
   deps = [
+    ":lib",
     ":power-manager-fake-bind",
-    ":power-manager-fake-driver-lib",
     "//src/devices/lib/driver:driver_runtime",
   ]
 }
@@ -41,5 +41,29 @@ fuchsia_driver_component("component") {
   component_name = "power-manager-fake-driver"
   manifest = "meta/power-manager-fake-driver.cml"
   deps = [ ":power-manager-fake-driver" ]
+  info = "power-manager-fake-driver.json"
+}
+
+driver_bind_rules("power-manager-nelson-fake-bind") {
+  rules = "power-manager-nelson-fake-bind.bind"
+  bind_output = "power-manager-nelson-fake-bind.bindbc"
+  deps = [ "../fuchsia.powermanager.driver.bind:powermanager_bindlib" ]
+}
+
+fuchsia_driver("power-manager-nelson-fake-driver") {
+  output_name = "power-manager-nelson-fake-driver"
+  sources = [ "nelson_driver.cc" ]
+
+  deps = [
+    ":lib",
+    ":power-manager-nelson-fake-bind",
+    "//src/devices/lib/driver:driver_runtime",
+  ]
+}
+
+fuchsia_driver_component("nelson-component") {
+  component_name = "power-manager-nelson-fake-driver"
+  manifest = "meta/power-manager-nelson-fake-driver.cml"
+  deps = [ ":power-manager-nelson-fake-driver" ]
   info = "power-manager-fake-driver.json"
 }
