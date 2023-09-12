@@ -78,6 +78,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             let mut use_disk_migration = false;
             let mut data_filesystem_format_str = "fxfs";
             let mut fxfs_blob = false;
+            let mut has_data = false;
 
             // Add all the AIBs and collect some argument values.
             builder.platform_bundle("fshost_common");
@@ -97,6 +98,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                         data_filesystem_format,
                     }) = data
                     {
+                        has_data = true;
                         match data_filesystem_format {
                             DataFilesystemFormat::Fxfs => {
                                 builder.platform_bundle("fshost_fvm_fxfs")
@@ -133,7 +135,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                 .field("blobfs_max_bytes", blobfs_max_bytes)?
                 .field("bootpart", true)?
                 .field("check_filesystems", true)?
-                .field("data", true)?
+                .field("data", has_data)?
                 .field("data_max_bytes", data_max_bytes)?
                 .field("disable_block_watcher", false)?
                 .field("factory", false)?
