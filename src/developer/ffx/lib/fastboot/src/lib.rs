@@ -8,6 +8,7 @@ pub mod file_resolver;
 pub mod info;
 pub mod lock;
 pub mod manifest;
+pub mod transport;
 pub mod unlock;
 pub mod usb_discovery;
 
