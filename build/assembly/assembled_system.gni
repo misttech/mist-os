@@ -120,10 +120,6 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     [list of labels] Dependencies with metadata including additional kernel
 #     command arguments to add to the ZBI.
 #
-#   include_component_id_index (default: false)
-#     [bool] Collect and merges a component id index from the base
-#     package set.
-#
 #   include_shell_commands (default: true)
 #     [bool] Whether to include shell commands. Should be set to false for
 #     build without shell access.
@@ -218,6 +214,7 @@ template("assembled_system") {
   # TODO(b/295031019): Remove once all clients have stopped providing.
   not_needed(invoker,
              [
+               "include_component_id_index",
                "use_assembly_fshost",
                "skip_fshost_validator",
              ])
@@ -579,7 +576,6 @@ template("assembled_system") {
                              [
                                "testonly",
                                "visibility",
-                               "include_component_id_index",
                                "kernel_zbi",
                                "kernel_image_name",
                                "bootfs_package_labels",
@@ -615,7 +611,6 @@ template("assembled_system") {
                            [
                              "testonly",
                              "visibility",
-                             "include_component_id_index",
                              "include_config_data",
                              "kernel_zbi",
                              "kernel_image_name",
@@ -1173,7 +1168,6 @@ template("assembled_system") {
       # Assembly does not emit information about the packages that it includes
       # via metadata, but via its own output files.
       distribution_entries_barrier = []
-      component_id_index_barrier = []
       package_barrier = []
       assembly_package_barrier = []
       driver_package_barrier = []

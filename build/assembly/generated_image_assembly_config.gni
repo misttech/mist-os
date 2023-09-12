@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/assembly/package_manifests_list.gni")
-import("//build/component/component_id_index.gni")
 import("//build/config.gni")
 import("//build/dist/distribution_manifest.gni")
 import("//build/dist/resource.gni")
@@ -43,10 +42,6 @@ import("//build/zbi/kernel_cmdline.gni")
 #   cmdline_deps (optional)
 #     [list of labels] Dependencies with metadata including additional kernel
 #     command arguments to add to the ZBI.
-#
-#   include_component_id_index (default: false)
-#     [bool] Collect and merges a component id index from the base
-#     package set.
 #
 #   include_config_data (default: true)
 #     [bool] Whether to create a config_data package for the assembly or not.

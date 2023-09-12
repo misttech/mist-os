@@ -108,7 +108,6 @@ if (is_fuchsia) {
     generate_image_metadata = false
 
     # Needed for scrutiny to find things for the component model.
-    include_component_id_index = true
     core_realm_definition = ":core_realm"
   }
 

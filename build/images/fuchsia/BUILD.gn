@@ -139,8 +139,6 @@ if (is_fuchsia) {
     generate_fvm_nand = !fxfs_blob && assembly_generate_fvm_nand
     generate_vbmeta = use_vbmeta
 
-    include_component_id_index = true
-
     # Use the GN arg for including shell commands.
     include_shell_commands = include_shell_commands_package
 

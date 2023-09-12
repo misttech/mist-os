@@ -107,7 +107,6 @@ template("assemble_network_conformance_system") {
 
     core_realm_definition = ":core"
 
-    include_component_id_index = true
     additional_boot_args =
         [ "virtcon.disable=true" ] + zedboot_additional_boot_args
     cmdline = [ "kernel.halt-on-panic=true" ]

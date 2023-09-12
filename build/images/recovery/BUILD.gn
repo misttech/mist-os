@@ -53,7 +53,6 @@ if (is_fuchsia) {
     }
     board_config_label = board_configuration_label
 
-    include_component_id_index = true
     additional_boot_args =
         [ "virtcon.disable=true" ] + zedboot_additional_boot_args
 
@@ -150,7 +149,6 @@ if (is_fuchsia) {
                         "//src/connectivity/network/netcfg:config-default",
                         "//src/recovery/factory_reset",
                         "//src/recovery/system:system_recovery",
-                        "//src/sys/core:component_id_index_no_restrict_storage",
                         "//src/ui/bin/brightness_manager:auto-brightness",
 
                         # Flattened from //src/sys/pkg:recovery
@@ -299,7 +297,6 @@ if (is_fuchsia) {
                     core_realm_network_aib_pkgs +
                     [
                       "//src/connectivity/network/netcfg:config-default",
-                      "//src/sys/core:component_id_index_no_restrict_storage",
                       "//src/firmware/fastboot-tcp",
                       "//src/firmware/fastboot-tcp:fastboot_tcp_mdns_config",
                       "//src/firmware/fastboot-usb",
@@ -371,8 +368,6 @@ if (is_fuchsia) {
     }
 
     ramdisk_in_zbi = true
-
-    include_component_id_index = true
 
     additional_boot_args = [ "virtcon.disable=true" ]
     cmdline = []

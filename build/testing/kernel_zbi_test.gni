@@ -55,7 +55,6 @@ template("_cuckoo_kernel_zbi_test") {
 
   assembly_input = {
     testonly = true
-    include_component_id_index = true
     namespace = cuckoo_target_name
     image_name = "fuchsia"
     kernel_zbi = assembly_kernel_zbi

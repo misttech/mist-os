@@ -390,29 +390,6 @@ template("legacy_assembly_input_bundle") {
     }
   }
 
-  component_id_index_dep = []
-  include_component_index = defined(invoker.include_component_id_index) &&
-                            invoker.include_component_id_index
-  if (include_component_index) {
-    # For details, see //docs/development/components/component_id_index.md#system-assembly
-    component_id_index_config("${target_name}.component_id_index_config") {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visibility",
-                             ])
-
-      # collect and merge component ID indices from the base set.
-      deps = invoker.base_packages
-
-      metadata = {
-        package_barrier = []
-      }
-    }
-
-    component_id_index_dep = [ ":${target_name}.component_id_index_config" ]
-  }
-
   create_package_archive =
       defined(invoker.create_package_archive) && invoker.create_package_archive
   create_package = create_package_archive ||
@@ -468,7 +445,7 @@ template("legacy_assembly_input_bundle") {
                              "testonly",
                              "visibility",
                            ])
-    deps = invoker.bootfs_labels + component_id_index_dep + [ kernel_zbi ]
+    deps = invoker.bootfs_labels + [ kernel_zbi ]
   }
 
   fuchsia_package(labels.bootfs_files_package) {
