@@ -270,7 +270,6 @@ const DEFAULT_INTERFACE_METRIC: u32 = 100;
 type UdpSockets = socket::datagram::SocketCollectionPair<socket::datagram::Udp>;
 
 pub(crate) struct BindingsNonSyncCtxImplInner {
-    rng: RngImpl,
     timers: timers::TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>>,
     devices: Devices<DeviceId<BindingsNonSyncCtxImpl>>,
     udp_sockets: UdpSockets,
@@ -281,7 +280,6 @@ pub(crate) struct BindingsNonSyncCtxImplInner {
 impl BindingsNonSyncCtxImplInner {
     fn new(routes_change_sink: routes::ChangeSink) -> Self {
         Self {
-            rng: Default::default(),
             timers: Default::default(),
             devices: Default::default(),
             udp_sockets: Default::default(),
@@ -411,37 +409,40 @@ macro_rules! trace_duration {
 pub(crate) use trace_duration;
 
 #[derive(Default)]
-pub(crate) struct RngImpl(CoreMutex<OsRng>);
+pub(crate) struct RngImpl;
 
-impl RngCore for &'_ RngImpl {
+/// [`RngCore`] for `RngImpl` relies entirely on the operating system to
+/// generate random numbers and it needs not keep any state itself.
+///
+/// [`OsRng`] is a zero-sized type that provides randomness from the OS.
+impl RngCore for RngImpl {
     fn next_u32(&mut self) -> u32 {
-        let RngImpl(this) = self;
-        this.lock().next_u32()
+        OsRng::default().next_u32()
     }
 
     fn next_u64(&mut self) -> u64 {
-        let RngImpl(this) = self;
-        this.lock().next_u64()
+        OsRng::default().next_u64()
     }
 
     fn fill_bytes(&mut self, dest: &mut [u8]) {
-        let RngImpl(this) = self;
-        this.lock().fill_bytes(dest)
+        OsRng::default().fill_bytes(dest)
     }
 
     fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
-        let RngImpl(this) = self;
-        this.lock().try_fill_bytes(dest)
+        OsRng::default().try_fill_bytes(dest)
     }
 }
 
-impl CryptoRng for &'_ RngImpl where OsRng: CryptoRng {}
+impl CryptoRng for RngImpl where OsRng: CryptoRng {}
 
 impl RngContext for BindingsNonSyncCtxImpl {
-    type Rng<'a> = &'a RngImpl where Self: 'a;
+    type Rng<'a> = RngImpl;
 
-    fn rng(&mut self) -> &RngImpl {
-        &self.rng
+    fn rng(&mut self) -> RngImpl {
+        // A change detector in case OsRng is no longer a ZST and we should keep
+        // state for it inside RngImpl.
+        let OsRng {} = OsRng::default();
+        RngImpl {}
     }
 }
 
