@@ -13,12 +13,9 @@ use fidl_fuchsia_feedback::{
 use fidl_fuchsia_mem::Buffer;
 use fuchsia_async::{Interval, Task};
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon::Duration;
+use fuchsia_zircon::{Duration, Vmo};
 use futures::{channel::mpsc, stream::once, StreamExt, TryFutureExt, TryStreamExt};
 use itertools::Itertools;
-
-use crate::pprof::pproto;
-use crate::profile_builder::profile_to_vmo;
 
 const CRASH_PRODUCT_NAME: &str = "FuchsiaHeapProfile";
 const CRASH_PROGRAM_NAME: &str = "memory_sampler";
@@ -28,12 +25,12 @@ const MAX_SNAPSHOT_RATE_PER_HOUR: i64 = 1;
 
 #[derive(PartialEq, Debug)]
 pub enum ProfileReport {
-    Partial { process_name: String, profile: pproto::Profile, iteration: usize },
-    Final { process_name: String, profile: pproto::Profile },
+    Partial { process_name: String, profile: Vmo, size: u64, iteration: usize },
+    Final { process_name: String, profile: Vmo, size: u64 },
 }
 
 impl ProfileReport {
-    fn get_process_name(&self) -> &str {
+    pub fn get_process_name(&self) -> &str {
         match self {
             ProfileReport::Partial { process_name, .. } => process_name,
             ProfileReport::Final { process_name, .. } => process_name,
@@ -58,7 +55,7 @@ impl ProfileReport {
 /// Warning: panics if called with more than
 /// `MAX_NUM_ATTACHMENTS_PER_CRASH_REPORT` profiles.
 async fn file_report(
-    profiles: &Vec<ProfileReport>,
+    profiles: Vec<ProfileReport>,
     crash_reporter: &CrashReporterProxy,
 ) -> Result<(), Error> {
     assert!(profiles.len() <= MAX_NUM_ATTACHMENTS_PER_CRASH_REPORT as usize);
@@ -66,22 +63,20 @@ async fn file_report(
         return Ok(());
     }
     let attachments: Result<Vec<Attachment>, Error> = profiles
-        .iter()
-        .group_by(|&p| p.get_process_name())
+        .into_iter()
+        .group_by(|p| p.get_process_name().to_string())
         .into_iter()
         .flat_map(|(_, profiles)| profiles.enumerate())
         .map(|(i, profile_report)| {
-            let (key, profile) = match profile_report {
-                ProfileReport::Final { process_name, profile } => {
-                    (format!("{}_final_{}", process_name, i), profile)
+            let (key, profile, size) = match profile_report {
+                ProfileReport::Final { process_name, profile, size } => {
+                    (format!("{}_final_{}", process_name, i), profile, size)
                 }
-                ProfileReport::Partial { process_name, profile, iteration } => {
-                    (format!("{}_partial_{}", process_name, iteration), profile)
+                ProfileReport::Partial { process_name, profile, size, iteration } => {
+                    (format!("{}_partial_{}", process_name, iteration), profile, size)
                 }
             };
-
-            let (vmo, size) = profile_to_vmo(&profile)?;
-            Ok(Attachment { key, value: Buffer { vmo, size } })
+            Ok(Attachment { key, value: Buffer { vmo: profile, size } })
         })
         .collect();
     let crash_report = CrashReport {
@@ -125,7 +120,7 @@ pub fn setup_crash_reporter() -> (mpsc::Sender<ProfileReport>, Task<Result<(), E
             .map(|(chunked_profiles, _)| Ok(chunked_profiles))
             .try_for_each(|profiles| async move {
                 let crash_reporter = connect_to_protocol::<CrashReporterMarker>()?;
-                file_report(&profiles, &crash_reporter)
+                file_report(profiles, &crash_reporter)
                     .inspect_err(|e| tracing::error!("Filing report: {}", e))
                     .await
             })
@@ -136,11 +131,10 @@ pub fn setup_crash_reporter() -> (mpsc::Sender<ProfileReport>, Task<Result<(), E
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::pprof::pproto::{Mapping, Sample};
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_feedback::CrashReporterRequest;
     use futures::{try_join, FutureExt};
-    use prost::Message;
+    use itertools::assert_equal;
 
     fn handle_crash_reporter_request(request: CrashReporterRequest) -> CrashReport {
         match request {
@@ -159,10 +153,10 @@ mod test {
     /// Note: this function assumes the following format for `Attachment::key`:
     ///   - `<process_name>_final_<index>` if it is a complete report.
     ///   - `<process_name>_partial_<iteration>` if it is a partial report.
-    fn retrieve_profile_from_attachment(attachment: &Attachment) -> ProfileReport {
+    fn retrieve_profile_from_attachment(attachment: Attachment) -> ProfileReport {
         let Attachment { key, value, .. } = attachment;
-        let encoded_profile = value.vmo.read_to_vec(0, value.size).unwrap();
-        let profile = pproto::Profile::decode(&encoded_profile[..]).unwrap();
+        let profile = value.vmo;
+        let size = value.size;
         let (prefix_key, index) = key.rsplit_once('_').unwrap();
         let (process_name, suffix) = prefix_key.rsplit_once('_').unwrap();
         let is_final = match suffix {
@@ -171,11 +165,12 @@ mod test {
             _ => panic!("Unexpected attachment name: {}", key),
         };
         if is_final {
-            ProfileReport::Final { process_name: process_name.to_string(), profile }
+            ProfileReport::Final { process_name: process_name.to_string(), profile, size }
         } else {
             ProfileReport::Partial {
                 process_name: process_name.to_string(),
                 profile,
+                size,
                 iteration: index.parse().unwrap(),
             }
         }
@@ -185,8 +180,20 @@ mod test {
     async fn test_file_report_no_profile() {
         let (client, _) = create_proxy_and_stream::<CrashReporterMarker>().unwrap();
         let no_profiles = vec![];
-        let file_report_future = file_report(&no_profiles, &client);
-        file_report_future.now_or_never().unwrap().unwrap()
+        let file_report_future = file_report(no_profiles, &client);
+        file_report_future
+            .now_or_never()
+            .expect("Future was not instantly resolved.")
+            .expect("Unexpected error when trying to file an empty report.")
+    }
+
+    /// Create a non-empty VMO filled with arbitrary data; can be used
+    /// for integrity tests.
+    fn create_vmo_with_some_data(size: usize) -> Vmo {
+        let data: &[u8] = &vec![42; size][..];
+        let vmo = Vmo::create(size as u64).unwrap();
+        vmo.write(&data, 0).unwrap();
+        vmo
     }
 
     #[fuchsia::test]
@@ -195,36 +202,25 @@ mod test {
             create_proxy_and_stream::<CrashReporterMarker>().unwrap();
 
         // Create some profiles with some arbitrary data.
-        let profiles = vec![
-            // First profile report for a first process, with some
-            // samples.
-            ProfileReport::Final {
-                process_name: "test_process_1".to_string(),
-                profile: pproto::Profile {
-                    sample: vec![Sample { location_id: vec![1, 2, 3], ..Default::default() }],
-                    ..Default::default()
-                },
-            },
-            // First profile report for a second process, with some
-            // mapping.
-            ProfileReport::Final {
-                process_name: "test_process_2".to_string(),
-                profile: pproto::Profile {
-                    mapping: vec![Mapping { memory_start: 42, ..Default::default() }],
-                    ..Default::default()
-                },
-            },
-            // Second profile report for the first process, with some
-            // mapping.
-            ProfileReport::Final {
-                process_name: "test_process_1".to_string(),
-                profile: pproto::Profile {
-                    mapping: vec![Mapping { memory_start: 42, ..Default::default() }],
-                    ..Default::default()
-                },
-            },
+        let size = 42;
+        let profiles_metadata = vec![
+            // First profile report for a first process.
+            ("test_process_1".to_string(), size),
+            // First profile report for a second process.
+            ("test_process_2".to_string(), size),
+            // Second profile report for the first process.
+            ("test_process_1".to_string(), size),
         ];
-        let file_report_future = file_report(&profiles, &client);
+        let profiles = profiles_metadata
+            .clone()
+            .into_iter()
+            .map(|(process_name, size)| ProfileReport::Final {
+                process_name,
+                size,
+                profile: create_vmo_with_some_data(size as usize),
+            })
+            .collect();
+        let file_report_future = file_report(profiles, &client);
         let (_, report) = try_join!(
             file_report_future,
             request_stream
@@ -235,14 +231,28 @@ mod test {
 
         assert_eq!(report.program_name, Some(CRASH_PROGRAM_NAME.to_string()));
         assert_eq!(report.crash_signature, Some(CRASH_SIGNATURE.to_string()));
-        let attachments: Vec<ProfileReport> = report
+        let attachments: Vec<(String, Vec<u8>, u64)> = report
             .attachments
-            .as_ref()
             .unwrap()
-            .iter()
+            .into_iter()
             .map(retrieve_profile_from_attachment)
+            .map(|p| match p {
+                ProfileReport::Final { process_name, profile, size } => {
+                    (process_name, profile.read_to_vec(0, size).unwrap(), size)
+                }
+                _ => panic!("Expected a complete report, but received a partial report instead."),
+            })
             .collect();
-        assert_eq!(attachments, profiles);
+        assert_equal(
+            attachments.into_iter(),
+            profiles_metadata.into_iter().map(|(process_name, size)| {
+                (
+                    process_name,
+                    create_vmo_with_some_data(size as usize).read_to_vec(0, size).unwrap(),
+                    size,
+                )
+            }),
+        );
     }
 
     #[fuchsia::test]
@@ -251,40 +261,28 @@ mod test {
             create_proxy_and_stream::<CrashReporterMarker>().unwrap();
 
         // Create some profiles with some arbitrary data.
-        let profiles = vec![
-            // First profile report for a first process, with some
-            // samples.
-            ProfileReport::Partial {
-                process_name: "test_process_1".to_string(),
-                profile: pproto::Profile {
-                    sample: vec![Sample { location_id: vec![1, 2, 3], ..Default::default() }],
-                    ..Default::default()
-                },
-                iteration: 0,
-            },
-            // First profile report for a second process, with some
-            // mapping.
-            ProfileReport::Partial {
-                process_name: "test_process_2".to_string(),
-                profile: pproto::Profile {
-                    mapping: vec![Mapping { memory_start: 42, ..Default::default() }],
-                    ..Default::default()
-                },
-                iteration: 42,
-            },
-            // Second profile report for the first process, with some
-            // mapping.
-            ProfileReport::Partial {
-                process_name: "test_process_1".to_string(),
-                profile: pproto::Profile {
-                    mapping: vec![Mapping { memory_start: 42, ..Default::default() }],
-                    ..Default::default()
-                },
-                iteration: 95,
-            },
+        let size = 42;
+        let profiles_metadata = vec![
+            // First profile report for a first process.
+            ("test_process_1".to_string(), size),
+            // First profile report for a second process.
+            ("test_process_2".to_string(), size),
+            // Second profile report for the first process.
+            ("test_process_1".to_string(), size),
         ];
+        let profiles = profiles_metadata
+            .clone()
+            .into_iter()
+            .enumerate()
+            .map(|(iteration, (process_name, size))| ProfileReport::Partial {
+                process_name,
+                size,
+                profile: create_vmo_with_some_data(size as usize),
+                iteration,
+            })
+            .collect();
 
-        let file_report_future = file_report(&profiles, &client);
+        let file_report_future = file_report(profiles, &client);
         let (_, report) = try_join!(
             file_report_future,
             request_stream
@@ -295,13 +293,30 @@ mod test {
 
         assert_eq!(report.program_name, Some(CRASH_PROGRAM_NAME.to_string()));
         assert_eq!(report.crash_signature, Some(CRASH_SIGNATURE.to_string()));
-        let attachments: Vec<ProfileReport> = report
+        let attachments: Vec<(String, Vec<u8>, u64, usize)> = report
             .attachments
-            .as_ref()
             .unwrap()
-            .iter()
+            .into_iter()
             .map(retrieve_profile_from_attachment)
+            .map(|p| match p {
+                ProfileReport::Partial { process_name, profile, size, iteration } => {
+                    (process_name, profile.read_to_vec(0, size).unwrap(), size, iteration)
+                }
+                _ => panic!("Expected a partial report, but received a complete report instead."),
+            })
             .collect();
-        assert_eq!(attachments, profiles);
+        assert_equal(
+            attachments.into_iter(),
+            profiles_metadata.clone().into_iter().enumerate().map(
+                |(iteration, (process_name, size))| {
+                    (
+                        process_name,
+                        create_vmo_with_some_data(size as usize).read_to_vec(0, size).unwrap(),
+                        size,
+                        iteration,
+                    )
+                },
+            ),
+        );
     }
 }

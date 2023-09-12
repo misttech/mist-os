@@ -12,7 +12,7 @@ use fidl_fuchsia_memory_sampler::ModuleMap;
 use fuchsia_zircon::Vmo;
 use prost::Message;
 
-use crate::pprof;
+use crate::{crash_reporter::ProfileReport, pprof};
 
 /// Represents an allocation for which no deallocation has been
 /// reported.
@@ -94,16 +94,16 @@ impl ProfileBuilder {
         self.dead_allocations.len()
     }
     /// Finalize the profile. Consumes this builder.
-    pub fn build(self) -> (String, pprof::pproto::Profile) {
-        (
-            self.process_name,
-            pprof::build_profile(
-                self.module_map.iter(),
-                self.live_allocations.values(),
-                self.dead_allocations.iter(),
-                &self.stack_traces,
-            ),
-        )
+    pub fn build(self) -> Result<ProfileReport, Error> {
+        let profile = pprof::build_profile(
+            self.module_map.iter(),
+            self.live_allocations.values(),
+            self.dead_allocations.iter(),
+            &self.stack_traces,
+        );
+
+        let (vmo, size) = profile_to_vmo(&profile)?;
+        Ok(ProfileReport::Final { process_name: self.process_name, profile: vmo, size })
     }
     /// Produce a partial profile from a process that is still
     /// live. Drop `dead_allocations` from `self`, and prune the
@@ -112,26 +112,30 @@ impl ProfileBuilder {
     /// Note: this lets one produce regular running profiles from a
     /// long-lived process, while clearing from memory the state that
     /// will no longer be useful.
-    pub fn build_partial_profile(&mut self) -> (String, pprof::pproto::Profile) {
+    pub fn build_partial_profile(&mut self, iteration: usize) -> Result<ProfileReport, Error> {
         let dead_allocations = std::mem::replace(&mut self.dead_allocations, vec![]);
-        let result = (
-            self.process_name.clone(),
-            pprof::build_profile(
-                self.module_map.iter(),
-                self.live_allocations.values(),
-                dead_allocations.iter(),
-                &self.stack_traces,
-            ),
+        let profile = pprof::build_profile(
+            self.module_map.iter(),
+            self.live_allocations.values(),
+            dead_allocations.iter(),
+            &self.stack_traces,
         );
         drop(dead_allocations);
         self.prune_cache();
-        result
+
+        let (vmo, size) = profile_to_vmo(&profile)?;
+        Ok(ProfileReport::Partial {
+            process_name: self.process_name.clone(),
+            profile: vmo,
+            size,
+            iteration,
+        })
     }
 }
 
 // Serialize a profile to a VMO. On success, returns a tuple of a
 // `Vmo` and the size of its content.
-pub fn profile_to_vmo(profile: &pprof::pproto::Profile) -> Result<(Vmo, u64), Error> {
+fn profile_to_vmo(profile: &pprof::pproto::Profile) -> Result<(Vmo, u64), Error> {
     let proto_profile = profile.encode_to_vec();
     let size = proto_profile.len() as u64;
     let vmo = Vmo::create(size)?;

@@ -7,7 +7,7 @@
 //! requests and produce a complete profile, as well as utilities to
 //! persist it.
 
-use crate::{crash_reporter::ProfileReport, pprof::pproto, profile_builder::ProfileBuilder};
+use crate::{crash_reporter::ProfileReport, profile_builder::ProfileBuilder};
 
 use anyhow::{Context, Error};
 use fidl_fuchsia_memory_sampler::{
@@ -47,8 +47,8 @@ async fn process_sampler_request<'a>(
         }
     };
     if builder.get_dead_allocations_count() >= DEAD_ALLOCATIONS_PROFILE_THRESHOLD {
-        let (process_name, profile) = builder.build_partial_profile();
-        tx.send(ProfileReport::Partial { process_name, profile, iteration: index }).await?;
+        let profile = builder.build_partial_profile(index)?;
+        tx.send(profile).await?;
     }
     Ok((builder, tx))
 }
@@ -58,7 +58,7 @@ async fn process_sampler_request<'a>(
 async fn process_sampler_requests(
     stream: impl Stream<Item = Result<SamplerRequest, fidl::Error>>,
     tx: &mut mpsc::Sender<ProfileReport>,
-) -> Result<(String, pproto::Profile), Error> {
+) -> Result<ProfileReport, Error> {
     let mut profile_builder = ProfileBuilder::default();
     stream
         .enumerate()
@@ -67,7 +67,7 @@ async fn process_sampler_requests(
             process_sampler_request(builder, tx, request, index)
         })
         .await?;
-    Ok(profile_builder.build())
+    profile_builder.build()
 }
 
 /// Serves the `Sampler` protocol for a given process. Once a client
@@ -82,9 +82,9 @@ async fn run_sampler_service(
     stream: SamplerRequestStream,
     mut tx: mpsc::Sender<ProfileReport>,
 ) -> Result<(), Error> {
-    let (process_name, profile) = process_sampler_requests(stream, &mut tx).await?;
-    tracing::debug!("Profiling for {} done, queuing final report", process_name);
-    tx.send(ProfileReport::Final { process_name, profile }).await?;
+    let profile = process_sampler_requests(stream, &mut tx).await?;
+    tracing::debug!("Profiling for {} done, queuing final report", profile.get_process_name());
+    tx.send(profile).await?;
     Ok(())
 }
 
@@ -123,17 +123,23 @@ mod test {
         ExecutableSegment, ModuleMap, SamplerMarker, SamplerRequest, SamplerSetProcessInfoRequest,
         StackTrace,
     };
+    use fuchsia_zircon::Vmo;
     use futures::{channel::mpsc, join, StreamExt};
     use itertools::{assert_equal, sorted};
+    use prost::Message;
 
     use crate::{
         crash_reporter::ProfileReport,
+        pprof::pproto::{Location, Mapping, Profile},
         sampler_service::{
-            pproto::{Location, Mapping},
             process_sampler_request, process_sampler_requests, ProfileBuilder,
             DEAD_ALLOCATIONS_PROFILE_THRESHOLD,
         },
     };
+
+    fn deserialize_profile(profile: Vmo, size: u64) -> Profile {
+        Profile::decode(&profile.read_to_vec(0, size).unwrap()[..]).unwrap()
+    }
 
     #[fuchsia::test]
     async fn test_process_sampler_requests_full_profile() -> Result<(), Error> {
@@ -186,12 +192,15 @@ mod test {
         client.record_deallocation(0x100, &deallocation_stack_trace)?;
         drop(client);
 
-        let (process_name, profile) = profile_future.await?;
-
-        assert_eq!("test process", process_name);
-        assert_eq!(3, profile.mapping.len());
-        assert_eq!(4, profile.location.len());
-        assert_eq!(3, profile.sample.len());
+        if let ProfileReport::Final { process_name, size, profile } = profile_future.await? {
+            assert_eq!("test process", process_name);
+            let profile = deserialize_profile(profile, size);
+            assert_eq!(3, profile.mapping.len());
+            assert_eq!(4, profile.location.len());
+            assert_eq!(3, profile.sample.len());
+        } else {
+            panic!("Expected complete report, got partial report instead.");
+        };
 
         Ok(())
     }
@@ -223,11 +232,12 @@ mod test {
         let (_, report) = join!(profile_future, rx.next());
         let report = report.unwrap();
         match report {
-            ProfileReport::Partial { process_name, profile, iteration } => {
+            ProfileReport::Partial { process_name, iteration, profile, size } => {
                 assert_eq!(process_name, TEST_NAME.to_string());
                 assert_eq!(iteration, TEST_INDEX);
                 // This test assumes that every single allocation ends
                 // up as a sample in the produced profile.
+                let profile = deserialize_profile(profile, size);
                 assert!(profile.sample.len() > DEAD_ALLOCATIONS_PROFILE_THRESHOLD);
             }
             _ => assert!(false),
@@ -279,11 +289,14 @@ mod test {
         })?;
         drop(client);
 
-        let (process_name, profile) = profile_future.await?;
-        assert_eq!("test process", process_name);
-        assert_eq!(3, profile.mapping.len());
-        assert_eq!(Vec::<Location>::new(), profile.location);
-
+        if let ProfileReport::Final { process_name, profile, size } = profile_future.await? {
+            assert_eq!("test process", process_name);
+            let profile = deserialize_profile(profile, size);
+            assert_eq!(3, profile.mapping.len());
+            assert_eq!(Vec::<Location>::new(), profile.location);
+        } else {
+            panic!("Expected complete report, got partial report instead.");
+        };
         Ok(())
     }
 
@@ -336,10 +349,14 @@ mod test {
         })?;
         drop(client);
 
-        let (process_name, profile) = profile_future.await?;
-        assert_eq!("other test process", process_name);
-        assert_eq!(6, profile.mapping.len());
-        assert_eq!(Vec::<Location>::new(), profile.location);
+        if let ProfileReport::Final { process_name, profile, size } = profile_future.await? {
+            assert_eq!("other test process", process_name);
+            let profile = deserialize_profile(profile, size);
+            assert_eq!(6, profile.mapping.len());
+            assert_eq!(Vec::<Location>::new(), profile.location);
+        } else {
+            panic!("Expected complete report, got partial report instead.");
+        };
 
         Ok(())
     }
@@ -356,11 +373,14 @@ mod test {
         client.record_allocation(0x100, &allocation_stack_trace, 100)?;
         drop(client);
 
-        let (process_name, profile) = profile_future.await?;
-        assert_eq!(String::default(), process_name);
-        let locations = profile.location.into_iter().map(|Location { address, .. }| address);
-        assert_equal(vec![1000, 1500].into_iter(), sorted(locations));
-
+        if let ProfileReport::Final { process_name, profile, size } = profile_future.await? {
+            assert_eq!(String::default(), process_name);
+            let profile = deserialize_profile(profile, size);
+            let locations = profile.location.into_iter().map(|Location { address, .. }| address);
+            assert_equal(vec![1000, 1500].into_iter(), sorted(locations));
+        } else {
+            panic!("Expected complete report, got partial report instead.");
+        };
         Ok(())
     }
 
@@ -375,11 +395,14 @@ mod test {
         client.record_deallocation(0x100, &stack_trace)?;
         drop(client);
 
-        let (process_name, profile) = profile_future.await?;
-
-        assert_eq!(String::default(), process_name);
-        assert_eq!(Vec::<Mapping>::new(), profile.mapping);
-        assert_eq!(Vec::<Location>::new(), profile.location);
+        if let ProfileReport::Final { process_name, profile, size } = profile_future.await? {
+            assert_eq!(String::default(), process_name);
+            let profile = deserialize_profile(profile, size);
+            assert_eq!(Vec::<Mapping>::new(), profile.mapping);
+            assert_eq!(Vec::<Location>::new(), profile.location);
+        } else {
+            panic!("Expected complete report, got partial report instead.");
+        };
 
         Ok(())
     }
