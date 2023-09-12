@@ -9,6 +9,7 @@ and remotetool.py.
 """
 
 import argparse
+import contextlib
 import os
 import sys
 
@@ -21,7 +22,7 @@ import reproxy_logs
 from api.log import log_pb2
 
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional, Sequence
+from typing import Any, Callable, Dict, Iterable, Optional, Sequence
 
 _SCRIPT_BASENAME = Path(__file__).name
 _SCRIPT_DIR = Path(__file__).parent
@@ -80,12 +81,14 @@ def infer_record_command_and_inputs(
 
 def expand_to_rpl(
         logdump: log_pb2.LogDump,
-        rtool: remotetool.RemoteTool) -> log_pb2.LogDump:
+        rtool: remotetool.RemoteTool,
+        action: Callable[[log_pb2.LogRecord], None] = None) -> log_pb2.LogDump:
     """Expands .rrpl to .rpl, adding data for command and inputs.
 
     Args:
       logdump: api.log.LogDump proto from reproxy (modify-by-reference).
       rtool: remotetool instance for retrieving action details.
+      action: action to run on each processed record.
 
     Returns:
       logdump, modified.
@@ -93,6 +96,8 @@ def expand_to_rpl(
     for record in logdump.records:
         if record.HasField('remote_metadata'):
             infer_record_command_and_inputs(record, rtool)
+        if action:
+            action(record)
     return logdump
 
 
@@ -115,12 +120,21 @@ def expand_to_rpl_command(args: argparse.Namespace) -> int:
     )
     rtool = remotetool.configure_remotetool(args.cfg)
 
-    logdump = expand_to_rpl(rrpl.proto, rtool)
-
+    # Stream records out to avoid losing data in the event of an error.
     if args.output:
-        args.output.write_text(str(logdump))
-    else:  # print to stdout
-        print(str(logdump))
+        outf = open(args.output, 'w')
+
+        def printer(record: log_pb2.LogRecord):
+            outf.write(str(record) + '\n')
+    else:
+        outf = contextlib.nullcontext()
+
+        def printer(record: log_pb2.LogRecord):
+            print(str(record) + '\n')  # print to stdout
+
+    with outf:
+        expand_to_rpl(rrpl.proto, rtool, action=printer)
+
     return 0
 
 

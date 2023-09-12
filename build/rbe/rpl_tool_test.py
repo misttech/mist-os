@@ -6,6 +6,7 @@
 import contextlib
 import io
 import os
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -175,28 +176,53 @@ class ExpandToRplTests(unittest.TestCase):
 
 class MainTests(unittest.TestCase):
 
-    def test_expand_to_rpl(self):
+    def test_expand_to_rpl_to_file(self):
         empty_logdump = log_pb2.LogDump()
+        log = reproxy_logs.ReproxyLog(empty_logdump)
         with mock.patch.object(reproxy_logs, 'parse_log',
-                               return_value=reproxy_logs.ReproxyLog(
-                                   empty_logdump)) as mock_parse_log:
+                               return_value=log) as mock_parse_log:
             with mock.patch.object(
                     remotetool, 'configure_remotetool',
                     return_value=_FAKE_REMOTETOOL) as mock_remotetool:
-                with mock.patch.object(
-                        rpl_tool, 'expand_to_rpl',
-                        return_value=log_pb2.LogDump()) as mock_expand:
-                    with mock.patch.object(Path, 'write_text') as mock_write:
+                with mock.patch.object(rpl_tool,
+                                       'expand_to_rpl') as mock_expand:
+                    with tempfile.TemporaryDirectory() as td:
                         exit_code = rpl_tool.main(
                             [
                                 'expand_to_rpl', 'reduced.rrpl', '-o',
-                                'expanded.rpl'
+                                os.path.join(td, 'expanded.rpl')
                             ])
         self.assertEqual(exit_code, 0)
         mock_parse_log.assert_called_once()
         mock_remotetool.assert_called_once()
-        mock_expand.assert_called_once_with(empty_logdump, _FAKE_REMOTETOOL)
-        mock_write.assert_called_once_with('')
+        mock_expand.assert_called_once()
+        expand_args, unused_kwargs = mock_expand.call_args_list[0]
+        self.assertEqual(expand_args[0], log.proto)
+        self.assertEqual(expand_args[1], _FAKE_REMOTETOOL)
+
+    def test_expand_to_rpl_to_stdout(self):
+        empty_logdump = log_pb2.LogDump()
+        log = reproxy_logs.ReproxyLog(empty_logdump)
+        with mock.patch.object(reproxy_logs, 'parse_log',
+                               return_value=log) as mock_parse_log:
+            with mock.patch.object(
+                    remotetool, 'configure_remotetool',
+                    return_value=_FAKE_REMOTETOOL) as mock_remotetool:
+                with mock.patch.object(rpl_tool,
+                                       'expand_to_rpl') as mock_expand:
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        exit_code = rpl_tool.main(
+                            [
+                                'expand_to_rpl',
+                                'reduced.rrpl',
+                            ])
+        self.assertEqual(exit_code, 0)
+        mock_parse_log.assert_called_once()
+        mock_remotetool.assert_called_once()
+        mock_expand.assert_called_once()
+        expand_args, unused_kwargs = mock_expand.call_args_list[0]
+        self.assertEqual(expand_args[0], log.proto)
+        self.assertEqual(expand_args[1], _FAKE_REMOTETOOL)
 
 
 if __name__ == '__main__':
