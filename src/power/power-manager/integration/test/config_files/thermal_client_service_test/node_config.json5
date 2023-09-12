@@ -3,7 +3,7 @@
         type: "TemperatureHandler",
         name: "thermal_000",
         config: {
-            driver_path: "/dev/class/thermal/000",
+            driver_path: "/dev/sys/test/soc_thermal",
             cache_duration_ms: 0,
         },
     },

@@ -7,18 +7,19 @@ mod mocks;
 
 use {
     crate::mocks::{
-        activity_service::MockActivityService, driver_manager::MockDriverManager,
-        input_settings_service::MockInputSettingsService,
-        system_controller::MockSystemControllerService, temperature_driver::MockTemperatureDriver,
+        activity_service::MockActivityService, input_settings_service::MockInputSettingsService,
+        system_controller::MockSystemControllerService,
     },
     fidl::endpoints::DiscoverableProtocolMarker,
     fidl::AsHandleRef as _,
-    fidl_fuchsia_hardware_power_statecontrol as fpower, fidl_fuchsia_io as fio,
+    fidl_fuchsia_driver_test as fdt, fidl_fuchsia_hardware_power_statecontrol as fpower,
+    fidl_fuchsia_io as fio,
+    fidl_fuchsia_powermanager_driver_temperaturecontrol as ftemperaturecontrol,
     fidl_fuchsia_testing as ftesting,
     fuchsia_component_test::{
         Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
     },
-    std::collections::HashMap,
+    fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
     std::sync::atomic::{AtomicU64, Ordering},
     std::sync::Arc,
     tracing::*,
@@ -36,24 +37,16 @@ static UNIQUE_REALM_NUMBER: AtomicU64 = AtomicU64::new(0);
 
 pub struct TestEnvBuilder {
     power_manager_node_config_path: Option<String>,
-    temperature_driver_paths: Vec<String>,
 }
 
 impl TestEnvBuilder {
     pub fn new() -> Self {
-        Self { power_manager_node_config_path: None, temperature_driver_paths: Vec::new() }
+        Self { power_manager_node_config_path: None }
     }
 
     /// Sets the node config path that Power Manager will be configured with.
     pub fn power_manager_node_config_path(mut self, path: &str) -> Self {
         self.power_manager_node_config_path = Some(path.into());
-        self
-    }
-
-    /// Sets the temperature driver paths to be added to the mock devfs. A MockTemperatureDriver is
-    /// created for each entry.
-    pub fn temperature_driver_paths(mut self, paths: Vec<&str>) -> Self {
-        self.temperature_driver_paths = paths.into_iter().map(String::from).collect();
         self
     }
 
@@ -70,6 +63,8 @@ impl TestEnvBuilder {
             RealmBuilder::with_params(RealmBuilderParams::new().realm_name(realm_name))
                 .await
                 .expect("Failed to create RealmBuilder");
+
+        realm_builder.driver_test_realm_setup().await.expect("Failed to setup driver test realm");
 
         let power_manager = realm_builder
             .add_child("power_manager", POWER_MANAGER_URL, ChildOptions::new())
@@ -96,27 +91,6 @@ impl TestEnvBuilder {
             )
             .await
             .expect("Failed to add child: activity_service");
-
-        let driver_manager = MockDriverManager::new();
-        let driver_manager_clone = driver_manager.clone();
-        let driver_manager_child = realm_builder
-            .add_local_child(
-                "driver_manager",
-                move |handles| Box::pin(driver_manager_clone.clone().run(handles)),
-                ChildOptions::new().eager(),
-            )
-            .await
-            .expect("Failed to add child: driver_manager");
-
-        let temperature_mocks = self
-            .temperature_driver_paths
-            .iter()
-            .map(|path| {
-                let temperature_mock = MockTemperatureDriver::new(path);
-                driver_manager.add_temperature_mock(path, temperature_mock.clone());
-                (path.into(), temperature_mock)
-            })
-            .collect();
 
         let input_settings_service = MockInputSettingsService::new();
         let input_settings_service_clone = input_settings_service.clone();
@@ -247,12 +221,12 @@ impl TestEnvBuilder {
             .await
             .unwrap();
 
-        let driver_manager_to_power_manager = Route::new().capability(
-            Capability::directory("dev-topological").rights(fio::R_STAR_DIR).path("/dev").weak(),
-        );
         realm_builder
             .add_route(
-                driver_manager_to_power_manager.from(&driver_manager_child).to(&power_manager),
+                Route::new()
+                    .capability(Capability::directory("dev-topological"))
+                    .from(Ref::child("driver_test_realm"))
+                    .to(&power_manager),
             )
             .await
             .unwrap();
@@ -273,19 +247,25 @@ impl TestEnvBuilder {
         // Finally, build it
         let realm_instance = realm_builder.build().await.expect("Failed to build RealmInstance");
 
+        // Start driver test realm
+        let args = fdt::RealmArgs {
+            root_driver: Some("fuchsia-boot:///#meta/test-parent-sys.cm".to_string()),
+            use_driver_framework_v2: Some(true),
+            ..Default::default()
+        };
+
+        realm_instance
+            .driver_test_realm_start(args)
+            .await
+            .expect("Failed to start driver test realm");
+
         // Increase the time scale so Power Manager's interval-based operation runs faster for
         // testing
         set_fake_time_scale(&realm_instance, FAKE_TIME_SCALE).await;
 
         TestEnv {
             realm_instance: Some(realm_instance),
-            mocks: Mocks {
-                activity_service,
-                driver_manager,
-                input_settings_service,
-                system_controller_service,
-                temperature: temperature_mocks,
-            },
+            mocks: Mocks { activity_service, input_settings_service, system_controller_service },
         }
     }
 }
@@ -320,8 +300,27 @@ impl TestEnv {
     }
 
     /// Sets the temperature for a mock temperature device.
-    pub fn set_temperature(&self, driver_path: &str, temperature: f32) {
-        self.mocks.temperature[driver_path].set_temperature(temperature);
+    pub async fn set_temperature(&self, driver_path: &str, temperature: f32) {
+        let dev = self.realm_instance.as_ref().unwrap().driver_test_realm_connect_to_dev().unwrap();
+
+        let control_path = driver_path.strip_prefix("/dev").unwrap().to_owned() + "/control";
+
+        let fake_temperature_control =
+            fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
+                ftemperaturecontrol::DeviceMarker,
+            >(&dev, &control_path)
+            .unwrap();
+
+        let _status = fake_temperature_control.set_temperature_celsius(temperature).await.unwrap();
+    }
+
+    // Wait for the device to finish enumerating.
+    pub async fn wait_for_device(&self, driver_path: &str) {
+        let dev = self.realm_instance.as_ref().unwrap().driver_test_realm_connect_to_dev().unwrap();
+
+        let path = driver_path.strip_prefix("/dev").unwrap().to_owned();
+
+        device_watcher::recursive_wait(&dev, &path).await.unwrap();
     }
 }
 
@@ -356,10 +355,8 @@ async fn set_fake_time_scale(realm_instance: &RealmInstance, scale: u32) {
 /// Container to hold all of the mocks within the RealmInstance.
 pub struct Mocks {
     pub activity_service: Arc<MockActivityService>,
-    pub driver_manager: Arc<MockDriverManager>,
     pub input_settings_service: Arc<MockInputSettingsService>,
     pub system_controller_service: Arc<MockSystemControllerService>,
-    pub temperature: HashMap<String, Arc<MockTemperatureDriver>>,
 }
 
 /// Tests that Power Manager triggers a thermal reboot if the temperature sensor at the given path
@@ -372,7 +369,7 @@ pub async fn test_thermal_reboot(mut env: TestEnv, sensor_path: &str, temperatur
     // 2) verify the reboot watcher sees the reboot request for 'HighTemperature'
     // 3) verify the system controller receives the reboot request
     // 4) verify the Driver Manager receives the termination state request
-    env.set_temperature(sensor_path, temperature);
+    env.set_temperature(sensor_path, temperature).await;
     assert_eq!(reboot_watcher.get_reboot_reason().await, fpower::RebootReason::HighTemperature);
     env.mocks.system_controller_service.wait_for_shutdown_request().await;
 

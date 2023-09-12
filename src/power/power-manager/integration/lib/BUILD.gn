@@ -14,8 +14,9 @@ rustc_library("lib") {
 
   deps = [
     ":integration-component",
+    "../../testing/fuchsia.powermanager.driver:fuchsia.powermanager.driver.temperaturecontrol_rust",
+    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
-    "//sdk/fidl/fuchsia.hardware.temperature:fuchsia.hardware.temperature_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.power.clientlevel:fuchsia.power.clientlevel_rust",
     "//sdk/fidl/fuchsia.power.profile:fuchsia.power.profile_rust",
@@ -24,6 +25,8 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//sdk/fidl/fuchsia.thermal:fuchsia.thermal_rust",
     "//sdk/fidl/fuchsia.ui.activity:fuchsia.ui.activity_rust",
+    "//sdk/lib/device-watcher/rust",
+    "//sdk/lib/driver_test_realm/realm_builder/rust",
     "//src/cobalt/bin/testing/mock_cobalt:component_v2",
     "//src/lib/fake-clock/fidl:fidl_rust",
     "//src/lib/fake-clock/svc",
@@ -33,10 +36,8 @@ rustc_library("lib") {
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-runtime",
     "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:tracing",
   ]
 
@@ -53,11 +54,9 @@ rustc_library("lib") {
     "src/client_connectors/thermal_client.rs",
     "src/lib.rs",
     "src/mocks/activity_service.rs",
-    "src/mocks/driver_manager.rs",
     "src/mocks/input_settings_service.rs",
     "src/mocks/mod.rs",
     "src/mocks/system_controller.rs",
-    "src/mocks/temperature_driver.rs",
   ]
 }
 
