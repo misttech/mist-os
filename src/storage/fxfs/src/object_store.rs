@@ -1855,8 +1855,15 @@ impl ObjectStore {
         node_attributes: Option<&fio::MutableNodeAttributes>,
         change_time: Option<Timestamp>,
     ) -> Result<(), Error> {
-        if change_time.is_none() && node_attributes.is_none() {
-            return Ok(());
+        if change_time.is_none() {
+            if let Some(attributes) = node_attributes {
+                let empty_attributes = fio::MutableNodeAttributes { ..Default::default() };
+                if *attributes == empty_attributes {
+                    return Ok(());
+                }
+            } else {
+                return Ok(());
+            }
         }
         let mut mutation = self.txn_get_object_mutation(transaction, object_id).await?;
         if let ObjectValue::Object { ref mut attributes, .. } = mutation.item.value {

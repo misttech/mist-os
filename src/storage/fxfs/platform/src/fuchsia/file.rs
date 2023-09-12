@@ -1644,4 +1644,69 @@ mod tests {
 
         fixture.close().await;
     }
+
+    #[fuchsia::test]
+    async fn test_update_attributes_also_updates_ctime() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            "foo",
+        )
+        .await;
+
+        // Writing to file should update ctime
+        file.write("hello, world!".as_bytes())
+            .await
+            .expect("FIDL call failed")
+            .map_err(Status::from_raw)
+            .expect("write failed");
+        let (_mutable_attributes, immutable_attributes) = file
+            .get_attributes(fio::NodeAttributesQuery::CHANGE_TIME)
+            .await
+            .expect("FIDL call failed")
+            .map_err(Status::from_raw)
+            .expect("get_attributes failed");
+        let ctime_after_write = immutable_attributes.change_time;
+
+        // Updating file attributes updates ctime as well
+        file.update_attributes(&fio::MutableNodeAttributes {
+            mode: Some(111),
+            gid: Some(222),
+            ..Default::default()
+        })
+        .await
+        .expect("FIDL call failed")
+        .map_err(Status::from_raw)
+        .expect("update_attributes failed");
+        let (_mutable_attributes, immutable_attributes) = file
+            .get_attributes(fio::NodeAttributesQuery::CHANGE_TIME)
+            .await
+            .expect("FIDL call failed")
+            .map_err(Status::from_raw)
+            .expect("get_attributes failed");
+        let ctime_after_update = immutable_attributes.change_time;
+        assert!(ctime_after_update > ctime_after_write);
+
+        // Flush metadata
+        file.sync()
+            .await
+            .expect("FIDL call failed")
+            .map_err(Status::from_raw)
+            .expect("sync failed");
+        let (_mutable_attributes, immutable_attributes) = file
+            .get_attributes(fio::NodeAttributesQuery::CHANGE_TIME)
+            .await
+            .expect("FIDL call failed")
+            .map_err(Status::from_raw)
+            .expect("get_attributes failed");
+        let ctime_after_sync = immutable_attributes.change_time;
+        assert_eq!(ctime_after_sync, ctime_after_update);
+        fixture.close().await;
+    }
 }

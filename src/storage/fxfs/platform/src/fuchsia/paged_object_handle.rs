@@ -442,6 +442,7 @@ impl PagedObjectHandle {
         content_size: Option<u64>,
         crtime: Option<Timestamp>,
         mtime: Option<Timestamp>,
+        ctime: Option<Timestamp>,
     ) -> Result<(), Error> {
         if let Some(content_size) = content_size {
             transaction.add_with_object(
@@ -457,10 +458,15 @@ impl PagedObjectHandle {
                 AssocObj::Borrowed(&self.handle),
             );
         }
+        let attributes = fio::MutableNodeAttributes {
+            creation_time: crtime.map(|t| t.as_nanos()),
+            modification_time: mtime.map(|t| t.as_nanos()),
+            ..Default::default()
+        };
         self.handle
-            .write_timestamps(transaction, crtime, mtime)
+            .update_attributes(transaction, Some(&attributes), ctime)
             .await
-            .context("write_timestamps failed")?;
+            .context("update_attributes failed")?;
         Ok(())
     }
 
@@ -479,6 +485,7 @@ impl PagedObjectHandle {
             &mut transaction,
             if content_size == previous_content_size { None } else { Some(content_size) },
             crtime,
+            mtime.clone(),
             mtime,
         )
         .await?;
@@ -548,6 +555,7 @@ impl PagedObjectHandle {
                 &mut transaction,
                 size,
                 if first_batch { crtime } else { None },
+                if first_batch { mtime.clone() } else { None },
                 if first_batch { mtime } else { None },
             )
             .await?;
@@ -792,35 +800,51 @@ impl PagedObjectHandle {
         }
 
         // A race condition can occur if another flush occurs between now and the end of the
-        // transaction. This lock is to prevent a another flush from occurring during that time.
+        // transaction. This lock is to prevent another flush from occurring during that time.
         let fs;
+        // The _flush_guard persists until the end of the function
         let _flush_guard;
         let set_creation_time = attributes.creation_time.is_some();
         let set_modification_time = attributes.modification_time.is_some();
-        if set_creation_time || set_modification_time {
+        let (attributes_with_pending_mtime, ctime) = {
             let store = self.handle.store();
             fs = store.filesystem();
             let keys = [LockKey::truncate(store.store_object_id(), self.handle.object_id())];
             _flush_guard = debug_assert_not_too_long!(fs.write_lock(&keys));
-        }
+            let mut inner = self.inner.lock().unwrap();
+            let mut attributes = attributes.clone();
+            // There is an assumption that when we expose ctime and mtime, that ctime is the same
+            // as dirty_mtime (when it is some value). When we call `update_attributes(..)`,
+            // a situation could arise where ctime is ahead of dirty_mtime and that assumption is no
+            // longer true. An example of this is when we call `update_attributes(..)` without
+            // setting mtime. In this case, we can no longer assume ctime is equal to dirty_mtime.
+            // A way around this is to update attributes with dirty_mtime whenever mtime is not
+            // passed in explicitly which will reset dirty_mtime upon successful completion.
+            let dirty_mtime = inner
+                .dirty_mtime
+                .begin_flush(self.was_file_modified_since_last_call()?)
+                .map(|t| t.as_nanos());
+            if !set_modification_time {
+                attributes.modification_time = dirty_mtime;
+            }
+            (attributes, Some(Timestamp::now()))
+        };
 
         let mut transaction = self.handle.new_transaction().await?;
         self.handle
-            .update_attributes(&mut transaction, Some(attributes), None)
+            .update_attributes(&mut transaction, Some(&attributes_with_pending_mtime), ctime)
             .await
             .context("update_attributes failed")?;
         transaction.commit().await.context("Failed to commit transaction")?;
-        // Any changes to the dirty timestamps before this transaction are superseded by the values
+        // Any changes to the creation_time before this transaction are superseded by the values
         // set in this update.
         {
             let mut inner = self.inner.lock().unwrap();
             if set_creation_time {
                 inner.dirty_crtime = DirtyTimestamp::None;
             }
-            if set_modification_time {
-                let _ = self.was_file_modified_since_last_call()?;
-                inner.dirty_mtime = DirtyTimestamp::None;
-            }
+            // Discard changes to dirty_mtime if no further update was made since begin_flush(..).
+            inner.dirty_mtime.end_flush();
         }
 
         Ok(())
@@ -830,7 +854,7 @@ impl PagedObjectHandle {
         // We must extract informaton from `inner` *before* we try and retrieve the properties from
         // the handle to avoid a window where we might see old properties.  When we flush, we update
         // the handle and *then* remove the properties from `inner`.
-        let (dirty_page_count, data_size, ctime, mtime) = {
+        let (dirty_page_count, data_size, crtime, mtime) = {
             let mut inner = self.inner.lock().unwrap();
             if self.was_file_modified_since_last_call()? {
                 inner.dirty_mtime = DirtyTimestamp::Some(Timestamp::now());
@@ -845,11 +869,12 @@ impl PagedObjectHandle {
         let mut props = self.handle.get_properties().await?;
         props.allocated_size += dirty_page_count * zx::system_get_page_size() as u64;
         props.data_attribute_size = data_size;
-        if let Some(t) = ctime {
+        if let Some(t) = crtime {
             props.creation_time = t;
         }
         if let Some(t) = mtime {
             props.modification_time = t;
+            props.change_time = t;
         }
         Ok(props)
     }
@@ -2048,6 +2073,61 @@ mod tests {
                 })
             );
         }
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_write_mtime_ctime() {
+        let fixture = TestFixture::new_unencrypted().await;
+        let root = fixture.root();
+
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+
+        file::write(&file, &[1, 2, 3, 4]).await.expect("write failed");
+        let write_attributes = get_attributes_checked(&file, fio::NodeAttributesQuery::all()).await;
+        assert_eq!(
+            write_attributes.mutable_attributes.modification_time,
+            write_attributes.immutable_attributes.change_time
+        );
+
+        // Do something else that should not change mtime or ctime
+        file.seek(fio::SeekOrigin::Start, 0)
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("seek failed");
+        file::read(&file).await.expect("read failed");
+        let read_attributes = get_attributes_checked(&file, fio::NodeAttributesQuery::all()).await;
+        assert_eq!(
+            write_attributes.mutable_attributes.modification_time,
+            read_attributes.mutable_attributes.modification_time,
+        );
+        assert_eq!(
+            write_attributes.immutable_attributes.change_time,
+            read_attributes.immutable_attributes.change_time,
+        );
+
+        // Syncing the file should have no affect on ctime
+        file.sync().await.unwrap().unwrap();
+        let sync_attributes = get_attributes_checked(&file, fio::NodeAttributesQuery::all()).await;
+        assert_eq!(
+            write_attributes.mutable_attributes.modification_time,
+            sync_attributes.mutable_attributes.modification_time,
+        );
+        assert_eq!(
+            write_attributes.immutable_attributes.change_time,
+            sync_attributes.immutable_attributes.change_time,
+        );
+
+        close_file_checked(file).await;
         fixture.close().await;
     }
 }

@@ -26,7 +26,7 @@ use {
             self,
             directory::{self, ReplacedChild},
             transaction::{LockKey, Options, Transaction},
-            Directory, ObjectDescriptor, ObjectStore,
+            Directory, ObjectDescriptor, ObjectStore, Timestamp,
         },
     },
     std::{
@@ -430,7 +430,7 @@ impl MutableDirectory for FxDirectory {
             .await
             .map_err(map_to_status)?;
         self.directory
-            .update_attributes(&mut transaction, Some(&attributes), 0, None)
+            .update_attributes(&mut transaction, Some(&attributes), 0, Some(Timestamp::now()))
             .await
             .map_err(map_to_status)?;
         transaction.commit().await.map_err(map_to_status)?;
@@ -2192,6 +2192,49 @@ mod tests {
             assert!(attrs.mutable_attributes.creation_time.is_none());
             assert!(attrs.mutable_attributes.modification_time.is_none());
         }
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_update_attributes_also_updates_ctime() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+
+        let dir = open_dir_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
+            "foo",
+        )
+        .await;
+
+        let (_mutable_attributes, immutable_attributes) = dir
+            .get_attributes(fio::NodeAttributesQuery::CHANGE_TIME)
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("get_attributes failed");
+
+        dir.update_attributes(&fio::MutableNodeAttributes {
+            modification_time: Some(Timestamp::now().as_nanos()),
+            mode: Some(111),
+            gid: Some(222),
+            ..Default::default()
+        })
+        .await
+        .expect("FIDL call failed")
+        .map_err(zx::ok)
+        .expect("update_attributes failed");
+
+        let (_mutable_attributes, immutable_attributes_after_update) = dir
+            .get_attributes(fio::NodeAttributesQuery::CHANGE_TIME)
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("get_attributes failed");
+        assert!(immutable_attributes_after_update.change_time > immutable_attributes.change_time);
         fixture.close().await;
     }
 }
