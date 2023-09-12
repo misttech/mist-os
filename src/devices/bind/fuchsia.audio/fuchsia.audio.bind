@@ -2,8 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-library fuchsia.dai;
+library fuchsia.audio;
 
 extend uint fuchsia.BIND_PROTOCOL {
-  DEVICE = 153,
+  DAI = 0x99,
 };
+
+extend uint fuchsia.BIND_FIDL_PROTOCOL {
+  DSP = 0x0E, // fuchsia.dsp
+};
+

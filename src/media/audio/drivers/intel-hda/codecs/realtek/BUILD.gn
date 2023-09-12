@@ -7,7 +7,7 @@ import("//build/drivers.gni")
 
 driver_bind_rules("ihda_codecs_realtek_bind") {
   rules = "realtek_ihda_codec.bind"
-  deps = [ "//src/devices/bind/fuchsia.intelhda" ]
+  deps = [ "//src/devices/bind/fuchsia.audio.intelhda" ]
   tests = "bind_test.json"
 }
 

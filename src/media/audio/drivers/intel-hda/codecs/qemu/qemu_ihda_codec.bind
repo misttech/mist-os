@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-using fuchsia.intelhda;
+using fuchsia.audio.intelhda;
 
-fuchsia.BIND_PROTOCOL == fuchsia.intelhda.BIND_PROTOCOL.IHDA_CODEC;
+fuchsia.BIND_PROTOCOL == fuchsia.audio.intelhda.BIND_PROTOCOL.IHDA_CODEC;
 
-fuchsia.BIND_IHDA_CODEC_VID == fuchsia.intelhda.BIND_IHDA_CODEC_VID.RED_HAT;
+fuchsia.BIND_IHDA_CODEC_VID == fuchsia.audio.intelhda.BIND_IHDA_CODEC_VID.RED_HAT;
 
 accept fuchsia.BIND_IHDA_CODEC_DID {
   0x0022  // QEMU
