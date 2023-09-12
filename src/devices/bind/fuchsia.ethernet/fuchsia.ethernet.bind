@@ -5,8 +5,8 @@
 library fuchsia.ethernet;
 
 extend uint fuchsia.BIND_PROTOCOL {
-  INTERFACE = 14,
-  IMPL = 15,
+  INTERFACE = 0x0E,
+  IMPL = 0x0F,
 };
 // The ethernet protocol is being deprecated. The LEGACY property allows
 // drivers to bind to the legacy implementation instead of the netdevice

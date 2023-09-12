@@ -5,5 +5,5 @@
 library fuchsia.thermal;
 
 extend uint fuchsia.BIND_PROTOCOL {
-  DEVICE = 73,
+  DEVICE = 0x49,
 };

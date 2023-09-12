@@ -5,6 +5,6 @@
 library fuchsia.network;
 
 extend uint fuchsia.BIND_PROTOCOL {
-  INTERFACE = 130,
-  IMPL = 131,
+  INTERFACE = 0x82,
+  IMPL = 0x83,
 };

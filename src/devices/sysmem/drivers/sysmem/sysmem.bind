@@ -9,7 +9,7 @@ using fuchsia.devicetree;
 fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC;
 
 if fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.DEVICETREE {
-  fuchsia.devicetree.first_compatible == "sysmem";
+  fuchsia.devicetree.FIRST_COMPATIBLE == "sysmem";
 } else {
   fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.platform.device.BIND_FIDL_PROTOCOL.DEVICE;
   fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC;

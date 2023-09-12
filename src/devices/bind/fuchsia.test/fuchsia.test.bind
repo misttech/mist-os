@@ -5,11 +5,11 @@
 library fuchsia.test;
 
 extend uint fuchsia.BIND_PROTOCOL {
-  DEVICE = 80,
-  COMPAT_CHILD = 81,
-  POWER_CHILD = 82,
-  PARENT = 83,
-  DEVHOST = 124,
+  DEVICE = 0x50,
+  COMPAT_CHILD = 0x51,
+  POWER_CHILD = 0x52,
+  PARENT = 0x53,
+  DEVHOST = 0x7C,
 };
 
 string TEST_CHILD;

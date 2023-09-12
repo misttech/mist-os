@@ -66,7 +66,7 @@
         "device": {
             "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC",
             "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.platform.BIND_PLATFORM_DEV_DID.DEVICETREE",
-            "fuchsia.devicetree.first_compatible": "\"amlogic,g12b-clk\""
+            "fuchsia.devicetree.FIRST_COMPATIBLE": "\"amlogic,g12b-clk\""
         },
         "expected": "match",
         "name": "SuccessDevicetree"
@@ -102,7 +102,7 @@
         "device": {
             "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC",
             "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.platform.BIND_PLATFORM_DEV_DID.DEVICETREE",
-            "fuchsia.devicetree.first_compatible": "\"amlogic,clk\""
+            "fuchsia.devicetree.FIRST_COMPATIBLE": "\"amlogic,clk\""
         },
         "expected": "abort",
         "name": "Incompatible"

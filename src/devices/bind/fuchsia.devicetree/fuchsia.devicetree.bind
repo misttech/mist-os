@@ -4,5 +4,5 @@
 
 library fuchsia.devicetree;
 
-string first_compatible;
+string FIRST_COMPATIBLE;
 

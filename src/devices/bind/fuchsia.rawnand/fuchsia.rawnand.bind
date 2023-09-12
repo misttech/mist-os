@@ -5,6 +5,6 @@
 library fuchsia.rawnand;
 
 extend uint fuchsia.BIND_PROTOCOL {
-  DEVICE = 95,
+  DEVICE = 0x5F,
 };
 
