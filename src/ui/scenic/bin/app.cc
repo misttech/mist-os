@@ -68,8 +68,7 @@ scenic_structured_config::Config GetConfig() {
   FX_LOGS(INFO) << "Scenic min_predicted_frame_duration(us): "
                 << values.frame_scheduler_min_predicted_frame_duration_in_us();
   FX_LOGS(INFO) << "Scenic pointer auto focus: " << values.pointer_auto_focus();
-  FX_LOGS(INFO) << "flatland_enable_display_composition: "
-                << values.flatland_enable_display_composition();
+  FX_LOGS(INFO) << "display_composition: " << values.display_composition();
   FX_LOGS(INFO) << "Scenic i_can_haz_display_id: "
                 << GetDisplayId(values)
                        .value_or(fuchsia::hardware::display::DisplayId{
@@ -388,7 +387,7 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     flatland_compositor_ = std::make_shared<flatland::DisplayCompositor>(
         async_get_default_dispatcher(), display_manager_->default_display_coordinator(),
         flatland_renderer, utils::CreateSysmemAllocatorSyncPtr("flatland::DisplayCompositor"),
-        config_values_.flatland_enable_display_composition());
+        config_values_.display_composition());
   }
 
   // Flatland manager depends on compositor, and is required by engine.

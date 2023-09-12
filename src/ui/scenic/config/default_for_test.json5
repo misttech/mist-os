@@ -1,7 +1,7 @@
 {
     frame_scheduler_min_predicted_frame_duration_in_us: 0,
     pointer_auto_focus: true,
-    flatland_enable_display_composition: true,
+    display_composition: true,
     i_can_haz_display_id: -1,
     i_can_haz_display_mode: -1,
 }

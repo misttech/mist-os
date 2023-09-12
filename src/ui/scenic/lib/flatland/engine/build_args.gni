@@ -7,9 +7,3 @@ declare_args() {
   # are rendered via the GPU renderer instead of by direct DisplayController scanout.
   flatland_visual_debugging = false
 }
-
-declare_args() {
-  # If true, this enables the compositor to attempt to use the display controller rendering
-  # path instead of always using the GPU/Vulkan rendering path.
-  flatland_enable_display_composition = false
-}

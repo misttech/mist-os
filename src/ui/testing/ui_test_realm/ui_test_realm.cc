@@ -344,8 +344,7 @@ void UITestRealm::RouteConfigData() {
 void UITestRealm::ConfigureScenic() {
   // Load default config for Scenic.
   realm_builder_.InitMutableConfigFromPackage(kScenicName);
-  realm_builder_.SetConfigValue(kScenicName, "flatland_enable_display_composition",
-                                ConfigValue::Bool(false));
+  realm_builder_.SetConfigValue(kScenicName, "display_composition", ConfigValue::Bool(false));
 }
 
 void UITestRealm::ConfigureSceneOwner() {

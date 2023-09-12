@@ -30,7 +30,7 @@ pub struct PlatformUiConfig {
     /// Scenic attempts to delegate composition of client images to the display controller, with
     /// GPU/Vulkan composition as the fallback. If false, GPU/Vulkan composition is always used.
     #[serde(default)]
-    pub enable_display_composition: bool,
+    pub display_composition: bool,
 
     /// The relevant input device bindings from which to install appropriate
     /// input handlers. Default to an empty set.
@@ -58,7 +58,7 @@ impl Default for PlatformUiConfig {
             sensor_config: Default::default(),
             frame_scheduler_min_predicted_frame_duration_in_us: Default::default(),
             pointer_auto_focus: true,
-            enable_display_composition: false,
+            display_composition: false,
             supported_input_devices: Default::default(),
             display_rotation: Default::default(),
             display_pixel_density: Default::default(),
