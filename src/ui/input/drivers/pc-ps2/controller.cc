@@ -183,16 +183,6 @@ void Controller::DdkInit(ddk::InitTxn txn) {
   });
 }
 
-void Controller::DdkUnbind(ddk::UnbindTxn txn) {
-  JoinInitThread();
-  txn.Reply();
-}
-
-void Controller::DdkSuspend(ddk::SuspendTxn txn) {
-  JoinInitThread();
-  txn.Reply(ZX_OK, 0);
-}
-
 zx::result<std::vector<uint8_t>> Controller::SendControllerCommand(
     Command command, cpp20::span<const uint8_t> data) {
   if (data.size() != command.param_count) {
@@ -270,12 +260,6 @@ StatusReg Controller::ReadStatus() {
 }
 
 uint8_t Controller::ReadData() { return inp(kDataReg); }
-
-void Controller::JoinInitThread() {
-  if (init_thread_.joinable()) {
-    init_thread_.join();
-  }
-}
 
 bool Controller::WaitWrite() {
   size_t i = 0;
