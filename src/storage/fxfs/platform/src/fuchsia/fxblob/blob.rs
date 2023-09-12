@@ -168,7 +168,6 @@ impl PagerBacked for FxBlob {
         &self.vmo
     }
 
-    // TODO(fxbug.dev/122125): refactor and share with file.rs
     fn page_in(self: Arc<Self>, mut range: Range<u64>) {
         async_enter!("page_in");
 
