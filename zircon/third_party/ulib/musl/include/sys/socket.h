@@ -259,6 +259,8 @@ struct linger {
 #define SCM_TXTIME SO_TXTIME
 #define SO_BINDTOIFINDEX 62
 #define SO_DETACH_REUSEPORT_BPF 68
+// On Linux, this is defined in <uapi/linux/netfilter_ipv4.h>.
+#define SO_ORIGINAL_DST 80
 
 #ifndef SOL_SOCKET
 #define SOL_SOCKET 1
@@ -317,18 +319,18 @@ struct linger {
 #define MSG_FASTOPEN 0x20000000
 #define MSG_CMSG_CLOEXEC 0x40000000
 
-#define CMSG_ALIGN(len) ( ((len)+sizeof(long)-1) & ~(sizeof(long)-1) )
+#define CMSG_ALIGN(len) (((len) + sizeof(long) - 1) & ~(sizeof(long) - 1))
 #define CMSG_DATA(cmsg) (((unsigned char*)(cmsg) + CMSG_ALIGN(sizeof(struct cmsghdr))))
 #define CMSG_SPACE(len) (CMSG_ALIGN(sizeof(struct cmsghdr)) + CMSG_ALIGN(len))
 #define CMSG_LEN(len) (CMSG_ALIGN(sizeof(struct cmsghdr)) + (len))
 #define CMSG_FIRSTHDR(mhdr)                                                                        \
   ((size_t)(mhdr)->msg_controllen >= sizeof(struct cmsghdr) ? (struct cmsghdr*)(mhdr)->msg_control \
                                                             : (struct cmsghdr*)0)
-#define CMSG_NXTHDR(mhdr, cmsg)                                              \
-  ((cmsg)->cmsg_len < sizeof(struct cmsghdr) ||                              \
-   (ssize_t)(CMSG_ALIGN((cmsg)->cmsg_len) + sizeof(struct cmsghdr)) >=       \
-       ((char*)(mhdr)->msg_control + (mhdr)->msg_controllen) - (char*)(cmsg) \
-       ? 0                                                                   \
+#define CMSG_NXTHDR(mhdr, cmsg)                                                      \
+  ((cmsg)->cmsg_len < sizeof(struct cmsghdr) ||                                      \
+           (ssize_t)(CMSG_ALIGN((cmsg)->cmsg_len) + sizeof(struct cmsghdr)) >=       \
+               ((char*)(mhdr)->msg_control + (mhdr)->msg_controllen) - (char*)(cmsg) \
+       ? 0                                                                           \
        : (struct cmsghdr*)((char*)(cmsg) + CMSG_ALIGN((cmsg)->cmsg_len)))
 
 #define SCM_RIGHTS 0x01

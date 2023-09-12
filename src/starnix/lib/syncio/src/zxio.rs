@@ -261,6 +261,7 @@ pub const SO_ZEROCOPY: u32 = 60;
 pub const SO_TXTIME: u32 = 61;
 pub const SO_BINDTOIFINDEX: u32 = 62;
 pub const SO_DETACH_REUSEPORT_BPF: u32 = 68;
+pub const SO_ORIGINAL_DST: u32 = 80;
 pub const SOL_SOCKET: u32 = 1;
 pub const SOL_IP: u32 = 0;
 pub const SOL_IPV6: u32 = 41;

@@ -385,6 +385,12 @@ SockOptResult GetSockOptProcessor::StoreOption(const fsocket::wire::TcpInfo& val
   return StoreRaw(&info, std::min(*optlen_, static_cast<socklen_t>(sizeof(info))));
 }
 
+template <>
+SockOptResult GetSockOptProcessor::StoreOption(const fuchsia_net::wire::SocketAddress& value) {
+  *optlen_ = fidl_to_sockaddr(value, optval_, *optlen_);
+  return SockOptResult::Ok();
+}
+
 // Used for various options that allow the caller to supply larger buffers than needed.
 struct PartialCopy {
   int32_t value;
@@ -995,6 +1001,17 @@ struct network_socket : public base_socket<T> {
           case IP_PKTINFO:
             return proc.Process(client()->GetIpPacketInfo(),
                                 [](const auto& response) { return response.value; });
+#if __Fuchsia_API_level__ >= 15
+          case SO_ORIGINAL_DST:
+            return proc.Process(client()->GetOriginalDestination(),
+                                [](const auto& response) { return response.value; });
+          case IP_RECVORIGDSTADDR:
+            return proc.Process(client()->GetIpReceiveOriginalDestinationAddress(),
+                                [](const auto& response) { return response.value; });
+          case IP_TRANSPARENT:
+            return proc.Process(client()->GetIpTransparent(),
+                                [](const auto& response) { return response.value; });
+#endif
           default:
             return SockOptResult::Errno(ENOPROTOOPT);
         }
@@ -1186,6 +1203,15 @@ struct network_socket : public base_socket<T> {
           case IP_PKTINFO:
             return proc.Process<IntOrChar>(
                 [this](IntOrChar value) { return client()->SetIpPacketInfo(value.value != 0); });
+#if __Fuchsia_API_level__ >= 15
+          case IP_RECVORIGDSTADDR:
+            return proc.Process<IntOrChar>([this](IntOrChar value) {
+              return client()->SetIpReceiveOriginalDestinationAddress(value.value != 0);
+            });
+          case IP_TRANSPARENT:
+            return proc.Process<IntOrChar>(
+                [this](IntOrChar value) { return client()->SetIpTransparent(value.value != 0); });
+#endif
           case MCAST_JOIN_GROUP:
             return SockOptResult::Errno(ENOTSUP);
           default:

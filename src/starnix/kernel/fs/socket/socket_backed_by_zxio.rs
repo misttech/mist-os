@@ -384,6 +384,7 @@ const_assert_eq!(syncio::zxio::SO_ZEROCOPY, uapi::SO_ZEROCOPY);
 const_assert_eq!(syncio::zxio::SO_TXTIME, uapi::SO_TXTIME);
 const_assert_eq!(syncio::zxio::SO_BINDTOIFINDEX, uapi::SO_BINDTOIFINDEX);
 const_assert_eq!(syncio::zxio::SO_DETACH_REUSEPORT_BPF, uapi::SO_DETACH_REUSEPORT_BPF);
+const_assert_eq!(syncio::zxio::SO_ORIGINAL_DST, uapi::SO_ORIGINAL_DST);
 
 const_assert_eq!(syncio::zxio::MSG_WAITALL, uapi::MSG_WAITALL);
 const_assert_eq!(syncio::zxio::MSG_PEEK, uapi::MSG_PEEK);

@@ -395,6 +395,23 @@ TEST_F(NetStreamSocketsTest, ShutdownPendingWrite) {
   EXPECT_EQ(rcvd, wrote);
 }
 
+// This test gives different results depending on the test environment.  In some cases, it returns
+// ENOENT, just as Fuchsia currently does, but in other cases, the getsockopt call succeeds.  For
+// now, we skip running this test on Linux.
+#if defined(__Fuchsia__)
+
+TEST_F(NetStreamSocketsTest, GetOriginalDestination) {
+  sockaddr_in original_dest_addr;
+  socklen_t original_dest_addr_len = sizeof(original_dest_addr);
+  ASSERT_EQ(getsockopt(server().get(), SOL_IP, SO_ORIGINAL_DST, &original_dest_addr,
+                       &original_dest_addr_len),
+            -1);
+  // There's no NAT involved, so we expect to get ENOENT.
+  ASSERT_EQ(errno, ENOENT);
+}
+
+#endif
+
 // Test close/shutdown of listening socket with multiple non-blocking connects.
 // This tests client sockets in connected and connecting states.
 void TestListenWhileConnect(const IOMethod& io_method, void (*stopListen)(fbl::unique_fd&)) {

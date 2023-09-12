@@ -243,7 +243,7 @@ ns2_test_component_names = []
 netstack2_syncudp_tests = [
   {
     label = streamsocket_label
-    expect_include_dep = ":socket_test_includes"
+    expects = true
   },
   {
     label = bsdsocket_label
