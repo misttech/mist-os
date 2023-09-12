@@ -15,7 +15,6 @@ group("tests") {
 
 source_set("common") {
   visibility = [ "//src/sys/*" ]
-  testonly = true
   sources = [
     "artifact.cc",
     "artifact.h",
@@ -72,6 +71,7 @@ source_set("common") {
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zx",
   ]
+  deps = [ "//build/validate:non_production_tag" ]
 }
 
 source_set("runner-unittests-common") {
