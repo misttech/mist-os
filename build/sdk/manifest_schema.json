@@ -58,6 +58,7 @@
                         "internal",
                         "cts",
                         "partner",
+                        "partner_internal",
                         "public"
                     ]
                 },

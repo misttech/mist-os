@@ -7,7 +7,7 @@ import("//build/fidl/fidl.gni")
 # NOTE: fuchsia.sys2 is slowly being unpacked into a set of
 # `fuchsia.component.*` libraries.
 fidl("fuchsia.sys2") {
-  sdk_category = "internal"
+  sdk_category = "partner_internal"
 
   public_deps = [
     "//sdk/fidl/fuchsia.component",

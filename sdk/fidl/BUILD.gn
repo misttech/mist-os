@@ -236,6 +236,7 @@ _sdk_partner_internal_fidl_libraries = [
   "fuchsia.posix.socket.raw",
   "fuchsia.posix.socket",
   "fuchsia.posix",
+  "fuchsia.sys2",
   "fuchsia.vulkan.loader",
 ]
 
