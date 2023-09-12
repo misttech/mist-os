@@ -293,6 +293,11 @@ fs_test_suite("fxfs") {
     ":test_fxfs_component_manifest_shard",
     "//src/storage/fs_test:test_crypt_service",
   ]
+
+  # TODO(fxbug.dev/297201368): Remove when these tests pass on RISC-V.
+  if (current_cpu == "riscv64") {
+    omit_components = [ ":fxfs-attr-tests" ]
+  }
 }
 
 slow_fs_test_suite("fxfs") {
@@ -319,6 +324,11 @@ group("tests") {
     ":lib_test($host_toolchain)",
     "//src/storage/fxfs/tools:tests",
   ]
+
+  # TODO(fxbug.dev/297201368): Remove when these tests pass on RISC-V.
+  if (current_cpu == "riscv64") {
+    deps -= [ ":fxfs-tests" ]
+  }
 }
 
 #################

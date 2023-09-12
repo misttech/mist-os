@@ -166,6 +166,15 @@ fs_test_suite("f2fs") {
     ":f2fs-slow-unittest",
     ":f2fs-component-runner-test",
   ]
+
+  # TODO(fxbug.dev/297201368): Remove when these tests pass on RISC-V.
+  if (current_cpu == "riscv64") {
+    omit_components = [ ":f2fs-attr-tests" ]
+    extra_components -= [
+      ":f2fs-unittest",
+      ":f2fs-large-volume-unittest",
+    ]
+  }
 }
 
 slow_fs_test_suite("f2fs") {

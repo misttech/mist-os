@@ -83,13 +83,9 @@ group("minimal") {
     deps -= [
       # TODO(fxbug.dev/122609): Remove after removing Go dependencies on RISC-V.
       "//src/connectivity/network:tests",
-
       # TODO(fxbug.dev/292292675): Enable once all dependencies succeed on RISC-V.
       # TODO(fxbug.dev/132473): Uncomment when adding to the default targets.
       # "//src/developer:tests",
-
-      # TODO(fxbug.dev/297201368): Remove when storage tests pass on RISC-V.
-      "//src/storage:tests",
     ]
 
     deps += [

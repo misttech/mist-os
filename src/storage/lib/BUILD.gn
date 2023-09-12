@@ -32,4 +32,9 @@ group("tests") {
     "vfs/rust:tests",
     "watchdog:tests",
   ]
+
+  # TODO(fxbug.dev/297201368): Remove when paver tests pass on RISC-V.
+  if (current_cpu == "riscv64") {
+    deps -= [ "paver:tests" ]
+  }
 }

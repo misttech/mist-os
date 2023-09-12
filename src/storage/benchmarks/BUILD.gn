@@ -55,6 +55,11 @@ group("benchmarks") {
     "host:benchmarks",
     "starnix:benchmarks",
   ]
+
+  # TODO(fxbug.dev/297201368): Remove when this can be built on RISCV64.
+  if (current_cpu == "riscv64") {
+    deps -= [ "starnix:benchmarks" ]
+  }
 }
 
 group("tests") {

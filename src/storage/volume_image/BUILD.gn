@@ -165,4 +165,9 @@ group("tests") {
     "adapter:tests",
     "fvm:tests",
   ]
+
+  # TODO(fxbug.dev/297201368): Remove when storage-volume-image-tests pass on RISC-V.
+  if (current_cpu == "riscv64") {
+    deps -= [ ":storage-volume-image-tests" ]
+  }
 }
