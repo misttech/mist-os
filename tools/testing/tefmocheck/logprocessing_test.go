@@ -29,6 +29,7 @@ ok 1 Test/1 (12.6s)
 not ok 2 Test2 (44.511025786s)
 Test3 output line 1
 Test3 output line 2
+ok 3 fakeTest (1)
 Tests took 41 seconds.
 ok 3 Test3 (27.90584341s)
 Test4 output line 1
@@ -100,18 +101,19 @@ func TestSplitLogByTest(t *testing.T) {
 				{"Test2", []byte("not ok 2 Test2 (44.511025786s)\n"), "", 284},
 				{"Test3", []byte("Test3 output line 1\n" +
 					"Test3 output line 2\n" +
+					"ok 3 fakeTest (1)\n" +
 					"Tests took 41 seconds.\n" +
 					"ok 3 Test3 (27.90584341s)\n"), "", 315},
 				{"Test4", []byte("Test4 output line 1\n" +
 					"Test4 output line 2\n" +
-					"Test4 output mixed with testrunner output not ok 4 Test4 (88.8s)\n"), "", 404},
+					"Test4 output mixed with testrunner output not ok 4 Test4 (88.8s)\n"), "", 422},
 				{"Test5", []byte("Test5 output line 1\n" +
 					"fail message\n" +
 					"Test5 failed\n" +
-					"not ok 5 Test5 (27.90584341s)\n"), "", 509},
+					"not ok 5 Test5 (27.90584341s)\n"), "", 527},
 				{"Test5", []byte("Test5 output\n" +
 					"2020/03/20 22:57:53.569095 botanist attempting to close SSH session due to: context canceled\n" +
-					"ok 6 Test5 (9s)\n"), "", 585},
+					"ok 6 Test5 (9s)\n"), "", 603},
 			},
 		}, {
 			name:       "log with ffx tests",

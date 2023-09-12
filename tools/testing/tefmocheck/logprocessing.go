@@ -132,7 +132,12 @@ func splitLogByTest(input []byte, testNames []string) ([]TestLog, error) {
 					if len(matches) != testFinishedSubmatches {
 						continue
 					} else if testName == "" {
-						testName = string(matches[testFinishedSubmatches-1])
+						newTestName := string(matches[testFinishedSubmatches-1])
+						if newTestName == testNames[testsSeen] {
+							testName = newTestName
+						} else {
+							continue
+						}
 					}
 				} else {
 					newTestName := string(matches[1])
