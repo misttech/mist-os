@@ -34,6 +34,7 @@ rustc_test("integration-bin") {
   deps = [
     "../testing/fidl:test.sampler_rust",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//sdk/fidl/fuchsia.metrics.test:fuchsia.metrics.test_rust",
     "//src/diagnostics/sampler/tests/fidl:fuchsia.mockrebootcontroller_rust",

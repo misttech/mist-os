@@ -8,20 +8,20 @@ use fuchsia_component::client::connect_to_protocol;
 use realm_proxy::client::RealmProxyClient;
 
 pub(crate) async fn create_realm() -> Result<RealmProxyClient, Error> {
-    create_realm_(fidl_test_sampler::RealmOptions { ..Default::default() }).await
+    inner_create_realm(fidl_test_sampler::RealmOptions { ..Default::default() }).await
 }
 
 pub(crate) async fn create_realm_with_name(
     name: impl Into<String>,
 ) -> Result<RealmProxyClient, Error> {
-    create_realm_(fidl_test_sampler::RealmOptions {
-        realm_name: Some(name.into()),
+    inner_create_realm(fidl_test_sampler::RealmOptions {
+        sampler_component_name: Some(name.into()),
         ..Default::default()
     })
     .await
 }
 
-async fn create_realm_(
+async fn inner_create_realm(
     options: fidl_test_sampler::RealmOptions,
 ) -> Result<RealmProxyClient, Error> {
     let realm_factory = connect_to_protocol::<fidl_test_sampler::RealmFactoryMarker>()?;

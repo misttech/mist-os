@@ -16,8 +16,7 @@ use fidl_fuchsia_testing_harness::OperationError;
 use fidl_test_sampler as ftest;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{
-    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmBuilderParams,
-    RealmInstance, Ref, Route,
+    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
 };
 use futures::{channel::mpsc, lock::Mutex, StreamExt};
 use std::sync::Arc;
@@ -53,11 +52,9 @@ impl SamplerRealmFactory {
         }
 
         let options = self.realm_options.take().unwrap();
-        let mut params = RealmBuilderParams::new();
-        if let Some(realm_name) = options.realm_name {
-            params = params.realm_name(realm_name);
-        }
-        let builder = RealmBuilder::with_params(params).await?;
+        let sampler_component_name =
+            options.sampler_component_name.as_ref().map(|s| s.as_str()).unwrap_or("sampler");
+        let builder = RealmBuilder::new().await?;
         let mocks_server = builder
             .add_local_child(
                 "mocks-server",
@@ -71,7 +68,9 @@ impl SamplerRealmFactory {
         let single_counter = wrapper_realm
             .add_child("single_counter", SINGLE_COUNTER_URL, ChildOptions::new())
             .await?;
-        let sampler = wrapper_realm.add_child("sampler", SAMPLER_URL, ChildOptions::new()).await?;
+        let sampler = wrapper_realm
+            .add_child(sampler_component_name, SAMPLER_URL, ChildOptions::new())
+            .await?;
         let test_case_archivist = wrapper_realm
             .add_child("test_case_archivist", ARCHIVIST_URL, ChildOptions::new())
             .await?;
@@ -196,6 +195,22 @@ impl SamplerRealmFactory {
                     .capability(Capability::protocol::<flogger::LogMarker>())
                     .from(&test_case_archivist)
                     .to(&sampler),
+            )
+            .await?;
+        wrapper_realm
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol::<fdiagnostics::ArchiveAccessorMarker>())
+                    .from(&test_case_archivist)
+                    .to(Ref::parent()),
+            )
+            .await?;
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol::<fdiagnostics::ArchiveAccessorMarker>())
+                    .from(&wrapper_realm)
+                    .to(Ref::parent()),
             )
             .await?;
         wrapper_realm

@@ -4,6 +4,7 @@
 
 use diagnostics_reader::{assert_data_tree, AnyProperty, ArchiveReader, Inspect};
 use fidl_fuchsia_component::BinderMarker;
+use fidl_fuchsia_diagnostics as fdiagnostics;
 use fidl_fuchsia_metrics_test::MetricEventLoggerQuerierMarker;
 use fidl_fuchsia_mockrebootcontroller::MockRebootControllerMarker;
 use fidl_fuchsia_samplertestcontroller::SamplerTestControllerMarker;
@@ -173,21 +174,22 @@ async fn reboot_server_crashed_test() {
 /// the reboot server goes down, sampler continues to run as expected.
 #[fuchsia::test]
 async fn sampler_inspect_test() {
-    let realm_name = "sampler_inspect_test_case";
-    let realm =
-        test_topology::create_realm_with_name(realm_name).await.expect("initialized topology");
+    let sampler_component = "sampler";
+    let realm = test_topology::create_realm_with_name(sampler_component)
+        .await
+        .expect("initialized topology");
     let _sampler_binder = realm
         .connect_to_named_protocol::<BinderMarker>("fuchsia.component.SamplerBinder")
         .await
         .unwrap();
 
     let hierarchy = loop {
+        let accessor =
+            realm.connect_to_protocol::<fdiagnostics::ArchiveAccessorMarker>().await.unwrap();
         // Observe verification shows up in inspect.
         let mut data = ArchiveReader::new()
-            .add_selector(format!(
-                "test_realm_factory/realm_builder\\:{}/wrapper/sampler:root",
-                realm_name
-            ))
+            .with_archive(accessor)
+            .add_selector(format!("{sampler_component}:root"))
             .snapshot::<Inspect>()
             .await
             .expect("got inspect data");
