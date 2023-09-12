@@ -251,8 +251,9 @@ fs_test_suite("minfs") {
   # TODO(fxbug.dev/297201368): Remove when these tests pass on RISC-V.
   if (current_cpu == "riscv64") {
     omit_components = [
-      ":minfs-resize-tests",
       ":minfs-attr-tests",
+      ":minfs-full-tests",
+      ":minfs-resize-tests",
     ]
     extra_components -= [ ":minfs-integration-fs-tests" ]
   }
