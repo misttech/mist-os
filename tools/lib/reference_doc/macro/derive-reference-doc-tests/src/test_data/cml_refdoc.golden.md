@@ -67,7 +67,7 @@ Note: The `fx` command below is for developers working in a Fuchsia source
 checkout environment.
 
 ```sh
-fx cmc include {{ "<var>" }}cmx_file{{ "</var>" }} --includeroot $FUCHSIA_DIR --includepath $FUCHSIA_DIR/sdk/lib
+fx cmc include {{ "<var>" }}cml_file{{ "</var>" }} --includeroot $FUCHSIA_DIR --includepath $FUCHSIA_DIR/sdk/lib
 ```
 
 Includes can cope with duplicate [`use`], [`offer`], [`expose`], or [`capabilities`]
