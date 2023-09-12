@@ -6,11 +6,7 @@ import("//build/components.gni")
 
 group("tests") {
   testonly = true
-  public_deps = [
-    ":apptests",
-    ":swapchain_tests",
-    ":unittests",
-  ]
+  public_deps = [ ":unittests" ]
 }
 
 config("vulkan_no_nodiscard") {
@@ -29,41 +25,17 @@ source_set("testing_deps") {
   sources = [
     "error_reporting_test.cc",
     "error_reporting_test.h",
-    "gfx_test.cc",
-    "gfx_test.h",
-    "session_test.cc",
-    "session_test.h",
-    "view_tree_session_test.cc",
-    "view_tree_session_test.h",
-    "vk_session_test.cc",
-    "vk_session_test.h",
-    "vk_util.cc",
-    "vk_util.h",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.ui.gfx:fuchsia.ui.gfx_hlcpp",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
-    "//sdk/fidl/fuchsia.ui.scenic.internal:fuchsia.ui.scenic.internal_hlcpp",
-    "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
-    "//sdk/lib/inspect/testing/cpp",
-    "//sdk/lib/sys/cpp/testing:unit",
     "//sdk/lib/ui/scenic/cpp",
-    "//src/lib/fostr/fidl/fuchsia.ui.scenic",
+    "//src/lib/fxl",
     "//src/lib/testing/loop_fixture",
-    "//src/ui/lib/escher",
-    "//src/ui/lib/escher/test/common:gtest_escher",
-    "//src/ui/scenic/lib/display/tests:mocks",
     "//src/ui/scenic/lib/gfx",
-    "//src/ui/scenic/lib/gfx:ids",
-    "//src/ui/scenic/lib/gfx/tests/mocks:util",
-    "//src/ui/scenic/lib/scenic/tests:testing_deps",
+    "//src/ui/scenic/lib/scenic",
     "//src/ui/scenic/lib/scenic/util",
-    "//src/ui/scenic/lib/scheduling/tests/mocks:frame_scheduler_mocks",
     "//src/ui/scenic/lib/utils",
-    "//third_party/glm",
-    "//zircon/system/ulib/async:async-cpp",
+    "//third_party/googletest:gtest",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/zx",
   ]
 
@@ -76,51 +48,15 @@ executable("unittests") {
 
   testonly = true
   sources = [
-    "annotation_manager_unittest.cc",
-    "camera_unittest.cc",
-    "compositor_unittest.cc",
-    "dump_visitor_unittest.cc",
-    "engine_unittest.cc",
     "escher_vulkan_smoke_test.cc",
-    "frame_timings_unittest.cc",
-    "gfx_buffer_collection_importer_unittest.cc",
-    "gfx_command_applier_unittest.cc",
-    "has_renderable_content_visitor_unittest.cc",
-    "hittest_accumulator_unittest.cc",
-    "hittest_global_unittest.cc",
-    "host_image_unittest.cc",
-    "id_unittest.cc",
-    "image_pipe2_unittest.cc",
-    "image_pipe_unittest_common.cc",
-    "image_pipe_updater_unittest.cc",
-    "memory_unittest.cc",
-    "node_unittest.cc",
     "object_linker_unittest.cc",
-    "pose_buffer_unit_test.cc",
-    "protected_memory_visitor_unittest.cc",
-    "scene_graph_unittest.cc",
-    "scene_unittest.cc",
-    "session_manager_unittest.cc",
-    "session_unittest.cc",
-    "shape_unittest.cc",
-    "size_change_hint_unittest.cc",
-    "snapshotter_unittest.cc",
-    "stereo_camera_unittest.cc",
-    "view_clipping_unittest.cc",
-    "view_tree_integrationtest.cc",
-    "view_tree_unittest.cc",
-    "view_unittest.cc",
   ]
   deps = [
     ":gfx_tests_main",
     ":testing_deps",
-    "//sdk/lib/stdcompat",
     "//src/lib/fsl",
+    "//src/ui/lib/escher/test/common:gtest_vulkan",
     "//src/ui/scenic/lib/gfx:object_linker",
-    "//src/ui/scenic/lib/input",
-    "//src/ui/scenic/lib/scheduling:id",
-    "//third_party/glm",
-    "//third_party/googletest:gmock",
   ]
 
   include_dirs = [ "//src/ui/lib/escher" ]
@@ -129,28 +65,4 @@ executable("unittests") {
   configs += [ "//build/config:Wno-conversion" ]
 
   configs += [ ":vulkan_no_nodiscard" ]
-}
-
-executable("swapchain_tests") {
-  output_name = "gfx_swapchain_tests"
-  testonly = true
-  sources = [ "display_swapchain_test.cc" ]
-  deps = [
-    ":testing_deps",
-    "//src/graphics/display/lib/coordinator-getter:client",
-    "//src/lib/fxl/test:gtest_main",
-  ]
-  include_dirs = [ "//src/ui/lib/escher" ]
-}
-
-executable("apptests") {
-  output_name = "gfx_apptests"
-
-  testonly = true
-  sources = [ "gfx_apptest.cc" ]
-  deps = [
-    ":gfx_tests_main",
-    ":testing_deps",
-    "//third_party/googletest:gmock",
-  ]
 }

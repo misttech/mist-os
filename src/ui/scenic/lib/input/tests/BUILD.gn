@@ -18,12 +18,11 @@ executable("unittests") {
     "mouse_test.cc",
     "pointerinjector_registry_unittest.cc",
     "touch_source_test.cc",
-    "view_tree_input_integration_test.cc",
   ]
   deps = [
-    ":util",
     "//sdk/fidl/fuchsia.ui.input.accessibility:fuchsia.ui.input.accessibility_hlcpp",
     "//sdk/lib/fidl/cpp",
+    "//sdk/lib/sys/cpp/testing:cpp",
     "//sdk/lib/ui/scenic/cpp",
     "//src/lib/fostr/fidl/fuchsia.ui.input",
     "//src/lib/fxl",
@@ -39,25 +38,5 @@ executable("unittests") {
     "//src/ui/scenic/lib/utils",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
-  ]
-}
-
-source_set("util") {
-  testonly = true
-  sources = [
-    "util.cc",
-    "util.h",
-  ]
-  deps = [
-    "//src/lib/fostr/fidl/fuchsia.ui.input",
-    "//src/ui/scenic/lib/focus",
-    "//src/ui/scenic/lib/gfx",
-    "//src/ui/scenic/lib/view_tree:view_tree_snapshot",
-    "//third_party/googletest:gtest",
-    "//zircon/system/ulib/hid",
-  ]
-  public_deps = [
-    "//src/ui/scenic/lib/gfx/tests:testing_deps",
-    "//src/ui/scenic/lib/input",
   ]
 }

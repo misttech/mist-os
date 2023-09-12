@@ -14,6 +14,7 @@
 #include <hid/hid.h>
 #include <src/lib/fostr/fidl/fuchsia/ui/input/formatting.h>
 
+#include "lib/inspect/cpp/inspect.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 #include "src/ui/scenic/lib/scheduling/constant_frame_predictor.h"
 #include "src/ui/scenic/lib/scheduling/default_frame_scheduler.h"
@@ -228,15 +229,10 @@ void InputSystemTest::InitializeScenic(std::shared_ptr<Scenic> scenic) {
     }
   };
 
-  scenic->RegisterSystem<GfxSystem>(engine_.get(),
-                                    /* sysmem */ nullptr,
-                                    /* display_manager */ nullptr,
-                                    /*image_pipe_updater*/ nullptr);
-
   // TODO(fxbug.dev/72919): There's a bunch of logic copied from app.cc here. This will be removed
   // when moving out the integration tests from this folder.
-  input_system_ =
-      std::make_unique<InputSystem>(context_.get(), *scenic_->inspect_node(), request_focus);
+  auto inspect_node = inspect::Node();
+  input_system_ = std::make_unique<InputSystem>(context_.get(), inspect_node, request_focus);
 
   {
     std::vector<view_tree::SubtreeSnapshotGenerator> subtrees;
@@ -259,17 +255,11 @@ void InputSystemTest::InitializeScenic(std::shared_ptr<Scenic> scenic) {
   frame_scheduler_->Initialize(
       std::make_shared<scheduling::VsyncTiming>(),
       /*update_sessions*/
-      [this, scenic](auto& sessions_to_update, auto trace_id, auto fences_from_previous_presents) {
-        auto results = scenic->UpdateSessions(sessions_to_update, trace_id);
-        engine_->SignalFencesWhenPreviousRendersAreDone(std::move(fences_from_previous_presents));
-        return results;
-      },
+      [](auto& sessions_to_update, auto trace_id, auto fences_from_previous_presents) {},
       /*on_cpu_work_done*/
       [this] { view_tree_snapshotter_->UpdateSnapshot(); },
       /*on_frame_presented*/
-      [scenic](auto latched_times, auto present_times) {
-        scenic->OnFramePresented(latched_times, present_times);
-      },
+      [scenic](auto latched_times, auto present_times) {},
       /*render_scheduled_frame*/
       [this](auto frame_number, auto presentation_time, auto callback) {
         engine_->RenderScheduledFrame(frame_number, presentation_time, std::move(callback));

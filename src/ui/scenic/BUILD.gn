@@ -30,8 +30,6 @@ group("tests") {
     ":focus_unittests",
     ":fuzzers",
     ":geometry_provider_unittests",
-    ":gfx_apptests",
-    ":gfx_swapchain_tests",
     ":gfx_unittests",
     ":gfx_util_unittests",
     ":input_unittests",
@@ -183,32 +181,6 @@ fuchsia_unittest_package("flatland_renderer_unittests") {
   test_type = "vulkan"
 }
 
-fuchsia_unittest_package("gfx_apptests") {
-  manifest = "meta/gfx_apptests.cml"
-  deps = [ "lib/gfx/tests:apptests" ] + scenic_test_deps
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-  test_type = "vulkan"
-}
-
-fuchsia_unittest_package("gfx_swapchain_tests") {
-  manifest = "meta/gfx_swapchain_tests.cml"
-  deps = [
-           "lib/gfx/tests:swapchain_tests",
-           "//src/graphics/display/testing/fake-coordinator-connector:child-component",
-         ] + scenic_test_deps
-  test_specs = {
-    environments = vulkan_envs
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-  test_type = "vulkan"
-}
-
 fuchsia_unittest_package("gfx_unittests") {
   manifest = "meta/gfx_unittests.cml"
   deps = [ "lib/gfx/tests:unittests" ] + scenic_test_deps
@@ -287,8 +259,8 @@ fuchsia_unittest_package("screen_capture_unittests") {
       max_severity = "ERROR"
     }
   }
+  test_type = "vulkan"
 }
-test_type = "vulkan"
 
 fuchsia_unittest_package("screen_capture2_unittests") {
   manifest = "meta/screen_capture2_unittests.cml"

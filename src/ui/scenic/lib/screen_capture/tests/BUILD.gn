@@ -14,7 +14,6 @@ executable("unittests") {
   testonly = true
 
   sources = [
-    "screen_capture_buffer_collection_unittests.cc",
     "screen_capture_unittest.cc",
 
     # TODO(97244): Remove unnecessary file run_all_unittests
@@ -27,7 +26,6 @@ executable("unittests") {
     "//src/graphics/display/lib/coordinator-getter:client",
     "//src/lib/testing/loop_fixture",
     "//src/ui/scenic/lib/allocation",
-    "//src/ui/scenic/lib/gfx/tests:testing_deps",
     "//src/ui/scenic/lib/screen_capture",
     "//src/ui/scenic/lib/utils",
     "//third_party/googletest:gmock",
@@ -38,8 +36,6 @@ executable("unittests") {
     "//src/lib/fsl",
     "//src/ui/lib/escher",
     "//src/ui/lib/escher/test/common:gtest_escher",
-    "//src/ui/scenic/lib/gfx/tests/mocks:util",
-    "//src/ui/scenic/lib/scenic/tests:testing_deps",
     "//src/ui/scenic/lib/scenic/util",
     "//src/ui/scenic/lib/utils",
     "//zircon/system/ulib/async:async-cpp",

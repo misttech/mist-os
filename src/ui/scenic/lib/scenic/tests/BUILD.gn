@@ -8,51 +8,15 @@ group("tests") {
   public_deps = [ ":unittests" ]
 }
 
-source_set("testing_deps") {
-  testonly = true
-  sources = [
-    "scenic_test.cc",
-    "scenic_test.h",
-  ]
-  public_deps = [
-    "//sdk/lib/sys/cpp",
-    "//sdk/lib/ui/scenic/cpp",
-    "//src/lib/fxl",
-    "//src/lib/testing/loop_fixture",
-    "//src/ui/scenic/lib/gfx",
-    "//src/ui/scenic/lib/scenic",
-    "//src/ui/scenic/lib/scheduling:id",
-    "//src/ui/scenic/lib/scheduling/tests/mocks:frame_scheduler_mocks",
-    "//third_party/googletest:gtest",
-    "//zircon/system/ulib/inspect",
-  ]
-  deps = [ "//sdk/lib/sys/cpp/testing:unit" ]
-}
-
-source_set("dummy_system") {
-  sources = [
-    "dummy_system.cc",
-    "dummy_system.h",
-  ]
-  deps = [
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
-    "//src/ui/scenic/lib/scenic",
-    "//zircon/system/ulib/inspect",
-  ]
-}
-
 executable("unittests") {
   output_name = "scenic_unittests"
   testonly = true
-  sources = [
-    "scenic_session_unittest.cc",
-    "scenic_unittest.cc",
-  ]
+  sources = [ "scenic_unittest.cc" ]
   deps = [
-    ":dummy_system",
-    ":testing_deps",
+    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
+    "//sdk/lib/sys/cpp/testing:cpp",
     "//src/lib/fxl/test:gtest_main",
-    "//src/ui/scenic/lib/gfx/tests:testing_deps",
-    "//src/ui/scenic/lib/shutdown/tests:unittests",
+    "//src/lib/testing/loop_fixture:gtest",
+    "//src/ui/scenic/lib/scenic",
   ]
 }

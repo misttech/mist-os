@@ -7,15 +7,12 @@ source_set("scenic") {
     "forward_declarations.h",
     "scenic.cc",
     "scenic.h",
-    "session.cc",
-    "session.h",
   ]
 
   public_deps = [
     ":command_dispatcher",
     ":event_reporter",
     ":system",
-    ":take_screenshot_delegate_deprecated",
     "//sdk/fidl/fuchsia.ui.annotation:fuchsia.ui.annotation_hlcpp",
     "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_hlcpp",
     "//sdk/fidl/fuchsia.ui.gfx:fuchsia.ui.gfx_hlcpp",
@@ -82,9 +79,4 @@ source_set("system") {
     "//src/ui/scenic/lib/scheduling:frame_scheduler",
     "//src/ui/scenic/lib/scheduling:id",
   ]
-}
-
-source_set("take_screenshot_delegate_deprecated") {
-  sources = [ "take_screenshot_delegate_deprecated.h" ]
-  public_deps = [ "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp" ]
 }

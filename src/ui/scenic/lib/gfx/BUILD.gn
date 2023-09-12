@@ -52,8 +52,6 @@ source_set("gfx_always_optimized") {
 
 source_set("gfx") {
   sources = [
-    "api/internal_snapshot_impl.cc",
-    "api/internal_snapshot_impl.h",
     "engine/annotation_manager.cc",
     "engine/annotation_manager.h",
     "engine/buffer_collection.cc",
@@ -88,8 +86,6 @@ source_set("gfx") {
     "engine/view_tree.h",
     "engine/view_tree_updater.cc",
     "engine/view_tree_updater.h",
-    "gfx_system.cc",
-    "gfx_system.h",
     "resources/buffer.cc",
     "resources/buffer.h",
     "resources/camera.cc",
@@ -234,7 +230,6 @@ source_set("gfx") {
     "//src/ui/scenic/lib/scenic:command_dispatcher",
     "//src/ui/scenic/lib/scenic:event_reporter",
     "//src/ui/scenic/lib/scenic:system",
-    "//src/ui/scenic/lib/scenic:take_screenshot_delegate_deprecated",
     "//src/ui/scenic/lib/scenic/util",
     "//src/ui/scenic/lib/scheduling:frame_scheduler",
     "//src/ui/scenic/lib/scheduling:present_helpers",

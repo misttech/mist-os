@@ -39,8 +39,6 @@ class FrameSchedulerTest : public ::gtest::TestLoopFixture {
           last_sessions_to_update_ = sessions_to_update;
 
           last_received_fences_ = std::move(fences_from_previous_presents);
-
-          return update_sessions_return_value_;
         },
         /*on_cpu_work_done*/
         [this]() { cpu_work_done_count_++; },
@@ -56,10 +54,6 @@ class FrameSchedulerTest : public ::gtest::TestLoopFixture {
               << "Currently only support a single frame in flight.";
           frame_presented_callback_ = std::move(callback);
         });
-  }
-
-  void SetUpdateSessionsReturnValue(SessionsWithFailedUpdates new_value) {
-    update_sessions_return_value_ = new_value;
   }
 
   Timestamps CreateTimestamps() {
@@ -140,7 +134,6 @@ class FrameSchedulerTest : public ::gtest::TestLoopFixture {
 
   DefaultFrameScheduler scheduler_;
 
-  SessionsWithFailedUpdates update_sessions_return_value_;
   uint64_t update_sessions_call_count_ = 0;
   uint64_t on_frame_presented_call_count_ = 0;
   uint64_t cpu_work_done_count_ = 0;
@@ -411,8 +404,6 @@ TEST_F(FrameSchedulerTest, SignalSuccessfulPresentCallbackOnlyWhenFramePresented
 
 TEST_F(FrameSchedulerTest, FailedUpdateWithRender_ShouldNotCrash) {
   constexpr SessionId kSessionId1 = 1;
-  SetUpdateSessionsReturnValue({kSessionId1});
-
   constexpr SessionId kSessionId2 = 2;
 
   uint64_t present_counts[2] = {0, 0};

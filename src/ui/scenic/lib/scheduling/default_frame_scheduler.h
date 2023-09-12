@@ -22,9 +22,9 @@
 
 namespace scheduling {
 
-using UpdateSessions = fit::function<SessionsWithFailedUpdates(
-    const std::unordered_map<SessionId, PresentId>& sessions_to_update, uint64_t trace_id,
-    std::vector<zx::event> fences_from_previous_presents)>;
+using UpdateSessions =
+    fit::function<void(const std::unordered_map<SessionId, PresentId>& sessions_to_update,
+                       uint64_t trace_id, std::vector<zx::event> fences_from_previous_presents)>;
 using OnCpuWorkDone = fit::function<void()>;
 using OnFramePresented = fit::function<void(
     const std::unordered_map<SessionId, std::map<PresentId, /*latched_time*/ zx::time>>&
@@ -132,9 +132,6 @@ class DefaultFrameScheduler final : public FrameScheduler {
   // Returns all the fences from previous presents for each session in |updates|.
   std::vector<zx::event> PrepareUpdates(const std::unordered_map<SessionId, PresentId>& updates,
                                         zx::time latched_time, uint64_t frame_number);
-
-  // Removes all references to each session passed in.
-  void RemoveFailedSessions(const std::unordered_set<SessionId>& sessions_with_failed_updates);
 
   struct PresentRequest {
     zx::time requested_presentation_time;

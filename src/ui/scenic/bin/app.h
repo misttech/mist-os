@@ -21,14 +21,11 @@
 #include "src/ui/scenic/lib/display/display_power_manager.h"
 #include "src/ui/scenic/lib/display/singleton_display_service.h"
 #include "src/ui/scenic/lib/flatland/engine/display_compositor.h"
-#include "src/ui/scenic/lib/flatland/engine/engine.h"
-#include "src/ui/scenic/lib/flatland/engine/engine_types.h"
 #include "src/ui/scenic/lib/flatland/flatland_manager.h"
 #include "src/ui/scenic/lib/flatland/flatland_presenter_impl.h"
 #include "src/ui/scenic/lib/flatland/link_system.h"
 #include "src/ui/scenic/lib/flatland/uber_struct_system.h"
 #include "src/ui/scenic/lib/focus/focus_manager.h"
-#include "src/ui/scenic/lib/gfx/engine/engine.h"
 #include "src/ui/scenic/lib/input/input_system.h"
 #include "src/ui/scenic/lib/scenic/scenic.h"
 #include "src/ui/scenic/lib/scheduling/default_frame_scheduler.h"
@@ -91,7 +88,6 @@ class App {
   // dependencies.
   scheduling::DefaultFrameScheduler frame_scheduler_;
 
-  gfx::Sysmem sysmem_;
   std::optional<display::DisplayManager> display_manager_;
   std::optional<display::SingletonDisplayService> singleton_display_service_;
   std::optional<DisplayInfoDelegate> display_info_delegate_;
@@ -101,8 +97,6 @@ class App {
   escher::EscherUniquePtr escher_;
   std::shared_ptr<utils::CleanupUntilDone> escher_cleanup_;
 
-  std::shared_ptr<gfx::ImagePipeUpdater> image_pipe_updater_;
-  std::optional<gfx::Engine> engine_;
   Scenic scenic_;
   std::unique_ptr<fsl::DeviceWatcher> device_watcher_;
 
@@ -130,7 +124,6 @@ class App {
   view_tree::Registry observer_registry_;
   view_tree::ScopedRegistry scoped_observer_registry_;
 
-  uint64_t gfx_frame_count_ = 0;
   uint64_t flatland_frame_count_ = 0;
 
   AnnotationRegistry annotation_registry_;

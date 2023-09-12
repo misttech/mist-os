@@ -15,8 +15,7 @@ void ScenicTest::SetUp() {
   context_ = provider.TakeContext();
   frame_scheduler_ = std::make_unique<scheduling::DefaultFrameScheduler>(
       std::make_unique<scheduling::ConstantFramePredictor>(/* static_vsync_offset */ zx::msec(5)));
-  scenic_ = std::make_shared<Scenic>(context_.get(), inspect_node_, *frame_scheduler_,
-                                     [this] { QuitLoop(); });
+  scenic_ = std::make_shared<Scenic>(context_.get());
   InitializeScenic(scenic_);
 }
 
@@ -26,14 +25,5 @@ void ScenicTest::TearDown() {
 }
 
 void ScenicTest::InitializeScenic(std::shared_ptr<Scenic> scenic) {}
-
-std::unique_ptr<::scenic::Session> ScenicTest::CreateSession() {
-  fuchsia::ui::scenic::SessionPtr session_ptr;
-  fidl::InterfaceHandle<fuchsia::ui::scenic::SessionListener> listener_handle;
-  fidl::InterfaceRequest<fuchsia::ui::scenic::SessionListener> listener_request =
-      listener_handle.NewRequest();
-  scenic()->CreateSession(session_ptr.NewRequest(), std::move(listener_handle));
-  return std::make_unique<::scenic::Session>(std::move(session_ptr), std::move(listener_request));
-}
 
 }  // namespace scenic_impl::test
