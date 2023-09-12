@@ -1092,7 +1092,11 @@ impl NetstackSeed {
             let devices = inspector.root().create_lazy_child("Devices", move || {
                 futures::future::ok(inspect::devices(&devices_ctx)).boxed()
             });
-            (sockets, routes, devices)
+            let neighbors_ctx = netstack.ctx.clone();
+            let neighbors = inspector.root().create_lazy_child("Neighbors", move || {
+                futures::future::ok(inspect::neighbors(&neighbors_ctx)).boxed()
+            });
+            (sockets, routes, devices, neighbors)
         };
 
         let diagnostics_handler = debug_fidl_worker::DiagnosticsHandler::default();

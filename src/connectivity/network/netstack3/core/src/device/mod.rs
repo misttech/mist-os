@@ -30,11 +30,12 @@ use lock_order::{
 };
 use net_types::{
     ethernet::Mac,
-    ip::{AddrSubnet, Ip, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu},
+    ip::{AddrSubnet, Ip, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu},
     BroadcastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
 use packet::{Buf, BufferMut, Serializer};
 use packet_formats::{ethernet::EthernetIpExt, utils::NonZeroDuration};
+use smallvec::SmallVec;
 use tracing::{debug, trace};
 
 use crate::{
@@ -53,13 +54,16 @@ use crate::{
         socket::HeldSockets,
         state::IpLinkDeviceState,
     },
-    error::{ExistsError, NotFoundError, NotSupportedError, SetIpAddressPropertiesError},
+    error::{
+        ExistsError, NotFoundError, NotSupportedError, SetIpAddressPropertiesError,
+        StaticNeighborInsertionError,
+    },
     ip::{
         device::{
             integration::SyncCtxWithIpDeviceConfiguration,
             nud::{
                 BufferNudHandler, ConfirmationFlags, DynamicNeighborUpdateSource,
-                LinkResolutionContext, NudHandler, NudIpHandler,
+                LinkResolutionContext, NeighborStateInspect, NudHandler, NudIpHandler,
             },
             state::{
                 AddrSubnetAndManualConfigEither, AssignedAddress as _, DualStackIpDeviceState,
@@ -76,7 +80,7 @@ use crate::{
         types::RawMetric,
     },
     sync::{PrimaryRc, RwLock, StrongRc, WeakRc},
-    trace_duration, BufferNonSyncContext, NonSyncContext, SyncCtx,
+    trace_duration, BufferNonSyncContext, Instant, NonSyncContext, SyncCtx,
 };
 
 /// A device.
@@ -523,6 +527,64 @@ impl<
             .loopback
             .as_ref()
             .map(|state| DeviceId::Loopback(LoopbackDeviceId(PrimaryRc::clone_strong(state))))
+    }
+}
+
+/// Visitor for NUD state.
+pub trait NeighborVisitor<C: NonSyncContext, T: Instant> {
+    /// Performs a user-defined operation over an iterator of neighbor state
+    /// describing the neighbors associated with a given `device`.
+    ///
+    /// This function will be called N times, where N is the number of devices
+    /// in the stack.
+    fn visit_neighbors<LinkAddress: Debug>(
+        &self,
+        device: DeviceId<C>,
+        neighbors: impl Iterator<Item = NeighborStateInspect<LinkAddress, T>>,
+    );
+}
+
+/// Creates a snapshot of the devices in the stack at the time of invocation.
+///
+/// Devices are copied into the return value.
+///
+/// The argument `filter_map` defines a filtering function, so that unneeded
+/// devices are not copied and returned in the snapshot.
+pub(crate) fn snapshot_device_ids<T, C: NonSyncContext, F: FnMut(DeviceId<C>) -> Option<T>>(
+    sync_ctx: &SyncCtx<C>,
+    filter_map: F,
+) -> impl IntoIterator<Item = T> {
+    let mut sync_ctx = Locked::new(sync_ctx);
+    let devices = sync_ctx.read_lock::<crate::lock_ordering::DeviceLayerState>();
+    let Devices { ethernet, loopback, ethernet_counter: _ } = &*devices;
+    DevicesIter { ethernet: ethernet.values(), loopback: loopback.iter() }
+        .filter_map(filter_map)
+        .collect::<SmallVec<[T; 32]>>()
+}
+
+/// Provides access to NUD state via a `visitor`.
+pub fn inspect_neighbors<C, V>(sync_ctx: &SyncCtx<C>, visitor: &V)
+where
+    C: NonSyncContext,
+    V: NeighborVisitor<C, <C as InstantContext>::Instant>,
+{
+    let device_ids = snapshot_device_ids(sync_ctx, |device| match device {
+        DeviceId::Ethernet(d) => Some(d),
+        // Loopback devices do not have neighbors.
+        DeviceId::Loopback(_) => None,
+    });
+    let mut sync_ctx = Locked::new(sync_ctx);
+    for device in device_ids {
+        let id = device.clone();
+        with_ethernet_state(&mut sync_ctx, &id, |mut device_state| {
+            let (arp, mut device_state) =
+                device_state.lock_and::<crate::lock_ordering::EthernetIpv4Arp>();
+            let nud = device_state.lock::<crate::lock_ordering::EthernetIpv6Nud>();
+            visitor.visit_neighbors(
+                DeviceId::from(device),
+                arp.nud.state_iter().chain(nud.state_iter()),
+            );
+        })
     }
 }
 
@@ -2297,13 +2359,47 @@ impl<NonSyncCtx: NonSyncContext, L> DeviceIdContext<AnyDevice> for Locked<&SyncC
     }
 }
 
+/// Inserts a static neighbor entry for a neighbor.
+pub fn insert_static_neighbor_entry<
+    I: Ip,
+    B: BufferMut,
+    Id,
+    C: BufferNonSyncContext<B> + crate::TimerContext<Id>,
+>(
+    sync_ctx: &SyncCtx<C>,
+    ctx: &mut C,
+    device: &DeviceId<C>,
+    addr: I::Addr,
+    mac: Mac,
+) -> Result<(), StaticNeighborInsertionError> {
+    let IpInvariant(result) = I::map_ip(
+        (IpInvariant((sync_ctx, ctx, device, mac)), addr),
+        |(IpInvariant((sync_ctx, ctx, device, mac)), addr)| {
+            let result = UnicastAddr::new(mac)
+                .ok_or(StaticNeighborInsertionError::AddressNotUnicast)
+                .and_then(|mac| {
+                    insert_static_arp_table_entry(sync_ctx, ctx, device, addr, mac)
+                        .map_err(StaticNeighborInsertionError::NotSupported)
+                });
+            IpInvariant(result)
+        },
+        |(IpInvariant((sync_ctx, ctx, device, mac)), addr)| {
+            let result = UnicastAddr::new(addr)
+                .ok_or(StaticNeighborInsertionError::AddressNotUnicast)
+                .and_then(|addr| {
+                    insert_ndp_table_entry(sync_ctx, ctx, device, addr, mac)
+                        .map_err(StaticNeighborInsertionError::NotSupported)
+                });
+            IpInvariant(result)
+        },
+    );
+    result
+}
+
 /// Insert a static entry into this device's ARP table.
 ///
 /// This will cause any conflicting dynamic entry to be removed, and
 /// any future conflicting gratuitous ARPs to be ignored.
-// TODO(rheacock): remove `cfg(test)` when this is used. Will probably be
-// called by a pub fn in the device mod.
-#[cfg(any(test, feature = "testutils"))]
 pub fn insert_static_arp_table_entry<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
@@ -2328,8 +2424,6 @@ pub fn insert_static_arp_table_entry<NonSyncCtx: NonSyncContext>(
 /// This method only gets called when testing to force set a neighbor's link
 /// address so that lookups succeed immediately, without doing address
 /// resolution.
-// TODO(rheacock): Remove when this is called from non-test code.
-#[cfg(any(test, feature = "testutils"))]
 pub fn insert_ndp_table_entry<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,

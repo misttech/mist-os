@@ -172,3 +172,15 @@ pub enum SetIpAddressPropertiesError {
 /// Error when link address resolution failed for a neighbor.
 #[derive(Debug, PartialEq)]
 pub struct AddressResolutionFailed;
+
+/// Error when a static neighbor entry cannot be inserted.
+#[derive(Debug, PartialEq, Eq, Error)]
+pub enum StaticNeighborInsertionError {
+    /// The address used for a static neighbor entry is not unicast.
+    #[error("Address is not unicast")]
+    AddressNotUnicast,
+
+    /// Loopback devices do not support neighbor entries.
+    #[error("{0}")]
+    NotSupported(#[from] NotSupportedError),
+}

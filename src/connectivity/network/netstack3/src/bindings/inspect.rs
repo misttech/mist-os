@@ -7,14 +7,14 @@
 //! This module provides utilities for publishing netstack3 diagnostics data to
 //! Inspect.
 
-use super::{devices::DeviceSpecificInfo, BindingsNonSyncCtxImpl, Ctx, DeviceIdExt};
+use super::{devices::DeviceSpecificInfo, BindingsNonSyncCtxImpl, Ctx, DeviceIdExt, StackTime};
 use fuchsia_inspect::ArrayProperty as _;
 use net_types::{
     ip::{Ip, IpAddress, IpVersion, Ipv4, Ipv6},
     Witness as _,
 };
 use netstack3_core::{device::DeviceId, ip, transport::tcp};
-use std::{borrow::Cow, num::NonZeroU16, ops::Deref, string::ToString as _};
+use std::{borrow::Cow, fmt::Debug, num::NonZeroU16, ops::Deref, string::ToString as _};
 
 /// Publishes netstack3 socket diagnostics data to Inspect.
 pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
@@ -166,5 +166,49 @@ pub(crate) fn devices(ctx: &Ctx) -> fuchsia_inspect::Inspector {
             })
         }
     });
+    inspector
+}
+
+pub(crate) fn neighbors(ctx: &Ctx) -> fuchsia_inspect::Inspector {
+    struct Visitor(fuchsia_inspect::Inspector);
+    impl netstack3_core::device::NeighborVisitor<BindingsNonSyncCtxImpl, StackTime> for Visitor {
+        fn visit_neighbors<LinkAddress: Debug>(
+            &self,
+            device: DeviceId<BindingsNonSyncCtxImpl>,
+            neighbors: impl Iterator<
+                Item = ip::device::nud::NeighborStateInspect<LinkAddress, StackTime>,
+            >,
+        ) {
+            use crate::bindings::DeviceIdExt as _;
+            let Self(inspector) = self;
+            let device_state = device.external_state();
+            let name = &device_state.static_common_info().name;
+            inspector.root().record_child(format!("{name}"), |node| {
+                for (i, neighbor) in neighbors.enumerate() {
+                    let ip::device::nud::NeighborStateInspect {
+                        state,
+                        ip_address,
+                        link_address,
+                        last_confirmed_at,
+                    } = neighbor;
+                    node.record_child(format!("{i}"), |node| {
+                        node.record_string("State", state);
+                        node.record_string("IpAddress", format!("{}", ip_address));
+                        if let Some(link_address) = link_address {
+                            node.record_string("LinkAddress", format!("{:?}", link_address));
+                        };
+                        if let Some(StackTime(last_confirmed_at)) = last_confirmed_at {
+                            node.record_int("LastConfirmedAt", last_confirmed_at.into_nanos());
+                        }
+                    })
+                }
+            });
+        }
+    }
+    let sync_ctx = ctx.sync_ctx();
+    let visitor =
+        Visitor(fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default()));
+    netstack3_core::device::inspect_neighbors::<BindingsNonSyncCtxImpl, _>(sync_ctx, &visitor);
+    let Visitor(inspector) = visitor;
     inspector
 }

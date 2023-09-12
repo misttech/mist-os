@@ -542,7 +542,7 @@ fn send_arp_request<D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpCont
 /// Each device will contain an `ArpState` object for each of the network
 /// protocols that it supports.
 pub(crate) struct ArpState<D: ArpDevice, I: Instant, N: LinkResolutionNotifier<D>> {
-    nud: NudState<Ipv4, D, I, N>,
+    pub(crate) nud: NudState<Ipv4, D, I, N>,
 }
 
 impl<D: ArpDevice, I: Instant, N: LinkResolutionNotifier<D>> Default for ArpState<D, I, N> {

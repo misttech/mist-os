@@ -12,14 +12,14 @@ use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fidl_fuchsia_netemul_network as net;
 use fuchsia_async as fasync;
 use futures::{channel::mpsc, StreamExt as _, TryFutureExt as _};
-use net_declare::{net_ip_v4, net_subnet_v4, net_subnet_v6};
+use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
 use net_types::{
     ip::{AddrSubnetEither, Ip, IpAddress, Ipv4, Ipv6},
     SpecifiedAddr,
 };
 use netstack3_core::{
     add_ip_addr_subnet,
-    device::update_ipv6_configuration,
+    device::{insert_static_neighbor_entry, update_ipv6_configuration},
     ip::{
         device::{slaac::STABLE_IID_SECRET_KEY_BYTES, Ipv6DeviceConfigurationUpdate},
         types::{AddableEntry, AddableEntryEither, AddableMetric, RawMetric},
@@ -35,9 +35,10 @@ use tracing_subscriber::{
 };
 
 use crate::bindings::{
+    ctx::BindingsNonSyncCtxImpl,
     devices::{BindingId, Devices},
     util::{ConversionContext as _, IntoFidl as _, TryIntoFidlWithContext as _},
-    Ctx, DEFAULT_INTERFACE_METRIC, LOOPBACK_NAME,
+    Ctx, TimerId, DEFAULT_INTERFACE_METRIC, LOOPBACK_NAME,
 };
 
 struct LogFormatter;
@@ -91,7 +92,7 @@ pub(crate) struct TestStack {
     services_sink: mpsc::UnboundedSender<crate::bindings::Service>,
     // The inspector instance given to Netstack, can be used to probe available
     // inspect data.
-    _inspector: Arc<fuchsia_inspect::Inspector>,
+    inspector: Arc<fuchsia_inspect::Inspector>,
     // Keep track of installed endpoints.
     endpoint_ids: HashMap<String, BindingId>,
 }
@@ -266,7 +267,7 @@ impl TestStack {
             netstack,
             task: Some(task),
             services_sink,
-            _inspector: inspector,
+            inspector: inspector,
             endpoint_ids: Default::default(),
         }
     }
@@ -286,6 +287,11 @@ impl TestStack {
     /// Acquire this `TestStack`'s netstack.
     pub(crate) fn netstack(&self) -> crate::bindings::Netstack {
         self.netstack.clone()
+    }
+
+    /// Gets a reference to the `Inspector` supplied to the `TestStack`.
+    pub(crate) fn inspector(&self) -> &fuchsia_inspect::Inspector {
+        &self.inspector
     }
 
     /// Synchronously shutdown the running stack.
@@ -979,6 +985,65 @@ async fn test_ipv6_slaac_secret_stable() {
     assert_eq!(true, interface_control.enable().await.expect("FIDL call").expect("enabled"));
 
     assert_eq!(get_slaac_secret(test_stack, if_id), Some(enabled_secret));
+
+    t
+}
+
+#[fixture::teardown(TestSetup::shutdown)]
+#[fasync::run_singlethreaded(test)]
+async fn test_neighbor_table_inspect() {
+    const EP_IDX: usize = 1;
+    let mut t = TestSetupBuilder::new()
+        .add_endpoint()
+        .add_stack(StackSetupBuilder::new().add_endpoint(EP_IDX, None))
+        .build()
+        .await;
+
+    let test_stack = t.get(0);
+    let bindings_id = test_stack.get_endpoint_id(EP_IDX);
+    test_stack.with_ctx(|ctx| {
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
+        let devices: &Devices<_> = non_sync_ctx.as_ref();
+        let device = devices.get_core_id(bindings_id).expect("get_core_id failed");
+        let v4_neigh_addr = net_ip_v4!("192.168.0.1");
+        let v4_neigh_mac = net_types::ethernet::Mac::new([0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF]);
+        insert_static_neighbor_entry::<
+            Ipv4,
+            packet::Buf<Vec<u8>>,
+            TimerId<BindingsNonSyncCtxImpl>,
+            BindingsNonSyncCtxImpl,
+        >(sync_ctx, non_sync_ctx, &device, v4_neigh_addr, v4_neigh_mac)
+        .expect("failed to insert static neighbor entry");
+        let v6_neigh_addr = net_ip_v6!("2001:DB8::1");
+        let v6_neigh_mac = net_types::ethernet::Mac::new([0x11, 0x22, 0x33, 0x44, 0x55, 0x66]);
+        insert_static_neighbor_entry::<
+            Ipv6,
+            packet::Buf<Vec<u8>>,
+            TimerId<BindingsNonSyncCtxImpl>,
+            BindingsNonSyncCtxImpl,
+        >(sync_ctx, non_sync_ctx, &device, v6_neigh_addr, v6_neigh_mac)
+        .expect("failed to insert static neighbor entry");
+    });
+    let inspector = test_stack.inspector();
+    use diagnostics_hierarchy::testing::DiagnosticsHierarchyGetter;
+    let data = inspector.get_diagnostics_hierarchy();
+    println!("{:#?}", data);
+    fuchsia_inspect::assert_data_tree!(data, "root": contains {
+        "Neighbors": {
+            "eth2": {
+                "0": {
+                    IpAddress: "192.168.0.1",
+                    State: "Static",
+                    LinkAddress: "AA:BB:CC:DD:EE:FF",
+                },
+                "1": {
+                    IpAddress: "2001:db8::1",
+                    State: "Static",
+                    LinkAddress: "11:22:33:44:55:66",
+                },
+            },
+        }
+    });
 
     t
 }
