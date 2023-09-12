@@ -163,9 +163,9 @@
                 "AllUDPSockets/UDPSocketPairTest.SetEmptyIPAddMembership/5",
 
                 // Uncategorized
-                "AllUDPSockets/UDPSocketPairTest.ReceiveOrigDstAddrDefault/*",
+                "AllUDPSockets/UDPSocketPairTest.ReceiveOrigDstAddrDefault/[0235]",
                 "AllUDPSockets/UDPSocketPairTest.SetAndGetIPPKTINFO/*",
-                "AllUDPSockets/UDPSocketPairTest.SetAndGetReceiveOrigDstAddr/*",
+                "AllUDPSockets/UDPSocketPairTest.SetAndGetReceiveOrigDstAddr/[0235]",
                 "AllUDPSockets/UDPSocketPairTest.SetAndGetSocketLinger/*",
                 "AllUDPSockets/UDPSocketPairTest.SetRecvTos/*",
 

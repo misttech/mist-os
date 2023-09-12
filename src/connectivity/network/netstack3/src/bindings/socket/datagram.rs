@@ -654,6 +654,10 @@ struct BindingData<I: Ip, T: Transport<I>> {
     /// The message queue is held here and also in the [`SocketCollection`]
     /// to which the socket belongs.
     messages: Arc<CoreMutex<MessageQueue<AvailableMessage<I, T>>>>,
+    /// If true, return the original received destination address in the control data.  This is
+    /// modified using the SetIpReceiveOriginalDestinationAddress method (a.k.a. IP_RECVORIGDSTADDR)
+    /// and is useful for transparent sockets (IP_TRANSPARENT).
+    ip_receive_original_destination_address: bool,
 }
 
 impl<I, T> BindingData<I, T>
@@ -689,7 +693,12 @@ where
             None
         );
 
-        Self { peer_event, info: SocketControlInfo { _properties: properties, id }, messages }
+        Self {
+            peer_event,
+            info: SocketControlInfo { _properties: properties, id },
+            messages,
+            ip_receive_original_destination_address: false,
+        }
     }
 }
 
@@ -792,7 +801,7 @@ where
         sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
         non_sync_ctx: &mut BindingsNonSyncCtxImpl,
     ) {
-        let Self { info: SocketControlInfo { _properties, id }, messages: _, peer_event: _ } = self;
+        let id = self.info.id;
         let _: Option<_> =
             I::with_collection_mut(non_sync_ctx, |c| c.received.remove(id.get_key_index()));
         let _: T::SocketInfo<_> = T::remove(sync_ctx, non_sync_ctx, id);
@@ -1274,18 +1283,19 @@ where
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpReceiveOriginalDestinationAddress {
-                value: _,
+                value,
                 responder,
             } => {
+                self.data.ip_receive_original_destination_address = value;
                 responder
-                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .send(Ok(()))
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpReceiveOriginalDestinationAddress {
                 responder,
             } => {
                 responder
-                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .send(Ok(self.data.ip_receive_original_destination_address))
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::AddIpv6Membership {
@@ -1395,8 +1405,9 @@ where
     }
 
     fn describe(&self) -> fposix_socket::SynchronousDatagramSocketDescribeResponse {
-        let Self { ctx: _, data: BindingData { peer_event, info: _, messages: _ } } = self;
-        let peer = peer_event
+        let peer = self
+            .data
+            .peer_event
             .duplicate_handle(
                 // The peer doesn't need to be able to signal, just receive signals,
                 // so attenuate that right when duplicating.
@@ -1411,14 +1422,12 @@ where
     }
 
     fn get_max_receive_buffer_size(&self) -> u64 {
-        let Self { ctx: _, data: BindingData { peer_event: _, info: _, messages } } = self;
-        messages.lock().max_available_messages_size().try_into().unwrap_or(u64::MAX)
+        self.data.messages.lock().max_available_messages_size().try_into().unwrap_or(u64::MAX)
     }
 
     fn set_max_receive_buffer_size(&mut self, max_bytes: u64) {
         let max_bytes = max_bytes.try_into().ok_checked::<TryFromIntError>().unwrap_or(usize::MAX);
-        let Self { ctx: _, data: BindingData { peer_event: _, info: _, messages } } = self;
-        messages.lock().set_max_available_messages_size(max_bytes)
+        self.data.messages.lock().set_max_available_messages_size(max_bytes)
     }
 
     /// Handles a [POSIX socket connect request].
@@ -1432,6 +1441,7 @@ where
                     peer_event: _,
                     messages: _,
                     info: SocketControlInfo { _properties: _, id },
+                    ip_receive_original_destination_address: _,
                 },
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
@@ -1465,6 +1475,7 @@ where
                     peer_event: _,
                     messages: _,
                     info: SocketControlInfo { _properties: _, id },
+                    ip_receive_original_destination_address: _,
                 },
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
@@ -1491,6 +1502,7 @@ where
                     peer_event: _,
                     messages: _,
                     info: SocketControlInfo { _properties: _, id },
+                    ip_receive_original_destination_address: _,
                 },
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
@@ -1510,6 +1522,7 @@ where
                     peer_event: _,
                     messages: _,
                     info: SocketControlInfo { _properties: _, id },
+                    ip_receive_original_destination_address: _,
                 },
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
@@ -1546,6 +1559,7 @@ where
                     peer_event: _,
                     messages: _,
                     info: SocketControlInfo { _properties: _, id },
+                    ip_receive_original_destination_address: _,
                 },
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
@@ -1571,9 +1585,14 @@ where
         let Self {
             ctx,
             data:
-                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+                BindingData {
+                    peer_event: _,
+                    info: SocketControlInfo { _properties, id },
+                    messages: _,
+                    ip_receive_original_destination_address,
+                },
         } = self;
-        let (sync_ctx, non_sync_ctx) = ctx.contexts();
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let front = I::with_collection(non_sync_ctx, |c| {
             let messages = c.received.get(id.get_key_index()).expect("has queue");
             let mut messages = messages.lock();
@@ -1619,7 +1638,27 @@ where
         let truncated = data.len().saturating_sub(data_len);
         data.truncate(data_len);
 
-        Ok((addr, data, Default::default(), truncated.try_into().unwrap_or(u32::MAX)))
+        let mut ip = None;
+        if *ip_receive_original_destination_address {
+            // For now just return the local address of the socket.
+            ip.get_or_insert_with(|| fposix_socket::IpRecvControlData::default())
+                .original_destination_address = Some(
+                T::get_socket_info(sync_ctx, non_sync_ctx, id)
+                    .into_fidl()
+                    .try_into_fidl_with_ctx(non_sync_ctx)
+                    .map(SockAddr::into_sock_addr)?,
+            );
+        }
+        let mut network = None;
+        if let Some(ip) = ip {
+            network
+                .get_or_insert_with(|| fposix_socket::NetworkSocketRecvControlData::default())
+                .ip = Some(ip);
+        }
+        let control_data =
+            fposix_socket::DatagramSocketRecvControlData { network, ..Default::default() };
+
+        Ok((addr, data, control_data, truncated.try_into().unwrap_or(u32::MAX)))
     }
 
     fn send_msg(
@@ -1633,7 +1672,12 @@ where
         let Self {
             ctx,
             data:
-                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+                BindingData {
+                    peer_event: _,
+                    info: SocketControlInfo { _properties, id },
+                    messages: _,
+                    ip_receive_original_destination_address: _,
+                },
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let remote = remote_addr
@@ -1663,7 +1707,12 @@ where
         let Self {
             ctx,
             data:
-                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+                BindingData {
+                    peer_event: _,
+                    info: SocketControlInfo { _properties, id },
+                    messages: _,
+                    ip_receive_original_destination_address: _,
+                },
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let device = device
@@ -1678,7 +1727,12 @@ where
         let Self {
             ctx,
             data:
-                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+                BindingData {
+                    peer_event: _,
+                    info: SocketControlInfo { _properties, id },
+                    messages: _,
+                    ip_receive_original_destination_address: _,
+                },
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts();
 
@@ -1701,7 +1755,12 @@ where
         let Self {
             ctx,
             data:
-                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+                BindingData {
+                    peer_event: _,
+                    info: SocketControlInfo { _properties, id },
+                    messages: _,
+                    ip_receive_original_destination_address: _,
+                },
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         T::set_reuse_port(sync_ctx, non_sync_ctx, id, reuse_port).map_err(IntoErrno::into_errno)
@@ -1711,7 +1770,12 @@ where
         let Self {
             ctx,
             data:
-                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+                BindingData {
+                    peer_event: _,
+                    info: SocketControlInfo { _properties, id },
+                    messages: _,
+                    ip_receive_original_destination_address: _,
+                },
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts();
 
@@ -1721,7 +1785,12 @@ where
     fn shutdown(self, how: fposix_socket::ShutdownMode) -> Result<(), fposix::Errno> {
         let Self {
             data:
-                BindingData { peer_event: _, info: SocketControlInfo { id, _properties }, messages },
+                BindingData {
+                    peer_event: _,
+                    info: SocketControlInfo { id, _properties },
+                    messages,
+                    ip_receive_original_destination_address: _,
+                },
             ctx,
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts();
@@ -1774,7 +1843,12 @@ where
         let Self {
             ctx,
             data:
-                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+                BindingData {
+                    peer_event: _,
+                    info: SocketControlInfo { _properties, id },
+                    messages: _,
+                    ip_receive_original_destination_address: _,
+                },
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
 
@@ -1810,7 +1884,12 @@ where
         let Self {
             ctx,
             data:
-                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+                BindingData {
+                    peer_event: _,
+                    info: SocketControlInfo { _properties, id },
+                    messages: _,
+                    ip_receive_original_destination_address: _,
+                },
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         T::set_unicast_hop_limit(sync_ctx, non_sync_ctx, id, hop_limit);
@@ -1837,7 +1916,12 @@ where
         let Self {
             ctx,
             data:
-                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+                BindingData {
+                    peer_event: _,
+                    info: SocketControlInfo { _properties, id },
+                    messages: _,
+                    ip_receive_original_destination_address: _,
+                },
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         T::set_multicast_hop_limit(sync_ctx, non_sync_ctx, id, hop_limit);
@@ -1854,7 +1938,12 @@ where
         let Self {
             ctx,
             data:
-                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+                BindingData {
+                    peer_event: _,
+                    info: SocketControlInfo { _properties, id },
+                    messages: _,
+                    ip_receive_original_destination_address: _,
+                },
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts();
         Ok(T::get_unicast_hop_limit(sync_ctx, non_sync_ctx, id).get())
@@ -1870,7 +1959,12 @@ where
         let Self {
             ctx,
             data:
-                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+                BindingData {
+                    peer_event: _,
+                    info: SocketControlInfo { _properties, id },
+                    messages: _,
+                    ip_receive_original_destination_address: _,
+                },
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts();
 
@@ -1881,7 +1975,12 @@ where
         let Self {
             ctx,
             data:
-                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+                BindingData {
+                    peer_event: _,
+                    info: SocketControlInfo { _properties, id },
+                    messages: _,
+                    ip_receive_original_destination_address: _,
+                },
         } = self;
         T::set_ip_transparent(ctx.sync_ctx(), id, value)
     }
@@ -1890,7 +1989,12 @@ where
         let Self {
             ctx,
             data:
-                BindingData { peer_event: _, info: SocketControlInfo { _properties, id }, messages: _ },
+                BindingData {
+                    peer_event: _,
+                    info: SocketControlInfo { _properties, id },
+                    messages: _,
+                    ip_receive_original_destination_address: _,
+                },
         } = self;
         T::get_ip_transparent(ctx.sync_ctx(), id)
     }
@@ -1983,6 +2087,7 @@ where
 mod tests {
     use super::*;
 
+    use assert_matches::assert_matches;
     use fidl::endpoints::{Proxy, ServerEnd};
     use fuchsia_async as fasync;
     use fuchsia_zircon::{self as zx, AsHandleRef};
@@ -3320,4 +3425,175 @@ mod tests {
     }
 
     declare_tests!(get_hop_limit_wrong_type);
+
+    #[fixture::teardown(TestSetup::shutdown)]
+    async fn receive_original_destination_address<A: TestSockAddr, T>(
+        proto: fposix_socket::DatagramSocketProtocol,
+    ) {
+        // Follow the same steps as the hello test above: Create two stacks, Alice (server listening
+        // on LOCAL_ADDR:200), and Bob (client, bound on REMOTE_ADDR:300).
+        let mut t = TestSetupBuilder::new()
+            .add_endpoint()
+            .add_endpoint()
+            .add_stack(
+                StackSetupBuilder::new()
+                    .add_named_endpoint(test_ep_name(1), Some(A::config_addr_subnet())),
+            )
+            .add_stack(
+                StackSetupBuilder::new()
+                    .add_named_endpoint(test_ep_name(2), Some(A::config_addr_subnet_remote())),
+            )
+            .build()
+            .await;
+
+        let alice = t.get(0);
+        let (alice_socket, alice_events) = get_socket_and_event::<A>(alice, proto).await;
+
+        // Setup Alice as a server, bound to LOCAL_ADDR:200
+        println!("Configuring alice...");
+        let () = alice_socket
+            .bind(&A::create(A::LOCAL_ADDR, 200))
+            .await
+            .unwrap()
+            .expect("alice bind suceeds");
+
+        // Setup Bob as a client, bound to REMOTE_ADDR:300
+        println!("Configuring bob...");
+        let bob = t.get(1);
+        let bob_socket = get_socket::<A>(bob, proto).await;
+        let () = bob_socket
+            .bind(&A::create(A::REMOTE_ADDR, 300))
+            .await
+            .unwrap()
+            .expect("bob bind suceeds");
+
+        // Connect Bob to Alice on LOCAL_ADDR:200
+        println!("Connecting bob to alice...");
+        let () = bob_socket
+            .connect(&A::create(A::LOCAL_ADDR, 200))
+            .await
+            .unwrap()
+            .expect("Connect succeeds");
+
+        // Send datagram from Bob's socket.
+        println!("Writing datagram to bob");
+        let body = "Hello".as_bytes();
+        assert_eq!(
+            bob_socket
+                .send_msg(
+                    None,
+                    &body,
+                    &fposix_socket::DatagramSocketSendControlData::default(),
+                    fposix_socket::SendMsgFlags::empty()
+                )
+                .await
+                .unwrap()
+                .expect("sendmsg suceeds"),
+            body.len() as i64
+        );
+
+        // Wait for datagram to arrive on Alice's socket:
+
+        println!("Waiting for signals");
+        assert_eq!(
+            fasync::OnSignals::new(&alice_events, ZXSIO_SIGNAL_INCOMING).await,
+            Ok(ZXSIO_SIGNAL_INCOMING | ZXSIO_SIGNAL_OUTGOING)
+        );
+
+        // Check the option is currently false.
+        assert!(!alice_socket
+            .get_ip_receive_original_destination_address()
+            .await
+            .expect("get_ip_receive_original_destination_address (FIDL) failed")
+            .expect("get_ip_receive_original_destination_address failed"),);
+
+        alice_socket
+            .set_ip_receive_original_destination_address(true)
+            .await
+            .expect("set_ip_receive_original_destination_address (FIDL) failed")
+            .expect("set_ip_receive_original_destination_address failed");
+
+        // The option should now be reported as set.
+        assert!(alice_socket
+            .get_ip_receive_original_destination_address()
+            .await
+            .expect("get_ip_receive_original_destination_address (FIDL) failed")
+            .expect("get_ip_receive_original_destination_address failed"),);
+
+        assert_matches!(
+            alice_socket
+                .recv_msg(false, 2048, true, fposix_socket::RecvMsgFlags::empty())
+                .await
+                .unwrap()
+                .expect("recvmsg suceeeds"),
+            (
+                _,
+                _,
+                fposix_socket::DatagramSocketRecvControlData {
+                    network:
+                        Some(fposix_socket::NetworkSocketRecvControlData {
+                            ip:
+                                Some(fposix_socket::IpRecvControlData {
+                                    original_destination_address: Some(addr),
+                                    ..
+                                }),
+                            ..
+                        }),
+                    ..
+                },
+                _,
+            ) => {
+                let addr = A::from_sock_addr(addr).expect("bad socket address return");
+                assert_eq!(addr.addr(), A::LOCAL_ADDR);
+                assert_eq!(addr.port(), 200);
+            }
+        );
+
+        // Turn it off.
+        alice_socket
+            .set_ip_receive_original_destination_address(false)
+            .await
+            .expect("set_ip_receive_original_destination_address (FIDL) failed")
+            .expect("set_ip_receive_original_destination_address failed");
+
+        assert!(!alice_socket
+            .get_ip_receive_original_destination_address()
+            .await
+            .expect("get_ip_receive_original_destination_address (FIDL) failed")
+            .expect("get_ip_receive_original_destination_address failed"),);
+
+        assert_eq!(
+            bob_socket
+                .send_msg(
+                    None,
+                    &body,
+                    &fposix_socket::DatagramSocketSendControlData::default(),
+                    fposix_socket::SendMsgFlags::empty()
+                )
+                .await
+                .unwrap()
+                .expect("sendmsg suceeds"),
+            body.len() as i64
+        );
+
+        // Wait for datagram to arrive on Alice's socket:
+        println!("Waiting for signals");
+        assert_eq!(
+            fasync::OnSignals::new(&alice_events, ZXSIO_SIGNAL_INCOMING).await,
+            Ok(ZXSIO_SIGNAL_INCOMING | ZXSIO_SIGNAL_OUTGOING)
+        );
+
+        assert_matches!(
+            alice_socket
+                .recv_msg(false, 2048, true, fposix_socket::RecvMsgFlags::empty())
+                .await
+                .unwrap()
+                .expect("recvmsg suceeeds"),
+            (_, _, fposix_socket::DatagramSocketRecvControlData { network: None, .. }, _)
+        );
+
+        t
+    }
+
+    declare_tests!(receive_original_destination_address);
 }

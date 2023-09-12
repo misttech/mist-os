@@ -492,6 +492,12 @@ type NetworkSocketRecvControlData = table {
         ///
         /// Present if the `SOL_IP` -> `IP_RECVTTL` option is enabled.
         2: ttl uint8;
+
+        /// The original destination address.
+        ///
+        /// Present if the `SOL_IP` -> `IP_RECVORIGDSTADDR` option is enabled.
+        @available(added=15)
+        3: original_destination_address fuchsia.net.SocketAddress;
     };
 
     /// IPv6 level ancillary data.

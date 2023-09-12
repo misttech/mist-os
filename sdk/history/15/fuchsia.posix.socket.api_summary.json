@@ -3549,6 +3549,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.posix.socket/IpRecvControlData.original_destination_address",
+        "ordinal": "3",
+        "type": "fuchsia.net/SocketAddress"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.posix.socket/IpRecvControlData.tos",
         "ordinal": "1",
         "type": "uint8"
