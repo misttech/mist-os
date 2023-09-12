@@ -2,31 +2,23 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load(":fuchsia_package_test.bzl", "fuchsia_package_test_suite")
-load(":fuchsia_package_checker_test.bzl", "fuchsia_package_checker_test", "make_file")
+load(":fuchsia_package_checker_test.bzl", "fuchsia_package_checker_test")
+load("//test_utils:make_file.bzl", "make_file")
 load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_component", "fuchsia_component_manifest", "fuchsia_package", "fuchsia_package_resource")
 
-# fuchsia_package_test_suite() does not support a visibility attribute!
-# so set the default for the package here.
-package(default_visibility = ["//visibility:public"])
-
-fuchsia_package_test_suite(name = "fuchsia_package_tests")
-
 fuchsia_package_checker_test(
-    name = "pkg_test",
+    name = "cc_pkg_test",
     package_name = "pkg_for_test",
-    size = "medium",
+    size = "small",
     manifests = [
         "meta/cc_component.cm",
         "meta/empty_component.cm",
     ],
     package_under_test = ":pkg",
-    # We currently strip all blobs
     stripped_blobs = [
-        ":simple_file_resource",
         ":cc_bin_resource",
     ],
-    unstripped_blobs = [],
+    unstripped_blobs = [":simple_file_resource"],
     visibility = ["//visibility:public"],
 )
 

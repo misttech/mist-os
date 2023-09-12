@@ -178,7 +178,7 @@ def _test_package_deps():
 
 # Entry point from the BUILD file; macro for running each test case's macro and
 # declaring a test suite that wraps them together.
-def fuchsia_package_test_suite(name):
+def fuchsia_package_test_suite(name, **kwargs):
     # Call all test functions and wrap their targets in a suite.
     _test_package_and_archive_name()
     _test_package_deps()
@@ -192,4 +192,5 @@ def fuchsia_package_test_suite(name):
             ":dependencies_test_single_driver",
             ":dependencies_test_composite",
         ],
+        **kwargs
     )

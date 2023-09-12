@@ -4,6 +4,8 @@
 
 """Convenience function to generate a JSON validating script."""
 
+load("//test_utils:py_test_utils.bzl", "PY_TOOLCHAIN_DEPS")
+
 # Script template
 _validator_command_template = """\
 #!/bin/sh
@@ -25,11 +27,7 @@ CREATE_VALIDATION_SCRIPT_ATTRS = {
         executable = True,
         cfg = "exec",
     ),
-    "_py_toolchain": attr.label(
-        default = "@rules_python//python:current_py_toolchain",
-        cfg = "exec",
-    ),
-}
+} | PY_TOOLCHAIN_DEPS
 
 def create_validation_script(ctx, generated_file, golden_file):
     """Create a validation script and its related runfiles object.

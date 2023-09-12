@@ -16,17 +16,7 @@ test_suite(
     tests = [
         ":assembly_tests",
         ":licenses_tests",
-        ":unittests",
-    ],
-)
-
-test_suite(
-    name = "unittests",
-    tags = ["unittests"],
-    tests = [
-        "//fuchsia_package:fuchsia_package_tests",
-        "//fuchsia_package:pkg_test",
-        "//fuchsia_package_resource:fuchsia_package_resource_tests",
+        "//fuchsia/packaging:tests",
     ],
 )
 

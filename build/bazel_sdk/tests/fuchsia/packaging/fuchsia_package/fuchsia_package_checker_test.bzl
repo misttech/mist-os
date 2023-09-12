@@ -4,6 +4,7 @@
 
 # buildifier: disable=module-docstring
 load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaPackageInfo", "FuchsiaPackageResourcesInfo")
+load("//test_utils:py_test_utils.bzl", "PY_TOOLCHAIN_DEPS", "populate_py_test_sh_script")
 
 def _fuchsia_package_checker_test_impl(ctx):
     sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
@@ -52,11 +53,7 @@ def _fuchsia_package_checker_test_impl(ctx):
         args.append("--blobs={}={}".format(blob.dest, blob.src.short_path))
         runfiles.append(blob.src)
 
-    script_content = "{checker} {args}".format(
-        checker = ctx.executable._package_checker.short_path,
-        args = " \\\n".join(args),
-    )
-    ctx.actions.write(script, script_content, is_executable = True)
+    populate_py_test_sh_script(ctx, script, ctx.executable._package_checker, args)
 
     return [
         DefaultInfo(
@@ -105,18 +102,5 @@ fuchsia_package_checker_test = rule(
             executable = True,
             cfg = "exec",
         ),
-    },
-)
-
-def _make_file_impl(ctx):
-    f = ctx.actions.declare_file(ctx.label.name + "_" + ctx.attr.filename)
-    ctx.actions.write(f, ctx.attr.content)
-    return DefaultInfo(files = depset([f]))
-
-make_file = rule(
-    implementation = _make_file_impl,
-    attrs = {
-        "filename": attr.string(),
-        "content": attr.string(),
-    },
+    } | PY_TOOLCHAIN_DEPS,
 )

@@ -43,7 +43,7 @@ def _test_provider_contents():
     expected_dest = "/data/foo"
 
     # Note, the expected_src needs to be in sync with the location of this file.
-    expected_src = "fuchsia_package_resource/text_file.txt"
+    expected_src = "fuchsia/packaging/provider_tests/text_file.txt"
 
     # Rule under test.
     fuchsia_package_resource(
@@ -92,7 +92,7 @@ def _test_empty_dest_failure():
 
 # Entry point from the BUILD file; macro for running each test case's macro and
 # declaring a test suite that wraps them together.
-def fuchsia_package_resource_test_suite(name):
+def fuchsia_package_resource_test_suite(name, **kwargs):
     # Call all test functions and wrap their targets in a suite.
     _test_provider_contents()
     _test_empty_dest_failure()
@@ -103,4 +103,5 @@ def fuchsia_package_resource_test_suite(name):
             ":provider_contents_test",
             ":empty_dest_should_fail_test",
         ],
+        **kwargs
     )
