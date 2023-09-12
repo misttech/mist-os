@@ -1,10 +1,10 @@
 {
   "pkg/fit/include/lib/fit/defer.h": "848d5a2b9fbde5581fc412ee4428920e",
-  "pkg/fit/include/lib/fit/function.h": "1f9ec2a85f688cad1cb2d812a53e5f1a",
+  "pkg/fit/include/lib/fit/function.h": "7f21ff10592bb5444bee6d546e2264a6",
   "pkg/fit/include/lib/fit/function_traits.h": "4db000fe2c2daba6d1b999c21c851da9",
   "pkg/fit/include/lib/fit/inline_any.h": "ff5fdb43689cc6cd5ef0225fc0579e46",
   "pkg/fit/include/lib/fit/internal/compiler.h": "eb80028d0f29a5e139e431e186e2ee24",
-  "pkg/fit/include/lib/fit/internal/function.h": "402f74003e496fb02b386dc9873a048b",
+  "pkg/fit/include/lib/fit/internal/function.h": "28cee1fbf06d1a967aa3714def6711a7",
   "pkg/fit/include/lib/fit/internal/inline_any.h": "a1804c1ece25483af393a98d976142bb",
   "pkg/fit/include/lib/fit/internal/result.h": "72af49b1512d59dfdb01d5e3db56fee9",
   "pkg/fit/include/lib/fit/internal/utility.h": "4e59989b0aa2d15818e2b3179fbe403c",
