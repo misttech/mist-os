@@ -270,7 +270,7 @@ class SetupLogdirForLogDumpTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             reproxy_logs.setup_logdir_for_logdump(Path(td))
 
-    def test_log_file_copied_to_new_dir(self):
+    def test_log_file_copied_to_new_dir_missing_reproxy_prefix(self):
         with tempfile.TemporaryDirectory() as td:
             log_file = Path(td) / 'test.rrpl'
             log_contents = 'fake log contents, not checked'
@@ -280,7 +280,21 @@ class SetupLogdirForLogDumpTest(unittest.TestCase):
                     new_log_dir = reproxy_logs.setup_logdir_for_logdump(
                         log_file)
             mock_mkdir.assert_called_with(parents=True, exist_ok=True)
-            mock_copy.assert_called_with(log_file, new_log_dir)
+            mock_copy.assert_called_with(
+                log_file, new_log_dir / 'reproxy_test.rrpl')
+
+    def test_log_file_copied_to_new_dir_with_reproxy_prefix(self):
+        with tempfile.TemporaryDirectory() as td:
+            log_base = 'reproxy_foo.rrpl'
+            log_file = Path(td) / log_base
+            log_contents = 'fake log contents, not checked'
+            _write_file_contents(log_file, log_contents)
+            with mock.patch.object(Path, 'mkdir') as mock_mkdir:
+                with mock.patch.object(shutil, 'copy2') as mock_copy:
+                    new_log_dir = reproxy_logs.setup_logdir_for_logdump(
+                        log_file)
+            mock_mkdir.assert_called_with(parents=True, exist_ok=True)
+            mock_copy.assert_called_with(log_file, new_log_dir / log_base)
 
 
 class ConvertReproxyActionsLogTest(unittest.TestCase):
@@ -351,6 +365,60 @@ class LookupOutputFileDigestTests(unittest.TestCase):
                     self.assertEqual(
                         reproxy_logs.lookup_output_file_digest_command(args), 0)
                 self.assertEqual(result.getvalue(), digest + '\n')
+
+
+class FilterRecordsTests(unittest.TestCase):
+
+    def test_basic_counter(self):
+        counter = 0
+
+        def action(unused):
+            nonlocal counter  # reference the one in the above scope
+            counter += 1
+
+        record = log_pb2.LogRecord()
+        reproxy_logs.filter_and_apply_records(
+            records=[record, record],
+            predicate=lambda record: True,
+            action=action,
+        )
+        self.assertEqual(counter, 2)
+
+    def test_basic_no_matches(self):
+        counter = 0
+
+        def action(unused):
+            nonlocal counter  # reference the one in the above scope
+            counter += 1
+
+        record = log_pb2.LogRecord()
+        reproxy_logs.filter_and_apply_records(
+            records=[record, record],
+            predicate=lambda record: False,
+            action=action,
+        )
+        self.assertEqual(counter, 0)
+
+
+class FilterRlibsCommandTest(unittest.TestCase):
+
+    def test_filter(self):
+        record1 = log_pb2.LogRecord()
+        record2 = log_pb2.LogRecord()
+        record1.command.output.output_files.extend(['foo.rlib'])  # match this
+        record2.command.output.output_files.extend(['bar.cc.o'])  # but not this
+        logdump = log_pb2.LogDump(records=[record1, record2])
+        with mock.patch.object(
+                reproxy_logs, 'parse_log',
+                return_value=reproxy_logs.ReproxyLog(logdump)) as mock_parse:
+            printed_text = io.StringIO()
+            with contextlib.redirect_stdout(printed_text):
+                exit_code = reproxy_logs.filter_rlibs_command(
+                    argparse.Namespace(log=Path('x.rrpl')))
+
+        self.assertEqual(exit_code, 0)
+        mock_parse.assert_called_once()
+        self.assertEqual(printed_text.getvalue(), str(record1) + '\n\n')
 
 
 class MainTests(unittest.TestCase):
@@ -435,6 +503,17 @@ class MainTests(unittest.TestCase):
                 ]) + '\n')
         self.assertEqual(status, 0)
         mock_multi_parse.assert_called_once()
+
+    def test_filter_rlibs(self):
+        log = reproxy_logs.ReproxyLog(log_pb2.LogDump())
+        with mock.patch.object(reproxy_logs, 'parse_log',
+                               return_value=log) as mock_parse:
+            with mock.patch.object(reproxy_logs,
+                                   'filter_and_apply_records') as mock_filter:
+                status = reproxy_logs.main(['filter_rlibs', 'log.rrpl'])
+        self.assertEqual(status, 0)
+        mock_parse.assert_called_once()
+        mock_filter.assert_called_once()
 
 
 if __name__ == '__main__':

@@ -289,10 +289,14 @@ def setup_logdir_for_logdump(path: Path, verbose: bool = False) -> Path:
         msg(f'Copying log to {cached_log_dir} for logdump processing.')
     cached_log_dir.mkdir(parents=True, exist_ok=True)
 
+    # The 'logdump' tool expects there to be a file named 'reproxy_*.rrpl'.
     if path == stdin_path:
         (cached_log_dir / 'reproxy_from_stdin.rrpl').write_bytes(log_contents)
     else:
-        shutil.copy2(path, cached_log_dir)
+        dest_file = str(path.name)
+        if not dest_file.startswith('reproxy_'):
+            dest_file = 'reproxy_' + dest_file
+        shutil.copy2(path, cached_log_dir / dest_file)
 
     return cached_log_dir
 
@@ -470,6 +474,37 @@ def plot_download_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def filter_and_apply_records(
+        records: Iterable[log_pb2.LogRecord],
+        predicate: Callable[[log_pb2.LogRecord],
+                            bool], action: Callable[[log_pb2.LogRecord], None]):
+    for record in records:
+        if predicate(record):
+            action(record)
+
+
+def _action_produces_rlib(record: log_pb2.LogRecord) -> bool:
+    return any(f.endswith('.rlib') for f in record.command.output.output_files)
+
+
+def _print_record(record: log_pb2.LogRecord) -> None:
+    print(str(record) + '\n'),
+
+
+def filter_rlibs_command(args: argparse.Namespace) -> int:
+    log = parse_log(
+        log_path=args.log,
+        reclient_bindir=fuchsia.RECLIENT_BINDIR,
+        verbose=False,
+    )
+    filter_and_apply_records(
+        records=log.proto.records,
+        predicate=_action_produces_rlib,
+        action=_print_record,
+    )
+    return 0
+
+
 def _main_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
 
@@ -537,7 +572,7 @@ def _main_arg_parser() -> argparse.ArgumentParser:
     plot_download_parser.add_argument(
         "log",
         type=Path,
-        help="reproxy log",
+        help="reproxy log (.rpl or .rrpl)",
         metavar="PATH",
     )
     plot_download_parser.add_argument(
@@ -546,6 +581,19 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         type=float,  # seconds
         default=5.0,
         metavar="SECONDS",
+    )
+
+    # command: filter_rlibs
+    filter_rlibs_parser = subparsers.add_parser(
+        'filter_rlibs',
+        help='Keep log records for actions that produce rlibs, print to stdout.',
+    )
+    filter_rlibs_parser.set_defaults(func=filter_rlibs_command)
+    filter_rlibs_parser.add_argument(
+        "log",
+        type=Path,
+        help="reproxy log (.rpl or .rrpl)",
+        metavar="PATH",
     )
 
     return parser
