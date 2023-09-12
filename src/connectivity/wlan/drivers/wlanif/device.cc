@@ -318,7 +318,7 @@ void Device::DeauthenticateReq(const wlan_fullmac_deauth_req_t* req) {
   std::memcpy(deauth_req.peer_sta_address.data(), req->peer_sta_address, ETH_ALEN);
 
   // reason_code
-  deauth_req.reason_code = ConvertReasonCode(req->reason_code);
+  deauth_req.reason_code = static_cast<fuchsia_wlan_ieee80211::wire::ReasonCode>(req->reason_code);
 
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
@@ -361,7 +361,8 @@ void Device::DisassociateReq(const wlan_fullmac_disassoc_req_t* req) {
   fuchsia_wlan_fullmac::wire::WlanFullmacDisassocReq disassoc_req;
 
   std::memcpy(disassoc_req.peer_sta_address.data(), req->peer_sta_address, ETH_ALEN);
-  disassoc_req.reason_code = ConvertReasonCode(req->reason_code);
+  disassoc_req.reason_code =
+      static_cast<fuchsia_wlan_ieee80211::wire::ReasonCode>(req->reason_code);
 
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {

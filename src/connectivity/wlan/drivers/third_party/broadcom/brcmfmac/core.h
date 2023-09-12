@@ -287,10 +287,10 @@ struct net_device {
   // The total number of times that brcmf_log_client_stats() has been called (only increases when
   // device is connected).
   uint32_t client_stats_log_count;
-  // The most recent times we have triggered a deauthentication for an rx freeze. We only track
-  // the most recent BRCMF_RX_FREEZE_MAX_REASSOCS_PER_HOUR times. The time point is represented by
-  // the count of client_stats logs.
-  std::list<uint32_t> rx_freeze_deauth_times;
+  // The most recent times we have triggered a deauthentication. We only track the most
+  // recent BRCMF_MAX_DEAUTHS_PER_HOUR times. The time point is represented by the count
+  // of client_stats logs.
+  std::list<uint32_t> deauth_trigger_times;
   struct {
     int tx_dropped;
     int tx_packets;
@@ -309,9 +309,16 @@ struct net_device {
     int tx_bad_pkts_prev;
     int total_rx_pkts_prev;
     int total_tx_pkts_prev;
+    int wme_rx_good_pkts_prev;
+    int wme_rx_bad_pkts_prev;
+    int wme_total_rx_pkts_prev;
 
-    int rx_freeze_count;  // The number of brcmf_log_client_stats called in which rx_packet number
-                          // freeze happens.
+    // The number of brcmf_log_client_stats called in which rx_packet number freeze happens.
+    int rx_freeze_count;
+    // Number of log periods (invocation of brcmf_log_client_stats) during which the wme rx error
+    // rate was high.
+    int high_wme_rx_error_rate_count;
+
     // The number of brcmf_log_client_stats() called in which data rate is low (gets reset any time
     // data rate goes higher and also when the client disconnects).
     int low_data_rate_count;

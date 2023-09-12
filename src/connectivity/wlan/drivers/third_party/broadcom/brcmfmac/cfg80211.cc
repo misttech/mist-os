@@ -41,6 +41,7 @@
 #include <wlan/common/ieee80211_codes.h>
 #include <wlan/common/macaddr.h>
 
+#include "fuchsia/wlan/ieee80211/cpp/fidl.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/bcdc.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/bits.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/brcmu_d11.h"
@@ -2092,36 +2093,19 @@ static void brcmf_log_client_stats(struct brcmf_cfg80211_info* cfg) {
     ifp->drvr->device->GetInspect()->LogRxFreeze();
   }
 
+  // Setting attempt_deauth will cause the system to deauth the connection, if it is within the
+  // allowed window of time.
+  bool attempt_deauth = false;
+  std::optional<wlan_ieee80211::ReasonCode> deauth_reason_code;
+
   // The reason for using larger or equal here is to make sure the deauth can be triggered again
   // after the limitation time passes.
-  if (ndev->stats.rx_freeze_count >= BRCMF_RX_FREEZE_THRESHOLD / BRCMF_CONNECT_LOG_DUR) {
-    // Trigger a deauth, unless we have exceeded our maximum rate
-    // (BRCMF_RX_FREEZE_MAX_DEAUTHS_PER_HOUR) within time limitation.
-    bool trigger_deauth = false;
-    uint32_t current_log_count = ndev->client_stats_log_count;
-    std::list<uint32_t>* deauth_times = &ndev->rx_freeze_deauth_times;
-
-    if (deauth_times->size() < BRCMF_RX_FREEZE_MAX_DEAUTHS_PER_HOUR) {
-      // Our total number of deauth's is less than the per-hour limit
-      trigger_deauth = true;
-    } else {
-      uint32_t oldest_deauth_time = deauth_times->front();
-      if ((current_log_count - oldest_deauth_time) > ZX_HOUR(1) / BRCMF_CONNECT_LOG_DUR) {
-        // It has been more than an hour since our oldest recorded deauth
-        trigger_deauth = true;
-        deauth_times->pop_front();
-      }
-    }
-
-    if (trigger_deauth) {
-      // Disassociate
-      BRCMF_ERR("No rx frames received in %zu seconds, triggering deauthentication",
-                static_cast<size_t>(BRCMF_RX_FREEZE_THRESHOLD) / ZX_SEC(1));
-      // Reset the rx freeze count when deauth is triggered, waiting for the next trigger.
-      ndev->stats.rx_freeze_count = 0;
-      brcmf_link_down(ifp->vif, wlan_ieee80211::ReasonCode::FW_RX_STALLED, BRCMF_E_DEAUTH_IND);
-      deauth_times->push_back(current_log_count);
-    }
+  constexpr int kFreezeThreshold = BRCMF_RX_FREEZE_THRESHOLD / BRCMF_CONNECT_LOG_DUR;
+  if (ndev->stats.rx_freeze_count >= kFreezeThreshold) {
+    BRCMF_ERR("No rx frames received in %zu seconds, attempting deauth.",
+              static_cast<size_t>(BRCMF_RX_FREEZE_THRESHOLD) / ZX_SEC(1));
+    attempt_deauth = true;
+    deauth_reason_code = wlan_ieee80211::ReasonCode::FW_RX_STALLED;
   }
 
   zxlogf(INFO, "Driver Stats: Rx - Good: %d Bad: %d; Tx - Sent to FW: %d Conf: %d Drop: %d Bad: %d",
@@ -2135,15 +2119,46 @@ static void brcmf_log_client_stats(struct brcmf_cfg80211_info* cfg) {
     BRCMF_INFO("Unable to get WME counters err: %s fw err %s", zx_status_get_string(err),
                brcmf_fil_get_errstr(fw_err));
   } else {
-    zxlogf(INFO, "WME counters - Rx: %d; Rx Bad: %d; Tx: %d; Tx Bad: %d",
-           wme_cnt.rx[AC_VO].packets + wme_cnt.rx[AC_VI].packets + wme_cnt.rx[AC_BE].packets +
-               wme_cnt.rx[AC_BK].packets,
-           wme_cnt.rx_failed[AC_VO].packets + wme_cnt.rx_failed[AC_VI].packets +
-               wme_cnt.rx_failed[AC_BE].packets + wme_cnt.rx_failed[AC_BK].packets,
-           wme_cnt.tx[AC_VO].packets + wme_cnt.tx[AC_VI].packets + wme_cnt.tx[AC_BE].packets +
-               wme_cnt.tx[AC_BK].packets,
-           wme_cnt.tx_failed[AC_VO].packets + wme_cnt.tx_failed[AC_VI].packets +
-               wme_cnt.tx_failed[AC_BE].packets + wme_cnt.tx_failed[AC_BK].packets);
+    int wme_rx_good_pkts = wme_cnt.rx[AC_VO].packets + wme_cnt.rx[AC_VI].packets +
+                           wme_cnt.rx[AC_BE].packets + wme_cnt.rx[AC_BK].packets;
+    int wme_rx_bad_pkts = wme_cnt.rx_failed[AC_VO].packets + wme_cnt.rx_failed[AC_VI].packets +
+                          wme_cnt.rx_failed[AC_BE].packets + wme_cnt.rx_failed[AC_BK].packets;
+    int wme_total_rx_pkts = wme_rx_good_pkts + wme_rx_bad_pkts;
+    int wme_tx_good_pkts = wme_cnt.tx[AC_VO].packets + wme_cnt.tx[AC_VI].packets +
+                           wme_cnt.tx[AC_BE].packets + wme_cnt.tx[AC_BK].packets;
+    int wme_tx_bad_pkts = wme_cnt.tx_failed[AC_VO].packets + wme_cnt.tx_failed[AC_VI].packets +
+                          wme_cnt.tx_failed[AC_BE].packets + wme_cnt.tx_failed[AC_BK].packets;
+    float wme_periodic_rx_err_rate = 0;
+
+    if (wme_total_rx_pkts > ndev->stats.wme_total_rx_pkts_prev) {
+      wme_periodic_rx_err_rate = (float)(wme_rx_bad_pkts - ndev->stats.wme_rx_bad_pkts_prev) /
+                                 (wme_total_rx_pkts - ndev->stats.wme_total_rx_pkts_prev);
+    }
+    ndev->stats.wme_total_rx_pkts_prev = wme_total_rx_pkts;
+    ndev->stats.wme_rx_bad_pkts_prev = wme_rx_bad_pkts;
+
+    if (wme_periodic_rx_err_rate >= BRCMF_WME_BAD_PKT_THRESHOLD) {
+      BRCMF_WARN("wme rx error rate %.2f%% greater than threshold of %.2f%%.",
+                 wme_periodic_rx_err_rate * 100, BRCMF_WME_BAD_PKT_THRESHOLD * 100);
+      ndev->stats.high_wme_rx_error_rate_count++;
+    } else {
+      ndev->stats.high_wme_rx_error_rate_count = 0;
+    }
+
+    if (ndev->stats.high_wme_rx_error_rate_count >=
+        (BRCMF_HIGH_WME_RX_ERROR_RATE_PERIOD_THRESHOLD / BRCMF_CONNECT_LOG_DUR)) {
+      // Log excessive wme rx error indicent to inspect
+      ifp->drvr->device->GetInspect()->LogHighWmeRxErrorRate();
+      BRCMF_ERR("wme rx error rate has been greater than %.2f%% for %ds, attempting deauth.",
+                BRCMF_WME_BAD_PKT_THRESHOLD * 100,
+                BRCMF_HIGH_WME_RX_ERROR_RATE_PERIOD_THRESHOLD / ZX_SEC(1));
+      attempt_deauth = true;
+      deauth_reason_code = wlan_ieee80211::ReasonCode::FW_HIGH_WME_RX_ERR_RATE;
+    }
+
+    zxlogf(INFO, "WME counters - Rx: %d; Rx Bad: %d; Tx: %d; Tx Bad: %d", wme_rx_good_pkts,
+           wme_rx_bad_pkts, wme_tx_good_pkts, wme_tx_bad_pkts);
+
     zxlogf(INFO, "VO AC - Rx: %d; Rx Bad: %d; Tx: %d; Tx Bad: %d", wme_cnt.rx[AC_VO].packets,
            wme_cnt.rx_failed[AC_VO].packets, wme_cnt.tx[AC_VO].packets,
            wme_cnt.tx_failed[AC_VO].packets);
@@ -2156,6 +2171,39 @@ static void brcmf_log_client_stats(struct brcmf_cfg80211_info* cfg) {
     zxlogf(INFO, "BK AC - Rx: %d; Rx Bad: %d; Tx: %d; Tx Bad: %d", wme_cnt.rx[AC_BK].packets,
            wme_cnt.rx_failed[AC_BK].packets, wme_cnt.tx[AC_BK].packets,
            wme_cnt.tx_failed[AC_BK].packets);
+  }
+
+  if (attempt_deauth && !deauth_reason_code.has_value()) {
+    BRCMF_WARN("deauth not triggered, since reason code is not set.");
+  } else if (attempt_deauth) {
+    // Trigger a deauth, unless we have exceeded our maximum deauth rate
+    // of BRCMF_MAX_DEAUTHS_PER_HOUR.
+    bool deauth_allowed = false;
+    uint32_t current_log_count = ndev->client_stats_log_count;
+
+    std::list<uint32_t>* deauth_times = &ndev->deauth_trigger_times;
+
+    if (deauth_times->size() < BRCMF_MAX_DEAUTHS_PER_HOUR) {
+      // Our total number of deauth's is less than the per-hour limit
+      deauth_allowed = true;
+    } else {
+      uint32_t oldest_deauth_time = deauth_times->front();
+      if ((current_log_count - oldest_deauth_time) > ZX_HOUR(1) / BRCMF_CONNECT_LOG_DUR) {
+        // It has been more than an hour since our oldest recorded deauth
+        deauth_allowed = true;
+        deauth_times->pop_front();
+      }
+    }
+
+    if (deauth_allowed) {
+      // Deauthenticate
+      BRCMF_WARN("we are within allowed limit of %d deauths per hour, triggering deauth",
+                 BRCMF_MAX_DEAUTHS_PER_HOUR);
+      // Reset the rx freeze count when deauth is triggered, waiting for the next trigger.
+      ndev->stats.rx_freeze_count = 0;
+      brcmf_link_down(ifp->vif, deauth_reason_code.value(), BRCMF_E_DEAUTH_IND);
+      deauth_times->push_back(current_log_count);
+    }
   }
 
   brcmf_bus_log_stats(cfg->pub->bus_if);
@@ -3687,7 +3735,7 @@ void brcmf_if_deauth_req(net_device* ndev, const wlan_fullmac::WlanFullmacDeauth
 
     memcpy(&scbval.ea, req->peer_sta_address.data(), ETH_ALEN);
     // The FIDL reason code is defined in uint16_t, so no information will be lost.
-    scbval.val = static_cast<uint32>(req->reason_code);
+    scbval.val = fidl::ToUnderlying(req->reason_code);
     zx_status_t status = brcmf_fil_cmd_data_set(ifp, BRCMF_C_SCB_DEAUTHENTICATE_FOR_REASON, &scbval,
                                                 sizeof(scbval), &fw_err);
     if (status != ZX_OK) {
@@ -3700,7 +3748,7 @@ void brcmf_if_deauth_req(net_device* ndev, const wlan_fullmac::WlanFullmacDeauth
 
   // Client IF processing
   if (brcmf_cfg80211_disconnect(ndev, req->peer_sta_address.data(),
-                                static_cast<uint32_t>(req->reason_code), true) != ZX_OK) {
+                                fidl::ToUnderlying(req->reason_code), true) != ZX_OK) {
     // Request to disconnect failed, so respond immediately
     brcmf_notify_deauth(ndev, req->peer_sta_address.data());
   }  // else wait for disconnect to complete before sending response
@@ -3759,7 +3807,7 @@ void brcmf_if_disassoc_req(net_device* ndev, const wlan_fullmac::WlanFullmacDisa
   BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC, FMT_MAC_ARGS(req->peer_sta_address));
 #endif /* !defined(NDEBUG) */
   zx_status_t status = brcmf_cfg80211_disconnect(ndev, req->peer_sta_address.data(),
-                                                 static_cast<uint16_t>(req->reason_code), false);
+                                                 fidl::ToUnderlying(req->reason_code), false);
   if (status != ZX_OK) {
     brcmf_notify_disassoc(ndev, status);
   }  // else notification will happen asynchronously
@@ -5271,7 +5319,7 @@ static zx_status_t brcmf_clear_firmware_connection_state(brcmf_if* ifp) {
 
   struct brcmf_scb_val_le scbval;
   memcpy(&scbval.ea, ifp->connect_req.selected_bss()->bssid().data(), ETH_ALEN);
-  scbval.val = static_cast<uint32_t>(wlan_ieee80211::ReasonCode::STA_LEAVING);
+  scbval.val = static_cast<uint16_t>(wlan_ieee80211::ReasonCode::STA_LEAVING);
   brcmf_set_bit(brcmf_vif_status_bit_t::DISCONNECTING, &ifp->vif->sme_state);
   status = brcmf_fil_cmd_data_set(ifp, BRCMF_C_DISASSOC, &scbval, sizeof(scbval), &fw_err);
   if (status != ZX_OK) {
@@ -5772,7 +5820,7 @@ static zx_status_t brcmf_indicate_client_disconnect(struct brcmf_if* ifp,
 
   wlan_ieee80211::ReasonCode reason_code = (connect_status == brcmf_connect_status_t::LINK_FAILED)
                                                ? wlan_ieee80211::ReasonCode::MLME_LINK_FAILED
-                                               : wlan::common::ConvertReasonCode(e->reason);
+                                               : static_cast<wlan_ieee80211::ReasonCode>(e->reason);
   brcmf_disconnect_done(cfg);
   brcmf_link_down(ifp->vif, reason_code, e->event_code);
   brcmf_clear_profile_on_client_disconnect(ndev_to_prof(ndev));
@@ -5835,8 +5883,8 @@ static zx_status_t brcmf_process_deauth_event(struct brcmf_if* ifp, const struct
   brcmf_proto_delete_peer(ifp->drvr, ifp->ifidx, (uint8_t*)e->addr);
   if (brcmf_is_apmode(ifp->vif)) {
     if (e->event_code == BRCMF_E_DEAUTH_IND) {
-      brcmf_notify_deauth_ind(ifp->ndev, e->addr, wlan::common::ConvertReasonCode(e->reason),
-                              false);
+      brcmf_notify_deauth_ind(ifp->ndev, e->addr,
+                              static_cast<wlan_ieee80211::ReasonCode>(e->reason), false);
     } else {
       // E_DEAUTH
       brcmf_notify_deauth(ifp->ndev, e->addr);
@@ -5861,8 +5909,8 @@ static zx_status_t brcmf_process_disassoc_ind_event(struct brcmf_if* ifp,
   brcmf_proto_delete_peer(ifp->drvr, ifp->ifidx, (uint8_t*)e->addr);
   if (brcmf_is_apmode(ifp->vif)) {
     if (e->event_code == BRCMF_E_DISASSOC_IND)
-      brcmf_notify_disassoc_ind(ifp->ndev, e->addr, wlan::common::ConvertReasonCode(e->reason),
-                                false);
+      brcmf_notify_disassoc_ind(ifp->ndev, e->addr,
+                                static_cast<wlan_ieee80211::ReasonCode>(e->reason), false);
     else
       // E_DISASSOC
       brcmf_notify_disassoc(ifp->ndev, ZX_OK);

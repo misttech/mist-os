@@ -25,6 +25,7 @@
 #include <wlan/common/ieee80211_codes.h>
 #include <wlan/common/mac_frame.h>
 
+#include "fidl/fuchsia.wlan.ieee80211/cpp/common_types.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/data_plane.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/device.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/device_context.h"
@@ -147,9 +148,7 @@ void WlanInterface::Start(StartRequestView request, fdf::Arena& arena,
   }
 
   NXPF_INFO("Starting wlan_fullmac interface");
-  {
-    fullmac_ifc_ = std::make_unique<WlanFullmacIfc>(std::move(request->ifc));
-  }
+  { fullmac_ifc_ = std::make_unique<WlanFullmacIfc>(std::move(request->ifc)); }
   is_up_ = true;
 
   completer.buffer(arena).ReplySuccess(std::move(mlme_channel_));
@@ -190,9 +189,8 @@ void WlanInterface::OnEapolTransmitted(zx_status_t status, const uint8_t* dst_ad
   // This work cannot be run on this thread since it's triggered from the mlan main process. There
   // are locks in fullmac that could block this call if fullmac is calling into this driver and
   // causes something to wait for the mlan main process to run.
-  status = async::PostTask(context_->device_->GetDispatcher(), [this, res = &response] {
-    fullmac_ifc_->EapolConf(res);
-  });
+  status = async::PostTask(context_->device_->GetDispatcher(),
+                           [this, res = &response] { fullmac_ifc_->EapolConf(res); });
   if (status != ZX_OK) {
     NXPF_ERR("Failed to schedule EAPOL transmit confirmation: %s", zx_status_get_string(status));
   }
@@ -436,7 +434,7 @@ void WlanInterface::DeauthReq(DeauthReqRequestView request, fdf::Arena& arena,
   if (role_ == fuchsia_wlan_common::wire::WlanMacRole::kAp) {
     // Deauth the specified client associated to the SoftAP.
     zx_status_t status = soft_ap_.DeauthSta(request->req.peer_sta_address.data(),
-                                            static_cast<uint16_t>(request->req.reason_code));
+                                            fidl::ToUnderlying(request->req.reason_code));
     if (status != ZX_OK) {
       // Deauth request failed, respond to SME anyway since there is no way to indicate status.
       wlan_fullmac_deauth_confirm_t resp{};
@@ -456,9 +454,9 @@ void WlanInterface::DeauthReq(DeauthReqRequestView request, fdf::Arena& arena,
     ConfirmDeauth();
   };
 
-  zx_status_t status = client_connection_.Disconnect(
-      request->req.peer_sta_address.data(), static_cast<uint16_t>(request->req.reason_code),
-      std::move(on_disconnect));
+  zx_status_t status = client_connection_.Disconnect(request->req.peer_sta_address.data(),
+                                                     fidl::ToUnderlying(request->req.reason_code),
+                                                     std::move(on_disconnect));
   if (status != ZX_OK) {
     // The request didn't work, send the notification right away.
     ConfirmDeauth();
@@ -499,9 +497,9 @@ void WlanInterface::DisassocReq(DisassocReqRequestView request, fdf::Arena& aren
     ConfirmDisassoc(status);
   };
 
-  zx_status_t status = client_connection_.Disconnect(
-      request->req.peer_sta_address.data(), static_cast<uint16_t>(request->req.reason_code),
-      std::move(on_disconnect));
+  zx_status_t status = client_connection_.Disconnect(request->req.peer_sta_address.data(),
+                                                     fidl::ToUnderlying(request->req.reason_code),
+                                                     std::move(on_disconnect));
   if (status != ZX_OK) {
     // The request didn't work, send the notification right away.
     ConfirmDisassoc(status);

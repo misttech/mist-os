@@ -57,6 +57,12 @@ zx_status_t DeviceInspect::Create(async_dispatcher_t* dispatcher,
     return status;
   }
 
+  inspect->high_wme_rx_error_rate_ = inspect->root_.CreateUint("high_wme_rx_error_rate", 0);
+  if ((status = inspect->high_wme_rx_error_rate_24hrs_.Init(
+           &inspect->root_, 24, "high_wme_rx_error_rate_24hrs", 0)) != ZX_OK) {
+    return status;
+  }
+
   DeviceConnMetrics& conn_metrics_ = inspect->conn_metrics_;
   conn_metrics_.root = inspect->root_.CreateChild("connection-metrics");
   conn_metrics_.success = conn_metrics_.root.CreateUint("success", 0);
@@ -101,6 +107,7 @@ zx_status_t DeviceInspect::Create(async_dispatcher_t* dispatcher,
         inspect->conn_metrics_.auth_fail_24hrs.SlideWindow();
         inspect->conn_metrics_.other_fail_24hrs.SlideWindow();
         inspect->low_data_rate_24hrs_.SlideWindow();
+        inspect->high_wme_rx_error_rate_24hrs_.SlideWindow();
       },
       kPeriodic);
   inspect->timer_hr_->Start(zx::hour(1).get());
@@ -154,6 +161,11 @@ void DeviceInspect::LogApSetSsidErr() {
 void DeviceInspect::LogLowDataRate() {
   low_data_rate_.Add(1);
   low_data_rate_24hrs_.Add(1);
+}
+
+void DeviceInspect::LogHighWmeRxErrorRate() {
+  high_wme_rx_error_rate_.Add(1);
+  high_wme_rx_error_rate_24hrs_.Add(1);
 }
 
 }  // namespace wlan::brcmfmac

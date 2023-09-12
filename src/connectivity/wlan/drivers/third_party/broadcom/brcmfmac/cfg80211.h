@@ -63,8 +63,10 @@ namespace wlan_common = fuchsia_wlan_common::wire;
 #define BRCMF_ROAM_TIMER_DUR              ZX_SEC(1) /* Roam timer duration */
 // The time threshold to distinguish whether the device encounters an rx freeze.
 #define BRCMF_RX_FREEZE_THRESHOLD         ZX_MIN(1)
-// Maximum number of times we can trigger a deauth for an rx freeze per hour
-#define BRCMF_RX_FREEZE_MAX_DEAUTHS_PER_HOUR 2
+// The time period to wait before which the connection is flagged for high wme rx error rate.
+#define BRCMF_HIGH_WME_RX_ERROR_RATE_PERIOD_THRESHOLD ZX_MIN(1)
+// Maximum number of times we can trigger a deauth for data path errors.
+#define BRCMF_MAX_DEAUTHS_PER_HOUR 2
 // FW data rate stuck at a low value for at least this long.
 #define BRCMF_LOW_DATA_RATE_DUR_THRESHOLD           ZX_MIN(5)
 // Reset the low data rate counter (if it has been stuck that long) so it can be logged into inspect
@@ -74,6 +76,9 @@ namespace wlan_common = fuchsia_wlan_common::wire;
 // Thresholds to trigger additional debug information.
 #define BRCMF_LOW_DATA_RATE_THRESHOLD     (6)     // 6Mbps
 #define BRCMF_HIGH_ERR_RATE_THRESHOLD     (0.05)  // 5% packet err rate.
+
+// WME error threshold to trigger a deauth.
+#define BRCMF_WME_BAD_PKT_THRESHOLD       (0.4)   // 40% of rx packets.
 
 #define WL_ESCAN_ACTION_START      1
 #define WL_ESCAN_ACTION_CONTINUE   2

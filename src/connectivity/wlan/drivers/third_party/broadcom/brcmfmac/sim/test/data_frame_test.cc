@@ -4,17 +4,21 @@
 
 #include <fuchsia/wlan/common/c/banjo.h>
 #include <fuchsia/wlan/internal/c/banjo.h>
+#include <lib/inspect/cpp/hierarchy.h>
+#include <lib/inspect/cpp/inspect.h>
 #include <zircon/errors.h>
 
 #include <array>
 #include <cstdint>
 #include <vector>
 
+#include "fidl/fuchsia.wlan.ieee80211/cpp/wire_types.h"
 #include "fuchsia/hardware/network/driver/c/banjo.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-fake-ap/sim-fake-ap.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_utils.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/test/sim_test.h"
+#include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/test/device_inspect_test_utils.h"
 #include "src/connectivity/wlan/lib/common/cpp/include/wlan/common/macaddr.h"
 
 // infrastructure BSS diagram:
@@ -156,6 +160,19 @@ class DataFrameTest : public SimTest {
   void OnEapolInd(const wlan_fullmac::WlanFullmacEapolIndication* ind);
 
  protected:
+  void GetHighWmeRxErrorRateInspectCount(uint64_t* out_count) {
+    ASSERT_NOT_NULL(out_count);
+    auto hierarchy = FetchHierarchy(device_->GetInspect()->inspector());
+    auto* root = hierarchy.value().GetByPath({"brcmfmac-phy"});
+    ASSERT_NE(nullptr, root);
+    // Only verify the value of hourly counter here, the relationship between hourly counter and
+    // daily counter is verified in device_inspect_test.
+    auto* uint_property =
+        root->node().get_property<inspect::UintPropertyValue>("high_wme_rx_error_rate");
+    ASSERT_NE(nullptr, uint_property);
+    *out_count = uint_property->value();
+  }
+
   struct AssocContext {
     // Information about the BSS we are attempting to associate with. Used to generate the
     // appropriate MLME calls (Join => Auth => Assoc).
@@ -172,6 +189,10 @@ class DataFrameTest : public SimTest {
 
     // Track number of deauth indications.
     size_t deauth_ind_count = 0;
+
+    // Track the last received deauth reason code.
+    fuchsia_wlan_ieee80211::wire::ReasonCode last_deauth_reason_code =
+        static_cast<fuchsia_wlan_ieee80211::wire::ReasonCode>(0);
   };
 
   // Context for managing eapol callbacks
@@ -209,7 +230,8 @@ class DataFrameTest : public SimTest {
 
   bool assoc_check_for_eapol_rx_ = false;
 
-  bool testing_rx_freeze_deauth_ = false;
+  bool testing_driver_triggered_deauth_ = false;
+  bool testing_rx_freeze_ = false;
 
  private:
   // StationIfc overrides
@@ -277,11 +299,13 @@ void DataFrameTest::Finish() {
 }
 
 void DataFrameTest::OnDeauthInd(const wlan_fullmac::WlanFullmacDeauthIndication* ind) {
-  if (!testing_rx_freeze_deauth_) {
-    // This function is only used for rx freeze deauth testing now.
+  if (!testing_driver_triggered_deauth_) {
+    // This function is only used driver initiated deauth testing.
     return;
   }
+
   assoc_context_.deauth_ind_count++;
+  assoc_context_.last_deauth_reason_code = ind->reason_code;
   assoc_context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
   // Do a re-association right after deauth.
   env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), zx::msec(200));
@@ -311,16 +335,20 @@ void DataFrameTest::OnEapolInd(const wlan_fullmac::WlanFullmacEapolIndication* i
 }
 
 void DataFrameTest::OnSignalReport(const wlan_fullmac::WlanFullmacSignalReportIndication* ind) {
-  if (!testing_rx_freeze_deauth_) {
-    // This function is only used for rx freeze deauth testing now.
+  if (!testing_driver_triggered_deauth_) {
+    // This function is only used for driver initiated deauth testing now.
     return;
   }
-  // Transmit a frame to AP right after each signal report to increase tx count and hold rx count.
-  constexpr uint16_t kFrameId = 123;
-  auto transmit = [&](void) {
-    device_->DataPath().TxEthernet(kFrameId, kClientMacAddress, ifc_mac_, ETH_P_IP, kSampleEthBody);
-  };
-  env_->ScheduleNotification(transmit, zx::msec(200));
+
+  if (testing_rx_freeze_) {
+    // Transmit a frame to AP right after each signal report to increase tx count and hold rx count.
+    constexpr uint16_t kFrameId = 123;
+    auto transmit = [&](void) {
+      device_->DataPath().TxEthernet(kFrameId, kClientMacAddress, ifc_mac_, ETH_P_IP,
+                                     kSampleEthBody);
+    };
+    env_->ScheduleNotification(transmit, zx::msec(200));
+  }
 }
 
 void DataFrameTest::OnDisassocInd(const wlan_fullmac::WlanFullmacDisassocIndication* ind) {}
@@ -655,7 +683,8 @@ TEST_F(DataFrameTest, RxUcastBeforeAssoc) {
 }
 
 TEST_F(DataFrameTest, DeauthWhenRxFreeze) {
-  testing_rx_freeze_deauth_ = true;
+  testing_driver_triggered_deauth_ = true;
+  testing_rx_freeze_ = true;
 
   constexpr zx::duration kFirstAssocDelay = zx::msec(1);
   constexpr zx::duration kRxFreezeTestDuration = zx::hour(1);
@@ -673,17 +702,110 @@ TEST_F(DataFrameTest, DeauthWhenRxFreeze) {
   env_->Run(kRxFreezeTestDuration);
 
   // One deauth should be triggered and a deauth_ind was sent to SME, and there should be only two
-  // deauths triggered in the one hour test.
-  EXPECT_EQ(assoc_context_.deauth_ind_count, (size_t)BRCMF_RX_FREEZE_MAX_DEAUTHS_PER_HOUR);
+  // deauths triggered in the one hour test. Also this should carry reason code FwRxStalled.
+  EXPECT_EQ(assoc_context_.deauth_ind_count, (size_t)BRCMF_MAX_DEAUTHS_PER_HOUR);
+  EXPECT_EQ(assoc_context_.last_deauth_reason_code,
+            fuchsia_wlan_ieee80211::wire::ReasonCode::kFwRxStalled);
+
   // The device got reconnected after deauth.
   EXPECT_EQ(ap.GetNumAssociatedClient(), 1U);
 
   // Run the test for another one hour,  verify that additional deauths can be triggered.
   env_->Run(kRxFreezeTestDuration);
 
-  EXPECT_EQ(assoc_context_.deauth_ind_count, (size_t)(2 * BRCMF_RX_FREEZE_MAX_DEAUTHS_PER_HOUR));
+  EXPECT_EQ(assoc_context_.deauth_ind_count, (size_t)(2 * BRCMF_MAX_DEAUTHS_PER_HOUR));
   // The device got reconnected after deauth.
   EXPECT_EQ(ap.GetNumAssociatedClient(), 1U);
+}
+
+TEST_F(DataFrameTest, WmeRxErrorHighDeauthTest) {
+  testing_driver_triggered_deauth_ = true;
+
+  constexpr zx::duration kFirstAssocDelay = zx::msec(1);
+  constexpr zx::duration kWmeRxErrorTestDuration = zx::hour(1);
+
+  // Create our device instance
+  Init();
+
+  // Start a fake AP
+  simulation::FakeAp ap(env_.get(), kApBssid, kApSsid, kDefaultChannel);
+  aps_.push_back(&ap);
+
+  assoc_context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
+  env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), kFirstAssocDelay);
+
+  // Set sim fw to return high wme rx error
+  device_->GetSim()->sim_fw->SetHighWmeRxErrorRate();
+
+  // Ensure inspect metric is 0 at the start.
+  uint64_t count;
+  GetHighWmeRxErrorRateInspectCount(&count);
+  EXPECT_EQ(count, 0u);
+
+  env_->Run(kWmeRxErrorTestDuration);
+
+  // One deauth should be triggered and a deauth_ind was sent to SME, and there should be only two
+  // deauths triggered in the one hour test. Also this should carry reason code FwRxStalled.
+  EXPECT_EQ(assoc_context_.deauth_ind_count, (size_t)BRCMF_MAX_DEAUTHS_PER_HOUR);
+  EXPECT_EQ(assoc_context_.last_deauth_reason_code,
+            fuchsia_wlan_ieee80211::wire::ReasonCode::kFwHighWmeRxErrRate);
+
+  // The device got reconnected after deauth.
+  EXPECT_EQ(ap.GetNumAssociatedClient(), 1U);
+  GetHighWmeRxErrorRateInspectCount(&count);
+  // The high error trigger kicks in only after (BRCMF_RX_FREEZE_THRESHOLD /
+  // BRCMF_CONNECT_LOG_DUR)th occurrences of log callback, so we subtract those.
+  EXPECT_EQ(count, (kWmeRxErrorTestDuration.get() / BRCMF_CONNECT_LOG_DUR) -
+                       ((BRCMF_RX_FREEZE_THRESHOLD / BRCMF_CONNECT_LOG_DUR) - 1));
+
+  // Run the test for another one hour,  verify that additional deauths can be triggered.
+  env_->Run(kWmeRxErrorTestDuration);
+
+  EXPECT_EQ(assoc_context_.deauth_ind_count, (size_t)(2 * BRCMF_MAX_DEAUTHS_PER_HOUR));
+  // The device got reconnected after deauth.
+  EXPECT_EQ(ap.GetNumAssociatedClient(), 1U);
+  // Ensure that inspect counter is non-zero.
+  GetHighWmeRxErrorRateInspectCount(&count);
+  // The high error trigger kicks in only after (BRCMF_RX_FREEZE_THRESHOLD /
+  // BRCMF_CONNECT_LOG_DUR)th occurrences of log callback, so we subtract those.
+  EXPECT_EQ(count, (2 * (kWmeRxErrorTestDuration.get() / BRCMF_CONNECT_LOG_DUR)) -
+                       ((BRCMF_RX_FREEZE_THRESHOLD / BRCMF_CONNECT_LOG_DUR) - 1));
+}
+
+TEST_F(DataFrameTest, WmeRxErrorHighResetTest) {
+  testing_driver_triggered_deauth_ = true;
+
+  constexpr zx::duration kFirstAssocDelay = zx::msec(1);
+  constexpr zx::duration kWmeRxErrorTestDuration = zx::sec(45);
+
+  // Create our device instance
+  Init();
+
+  // Start a fake AP
+  simulation::FakeAp ap(env_.get(), kApBssid, kApSsid, kDefaultChannel);
+  aps_.push_back(&ap);
+
+  assoc_context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
+  env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), kFirstAssocDelay);
+
+  uint64_t count;
+  GetHighWmeRxErrorRateInspectCount(&count);
+  EXPECT_EQ(count, 0u);
+
+  // Alternate stats to return high rx error, and no rx error. This should create a scenario where
+  // there is no prolonged periods of high error rate, causing this trigger to not kicked.
+  device_->GetSim()->sim_fw->SetHighWmeRxErrorRate();
+  env_->Run(kWmeRxErrorTestDuration);
+  device_->GetSim()->sim_fw->ClearHighWmeRxErrorRate();
+  env_->Run(kWmeRxErrorTestDuration);
+  device_->GetSim()->sim_fw->SetHighWmeRxErrorRate();
+  env_->Run(kWmeRxErrorTestDuration);
+  device_->GetSim()->sim_fw->ClearHighWmeRxErrorRate();
+  env_->Run(kWmeRxErrorTestDuration);
+
+  // Ensure that inspect metrics has not incremented.
+  GetHighWmeRxErrorRateInspectCount(&count);
+  EXPECT_EQ(count, 0u);
 }
 
 }  // namespace wlan::brcmfmac

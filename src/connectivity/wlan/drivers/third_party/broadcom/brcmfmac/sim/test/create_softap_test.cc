@@ -404,7 +404,6 @@ void CreateSoftAPTest::DeauthClient(common::MacAddr client_mac) {
   wlan_fullmac::WlanFullmacDeauthReq req;
 
   memcpy(req.peer_sta_address.data(), client_mac.byte, ETH_ALEN);
-  req.reason_code = wlan_ieee80211::ReasonCode::kReserved0;
 
   auto result = softap_ifc_.client_.buffer(softap_ifc_.test_arena_)->DeauthReq(req);
   EXPECT_TRUE(result.ok());

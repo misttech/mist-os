@@ -258,19 +258,6 @@ fuchsia_wlan_fullmac::wire::WlanAuthResult ConvertAuthResult(uint8_t in) {
   }
 }
 
-fuchsia_wlan_ieee80211::wire::ReasonCode ConvertReasonCode(uint16_t reason_code) {
-  if (0 == reason_code) {
-    return fuchsia_wlan_ieee80211::wire::ReasonCode::kReserved0;
-  }
-  if (67 <= reason_code && reason_code <= 127) {
-    return fuchsia_wlan_ieee80211::wire::ReasonCode::kReserved67To127;
-  }
-  if (130 <= reason_code && reason_code <= UINT16_MAX) {
-    return fuchsia_wlan_ieee80211::wire::ReasonCode::kReserved130To65535;
-  }
-  return static_cast<fuchsia_wlan_ieee80211::wire::ReasonCode>(reason_code);
-}
-
 fuchsia_wlan_fullmac::wire::WlanAssocResult ConvertAssocResult(uint8_t code) {
   switch (code) {
     case WLAN_ASSOC_RESULT_SUCCESS:
@@ -769,26 +756,11 @@ void ConvertAuthInd(const fuchsia_wlan_fullmac::wire::WlanFullmacAuthInd& in,
   out->auth_type = ConvertWlanAuthType(in.auth_type);
 }
 
-uint16_t ConvertReasonCode(fuchsia_wlan_ieee80211::wire::ReasonCode reason_code) {
-  uint16_t code = static_cast<uint16_t>(reason_code);
-
-  if (0 == code) {
-    return REASON_CODE_RESERVED_0;
-  }
-  if (67 <= code && code <= 127) {
-    return REASON_CODE_RESERVED_67_TO_127;
-  }
-  if (130 <= code && code <= UINT16_MAX) {
-    return REASON_CODE_RESERVED_130_TO_65535;
-  }
-  return code;
-}
-
 void ConvertDeauthInd(const fuchsia_wlan_fullmac::wire::WlanFullmacDeauthIndication& in,
                       wlan_fullmac_deauth_indication_t* out) {
   memcpy(out->peer_sta_address, in.peer_sta_address.data(),
          fuchsia_wlan_ieee80211::wire::kMacAddrLen);
-  out->reason_code = ConvertReasonCode(in.reason_code);
+  out->reason_code = static_cast<reason_code_t>(in.reason_code);
   out->locally_initiated = in.locally_initiated;
 }
 
@@ -815,7 +787,7 @@ void ConvertDisassocInd(const fuchsia_wlan_fullmac::wire::WlanFullmacDisassocInd
                         wlan_fullmac_disassoc_indication_t* out) {
   memcpy(out->peer_sta_address, in.peer_sta_address.data(),
          fuchsia_wlan_ieee80211::wire::kMacAddrLen);
-  out->reason_code = ConvertReasonCode(in.reason_code);
+  out->reason_code = static_cast<reason_code_t>(in.reason_code);
   out->locally_initiated = in.locally_initiated;
 }
 

@@ -203,7 +203,7 @@ impl InfraBss {
     ) -> Result<(), Error> {
         let client = get_client_mut(&mut self.clients, req.peer_sta_address)?;
         client
-            .handle_mlme_disassoc_req(ctx, req.reason_code as u16)
+            .handle_mlme_disassoc_req(ctx, req.reason_code.into_primitive())
             .map_err(|e| make_client_error(client.addr, e))
     }
 

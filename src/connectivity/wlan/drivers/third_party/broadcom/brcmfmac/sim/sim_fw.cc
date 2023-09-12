@@ -160,6 +160,7 @@ zx_status_t SimFirmware::SetupIovarTable() {
       {"wstats_counters", sizeof(wl_wstats_cnt_t), nullptr, &SimFirmware::IovarWstatsCountersGet},
       {"buf_key_b4_m4", sizeof(uint32_t), &SimFirmware::IovarSet, &SimFirmware::IovarGet,
        std::nullopt, &buf_key_b4_m4_},
+      {"wme_counters", sizeof(wl_wme_cnt_t), nullptr, &SimFirmware::IovarWmeCounterGet},
   };
 
   for (const auto& it : kIovarInfoTable) {
@@ -1045,7 +1046,8 @@ void SimFirmware::HandleAssocReq(std::shared_ptr<const simulation::SimAssocReqFr
     // casted value as (presumably) existing APs may err in doing.
     simulation::SimAssocRespFrame assoc_resp_frame(
         frame->bssid_, frame->src_addr_,
-        static_cast<wlan_ieee80211::StatusCode>(wlan_ieee80211::ReasonCode::kNotAuthenticated));
+        static_cast<wlan_ieee80211::StatusCode>(
+            fidl::ToUnderlying(wlan_ieee80211::ReasonCode::kNotAuthenticated)));
     hw_.Tx(assoc_resp_frame);
     BRCMF_DBG(SIM, "Assoc fail, should be authenticated first.");
   }
@@ -1501,27 +1503,26 @@ bool SimFirmware::FindAndRemoveClient(const common::MacAddr client_mac, bool mot
           // When this client is authenticated but not associated, only send up BRCMF_E_DEAUTH_IND
           // to driver.
           SendEventToDriver(0, nullptr, BRCMF_E_DEAUTH_IND, BRCMF_E_STATUS_SUCCESS,
-                            softap_ifidx_.value(), nullptr, 0, static_cast<uint32_t>(deauth_reason),
+                            softap_ifidx_.value(), nullptr, 0, fidl::ToUnderlying(deauth_reason),
                             client_mac);
         } else if (client->state == Client::ASSOCIATED) {
           // When this client is associated, send both BRCMF_E_DEAUTH_IND and BRCMF_E_DISASSOC_IND
           // events up to driver.
           SendEventToDriver(0, nullptr, BRCMF_E_DEAUTH_IND, BRCMF_E_STATUS_SUCCESS,
-                            softap_ifidx_.value(), nullptr, 0, static_cast<uint32_t>(deauth_reason),
+                            softap_ifidx_.value(), nullptr, 0, fidl::ToUnderlying(deauth_reason),
                             client_mac);
-          SendEventToDriver(
-              0, nullptr, BRCMF_E_DISASSOC_IND, BRCMF_E_STATUS_SUCCESS, softap_ifidx_.value(),
-              nullptr, BRCMF_EVENT_MSG_LINK,
-              static_cast<uint32_t>(wlan_ieee80211::ReasonCode::kLeavingNetworkDisassoc),
-              client_mac);
+          SendEventToDriver(0, nullptr, BRCMF_E_DISASSOC_IND, BRCMF_E_STATUS_SUCCESS,
+                            softap_ifidx_.value(), nullptr, BRCMF_EVENT_MSG_LINK,
+                            fidl::ToUnderlying(wlan_ieee80211::ReasonCode::kLeavingNetworkDisassoc),
+                            client_mac);
         }
       } else {
         BRCMF_DBG(SIM, "deauth_reason is not used.");
         // The removal is triggered by a disassoc frame.
-        SendEventToDriver(
-            0, nullptr, BRCMF_E_DISASSOC_IND, BRCMF_E_STATUS_SUCCESS, softap_ifidx_.value(),
-            nullptr, BRCMF_EVENT_MSG_LINK,
-            static_cast<uint32_t>(wlan_ieee80211::ReasonCode::kLeavingNetworkDisassoc), client_mac);
+        SendEventToDriver(0, nullptr, BRCMF_E_DISASSOC_IND, BRCMF_E_STATUS_SUCCESS,
+                          softap_ifidx_.value(), nullptr, BRCMF_EVENT_MSG_LINK,
+                          fidl::ToUnderlying(wlan_ieee80211::ReasonCode::kLeavingNetworkDisassoc),
+                          client_mac);
       }
 
       clients.remove(client);
@@ -1554,8 +1555,8 @@ std::vector<brcmf_wsec_key_le> SimFirmware::GetKeyList(uint16_t ifidx) {
 }
 
 void SimFirmware::RxDeauthReq(std::shared_ptr<const simulation::SimDeauthFrame> frame) {
-  BRCMF_DBG(SIM, "Deauth from %s for %s reason: %d", MACSTR(frame->src_addr_),
-            MACSTR(frame->dst_addr_), static_cast<int>(frame->reason_));
+  BRCMF_DBG(SIM, "Deauth from %s for %s reason: %u", MACSTR(frame->src_addr_),
+            MACSTR(frame->dst_addr_), static_cast<uint16_t>(frame->reason_));
   // First check if this is a deauth meant for a client associated to our SoftAP
   auto ifidx = GetIfidxByMac(frame->dst_addr_);
   if (ifidx == -1) {
@@ -1617,8 +1618,8 @@ wlan_common::WlanChannel SimFirmware::GetIfChannel(bool is_ap) {
 
 // This routine for now only handles Disassoc Request meant for the SoftAP IF.
 void SimFirmware::RxDisassocReq(std::shared_ptr<const simulation::SimDisassocReqFrame> frame) {
-  BRCMF_DBG(SIM, "Disassoc from %s for %s reason: %d", MACSTR(frame->src_addr_),
-            MACSTR(frame->dst_addr_), static_cast<int>(frame->reason_));
+  BRCMF_DBG(SIM, "Disassoc from %s for %s reason: %u", MACSTR(frame->src_addr_),
+            MACSTR(frame->dst_addr_), fidl::ToUnderlying(frame->reason_));
   // First check if this is a disassoc meant for a client associated to our SoftAP
   auto ifidx = GetIfidxByMac(frame->dst_addr_);
   if (ifidx == -1) {
@@ -1947,7 +1948,7 @@ void SimFirmware::HandleDisconnectForClientIF(
   if (frame->MgmtFrameType() == simulation::SimManagementFrame::FRAME_TYPE_DEAUTH) {
     // The client could receive a deauth even after disassociation. Notify the driver always
     SendEventToDriver(0, nullptr, BRCMF_E_DEAUTH_IND, BRCMF_E_STATUS_SUCCESS, kClientIfidx, 0, 0,
-                      static_cast<uint32_t>(reason));
+                      fidl::ToUnderlying(reason));
     if (auth_state_.state == AuthState::AUTHENTICATED) {
       AuthClearContext();
     }
@@ -1970,10 +1971,10 @@ void SimFirmware::SetStateToDisassociated(wlan_ieee80211::ReasonCode reason,
   DisableBeaconWatchdog();
   // Send the appropriate event to driver.
   SendEventToDriver(0, nullptr, locally_initiated ? BRCMF_E_DISASSOC : BRCMF_E_DISASSOC_IND,
-                    BRCMF_E_STATUS_SUCCESS, kClientIfidx, nullptr, 0, static_cast<uint32_t>(reason),
+                    BRCMF_E_STATUS_SUCCESS, kClientIfidx, nullptr, 0, fidl::ToUnderlying(reason),
                     assoc_state_.opts->bssid, kDisassocEventDelay);
   SendEventToDriver(0, nullptr, BRCMF_E_LINK, BRCMF_E_STATUS_SUCCESS, kClientIfidx, nullptr, 0,
-                    static_cast<uint32_t>(reason), assoc_state_.opts->bssid, kLinkEventDelay);
+                    fidl::ToUnderlying(reason), assoc_state_.opts->bssid, kLinkEventDelay);
 }
 
 void SimFirmware::SetTargetBssInfo(const brcmf_bss_info_le& bss_info, cpp20::span<uint8_t> ie_buf) {
@@ -2763,6 +2764,29 @@ zx_status_t SimFirmware::IovarWmeAcStaGet(SimIovarGetReq* req) {
 zx_status_t SimFirmware::IovarWmeApsdGet(SimIovarGetReq* req) {
   uint32_t* result_ptr = static_cast<uint32_t*>(req->value);
   *result_ptr = 1;
+  return ZX_OK;
+}
+
+zx_status_t SimFirmware::IovarWmeCounterGet(SimIovarGetReq* req) {
+  auto wme_cnt = static_cast<wl_wme_cnt_t*>(req->value);
+  auto version = wme_cnt->version;
+  auto length = wme_cnt->length;
+
+  memset(wme_cnt, 0, sizeof(*wme_cnt));
+
+  // Use high ratio of Rx failure when this config is set.
+  if (wme_high_rx_fail_) {
+    wme_rx_be_good_cnt_ += wme_rx_be_good_inc_;
+    wme_rx_be_bad_cnt_ += wme_rx_be_bad_inc_;
+  }
+
+  wme_cnt->rx[AC_BE].packets = wme_rx_be_good_cnt_;
+  wme_cnt->rx_failed[AC_BE].packets = wme_rx_be_bad_cnt_;
+
+  // Restore version and length
+  wme_cnt->version = version;
+  wme_cnt->length = length;
+
   return ZX_OK;
 }
 

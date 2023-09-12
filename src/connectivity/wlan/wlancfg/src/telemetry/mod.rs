@@ -65,6 +65,8 @@ const USER_RESTART_TIME_THRESHOLD: zx::Duration = zx::Duration::from_seconds(5);
 pub const METRICS_SHORT_CONNECT_DURATION: zx::Duration = zx::Duration::from_seconds(90);
 // Minimum connection duration for logging average connection score deltas.
 pub const AVERAGE_SCORE_DELTA_MINIMUM_DURATION: zx::Duration = zx::Duration::from_seconds(30);
+// Maximum value of reason code accepted by cobalt metrics (set by max_event_code)
+pub const COBALT_REASON_CODE_MAX: u16 = 1000;
 
 #[derive(Clone, Debug, PartialEq)]
 // Connection score and the time at which it was calculated.
@@ -138,7 +140,7 @@ pub struct DisconnectInfo {
 pub trait DisconnectSourceExt {
     fn inspect_string(&self) -> String;
     fn flattened_reason_code(&self) -> u32;
-    fn raw_reason_code(&self) -> u16;
+    fn cobalt_reason_code(&self) -> u16;
     fn locally_initiated(&self) -> bool;
 }
 
@@ -165,17 +167,26 @@ impl DisconnectSourceExt for fidl_sme::DisconnectSource {
     /// This is mainly used for metric.
     fn flattened_reason_code(&self) -> u32 {
         match self {
-            fidl_sme::DisconnectSource::Ap(cause) => cause.reason_code as u32,
+            fidl_sme::DisconnectSource::Ap(cause) => cause.reason_code.into_primitive() as u32,
             fidl_sme::DisconnectSource::User(reason) => (1u32 << 16) + *reason as u32,
-            fidl_sme::DisconnectSource::Mlme(cause) => (1u32 << 17) + cause.reason_code as u32,
+            fidl_sme::DisconnectSource::Mlme(cause) => {
+                (1u32 << 17) + (cause.reason_code.into_primitive() as u32)
+            }
         }
     }
 
-    fn raw_reason_code(&self) -> u16 {
+    fn cobalt_reason_code(&self) -> u16 {
         match self {
-            fidl_sme::DisconnectSource::Ap(cause) => cause.reason_code as u16,
-            fidl_sme::DisconnectSource::User(reason) => *reason as u16,
-            fidl_sme::DisconnectSource::Mlme(cause) => cause.reason_code as u16,
+            // Cobalt metrics expects reason_code value to be less than COBALT_REASON_CODE_MAX.
+            fidl_sme::DisconnectSource::Ap(cause) => {
+                std::cmp::min(cause.reason_code.into_primitive(), COBALT_REASON_CODE_MAX)
+            }
+            fidl_sme::DisconnectSource::User(reason) => {
+                std::cmp::min(*reason as u16, COBALT_REASON_CODE_MAX)
+            }
+            fidl_sme::DisconnectSource::Mlme(cause) => {
+                std::cmp::min(cause.reason_code.into_primitive(), COBALT_REASON_CODE_MAX)
+            }
         }
     }
 
@@ -2203,7 +2214,7 @@ impl StatsLogger {
         metric_events.push(MetricEvent {
             metric_id: metrics::DISCONNECT_BREAKDOWN_BY_REASON_CODE_METRIC_ID,
             event_codes: vec![
-                disconnect_info.disconnect_source.raw_reason_code() as u32,
+                disconnect_info.disconnect_source.cobalt_reason_code() as u32,
                 disconnect_source_dim as u32,
             ],
             payload: MetricEventPayload::Count(1),
@@ -2473,7 +2484,7 @@ impl StatsLogger {
             metrics::DOWNTIME_BREAKDOWN_BY_DISCONNECT_REASON_METRIC_ID,
             downtime.into_micros(),
             &[
-                disconnect_info.disconnect_source.raw_reason_code() as u32,
+                disconnect_info.disconnect_source.cobalt_reason_code() as u32,
                 disconnect_source_dim as u32
             ],
         );

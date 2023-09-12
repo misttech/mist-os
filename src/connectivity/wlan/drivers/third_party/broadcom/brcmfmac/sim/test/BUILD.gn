@@ -263,6 +263,7 @@ executable("data_frame_test") {
     "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_banjo_c",
     "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
     "//src/connectivity/wlan/drivers/testing/lib/sim-fake-ap",
+    "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/test:device_inspect_utils",
     "//src/connectivity/wlan/lib/common/cpp:common",
   ]
 

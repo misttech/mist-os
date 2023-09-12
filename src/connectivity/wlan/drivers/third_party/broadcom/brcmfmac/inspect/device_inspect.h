@@ -60,6 +60,7 @@ class DeviceInspect {
   void LogSdioMaxTxSeqErr();
   void LogApSetSsidErr();
   void LogLowDataRate();
+  void LogHighWmeRxErrorRate();
 
  private:
   // Only constructible through Create().
@@ -83,6 +84,8 @@ class DeviceInspect {
   WindowedUintProperty ap_set_ssid_err_24hrs_;
   inspect::UintProperty low_data_rate_;
   WindowedUintProperty low_data_rate_24hrs_;
+  inspect::UintProperty high_wme_rx_error_rate_;
+  WindowedUintProperty high_wme_rx_error_rate_24hrs_;
 };
 
 }  // namespace wlan::brcmfmac

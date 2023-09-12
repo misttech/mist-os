@@ -301,16 +301,7 @@ void WlanFullmacIfc::DeauthInd(const wlan_fullmac_deauth_indication_t* ind) {
   fuchsia_wlan_fullmac::wire::WlanFullmacDeauthIndication fidl_ind;
   memcpy(fidl_ind.peer_sta_address.data(), ind->peer_sta_address,
          fuchsia_wlan_ieee80211::wire::kMacAddrLen);
-
-  if (0 == ind->reason_code) {
-    fidl_ind.reason_code = fuchsia_wlan_ieee80211::wire::ReasonCode::kReserved0;
-  } else if (67 <= ind->reason_code && ind->reason_code <= 127) {
-    fidl_ind.reason_code = fuchsia_wlan_ieee80211::wire::ReasonCode::kReserved67To127;
-  } else if (130 <= ind->reason_code && ind->reason_code <= UINT16_MAX) {
-    fidl_ind.reason_code = fuchsia_wlan_ieee80211::wire::ReasonCode::kReserved130To65535;
-  } else {
-    fidl_ind.reason_code = static_cast<fuchsia_wlan_ieee80211::wire::ReasonCode>(ind->reason_code);
-  }
+  fidl_ind.reason_code = static_cast<fuchsia_wlan_ieee80211::wire::ReasonCode>(ind->reason_code);
   fidl_ind.locally_initiated = ind->locally_initiated;
 
   auto result = ifc_client_.buffer(*arena)->DeauthInd(fidl_ind);
@@ -390,15 +381,7 @@ void WlanFullmacIfc::DisassocInd(const wlan_fullmac_disassoc_indication_t* ind) 
   memcpy(fidl_ind.peer_sta_address.data(), ind->peer_sta_address,
          fuchsia_wlan_ieee80211::wire::kMacAddrLen);
 
-  if (0 == ind->reason_code) {
-    fidl_ind.reason_code = fuchsia_wlan_ieee80211::wire::ReasonCode::kReserved0;
-  } else if (67 <= ind->reason_code && ind->reason_code <= 127) {
-    fidl_ind.reason_code = fuchsia_wlan_ieee80211::wire::ReasonCode::kReserved67To127;
-  } else if (130 <= ind->reason_code && ind->reason_code <= UINT16_MAX) {
-    fidl_ind.reason_code = fuchsia_wlan_ieee80211::wire::ReasonCode::kReserved130To65535;
-  } else {
-    fidl_ind.reason_code = static_cast<fuchsia_wlan_ieee80211::wire::ReasonCode>(ind->reason_code);
-  }
+  fidl_ind.reason_code = static_cast<fuchsia_wlan_ieee80211::wire::ReasonCode>(ind->reason_code);
   fidl_ind.locally_initiated = ind->locally_initiated;
 
   auto result = ifc_client_.buffer(*arena)->DisassocInd(fidl_ind);

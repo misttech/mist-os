@@ -61,22 +61,6 @@ source_set("common") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("ieee80211_codes_test") {
-  output_name = "ieee80211_codes_test"
-  testonly = true
-  sources = [ "ieee80211_codes_test.cc" ]
-  deps = [
-    ":common",
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_hlcpp",
-    "//src/lib/fxl/test:gtest_main",
-  ]
-}
-
-fuchsia_unittest_package("ieee80211_codes_tests") {
-  package_name = "ieee80211-codes-tests"
-  deps = [ ":ieee80211_codes_test" ]
-}
-
 executable("mcs_rate_lookup_test") {
   output_name = "mcs_rate_lookup_test"
   testonly = true

@@ -119,27 +119,9 @@ constexpr bool IsValidStatusCode(T status_code) {
 
 }  // namespace
 
-uint16_t ConvertReasonCode(wlan_ieee80211::ReasonCode reason_code) {
-  // For every RESERVED_X_TO_Y value, this will return X.
-  return static_cast<uint16_t>(reason_code);
-}
-
 uint16_t ConvertStatusCode(wlan_ieee80211::StatusCode status) {
   ZX_ASSERT(IsValidStatusCode(status));
   return static_cast<uint16_t>(status);
-}
-
-wlan_ieee80211::ReasonCode ConvertReasonCode(uint16_t reason_code) {
-  if (0 == reason_code) {
-    return wlan_ieee80211::ReasonCode::RESERVED_0;
-  }
-  if (67 <= reason_code && reason_code <= 127) {
-    return wlan_ieee80211::ReasonCode::RESERVED_67_TO_127;
-  }
-  if (130 <= reason_code && reason_code <= UINT16_MAX) {
-    return wlan_ieee80211::ReasonCode::RESERVED_130_TO_65535;
-  }
-  return static_cast<wlan_ieee80211::ReasonCode>(reason_code);
 }
 
 wlan_ieee80211::StatusCode ConvertStatusCode(uint16_t status) {

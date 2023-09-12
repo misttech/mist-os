@@ -716,9 +716,7 @@ TEST_F(WlanInterfaceTest, WlanFullmacImplConnectDisconnectReq) {
   EXPECT_EQ(ifc_results_.report_ind_.snr_db, kTestSnr);
 
   constexpr uint8_t kTestPeerAddr[] = {1, 2, 3, 4, 5, 6};
-  fuchsia_wlan_fullmac::wire::WlanFullmacDeauthReq deauth_req = {
-      .reason_code = fuchsia_wlan_ieee80211::wire::ReasonCode::kReserved0,
-  };
+  fuchsia_wlan_fullmac::wire::WlanFullmacDeauthReq deauth_req;
   memcpy(deauth_req.peer_sta_address.data(), kTestPeerAddr, sizeof(kTestPeerAddr));
 
   {
@@ -1165,9 +1163,7 @@ TEST_F(WlanInterfaceTest, SoftApStaLocalDisconnect) {
   EXPECT_EQ(ifc_results_.assoc_ind_.listen_interval, 0);
 
   // Send a deauth request to disconnect the STA
-  fuchsia_wlan_fullmac::wire::WlanFullmacDeauthReq deauth_req = {
-      .reason_code = fuchsia_wlan_ieee80211::wire::ReasonCode::kReserved0,
-  };
+  fuchsia_wlan_fullmac::wire::WlanFullmacDeauthReq deauth_req;
   memcpy(deauth_req.peer_sta_address.data(), kTestSoftApClient, ETH_ALEN);
 
   env_.ScheduleNotification(

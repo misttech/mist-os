@@ -1297,7 +1297,7 @@ mod tests {
         r_sta
             .handle_mlme_disassoc_req(
                 &mut ctx,
-                fidl_ieee80211::ReasonCode::LeavingNetworkDisassoc as u16,
+                fidl_ieee80211::ReasonCode::LeavingNetworkDisassoc.into_primitive(),
             )
             .expect("expected OK");
         assert!(!fake_device_state.lock().unwrap().assocs.contains_key(&CLIENT_ADDR));
@@ -1431,7 +1431,7 @@ mod tests {
         r_sta
             .handle_mlme_disassoc_req(
                 &mut ctx,
-                fidl_ieee80211::ReasonCode::LeavingNetworkDisassoc as u16,
+                fidl_ieee80211::ReasonCode::LeavingNetworkDisassoc.into_primitive(),
             )
             .expect("expected OK");
         assert_variant!(r_sta.state.as_ref(), State::Authenticated);
@@ -1563,7 +1563,7 @@ mod tests {
         r_sta
             .handle_disassoc_frame(
                 &mut ctx,
-                ReasonCode(fidl_ieee80211::ReasonCode::LeavingNetworkDisassoc as u16),
+                ReasonCode(fidl_ieee80211::ReasonCode::LeavingNetworkDisassoc.into_primitive()),
             )
             .expect("expected OK");
 
@@ -1696,7 +1696,7 @@ mod tests {
         r_sta
             .handle_deauth_frame(
                 &mut ctx,
-                ReasonCode(fidl_ieee80211::ReasonCode::LeavingNetworkDeauth as u16),
+                ReasonCode(fidl_ieee80211::ReasonCode::LeavingNetworkDeauth.into_primitive()),
             )
             .expect("expected OK");
         let msg = fake_device_state

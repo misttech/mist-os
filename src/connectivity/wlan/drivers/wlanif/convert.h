@@ -38,8 +38,6 @@ fuchsia_wlan_common::wire::BssType ConvertBssType(const bss_type_t& in);
 
 fuchsia_wlan_fullmac::wire::WlanAssocResult ConvertAssocResult(uint8_t code);
 
-fuchsia_wlan_ieee80211::wire::ReasonCode ConvertReasonCode(uint16_t reason_code);
-
 fuchsia_wlan_common::wire::WlanMacRole ConvertMacRole(wlan_mac_role_t role);
 void ConvertBandCapability(const wlan_fullmac_band_capability_t& in,
                            fuchsia_wlan_fullmac::wire::WlanFullmacBandCapability* out);

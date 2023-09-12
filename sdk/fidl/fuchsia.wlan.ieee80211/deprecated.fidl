@@ -1,12 +1,15 @@
-// Copyright 2020 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 library fuchsia.wlan.ieee80211;
 
+
 /// 802.11 reason codes.  These values are common throughout the standard.
 /// IEEE Std 802.11-2016, 9.4.1.7, Table 9-45
-@available(added=16)
-type ReasonCode = flexible enum : uint16 {
+@available(removed=16)
+type ReasonCode = strict enum : uint16 {
+    RESERVED_0 = 0;
+
     UNSPECIFIED_REASON = 1;
     INVALID_AUTHENTICATION = 2;
     LEAVING_NETWORK_DEAUTH = 3;
@@ -73,14 +76,14 @@ type ReasonCode = flexible enum : uint16 {
     MESH_CHANNEL_SWITCH_REGULATORY_REQUIREMENTS = 65;
     MESH_CHANNEL_SWITCH_UNSPECIFIED = 66;
 
-    /// -----
-    /// Values 67 to 127 are reserved by the IEEE protocol, and
-    /// values 128 to 65535 are reserved for platform use.
+    RESERVED_67_TO_127 = 67;
+
+    /// Reserved values we will use for our own purposes.
     /// -----
     /// MLME lost the link, usually caused by loss of signal with the AP.
     MLME_LINK_FAILED = 128;
-    /// Driver detected a stalled Rx path in FW.
+    /// Driver detected a lack of rx frames.
     FW_RX_STALLED = 129;
-    /// Driver detected high wme rx error rate in FW.
-    FW_HIGH_WME_RX_ERR_RATE = 130;
+
+    RESERVED_130_TO_65535 = 130;
 };

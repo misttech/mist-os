@@ -8,6 +8,7 @@ fidl("fuchsia.wlan.ieee80211") {
 
   sources = [
     "constants.fidl",
+    "deprecated.fidl",
     "fields.fidl",
     "overview.fidl",
     "reason_code.fidl",

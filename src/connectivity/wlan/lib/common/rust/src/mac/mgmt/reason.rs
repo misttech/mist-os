@@ -13,7 +13,7 @@ pub struct ReasonCode(pub u16);
 
 impl From<fidl_ieee80211::ReasonCode> for ReasonCode {
     fn from(fidl_reason_code: fidl_ieee80211::ReasonCode) -> ReasonCode {
-        ReasonCode(fidl_reason_code as u16)
+        ReasonCode(fidl_reason_code.into_primitive())
     }
 }
 
