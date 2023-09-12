@@ -218,8 +218,6 @@ impl PagerBacked for FxBlob {
         let block_alignment = self.read_alignment();
         ensure!(block_alignment > 0, FxfsError::Inconsistent);
         debug_assert_eq!(block_alignment % zx::system_get_page_size() as u64, 0);
-        debug_assert_eq!(range.start % block_alignment, 0);
-        debug_assert_eq!(range.end % block_alignment, 0);
 
         let mut buffer = self.handle.allocate_buffer((range.end - range.start) as usize);
         let read = if self.compressed_offsets.is_empty() {

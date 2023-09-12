@@ -436,14 +436,12 @@ pub trait PagerBacked: Sync + Send + 'static {
 
 /// A generic page_in implementation that supplies pages using block-aligned reads.
 pub fn default_page_in<P: PagerBacked>(this: Arc<P>, mut range: Range<u64>) {
-    const ZERO_VMO_SIZE: u64 = 1_048_576;
-    static ZERO_VMO: Lazy<zx::Vmo> = Lazy::new(|| zx::Vmo::create(ZERO_VMO_SIZE).unwrap());
-    static TRANSFER_BUFFERS: Lazy<TransferBuffers> = Lazy::new(|| TransferBuffers::new());
-
     let read_alignment = this.read_alignment();
     let byte_size = round_up(this.byte_size(), read_alignment).unwrap();
 
     // Zero-pad the tail if requested range exceeds the size of the thing we're reading.
+    const ZERO_VMO_SIZE: u64 = 1_048_576;
+    static ZERO_VMO: Lazy<zx::Vmo> = Lazy::new(|| zx::Vmo::create(ZERO_VMO_SIZE).unwrap());
     let mut offset = std::cmp::max(range.start, byte_size);
     while offset < range.end {
         let end = std::cmp::min(range.end, offset + ZERO_VMO_SIZE);
@@ -451,69 +449,116 @@ pub fn default_page_in<P: PagerBacked>(this: Arc<P>, mut range: Range<u64>) {
         offset = end;
     }
 
-    range.start = round_down(range.start, read_alignment);
+    if range.start % read_alignment != 0 {
+        tracing::warn!(
+            "Misaligned range.start in DefaultPagerBackedVmo::default_page_in. {} % {}",
+            range.start,
+            read_alignment
+        );
+        range.start = round_down(range.start, read_alignment);
+    }
+    if range.end % read_alignment != 0 {
+        tracing::warn!(
+            "Misaligned range.end in DefaultPagerBackedVmo::default_page_in. {} % {}",
+            range.end,
+            read_alignment
+        );
+        range.end = round_up(range.end, read_alignment).unwrap();
+    }
+    let mut read_size = round_down(TRANSFER_BUFFER_MAX_SIZE, read_alignment);
 
-    // Calls to aligned_read must be aligned at all time, but also not exceed the last block of
-    // the file.
-    let read_range_end = round_up(range.end, read_alignment).unwrap();
+    if read_size == 0 {
+        // TODO(fxbug.dev/299040602): If/when we can be sure compressed chunks are not larger
+        // than transfer buffers, we can simplify this. For now, we must read a whole block
+        // and use multiple transfer buffers in this case.
+        read_size = read_alignment;
+        // Maximum supported read size is 8MiB at time of writing. This is sufficient
+        // for 1023*8MiB = ~8GiB blobs which is much larger than we need.
+        assert!(read_size < TRANSFER_BUFFER_COUNT * TRANSFER_BUFFER_MAX_SIZE);
+    }
 
-    // This serves as a basic form of read-ahead.
-    let read_size = round_up(65536, read_alignment).unwrap();
+    let mut futures = Vec::with_capacity(8);
+    while range.start < range.end {
+        let read_range = range.start..std::cmp::min(range.end, range.start + read_size);
+        range.start = read_range.end;
 
-    this.clone().pager().spawn(async move {
-        let transfer_vmo = Arc::new(TRANSFER_BUFFERS.get().await);
-        let mut futures = Vec::with_capacity(16);
-        while range.start < range.end {
-            let read_range = range.start..std::cmp::min(read_range_end, range.start + read_size);
-            range.start += read_size;
-
-            let this = this.clone();
-            let transfer_vmo = transfer_vmo.clone();
-            futures.push(async move {
-                let read_range = read_range.clone();
-                let (buffer_result, ()) = join!(this.aligned_read(read_range.clone()), async {
-                    // Committing pages in the kernel is time consuming, so we do this in
-                    // parallel to the read.  This assumes that the implementation of join!
-                    // polls the other future first (which happens to be the case for now).
-                    // TODO(fxbug.dev/299999955): We should decommit what we don't supply.
-                    transfer_vmo.commit(&read_range);
-                });
-                let (buffer, buffer_len) = match buffer_result {
-                    Ok(v) => v,
-                    Err(e) => {
-                        error!(
-                            range = ?read_range,
-                            pager_key = ?this.pager_key(),
-                            ?byte_size,
-                            error = ?e,
-                            "Failed to load range"
+        static TRANSFER_BUFFERS: Lazy<TransferBuffers> = Lazy::new(|| TransferBuffers::new());
+        let this = this.clone();
+        futures.push(async move {
+            let num_tx_buffers =
+                (read_size + TRANSFER_BUFFER_MAX_SIZE - 1) / TRANSFER_BUFFER_MAX_SIZE;
+            let (buffer_result, tx_buffers) = join!(this.aligned_read(read_range.clone()), async {
+                // Committing pages in the kernel is time consuming, so we do this in
+                // parallel to the read.  This assumes that the implementation of join!
+                // polls the other future first (which happens to be the case for now).
+                let mut tx_buffers = Vec::new();
+                for i in 0..num_tx_buffers {
+                    let buffer = TRANSFER_BUFFERS.get().await;
+                    let commit_size = std::cmp::min(
+                        TRANSFER_BUFFER_MAX_SIZE,
+                        read_range.end - (read_range.start + i * TRANSFER_BUFFER_MAX_SIZE),
+                    );
+                    buffer.commit(commit_size);
+                    tx_buffers.push(buffer);
+                }
+                tx_buffers
+            });
+            let (buffer, buffer_len) = match buffer_result {
+                Ok(v) => v,
+                Err(e) => {
+                    error!(
+                        range = ?read_range,
+                        pager_key = ?this.pager_key(),
+                        ?byte_size,
+                        error = ?e,
+                        "Failed to load range"
+                    );
+                    this.pager().report_failure(this.vmo(), read_range.clone(), map_to_status(e));
+                    return;
+                }
+            };
+            let buf = &buffer.as_slice()[..buffer_len];
+            let mut buf_range = read_range.start
+                ..round_up(read_range.start + buffer_len as u64, zx::system_get_page_size())
+                    .unwrap();
+            for (buf, transfer_buffer) in
+                std::iter::zip(buf.chunks(TRANSFER_BUFFER_MAX_SIZE as usize), tx_buffers)
+            {
+                let supply_range = buf_range.start
+                    ..round_up(buf_range.start + buf.len() as u64, zx::system_get_page_size())
+                        .unwrap();
+                buf_range.start += buf.len() as u64;
+                match transfer_buffer.vmo().write(buf, transfer_buffer.offset()) {
+                    Ok(_) => {
+                        this.pager().supply_pages(
+                            this.vmo(),
+                            supply_range.clone(),
+                            transfer_buffer.vmo(),
+                            transfer_buffer.offset(),
                         );
+                    }
+                    Err(e) => {
+                        // Failures here due to OOM will get reported as IO errors, as those are
+                        // considered transient.
+                        error!(
+                        range = ?supply_range,
+                        pager_key = ?this.pager_key(),
+                        error = ?e,
+                        "Failed to transfer range");
                         this.pager().report_failure(
                             this.vmo(),
-                            read_range.clone(),
-                            map_to_status(e),
+                            supply_range.clone(),
+                            zx::Status::IO,
                         );
-                        return;
                     }
-                };
-                let buf = &buffer.as_slice()[..buffer_len];
-                let supply_range = read_range.start
-                    ..round_up(
-                        read_range.start + buffer_len as u64,
-                        zx::system_get_page_size() as u64,
-                    )
-                    .unwrap();
-                transfer_vmo.vmo().write(buf, read_range.start).unwrap();
-                this.pager().supply_pages(
-                    this.vmo(),
-                    supply_range,
-                    transfer_vmo.vmo(),
-                    read_range.start,
-                );
-            });
-        }
-        stream::iter(futures).buffered(16).collect::<Vec<()>>().await;
-    });
+                }
+            }
+        });
+    }
+
+    // TODO(fxbug.dev/299206422): Cap concurrency and prevent parallelism until we have a
+    // solution for buffer allocation failing.
+    this.pager().spawn(stream::iter(futures).buffer_unordered(8).collect());
 }
 
 /// Represents a dirty range of page aligned bytes within a pager backed VMO.
@@ -560,29 +605,36 @@ impl PagerVmoStats {
 
 // Transfer buffers are to be used with supply_pages. supply_pages only works with pages that are
 // unmapped, but we need the pages to be mapped so that we can decrypt and potentially verify
-// checksums. To keep things simple, we use a set of maximally sized sparse VMOs that we loan out
-// (one per page_in request).
-const TRANSFER_BUFFER_COUNT: usize = 8;
+// checksums.  To keep things simple, the buffers are fixed size at 1 MiB which should cover most
+// requests.
+pub const TRANSFER_BUFFER_MAX_SIZE: u64 = 1_048_576;
+
+// The number of transfer buffers we support.
+const TRANSFER_BUFFER_COUNT: u64 = 8;
 
 pub struct TransferBuffers {
-    vmos: [zx::Vmo; TRANSFER_BUFFER_COUNT],
-    free_list: Mutex<Vec<usize>>,
+    vmo: zx::Vmo,
+    free_list: Mutex<Vec<u64>>,
     event: event_listener::Event,
 }
 
 impl TransferBuffers {
     pub fn new() -> Self {
-        let vmos =
-            std::array::from_fn(|_| zx::Vmo::create(fxfs::filesystem::MAX_FILE_SIZE).unwrap());
-        let free_list = Mutex::new((0..vmos.len()).collect());
-        Self { vmos, free_list, event: event_listener::Event::new() }
+        const VMO_SIZE: u64 = TRANSFER_BUFFER_COUNT * TRANSFER_BUFFER_MAX_SIZE;
+        Self {
+            vmo: zx::Vmo::create(VMO_SIZE).unwrap(),
+            free_list: Mutex::new(
+                (0..VMO_SIZE).step_by(TRANSFER_BUFFER_MAX_SIZE as usize).collect(),
+            ),
+            event: event_listener::Event::new(),
+        }
     }
 
     pub async fn get(&self) -> TransferBuffer<'_> {
         loop {
             let listener = self.event.listen();
-            if let Some(index) = self.free_list.lock().unwrap().pop() {
-                return TransferBuffer { buffers: self, index };
+            if let Some(offset) = self.free_list.lock().unwrap().pop() {
+                return TransferBuffer { buffers: self, offset };
             }
             listener.await;
         }
@@ -591,29 +643,35 @@ impl TransferBuffers {
 
 pub struct TransferBuffer<'a> {
     buffers: &'a TransferBuffers,
-    index: usize,
+
+    // The offset this buffer starts at in the VMO.
+    offset: u64,
 }
 
 impl TransferBuffer<'_> {
     pub fn vmo(&self) -> &zx::Vmo {
-        &self.buffers.vmos[self.index]
+        &self.buffers.vmo
+    }
+
+    pub fn offset(&self) -> u64 {
+        self.offset
     }
 
     // Allocating pages in the kernel is time-consuming, so it can help to commit pages first,
     // whilst other work is occurring in the background, and then copy later which is relatively
     // fast.
-    pub fn commit(&self, range: &Range<u64>) {
-        let _ignore_error = self.buffers.vmos[self.index].op_range(
+    pub fn commit(&self, size: u64) {
+        let _ignore_error = self.buffers.vmo.op_range(
             zx::VmoOp::COMMIT,
-            range.start,
-            range.end - range.start,
+            self.offset,
+            std::cmp::min(size, TRANSFER_BUFFER_MAX_SIZE),
         );
     }
 }
 
 impl Drop for TransferBuffer<'_> {
     fn drop(&mut self) {
-        self.buffers.free_list.lock().unwrap().push(self.index);
+        self.buffers.free_list.lock().unwrap().push(self.offset);
         self.buffers.event.notify(1);
     }
 }
