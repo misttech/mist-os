@@ -24,16 +24,21 @@ enum Port {
 };
 
 class Controller;
-using ControllerDeviceType = ddk::Device<Controller, ddk::Initializable>;
+using ControllerDeviceType =
+    ddk::Device<Controller, ddk::Initializable, ddk::Suspendable, ddk::Unbindable>;
 class Controller : public ControllerDeviceType {
  public:
   explicit Controller(zx_device_t* parent) : ControllerDeviceType(parent) {}
   static zx_status_t Bind(void* ctx, zx_device_t* parent);
 
+  void DdkSuspend(ddk::SuspendTxn txn);
+  void DdkUnbind(ddk::UnbindTxn txn);
+
   void DdkRelease() {
-    init_thread_.join();
+    JoinInitThread();
     delete this;
   }
+
   void DdkInit(ddk::InitTxn txn);
 
   // Send a command to the controller.
@@ -46,6 +51,8 @@ class Controller : public ControllerDeviceType {
   StatusReg ReadStatus();
 
   uint8_t ReadData();
+
+  void JoinInitThread();
 
   // For unit tests
   sync_completion_t& added_children() { return added_children_; }
