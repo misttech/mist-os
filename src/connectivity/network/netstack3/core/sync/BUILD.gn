@@ -9,10 +9,7 @@ _sources = [
   "src/lib.rs",
   "src/rc.rs",
 ]
-_deps = [
-  "//src/lib/const-unwrap",
-  "//third_party/rust_crates:derivative",
-]
+_deps = [ "//third_party/rust_crates:derivative" ]
 
 rustc_library("netstack3_sync_instrumented") {
   version = "0.0.1"

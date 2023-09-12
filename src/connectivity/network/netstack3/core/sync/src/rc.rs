@@ -16,7 +16,6 @@
 use core::{
     convert::AsRef,
     hash::{Hash, Hasher},
-    num::NonZeroUsize,
     ops::Deref,
     panic::Location,
     sync::atomic::{AtomicBool, Ordering},
@@ -122,7 +121,7 @@ mod caller {
 struct Inner<T> {
     marked_for_destruction: AtomicBool,
     callers: caller::Callers,
-    data: T,
+    data: core::mem::ManuallyDrop<T>,
 }
 
 impl<T> Inner<T> {
@@ -133,12 +132,53 @@ impl<T> Inner<T> {
         // visible here.
         assert!(marked_for_destruction.load(Ordering::Acquire), "Must be marked for destruction");
     }
+
+    fn unwrap(mut self) -> T {
+        // We cannot destructure `self` by value since `Inner` implements
+        // `Drop`. So we must manually drop all the fields but data and then
+        // forget self.
+        let Inner { marked_for_destruction, data, callers: holders } = &mut self;
+
+        // Make sure that `inner` is in a valid state for destruction.
+        //
+        // Note that we do not actually destroy all of `self` here; we decompose
+        // it into its parts, keeping what we need & throwing away what we
+        // don't. Regardless, we perform the same checks.
+        Inner::<T>::pre_drop_check(marked_for_destruction);
+
+        // SAFETY: Safe since we own `self` and `self` is immediately forgotten
+        // below so the its destructor (and those of its fields) will not be run
+        // as a result of `self` being dropped.
+        let data = unsafe {
+            // Explicitly drop since we do not need these anymore.
+            core::ptr::drop_in_place(marked_for_destruction);
+            core::ptr::drop_in_place(holders);
+
+            core::mem::ManuallyDrop::take(data)
+        };
+        // Forget self now to prevent its `Drop::drop` impl from being run which
+        // will attempt to destroy `data` but still perform pre-drop checks on
+        // `Inner`'s state.
+        core::mem::forget(self);
+
+        data
+    }
 }
 
 impl<T> Drop for Inner<T> {
     fn drop(&mut self) {
-        let Inner { marked_for_destruction, data: _, callers: _ } = self;
-        Self::pre_drop_check(marked_for_destruction)
+        let Inner { marked_for_destruction, data, callers: _ } = self;
+        // Take data out of ManuallyDrop in case we panic in pre_drop_check.
+        // That'll ensure data is dropped if we hit the panic.
+        //
+        //  SAFETY: Safe because ManuallyDrop is not referenced again after
+        // taking.
+        let data = unsafe { core::mem::ManuallyDrop::take(data) };
+        Self::pre_drop_check(marked_for_destruction);
+        // TODO(https://fxbug.dev/122388): Instead of manually dropping here
+        // we'll send data over a notifier to allow awaiting for all strong refs
+        // to drop
+        core::mem::drop(data);
     }
 }
 
@@ -153,50 +193,40 @@ impl<T> Drop for Inner<T> {
 // TODO(https://fxbug.dev/122388): Implement the blocking.
 #[derive(Debug)]
 pub struct Primary<T> {
-    /// Used to let this `Primary`'s `Drop::drop` implementation know if
-    /// there are any extra (inner) [`alloc::sync::Arc`]s held.
-    extra_refs_on_drops: Option<NonZeroUsize>,
-    inner: alloc::sync::Arc<Inner<T>>,
+    inner: core::mem::ManuallyDrop<alloc::sync::Arc<Inner<T>>>,
 }
-
-const ONE_NONZERO_USIZE: NonZeroUsize = const_unwrap::const_unwrap_option(NonZeroUsize::new(1_));
 
 impl<T> Drop for Primary<T> {
     fn drop(&mut self) {
-        let Self { extra_refs_on_drops, inner } = self;
-        let Inner { marked_for_destruction, data: _, callers } = inner.as_ref();
-
-        // `Ordering::Release` because want to make sure that all memory writes
-        // before dropping this `Primary` synchronizes with later attempts to
-        // upgrade weak pointers and the `Drop::drop` impl of `Inner`.
-        //
-        // TODO(https://fxbug.dev/122388): Require explicit marking for
-        // destruction of the reference and support blocking.
-        let was_marked = marked_for_destruction.swap(true, Ordering::Release);
+        let was_marked = self.mark_for_destruction();
+        let Self { inner } = self;
+        // Take the inner out of ManuallyDrop early so its Drop impl will run in
+        // case we panic here.
+        // SAFETY: Safe because we don't reference ManuallyDrop again.
+        let inner = unsafe { core::mem::ManuallyDrop::take(inner) };
 
         // Make debugging easier: don't panic if a panic is already happening
-        // since double-panics are annoying to debug.
-        if std::thread::panicking() {
-            return;
+        // since double-panics are annoying to debug. This means that the
+        // invariants provided by Primary are possibly violated during an
+        // unwind, but we're sidestepping that problem because Fuchsia is our
+        // only audience here.
+        if !std::thread::panicking() {
+            assert_eq!(was_marked, false, "Must not be marked for destruction yet");
+
+            let Inner { marked_for_destruction: _, callers, data: _ } = &*inner;
+
+            // Make sure that this `Primary` is the last thing to hold a strong
+            // reference to the underlying data when it is being dropped.
+            //
+            // TODO(https://fxbug.dev/122388): Require explicit killing of the
+            // reference and support blocking instead of this panic here.
+            let refs = alloc::sync::Arc::strong_count(&inner).checked_sub(1).unwrap();
+            assert!(
+                refs == 0,
+                "dropped Primary with {refs} strong refs remaining, \
+                            Callers={callers:?}"
+            );
         }
-
-        assert_eq!(was_marked, false, "Must not be marked for destruction yet");
-
-        // Make sure that this `Primary` is the last thing to hold a strong
-        // reference to the underlying data when it is being dropped.
-        //
-        // Note that this family of reference counted pointers is always used
-        // under a single lock so we know two threads will not concurrently
-        // attempt to handle this drop method and attempt to upgrade a weak
-        // reference.
-        //
-        // TODO(https://fxbug.dev/122388): Require explicit killing of the
-        // reference and support blocking instead of this panic here.
-        assert_eq!(
-            alloc::sync::Arc::strong_count(inner),
-            1 + extra_refs_on_drops.map_or(0, NonZeroUsize::get),
-            "extra_refs_on_drops={extra_refs_on_drops:?}, Callers={callers:?}",
-        );
     }
 }
 
@@ -210,41 +240,52 @@ impl<T> Deref for Primary<T> {
     type Target = T;
 
     fn deref(&self) -> &T {
-        let Self { extra_refs_on_drops: _, inner } = self;
-        let Inner { marked_for_destruction: _, data, callers: _ } = inner.deref();
+        let Self { inner } = self;
+        let Inner { marked_for_destruction: _, data, callers: _ } = &***inner;
         data
     }
 }
 
 impl<T> Primary<T> {
+    // Marks this primary reference as ready for destruction. Used by all
+    // dropping flows. We take &mut self here to ensure we have the only
+    // possible reference to Primary. Returns whether it was already marked for
+    // destruction.
+    fn mark_for_destruction(&mut self) -> bool {
+        let Self { inner } = self;
+        // `Ordering::Release` because want to make sure that all memory writes
+        // before dropping this `Primary` synchronizes with later attempts to
+        // upgrade weak pointers and the `Drop::drop` impl of `Inner`.
+        inner.marked_for_destruction.swap(true, Ordering::Release)
+    }
+
     /// Returns a new strongly-held reference.
     pub fn new(data: T) -> Primary<T> {
         Primary {
-            extra_refs_on_drops: None,
-            inner: alloc::sync::Arc::new(Inner {
+            inner: core::mem::ManuallyDrop::new(alloc::sync::Arc::new(Inner {
                 marked_for_destruction: AtomicBool::new(false),
                 callers: caller::Callers::default(),
-                data,
-            }),
+                data: core::mem::ManuallyDrop::new(data),
+            })),
         }
     }
 
     /// Clones a strongly-held reference.
     #[cfg_attr(feature = "rc-debug-names", track_caller)]
-    pub fn clone_strong(Self { extra_refs_on_drops: _, inner }: &Self) -> Strong<T> {
-        let Inner { data: _, callers, marked_for_destruction: _ } = &**inner;
+    pub fn clone_strong(Self { inner }: &Self) -> Strong<T> {
+        let Inner { data: _, callers, marked_for_destruction: _ } = &***inner;
         let caller = callers.insert(Location::caller());
         Strong { inner: alloc::sync::Arc::clone(inner), caller }
     }
 
     /// Returns a weak reference pointing to the same underlying data.
-    pub fn downgrade(Self { extra_refs_on_drops: _, inner }: &Self) -> Weak<T> {
+    pub fn downgrade(Self { inner }: &Self) -> Weak<T> {
         Weak(alloc::sync::Arc::downgrade(inner))
     }
 
     /// Returns true if the two pointers point to the same allocation.
     pub fn ptr_eq(
-        Self { extra_refs_on_drops: _, inner: this }: &Self,
+        Self { inner: this }: &Self,
         Strong { inner: other, caller: _ }: &Strong<T>,
     ) -> bool {
         alloc::sync::Arc::ptr_eq(this, other)
@@ -257,58 +298,22 @@ impl<T> Primary<T> {
     /// Panics if [`Strong`] references are held when this function is called.
     pub fn unwrap(mut this: Self) -> T {
         let inner = {
-            let Self { extra_refs_on_drops, inner } = &mut this;
-            let inner = alloc::sync::Arc::clone(inner);
-            // We are going to drop the `Primary` but while holding a reference
-            // to the inner `alloc::sync::Arc`. Let this `Primary`'s `Drop::drop`
-            // impl know that we have an extra reference.
-            assert_eq!(core::mem::replace(extra_refs_on_drops, Some(ONE_NONZERO_USIZE)), None,);
-            core::mem::drop(this);
+            // Prepare for destruction.
+            assert!(!this.mark_for_destruction());
+            let Self { inner } = &mut this;
+            // SAFETY: Safe because inner can't be used after this. We forget
+            // our Primary reference to prevent its Drop impl from running.
+            let inner = unsafe { core::mem::ManuallyDrop::take(inner) };
+            core::mem::forget(this);
             inner
         };
 
         match alloc::sync::Arc::try_unwrap(inner) {
-            Ok(mut inner) => {
-                // We cannot destructure `inner` by value since `Inner`
-                // implements `Drop`. As a workaround, we ptr-read `data` and
-                // `core::mem::forget` `inner` to prevent `inner` from being
-                // destroyed which will result in `data` being destroyed as
-                // well.
-                let Inner { marked_for_destruction, data, callers: holders } = &mut inner;
-
-                // Make sure that `inner` is in a valid state for destruction.
-                //
-                // Note that we do not actually destroy all of `inner` here; we
-                // decompose it into its parts, keeping what we need & throwing
-                // away what we don't. Regardless, we perform the same checks.
-                Inner::<T>::pre_drop_check(marked_for_destruction);
-
-                // Safe since we know the reference (`inner`) points to a valid
-                // object and `inner` is forgotten below so the destructor for
-                // `inner` (and its fields) will not be run as a result of
-                // `inner` being dropped.
-                let data = unsafe {
-                    // Explicitly drop since we do not need these anymore.
-                    core::ptr::drop_in_place(marked_for_destruction);
-                    core::ptr::drop_in_place(holders);
-
-                    // Read the data to return to the caller.
-                    core::ptr::read(data)
-                };
-
-                // Forget inner now to prevent its `Drop::drop` impl from being
-                // run which will attempt to destroy `data` but still perform
-                // pre-drop checks on `Inner`'s state.
-                core::mem::forget(inner);
-
-                // We now own `data` and its destructor will not run (until
-                // dropped by the caller).
-                data
-            }
+            Ok(inner) => inner.unwrap(),
             Err(inner) => {
-                // Unreachable because `Primary`'s drop impl would have panic-ed
-                // if we had any [`Strong`]s held.
-                unreachable!("still had strong refs: {}", alloc::sync::Arc::strong_count(&inner))
+                let callers = &inner.callers;
+                let refs = alloc::sync::Arc::strong_count(&inner).checked_sub(1).unwrap();
+                panic!("can't unwrap, still had {refs} strong refs: {callers:?}");
             }
         }
     }
@@ -521,7 +526,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "extra_refs_on_drops=Some(1)")]
+    #[should_panic(expected = "can't unwrap, still had 1 strong refs")]
     fn unwrap_primary_with_strong_held() {
         let primary = Primary::new(8);
         let _strong: Strong<_> = Primary::clone_strong(&primary);
@@ -529,11 +534,26 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "extra_refs_on_drops=None")]
+    #[should_panic(expected = "dropped Primary with 1 strong refs remaining")]
     fn drop_primary_with_strong_held() {
         let primary = Primary::new(9);
         let _strong: Strong<_> = Primary::clone_strong(&primary);
         core::mem::drop(primary);
+    }
+
+    // This test trips LSAN on Fuchsia for some unknown reason. The host-side
+    // test should be enough to protect us against regressing on the panicking
+    // check.
+    #[cfg(not(target_os = "fuchsia"))]
+    #[test]
+    #[should_panic(expected = "oopsie")]
+    fn double_panic_protect() {
+        let primary = Primary::new(9);
+        let strong = Primary::clone_strong(&primary);
+        // This will cause primary to be dropped before strong and would yield a
+        // double panic if we didn't protect against it in Primary's Drop impl.
+        let _tuple_to_invert_drop_order = (primary, strong);
+        panic!("oopsie");
     }
 
     #[cfg(feature = "rc-debug-names")]
@@ -548,8 +568,8 @@ mod tests {
         let weak = Strong::downgrade(&strong2);
         let strong3 = weak.upgrade().unwrap();
 
-        let Primary { extra_refs_on_drops: _, inner } = &primary;
-        let Inner { marked_for_destruction: _, callers, data: _ } = &**inner;
+        let Primary { inner } = &primary;
+        let Inner { marked_for_destruction: _, callers, data: _ } = &***inner;
 
         let strongs = [strong1, strong2, strong3];
         let _: &Location<'_> = strongs.iter().enumerate().fold(here, |prev, (i, cur)| {
@@ -584,8 +604,8 @@ mod tests {
         let strong2 = clone_in_fn(&primary);
         assert_eq!(strong1.caller.location, strong2.caller.location);
 
-        let Primary { extra_refs_on_drops: _, inner } = &primary;
-        let Inner { marked_for_destruction: _, callers, data: _ } = &**inner;
+        let Primary { inner } = &primary;
+        let Inner { marked_for_destruction: _, callers, data: _ } = &***inner;
 
         {
             let callers = callers.callers.lock();
