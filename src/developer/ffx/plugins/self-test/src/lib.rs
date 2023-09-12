@@ -4,6 +4,7 @@
 
 use crate::test::*;
 use anyhow::Result;
+use errors::ffx_error;
 use ffx_selftest_args::SelftestCommand;
 use fho::{FfxMain, FfxTool, SimpleWriter};
 use std::time::Duration;
@@ -60,13 +61,16 @@ pub async fn selftest(cmd: SelftestCommand) -> Result<()> {
         component::include_target::test_list,
         debug::include_target::test_debug_run_crasher,
         debug::include_target::test_debug_limbo,
-        target::include_target::test_list,
         target::include_target::test_get_ssh_address_includes_port,
         target::include_target::test_target_show
     ];
 
     let mut tests = default_tests;
     if cmd.include_target {
+        if std::env::var("FUCHSIA_DEVICE_ADDR").is_err() {
+            return Err(ffx_error!("FUCHSIA_DEVICE_ADDR must be set. (Run using `fx test --e2e ffx-e2e-with-target.sh`)").into());
+        }
+
         tests.append(&mut target_tests);
     }
     if let Some(filter) = cmd.filter {

@@ -54,7 +54,7 @@ pub mod include_target {
             }
         }
 
-        let target = get_target_nodename().await?;
+        let target = get_target_addr().await?;
         let sdk = ffx_config::global_env_context()
             .context("loading global environment context")?
             .get_sdk()
@@ -130,7 +130,7 @@ pub mod include_target {
         let isolate = new_isolate("debug-limbo").await?;
         isolate.start_daemon().await?;
 
-        let target = get_target_nodename().await?;
+        let target = get_target_addr().await?;
 
         // Ensure limbo is active and clean.
         let output = isolate.ffx(&["--target", &target, "debug", "limbo", "disable"]).await?;

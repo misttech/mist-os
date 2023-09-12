@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, bail, ensure, Context, Result};
+use anyhow::{Context, Result};
 use errors::ffx_bail;
 use ffx_config::{
     global_env_context,
@@ -50,48 +50,10 @@ pub async fn new_isolate(name: &str) -> Result<ffx_isolate::Isolate> {
     Ok(isolate)
 }
 
-/// Get the target nodename we're expected to interact with in this test, or
-/// pick the first discovered target. If nodename is set via $FUCHSIA_NODENAME
-/// that is returned, if the nodename is not given, and zero targets are found,
-/// this is also an error.
-pub async fn get_target_nodename() -> Result<String> {
-    if let Ok(nodename) = std::env::var("FUCHSIA_NODENAME") {
-        return Ok(nodename);
-    }
-
-    let isolate = new_isolate("initial-target-discovery").await?;
-    isolate.start_daemon().await?;
-
-    // ensure a daemon is spun up first, so we have a moment to discover targets.
-    let out = isolate.ffx(&["target", "wait", "-t", "5"]).await?;
-    if !out.status.success() {
-        bail!("No targets found after 5s")
-    }
-
-    let out = isolate.ffx(&["target", "list", "-f", "j"]).await.context("getting target list")?;
-    drop(isolate);
-
-    ensure!(out.status.success(), "Looking up a target name failed: {:?}", out);
-
-    let targets: Value =
-        serde_json::from_str(&out.stdout).context("parsing output from target list")?;
-
-    let targets = targets.as_array().ok_or(anyhow!("expected target list ot return an array"))?;
-
-    let target = targets
-        .iter()
-        .find(|target| {
-            target["nodename"] != ""
-                && target["target_state"]
-                    .as_str()
-                    .map(|s| s.to_lowercase().contains("product"))
-                    .unwrap_or(false)
-        })
-        .ok_or(anyhow!("did not find any named targets in a product state"))?;
-    target["nodename"]
-        .as_str()
-        .map(|s| s.to_string())
-        .ok_or(anyhow!("expected product state target to have a nodename"))
+// For tests, we use the target address rather than node name to be in sync
+// with isolates, which also use FUCHSIA_DEVICE_ADDR.
+pub async fn get_target_addr() -> Result<String> {
+    std::env::var("FUCHSIA_DEVICE_ADDR").or_else(|_| ffx_bail!("FUCHSIA_DEVICE_ADDR unset"))
 }
 
 /// run runs the given set of tests printing results to stdout and exiting

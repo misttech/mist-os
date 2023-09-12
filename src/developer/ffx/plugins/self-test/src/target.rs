@@ -58,41 +58,19 @@ pub(crate) async fn test_manual_add_get_ssh_address_late_add() -> Result<()> {
 pub mod include_target {
     use super::*;
 
-    pub(crate) async fn test_list() -> Result<()> {
-        let isolate = new_isolate("target-list").await?;
-        isolate.start_daemon().await?;
-
-        let mut lines = Vec::<String>::new();
-
-        // It takes a few moments to discover devices on the local network over
-        // mdns, so we retry until timeout or a useful value.
-        while lines.len() < 2 {
-            let out = isolate.ffx(&["target", "list"]).await?;
-            // cmd.stderr(Stdio::inherit());
-            lines = out.stdout.lines().map(|s| s.to_owned()).collect();
-        }
-
-        ensure!(
-            lines.len() >= 2,
-            format!("expected more than one line of output, got:\n{:?}", lines)
-        );
-
-        let headers = vec!["NAME", "SERIAL", "TYPE", "STATE", "ADDRS/IP", "RCS"];
-        let headerline = &lines[0];
-        for (got, want) in headerline.split_whitespace().zip(headers) {
-            ensure!(got == want, format!("assertion failed:\nLEFT: {:?}\nRIGHT: {:?}", got, want));
-        }
-        Ok(())
-    }
+    // TODO(slgrady): Create tests for "ffx target list" (currently non-existent
+    // since the previous test was dependent on discovery), and getting a target
+    // by name (currently non-existent since these tests only expect to have an
+    // address specified)
 
     pub(crate) async fn test_get_ssh_address_includes_port() -> Result<()> {
         let isolate = new_isolate("target-get-ssh-address-includes-port").await?;
         isolate.start_daemon().await?;
 
-        let target_nodename = get_target_nodename().await?;
+        let target_nodeaddr = get_target_addr().await?;
 
         let out = isolate
-            .ffx(&["--target", &target_nodename, "target", "get-ssh-address", "-t", "5"])
+            .ffx(&["--target", &target_nodeaddr, "target", "get-ssh-address", "-t", "5"])
             .await?;
 
         ensure!(out.stdout.contains(":22"), "expected stdout to contain ':22', got {:?}", out);
@@ -106,9 +84,9 @@ pub mod include_target {
         let isolate = new_isolate("target-show").await?;
         isolate.start_daemon().await?;
 
-        let target_nodename = get_target_nodename().await?;
+        let target_nodeaddr = get_target_addr().await?;
 
-        let out = isolate.ffx(&["--target", &target_nodename, "target", "show"]).await?;
+        let out = isolate.ffx(&["--target", &target_nodeaddr, "target", "show"]).await?;
 
         ensure!(out.status.success(), "status is unexpected: {:?}", out);
         ensure!(!out.stdout.is_empty(), "stdout is unexpectedly empty: {:?}", out);

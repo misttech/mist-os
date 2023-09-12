@@ -11,9 +11,9 @@ pub mod include_target {
     pub(crate) async fn test_list() -> Result<()> {
         let isolate = new_isolate("component-list").await?;
         isolate.start_daemon().await?;
-        let target_nodename = get_target_nodename().await?;
+        let target_nodeaddr = get_target_addr().await?;
 
-        let out = isolate.ffx(&["--target", &target_nodename, "component", "list"]).await?;
+        let out = isolate.ffx(&["--target", &target_nodeaddr, "component", "list"]).await?;
 
         ensure!(out.status.success(), "status is unexpected: {:?}", out);
         ensure!(!out.stdout.is_empty(), "stdout is unexpectedly empty: {:?}", out);

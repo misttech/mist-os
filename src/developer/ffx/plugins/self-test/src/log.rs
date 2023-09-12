@@ -52,7 +52,7 @@ pub mod include_log {
             }
         }
 
-        let target = get_target_nodename().await?;
+        let target = get_target_addr().await?;
         let sdk = ffx_config::global_env_context()
             .context("loading global environment context")?
             .get_sdk()
