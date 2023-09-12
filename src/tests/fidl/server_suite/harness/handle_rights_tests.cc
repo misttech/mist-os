@@ -11,7 +11,7 @@ using namespace channel_util;
 
 namespace server_suite {
 
-// The channel should close when a handle is needed but not sent.
+// The server should tear down when the request is missing a handle.
 CLOSED_SERVER_TEST(ClientSendsTooFewHandles) {
   zx::port port;
   ASSERT_OK(zx::port::create(0, &port));
@@ -28,7 +28,7 @@ CLOSED_SERVER_TEST(ClientSendsTooFewHandles) {
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
 }
 
-// The channel should close when the wrong handle type is sent.
+// The server should tear down when it receives the wrong handle type.
 CLOSED_SERVER_TEST(ClientSendsWrongHandleType) {
   zx::port port;
   ASSERT_OK(zx::port::create(0, &port));
@@ -90,7 +90,7 @@ CLOSED_SERVER_TEST(ClientSendsTooManyRights) {
   ASSERT_OK(client_end().read_and_check(bytes_out));
 }
 
-// The channel should close when a channel with too few rights is sent.
+// The server should tear down when it receives a handle with too few rights.
 CLOSED_SERVER_TEST(ClientSendsTooFewRights) {
   zx::event event;
   ASSERT_OK(zx::event::create(0, &event));
@@ -117,8 +117,9 @@ CLOSED_SERVER_TEST(ClientSendsTooFewRights) {
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
 }
 
-// Server bindings need to implement special cases for ZX_RIGHT_SAME_RIGHTS and ZX_OBJ_TYPE_NONE.
-// This tests that these special cases correctly pass through the existing object type and rights.
+// The server should handle ZX_OBJ_TYPE_NONE and ZX_RIGHT_SAME_RIGHTS correctly.
+// ZX_OBJ_TYPE_NONE means "any object type is allowed".
+// ZX_RIGHT_SAME_RIGHTS means "any rights are allowed".
 CLOSED_SERVER_TEST(ClientSendsObjectOverPlainHandle) {
   zx::event event;
   ASSERT_OK(zx::event::create(0, &event));
@@ -147,7 +148,7 @@ CLOSED_SERVER_TEST(ClientSendsObjectOverPlainHandle) {
   ASSERT_OK(client_end().read_and_check(bytes_out));
 }
 
-// The channel should close when the wrong handle type is sent.
+// The server should tear down when it tries to send the wrong handle type.
 CLOSED_SERVER_TEST(ServerSendsWrongHandleType) {
   zx::port port;
   ASSERT_OK(zx::port::create(0, &port));
@@ -165,7 +166,7 @@ CLOSED_SERVER_TEST(ServerSendsWrongHandleType) {
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
 }
 
-// When a handle with too many rights is sent, the rights should be reduced.
+// When the server sends a handle with too many rights, the rights should be reduced.
 CLOSED_SERVER_TEST(ServerSendsTooManyRights) {
   zx::event event;
   ASSERT_OK(zx::event::create(0, &event));
@@ -209,7 +210,7 @@ CLOSED_SERVER_TEST(ServerSendsTooManyRights) {
   ASSERT_OK(client_end().read_and_check(bytes_out, handles_out));
 }
 
-// The channel should close when a channel with too few rights is sent.
+// The server should tear down when it tries to send a handle with too few rights.
 CLOSED_SERVER_TEST(ServerSendsTooFewRights) {
   zx::event event;
   ASSERT_OK(zx::event::create(0, &event));

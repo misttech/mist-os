@@ -13,6 +13,7 @@ using namespace channel_util;
 
 namespace client_suite {
 
+// The client should call a strict one-way method.
 CLIENT_TEST(OneWayStrictSend) {
   runner()->CallStrictOneWay({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -30,6 +31,7 @@ CLIENT_TEST(OneWayStrictSend) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a flexible one-way method.
 CLIENT_TEST(OneWayFlexibleSend) {
   runner()->CallFlexibleOneWay({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -47,6 +49,7 @@ CLIENT_TEST(OneWayFlexibleSend) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a strict two-way method and receive the response.
 CLIENT_TEST(TwoWayStrictSend) {
   runner()->CallStrictTwoWay({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -71,6 +74,8 @@ CLIENT_TEST(TwoWayStrictSend) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a strict two-way method and receive the response,
+// despite the schema (strict) not matching the response's dynamic flags (flexible).
 CLIENT_TEST(TwoWayStrictSendMismatchedStrictness) {
   runner()->CallStrictTwoWay({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -95,6 +100,7 @@ CLIENT_TEST(TwoWayStrictSendMismatchedStrictness) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a strict two-way method and receive the nonempty response.
 CLIENT_TEST(TwoWayStrictSendNonEmptyPayload) {
   runner()
       ->CallStrictTwoWayFields({{.target = TakeOpenClient()}})
@@ -123,6 +129,7 @@ CLIENT_TEST(TwoWayStrictSendNonEmptyPayload) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a strict fallible two-way method and receive the success response.
 CLIENT_TEST(TwoWayStrictErrorSyntaxSendSuccessResponse) {
   runner()->CallStrictTwoWayErr({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -149,6 +156,7 @@ CLIENT_TEST(TwoWayStrictErrorSyntaxSendSuccessResponse) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a strict fallible two-way method and receive the error response.
 CLIENT_TEST(TwoWayStrictErrorSyntaxSendErrorResponse) {
   static constexpr int32_t kApplicationError = 39243320;
 
@@ -178,6 +186,8 @@ CLIENT_TEST(TwoWayStrictErrorSyntaxSendErrorResponse) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should tear down when it calls a strict fallible two-way method and
+// receives an "unknown method" response (with strict dynamic flag).
 CLIENT_TEST(TwoWayStrictErrorSyntaxSendUnknownMethodResponse) {
   runner()->CallStrictTwoWayErr({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -205,6 +215,8 @@ CLIENT_TEST(TwoWayStrictErrorSyntaxSendUnknownMethodResponse) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should tear down when it calls a strict fallible two-way method
+// and receives an "unknown method" response (with flexible dynamic flag).
 CLIENT_TEST(TwoWayStrictErrorSyntaxSendMismatchedStrictnessUnknownMethodResponse) {
   runner()->CallStrictTwoWayErr({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -232,6 +244,8 @@ CLIENT_TEST(TwoWayStrictErrorSyntaxSendMismatchedStrictnessUnknownMethodResponse
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a strict fallible two-way method and receive the
+// nonempty success response.
 CLIENT_TEST(TwoWayStrictErrorSyntaxSendNonEmptyPayload) {
   runner()
       ->CallStrictTwoWayFieldsErr({{.target = TakeOpenClient()}})
@@ -262,6 +276,7 @@ CLIENT_TEST(TwoWayStrictErrorSyntaxSendNonEmptyPayload) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a flexible two-way method and receive the empty response.
 CLIENT_TEST(TwoWayFlexibleSendSuccessResponse) {
   runner()->CallFlexibleTwoWay({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -288,6 +303,8 @@ CLIENT_TEST(TwoWayFlexibleSendSuccessResponse) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should tear down when it calls a flexible two-way method and receives
+// a domain error response, which is invalid for a method without error syntax.
 CLIENT_TEST(TwoWayFlexibleSendErrorResponse) {
   runner()->CallFlexibleTwoWay({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -315,6 +332,7 @@ CLIENT_TEST(TwoWayFlexibleSendErrorResponse) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a flexible two-way method and accept the "unknown method" response.
 CLIENT_TEST(TwoWayFlexibleSendUnknownMethodResponse) {
   runner()->CallFlexibleTwoWay({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -342,6 +360,10 @@ CLIENT_TEST(TwoWayFlexibleSendUnknownMethodResponse) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// TODO(fxbug.dev/133435): This test is incorrect. The client should tear down
+// because the response message is inconsistent. Once fixed, comment should be:
+// > The client should tear down when it calls a flexible two-way method and
+// > receives an "unknown method" response (with strict dynamic flag).
 CLIENT_TEST(TwoWayFlexibleSendMismatchedStrictnessUnknownMethodResponse) {
   runner()->CallFlexibleTwoWay({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -369,6 +391,8 @@ CLIENT_TEST(TwoWayFlexibleSendMismatchedStrictnessUnknownMethodResponse) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should tear down when it calls a flexible two-way method and
+// receives a framework error response other than "unsupported method".
 CLIENT_TEST(TwoWayFlexibleSendOtherTransportErrResponse) {
   runner()->CallFlexibleTwoWay({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -396,6 +420,7 @@ CLIENT_TEST(TwoWayFlexibleSendOtherTransportErrResponse) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a flexible two-way method and receive the nonempty response.
 CLIENT_TEST(TwoWayFlexibleSendNonEmptyPayloadSuccessResponse) {
   static constexpr int32_t kSomeFieldValue = 302340665;
 
@@ -429,6 +454,8 @@ CLIENT_TEST(TwoWayFlexibleSendNonEmptyPayloadSuccessResponse) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a flexible two-way method whose response is nonempty,
+// and accept the "unknown method" response.
 CLIENT_TEST(TwoWayFlexibleSendNonEmptyPayloadUnknownMethodResponse) {
   runner()
       ->CallFlexibleTwoWayFields({{.target = TakeOpenClient()}})
@@ -460,6 +487,7 @@ CLIENT_TEST(TwoWayFlexibleSendNonEmptyPayloadUnknownMethodResponse) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a flexible fallible two-way method and receive the success response.
 CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendSuccessResponse) {
   runner()->CallFlexibleTwoWayErr({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -486,6 +514,7 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendSuccessResponse) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a flexible fallible two-way method and receive the error response.
 CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendErrorResponse) {
   static constexpr int32_t kApplicationError = 1456681;
 
@@ -515,6 +544,7 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendErrorResponse) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a flexible fallible two-way method accept the "unknown method" response.
 CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendUnknownMethodResponse) {
   runner()->CallFlexibleTwoWayErr({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -542,6 +572,10 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendUnknownMethodResponse) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// TODO(fxbug.dev/133435): This test is incorrect. The client should tear down
+// because the response message is inconsistent. Once fixed, comment should be:
+// > The client should tear down when it calls a flexible fallible two-way method
+// > and receives an "unknown method" response (with strict dynamic flag).
 CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendMismatchedStrictnessUnknownMethodResponse) {
   runner()->CallFlexibleTwoWayErr({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -569,6 +603,8 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendMismatchedStrictnessUnknownMethodRespon
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should tear down when it calls a flexible fallible two-way method
+// and receives a framework error response other than "unsupported method".
 CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendOtherTransportErrResponse) {
   runner()->CallFlexibleTwoWayErr({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -596,6 +632,8 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendOtherTransportErrResponse) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a flexible fallible two-way method and receive
+// the nonempty success response.
 CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendNonEmptyPayloadSuccessResponse) {
   static constexpr int32_t kSomeFieldValue = 670705054;
 
@@ -629,6 +667,8 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendNonEmptyPayloadSuccessResponse) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a flexible fallible two-way method whose response is
+// nonempty, and accept the "unknown method" response.
 CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendNonEmptyPayloadUnknownMethodResponse) {
   runner()
       ->CallFlexibleTwoWayFieldsErr({{.target = TakeOpenClient()}})
@@ -660,6 +700,7 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendNonEmptyPayloadUnknownMethodResponse) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should receive a strict event.
 CLIENT_TEST(ReceiveStrictEvent) {
   auto reporter = ReceiveOpenEvents();
   ASSERT_NE(nullptr, reporter);
@@ -678,6 +719,8 @@ CLIENT_TEST(ReceiveStrictEvent) {
   ASSERT_FALSE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
+// The client should receive an event, despite the schema (strict) not matching
+// the dynamic flags (flexible).
 CLIENT_TEST(ReceiveStrictEventMismatchedStrictness) {
   auto reporter = ReceiveOpenEvents();
   ASSERT_NE(nullptr, reporter);
@@ -696,6 +739,7 @@ CLIENT_TEST(ReceiveStrictEventMismatchedStrictness) {
   ASSERT_FALSE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
+// The client should receive a flexible event.
 CLIENT_TEST(ReceiveFlexibleEvent) {
   auto reporter = ReceiveOpenEvents();
   ASSERT_NE(nullptr, reporter);
@@ -714,6 +758,8 @@ CLIENT_TEST(ReceiveFlexibleEvent) {
   ASSERT_FALSE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
+// The client should receive an event, despite the schema (flexible) not
+// matching the dynamic flags (strict).
 CLIENT_TEST(ReceiveFlexibleEventMismatchedStrictness) {
   auto reporter = ReceiveOpenEvents();
   ASSERT_NE(nullptr, reporter);
@@ -732,6 +778,7 @@ CLIENT_TEST(ReceiveFlexibleEventMismatchedStrictness) {
   ASSERT_FALSE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
+// The open client should tear down when it receives an unknown strict event.
 CLIENT_TEST(UnknownStrictEventOpenProtocol) {
   auto reporter = ReceiveOpenEvents();
   ASSERT_NE(nullptr, reporter);
@@ -754,6 +801,7 @@ CLIENT_TEST(UnknownStrictEventOpenProtocol) {
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
+// The open client should accept an unknown flexible event.
 CLIENT_TEST(UnknownFlexibleEventOpenProtocol) {
   auto reporter = ReceiveOpenEvents();
   ASSERT_NE(nullptr, reporter);
@@ -774,6 +822,7 @@ CLIENT_TEST(UnknownFlexibleEventOpenProtocol) {
   ASSERT_FALSE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
+// The ajar client should tear down when it receives an unknown strict event.
 CLIENT_TEST(UnknownStrictEventAjarProtocol) {
   auto reporter = ReceiveAjarEvents();
   ASSERT_NE(nullptr, reporter);
@@ -796,6 +845,7 @@ CLIENT_TEST(UnknownStrictEventAjarProtocol) {
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
+// The ajar client should accept an unknown flexible event.
 CLIENT_TEST(UnknownFlexibleEventAjarProtocol) {
   auto reporter = ReceiveAjarEvents();
   ASSERT_NE(nullptr, reporter);
@@ -816,6 +866,7 @@ CLIENT_TEST(UnknownFlexibleEventAjarProtocol) {
   ASSERT_FALSE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
+// The closed client should tear down when it receives an unknown strict event.
 CLIENT_TEST(UnknownStrictEventClosedProtocol) {
   auto reporter = ReceiveClosedEvents();
   ASSERT_NE(nullptr, reporter);
@@ -838,6 +889,7 @@ CLIENT_TEST(UnknownStrictEventClosedProtocol) {
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
+// The closed client should tear down when it receives an unknown flexible event.
 CLIENT_TEST(UnknownFlexibleEventClosedProtocol) {
   auto reporter = ReceiveClosedEvents();
   ASSERT_NE(nullptr, reporter);
@@ -860,6 +912,8 @@ CLIENT_TEST(UnknownFlexibleEventClosedProtocol) {
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
+// The client should tear down when it receives an unsolicited strict message
+// with nonzero txid and an unknown ordinal.
 CLIENT_TEST(UnknownStrictServerInitiatedTwoWay) {
   auto reporter = ReceiveOpenEvents();
   ASSERT_NE(nullptr, reporter);
@@ -882,6 +936,8 @@ CLIENT_TEST(UnknownStrictServerInitiatedTwoWay) {
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
+// The client should tear down when it receives an unsolicited flexible message
+// with nonzero txid and an unknown ordinal.
 CLIENT_TEST(UnknownFlexibleServerInitiatedTwoWay) {
   auto reporter = ReceiveOpenEvents();
   ASSERT_NE(nullptr, reporter);

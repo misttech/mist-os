@@ -12,8 +12,7 @@ namespace server_suite {
 // Check that the test runner is set up correctly without doing anything else.
 CLOSED_SERVER_TEST(Setup) {}
 
-// Check that the |IgnoreDisabled| test is in fact ignored. All implementations under test should
-// ensure that their |Runner.IsEnabled()| method implementations refuse to run this test.
+// Check that the test disabling mechanism works.
 CLOSED_SERVER_TEST(IgnoreDisabled) {
   // This test will always fail when run - the only purpose of putting it here is to ensure that
   // each implementation's runner respects |!is_enabled()| tests by skipping over this code in all
@@ -21,7 +20,7 @@ CLOSED_SERVER_TEST(IgnoreDisabled) {
   FAIL();
 }
 
-// Check that a one-way call is received at Target.
+// The server should receive a one-way method request.
 CLOSED_SERVER_TEST(OneWayNoPayload) {
   ASSERT_OK(client_end().write(
       header(kOneWayTxid, kOrdinalOneWayNoPayload, fidl::MessageDynamicFlags::kStrictMethod)));
@@ -29,7 +28,7 @@ CLOSED_SERVER_TEST(OneWayNoPayload) {
   WAIT_UNTIL([this]() { return reporter().received_one_way_no_payload(); });
 }
 
-// Check that Target replies to a two-way call.
+// The server should reply to a two-way method request (no payload).
 CLOSED_SERVER_TEST(TwoWayNoPayload) {
   ASSERT_OK(client_end().write(
       header(kTwoWayTxid, kOrdinalTwoWayNoPayload, fidl::MessageDynamicFlags::kStrictMethod)));
@@ -40,6 +39,7 @@ CLOSED_SERVER_TEST(TwoWayNoPayload) {
       header(kTwoWayTxid, kOrdinalTwoWayNoPayload, fidl::MessageDynamicFlags::kStrictMethod)));
 }
 
+// The server should reply to a two-way method request (struct payload).
 CLOSED_SERVER_TEST(TwoWayStructPayload) {
   Bytes bytes = {
       header(kTwoWayTxid, kOrdinalTwoWayStructPayload, fidl::MessageDynamicFlags::kStrictMethod),
@@ -53,6 +53,7 @@ CLOSED_SERVER_TEST(TwoWayStructPayload) {
   ASSERT_OK(client_end().read_and_check(bytes));
 }
 
+// The server should reply to a two-way method request (table payload).
 CLOSED_SERVER_TEST(TwoWayTablePayload) {
   Bytes bytes = {
       // clang-format off
@@ -71,6 +72,7 @@ CLOSED_SERVER_TEST(TwoWayTablePayload) {
   ASSERT_OK(client_end().read_and_check(bytes));
 }
 
+// The server should reply to a two-way method request (union payload).
 CLOSED_SERVER_TEST(TwoWayUnionPayload) {
   Bytes bytes = {
       // clang-format off
@@ -87,7 +89,7 @@ CLOSED_SERVER_TEST(TwoWayUnionPayload) {
   ASSERT_OK(client_end().read_and_check(bytes));
 }
 
-// Check that Target replies to a two-way call with a result (for a method using error syntax).
+// The server should reply to a fallible method (success).
 CLOSED_SERVER_TEST(TwoWayResultWithPayload) {
   Bytes bytes_in = {
       // clang-format off
@@ -112,7 +114,7 @@ CLOSED_SERVER_TEST(TwoWayResultWithPayload) {
   ASSERT_OK(client_end().read_and_check(bytes_out));
 }
 
-// Check that Target replies to a two-way call with an error (for a method using error syntax).
+// The server should reply to a fallible method (error).
 CLOSED_SERVER_TEST(TwoWayResultWithError) {
   Bytes bytes_in = {
       // clang-format off

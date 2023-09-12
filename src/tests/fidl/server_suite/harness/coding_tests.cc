@@ -10,6 +10,7 @@ using namespace channel_util;
 
 namespace server_suite {
 
+// The server should tear down when it fails to decode a request.
 CLOSED_SERVER_TEST(BadPayloadEncoding) {
   Bytes bytes_in = {
       // clang-format off
@@ -24,6 +25,7 @@ CLOSED_SERVER_TEST(BadPayloadEncoding) {
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
 }
 
+// The server should reject V1 messages (no payload).
 CLOSED_SERVER_TEST(V1TwoWayNoPayload) {
   Bytes bytes_in = {
       as_bytes(fidl_message_header_t{
@@ -41,6 +43,7 @@ CLOSED_SERVER_TEST(V1TwoWayNoPayload) {
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
 }
 
+// The server should reject V1 messages (struct payload).
 CLOSED_SERVER_TEST(V1TwoWayStructPayload) {
   Bytes bytes_in = {
       // header

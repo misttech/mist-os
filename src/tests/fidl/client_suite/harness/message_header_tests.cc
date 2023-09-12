@@ -13,6 +13,7 @@ using namespace channel_util;
 
 namespace client_suite {
 
+// The client should tear down when it receives an event with an invalid magic number.
 CLIENT_TEST(ReceiveEventBadMagicNumber) {
   auto reporter = ReceiveClosedEvents();
   ASSERT_NE(nullptr, reporter);
@@ -34,6 +35,7 @@ CLIENT_TEST(ReceiveEventBadMagicNumber) {
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
+// The client should tear down when it receives an event with nonzero txid.
 CLIENT_TEST(ReceiveEventUnexpectedTxid) {
   auto reporter = ReceiveClosedEvents();
   ASSERT_NE(nullptr, reporter);
@@ -55,6 +57,7 @@ CLIENT_TEST(ReceiveEventUnexpectedTxid) {
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
+// The client should tear down when it receives an event with an unknown ordinal.
 CLIENT_TEST(ReceiveEventUnknownOrdinal) {
   auto reporter = ReceiveClosedEvents();
   ASSERT_NE(nullptr, reporter);
@@ -75,6 +78,7 @@ CLIENT_TEST(ReceiveEventUnknownOrdinal) {
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
+// The client should tear down when it receives a response with an invalid magic number.
 CLIENT_TEST(ReceiveResponseBadMagicNumber) {
   runner()->CallTwoWayNoPayload({{.target = TakeClosedClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -105,6 +109,7 @@ CLIENT_TEST(ReceiveResponseBadMagicNumber) {
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
+// The client should tear down when it receives a response with an unexpected txid.
 CLIENT_TEST(ReceiveResponseUnexpectedTxid) {
   if (WaitFor(runner()->GetVersion()).value().version() < 1) {
     GTEST_SKIP() << "Skipping because Runner has not implemented GetBindingsProperties() yet";
@@ -147,6 +152,8 @@ CLIENT_TEST(ReceiveResponseUnexpectedTxid) {
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
+// The client should tear down when it receives a response with an ordinal
+// that is known but different from the request ordinal.
 CLIENT_TEST(ReceiveResponseWrongOrdinalKnown) {
   runner()->CallTwoWayNoPayload({{.target = TakeClosedClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -176,6 +183,7 @@ CLIENT_TEST(ReceiveResponseWrongOrdinalKnown) {
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
+// The client should tear down when it receives a response with an unknown ordinal.
 CLIENT_TEST(ReceiveResponseWrongOrdinalUnknown) {
   runner()->CallTwoWayNoPayload({{.target = TakeClosedClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();

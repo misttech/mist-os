@@ -9,7 +9,7 @@ using namespace channel_util;
 
 namespace server_suite {
 
-// The server sends epitaphs to clients.
+// The server should be able to send an epitaph.
 CLOSED_SERVER_TEST(ServerSendsEpitaph) {
   constexpr zx_status_t sent_status = 456;
 

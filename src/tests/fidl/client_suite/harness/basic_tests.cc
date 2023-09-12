@@ -13,8 +13,10 @@ using namespace channel_util;
 
 namespace client_suite {
 
+// Check that the test runner is set up correctly without doing anything else.
 CLIENT_TEST(Setup) {}
 
+// The client should call a two-way method and receive the empty response.
 CLIENT_TEST(TwoWayNoPayload) {
   runner()->CallTwoWayNoPayload({{.target = TakeClosedClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -39,6 +41,7 @@ CLIENT_TEST(TwoWayNoPayload) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a two-way method and receive the struct response.
 CLIENT_TEST(TwoWayStructPayload) {
   static const fidl_clientsuite::NonEmptyPayload kPayload{{.some_field = 42}};
 
@@ -71,6 +74,7 @@ CLIENT_TEST(TwoWayStructPayload) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a two-way method and receive the table response.
 CLIENT_TEST(TwoWayTablePayload) {
   static const fidl_clientsuite::TablePayload kPayload{{.some_field = 42}};
 
@@ -101,6 +105,7 @@ CLIENT_TEST(TwoWayTablePayload) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a two-way method and receive the union response.
 CLIENT_TEST(TwoWayUnionPayload) {
   static const fidl_clientsuite::UnionPayload kPayload =
       fidl_clientsuite::UnionPayload::WithSomeVariant(320494);
@@ -132,6 +137,7 @@ CLIENT_TEST(TwoWayUnionPayload) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a fallible two-way method and receive the success response.
 CLIENT_TEST(TwoWayResultWithPayload) {
   static const fidl_clientsuite::NonEmptyPayload kPayload{{.some_field = 390023}};
 
@@ -165,6 +171,7 @@ CLIENT_TEST(TwoWayResultWithPayload) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a fallible two-way method and receive the error response.
 CLIENT_TEST(TwoWayResultWithError) {
   static const int32_t kError = 90240;
 
@@ -198,6 +205,7 @@ CLIENT_TEST(TwoWayResultWithError) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a two-way method with a struct request and receive the response.
 CLIENT_TEST(TwoWayStructRequest) {
   static const fidl_clientsuite::NonEmptyPayload kRequest{{.some_field = 390023}};
 
@@ -228,6 +236,7 @@ CLIENT_TEST(TwoWayStructRequest) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a two-way method with a table request and receive the response.
 CLIENT_TEST(TwoWayTableRequest) {
   static const fidl_clientsuite::TablePayload kRequest{{.some_field = 390023}};
 
@@ -257,6 +266,7 @@ CLIENT_TEST(TwoWayTableRequest) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a two-way method with a union request and receive the response.
 CLIENT_TEST(TwoWayUnionRequest) {
   static const fidl_clientsuite::UnionPayload kRequest =
       fidl_clientsuite::UnionPayload::WithSomeVariant(390023);
@@ -287,6 +297,7 @@ CLIENT_TEST(TwoWayUnionRequest) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a one-way method with an empty request.
 CLIENT_TEST(OneWayNoRequest) {
   runner()
       ->CallOneWayNoRequest({{.target = TakeClosedClient()}})
@@ -306,6 +317,7 @@ CLIENT_TEST(OneWayNoRequest) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a one-way method with a struct request.
 CLIENT_TEST(OneWayStructRequest) {
   static const fidl_clientsuite::NonEmptyPayload kRequest{{.some_field = 390023}};
 
@@ -329,6 +341,7 @@ CLIENT_TEST(OneWayStructRequest) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a one-way method with a table request.
 CLIENT_TEST(OneWayTableRequest) {
   static const fidl_clientsuite::TablePayload kRequest{{.some_field = 390023}};
 
@@ -351,6 +364,7 @@ CLIENT_TEST(OneWayTableRequest) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should call a one-way method with a union request.
 CLIENT_TEST(OneWayUnionRequest) {
   static const fidl_clientsuite::UnionPayload kRequest =
       fidl_clientsuite::UnionPayload::WithSomeVariant(390023);
@@ -374,6 +388,7 @@ CLIENT_TEST(OneWayUnionRequest) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should receive an event with no payload.
 CLIENT_TEST(ReceiveEventNoPayload) {
   auto reporter = ReceiveClosedEvents();
   ASSERT_NE(nullptr, reporter);
@@ -390,6 +405,7 @@ CLIENT_TEST(ReceiveEventNoPayload) {
   ASSERT_TRUE(event.on_event_no_payload().has_value());
 }
 
+// The client should receive an event with a struct.
 CLIENT_TEST(ReceiveEventStructPayload) {
   static const fidl_clientsuite::NonEmptyPayload kRequest{{.some_field = 9098607}};
 
@@ -410,6 +426,7 @@ CLIENT_TEST(ReceiveEventStructPayload) {
   EXPECT_EQ(kRequest, event.on_event_struct_payload().value());
 }
 
+// The client should receive an event with a table.
 CLIENT_TEST(ReceiveEventTablePayload) {
   static const fidl_clientsuite::TablePayload kRequest{{.some_field = 9098607}};
 
@@ -430,6 +447,7 @@ CLIENT_TEST(ReceiveEventTablePayload) {
   EXPECT_EQ(kRequest, event.on_event_table_payload().value());
 }
 
+// The client should receive an event with a union.
 CLIENT_TEST(ReceiveEventUnionPayload) {
   static const fidl_clientsuite::UnionPayload kRequest =
       fidl_clientsuite::UnionPayload::WithSomeVariant(87662);
@@ -451,6 +469,7 @@ CLIENT_TEST(ReceiveEventUnionPayload) {
   EXPECT_EQ(kRequest, event.on_event_union_payload().value());
 }
 
+// The client should fail to call a two-way method after the server closes the channel.
 CLIENT_TEST(GracefulFailureDuringCallAfterPeerClose) {
   server_end().get().reset();
 

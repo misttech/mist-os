@@ -13,6 +13,7 @@ using namespace channel_util;
 
 namespace client_suite {
 
+// The client should reject V1 messages (no payload).
 CLIENT_TEST(V1TwoWayNoPayload) {
   runner()->CallTwoWayNoPayload({{.target = TakeClosedClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -45,6 +46,7 @@ CLIENT_TEST(V1TwoWayNoPayload) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
+// The client should reject V1 messages (struct payload).
 CLIENT_TEST(V1TwoWayStructPayload) {
   static const fidl_clientsuite::NonEmptyPayload kPayload{{.some_field = 42}};
 

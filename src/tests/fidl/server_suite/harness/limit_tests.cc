@@ -13,6 +13,7 @@ constexpr uint32_t maxVecBytesInMsg =
     ZX_CHANNEL_MAX_MSG_BYTES - sizeof(fidl_message_header_t) - sizeof(fidl_vector_t);
 constexpr uint32_t maxVecHandlesInMsg = ZX_CHANNEL_MAX_MSG_HANDLES;
 
+// The server should accept a request with the maximum number of bytes.
 CLOSED_SERVER_TEST(RequestMatchesByteLimit) {
   constexpr uint32_t n = maxVecBytesInMsg;
 
@@ -33,6 +34,7 @@ CLOSED_SERVER_TEST(RequestMatchesByteLimit) {
   ASSERT_OK(client_end().write(bytes_out));
 }
 
+// The serve should accept a request with the maximum number of handles.
 CLOSED_SERVER_TEST(RequestMatchesHandleLimit) {
   constexpr uint32_t n = maxVecHandlesInMsg;
 
@@ -64,6 +66,7 @@ CLOSED_SERVER_TEST(RequestMatchesHandleLimit) {
   ASSERT_OK(client_end().write(bytes_out));
 }
 
+// The server should be able to send a response with the maximum number of bytes.
 CLOSED_SERVER_TEST(ResponseMatchesByteLimit) {
   constexpr uint32_t n = maxVecBytesInMsg;
 
@@ -84,6 +87,7 @@ CLOSED_SERVER_TEST(ResponseMatchesByteLimit) {
   ASSERT_OK(client_end().read_and_check(bytes_out));
 }
 
+// The server should tear down when it tries to send a response with too many bytes.
 CLOSED_SERVER_TEST(ResponseExceedsByteLimit) {
   constexpr uint32_t n = maxVecBytesInMsg + 1;
 
@@ -98,6 +102,7 @@ CLOSED_SERVER_TEST(ResponseExceedsByteLimit) {
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
 }
 
+// The server should be able to send a response with the maximum number of handles.
 CLOSED_SERVER_TEST(ResponseMatchesHandleLimit) {
   constexpr uint32_t n = maxVecHandlesInMsg;
 
@@ -125,6 +130,7 @@ CLOSED_SERVER_TEST(ResponseMatchesHandleLimit) {
   ASSERT_OK(client_end().read_and_check(bytes_out, handle_infos_out));
 }
 
+// The server should tear down when it tries to send a response with too many handles.
 CLOSED_SERVER_TEST(ResponseExceedsHandleLimit) {
   constexpr uint32_t n = maxVecHandlesInMsg + 1;
 
