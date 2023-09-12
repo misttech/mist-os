@@ -11,8 +11,9 @@
 //!     one strong reference exists _and_ the data has not been marked for
 //!     destruction.
 //!   * Allow waiting for all strongly-held references to be dropped after
-//!     marking the data. (TODO: https://fxbug.dev/122388).
+//!     marking the data.
 
+use alloc::boxed::Box;
 use core::{
     convert::AsRef,
     hash::{Hash, Hasher},
@@ -117,11 +118,17 @@ mod caller {
     }
 }
 
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 struct Inner<T> {
     marked_for_destruction: AtomicBool,
     callers: caller::Callers,
     data: core::mem::ManuallyDrop<T>,
+    // NB: Notifier could be an atomic pointer or atomic box but this mutex is
+    // never contended and we don't have to import new code into the repository
+    // (i.e. atomicbox) or write unsafe code.
+    #[derivative(Debug = "ignore")]
+    notifier: crate::Mutex<Option<Box<dyn Notifier<T>>>>,
 }
 
 impl<T> Inner<T> {
@@ -137,7 +144,7 @@ impl<T> Inner<T> {
         // We cannot destructure `self` by value since `Inner` implements
         // `Drop`. So we must manually drop all the fields but data and then
         // forget self.
-        let Inner { marked_for_destruction, data, callers: holders } = &mut self;
+        let Inner { marked_for_destruction, data, callers: holders, notifier } = &mut self;
 
         // Make sure that `inner` is in a valid state for destruction.
         //
@@ -153,6 +160,7 @@ impl<T> Inner<T> {
             // Explicitly drop since we do not need these anymore.
             core::ptr::drop_in_place(marked_for_destruction);
             core::ptr::drop_in_place(holders);
+            core::ptr::drop_in_place(notifier);
 
             core::mem::ManuallyDrop::take(data)
         };
@@ -163,11 +171,28 @@ impl<T> Inner<T> {
 
         data
     }
+
+    /// Sets the notifier for this `Inner`.
+    ///
+    /// Panics if notifier is already set.
+    fn set_notifier<N: Notifier<T> + 'static>(&self, notifier: N) {
+        let Self { marked_for_destruction: _, callers: _, data: _, notifier: slot } = self;
+
+        // Using dynamic dispatch to notify allows us to not have to know the
+        // notifier that will be used from creation and spread the type on all
+        // reference types in this crate. The assumption is that the allocation
+        // and dynamic dispatch costs here are tiny compared to the overall work
+        // of destroying the resources this module is targeting.
+        let boxed: Box<dyn Notifier<T>> = Box::new(notifier);
+        let prev_notifier = { slot.lock().replace(boxed) };
+        // Uphold invariant that this can only be done from Primary.
+        assert!(prev_notifier.is_none(), "can't have a notifier already installed");
+    }
 }
 
 impl<T> Drop for Inner<T> {
     fn drop(&mut self) {
-        let Inner { marked_for_destruction, data, callers: _ } = self;
+        let Inner { marked_for_destruction, data, callers: _, notifier } = self;
         // Take data out of ManuallyDrop in case we panic in pre_drop_check.
         // That'll ensure data is dropped if we hit the panic.
         //
@@ -175,10 +200,9 @@ impl<T> Drop for Inner<T> {
         // taking.
         let data = unsafe { core::mem::ManuallyDrop::take(data) };
         Self::pre_drop_check(marked_for_destruction);
-        // TODO(https://fxbug.dev/122388): Instead of manually dropping here
-        // we'll send data over a notifier to allow awaiting for all strong refs
-        // to drop
-        core::mem::drop(data);
+        if let Some(mut notifier) = notifier.lock().take() {
+            notifier.notify(data);
+        }
     }
 }
 
@@ -190,7 +214,6 @@ impl<T> Drop for Inner<T> {
 /// For now, this reference is no different than a [`Strong`] but later changes
 /// will enable blocking the destruction of a primary reference until all
 /// strongly held references are dropped.
-// TODO(https://fxbug.dev/122388): Implement the blocking.
 #[derive(Debug)]
 pub struct Primary<T> {
     inner: core::mem::ManuallyDrop<alloc::sync::Arc<Inner<T>>>,
@@ -213,13 +236,10 @@ impl<T> Drop for Primary<T> {
         if !std::thread::panicking() {
             assert_eq!(was_marked, false, "Must not be marked for destruction yet");
 
-            let Inner { marked_for_destruction: _, callers, data: _ } = &*inner;
+            let Inner { marked_for_destruction: _, callers, data: _, notifier: _ } = &*inner;
 
             // Make sure that this `Primary` is the last thing to hold a strong
             // reference to the underlying data when it is being dropped.
-            //
-            // TODO(https://fxbug.dev/122388): Require explicit killing of the
-            // reference and support blocking instead of this panic here.
             let refs = alloc::sync::Arc::strong_count(&inner).checked_sub(1).unwrap();
             assert!(
                 refs == 0,
@@ -241,7 +261,7 @@ impl<T> Deref for Primary<T> {
 
     fn deref(&self) -> &T {
         let Self { inner } = self;
-        let Inner { marked_for_destruction: _, data, callers: _ } = &***inner;
+        let Inner { marked_for_destruction: _, data, callers: _, notifier: _ } = &***inner;
         data
     }
 }
@@ -266,6 +286,7 @@ impl<T> Primary<T> {
                 marked_for_destruction: AtomicBool::new(false),
                 callers: caller::Callers::default(),
                 data: core::mem::ManuallyDrop::new(data),
+                notifier: crate::Mutex::new(None),
             })),
         }
     }
@@ -273,7 +294,7 @@ impl<T> Primary<T> {
     /// Clones a strongly-held reference.
     #[cfg_attr(feature = "rc-debug-names", track_caller)]
     pub fn clone_strong(Self { inner }: &Self) -> Strong<T> {
-        let Inner { data: _, callers, marked_for_destruction: _ } = &***inner;
+        let Inner { data: _, callers, marked_for_destruction: _, notifier: _ } = &***inner;
         let caller = callers.insert(Location::caller());
         Strong { inner: alloc::sync::Arc::clone(inner), caller }
     }
@@ -291,31 +312,68 @@ impl<T> Primary<T> {
         alloc::sync::Arc::ptr_eq(this, other)
     }
 
+    fn mark_for_destruction_and_take_inner(mut this: Self) -> alloc::sync::Arc<Inner<T>> {
+        // Prepare for destruction.
+        assert!(!this.mark_for_destruction());
+        let Self { inner } = &mut this;
+        // SAFETY: Safe because inner can't be used after this. We forget
+        // our Primary reference to prevent its Drop impl from running.
+        let inner = unsafe { core::mem::ManuallyDrop::take(inner) };
+        core::mem::forget(this);
+        inner
+    }
+
+    fn try_unwrap(this: Self) -> Result<T, alloc::sync::Arc<Inner<T>>> {
+        let inner = Self::mark_for_destruction_and_take_inner(this);
+        alloc::sync::Arc::try_unwrap(inner).map(Inner::unwrap)
+    }
+
     /// Returns the inner value if no [`Strong`] references are held.
     ///
     /// # Panics
     ///
     /// Panics if [`Strong`] references are held when this function is called.
-    pub fn unwrap(mut this: Self) -> T {
-        let inner = {
-            // Prepare for destruction.
-            assert!(!this.mark_for_destruction());
-            let Self { inner } = &mut this;
-            // SAFETY: Safe because inner can't be used after this. We forget
-            // our Primary reference to prevent its Drop impl from running.
-            let inner = unsafe { core::mem::ManuallyDrop::take(inner) };
-            core::mem::forget(this);
-            inner
-        };
+    pub fn unwrap(this: Self) -> T {
+        Self::try_unwrap(this).unwrap_or_else(|inner| {
+            let callers = &inner.callers;
+            let refs = alloc::sync::Arc::strong_count(&inner).checked_sub(1).unwrap();
+            panic!("can't unwrap, still had {refs} strong refs: {callers:?}");
+        })
+    }
 
-        match alloc::sync::Arc::try_unwrap(inner) {
-            Ok(inner) => inner.unwrap(),
-            Err(inner) => {
-                let callers = &inner.callers;
-                let refs = alloc::sync::Arc::strong_count(&inner).checked_sub(1).unwrap();
-                panic!("can't unwrap, still had {refs} strong refs: {callers:?}");
-            }
-        }
+    /// Marks this [`Primary`] for destruction and uses `notifier` as a signaler
+    /// for when destruction of all strong references is terminated. After
+    /// calling `unwrap_with_notifier` [`Weak`] references can no longer be
+    /// upgraded.
+    pub fn unwrap_with_notifier<N: Notifier<T> + 'static>(this: Self, notifier: N) {
+        let inner = Self::mark_for_destruction_and_take_inner(this);
+        inner.set_notifier(notifier);
+        // Now we can drop our inner reference, if we were the last this will
+        // trigger the notifier.
+        core::mem::drop(inner);
+    }
+
+    /// Marks this [`Primary`] for destruction and returns `Ok` if this was the
+    /// last strong reference standing for it. Otherwise `new_notifier` is
+    /// called to create a new notifier to observe deferred destruction.
+    ///
+    /// Like [`Primary::unwrap_with_notifier`], [`Weak`] references can no
+    /// longer be upgraded after calling `unwrap_or_notify_with`.
+    pub fn unwrap_or_notify_with<N: Notifier<T> + 'static, O, F: FnOnce() -> (N, O)>(
+        this: Self,
+        new_notifier: F,
+    ) -> Result<T, O> {
+        Self::try_unwrap(this).map_err(move |inner| {
+            let (notifier, output) = new_notifier();
+            inner.set_notifier(notifier);
+            output
+        })
+    }
+
+    /// Creates a [`DebugReferences`] instance.
+    pub fn debug_references(this: &Self) -> DebugReferences<T> {
+        let Self { inner } = this;
+        DebugReferences(alloc::sync::Arc::downgrade(&*inner))
     }
 }
 
@@ -337,7 +395,7 @@ pub struct Strong<T> {
 impl<T> Drop for Strong<T> {
     fn drop(&mut self) {
         let Self { inner, caller } = self;
-        let Inner { marked_for_destruction: _, callers, data: _ } = &**inner;
+        let Inner { marked_for_destruction: _, callers, data: _, notifier: _ } = &**inner;
         caller.release(callers);
     }
 }
@@ -353,7 +411,7 @@ impl<T> Deref for Strong<T> {
 
     fn deref(&self) -> &T {
         let Self { inner, caller: _ } = self;
-        let Inner { marked_for_destruction: _, data, callers: _ } = inner.deref();
+        let Inner { marked_for_destruction: _, data, callers: _, notifier: _ } = inner.deref();
         data
     }
 }
@@ -377,7 +435,7 @@ impl<T> Clone for Strong<T> {
     #[cfg_attr(feature = "rc-debug-names", track_caller)]
     fn clone(&self) -> Self {
         let Self { inner, caller: _ } = self;
-        let Inner { data: _, marked_for_destruction: _, callers } = &**inner;
+        let Inner { data: _, marked_for_destruction: _, callers, notifier: _ } = &**inner;
         let caller = callers.insert(Location::caller());
         Self { inner: alloc::sync::Arc::clone(inner), caller }
     }
@@ -391,7 +449,7 @@ impl<T> Strong<T> {
 
     /// Returns true if the inner value has since been marked for destruction.
     pub fn marked_for_destruction(Self { inner, caller: _ }: &Self) -> bool {
-        let Inner { marked_for_destruction, data: _, callers: _ } = inner.as_ref();
+        let Inner { marked_for_destruction, data: _, callers: _, notifier: _ } = inner.as_ref();
         // `Ordering::Acquire` because we want to synchronize with with the
         // `Ordering::Release` write to `marked_for_destruction` so that all
         // memory writes before the reference was marked for destruction is
@@ -420,6 +478,12 @@ impl<T> Strong<T> {
         let this = alloc::sync::Arc::as_ptr(this);
         let other = alloc::sync::Arc::as_ptr(other);
         this.cmp(&other)
+    }
+
+    /// Creates a [`DebugReferences`] instance.
+    pub fn debug_references(this: &Self) -> DebugReferences<T> {
+        let Self { inner, caller: _ } = this;
+        DebugReferences(alloc::sync::Arc::downgrade(inner))
     }
 }
 
@@ -472,7 +536,7 @@ impl<T> Weak<T> {
     pub fn upgrade(&self) -> Option<Strong<T>> {
         let Self(weak) = self;
         let arc = weak.upgrade()?;
-        let Inner { marked_for_destruction, data: _, callers } = arc.deref();
+        let Inner { marked_for_destruction, data: _, callers, notifier: _ } = arc.deref();
 
         // `Ordering::Acquire` because we want to synchronize with with the
         // `Ordering::Release` write to `marked_for_destruction` so that all
@@ -484,6 +548,71 @@ impl<T> Weak<T> {
         } else {
             None
         }
+    }
+
+    /// Creates a [`DebugReferences`] instance.
+    pub fn debug_references(&self) -> DebugReferences<T> {
+        let Self(inner) = self;
+        DebugReferences(inner.clone())
+    }
+}
+
+/// Provides a [`Debug`] implementation that contains information helpful for
+/// debugging dangling references.
+pub struct DebugReferences<T>(alloc::sync::Weak<Inner<T>>);
+
+impl<T> core::fmt::Debug for DebugReferences<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let Self(inner) = self;
+        let mut f = f.debug_struct("DebugReferences");
+        if let Some(inner) = inner.upgrade() {
+            let strong_count = alloc::sync::Arc::strong_count(&inner);
+            let Inner { marked_for_destruction, callers, data: _, notifier: _ } = &*inner;
+            f.field("strong_count", &strong_count)
+                .field("marked_for_destruction", marked_for_destruction)
+                .field("callers", callers)
+                .finish()
+        } else {
+            let strong_count = 0_usize;
+            f.field("strong_count", &strong_count).finish_non_exhaustive()
+        }
+    }
+}
+
+/// Provides delegated notification of all strong references of a [`Primary`]
+/// being dropped.
+///
+/// See [`Primary::unwrap_with_notifier`].
+pub trait Notifier<T>: Send {
+    /// Called when the data contained in the [`Primary`] reference can be
+    /// extracted out because there are no more strong references to it.
+    fn notify(&mut self, data: T);
+}
+
+/// An implementation of [`Notifier`] that stores the unwrapped data in a
+/// `Clone` type.
+///
+/// Useful for tests where completion assertions are possible and useful.
+#[derive(Debug, Clone)]
+pub struct ArcNotifier<T>(alloc::sync::Arc<crate::Mutex<Option<T>>>);
+
+impl<T> ArcNotifier<T> {
+    /// Creates a new `ArcNotifier`.
+    pub fn new() -> Self {
+        Self(alloc::sync::Arc::new(crate::Mutex::new(None)))
+    }
+
+    /// Takes the notified value, if any.
+    pub fn take(&self) -> Option<T> {
+        let Self(inner) = self;
+        inner.lock().take()
+    }
+}
+
+impl<T: Send> Notifier<T> for ArcNotifier<T> {
+    fn notify(&mut self, data: T) {
+        let Self(inner) = self;
+        assert!(inner.lock().replace(data).is_none(), "notified twice");
     }
 }
 
@@ -569,7 +698,7 @@ mod tests {
         let strong3 = weak.upgrade().unwrap();
 
         let Primary { inner } = &primary;
-        let Inner { marked_for_destruction: _, callers, data: _ } = &***inner;
+        let Inner { marked_for_destruction: _, callers, data: _, notifier: _ } = &***inner;
 
         let strongs = [strong1, strong2, strong3];
         let _: &Location<'_> = strongs.iter().enumerate().fold(here, |prev, (i, cur)| {
@@ -605,7 +734,7 @@ mod tests {
         assert_eq!(strong1.caller.location, strong2.caller.location);
 
         let Primary { inner } = &primary;
-        let Inner { marked_for_destruction: _, callers, data: _ } = &***inner;
+        let Inner { marked_for_destruction: _, callers, data: _, notifier: _ } = &***inner;
 
         {
             let callers = callers.callers.lock();
@@ -629,5 +758,40 @@ mod tests {
         let primary = Primary::new(10);
         let _strong = Primary::clone_strong(&primary);
         drop(primary);
+    }
+
+    #[test]
+    fn unwrap_with_notifier() {
+        let primary = Primary::new(10);
+        let strong = Primary::clone_strong(&primary);
+        let notifier = ArcNotifier::new();
+        Primary::unwrap_with_notifier(primary, notifier.clone());
+        // Strong reference is still alive.
+        assert_eq!(notifier.take(), None);
+        core::mem::drop(strong);
+        assert_eq!(notifier.take(), Some(10));
+    }
+
+    #[test]
+    fn unwrap_or_notify_with_immediate() {
+        let primary = Primary::new(10);
+        let result = Primary::unwrap_or_notify_with::<ArcNotifier<_>, (), _>(primary, || {
+            panic!("should not try to create notifier")
+        });
+        assert_eq!(result, Ok(10));
+    }
+
+    #[test]
+    fn unwrap_or_notify_with_deferred() {
+        let primary = Primary::new(10);
+        let strong = Primary::clone_strong(&primary);
+        let result = Primary::unwrap_or_notify_with(primary, || {
+            let notifier = ArcNotifier::new();
+            (notifier.clone(), notifier)
+        });
+        let notifier = result.unwrap_err();
+        assert_eq!(notifier.take(), None);
+        core::mem::drop(strong);
+        assert_eq!(notifier.take(), Some(10));
     }
 }
