@@ -9,6 +9,8 @@
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
 
+#include <bind/powermanager_bindlib/cpp/bind.h>
+
 namespace {
 
 class RootDriver : public fdf::DriverBase,
@@ -78,7 +80,8 @@ class RootDriver : public fdf::DriverBase,
                      .class_name("test");
 
     auto properties = fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty>(arena, 1);
-    properties[0] = fdf::MakeProperty(arena, 1 /* BIND_PROTOCOL */, 0x0001);
+    properties[0] = fdf::MakeProperty(arena, 1 /* BIND_PROTOCOL */,
+                                      bind_fuchsia_powermanager_driver::BIND_PROTOCOL_ROOT);
 
     auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                     .name(arena, child_node_name)

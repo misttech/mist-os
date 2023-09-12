@@ -9,7 +9,7 @@ import("//build/drivers.gni")
 driver_bind_rules("power-manager-fake-bind") {
   rules = "power-manager-fake-bind.bind"
   bind_output = "power-manager-fake-bind.bindbc"
-  deps = [ "//src/devices/bind/fuchsia.test" ]
+  deps = [ "../fuchsia.powermanager.driver.bind:powermanager_bindlib" ]
 }
 
 source_set("power-manager-fake-driver-lib") {
@@ -20,7 +20,7 @@ source_set("power-manager-fake-driver-lib") {
   ]
 
   public_deps = [
-    "../fuchsia.powermanager.driver:fuchsia.powermanager.driver.temperaturecontrol_cpp_wire",
+    "../fuchsia.powermanager.driver.fidl:fuchsia.powermanager.driver.temperaturecontrol_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.temperature:fuchsia.hardware.temperature_cpp_wire",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/devfs/cpp",

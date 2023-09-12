@@ -14,7 +14,7 @@ rustc_library("lib") {
 
   deps = [
     ":integration-component",
-    "../../testing/fuchsia.powermanager.driver:fuchsia.powermanager.driver.temperaturecontrol_rust",
+    "../../testing/fuchsia.powermanager.driver.fidl:fuchsia.powermanager.driver.temperaturecontrol_rust",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
