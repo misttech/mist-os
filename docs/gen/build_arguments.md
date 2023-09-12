@@ -2692,7 +2692,7 @@ disabled.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:150
+From //zircon/kernel/params.gni:140
 
 ### enable_mdns_trace
 
@@ -5325,19 +5325,6 @@ From //products/bringup.gni:17
 
 From //build/packages/prebuilt_package_with_flavors.gni:29
 
-### page_compression_enabled
-
-TODO(fxbug.dev/60238): For use while the related RFC is in iterate and can
-be removed once the RFC is finalized.
-Controls kernel page compression and the linking and instantiation of its
-dependencies.
-Defaults to true only when the kernel_debug_level is high enough to enable
-in testing but disable for production.
-
-**Current value (from the default):** `true`
-
-From //zircon/kernel/params.gni:142
-
 ### partitions_config_contents
 
 **Current value for `target_cpu = "arm64"`:** `["//out/not-default/fuchsia.esp.blk"]`
@@ -5626,7 +5613,7 @@ Example JNI include paths for a Linux system:
 
 **Current value (from the default):** `[]`
 
-From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:302
+From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:306
 
 ### pw_arduino_build_BOARD
 
