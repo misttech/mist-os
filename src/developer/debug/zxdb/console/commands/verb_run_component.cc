@@ -23,20 +23,19 @@ const char kHelp[] =
 
   Runs the component with the given URL.
 
-  V2 components will be launched in the "ffx-laboratory" collection, similar to
-  the behavior of "ffx component run --recreate". The collection only provides
+  Components will be launched in the "ffx-laboratory" collection, similar to
+  the behavior of "ffx component run --recreate". The collection provides
   a restricted set of capabilities and is only suitable for running some demo
   components. If any other capabilities are needed, it's recommended to declare
-  it statically and attach to it from the debugger.
+  it statically or create it elsewhere in the topology, and attach to it from
+  the debugger.
 
   See https://fuchsia.dev/fuchsia-src/development/components/run#ffx-laboratory.
 
 Arguments
 
   <url>
-      The URL of the component to run. Both v1 and v2 components are supported.
-      v1 components have their URLs ending with ".cmx", while v2 components have
-      their URLs ending with ".cm".
+      The URL of the component to run.
 
   <args>*
 
@@ -45,7 +44,6 @@ Arguments
 
 Examples
 
-  run-component fuchsia-pkg://fuchsia.com/crasher#meta/cpp_crasher.cmx log_fatal
   run-component fuchsia-pkg://fuchsia.com/crasher#meta/cpp_crasher.cm
 )";
 

@@ -41,7 +41,7 @@ process new
     [zxdb] process new
     Process 2 [Not running]
     [zxdb] attach 22860
-    Attached Process 2 [Running] koid=22860 foobar.cmx
+    Attached Process 2 [Running] koid=22860 foobar.cm
 )";
 
 void RunVerbNew(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
