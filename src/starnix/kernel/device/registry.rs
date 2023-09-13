@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    collections::RangeMap,
     fs::{kobject::*, sysfs::SysFsDirectory, FileOps, FsNode},
     lock::{Mutex, RwLock},
     logging::log_error,
@@ -18,6 +17,7 @@ use std::{
 };
 
 use dyn_clone::{clone_trait_object, DynClone};
+use range_map::RangeMap;
 
 const CHRDEV_MINOR_MAX: u32 = 256;
 const BLKDEV_MINOR_MAX: u32 = 2u32.pow(20);

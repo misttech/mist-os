@@ -16,6 +16,7 @@ group("tests") {
 
   deps = [
     "extended_pstate:tests",
+    "range_map:tests",
     "starnix-sync:tests",
     "syncio:tests",
     "ubpf:tests",

@@ -30,7 +30,6 @@ mod trace;
 mod arch;
 mod auth;
 mod bpf;
-mod collections;
 mod device;
 mod diagnostics;
 mod drop_notifier;

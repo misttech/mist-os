@@ -103,6 +103,7 @@ rustc_binary("starnix_kernel_bin") {
     "//src/starnix/lib/kill_job_on_panic",
     "//src/starnix/lib/linux_uapi",
     "//src/starnix/lib/magma",
+    "//src/starnix/lib/range_map",
     "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/syncio",
     "//src/starnix/lib/ubpf",
@@ -151,7 +152,6 @@ rustc_binary("starnix_kernel_bin") {
 
   test_deps = [
     "//src/lib/fuchsia-fs",
-    "//src/lib/fuchsia-fs",
     "//src/lib/test_util",
     "//src/storage/ext4/tests:test_img",
     "//src/storage/fxfs/platform:fxfs-testing",
@@ -176,8 +176,6 @@ rustc_binary("starnix_kernel_bin") {
     "arch/mod.rs",
     "auth.rs",
     "bpf.rs",
-    "collections/mod.rs",
-    "collections/range_map.rs",
     "device/binder.rs",
     "device/common.rs",
     "device/features.rs",

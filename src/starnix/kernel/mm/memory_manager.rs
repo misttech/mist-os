@@ -6,11 +6,11 @@ use anyhow::{anyhow, Error};
 use bitflags::bitflags;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use once_cell::sync::Lazy;
+use range_map::*;
 use std::{collections::HashMap, convert::TryInto, ffi::CStr, ops::Range, sync::Arc};
 use zerocopy::{AsBytes, FromBytes};
 
 use crate::{
-    collections::*,
     fs::*,
     lock::{Mutex, RwLock},
     logging::*,

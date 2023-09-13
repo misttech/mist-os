@@ -1,0 +1,30 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_library.gni")
+
+rustc_library("range_map") {
+  edition = "2021"
+  with_unit_tests = true
+  sources = [ "src/lib.rs" ]
+  test_deps = [ "//src/lib/fuchsia" ]
+}
+
+fuchsia_unittest_component("unittests_component") {
+  component_name = "range_map_unittests"
+  deps = [ ":range_map_test" ]
+}
+
+fuchsia_test_package("range_map_unittests") {
+  test_components = [ ":unittests_component" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+    ":range_map_test($host_toolchain)",
+    ":range_map_unittests",
+  ]
+}
