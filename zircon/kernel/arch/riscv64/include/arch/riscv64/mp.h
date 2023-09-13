@@ -79,39 +79,40 @@ inline riscv64_percpu* riscv64_read_percpu_ptr() { return riscv64_percpu_ptr; }
 // reschedule.
 template <typename T, size_t Offset>
 [[gnu::always_inline]] inline T riscv64_read_percpu_field() {
+  static_assert((Offset & (alignof(T) - 1)) == 0, "Bad offset alignment");
   if constexpr (sizeof(T) == sizeof(uint32_t)) {
-    uint32_t value;
+    T value;
     __asm__ volatile("lwu %0, %1(s11)" : "=r"(value) : "I"(Offset));
-    return static_cast<T>(value);
+    return value;
   } else {
     static_assert(sizeof(T) == sizeof(uint64_t));
-    uint64_t value;
+    T value;
     __asm__ volatile("ld %0, %1(s11)" : "=r"(value) : "I"(Offset));
-    return static_cast<T>(value);
+    return value;
   }
 }
-#define READ_PERCPU_FIELD32(field) \
-  (riscv64_read_percpu_field<uint32_t, offsetof(riscv64_percpu, field)>())
+#define READ_PERCPU_FIELD(field) \
+  (riscv64_read_percpu_field<decltype(riscv64_percpu::field), offsetof(riscv64_percpu, field)>())
 
 template <typename T, size_t Offset>
 [[gnu::always_inline]] inline void riscv64_write_percpu_field(T value) {
+  static_assert((Offset & (alignof(T) - 1)) == 0, "Bad offset alignment");
   if constexpr (sizeof(T) == sizeof(uint32_t)) {
-    __asm__ volatile("sw %0, %1(s11)" : : "r"(static_cast<uint32_t>(value)), "I"(Offset));
+    __asm__ volatile("sw %0, %1(s11)" : : "r"(value), "I"(Offset));
   } else {
     static_assert(sizeof(T) == sizeof(uint64_t));
-    __asm__ volatile("sd %0, %1(s11)" : : "r"(static_cast<uint64_t>(value)), "I"(Offset));
+    __asm__ volatile("sd %0, %1(s11)" : : "r"(value), "I"(Offset));
   }
 }
-#define WRITE_PERCPU_FIELD32(field, value) \
-  (riscv64_write_percpu_field<uint32_t, offsetof(riscv64_percpu, field)>(value))
+#define WRITE_PERCPU_FIELD(field, value)                                                         \
+  (riscv64_write_percpu_field<decltype(riscv64_percpu::field), offsetof(riscv64_percpu, field)>( \
+      value))
 
 // Setup the high-level percpu struct pointer for |cpu_num|.
 void arch_setup_percpu(cpu_num_t cpu_num, percpu* percpu);
 
 // Return a pointer to the high-level percpu struct for the calling CPU.
-inline struct percpu* arch_get_curr_percpu() {
-  return riscv64_read_percpu_ptr()->high_level_percpu;
-}
+inline struct percpu* arch_get_curr_percpu() { return READ_PERCPU_FIELD(high_level_percpu); }
 
 extern uint riscv64_num_cpus;
 
@@ -121,15 +122,15 @@ inline uint arch_max_num_cpus() { return riscv64_num_cpus; }
 
 void riscv64_mp_early_init_percpu(uint32_t hart_id, uint cpu_num);
 
-inline cpu_num_t arch_curr_cpu_num() { return READ_PERCPU_FIELD32(cpu_num); }
-inline uint32_t riscv64_curr_hart_id() { return READ_PERCPU_FIELD32(hart_id); }
+inline cpu_num_t arch_curr_cpu_num() { return READ_PERCPU_FIELD(cpu_num); }
+inline uint32_t riscv64_curr_hart_id() { return READ_PERCPU_FIELD(hart_id); }
 
 // Translate a bitmap of cpu ids to a bitmap of harts, which may not be 1:1
 arch::HartMask riscv64_cpu_mask_to_hart_mask(cpu_mask_t cmask);
 
-inline bool arch_get_restricted_flag() { return READ_PERCPU_FIELD32(in_restricted_mode); }
+inline bool arch_get_restricted_flag() { return READ_PERCPU_FIELD(in_restricted_mode); }
 inline void arch_set_restricted_flag(bool restricted) {
-  WRITE_PERCPU_FIELD32(in_restricted_mode, restricted ? 1 : 0);
+  WRITE_PERCPU_FIELD(in_restricted_mode, restricted ? 1 : 0);
 }
 
 uint32_t riscv64_boot_hart_id();

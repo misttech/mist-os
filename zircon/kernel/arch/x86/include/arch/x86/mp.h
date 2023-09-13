@@ -142,24 +142,43 @@ int x86_apic_id_to_cpu_num(uint32_t apic_id);
 // Allocate all of the necessary structures for all of the APs to run.
 zx_status_t x86_allocate_ap_structures(uint32_t *apic_ids, uint8_t cpu_count);
 
-inline struct x86_percpu *x86_get_percpu() {
-  return (struct x86_percpu *)x86_read_gs_offset64(PERCPU_DIRECT_OFFSET);
+template <typename T, size_t Offset>
+[[gnu::always_inline]] inline T x86_read_percpu_field() {
+  static_assert((Offset & (alignof(T) - 1)) == 0, "Bad offset alignment");
+  if constexpr (sizeof(T) == sizeof(uint32_t)) {
+    return reinterpret_cast<T>(x86_read_gs_offset32(Offset));
+  } else {
+    static_assert(sizeof(T) == sizeof(uint64_t));
+    return reinterpret_cast<T>(x86_read_gs_offset64(Offset));
+  }
 }
+
+template <typename T, size_t Offset>
+[[gnu::always_inline]] inline void x86_write_percpu_field(T value) {
+  static_assert((Offset & (alignof(T) - 1)) == 0, "Bad offset alignment");
+  if constexpr (sizeof(T) == sizeof(uint32_t)) {
+    x86_write_gs_offset32(Offset, reinterpret_cast<uint32_t>(value));
+  } else {
+    static_assert(sizeof(T) == sizeof(uint64_t));
+    x86_write_gs_offset64(Offset, reinterpret_cast<uint64_t>(value));
+  }
+}
+
+#define READ_PERCPU_FIELD(field) \
+  (x86_read_percpu_field<decltype(x86_percpu::field), offsetof(x86_percpu, field)>())
+
+#define WRITE_PERCPU_FIELD(field, value) \
+  (x86_write_percpu_field<decltype(x86_percpu::field), offsetof(x86_percpu, field)>(value))
+
+inline struct x86_percpu *x86_get_percpu() { return READ_PERCPU_FIELD(direct); }
 
 // Return a pointer to the high-level percpu struct for the calling CPU.
-inline struct percpu *arch_get_curr_percpu() {
-  return ((struct percpu *)x86_read_gs_offset64(PERCPU_HIGH_LEVEL_PERCPU_OFFSET));
-}
+inline struct percpu *arch_get_curr_percpu() { return READ_PERCPU_FIELD(high_level_percpu); }
 
-inline cpu_num_t arch_curr_cpu_num() { return x86_read_gs_offset32(PERCPU_CPU_NUM_OFFSET); }
+inline cpu_num_t arch_curr_cpu_num() { return READ_PERCPU_FIELD(cpu_num); }
 
 extern uint8_t x86_num_cpus;
 inline uint arch_max_num_cpus() { return x86_num_cpus; }
-
-#define READ_PERCPU_FIELD32(field) x86_read_gs_offset32(offsetof(struct x86_percpu, field))
-
-#define WRITE_PERCPU_FIELD32(field, value) \
-  x86_write_gs_offset32(offsetof(struct x86_percpu, field), (value))
 
 void x86_ipi_halt_handler(void *) __NO_RETURN;
 
@@ -171,11 +190,11 @@ void x86_force_halt_all_but_local_and_bsp();
 // Setup the high-level percpu struct pointer for |cpu_num|.
 void arch_setup_percpu(cpu_num_t cpu_num, struct percpu *percpu);
 
-inline void arch_set_restricted_flag(bool set) {
-  WRITE_PERCPU_FIELD32(in_restricted_mode, set ? 1 : 0);
+inline void arch_set_restricted_flag(bool restricted) {
+  WRITE_PERCPU_FIELD(in_restricted_mode, restricted ? 1 : 0);
 }
 
-inline bool arch_get_restricted_flag() { return READ_PERCPU_FIELD32(in_restricted_mode); }
+inline bool arch_get_restricted_flag() { return READ_PERCPU_FIELD(in_restricted_mode); }
 
 #endif  // !__ASSEMBLER__
 

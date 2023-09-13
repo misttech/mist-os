@@ -90,26 +90,47 @@ inline struct arm64_percpu* arm64_read_percpu_ptr() {
   return p;
 }
 
-inline uint32_t arm64_read_percpu_u32(size_t offset) {
-  uint32_t val;
-
-  // mark as volatile to force a read of the field to make sure
-  // the compiler always emits a read when asked and does not cache
-  // a copy between
-  __asm__ volatile("ldr %w[val], [x20, %[offset]]" : [val] "=r"(val) : [offset] "Ir"(offset));
-  return val;
+// Mark as volatile to force a read of the field to make sure the compiler
+// always emits a read when asked and does not cache a copy between.  For the
+// same reason, this can't by done via the arm64_percpu_ptr variable, since
+// the compiler could copy x20 into another register and access it after a
+// reschedule.
+template <typename T, size_t Offset>
+[[gnu::always_inline]] inline T arm64_read_percpu_field() {
+  static_assert((Offset & (alignof(T) - 1)) == 0, "Bad offset alignment");
+  if constexpr (sizeof(T) == sizeof(uint32_t)) {
+    T value;
+    __asm__ volatile("ldr %w[val], [x20, %[offset]]" : [val] "=r"(value) : [offset] "Ir"(Offset));
+    return value;
+  } else {
+    static_assert(sizeof(T) == sizeof(uint64_t));
+    T value;
+    __asm__ volatile("ldr %[val], [x20, %[offset]]" : [val] "=r"(value) : [offset] "Ir"(Offset));
+    return value;
+  }
 }
+#define READ_PERCPU_FIELD(field) \
+  (arm64_read_percpu_field<decltype(arm64_percpu::field), offsetof(arm64_percpu, field)>())
 
-inline void arm64_write_percpu_u32(size_t offset, uint32_t val) {
-  __asm__("str %w[val], [x20, %[offset]]" ::[val] "r"(val), [offset] "Ir"(offset) : "memory");
+template <typename T, size_t Offset>
+[[gnu::always_inline]] inline void arm64_write_percpu_field(T value) {
+  static_assert((Offset & (alignof(T) - 1)) == 0, "Bad offset alignment");
+  if constexpr (sizeof(T) == sizeof(uint32_t)) {
+    __asm__ volatile("str %w[val], [x20, %[offset]]" ::[val] "r"(value), [offset] "Ir"(Offset)
+                     : "memory");
+  } else {
+    static_assert(sizeof(T) == sizeof(uint64_t));
+    __asm__ volatile("str %[val], [x20, %[offset]]" ::[val] "r"(value), [offset] "Ir"(Offset)
+                     : "memory");
+  }
 }
+#define WRITE_PERCPU_FIELD(field, value) \
+  (arm64_write_percpu_field<decltype(arm64_percpu::field), offsetof(arm64_percpu, field)>(value))
 
 // Return a pointer to the high-level percpu struct for the calling CPU.
-inline struct percpu* arch_get_curr_percpu() { return arm64_read_percpu_ptr()->high_level_percpu; }
+inline struct percpu* arch_get_curr_percpu() { return READ_PERCPU_FIELD(high_level_percpu); }
 
-inline cpu_num_t arch_curr_cpu_num() {
-  return arm64_read_percpu_u32(offsetof(struct arm64_percpu, cpu_num));
-}
+inline cpu_num_t arch_curr_cpu_num() { return READ_PERCPU_FIELD(cpu_num); }
 
 // TODO(fxbug.dev/32903) get num_cpus from topology.
 // This needs to be set very early (before arch_init).
@@ -137,19 +158,14 @@ uint64_t arch_cpu_num_to_mpidr(cpu_num_t cpu_num);
 // translate mpidr to cpu number
 cpu_num_t arm64_mpidr_to_cpu_num(uint64_t mpidr);
 
-#define READ_PERCPU_FIELD32(field) arm64_read_percpu_u32(offsetof(struct arm64_percpu, field))
-
-#define WRITE_PERCPU_FIELD32(field, value) \
-  arm64_write_percpu_u32(offsetof(struct arm64_percpu, field), (value))
-
 // Setup the high-level percpu struct pointer for |cpu_num|.
 void arch_setup_percpu(cpu_num_t cpu_num, struct percpu* percpu);
 
 inline void arch_set_restricted_flag(bool restricted) {
-  WRITE_PERCPU_FIELD32(in_restricted_mode, restricted ? 1 : 0);
+  WRITE_PERCPU_FIELD(in_restricted_mode, restricted ? 1 : 0);
 }
 
-inline bool arch_get_restricted_flag() { return READ_PERCPU_FIELD32(in_restricted_mode); }
+inline bool arch_get_restricted_flag() { return READ_PERCPU_FIELD(in_restricted_mode); }
 
 #endif  // !__ASSEMBLER__
 

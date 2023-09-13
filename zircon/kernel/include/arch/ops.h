@@ -64,13 +64,13 @@ extern "C" void arch_zero_page(void *);
 //
 // arch_blocking_disallowed() should only be true when interrupts are
 // disabled.
-inline bool arch_blocking_disallowed() { return READ_PERCPU_FIELD32(blocking_disallowed); }
+inline bool arch_blocking_disallowed() { return READ_PERCPU_FIELD(blocking_disallowed); }
 
 inline void arch_set_blocking_disallowed(bool value) {
-  WRITE_PERCPU_FIELD32(blocking_disallowed, value);
+  WRITE_PERCPU_FIELD(blocking_disallowed, value);
 }
 
-inline uint32_t arch_num_spinlocks_held() { return READ_PERCPU_FIELD32(num_spinlocks); }
+inline uint32_t arch_num_spinlocks_held() { return READ_PERCPU_FIELD(num_spinlocks); }
 
 #endif  // !__ASSEMBLER__
 
