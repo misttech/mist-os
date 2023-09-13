@@ -14,7 +14,7 @@ use fidl_fuchsia_net_routes as fnet_routes;
 use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fuchsia_zircon as zx;
 use futures::{
-    channel::mpsc, channel::oneshot, lock::Mutex as AsyncMutex, FutureExt, StreamExt as _,
+    channel::mpsc, channel::oneshot, future::FusedFuture as _, FutureExt, StreamExt as _,
     TryStream, TryStreamExt as _,
 };
 use itertools::Itertools as _;
@@ -228,35 +228,41 @@ async fn serve_watcher<I: fnet_routes_ext::FidlRouteIpExt>(
 
     let non_sync_ctx = ctx.non_sync_ctx_mut();
 
-    let watcher = non_sync_ctx.route_update_dispatcher.lock().connect_new_client::<I>();
+    let mut watcher = non_sync_ctx.route_update_dispatcher.lock().connect_new_client::<I>();
 
     let canceled_fut = watcher.canceled.wait();
-    // NB: `watcher` needs to be an `AsyncMutex` so that it can be borrowed from
-    // "all" futures in the following `try_for_each_concurrent`.
-    let watcher = AsyncMutex::new(watcher);
 
     let result = {
-        let watch_fut = request_stream
-            .map_err(ServeWatcherError::ErrorInStream)
-            .try_for_each_concurrent(None, |request| async {
-                let mut watcher = watcher
-                    .try_lock()
-                    // If the watcher is already borrowed, then we're still
-                    // handling a previous call to watch. This is erroneous
-                    // usage by the client, and we're expected to hangup.
-                    .ok_or(ServeWatcherError::PreviousPendingWatch)?;
-                let result = respond_to_watch_request(request, watcher.watch().await)
-                    .map_err(ServeWatcherError::FailedToRespond);
-                result
-            });
-
-        futures::pin_mut!(canceled_fut, watch_fut);
-        futures::select! {
-            result = watch_fut => result,
-            () = canceled_fut => Err(ServeWatcherError::Canceled),
+        let mut request_stream = request_stream.map_err(ServeWatcherError::ErrorInStream).fuse();
+        futures::pin_mut!(canceled_fut);
+        let mut pending_watch_request = futures::future::OptionFuture::default();
+        loop {
+            pending_watch_request = futures::select! {
+                request = request_stream.try_next() => match request {
+                    Ok(Some(req)) => if pending_watch_request.is_terminated() {
+                        // Convince the compiler that we're not holding on to a
+                        // borrow of watcher.
+                        std::mem::drop(pending_watch_request);
+                        // Old request is terminated, accept this new one.
+                        Some(watcher.watch().map(move |events| (req, events))).into()
+                    } else {
+                        break Err(ServeWatcherError::PreviousPendingWatch);
+                    },
+                    Ok(None) => break Ok(()),
+                    Err(e) => break Err(e),
+                },
+                r = pending_watch_request => {
+                    let (request, events) = r.expect("OptionFuture is not selected if empty");
+                    match respond_to_watch_request(request, events) {
+                        Ok(()) => None.into(),
+                        Err(e) => break Err(ServeWatcherError::FailedToRespond(e)),
+                    }
+                },
+                () = canceled_fut => break Err(ServeWatcherError::Canceled),
+            };
         }
     };
-    non_sync_ctx.route_update_dispatcher.lock().disconnect_client::<I>(watcher.into_inner());
+    non_sync_ctx.route_update_dispatcher.lock().disconnect_client::<I>(watcher);
     result
 }
 
@@ -479,15 +485,16 @@ impl<I: Ip> RoutesWatcher<I> {
     // Watch returns the currently available events (up to
     // [`fnet_routes::MAX_EVENTS`]). This call will block if there are no
     // available events.
-    async fn watch(&mut self) -> Vec<fnet_routes_ext::Event<I>> {
+    fn watch(
+        &mut self,
+    ) -> impl futures::Future<Output = Vec<fnet_routes_ext::Event<I>>> + Unpin + '_ {
         let RoutesWatcher { existing_events, receiver, canceled: _ } = self;
         futures::stream::iter(existing_events.by_ref())
             .chain(receiver)
             // Note: `ready_chunks` blocks until at least 1 event is ready.
             .ready_chunks(fnet_routes::MAX_EVENTS.into())
-            .next()
-            .await
-            .expect("underlying event stream unexpectedly ended")
+            .into_future()
+            .map(|(r, _ready_chunks)| r.expect("underlying event stream unexpectedly ended"))
     }
 }
 
