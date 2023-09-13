@@ -846,6 +846,9 @@
                 "WriteTest.WriteExceedsRLimit",
                 "WriteTest.PartialWriteSIGSEGV",
                 "WriteTest.PartialWriteSIGBUS",
+
+                // xattr_test
+                "XattrTest.SecurityCapacityXattr",
             ],
         },
         {
