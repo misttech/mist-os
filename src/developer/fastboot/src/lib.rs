@@ -4,6 +4,7 @@
 
 use {
     anyhow::{anyhow, bail, Result},
+    async_trait::async_trait,
     chrono::Duration,
     command::Command,
     fuchsia_async::TimeoutExt,
@@ -15,6 +16,7 @@ use {
     lazy_static::lazy_static,
     reply::Reply,
     std::convert::TryFrom,
+    std::marker::Sync,
     thiserror::Error,
 };
 
@@ -35,8 +37,9 @@ pub enum SendError {
     Timeout,
 }
 
+#[async_trait]
 pub trait InfoListener {
-    fn on_info(&self, info: String) -> Result<()> {
+    async fn on_info(&self, info: String) -> Result<()> {
         tracing::info!("Fastboot Info: \"{}\"", info);
         Ok(())
     }
@@ -45,11 +48,12 @@ pub trait InfoListener {
 struct LogInfoListener {}
 impl InfoListener for LogInfoListener {}
 
+#[async_trait]
 pub trait UploadProgressListener {
-    fn on_started(&self, size: usize) -> Result<()>;
-    fn on_progress(&self, bytes_written: u64) -> Result<()>;
-    fn on_error(&self, error: &str) -> Result<()>;
-    fn on_finished(&self) -> Result<()>;
+    async fn on_started(&self, size: usize) -> Result<()>;
+    async fn on_progress(&self, bytes_written: u64) -> Result<()>;
+    async fn on_error(&self, error: &str) -> Result<()>;
+    async fn on_finished(&self) -> Result<()>;
 }
 
 async fn read_from_interface<T: AsyncRead + Unpin>(interface: &mut T) -> Result<Reply> {
@@ -74,7 +78,7 @@ async fn read_from_interface<T: AsyncRead + Unpin>(interface: &mut T) -> Result<
 
 async fn read<T: AsyncRead + Unpin>(
     interface: &mut T,
-    listener: &impl InfoListener,
+    listener: &(impl InfoListener + Sync),
 ) -> Result<Reply> {
     read_with_timeout(interface, listener, Duration::seconds(DEFAULT_READ_TIMEOUT_SECS)).await
 }
@@ -86,7 +90,7 @@ async fn read_and_log_info<T: AsyncRead + Unpin>(interface: &mut T) -> Result<Re
 
 async fn read_with_timeout<T: AsyncRead + Unpin>(
     interface: &mut T,
-    listener: &impl InfoListener,
+    listener: &(impl InfoListener + Sync),
     timeout: Duration,
 ) -> Result<Reply> {
     let std_timeout = timeout.to_std().expect("converting chrono Duration to std");
@@ -96,7 +100,7 @@ async fn read_with_timeout<T: AsyncRead + Unpin>(
             .on_timeout(end_time, || Err(anyhow!(SendError::Timeout)))
             .await
         {
-            Ok(Reply::Info(msg)) => listener.on_info(msg)?,
+            Ok(Reply::Info(msg)) => listener.on_info(msg).await?,
             #[cfg(target_os = "linux")]
             Err(e) => {
                 // If we get a TIMEDOUT response, keep reading -- that's just the usb_bulk crate
@@ -141,7 +145,7 @@ async fn read_with_timeout<T: AsyncRead + Unpin>(
 pub async fn send_with_listener<T: AsyncRead + AsyncWrite + Unpin>(
     cmd: Command,
     interface: &mut T,
-    listener: &impl InfoListener,
+    listener: &(impl InfoListener + Sync),
 ) -> Result<Reply> {
     let _lock = SEND_LOCK.lock().await;
     let bytes = Vec::<u8>::try_from(&cmd)?;
@@ -196,16 +200,16 @@ pub async fn upload<T: AsyncRead + AsyncWrite + Unpin>(
                     data.len()
                 );
                 tracing::error!(%err);
-                listener.on_error(&err)?;
+                listener.on_error(&err).await?;
                 bail!(err);
             }
-            listener.on_started(data.len())?;
+            listener.on_started(data.len()).await?;
             tracing::debug!("fastboot: writing {} bytes", data.len());
             match interface.write(&data).await {
                 Err(e) => {
                     let err = format!("Could not write to usb interface: {:?}", e);
                     tracing::error!(%err);
-                    listener.on_error(&err)?;
+                    listener.on_error(&err).await?;
                     bail!(err);
                 }
                 _ => (),
@@ -213,13 +217,13 @@ pub async fn upload<T: AsyncRead + AsyncWrite + Unpin>(
             tracing::debug!("fastboot: completed writing {} bytes", data.len());
             match read_and_log_info(interface).await {
                 Ok(reply) => {
-                    listener.on_finished()?;
+                    listener.on_finished().await?;
                     Ok(reply)
                 }
                 Err(e) => {
                     let err = format!("Could not verify upload: {:?}", e);
                     tracing::error!(%err);
-                    listener.on_error(&err)?;
+                    listener.on_error(&err).await?;
                     bail!(err);
                 }
             }

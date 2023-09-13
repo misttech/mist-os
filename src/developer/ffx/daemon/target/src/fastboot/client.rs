@@ -305,7 +305,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
                             path,
                             e
                         );
-                        upload_listener.on_error(&format!("{}", e))?;
+                        upload_listener.on_error(&format!("{}", e)).await?;
                         responder
                             .send(Err(FastbootError::ProtocolError))
                             .context("sending error response")?;

@@ -170,8 +170,9 @@ impl VariableListener {
     }
 }
 
+#[async_trait]
 impl fastboot::InfoListener for VariableListener {
-    fn on_info(&self, info: String) -> Result<()> {
+    async fn on_info(&self, info: String) -> Result<()> {
         if let Some((name, val)) = info.split_once(':') {
             self.0.on_variable(name.trim(), val.trim()).map_err(|e| anyhow!(e))?;
         }
@@ -187,20 +188,21 @@ impl UploadProgressListener {
     }
 }
 
+#[async_trait]
 impl fastboot::UploadProgressListener for UploadProgressListener {
-    fn on_started(&self, size: usize) -> Result<()> {
+    async fn on_started(&self, size: usize) -> Result<()> {
         self.0.on_started(size.try_into()?).map_err(|e| anyhow!(e))
     }
 
-    fn on_progress(&self, bytes_written: u64) -> Result<()> {
+    async fn on_progress(&self, bytes_written: u64) -> Result<()> {
         self.0.on_progress(bytes_written).map_err(|e| anyhow!(e))
     }
 
-    fn on_error(&self, error: &str) -> Result<()> {
+    async fn on_error(&self, error: &str) -> Result<()> {
         self.0.on_error(error).map_err(|e| anyhow!(e))
     }
 
-    fn on_finished(&self) -> Result<()> {
+    async fn on_finished(&self) -> Result<()> {
         self.0.on_finished().map_err(|e| anyhow!(e))
     }
 }
