@@ -11,7 +11,7 @@ pub mod include_target {
     pub(crate) async fn test_list() -> Result<()> {
         let isolate = new_isolate("component-list").await?;
         isolate.start_daemon().await?;
-        let target_nodeaddr = get_target_addr().await?;
+        let target_nodeaddr = get_target_addr();
 
         let out = isolate.ffx(&["--target", &target_nodeaddr, "component", "list"]).await?;
 

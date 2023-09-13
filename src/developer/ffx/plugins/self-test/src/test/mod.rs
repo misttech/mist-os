@@ -52,8 +52,9 @@ pub async fn new_isolate(name: &str) -> Result<ffx_isolate::Isolate> {
 
 // For tests, we use the target address rather than node name to be in sync
 // with isolates, which also use FUCHSIA_DEVICE_ADDR.
-pub async fn get_target_addr() -> Result<String> {
-    std::env::var("FUCHSIA_DEVICE_ADDR").or_else(|_| ffx_bail!("FUCHSIA_DEVICE_ADDR unset"))
+pub fn get_target_addr() -> String {
+    // We check for this in src/lib.rs when it is invoked
+    std::env::var("FUCHSIA_DEVICE_ADDR").expect("FUCHSIA_DEVICE_ADDR unset")
 }
 
 /// run runs the given set of tests printing results to stdout and exiting

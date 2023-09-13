@@ -67,7 +67,7 @@ pub mod include_target {
         let isolate = new_isolate("target-get-ssh-address-includes-port").await?;
         isolate.start_daemon().await?;
 
-        let target_nodeaddr = get_target_addr().await?;
+        let target_nodeaddr = get_target_addr();
 
         let out = isolate
             .ffx(&["--target", &target_nodeaddr, "target", "get-ssh-address", "-t", "5"])
@@ -84,7 +84,7 @@ pub mod include_target {
         let isolate = new_isolate("target-show").await?;
         isolate.start_daemon().await?;
 
-        let target_nodeaddr = get_target_addr().await?;
+        let target_nodeaddr = get_target_addr();
 
         let out = isolate.ffx(&["--target", &target_nodeaddr, "target", "show"]).await?;
 
