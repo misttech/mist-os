@@ -15,7 +15,7 @@ use {
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs, server::ServiceObj},
     futures::{channel::mpsc::UnboundedSender, StreamExt, TryStreamExt},
     tiles_config,
-    tracing::{error, warn},
+    tracing::{error, info, warn},
 };
 
 // The maximum number of concurrent services to serve.
@@ -54,63 +54,85 @@ fn run_services(
 
 fn run_graphical_presenter_service(
     mut request_stream: element::GraphicalPresenterRequestStream,
-    internal_sender: UnboundedSender<MessageInternal>,
+    mut internal_sender: UnboundedSender<MessageInternal>,
 ) {
     fasync::Task::local(async move {
-        while let Ok(Some(request)) = request_stream.try_next().await {
-            match request {
-                element::GraphicalPresenterRequest::PresentView {
-                    view_spec,
-                    annotation_controller,
-                    view_controller_request,
-                    responder,
-                } => {
-                    // "Unwrap" the optional element::AnnotationControllerProxy.
-                    let annotation_controller = match annotation_controller {
-                        Some(proxy) => match proxy.into_proxy() {
-                            Ok(proxy) => Some(proxy),
-                            Err(e) => {
-                                warn!("Failed to obtain AnnotationControllerProxy: {}", e);
-                                None
-                            }
-                        },
-                        None => None,
-                    };
-                    // "Unwrap" the optional element::ViewControllerRequestStream.
-                    let view_controller_request_stream = match view_controller_request {
-                        Some(request_stream) => match request_stream.into_stream() {
-                            Ok(request_stream) => Some(request_stream),
-                            Err(e) => {
-                                warn!("Failed to obtain ViewControllerRequestStream: {}", e);
-                                None
-                            }
-                        },
-                        None => None,
-                    };
-                    internal_sender
-                        .unbounded_send(
-                            MessageInternal::GraphicalPresenterPresentView {
-                                view_spec,
-                                annotation_controller,
-                                view_controller_request_stream,
-                                responder,
-                            },
-                            // TODO(fxbug.dev/88656): is this a safe expect()?  I think so, since
-                            // we're using Task::local() instead of Task::spawn(), so we're on the
-                            // same thread as main(), which will keep the receiver end alive until
-                            // it exits, at which time the executor will not tick this task again.
-                            // Assuming that we verify this understanding, what is the appropriate
-                            // way to document this understanding?  Is it so idiomatic it needs no
-                            // comment?  We're all Rust n00bs here, so maybe not?
-                        )
-                        .expect("Failed to send MessageInternal.");
+        loop {
+            let result = request_stream.try_next().await;
+            match result {
+                Ok(Some(request)) => {
+                    internal_sender = handle_graphical_presenter_request(request, internal_sender)
+                }
+                Ok(None) => {
+                    info!("GraphicalPresenterRequestStream ended with Ok(None)");
+                    return;
+                }
+                Err(e) => {
+                    error!(
+                        "Error while retrieving requests from GraphicalPresenterRequestStream: {}",
+                        e
+                    );
+                    return;
                 }
             }
         }
-        // TODO(fxbug.dev/88656): if the result of try_next() is Err, we should probably log that instead of
-        // silently swallowing it.
     })
     .detach();
+}
+
+fn handle_graphical_presenter_request(
+    request: element::GraphicalPresenterRequest,
+    internal_sender: UnboundedSender<MessageInternal>,
+) -> UnboundedSender<MessageInternal> {
+    match request {
+        element::GraphicalPresenterRequest::PresentView {
+            view_spec,
+            annotation_controller,
+            view_controller_request,
+            responder,
+        } => {
+            // "Unwrap" the optional element::AnnotationControllerProxy.
+            let annotation_controller = match annotation_controller {
+                Some(proxy) => match proxy.into_proxy() {
+                    Ok(proxy) => Some(proxy),
+                    Err(e) => {
+                        warn!("Failed to obtain AnnotationControllerProxy: {}", e);
+                        None
+                    }
+                },
+                None => None,
+            };
+            // "Unwrap" the optional element::ViewControllerRequestStream.
+            let view_controller_request_stream = match view_controller_request {
+                Some(request_stream) => match request_stream.into_stream() {
+                    Ok(request_stream) => Some(request_stream),
+                    Err(e) => {
+                        warn!("Failed to obtain ViewControllerRequestStream: {}", e);
+                        None
+                    }
+                },
+                None => None,
+            };
+            internal_sender
+                .unbounded_send(
+                    MessageInternal::GraphicalPresenterPresentView {
+                        view_spec,
+                        annotation_controller,
+                        view_controller_request_stream,
+                        responder,
+                    },
+                    // TODO(fxbug.dev/88656): is this a safe expect()?  I think so, since
+                    // we're using Task::local() instead of Task::spawn(), so we're on the
+                    // same thread as main(), which will keep the receiver end alive until
+                    // it exits, at which time the executor will not tick this task again.
+                    // Assuming that we verify this understanding, what is the appropriate
+                    // way to document this understanding?  Is it so idiomatic it needs no
+                    // comment?  We're all Rust n00bs here, so maybe not?
+                )
+                .expect("Failed to send MessageInternal.");
+        }
+    }
+    return internal_sender;
 }
 
 #[fuchsia::main(logging = true)]
