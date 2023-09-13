@@ -10,7 +10,8 @@ function list_optional_features {
     "incremental_legacy" \
     "incremental_new" \
     "legacy_fastboot" \
-    "legacy_fxtest"
+    "legacy_fxtest" \
+    "foreground_repo_server"
 }
 
 # Return 0 (true) if the default of the given feature is enabled, 1 (false) otherwise.
@@ -22,6 +23,7 @@ function is_feature_enabled_by_default {
   "incremental_new") return 1 ;;
   "legacy_fastboot") return 1 ;;
   "legacy_fxtest") return 0 ;;
+  "foreground_repo_server") return 1 ;;
   esac
 
   # global default is enabled
@@ -59,6 +61,12 @@ function help_optional_feature {
   "legacy_fxtest")
     h=(
       "Use the old Dart implementation of fx test rather than the new Python one."
+      )
+    ;;
+  "foreground_repo_server")
+    h=(
+      "Run repository server and device registration as a foreground process,"
+      "using 'ffx repository serve'"
       )
     ;;
   esac

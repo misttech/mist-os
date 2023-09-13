@@ -73,7 +73,7 @@ function check-if-we-can-start-package-server {
       return 1
     fi
 
-    configured_mode="$(package-server-mode)"
+    local configured_mode="$(package-server-mode)"
     if [[ "${configured_mode}" == "ffx" ]]; then
       fx-error "Even though we are trying to start a pm package server, it appears"
       fx-error "we are configured to use the ffx repository server. Try shutting it"
@@ -111,39 +111,46 @@ function check-if-we-can-start-package-server {
 
     return 1
   else
-    local expected_addr=$(join-repository-ip-port "${expected_ip}" "${expected_port}")
-    local err=$?
-    if [[ "${err}" -ne 0 ]]; then
-      return 1
-    fi
+    if is_feature_enabled "foreground_repo_server"; then
+      fx-error "It looks like some process is listening on ${port}."
+      fx-error "You probably need to stop that and start a new one here with \"fx serve\""
 
-    # Check if the ffx package repository server is already running on the expected address.
-    local actual_addr=$(ffx-repository-server-running-address)
-    local err=$?
-    if [[ "${err}" -ne 0 ]]; then
       return 1
-    fi
+    else
+      local expected_addr=$(join-repository-ip-port "${expected_ip}" "${expected_port}")
+      local err=$?
+      if [[ "${err}" -ne 0 ]]; then
+        return 1
+      fi
 
-    if [[ ! -z "${actual_addr}" ]]; then
-      if [[ "${expected_addr}" == "${actual_addr}" ]]; then
-        return 0
+      # Check if the ffx package repository server is already running on the expected address.
+      local actual_addr=$(ffx-repository-server-running-address)
+      local err=$?
+      if [[ "${err}" -ne 0 ]]; then
+        return 1
+      fi
+
+      if [[ ! -z "${actual_addr}" ]]; then
+        if [[ "${expected_addr}" == "${actual_addr}" ]]; then
+          return 0
+        else
+          fx-error "The repository server is already running on '${actual_addr}', not '${expected_addr}'."
+          fx-error "To fix this, run:"
+          fx-error ""
+          fx-error "$ ffx repository server stop"
+          fx-error ""
+          fx-error "Then re-run this command."
+
+          return 1
+        fi
       else
-        fx-error "The repository server is already running on '${actual_addr}', not '${expected_addr}'."
-        fx-error "To fix this, run:"
+        fx-error "Another process is using port '${expected_port}', which"
+        fx-error "will block the ffx repository server from listening on ${ffx_addr}."
         fx-error ""
-        fx-error "$ ffx repository server stop"
-        fx-error ""
-        fx-error "Then re-run this command."
+        fx-error "Try shutting down that process, and re-running this command."
 
         return 1
       fi
-    else
-      fx-error "Another process is using port '${expected_port}', which"
-      fx-error "will block the ffx repository server from listening on ${ffx_addr}."
-      fx-error ""
-      fx-error "Try shutting down that process, and re-running this command."
-
-      return 1
     fi
   fi
 }
