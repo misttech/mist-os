@@ -1,10 +1,8 @@
 # `flatland-view-provider` example app
 
-There are three components defined here (plus tests):
+There are two components defined here (plus tests):
 - `flatland-view-provider.cm`
 - `flatland-view-provider-vulkan.cm`
-- `flatland-view-provider-example.cmx`
-  - (deprecated; used only for integration tests)
 
 `flatland-view-provider.cm` is a simple example app which uses Flatland to display
 content.  It displays colored squares which rotate colors through time.  It also listens
@@ -17,6 +15,4 @@ TODO(fxbug.dev/104692): the Vulkan version uses a single filled rect, instead of
 each quadrant in a different color.
 
 To launch:
-`ffx session add fuchsia-pkg://fuchsia.com/flatland-examples#meta/flatland-view-provider.cm`
-or
 `ffx session add fuchsia-pkg://fuchsia.com/flatland-examples#meta/flatland-view-provider.cm`

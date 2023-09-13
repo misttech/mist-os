@@ -35,7 +35,7 @@ empty struct with `#[derive(FromArgs, Debug, PartialEq)]`.)
     1. Remove syslog initialization; Launcher does that.
 1. In BUILD.gn, `import("//build/rust/rustc_library.gni")`, change
 `rustc_bin` to `rustc_lib`, and replace `main.rs` with `lib.rs` in `sources`.
-1. In the .cmx for unit tests, change `_bin_test` to `_lib_test`.
+1. In the .cml for unit tests, change `_bin_test` to `_lib_test`.
 
 In `//src/diagnostics/launcher`:
 

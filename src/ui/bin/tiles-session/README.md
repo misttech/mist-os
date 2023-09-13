@@ -22,7 +22,7 @@ ffx session launch fuchsia-pkg://fuchsia.com/tiles-session#meta/tiles-session.cm
 
 For example:
 ```
-ffx session add fuchsia-pkg://fuchsia.com/flatland-examples#meta/flatland-view-provider-example.cmx
+ffx session add fuchsia-pkg://fuchsia.com/flatland-examples#meta/flatland-view-provider.cm
 ```
 
 ## Current limitations

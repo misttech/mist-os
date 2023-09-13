@@ -192,7 +192,7 @@ will cause an audio file to be created for each output device.
 These files are created on the target (Fuchsia) device at location
 `/tmp/r/sys/<pkg>/wav_writer_N.wav`, where N is a unique integer for each output
 and `<pkg>` is the name of the `audio_core` package (such as
-`fuchsia.com:audio_core:0#meta:audio_core.cmx`). One can copy these files back
+`fuchsia.com:audio_core:0#meta:audio_core.cm`). One can copy these files back
 to the host with: `fx scp <ip of fuchsia device>:/tmp/.../wav_writer_*.wav
 ~/Desktop/` At this time, once audio playback begins on any device, the system
 audio mixer produces audio for ALL audio output devices (even if no client is

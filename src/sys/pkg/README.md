@@ -125,8 +125,8 @@ for examples.
 
 The package resolver is configured by default to resolve `fuchsia.com` to the
 local development host. To run a component in a package you’ve built locally,
-you can run something like `fx shell run
-fuchsia-pkg://fuchsia.com/<package_name>#meta/<component_name>.cmx`
+you can run something like `ffx component run /core/ffx-laborary:test
+fuchsia-pkg://fuchsia.com/<package_name>#meta/<component_name>.cm`
 
 ### FAQs
 
