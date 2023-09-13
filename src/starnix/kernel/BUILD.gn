@@ -28,13 +28,7 @@ group("tests") {
 }
 
 static_library("restricted_trampoline") {
-  if (current_cpu == "x64") {
-    sources = [ "execution/trampoline_x64.S" ]
-  } else if (current_cpu == "arm64") {
-    sources = [ "execution/trampoline_arm64.S" ]
-  } else if (current_cpu == "riscv64") {
-    sources = [ "execution/trampoline_riscv64.S" ]
-  }
+  sources = [ "execution/trampoline_${current_cpu}.S" ]
 }
 
 rustc_binary("starnix_kernel_bin") {
@@ -170,6 +164,15 @@ rustc_binary("starnix_kernel_bin") {
   non_rust_deps = [ ":restricted_trampoline" ]
 
   sources = [
+    "arch/${current_cpu}/execution.rs",
+    "arch/${current_cpu}/loader.rs",
+    "arch/${current_cpu}/mod.rs",
+    "arch/${current_cpu}/registers.rs",
+    "arch/${current_cpu}/signal_handling.rs",
+    "arch/${current_cpu}/syscalls.rs",
+    "arch/${current_cpu}/task.rs",
+    "arch/${current_cpu}/uapi.rs",
+    "arch/${current_cpu}/vdso.rs",
     "arch/mod.rs",
     "auth.rs",
     "bpf.rs",
@@ -361,28 +364,6 @@ rustc_binary("starnix_kernel_bin") {
     "vmex_resource.rs",
   ]
 
-  arch_dir = ""
-  if (current_cpu == "x64") {
-    arch_dir = "arch/x64"
-  } else if (current_cpu == "arm64") {
-    arch_dir = "arch/aarch64"
-  } else if (current_cpu == "riscv64") {
-    arch_dir = "arch/riscv64"
-  }
-  if (arch_dir != "") {
-    sources += [
-      "${arch_dir}/execution.rs",
-      "${arch_dir}/loader.rs",
-      "${arch_dir}/mod.rs",
-      "${arch_dir}/registers.rs",
-      "${arch_dir}/signal_handling.rs",
-      "${arch_dir}/syscalls.rs",
-      "${arch_dir}/task.rs",
-      "${arch_dir}/uapi.rs",
-      "${arch_dir}/vdso.rs",
-    ]
-  }
-
   features = []
   if (starnix_disable_logging) {
     features = [ "disable_logging" ]
@@ -442,34 +423,19 @@ config("vdso_config") {
 
   # Use a custom linker script to ensure only one PT_LOAD header.
   vdso_linker_script = "vdso/vdso.ld"
-  ldflags += [ "-Wl,-T," + rebase_path(vdso_linker_script, root_build_dir) ]
-
-  if (current_cpu == "x64") {
-    vdso_version_script = "vdso/vdso-x64.map"
-    ldflags += [ "-Wl,--version-script," +
-                 rebase_path(vdso_version_script, root_build_dir) ]
-  } else if (current_cpu == "arm64") {
-    vdso_version_script = "vdso/vdso-aarch64.map"
-    ldflags += [ "-Wl,--version-script," +
-                 rebase_path(vdso_version_script, root_build_dir) ]
-  } else if (current_cpu == "riscv64") {
-    vdso_version_script = "vdso/vdso-riscv64.map"
-    ldflags += [ "-Wl,--version-script," +
-                 rebase_path(vdso_version_script, root_build_dir) ]
-  }
+  vdso_version_script = "vdso/vdso-${current_cpu}.map"
+  ldflags += [
+    "-Wl,-T," + rebase_path(vdso_linker_script, root_build_dir),
+    "-Wl,--version-script," + rebase_path(vdso_version_script, root_build_dir),
+  ]
 }
 
 loadable_module("vdso") {
-  if (current_cpu == "x64") {
-    sources = [
-      "vdso/vdso-x64.cc",
-      "vdso/vvar-data.h",
-    ]
-  } else if (current_cpu == "arm64") {
-    sources = [ "vdso/vdso-aarch64.cc" ]
-  } else if (current_cpu == "riscv64") {
-    sources = [ "vdso/vdso-riscv64.cc" ]
-  }
+  sources = [
+    "vdso/vdso-${current_cpu}.cc",
+    "vdso/vvar-data.h",
+  ]
+
   output_name = "libvdso"
   configs += [ ":vdso_config" ]
   if (is_linux) {

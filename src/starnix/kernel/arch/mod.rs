@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 #[cfg(target_arch = "aarch64")]
-mod aarch64;
+mod arm64;
 
 #[cfg(target_arch = "aarch64")]
-pub use aarch64::*;
+pub use arm64::*;
 
 #[cfg(target_arch = "x86_64")]
 mod x64;
