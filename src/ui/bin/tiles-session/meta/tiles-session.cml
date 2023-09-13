@@ -35,7 +35,6 @@
                 "fuchsia.session.scene.Manager",
                 "fuchsia.tracing.provider.Registry",
                 "fuchsia.ui.composition.Flatland",
-                "fuchsia.ui.scenic.Scenic",
             ],
         },
         {
@@ -62,7 +61,6 @@
                 "fuchsia.ui.display.singleton.Info",
                 "fuchsia.ui.input.ImeService",
                 "fuchsia.ui.input3.Keyboard",
-                "fuchsia.ui.scenic.Scenic",
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",
