@@ -72,17 +72,22 @@ as watchpoints, pointer comparison is controlled via the `match` field of the
 `mcontext6` register, which can be controlled to either match an exact tagged
 value or ignore the tag just like with pointer masking.
 
-### Set the tag to 8 bits always
+### Set the tag to 8 bits (for Sv39 and Sv48)
 
-The most immediate use case of Zjpm is enabling dynamic safety catchers such as
-HWASan on RISC-V which is dependent on storing metadata into the top bits of a
-pointer. ARM TBI only supports a tag size of 8 bits. Zjpm is much more flexible
-though, allowing a variable number of top bits to be ignored of memory accesses.
-This number of bits can be controlled in different modes via a CSR register.
+The most immediate use case of Zjpm is enabling memory error detection tools
+such as HWASan on RISC-V which is dependent on storing metadata into the top
+bits of a pointer. ARM TBI only supports a tag size of 8 bits. Zjpm is much
+more flexible though, allowing a variable number of top bits to be ignored of
+memory accesses. This number of bits can be controlled in different modes via a
+CSR register.
 
 The simplest approach is to just conform to what we have now. ARM TBI and
 HWASan already use an 8-bit tag but there really isn't any immediate or
 foreseeable demand for a tag larger (or smaller) than 8 bits.
+
+A tag size of 8 bits will only be supported for Sv39 and Sv48. This is because
+Sv57 only supports masking the top 7 bits. The tag size will need to be
+revisited if Sv57 is supported in the future.
 
 ## Implementation
 
@@ -94,8 +99,15 @@ The existing syscall infrastructure should already be set up for accepting
 tagged userspace pointers with a fixed tag size.
 
 The `ZX_FEATURE_KIND_ADDRESS_TAGGING` [feature][features] will have an extra
-flag (something like `ZX_RISCV64_FEATURE_ADDRESS_TAGGING_PM`) to indicate Zjpm
-is enabled.
+flag (something like `ZX_RISCV64_FEATURE_ADDRESS_TAGGING_ZJPM_8BIT`) to
+indicate Zjpm is enabled and the tag size.
+`ZX_RISCV64_FEATURE_ADDRESS_TAGGING_ZJPM_8BIT` indicates that the top 8 bits
+are definitely masked, but in the future we may want to add other flags that
+mean more of the upper bits get masked. For example, we could add something
+like `ZX_RISCV64_FEATURE_ADDRESS_TAGGING_ZJPM_16BIT` to indicate the top 16
+bits are masked, but `ZX_FEATURE_KIND_ADDRESS_TAGGING` would also set the 8-bit
+equivalent flag to ensure compatible code checking the 8-bit flag will work for
+future systems.
 
 Zjpm also depends on the Zicsr extension being enabled, which provides
 instructions for modifying CSR registers.
@@ -115,6 +127,14 @@ enabled.
 
 Zjpm provides much more flexibility than ARM TBI, so we could support more
 masking options.
+
+At the moment, there doesn't seem to be any real hardware that supports the
+latest version of Zjpm, so it's underspecified how the kernel will be able to
+discover what support is available in the hardware. Until we know what real
+constraints there will be for hardware, the conservative single-feature
+always-on mode proposed here will be what's best supported if anything is.
+[QEMU][qemu] should support pointer masking and can be enabled with the
+"x-j" cpu property.
 
 ### Set the tag to some other static value always
 
@@ -145,11 +165,11 @@ future.
 
 ### Pointer Masking on Instruction Fetching
 
-One powerful feature of Zjpm enabling PM on instruction fetches, including those
-resulting from monotonic PC increases due to straight line execution, control
-transfers (e.g., branches and direct/indirect jumps and `uret`/`sret`/`mret`).
-This proposal only outlines pointer masking rules on data pointers, but leaves
-room for exploring this option in the future.
+One powerful feature of Zjpm is enabling PM on instruction fetches, including
+those resulting from monotonic PC increases due to straight line execution,
+control transfers (e.g., branches and direct/indirect jumps and
+`uret`/`sret`/`mret`). This proposal only outlines pointer masking rules on
+data pointers, but leaves room for exploring this option in the future.
 
 ### Interaction with other desirable hardware features
 
@@ -170,3 +190,4 @@ accommodate any major changes in the spec.
 [hwasan]: https://clang.llvm.org/docs/HardwareAssistedAddressSanitizerDesign.html
 [rfc143]: /docs/contribute/governance/rfcs/0143_userspace_top_byte_ignore.md
 [features]: /docs/reference/syscalls/system_get_features.md
+[qemu]: https://lists.gnu.org/archive/html/qemu-riscv/2021-10/msg00682.html
