@@ -88,9 +88,6 @@ ffx_subtool_fidl_allowlist = [
   # used by ffx driver
   "//sdk/fidl/fuchsia.storage.metrics:fuchsia.storage.metrics",
 
-  # Used by RemoteControl
-  "//sdk/fidl/fuchsia.sys2:fuchsia.sys2",
-
   # used by ffx test
   "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager",
 
