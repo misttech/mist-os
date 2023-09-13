@@ -33,3 +33,8 @@ legacy_base_package_labels += [ "//tools/cargo-gnaw:install-cargo-gnaw" ]
 base_driver_package_labels += [ "//src/connectivity/bluetooth:core-drivers" ]
 
 legacy_universe_package_labels += [ "//bundles/tools" ]
+
+# Set the default pkgfs allowlist to use for all core-based products to the
+# "eng" allowlist.
+product_system_image_deps +=
+    [ "//src/security/policy:pkgfs_non_static_pkgs_allowlist_eng" ]

@@ -183,6 +183,7 @@ size_checker_input = {
         # These are part of the system-image package, and the only remaining
         # contents of the "system" packages.
         "build/images/fuchsia/fuchsia/base",
+        "packages/system/pkgfs_non_static_pkgs_allowlist_eng",
         "packages/system/disable-executability-restrictions",
       ]
       limit = 8552106  # 8.155 MiB

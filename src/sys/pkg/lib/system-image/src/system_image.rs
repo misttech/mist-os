@@ -98,7 +98,7 @@ mod tests {
     }
 
     impl TestEnv {
-        async fn new(system_image: SystemImageBuilder) -> (Self, SystemImage) {
+        async fn new(system_image: SystemImageBuilder<'_>) -> (Self, SystemImage) {
             let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().await.unwrap();
             let system_image = system_image.build().await;
             system_image.write_to_blobfs(&blobfs).await;
