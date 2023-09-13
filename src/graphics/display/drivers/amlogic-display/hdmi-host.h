@@ -117,10 +117,9 @@ class HdmiHost {
 
   zx_status_t CalculateAndSetHdmiHardwareParams(const display_mode_t* disp_timing);
 
-  zx_status_t ConfigurePll();
-
  private:
   zx_status_t CalculateAndSetHdmiHardwareParams(const display_mode_t* disp_timing, hdmi_param* p);
+  void ConfigurePll();
   void ConfigEncoder();
   void ConfigPhy();
 

@@ -285,8 +285,6 @@ zx::result<> Vout::ApplyConfiguration(const display_mode_t* mode) {
       }
 
       memcpy(&hdmi_.cur_display_mode_, mode, sizeof(display_mode_t));
-      // FIXME: Need documentation for HDMI PLL initialization
-      hdmi_.hdmi_host->ConfigurePll();
       hdmi_.hdmi_host->ModeSet(*mode);
       return zx::ok();
     }

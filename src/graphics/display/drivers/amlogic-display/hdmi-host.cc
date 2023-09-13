@@ -142,6 +142,8 @@ void HdmiHost::HostOff() {
 }
 
 zx_status_t HdmiHost::ModeSet(const display_mode_t& mode) {
+  ConfigurePll();
+
   for (size_t i = 0; ENC_LUT_GEN[i].reg != 0xFFFFFFFF; i++) {
     WRITE32_REG(VPU, ENC_LUT_GEN[i].reg, ENC_LUT_GEN[i].val);
   }

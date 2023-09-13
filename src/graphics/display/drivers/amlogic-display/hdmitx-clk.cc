@@ -63,7 +63,7 @@ void HdmiHost::WaitForPllLocked() {
   } while (err);
 }
 
-zx_status_t HdmiHost::ConfigurePll() {
+void HdmiHost::ConfigurePll() {
   const struct pll_param* pll = &p_.pll_p_24b;
 
   // Set VIU Mux Ctrl
@@ -150,9 +150,6 @@ zx_status_t HdmiHost::ConfigurePll() {
         .set_divider0_enabled(true)
         .WriteTo(&(*hhi_mmio_));
   }
-
-  zxlogf(INFO, "done!");
-  return ZX_OK;
 }
 
 void HdmiHost::ConfigureHpllClkOut(uint32_t hpll) {
