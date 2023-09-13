@@ -229,4 +229,22 @@ test_platforms = [
     iperf_servers = "1"
     pool = "fuchsia.tests.connectivity"
   },
+  {
+    access_points = "1"
+    device_type = "Vim3"
+    pool = "fuchsia.tests.connectivity"
+  },
+  {
+    access_points = "1"
+    device_type = "Vim3"
+    iperf_servers = "1"
+    pool = "fuchsia.tests.connectivity"
+  },
+  {
+    access_points = "1"
+    attenuators = "1"
+    device_type = "Vim3"
+    iperf_servers = "1"
+    pool = "fuchsia.tests.connectivity"
+  },
 ]
