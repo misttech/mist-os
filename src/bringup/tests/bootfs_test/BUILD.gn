@@ -15,9 +15,6 @@ test("running_on_bootfs_test") {
   ]
 }
 
-# Note: this test should end up in /boot, which means the cmx produced here is
-# irrelevant, however, we don't allow bare tests in packages anymore, so the
-# cmx production avoids needing a very specialized exception for this case.
 bootfs_test("running-on-bootfs-test") {
   name = "running-on-bootfs-test"
   deps = [ ":running_on_bootfs_test" ]
