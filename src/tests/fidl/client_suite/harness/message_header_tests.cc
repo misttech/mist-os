@@ -17,7 +17,7 @@ namespace {
 using namespace ::channel_util;
 
 // The client should tear down when it receives an event with an invalid magic number.
-CLIENT_TEST(ReceiveEventBadMagicNumber) {
+CLIENT_TEST(60, ReceiveEventBadMagicNumber) {
   Bytes event = Header{
       .txid = 0,
       .magic_number = kBadMagicNumber,
@@ -38,7 +38,7 @@ CLIENT_TEST(ReceiveEventBadMagicNumber) {
 }
 
 // The client should tear down when it receives an event with nonzero txid.
-CLIENT_TEST(ReceiveEventUnexpectedTxid) {
+CLIENT_TEST(61, ReceiveEventUnexpectedTxid) {
   Bytes event = Header{.txid = 123, .ordinal = kOrdinal_ClosedTarget_OnEventNoPayload};
   auto reporter = ReceiveClosedEvents();
   ASSERT_NE(reporter, nullptr);
@@ -56,7 +56,7 @@ CLIENT_TEST(ReceiveEventUnexpectedTxid) {
 }
 
 // The client should tear down when it receives an event with an unknown ordinal.
-CLIENT_TEST(ReceiveEventUnknownOrdinal) {
+CLIENT_TEST(62, ReceiveEventUnknownOrdinal) {
   Bytes event = Header{.txid = 0, .ordinal = kOrdinalFakeUnknownMethod};
   auto reporter = ReceiveClosedEvents();
   ASSERT_NE(reporter, nullptr);
@@ -74,7 +74,7 @@ CLIENT_TEST(ReceiveEventUnknownOrdinal) {
 }
 
 // The client should tear down when it receives a response with an invalid magic number.
-CLIENT_TEST(ReceiveResponseBadMagicNumber) {
+CLIENT_TEST(63, ReceiveResponseBadMagicNumber) {
   Bytes expected_request = Header{
       .txid = kTxidNotKnown,
       .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload,
@@ -101,7 +101,7 @@ CLIENT_TEST(ReceiveResponseBadMagicNumber) {
 }
 
 // The client should tear down when it receives a response with an unexpected txid.
-CLIENT_TEST(ReceiveResponseUnexpectedTxid) {
+CLIENT_TEST(64, ReceiveResponseUnexpectedTxid) {
   if (WaitFor(runner()->GetBindingsProperties()).value().io_style() ==
       fidl_clientsuite::IoStyle::kSync) {
     GTEST_SKIP() << "Skipping because sync bindings use zx_channel_call, so the thread would "
@@ -137,7 +137,7 @@ CLIENT_TEST(ReceiveResponseUnexpectedTxid) {
 
 // The client should tear down when it receives a response with an ordinal
 // that is known but different from the request ordinal.
-CLIENT_TEST(ReceiveResponseWrongOrdinalKnown) {
+CLIENT_TEST(65, ReceiveResponseWrongOrdinalKnown) {
   Bytes expected_request =
       Header{.txid = kTxidNotKnown, .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload};
   Bytes response =
@@ -159,7 +159,7 @@ CLIENT_TEST(ReceiveResponseWrongOrdinalKnown) {
 }
 
 // The client should tear down when it receives a response with an unknown ordinal.
-CLIENT_TEST(ReceiveResponseWrongOrdinalUnknown) {
+CLIENT_TEST(67, ReceiveResponseWrongOrdinalUnknown) {
   Bytes expected_request =
       Header{.txid = kTxidNotKnown, .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload};
   Bytes response = Header{.txid = kTxidNotKnown, .ordinal = kOrdinalFakeUnknownMethod};

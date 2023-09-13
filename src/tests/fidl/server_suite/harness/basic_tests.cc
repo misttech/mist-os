@@ -15,27 +15,27 @@ namespace {
 using namespace ::channel_util;
 
 // Check that the test runner is set up correctly without doing anything else.
-CLOSED_SERVER_TEST(Setup) {}
+CLOSED_SERVER_TEST(1, Setup) {}
 
 // Check that the test disabling mechanism works.
-CLOSED_SERVER_TEST(IgnoreDisabled) { FAIL() << "This test should be skipped!"; }
+CLOSED_SERVER_TEST(107, IgnoreDisabled) { FAIL() << "This test should be skipped!"; }
 
 // The server should receive a one-way method request.
-CLOSED_SERVER_TEST(OneWayNoPayload) {
+CLOSED_SERVER_TEST(2, OneWayNoPayload) {
   Bytes request = Header{.txid = 0, .ordinal = kOrdinal_ClosedTarget_OneWayNoPayload};
   ASSERT_OK(client_end().write(request));
   WAIT_UNTIL([this]() { return reporter().received_one_way_no_payload(); });
 }
 
 // The server should reply to a two-way method request (no payload).
-CLOSED_SERVER_TEST(TwoWayNoPayload) {
+CLOSED_SERVER_TEST(3, TwoWayNoPayload) {
   Bytes bytes = Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload};
   ASSERT_OK(client_end().write(bytes));
   ASSERT_OK(client_end().read_and_check(bytes));
 }
 
 // The server should reply to a two-way method request (struct payload).
-CLOSED_SERVER_TEST(TwoWayStructPayload) {
+CLOSED_SERVER_TEST(6, TwoWayStructPayload) {
   Bytes bytes = {
       Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_TwoWayStructPayload},
       {uint8(0xab), padding(7)},
@@ -45,7 +45,7 @@ CLOSED_SERVER_TEST(TwoWayStructPayload) {
 }
 
 // The server should reply to a two-way method request (table payload).
-CLOSED_SERVER_TEST(TwoWayTablePayload) {
+CLOSED_SERVER_TEST(7, TwoWayTablePayload) {
   Bytes bytes = {
       Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_TwoWayTablePayload},
       table_max_ordinal(1),
@@ -57,7 +57,7 @@ CLOSED_SERVER_TEST(TwoWayTablePayload) {
 }
 
 // The server should reply to a two-way method request (union payload).
-CLOSED_SERVER_TEST(TwoWayUnionPayload) {
+CLOSED_SERVER_TEST(8, TwoWayUnionPayload) {
   Bytes bytes = {
       Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_TwoWayUnionPayload},
       union_ordinal(1),
@@ -68,7 +68,7 @@ CLOSED_SERVER_TEST(TwoWayUnionPayload) {
 }
 
 // The server should reply to a fallible method (success).
-CLOSED_SERVER_TEST(TwoWayResultWithPayload) {
+CLOSED_SERVER_TEST(4, TwoWayResultWithPayload) {
   Bytes bytes = {
       Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_TwoWayResult},
       union_ordinal(1),
@@ -81,7 +81,7 @@ CLOSED_SERVER_TEST(TwoWayResultWithPayload) {
 }
 
 // The server should reply to a fallible method (error).
-CLOSED_SERVER_TEST(TwoWayResultWithError) {
+CLOSED_SERVER_TEST(5, TwoWayResultWithError) {
   Bytes bytes = {
       Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_TwoWayResult},
       union_ordinal(2),

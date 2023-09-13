@@ -13,7 +13,7 @@ using namespace ::channel_util;
 
 // When sending an event, if channel_write returns PEER_CLOSED, the bindings
 // should hide it and return successfully. This helps prevent race conditions.
-OPEN_SERVER_TEST(EventSendingDoNotReportPeerClosed) {
+OPEN_SERVER_TEST(109, EventSendingDoNotReportPeerClosed) {
   client_end().reset();
   controller()->SendStrictEvent().ThenExactlyOnce([&](auto result) {
     MarkControllerCallbackRun();
@@ -26,7 +26,7 @@ OPEN_SERVER_TEST(EventSendingDoNotReportPeerClosed) {
 
 // When sending a reply, if channel_write returns PEER_CLOSED, the bindings
 // should hide it and return successfully. This helps prevent race conditions.
-CLOSED_SERVER_TEST(ReplySendingDoNotReportPeerClosed) {
+CLOSED_SERVER_TEST(110, ReplySendingDoNotReportPeerClosed) {
   Bytes request = Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload};
   ASSERT_OK(client_end().write(request));
   client_end().reset();
@@ -36,7 +36,7 @@ CLOSED_SERVER_TEST(ReplySendingDoNotReportPeerClosed) {
 
 // The server should drain out messages buffered by a client, even when the
 // client closed their endpoint right away after writing those messages.
-CLOSED_SERVER_TEST(ReceiveOneWayNoPayloadFromPeerClosedChannel) {
+CLOSED_SERVER_TEST(111, ReceiveOneWayNoPayloadFromPeerClosedChannel) {
   Bytes request = Header{.txid = 0, .ordinal = kOrdinal_ClosedTarget_OneWayNoPayload};
   ASSERT_OK(client_end().write(request));
   client_end().reset();
@@ -46,7 +46,7 @@ CLOSED_SERVER_TEST(ReceiveOneWayNoPayloadFromPeerClosedChannel) {
 // This test isn't really necessary, since the test fixture does this implicitly
 // at the end of all tests that don't call ASSERT_SERVER_TEARDOWN themselves.
 // We include it here just to be explicit that this behavior is covered.
-CLOSED_SERVER_TEST(ServerTearsDownWhenPeerClosed) {
+CLOSED_SERVER_TEST(113, ServerTearsDownWhenPeerClosed) {
   client_end().reset();
   WAIT_UNTIL([this]() { return reporter().teardown_reason().has_value(); });
   EXPECT_TEARDOWN_REASON(fidl_serversuite::TeardownReason::kChannelPeerClosed);

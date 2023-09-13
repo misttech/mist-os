@@ -16,7 +16,7 @@ namespace {
 using namespace ::channel_util;
 
 // The server should tear down when the request is missing a handle.
-CLOSED_SERVER_TEST(ClientSendsTooFewHandles) {
+CLOSED_SERVER_TEST(16, ClientSendsTooFewHandles) {
   Bytes request = {
       Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_GetSignalableEventRights},
       {handle_present(), padding(4)},
@@ -27,7 +27,7 @@ CLOSED_SERVER_TEST(ClientSendsTooFewHandles) {
 }
 
 // The server should tear down when it receives the wrong handle type.
-CLOSED_SERVER_TEST(ClientSendsWrongHandleType) {
+CLOSED_SERVER_TEST(17, ClientSendsWrongHandleType) {
   zx::port port;
   ASSERT_OK(zx::port::create(0, &port));
 
@@ -46,7 +46,7 @@ CLOSED_SERVER_TEST(ClientSendsWrongHandleType) {
 }
 
 // When a handle with too many rights is sent, the rights should be reduced.
-CLOSED_SERVER_TEST(ClientSendsTooManyRights) {
+CLOSED_SERVER_TEST(18, ClientSendsTooManyRights) {
   zx::event event;
   ASSERT_OK(zx::event::create(0, &event));
 
@@ -71,7 +71,7 @@ CLOSED_SERVER_TEST(ClientSendsTooManyRights) {
 }
 
 // The server should tear down when it receives a handle with too few rights.
-CLOSED_SERVER_TEST(ClientSendsTooFewRights) {
+CLOSED_SERVER_TEST(19, ClientSendsTooFewRights) {
   zx::event event;
   ASSERT_OK(zx::event::create(0, &event));
   zx::event reduced_rights_event;
@@ -94,7 +94,7 @@ CLOSED_SERVER_TEST(ClientSendsTooFewRights) {
 // The server should handle ZX_OBJ_TYPE_NONE and ZX_RIGHT_SAME_RIGHTS correctly.
 // ZX_OBJ_TYPE_NONE means "any object type is allowed".
 // ZX_RIGHT_SAME_RIGHTS means "any rights are allowed".
-CLOSED_SERVER_TEST(ClientSendsObjectOverPlainHandle) {
+CLOSED_SERVER_TEST(20, ClientSendsObjectOverPlainHandle) {
   zx::event event;
   ASSERT_OK(zx::event::create(0, &event));
 
@@ -112,7 +112,7 @@ CLOSED_SERVER_TEST(ClientSendsObjectOverPlainHandle) {
 }
 
 // The server should tear down when it tries to send the wrong handle type.
-CLOSED_SERVER_TEST(ServerSendsWrongHandleType) {
+CLOSED_SERVER_TEST(21, ServerSendsWrongHandleType) {
   zx::port port;
   ASSERT_OK(zx::port::create(0, &port));
 
@@ -132,7 +132,7 @@ CLOSED_SERVER_TEST(ServerSendsWrongHandleType) {
 }
 
 // When the server sends a handle with too many rights, the rights should be reduced.
-CLOSED_SERVER_TEST(ServerSendsTooManyRights) {
+CLOSED_SERVER_TEST(22, ServerSendsTooManyRights) {
   zx::event event;
   ASSERT_OK(zx::event::create(0, &event));
 
@@ -165,7 +165,7 @@ CLOSED_SERVER_TEST(ServerSendsTooManyRights) {
 }
 
 // The server should tear down when it tries to send a handle with too few rights.
-CLOSED_SERVER_TEST(ServerSendsTooFewRights) {
+CLOSED_SERVER_TEST(23, ServerSendsTooFewRights) {
   zx::event event;
   ASSERT_OK(zx::event::create(0, &event));
   zx::event reduced_rights_event;

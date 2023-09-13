@@ -19,6 +19,8 @@
 #include "src/lib/testing/predicates/status.h"
 #include "src/tests/fidl/channel_util/channel.h"
 
+namespace server_suite {
+
 #define WAIT_UNTIL(condition) ASSERT_TRUE(_wait_until(condition));
 
 #define WAIT_UNTIL_EXT(ext, condition) ASSERT_TRUE((ext)->_wait_until(condition));
@@ -32,23 +34,28 @@
     _check_teardown_reason(reason);        \
   } while (false);
 
-// Defines a new server test. Relies on gtest under the hood.
-// Tests must use upper camel case names and be defined in the |Test| enum in
-// serversuite.test.fidl.
-#define SERVER_TEST(test_name, target_type)                                              \
-  struct ServerTestWrapper##test_name : public ServerTest<target_type> {                 \
-    ServerTestWrapper##test_name() : ServerTest(fidl_serversuite::Test::k##test_name) {} \
-  };                                                                                     \
-  TEST_F(ServerTestWrapper##test_name, test_name)
+// Defines a server test using GoogleTest.
+// Use {CLOSED,AJAR,OPEN}_SERVER_TEST for the {Closed,Ajar,Open}Target protocol.
+// (1) test_number must be a fidl.serversuite/Test enum member value.
+// (2) test_name must be the enum member's name in UpperCamelCase.
+// We include (1) to make it easier to correlate logs when a test fails.
+#define CLOSED_SERVER_TEST(test_number, test_name) \
+  SERVER_TEST_IMPL(test_number, test_name, fidl_serversuite::AnyTarget::Tag::kClosedTarget)
+#define AJAR_SERVER_TEST(test_number, test_name) \
+  SERVER_TEST_IMPL(test_number, test_name, fidl_serversuite::AnyTarget::Tag::kAjarTarget)
+#define OPEN_SERVER_TEST(test_number, test_name) \
+  SERVER_TEST_IMPL(test_number, test_name, fidl_serversuite::AnyTarget::Tag::kOpenTarget)
 
-#define CLOSED_SERVER_TEST(test_name) \
-  SERVER_TEST(test_name, fidl_serversuite::AnyTarget::Tag::kClosedTarget)
-#define AJAR_SERVER_TEST(test_name) \
-  SERVER_TEST(test_name, fidl_serversuite::AnyTarget::Tag::kAjarTarget)
-#define OPEN_SERVER_TEST(test_name) \
-  SERVER_TEST(test_name, fidl_serversuite::AnyTarget::Tag::kOpenTarget)
-
-namespace server_suite {
+#define SERVER_TEST_IMPL(test_number, test_name, target_kind)                                  \
+  static_assert((test_number) == static_cast<uint32_t>(fidl_serversuite::Test::k##test_name),  \
+                "In SERVER_TEST macro: test number " #test_number                              \
+                " does not match test name \"" #test_name "\"");                               \
+  static_assert(static_cast<uint32_t>(fidl_serversuite::Test::k##test_name) == (test_number)); \
+  struct ServerTest_##test_number : public ServerTest<target_kind> {                           \
+    ServerTest_##test_number() : ServerTest(fidl_serversuite::Test::k##test_name) {}           \
+  };                                                                                           \
+  /* NOLINTNEXTLINE(google-readability-avoid-underscore-in-googletest-name) */                 \
+  TEST_F(ServerTest_##test_number, test_name)
 
 template <typename Protocol>
 class TeardownReasonReporterMixin : public virtual fidl::AsyncEventHandler<Protocol> {
@@ -189,9 +196,6 @@ struct TargetTypes<fidl_serversuite::AnyTarget::Tag::kOpenTarget> {
 };
 
 template <fidl_serversuite::AnyTarget::Tag TARGET_TYPE>
-using Target = typename TargetTypes<TARGET_TYPE>::Target;
-
-template <fidl_serversuite::AnyTarget::Tag TARGET_TYPE>
 using TargetController = typename TargetTypes<TARGET_TYPE>::Controller;
 
 template <fidl_serversuite::AnyTarget::Tag TARGET_TYPE>
@@ -228,7 +232,7 @@ class ServerTest : private ::loop_fixture::RealLoop, public ::testing::Test {
     auto controller_endpoints = fidl::CreateEndpoints<TargetController<TARGET_TYPE>>();
     ASSERT_OK(controller_endpoints.status_value()) << controller_endpoints.status_string();
 
-    auto target_endpoints = fidl::CreateEndpoints<Target<TARGET_TYPE>>();
+    auto target_endpoints = fidl::CreateEndpoints<typename TargetTypes<TARGET_TYPE>::Target>();
     ASSERT_OK(target_endpoints.status_value()) << target_endpoints.status_string();
     target_ = channel_util::Channel(target_endpoints->client.TakeChannel());
 

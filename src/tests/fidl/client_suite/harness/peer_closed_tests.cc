@@ -15,7 +15,7 @@ using namespace ::channel_util;
 
 // When making a one-way call, if channel_write returns PEER_CLOSED, the bindings
 // should hide it and return successfully. This helps prevent race conditions.
-CLIENT_TEST(OneWayCallDoNotReportPeerClosed) {
+CLIENT_TEST(59, OneWayCallDoNotReportPeerClosed) {
   server_end().get().reset();
   runner()->CallOneWayNoRequest({{.target = TakeClosedClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();

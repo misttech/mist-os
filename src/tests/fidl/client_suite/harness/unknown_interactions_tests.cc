@@ -15,7 +15,7 @@ namespace {
 using namespace ::channel_util;
 
 // The client should call a strict one-way method.
-CLIENT_TEST(OneWayStrictSend) {
+CLIENT_TEST(4, OneWayStrictSend) {
   Bytes expected_request = Header{.txid = kOneWayTxid, .ordinal = kOrdinal_OpenTarget_StrictOneWay};
   runner()->CallStrictOneWay({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -27,7 +27,7 @@ CLIENT_TEST(OneWayStrictSend) {
 }
 
 // The client should call a flexible one-way method.
-CLIENT_TEST(OneWayFlexibleSend) {
+CLIENT_TEST(5, OneWayFlexibleSend) {
   Bytes expected_request = Header{
       .txid = kOneWayTxid,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -43,7 +43,7 @@ CLIENT_TEST(OneWayFlexibleSend) {
 }
 
 // The client should call a strict two-way method and receive the response.
-CLIENT_TEST(TwoWayStrictSend) {
+CLIENT_TEST(6, TwoWayStrictSend) {
   Bytes bytes = Header{.txid = kTxidNotKnown, .ordinal = kOrdinal_OpenTarget_StrictTwoWay};
   runner()->CallStrictTwoWay({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -58,7 +58,7 @@ CLIENT_TEST(TwoWayStrictSend) {
 
 // The client should call a strict two-way method and receive the response,
 // despite the schema (strict) not matching the response's dynamic flags (flexible).
-CLIENT_TEST(TwoWayStrictSendMismatchedStrictness) {
+CLIENT_TEST(7, TwoWayStrictSendMismatchedStrictness) {
   Bytes expected_request = Header{
       .txid = kTxidNotKnown,
       .ordinal = kOrdinal_OpenTarget_StrictTwoWay,
@@ -80,7 +80,7 @@ CLIENT_TEST(TwoWayStrictSendMismatchedStrictness) {
 }
 
 // The client should call a strict two-way method and receive the nonempty response.
-CLIENT_TEST(TwoWayStrictSendNonEmptyPayload) {
+CLIENT_TEST(38, TwoWayStrictSendNonEmptyPayload) {
   Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinal_OpenTarget_StrictTwoWayFields};
   fidl_clientsuite::NonEmptyPayload payload = {{.some_field = 541768}};
   Bytes expected_request = header;
@@ -100,7 +100,7 @@ CLIENT_TEST(TwoWayStrictSendNonEmptyPayload) {
 }
 
 // The client should call a strict fallible two-way method and receive the success response.
-CLIENT_TEST(TwoWayStrictErrorSyntaxSendSuccessResponse) {
+CLIENT_TEST(8, TwoWayStrictErrorSyntaxSendSuccessResponse) {
   Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinal_OpenTarget_StrictTwoWayErr};
   Bytes expected_request = header;
   Bytes response = {header, union_ordinal(kResultUnionSuccess), inline_envelope({0x00})};
@@ -116,7 +116,7 @@ CLIENT_TEST(TwoWayStrictErrorSyntaxSendSuccessResponse) {
 }
 
 // The client should call a strict fallible two-way method and receive the error response.
-CLIENT_TEST(TwoWayStrictErrorSyntaxSendErrorResponse) {
+CLIENT_TEST(9, TwoWayStrictErrorSyntaxSendErrorResponse) {
   Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinal_OpenTarget_StrictTwoWayErr};
   int32_t error = 39243320;
   Bytes expected_request = header;
@@ -135,7 +135,7 @@ CLIENT_TEST(TwoWayStrictErrorSyntaxSendErrorResponse) {
 
 // The client should tear down when it calls a strict fallible two-way method and
 // receives an "unknown method" response (with strict dynamic flag).
-CLIENT_TEST(TwoWayStrictErrorSyntaxSendUnknownMethodResponse) {
+CLIENT_TEST(10, TwoWayStrictErrorSyntaxSendUnknownMethodResponse) {
   Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinal_OpenTarget_StrictTwoWayErr};
   Bytes expected_request = header;
   Bytes response = {
@@ -157,7 +157,7 @@ CLIENT_TEST(TwoWayStrictErrorSyntaxSendUnknownMethodResponse) {
 
 // The client should tear down when it calls a strict fallible two-way method
 // and receives an "unknown method" response (with flexible dynamic flag).
-CLIENT_TEST(TwoWayStrictErrorSyntaxSendMismatchedStrictnessUnknownMethodResponse) {
+CLIENT_TEST(11, TwoWayStrictErrorSyntaxSendMismatchedStrictnessUnknownMethodResponse) {
   Bytes expected_request = Header{
       .txid = kTxidNotKnown,
       .ordinal = kOrdinal_OpenTarget_StrictTwoWayErr,
@@ -185,7 +185,7 @@ CLIENT_TEST(TwoWayStrictErrorSyntaxSendMismatchedStrictnessUnknownMethodResponse
 
 // The client should call a strict fallible two-way method and receive the
 // nonempty success response.
-CLIENT_TEST(TwoWayStrictErrorSyntaxSendNonEmptyPayload) {
+CLIENT_TEST(39, TwoWayStrictErrorSyntaxSendNonEmptyPayload) {
   Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinal_OpenTarget_StrictTwoWayFieldsErr};
   fidl_clientsuite::NonEmptyPayload payload = {{.some_field = 394966}};
   Bytes expected_request = header;
@@ -205,7 +205,7 @@ CLIENT_TEST(TwoWayStrictErrorSyntaxSendNonEmptyPayload) {
 }
 
 // The client should call a flexible two-way method and receive the empty response.
-CLIENT_TEST(TwoWayFlexibleSendSuccessResponse) {
+CLIENT_TEST(12, TwoWayFlexibleSendSuccessResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -226,7 +226,7 @@ CLIENT_TEST(TwoWayFlexibleSendSuccessResponse) {
 
 // The client should tear down when it calls a flexible two-way method and receives
 // a domain error response, which is invalid for a method without error syntax.
-CLIENT_TEST(TwoWayFlexibleSendErrorResponse) {
+CLIENT_TEST(13, TwoWayFlexibleSendErrorResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -251,7 +251,7 @@ CLIENT_TEST(TwoWayFlexibleSendErrorResponse) {
 }
 
 // The client should call a flexible two-way method and accept the "unknown method" response.
-CLIENT_TEST(TwoWayFlexibleSendUnknownMethodResponse) {
+CLIENT_TEST(14, TwoWayFlexibleSendUnknownMethodResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -279,7 +279,7 @@ CLIENT_TEST(TwoWayFlexibleSendUnknownMethodResponse) {
 // because the response message is inconsistent. Once fixed, comment should be:
 // > The client should tear down when it calls a flexible two-way method and
 // > receives an "unknown method" response (with strict dynamic flag).
-CLIENT_TEST(TwoWayFlexibleSendMismatchedStrictnessUnknownMethodResponse) {
+CLIENT_TEST(15, TwoWayFlexibleSendMismatchedStrictnessUnknownMethodResponse) {
   Bytes expected_request = Header{
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -304,7 +304,7 @@ CLIENT_TEST(TwoWayFlexibleSendMismatchedStrictnessUnknownMethodResponse) {
 
 // The client should tear down when it calls a flexible two-way method and
 // receives a framework error response other than "unsupported method".
-CLIENT_TEST(TwoWayFlexibleSendOtherTransportErrResponse) {
+CLIENT_TEST(16, TwoWayFlexibleSendOtherTransportErrResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -329,7 +329,7 @@ CLIENT_TEST(TwoWayFlexibleSendOtherTransportErrResponse) {
 }
 
 // The client should call a flexible two-way method and receive the nonempty response.
-CLIENT_TEST(TwoWayFlexibleSendNonEmptyPayloadSuccessResponse) {
+CLIENT_TEST(17, TwoWayFlexibleSendNonEmptyPayloadSuccessResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -355,7 +355,7 @@ CLIENT_TEST(TwoWayFlexibleSendNonEmptyPayloadSuccessResponse) {
 
 // The client should call a flexible two-way method whose response is nonempty,
 // and accept the "unknown method" response.
-CLIENT_TEST(TwoWayFlexibleSendNonEmptyPayloadUnknownMethodResponse) {
+CLIENT_TEST(18, TwoWayFlexibleSendNonEmptyPayloadUnknownMethodResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -383,7 +383,7 @@ CLIENT_TEST(TwoWayFlexibleSendNonEmptyPayloadUnknownMethodResponse) {
 }
 
 // The client should call a flexible fallible two-way method and receive the success response.
-CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendSuccessResponse) {
+CLIENT_TEST(19, TwoWayFlexibleErrorSyntaxSendSuccessResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -403,7 +403,7 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendSuccessResponse) {
 }
 
 // The client should call a flexible fallible two-way method and receive the error response.
-CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendErrorResponse) {
+CLIENT_TEST(20, TwoWayFlexibleErrorSyntaxSendErrorResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -425,7 +425,7 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendErrorResponse) {
 }
 
 // The client should call a flexible fallible two-way method accept the "unknown method" response.
-CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendUnknownMethodResponse) {
+CLIENT_TEST(21, TwoWayFlexibleErrorSyntaxSendUnknownMethodResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -453,7 +453,7 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendUnknownMethodResponse) {
 // because the response message is inconsistent. Once fixed, comment should be:
 // > The client should tear down when it calls a flexible fallible two-way method
 // > and receives an "unknown method" response (with strict dynamic flag).
-CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendMismatchedStrictnessUnknownMethodResponse) {
+CLIENT_TEST(22, TwoWayFlexibleErrorSyntaxSendMismatchedStrictnessUnknownMethodResponse) {
   Bytes expected_request = Header{
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -478,7 +478,7 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendMismatchedStrictnessUnknownMethodRespon
 
 // The client should tear down when it calls a flexible fallible two-way method
 // and receives a framework error response other than "unsupported method".
-CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendOtherTransportErrResponse) {
+CLIENT_TEST(23, TwoWayFlexibleErrorSyntaxSendOtherTransportErrResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -504,7 +504,7 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendOtherTransportErrResponse) {
 
 // The client should call a flexible fallible two-way method and receive
 // the nonempty success response.
-CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendNonEmptyPayloadSuccessResponse) {
+CLIENT_TEST(24, TwoWayFlexibleErrorSyntaxSendNonEmptyPayloadSuccessResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -530,7 +530,7 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendNonEmptyPayloadSuccessResponse) {
 
 // The client should call a flexible fallible two-way method whose response is
 // nonempty, and accept the "unknown method" response.
-CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendNonEmptyPayloadUnknownMethodResponse) {
+CLIENT_TEST(25, TwoWayFlexibleErrorSyntaxSendNonEmptyPayloadUnknownMethodResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -558,7 +558,7 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendNonEmptyPayloadUnknownMethodResponse) {
 }
 
 // The client should receive a strict event.
-CLIENT_TEST(ReceiveStrictEvent) {
+CLIENT_TEST(26, ReceiveStrictEvent) {
   Bytes event = Header{.txid = kOneWayTxid, .ordinal = kOrdinal_OpenTarget_StrictEvent};
   auto reporter = ReceiveOpenEvents();
   ASSERT_NE(reporter, nullptr);
@@ -572,7 +572,7 @@ CLIENT_TEST(ReceiveStrictEvent) {
 
 // The client should receive an event, despite the schema (strict) not matching
 // the dynamic flags (flexible).
-CLIENT_TEST(ReceiveStrictEventMismatchedStrictness) {
+CLIENT_TEST(27, ReceiveStrictEventMismatchedStrictness) {
   Bytes event = Header{
       .txid = kOneWayTxid,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -589,7 +589,7 @@ CLIENT_TEST(ReceiveStrictEventMismatchedStrictness) {
 }
 
 // The client should receive a flexible event.
-CLIENT_TEST(ReceiveFlexibleEvent) {
+CLIENT_TEST(28, ReceiveFlexibleEvent) {
   Bytes event = Header{
       .txid = kOneWayTxid,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -607,7 +607,7 @@ CLIENT_TEST(ReceiveFlexibleEvent) {
 
 // The client should receive an event, despite the schema (flexible) not
 // matching the dynamic flags (strict).
-CLIENT_TEST(ReceiveFlexibleEventMismatchedStrictness) {
+CLIENT_TEST(29, ReceiveFlexibleEventMismatchedStrictness) {
   Bytes event = Header{.txid = kOneWayTxid, .ordinal = kOrdinal_OpenTarget_FlexibleEvent};
   auto reporter = ReceiveOpenEvents();
   ASSERT_NE(reporter, nullptr);
@@ -620,7 +620,7 @@ CLIENT_TEST(ReceiveFlexibleEventMismatchedStrictness) {
 }
 
 // The open client should tear down when it receives an unknown strict event.
-CLIENT_TEST(UnknownStrictEventOpenProtocol) {
+CLIENT_TEST(30, UnknownStrictEventOpenProtocol) {
   Bytes event = Header{.txid = kOneWayTxid, .ordinal = kOrdinalFakeUnknownMethod};
   auto reporter = ReceiveOpenEvents();
   ASSERT_NE(reporter, nullptr);
@@ -639,7 +639,7 @@ CLIENT_TEST(UnknownStrictEventOpenProtocol) {
 }
 
 // The open client should accept an unknown flexible event.
-CLIENT_TEST(UnknownFlexibleEventOpenProtocol) {
+CLIENT_TEST(31, UnknownFlexibleEventOpenProtocol) {
   Bytes event = Header{
       .txid = kOneWayTxid,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -658,7 +658,7 @@ CLIENT_TEST(UnknownFlexibleEventOpenProtocol) {
 }
 
 // The ajar client should tear down when it receives an unknown strict event.
-CLIENT_TEST(UnknownStrictEventAjarProtocol) {
+CLIENT_TEST(32, UnknownStrictEventAjarProtocol) {
   Bytes event = Header{.txid = kOneWayTxid, .ordinal = kOrdinalFakeUnknownMethod};
   auto reporter = ReceiveAjarEvents();
   ASSERT_NE(reporter, nullptr);
@@ -677,7 +677,7 @@ CLIENT_TEST(UnknownStrictEventAjarProtocol) {
 }
 
 // The ajar client should accept an unknown flexible event.
-CLIENT_TEST(UnknownFlexibleEventAjarProtocol) {
+CLIENT_TEST(33, UnknownFlexibleEventAjarProtocol) {
   Bytes event = Header{
       .txid = kOneWayTxid,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -696,7 +696,7 @@ CLIENT_TEST(UnknownFlexibleEventAjarProtocol) {
 }
 
 // The closed client should tear down when it receives an unknown strict event.
-CLIENT_TEST(UnknownStrictEventClosedProtocol) {
+CLIENT_TEST(34, UnknownStrictEventClosedProtocol) {
   Bytes event = Header{.txid = kOneWayTxid, .ordinal = kOrdinalFakeUnknownMethod};
   auto reporter = ReceiveClosedEvents();
   ASSERT_NE(reporter, nullptr);
@@ -715,7 +715,7 @@ CLIENT_TEST(UnknownStrictEventClosedProtocol) {
 }
 
 // The closed client should tear down when it receives an unknown flexible event.
-CLIENT_TEST(UnknownFlexibleEventClosedProtocol) {
+CLIENT_TEST(35, UnknownFlexibleEventClosedProtocol) {
   Bytes event = Header{
       .txid = kOneWayTxid,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -739,7 +739,7 @@ CLIENT_TEST(UnknownFlexibleEventClosedProtocol) {
 
 // The client should tear down when it receives an unsolicited strict message
 // with nonzero txid and an unknown ordinal.
-CLIENT_TEST(UnknownStrictServerInitiatedTwoWay) {
+CLIENT_TEST(36, UnknownStrictServerInitiatedTwoWay) {
   Bytes bytes = Header{.txid = kTwoWayTxid, .ordinal = kOrdinalFakeUnknownMethod};
   auto reporter = ReceiveOpenEvents();
   ASSERT_NE(reporter, nullptr);
@@ -759,7 +759,7 @@ CLIENT_TEST(UnknownStrictServerInitiatedTwoWay) {
 
 // The client should tear down when it receives an unsolicited flexible message
 // with nonzero txid and an unknown ordinal.
-CLIENT_TEST(UnknownFlexibleServerInitiatedTwoWay) {
+CLIENT_TEST(37, UnknownFlexibleServerInitiatedTwoWay) {
   Bytes bytes = Header{
       .txid = kTwoWayTxid,
       .dynamic_flags = kDynamicFlagsFlexible,

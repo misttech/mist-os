@@ -19,7 +19,7 @@ namespace {
 using namespace ::channel_util;
 
 // The server should send a strict event.
-OPEN_SERVER_TEST(SendStrictEvent) {
+OPEN_SERVER_TEST(32, SendStrictEvent) {
   Bytes expected_event = Header{.txid = 0, .ordinal = kOrdinal_OpenTarget_StrictEvent};
   controller()->SendStrictEvent().ThenExactlyOnce([&](auto result) {
     MarkControllerCallbackRun();
@@ -30,7 +30,7 @@ OPEN_SERVER_TEST(SendStrictEvent) {
 }
 
 // The server should send a flexible event.
-OPEN_SERVER_TEST(SendFlexibleEvent) {
+OPEN_SERVER_TEST(33, SendFlexibleEvent) {
   Bytes expected_event = Header{
       .txid = 0,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -45,7 +45,7 @@ OPEN_SERVER_TEST(SendFlexibleEvent) {
 }
 
 // The server should receive a strict one-way method.
-OPEN_SERVER_TEST(ReceiveStrictOneWay) {
+OPEN_SERVER_TEST(34, ReceiveStrictOneWay) {
   Bytes request = Header{.txid = 0, .ordinal = kOrdinal_OpenTarget_StrictOneWay};
   ASSERT_OK(client_end().write(request));
   WAIT_UNTIL([this]() { return reporter().received_strict_one_way(); });
@@ -54,7 +54,7 @@ OPEN_SERVER_TEST(ReceiveStrictOneWay) {
 
 // The server should receive a one-way method, despite the schema (strict)
 // not matching the dynamic flags (flexible).
-OPEN_SERVER_TEST(ReceiveStrictOneWayMismatchedStrictness) {
+OPEN_SERVER_TEST(35, ReceiveStrictOneWayMismatchedStrictness) {
   Bytes request = Header{
       .txid = 0,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -66,7 +66,7 @@ OPEN_SERVER_TEST(ReceiveStrictOneWayMismatchedStrictness) {
 }
 
 // The server should receive a flexible one-way method.
-OPEN_SERVER_TEST(ReceiveFlexibleOneWay) {
+OPEN_SERVER_TEST(36, ReceiveFlexibleOneWay) {
   Bytes request = Header{
       .txid = 0,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -79,14 +79,14 @@ OPEN_SERVER_TEST(ReceiveFlexibleOneWay) {
 
 // The server should receive a one-way method, despite the schema (flexible)
 // not matching the dynamic flags (strict).
-OPEN_SERVER_TEST(ReceiveFlexibleOneWayMismatchedStrictness) {
+OPEN_SERVER_TEST(37, ReceiveFlexibleOneWayMismatchedStrictness) {
   Bytes request = Header{.txid = 0, .ordinal = kOrdinal_OpenTarget_FlexibleOneWay};
   ASSERT_OK(client_end().write(request));
   WAIT_UNTIL([this]() { return reporter().received_flexible_one_way(); });
 }
 
 // The server should reply to a strict two-way method.
-OPEN_SERVER_TEST(StrictTwoWayResponse) {
+OPEN_SERVER_TEST(38, StrictTwoWayResponse) {
   Bytes bytes = Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_OpenTarget_StrictTwoWay};
   ASSERT_OK(client_end().write(bytes));
   ASSERT_OK(client_end().read_and_check(bytes));
@@ -94,7 +94,7 @@ OPEN_SERVER_TEST(StrictTwoWayResponse) {
 
 // The server should reply to a two-way method, despite the schema (strict)
 // not matching the request's dynamic flags (flexible).
-OPEN_SERVER_TEST(StrictTwoWayResponseMismatchedStrictness) {
+OPEN_SERVER_TEST(39, StrictTwoWayResponseMismatchedStrictness) {
   Bytes request = Header{
       .txid = kTwoWayTxid,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -109,7 +109,7 @@ OPEN_SERVER_TEST(StrictTwoWayResponseMismatchedStrictness) {
 }
 
 // The server should reply to a strict two-way method (nonempty).
-OPEN_SERVER_TEST(StrictTwoWayNonEmptyResponse) {
+OPEN_SERVER_TEST(63, StrictTwoWayNonEmptyResponse) {
   Bytes bytes = {
       Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_OpenTarget_StrictTwoWayFields},
       encode(fidl_serversuite::OpenTargetStrictTwoWayFieldsRequest(504230)),
@@ -119,7 +119,7 @@ OPEN_SERVER_TEST(StrictTwoWayNonEmptyResponse) {
 }
 
 // The server should reply to a strict fallible two-way method (success).
-OPEN_SERVER_TEST(StrictTwoWayErrorSyntaxResponse) {
+OPEN_SERVER_TEST(40, StrictTwoWayErrorSyntaxResponse) {
   Bytes bytes = {
       Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_OpenTarget_StrictTwoWayErr},
       union_ordinal(kResultUnionSuccess),
@@ -131,7 +131,7 @@ OPEN_SERVER_TEST(StrictTwoWayErrorSyntaxResponse) {
 
 // The server should reply to a fallible two-way method (success), despite the
 // schema (strict) not matching the request's dynamic flags (flexible).
-OPEN_SERVER_TEST(StrictTwoWayErrorSyntaxResponseMismatchedStrictness) {
+OPEN_SERVER_TEST(41, StrictTwoWayErrorSyntaxResponseMismatchedStrictness) {
   Bytes payload = {
       union_ordinal(kResultUnionSuccess),
       inline_envelope({0x00}),
@@ -156,7 +156,7 @@ OPEN_SERVER_TEST(StrictTwoWayErrorSyntaxResponseMismatchedStrictness) {
 }
 
 // The server should reply to a strict fallible two-way method (nonempty success).
-OPEN_SERVER_TEST(StrictTwoWayErrorSyntaxNonEmptyResponse) {
+OPEN_SERVER_TEST(64, StrictTwoWayErrorSyntaxNonEmptyResponse) {
   Bytes bytes = {
       Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_OpenTarget_StrictTwoWayFieldsErr},
       union_ordinal(kResultUnionSuccess),
@@ -167,7 +167,7 @@ OPEN_SERVER_TEST(StrictTwoWayErrorSyntaxNonEmptyResponse) {
 }
 
 // The server should reply to a flexible two-way method.
-OPEN_SERVER_TEST(FlexibleTwoWayResponse) {
+OPEN_SERVER_TEST(42, FlexibleTwoWayResponse) {
   Header header = {
       .txid = kTwoWayTxid,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -181,7 +181,7 @@ OPEN_SERVER_TEST(FlexibleTwoWayResponse) {
 
 // The server should reply to a two-way method, despite the schema (flexible)
 // not matching the request's dynamic flags (strict).
-OPEN_SERVER_TEST(FlexibleTwoWayResponseMismatchedStrictness) {
+OPEN_SERVER_TEST(43, FlexibleTwoWayResponseMismatchedStrictness) {
   Bytes request = Header{
       .txid = kTwoWayTxid,
       .ordinal = kOrdinal_OpenTarget_FlexibleTwoWay,
@@ -200,7 +200,7 @@ OPEN_SERVER_TEST(FlexibleTwoWayResponseMismatchedStrictness) {
 }
 
 // The server should reply to a flexible two-way method (nonempty).
-OPEN_SERVER_TEST(FlexibleTwoWayNonEmptyResponse) {
+OPEN_SERVER_TEST(44, FlexibleTwoWayNonEmptyResponse) {
   Header header = {
       .txid = kTwoWayTxid,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -214,7 +214,7 @@ OPEN_SERVER_TEST(FlexibleTwoWayNonEmptyResponse) {
 }
 
 // The server should reply to a flexible fallible two-way method (success).
-OPEN_SERVER_TEST(FlexibleTwoWayErrorSyntaxResponseSuccessResult) {
+OPEN_SERVER_TEST(45, FlexibleTwoWayErrorSyntaxResponseSuccessResult) {
   Bytes bytes = {
       Header{
           .txid = kTwoWayTxid,
@@ -229,7 +229,7 @@ OPEN_SERVER_TEST(FlexibleTwoWayErrorSyntaxResponseSuccessResult) {
 }
 
 // The server should reply to a flexible fallible two-way method (error).
-OPEN_SERVER_TEST(FlexibleTwoWayErrorSyntaxResponseErrorResult) {
+OPEN_SERVER_TEST(46, FlexibleTwoWayErrorSyntaxResponseErrorResult) {
   Bytes bytes = {
       Header{
           .txid = kTwoWayTxid,
@@ -244,7 +244,7 @@ OPEN_SERVER_TEST(FlexibleTwoWayErrorSyntaxResponseErrorResult) {
 }
 
 // The server should reply to a flexible fallible two-way method (nonempty success).
-OPEN_SERVER_TEST(FlexibleTwoWayErrorSyntaxNonEmptyResponseSuccessResult) {
+OPEN_SERVER_TEST(47, FlexibleTwoWayErrorSyntaxNonEmptyResponseSuccessResult) {
   Bytes bytes = {
       Header{
           .txid = kTwoWayTxid,
@@ -259,7 +259,7 @@ OPEN_SERVER_TEST(FlexibleTwoWayErrorSyntaxNonEmptyResponseSuccessResult) {
 }
 
 // The server should reply to a flexible fallible two-way method (nonempty, error).
-OPEN_SERVER_TEST(FlexibleTwoWayErrorSyntaxNonEmptyResponseErrorResult) {
+OPEN_SERVER_TEST(48, FlexibleTwoWayErrorSyntaxNonEmptyResponseErrorResult) {
   Bytes bytes = {
       Header{
           .txid = kTwoWayTxid,
@@ -274,7 +274,7 @@ OPEN_SERVER_TEST(FlexibleTwoWayErrorSyntaxNonEmptyResponseErrorResult) {
 }
 
 // The server should tear down when it receives an unknown strict one-way method.
-OPEN_SERVER_TEST(UnknownStrictOneWayOpenProtocol) {
+OPEN_SERVER_TEST(49, UnknownStrictOneWayOpenProtocol) {
   Bytes request = Header{.txid = 0, .ordinal = kOrdinalFakeUnknownMethod};
   ASSERT_OK(client_end().write(request));
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
@@ -284,7 +284,7 @@ OPEN_SERVER_TEST(UnknownStrictOneWayOpenProtocol) {
 
 // The server should run the unknown method handler when it receives an unknown
 // flexible one-way method.
-OPEN_SERVER_TEST(UnknownFlexibleOneWayOpenProtocol) {
+OPEN_SERVER_TEST(50, UnknownFlexibleOneWayOpenProtocol) {
   Bytes request = Header{
       .txid = 0,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -299,7 +299,7 @@ OPEN_SERVER_TEST(UnknownFlexibleOneWayOpenProtocol) {
 }
 
 // The server should close handles in an unknown flexible one-way method request.
-OPEN_SERVER_TEST(UnknownFlexibleOneWayHandleOpenProtocol) {
+OPEN_SERVER_TEST(51, UnknownFlexibleOneWayHandleOpenProtocol) {
   zx::eventpair event1, event2;
   ASSERT_OK(zx::eventpair::create(0, &event1, &event2));
 
@@ -326,7 +326,7 @@ OPEN_SERVER_TEST(UnknownFlexibleOneWayHandleOpenProtocol) {
 }
 
 // The server should tear down when it receives an unknown strict two-way method.
-OPEN_SERVER_TEST(UnknownStrictTwoWayOpenProtocol) {
+OPEN_SERVER_TEST(52, UnknownStrictTwoWayOpenProtocol) {
   Bytes request = Header{.txid = kTwoWayTxid, .ordinal = kOrdinalFakeUnknownMethod};
   ASSERT_OK(client_end().write(request));
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
@@ -336,7 +336,7 @@ OPEN_SERVER_TEST(UnknownStrictTwoWayOpenProtocol) {
 
 // The server should send an automatic reply and run the unknown method handler
 // when it receives an unknown flexible two-way method.
-OPEN_SERVER_TEST(UnknownFlexibleTwoWayOpenProtocol) {
+OPEN_SERVER_TEST(53, UnknownFlexibleTwoWayOpenProtocol) {
   Header header = {
       .txid = kTwoWayTxid,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -358,7 +358,7 @@ OPEN_SERVER_TEST(UnknownFlexibleTwoWayOpenProtocol) {
 }
 
 // The server should close handles in an unknown flexible two-way method request.
-OPEN_SERVER_TEST(UnknownFlexibleTwoWayHandleOpenProtocol) {
+OPEN_SERVER_TEST(54, UnknownFlexibleTwoWayHandleOpenProtocol) {
   zx::eventpair event1, event2;
   ASSERT_OK(zx::eventpair::create(0, &event1, &event2));
 
@@ -390,7 +390,7 @@ OPEN_SERVER_TEST(UnknownFlexibleTwoWayHandleOpenProtocol) {
 }
 
 // The ajar server should tear down when it receives an unknown strict one-way method.
-AJAR_SERVER_TEST(UnknownStrictOneWayAjarProtocol) {
+AJAR_SERVER_TEST(55, UnknownStrictOneWayAjarProtocol) {
   Bytes request = Header{.txid = 0, .ordinal = kOrdinalFakeUnknownMethod};
   ASSERT_OK(client_end().write(request));
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
@@ -400,7 +400,7 @@ AJAR_SERVER_TEST(UnknownStrictOneWayAjarProtocol) {
 
 // The ajar server should run the unknown method handler when it receives an unknown
 // flexible one-way method.
-AJAR_SERVER_TEST(UnknownFlexibleOneWayAjarProtocol) {
+AJAR_SERVER_TEST(56, UnknownFlexibleOneWayAjarProtocol) {
   Bytes request = Header{
       .txid = 0,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -415,7 +415,7 @@ AJAR_SERVER_TEST(UnknownFlexibleOneWayAjarProtocol) {
 }
 
 // The ajar server should tear down when it receives an unknown strict two-way method.
-AJAR_SERVER_TEST(UnknownStrictTwoWayAjarProtocol) {
+AJAR_SERVER_TEST(57, UnknownStrictTwoWayAjarProtocol) {
   Bytes request = Header{.txid = kTwoWayTxid, .ordinal = kOrdinalFakeUnknownMethod};
   ASSERT_OK(client_end().write(request));
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
@@ -424,7 +424,7 @@ AJAR_SERVER_TEST(UnknownStrictTwoWayAjarProtocol) {
 }
 
 // The ajar server should tear down when it receives an unknown flexible two-way method.
-AJAR_SERVER_TEST(UnknownFlexibleTwoWayAjarProtocol) {
+AJAR_SERVER_TEST(58, UnknownFlexibleTwoWayAjarProtocol) {
   Bytes request = Header{
       .txid = kTwoWayTxid,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -438,7 +438,7 @@ AJAR_SERVER_TEST(UnknownFlexibleTwoWayAjarProtocol) {
 }
 
 // The closed server should tear down when it receives an unknown strict one-way method.
-CLOSED_SERVER_TEST(UnknownStrictOneWayClosedProtocol) {
+CLOSED_SERVER_TEST(59, UnknownStrictOneWayClosedProtocol) {
   Bytes request = Header{.txid = 0, .ordinal = kOrdinalFakeUnknownMethod};
   ASSERT_OK(client_end().write(request));
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
@@ -446,7 +446,7 @@ CLOSED_SERVER_TEST(UnknownStrictOneWayClosedProtocol) {
 }
 
 // The closed server should tear down when it receives an unknown flexible one-way method.
-CLOSED_SERVER_TEST(UnknownFlexibleOneWayClosedProtocol) {
+CLOSED_SERVER_TEST(60, UnknownFlexibleOneWayClosedProtocol) {
   Bytes request = Header{
       .txid = 0,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -458,7 +458,7 @@ CLOSED_SERVER_TEST(UnknownFlexibleOneWayClosedProtocol) {
 }
 
 // The closed server should tear down when it receives an unknown strict two-way method.
-CLOSED_SERVER_TEST(UnknownStrictTwoWayClosedProtocol) {
+CLOSED_SERVER_TEST(61, UnknownStrictTwoWayClosedProtocol) {
   Bytes request = Header{.txid = kTwoWayTxid, .ordinal = kOrdinalFakeUnknownMethod};
   ASSERT_OK(client_end().write(request));
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
@@ -466,7 +466,7 @@ CLOSED_SERVER_TEST(UnknownStrictTwoWayClosedProtocol) {
 }
 
 // The closed server should tear down when it receives an unknown flexible two-way method.
-CLOSED_SERVER_TEST(UnknownFlexibleTwoWayClosedProtocol) {
+CLOSED_SERVER_TEST(62, UnknownFlexibleTwoWayClosedProtocol) {
   Bytes request = Header{
       .txid = kTwoWayTxid,
       .dynamic_flags = kDynamicFlagsFlexible,

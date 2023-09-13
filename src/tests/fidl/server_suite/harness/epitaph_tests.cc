@@ -14,7 +14,7 @@ namespace {
 using namespace ::channel_util;
 
 // The server should be able to send an epitaph.
-CLOSED_SERVER_TEST(ServerSendsEpitaph) {
+CLOSED_SERVER_TEST(24, ServerSendsEpitaph) {
   zx_status_t epitaph = 456;
   Bytes expected = {
       Header{.txid = 0, .ordinal = kOrdinal_ClosedTarget_Epitaph},
@@ -27,7 +27,7 @@ CLOSED_SERVER_TEST(ServerSendsEpitaph) {
 }
 
 // It is not permissible to send epitaphs to servers.
-CLOSED_SERVER_TEST(ServerReceivesEpitaphInvalid) {
+CLOSED_SERVER_TEST(25, ServerReceivesEpitaphInvalid) {
   Bytes request = {
       Header{.txid = 0, .ordinal = kOrdinal_ClosedTarget_Epitaph},
       {int32(456), padding(4)},

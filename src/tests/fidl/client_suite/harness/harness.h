@@ -20,11 +20,19 @@
 
 namespace client_suite {
 
-#define CLIENT_TEST(test_name)                                                           \
-  struct ClientTestWrapper##test_name : public ClientTest {                              \
-    ClientTestWrapper##test_name() : ClientTest(fidl_clientsuite::Test::k##test_name) {} \
-  };                                                                                     \
-  TEST_F(ClientTestWrapper##test_name, test_name)
+// Defines a client test using GoogleTest.
+// (1) test_number must be a fidl.clientsuite/Test enum member value.
+// (2) test_name must be the enum member's name in UpperCamelCase.
+// We include (1) to make it easier to correlate logs when a test fails.
+#define CLIENT_TEST(test_number, test_name)                                                   \
+  static_assert((test_number) == static_cast<uint32_t>(fidl_clientsuite::Test::k##test_name), \
+                "In CLIENT_TEST macro: test number " #test_number                             \
+                " does not match test name \"" #test_name "\"");                              \
+  struct ClientTest_##test_number : public ClientTest {                                       \
+    ClientTest_##test_number() : ClientTest(fidl_clientsuite::Test::k##test_name) {}          \
+  };                                                                                          \
+  /* NOLINTNEXTLINE(google-readability-avoid-underscore-in-googletest-name) */                \
+  TEST_F(ClientTest_##test_number, test_name)
 
 template <typename Reporter, typename Event>
 class EventReporter : public fidl::Server<Reporter> {

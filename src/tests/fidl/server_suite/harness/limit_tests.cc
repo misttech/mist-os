@@ -19,7 +19,7 @@ const uint32_t kMaxVecBytesInMsg =
 const uint32_t kMaxVecHandlesInMsg = ZX_CHANNEL_MAX_MSG_HANDLES;
 
 // The server should accept a request with the maximum number of bytes.
-CLOSED_SERVER_TEST(RequestMatchesByteLimit) {
+CLOSED_SERVER_TEST(26, RequestMatchesByteLimit) {
   uint32_t count = kMaxVecBytesInMsg;
   Header header = {.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_ByteVectorSize};
   Bytes request = {header, vector_header(count), repeat(0x00).times(count)};
@@ -29,7 +29,7 @@ CLOSED_SERVER_TEST(RequestMatchesByteLimit) {
 }
 
 // The serve should accept a request with the maximum number of handles.
-CLOSED_SERVER_TEST(RequestMatchesHandleLimit) {
+CLOSED_SERVER_TEST(27, RequestMatchesHandleLimit) {
   uint32_t count = kMaxVecHandlesInMsg;
   Handles handles;
   for (uint32_t i = 0; i < count; i++) {
@@ -56,7 +56,7 @@ CLOSED_SERVER_TEST(RequestMatchesHandleLimit) {
 }
 
 // The server should be able to send a response with the maximum number of bytes.
-CLOSED_SERVER_TEST(ResponseMatchesByteLimit) {
+CLOSED_SERVER_TEST(28, ResponseMatchesByteLimit) {
   uint32_t count = kMaxVecBytesInMsg;
   Header header = {.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_CreateNByteVector};
   Bytes request = {header, uint32(count), padding(4)};
@@ -66,7 +66,7 @@ CLOSED_SERVER_TEST(ResponseMatchesByteLimit) {
 }
 
 // The server should tear down when it tries to send a response with too many bytes.
-CLOSED_SERVER_TEST(ResponseExceedsByteLimit) {
+CLOSED_SERVER_TEST(30, ResponseExceedsByteLimit) {
   uint32_t count = kMaxVecBytesInMsg + 1;
   Bytes request = {
       Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_CreateNByteVector},
@@ -78,7 +78,7 @@ CLOSED_SERVER_TEST(ResponseExceedsByteLimit) {
 }
 
 // The server should be able to send a response with the maximum number of handles.
-CLOSED_SERVER_TEST(ResponseMatchesHandleLimit) {
+CLOSED_SERVER_TEST(29, ResponseMatchesHandleLimit) {
   uint32_t count = kMaxVecHandlesInMsg;
   ExpectedHandles expected_handles;
   for (uint32_t i = 0; i < count; i++) {
@@ -106,7 +106,7 @@ CLOSED_SERVER_TEST(ResponseMatchesHandleLimit) {
 }
 
 // The server should tear down when it tries to send a response with too many handles.
-CLOSED_SERVER_TEST(ResponseExceedsHandleLimit) {
+CLOSED_SERVER_TEST(31, ResponseExceedsHandleLimit) {
   uint32_t count = kMaxVecHandlesInMsg + 1;
   Bytes request = {
       Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_CreateNHandleVector},

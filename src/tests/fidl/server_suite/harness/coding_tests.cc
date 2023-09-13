@@ -15,7 +15,7 @@ namespace {
 using namespace ::channel_util;
 
 // The server should tear down when it fails to decode a request.
-CLOSED_SERVER_TEST(BadPayloadEncoding) {
+CLOSED_SERVER_TEST(15, BadPayloadEncoding) {
   Bytes request = {
       Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_TwoWayResult},
       // Ordinal 3 is unknown in the FIDL schema, and the union is strict.
@@ -28,7 +28,7 @@ CLOSED_SERVER_TEST(BadPayloadEncoding) {
 }
 
 // The server should reject V1 messages (no payload).
-CLOSED_SERVER_TEST(V1TwoWayNoPayload) {
+CLOSED_SERVER_TEST(105, V1TwoWayNoPayload) {
   Bytes request = Header{
       .txid = kTwoWayTxid,
       .at_rest_flags = {0, 0},  // at-rest flags without V2 bit set
@@ -40,7 +40,7 @@ CLOSED_SERVER_TEST(V1TwoWayNoPayload) {
 }
 
 // The server should reject V1 messages (struct payload).
-CLOSED_SERVER_TEST(V1TwoWayStructPayload) {
+CLOSED_SERVER_TEST(106, V1TwoWayStructPayload) {
   Bytes request = {
       Header{
           .txid = kTwoWayTxid,

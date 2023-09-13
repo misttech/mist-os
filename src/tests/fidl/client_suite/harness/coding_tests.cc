@@ -15,7 +15,7 @@ namespace {
 using namespace ::channel_util;
 
 // The client should reject V1 messages (no payload).
-CLIENT_TEST(V1TwoWayNoPayload) {
+CLIENT_TEST(40, V1TwoWayNoPayload) {
   Bytes expected_request = Header{
       .txid = kTxidNotKnown,
       .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload,
@@ -38,7 +38,7 @@ CLIENT_TEST(V1TwoWayNoPayload) {
 }
 
 // The client should reject V1 messages (struct payload).
-CLIENT_TEST(V1TwoWayStructPayload) {
+CLIENT_TEST(41, V1TwoWayStructPayload) {
   Bytes expected_request = Header{
       .txid = kTxidNotKnown,
       .ordinal = kOrdinal_ClosedTarget_TwoWayStructPayload,
