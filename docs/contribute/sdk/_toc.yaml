@@ -3,3 +3,5 @@ toc:
   path: /docs/contribute/sdk/README.md
 - title: "SDK Categories"
   path: /docs/contribute/sdk/categories.md
+- title: "Contribute SDK Packages"
+  path: /docs/contribute/sdk/packages.md
