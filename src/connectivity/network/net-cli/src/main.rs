@@ -88,7 +88,7 @@ const REALM_QUERY_PATH: &str = "/svc/fuchsia.sys2.RealmQuery.root";
 const NETSTACK_MONIKER: &str = "./core/network/netstack";
 const DHCPD_MONIKER: &str = "./core/network/dhcpd";
 const DNS_RESOLVER_MONIKER: &str = "./core/network/dns-resolver";
-const MIGRATION_CONTROLLER_MONIKER: &str = "./core/network/network-features";
+const MIGRATION_CONTROLLER_MONIKER: &str = "./core/network/netstack-migration";
 
 #[async_trait::async_trait]
 impl net_cli::ServiceConnector<fdebug::InterfacesMarker> for Connector {
