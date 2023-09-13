@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-workspace(name = "sdk-integration")
+workspace(name = "bazel-sdk-tests")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
@@ -19,7 +19,6 @@ load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
 
 bazel_skylib_workspace()
 
-# Setup fuchsia rules
 local_repository(
     name = "fuchsia_sdk_common",
     path = "../bazel_rules_fuchsia/common",
@@ -32,23 +31,32 @@ local_repository(
 
 load(
     "@fuchsia_workspace//fuchsia:deps.bzl",
-    "fuchsia_clang_repository",
     "fuchsia_sdk_repository",
-    "rules_fuchsia_deps",
 )
+
+# This will add the fuchsia_sdk repos and the clang repo
+load("//:test_workspace_setup.bzl", "setup_test_workspace")
+
+setup_test_workspace(
+    name = "setup-workspace",
+    fuchsia_root = "../../../",
+)
+
+load("@setup-workspace//:defs.bzl", "CLANG_PATH", "local_fuchsia_sdk_repository")
+
+local_fuchsia_sdk_repository()
+
+load("@fuchsia_sdk//fuchsia:deps.bzl", "rules_fuchsia_deps")
 
 rules_fuchsia_deps()
 
-fuchsia_sdk_repository(
-    name = "fuchsia_sdk",
-)
-
 register_toolchains("@fuchsia_sdk//:fuchsia_toolchain_sdk")
+
+load("@fuchsia_sdk//fuchsia:clang.bzl", "fuchsia_clang_repository")
 
 fuchsia_clang_repository(
     name = "fuchsia_clang",
-    # TODO(fxbug.dev/124321) Remove the need to hardcode the host here.
-    local_path = "../../../prebuilt/third_party/clang/linux-x64",
+    local_path = CLANG_PATH,
 )
 
 load("@fuchsia_clang//:defs.bzl", "register_clang_toolchains")
@@ -58,6 +66,8 @@ register_clang_toolchains()
 # Register compact python runtime toolchain. This picks up the host
 # python3 interpreter in the current PATH, and packages it in a way
 # that allows sandboxes and remote builders to access / use it.
+# Note, you must have pip installed if you are trying to use your local
+# python installation or this will fail.
 load(
     "@fuchsia_sdk_common//:toolchains/python/repository_rule.bzl",
     "compact_python_runtime_repository",

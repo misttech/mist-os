@@ -63,7 +63,7 @@ For more options, invoke the script with `--help`.
 
 ## Direct bazel invocation
 
-Finally, it is possible, **on Linux only**, to directly invoke `bazel test`
+Finally, it is possible to directly invoke `bazel test`
 in this directory after some necessary preparation, i.e. for running against
 the `@fuchsia_sdk` repository:
 
@@ -72,9 +72,6 @@ the `@fuchsia_sdk` repository:
 
 - Run `fx build generate_fuchsia_sdk_repository` to populate pre-requisites
   from a Fuchsia checkout.
-
-- Define the `LOCAL_FUCHSIA_PLATFORM_BUILD` to point to the build
-  directory corresponding to the previous step.
 
 - Invoke `bazel test --config=fuchsia_<cpu> <test_target>`, where
   `<cpu>` matches the CPU architecture of your Fuchsia build configuration.
@@ -87,7 +84,6 @@ For example:
 cd /work/fuchsia
 fx set core.x64
 fx build generate_fuchsia_sdk_repository
-export LOCAL_FUCHSIA_PLATFORM_BUILD=$(fx get-build-dir)
 cd build/bazel_sdk/tests
 
 # Run this once, and then after each `jiri update`
@@ -100,5 +96,3 @@ bazel test --config=fuchsia_x64 :tests
 To run against a local IDK, define `LOCAL_FUCHSIA_IDK_DIRECTORY` instead
 in your environment before invoking `bazel test ...` as above.
 
-This last method does not work on macOS because the WORKSPACE.bazel hard-codes
-linux-specific paths to host prebuilt binaries (https://fxbug.dev/124321).
