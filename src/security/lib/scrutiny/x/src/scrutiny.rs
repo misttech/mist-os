@@ -40,9 +40,10 @@ impl Scrutiny {
 
         let system: System = System::new(product_bundle.clone(), variant)?;
 
-        let blob_set: Box<dyn BlobSet> = Box::new(CompositeBlobSet::new(
-            [product_bundle.blob_set()?, Box::new(system.zbi().bootfs()?.clone())].into_iter(),
-        ));
+        let blob_set: Box<dyn BlobSet> = Box::new(CompositeBlobSet::new([
+            product_bundle.blob_set()?,
+            Box::new(system.zbi().bootfs()?.clone()),
+        ]));
         Ok(Self(Rc::new(ScrutinyData { product_bundle, blob_set, system })))
     }
 }

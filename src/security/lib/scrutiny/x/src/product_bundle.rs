@@ -123,8 +123,7 @@ impl ProductBundle {
             .map(|repository| repository.blobs())
             .collect::<Result<Vec<_>, _>>()
             .map(|repositories| {
-                let blobs: Box<dyn BlobSet> =
-                    Box::new(CompositeBlobSet::new(repositories.into_iter()));
+                let blobs: Box<dyn BlobSet> = Box::new(CompositeBlobSet::new(repositories));
                 blobs
             })
     }

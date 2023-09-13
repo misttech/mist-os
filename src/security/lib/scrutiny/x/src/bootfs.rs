@@ -325,12 +325,12 @@ mod tests {
         let path_1: Box<dyn api::Path> = Box::new("path_1");
         let path_2: Box<dyn api::Path> = Box::new("path_2");
         let blob_1 = VerifiedMemoryBlob::new(
-            [Box::new(data_source.clone()) as Box<dyn api::DataSource>].into_iter(),
+            [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
             "blob_1".as_bytes().into(),
         )
         .expect("blob");
         let blob_2 = VerifiedMemoryBlob::new(
-            [Box::new(data_source.clone()) as Box<dyn api::DataSource>].into_iter(),
+            [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
             "blob_2".as_bytes().into(),
         )
         .expect("blob");
@@ -374,12 +374,12 @@ mod tests {
         let path_1: Box<dyn api::Path> = Box::new("path_1");
         let path_2: Box<dyn api::Path> = Box::new("path_2");
         let blob_1 = VerifiedMemoryBlob::new(
-            [Box::new(data_source.clone()) as Box<dyn api::DataSource>].into_iter(),
+            [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
             "blob_1".as_bytes().into(),
         )
         .expect("blob");
         let blob_2 = VerifiedMemoryBlob::new(
-            [Box::new(data_source.clone()) as Box<dyn api::DataSource>].into_iter(),
+            [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
             "blob_2".as_bytes().into(),
         )
         .expect("blob");
@@ -424,12 +424,12 @@ mod tests {
         let blob_1_path_2: Box<dyn api::Path> = Box::new("blob_1_path_2");
         let blob_2_path: Box<dyn api::Path> = Box::new("blob_2_path");
         let blob_1 = VerifiedMemoryBlob::new(
-            [Box::new(data_source.clone()) as Box<dyn api::DataSource>].into_iter(),
+            [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
             "blob_1".as_bytes().into(),
         )
         .expect("blob");
         let blob_2 = VerifiedMemoryBlob::new(
-            [Box::new(data_source.clone()) as Box<dyn api::DataSource>].into_iter(),
+            [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
             "blob_2".as_bytes().into(),
         )
         .expect("blob");

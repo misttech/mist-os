@@ -86,7 +86,7 @@ impl Zbi {
         {
             let path: Box<dyn api::Path> = Box::new(path_string);
             let blob = VerifiedMemoryBlob::new(
-                [Box::new(self.0.data_source.clone()) as Box<dyn api::DataSource>].into_iter(),
+                [Box::new(self.0.data_source.clone()) as Box<dyn api::DataSource>],
                 bytes,
             )
             .map_err(|error| api::ZbiError::Hash { bootfs_path: path.clone(), error })?;

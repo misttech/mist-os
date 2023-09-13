@@ -449,8 +449,8 @@ mod tests {
         );
         let blob_set_data_source = ds::DataSource::new(blob_set_data_source_info.clone());
         let blob_set: VerifiedMemoryBlobSet = VerifiedMemoryBlobSet::new(
-            [Box::new(blob_set_data_source.clone()) as Box<dyn api::DataSource>].into_iter(),
-            [far_bytes.clone().as_slice(), content_blob_content_str.as_bytes()].into_iter(),
+            [Box::new(blob_set_data_source.clone()) as Box<dyn api::DataSource>],
+            [far_bytes.clone().as_slice(), content_blob_content_str.as_bytes()],
         );
 
         let meta_far_hash: Box<dyn api::Hash> = Box::new(Hash::from(far_fuchsia_hash));
@@ -565,13 +565,13 @@ mod tests {
     #[fuchsia::test]
     fn bad_far() {
         let bad_far_contents = vec![];
-        let bad_far_blob = VerifiedMemoryBlob::new([].into_iter(), bad_far_contents.clone())
-            .expect("bad far blob");
+        let bad_far_blob =
+            VerifiedMemoryBlob::new([], bad_far_contents.clone()).expect("bad far blob");
         match Package::new(
             None,
             api::PackageResolverUrl::FuchsiaPkgUrl,
             Box::new(bad_far_blob),
-            Box::new(VerifiedMemoryBlobSet::new(iter::empty(), iter::empty::<&[u8]>())),
+            Box::new(VerifiedMemoryBlobSet::new([], iter::empty::<&[u8]>())),
         ) {
             Err(Error::Far(_)) => {}
             Ok(_) => {
@@ -597,11 +597,10 @@ mod tests {
         };
         let mut far_bytes = vec![];
         fuchsia_archive::write(&mut far_bytes, far_map).unwrap();
-        let far_blob =
-            VerifiedMemoryBlob::new([].into_iter(), far_bytes.clone()).expect("far blob");
+        let far_blob = VerifiedMemoryBlob::new([], far_bytes.clone()).expect("far blob");
 
         // Use empty blob set.
-        let blob_set = VerifiedMemoryBlobSet::new(iter::empty(), iter::empty::<&[u8]>());
+        let blob_set = VerifiedMemoryBlobSet::new([], iter::empty::<&[u8]>());
 
         // Attempt to construct package; expect FarError due to missing meta/package.
         match Package::new(
@@ -635,11 +634,10 @@ mod tests {
         };
         let mut far_bytes = vec![];
         fuchsia_archive::write(&mut far_bytes, far_map).unwrap();
-        let far_blob =
-            VerifiedMemoryBlob::new([].into_iter(), far_bytes.clone()).expect("far blob");
+        let far_blob = VerifiedMemoryBlob::new([], far_bytes.clone()).expect("far blob");
 
         // Use empty blob set.
-        let blob_set = VerifiedMemoryBlobSet::new(iter::empty(), iter::empty::<&[u8]>());
+        let blob_set = VerifiedMemoryBlobSet::new([], iter::empty::<&[u8]>());
 
         // Attempt to construct package; expect FarError due to missing meta/package.
         match Package::new(
@@ -696,10 +694,9 @@ mod tests {
         fuchsia_archive::write(&mut far_bytes, far_map).unwrap();
 
         // Use empty blob set: Lookup of content blob will fail.
-        let blob_set = VerifiedMemoryBlobSet::new(iter::empty(), iter::empty::<&[u8]>());
+        let blob_set = VerifiedMemoryBlobSet::new([], iter::empty::<&[u8]>());
 
-        let far_blob =
-            VerifiedMemoryBlob::new([].into_iter(), far_bytes.clone()).expect("far blob");
+        let far_blob = VerifiedMemoryBlob::new([], far_bytes.clone()).expect("far blob");
 
         // Attempt to construct package. This will construct content blobs that store their metadata
         // such as their data source. Locating the content blob that is missing from `blob_set`

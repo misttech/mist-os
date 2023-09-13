@@ -66,8 +66,8 @@ pub(crate) struct CompositeBlobSet {
 }
 
 impl CompositeBlobSet {
-    pub fn new(delegates: impl Iterator<Item = Box<dyn BlobSet>>) -> Self {
-        Self { delegates: delegates.collect() }
+    pub fn new(delegates: impl IntoIterator<Item = Box<dyn BlobSet>>) -> Self {
+        Self { delegates: delegates.into_iter().collect() }
     }
 }
 
@@ -228,12 +228,12 @@ impl VerifiedMemoryBlob {
     /// Constructs a [`VerifiedMemoryBlob`] associated with the given `data_source`, and `bytes`,
     /// internally computing `hash`.
     pub fn new(
-        data_sources: impl Iterator<Item = Box<dyn api::DataSource>>,
+        data_sources: impl IntoIterator<Item = Box<dyn api::DataSource>>,
         bytes: Vec<u8>,
     ) -> Result<Self, io::Error> {
         let hash: Hash = FuchsiaMerkleTree::from_reader(bytes.as_slice())?.root().into();
         Ok(Self(Rc::new(MemoryBlobData {
-            data_sources: data_sources.collect::<Vec<_>>(),
+            data_sources: data_sources.into_iter().collect::<Vec<_>>(),
             hash: Box::new(hash),
             bytes,
         })))
@@ -488,15 +488,16 @@ pub(crate) mod test {
         /// Constructs a new [`VerifiedMemoryBlobSet`] that owns its own copy of the blobs
         /// enumerated by `blobs`.
         pub fn new<R: io::Read>(
-            data_sources: impl Iterator<Item = Box<dyn api::DataSource>>,
-            blobs: impl Iterator<Item = R>,
+            data_sources: impl IntoIterator<Item = Box<dyn api::DataSource>>,
+            blobs: impl IntoIterator<Item = R>,
         ) -> Self {
-            let data_sources = data_sources.collect::<Vec<_>>();
+            let data_sources = data_sources.into_iter().collect::<Vec<_>>();
             let blobs = blobs
+                .into_iter()
                 .map(|mut blob| {
                     let mut bytes = vec![];
                     blob.read_to_end(&mut bytes).expect("read blob for memory blob set");
-                    let blob = VerifiedMemoryBlob::new(data_sources.clone().into_iter(), bytes)
+                    let blob = VerifiedMemoryBlob::new(data_sources.clone(), bytes)
                         .expect("hash blob for memory blob set");
                     (blob.hash(), blob)
                 })
