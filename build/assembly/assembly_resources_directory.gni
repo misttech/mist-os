@@ -1,0 +1,64 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bazel/bazel_inputs.gni")
+
+# Creates an directory of resources that are provided to assembly subsystems.
+#
+# Parameters
+#
+#  sources (required)
+#    [list] List of resource files to be added to the directory.
+#    The filename will be preserved.
+#
+template("assembly_resources_directory") {
+  assert(defined(invoker.sources), "sources must be defined")
+
+  files = {
+    dir = "${target_out_dir}/${target_name}"
+  }
+
+  labels = {
+    dir = "${target_name}_dir"
+    assembly_config = "${target_name}_assembly_config"
+    bazel_inputs = "${target_name}_bazel_inputs"
+  }
+
+  # We add an assembly_config.json so that this directory "looks" like an AIB and
+  # can be handled exactly the same as the AIBs.
+  generated_file(labels.assembly_config) {
+    contents = "{}"
+    outputs = [ "${files.dir}/assembly_config.json" ]
+  }
+
+  copy(labels.dir) {
+    sources = invoker.sources
+    outputs = [ "${files.dir}/{{source_file_part}}" ]
+    public_deps = [ ":${labels.assembly_config}" ]
+  }
+
+  # Make the static resources available to Bazel.
+  bazel_input_resource_directory(labels.bazel_inputs) {
+    source_dir = "${files.dir}"
+    dest_dir = rebase_path("${files.dir}", root_out_dir)
+    deps = [ ":${labels.dir}" ]
+  }
+
+  group(target_name) {
+    public_deps = [
+      ":${labels.bazel_inputs}",
+      ":${labels.dir}",
+    ]
+
+    # Add the AIB archive metadata so that it will be copied to OOT repos.
+    metadata = {
+      assembly_input_archives = [
+        {
+          path = rebase_path(files.dir, root_build_dir)
+          label = get_label_info(":$target_name", "label_with_toolchain")
+        },
+      ]
+    }
+  }
+}
