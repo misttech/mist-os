@@ -291,20 +291,43 @@ func TestMakeShards(t *testing.T) {
 
 	t.Run("shard with package repo", func(t *testing.T) {
 		buildDir := t.TempDir()
-		var blobMerkle pm_build.MerkleRoot
+		var blobMerkle, indirectBlobMerkle pm_build.MerkleRoot
 		for i := 0; i < 32; i++ {
 			blobMerkle[i] = byte(1)
+			indirectBlobMerkle[i] = byte(2)
 		}
 		withPackageManifest := func(test build.TestSpec) build.TestSpec {
-			test.PackageManifests = []string{fmt.Sprintf("path/to/%s/package_manifest.json", test.Name)}
-			absPath := filepath.Join(buildDir, test.PackageManifests[0])
+			packageManifestPath := fmt.Sprintf("path/to/%s/package_manifest.json", test.Name)
+			test.PackageManifests = []string{packageManifestPath}
+			absPath := filepath.Join(buildDir, packageManifestPath)
 			if err := os.MkdirAll(filepath.Dir(absPath), 0o700); err != nil {
 				t.Fatal(err)
 			}
+
+			// Write inner subpackage
+			subpackageName := test.Name + "subpackage"
+			subpackageManifestPath := fmt.Sprintf("path/to/%s/package_manifest.json", subpackageName)
+			subAbsPath := filepath.Join(buildDir, subpackageManifestPath)
+			if err := os.MkdirAll(filepath.Dir(subAbsPath), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			subpackageManifest := pm_build.PackageManifest{
+				Version: "1",
+				Blobs: []pm_build.PackageBlobInfo{
+					{Merkle: indirectBlobMerkle},
+				},
+			}
+			if err := jsonutil.WriteToFile(subAbsPath, subpackageManifest); err != nil {
+				t.Fatal(err)
+			}
+
 			packageManifest := pm_build.PackageManifest{
 				Version: "1",
 				Blobs: []pm_build.PackageBlobInfo{
 					{Merkle: blobMerkle},
+				},
+				Subpackages: []pm_build.PackageSubpackageInfo{
+					{Name: subpackageName, ManifestPath: subpackageManifestPath},
 				},
 			}
 			if err := jsonutil.WriteToFile(absPath, packageManifest); err != nil {
@@ -324,7 +347,7 @@ func TestMakeShards(t *testing.T) {
 		)
 
 		// Create regular blob.
-		writeBlob := func(blobsDir string) {
+		writeBlob := func(blobsDir string, blobMerkle pm_build.MerkleRoot) {
 			if err := os.MkdirAll(blobsDir, 0o700); err != nil {
 				t.Fatal(err)
 			}
@@ -332,7 +355,8 @@ func TestMakeShards(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		writeBlob(filepath.Join(buildDir, blobsDirName))
+		writeBlob(filepath.Join(buildDir, blobsDirName), blobMerkle)
+		writeBlob(filepath.Join(buildDir, blobsDirName), indirectBlobMerkle)
 		for _, s := range actual {
 			if err := s.CreatePackageRepo(buildDir, "", true); err != nil {
 				t.Fatal(err)
@@ -371,7 +395,8 @@ func TestMakeShards(t *testing.T) {
 		if err := jsonutil.WriteToFile(filepath.Join(buildDir, deliveryBlobConfigName), deliveryBlobConfig); err != nil {
 			t.Fatal(err)
 		}
-		writeBlob(filepath.Join(buildDir, blobsDirName, "1"))
+		writeBlob(filepath.Join(buildDir, blobsDirName, "1"), blobMerkle)
+		writeBlob(filepath.Join(buildDir, blobsDirName, "1"), indirectBlobMerkle)
 		for _, s := range actual {
 			if err := s.CreatePackageRepo(buildDir, "", true); err != nil {
 				t.Fatal(err)
@@ -381,6 +406,13 @@ func TestMakeShards(t *testing.T) {
 				t.Error(err)
 			}
 			if _, err := os.Stat(filepath.Join(buildDir, s.PkgRepo, blobsDirName, blobMerkle.String())); !os.IsNotExist(err) {
+				t.Errorf("got err: %s; want file not exist err", err)
+			}
+			// Check that the subpackage blob was included too
+			if _, err := os.Stat(filepath.Join(buildDir, s.PkgRepo, blobsDirName, "1", indirectBlobMerkle.String())); err != nil {
+				t.Error(err)
+			}
+			if _, err := os.Stat(filepath.Join(buildDir, s.PkgRepo, blobsDirName, indirectBlobMerkle.String())); !os.IsNotExist(err) {
 				t.Errorf("got err: %s; want file not exist err", err)
 			}
 		}

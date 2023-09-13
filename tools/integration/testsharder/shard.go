@@ -115,27 +115,55 @@ func (s *Shard) CreatePackageRepo(buildDir string, globalRepoMetadata string, ca
 			return err
 		}
 		for _, p := range pkgManifests {
-			manifest, err := pm_build.LoadPackageManifest(filepath.Join(buildDir, p))
-			if err != nil {
+			if err := prepareBlobsForPackage(p, addedBlobs, buildDir, globalRepoMetadata, blobsDirRel, blobsDir); err != nil {
 				return err
-			}
-			for _, blob := range manifest.Blobs {
-				if _, exists := addedBlobs[blob.Merkle.String()]; !exists {
-					// Use the blobs from the blobs dir instead of blob.SourcePath
-					// since SourcePath only points to uncompressed blobs.
-					src := filepath.Join(globalRepoMetadata, blobsDirRel, blob.Merkle.String())
-					dst := filepath.Join(blobsDir, blob.Merkle.String())
-					if err := linkOrCopy(src, dst); err != nil {
-						return err
-					}
-					addedBlobs[blob.Merkle.String()] = struct{}{}
-				}
 			}
 		}
 	}
 
 	s.PkgRepo = localRepoRel
 	s.AddDeps([]string{localRepoRel})
+	return nil
+}
+
+// prepareBlobsForPackage loads the given manifest path and ensures that all
+// blobs it references, either directly or via subpackages, are copied or
+// linked from globalRepoMetadata/blobsDirRel into blobsDir and enumerated in
+// addedBlobs.
+func prepareBlobsForPackage(
+	manifestPath string,
+	addedBlobs map[string]struct{},
+	buildDir string,
+	globalRepoMetadata string,
+	blobsDirRel string,
+	blobsDir string,
+) error {
+	manifest, err := pm_build.LoadPackageManifest(filepath.Join(buildDir, manifestPath))
+	if err != nil {
+		return err
+	}
+
+	// Ensure all blobs directly referenced are added
+	for _, blob := range manifest.Blobs {
+		if _, exists := addedBlobs[blob.Merkle.String()]; !exists {
+			// Use the blobs from the blobs dir instead of blob.SourcePath
+			// since SourcePath only points to uncompressed blobs.
+			src := filepath.Join(globalRepoMetadata, blobsDirRel, blob.Merkle.String())
+			dst := filepath.Join(blobsDir, blob.Merkle.String())
+			if err := linkOrCopy(src, dst); err != nil {
+				return err
+			}
+			addedBlobs[blob.Merkle.String()] = struct{}{}
+		}
+	}
+
+	// Walk all subpackages and ensure their blobs are added too.
+	for _, subpackage := range manifest.Subpackages {
+		if err := prepareBlobsForPackage(subpackage.ManifestPath, addedBlobs, buildDir, globalRepoMetadata, blobsDirRel, blobsDir); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
