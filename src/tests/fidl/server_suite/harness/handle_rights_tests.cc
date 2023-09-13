@@ -18,7 +18,7 @@ using namespace ::channel_util;
 // The server should tear down when the request is missing a handle.
 CLOSED_SERVER_TEST(ClientSendsTooFewHandles) {
   Bytes request = {
-      Header{.txid = kTwoWayTxid, .ordinal = kOrdinalGetSignalableEventRights},
+      Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_GetSignalableEventRights},
       {handle_present(), padding(4)},
   };
   ASSERT_OK(client_end().write(request));
@@ -33,7 +33,7 @@ CLOSED_SERVER_TEST(ClientSendsWrongHandleType) {
 
   Message request = {
       Bytes{
-          Header{.txid = kTwoWayTxid, .ordinal = kOrdinalGetSignalableEventRights},
+          Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_GetSignalableEventRights},
           {handle_present(), padding(4)},
       },
       Handles{
@@ -57,7 +57,7 @@ CLOSED_SERVER_TEST(ClientSendsTooManyRights) {
   static_assert(ZX_DEFAULT_EVENT_RIGHTS & ZX_RIGHT_SIGNAL);
   static_assert(ZX_DEFAULT_EVENT_RIGHTS & ~ZX_RIGHT_SIGNAL);
 
-  Header header = {.txid = kTwoWayTxid, .ordinal = kOrdinalGetSignalableEventRights};
+  Header header = {.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_GetSignalableEventRights};
   Message request = {
       Bytes{header, handle_present(), padding(4)},
       Handles{{.handle = event.release(), .type = ZX_OBJ_TYPE_EVENT}},
@@ -79,7 +79,7 @@ CLOSED_SERVER_TEST(ClientSendsTooFewRights) {
 
   Message request = {
       Bytes{
-          Header{.txid = kTwoWayTxid, .ordinal = kOrdinalGetSignalableEventRights},
+          Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_GetSignalableEventRights},
           {handle_present(), padding(4)},
       },
       Handles{
@@ -98,7 +98,7 @@ CLOSED_SERVER_TEST(ClientSendsObjectOverPlainHandle) {
   zx::event event;
   ASSERT_OK(zx::event::create(0, &event));
 
-  Header header = {.txid = kTwoWayTxid, .ordinal = kOrdinalGetHandleRights};
+  Header header = {.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_GetHandleRights};
   Message request = {
       Bytes{header, handle_present(), padding(4)},
       Handles{{.handle = event.release(), .type = ZX_OBJ_TYPE_EVENT}},
@@ -118,7 +118,8 @@ CLOSED_SERVER_TEST(ServerSendsWrongHandleType) {
 
   Message request = {
       Bytes{
-          Header{.txid = kTwoWayTxid, .ordinal = kOrdinalEchoAsTransferableSignalableEvent},
+          Header{.txid = kTwoWayTxid,
+                 .ordinal = kOrdinal_ClosedTarget_EchoAsTransferableSignalableEvent},
           {handle_present(), padding(4)},
       },
       Handles{
@@ -143,7 +144,8 @@ CLOSED_SERVER_TEST(ServerSendsTooManyRights) {
   static_assert(ZX_DEFAULT_EVENT_RIGHTS & ~ZX_RIGHT_SIGNAL);
 
   Bytes bytes = {
-      Header{.txid = kTwoWayTxid, .ordinal = kOrdinalEchoAsTransferableSignalableEvent},
+      Header{.txid = kTwoWayTxid,
+             .ordinal = kOrdinal_ClosedTarget_EchoAsTransferableSignalableEvent},
       {handle_present(), padding(4)},
   };
   Message request = {
@@ -171,7 +173,8 @@ CLOSED_SERVER_TEST(ServerSendsTooFewRights) {
 
   Message request = {
       Bytes{
-          Header{.txid = kTwoWayTxid, .ordinal = kOrdinalEchoAsTransferableSignalableEvent},
+          Header{.txid = kTwoWayTxid,
+                 .ordinal = kOrdinal_ClosedTarget_EchoAsTransferableSignalableEvent},
           {handle_present(), padding(4)},
       },
       Handles{

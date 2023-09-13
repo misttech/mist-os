@@ -16,7 +16,7 @@ using namespace ::channel_util;
 
 // The client should call a strict one-way method.
 CLIENT_TEST(OneWayStrictSend) {
-  Bytes expected_request = Header{.txid = kOneWayTxid, .ordinal = kOrdinalStrictOneWay};
+  Bytes expected_request = Header{.txid = kOneWayTxid, .ordinal = kOrdinal_OpenTarget_StrictOneWay};
   runner()->CallStrictOneWay({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
@@ -31,7 +31,7 @@ CLIENT_TEST(OneWayFlexibleSend) {
   Bytes expected_request = Header{
       .txid = kOneWayTxid,
       .dynamic_flags = kDynamicFlagsFlexible,
-      .ordinal = kOrdinalFlexibleOneWay,
+      .ordinal = kOrdinal_OpenTarget_FlexibleOneWay,
   };
   runner()->CallFlexibleOneWay({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -44,7 +44,7 @@ CLIENT_TEST(OneWayFlexibleSend) {
 
 // The client should call a strict two-way method and receive the response.
 CLIENT_TEST(TwoWayStrictSend) {
-  Bytes bytes = Header{.txid = kTxidNotKnown, .ordinal = kOrdinalStrictTwoWay};
+  Bytes bytes = Header{.txid = kTxidNotKnown, .ordinal = kOrdinal_OpenTarget_StrictTwoWay};
   runner()->CallStrictTwoWay({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
@@ -61,12 +61,12 @@ CLIENT_TEST(TwoWayStrictSend) {
 CLIENT_TEST(TwoWayStrictSendMismatchedStrictness) {
   Bytes expected_request = Header{
       .txid = kTxidNotKnown,
-      .ordinal = kOrdinalStrictTwoWay,
+      .ordinal = kOrdinal_OpenTarget_StrictTwoWay,
   };
   Bytes response = Header{
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
-      .ordinal = kOrdinalStrictTwoWay,
+      .ordinal = kOrdinal_OpenTarget_StrictTwoWay,
   };
   runner()->CallStrictTwoWay({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -81,7 +81,7 @@ CLIENT_TEST(TwoWayStrictSendMismatchedStrictness) {
 
 // The client should call a strict two-way method and receive the nonempty response.
 CLIENT_TEST(TwoWayStrictSendNonEmptyPayload) {
-  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalStrictTwoWayFields};
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinal_OpenTarget_StrictTwoWayFields};
   fidl_clientsuite::NonEmptyPayload payload = {{.some_field = 541768}};
   Bytes expected_request = header;
   Bytes response = {header, encode(payload)};
@@ -101,7 +101,7 @@ CLIENT_TEST(TwoWayStrictSendNonEmptyPayload) {
 
 // The client should call a strict fallible two-way method and receive the success response.
 CLIENT_TEST(TwoWayStrictErrorSyntaxSendSuccessResponse) {
-  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalStrictTwoWayErr};
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinal_OpenTarget_StrictTwoWayErr};
   Bytes expected_request = header;
   Bytes response = {header, union_ordinal(kResultUnionSuccess), inline_envelope({0x00})};
   runner()->CallStrictTwoWayErr({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
@@ -117,7 +117,7 @@ CLIENT_TEST(TwoWayStrictErrorSyntaxSendSuccessResponse) {
 
 // The client should call a strict fallible two-way method and receive the error response.
 CLIENT_TEST(TwoWayStrictErrorSyntaxSendErrorResponse) {
-  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalStrictTwoWayErr};
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinal_OpenTarget_StrictTwoWayErr};
   int32_t error = 39243320;
   Bytes expected_request = header;
   Bytes response = {header, union_ordinal(kResultUnionDomainError), inline_envelope(int32(error))};
@@ -136,7 +136,7 @@ CLIENT_TEST(TwoWayStrictErrorSyntaxSendErrorResponse) {
 // The client should tear down when it calls a strict fallible two-way method and
 // receives an "unknown method" response (with strict dynamic flag).
 CLIENT_TEST(TwoWayStrictErrorSyntaxSendUnknownMethodResponse) {
-  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalStrictTwoWayErr};
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinal_OpenTarget_StrictTwoWayErr};
   Bytes expected_request = header;
   Bytes response = {
       header,
@@ -160,13 +160,13 @@ CLIENT_TEST(TwoWayStrictErrorSyntaxSendUnknownMethodResponse) {
 CLIENT_TEST(TwoWayStrictErrorSyntaxSendMismatchedStrictnessUnknownMethodResponse) {
   Bytes expected_request = Header{
       .txid = kTxidNotKnown,
-      .ordinal = kOrdinalStrictTwoWayErr,
+      .ordinal = kOrdinal_OpenTarget_StrictTwoWayErr,
   };
   Bytes response = {
       Header{
           .txid = kTxidNotKnown,
           .dynamic_flags = kDynamicFlagsFlexible,
-          .ordinal = kOrdinalStrictTwoWayErr,
+          .ordinal = kOrdinal_OpenTarget_StrictTwoWayErr,
       },
       union_ordinal(kResultUnionFrameworkError),
       inline_envelope(int32(ZX_ERR_NOT_SUPPORTED)),
@@ -186,7 +186,7 @@ CLIENT_TEST(TwoWayStrictErrorSyntaxSendMismatchedStrictnessUnknownMethodResponse
 // The client should call a strict fallible two-way method and receive the
 // nonempty success response.
 CLIENT_TEST(TwoWayStrictErrorSyntaxSendNonEmptyPayload) {
-  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalStrictTwoWayFieldsErr};
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinal_OpenTarget_StrictTwoWayFieldsErr};
   fidl_clientsuite::NonEmptyPayload payload = {{.some_field = 394966}};
   Bytes expected_request = header;
   Bytes response = {header, union_ordinal(kResultUnionSuccess), inline_envelope(int32(394966))};
@@ -209,7 +209,7 @@ CLIENT_TEST(TwoWayFlexibleSendSuccessResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
-      .ordinal = kOrdinalFlexibleTwoWay,
+      .ordinal = kOrdinal_OpenTarget_FlexibleTwoWay,
   };
   Bytes expected_request = header;
   Bytes response = {header, union_ordinal(kResultUnionSuccess), inline_envelope({0x00})};
@@ -230,7 +230,7 @@ CLIENT_TEST(TwoWayFlexibleSendErrorResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
-      .ordinal = kOrdinalFlexibleTwoWay,
+      .ordinal = kOrdinal_OpenTarget_FlexibleTwoWay,
   };
   Bytes expected_request = header;
   Bytes response = {
@@ -255,7 +255,7 @@ CLIENT_TEST(TwoWayFlexibleSendUnknownMethodResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
-      .ordinal = kOrdinalFlexibleTwoWay,
+      .ordinal = kOrdinal_OpenTarget_FlexibleTwoWay,
   };
   Bytes expected_request = header;
   Bytes response = {
@@ -283,10 +283,10 @@ CLIENT_TEST(TwoWayFlexibleSendMismatchedStrictnessUnknownMethodResponse) {
   Bytes expected_request = Header{
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
-      .ordinal = kOrdinalFlexibleTwoWay,
+      .ordinal = kOrdinal_OpenTarget_FlexibleTwoWay,
   };
   Bytes response = {
-      Header{.txid = kTxidNotKnown, .ordinal = kOrdinalFlexibleTwoWay},
+      Header{.txid = kTxidNotKnown, .ordinal = kOrdinal_OpenTarget_FlexibleTwoWay},
       union_ordinal(kResultUnionFrameworkError),
       inline_envelope(int32(ZX_ERR_NOT_SUPPORTED)),
   };
@@ -308,7 +308,7 @@ CLIENT_TEST(TwoWayFlexibleSendOtherTransportErrResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
-      .ordinal = kOrdinalFlexibleTwoWay,
+      .ordinal = kOrdinal_OpenTarget_FlexibleTwoWay,
   };
   Bytes expected_request = header;
   Bytes response = {
@@ -333,7 +333,7 @@ CLIENT_TEST(TwoWayFlexibleSendNonEmptyPayloadSuccessResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
-      .ordinal = kOrdinalFlexibleTwoWayFields,
+      .ordinal = kOrdinal_OpenTarget_FlexibleTwoWayFields,
   };
   int32_t some_field = 302340665;
   fidl_clientsuite::NonEmptyPayload payload = {{.some_field = some_field}};
@@ -359,7 +359,7 @@ CLIENT_TEST(TwoWayFlexibleSendNonEmptyPayloadUnknownMethodResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
-      .ordinal = kOrdinalFlexibleTwoWayFields,
+      .ordinal = kOrdinal_OpenTarget_FlexibleTwoWayFields,
   };
   Bytes expected_request = header;
   Bytes response = {
@@ -387,7 +387,7 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendSuccessResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
-      .ordinal = kOrdinalFlexibleTwoWayErr,
+      .ordinal = kOrdinal_OpenTarget_FlexibleTwoWayErr,
   };
   Bytes expected_request = header;
   Bytes response = {header, union_ordinal(kResultUnionSuccess), inline_envelope({0x00})};
@@ -407,7 +407,7 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendErrorResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
-      .ordinal = kOrdinalFlexibleTwoWayErr,
+      .ordinal = kOrdinal_OpenTarget_FlexibleTwoWayErr,
   };
   int32_t error = 1456681;
   Bytes expected_request = header;
@@ -429,7 +429,7 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendUnknownMethodResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
-      .ordinal = kOrdinalFlexibleTwoWayErr,
+      .ordinal = kOrdinal_OpenTarget_FlexibleTwoWayErr,
   };
   Bytes expected_request = header;
   Bytes response = {
@@ -457,10 +457,10 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendMismatchedStrictnessUnknownMethodRespon
   Bytes expected_request = Header{
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
-      .ordinal = kOrdinalFlexibleTwoWayErr,
+      .ordinal = kOrdinal_OpenTarget_FlexibleTwoWayErr,
   };
   Bytes response = {
-      Header{.txid = kTxidNotKnown, .ordinal = kOrdinalFlexibleTwoWayErr},
+      Header{.txid = kTxidNotKnown, .ordinal = kOrdinal_OpenTarget_FlexibleTwoWayErr},
       union_ordinal(kResultUnionFrameworkError),
       inline_envelope(int32(ZX_ERR_NOT_SUPPORTED)),
   };
@@ -482,7 +482,7 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendOtherTransportErrResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
-      .ordinal = kOrdinalFlexibleTwoWayErr,
+      .ordinal = kOrdinal_OpenTarget_FlexibleTwoWayErr,
   };
   Bytes expected_request = header;
   Bytes response = {
@@ -508,7 +508,7 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendNonEmptyPayloadSuccessResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
-      .ordinal = kOrdinalFlexibleTwoWayFieldsErr,
+      .ordinal = kOrdinal_OpenTarget_FlexibleTwoWayFieldsErr,
   };
   int32_t some_field = 670705054;
   fidl_clientsuite::NonEmptyPayload payload = {{.some_field = some_field}};
@@ -534,7 +534,7 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendNonEmptyPayloadUnknownMethodResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
-      .ordinal = kOrdinalFlexibleTwoWayFieldsErr,
+      .ordinal = kOrdinal_OpenTarget_FlexibleTwoWayFieldsErr,
   };
   Bytes expected_request = header;
   Bytes response = {
@@ -559,7 +559,7 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendNonEmptyPayloadUnknownMethodResponse) {
 
 // The client should receive a strict event.
 CLIENT_TEST(ReceiveStrictEvent) {
-  Bytes event = Header{.txid = kOneWayTxid, .ordinal = kOrdinalStrictEvent};
+  Bytes event = Header{.txid = kOneWayTxid, .ordinal = kOrdinal_OpenTarget_StrictEvent};
   auto reporter = ReceiveOpenEvents();
   ASSERT_NE(reporter, nullptr);
   ASSERT_OK(server_end().write(event));
@@ -576,7 +576,7 @@ CLIENT_TEST(ReceiveStrictEventMismatchedStrictness) {
   Bytes event = Header{
       .txid = kOneWayTxid,
       .dynamic_flags = kDynamicFlagsFlexible,
-      .ordinal = kOrdinalStrictEvent,
+      .ordinal = kOrdinal_OpenTarget_StrictEvent,
   };
   auto reporter = ReceiveOpenEvents();
   ASSERT_NE(reporter, nullptr);
@@ -593,7 +593,7 @@ CLIENT_TEST(ReceiveFlexibleEvent) {
   Bytes event = Header{
       .txid = kOneWayTxid,
       .dynamic_flags = kDynamicFlagsFlexible,
-      .ordinal = kOrdinalFlexibleEvent,
+      .ordinal = kOrdinal_OpenTarget_FlexibleEvent,
   };
   auto reporter = ReceiveOpenEvents();
   ASSERT_NE(reporter, nullptr);
@@ -608,7 +608,7 @@ CLIENT_TEST(ReceiveFlexibleEvent) {
 // The client should receive an event, despite the schema (flexible) not
 // matching the dynamic flags (strict).
 CLIENT_TEST(ReceiveFlexibleEventMismatchedStrictness) {
-  Bytes event = Header{.txid = kOneWayTxid, .ordinal = kOrdinalFlexibleEvent};
+  Bytes event = Header{.txid = kOneWayTxid, .ordinal = kOrdinal_OpenTarget_FlexibleEvent};
   auto reporter = ReceiveOpenEvents();
   ASSERT_NE(reporter, nullptr);
   ASSERT_OK(server_end().write(event));

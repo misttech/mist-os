@@ -20,7 +20,7 @@ using namespace ::channel_util;
 
 // The server should send a strict event.
 OPEN_SERVER_TEST(SendStrictEvent) {
-  Bytes expected_event = Header{.txid = 0, .ordinal = kOrdinalStrictEvent};
+  Bytes expected_event = Header{.txid = 0, .ordinal = kOrdinal_OpenTarget_StrictEvent};
   controller()->SendStrictEvent().ThenExactlyOnce([&](auto result) {
     MarkControllerCallbackRun();
     ASSERT_TRUE(result.is_ok());
@@ -34,7 +34,7 @@ OPEN_SERVER_TEST(SendFlexibleEvent) {
   Bytes expected_event = Header{
       .txid = 0,
       .dynamic_flags = kDynamicFlagsFlexible,
-      .ordinal = kOrdinalFlexibleEvent,
+      .ordinal = kOrdinal_OpenTarget_FlexibleEvent,
   };
   controller()->SendFlexibleEvent().ThenExactlyOnce([&](auto result) {
     MarkControllerCallbackRun();
@@ -46,7 +46,7 @@ OPEN_SERVER_TEST(SendFlexibleEvent) {
 
 // The server should receive a strict one-way method.
 OPEN_SERVER_TEST(ReceiveStrictOneWay) {
-  Bytes request = Header{.txid = 0, .ordinal = kOrdinalStrictOneWay};
+  Bytes request = Header{.txid = 0, .ordinal = kOrdinal_OpenTarget_StrictOneWay};
   ASSERT_OK(client_end().write(request));
   WAIT_UNTIL([this]() { return reporter().received_strict_one_way(); });
   ;
@@ -58,7 +58,7 @@ OPEN_SERVER_TEST(ReceiveStrictOneWayMismatchedStrictness) {
   Bytes request = Header{
       .txid = 0,
       .dynamic_flags = kDynamicFlagsFlexible,
-      .ordinal = kOrdinalStrictOneWay,
+      .ordinal = kOrdinal_OpenTarget_StrictOneWay,
   };
   ASSERT_OK(client_end().write(request));
   WAIT_UNTIL([this]() { return reporter().received_strict_one_way(); });
@@ -70,7 +70,7 @@ OPEN_SERVER_TEST(ReceiveFlexibleOneWay) {
   Bytes request = Header{
       .txid = 0,
       .dynamic_flags = kDynamicFlagsFlexible,
-      .ordinal = kOrdinalFlexibleOneWay,
+      .ordinal = kOrdinal_OpenTarget_FlexibleOneWay,
   };
   ASSERT_OK(client_end().write(request));
   WAIT_UNTIL([this]() { return reporter().received_flexible_one_way(); });
@@ -80,14 +80,14 @@ OPEN_SERVER_TEST(ReceiveFlexibleOneWay) {
 // The server should receive a one-way method, despite the schema (flexible)
 // not matching the dynamic flags (strict).
 OPEN_SERVER_TEST(ReceiveFlexibleOneWayMismatchedStrictness) {
-  Bytes request = Header{.txid = 0, .ordinal = kOrdinalFlexibleOneWay};
+  Bytes request = Header{.txid = 0, .ordinal = kOrdinal_OpenTarget_FlexibleOneWay};
   ASSERT_OK(client_end().write(request));
   WAIT_UNTIL([this]() { return reporter().received_flexible_one_way(); });
 }
 
 // The server should reply to a strict two-way method.
 OPEN_SERVER_TEST(StrictTwoWayResponse) {
-  Bytes bytes = Header{.txid = kTwoWayTxid, .ordinal = kOrdinalStrictTwoWay};
+  Bytes bytes = Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_OpenTarget_StrictTwoWay};
   ASSERT_OK(client_end().write(bytes));
   ASSERT_OK(client_end().read_and_check(bytes));
 }
@@ -98,11 +98,11 @@ OPEN_SERVER_TEST(StrictTwoWayResponseMismatchedStrictness) {
   Bytes request = Header{
       .txid = kTwoWayTxid,
       .dynamic_flags = kDynamicFlagsFlexible,
-      .ordinal = kOrdinalStrictTwoWay,
+      .ordinal = kOrdinal_OpenTarget_StrictTwoWay,
   };
   Bytes expected_response = Header{
       .txid = kTwoWayTxid,
-      .ordinal = kOrdinalStrictTwoWay,
+      .ordinal = kOrdinal_OpenTarget_StrictTwoWay,
   };
   ASSERT_OK(client_end().write(request));
   ASSERT_OK(client_end().read_and_check(expected_response));
@@ -111,7 +111,7 @@ OPEN_SERVER_TEST(StrictTwoWayResponseMismatchedStrictness) {
 // The server should reply to a strict two-way method (nonempty).
 OPEN_SERVER_TEST(StrictTwoWayNonEmptyResponse) {
   Bytes bytes = {
-      Header{.txid = kTwoWayTxid, .ordinal = kOrdinalStrictTwoWayFields},
+      Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_OpenTarget_StrictTwoWayFields},
       encode(fidl_serversuite::OpenTargetStrictTwoWayFieldsRequest(504230)),
   };
   ASSERT_OK(client_end().write(bytes));
@@ -121,7 +121,7 @@ OPEN_SERVER_TEST(StrictTwoWayNonEmptyResponse) {
 // The server should reply to a strict fallible two-way method (success).
 OPEN_SERVER_TEST(StrictTwoWayErrorSyntaxResponse) {
   Bytes bytes = {
-      Header{.txid = kTwoWayTxid, .ordinal = kOrdinalStrictTwoWayErr},
+      Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_OpenTarget_StrictTwoWayErr},
       union_ordinal(kResultUnionSuccess),
       inline_envelope({0x00}),
   };
@@ -140,14 +140,14 @@ OPEN_SERVER_TEST(StrictTwoWayErrorSyntaxResponseMismatchedStrictness) {
       Header{
           .txid = kTwoWayTxid,
           .dynamic_flags = kDynamicFlagsFlexible,
-          .ordinal = kOrdinalStrictTwoWayErr,
+          .ordinal = kOrdinal_OpenTarget_StrictTwoWayErr,
       },
       payload,
   };
   Bytes expected_response = {
       Header{
           .txid = kTwoWayTxid,
-          .ordinal = kOrdinalStrictTwoWayErr,
+          .ordinal = kOrdinal_OpenTarget_StrictTwoWayErr,
       },
       payload,
   };
@@ -158,7 +158,7 @@ OPEN_SERVER_TEST(StrictTwoWayErrorSyntaxResponseMismatchedStrictness) {
 // The server should reply to a strict fallible two-way method (nonempty success).
 OPEN_SERVER_TEST(StrictTwoWayErrorSyntaxNonEmptyResponse) {
   Bytes bytes = {
-      Header{.txid = kTwoWayTxid, .ordinal = kOrdinalStrictTwoWayFieldsErr},
+      Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_OpenTarget_StrictTwoWayFieldsErr},
       union_ordinal(kResultUnionSuccess),
       inline_envelope(int32(406601)),
   };
@@ -171,7 +171,7 @@ OPEN_SERVER_TEST(FlexibleTwoWayResponse) {
   Header header = {
       .txid = kTwoWayTxid,
       .dynamic_flags = kDynamicFlagsFlexible,
-      .ordinal = kOrdinalFlexibleTwoWay,
+      .ordinal = kOrdinal_OpenTarget_FlexibleTwoWay,
   };
   Bytes request = header;
   Bytes expected_response = {header, union_ordinal(kResultUnionSuccess), inline_envelope({0x00})};
@@ -184,13 +184,13 @@ OPEN_SERVER_TEST(FlexibleTwoWayResponse) {
 OPEN_SERVER_TEST(FlexibleTwoWayResponseMismatchedStrictness) {
   Bytes request = Header{
       .txid = kTwoWayTxid,
-      .ordinal = kOrdinalFlexibleTwoWay,
+      .ordinal = kOrdinal_OpenTarget_FlexibleTwoWay,
   };
   Bytes expected_response = {
       Header{
           .txid = kTwoWayTxid,
           .dynamic_flags = kDynamicFlagsFlexible,
-          .ordinal = kOrdinalFlexibleTwoWay,
+          .ordinal = kOrdinal_OpenTarget_FlexibleTwoWay,
       },
       union_ordinal(kResultUnionSuccess),
       inline_envelope({0x00}),
@@ -204,7 +204,7 @@ OPEN_SERVER_TEST(FlexibleTwoWayNonEmptyResponse) {
   Header header = {
       .txid = kTwoWayTxid,
       .dynamic_flags = kDynamicFlagsFlexible,
-      .ordinal = kOrdinalFlexibleTwoWayFields,
+      .ordinal = kOrdinal_OpenTarget_FlexibleTwoWayFields,
   };
   Bytes payload = int32(3023950);
   Bytes request = {header, payload, padding(4)};
@@ -219,7 +219,7 @@ OPEN_SERVER_TEST(FlexibleTwoWayErrorSyntaxResponseSuccessResult) {
       Header{
           .txid = kTwoWayTxid,
           .dynamic_flags = kDynamicFlagsFlexible,
-          .ordinal = kOrdinalFlexibleTwoWayErr,
+          .ordinal = kOrdinal_OpenTarget_FlexibleTwoWayErr,
       },
       union_ordinal(kResultUnionSuccess),
       inline_envelope({0x00}),
@@ -234,7 +234,7 @@ OPEN_SERVER_TEST(FlexibleTwoWayErrorSyntaxResponseErrorResult) {
       Header{
           .txid = kTwoWayTxid,
           .dynamic_flags = kDynamicFlagsFlexible,
-          .ordinal = kOrdinalFlexibleTwoWayErr,
+          .ordinal = kOrdinal_OpenTarget_FlexibleTwoWayErr,
       },
       union_ordinal(kResultUnionDomainError),
       inline_envelope(int32(60602293)),
@@ -249,7 +249,7 @@ OPEN_SERVER_TEST(FlexibleTwoWayErrorSyntaxNonEmptyResponseSuccessResult) {
       Header{
           .txid = kTwoWayTxid,
           .dynamic_flags = kDynamicFlagsFlexible,
-          .ordinal = kOrdinalFlexibleTwoWayFieldsErr,
+          .ordinal = kOrdinal_OpenTarget_FlexibleTwoWayFieldsErr,
       },
       union_ordinal(kResultUnionSuccess),
       inline_envelope(int32(406601)),
@@ -264,7 +264,7 @@ OPEN_SERVER_TEST(FlexibleTwoWayErrorSyntaxNonEmptyResponseErrorResult) {
       Header{
           .txid = kTwoWayTxid,
           .dynamic_flags = kDynamicFlagsFlexible,
-          .ordinal = kOrdinalFlexibleTwoWayFieldsErr,
+          .ordinal = kOrdinal_OpenTarget_FlexibleTwoWayFieldsErr,
       },
       union_ordinal(kResultUnionDomainError),
       inline_envelope(int32(60602293)),

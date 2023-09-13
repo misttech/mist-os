@@ -17,7 +17,7 @@ using namespace ::channel_util;
 CLOSED_SERVER_TEST(ServerSendsEpitaph) {
   zx_status_t epitaph = 456;
   Bytes expected = {
-      Header{.txid = 0, .ordinal = kOrdinalEpitaph},
+      Header{.txid = 0, .ordinal = kOrdinal_ClosedTarget_Epitaph},
       {int32(epitaph), padding(4)},
   };
   ASSERT_TRUE(controller()->CloseWithEpitaph({epitaph}).is_ok());
@@ -29,7 +29,7 @@ CLOSED_SERVER_TEST(ServerSendsEpitaph) {
 // It is not permissible to send epitaphs to servers.
 CLOSED_SERVER_TEST(ServerReceivesEpitaphInvalid) {
   Bytes request = {
-      Header{.txid = 0, .ordinal = kOrdinalEpitaph},
+      Header{.txid = 0, .ordinal = kOrdinal_ClosedTarget_Epitaph},
       {int32(456), padding(4)},
   };
   ASSERT_OK(client_end().write(request));

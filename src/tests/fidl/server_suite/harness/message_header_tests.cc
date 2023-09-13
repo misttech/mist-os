@@ -18,7 +18,7 @@ using namespace ::channel_util;
 
 // The server should tear down when it receives a one-way request with nonzero txid.
 CLOSED_SERVER_TEST(OneWayWithNonZeroTxid) {
-  Bytes request = Header{.txid = kTwoWayTxid, .ordinal = kOrdinalOneWayNoPayload};
+  Bytes request = Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_OneWayNoPayload};
   ASSERT_OK(client_end().write(request));
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
@@ -28,7 +28,7 @@ CLOSED_SERVER_TEST(OneWayWithNonZeroTxid) {
 
 // The server should tear down when it receives a two-way request with zero txid.
 CLOSED_SERVER_TEST(TwoWayNoPayloadWithZeroTxid) {
-  Bytes request = Header{.txid = 0, .ordinal = kOrdinalTwoWayNoPayload};
+  Bytes request = Header{.txid = 0, .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload};
   ASSERT_OK(client_end().write(request));
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
@@ -51,7 +51,7 @@ CLOSED_SERVER_TEST(BadMagicNumberCausesClose) {
   Bytes request = Header{
       .txid = kTwoWayTxid,
       .magic_number = kBadMagicNumber,
-      .ordinal = kOrdinalTwoWayNoPayload,
+      .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload,
   };
   ASSERT_OK(client_end().write(request));
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
@@ -65,11 +65,11 @@ CLOSED_SERVER_TEST(IgnoresUnrecognizedAtRestFlags) {
   Bytes request = Header{
       .txid = kTwoWayTxid,
       .at_rest_flags = {0xff, 0xff},
-      .ordinal = kOrdinalTwoWayNoPayload,
+      .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload,
   };
   Bytes expected_response = Header{
       .txid = kTwoWayTxid,
-      .ordinal = kOrdinalTwoWayNoPayload,
+      .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload,
   };
   ASSERT_OK(client_end().write(request));
   ASSERT_OK(client_end().read_and_check(expected_response));
@@ -80,11 +80,11 @@ CLOSED_SERVER_TEST(IgnoresUnrecognizedDynamicFlags) {
   Bytes request = Header{
       .txid = kTwoWayTxid,
       .dynamic_flags = 0x7f,  // all bits set except FLEXIBLE (most significant bit)
-      .ordinal = kOrdinalTwoWayNoPayload,
+      .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload,
   };
   Bytes expected_response = Header{
       .txid = kTwoWayTxid,
-      .ordinal = kOrdinalTwoWayNoPayload,
+      .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload,
   };
   ASSERT_OK(client_end().write(request));
   ASSERT_OK(client_end().read_and_check(expected_response));

@@ -27,7 +27,7 @@ OPEN_SERVER_TEST(EventSendingDoNotReportPeerClosed) {
 // When sending a reply, if channel_write returns PEER_CLOSED, the bindings
 // should hide it and return successfully. This helps prevent race conditions.
 CLOSED_SERVER_TEST(ReplySendingDoNotReportPeerClosed) {
-  Bytes request = Header{.txid = kTwoWayTxid, .ordinal = kOrdinalTwoWayNoPayload};
+  Bytes request = Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload};
   ASSERT_OK(client_end().write(request));
   client_end().reset();
   WAIT_UNTIL([this]() { return reporter().teardown_reason().has_value(); });
@@ -37,7 +37,7 @@ CLOSED_SERVER_TEST(ReplySendingDoNotReportPeerClosed) {
 // The server should drain out messages buffered by a client, even when the
 // client closed their endpoint right away after writing those messages.
 CLOSED_SERVER_TEST(ReceiveOneWayNoPayloadFromPeerClosedChannel) {
-  Bytes request = Header{.txid = 0, .ordinal = kOrdinalOneWayNoPayload};
+  Bytes request = Header{.txid = 0, .ordinal = kOrdinal_ClosedTarget_OneWayNoPayload};
   ASSERT_OK(client_end().write(request));
   client_end().reset();
   WAIT_UNTIL([this]() { return reporter().received_one_way_no_payload(); });

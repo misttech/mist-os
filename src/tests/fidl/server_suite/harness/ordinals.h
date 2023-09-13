@@ -9,52 +9,49 @@
 
 namespace server_suite {
 
-// To find all ordinals:
-//
-//     cat
-//     out/default/fidling/gen/src/tests/fidl/server_suite/fidl/fidl.serversuite/cpp/fidl/fidl.serversuite/cpp/wire_messaging.cc
-//     | grep -e 'constexpr.*k.*Target.*Ordinal'
-//
-// While using `jq` would be much nicer, large numbers are mishandled and the
-// displayed ordinal ends up being incorrect.
-//
-// Ordinals are redefined here even though they may be accessible via C++
-// binding definitions to ensure they are unchanged by changes in the bindings.
+/*
+To find all ordinals:
 
-// Closed Target Ordinals
-static const uint64_t kOrdinalOneWayNoPayload = 462698674125537694lu;
-static const uint64_t kOrdinalTwoWayNoPayload = 6618634609655918175lu;
-static const uint64_t kOrdinalTwoWayStructPayload = 3546419415198665872lu;
-static const uint64_t kOrdinalTwoWayTablePayload = 7142567342575659946lu;
-static const uint64_t kOrdinalTwoWayUnionPayload = 8633460217663942074lu;
-static const uint64_t kOrdinalTwoWayResult = 806800322701855052lu;
-static const uint64_t kOrdinalGetHandleRights = 1195943399487699944lu;
-static const uint64_t kOrdinalGetSignalableEventRights = 475344252578913711lu;
-static const uint64_t kOrdinalEchoAsTransferableSignalableEvent = 6829189580925709472lu;
-static const uint64_t kOrdinalByteVectorSize = 1174084469162245669lu;
-static const uint64_t kOrdinalHandleVectorSize = 5483915628125979959lu;
-static const uint64_t kOrdinalCreateNByteVector = 2219580753158511713lu;
-static const uint64_t kOrdinalCreateNHandleVector = 2752855654734922045lu;
+grep 'constexpr.*k.*Target_.*Ordinal' \
+out/default/fidling/gen/src/tests/fidl/server_suite/fidl/fidl.serversuite/cpp/fidl/fidl.serversuite/cpp/wire_messaging.cc
+\ | sed -E 's/.* k(\w+Target_.*)_Ordinal = (.*);$/const uint64_t kOrdinal_\1 = \2;/'
 
-// Open Target Ordinals
-static const uint64_t kOrdinalStrictEvent = 538454334407181957lu;
-static const uint64_t kOrdinalFlexibleEvent = 4889200613481231166lu;
-static const uint64_t kOrdinalStrictOneWay = 2656433164255935131lu;
-static const uint64_t kOrdinalFlexibleOneWay = 4763610705738353240lu;
-static const uint64_t kOrdinalStrictTwoWay = 8071027055008411395lu;
-static const uint64_t kOrdinalStrictTwoWayFields = 3163464055637704720lu;
-static const uint64_t kOrdinalStrictTwoWayErr = 7997291255991962412lu;
-static const uint64_t kOrdinalStrictTwoWayFieldsErr = 3502827294789008624lu;
-static const uint64_t kOrdinalFlexibleTwoWay = 1871583035380534385lu;
-static const uint64_t kOrdinalFlexibleTwoWayFields = 5173692443570239348lu;
-static const uint64_t kOrdinalFlexibleTwoWayErr = 372287587009602464lu;
-static const uint64_t kOrdinalFlexibleTwoWayFieldsErr = 1925250685993373878lu;
+We define ordinals here even though they're accessible in the C++ bindings
+because the harness is designed to never use the bindings-under-test.
+*/
 
-// Common Ordinals
-static const uint64_t kOrdinalEpitaph = 0xfffffffffffffffflu;
-// A made-up ordinal used when a method is needed that isn't known to the
-// server.
-static const uint64_t kOrdinalFakeUnknownMethod = 0x10ff10ff10ff10fflu;
+// Target ordinals
+const uint64_t kOrdinal_ClosedTarget_OneWayNoPayload = 462698674125537694lu;
+const uint64_t kOrdinal_ClosedTarget_TwoWayNoPayload = 6618634609655918175lu;
+const uint64_t kOrdinal_ClosedTarget_TwoWayStructPayload = 3546419415198665872lu;
+const uint64_t kOrdinal_ClosedTarget_TwoWayTablePayload = 7142567342575659946lu;
+const uint64_t kOrdinal_ClosedTarget_TwoWayUnionPayload = 8633460217663942074lu;
+const uint64_t kOrdinal_ClosedTarget_TwoWayResult = 806800322701855052lu;
+const uint64_t kOrdinal_ClosedTarget_GetHandleRights = 1195943399487699944lu;
+const uint64_t kOrdinal_ClosedTarget_GetSignalableEventRights = 475344252578913711lu;
+const uint64_t kOrdinal_ClosedTarget_EchoAsTransferableSignalableEvent = 6829189580925709472lu;
+const uint64_t kOrdinal_ClosedTarget_ByteVectorSize = 1174084469162245669lu;
+const uint64_t kOrdinal_ClosedTarget_HandleVectorSize = 5483915628125979959lu;
+const uint64_t kOrdinal_ClosedTarget_CreateNByteVector = 2219580753158511713lu;
+const uint64_t kOrdinal_ClosedTarget_CreateNHandleVector = 2752855654734922045lu;
+const uint64_t kOrdinal_OpenTarget_StrictEvent = 538454334407181957lu;
+const uint64_t kOrdinal_OpenTarget_FlexibleEvent = 4889200613481231166lu;
+const uint64_t kOrdinal_OpenTarget_StrictOneWay = 2656433164255935131lu;
+const uint64_t kOrdinal_OpenTarget_FlexibleOneWay = 4763610705738353240lu;
+const uint64_t kOrdinal_OpenTarget_StrictTwoWay = 8071027055008411395lu;
+const uint64_t kOrdinal_OpenTarget_StrictTwoWayFields = 3163464055637704720lu;
+const uint64_t kOrdinal_OpenTarget_StrictTwoWayErr = 7997291255991962412lu;
+const uint64_t kOrdinal_OpenTarget_StrictTwoWayFieldsErr = 3502827294789008624lu;
+const uint64_t kOrdinal_OpenTarget_FlexibleTwoWay = 1871583035380534385lu;
+const uint64_t kOrdinal_OpenTarget_FlexibleTwoWayFields = 5173692443570239348lu;
+const uint64_t kOrdinal_OpenTarget_FlexibleTwoWayErr = 372287587009602464lu;
+const uint64_t kOrdinal_OpenTarget_FlexibleTwoWayFieldsErr = 1925250685993373878lu;
+
+// Epitaph ordinal
+const uint64_t kOrdinal_ClosedTarget_Epitaph = 0xfffffffffffffffflu;
+
+// A fake ordinal that's unknown to the server
+const uint64_t kOrdinalFakeUnknownMethod = 0x10ff10ff10ff10fflu;
 
 }  // namespace server_suite
 

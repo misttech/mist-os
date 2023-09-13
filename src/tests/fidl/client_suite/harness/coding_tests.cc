@@ -18,12 +18,12 @@ using namespace ::channel_util;
 CLIENT_TEST(V1TwoWayNoPayload) {
   Bytes expected_request = Header{
       .txid = kTxidNotKnown,
-      .ordinal = kOrdinalTwoWayNoPayload,
+      .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload,
   };
   Bytes response = Header{
       .txid = kTxidNotKnown,
       .at_rest_flags = {0, 0},  // at-rest flags without V2 bit set
-      .ordinal = kOrdinalTwoWayNoPayload,
+      .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload,
   };
   runner()->CallTwoWayNoPayload({{.target = TakeClosedClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -41,13 +41,13 @@ CLIENT_TEST(V1TwoWayNoPayload) {
 CLIENT_TEST(V1TwoWayStructPayload) {
   Bytes expected_request = Header{
       .txid = kTxidNotKnown,
-      .ordinal = kOrdinalTwoWayStructPayload,
+      .ordinal = kOrdinal_ClosedTarget_TwoWayStructPayload,
   };
   Bytes response = {
       Header{
           .txid = kTxidNotKnown,
           .at_rest_flags = {0, 0},  // at-rest flags without V2 bit set
-          .ordinal = kOrdinalTwoWayStructPayload,
+          .ordinal = kOrdinal_ClosedTarget_TwoWayStructPayload,
       },
       {int32(42), padding(4)},
   };

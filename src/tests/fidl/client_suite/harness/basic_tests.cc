@@ -20,7 +20,7 @@ CLIENT_TEST(Setup) {}
 
 // The client should call a two-way method and receive the empty response.
 CLIENT_TEST(TwoWayNoPayload) {
-  Bytes bytes = Header{.txid = kTxidNotKnown, .ordinal = kOrdinalTwoWayNoPayload};
+  Bytes bytes = Header{.txid = kTxidNotKnown, .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload};
   runner()->CallTwoWayNoPayload({{.target = TakeClosedClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
@@ -34,7 +34,7 @@ CLIENT_TEST(TwoWayNoPayload) {
 
 // The client should call a two-way method and receive the struct response.
 CLIENT_TEST(TwoWayStructPayload) {
-  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalTwoWayStructPayload};
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinal_ClosedTarget_TwoWayStructPayload};
   fidl_clientsuite::NonEmptyPayload payload = {{.some_field = 42}};
   Bytes expected_request = header;
   Bytes response = {header, encode(payload)};
@@ -54,7 +54,7 @@ CLIENT_TEST(TwoWayStructPayload) {
 
 // The client should call a two-way method and receive the table response.
 CLIENT_TEST(TwoWayTablePayload) {
-  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalTwoWayTablePayload};
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinal_ClosedTarget_TwoWayTablePayload};
   fidl_clientsuite::TablePayload payload = {{.some_field = 42}};
   Bytes expected_request = header;
   Bytes response = {header, encode(payload)};
@@ -74,7 +74,7 @@ CLIENT_TEST(TwoWayTablePayload) {
 
 // The client should call a two-way method and receive the union response.
 CLIENT_TEST(TwoWayUnionPayload) {
-  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalTwoWayUnionPayload};
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinal_ClosedTarget_TwoWayUnionPayload};
   fidl_clientsuite::UnionPayload payload = fidl_clientsuite::UnionPayload::WithSomeVariant(320494);
   Bytes expected_request = header;
   Bytes response = {header, encode(payload)};
@@ -94,7 +94,7 @@ CLIENT_TEST(TwoWayUnionPayload) {
 
 // The client should call a fallible two-way method and receive the success response.
 CLIENT_TEST(TwoWayResultWithPayload) {
-  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalTwoWayStructPayloadErr};
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinal_ClosedTarget_TwoWayStructPayloadErr};
   int32_t field = 390023;
   fidl_clientsuite::NonEmptyPayload payload = {{.some_field = field}};
   Bytes expected_request = header;
@@ -116,7 +116,7 @@ CLIENT_TEST(TwoWayResultWithPayload) {
 
 // The client should call a fallible two-way method and receive the error response.
 CLIENT_TEST(TwoWayResultWithError) {
-  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalTwoWayStructPayloadErr};
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinal_ClosedTarget_TwoWayStructPayloadErr};
   int32_t error = 90240;
   Bytes expected_request = header;
   Bytes response = {header, union_ordinal(kResultUnionDomainError), inline_envelope(int32(error))};
@@ -137,7 +137,7 @@ CLIENT_TEST(TwoWayResultWithError) {
 
 // The client should call a two-way method with a struct request and receive the response.
 CLIENT_TEST(TwoWayStructRequest) {
-  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalTwoWayStructRequest};
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinal_ClosedTarget_TwoWayStructRequest};
   fidl_clientsuite::NonEmptyPayload payload = {{.some_field = 390023}};
   Bytes expected_request = {header, encode(payload)};
   Bytes response = header;
@@ -157,7 +157,7 @@ CLIENT_TEST(TwoWayStructRequest) {
 
 // The client should call a two-way method with a table request and receive the response.
 CLIENT_TEST(TwoWayTableRequest) {
-  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalTwoWayTableRequest};
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinal_ClosedTarget_TwoWayTableRequest};
   fidl_clientsuite::TablePayload payload = {{.some_field = 390023}};
   Bytes expected_request = {header, encode(payload)};
   Bytes response = header;
@@ -176,7 +176,7 @@ CLIENT_TEST(TwoWayTableRequest) {
 
 // The client should call a two-way method with a union request and receive the response.
 CLIENT_TEST(TwoWayUnionRequest) {
-  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalTwoWayUnionRequest};
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinal_ClosedTarget_TwoWayUnionRequest};
   fidl_clientsuite::UnionPayload payload = fidl_clientsuite::UnionPayload::WithSomeVariant(390023);
   Bytes expected_request = {header, encode(payload)};
   Bytes response = header;
@@ -195,7 +195,7 @@ CLIENT_TEST(TwoWayUnionRequest) {
 
 // The client should call a one-way method with an empty request.
 CLIENT_TEST(OneWayNoRequest) {
-  Bytes expected_request = Header{.txid = 0, .ordinal = kOrdinalOneWayNoRequest};
+  Bytes expected_request = Header{.txid = 0, .ordinal = kOrdinal_ClosedTarget_OneWayNoRequest};
   runner()->CallOneWayNoRequest({{.target = TakeClosedClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
@@ -209,7 +209,7 @@ CLIENT_TEST(OneWayNoRequest) {
 CLIENT_TEST(OneWayStructRequest) {
   fidl_clientsuite::NonEmptyPayload payload = {{.some_field = 390023}};
   Bytes expected_request = {
-      Header{.txid = 0, .ordinal = kOrdinalOneWayStructRequest},
+      Header{.txid = 0, .ordinal = kOrdinal_ClosedTarget_OneWayStructRequest},
       encode(payload),
   };
   runner()
@@ -228,7 +228,7 @@ CLIENT_TEST(OneWayStructRequest) {
 CLIENT_TEST(OneWayTableRequest) {
   fidl_clientsuite::TablePayload payload = {{.some_field = 390023}};
   Bytes expected_request = {
-      Header{.txid = 0, .ordinal = kOrdinalOneWayTableRequest},
+      Header{.txid = 0, .ordinal = kOrdinal_ClosedTarget_OneWayTableRequest},
       encode(payload),
   };
   runner()
@@ -246,7 +246,7 @@ CLIENT_TEST(OneWayTableRequest) {
 CLIENT_TEST(OneWayUnionRequest) {
   fidl_clientsuite::UnionPayload payload = fidl_clientsuite::UnionPayload::WithSomeVariant(390023);
   Bytes expected_request = {
-      Header{.txid = 0, .ordinal = kOrdinalOneWayUnionRequest},
+      Header{.txid = 0, .ordinal = kOrdinal_ClosedTarget_OneWayUnionRequest},
       encode(payload),
   };
   runner()
@@ -262,7 +262,7 @@ CLIENT_TEST(OneWayUnionRequest) {
 
 // The client should receive an event with no payload.
 CLIENT_TEST(ReceiveEventNoPayload) {
-  Bytes event = Header{.txid = kOneWayTxid, .ordinal = kOrdinalOnEventNoPayload};
+  Bytes event = Header{.txid = kOneWayTxid, .ordinal = kOrdinal_ClosedTarget_OnEventNoPayload};
   auto reporter = ReceiveClosedEvents();
   ASSERT_NE(reporter, nullptr);
   ASSERT_OK(server_end().write(event));
@@ -276,7 +276,7 @@ CLIENT_TEST(ReceiveEventNoPayload) {
 CLIENT_TEST(ReceiveEventStructPayload) {
   fidl_clientsuite::NonEmptyPayload payload = {{.some_field = 9098607}};
   Bytes bytes_in = {
-      Header{.txid = kOneWayTxid, .ordinal = kOrdinalOnEventStructPayload},
+      Header{.txid = kOneWayTxid, .ordinal = kOrdinal_ClosedTarget_OnEventStructPayload},
       encode(payload),
   };
   auto reporter = ReceiveClosedEvents();
@@ -293,7 +293,7 @@ CLIENT_TEST(ReceiveEventStructPayload) {
 CLIENT_TEST(ReceiveEventTablePayload) {
   fidl_clientsuite::TablePayload payload = {{.some_field = 9098607}};
   Bytes event = {
-      Header{.txid = kOneWayTxid, .ordinal = kOrdinalOnEventTablePayload},
+      Header{.txid = kOneWayTxid, .ordinal = kOrdinal_ClosedTarget_OnEventTablePayload},
       encode(payload),
   };
   auto reporter = ReceiveClosedEvents();
@@ -310,7 +310,7 @@ CLIENT_TEST(ReceiveEventTablePayload) {
 CLIENT_TEST(ReceiveEventUnionPayload) {
   fidl_clientsuite::UnionPayload payload = fidl_clientsuite::UnionPayload::WithSomeVariant(87662);
   Bytes event = {
-      Header{.txid = kOneWayTxid, .ordinal = kOrdinalOnEventUnionPayload},
+      Header{.txid = kOneWayTxid, .ordinal = kOrdinal_ClosedTarget_OnEventUnionPayload},
       encode(payload),
   };
   auto reporter = ReceiveClosedEvents();

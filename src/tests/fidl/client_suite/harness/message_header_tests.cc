@@ -21,7 +21,7 @@ CLIENT_TEST(ReceiveEventBadMagicNumber) {
   Bytes event = Header{
       .txid = 0,
       .magic_number = kBadMagicNumber,
-      .ordinal = kOrdinalOnEventNoPayload,
+      .ordinal = kOrdinal_ClosedTarget_OnEventNoPayload,
   };
   auto reporter = ReceiveClosedEvents();
   ASSERT_NE(reporter, nullptr);
@@ -39,7 +39,7 @@ CLIENT_TEST(ReceiveEventBadMagicNumber) {
 
 // The client should tear down when it receives an event with nonzero txid.
 CLIENT_TEST(ReceiveEventUnexpectedTxid) {
-  Bytes event = Header{.txid = 123, .ordinal = kOrdinalOnEventNoPayload};
+  Bytes event = Header{.txid = 123, .ordinal = kOrdinal_ClosedTarget_OnEventNoPayload};
   auto reporter = ReceiveClosedEvents();
   ASSERT_NE(reporter, nullptr);
   ASSERT_OK(server_end().write(event));
@@ -77,12 +77,12 @@ CLIENT_TEST(ReceiveEventUnknownOrdinal) {
 CLIENT_TEST(ReceiveResponseBadMagicNumber) {
   Bytes expected_request = Header{
       .txid = kTxidNotKnown,
-      .ordinal = kOrdinalTwoWayNoPayload,
+      .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload,
   };
   Bytes response = Header{
       .txid = kTxidNotKnown,
       .magic_number = kBadMagicNumber,
-      .ordinal = kOrdinalTwoWayNoPayload,
+      .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload,
   };
   runner()->CallTwoWayNoPayload({{.target = TakeClosedClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
@@ -114,8 +114,9 @@ CLIENT_TEST(ReceiveResponseUnexpectedTxid) {
   zx_txid_t right_txid;
   zx_txid_t wrong_txid = 123;
 
-  Bytes expected_request = Header{.txid = kTxidNotKnown, .ordinal = kOrdinalTwoWayNoPayload};
-  Bytes response = Header{.txid = wrong_txid, .ordinal = kOrdinalTwoWayNoPayload};
+  Bytes expected_request =
+      Header{.txid = kTxidNotKnown, .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload};
+  Bytes response = Header{.txid = wrong_txid, .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload};
   runner()->CallTwoWayNoPayload({{.target = TakeClosedClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
@@ -137,8 +138,10 @@ CLIENT_TEST(ReceiveResponseUnexpectedTxid) {
 // The client should tear down when it receives a response with an ordinal
 // that is known but different from the request ordinal.
 CLIENT_TEST(ReceiveResponseWrongOrdinalKnown) {
-  Bytes expected_request = Header{.txid = kTxidNotKnown, .ordinal = kOrdinalTwoWayNoPayload};
-  Bytes response = Header{.txid = kTxidNotKnown, .ordinal = kOrdinalTwoWayStructPayload};
+  Bytes expected_request =
+      Header{.txid = kTxidNotKnown, .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload};
+  Bytes response =
+      Header{.txid = kTxidNotKnown, .ordinal = kOrdinal_ClosedTarget_TwoWayStructPayload};
   runner()->CallTwoWayNoPayload({{.target = TakeClosedClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
@@ -157,7 +160,8 @@ CLIENT_TEST(ReceiveResponseWrongOrdinalKnown) {
 
 // The client should tear down when it receives a response with an unknown ordinal.
 CLIENT_TEST(ReceiveResponseWrongOrdinalUnknown) {
-  Bytes expected_request = Header{.txid = kTxidNotKnown, .ordinal = kOrdinalTwoWayNoPayload};
+  Bytes expected_request =
+      Header{.txid = kTxidNotKnown, .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload};
   Bytes response = Header{.txid = kTxidNotKnown, .ordinal = kOrdinalFakeUnknownMethod};
   runner()->CallTwoWayNoPayload({{.target = TakeClosedClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();

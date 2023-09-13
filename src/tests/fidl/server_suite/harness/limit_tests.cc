@@ -21,7 +21,7 @@ const uint32_t kMaxVecHandlesInMsg = ZX_CHANNEL_MAX_MSG_HANDLES;
 // The server should accept a request with the maximum number of bytes.
 CLOSED_SERVER_TEST(RequestMatchesByteLimit) {
   uint32_t count = kMaxVecBytesInMsg;
-  Header header = {.txid = kTwoWayTxid, .ordinal = kOrdinalByteVectorSize};
+  Header header = {.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_ByteVectorSize};
   Bytes request = {header, vector_header(count), repeat(0x00).times(count)};
   Bytes expected_response = {header, uint32(count), padding(4)};
   ASSERT_OK(client_end().write(request));
@@ -38,7 +38,7 @@ CLOSED_SERVER_TEST(RequestMatchesHandleLimit) {
     handles.push_back(Handle{.handle = event.release(), .type = ZX_OBJ_TYPE_EVENT});
   }
 
-  Header header = {.txid = kTwoWayTxid, .ordinal = kOrdinalHandleVectorSize};
+  Header header = {.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_HandleVectorSize};
   Message request = {
       Bytes{
           header,
@@ -58,7 +58,7 @@ CLOSED_SERVER_TEST(RequestMatchesHandleLimit) {
 // The server should be able to send a response with the maximum number of bytes.
 CLOSED_SERVER_TEST(ResponseMatchesByteLimit) {
   uint32_t count = kMaxVecBytesInMsg;
-  Header header = {.txid = kTwoWayTxid, .ordinal = kOrdinalCreateNByteVector};
+  Header header = {.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_CreateNByteVector};
   Bytes request = {header, uint32(count), padding(4)};
   Bytes expected_response = {header, vector_header(count), repeat(0x00).times(count)};
   ASSERT_OK(client_end().write(request));
@@ -69,7 +69,7 @@ CLOSED_SERVER_TEST(ResponseMatchesByteLimit) {
 CLOSED_SERVER_TEST(ResponseExceedsByteLimit) {
   uint32_t count = kMaxVecBytesInMsg + 1;
   Bytes request = {
-      Header{.txid = kTwoWayTxid, .ordinal = kOrdinalCreateNByteVector},
+      Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_CreateNByteVector},
       {uint32(count), padding(4)},
   };
   ASSERT_OK(client_end().write(request));
@@ -88,7 +88,7 @@ CLOSED_SERVER_TEST(ResponseMatchesHandleLimit) {
     });
   }
 
-  Header header = {.txid = kTwoWayTxid, .ordinal = kOrdinalCreateNHandleVector};
+  Header header = {.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_CreateNHandleVector};
   Message request = {
       Bytes{header, uint32(count), padding(4)},
       Handles{},
@@ -109,7 +109,7 @@ CLOSED_SERVER_TEST(ResponseMatchesHandleLimit) {
 CLOSED_SERVER_TEST(ResponseExceedsHandleLimit) {
   uint32_t count = kMaxVecHandlesInMsg + 1;
   Bytes request = {
-      Header{.txid = kTwoWayTxid, .ordinal = kOrdinalCreateNHandleVector},
+      Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_CreateNHandleVector},
       {uint32(count), padding(4)},
   };
   ASSERT_OK(client_end().write(request));
