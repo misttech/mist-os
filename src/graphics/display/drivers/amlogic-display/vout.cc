@@ -245,15 +245,24 @@ zx::result<> Vout::PowerOn() {
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
-bool Vout::CheckMode(const display_mode_t* mode) {
+bool Vout::IsDisplayModeSupported(const display_mode_t* mode) {
+  ZX_DEBUG_ASSERT(mode != nullptr);
   switch (type_) {
     case kDsi:
-      return false;
+      return true;
     case kHdmi:
-      return memcmp(&hdmi_.cur_display_mode_, mode, sizeof(display_mode_t)) &&
-             !hdmi_.hdmi_host->IsDisplayModeSupported(*mode);
+      // `cur_display_mode_` stores the most recently applied display mode,
+      // which is guaranteed to be supported. We skip the check if `mode` equals
+      // to `cur_display_mode_`.
+      // TODO(fxbug.dev/132602): This breaks the abstraction boundary between
+      // Vout and HdmiHost, the comparison should be moved to HdmiHost
+      // implementation.
+      // TODO(fxbug.dev/132603): Do not use byte-wise comparison for structs.
+      // We should replace `display_mode_t` (banjo type) with an internal type.
+      return memcmp(&hdmi_.cur_display_mode_, mode, sizeof(display_mode_t)) == 0 ||
+             hdmi_.hdmi_host->IsDisplayModeSupported(*mode);
     default:
-      return false;
+      return true;
   }
 }
 

@@ -88,7 +88,7 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
 
   void DisplayConnected();
   void DisplayDisconnected();
-  bool CheckMode(const display_mode_t* mode);
+  bool IsDisplayModeSupported(const display_mode_t* mode);
   zx::result<> ApplyConfiguration(const display_mode_t* mode);
   zx::result<> OnDisplaysChanged(added_display_info_t& info);
 

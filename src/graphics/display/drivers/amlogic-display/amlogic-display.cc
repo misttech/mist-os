@@ -441,7 +441,7 @@ config_check_result_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
     return CONFIG_CHECK_RESULT_OK;
   }
 
-  if (vout_->CheckMode(&display_configs[0]->mode)) {
+  if (!vout_->IsDisplayModeSupported(&display_configs[0]->mode)) {
     return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
   }
 
