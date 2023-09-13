@@ -330,6 +330,7 @@ sdk_molecule("host_tools") {
     "//tools/sdk-tools/fssh:fssh_sdk",
     "//src/developer/debug/zxdb:zxdb_sdk",
     "//src/developer/ffx:bin_sdk",
+    "//src/developer/ffx/plugins/audio:sdk",
     "//src/developer/ffx/plugins/assembly:sdk",
     "//src/developer/ffx/plugins/package:sdk",
     "//src/developer/ffx/plugins/product:sdk",
