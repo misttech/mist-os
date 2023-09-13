@@ -500,6 +500,13 @@ class InputSdk(object):
         """Return the manifest for this SDK."""
         return self._read_json(os.path.join('meta', 'manifest.json'))
 
+    def get_api_level(self) -> int:
+        """Return the api level for this SDK."""
+        file = os.path.join(self._directory, 'api_level')
+        self._state.add_input(source)
+        with open(file) as f:
+            return int(f.read())
+
     def get_element_meta(self, element: Path) -> ElementMeta:
         """Return the contents of the given element's manifest."""
         # 'element' is actually a path to a meta.json file, relative
@@ -814,7 +821,7 @@ def main(main_args=None):
         )
 
     if len(args.inputs
-          ) == 1 and args.inputs[0].archive and args.output_directory:
+           ) == 1 and args.inputs[0].archive and args.output_directory:
         parser.error(
             'Using a single input archive as input and an output directory is not supported!\n'
             +

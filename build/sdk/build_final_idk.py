@@ -366,14 +366,11 @@ def main():
                                    ninja_targets, env=ninja_env):
                 return 1
 
-            # Since the merge script does not understand API levels yet,
-            # ignore the results of extra API levels.
-            if api_level != 0:
-                continue
-
             for sdk_target in args.sdk_targets:
-                all_input_dirs.append(
-                    sdk_label_to_exported_dir(sdk_target, build_dir))
+                base_exported_dir = sdk_label_to_exported_dir(sdk_target, build_dir)
+                all_input_dirs.append(base_exported_dir)
+                api_level_path = base_exported_dir / 'api_level'
+                api_level_path.write_text(str(api_level))
 
     # Merge everything into the final directory (or archive).
     merge_cmd_args = [
