@@ -313,6 +313,15 @@ bool IsPixelClockSupported(int pixel_clock_khz) {
 }  // namespace
 
 bool HdmiHost::IsDisplayModeSupported(const display_mode_t& mode) const {
+  // TODO(fxbug.dev/124984): High-resolution display modes (4K or more) are not
+  // supported.
+  const int kMaximumAllowedWidth = 2560;
+  const int kMaximumAllowedHeight = 1600;
+
+  if (mode.h_addressable > kMaximumAllowedWidth || mode.v_addressable > kMaximumAllowedHeight) {
+    return false;
+  }
+
   // TODO(fxbug.dev/133248): Interlaced modes are not supported.
   if (mode.flags & MODE_FLAG_INTERLACED) {
     return false;
