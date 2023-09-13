@@ -7,154 +7,93 @@
 
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
+#include <lib/zx/time.h>
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
 #include <zircon/fidl.h>
+#include <zircon/types.h>
 
-#include <algorithm>
-#include <iostream>
 #include <utility>
 
 #include "src/tests/fidl/channel_util/bytes.h"
 
 namespace channel_util {
 
-// Non-owning handle types for channel read/write.
-using HandleDispositions = std::vector<zx_handle_disposition_t>;
-using HandleInfos = std::vector<zx_handle_info_t>;
+// A handle to send on a channel. This is like zx_handle_disposition_t but with
+// defaults for type and rights.
+struct Handle {
+  zx_handle_t handle;
+  zx_obj_type_t type = ZX_OBJ_TYPE_NONE;
+  zx_rights_t rights = ZX_RIGHT_SAME_RIGHTS;
+};
 
-// Value that can be set in the header as a placeholder when passing Bytes to
-// read_and_check_unknown_txid. When using unknown_txid mode, the txid in the
-// expected bytes is ignored; this constant can be used to document the fact
-// that the txid value used in the expected bytes is a marker for an unknown
-// value.
-static const zx_txid_t kTxidNotKnown = 0;
+// A handle we expect to receive on a channel. This is like zx_handle_info_t but
+// with defaults for type and rights, and no zx_handle_t field. Instead, you can
+// set the koid to assert on the koid of the received handle.
+struct ExpectedHandle {
+  zx_koid_t koid = ZX_KOID_INVALID;
+  zx_obj_type_t type = ZX_OBJ_TYPE_NONE;
+  zx_rights_t rights = ZX_RIGHT_SAME_RIGHTS;
+};
 
-// A value to use when constructing a header with an invalid magic number.
-static const uint8_t kBadMagicNumber = 87;
+using Handles = std::vector<Handle>;
+using ExpectedHandles = std::vector<ExpectedHandle>;
+
+// A message to write to a channel.
+struct Message {
+  Bytes bytes;
+  Handles handles = {};
+
+  // NOLINTNEXTLINE(google-explicit-constructor)
+  Message(Bytes bytes) : bytes(std::move(bytes)) {}
+  Message(Bytes bytes, Handles handles) : bytes(std::move(bytes)), handles(std::move(handles)) {}
+};
+
+// A message that is expected when reading from a channel.
+struct ExpectedMessage {
+  Bytes bytes;
+  ExpectedHandles handles = {};
+
+  // NOLINTNEXTLINE(google-explicit-constructor)
+  ExpectedMessage(Bytes bytes) : bytes(std::move(bytes)) {}
+  ExpectedMessage(Bytes bytes, ExpectedHandles handles)
+      : bytes(std::move(bytes)), handles(std::move(handles)) {}
+};
+
+// Timeout to use when waiting for a signal on a channel.
+const zx::duration kWaitTimeout = zx::sec(10);
 
 class Channel {
  public:
   Channel() = default;
-  Channel(Channel&&) = default;
-  Channel& operator=(Channel&&) = default;
-
   explicit Channel(zx::channel channel) : channel_(std::move(channel)) {}
 
-  zx_status_t write(const Bytes& bytes, const HandleDispositions& handle_dispositions = {}) {
-    ZX_ASSERT_MSG(0 == bytes.size() % FIDL_ALIGNMENT, "bytes must be 8-byte aligned");
-    return channel_.write_etc(0, bytes.data(), static_cast<uint32_t>(bytes.size()),
-                              const_cast<zx_handle_disposition_t*>(handle_dispositions.data()),
-                              static_cast<uint32_t>(handle_dispositions.size()));
-  }
+  zx_status_t write(const Message& message);
 
   zx_status_t wait_for_signal(zx_signals_t signal) {
     ZX_ASSERT_MSG(__builtin_popcount(signal) == 1, "wait_for_signal expects exactly 1 signal");
-    return channel_.wait_one(signal, zx::time::infinite(), nullptr);
+    return channel_.wait_one(signal, zx::deadline_after(kWaitTimeout), nullptr);
   }
 
   bool is_signal_present(zx_signals_t signal) {
-    ZX_ASSERT_MSG(__builtin_popcount(signal) == 1, "wait_for_signal expects exactly 1 signal");
+    ZX_ASSERT_MSG(__builtin_popcount(signal) == 1, "is_signal_present expects exactly 1 signal");
     return ZX_OK == channel_.wait_one(signal, zx::time::infinite_past(), nullptr);
   }
 
-  zx_status_t read_and_check(const Bytes& expected, const HandleInfos& expected_handles = {}) {
-    return read_and_check_impl(expected, expected_handles, /*out_unknown_txid=*/nullptr);
+  zx_status_t read_and_check(const ExpectedMessage& expected) {
+    return read_and_check_impl("read_and_check", expected, nullptr);
   }
 
-  zx_status_t read_and_check_unknown_txid(zx_txid_t* out_txid, const Bytes& expected,
-                                          const HandleInfos& expected_handles = {}) {
-    return read_and_check_impl(expected, expected_handles, out_txid);
+  zx_status_t read_and_check_unknown_txid(const ExpectedMessage& expected, zx_txid_t* out_txid) {
+    return read_and_check_impl("read_and_check_unknown_txid", expected, out_txid);
   }
 
   zx::channel& get() { return channel_; }
   void reset() { channel_.reset(); }
 
  private:
-  zx_status_t read_and_check_impl(const Bytes& expected, const HandleInfos& expected_handles,
-                                  zx_txid_t* out_unknown_txid) {
-    ZX_ASSERT_MSG(0 == expected.size() % 8, "bytes must be 8-byte aligned");
-    uint8_t bytes[ZX_CHANNEL_MAX_MSG_BYTES];
-    zx_handle_info_t handles[ZX_CHANNEL_MAX_MSG_HANDLES];
-    uint32_t actual_bytes;
-    uint32_t actual_handles;
-    zx_status_t status = channel_.read_etc(0, bytes, handles, std::size(bytes), std::size(handles),
-                                           &actual_bytes, &actual_handles);
-    if (status != ZX_OK) {
-      std::cerr << "read_and_check*: channel read() returned status code: " << status << std::endl;
-      return status;
-    }
-    if (out_unknown_txid != nullptr) {
-      // If out_unknown_txid is non-null, we need to retrieve the txid.
-      if (actual_bytes < sizeof(fidl_message_header_t)) {
-        std::cerr << "read_and_check*: message body smaller than FIDL message header" << std::endl;
-        return ZX_ERR_INVALID_ARGS;
-      }
-      fidl_message_header_t hdr;
-      memcpy(&hdr, bytes, sizeof(fidl_message_header_t));
-      *out_unknown_txid = hdr.txid;
-    }
-    if (expected_handles.size() != actual_handles) {
-      status = ZX_ERR_INVALID_ARGS;
-      std::cerr << "read_and_check*: num expected handles: " << expected_handles.size()
-                << " num actual handles: " << actual_handles << std::endl;
-      return ZX_ERR_INVALID_ARGS;
-    }
-
-    zx_status_t comparison_status = compare_bytes(expected, out_unknown_txid, actual_bytes, bytes);
-    if (comparison_status != ZX_OK) {
-      status = comparison_status;
-      std::cerr << "read_and_check*: bytes mismatch: " << comparison_status << std::endl;
-    }
-
-    for (uint32_t i = 0;
-         i < std::min(static_cast<uint32_t>(expected_handles.size()), actual_handles); i++) {
-      // Sanity checks. These should always be true for a handle sent over a channel.
-      ZX_ASSERT(ZX_HANDLE_INVALID != handles[i].handle);
-      ZX_ASSERT(0 == handles[i].unused);
-
-      // Ensure rights and object type match expectations.
-      if (expected_handles[i].rights != handles[i].rights) {
-        status = ZX_ERR_INVALID_ARGS;
-        std::cerr << std::dec << "read_and_check: handles[" << i << "].rights != expected_handles["
-                  << i << "].rights: 0x" << std::hex << expected_handles[i].rights << " != 0x"
-                  << handles[i].rights << std::endl;
-      }
-      if (expected_handles[i].type != handles[i].type) {
-        status = ZX_ERR_INVALID_ARGS;
-        std::cerr << std::dec << "read_and_check: handles[" << i << "].type != expected_handles["
-                  << i << "].type: 0x" << std::hex << expected_handles[i].type << " != 0x"
-                  << handles[i].type << std::endl;
-      }
-    }
-
-    return status;
-  }
-
-  static zx_status_t compare_bytes(const Bytes& expected, const zx_txid_t* out_unknown_txid,
-                                   uint64_t actual_bytes, const uint8_t* bytes) {
-    zx_status_t status = ZX_OK;
-    if (expected.size() != actual_bytes) {
-      status = ZX_ERR_INVALID_ARGS;
-      std::cerr << "read_and_check*: num expected bytes: " << expected.size()
-                << " num actual bytes: " << actual_bytes << std::endl;
-    }
-
-    for (uint32_t i = 0; i < std::min(static_cast<uint64_t>(expected.size()), actual_bytes); i++) {
-      constexpr uint32_t kTxidOffset = offsetof(fidl_message_header_t, txid);
-      if (out_unknown_txid != nullptr && i >= kTxidOffset &&
-          i < kTxidOffset + sizeof(fidl_message_header_t::txid)) {
-        // If out_unknown_txid is non-null, the txid value is unknown so it shouldn't be checked.
-        continue;
-      }
-      if (expected.data()[i] != bytes[i]) {
-        status = ZX_ERR_INVALID_ARGS;
-        std::cerr << std::dec << "read_and_check: bytes[" << i << "] != expected[" << i << "]: 0x"
-                  << std::hex << +bytes[i] << " != 0x" << +expected.data()[i] << std::endl;
-      }
-    }
-    return status;
-  }
+  zx_status_t read_and_check_impl(const char* log_prefix, const ExpectedMessage& expected,
+                                  zx_txid_t* out_unknown_txid);
 
   zx::channel channel_;
 };

@@ -11,7 +11,7 @@
 namespace channel_util {
 
 TEST(Bytes, Basic) {
-  Bytes b1(0x12);
+  Bytes b1 = {0x12};
   ASSERT_EQ(1u, b1.size());
   ASSERT_EQ(0x12, b1.data()[0]);
 
@@ -61,14 +61,14 @@ void test_number(Bytes (*fn)(T)) {
 }  // namespace
 
 TEST(Bytes, Numbers) {
-  test_number(u8);
-  test_number(u16);
-  test_number(u32);
-  test_number(u64);
-  test_number(i8);
-  test_number(i16);
-  test_number(i32);
-  test_number(i64);
+  test_number(uint8);
+  test_number(uint16);
+  test_number(uint32);
+  test_number(uint64);
+  test_number(int8);
+  test_number(int16);
+  test_number(int32);
+  test_number(int64);
 }
 
 TEST(Bytes, Repeat) {
@@ -89,7 +89,8 @@ TEST(Bytes, Header) {
       .magic_number = kFidlWireFormatMagicNumberInitial,
       .ordinal = 456,
   });
-  ASSERT_EQ(expected, header(123, 456, fidl::MessageDynamicFlags::kStrictMethod));
+  Bytes actual = Header{.txid = 123, .ordinal = 456};
+  ASSERT_EQ(expected, actual);
 }
 
 TEST(Bytes, UnionOrdinal) {
@@ -130,6 +131,7 @@ TEST(Bytes, HandlePresent) {
   Bytes expected = {0xff, 0xff, 0xff, 0xff};
   ASSERT_EQ(expected, handle_present());
 }
+
 TEST(Bytes, HandleAbsent) {
   Bytes expected = {0x00, 0x00, 0x00, 0x00};
   ASSERT_EQ(expected, handle_absent());
@@ -139,6 +141,7 @@ TEST(Bytes, PointerPresent) {
   Bytes expected = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
   ASSERT_EQ(expected, pointer_present());
 }
+
 TEST(Bytes, PointerAbsent) {
   Bytes expected = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
   ASSERT_EQ(expected, pointer_absent());
@@ -150,11 +153,13 @@ TEST(Bytes, OutOfLineEnvelope) {
 }
 
 TEST(Bytes, InlineEnvelope) {
+  Bytes expected = {0x55, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00};
+  ASSERT_EQ(expected, inline_envelope(uint8(0x55)));
+}
+
+TEST(Bytes, InlineEnvelopeWithHandle) {
   Bytes expected = {0xfe, 0xdc, 0xba, 0x98, 0x01, 0x00, 0x01, 0x00};
   ASSERT_EQ(expected, inline_envelope({0xfe, 0xdc, 0xba, 0x98}, true));
-
-  Bytes expected2 = {0x55, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00};
-  ASSERT_EQ(expected2, inline_envelope(u8(0x55), false));
 }
 
 }  // namespace channel_util

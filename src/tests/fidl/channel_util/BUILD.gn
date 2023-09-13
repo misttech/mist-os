@@ -8,6 +8,7 @@ source_set("channel_util") {
   testonly = true
   sources = [
     "bytes.h",
+    "channel.cc",
     "channel.h",
   ]
   public_deps = [ "//src/lib/fidl/cpp" ]

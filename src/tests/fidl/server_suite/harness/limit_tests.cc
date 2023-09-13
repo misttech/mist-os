@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fidl.serversuite/cpp/common_types.h>
+
+#include "src/lib/testing/predicates/status.h"
+#include "src/tests/fidl/channel_util/channel.h"
 #include "src/tests/fidl/server_suite/harness/harness.h"
 #include "src/tests/fidl/server_suite/harness/ordinals.h"
 
@@ -10,138 +14,109 @@ namespace {
 
 using namespace ::channel_util;
 
-constexpr uint32_t maxVecBytesInMsg =
+const uint32_t kMaxVecBytesInMsg =
     ZX_CHANNEL_MAX_MSG_BYTES - sizeof(fidl_message_header_t) - sizeof(fidl_vector_t);
-constexpr uint32_t maxVecHandlesInMsg = ZX_CHANNEL_MAX_MSG_HANDLES;
+const uint32_t kMaxVecHandlesInMsg = ZX_CHANNEL_MAX_MSG_HANDLES;
 
 // The server should accept a request with the maximum number of bytes.
 CLOSED_SERVER_TEST(RequestMatchesByteLimit) {
-  constexpr uint32_t n = maxVecBytesInMsg;
-
-  Bytes bytes_in = {
-      header(kTwoWayTxid, kOrdinalByteVectorSize, fidl::MessageDynamicFlags::kStrictMethod),
-      vector_header(n),
-      repeat(0).times(n),
-  };
-  ASSERT_OK(client_end().write(bytes_in));
-
+  uint32_t count = kMaxVecBytesInMsg;
+  Header header = {.txid = kTwoWayTxid, .ordinal = kOrdinalByteVectorSize};
+  Bytes request = {header, vector_header(count), repeat(0x00).times(count)};
+  Bytes expected_response = {header, uint32(count), padding(4)};
+  ASSERT_OK(client_end().write(request));
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTwoWayTxid, kOrdinalByteVectorSize, fidl::MessageDynamicFlags::kStrictMethod),
-      u32(n),
-      padding(4),
-  };
-  ASSERT_OK(client_end().write(bytes_out));
+  ASSERT_OK(client_end().read_and_check(expected_response));
 }
 
 // The serve should accept a request with the maximum number of handles.
 CLOSED_SERVER_TEST(RequestMatchesHandleLimit) {
-  constexpr uint32_t n = maxVecHandlesInMsg;
-
-  Bytes bytes_in = {
-      header(kTwoWayTxid, kOrdinalHandleVectorSize, fidl::MessageDynamicFlags::kStrictMethod),
-      vector_header(n),
-      repeat(0xff).times(n * sizeof(zx_handle_t)),
-  };
-  HandleDispositions handle_dispositions_in;
-  for (uint32_t i = 0; i < n; i++) {
-    zx::event ev;
-    ASSERT_OK(zx::event::create(0, &ev));
-    handle_dispositions_in.push_back(zx_handle_disposition_t{
-        .operation = ZX_HANDLE_OP_MOVE,
-        .handle = ev.release(),
-        .type = ZX_OBJ_TYPE_EVENT,
-        .rights = ZX_DEFAULT_EVENT_RIGHTS,
-    });
+  uint32_t count = kMaxVecHandlesInMsg;
+  Handles handles;
+  for (uint32_t i = 0; i < count; i++) {
+    zx::event event;
+    ASSERT_OK(zx::event::create(0, &event));
+    handles.push_back(Handle{.handle = event.release(), .type = ZX_OBJ_TYPE_EVENT});
   }
-  ASSERT_OK(client_end().write(bytes_in, handle_dispositions_in));
 
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTwoWayTxid, kOrdinalHandleVectorSize, fidl::MessageDynamicFlags::kStrictMethod),
-      u32(n),
-      padding(4),
+  Header header = {.txid = kTwoWayTxid, .ordinal = kOrdinalHandleVectorSize};
+  Message request = {
+      Bytes{
+          header,
+          vector_header(count),
+          repeat(0xff).times(count * sizeof(zx_handle_t)),
+      },
+      handles,
   };
-  ASSERT_OK(client_end().write(bytes_out));
+  ExpectedMessage expected_response = {
+      {header, uint32(count), padding(4)},
+      ExpectedHandles{},
+  };
+  ASSERT_OK(client_end().write(request));
+  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
+  ASSERT_OK(client_end().read_and_check(expected_response));
 }
 
 // The server should be able to send a response with the maximum number of bytes.
 CLOSED_SERVER_TEST(ResponseMatchesByteLimit) {
-  constexpr uint32_t n = maxVecBytesInMsg;
-
-  Bytes bytes_in = {
-      header(kTwoWayTxid, kOrdinalCreateNByteVector, fidl::MessageDynamicFlags::kStrictMethod),
-      u32(n),
-      padding(4),
-  };
-  ASSERT_OK(client_end().write(bytes_in));
-
+  uint32_t count = kMaxVecBytesInMsg;
+  Header header = {.txid = kTwoWayTxid, .ordinal = kOrdinalCreateNByteVector};
+  Bytes request = {header, uint32(count), padding(4)};
+  Bytes expected_response = {header, vector_header(count), repeat(0x00).times(count)};
+  ASSERT_OK(client_end().write(request));
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTwoWayTxid, kOrdinalCreateNByteVector, fidl::MessageDynamicFlags::kStrictMethod),
-      vector_header(n),
-      repeat(0).times(n),
-  };
-  ASSERT_OK(client_end().read_and_check(bytes_out));
+  ASSERT_OK(client_end().read_and_check(expected_response));
 }
 
 // The server should tear down when it tries to send a response with too many bytes.
 CLOSED_SERVER_TEST(ResponseExceedsByteLimit) {
-  constexpr uint32_t n = maxVecBytesInMsg + 1;
-
-  Bytes bytes_in = {
-      header(kTwoWayTxid, kOrdinalCreateNByteVector, fidl::MessageDynamicFlags::kStrictMethod),
-      u32(n),
-      padding(4),
+  uint32_t count = kMaxVecBytesInMsg + 1;
+  Bytes request = {
+      Header{.txid = kTwoWayTxid, .ordinal = kOrdinalCreateNByteVector},
+      {uint32(count), padding(4)},
   };
-  ASSERT_OK(client_end().write(bytes_in));
-
+  ASSERT_OK(client_end().write(request));
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
 }
 
 // The server should be able to send a response with the maximum number of handles.
 CLOSED_SERVER_TEST(ResponseMatchesHandleLimit) {
-  constexpr uint32_t n = maxVecHandlesInMsg;
-
-  Bytes bytes_in = {
-      header(kTwoWayTxid, kOrdinalCreateNHandleVector, fidl::MessageDynamicFlags::kStrictMethod),
-      u32(n),
-      padding(4),
-  };
-  ASSERT_OK(client_end().write(bytes_in));
-
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTwoWayTxid, kOrdinalCreateNHandleVector, fidl::MessageDynamicFlags::kStrictMethod),
-      vector_header(n),
-      repeat(0xff).times(n * sizeof(zx_handle_t)),
-  };
-  HandleInfos handle_infos_out;
-  for (uint32_t i = 0; i < n; i++) {
-    handle_infos_out.push_back(zx_handle_info_t{
+  uint32_t count = kMaxVecHandlesInMsg;
+  ExpectedHandles expected_handles;
+  for (uint32_t i = 0; i < count; i++) {
+    expected_handles.push_back(ExpectedHandle{
         .type = ZX_OBJ_TYPE_EVENT,
         .rights = ZX_DEFAULT_EVENT_RIGHTS,
     });
   }
-  ASSERT_OK(client_end().read_and_check(bytes_out, handle_infos_out));
+
+  Header header = {.txid = kTwoWayTxid, .ordinal = kOrdinalCreateNHandleVector};
+  Message request = {
+      Bytes{header, uint32(count), padding(4)},
+      Handles{},
+  };
+  ExpectedMessage expected_response = {
+      Bytes{
+          header,
+          vector_header(count),
+          repeat(0xff).times(count * sizeof(zx_handle_t)),
+      },
+      expected_handles,
+  };
+  ASSERT_OK(client_end().write(request));
+  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
+  ASSERT_OK(client_end().read_and_check(expected_response));
 }
 
 // The server should tear down when it tries to send a response with too many handles.
 CLOSED_SERVER_TEST(ResponseExceedsHandleLimit) {
-  constexpr uint32_t n = maxVecHandlesInMsg + 1;
-
-  Bytes bytes_in = {
-      header(kTwoWayTxid, kOrdinalCreateNHandleVector, fidl::MessageDynamicFlags::kStrictMethod),
-      u32(n),
-      padding(4),
+  uint32_t count = kMaxVecHandlesInMsg + 1;
+  Bytes request = {
+      Header{.txid = kTwoWayTxid, .ordinal = kOrdinalCreateNHandleVector},
+      {uint32(count), padding(4)},
   };
-  ASSERT_OK(client_end().write(bytes_in));
-
+  ASSERT_OK(client_end().write(request));
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
 }

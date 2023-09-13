@@ -20,129 +20,89 @@ CLIENT_TEST(Setup) {}
 
 // The client should call a two-way method and receive the empty response.
 CLIENT_TEST(TwoWayNoPayload) {
+  Bytes bytes = Header{.txid = kTxidNotKnown, .ordinal = kOrdinalTwoWayNoPayload};
   runner()->CallTwoWayNoPayload({{.target = TakeClosedClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().success().has_value());
   });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalTwoWayNoPayload, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalTwoWayNoPayload, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(bytes, &bytes.txid()));
+  ASSERT_NE(bytes.txid(), 0u);
+  ASSERT_OK(server_end().write(bytes));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a two-way method and receive the struct response.
 CLIENT_TEST(TwoWayStructPayload) {
-  static const fidl_clientsuite::NonEmptyPayload kPayload{{.some_field = 42}};
-
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalTwoWayStructPayload};
+  fidl_clientsuite::NonEmptyPayload payload = {{.some_field = 42}};
+  Bytes expected_request = header;
+  Bytes response = {header, encode(payload)};
   runner()
       ->CallTwoWayStructPayload({{.target = TakeClosedClient()}})
-      .ThenExactlyOnce(
-          [&](fidl::Result<fidl_clientsuite::Runner::CallTwoWayStructPayload>& result) {
-            MarkCallbackRun();
-            ASSERT_TRUE(result.is_ok()) << result.error_value();
-            ASSERT_TRUE(result.value().success().has_value());
-            ASSERT_EQ(result.value().success().value(), kPayload);
-          });
-
+      .ThenExactlyOnce([&](auto result) {
+        MarkCallbackRun();
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result.value().success().has_value());
+        ASSERT_EQ(result.value().success().value(), payload);
+      });
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalTwoWayStructPayload, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalTwoWayStructPayload, fidl::MessageDynamicFlags::kStrictMethod),
-      i32(42),
-      padding(4),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a two-way method and receive the table response.
 CLIENT_TEST(TwoWayTablePayload) {
-  static const fidl_clientsuite::TablePayload kPayload{{.some_field = 42}};
-
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalTwoWayTablePayload};
+  fidl_clientsuite::TablePayload payload = {{.some_field = 42}};
+  Bytes expected_request = header;
+  Bytes response = {header, encode(payload)};
   runner()
       ->CallTwoWayTablePayload({{.target = TakeClosedClient()}})
-      .ThenExactlyOnce([&](fidl::Result<fidl_clientsuite::Runner::CallTwoWayTablePayload>& result) {
+      .ThenExactlyOnce([&](auto result) {
         MarkCallbackRun();
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result.value().success().has_value());
-        ASSERT_EQ(result.value().success().value(), kPayload);
+        ASSERT_EQ(result.value().success().value(), payload);
       });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalTwoWayTablePayload, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalTwoWayTablePayload, fidl::MessageDynamicFlags::kStrictMethod),
-      encode(kPayload),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a two-way method and receive the union response.
 CLIENT_TEST(TwoWayUnionPayload) {
-  static const fidl_clientsuite::UnionPayload kPayload =
-      fidl_clientsuite::UnionPayload::WithSomeVariant(320494);
-
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalTwoWayUnionPayload};
+  fidl_clientsuite::UnionPayload payload = fidl_clientsuite::UnionPayload::WithSomeVariant(320494);
+  Bytes expected_request = header;
+  Bytes response = {header, encode(payload)};
   runner()
       ->CallTwoWayUnionPayload({{.target = TakeClosedClient()}})
-      .ThenExactlyOnce([&](fidl::Result<fidl_clientsuite::Runner::CallTwoWayUnionPayload>& result) {
+      .ThenExactlyOnce([&](auto result) {
         MarkCallbackRun();
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result.value().success().has_value());
-        ASSERT_EQ(result.value().success().value(), kPayload);
+        ASSERT_EQ(result.value().success().value(), payload);
       });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalTwoWayUnionPayload, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalTwoWayUnionPayload, fidl::MessageDynamicFlags::kStrictMethod),
-      encode(kPayload),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a fallible two-way method and receive the success response.
 CLIENT_TEST(TwoWayResultWithPayload) {
-  static const fidl_clientsuite::NonEmptyPayload kPayload{{.some_field = 390023}};
-
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalTwoWayStructPayloadErr};
+  int32_t field = 390023;
+  fidl_clientsuite::NonEmptyPayload payload = {{.some_field = field}};
+  Bytes expected_request = header;
+  Bytes response = {header, union_ordinal(kResultUnionSuccess), inline_envelope(int32(field))};
   runner()
       ->CallTwoWayStructPayloadErr({{.target = TakeClosedClient()}})
       .ThenExactlyOnce(
@@ -150,33 +110,21 @@ CLIENT_TEST(TwoWayResultWithPayload) {
             MarkCallbackRun();
             ASSERT_TRUE(result.is_ok()) << result.error_value();
             ASSERT_TRUE(result.value().success().has_value());
-            ASSERT_EQ(result.value().success().value(), kPayload);
+            ASSERT_EQ(result.value().success().value(), payload);
           });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalTwoWayStructPayloadErr,
-             fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalTwoWayStructPayloadErr, fidl::MessageDynamicFlags::kStrictMethod),
-      union_ordinal(kResultUnionSuccess),
-      inline_envelope({i32(kPayload.some_field())}, false),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a fallible two-way method and receive the error response.
 CLIENT_TEST(TwoWayResultWithError) {
-  static const int32_t kError = 90240;
-
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalTwoWayStructPayloadErr};
+  int32_t error = 90240;
+  Bytes expected_request = header;
+  Bytes response = {header, union_ordinal(kResultUnionDomainError), inline_envelope(int32(error))};
   runner()
       ->CallTwoWayStructPayloadErr({{.target = TakeClosedClient()}})
       .ThenExactlyOnce(
@@ -184,305 +132,220 @@ CLIENT_TEST(TwoWayResultWithError) {
             MarkCallbackRun();
             ASSERT_TRUE(result.is_ok()) << result.error_value();
             ASSERT_TRUE(result.value().application_error().has_value());
-            ASSERT_EQ(result.value().application_error().value(), kError);
+            ASSERT_EQ(result.value().application_error().value(), error);
           });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalTwoWayStructPayloadErr,
-             fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalTwoWayStructPayloadErr, fidl::MessageDynamicFlags::kStrictMethod),
-      union_ordinal(kResultUnionError),
-      inline_envelope({i32(kError)}, false),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a two-way method with a struct request and receive the response.
 CLIENT_TEST(TwoWayStructRequest) {
-  static const fidl_clientsuite::NonEmptyPayload kRequest{{.some_field = 390023}};
-
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalTwoWayStructRequest};
+  fidl_clientsuite::NonEmptyPayload payload = {{.some_field = 390023}};
+  Bytes expected_request = {header, encode(payload)};
+  Bytes response = header;
   runner()
-      ->CallTwoWayStructRequest({{.target = TakeClosedClient(), .request = kRequest}})
+      ->CallTwoWayStructRequest({{.target = TakeClosedClient(), .request = payload}})
       .ThenExactlyOnce(
           [&](fidl::Result<fidl_clientsuite::Runner::CallTwoWayStructRequest>& result) {
             MarkCallbackRun();
             ASSERT_TRUE(result.is_ok()) << result.error_value();
-            ASSERT_EQ(fidl_clientsuite::EmptyResultClassification::WithSuccess({}), result.value());
+            ASSERT_EQ(result.value(), fidl_clientsuite::EmptyResultClassification::WithSuccess({}));
           });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalTwoWayStructRequest, fidl::MessageDynamicFlags::kStrictMethod),
-      encode(kRequest),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalTwoWayStructRequest, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a two-way method with a table request and receive the response.
 CLIENT_TEST(TwoWayTableRequest) {
-  static const fidl_clientsuite::TablePayload kRequest{{.some_field = 390023}};
-
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalTwoWayTableRequest};
+  fidl_clientsuite::TablePayload payload = {{.some_field = 390023}};
+  Bytes expected_request = {header, encode(payload)};
+  Bytes response = header;
   runner()
-      ->CallTwoWayTableRequest({{.target = TakeClosedClient(), .request = kRequest}})
-      .ThenExactlyOnce([&](fidl::Result<fidl_clientsuite::Runner::CallTwoWayTableRequest>& result) {
+      ->CallTwoWayTableRequest({{.target = TakeClosedClient(), .request = payload}})
+      .ThenExactlyOnce([&](auto result) {
         MarkCallbackRun();
         ASSERT_TRUE(result.is_ok()) << result.error_value();
-        ASSERT_EQ(fidl_clientsuite::EmptyResultClassification::WithSuccess({}), result.value());
+        ASSERT_EQ(result.value(), fidl_clientsuite::EmptyResultClassification::WithSuccess({}));
       });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(0, kOrdinalTwoWayTableRequest, fidl::MessageDynamicFlags::kStrictMethod),
-      encode(kRequest),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalTwoWayTableRequest, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a two-way method with a union request and receive the response.
 CLIENT_TEST(TwoWayUnionRequest) {
-  static const fidl_clientsuite::UnionPayload kRequest =
-      fidl_clientsuite::UnionPayload::WithSomeVariant(390023);
-
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalTwoWayUnionRequest};
+  fidl_clientsuite::UnionPayload payload = fidl_clientsuite::UnionPayload::WithSomeVariant(390023);
+  Bytes expected_request = {header, encode(payload)};
+  Bytes response = header;
   runner()
-      ->CallTwoWayUnionRequest({{.target = TakeClosedClient(), .request = kRequest}})
-      .ThenExactlyOnce([&](fidl::Result<fidl_clientsuite::Runner::CallTwoWayUnionRequest>& result) {
+      ->CallTwoWayUnionRequest({{.target = TakeClosedClient(), .request = payload}})
+      .ThenExactlyOnce([&](auto result) {
         MarkCallbackRun();
         ASSERT_TRUE(result.is_ok()) << result.error_value();
-        ASSERT_EQ(fidl_clientsuite::EmptyResultClassification::WithSuccess({}), result.value());
+        ASSERT_EQ(result.value(), fidl_clientsuite::EmptyResultClassification::WithSuccess({}));
       });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(0, kOrdinalTwoWayUnionRequest, fidl::MessageDynamicFlags::kStrictMethod),
-      encode(kRequest),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalTwoWayUnionRequest, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a one-way method with an empty request.
 CLIENT_TEST(OneWayNoRequest) {
-  runner()
-      ->CallOneWayNoRequest({{.target = TakeClosedClient()}})
-      .ThenExactlyOnce([&](fidl::Result<fidl_clientsuite::Runner::CallOneWayNoRequest>& result) {
-        MarkCallbackRun();
-        ASSERT_TRUE(result.is_ok()) << result.error_value();
-        ASSERT_EQ(fidl_clientsuite::EmptyResultClassification::WithSuccess({}), result.value());
-      });
-
+  Bytes expected_request = Header{.txid = 0, .ordinal = kOrdinalOneWayNoRequest};
+  runner()->CallOneWayNoRequest({{.target = TakeClosedClient()}}).ThenExactlyOnce([&](auto result) {
+    MarkCallbackRun();
+    ASSERT_TRUE(result.is_ok()) << result.error_value();
+    ASSERT_EQ(result.value(), fidl_clientsuite::EmptyResultClassification::WithSuccess({}));
+  });
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(0, kOrdinalOneWayNoRequest, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  ASSERT_OK(server_end().read_and_check(bytes_out));
-
+  ASSERT_OK(server_end().read_and_check(expected_request));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a one-way method with a struct request.
 CLIENT_TEST(OneWayStructRequest) {
-  static const fidl_clientsuite::NonEmptyPayload kRequest{{.some_field = 390023}};
-
+  fidl_clientsuite::NonEmptyPayload payload = {{.some_field = 390023}};
+  Bytes expected_request = {
+      Header{.txid = 0, .ordinal = kOrdinalOneWayStructRequest},
+      encode(payload),
+  };
   runner()
-      ->CallOneWayStructRequest({{.target = TakeClosedClient(), .request = kRequest}})
+      ->CallOneWayStructRequest({{.target = TakeClosedClient(), .request = payload}})
       .ThenExactlyOnce(
           [&](fidl::Result<fidl_clientsuite::Runner::CallOneWayStructRequest>& result) {
             MarkCallbackRun();
             ASSERT_TRUE(result.is_ok()) << result.error_value();
-            ASSERT_EQ(fidl_clientsuite::EmptyResultClassification::WithSuccess({}), result.value());
+            ASSERT_EQ(result.value(), fidl_clientsuite::EmptyResultClassification::WithSuccess({}));
           });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(0, kOrdinalOneWayStructRequest, fidl::MessageDynamicFlags::kStrictMethod),
-      encode(kRequest),
-  };
-  ASSERT_OK(server_end().read_and_check(bytes_out));
-
+  ASSERT_OK(server_end().read_and_check(expected_request));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a one-way method with a table request.
 CLIENT_TEST(OneWayTableRequest) {
-  static const fidl_clientsuite::TablePayload kRequest{{.some_field = 390023}};
-
+  fidl_clientsuite::TablePayload payload = {{.some_field = 390023}};
+  Bytes expected_request = {
+      Header{.txid = 0, .ordinal = kOrdinalOneWayTableRequest},
+      encode(payload),
+  };
   runner()
-      ->CallOneWayTableRequest({{.target = TakeClosedClient(), .request = kRequest}})
-      .ThenExactlyOnce([&](fidl::Result<fidl_clientsuite::Runner::CallOneWayTableRequest>& result) {
+      ->CallOneWayTableRequest({{.target = TakeClosedClient(), .request = payload}})
+      .ThenExactlyOnce([&](auto result) {
         MarkCallbackRun();
         ASSERT_TRUE(result.is_ok()) << result.error_value();
-        ASSERT_EQ(fidl_clientsuite::EmptyResultClassification::WithSuccess({}), result.value());
+        ASSERT_EQ(result.value(), fidl_clientsuite::EmptyResultClassification::WithSuccess({}));
       });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(0, kOrdinalOneWayTableRequest, fidl::MessageDynamicFlags::kStrictMethod),
-      encode(kRequest),
-  };
-  ASSERT_OK(server_end().read_and_check(bytes_out));
-
+  ASSERT_OK(server_end().read_and_check(expected_request));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a one-way method with a union request.
 CLIENT_TEST(OneWayUnionRequest) {
-  static const fidl_clientsuite::UnionPayload kRequest =
-      fidl_clientsuite::UnionPayload::WithSomeVariant(390023);
-
+  fidl_clientsuite::UnionPayload payload = fidl_clientsuite::UnionPayload::WithSomeVariant(390023);
+  Bytes expected_request = {
+      Header{.txid = 0, .ordinal = kOrdinalOneWayUnionRequest},
+      encode(payload),
+  };
   runner()
-      ->CallOneWayUnionRequest({{.target = TakeClosedClient(), .request = kRequest}})
-      .ThenExactlyOnce([&](fidl::Result<fidl_clientsuite::Runner::CallOneWayUnionRequest>& result) {
+      ->CallOneWayUnionRequest({{.target = TakeClosedClient(), .request = payload}})
+      .ThenExactlyOnce([&](auto result) {
         MarkCallbackRun();
         ASSERT_TRUE(result.is_ok()) << result.error_value();
-        ASSERT_EQ(fidl_clientsuite::EmptyResultClassification::WithSuccess({}), result.value());
+        ASSERT_EQ(result.value(), fidl_clientsuite::EmptyResultClassification::WithSuccess({}));
       });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(0, kOrdinalOneWayUnionRequest, fidl::MessageDynamicFlags::kStrictMethod),
-      encode(kRequest),
-  };
-  ASSERT_OK(server_end().read_and_check(bytes_out));
-
+  ASSERT_OK(server_end().read_and_check(expected_request));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should receive an event with no payload.
 CLIENT_TEST(ReceiveEventNoPayload) {
+  Bytes event = Header{.txid = kOneWayTxid, .ordinal = kOrdinalOnEventNoPayload};
   auto reporter = ReceiveClosedEvents();
-  ASSERT_NE(nullptr, reporter);
-
-  Bytes bytes_in = {
-      header(kOneWayTxid, kOrdinalOnEventNoPayload, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_NE(reporter, nullptr);
+  ASSERT_OK(server_end().write(event));
   WAIT_UNTIL([reporter]() { return reporter->NumReceivedEvents(); });
-
-  ASSERT_EQ(1u, reporter->NumReceivedEvents());
-  auto event = reporter->TakeNextEvent();
-  ASSERT_TRUE(event.on_event_no_payload().has_value());
+  ASSERT_EQ(reporter->NumReceivedEvents(), 1u);
+  auto reporter_event = reporter->TakeNextEvent();
+  ASSERT_TRUE(reporter_event.on_event_no_payload().has_value());
 }
 
 // The client should receive an event with a struct.
 CLIENT_TEST(ReceiveEventStructPayload) {
-  static const fidl_clientsuite::NonEmptyPayload kRequest{{.some_field = 9098607}};
-
-  auto reporter = ReceiveClosedEvents();
-  ASSERT_NE(nullptr, reporter);
-
+  fidl_clientsuite::NonEmptyPayload payload = {{.some_field = 9098607}};
   Bytes bytes_in = {
-      header(kOneWayTxid, kOrdinalOnEventStructPayload, fidl::MessageDynamicFlags::kStrictMethod),
-      encode(kRequest),
+      Header{.txid = kOneWayTxid, .ordinal = kOrdinalOnEventStructPayload},
+      encode(payload),
   };
+  auto reporter = ReceiveClosedEvents();
+  ASSERT_NE(reporter, nullptr);
   ASSERT_OK(server_end().write(bytes_in));
-
   WAIT_UNTIL([reporter]() { return reporter->NumReceivedEvents(); });
-
-  ASSERT_EQ(1u, reporter->NumReceivedEvents());
-  auto event = reporter->TakeNextEvent();
-  ASSERT_TRUE(event.on_event_struct_payload().has_value());
-  EXPECT_EQ(kRequest, event.on_event_struct_payload().value());
+  ASSERT_EQ(reporter->NumReceivedEvents(), 1u);
+  auto reporter_event = reporter->TakeNextEvent();
+  ASSERT_TRUE(reporter_event.on_event_struct_payload().has_value());
+  EXPECT_EQ(reporter_event.on_event_struct_payload().value(), payload);
 }
 
 // The client should receive an event with a table.
 CLIENT_TEST(ReceiveEventTablePayload) {
-  static const fidl_clientsuite::TablePayload kRequest{{.some_field = 9098607}};
-
-  auto reporter = ReceiveClosedEvents();
-  ASSERT_NE(nullptr, reporter);
-
-  Bytes bytes_in = {
-      header(kOneWayTxid, kOrdinalOnEventTablePayload, fidl::MessageDynamicFlags::kStrictMethod),
-      encode(kRequest),
+  fidl_clientsuite::TablePayload payload = {{.some_field = 9098607}};
+  Bytes event = {
+      Header{.txid = kOneWayTxid, .ordinal = kOrdinalOnEventTablePayload},
+      encode(payload),
   };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  auto reporter = ReceiveClosedEvents();
+  ASSERT_NE(reporter, nullptr);
+  ASSERT_OK(server_end().write(event));
   WAIT_UNTIL([reporter]() { return reporter->NumReceivedEvents(); });
-
-  ASSERT_EQ(1u, reporter->NumReceivedEvents());
-  auto event = reporter->TakeNextEvent();
-  ASSERT_TRUE(event.on_event_table_payload().has_value());
-  EXPECT_EQ(kRequest, event.on_event_table_payload().value());
+  ASSERT_EQ(reporter->NumReceivedEvents(), 1u);
+  auto reporter_event = reporter->TakeNextEvent();
+  ASSERT_TRUE(reporter_event.on_event_table_payload().has_value());
+  EXPECT_EQ(reporter_event.on_event_table_payload().value(), payload);
 }
 
 // The client should receive an event with a union.
 CLIENT_TEST(ReceiveEventUnionPayload) {
-  static const fidl_clientsuite::UnionPayload kRequest =
-      fidl_clientsuite::UnionPayload::WithSomeVariant(87662);
-
-  auto reporter = ReceiveClosedEvents();
-  ASSERT_NE(nullptr, reporter);
-
-  Bytes bytes_in = {
-      header(kOneWayTxid, kOrdinalOnEventUnionPayload, fidl::MessageDynamicFlags::kStrictMethod),
-      encode(kRequest),
+  fidl_clientsuite::UnionPayload payload = fidl_clientsuite::UnionPayload::WithSomeVariant(87662);
+  Bytes event = {
+      Header{.txid = kOneWayTxid, .ordinal = kOrdinalOnEventUnionPayload},
+      encode(payload),
   };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  auto reporter = ReceiveClosedEvents();
+  ASSERT_NE(reporter, nullptr);
+  ASSERT_OK(server_end().write(event));
   WAIT_UNTIL([reporter]() { return reporter->NumReceivedEvents(); });
-
-  ASSERT_EQ(1u, reporter->NumReceivedEvents());
-  auto event = reporter->TakeNextEvent();
-  ASSERT_TRUE(event.on_event_union_payload().has_value());
-  EXPECT_EQ(kRequest, event.on_event_union_payload().value());
+  ASSERT_EQ(reporter->NumReceivedEvents(), 1u);
+  auto reporter_event = reporter->TakeNextEvent();
+  ASSERT_TRUE(reporter_event.on_event_union_payload().has_value());
+  EXPECT_EQ(reporter_event.on_event_union_payload().value(), payload);
 }
 
 // The client should fail to call a two-way method after the server closes the channel.
 CLIENT_TEST(GracefulFailureDuringCallAfterPeerClose) {
   server_end().get().reset();
-
   runner()->CallTwoWayNoPayload({{.target = TakeClosedClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().fidl_error().has_value());
-    ASSERT_EQ(fidl_clientsuite::FidlErrorKind::kChannelPeerClosed,
-              result.value().fidl_error().value());
+    ASSERT_EQ(result.value().fidl_error().value(),
+              fidl_clientsuite::FidlErrorKind::kChannelPeerClosed);
   });
-
   WAIT_UNTIL_CALLBACK_RUN();
 }
 

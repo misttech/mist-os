@@ -5,8 +5,7 @@
 #include <fidl/fidl.clientsuite/cpp/common_types.h>
 #include <fidl/fidl.clientsuite/cpp/natural_types.h>
 
-#include <memory>
-
+#include "src/tests/fidl/channel_util/bytes.h"
 #include "src/tests/fidl/client_suite/harness/harness.h"
 #include "src/tests/fidl/client_suite/harness/ordinals.h"
 
@@ -17,348 +16,275 @@ using namespace ::channel_util;
 
 // The client should call a strict one-way method.
 CLIENT_TEST(OneWayStrictSend) {
+  Bytes expected_request = Header{.txid = kOneWayTxid, .ordinal = kOrdinalStrictOneWay};
   runner()->CallStrictOneWay({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().success().has_value());
   });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kOneWayTxid, kOrdinalStrictOneWay, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  ASSERT_OK(server_end().read_and_check(bytes_out));
-
+  ASSERT_OK(server_end().read_and_check(expected_request));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a flexible one-way method.
 CLIENT_TEST(OneWayFlexibleSend) {
+  Bytes expected_request = Header{
+      .txid = kOneWayTxid,
+      .dynamic_flags = kDynamicFlagsFlexible,
+      .ordinal = kOrdinalFlexibleOneWay,
+  };
   runner()->CallFlexibleOneWay({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().success().has_value());
   });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kOneWayTxid, kOrdinalFlexibleOneWay, fidl::MessageDynamicFlags::kFlexibleMethod),
-  };
-  ASSERT_OK(server_end().read_and_check(bytes_out));
-
+  ASSERT_OK(server_end().read_and_check(expected_request));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a strict two-way method and receive the response.
 CLIENT_TEST(TwoWayStrictSend) {
+  Bytes bytes = Header{.txid = kTxidNotKnown, .ordinal = kOrdinalStrictTwoWay};
   runner()->CallStrictTwoWay({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().success().has_value());
   });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalStrictTwoWay, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalStrictTwoWay, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(bytes, &bytes.txid()));
+  ASSERT_NE(bytes.txid(), 0u);
+  ASSERT_OK(server_end().write(bytes));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a strict two-way method and receive the response,
 // despite the schema (strict) not matching the response's dynamic flags (flexible).
 CLIENT_TEST(TwoWayStrictSendMismatchedStrictness) {
+  Bytes expected_request = Header{
+      .txid = kTxidNotKnown,
+      .ordinal = kOrdinalStrictTwoWay,
+  };
+  Bytes response = Header{
+      .txid = kTxidNotKnown,
+      .dynamic_flags = kDynamicFlagsFlexible,
+      .ordinal = kOrdinalStrictTwoWay,
+  };
   runner()->CallStrictTwoWay({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().success().has_value());
   });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalStrictTwoWay, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalStrictTwoWay, fidl::MessageDynamicFlags::kFlexibleMethod),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a strict two-way method and receive the nonempty response.
 CLIENT_TEST(TwoWayStrictSendNonEmptyPayload) {
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalStrictTwoWayFields};
+  fidl_clientsuite::NonEmptyPayload payload = {{.some_field = 541768}};
+  Bytes expected_request = header;
+  Bytes response = {header, encode(payload)};
   runner()
       ->CallStrictTwoWayFields({{.target = TakeOpenClient()}})
       .ThenExactlyOnce([&](auto result) {
         MarkCallbackRun();
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result.value().success().has_value());
-        ASSERT_EQ(fidl_clientsuite::NonEmptyPayload(541768), result.value().success().value());
+        ASSERT_EQ(result.value().success().value(), payload);
       });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalStrictTwoWayFields, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalStrictTwoWayFields, fidl::MessageDynamicFlags::kStrictMethod),
-      encode(fidl_clientsuite::NonEmptyPayload(541768)),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a strict fallible two-way method and receive the success response.
 CLIENT_TEST(TwoWayStrictErrorSyntaxSendSuccessResponse) {
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalStrictTwoWayErr};
+  Bytes expected_request = header;
+  Bytes response = {header, union_ordinal(kResultUnionSuccess), inline_envelope({0x00})};
   runner()->CallStrictTwoWayErr({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().success().has_value());
   });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalStrictTwoWayErr, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalStrictTwoWayErr, fidl::MessageDynamicFlags::kStrictMethod),
-      union_ordinal(kResultUnionSuccess),
-      inline_envelope({padding(4)}, false),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a strict fallible two-way method and receive the error response.
 CLIENT_TEST(TwoWayStrictErrorSyntaxSendErrorResponse) {
-  static constexpr int32_t kApplicationError = 39243320;
-
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalStrictTwoWayErr};
+  int32_t error = 39243320;
+  Bytes expected_request = header;
+  Bytes response = {header, union_ordinal(kResultUnionDomainError), inline_envelope(int32(error))};
   runner()->CallStrictTwoWayErr({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().application_error().has_value());
-    ASSERT_EQ(kApplicationError, result.value().application_error().value());
+    ASSERT_EQ(result.value().application_error().value(), error);
   });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalStrictTwoWayErr, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalStrictTwoWayErr, fidl::MessageDynamicFlags::kStrictMethod),
-      union_ordinal(kResultUnionError),
-      inline_envelope({i32(kApplicationError)}, false),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should tear down when it calls a strict fallible two-way method and
 // receives an "unknown method" response (with strict dynamic flag).
 CLIENT_TEST(TwoWayStrictErrorSyntaxSendUnknownMethodResponse) {
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalStrictTwoWayErr};
+  Bytes expected_request = header;
+  Bytes response = {
+      header,
+      union_ordinal(kResultUnionFrameworkError),
+      inline_envelope(int32(ZX_ERR_NOT_SUPPORTED)),
+  };
   runner()->CallStrictTwoWayErr({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().fidl_error().has_value());
-    ASSERT_EQ(fidl_clientsuite::FidlErrorKind::kDecodingError, result.value().fidl_error().value());
+    ASSERT_EQ(result.value().fidl_error().value(), fidl_clientsuite::FidlErrorKind::kDecodingError);
   });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalStrictTwoWayErr, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalStrictTwoWayErr, fidl::MessageDynamicFlags::kStrictMethod),
-      union_ordinal(kResultUnionTransportError),
-      inline_envelope({i32(ZX_ERR_NOT_SUPPORTED)}, false),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should tear down when it calls a strict fallible two-way method
 // and receives an "unknown method" response (with flexible dynamic flag).
 CLIENT_TEST(TwoWayStrictErrorSyntaxSendMismatchedStrictnessUnknownMethodResponse) {
+  Bytes expected_request = Header{
+      .txid = kTxidNotKnown,
+      .ordinal = kOrdinalStrictTwoWayErr,
+  };
+  Bytes response = {
+      Header{
+          .txid = kTxidNotKnown,
+          .dynamic_flags = kDynamicFlagsFlexible,
+          .ordinal = kOrdinalStrictTwoWayErr,
+      },
+      union_ordinal(kResultUnionFrameworkError),
+      inline_envelope(int32(ZX_ERR_NOT_SUPPORTED)),
+  };
   runner()->CallStrictTwoWayErr({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().fidl_error().has_value());
-    ASSERT_EQ(fidl_clientsuite::FidlErrorKind::kDecodingError, result.value().fidl_error().value());
+    ASSERT_EQ(result.value().fidl_error().value(), fidl_clientsuite::FidlErrorKind::kDecodingError);
   });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalStrictTwoWayErr, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalStrictTwoWayErr, fidl::MessageDynamicFlags::kFlexibleMethod),
-      union_ordinal(kResultUnionTransportError),
-      inline_envelope({i32(ZX_ERR_NOT_SUPPORTED)}, false),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a strict fallible two-way method and receive the
 // nonempty success response.
 CLIENT_TEST(TwoWayStrictErrorSyntaxSendNonEmptyPayload) {
+  Header header = {.txid = kTxidNotKnown, .ordinal = kOrdinalStrictTwoWayFieldsErr};
+  fidl_clientsuite::NonEmptyPayload payload = {{.some_field = 394966}};
+  Bytes expected_request = header;
+  Bytes response = {header, union_ordinal(kResultUnionSuccess), inline_envelope(int32(394966))};
   runner()
       ->CallStrictTwoWayFieldsErr({{.target = TakeOpenClient()}})
       .ThenExactlyOnce([&](auto result) {
         MarkCallbackRun();
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result.value().success().has_value());
-        ASSERT_EQ(fidl_clientsuite::NonEmptyPayload(394966), result.value().success().value());
+        ASSERT_EQ(result.value().success().value(), payload);
       });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalStrictTwoWayFieldsErr,
-             fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalStrictTwoWayFieldsErr, fidl::MessageDynamicFlags::kStrictMethod),
-      union_ordinal(kResultUnionSuccess),
-      inline_envelope({i32(394966)}, false),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a flexible two-way method and receive the empty response.
 CLIENT_TEST(TwoWayFlexibleSendSuccessResponse) {
+  Header header = {
+      .txid = kTxidNotKnown,
+      .dynamic_flags = kDynamicFlagsFlexible,
+      .ordinal = kOrdinalFlexibleTwoWay,
+  };
+  Bytes expected_request = header;
+  Bytes response = {header, union_ordinal(kResultUnionSuccess), inline_envelope({0x00})};
   runner()->CallFlexibleTwoWay({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().success().has_value());
   });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalFlexibleTwoWay, fidl::MessageDynamicFlags::kFlexibleMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalFlexibleTwoWay, fidl::MessageDynamicFlags::kFlexibleMethod),
-      union_ordinal(kResultUnionSuccess),
-      inline_envelope({padding(4)}, false),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should tear down when it calls a flexible two-way method and receives
 // a domain error response, which is invalid for a method without error syntax.
 CLIENT_TEST(TwoWayFlexibleSendErrorResponse) {
+  Header header = {
+      .txid = kTxidNotKnown,
+      .dynamic_flags = kDynamicFlagsFlexible,
+      .ordinal = kOrdinalFlexibleTwoWay,
+  };
+  Bytes expected_request = header;
+  Bytes response = {
+      header,
+      union_ordinal(kResultUnionDomainError),
+      inline_envelope(int32(39205950)),
+  };
   runner()->CallFlexibleTwoWay({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().fidl_error().has_value());
-    ASSERT_EQ(fidl_clientsuite::FidlErrorKind::kDecodingError, result.value().fidl_error().value());
+    ASSERT_EQ(result.value().fidl_error().value(), fidl_clientsuite::FidlErrorKind::kDecodingError);
   });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalFlexibleTwoWay, fidl::MessageDynamicFlags::kFlexibleMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalFlexibleTwoWay, fidl::MessageDynamicFlags::kFlexibleMethod),
-      union_ordinal(kResultUnionError),
-      inline_envelope({i32(39205950)}, false),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a flexible two-way method and accept the "unknown method" response.
 CLIENT_TEST(TwoWayFlexibleSendUnknownMethodResponse) {
+  Header header = {
+      .txid = kTxidNotKnown,
+      .dynamic_flags = kDynamicFlagsFlexible,
+      .ordinal = kOrdinalFlexibleTwoWay,
+  };
+  Bytes expected_request = header;
+  Bytes response = {
+      header,
+      union_ordinal(kResultUnionFrameworkError),
+      inline_envelope(int32(ZX_ERR_NOT_SUPPORTED)),
+  };
   runner()->CallFlexibleTwoWay({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().fidl_error().has_value());
-    ASSERT_EQ(fidl_clientsuite::FidlErrorKind::kUnknownMethod, result.value().fidl_error().value());
+    ASSERT_EQ(result.value().fidl_error().value(), fidl_clientsuite::FidlErrorKind::kUnknownMethod);
   });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalFlexibleTwoWay, fidl::MessageDynamicFlags::kFlexibleMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalFlexibleTwoWay, fidl::MessageDynamicFlags::kFlexibleMethod),
-      union_ordinal(kResultUnionTransportError),
-      inline_envelope({i32(ZX_ERR_NOT_SUPPORTED)}, false),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
@@ -367,210 +293,179 @@ CLIENT_TEST(TwoWayFlexibleSendUnknownMethodResponse) {
 // > The client should tear down when it calls a flexible two-way method and
 // > receives an "unknown method" response (with strict dynamic flag).
 CLIENT_TEST(TwoWayFlexibleSendMismatchedStrictnessUnknownMethodResponse) {
+  Bytes expected_request = Header{
+      .txid = kTxidNotKnown,
+      .dynamic_flags = kDynamicFlagsFlexible,
+      .ordinal = kOrdinalFlexibleTwoWay,
+  };
+  Bytes response = {
+      Header{.txid = kTxidNotKnown, .ordinal = kOrdinalFlexibleTwoWay},
+      union_ordinal(kResultUnionFrameworkError),
+      inline_envelope(int32(ZX_ERR_NOT_SUPPORTED)),
+  };
   runner()->CallFlexibleTwoWay({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().fidl_error().has_value());
-    ASSERT_EQ(fidl_clientsuite::FidlErrorKind::kUnknownMethod, result.value().fidl_error().value());
+    ASSERT_EQ(result.value().fidl_error().value(), fidl_clientsuite::FidlErrorKind::kUnknownMethod);
   });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalFlexibleTwoWay, fidl::MessageDynamicFlags::kFlexibleMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalFlexibleTwoWay, fidl::MessageDynamicFlags::kStrictMethod),
-      union_ordinal(kResultUnionTransportError),
-      inline_envelope({i32(ZX_ERR_NOT_SUPPORTED)}, false),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should tear down when it calls a flexible two-way method and
 // receives a framework error response other than "unsupported method".
 CLIENT_TEST(TwoWayFlexibleSendOtherTransportErrResponse) {
+  Header header = {
+      .txid = kTxidNotKnown,
+      .dynamic_flags = kDynamicFlagsFlexible,
+      .ordinal = kOrdinalFlexibleTwoWay,
+  };
+  Bytes expected_request = header;
+  Bytes response = {
+      header,
+      union_ordinal(kResultUnionFrameworkError),
+      inline_envelope(int32(ZX_ERR_ACCESS_DENIED)),
+  };
   runner()->CallFlexibleTwoWay({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().fidl_error().has_value());
-    ASSERT_EQ(fidl_clientsuite::FidlErrorKind::kDecodingError, result.value().fidl_error().value());
+    ASSERT_EQ(result.value().fidl_error().value(), fidl_clientsuite::FidlErrorKind::kDecodingError);
   });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalFlexibleTwoWay, fidl::MessageDynamicFlags::kFlexibleMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalFlexibleTwoWay, fidl::MessageDynamicFlags::kFlexibleMethod),
-      union_ordinal(kResultUnionTransportError),
-      inline_envelope({i32(ZX_ERR_ACCESS_DENIED)}, false),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a flexible two-way method and receive the nonempty response.
 CLIENT_TEST(TwoWayFlexibleSendNonEmptyPayloadSuccessResponse) {
-  static constexpr int32_t kSomeFieldValue = 302340665;
-
+  Header header = {
+      .txid = kTxidNotKnown,
+      .dynamic_flags = kDynamicFlagsFlexible,
+      .ordinal = kOrdinalFlexibleTwoWayFields,
+  };
+  int32_t some_field = 302340665;
+  fidl_clientsuite::NonEmptyPayload payload = {{.some_field = some_field}};
+  Bytes expected_request = header;
+  Bytes response = {header, union_ordinal(kResultUnionSuccess), inline_envelope(int32(some_field))};
   runner()
       ->CallFlexibleTwoWayFields({{.target = TakeOpenClient()}})
       .ThenExactlyOnce([&](auto result) {
         MarkCallbackRun();
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result.value().success().has_value());
-        ASSERT_EQ(fidl_clientsuite::NonEmptyPayload(kSomeFieldValue),
-                  result.value().success().value());
+        ASSERT_EQ(result.value().success().value(), payload);
       });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalFlexibleTwoWayFields,
-             fidl::MessageDynamicFlags::kFlexibleMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalFlexibleTwoWayFields, fidl::MessageDynamicFlags::kFlexibleMethod),
-      union_ordinal(kResultUnionSuccess),
-      inline_envelope({i32(kSomeFieldValue)}, false),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a flexible two-way method whose response is nonempty,
 // and accept the "unknown method" response.
 CLIENT_TEST(TwoWayFlexibleSendNonEmptyPayloadUnknownMethodResponse) {
+  Header header = {
+      .txid = kTxidNotKnown,
+      .dynamic_flags = kDynamicFlagsFlexible,
+      .ordinal = kOrdinalFlexibleTwoWayFields,
+  };
+  Bytes expected_request = header;
+  Bytes response = {
+      header,
+      union_ordinal(kResultUnionFrameworkError),
+      inline_envelope(int32(ZX_ERR_NOT_SUPPORTED)),
+  };
   runner()
       ->CallFlexibleTwoWayFields({{.target = TakeOpenClient()}})
       .ThenExactlyOnce([&](auto result) {
         MarkCallbackRun();
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result.value().fidl_error().has_value());
-        ASSERT_EQ(fidl_clientsuite::FidlErrorKind::kUnknownMethod,
-                  result.value().fidl_error().value());
+        ASSERT_EQ(result.value().fidl_error().value(),
+                  fidl_clientsuite::FidlErrorKind::kUnknownMethod);
       });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalFlexibleTwoWayFields,
-             fidl::MessageDynamicFlags::kFlexibleMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalFlexibleTwoWayFields, fidl::MessageDynamicFlags::kFlexibleMethod),
-      union_ordinal(kResultUnionTransportError),
-      inline_envelope({i32(ZX_ERR_NOT_SUPPORTED)}, false),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a flexible fallible two-way method and receive the success response.
 CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendSuccessResponse) {
+  Header header = {
+      .txid = kTxidNotKnown,
+      .dynamic_flags = kDynamicFlagsFlexible,
+      .ordinal = kOrdinalFlexibleTwoWayErr,
+  };
+  Bytes expected_request = header;
+  Bytes response = {header, union_ordinal(kResultUnionSuccess), inline_envelope({0x00})};
   runner()->CallFlexibleTwoWayErr({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().success().has_value());
   });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalFlexibleTwoWayErr, fidl::MessageDynamicFlags::kFlexibleMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalFlexibleTwoWayErr, fidl::MessageDynamicFlags::kFlexibleMethod),
-      union_ordinal(kResultUnionSuccess),
-      inline_envelope({padding(4)}, false),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a flexible fallible two-way method and receive the error response.
 CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendErrorResponse) {
-  static constexpr int32_t kApplicationError = 1456681;
-
+  Header header = {
+      .txid = kTxidNotKnown,
+      .dynamic_flags = kDynamicFlagsFlexible,
+      .ordinal = kOrdinalFlexibleTwoWayErr,
+  };
+  int32_t error = 1456681;
+  Bytes expected_request = header;
+  Bytes response = {header, union_ordinal(kResultUnionDomainError), inline_envelope(int32(error))};
   runner()->CallFlexibleTwoWayErr({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().application_error().has_value());
-    ASSERT_EQ(kApplicationError, result.value().application_error().value());
+    ASSERT_EQ(result.value().application_error().value(), error);
   });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalFlexibleTwoWayErr, fidl::MessageDynamicFlags::kFlexibleMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalFlexibleTwoWayErr, fidl::MessageDynamicFlags::kFlexibleMethod),
-      union_ordinal(kResultUnionError),
-      inline_envelope({i32(kApplicationError)}, false),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a flexible fallible two-way method accept the "unknown method" response.
 CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendUnknownMethodResponse) {
+  Header header = {
+      .txid = kTxidNotKnown,
+      .dynamic_flags = kDynamicFlagsFlexible,
+      .ordinal = kOrdinalFlexibleTwoWayErr,
+  };
+  Bytes expected_request = header;
+  Bytes response = {
+      header,
+      union_ordinal(kResultUnionFrameworkError),
+      inline_envelope(int32(ZX_ERR_NOT_SUPPORTED)),
+  };
   runner()->CallFlexibleTwoWayErr({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().fidl_error().has_value());
-    ASSERT_EQ(fidl_clientsuite::FidlErrorKind::kUnknownMethod, result.value().fidl_error().value());
+    ASSERT_EQ(result.value().fidl_error().value(), fidl_clientsuite::FidlErrorKind::kUnknownMethod);
   });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalFlexibleTwoWayErr, fidl::MessageDynamicFlags::kFlexibleMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalFlexibleTwoWayErr, fidl::MessageDynamicFlags::kFlexibleMethod),
-      union_ordinal(kResultUnionTransportError),
-      inline_envelope({i32(ZX_ERR_NOT_SUPPORTED)}, false),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
@@ -579,223 +474,187 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendUnknownMethodResponse) {
 // > The client should tear down when it calls a flexible fallible two-way method
 // > and receives an "unknown method" response (with strict dynamic flag).
 CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendMismatchedStrictnessUnknownMethodResponse) {
+  Bytes expected_request = Header{
+      .txid = kTxidNotKnown,
+      .dynamic_flags = kDynamicFlagsFlexible,
+      .ordinal = kOrdinalFlexibleTwoWayErr,
+  };
+  Bytes response = {
+      Header{.txid = kTxidNotKnown, .ordinal = kOrdinalFlexibleTwoWayErr},
+      union_ordinal(kResultUnionFrameworkError),
+      inline_envelope(int32(ZX_ERR_NOT_SUPPORTED)),
+  };
   runner()->CallFlexibleTwoWayErr({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().fidl_error().has_value());
-    ASSERT_EQ(fidl_clientsuite::FidlErrorKind::kUnknownMethod, result.value().fidl_error().value());
+    ASSERT_EQ(result.value().fidl_error().value(), fidl_clientsuite::FidlErrorKind::kUnknownMethod);
   });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalFlexibleTwoWayErr, fidl::MessageDynamicFlags::kFlexibleMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalFlexibleTwoWayErr, fidl::MessageDynamicFlags::kStrictMethod),
-      union_ordinal(kResultUnionTransportError),
-      inline_envelope({i32(ZX_ERR_NOT_SUPPORTED)}, false),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should tear down when it calls a flexible fallible two-way method
 // and receives a framework error response other than "unsupported method".
 CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendOtherTransportErrResponse) {
+  Header header = {
+      .txid = kTxidNotKnown,
+      .dynamic_flags = kDynamicFlagsFlexible,
+      .ordinal = kOrdinalFlexibleTwoWayErr,
+  };
+  Bytes expected_request = header;
+  Bytes response = {
+      header,
+      union_ordinal(kResultUnionFrameworkError),
+      inline_envelope(int32(ZX_ERR_ACCESS_DENIED)),
+  };
   runner()->CallFlexibleTwoWayErr({{.target = TakeOpenClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().fidl_error().has_value());
-    ASSERT_EQ(fidl_clientsuite::FidlErrorKind::kDecodingError, result.value().fidl_error().value());
+    ASSERT_EQ(result.value().fidl_error().value(), fidl_clientsuite::FidlErrorKind::kDecodingError);
   });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalFlexibleTwoWayErr, fidl::MessageDynamicFlags::kFlexibleMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalFlexibleTwoWayErr, fidl::MessageDynamicFlags::kFlexibleMethod),
-      union_ordinal(kResultUnionTransportError),
-      inline_envelope({i32(ZX_ERR_ACCESS_DENIED)}, false),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a flexible fallible two-way method and receive
 // the nonempty success response.
 CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendNonEmptyPayloadSuccessResponse) {
-  static constexpr int32_t kSomeFieldValue = 670705054;
-
+  Header header = {
+      .txid = kTxidNotKnown,
+      .dynamic_flags = kDynamicFlagsFlexible,
+      .ordinal = kOrdinalFlexibleTwoWayFieldsErr,
+  };
+  int32_t some_field = 670705054;
+  fidl_clientsuite::NonEmptyPayload payload = {{.some_field = some_field}};
+  Bytes expected_request = header;
+  Bytes response = {header, union_ordinal(kResultUnionSuccess), inline_envelope(int32(some_field))};
   runner()
       ->CallFlexibleTwoWayFieldsErr({{.target = TakeOpenClient()}})
       .ThenExactlyOnce([&](auto result) {
         MarkCallbackRun();
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result.value().success().has_value());
-        ASSERT_EQ(fidl_clientsuite::NonEmptyPayload(kSomeFieldValue),
-                  result.value().success().value());
+        ASSERT_EQ(result.value().success().value(), payload);
       });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalFlexibleTwoWayFieldsErr,
-             fidl::MessageDynamicFlags::kFlexibleMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalFlexibleTwoWayFieldsErr, fidl::MessageDynamicFlags::kFlexibleMethod),
-      union_ordinal(kResultUnionSuccess),
-      inline_envelope({i32(kSomeFieldValue)}, false),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should call a flexible fallible two-way method whose response is
 // nonempty, and accept the "unknown method" response.
 CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendNonEmptyPayloadUnknownMethodResponse) {
+  Header header = {
+      .txid = kTxidNotKnown,
+      .dynamic_flags = kDynamicFlagsFlexible,
+      .ordinal = kOrdinalFlexibleTwoWayFieldsErr,
+  };
+  Bytes expected_request = header;
+  Bytes response = {
+      header,
+      union_ordinal(kResultUnionFrameworkError),
+      inline_envelope(int32(ZX_ERR_NOT_SUPPORTED)),
+  };
   runner()
       ->CallFlexibleTwoWayFieldsErr({{.target = TakeOpenClient()}})
       .ThenExactlyOnce([&](auto result) {
         MarkCallbackRun();
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result.value().fidl_error().has_value());
-        ASSERT_EQ(fidl_clientsuite::FidlErrorKind::kUnknownMethod,
-                  result.value().fidl_error().value());
+        ASSERT_EQ(result.value().fidl_error().value(),
+                  fidl_clientsuite::FidlErrorKind::kUnknownMethod);
       });
-
   ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
-
-  Bytes bytes_out = {
-      header(kTxidNotKnown, kOrdinalFlexibleTwoWayFieldsErr,
-             fidl::MessageDynamicFlags::kFlexibleMethod),
-  };
-  zx_txid_t txid;
-  ASSERT_OK(server_end().read_and_check_unknown_txid(&txid, bytes_out));
-  ASSERT_NE(0u, txid);
-
-  Bytes bytes_in = {
-      header(txid, kOrdinalFlexibleTwoWayFieldsErr, fidl::MessageDynamicFlags::kFlexibleMethod),
-      union_ordinal(kResultUnionTransportError),
-      inline_envelope({i32(ZX_ERR_NOT_SUPPORTED)}, false),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
+  ASSERT_NE(response.txid(), 0u);
+  ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
 // The client should receive a strict event.
 CLIENT_TEST(ReceiveStrictEvent) {
+  Bytes event = Header{.txid = kOneWayTxid, .ordinal = kOrdinalStrictEvent};
   auto reporter = ReceiveOpenEvents();
-  ASSERT_NE(nullptr, reporter);
-
-  Bytes bytes_in = {
-      header(kOneWayTxid, kOrdinalStrictEvent, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_NE(reporter, nullptr);
+  ASSERT_OK(server_end().write(event));
   WAIT_UNTIL([reporter]() { return reporter->NumReceivedEvents(); });
-
-  ASSERT_EQ(1u, reporter->NumReceivedEvents());
-  auto event = reporter->TakeNextEvent();
-  ASSERT_TRUE(event.strict_event().has_value());
-
+  ASSERT_EQ(reporter->NumReceivedEvents(), 1u);
+  auto reporter_event = reporter->TakeNextEvent();
+  ASSERT_TRUE(reporter_event.strict_event().has_value());
   ASSERT_FALSE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
 // The client should receive an event, despite the schema (strict) not matching
 // the dynamic flags (flexible).
 CLIENT_TEST(ReceiveStrictEventMismatchedStrictness) {
-  auto reporter = ReceiveOpenEvents();
-  ASSERT_NE(nullptr, reporter);
-
-  Bytes bytes_in = {
-      header(kOneWayTxid, kOrdinalStrictEvent, fidl::MessageDynamicFlags::kFlexibleMethod),
+  Bytes event = Header{
+      .txid = kOneWayTxid,
+      .dynamic_flags = kDynamicFlagsFlexible,
+      .ordinal = kOrdinalStrictEvent,
   };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  auto reporter = ReceiveOpenEvents();
+  ASSERT_NE(reporter, nullptr);
+  ASSERT_OK(server_end().write(event));
   WAIT_UNTIL([reporter]() { return reporter->NumReceivedEvents(); });
-
-  ASSERT_EQ(1u, reporter->NumReceivedEvents());
-  auto event = reporter->TakeNextEvent();
-  ASSERT_TRUE(event.strict_event().has_value());
-
+  ASSERT_EQ(reporter->NumReceivedEvents(), 1u);
+  auto reporter_event = reporter->TakeNextEvent();
+  ASSERT_TRUE(reporter_event.strict_event().has_value());
   ASSERT_FALSE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
 // The client should receive a flexible event.
 CLIENT_TEST(ReceiveFlexibleEvent) {
-  auto reporter = ReceiveOpenEvents();
-  ASSERT_NE(nullptr, reporter);
-
-  Bytes bytes_in = {
-      header(kOneWayTxid, kOrdinalFlexibleEvent, fidl::MessageDynamicFlags::kFlexibleMethod),
+  Bytes event = Header{
+      .txid = kOneWayTxid,
+      .dynamic_flags = kDynamicFlagsFlexible,
+      .ordinal = kOrdinalFlexibleEvent,
   };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  auto reporter = ReceiveOpenEvents();
+  ASSERT_NE(reporter, nullptr);
+  ASSERT_OK(server_end().write(event));
   WAIT_UNTIL([reporter]() { return reporter->NumReceivedEvents(); });
-
-  ASSERT_EQ(1u, reporter->NumReceivedEvents());
-  auto event = reporter->TakeNextEvent();
-  ASSERT_TRUE(event.flexible_event().has_value());
-
+  ASSERT_EQ(reporter->NumReceivedEvents(), 1u);
+  auto reporter_event = reporter->TakeNextEvent();
+  ASSERT_TRUE(reporter_event.flexible_event().has_value());
   ASSERT_FALSE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
 // The client should receive an event, despite the schema (flexible) not
 // matching the dynamic flags (strict).
 CLIENT_TEST(ReceiveFlexibleEventMismatchedStrictness) {
+  Bytes event = Header{.txid = kOneWayTxid, .ordinal = kOrdinalFlexibleEvent};
   auto reporter = ReceiveOpenEvents();
-  ASSERT_NE(nullptr, reporter);
-
-  Bytes bytes_in = {
-      header(kOneWayTxid, kOrdinalFlexibleEvent, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_NE(reporter, nullptr);
+  ASSERT_OK(server_end().write(event));
   WAIT_UNTIL([reporter]() { return reporter->NumReceivedEvents(); });
-
-  ASSERT_EQ(1u, reporter->NumReceivedEvents());
-  auto event = reporter->TakeNextEvent();
-  ASSERT_TRUE(event.flexible_event().has_value());
-
+  ASSERT_EQ(reporter->NumReceivedEvents(), 1u);
+  auto reporter_event = reporter->TakeNextEvent();
+  ASSERT_TRUE(reporter_event.flexible_event().has_value());
   ASSERT_FALSE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
 // The open client should tear down when it receives an unknown strict event.
 CLIENT_TEST(UnknownStrictEventOpenProtocol) {
+  Bytes event = Header{.txid = kOneWayTxid, .ordinal = kOrdinalFakeUnknownMethod};
   auto reporter = ReceiveOpenEvents();
-  ASSERT_NE(nullptr, reporter);
-
-  Bytes bytes_in = {
-      header(kOneWayTxid, kOrdinalFakeUnknownMethod, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_NE(reporter, nullptr);
+  ASSERT_OK(server_end().write(event));
   WAIT_UNTIL([reporter]() { return reporter->NumReceivedEvents(); });
-
-  ASSERT_EQ(1u, reporter->NumReceivedEvents());
-  auto event = reporter->TakeNextEvent();
-  ASSERT_TRUE(event.fidl_error().has_value());
-  ASSERT_EQ(fidl_clientsuite::FidlErrorKind::kUnexpectedMessage, event.fidl_error().value());
+  ASSERT_EQ(reporter->NumReceivedEvents(), 1u);
+  auto reporter_event = reporter->TakeNextEvent();
+  ASSERT_TRUE(reporter_event.fidl_error().has_value());
+  ASSERT_EQ(reporter_event.fidl_error().value(),
+            fidl_clientsuite::FidlErrorKind::kUnexpectedMessage);
 
   // TODO(fxbug.dev/78906, fxbug.dev/74241): Clients should close the channel
   // when they receive an unsupported unknown event, but many of them don't
@@ -805,41 +664,35 @@ CLIENT_TEST(UnknownStrictEventOpenProtocol) {
 
 // The open client should accept an unknown flexible event.
 CLIENT_TEST(UnknownFlexibleEventOpenProtocol) {
-  auto reporter = ReceiveOpenEvents();
-  ASSERT_NE(nullptr, reporter);
-
-  Bytes bytes_in = {
-      header(kOneWayTxid, kOrdinalFakeUnknownMethod, fidl::MessageDynamicFlags::kFlexibleMethod),
+  Bytes event = Header{
+      .txid = kOneWayTxid,
+      .dynamic_flags = kDynamicFlagsFlexible,
+      .ordinal = kOrdinalFakeUnknownMethod,
   };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  auto reporter = ReceiveOpenEvents();
+  ASSERT_NE(reporter, nullptr);
+  ASSERT_OK(server_end().write(event));
   WAIT_UNTIL([reporter]() { return reporter->NumReceivedEvents(); });
-
-  ASSERT_EQ(1u, reporter->NumReceivedEvents());
-  auto event = reporter->TakeNextEvent();
-  ASSERT_TRUE(event.unknown_event().has_value());
-  ASSERT_EQ(fidl_clientsuite::UnknownEvent(kOrdinalFakeUnknownMethod),
-            event.unknown_event().value());
-
+  ASSERT_EQ(reporter->NumReceivedEvents(), 1u);
+  auto reporter_event = reporter->TakeNextEvent();
+  ASSERT_TRUE(reporter_event.unknown_event().has_value());
+  ASSERT_EQ(reporter_event.unknown_event().value(),
+            fidl_clientsuite::UnknownEvent(kOrdinalFakeUnknownMethod));
   ASSERT_FALSE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
 // The ajar client should tear down when it receives an unknown strict event.
 CLIENT_TEST(UnknownStrictEventAjarProtocol) {
+  Bytes event = Header{.txid = kOneWayTxid, .ordinal = kOrdinalFakeUnknownMethod};
   auto reporter = ReceiveAjarEvents();
-  ASSERT_NE(nullptr, reporter);
-
-  Bytes bytes_in = {
-      header(kOneWayTxid, kOrdinalFakeUnknownMethod, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_NE(reporter, nullptr);
+  ASSERT_OK(server_end().write(event));
   WAIT_UNTIL([reporter]() { return reporter->NumReceivedEvents(); });
-
-  ASSERT_EQ(1u, reporter->NumReceivedEvents());
-  auto event = reporter->TakeNextEvent();
-  ASSERT_TRUE(event.fidl_error().has_value());
-  ASSERT_EQ(fidl_clientsuite::FidlErrorKind::kUnexpectedMessage, event.fidl_error().value());
+  ASSERT_EQ(reporter->NumReceivedEvents(), 1u);
+  auto reporter_event = reporter->TakeNextEvent();
+  ASSERT_TRUE(reporter_event.fidl_error().has_value());
+  ASSERT_EQ(reporter_event.fidl_error().value(),
+            fidl_clientsuite::FidlErrorKind::kUnexpectedMessage);
 
   // TODO(fxbug.dev/78906, fxbug.dev/74241): Clients should close the channel
   // when they receive an unsupported unknown event, but many of them don't
@@ -849,41 +702,35 @@ CLIENT_TEST(UnknownStrictEventAjarProtocol) {
 
 // The ajar client should accept an unknown flexible event.
 CLIENT_TEST(UnknownFlexibleEventAjarProtocol) {
-  auto reporter = ReceiveAjarEvents();
-  ASSERT_NE(nullptr, reporter);
-
-  Bytes bytes_in = {
-      header(kOneWayTxid, kOrdinalFakeUnknownMethod, fidl::MessageDynamicFlags::kFlexibleMethod),
+  Bytes event = Header{
+      .txid = kOneWayTxid,
+      .dynamic_flags = kDynamicFlagsFlexible,
+      .ordinal = kOrdinalFakeUnknownMethod,
   };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  auto reporter = ReceiveAjarEvents();
+  ASSERT_NE(reporter, nullptr);
+  ASSERT_OK(server_end().write(event));
   WAIT_UNTIL([reporter]() { return reporter->NumReceivedEvents(); });
-
-  ASSERT_EQ(1u, reporter->NumReceivedEvents());
-  auto event = reporter->TakeNextEvent();
-  ASSERT_TRUE(event.unknown_event().has_value());
-  ASSERT_EQ(fidl_clientsuite::UnknownEvent(kOrdinalFakeUnknownMethod),
-            event.unknown_event().value());
-
+  ASSERT_EQ(reporter->NumReceivedEvents(), 1u);
+  auto reporter_event = reporter->TakeNextEvent();
+  ASSERT_TRUE(reporter_event.unknown_event().has_value());
+  ASSERT_EQ(reporter_event.unknown_event().value(),
+            fidl_clientsuite::UnknownEvent(kOrdinalFakeUnknownMethod));
   ASSERT_FALSE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
 
 // The closed client should tear down when it receives an unknown strict event.
 CLIENT_TEST(UnknownStrictEventClosedProtocol) {
+  Bytes event = Header{.txid = kOneWayTxid, .ordinal = kOrdinalFakeUnknownMethod};
   auto reporter = ReceiveClosedEvents();
-  ASSERT_NE(nullptr, reporter);
-
-  Bytes bytes_in = {
-      header(kOneWayTxid, kOrdinalFakeUnknownMethod, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_NE(reporter, nullptr);
+  ASSERT_OK(server_end().write(event));
   WAIT_UNTIL([reporter]() { return reporter->NumReceivedEvents(); });
-
-  ASSERT_EQ(1u, reporter->NumReceivedEvents());
-  auto event = reporter->TakeNextEvent();
-  ASSERT_TRUE(event.fidl_error().has_value());
-  ASSERT_EQ(fidl_clientsuite::FidlErrorKind::kUnexpectedMessage, event.fidl_error().value());
+  ASSERT_EQ(reporter->NumReceivedEvents(), 1u);
+  auto reporter_event = reporter->TakeNextEvent();
+  ASSERT_TRUE(reporter_event.fidl_error().has_value());
+  ASSERT_EQ(reporter_event.fidl_error().value(),
+            fidl_clientsuite::FidlErrorKind::kUnexpectedMessage);
 
   // TODO(fxbug.dev/78906, fxbug.dev/74241): Clients should close the channel
   // when they receive an unsupported unknown event, but many of them don't
@@ -893,20 +740,20 @@ CLIENT_TEST(UnknownStrictEventClosedProtocol) {
 
 // The closed client should tear down when it receives an unknown flexible event.
 CLIENT_TEST(UnknownFlexibleEventClosedProtocol) {
-  auto reporter = ReceiveClosedEvents();
-  ASSERT_NE(nullptr, reporter);
-
-  Bytes bytes_in = {
-      header(kOneWayTxid, kOrdinalFakeUnknownMethod, fidl::MessageDynamicFlags::kFlexibleMethod),
+  Bytes event = Header{
+      .txid = kOneWayTxid,
+      .dynamic_flags = kDynamicFlagsFlexible,
+      .ordinal = kOrdinalFakeUnknownMethod,
   };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  auto reporter = ReceiveClosedEvents();
+  ASSERT_NE(reporter, nullptr);
+  ASSERT_OK(server_end().write(event));
   WAIT_UNTIL([reporter]() { return reporter->NumReceivedEvents(); });
-
-  ASSERT_EQ(1u, reporter->NumReceivedEvents());
-  auto event = reporter->TakeNextEvent();
-  ASSERT_TRUE(event.fidl_error().has_value());
-  ASSERT_EQ(fidl_clientsuite::FidlErrorKind::kUnexpectedMessage, event.fidl_error().value());
+  ASSERT_EQ(reporter->NumReceivedEvents(), 1u);
+  auto reporter_event = reporter->TakeNextEvent();
+  ASSERT_TRUE(reporter_event.fidl_error().has_value());
+  ASSERT_EQ(reporter_event.fidl_error().value(),
+            fidl_clientsuite::FidlErrorKind::kUnexpectedMessage);
 
   // TODO(fxbug.dev/78906, fxbug.dev/74241): Clients should close the channel
   // when they receive an unsupported unknown event, but many of them don't
@@ -917,20 +764,16 @@ CLIENT_TEST(UnknownFlexibleEventClosedProtocol) {
 // The client should tear down when it receives an unsolicited strict message
 // with nonzero txid and an unknown ordinal.
 CLIENT_TEST(UnknownStrictServerInitiatedTwoWay) {
+  Bytes bytes = Header{.txid = kTwoWayTxid, .ordinal = kOrdinalFakeUnknownMethod};
   auto reporter = ReceiveOpenEvents();
-  ASSERT_NE(nullptr, reporter);
-
-  Bytes bytes_in = {
-      header(kTwoWayTxid, kOrdinalFakeUnknownMethod, fidl::MessageDynamicFlags::kStrictMethod),
-  };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  ASSERT_NE(reporter, nullptr);
+  ASSERT_OK(server_end().write(bytes));
   WAIT_UNTIL([reporter]() { return reporter->NumReceivedEvents(); });
-
-  ASSERT_EQ(1u, reporter->NumReceivedEvents());
-  auto event = reporter->TakeNextEvent();
-  ASSERT_TRUE(event.fidl_error().has_value());
-  ASSERT_EQ(fidl_clientsuite::FidlErrorKind::kUnexpectedMessage, event.fidl_error().value());
+  ASSERT_EQ(reporter->NumReceivedEvents(), 1u);
+  auto reporter_event = reporter->TakeNextEvent();
+  ASSERT_TRUE(reporter_event.fidl_error().has_value());
+  ASSERT_EQ(reporter_event.fidl_error().value(),
+            fidl_clientsuite::FidlErrorKind::kUnexpectedMessage);
 
   // TODO(fxbug.dev/78906, fxbug.dev/74241): Clients should close the channel
   // when they receive an unsupported unknown event, but many of them don't
@@ -941,20 +784,20 @@ CLIENT_TEST(UnknownStrictServerInitiatedTwoWay) {
 // The client should tear down when it receives an unsolicited flexible message
 // with nonzero txid and an unknown ordinal.
 CLIENT_TEST(UnknownFlexibleServerInitiatedTwoWay) {
-  auto reporter = ReceiveOpenEvents();
-  ASSERT_NE(nullptr, reporter);
-
-  Bytes bytes_in = {
-      header(kTwoWayTxid, kOrdinalFakeUnknownMethod, fidl::MessageDynamicFlags::kFlexibleMethod),
+  Bytes bytes = Header{
+      .txid = kTwoWayTxid,
+      .dynamic_flags = kDynamicFlagsFlexible,
+      .ordinal = kOrdinalFakeUnknownMethod,
   };
-  ASSERT_OK(server_end().write(bytes_in));
-
+  auto reporter = ReceiveOpenEvents();
+  ASSERT_NE(reporter, nullptr);
+  ASSERT_OK(server_end().write(bytes));
   WAIT_UNTIL([reporter]() { return reporter->NumReceivedEvents(); });
-
-  ASSERT_EQ(1u, reporter->NumReceivedEvents());
-  auto event = reporter->TakeNextEvent();
-  ASSERT_TRUE(event.fidl_error().has_value());
-  ASSERT_EQ(fidl_clientsuite::FidlErrorKind::kUnexpectedMessage, event.fidl_error().value());
+  ASSERT_EQ(reporter->NumReceivedEvents(), 1u);
+  auto reporter_event = reporter->TakeNextEvent();
+  ASSERT_TRUE(reporter_event.fidl_error().has_value());
+  ASSERT_EQ(reporter_event.fidl_error().value(),
+            fidl_clientsuite::FidlErrorKind::kUnexpectedMessage);
 
   // TODO(fxbug.dev/78906, fxbug.dev/74241): Clients should close the channel
   // when they receive an unsupported unknown event, but many of them don't

@@ -11,10 +11,6 @@
 
 namespace client_suite {
 
-static const fidl_xunion_tag_t kResultUnionSuccess = 1;
-static const fidl_xunion_tag_t kResultUnionError = 2;
-static const fidl_xunion_tag_t kResultUnionTransportError = 3;
-
 // To find all ordinals:
 //
 //     cat

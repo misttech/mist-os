@@ -17,13 +17,11 @@ using namespace ::channel_util;
 // should hide it and return successfully. This helps prevent race conditions.
 CLIENT_TEST(OneWayCallDoNotReportPeerClosed) {
   server_end().get().reset();
-
   runner()->CallOneWayNoRequest({{.target = TakeClosedClient()}}).ThenExactlyOnce([&](auto result) {
     MarkCallbackRun();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().success().has_value());
   });
-
   WAIT_UNTIL_CALLBACK_RUN();
 }
 

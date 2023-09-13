@@ -355,6 +355,7 @@ class RunnerServer : public fidl::serversuite::Runner {
         callback(false);
         return;
 
+      case fidl::serversuite::Test::SERVER_SENDS_WRONG_HANDLE_TYPE:
       case fidl::serversuite::Test::SERVER_SENDS_TOO_FEW_RIGHTS:
       case fidl::serversuite::Test::RESPONSE_EXCEEDS_BYTE_LIMIT:
       case fidl::serversuite::Test::RESPONSE_EXCEEDS_HANDLE_LIMIT:
