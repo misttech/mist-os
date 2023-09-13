@@ -277,7 +277,7 @@ zx::result<> Vout::ApplyConfiguration(const display_mode_t* mode) {
         return zx::ok();
       }
 
-      zx_status_t status = hdmi_.hdmi_host->CalculateAndSetHdmiHardwareParams(mode);
+      zx_status_t status = hdmi_.hdmi_host->CalculateAndSetHdmiHardwareParams(*mode);
       if (status != ZX_OK) {
         zxlogf(ERROR, "Failed to get HDMI hardware parameters for current HDMI display mode: %s",
                zx_status_get_string(status));

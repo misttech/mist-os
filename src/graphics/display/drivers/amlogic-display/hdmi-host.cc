@@ -58,6 +58,82 @@ void TranslateDisplayMode(fidl::AnyArena& allocator, const display_mode_t& in_mo
   out_mode->set_color(color);
 }
 
+// `mode` must be a mode supported by `HdmiHost`.
+cea_timing CalculateDisplayTimings(const display_mode_t& mode) {
+  cea_timing timings;
+
+  timings.interlace_mode = mode.flags & MODE_FLAG_INTERLACED;
+  timings.pfreq = (mode.pixel_clock_10khz * 10);  // KHz
+  // TODO: pixel repetition is 0 for most progressive. We don't support interlaced
+  timings.pixel_repeat = 0;
+  timings.hactive = mode.h_addressable;
+  timings.hblank = mode.h_blanking;
+  timings.hfront = mode.h_front_porch;
+  timings.hsync = mode.h_sync_pulse;
+  timings.htotal = (timings.hactive) + (timings.hblank);
+  timings.hback = (timings.hblank) - (timings.hfront + timings.hsync);
+  timings.hpol = mode.flags & MODE_FLAG_HSYNC_POSITIVE;
+
+  timings.vactive = mode.v_addressable;
+  timings.vblank0 = mode.v_blanking;
+  timings.vfront = mode.v_front_porch;
+  timings.vsync = mode.v_sync_pulse;
+  timings.vtotal = (timings.vactive) + (timings.vblank0);
+  timings.vback = (timings.vblank0) - (timings.vfront + timings.vsync);
+  timings.vpol = mode.flags & MODE_FLAG_VSYNC_POSITIVE;
+
+  // FIXE: VENC Repeat is undocumented. It seems to be only needed for the following
+  // resolutions: 1280x720p60, 1280x720p50, 720x480p60, 720x480i60, 720x576p50, 720x576i50
+  // For now, we will simply not support this feature.
+  timings.venc_pixel_repeat = 0;
+
+  return timings;
+}
+
+// `mode` must be a mode supported by `HdmiHost`.
+pll_param CalculateClockParameters(const display_mode_t& mode) {
+  pll_param params;
+
+  // TODO: We probably need a more sophisticated method for calculating
+  // clocks. This will do for now.
+  params.viu_channel = 1;
+  params.viu_type = VIU_ENCP;
+  params.vid_pll_div = VID_PLL_DIV_5;
+  params.vid_clk_div = 2;
+  params.hdmi_tx_pixel_div = 1;
+  params.encp_div = 1;
+  params.od1 = 1;
+  params.od2 = 1;
+  params.od3 = 1;
+
+  int pixel_clock_khz = mode.pixel_clock_10khz * 10;
+  params.hpll_clk_out = (pixel_clock_khz * 10);
+  while (params.hpll_clk_out < 2900000) {
+    if (params.od1 < 4) {
+      params.od1 *= 2;
+      params.hpll_clk_out *= 2;
+    } else if (params.od2 < 4) {
+      params.od2 *= 2;
+      params.hpll_clk_out *= 2;
+    } else if (params.od3 < 4) {
+      params.od3 *= 2;
+      params.hpll_clk_out *= 2;
+    } else {
+      ZX_DEBUG_ASSERT_MSG(false,
+                          "Failed to set HDMI PLL to a valid VCO frequency range for pixel clock "
+                          "%d kHz. This should never happen since IsDisplayModeSupported() "
+                          "returned true.",
+                          pixel_clock_khz);
+    }
+  }
+  ZX_DEBUG_ASSERT_MSG(params.hpll_clk_out <= 6000000,
+                      "Calculated HDMI PLL VCO frequency (%" PRIu32
+                      " kHz) exceeds the VCO frequency limit 6GHz. This should never happen since "
+                      "IsDisplayModeSupported() returned true.",
+                      params.hpll_clk_out);
+  return params;
+}
+
 }  // namespace
 
 zx_status_t HdmiHost::Init() {
@@ -337,81 +413,13 @@ bool HdmiHost::IsDisplayModeSupported(const display_mode_t& mode) const {
   return true;
 }
 
-zx_status_t HdmiHost::CalculateAndSetHdmiHardwareParams(const display_mode_t* disp_timing) {
-  return CalculateAndSetHdmiHardwareParams(disp_timing, &p_);
-}
-
-zx_status_t HdmiHost::CalculateAndSetHdmiHardwareParams(const display_mode_t* disp_timing,
-                                                        hdmi_param* p) {
-  ZX_DEBUG_ASSERT(disp_timing != nullptr);
-
-  if (!IsDisplayModeSupported(*disp_timing)) {
+zx_status_t HdmiHost::CalculateAndSetHdmiHardwareParams(const display_mode_t& mode) {
+  if (!IsDisplayModeSupported(mode)) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  // Monitor has its own preferred timings. Use that
-  p->timings.interlace_mode = disp_timing->flags & MODE_FLAG_INTERLACED;
-  p->timings.pfreq = (disp_timing->pixel_clock_10khz * 10);  // KHz
-  // TODO: pixel repetition is 0 for most progressive. We don't support interlaced
-  p->timings.pixel_repeat = 0;
-  p->timings.hactive = disp_timing->h_addressable;
-  p->timings.hblank = disp_timing->h_blanking;
-  p->timings.hfront = disp_timing->h_front_porch;
-  p->timings.hsync = disp_timing->h_sync_pulse;
-  p->timings.htotal = (p->timings.hactive) + (p->timings.hblank);
-  p->timings.hback = (p->timings.hblank) - (p->timings.hfront + p->timings.hsync);
-  p->timings.hpol = disp_timing->flags & MODE_FLAG_HSYNC_POSITIVE;
-
-  p->timings.vactive = disp_timing->v_addressable;
-  p->timings.vblank0 = disp_timing->v_blanking;
-  p->timings.vfront = disp_timing->v_front_porch;
-  p->timings.vsync = disp_timing->v_sync_pulse;
-  p->timings.vtotal = (p->timings.vactive) + (p->timings.vblank0);
-  p->timings.vback = (p->timings.vblank0) - (p->timings.vfront + p->timings.vsync);
-  p->timings.vpol = disp_timing->flags & MODE_FLAG_VSYNC_POSITIVE;
-
-  // FIXE: VENC Repeat is undocumented. It seems to be only needed for the following
-  // resolutions: 1280x720p60, 1280x720p50, 720x480p60, 720x480i60, 720x576p50, 720x576i50
-  // For now, we will simply not support this feature.
-  p->timings.venc_pixel_repeat = 0;
-
-  // TODO: We probably need a more sophisticated method for calculating
-  // clocks. This will do for now.
-  p->pll_p_24b.viu_channel = 1;
-  p->pll_p_24b.viu_type = VIU_ENCP;
-  p->pll_p_24b.vid_pll_div = VID_PLL_DIV_5;
-  p->pll_p_24b.vid_clk_div = 2;
-  p->pll_p_24b.hdmi_tx_pixel_div = 1;
-  p->pll_p_24b.encp_div = 1;
-  p->pll_p_24b.od1 = 1;
-  p->pll_p_24b.od2 = 1;
-  p->pll_p_24b.od3 = 1;
-
-  p->pll_p_24b.hpll_clk_out = (p->timings.pfreq * 10);
-  while (p->pll_p_24b.hpll_clk_out < 2900000) {
-    if (p->pll_p_24b.od1 < 4) {
-      p->pll_p_24b.od1 *= 2;
-      p->pll_p_24b.hpll_clk_out *= 2;
-    } else if (p->pll_p_24b.od2 < 4) {
-      p->pll_p_24b.od2 *= 2;
-      p->pll_p_24b.hpll_clk_out *= 2;
-    } else if (p->pll_p_24b.od3 < 4) {
-      p->pll_p_24b.od3 *= 2;
-      p->pll_p_24b.hpll_clk_out *= 2;
-    } else {
-      ZX_DEBUG_ASSERT_MSG(false,
-                          "Failed to set HDMI PLL to a valid VCO frequency range for pixel clock "
-                          "%d kHz. This should never happen since IsDisplayModeSupported() "
-                          "returned true.",
-                          p->timings.pfreq);
-    }
-  }
-  ZX_DEBUG_ASSERT_MSG(p->pll_p_24b.hpll_clk_out <= 6000000,
-                      "Calculated HDMI PLL VCO frequency (%" PRIu32
-                      " kHz) exceeds the VCO frequency limit 6GHz. This should never happen since "
-                      "IsDisplayModeSupported() returned true.",
-                      p->pll_p_24b.hpll_clk_out);
-
+  p_.timings = CalculateDisplayTimings(mode);
+  p_.pll_p_24b = CalculateClockParameters(mode);
   return ZX_OK;
 }
 

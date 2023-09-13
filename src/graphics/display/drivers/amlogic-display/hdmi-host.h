@@ -115,10 +115,16 @@ class HdmiHost {
   // engine driver and can be used in a display configuration.
   bool IsDisplayModeSupported(const display_mode_t& mode) const;
 
-  zx_status_t CalculateAndSetHdmiHardwareParams(const display_mode_t* disp_timing);
+  // Calculates the HDMI hardware parameters for `mode`.
+  //
+  // Returns ZX_ERR_NOT_SUPPORTED if the mode is not supported by the hardware;
+  // otherwise, sets the host controller internal state for `mode` and returns
+  // ZX_OK.
+  //
+  // TODO(fxbug.dev/132602): This should not be exposed as a public interface.
+  zx_status_t CalculateAndSetHdmiHardwareParams(const display_mode_t& mode);
 
  private:
-  zx_status_t CalculateAndSetHdmiHardwareParams(const display_mode_t* disp_timing, hdmi_param* p);
   void ConfigurePll();
   void ConfigEncoder();
   void ConfigPhy();
