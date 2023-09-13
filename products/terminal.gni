@@ -63,9 +63,9 @@ legacy_cache_package_labels +=
 # TODO(fxbug.dev/127138): Remove once we support packages in the SDK and we want to put this
 # in the SDK.
 legacy_cache_package_labels += [
-  "//src/tests/fidl/client_suite/harness",
+  "//src/tests/fidl/dynsuite/client_suite/harness",
   "//src/tests/fidl/compatibility:packages",
-  "//src/tests/fidl/server_suite/harness",
+  "//src/tests/fidl/dynsuite/server_suite/harness",
 ]
 
 # Use the product assembly config target to specify the product configuration.

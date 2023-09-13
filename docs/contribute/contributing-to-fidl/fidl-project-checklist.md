@@ -124,7 +124,7 @@ Add coverage to:
 [bindings-refs]: /docs/reference/fidl/bindings/overview.md
 [bindings-spec]: /docs/reference/fidl/language/bindings-spec.md
 [bindings-tutorials]: /docs/development/languages/fidl/tutorials/overview.md
-[client suite]: /src/tests/fidl/client_suite/
+[client suite]: /src/tests/fidl/dynsuite/client_suite/
 [dangerous identifiers suite]: /src/tests/fidl/dangerous_identifiers/
 [debugdata]: /zircon/system/ulib/c/sanitizers/debugdata.cc
 [dynamic compatibility suite]: /src/tests/fidl/compatibility/
@@ -147,7 +147,7 @@ Add coverage to:
 [RELRO]: https://www.redhat.com/en/blog/hardening-elf-binaries-using-relocation-read-only-relro
 [sanitizer-abi]: /zircon/system/ulib/ldmsg/BUILD.gn
 [summarize]: /tools/fidl/fidl_api_summarize/
-[server suite]: /src/tests/fidl/server_suite/
+[server suite]: /src/tests/fidl/dynsuite/server_suite/
 [source compatibility suite]: /src/tests/fidl/source_compatibility/
 [span-tests]: /tools/fidl/fidlc/tests/span_tests.cc
 [table-tests]: /tools/fidl/fidlc/tests/table_tests.cc
