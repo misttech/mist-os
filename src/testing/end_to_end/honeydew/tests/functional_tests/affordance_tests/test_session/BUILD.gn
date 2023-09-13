@@ -40,6 +40,9 @@ if (is_host) {
 
   group("unstable_non_sl4f_emulator_tests") {
     testonly = true
-    public_deps = [ ":session_test_fc($host_toolchain)" ]
+    public_deps = []
+
+    # TODO(b/296269354): Uncomment after updating builders to target "workbench"
+    # public_deps = [ ":session_test_fc($host_toolchain)" ]
   }
 }
