@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::pbm::make_configs;
+use crate::pbm::{get_virtual_devices, make_configs};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use emulator_instance::{clean_up_instance_dir, EmulatorConfiguration, EngineType, NetworkingMode};
@@ -126,11 +126,12 @@ impl<T: EngineOperations> FfxMain for EmuStartTool<T> {
 
         // List the devices available in this product bundle
         if self.cmd.device_list {
-            let devices = &product_bundle
-                .expect("product bundle needed for device list")
-                .device_refs()
-                .user_message("Error listing available virtual device specifications")?;
-            println!("Valid virtual device specifications are: {:?}", devices);
+            let virtual_devices = get_virtual_devices(&product_bundle.unwrap(), &self.sdk).await?;
+            if virtual_devices.is_empty() {
+                println!("There are no virtual devices configured for this product bundle");
+            } else {
+                println!("Valid virtual device specifications are: {:?}", virtual_devices);
+            }
             return Ok(());
         }
 
@@ -346,6 +347,11 @@ impl<T: EngineOperations> EmuStartTool<T> {
             }
 
             if self.cmd.device.is_none() {
+                let virtual_devices =
+                    get_virtual_devices(&loaded_product_bundle, &self.sdk).await?;
+                if virtual_devices.is_empty() {
+                    ffx_bail!("There are no virtual devices configured for this product bundle")
+                }
                 // Virtual device spec name
                 if let Some(device_name) = self.cmd.device().await? {
                     if self.cmd.device.is_none() && device_name != "" {

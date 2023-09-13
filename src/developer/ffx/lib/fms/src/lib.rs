@@ -20,6 +20,7 @@ use std::{
 
 /// Manager for finding available SDK Modules for download or ensuring that an
 /// SDK Module (artifact) is downloaded.
+#[derive(Debug)]
 pub struct Entries {
     /// A collection of FMS Entries that have been added.
     data: HashMap<String, Metadata>,
@@ -189,7 +190,6 @@ pub fn find_product_bundle<'a>(
 ///     contain both physical and virtual specs. The first virtual device spec
 ///     is returned.
 ///
-/// Errors if no suitable Virtual Device Specification is found.
 pub fn find_virtual_devices(
     fms_entries: &Entries,
     fms_name_list: &[String],
@@ -201,9 +201,6 @@ pub fn find_virtual_devices(
             Some(_) => tracing::debug!("FMS name {:?} is not a known virtual device", fms_name),
             None => bail!("FMS name {:?} was not found", fms_name),
         }
-    }
-    if v.is_empty() {
-        bail!("No virtual device specification was found in {:?}.", fms_name_list);
     }
     Ok(v)
 }
