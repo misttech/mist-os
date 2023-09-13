@@ -15,19 +15,14 @@
 
 namespace fit {
 
-// TODO(fxbug.dev/133501): Remove Allocator defaults for `function_impl` and `callback_impl` once
-// Pigweed change is merged (needed for soft transition).
-
-template <size_t inline_target_size, bool require_inline, typename FunctionType,
-          typename Allocator = std::allocator<std::byte>>
+template <size_t inline_target_size, bool require_inline, typename FunctionType, typename Allocator>
 class function_impl {
   static_assert(std::is_function<FunctionType>::value,
                 "fit::function must be instantiated with a function type, such as void() or "
                 "int(char*, bool)");
 };
 
-template <size_t inline_target_size, bool require_inline, typename FunctionType,
-          typename Allocator = std::allocator<std::byte>>
+template <size_t inline_target_size, bool require_inline, typename FunctionType, typename Allocator>
 class callback_impl {
   static_assert(std::is_function<FunctionType>::value,
                 "fit::callback must be instantiated with a function type, such as void() or "

@@ -72,9 +72,9 @@ class CompletionCallback {
   CompletionCallback(Callable target) : callback_(std::move(target)) {}
 
   // Delete specialization for fit::callback.
-  template <size_t other_inline_target_size, bool other_require_inline>
-  CompletionCallback(
-      ::fit::callback_impl<other_inline_target_size, other_require_inline, void(Args...)>) = delete;
+  template <size_t other_inline_target_size, bool other_require_inline, typename OtherAllocator>
+  CompletionCallback(::fit::callback_impl<other_inline_target_size, other_require_inline,
+                                          void(Args...), OtherAllocator>) = delete;
 
   CompletionCallback(CompletionCallback&& other) : callback_(std::move(other.callback_)) {}
 

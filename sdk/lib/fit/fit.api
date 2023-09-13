@@ -1,6 +1,6 @@
 {
   "pkg/fit/include/lib/fit/defer.h": "848d5a2b9fbde5581fc412ee4428920e",
-  "pkg/fit/include/lib/fit/function.h": "7f21ff10592bb5444bee6d546e2264a6",
+  "pkg/fit/include/lib/fit/function.h": "537fe58f763c25b3458833f29e358dd1",
   "pkg/fit/include/lib/fit/function_traits.h": "4db000fe2c2daba6d1b999c21c851da9",
   "pkg/fit/include/lib/fit/inline_any.h": "ff5fdb43689cc6cd5ef0225fc0579e46",
   "pkg/fit/include/lib/fit/internal/compiler.h": "eb80028d0f29a5e139e431e186e2ee24",
