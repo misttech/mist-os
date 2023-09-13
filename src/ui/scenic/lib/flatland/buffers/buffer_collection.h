@@ -26,7 +26,9 @@ class BufferCollectionInfo {
   // as Allocator_Sync pointers are thread safe, but if this becomes async it may become unsafe.
   static fit::result<fit::failed, BufferCollectionInfo> New(
       fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
-      BufferCollectionHandle buffer_collection_token);
+      BufferCollectionHandle buffer_collection_token,
+      std::optional<fuchsia::sysmem::ImageFormatConstraints> image_format_constraints =
+          std::nullopt);
 
   // Creates a non-initialized instance of this class. Fully initialized instances must
   // be created via a call to |New|.

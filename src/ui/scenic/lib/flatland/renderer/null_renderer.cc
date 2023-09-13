@@ -6,6 +6,9 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#include <memory>
+#include <optional>
+
 #include "fidl/fuchsia.images2/cpp/wire_types.h"
 
 namespace flatland {
@@ -24,8 +27,20 @@ bool NullRenderer::ImportBufferCollection(
     FX_LOGS(ERROR) << "Duplicate GlobalBufferCollectionID: " << collection_id;
     return false;
   }
-
-  auto result = BufferCollectionInfo::New(sysmem_allocator, std::move(token));
+  std::optional<fuchsia::sysmem::ImageFormatConstraints> image_constraints;
+  if (size.has_value()) {
+    image_constraints = std::make_optional<fuchsia::sysmem::ImageFormatConstraints>();
+    image_constraints->pixel_format.type = fuchsia::sysmem::PixelFormatType::BGRA32;
+    image_constraints->color_spaces_count = 1;
+    image_constraints->color_space[0] =
+        fuchsia::sysmem::ColorSpace{.type = fuchsia::sysmem::ColorSpaceType::SRGB};
+    image_constraints->required_min_coded_width = size->width;
+    image_constraints->required_min_coded_height = size->height;
+    image_constraints->required_max_coded_width = size->width;
+    image_constraints->required_max_coded_height = size->height;
+  }
+  auto result =
+      BufferCollectionInfo::New(sysmem_allocator, std::move(token), std::move(image_constraints));
   if (result.is_error()) {
     FX_LOGS(ERROR) << "Unable to register collection.";
     return false;

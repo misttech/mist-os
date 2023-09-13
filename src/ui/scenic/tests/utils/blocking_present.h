@@ -16,6 +16,7 @@ namespace integration_tests {
 // 1. Scenic indicates that the frame has been presented.
 // 2. Scenic indicates that the flatland client can begin rendering the next frame.
 void BlockingPresent(LoggingEventLoop* loop, fuchsia::ui::composition::FlatlandPtr& flatland,
+                     fuchsia::ui::composition::PresentArgs present_args = {},
                      cpp20::source_location = cpp20::source_location::current());
 
 }  // namespace integration_tests

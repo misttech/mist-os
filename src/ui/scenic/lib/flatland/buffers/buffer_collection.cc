@@ -34,7 +34,8 @@ BufferCollectionInfo::BufferCollectionInfo(BufferCollectionInfo&& other) noexcep
 
 fit::result<fit::failed, BufferCollectionInfo> BufferCollectionInfo::New(
     fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
-    BufferCollectionHandle buffer_collection_token) {
+    BufferCollectionHandle buffer_collection_token,
+    std::optional<fuchsia::sysmem::ImageFormatConstraints> image_format_constraints) {
   FX_DCHECK(sysmem_allocator);
 
   if (!buffer_collection_token.is_valid()) {
@@ -67,6 +68,11 @@ fit::result<fit::failed, BufferCollectionInfo> BufferCollectionInfo::New(
   constraints.min_buffer_count = 1;
   constraints.usage.vulkan =
       fuchsia::sysmem::vulkanUsageSampled | fuchsia::sysmem::vulkanUsageTransferSrc;
+
+  if (image_format_constraints.has_value()) {
+    constraints.image_format_constraints_count = 1;
+    constraints.image_format_constraints[0] = image_format_constraints.value();
+  }
   status = buffer_collection->SetConstraints(true /* has_constraints */, constraints);
 
   // From this point on, if we fail, we DCHECK, because we should have already caught errors

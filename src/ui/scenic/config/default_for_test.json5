@@ -1,4 +1,5 @@
 {
+    renderer: "vulkan",
     frame_scheduler_min_predicted_frame_duration_in_us: 0,
     pointer_auto_focus: true,
     display_composition: true,

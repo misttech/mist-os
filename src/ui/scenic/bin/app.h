@@ -61,6 +61,14 @@ class DisplayInfoDelegate : public Scenic::GetDisplayInfoDelegateDeprecated {
   std::shared_ptr<display::Display> display_ = nullptr;
 };
 
+// What type of renderer is used by Scenic.
+enum class RendererType : uint8_t {
+  // Send all rendering operations to void.
+  NULL_RENDERER,
+  // Use Vulkan for rendering.
+  VULKAN,
+};
+
 class App {
  public:
   App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspect_node,
@@ -88,6 +96,7 @@ class App {
   // dependencies.
   scheduling::DefaultFrameScheduler frame_scheduler_;
 
+  RendererType renderer_type_;
   std::optional<display::DisplayManager> display_manager_;
   std::optional<display::SingletonDisplayService> singleton_display_service_;
   std::optional<DisplayInfoDelegate> display_info_delegate_;

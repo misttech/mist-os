@@ -23,6 +23,7 @@ struct ViewProviderConfig {
 
 struct RealmBuilderArgs {
   std::optional<ViewProviderConfig> view_provider_config;
+  std::optional<std::string> renderer_type_config;
 };
 
 // Helper class for building a scenic realm. The scenic realm consists of three

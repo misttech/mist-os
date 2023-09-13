@@ -86,6 +86,10 @@
         },
     ],
     config: {
+        renderer: {
+            type: "string",
+            max_size: 16,
+        },
         frame_scheduler_min_predicted_frame_duration_in_us: { type: "uint64" },
         pointer_auto_focus: { type: "bool" },
         display_composition: { type: "bool" },

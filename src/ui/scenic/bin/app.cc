@@ -10,6 +10,7 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 
 #include "rapidjson/document.h"
@@ -20,6 +21,7 @@
 #include "src/ui/scenic/lib/display/color_converter.h"
 #include "src/ui/scenic/lib/display/display_power_manager.h"
 #include "src/ui/scenic/lib/flatland/engine/engine_types.h"
+#include "src/ui/scenic/lib/flatland/renderer/null_renderer.h"
 #include "src/ui/scenic/lib/flatland/renderer/vk_renderer.h"
 #include "src/ui/scenic/lib/scheduling/frame_metrics_registry.cb.h"
 #include "src/ui/scenic/lib/scheduling/windowed_frame_predictor.h"
@@ -34,6 +36,8 @@
 
 namespace {
 
+using scenic_impl::RendererType;
+
 // App installs the loader manifest FS at this path so it can use
 // fsl::DeviceWatcher on it.
 static const char* kDependencyPath = "/gpu-manifest-fs";
@@ -45,7 +49,7 @@ static constexpr zx::duration kShutdownTimeout = zx::sec(1);
 static constexpr zx::duration kEscherCleanupRetryInterval{1'000'000};  // 1 millisecond
 
 std::optional<fuchsia::hardware::display::DisplayId> GetDisplayId(
-    scenic_structured_config::Config values) {
+    const scenic_structured_config::Config& values) {
   if (values.i_can_haz_display_id() < 0) {
     return std::nullopt;
   }
@@ -53,7 +57,7 @@ std::optional<fuchsia::hardware::display::DisplayId> GetDisplayId(
       {.value = static_cast<uint64_t>(values.i_can_haz_display_id())});
 }
 
-std::optional<uint64_t> GetDisplayMode(scenic_structured_config::Config values) {
+std::optional<uint64_t> GetDisplayMode(const scenic_structured_config::Config& values) {
   if (values.i_can_haz_display_mode() < 0) {
     return std::nullopt;
   }
@@ -70,11 +74,30 @@ uint64_t GetDisplayRotation(scenic_structured_config::Config values) {
   return 0;
 }
 
+std::string ToString(RendererType type) {
+  switch (type) {
+    case RendererType::NULL_RENDERER:
+      return "null";
+    case RendererType::VULKAN:
+      return "vulkan";
+  }
+}
+
+RendererType GetRendererType(const scenic_structured_config::Config& values) {
+  if (ToString(RendererType::NULL_RENDERER).compare(values.renderer()) == 0)
+    return RendererType::NULL_RENDERER;
+  if (ToString(RendererType::VULKAN).compare(values.renderer()) == 0)
+    return RendererType::VULKAN;
+  FX_LOGS(WARNING) << "Unknown renderer type: " << values.renderer() << ". Falling back to vulkan";
+  return RendererType::VULKAN;
+}
+
 // Gets Scenic's structured config values and logs them.
 scenic_structured_config::Config GetConfig() {
   // Retrieve structured configuration
   auto values = scenic_structured_config::Config::TakeFromStartupHandle();
 
+  FX_LOGS(INFO) << "Scenic renderer: " << ToString(GetRendererType(values));
   FX_LOGS(INFO) << "Scenic min_predicted_frame_duration(us): "
                 << values.frame_scheduler_min_predicted_frame_duration_in_us();
   FX_LOGS(INFO) << "Scenic pointer auto focus: " << values.pointer_auto_focus();
@@ -179,6 +202,7 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
               scheduling::DefaultFrameScheduler::kInitialRenderDuration,
               scheduling::DefaultFrameScheduler::kInitialUpdateDuration),
           inspect_node_.CreateChild("FrameScheduler"), &metrics_logger_),
+      renderer_type_(GetRendererType(config_values_)),
       scenic_(app_context_.get()),
       uber_struct_system_(std::make_shared<flatland::UberStructSystem>()),
       link_system_(
@@ -226,26 +250,31 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
       [] { FX_LOGS(WARNING) << "SCENIC IS WAITING FOR VULKAN TO BE AVAILABLE..."; });
   PostDelayedTaskUntilCancelled(vulkan_wait_log->callback(), kWaitWarningInterval);
 
-  // Wait for a Vulkan ICD to become advertised before trying to launch escher.
-  FX_DCHECK(!device_watcher_);
-  device_watcher_ = fsl::DeviceWatcher::Create(
-      kDependencyPath,
-      [this, vulkan_loader = std::move(vulkan_loader),
-       completer = std::move(escher_bridge.completer),
-       vulkan_wait_log = std::move(vulkan_wait_log)](
-          const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) mutable {
-        auto escher = utils::CreateEscher(app_context_.get());
-        if (!escher) {
-          FX_LOGS(WARNING) << "Escher creation failed.";
-          // This should almost never happen, but might if the device was removed quickly after it
-          // was added or if the Vulkan driver doesn't actually work on this hardware. Retry when a
-          // new device is added.
-          return;
-        }
-        completer.complete_ok(std::move(escher));
-        device_watcher_.reset();
-      });
-  FX_DCHECK(device_watcher_);
+  if (renderer_type_ == RendererType::VULKAN) {
+    // Wait for a Vulkan ICD to become advertised before trying to launch escher.
+    FX_DCHECK(!device_watcher_);
+    device_watcher_ = fsl::DeviceWatcher::Create(
+        kDependencyPath, [this, vulkan_loader = std::move(vulkan_loader),
+                          completer = std::move(escher_bridge.completer),
+                          vulkan_wait_log = std::move(vulkan_wait_log)](
+                             const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                             const std::string& filename) mutable {
+          auto escher = utils::CreateEscher(app_context_.get());
+          if (!escher) {
+            FX_LOGS(WARNING) << "Escher creation failed.";
+            // This should almost never happen, but might if the device was removed quickly after it
+            // was added or if the Vulkan driver doesn't actually work on this hardware. Retry when
+            // a new device is added.
+            return;
+          }
+          completer.complete_ok(std::move(escher));
+          device_watcher_.reset();
+        });
+    FX_DCHECK(device_watcher_);
+  } else {
+    // Immediately complete promise if we aren't using vulkan renderer.
+    escher_bridge.completer.complete_ok(nullptr);
+  }
 
   auto display_wait_log = std::make_unique<fxl::CancelableClosure>(
       [] { FX_LOGS(WARNING) << "SCENIC IS WAITING FOR DISPLAY TO BE AVAILABLE..."; });
@@ -293,22 +322,24 @@ void App::InitializeServices(escher::EscherUniquePtr escher,
     return;
   }
 
-  if (!escher || !escher->device()) {
-    FX_LOGS(ERROR) << "No Vulkan on device, Graphics system exiting.";
-    shutdown_manager_->Shutdown(kShutdownTimeout);
-    return;
-  }
+  if (renderer_type_ == RendererType::VULKAN) {
+    if (!escher || !escher->device()) {
+      FX_LOGS(ERROR) << "No Vulkan on device, Graphics system exiting.";
+      shutdown_manager_->Shutdown(kShutdownTimeout);
+      return;
+    }
 
-  escher_ = std::move(escher);
-  escher_cleanup_ = std::make_shared<utils::CleanupUntilDone>(kEscherCleanupRetryInterval,
-                                                              [escher = escher_->GetWeakPtr()]() {
-                                                                if (!escher) {
-                                                                  // Escher is destroyed, so there
-                                                                  // is no cleanup to be done.
-                                                                  return true;
-                                                                }
-                                                                return escher->Cleanup();
-                                                              });
+    escher_ = std::move(escher);
+    escher_cleanup_ = std::make_shared<utils::CleanupUntilDone>(kEscherCleanupRetryInterval,
+                                                                [escher = escher_->GetWeakPtr()]() {
+                                                                  if (!escher) {
+                                                                    // Escher is destroyed, so there
+                                                                    // is no cleanup to be done.
+                                                                    return true;
+                                                                  }
+                                                                  return escher->Cleanup();
+                                                                });
+  }
 
   InitializeGraphics(display);
   InitializeInput();
@@ -331,7 +362,7 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
   // unexpected lazy pipeline creation.  This allows us to detect when this slips through our
   // testing and occurs in the wild.  In order to detect problems ASAP during development, debug
   // builds CHECK instead of logging to Cobalt.
-  {
+  if (renderer_type_ == RendererType::VULKAN) {
     auto pipeline_builder = std::make_unique<escher::PipelineBuilder>(escher_->vk_device());
     pipeline_builder->set_log_pipeline_creation_callback(
         [metrics_logger = &metrics_logger_](const vk::GraphicsPipelineCreateInfo* graphics_info,
@@ -361,7 +392,15 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     display_info_delegate_.emplace(display);
   }
 
-  auto flatland_renderer = std::make_shared<flatland::VkRenderer>(escher_->GetWeakPtr());
+  std::shared_ptr<flatland::Renderer> flatland_renderer;
+  switch (renderer_type_) {
+    case RendererType::NULL_RENDERER:
+      flatland_renderer = std::make_shared<flatland::NullRenderer>();
+      break;
+    case RendererType::VULKAN:
+      flatland_renderer = std::make_shared<flatland::VkRenderer>(escher_->GetWeakPtr());
+      break;
+  }
   // TODO(fxbug.dev/78186): flatland::VkRenderer hardcodes the framebuffer pixel format.
   // Eventually we won't, instead choosing one from the list of acceptable formats advertised by
   // each plugged-in display.  This will raise the issue of where to do pipeline cache warming: it
@@ -626,7 +665,8 @@ void App::InitializeHeartbeat(display::Display& display) {
         view_tree_snapshotter_->UpdateSnapshot();
         // Always defer the first cleanup attempt, because the first try is almost guaranteed to
         // fail, and checking the status of a `VkFence` is fairly expensive.
-        escher_cleanup_->Cleanup(/*ok_to_run_immediately=*/false);
+        if (escher_cleanup_)
+          escher_cleanup_->Cleanup(/*ok_to_run_immediately=*/false);
       },
       /*on_frame_presented*/
       [this](auto latched_times, auto present_times) {

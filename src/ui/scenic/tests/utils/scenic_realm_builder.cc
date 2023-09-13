@@ -63,6 +63,13 @@ ScenicRealmBuilder& ScenicRealmBuilder::Init(RealmBuilderArgs args) {
                                   .targets = {ChildRef{config.name}}});
   }
 
+  // Configure the renderer type for Scenic.
+  if (args.renderer_type_config.has_value()) {
+    realm_builder_.InitMutableConfigFromPackage(kScenic);
+    realm_builder_.SetConfigValue(kScenic, "renderer",
+                                  ConfigValue(args.renderer_type_config.value()));
+  }
+
   return *this;
 }
 

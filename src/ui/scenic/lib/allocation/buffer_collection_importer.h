@@ -94,7 +94,7 @@ class BufferCollectionImporter {
   // |token| must be a valid sysmem token.
   // |usage| determines the type of buffer collection to be imported.
   // |size| may be optionally set to indicate the intended size usage so that it may be specified
-  // when setting constraints in |token|.
+  // when setting constraints in |token|, i.e. for kRenderTarget allocations.
   virtual bool ImportBufferCollection(
       GlobalBufferCollectionId collection_id, fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
       fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,

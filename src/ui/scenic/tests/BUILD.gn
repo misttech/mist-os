@@ -10,6 +10,7 @@ group("tests") {
   public_deps = [
     ":display_integration_tests",
     ":flatland_integration_tests",
+    ":flatland_null_renderer_integration_test",
     ":flatland_protected_memory_integration_test",
     ":observer_integration_tests",
   ]
@@ -168,6 +169,25 @@ fuchsia_test_component("flatland_view_integration_test") {
   manifest = "meta/flatland_view_integration_test.cml"
   deps = [ ":flatland_view_integration_test_bin" ]
   test_type = "vulkan"
+}
+
+executable("null_renderer_integration_test_bin") {
+  testonly = true
+  sources = [ "flatland_integration_tests/null_renderer_integration_test.cc" ]
+  deps = [
+    ":common_deps",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
+    "//src/ui/scenic/lib/allocation:allocation",
+    "//src/ui/scenic/lib/utils:utils",
+  ]
+}
+
+fuchsia_test_component("null_renderer_integration_test") {
+  component_name = "null_renderer_integration_test"
+  manifest = "meta/null_renderer_integration_test.cml"
+  deps = [ ":null_renderer_integration_test_bin" ]
+  test_type = "system"
 }
 
 executable("observer_registry_integration_test_bin") {
@@ -373,16 +393,26 @@ fuchsia_test_package("flatland_integration_tests") {
   test_components = [
     ":flatland_focus_integration_test",
     ":flatland_mouse_integration_test",
-    ":flatland_touch_integration_test",
-    ":screen_capture_integration_test",
-    ":screen_capture2_integration_test",
-    ":flatland_view_ref_installed_integration_test",
-    ":flatland_view_integration_test",
     ":flatland_pixeltest_flip_and_orientation",
     ":flatland_pixeltest_general",
+    ":flatland_touch_integration_test",
+    ":flatland_view_ref_installed_integration_test",
+    ":flatland_view_integration_test",
+    ":screen_capture_integration_test",
+    ":screen_capture2_integration_test",
   ]
   test_specs = {
     environments = vulkan_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
+fuchsia_test_package("flatland_null_renderer_integration_test") {
+  test_components = [ ":null_renderer_integration_test" ]
+
+  test_specs = {
     log_settings = {
       max_severity = "ERROR"
     }
