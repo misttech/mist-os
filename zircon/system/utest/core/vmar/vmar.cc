@@ -546,8 +546,16 @@ zx_status_t MakeManualAlignedVmar(size_t vmar_size, size_t alignment, zx_handle_
 
 TEST(Vmar, AlignmentVmarMapTest) {
   const size_t size = zx_system_get_page_size() * 2;
+#if defined(__riscv) && __has_feature(address_sanitizer)
+  // The reduced address space of riscv along with additional address space utilization with ASAN
+  // does not allow large VMAR allocations to succeed. So scale down the VMAR size, which should
+  // prevent testing of only three of the higher alignment flags.
+  const auto vmar_size = (512ull * 1024 * 1024);
+  const auto vmar_alignment = (32ull * 1024 * 1024);
+#else
   const auto vmar_size = (8ull * 1024 * 1024 * 1024);
   const auto vmar_alignment = (512ull * 1024 * 1024);
+#endif
 
   zx_handle_t vmo;
   ASSERT_EQ(zx_vmo_create(size, 0, &vmo), ZX_OK);
@@ -583,9 +591,17 @@ TEST(Vmar, AlignmentVmarMapTest) {
   // Test all supported alignments.
   for (const auto& d : align_data) {
     zx_vaddr_t mapping_addr = 0u;
-    ASSERT_EQ(zx_vmar_map(vmar, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | d.alignment, 0, vmo, 0, size,
-                          &mapping_addr),
-              ZX_OK);
+    zx_status_t status = zx_vmar_map(vmar, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | d.alignment, 0, vmo,
+                                     0, size, &mapping_addr);
+    if (status != ZX_OK) {
+      if (1ull << d.zero_bits > vmar_size) {
+        // If the requested alignment was greater than the VMAR size, the map should fail with
+        // ZX_ERR_NO_RESOURCES. Any other failure code is unexpected.
+        ASSERT_EQ(ZX_ERR_NO_RESOURCES, status, "alignment zero bits %d", d.zero_bits);
+        continue;
+      }
+    }
+    ASSERT_OK(status, "alignment zero bits %d", d.zero_bits);
 
     ASSERT_NE(mapping_addr, 0u);
     EXPECT_GE(__builtin_ctzll(mapping_addr), d.zero_bits);
@@ -601,8 +617,16 @@ TEST(Vmar, AlignmentVmarMapTest) {
 
 TEST(Vmar, AlignmentVmarAllocateTest) {
   const size_t size = zx_system_get_page_size() * 16;
+#if defined(__riscv) && __has_feature(address_sanitizer)
+  // The reduced address space of riscv along with additional address space utilization with ASAN
+  // does not allow large VMAR allocations to succeed. So scale down the VMAR size, which should
+  // prevent testing of only three of the higher alignment flags.
+  const auto vmar_size = (512ull * 1024 * 1024);
+  const auto vmar_alignment = (32ull * 1024 * 1024);
+#else
   const auto vmar_size = (8ull * 1024 * 1024 * 1024);
   const auto vmar_alignment = (512ull * 1024 * 1024);
+#endif
 
   zx_handle_t vmar = ZX_HANDLE_INVALID;
   ASSERT_EQ(MakeManualAlignedVmar(vmar_size, vmar_alignment, &vmar), ZX_OK);
@@ -639,9 +663,18 @@ TEST(Vmar, AlignmentVmarAllocateTest) {
   for (const auto& d : align_data) {
     zx_handle_t child_vmar;
     uintptr_t mapping_addr = 0u;
-    ASSERT_EQ(zx_vmar_allocate(vmar, ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | d.alignment, 0, size,
-                               &child_vmar, &mapping_addr),
-              ZX_OK);
+    zx_status_t status =
+        zx_vmar_allocate(vmar, ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | d.alignment, 0, size,
+                         &child_vmar, &mapping_addr);
+    if (status != ZX_OK) {
+      // If the requested alignment was greater than the VMAR size, the allocation should fail with
+      // ZX_ERR_NO_RESOURCES. Any other failure code is unexpected.
+      if (1ull << d.zero_bits > vmar_size) {
+        ASSERT_EQ(ZX_ERR_NO_RESOURCES, status, "alignment zero bits %d", d.zero_bits);
+        continue;
+      }
+    }
+    ASSERT_OK(status, "alignment zero bits %d", d.zero_bits);
 
     ASSERT_NE(mapping_addr, 0u);
     EXPECT_GE(__builtin_ctzll(mapping_addr), d.zero_bits);
