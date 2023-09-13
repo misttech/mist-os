@@ -116,12 +116,12 @@ class HdmiHost {
   // engine driver and can be used in a display configuration.
   bool IsDisplayModeSupported(const display_mode_t& mode) const;
 
-  zx_status_t GetVic(display_mode_t* disp_timing);
+  zx_status_t CalculateAndSetHdmiHardwareParams(const display_mode_t* disp_timing);
 
   zx_status_t ConfigurePll();
 
  private:
-  zx_status_t GetVic(display_mode_t* disp_timing, hdmi_param* p);
+  zx_status_t CalculateAndSetHdmiHardwareParams(const display_mode_t* disp_timing, hdmi_param* p);
   void ConfigEncoder();
   void ConfigPhy();
 

@@ -267,6 +267,7 @@ bool Vout::IsDisplayModeSupported(const display_mode_t* mode) {
 }
 
 zx::result<> Vout::ApplyConfiguration(const display_mode_t* mode) {
+  ZX_DEBUG_ASSERT(mode != nullptr);
   switch (type_) {
     case kDsi:
       return zx::ok();
@@ -276,11 +277,9 @@ zx::result<> Vout::ApplyConfiguration(const display_mode_t* mode) {
         return zx::ok();
       }
 
-      display_mode_t modified_mode;
-      memcpy(&modified_mode, mode, sizeof(display_mode_t));
-      zx_status_t status = hdmi_.hdmi_host->GetVic(&modified_mode);
+      zx_status_t status = hdmi_.hdmi_host->CalculateAndSetHdmiHardwareParams(mode);
       if (status != ZX_OK) {
-        zxlogf(ERROR, "Failed to get video clock for current HDMI display mode: %s",
+        zxlogf(ERROR, "Failed to get HDMI hardware parameters for current HDMI display mode: %s",
                zx_status_get_string(status));
         return zx::error(status);
       }
@@ -288,7 +287,7 @@ zx::result<> Vout::ApplyConfiguration(const display_mode_t* mode) {
       memcpy(&hdmi_.cur_display_mode_, mode, sizeof(display_mode_t));
       // FIXME: Need documentation for HDMI PLL initialization
       hdmi_.hdmi_host->ConfigurePll();
-      hdmi_.hdmi_host->ModeSet(modified_mode);
+      hdmi_.hdmi_host->ModeSet(*mode);
       return zx::ok();
     }
     default:

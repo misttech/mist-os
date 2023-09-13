@@ -335,34 +335,16 @@ bool HdmiHost::IsDisplayModeSupported(const display_mode_t& mode) const {
   return true;
 }
 
-zx_status_t HdmiHost::GetVic(display_mode_t* disp_timing) { return GetVic(disp_timing, &p_); }
+zx_status_t HdmiHost::CalculateAndSetHdmiHardwareParams(const display_mode_t* disp_timing) {
+  return CalculateAndSetHdmiHardwareParams(disp_timing, &p_);
+}
 
-zx_status_t HdmiHost::GetVic(display_mode_t* disp_timing, hdmi_param* p) {
+zx_status_t HdmiHost::CalculateAndSetHdmiHardwareParams(const display_mode_t* disp_timing,
+                                                        hdmi_param* p) {
   ZX_DEBUG_ASSERT(disp_timing != nullptr);
 
   if (!IsDisplayModeSupported(*disp_timing)) {
     return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  if (disp_timing->v_addressable == 2160) {
-    zxlogf(INFO, "4K Monitor Detected.");
-
-    if ((disp_timing->pixel_clock_10khz * 10) == 533250) {
-      // FIXME: 4K with reduced blanking (533.25MHz) does not work
-      zxlogf(INFO, "4K @ 30Hz");
-      disp_timing->flags &= ~MODE_FLAG_INTERLACED;
-      disp_timing->pixel_clock_10khz = 29700;
-      disp_timing->h_addressable = 3840;
-      disp_timing->h_blanking = 560;
-      disp_timing->h_front_porch = 176;
-      disp_timing->h_sync_pulse = 88;
-      disp_timing->flags |= MODE_FLAG_HSYNC_POSITIVE;
-      disp_timing->v_addressable = 2160;
-      disp_timing->v_blanking = 90;
-      disp_timing->v_front_porch = 8;
-      disp_timing->v_sync_pulse = 10;
-      disp_timing->flags |= MODE_FLAG_VSYNC_POSITIVE;
-    }
   }
 
   // Monitor has its own preferred timings. Use that
