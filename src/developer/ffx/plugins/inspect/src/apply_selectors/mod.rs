@@ -116,9 +116,9 @@ mod tests {
 
     #[fuchsia::test]
     fn hide_filtered_selectors() {
-        let selectors = "realm1/realm2/sessio5/account_manager.cmx:root/accounts:total
-realm1/realm2/session5/account_manager.cmx:root/listeners:total_opened
-realm1/realm2/session5/account_manager.cmx:root/listeners:active";
+        let selectors = "realm1/realm2/session5/account_manager:root/accounts:total
+realm1/realm2/session5/account_manager:root/listeners:total_opened
+realm1/realm2/session5/account_manager:root/listeners:active";
 
         let mut selector_file =
             NamedTempFile::new().expect("Unable to create tempfile for testing.");
@@ -143,9 +143,9 @@ realm1/realm2/session5/account_manager.cmx:root/listeners:active";
         screen.refresh_screen_and_flush();
 
         // The output should not contain these selectors
-        // realm1/realm2/session5/account_manager.cmx:root/accounts:active
-        // realm1/realm2/session5/account_manager.cmx:root/auth_providers:types
-        // realm1/realm2/session5/account_manager.cmx:root/listeners:events
+        // realm1/realm2/session5/account_manager:root/accounts:active
+        // realm1/realm2/session5/account_manager:root/auth_providers:types
+        // realm1/realm2/session5/account_manager:root/listeners:events
 
         let screen_output = fake_terminal.screen_without_help_footer();
 

@@ -245,10 +245,10 @@ pub fn get_v1_json_dump() -> serde_json::Value {
                 "data_source":"Inspect",
                 "metadata":{
                     "filename":"fuchsia.inspect.Tree",
-                    "component_url": "fuchsia-pkg://fuchsia.com/account#meta/account_manager.cmx",
+                    "component_url": "fuchsia-pkg://fuchsia.com/account#meta/account_manager",
                     "timestamp":0
                 },
-                "moniker":"realm1/realm2/session5/account_manager.cmx",
+                "moniker":"realm1/realm2/session5/account_manager",
                 "payload":{
                     "root": {
                         "accounts": {
@@ -278,10 +278,10 @@ pub fn get_v1_single_value_json() -> serde_json::Value {
                 "data_source":"Inspect",
                 "metadata":{
                     "filename":"fuchsia.inspect.Tree",
-                    "component_url": "fuchsia-pkg://fuchsia.com/account#meta/account_manager.cmx",
+                    "component_url": "fuchsia-pkg://fuchsia.com/account#meta/account_manager",
                     "timestamp":0
                 },
-                "moniker":"realm1/realm2/session5/account_manager.cmx",
+                "moniker":"realm1/realm2/session5/account_manager",
                 "payload":{
                     "root": {
                         "accounts": {

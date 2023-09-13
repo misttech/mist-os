@@ -201,10 +201,10 @@ mod tests {
                     "data_source": "Inspect",
                     "metadata": {
                         "filename": "fuchsia.inspect.Tree",
-                        "component_url": "fuchsia-pkg://fuchsia.com/blooper#meta/blooper.cmx",
+                        "component_url": "fuchsia-pkg://fuchsia.com/blooper#meta/blooper.cm",
                         "timestamp": 0
                     },
-                    "moniker": "blooper.cmx",
+                    "moniker": "blooper",
                     "payload": {
                         "root": {
                             "a": {
@@ -218,7 +218,7 @@ mod tests {
             ]
         );
 
-        let selector = "blooper.cmx:root/a:b";
+        let selector = "blooper:root/a:b";
         let mut selector_path =
             tempfile::NamedTempFile::new().expect("Creating tmp selector file should succeed.");
 
@@ -233,7 +233,7 @@ mod tests {
             }
         }
         let filtered_data_string =
-            filter_data_to_lines(&selector_path.path(), &schemas, &Some("blooper.cmx".to_string()))
+            filter_data_to_lines(&selector_path.path(), &schemas, &Some("blooper".to_string()))
                 .expect("filtering hierarchy should succeed.");
 
         let removed_lines = filtered_data_string.iter().fold(HashSet::new(), |mut acc, line| {
@@ -250,12 +250,12 @@ mod tests {
 
     #[fuchsia::test]
     fn v1_filter_data_to_lines_test() {
-        let full_tree_selector = "*/realm2/session5/account_manager.cmx:root/accounts:active
-realm1/realm*/sessio*/account_manager.cmx:root/accounts:total
-realm1/realm2/session5/account_manager.cmx:root/auth_providers:types
-realm1/realm2/session5/account_manager.cmx:root/listeners:active
+        let full_tree_selector = "*/realm2/session5/account_manager:root/accounts:active
+realm1/realm*/sessio*/account_manager:root/accounts:total
+realm1/realm2/session5/account_manager:root/auth_providers:types
+realm1/realm2/session5/account_manager:root/listeners:active
 realm1/realm2/session5/account_*:root/listeners:events
-realm1/realm2/session5/account_manager.cmx:root/listeners:total_opened";
+realm1/realm2/session5/account_manager:root/listeners:total_opened";
 
         setup_and_run_selector_filtering(
             full_tree_selector,
@@ -268,11 +268,10 @@ realm1/realm2/session5/account_manager.cmx:root/listeners:total_opened";
             full_tree_selector,
             get_v1_json_dump(),
             get_v1_json_dump(),
-            Some("realm1/realm2/session5/account_manager.cmx".to_string()),
+            Some("realm1/realm2/session5/account_manager".to_string()),
         );
 
-        let single_value_selector =
-            "realm1/realm2/session5/account_manager.cmx:root/accounts:active";
+        let single_value_selector = "realm1/realm2/session5/account_manager:root/accounts:active";
 
         setup_and_run_selector_filtering(
             single_value_selector,
@@ -285,14 +284,14 @@ realm1/realm2/session5/account_manager.cmx:root/listeners:total_opened";
             single_value_selector,
             get_v1_json_dump(),
             get_v1_single_value_json(),
-            Some("realm1/realm2/session5/account_manager.cmx".to_string()),
+            Some("realm1/realm2/session5/account_manager".to_string()),
         );
 
         setup_and_run_selector_filtering(
             single_value_selector,
             get_v1_json_dump(),
             get_empty_value_json(),
-            Some("bloop.cmx".to_string()),
+            Some("bloop".to_string()),
         );
     }
 }
