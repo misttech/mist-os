@@ -74,11 +74,11 @@ __EXPORT void inspector_print_backtrace_markup(FILE* f, zx_handle_t process, zx_
         source += "context";
         break;
     }
-    if (frame.fatal_error) {
-      source += "\nunwinding aborted: " + frame.error.msg();
-    }
     fprintf(f, "{{{bt:%u:%#" PRIxPTR ":%s:%s}}}\n", n, pc, frame.pc_is_return_address ? "ra" : "pc",
             source.c_str());
+    if (frame.fatal_error) {
+      fprintf(f, "unwinding aborted: %s\n", frame.error.msg().c_str());
+    }
     n++;
   }
 
