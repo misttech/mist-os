@@ -21,6 +21,30 @@ if (is_host) {
     public_deps = [ ":emulator_tests" ]
   }
 
+  # Stable infra test groups.
+  group("stable_sl4f_emulator_tests") {
+    testonly = true
+    public_deps = [ "test_generic_fuchsia_device:stable_sl4f_emulator_tests" ]
+  }
+
+  group("stable_non_sl4f_emulator_tests") {
+    testonly = true
+    public_deps =
+        [ "test_generic_fuchsia_device:stable_non_sl4f_emulator_tests" ]
+  }
+
+  # Unstable infra test groups.
+  group("unstable_sl4f_emulator_tests") {
+    testonly = true
+    public_deps = [ "test_generic_fuchsia_device:unstable_sl4f_emulator_tests" ]
+  }
+
+  group("unstable_non_sl4f_emulator_tests") {
+    testonly = true
+    public_deps =
+        [ "test_generic_fuchsia_device:unstable_non_sl4f_emulator_tests" ]
+  }
+
   # Group of test cases that will be run in FYI on NUC.
   group("nuc_tests_fyi") {
     testonly = true
@@ -28,6 +52,28 @@ if (is_host) {
       "test_x64:x64_test($host_toolchain)",
       "test_x64:x64_test_fc($host_toolchain)",
     ]
+  }
+
+  # Stable infra test groups.
+  group("stable_sl4f_nuc_tests") {
+    testonly = true
+    public_deps = [ "test_x64:stable_sl4f_nuc_tests" ]
+  }
+
+  group("stable_non_sl4f_nuc_tests") {
+    testonly = true
+    public_deps = [ "test_x64:stable_non_sl4f_nuc_tests" ]
+  }
+
+  # Unstable infra test groups.
+  group("unstable_sl4f_nuc_tests") {
+    testonly = true
+    public_deps = [ "test_x64:unstable_sl4f_nuc_tests" ]
+  }
+
+  group("unstable_non_sl4f_nuc_tests") {
+    testonly = true
+    public_deps = [ "test_x64:unstable_non_sl4f_nuc_tests" ]
   }
 
   # Group of test cases that will be run in FYI on VIM3.
@@ -39,13 +85,36 @@ if (is_host) {
     ]
   }
 
+  # Stable infra test groups.
+  group("stable_sl4f_vim3_tests") {
+    testonly = true
+    public_deps = [ "test_vim3:stable_sl4f_vim3_tests" ]
+  }
+
+  group("stable_non_sl4f_vim3_tests") {
+    testonly = true
+    public_deps = [ "test_vim3:stable_non_sl4f_vim3_tests" ]
+  }
+
+  # Unstable infra test groups.
+  group("unstable_sl4f_vim3_tests") {
+    testonly = true
+    public_deps = [ "test_vim3:unstable_sl4f_vim3_tests" ]
+  }
+
+  group("unstable_non_sl4f_vim3_tests") {
+    testonly = true
+    public_deps = [ "test_vim3:unstable_non_sl4f_vim3_tests" ]
+  }
+
   # Group containing all of the HoneyDew device classes functional test cases.
   group("tests") {
     testonly = true
     public_deps = [
-      ":emulator_tests_fyi",
-      ":nuc_tests_fyi",
-      ":vim3_tests_fyi",
+      "test_fuchsia_device:tests",
+      "test_generic_fuchsia_device:tests",
+      "test_vim3:tests",
+      "test_x64:tests",
     ]
   }
 }

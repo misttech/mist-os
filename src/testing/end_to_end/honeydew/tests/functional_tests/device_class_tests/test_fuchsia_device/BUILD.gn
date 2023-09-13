@@ -38,4 +38,12 @@ if (is_host) {
     transport = "fuchsia-controller"
     environments = [ emu_env ]
   }
+
+  group("tests") {
+    testonly = true
+    public_deps = [
+      ":fuchsia_device_test($host_toolchain)",
+      ":fuchsia_device_test_fc($host_toolchain)",
+    ]
+  }
 }

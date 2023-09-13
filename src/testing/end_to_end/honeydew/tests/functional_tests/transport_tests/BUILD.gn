@@ -13,8 +13,33 @@ if (is_host) {
   group("tests") {
     testonly = true
     public_deps = [
-      ":emulator_tests_fyi",
-      "test_fastboot:fastboot_test($host_toolchain)",
+      "test_fastboot:tests",
+      "test_ffx:tests",
+    ]
+  }
+
+  # Stable infra test groups.
+  group("stable_sl4f_emulator_tests") {
+    testonly = true
+    public_deps = []
+  }
+
+  group("stable_non_sl4f_emulator_tests") {
+    testonly = true
+    public_deps = []
+  }
+
+  # Unstable infra test groups.
+  group("unstable_sl4f_emulator_tests") {
+    testonly = true
+    public_deps = []
+  }
+
+  group("unstable_non_sl4f_emulator_tests") {
+    testonly = true
+    public_deps = [
+      "test_fastboot:unstable_non_sl4f_emulator_tests",
+      "test_ffx:unstable_non_sl4f_emulator_tests",
     ]
   }
 }

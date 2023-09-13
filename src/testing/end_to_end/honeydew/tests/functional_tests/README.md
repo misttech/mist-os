@@ -47,21 +47,25 @@ Use the following approach in deciding whether to run the test case in CQ/CI/FYI
 
 Based on this we have created the following:
 * Test case build groups:
-  * `emulator_tests` - Group of test cases that will be run in CQ on emulator.
-  * `emulator_tests_fyi` - Group of test cases that will be run in FYI on emulator.
-  * `nuc_tests_fyi` - Group of test cases that will be run in FYI on NUC.
-  * `vim3_tests_fyi` - Group of test cases that will be run in FYI on VIM3.
-  * `terminal_emulator_tests_fyi` - Group of test cases that will be run in FYI on emulator build using terminal.
-  * format: `[Optional <PRODUCT>]_<BOARD>_tests_[ |fyi|ci]`, where
-    * specifying `<PRODUCT>` is optional but recommended when tets case group is
-      created for a specific `<PRODUCT>` configuration
-    * if group is for "CQ" then no postfix is needed but for other stages,
-      postfix is necessary (`_fyi` or `_ci`)
-* Builders:
-  * `core.qemu-x64-debug-pye2e` - CQ builder to run `emulator_tests` test group
-  * `core.qemu-x64-debug-pye2e-staging` - FYI builder to run `emulator_tests_fyi` test group
-  * `core.x64-debug-pye2e-staging` - FYI builder to run `nuc_tests_fyi` test group
-  * `core.vim3-debug-pye2e-staging` - FYI builder to run `vim3_tests_fyi` test group
+  * Test group naming scheme: `<STABILITY>_<SL4F_USAGE>_<BOARD>_tests`
+    * `<STABILITY>` - Whether tests are stable or flaky - "stable" or "unstable".
+        All newly added tests must be added to the "unstable" groups until 200
+        passing runs in infra FYI builder have been observed, after which they
+        may be promoted to "stable" groups.
+    * `<SL4F_USAGE>` - Whether tests require SL4F server or not - "sl4f" or "non_sl4f"
+    * `<BOARD>` - The board that the tests require to run on - e.g. "emulator", "nuc", "vim3"
+    * Examples:
+      * `stable_non_sl4f_emulator_tests`
+      * `unstable_sl4f_emulator_tests`
+  * This naming scheme is chosen to facilitate infra builder configuration.
+    * `<STABILITY>` informs whether a group is run in CI/CQ.
+    * `<SL4F_USAGE>` informs whether a test group can be run on certain products.
+    * `<BOARD>` informs whether a test group can be run on certain boards.
+* Builder examples:
+  * `core.qemu-x64-debug-pye2e` - CQ builder to run stable emulator tests
+  * `core.qemu-x64-debug-pye2e-staging` - FYI builder to run unstable emulator tests
+  * `core.x64-debug-pye2e-staging` - FYI builder to run unstable NUC tests
+  * `core.vim3-debug-pye2e-staging` - FYI builder to run unstable VIM3 tests
   * format: `<PRODUCT>.<BOARD>-debug-pye2e-[ |staging|ci]`, where
     * if builder is for "CQ" then no postfix is needed but for other stages,
       postfix is necessary (`-staging` or `-ci`)

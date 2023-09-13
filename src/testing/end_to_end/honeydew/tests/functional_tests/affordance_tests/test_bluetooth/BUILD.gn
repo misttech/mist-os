@@ -24,4 +24,36 @@ if (is_host) {
     transport = "fuchsia-controller"
     environments = [ nuc_env ]
   }
+
+  group("tests") {
+    testonly = true
+    public_deps = [
+      ":bluetooth_gap_test($host_toolchain)",
+      ":bluetooth_gap_test_fc($host_toolchain)",
+    ]
+  }
+
+  # BT affordance tests are not enabled in infra yet.
+
+  # Stable infra test groups.
+  group("stable_sl4f_emulator_tests") {
+    testonly = true
+    public_deps = []
+  }
+
+  group("stable_non_sl4f_emulator_tests") {
+    testonly = true
+    public_deps = []
+  }
+
+  # Unstable infra test groups.
+  group("unstable_sl4f_emulator_tests") {
+    testonly = true
+    public_deps = []
+  }
+
+  group("unstable_non_sl4f_emulator_tests") {
+    testonly = true
+    public_deps = []
+  }
 }
