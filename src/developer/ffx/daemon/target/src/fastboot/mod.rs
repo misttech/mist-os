@@ -5,10 +5,7 @@
 use crate::{
     fastboot::{
         client::{FastbootImpl, InterfaceFactory},
-        network::{
-            tcp::TcpNetworkFactory,
-            udp::{UdpNetworkFactory, UdpNetworkInterface},
-        },
+        network::{tcp::TcpNetworkFactory, udp::UdpNetworkFactory},
     },
     target::Target,
 };
@@ -24,6 +21,7 @@ use fastboot::{
 use ffx_config::get;
 use ffx_daemon_events::FastbootInterface;
 use ffx_fastboot::transport::tcp::TcpNetworkInterface;
+use ffx_fastboot::transport::udp::UdpNetworkInterface;
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_developer_ffx::{
     FastbootRequestStream, UploadProgressListenerMarker, UploadProgressListenerProxy,
