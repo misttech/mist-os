@@ -373,16 +373,6 @@ zx_status_t HdmiHost::CalculateAndSetHdmiHardwareParams(const display_mode_t* di
   // For now, we will simply not support this feature.
   p->timings.venc_pixel_repeat = 0;
 
-  if (p->timings.pfreq > 500000) {
-    p->phy_mode = 1;
-  } else if (p->timings.pfreq > 200000) {
-    p->phy_mode = 2;
-  } else if (p->timings.pfreq > 100000) {
-    p->phy_mode = 3;
-  } else {
-    p->phy_mode = 4;
-  }
-
   // TODO: We probably need a more sophisticated method for calculating
   // clocks. This will do for now.
   p->pll_p_24b.viu_channel = 1;
@@ -529,8 +519,6 @@ void HdmiHost::ConfigEncoder() {
 }
 
 void HdmiHost::ConfigPhy() {
-  auto* p = &p_;
-
   HhiHdmiPhyCntl0Reg::Get().FromValue(0).WriteTo(&(*hhi_mmio_));
   HhiHdmiPhyCntl1Reg::Get()
       .ReadFrom(&(*hhi_mmio_))
@@ -583,26 +571,18 @@ void HdmiHost::ConfigPhy() {
       .WriteTo(&(*hhi_mmio_));
   usleep(2);
 
-  switch (p->phy_mode) {
-    case 1: /* 5.94Gbps, 3.7125Gbsp */
-      HhiHdmiPhyCntl0Reg::Get().FromValue(0).set_hdmi_ctl1(0x37eb).set_hdmi_ctl2(0x65c4).WriteTo(
-          &(*hhi_mmio_));
-      HhiHdmiPhyCntl3Reg::Get().FromValue(0x2ab0ff3b).WriteTo(&(*hhi_mmio_));
-      HhiHdmiPhyCntl5Reg::Get().FromValue(0x0000080b).WriteTo(&(*hhi_mmio_));
-      break;
-    case 2: /* 2.97Gbps */
-      HhiHdmiPhyCntl0Reg::Get().FromValue(0).set_hdmi_ctl1(0x33eb).set_hdmi_ctl2(0x6262).WriteTo(
-          &(*hhi_mmio_));
-      HhiHdmiPhyCntl3Reg::Get().FromValue(0x2ab0ff3b).WriteTo(&(*hhi_mmio_));
-      HhiHdmiPhyCntl5Reg::Get().FromValue(0x00000003).WriteTo(&(*hhi_mmio_));
-      break;
-    default: /* 1.485Gbps, and below */
-      HhiHdmiPhyCntl0Reg::Get().FromValue(0).set_hdmi_ctl1(0x33eb).set_hdmi_ctl2(0x4242).WriteTo(
-          &(*hhi_mmio_));
-      HhiHdmiPhyCntl3Reg::Get().FromValue(0x2ab0ff3b).WriteTo(&(*hhi_mmio_));
-      HhiHdmiPhyCntl5Reg::Get().FromValue(0x00000003).WriteTo(&(*hhi_mmio_));
-      break;
-  }
+  // The following configuration for HDMI PHY control register 0, 3 and 5 only
+  // works for display modes where the display resolution is lower than
+  // 3840 x 2160. The configuration currently works for all display modes
+  // supported by this driver.
+  //
+  // TODO(fxbug.dev/124984): Set the PHY control registers properly if the
+  // display uses a 4k resolution (3840 x 2160 or higher).
+  HhiHdmiPhyCntl0Reg::Get().FromValue(0).set_hdmi_ctl1(0x33eb).set_hdmi_ctl2(0x4242).WriteTo(
+      &(*hhi_mmio_));
+  HhiHdmiPhyCntl3Reg::Get().FromValue(0x2ab0ff3b).WriteTo(&(*hhi_mmio_));
+  HhiHdmiPhyCntl5Reg::Get().FromValue(0x00000003).WriteTo(&(*hhi_mmio_));
+
   usleep(20);
   zxlogf(INFO, "done!");
 }

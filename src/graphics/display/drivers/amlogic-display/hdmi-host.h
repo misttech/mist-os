@@ -87,7 +87,6 @@ struct cea_timing {
 };
 
 struct hdmi_param {
-  uint8_t phy_mode;
   pll_param pll_p_24b;
   struct cea_timing timings;
 };
