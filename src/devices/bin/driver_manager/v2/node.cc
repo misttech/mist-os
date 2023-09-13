@@ -371,9 +371,9 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
   ZX_ASSERT_MSG(primary->devfs_device_.topological_node().has_value(), "%s",
                 composite->MakeTopologicalPath().c_str());
 
-  primary->devfs_device_.topological_node().value().add_child(composite->name_, std::nullopt,
-                                                              composite->CreateDevfsPassthrough(),
-                                                              composite->devfs_device_);
+  primary->devfs_device_.topological_node().value().add_child(
+      composite->name_, std::nullopt, composite->CreateControllerOnlyDevfsPassthrough(),
+      composite->devfs_device_);
   composite->devfs_device_.publish();
   return zx::ok(std::move(composite));
 }
@@ -831,7 +831,7 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
     }
   }
 
-  Devnode::Target devfs_target = Devnode::Target();
+  Devnode::Target devfs_target;
   std::optional<std::string_view> devfs_class_path;
   if (args.devfs_args().has_value() && args.devfs_args()->connector().has_value()) {
     if (args.devfs_args()->class_name().has_value()) {
@@ -844,6 +844,8 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
                                  zx::channel server, Devnode::PassThrough::ConnectionType type) {
           return connector->Connect(std::move(server)).status();
         });
+  } else {
+    devfs_target = child->CreateControllerOnlyDevfsPassthrough();
   }
   ZX_ASSERT(devfs_device_.topological_node().has_value());
   zx_status_t status = devfs_device_.topological_node()->add_child(
@@ -1242,7 +1244,7 @@ void Node::SetPerformanceState(SetPerformanceStateRequestView request,
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
-Devnode::Target Node::CreateDevfsPassthrough() {
+Devnode::Target Node::CreateControllerOnlyDevfsPassthrough() {
   return Devnode::PassThrough(
       [node = weak_from_this(), node_name = name_](zx::channel server_end,
                                                    Devnode::PassThrough::ConnectionType type) {

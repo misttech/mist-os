@@ -464,6 +464,11 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
 
   void SetupDevfs(DriverRunner& runner) { runner.root_node()->SetupDevfsForRootNode(devfs_); }
 
+  Devfs& devfs() {
+    EXPECT_TRUE(devfs_.has_value());
+    return devfs_.value();
+  }
+
  private:
   TestRealm realm_;
   TestDirectory driver_host_dir_{dispatcher()};
@@ -2355,6 +2360,67 @@ TEST_F(DriverRunnerTest, TestBindResultTracker) {
   }
 
   ASSERT_EQ(true, callback_called);
+}
+
+// Start the root driver, add a child node, and verify that the child node's device controller is
+// reachable.
+TEST_F(DriverRunnerTest, ConnectToDeviceController) {
+  auto driver_index = CreateDriverIndex();
+  auto driver_index_client = driver_index.Connect();
+  ASSERT_EQ(ZX_OK, driver_index_client.status_value());
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
+                             &LoaderFactory, dispatcher());
+  SetupDevfs(driver_runner);
+  auto defer = fit::defer([this] { Unbind(); });
+
+  fdf::NodeControllerPtr node_controller;
+
+  TestDriver* root_test_driver = nullptr;
+  fdf::NodePtr second_node;
+  driver_host().SetStartHandler([this, &root_test_driver, &node_controller, &second_node](
+                                    fdf::DriverStartArgs start_args, auto request) {
+    auto& entries = start_args.program().entries();
+    EXPECT_EQ(2u, entries.size());
+    EXPECT_EQ("binary", entries[0].key);
+    EXPECT_EQ("driver/root-driver.so", entries[0].value->str());
+    EXPECT_EQ("colocate", entries[1].key);
+    EXPECT_EQ("false", entries[1].value->str());
+
+    fdf::NodePtr root_node;
+    EXPECT_EQ(ZX_OK, root_node.Bind(std::move(*start_args.mutable_node()), dispatcher()));
+
+    fdf::NodeAddArgs args;
+    args.set_name("node-1");
+    root_node->AddChild(std::move(args), node_controller.NewRequest(dispatcher()),
+                        second_node.NewRequest(dispatcher()),
+                        [](auto result) { EXPECT_FALSE(result.is_err()); });
+    root_test_driver = BindDriver(std::move(request), std::move(root_node));
+  });
+  auto root_driver = StartRootDriver("fuchsia-boot:///#meta/root-driver.cm", driver_runner);
+  ASSERT_EQ(ZX_OK, root_driver.status_value());
+  RunLoopUntilIdle();
+
+  fs::SynchronousVfs vfs(dispatcher());
+  zx::result dev_res = devfs().Connect(vfs);
+  ASSERT_TRUE(dev_res.is_ok());
+  fidl::WireClient<fuchsia_io::Directory> dev{std::move(*dev_res), dispatcher()};
+  zx::result controller_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
+  ASSERT_FALSE(controller_endpoints.is_error());
+
+  ASSERT_TRUE(
+      dev->Open(fuchsia_io::OpenFlags::kNotDirectory, {}, "node-1/device_controller",
+                fidl::ServerEnd<fuchsia_io::Node>(controller_endpoints->server.TakeChannel()))
+          .ok());
+  RunLoopUntilIdle();
+  fidl::WireClient<fuchsia_device::Controller> device_controller{
+      std::move(controller_endpoints->client), dispatcher()};
+  device_controller->GetTopologicalPath().Then(
+      [](fidl::WireUnownedResult<fuchsia_device::Controller::GetTopologicalPath>& reply) {
+        ASSERT_EQ(reply.status(), ZX_OK);
+        ASSERT_TRUE(reply->is_ok());
+        ASSERT_EQ(reply.value()->path.get(), "dev/node-1");
+      });
+  RunLoopUntilIdle();
 }
 
 TEST(CompositeServiceOfferTest, WorkingOffer) {
