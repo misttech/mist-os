@@ -7254,6 +7254,9 @@ pub mod tests {
                     }
                     responder.send(Ok(response))?;
                 }
+                fbinder::ProcessAccessorRequest::_UnknownMethod { ordinal, .. } => {
+                    log_warn!("Unknown ProcessAccessor ordinal: {}", ordinal);
+                }
             }
         }
         Ok(fds)

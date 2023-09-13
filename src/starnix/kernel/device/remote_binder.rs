@@ -578,6 +578,9 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                 });
                 waiter.await;
             }
+            fbinder::BinderRequest::_UnknownMethod { ordinal, .. } => {
+                log_warn!("Unknown Binder ordinal: {}", ordinal);
+            }
         }
         Ok(())
     }
@@ -644,6 +647,10 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                     responder
                         .send(result)
                         .context("Unable to send LutexControllerRequest::WakeBitset response")
+                }
+                fbinder::LutexControllerRequest::_UnknownMethod { ordinal, .. } => {
+                    log_warn!("Unknown LutexController ordinal: {}", ordinal);
+                    Ok(())
                 }
             }
         }
@@ -809,6 +816,9 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                         }
                         Ok(None) => {}
                     }
+                }
+                fbinder::DevBinderRequest::_UnknownMethod { ordinal, .. } => {
+                    log_warn!("Unknown DevBinder ordinal: {}", ordinal);
                 }
             }
         }
