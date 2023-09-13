@@ -21,6 +21,7 @@ use std::io::{stderr, stdin, stdout};
 use structured_ui;
 
 const PB_MANIFEST_NAME: &'static str = "product_bundles.json";
+const CONFIG_BASE_URLS: &'static str = "pbms.base_urls";
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct ProductBundle {
@@ -42,7 +43,7 @@ pub async fn pb_list(
     let mut err_out = stderr();
     let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
     if let Some(version) = cmd.version {
-        let pbs = pb_list_impl(&cmd.auth, &cmd.base_url, &version, &ui).await?;
+        let pbs = pb_list_impl(&cmd.auth, cmd.base_url, &version, &ui).await?;
         if writer.is_machine() {
             writer.machine(&pbs)?;
         } else {
@@ -59,23 +60,34 @@ pub async fn pb_list(
 
 pub async fn pb_list_impl<I>(
     auth: &AuthFlowChoice,
-    base_url: &str,
+    override_base_url: Option<String>,
     version: &str,
     ui: &I,
 ) -> Result<Vec<ProductBundle>>
 where
     I: structured_ui::Interface + Sync,
 {
-    let start = std::time::Instant::now();
-    tracing::info!("---------------------- List Begin ----------------------------");
     let client = Client::initial()?;
-    let products = pb_gather_from_url(base_url, auth, ui, &client).await?;
 
-    tracing::debug!("Looking for product with version {}", version);
+    let mut products = Vec::new();
+    let base_urls = if let Some(base_url) = override_base_url {
+        vec![base_url]
+    } else {
+        ffx_config::get::<Vec<String>, _>(CONFIG_BASE_URLS)
+            .await
+            .context("get config CONFIG_BASE_URLS")?
+            .iter()
+            .map(|x| format!("{}/{}", x, version))
+            .collect::<Vec<_>>()
+    };
+
+    for base_url in &base_urls {
+        let prods = pb_gather_from_url(base_url, auth, ui, &client).await?;
+        products.extend(prods);
+    }
+
     let products =
         products.iter().cloned().filter(|x| x.product_version == version).collect::<Vec<_>>();
-    tracing::debug!("Total ffx product list runtime {} seconds.", start.elapsed().as_secs_f32());
-    tracing::debug!("End");
     Ok(products)
 }
 
@@ -139,7 +151,7 @@ mod test {
         let ui = structured_ui::MockUi::new();
         let pbs = pb_list_impl(
             &AuthFlowChoice::Default,
-            &format!("file:{}", test_env.home.display()),
+            Some(format!("file:{}", test_env.home.display())),
             "fake_version",
             &ui,
         )
