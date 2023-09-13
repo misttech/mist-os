@@ -23,16 +23,16 @@ namespace {
 // matching the given koid. Fills the process_name if such process can be found.
 // Fills the component_info if the process belongs to some component.
 bool FindProcess(const debug_ipc::ProcessTreeRecord& record, zx_koid_t koid_to_find,
-                 std::string* process_name,
-                 std::optional<debug_ipc::ComponentInfo>* component_info) {
+                 std::string* process_name, std::vector<debug_ipc::ComponentInfo>* component_info) {
   if (record.koid == koid_to_find) {
     *process_name = record.name;
     return true;
   }
   for (const auto& child : record.children) {
     if (FindProcess(child, koid_to_find, process_name, component_info)) {
-      if (!*component_info && record.component) {
-        *component_info = record.component;
+      if (!record.components.empty()) {
+        component_info->insert(component_info->end(), record.components.begin(),
+                               record.components.end());
       }
       return true;
     }
@@ -61,20 +61,23 @@ TEST_F(ZirconSystemInterfaceTest, GetProcessTree) {
 
   // Our koid should be somewhere in the tree.
   std::string process_name;
-  std::optional<debug_ipc::ComponentInfo> component_info;
-  EXPECT_TRUE(FindProcess(root, self_koid, &process_name, &component_info));
+  std::vector<debug_ipc::ComponentInfo> all_component_info;
+  EXPECT_TRUE(FindProcess(root, self_koid, &process_name, &all_component_info));
 
   // The process_name and component info should match
   EXPECT_EQ(zircon::NameForObject(*self), process_name);
-  ASSERT_TRUE(component_info);
-  EXPECT_EQ(".", component_info->moniker);
+  ASSERT_FALSE(all_component_info.empty());
+  ASSERT_EQ(all_component_info.size(), 1ull);
+
+  const auto& component_info = all_component_info[0];
+  EXPECT_EQ(".", component_info.moniker);
   // The url will include a hash that cannot be compared.
-  ASSERT_FALSE(component_info->url.empty());
+  ASSERT_FALSE(component_info.url.empty());
   std::string_view prefix = "fuchsia-pkg://fuchsia.com/debug_agent_unit_tests";
   std::string_view suffix = "#meta/debug_agent_unit_tests.cm";
-  ASSERT_GE(component_info->url.size(), prefix.size() + suffix.size());
-  EXPECT_EQ(prefix, component_info->url.substr(0, prefix.size()));
-  EXPECT_EQ(suffix, component_info->url.substr(component_info->url.size() - suffix.size()));
+  ASSERT_GE(component_info.url.size(), prefix.size() + suffix.size());
+  EXPECT_EQ(prefix, component_info.url.substr(0, prefix.size()));
+  EXPECT_EQ(suffix, component_info.url.substr(component_info.url.size() - suffix.size()));
 }
 
 TEST_F(ZirconSystemInterfaceTest, FindComponentInfo) {
@@ -87,17 +90,18 @@ TEST_F(ZirconSystemInterfaceTest, FindComponentInfo) {
   zx::process::self()->duplicate(ZX_RIGHT_SAME_RIGHTS, &handle);
   ZirconProcessHandle self(std::move(handle));
 
-  auto component_info = system_interface.GetComponentManager().FindComponentInfo(self);
+  auto components = system_interface.GetComponentManager().FindComponentInfo(self);
+  ASSERT_EQ(components.size(), 1ull);
 
-  ASSERT_TRUE(component_info);
-  EXPECT_EQ(".", component_info->moniker);
+  auto component_info = components[0];
+  EXPECT_EQ(".", component_info.moniker);
   // The url will include a hash that cannot be compared.
-  ASSERT_FALSE(component_info->url.empty());
+  ASSERT_FALSE(component_info.url.empty());
   std::string_view prefix = "fuchsia-pkg://fuchsia.com/debug_agent_unit_tests";
   std::string_view suffix = "#meta/debug_agent_unit_tests.cm";
-  ASSERT_GE(component_info->url.size(), prefix.size() + suffix.size());
-  EXPECT_EQ(prefix, component_info->url.substr(0, prefix.size()));
-  EXPECT_EQ(suffix, component_info->url.substr(component_info->url.size() - suffix.size()));
+  ASSERT_GE(component_info.url.size(), prefix.size() + suffix.size());
+  EXPECT_EQ(prefix, component_info.url.substr(0, prefix.size()));
+  EXPECT_EQ(suffix, component_info.url.substr(component_info.url.size() - suffix.size()));
 }
 
 TEST_F(ZirconSystemInterfaceTest, FilterMatchProcess) {

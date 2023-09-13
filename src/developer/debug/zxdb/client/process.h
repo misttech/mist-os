@@ -71,7 +71,7 @@ class Process : public ClientObject {
   virtual const std::string& GetName() const = 0;
 
   // Returns the component information.
-  virtual const std::optional<debug_ipc::ComponentInfo>& GetComponentInfo() const = 0;
+  virtual const std::vector<debug_ipc::ComponentInfo>& GetComponentInfo() const = 0;
 
   // Returns the interface for querying symbols for this process.
   virtual ProcessSymbols* GetSymbols() = 0;

@@ -48,7 +48,7 @@ std::unique_ptr<TargetImpl> TargetImpl::Clone(System* system) {
 
 void TargetImpl::CreateProcess(Process::StartType start_type, uint64_t koid,
                                const std::string& process_name, uint64_t timestamp,
-                               std::optional<debug_ipc::ComponentInfo> component_info) {
+                               const std::vector<debug_ipc::ComponentInfo>& component_info) {
   FX_DCHECK(!process_.get());  // Shouldn't have a process.
 
   state_ = State::kRunning;
@@ -64,8 +64,7 @@ void TargetImpl::CreateProcessForTesting(uint64_t koid, const std::string& proce
   state_ = State::kStarting;
   uint64_t cur_mock_timestamp = mock_timestamp_;
   mock_timestamp_ += 1000;
-  OnLaunchOrAttachReply(CallbackWithTimestamp(), Err(), koid, process_name, cur_mock_timestamp,
-                        std::nullopt);
+  OnLaunchOrAttachReply(CallbackWithTimestamp(), Err(), koid, process_name, cur_mock_timestamp, {});
 }
 
 void TargetImpl::ImplicitlyDetach() {
@@ -113,7 +112,7 @@ void TargetImpl::Launch(CallbackWithTimestamp callback) {
                    const Err& err, debug_ipc::RunBinaryReply reply) mutable {
         TargetImpl::OnLaunchOrAttachReplyThunk(weak_target, std::move(callback), err,
                                                reply.process_id, reply.status, reply.process_name,
-                                               reply.timestamp, std::nullopt);
+                                               reply.timestamp, {});
       });
 }
 
@@ -162,7 +161,7 @@ void TargetImpl::Attach(uint64_t koid, CallbackWithTimestamp callback) {
                                                const Err& err,
                                                debug_ipc::AttachReply reply) mutable {
     OnLaunchOrAttachReplyThunk(std::move(weak_target), std::move(callback), err, koid, reply.status,
-                               reply.name, reply.timestamp, std::move(reply.component));
+                               reply.name, reply.timestamp, std::move(reply.components));
   });
 }
 
@@ -206,7 +205,7 @@ void TargetImpl::OnProcessExiting(int return_code, uint64_t timestamp) {
 void TargetImpl::OnLaunchOrAttachReplyThunk(
     fxl::WeakPtr<TargetImpl> target, CallbackWithTimestamp callback, const Err& input_err,
     uint64_t koid, const debug::Status& status, const std::string& process_name, uint64_t timestamp,
-    std::optional<debug_ipc::ComponentInfo> component_info) {
+    const std::vector<debug_ipc::ComponentInfo>& component_info) {
   // The input Err indicates a transport error while the debug::Status indicates the remote error,
   // map them to a single value.
   Err err = input_err;
@@ -229,10 +228,9 @@ void TargetImpl::OnLaunchOrAttachReplyThunk(
   }
 }
 
-void TargetImpl::OnLaunchOrAttachReply(CallbackWithTimestamp callback, const Err& err,
-                                       uint64_t koid, const std::string& process_name,
-                                       uint64_t timestamp,
-                                       std::optional<debug_ipc::ComponentInfo> component_info) {
+void TargetImpl::OnLaunchOrAttachReply(
+    CallbackWithTimestamp callback, const Err& err, uint64_t koid, const std::string& process_name,
+    uint64_t timestamp, const std::vector<debug_ipc::ComponentInfo>& component_info) {
   FX_DCHECK(state_ == State::kAttaching || state_ == State::kStarting);
   FX_DCHECK(!process_.get());  // Shouldn't have a process.
 

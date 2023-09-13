@@ -364,8 +364,8 @@ TEST_F(SessionTest, StatusRequest) {
   const std::string kProcessName1 = "process-1";
   const std::string kProcessName2 = "process-2";
 
-  sink()->AppendProcessRecord({kProcessKoid1, kProcessName1, std::nullopt, {}});
-  sink()->AppendProcessRecord({kProcessKoid2, kProcessName2, std::nullopt, {}});
+  sink()->AppendProcessRecord({kProcessKoid1, kProcessName1, {}, {}});
+  sink()->AppendProcessRecord({kProcessKoid2, kProcessName2, {}, {}});
 
   bool called = false;
   debug_ipc::StatusReply status = {};

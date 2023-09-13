@@ -72,8 +72,9 @@ OutputBuffer FormatProcessRecords(std::vector<debug_ipc::ProcessRecord> records,
 
     row.push_back(std::to_string(record.process_koid));
     row.push_back(record.process_name);
-    if (record.component) {
-      row.push_back(record.component->url.substr(record.component->url.find_last_of('/') + 1));
+    if (record.components.size() == 1) {
+      row.push_back(
+          record.components[0].url.substr(record.components[0].url.find_last_of('/') + 1));
     }
   }
 

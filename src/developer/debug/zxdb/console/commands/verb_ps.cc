@@ -70,10 +70,15 @@ void OutputProcessTreeRecord(const debug_ipc::ProcessTreeRecord& rec, int indent
   output->Append(Syntax::kSpecial, std::to_string(rec.koid));
   if (!rec.name.empty())
     output->Append(syntax, " " + rec.name);
-  if (rec.component) {
-    output->Append(" " + rec.component->moniker, TextForegroundColor::kCyan);
-    output->Append(" " + rec.component->url, TextForegroundColor::kGray);
+
+  // Note if there are multiple components associated a particular job, we output
+  // nothing here since there is either not enough information to be helpful or
+  // too much information in the process graph.
+  if (rec.components.size() == 1) {
+    output->Append(" " + rec.components[0].moniker, TextForegroundColor::kCyan);
+    output->Append(" " + rec.components[0].url, TextForegroundColor::kGray);
   }
+
   output->Append(syntax, "\n");
 
   for (const auto& child : rec.children)
@@ -89,12 +94,20 @@ std::optional<debug_ipc::ProcessTreeRecord> FilterProcessTree(
 
   // A record matches if its (job) name or component name matches.
   bool matched = rec.name.find(filter) != std::string::npos;
-  if (!matched && rec.component) {
+  if (!matched && rec.components.size() == 1) {
     // Use the base name of the URL as the "component name".
     // e.g. "fuchsia-pkg://url#meta/foobar.cm" has a component name of "foobar.cm".
-    std::string_view url = rec.component->url;
+    std::string_view url = rec.components[0].url;
     std::string_view name = url.substr(url.find_last_of('/') + 1);
     matched = name.find(filter) != std::string_view::npos;
+  } else if (!matched && !rec.components.empty()) {
+    for (const auto& component : rec.components) {
+      std::string_view url = component.url;
+      std::string_view name = url.substr(url.find_last_of('/') + 1);
+      matched = name.find(filter) != std::string_view::npos;
+      if (matched)
+        break;
+    }
   }
 
   // If a record matches, show all its children.
@@ -112,7 +125,7 @@ std::optional<debug_ipc::ProcessTreeRecord> FilterProcessTree(
     result.type = rec.type;
     result.koid = rec.koid;
     result.name = rec.name;
-    result.component = rec.component;
+    result.components = rec.components;
     return result;
   }
 

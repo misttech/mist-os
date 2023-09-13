@@ -166,15 +166,34 @@ struct ProcessTreeRecord {
 
   // The following fields are only valid on kJob and will be skipped if type is kProcess.
 
-  // The component information if the current job is the root job of an ELF component.
-  std::optional<ComponentInfo> component;
+  // The component information if the process is running in a component. There could be many
+  // components for a single process. An empty vector means there was no component associated with
+  // the process. Order of components is not guaranteed.
+  std::vector<ComponentInfo> components;
 
   std::vector<ProcessTreeRecord> children;
 
   void Serialize(Serializer& ser, uint32_t ver) {
     ser | type | koid | name;
     if (type == Type::kJob) {
-      ser | component | children;
+      if (ver < 57) {
+        // The component information if the current job is the root job of an ELF component.
+        // Deprecated in version 57 in favor of |components|.
+        std::optional<ComponentInfo> component = std::nullopt;
+        if (!components.empty()) {
+          component = components[0];
+        }
+        components.clear();
+
+        ser | component;
+
+        if (component) {
+          components = {*component};
+        }
+      } else {
+        ser | components;
+      }
+      ser | children;
     }
   }
 };
@@ -286,13 +305,32 @@ struct ProcessRecord {
   uint64_t process_koid = 0;
   std::string process_name;
 
-  // The component information if the process is running in a component. Not hooked up yet.
-  std::optional<ComponentInfo> component;
+  // The component information if the process is running in a component. There could be many
+  // components for a single process. An empty vector means there was no component associated with
+  // the process. Order of components is not guaranteed.
+  std::vector<ComponentInfo> components;
 
   std::vector<ThreadRecord> threads;
 
   void Serialize(Serializer& ser, uint32_t ver) {
-    ser | process_koid | process_name | component | threads;
+    ser | process_koid | process_name | threads;
+    if (ver < 57) {
+      // The component information if the process is running in a component.
+      // Deprecated in version 57 in favor of |components|.
+      std::optional<ComponentInfo> component = std::nullopt;
+      if (!components.empty()) {
+        component = components[0];
+      }
+      components.clear();
+
+      ser | component;
+
+      if (component) {
+        components = {*component};
+      }
+    } else {
+      ser | components;
+    }
   }
 };
 

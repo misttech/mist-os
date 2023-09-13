@@ -30,10 +30,10 @@ class ComponentManager {
   virtual ~ComponentManager() = default;
 
   // Find the component information if the job is the root job of an ELF component.
-  virtual std::optional<debug_ipc::ComponentInfo> FindComponentInfo(zx_koid_t job_koid) const = 0;
+  virtual std::vector<debug_ipc::ComponentInfo> FindComponentInfo(zx_koid_t job_koid) const = 0;
 
   // Find the component information if the process runs in the context of a component.
-  std::optional<debug_ipc::ComponentInfo> FindComponentInfo(const ProcessHandle& process) const;
+  std::vector<debug_ipc::ComponentInfo> FindComponentInfo(const ProcessHandle& process) const;
 
   // Set the debug_agent. ComponentManager needs a debug_agent to notify component starting and
   // exiting events.

@@ -337,7 +337,7 @@ void InterceptionWorkflow::OnComponentStarted(const std::string& moniker, const 
   for (const auto& filter : filters_) {
     if (filter.main_filter &&
         debug_ipc::FilterMatches(filter.filter->filter(), "",
-                                 debug_ipc::ComponentInfo{.moniker = moniker, .url = url})) {
+                                 {debug_ipc::ComponentInfo{.moniker = moniker, .url = url}})) {
       running_main_components_.emplace(moniker);
       return;
     }

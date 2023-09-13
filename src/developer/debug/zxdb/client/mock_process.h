@@ -32,7 +32,7 @@ class MockProcess : public Process {
   Target* GetTarget() const override { return target_; }
   uint64_t GetKoid() const override { return 0; }
   const std::string& GetName() const override { return kMockProcessName; }
-  const std::optional<debug_ipc::ComponentInfo>& GetComponentInfo() const override {
+  const std::vector<debug_ipc::ComponentInfo>& GetComponentInfo() const override {
     return kComponentInfo;
   }
   ProcessSymbols* GetSymbols() override { return symbols_; }
@@ -62,8 +62,8 @@ class MockProcess : public Process {
   Target* target_ = nullptr;
 
   inline static std::string kMockProcessName = "Mock process";
-  inline static std::optional<debug_ipc::ComponentInfo> kComponentInfo =
-      debug_ipc::ComponentInfo{.moniker = "/moniker", .url = "schema://url#meta/component.cm"};
+  inline static std::vector<debug_ipc::ComponentInfo> kComponentInfo = {
+      debug_ipc::ComponentInfo{.moniker = "/moniker", .url = "schema://url#meta/component.cm"}};
   ProcessSymbols* symbols_ = nullptr;
   std::optional<TLSHelpers> tls_helpers_ = std::nullopt;
 

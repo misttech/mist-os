@@ -4,6 +4,8 @@
 
 #include "src/developer/debug/ipc/filter_utils.h"
 
+#include <algorithm>
+
 #include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/shared/string_util.h"
 
@@ -27,25 +29,29 @@ bool MatchComponentUrl(std::string_view url, std::string_view pattern) {
 }  // namespace
 
 bool FilterMatches(const Filter& filter, const std::string& process_name,
-                   const std::optional<ComponentInfo>& component) {
-  switch (filter.type) {
-    case Filter::Type::kProcessNameSubstr:
-      return process_name.find(filter.pattern) != std::string::npos;
-    case Filter::Type::kProcessName:
-      return process_name == filter.pattern;
-    case Filter::Type::kComponentName:
-      return component &&
-             component->url.substr(component->url.find_last_of('/') + 1) == filter.pattern;
-    case Filter::Type::kComponentUrl:
-      return component && MatchComponentUrl(component->url, filter.pattern);
-    case Filter::Type::kComponentMoniker:
-      return component && component->moniker == filter.pattern;
-    case Filter::Type::kComponentMonikerSuffix:
-      return component && debug::StringEndsWith(component->moniker, filter.pattern);
-    case Filter::Type::kUnset:
-    case Filter::Type::kLast:
-      return false;
+                   const std::vector<ComponentInfo>& components) {
+  if (filter.type == Filter::Type::kProcessNameSubstr) {
+    return process_name.find(filter.pattern) != std::string::npos;
+  } else if (filter.type == Filter::Type::kProcessName) {
+    return process_name == filter.pattern;
+  } else if (filter.type == Filter::Type::kUnset || filter.type == Filter::Type::kLast) {
+    return false;
   }
+
+  return std::any_of(components.cbegin(), components.cend(), [&](const auto& component) {
+    switch (filter.type) {
+      case Filter::Type::kComponentName:
+        return component.url.substr(component.url.find_last_of('/') + 1) == filter.pattern;
+      case Filter::Type::kComponentUrl:
+        return MatchComponentUrl(component.url, filter.pattern);
+      case Filter::Type::kComponentMoniker:
+        return component.moniker == filter.pattern;
+      case Filter::Type::kComponentMonikerSuffix:
+        return debug::StringEndsWith(component.moniker, filter.pattern);
+      default:
+        return false;
+    }
+  });
 }
 
 }  // namespace debug_ipc

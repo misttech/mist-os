@@ -9,15 +9,16 @@
 
 namespace debug_agent {
 
-std::optional<debug_ipc::ComponentInfo> ComponentManager::FindComponentInfo(
+std::vector<debug_ipc::ComponentInfo> ComponentManager::FindComponentInfo(
     const ProcessHandle& process) const {
   zx_koid_t job_koid = process.GetJobKoid();
   while (job_koid) {
-    if (auto info = FindComponentInfo(job_koid); info)
-      return info;
+    auto components = FindComponentInfo(job_koid);
+    if (!components.empty())
+      return components;
     job_koid = system_interface_->GetParentJobKoid(job_koid);
   }
-  return std::nullopt;
+  return {};
 }
 
 }  // namespace debug_agent

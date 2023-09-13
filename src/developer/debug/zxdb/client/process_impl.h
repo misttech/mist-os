@@ -26,7 +26,7 @@ class ProcessImpl : public Process, public ProcessSymbols::Notifications {
  public:
   ProcessImpl(TargetImpl* target, uint64_t koid, const std::string& name,
               Process::StartType start_type,
-              std::optional<debug_ipc::ComponentInfo> component_info);
+              const std::vector<debug_ipc::ComponentInfo>& component_info);
   ~ProcessImpl() override;
 
   ThreadImpl* GetThreadImplFromKoid(uint64_t koid);
@@ -37,7 +37,7 @@ class ProcessImpl : public Process, public ProcessSymbols::Notifications {
   Target* GetTarget() const override { return target_; }
   uint64_t GetKoid() const override { return koid_; }
   const std::string& GetName() const override { return name_; }
-  const std::optional<debug_ipc::ComponentInfo>& GetComponentInfo() const override {
+  const std::vector<debug_ipc::ComponentInfo>& GetComponentInfo() const override {
     return component_info_;
   }
   ProcessSymbols* GetSymbols() override { return &symbols_; }
@@ -115,7 +115,7 @@ class ProcessImpl : public Process, public ProcessSymbols::Notifications {
   TargetImpl* const target_;  // The target owns |this|.
   const uint64_t koid_;
   std::string name_;
-  std::optional<debug_ipc::ComponentInfo> component_info_;
+  std::vector<debug_ipc::ComponentInfo> component_info_;
 
   // Threads indexed by their thread koid.
   std::map<uint64_t, std::unique_ptr<ThreadImpl>> threads_;

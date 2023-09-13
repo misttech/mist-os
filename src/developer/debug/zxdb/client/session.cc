@@ -637,7 +637,7 @@ void Session::DispatchNotifyProcessStarting(const debug_ipc::NotifyProcessStarti
                         ? Process::StartType::kAttach
                         : Process::StartType::kLaunch;
   found_target->CreateProcess(start_type, notify.koid, notify.name, notify.timestamp,
-                              notify.component);
+                              notify.components);
 }
 
 void Session::DispatchNotifyProcessExiting(const debug_ipc::NotifyProcessExiting& notify) {

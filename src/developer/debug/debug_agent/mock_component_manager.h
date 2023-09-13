@@ -22,10 +22,19 @@ class MockComponentManager : public ComponentManager {
   // ComponentManager implementation.
   void SetDebugAgent(DebugAgent*) override {}
 
-  std::optional<debug_ipc::ComponentInfo> FindComponentInfo(zx_koid_t job_koid) const override {
-    if (auto it = component_info_.find(job_koid); it != component_info_.end())
-      return it->second;
-    return std::nullopt;
+  std::vector<debug_ipc::ComponentInfo> FindComponentInfo(zx_koid_t job_koid) const override {
+    auto [start, end] = component_info_.equal_range(job_koid);
+    if (start == component_info_.end()) {
+      // Not found.
+      return {};
+    }
+
+    std::vector<debug_ipc::ComponentInfo> components;
+    components.reserve(std::distance(start, end));
+    for (auto& i = start; i != end; ++i) {
+      components.push_back(i->second);
+    }
+    return components;
   }
 
   debug::Status LaunchComponent(std::string url) override { return debug::Status("Not supported"); }
@@ -41,7 +50,7 @@ class MockComponentManager : public ComponentManager {
   }
 
  private:
-  std::map<zx_koid_t, debug_ipc::ComponentInfo> component_info_;
+  std::multimap<zx_koid_t, debug_ipc::ComponentInfo> component_info_;
 };
 
 }  // namespace debug_agent

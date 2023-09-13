@@ -19,7 +19,8 @@ ProcessTreeRecord GetProcessTreeFrom(const JobHandle& job,
   result.type = ProcessTreeRecord::Type::kJob;
   result.koid = job.GetKoid();
   result.name = job.GetName();
-  result.component = component_manager.FindComponentInfo(job.GetKoid());
+
+  result.components = component_manager.FindComponentInfo(job.GetKoid());
 
   for (const auto& child_process : job.GetChildProcesses()) {
     ProcessTreeRecord& proc_record = result.children.emplace_back();

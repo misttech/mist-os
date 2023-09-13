@@ -33,7 +33,8 @@ class TargetImpl : public Target {
 
   // Create a process in the target. The process should have been attached in debug_agent.
   void CreateProcess(Process::StartType start_type, uint64_t koid, const std::string& process_name,
-                     uint64_t timestamp, std::optional<debug_ipc::ComponentInfo> component_info);
+                     uint64_t timestamp,
+                     const std::vector<debug_ipc::ComponentInfo>& component_info);
 
   // Tests can use this to create a target for mocking purposes without making any IPC. To destroy
   // call ImplicitlyDetach().
@@ -62,14 +63,13 @@ class TargetImpl : public Target {
   // Most logic between attaching and starting is shared so these functions handle both cases. The
   // thunk resolves the weak pointer and issues special errors if it's gone. It also maps the
   // transport errors in |err| and the report errors in |status| to a single error value.
-  static void OnLaunchOrAttachReplyThunk(fxl::WeakPtr<TargetImpl> target,
-                                         CallbackWithTimestamp callback, const Err& err,
-                                         uint64_t koid, const debug::Status& status,
-                                         const std::string& process_name, uint64_t timestamp,
-                                         std::optional<debug_ipc::ComponentInfo> component_info);
+  static void OnLaunchOrAttachReplyThunk(
+      fxl::WeakPtr<TargetImpl> target, CallbackWithTimestamp callback, const Err& err,
+      uint64_t koid, const debug::Status& status, const std::string& process_name,
+      uint64_t timestamp, const std::vector<debug_ipc::ComponentInfo>& component_info);
   void OnLaunchOrAttachReply(CallbackWithTimestamp callback, const Err& err, uint64_t koid,
                              const std::string& process_name, uint64_t timestamp,
-                             std::optional<debug_ipc::ComponentInfo> component_info);
+                             const std::vector<debug_ipc::ComponentInfo>& component_info);
 
   void OnKillOrDetachReply(ProcessObserver::DestroyReason reason, const Err& err,
                            const debug::Status& status, Callback callback, uint64_t timestamp);

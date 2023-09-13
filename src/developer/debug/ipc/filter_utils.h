@@ -11,9 +11,10 @@
 
 namespace debug_ipc {
 
-// Matches the filter with the given process_name and the component info, ignoring the job_koid.
+// Matches the filter with the given process_name or any of the components given in |components|,
+// ignoring the job_koid.
 bool FilterMatches(const Filter& filter, const std::string& process_name,
-                   const std::optional<ComponentInfo>& component);
+                   const std::vector<ComponentInfo>& components);
 
 }  // namespace debug_ipc
 

@@ -81,7 +81,10 @@ ProcessRecord CreateProcessRecord(uint32_t process_koid, uint32_t thread_count,
   ProcessRecord record;
   record.process_koid = process_koid;
   record.process_name = fxl::StringPrintf("process-%u", process_koid);
-  record.component = std::move(component_info);
+
+  if (component_info) {
+    record.components.push_back(std::move(*component_info));
+  }
 
   record.threads.reserve(thread_count);
   for (uint32_t i = 0; i < thread_count; i++) {
@@ -103,6 +106,7 @@ TEST(Protocol, StatusReply) {
   StatusReply one;
   one.processes.push_back(CreateProcessRecord(0x1, 1, ComponentInfo{.moniker = "/", .url = "url"}));
   one.processes.push_back(CreateProcessRecord(0x2, 2, std::nullopt));
+  auto& one_components = one.processes[0].components;
 
   one.limbo.push_back(CreateProcessRecord(0x3, 3, std::nullopt));
 
@@ -112,16 +116,19 @@ TEST(Protocol, StatusReply) {
   ASSERT_EQ(two.processes.size(), 2u);
   EXPECT_EQ(two.processes[0].process_koid, one.processes[0].process_koid);
   EXPECT_EQ(two.processes[0].process_name, one.processes[0].process_name);
-  ASSERT_TRUE(two.processes[0].component);
-  EXPECT_EQ(two.processes[0].component->moniker, one.processes[0].component->moniker);
-  EXPECT_EQ(two.processes[0].component->url, one.processes[0].component->url);
+  ASSERT_FALSE(two.processes[0].components.empty());
+  ASSERT_EQ(two.processes[0].components.size(), 1ull);
+
+  auto& two_components = two.processes[0].components;
+  EXPECT_EQ(two_components[0].moniker, one_components[0].moniker);
+  EXPECT_EQ(two_components[0].url, one_components[0].url);
   ASSERT_EQ(two.processes[0].threads.size(), 1u);
   ASSERT_EQ(two.processes[0].threads[0].id, one.processes[0].threads[0].id);
   ASSERT_EQ(two.processes[0].threads[0].name, one.processes[0].threads[0].name);
 
   EXPECT_EQ(two.processes[1].process_koid, one.processes[1].process_koid);
   EXPECT_EQ(two.processes[1].process_name, one.processes[1].process_name);
-  ASSERT_FALSE(two.processes[1].component);
+  ASSERT_TRUE(two.processes[1].components.empty());
   ASSERT_EQ(two.processes[1].threads.size(), 2u);
   ASSERT_EQ(two.processes[1].threads[0].id, one.processes[1].threads[0].id);
   ASSERT_EQ(two.processes[1].threads[0].name, one.processes[1].threads[0].name);
@@ -131,7 +138,7 @@ TEST(Protocol, StatusReply) {
   ASSERT_EQ(two.limbo.size(), 1u);
   EXPECT_EQ(two.limbo[0].process_koid, one.limbo[0].process_koid);
   EXPECT_EQ(two.limbo[0].process_name, one.limbo[0].process_name);
-  ASSERT_FALSE(two.limbo[0].component);
+  ASSERT_TRUE(two.limbo[0].components.empty());
   ASSERT_EQ(two.limbo[0].threads.size(), 3u);
   ASSERT_EQ(two.limbo[0].threads[0].id, one.limbo[0].threads[0].id);
   ASSERT_EQ(two.limbo[0].threads[0].name, one.limbo[0].threads[0].name);
@@ -212,16 +219,20 @@ TEST(Protocol, AttachReply) {
   initial.timestamp = kTestTimestampDefault;
   initial.status = debug::Status();
   initial.name = "virtual console";
-  initial.component = ComponentInfo{.moniker = "/moniker", .url = "url"};
+  initial.components = {ComponentInfo{.moniker = "/moniker", .url = "url"}};
 
   AttachReply second;
   ASSERT_TRUE(SerializeDeserialize(initial, &second));
   EXPECT_EQ(initial.timestamp, second.timestamp);
   EXPECT_EQ(initial.status, second.status);
   EXPECT_EQ(initial.name, second.name);
-  ASSERT_TRUE(second.component);
-  EXPECT_EQ(initial.component->moniker, second.component->moniker);
-  EXPECT_EQ(initial.component->url, second.component->url);
+
+  ASSERT_FALSE(second.components.empty());
+  EXPECT_EQ(initial.components.size(), 1ull);
+  auto initial_component = initial.components[0];
+  auto component = second.components[0];
+  EXPECT_EQ(initial_component.moniker, component.moniker);
+  EXPECT_EQ(initial_component.url, component.url);
 }
 
 // Detach ------------------------------------------------------------------------------------------
@@ -307,9 +318,11 @@ TEST(Protocol, ProcessTreeReply) {
   initial.root.type = ProcessTreeRecord::Type::kJob;
   initial.root.koid = 1234;
   initial.root.name = "root";
-  initial.root.component.emplace();
-  initial.root.component->url = "fuchsia-pkg://package#meta/component.cm";
-  initial.root.component->moniker = "/moniker";
+
+  auto& initial_components = initial.root.components;
+  initial_components = {
+      ComponentInfo{.moniker = "/moniker", .url = "fuchsia-pkg://package#meta/component.cm"}};
+  const auto& initial_component = initial_components[0];
 
   initial.root.children.resize(1);
   initial.root.children[0].type = ProcessTreeRecord::Type::kProcess;
@@ -322,8 +335,13 @@ TEST(Protocol, ProcessTreeReply) {
   EXPECT_EQ(initial.root.type, second.root.type);
   EXPECT_EQ(initial.root.koid, second.root.koid);
   EXPECT_EQ(initial.root.name, second.root.name);
-  EXPECT_EQ(initial.root.component->moniker, second.root.component->moniker);
-  EXPECT_EQ(initial.root.component->url, second.root.component->url);
+  ASSERT_FALSE(second.root.components.empty());
+
+  const auto& reply_components = second.root.components;
+  EXPECT_EQ(initial_components.size(), reply_components.size());
+  EXPECT_EQ(initial_component.moniker, reply_components[0].moniker);
+  EXPECT_EQ(initial_component.url, reply_components[0].url);
+
   ASSERT_EQ(initial.root.children.size(), second.root.children.size());
   EXPECT_EQ(initial.root.children[0].type, second.root.children[0].type);
   EXPECT_EQ(initial.root.children[0].koid, second.root.children[0].koid);
@@ -1044,7 +1062,7 @@ TEST(Protocol, NotifyProcessStarting) {
   initial.koid = 10;
   initial.name = "some_process";
   initial.timestamp = kTestTimestampDefault;
-  initial.component = ComponentInfo{.moniker = "moniker", .url = "url"};
+  initial.components = {ComponentInfo{.moniker = "moniker", .url = "url"}};
 
   NotifyProcessStarting second;
   ASSERT_TRUE(SerializeDeserialize(initial, &second));
@@ -1053,9 +1071,11 @@ TEST(Protocol, NotifyProcessStarting) {
   EXPECT_EQ(initial.koid, second.koid);
   EXPECT_EQ(initial.name, second.name);
   EXPECT_EQ(initial.timestamp, second.timestamp);
-  ASSERT_TRUE(second.component);
-  EXPECT_EQ(initial.component->moniker, second.component->moniker);
-  EXPECT_EQ(initial.component->url, second.component->url);
+  ASSERT_FALSE(second.components.empty());
+  auto initial_component = initial.components[0];
+  auto component = second.components[0];
+  EXPECT_EQ(initial_component.moniker, component.moniker);
+  EXPECT_EQ(initial_component.url, component.url);
 }
 
 TEST(Protocol, NotifyProcessExiting) {

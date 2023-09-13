@@ -24,9 +24,8 @@ debug_ipc::ProcessTreeReply GetCannedProcessTreeReply() {
   reply.root.children.emplace_back();
   reply.root.children[0].koid = 100;
   reply.root.children[0].name = "j1";
-  reply.root.children[0].component.emplace();
-  reply.root.children[0].component->moniker = "/some/moniker";
-  reply.root.children[0].component->url = "schema://url#meta/component.cm";
+  reply.root.children[0].components.push_back(
+      {.moniker = "/some/moniker", .url = "schema://url#meta/component.cm"});
 
   reply.root.children[0].children.emplace_back();
   reply.root.children[0].children[0].koid = 101;

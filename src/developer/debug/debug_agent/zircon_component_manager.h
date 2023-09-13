@@ -24,7 +24,7 @@ class ZirconComponentManager : public ComponentManager {
 
   // ComponentManager implementation.
   void SetDebugAgent(DebugAgent* debug_agent) override { debug_agent_ = debug_agent; }
-  std::optional<debug_ipc::ComponentInfo> FindComponentInfo(zx_koid_t job_koid) const override;
+  std::vector<debug_ipc::ComponentInfo> FindComponentInfo(zx_koid_t job_koid) const override;
   debug::Status LaunchComponent(std::string url) override;
   debug::Status LaunchTest(std::string url, std::optional<std::string> realm,
                            std::vector<std::string> case_filters) override;
@@ -44,13 +44,16 @@ class ZirconComponentManager : public ComponentManager {
   class TestLauncher;
 
   void GetNextComponentEvent();
+  // std::optional<std::vector<debug_ipc::ComponentInfo>> FindAllComponentInfo(zx_koid_t job_koid);
 
   fit::callback<void()> ready_callback_ = []() {};
 
   DebugAgent* debug_agent_ = nullptr;  // nullable.
 
-  // Information of all running components in the system, indexed by their job koids.
-  std::map<zx_koid_t, debug_ipc::ComponentInfo> running_component_info_;
+  // Information of all running components in the system, indexed by their job koids. The
+  // relationship between job and and component instances is 1:n, so there can be multiple
+  // component instances within a single job.
+  std::multimap<zx_koid_t, debug_ipc::ComponentInfo> running_component_info_;
   fidl::Client<fuchsia_component::EventStream> event_stream_client_;
 
   // Monikers of v2 components we're expecting.

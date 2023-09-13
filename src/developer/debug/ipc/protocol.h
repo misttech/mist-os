@@ -35,7 +35,7 @@ namespace debug_ipc {
 // CURRENT_SUPPORTED_API_LEVEL is equal to FUCHSIA_API_LEVEL specified in platform_version.json.
 // If not, continue reading the comments below.
 
-constexpr uint32_t kCurrentProtocolVersion = 56;
+constexpr uint32_t kCurrentProtocolVersion = 57;
 
 // How to decide kMinimumProtocolVersion
 // -------------------------------------
@@ -277,11 +277,30 @@ struct AttachReply {
   debug::Status status;  // Result of attaching.
   std::string name;
 
-  // The component information if the task is a process and the process is running in a component.
-  std::optional<ComponentInfo> component;
+  // The component information if the process is running in a component. There could be many
+  // components for a single process. An empty vector means there was no component associated with
+  // the process. Order of components is not guaranteed.
+  std::vector<ComponentInfo> components;
 
   void Serialize(Serializer& ser, uint32_t ver) {
-    ser | timestamp | koid | status | name | component;
+    ser | timestamp | koid | status | name;
+    if (ver < 57) {
+      // The component information if the task is a process and the process is running in a
+      // component.
+      std::optional<ComponentInfo> component = std::nullopt;
+      if (!components.empty()) {
+        component = components[0];
+      }
+      components.clear();
+
+      ser | component;
+
+      if (component) {
+        components = {*component};
+      }
+    } else {
+      ser | components;
+    }
   }
 };
 
@@ -663,11 +682,29 @@ struct NotifyProcessStarting {
   uint64_t koid = 0;
   std::string name;
 
-  // The component information if the process is running in a component.
-  std::optional<ComponentInfo> component;
+  // The component information if the process is running in a component. There could be many
+  // components for a single process. An empty vector means there was no component associated with
+  // the process. Order of components is not guaranteed.
+  std::vector<ComponentInfo> components;
 
   void Serialize(Serializer& ser, uint32_t ver) {
-    ser | timestamp | type | koid | name | component;
+    ser | timestamp | type | koid | name;
+    if (ver < 57) {
+      // The component information if the process is running in a component.
+      std::optional<ComponentInfo> component = std::nullopt;
+      if (!components.empty()) {
+        component = components[0];
+      }
+      components.clear();
+
+      ser | component;
+
+      if (component) {
+        components = {*component};
+      }
+    } else {
+      ser | components;
+    }
   }
 };
 

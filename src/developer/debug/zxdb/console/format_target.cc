@@ -42,9 +42,18 @@ OutputBuffer FormatTarget(ConsoleContext* context, const Target* target) {
   if (auto process = target->GetProcess()) {
     out.Append(Syntax::kVariable, " name");
     out.Append("=" + FormatConsoleString(process->GetName()));
-    if (auto component = process->GetComponentInfo()) {
+    if (process->GetComponentInfo().size() == 1) {
       out.Append(Syntax::kVariable, " component");
-      out.Append("=" + FormatConsoleString(GetComponentName(component)));
+      out.Append("=" + FormatConsoleString(GetComponentName(process->GetComponentInfo()[0])));
+    } else if (!process->GetComponentInfo().empty()) {
+      out.Append(Syntax::kVariable, " components=");
+      auto& components = process->GetComponentInfo();
+      for (size_t i = 0; i < components.size(); i++) {
+        out.Append(FormatConsoleString(GetComponentName(components[i])));
+        if (i + 1 < components.size()) {
+          out.Append(",");
+        }
+      }
     }
   }
   out.Append("\n");
@@ -84,7 +93,9 @@ OutputBuffer FormatTargetList(ConsoleContext* context, int indent) {
     if (auto process = target->GetProcess()) {
       row.push_back(std::to_string(process->GetKoid()));
       row.push_back(process->GetName());
-      row.push_back(GetComponentName(process->GetComponentInfo()));
+      if (process->GetComponentInfo().size() == 1) {
+        row.push_back(GetComponentName(process->GetComponentInfo()[0]));
+      }
     } else {
       row.emplace_back();
     }
