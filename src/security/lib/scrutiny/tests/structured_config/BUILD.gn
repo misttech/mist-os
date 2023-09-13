@@ -96,9 +96,6 @@ if (is_fuchsia) {
       build_type = "user"
       feature_set_level = "utility"
       storage = {
-        component_id_index = {
-          exclude_default_platform_ids = true
-        }
         configure_fshost = true
         filesystems = {
           image_name = "assembly"

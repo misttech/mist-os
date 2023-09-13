@@ -59,9 +59,6 @@ if (is_fuchsia) {
       feature_set_level = "empty"
       build_type = "eng"
       storage = {
-        component_id_index = {
-          exclude_default_platform_ids = true
-        }
         configure_fshost = true
         filesystems = {
           image_name = "assembly"

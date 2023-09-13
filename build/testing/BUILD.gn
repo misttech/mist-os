@@ -22,9 +22,6 @@ product_assembly_configuration("cuckoo-product-configuration-fxfs") {
     #feature_set_level = "minimal"
     build_type = "eng"
     storage = {
-      component_id_index = {
-        exclude_default_platform_ids = true
-      }
       configure_fshost = true
       filesystems = {
         volume = {
@@ -48,9 +45,6 @@ product_assembly_configuration("cuckoo-product-configuration-minfs") {
     #feature_set_level = "minimal"
     build_type = "eng"
     storage = {
-      component_id_index = {
-        exclude_default_platform_ids = true
-      }
       configure_fshost = true
       filesystems = {
         volume = {
@@ -75,9 +69,6 @@ product_assembly_configuration("cuckoo-product-configuration-fxblob") {
     #feature_set_level = "minimal"
     build_type = "eng"
     storage = {
-      component_id_index = {
-        exclude_default_platform_ids = true
-      }
       configure_fshost = true
       filesystems = {
         volume = "fxfs"

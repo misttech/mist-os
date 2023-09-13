@@ -32,8 +32,4 @@ pub struct ComponentIdIndexConfig {
     /// An optional index to use for product-provided components.
     #[serde(default)]
     pub product_index: Option<Utf8PathBuf>,
-
-    /// Avoid including the default platform-provided component ids.
-    #[serde(default)]
-    pub exclude_default_platform_ids: bool,
 }

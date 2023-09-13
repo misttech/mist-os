@@ -27,14 +27,11 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
         // Build and add the component id index.
         let mut index_builder = ComponentIdIndexBuilder::default();
 
-        // If the product requests the platform id index, then find it in the
-        // "resources" directory and add it to the builder. The "resources"
-        // directory is built and shipped alonside the platform AIBs which is
-        // how it becomes available to subsystems.
-        if !storage_config.component_id_index.exclude_default_platform_ids {
-            let core_index = context.get_resource("core_component_id_index.json5");
-            index_builder.index(core_index);
-        }
+        // Find the default platform id index and add it to the builder.
+        // The "resources" directory is built and shipped alonside the platform
+        // AIBs which is how it becomes available to subsystems.
+        let core_index = context.get_resource("core_component_id_index.json5");
+        index_builder.index(core_index);
 
         // If the product provided their own index, add it to the builder.
         if let Some(product_index) = &storage_config.component_id_index.product_index {

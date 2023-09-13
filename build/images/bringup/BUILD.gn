@@ -54,9 +54,6 @@ product_assembly_configuration("product_assembly_config") {
     feature_set_level = "bootstrap"
     build_type = "eng"
     storage = {
-      component_id_index = {
-        exclude_default_platform_ids = true
-      }
       configure_fshost = true
       filesystems = {
         image_name = "bringup"
