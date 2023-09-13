@@ -8,8 +8,8 @@ use core::{num::NonZeroU16, ops::Deref};
 
 use derivative::Derivative;
 use net_types::{
-    ip::{GenericOverIp, Ip, IpAddress},
-    SpecifiedAddr, ZonedAddr,
+    ip::{GenericOverIp, Ip, IpAddress, Ipv4Addr},
+    NonMappedAddr, SpecifiedAddr, ZonedAddr,
 };
 
 use crate::socket::{datagram::DualStackIpExt, AddrVec, SocketMapAddrSpec};
@@ -39,11 +39,86 @@ impl<A: IpAddress, Z> From<ZonedAddr<SpecifiedAddr<A>, Z>> for SocketZonedIpAddr
     }
 }
 
+/// An IP address that witnesses all required properties of a socket address.
+///
+/// Requires `SpecifiedAddr` because most contexts do not permit unspecified
+/// addresses; those that do can hold a `Option<SocketIpAddr>`.
+///
+/// Requires `NonMappedAddr` because mapped addresses (i.e. ipv4-mapped-ipv6
+/// addresses) are converted from their original IP version to their target IP
+/// version when entering the stack.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) struct SocketIpAddr<A: IpAddress>(NonMappedAddr<SpecifiedAddr<A>>);
+
+impl<A: IpAddress> SocketIpAddr<A> {
+    #[cfg(test)]
+    pub(crate) fn new(addr: A) -> Option<SocketIpAddr<A>> {
+        Some(SocketIpAddr(NonMappedAddr::new(SpecifiedAddr::new(addr)?)?))
+    }
+
+    /// Callers must ensure that the addr is both `Specified` and `NonMapped`.
+    #[cfg(test)]
+    pub(crate) const unsafe fn new_unchecked(addr: A) -> SocketIpAddr<A> {
+        SocketIpAddr(NonMappedAddr::new_unchecked(SpecifiedAddr::new_unchecked(addr)))
+    }
+
+    pub(crate) fn addr(self) -> A {
+        let SocketIpAddr(addr) = self;
+        **addr
+    }
+
+    /// Constructs a `SocktIpAddr` from an addr that is known to be specified.
+    ///
+    /// # Panics
+    ///
+    /// If the given addr is mapped.
+    // TODO(https://fxbug.dev/132092): Remove this function and it's callsites
+    // once `SocketIpAddr` is the defacto address type in NS3's socket layer.
+    pub(crate) fn new_from_specified_or_panic(addr: SpecifiedAddr<A>) -> Self {
+        SocketIpAddr(NonMappedAddr::new(addr).expect("should be called with a non-mapped addr"))
+    }
+}
+
+impl SocketIpAddr<Ipv4Addr> {
+    pub(crate) fn new_ipv4_specified(addr: SpecifiedAddr<Ipv4Addr>) -> Self {
+        addr.try_into().unwrap_or_else(|AddrIsMappedError {}| {
+            unreachable!("IPv4 addresses must be non-mapped")
+        })
+    }
+}
+
+impl<A: IpAddress> From<SocketIpAddr<A>> for SpecifiedAddr<A> {
+    fn from(addr: SocketIpAddr<A>) -> Self {
+        let SocketIpAddr(addr) = addr;
+        *addr
+    }
+}
+
+impl<A: IpAddress> AsRef<SpecifiedAddr<A>> for SocketIpAddr<A> {
+    fn as_ref(&self) -> &SpecifiedAddr<A> {
+        let SocketIpAddr(addr) = self;
+        addr.as_ref()
+    }
+}
+
+/// The addr could not be converted to a `NonMappedAddr`.
+///
+/// Perhaps the address was an ipv4-mapped-ipv6 addresses.
+#[derive(Debug)]
+pub(crate) struct AddrIsMappedError {}
+
+impl<A: IpAddress> TryFrom<SpecifiedAddr<A>> for SocketIpAddr<A> {
+    type Error = AddrIsMappedError;
+    fn try_from(addr: SpecifiedAddr<A>) -> Result<Self, Self::Error> {
+        NonMappedAddr::new(addr).map(SocketIpAddr).ok_or(AddrIsMappedError {})
+    }
+}
+
 /// The IP address and identifier (port) of a listening socket.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct ListenerIpAddr<A: IpAddress, LI> {
     /// The specific address being listened on, or `None` for all addresses.
-    pub(crate) addr: Option<SpecifiedAddr<A>>,
+    pub(crate) addr: Option<SocketIpAddr<A>>,
     /// The local identifier (i.e. port for TCP/UDP).
     pub(crate) identifier: LI,
 }
@@ -58,8 +133,8 @@ pub(crate) struct ListenerAddr<A, D> {
 // The IP address and identifier (port) of a connected socket.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct ConnIpAddr<A: IpAddress, LI, RI> {
-    pub(crate) local: (SpecifiedAddr<A>, LI),
-    pub(crate) remote: (SpecifiedAddr<A>, RI),
+    pub(crate) local: (SocketIpAddr<A>, LI),
+    pub(crate) remote: (SocketIpAddr<A>, RI),
 }
 
 /// The address of a connected socket.
@@ -85,11 +160,9 @@ where
 pub(crate) enum DualStackIpAddr<A: IpAddress>
 where
     A::Version: DualStackIpExt,
-    // TODO(https://fxbug.dev/132092): Use a witness type for these addresses
-    // that asserts that they can't be IPv4-mapped-IPv6 addresses.
 {
-    ThisStack(Option<SpecifiedAddr<A>>),
-    OtherStack(Option<SpecifiedAddr<<<A::Version as DualStackIpExt>::OtherVersion as Ip>::Addr>>),
+    ThisStack(Option<SocketIpAddr<A>>),
+    OtherStack(Option<SocketIpAddr<<<A::Version as DualStackIpExt>::OtherVersion as Ip>::Addr>>),
 }
 
 /// The IP address and identifiers (ports) of a dual-stack connected socket.
@@ -184,11 +257,11 @@ impl<I: Ip, A: SocketMapAddrSpec> IpAddrVec<I, A> {
                 None
             }
             IpAddrVec::Connected(ConnIpAddr { local: (local_ip, local_identifier), remote }) => {
-                let _: (SpecifiedAddr<I::Addr>, A::RemoteIdentifier) = remote;
+                let _: (SocketIpAddr<I::Addr>, A::RemoteIdentifier) = remote;
                 Some(ListenerIpAddr { addr: Some(local_ip), identifier: local_identifier })
             }
             IpAddrVec::Listener(ListenerIpAddr { addr: Some(addr), identifier }) => {
-                let _: SpecifiedAddr<I::Addr> = addr;
+                let _: SocketIpAddr<I::Addr> = addr;
                 Some(ListenerIpAddr { addr: None, identifier })
             }
         }

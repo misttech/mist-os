@@ -38,7 +38,7 @@ use net_types::{
         GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6,
         Ipv6Addr,
     },
-    AddrAndZone, SpecifiedAddr, ZonedAddr,
+    AddrAndZone, NonMappedAddr, SpecifiedAddr, ZonedAddr,
 };
 use packet::EmptyBuf;
 use packet_formats::ip::IpProto;
@@ -67,7 +67,8 @@ use crate::{
     },
     socket::{
         address::{
-            ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr, SocketZonedIpAddr,
+            ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr, SocketIpAddr,
+            SocketZonedIpAddr,
         },
         AddrVec, Bound, BoundSocketMap, IncompatibleError, InsertError, Inserter, ListenerAddrInfo,
         RemoveResult, Shutdown, SocketMapAddrStateSpec, SocketMapAddrStateUpdateSharingSpec,
@@ -844,7 +845,7 @@ impl<I: IpExt, D: WeakId, C: NonSyncContext> PortAllocImpl
     for BoundSocketMap<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>
 {
     const EPHEMERAL_RANGE: RangeInclusive<u16> = 49152..=65535;
-    type Id = Option<SpecifiedAddr<I::Addr>>;
+    type Id = Option<SocketIpAddr<I::Addr>>;
 
     fn is_port_available(&self, addr: &Self::Id, port: u16) -> bool {
         // We can safely unwrap here, because the ports received in
@@ -1169,6 +1170,19 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         addr: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
         port: Option<NonZeroU16>,
     ) -> Result<SocketId<I>, BindError> {
+        // TODO(https://fxbug.dev/21198): Support dual-stack bind.
+        if let Some(addr) = addr.as_ref() {
+            match NonMappedAddr::new(addr.deref().addr()) {
+                Some(_addr) => {}
+                None => {
+                    // Prevent binding to ipv4-mapped-ipv6 addrs for now.
+                    return Err(BindError::LocalAddressError(
+                        LocalAddressError::AddressUnexpectedlyMapped,
+                    ));
+                }
+            }
+        }
+
         // TODO(https://fxbug.dev/104300): Check if local_ip is a unicast address.
         self.with_ip_transport_ctx_and_tcp_sockets_mut(
             |ip_transport_ctx, Sockets { socket_state, port_alloc, socketmap }| {
@@ -1178,7 +1192,11 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                 }
                 let port = match port {
                     None => {
-                        let addr = addr.as_ref().map(|a| a.deref().addr());
+                        // TODO(https://fxbug.dev/132092): Delete conversion
+                        // once `SocketZonedIpAddr` holds `SocketIpAddr`.
+                        let addr = addr
+                            .as_ref()
+                            .map(|a| SocketIpAddr::new_from_specified_or_panic(a.deref().addr()));
                         match port_alloc.try_alloc(&addr, &socketmap) {
                             Some(port) => {
                                 NonZeroU16::new(port).expect("ephemeral ports must be non-zero")
@@ -1225,6 +1243,9 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     None => (None, bound_device.clone().map(EitherDeviceId::Weak)),
                 };
 
+                // TODO(https://fxbug.dev/132092): Delete conversion
+                // once `SocketZonedIpAddr` holds `SocketIpAddr`.
+                let local_ip = local_ip.map(SocketIpAddr::new_from_specified_or_panic);
                 let addr = ListenerAddr {
                     ip: ListenerIpAddr { addr: local_ip, identifier: port },
                     device: device.map(|d| d.as_weak(ip_transport_ctx).into_owned()),
@@ -1331,7 +1352,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
 
             Ok((
                 conn_id,
-                SocketAddr { ip: maybe_zoned(remote_ip, device), port: remote_port },
+                SocketAddr { ip: maybe_zoned(remote_ip.into(), device), port: remote_port },
                 client_buffers,
             ))
         })
@@ -1419,7 +1440,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     .new_ip_socket(
                         ctx,
                         device.as_ref().map(|d| d.as_ref()),
-                        local_ip,
+                        local_ip.map(SocketIpAddr::into),
                         remote_ip,
                         IpProto::Tcp.into(),
                         DefaultSendOptions,
@@ -1429,14 +1450,17 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     })?;
 
                 let local_port = local_port.map_or_else(
-                    || match sockets
-                        .port_alloc
-                        .try_alloc(&Some(*ip_sock.local_ip()), &sockets.socketmap)
-                    {
-                        Some(port) => {
-                            Ok(NonZeroU16::new(port).expect("ephemeral ports must be non-zero"))
+                    || {
+                        // TODO(https://fxbug.dev/132092): Delete conversion
+                        // once `IpSock` holds `SocketIpAddr`.
+                        let local_ip =
+                            SocketIpAddr::new_from_specified_or_panic(*ip_sock.local_ip());
+                        match sockets.port_alloc.try_alloc(&Some(local_ip), &sockets.socketmap) {
+                            Some(port) => {
+                                Ok(NonZeroU16::new(port).expect("ephemeral ports must be non-zero"))
+                            }
+                            None => Err(ConnectError::NoPort),
                         }
-                        None => Err(ConnectError::NoPort),
                     },
                     Ok,
                 )?;
@@ -1647,8 +1671,8 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     } = addr;
 
                     if !crate::socket::can_device_change(
-                        Some(local_ip),
-                        Some(remote_ip),
+                        Some(local_ip.as_ref()),
+                        Some(remote_ip.as_ref()),
                         old_device.as_ref(),
                         new_device.as_ref(),
                     ) {
@@ -1659,8 +1683,8 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                         .new_ip_socket(
                             ctx,
                             new_device.as_ref().map(EitherDeviceId::Strong),
-                            Some(*local_ip),
-                            *remote_ip,
+                            Some((*local_ip).into()),
+                            (*remote_ip).into(),
                             IpProto::Tcp.into(),
                             Default::default(),
                         )
@@ -1701,8 +1725,8 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     let ListenerIpAddr { identifier: _, addr: ip } = ip_addr;
 
                     if !crate::socket::can_device_change(
-                        ip.as_ref(), /* local_ip */
-                        None,        /* remote_ip */
+                        ip.as_ref().map(|a| a.as_ref()), /* local_ip */
+                        None,                            /* remote_ip */
                         old_device.as_ref(),
                         new_device.as_ref(),
                     ) {
@@ -1894,6 +1918,10 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         error: IcmpErrorCode,
     ) {
         self.with_tcp_sockets_mut(|Sockets { socket_state, port_alloc: _, socketmap }| {
+            // TODO(https://fxbug.dev/132092): Remove panic opportunities once
+            // `SocketHandler` functions take `SocketIpAddr`.
+            let orig_src_ip = SocketIpAddr::new_from_specified_or_panic(orig_src_ip);
+            let orig_dst_ip = SocketIpAddr::new_from_specified_or_panic(orig_dst_ip);
             let conn_id = match socketmap.conns().get_by_addr(&ConnAddr {
                 ip: ConnIpAddr {
                     local: (orig_src_ip, orig_src_port),
@@ -1993,7 +2021,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                             *addr;
                         Some(SocketStats {
                             id: SocketId(index, IpVersionMarker::default()),
-                            local: Some((addr, identifier)),
+                            local: Some((addr.map(SocketIpAddr::into), identifier)),
                             remote: None,
                         })
                     }
@@ -2009,12 +2037,16 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                         } = state;
                         (!defunct).then(|| {
                             let ConnAddr {
-                                ip: ConnIpAddr { local: (local_ip, local_port), remote },
+                                ip:
+                                    ConnIpAddr {
+                                        local: (local_ip, local_port),
+                                        remote: (remote_ip, remote_port),
+                                    },
                                 device: _,
                             } = *addr;
                             let id = SocketId(index, IpVersionMarker::default());
-                            let local = Some((Some(local_ip), local_port));
-                            let remote = Some(remote);
+                            let local = Some((Some(local_ip.into()), local_port));
+                            let remote = Some((remote_ip.into(), remote_port));
                             SocketStats { id, local, remote }
                         })
                     }
@@ -2464,11 +2496,12 @@ where
         (ip_sock.local_ip().clone(), local_port),
         (ip_sock.remote_ip().clone(), remote_port),
     );
+    // TODO(https://fxbug.dev/132092): Delete conversion once `IpSock` uses
+    // `SocketIpAddr`.
+    let local_ip = SocketIpAddr::new_from_specified_or_panic(*ip_sock.local_ip());
+    let remote_ip = SocketIpAddr::new_from_specified_or_panic(*ip_sock.remote_ip());
     let conn_addr = ConnAddr {
-        ip: ConnIpAddr {
-            local: (ip_sock.local_ip().clone(), local_port),
-            remote: (ip_sock.remote_ip().clone(), remote_port),
-        },
+        ip: ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) },
         device: ip_sock.device().cloned(),
     };
     let now = ctx.now();
@@ -2717,7 +2750,7 @@ impl<A: IpAddress, D: Clone> From<ListenerAddr<ListenerIpAddr<A, NonZeroU16>, D>
 {
     fn from(addr: ListenerAddr<ListenerIpAddr<A, NonZeroU16>, D>) -> Self {
         let ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device } = addr;
-        let addr = addr.map(|ip| maybe_zoned(ip, &device));
+        let addr = addr.map(|ip| maybe_zoned(ip.into(), &device));
         BoundInfo { addr, port: identifier, device }
     }
 }
@@ -2727,8 +2760,8 @@ impl<A: IpAddress, D: Clone> From<ConnAddr<ConnIpAddr<A, NonZeroU16, NonZeroU16>
 {
     fn from(addr: ConnAddr<ConnIpAddr<A, NonZeroU16, NonZeroU16>, D>) -> Self {
         let ConnAddr { ip: ConnIpAddr { local, remote }, device } = addr;
-        let convert = |(ip, port): (SpecifiedAddr<A>, NonZeroU16)| SocketAddr {
-            ip: maybe_zoned(ip, &device),
+        let convert = |(ip, port): (SocketIpAddr<A>, NonZeroU16)| SocketAddr {
+            ip: maybe_zoned(ip.into(), &device),
             port,
         };
         Self { local_addr: convert(local), remote_addr: convert(remote), device }

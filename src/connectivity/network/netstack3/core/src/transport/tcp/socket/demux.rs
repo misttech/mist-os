@@ -31,7 +31,10 @@ use crate::{
         IpStateContext, TransportReceiveError,
     },
     socket::{
-        address::{AddrVecIter, ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr},
+        address::{
+            AddrIsMappedError, AddrVecIter, ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr,
+            SocketIpAddr,
+        },
         AddrVec,
     },
     trace_duration,
@@ -91,15 +94,32 @@ where
             }
             Some(src_ip) => src_ip,
         };
-        let packet =
-            match buffer.parse_with::<_, TcpSegment<_>>(TcpParseArgs::new(*remote_ip, *local_ip)) {
-                Ok(packet) => packet,
-                Err(err) => {
-                    // TODO(https://fxbug.dev/101993): Increment the counter.
-                    trace!("tcp: failed parsing incoming packet {:?}", err);
-                    return Ok(());
-                }
-            };
+        let remote_ip: SocketIpAddr<_> = match remote_ip.try_into() {
+            Ok(remote_ip) => remote_ip,
+            Err(AddrIsMappedError {}) => {
+                // TODO(https://fxbug.dev/101993): Increment the counter.
+                trace!("tcp: source address is mapped (ipv4-mapped-ipv6), dropping the packet");
+                return Ok(());
+            }
+        };
+        let local_ip: SocketIpAddr<_> = match local_ip.try_into() {
+            Ok(local_ip) => local_ip,
+            Err(AddrIsMappedError {}) => {
+                // TODO(https://fxbug.dev/101993): Increment the counter.
+                trace!("tcp: remote address is mapped (ipv4-mapped-ipv6), dropping the packet");
+                return Ok(());
+            }
+        };
+        let packet = match buffer
+            .parse_with::<_, TcpSegment<_>>(TcpParseArgs::new(remote_ip.addr(), local_ip.addr()))
+        {
+            Ok(packet) => packet,
+            Err(err) => {
+                // TODO(https://fxbug.dev/101993): Increment the counter.
+                trace!("tcp: failed parsing incoming packet {:?}", err);
+                return Ok(());
+            }
+        };
         let local_port = packet.dst_port();
         let remote_port = packet.src_port();
         let incoming = match Segment::try_from(packet) {
@@ -249,8 +269,8 @@ fn handle_incoming_packet<I, B, C, SC>(
             match ip_transport_ctx.send_oneshot_ip_packet(
                 ctx,
                 None,
-                Some(local_ip),
-                remote_ip,
+                Some(local_ip.into()),
+                remote_ip.into(),
                 IpProto::Tcp.into(),
                 DefaultSendOptions,
                 |_addr| tcp_serialize_segment(seg, conn_addr),
@@ -521,7 +541,7 @@ where
     // Ensure that if the remote address requires a zone, we propagate that to
     // the address for the connected socket.
     let bound_device = bound_device.as_ref();
-    let bound_device = if crate::socket::must_have_zone(&remote_ip) {
+    let bound_device = if crate::socket::must_have_zone(remote_ip.as_ref()) {
         Some(bound_device.map_or(EitherDeviceId::Strong(incoming_device), EitherDeviceId::Weak))
     } else {
         bound_device.map(EitherDeviceId::Weak)
@@ -531,8 +551,8 @@ where
     let ip_sock = match ip_transport_ctx.new_ip_socket(
         ctx,
         bound_device,
-        Some(local_ip),
-        remote_ip,
+        Some(local_ip.into()),
+        remote_ip.into(),
         IpProto::Tcp.into(),
         DefaultSendOptions,
     ) {
@@ -695,8 +715,8 @@ where
     let Segment { seq, ack, wnd, contents, options } = segment.into();
     let ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) } = conn_addr;
     let mut builder = TcpSegmentBuilder::new(
-        *local_ip,
-        *remote_ip,
+        local_ip.addr(),
+        remote_ip.addr(),
         local_port,
         remote_port,
         seq.into(),
@@ -773,8 +793,14 @@ mod test {
         let serializer = super::tcp_serialize_segment(
             segment,
             ConnIpAddr {
-                local: (I::FAKE_CONFIG.local_ip, SOURCE_PORT),
-                remote: (I::FAKE_CONFIG.remote_ip, DEST_PORT),
+                local: (
+                    SocketIpAddr::new_from_specified_or_panic(I::FAKE_CONFIG.local_ip),
+                    SOURCE_PORT,
+                ),
+                remote: (
+                    SocketIpAddr::new_from_specified_or_panic(I::FAKE_CONFIG.remote_ip),
+                    DEST_PORT,
+                ),
             },
         );
 

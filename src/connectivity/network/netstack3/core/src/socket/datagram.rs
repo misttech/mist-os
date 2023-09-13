@@ -19,7 +19,7 @@ use either::Either;
 use explicit::UnreachableExt as _;
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv6},
-    MulticastAddr, MulticastAddress as _, SpecifiedAddr, ZonedAddr,
+    MulticastAddr, MulticastAddress as _, NonMappedAddr, SpecifiedAddr, ZonedAddr,
 };
 use packet::{BufferMut, Serializer};
 use packet_formats::ip::{IpProto, IpProtoExt};
@@ -45,7 +45,7 @@ use crate::{
         self,
         address::{
             AddrVecIter, ConnAddr, ConnIpAddr, DualStackConnIpAddr, DualStackIpAddr,
-            DualStackListenerIpAddr, ListenerIpAddr, SocketZonedIpAddr,
+            DualStackListenerIpAddr, ListenerIpAddr, SocketIpAddr, SocketZonedIpAddr,
         },
         AddrVec, BoundSocketMap, ExistsError, InsertError, ListenerAddr, Shutdown,
         SocketMapAddrSpec, SocketMapConflictPolicy, SocketMapStateSpec,
@@ -117,8 +117,8 @@ impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: DatagramSocketMapSpec<I, D, A>>
 {
     pub(crate) fn iter_receivers(
         &self,
-        (src_ip, src_port): (I::Addr, Option<A::RemoteIdentifier>),
-        (dst_ip, dst_port): (SpecifiedAddr<I::Addr>, A::LocalIdentifier),
+        (src_ip, src_port): (Option<SocketIpAddr<I::Addr>>, Option<A::RemoteIdentifier>),
+        (dst_ip, dst_port): (SocketIpAddr<I::Addr>, A::LocalIdentifier),
         device: D,
     ) -> Option<
         FoundSockets<
@@ -154,8 +154,8 @@ impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: DatagramSocketMapSpec<I, D, A>>
     /// were found, or the results of the lookup.
     fn lookup(
         &self,
-        (src_ip, src_port): (I::Addr, Option<A::RemoteIdentifier>),
-        (dst_ip, dst_port): (SpecifiedAddr<I::Addr>, A::LocalIdentifier),
+        (src_ip, src_port): (Option<SocketIpAddr<I::Addr>>, Option<A::RemoteIdentifier>),
+        (dst_ip, dst_port): (SocketIpAddr<I::Addr>, A::LocalIdentifier),
         device: D,
     ) -> Option<
         FoundSockets<
@@ -164,7 +164,7 @@ impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: DatagramSocketMapSpec<I, D, A>>
         >,
     > {
         let mut matching_entries = AddrVecIter::with_device(
-            match (SpecifiedAddr::new(src_ip), src_port) {
+            match (src_ip, src_port) {
                 (Some(specified_src_ip), Some(src_port)) => {
                     ConnIpAddr { local: (dst_ip, dst_port), remote: (specified_src_ip, src_port) }
                         .into()
@@ -180,7 +180,7 @@ impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: DatagramSocketMapSpec<I, D, A>>
             AddrVec::Conn(c) => self.conns().get_by_addr(&c).map(|state| AddrEntry::Conn(state, c)),
         });
 
-        if dst_ip.is_multicast() {
+        if dst_ip.addr().is_multicast() {
             Some(FoundSockets::Multicast(matching_entries))
         } else {
             let single_entry: Option<_> = matching_entries.next();
@@ -415,11 +415,12 @@ impl<A: IpAddress, D: crate::device::Id> ConnAddr<ConnIpAddr<A, NonZeroU16, NonZ
         id: &ProtocolFlowId<A>,
         local_port: NonZeroU16,
     ) -> Self {
+        // TODO(https://fxbug.dev/132092): Remove these panic opportunities once
+        // `ProtocolFlowId` holds `SocketIpAddr`.
+        let local_ip = SocketIpAddr::new_from_specified_or_panic(*id.local_addr());
+        let remote_ip = SocketIpAddr::new_from_specified_or_panic(*id.remote_addr());
         Self {
-            ip: ConnIpAddr {
-                local: (*id.local_addr(), local_port),
-                remote: (*id.remote_addr(), id.remote_port()),
-            },
+            ip: ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, id.remote_port()) },
             device: None,
         }
     }
@@ -1466,13 +1467,10 @@ where
                         /// current stack.
                         OnlyCurrentStack(
                             MaybeDualStack<DS, NDS>,
-                            &'a Option<SpecifiedAddr<I::Addr>>,
+                            &'a Option<SocketIpAddr<I::Addr>>,
                         ),
                         /// Bound to an address only on the other stack.
-                        OnlyOtherStack(
-                            DS,
-                            &'a Option<SpecifiedAddr<<I::OtherVersion as Ip>::Addr>>,
-                        ),
+                        OnlyOtherStack(DS, &'a Option<SocketIpAddr<<I::OtherVersion as Ip>::Addr>>),
                     }
 
                     let ListenerState { addr, ip_options } = state;
@@ -1545,7 +1543,7 @@ where
                             sync_ctx.with_bound_sockets_mut(|_sync_ctx, bound, _allocator| {
                                 BoundStateHandler::<_, S, _>::remove_listener(
                                     bound,
-                                    ip,
+                                    &ip,
                                     *identifier,
                                     &device,
                                     &S::make_receiving_map_id(id),
@@ -1558,7 +1556,7 @@ where
                                 |_sync_ctx, other_bound| {
                                     BoundStateHandler::<_, S, _>::remove_listener(
                                         other_bound,
-                                        other_ip,
+                                        &other_ip,
                                         *identifier,
                                         &device,
                                         &id,
@@ -1722,14 +1720,14 @@ struct DualStackUnspecifiedAddr;
 impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> BoundStateHandler<I, S, D>
     for BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>
 {
-    type ListenerAddr = Option<SpecifiedAddr<I::Addr>>;
+    type ListenerAddr = Option<SocketIpAddr<I::Addr>>;
     type ReceivingId =
         <S::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, S::AddrSpec>>::ReceivingId;
     type InsertListenerSharingState =
         <S::SocketMapSpec<I, D> as SocketMapStateSpec>::ListenerSharingState;
     fn is_listener_entry_available(
         &self,
-        addr: Option<SpecifiedAddr<I::Addr>>,
+        addr: Self::ListenerAddr,
         identifier: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
         sharing: &Self::InsertListenerSharingState,
     ) -> bool {
@@ -1854,7 +1852,7 @@ fn try_insert_single_listener<
     S: DatagramSocketMapSpec<I, D, A>,
 >(
     bound: &mut BoundSocketMap<I, D, A, S>,
-    addr: Option<SpecifiedAddr<I::Addr>>,
+    addr: Option<SocketIpAddr<I::Addr>>,
     identifier: A::LocalIdentifier,
     device: Option<D>,
     sharing: S::ListenerSharingState,
@@ -1884,7 +1882,7 @@ fn remove_single_listener<
     S: DatagramSocketMapSpec<I, D, A>,
 >(
     bound: &mut BoundSocketMap<I, D, A, S>,
-    addr: &Option<SpecifiedAddr<I::Addr>>,
+    addr: &Option<SocketIpAddr<I::Addr>>,
     identifier: A::LocalIdentifier,
     device: &Option<D>,
     id: &S::ListenerId,
@@ -2121,7 +2119,9 @@ where
         let identifier = match local_id {
             Some(id) => Some(id),
             None => try_pick_identifier::<I, S, _, _, _>(
-                addr.as_ref().map(|a| a.deref().addr()),
+                // TODO(https://fxbug.dev/132092): Delete conversion once
+                // `SocketZonedIpAddr` holds `SocketIpAddr`.
+                addr.as_ref().map(|a| SocketIpAddr::new_from_specified_or_panic(a.deref().addr())),
                 bound,
                 ctx,
                 &sharing,
@@ -2132,6 +2132,10 @@ where
             try_pick_bound_address::<I, _, _, _>(addr, device, sync_ctx, identifier)?;
         let weak_device = device.map(|d| d.as_weak(sync_ctx).into_owned());
 
+        // TODO(https://fxbug.dev/132092): Delete conversion once `ZonedAddr`
+        // holds `NonMappedAddr`.
+        let addr =
+            addr.map(SocketIpAddr::try_from).transpose().expect("ZonedAddr should be non-mapped");
         BoundStateHandler::<_, S, _>::try_insert_listener(
             bound,
             addr,
@@ -2406,7 +2410,7 @@ where
                         sync_ctx,
                         ctx,
                         socket_device.as_ref().map(|d| d.as_ref()),
-                        local_ip,
+                        local_ip.map(SocketIpAddr::into),
                         remote_ip,
                         proto.into(),
                         Default::default(),
@@ -2428,7 +2432,10 @@ where
                             )
                             .ok_or(ConnectError::CouldNotAllocateLocalPort)?,
                     };
-
+                    // TODO(https://fxbug.dev/132092): Remove these panic opportunities once
+                    // `IpSock` to holds `SocketIpAddr`.
+                    let local_ip = SocketIpAddr::new_from_specified_or_panic(local_ip);
+                    let remote_ip = SocketIpAddr::new_from_specified_or_panic(remote_ip);
                     let c = ConnAddr {
                         ip: ConnIpAddr {
                             local: (local_ip, local_id),
@@ -2797,6 +2804,9 @@ pub(crate) enum SendToError<B, S> {
     NotWriteable(B),
     Zone(B, ZonedAddressError),
     CreateAndSend(S, IpSockCreateAndSendError),
+    // The remote address is mapped (i.e. an ipv4-mapped-ipv6 address), but the
+    // socket is not dual-stack enabled.
+    RemoteUnexpectedlyMapped(B),
 }
 
 pub(crate) fn send_to<
@@ -2886,6 +2896,20 @@ where
             }
         };
 
+        // TODO(https://fxbug.dev/21198): For now, short circuit when asked to
+        // send to a mapped remote address, which prevents panics further in the
+        // send pipeline when converting remote to a `SocketIpAddr`.
+        //
+        // This should eventually translate the remote to its non-mapped form,
+        // or fail if the socket doesn't support dual-stack operations.
+        match NonMappedAddr::new(remote_ip.deref().addr()) {
+            Some(_addr) => {}
+            None => {
+                // Prevent sending to ipv4-mapped-ipv6 addrs for now.
+                return Err(Either::Right(SendToError::RemoteUnexpectedlyMapped(body)));
+            }
+        }
+
         sync_ctx
             .with_transport_context_buf(|sync_ctx| {
                 send_oneshot::<_, S, _, _, _>(
@@ -2914,7 +2938,7 @@ fn send_oneshot<
     sync_ctx: &mut SC,
     ctx: &mut C,
     (local_ip, local_id): (
-        Option<SpecifiedAddr<I::Addr>>,
+        Option<SocketIpAddr<I::Addr>>,
         <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
     ),
     remote_ip: SocketZonedIpAddr<I::Addr, SC::DeviceId>,
@@ -2930,15 +2954,22 @@ fn send_oneshot<
             Err(e) => return Err(SendToError::Zone(body, e)),
         };
 
+    // TODO(https://fxbug.dev/132092): Delete conversion once
+    // `SocketZonedIpAddr` holds `SocketIpAddr`.
+    let remote_ip: SocketIpAddr<_> = remote_ip.try_into().unwrap();
+
     sync_ctx
         .send_oneshot_ip_packet(
             ctx,
             device.as_ref().map(|d| d.as_ref()),
-            local_ip,
-            remote_ip,
+            local_ip.map(SocketIpAddr::into),
+            remote_ip.into(),
             proto,
             ip_options,
             |local_ip| {
+                // TODO(https://fxbug.dev/132092): Delete panic opportunity once
+                // once `send_oneshot_ip_packet` takes a `SocketIpAddr`.
+                let local_ip = SocketIpAddr::new_from_specified_or_panic(local_ip);
                 S::make_packet(
                     body,
                     &ConnIpAddr { local: (local_ip, local_id), remote: (remote_ip, remote_id) },
@@ -3000,8 +3031,8 @@ pub(crate) fn set_device<
                     let bound_addr = ListenerAddr { ip: ip.clone(), device: old_device.clone() };
 
                     if !socket::can_device_change(
-                        ip_addr.as_ref(), /* local_ip */
-                        None,             /* remote_ip */
+                        ip_addr.as_ref().map(|a| a.as_ref()), /* local_ip */
+                        None,                                 /* remote_ip */
                         old_device.as_ref(),
                         new_device,
                     ) {
@@ -3033,8 +3064,6 @@ pub(crate) fn set_device<
 
                         let new_ip = match sync_ctx.dual_stack_context().to_converter() {
                             MaybeDualStack::DualStack(converter) => {
-                                // TODO(https://fxbug.dev/21198): Don't assume the
-                                // listener address is in the current stack.
                                 let ListenerIpAddr { addr, identifier } = ip;
                                 converter.convert_back(DualStackListenerIpAddr {
                                     addr: DualStackIpAddr::ThisStack(addr),
@@ -3072,8 +3101,8 @@ pub(crate) fn set_device<
                     let ConnAddr { device: old_device, ip } = addr;
                     let ConnIpAddr { local: (local_ip, _), remote: (remote_ip, _) } = *ip;
                     if !socket::can_device_change(
-                        Some(&local_ip),
-                        Some(&remote_ip),
+                        Some(local_ip.as_ref()),
+                        Some(remote_ip.as_ref()),
                         old_device.as_ref(),
                         new_device,
                     ) {
@@ -3090,8 +3119,8 @@ pub(crate) fn set_device<
                                     .new_ip_socket(
                                         ctx,
                                         new_device.map(EitherDeviceId::Strong),
-                                        Some(local_ip),
-                                        remote_ip,
+                                        Some(local_ip.into()),
+                                        remote_ip.into(),
                                         socket.proto(),
                                         Default::default(),
                                     )

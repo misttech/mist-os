@@ -48,12 +48,13 @@ use crate::{
         icmp::IcmpIpExt,
         socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError},
         BufferIpTransportContext, BufferTransportIpContext, IpTransportContext,
-        MulticastMembershipHandler, TransportIpContext, TransportReceiveError,
+        MulticastMembershipHandler, ResolveRouteError, TransportIpContext, TransportReceiveError,
     },
     socket::{
         address::{
-            ConnAddr, ConnIpAddr, DualStackConnIpAddr, DualStackIpAddr, DualStackListenerIpAddr,
-            IpPortSpec, ListenerAddr, ListenerIpAddr, SocketZonedIpAddr,
+            AddrIsMappedError, ConnAddr, ConnIpAddr, DualStackConnIpAddr, DualStackIpAddr,
+            DualStackListenerIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr, SocketIpAddr,
+            SocketZonedIpAddr,
         },
         datagram::{
             self, AddrEntry, BoundSocketState as DatagramBoundSocketState,
@@ -439,8 +440,8 @@ impl DatagramSocketSpec for Udp {
     ) -> Self::Serializer<I, B> {
         let ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) } = addr;
         body.encapsulate(UdpPacketBuilder::new(
-            local_ip.get(),
-            remote_ip.get(),
+            local_ip.addr(),
+            remote_ip.addr(),
             Some(*local_port),
             *remote_port,
         ))
@@ -682,17 +683,17 @@ impl<'a, I: Ip + IpExt, D: WeakId + 'a> AddrEntry<'a, I, D, IpPortSpec, (Udp, I,
 /// yield 0, 1, or multiple sockets.
 fn lookup<'s, I: Ip + IpExt, D: WeakId>(
     bound: &'s DatagramBoundSockets<I, D, IpPortSpec, (Udp, I, D)>,
-    (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
-    (dst_ip, dst_port): (SpecifiedAddr<I::Addr>, NonZeroU16),
+    (src_ip, src_port): (Option<SocketIpAddr<I::Addr>>, Option<NonZeroU16>),
+    (dst_ip, dst_port): (SocketIpAddr<I::Addr>, NonZeroU16),
     device: D,
 ) -> impl Iterator<Item = LookupResult<'s, I, D>> + 's {
     let matching_entries = bound.iter_receivers((src_ip, src_port), (dst_ip, dst_port), device);
     match matching_entries {
         None => Either::Left(None),
         Some(FoundSockets::Single(entry)) => {
-            let selector = SocketSelectorParams {
-                src_ip,
-                dst_ip,
+            let selector = SocketSelectorParams::<_, SpecifiedAddr<I::Addr>> {
+                src_ip: src_ip.map_or(I::UNSPECIFIED_ADDRESS, SocketIpAddr::addr),
+                dst_ip: dst_ip.into(),
                 src_port: src_port.map_or(0, NonZeroU16::get),
                 dst_port: dst_port.get(),
                 _ip: IpVersionMarker::default(),
@@ -799,20 +800,30 @@ where
                      local: (local_ip, local_id),
                      remote: (remote_ip, remote_id),
                  })| {
-                    (local_ip, IpInvariant(local_id), remote_ip, IpInvariant(remote_id))
+                    (
+                        local_ip.into(),
+                        IpInvariant(local_id),
+                        remote_ip.into(),
+                        IpInvariant(remote_id),
+                    )
                 },
                 |Wrapper(dual_stack_conn_ip_addr)| match dual_stack_conn_ip_addr {
                     DualStackConnIpAddr::ThisStack(ConnIpAddr {
                         local: (local_ip, local_id),
                         remote: (remote_ip, remote_id),
-                    }) => (local_ip, IpInvariant(local_id), remote_ip, IpInvariant(remote_id)),
+                    }) => (
+                        local_ip.into(),
+                        IpInvariant(local_id),
+                        remote_ip.into(),
+                        IpInvariant(remote_id),
+                    ),
                     DualStackConnIpAddr::OtherStack(ConnIpAddr {
                         local: (local_ip, local_id),
                         remote: (remote_ip, remote_id),
                     }) => (
-                        to_ipv6_mapped(local_ip),
+                        to_ipv6_mapped(local_ip.into()),
                         IpInvariant(local_id),
-                        to_ipv6_mapped(remote_ip),
+                        to_ipv6_mapped(remote_ip.into()),
                         IpInvariant(remote_id),
                     ),
                 },
@@ -854,12 +865,14 @@ where
         struct Wrapper<I: Ip + DualStackIpExt>(I::DualStackListenerIpAddr<NonZeroU16>);
         let (addr, IpInvariant(identifier)): (Option<SpecifiedAddr<A>>, _) = A::Version::map_ip(
             Wrapper(ip),
-            |Wrapper(ListenerIpAddr { addr, identifier })| (addr, IpInvariant(identifier)),
+            |Wrapper(ListenerIpAddr { addr, identifier })| {
+                (addr.map(SocketIpAddr::into), IpInvariant(identifier))
+            },
             |Wrapper(DualStackListenerIpAddr { addr, identifier })| {
                 let addr = match addr {
-                    DualStackIpAddr::ThisStack(addr) => addr,
+                    DualStackIpAddr::ThisStack(addr) => addr.map(SocketIpAddr::into),
                     DualStackIpAddr::OtherStack(addr) => SpecifiedAddr::new(
-                        addr.map_or(Ipv4::UNSPECIFIED_ADDRESS, |a| a.get()).to_ipv6_mapped(),
+                        addr.map_or(Ipv4::UNSPECIFIED_ADDRESS, SocketIpAddr::addr).to_ipv6_mapped(),
                     ),
                 };
                 (addr, IpInvariant(identifier))
@@ -1156,16 +1169,31 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> IpTransportCon
                 return;
             }
         };
+
         if let (Some(src_ip), Some(src_port), Some(dst_port)) =
             (src_ip, udp_packet.src_port(), udp_packet.dst_port())
         {
+            let src_ip = match src_ip.try_into() {
+                Ok(addr) => addr,
+                Err(AddrIsMappedError {}) => {
+                    trace!("UdpIpTransportContext::receive_icmp_error: mapped source address");
+                    return;
+                }
+            };
+            let dst_ip = match dst_ip.try_into() {
+                Ok(addr) => addr,
+                Err(AddrIsMappedError {}) => {
+                    trace!("UdpIpTransportContext::receive_icmp_error: mapped destination address");
+                    return;
+                }
+            };
             sync_ctx.with_bound_state_context(|sync_ctx| {
                 BoundStateContext::<I, _>::with_bound_sockets(
                     sync_ctx,
                     |sync_ctx, BoundSockets { bound_sockets, lazy_port_alloc: _ }| {
                         let receiver = lookup(
                             bound_sockets,
-                            (*dst_ip, Some(dst_port)),
+                            (Some(dst_ip), Some(dst_port)),
                             (src_ip, src_port),
                             sync_ctx.downgrade_device_id(device),
                         )
@@ -1217,7 +1245,7 @@ fn receive_ip_packet<
 ) -> Result<(), (B, TransportReceiveError)> {
     trace_duration!(ctx, "udp::receive_ip_packet");
     trace!("received UDP packet: {:x?}", buffer.as_mut());
-    let src_ip = src_ip.into();
+    let src_ip: I::Addr = src_ip.into();
 
     let packet = if let Ok(packet) =
         buffer.parse_with::<_, UdpPacket<_>>(UdpParseArgs::new(src_ip, dst_ip.get()))
@@ -1227,6 +1255,25 @@ fn receive_ip_packet<
         // There isn't much we can do if the UDP packet is
         // malformed.
         return Ok(());
+    };
+
+    let src_ip = if let Some(src_ip) = SpecifiedAddr::new(src_ip) {
+        match src_ip.try_into() {
+            Ok(addr) => Some(addr),
+            Err(AddrIsMappedError {}) => {
+                trace!("UdpIpTransportContext::receive_icmp_error: mapped source address");
+                return Ok(());
+            }
+        }
+    } else {
+        None
+    };
+    let dst_ip = match dst_ip.try_into() {
+        Ok(addr) => addr,
+        Err(AddrIsMappedError {}) => {
+            trace!("UdpIpTransportContext::receive_icmp_error: mapped destination address");
+            return Ok(());
+        }
     };
 
     let src_port = packet.src_port();
@@ -1262,8 +1309,14 @@ fn receive_ip_packet<
     });
 
     let was_delivered = recipients.into_iter().fold(false, |was_delivered, lookup_result| {
-        let delivered =
-            try_deliver(sync_ctx, ctx, lookup_result, dst_ip.get(), (src_ip, src_port), &buffer);
+        let delivered = try_deliver(
+            sync_ctx,
+            ctx,
+            lookup_result,
+            dst_ip.addr(),
+            (src_ip.map_or(I::UNSPECIFIED_ADDRESS, SocketIpAddr::addr), src_port),
+            &buffer,
+        );
         was_delivered | delivered
     });
 
@@ -1809,6 +1862,12 @@ impl<
                                 IpSockCreateAndSendError::Mtu => SendToError::Mtu,
                                 IpSockCreateAndSendError::Create(e) => SendToError::CreateSock(e),
                             },
+                        ),
+                        datagram::SendToError::RemoteUnexpectedlyMapped(body) => (
+                            body,
+                            SendToError::CreateSock(IpSockCreationError::Route(
+                                ResolveRouteError::Unreachable,
+                            )),
                         ),
                     };
                     (body, Either::Right(err))
@@ -3249,8 +3308,8 @@ mod tests {
     where
         I: Ip + TestIpExt,
     {
-        let local_ip = local_ip::<I>();
-        let remote_ip = remote_ip::<I>();
+        let local_ip = SocketIpAddr::new_from_specified_or_panic(local_ip::<I>());
+        let remote_ip = SocketIpAddr::new_from_specified_or_panic(remote_ip::<I>());
         ConnAddr {
             ip: ConnIpAddr { local: (local_ip, LOCAL_PORT), remote: (remote_ip, REMOTE_PORT) },
             device,
@@ -3264,7 +3323,7 @@ mod tests {
     where
         I: Ip + TestIpExt,
     {
-        let local_ip = local_ip::<I>();
+        let local_ip = SocketIpAddr::new_from_specified_or_panic(local_ip::<I>());
         ListenerAddr { ip: ListenerIpAddr { identifier: LOCAL_PORT, addr: Some(local_ip) }, device }
             .into()
     }
@@ -3301,8 +3360,8 @@ mod tests {
     #[ip_test]
     fn test_iter_receiving_addrs<I: Ip + TestIpExt>() {
         let addr = ConnIpAddr {
-            local: (local_ip::<I>(), LOCAL_PORT),
-            remote: (remote_ip::<I>(), REMOTE_PORT),
+            local: (SocketIpAddr::new_from_specified_or_panic(local_ip::<I>()), LOCAL_PORT),
+            remote: (SocketIpAddr::new_from_specified_or_panic(remote_ip::<I>()), REMOTE_PORT),
         };
         assert_eq!(
             iter_receiving_addrs::<I, _>(addr, FakeWeakDeviceId(FakeDeviceId)).collect::<Vec<_>>(),
@@ -7338,7 +7397,7 @@ where {
         ip: I::Addr,
         port: u16,
     ) -> AddrVec<I, FakeWeakDeviceId<FakeDeviceId>, IpPortSpec> {
-        let addr = SpecifiedAddr::new(ip);
+        let addr = SpecifiedAddr::new(ip).map(SocketIpAddr::new_from_specified_or_panic);
         let port = NonZeroU16::new(port).expect("port must be nonzero");
         AddrVec::Listen(ListenerAddr {
             ip: ListenerIpAddr { addr, identifier: port },
@@ -7351,7 +7410,7 @@ where {
         port: u16,
         device: FakeWeakDeviceId<FakeDeviceId>,
     ) -> AddrVec<I, FakeWeakDeviceId<FakeDeviceId>, IpPortSpec> {
-        let addr = SpecifiedAddr::new(ip);
+        let addr = SpecifiedAddr::new(ip).map(SocketIpAddr::new_from_specified_or_panic);
         let port = NonZeroU16::new(port).expect("port must be nonzero");
         AddrVec::Listen(ListenerAddr {
             ip: ListenerIpAddr { addr, identifier: port },
@@ -7365,9 +7424,9 @@ where {
         remote_ip: I::Addr,
         remote_port: u16,
     ) -> AddrVec<I, FakeWeakDeviceId<FakeDeviceId>, IpPortSpec> {
-        let local_ip = SpecifiedAddr::new(local_ip).expect("addr must be specified");
+        let local_ip = SocketIpAddr::new(local_ip).expect("addr must be specified & non-mapped");
         let local_port = NonZeroU16::new(local_port).expect("port must be nonzero");
-        let remote_ip = SpecifiedAddr::new(remote_ip).expect("addr must be specified");
+        let remote_ip = SocketIpAddr::new(remote_ip).expect("addr must be specified & non-mapped");
         let remote_port = NonZeroU16::new(remote_port).expect("port must be nonzero");
         AddrVec::Conn(ConnAddr {
             ip: ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) },

@@ -554,7 +554,9 @@ impl IntoErrno for LocalAddressError {
         match self {
             LocalAddressError::CannotBindToAddress
             | LocalAddressError::FailedToAllocateLocalPort => Errno::Eaddrnotavail,
-            LocalAddressError::AddressMismatch => Errno::Einval,
+            LocalAddressError::AddressMismatch | LocalAddressError::AddressUnexpectedlyMapped => {
+                Errno::Einval
+            }
             LocalAddressError::AddressInUse => Errno::Eaddrinuse,
             LocalAddressError::Zone(e) => e.into_errno(),
         }
@@ -609,6 +611,9 @@ impl IntoErrno for netstack3_core::ip::icmp::IcmpSockCreationError {
         match self {
             netstack3_core::ip::icmp::IcmpSockCreationError::Ip(e) => e.into_errno(),
             netstack3_core::ip::icmp::IcmpSockCreationError::SockAddrConflict => Errno::Eaddrinuse,
+            netstack3_core::ip::icmp::IcmpSockCreationError::RemoteAddrIsMapped => {
+                Errno::Enetunreach
+            }
         }
     }
 }

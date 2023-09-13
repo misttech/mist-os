@@ -68,7 +68,7 @@ use crate::{
     },
     socket::{
         self,
-        address::{ConnAddr, ConnIpAddr},
+        address::{AddrIsMappedError, ConnAddr, ConnIpAddr, SocketIpAddr},
         datagram::{
             self, DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec,
             DatagramSocketSpec,
@@ -762,8 +762,8 @@ impl DatagramSocketSpec for Icmp {
         let icmp_echo: packet_formats::icmp::IcmpPacketRaw<I, &[u8], IcmpEchoRequest> =
             body.parse().unwrap();
         let icmp_builder = IcmpPacketBuilder::<I, _>::new(
-            local_ip.get(),
-            remote_ip.get(),
+            local_ip.addr(),
+            remote_ip.addr(),
             packet_formats::icmp::IcmpUnusedCode,
             IcmpEchoRequest::new(id.get(), icmp_echo.message().seq()),
         );
@@ -827,8 +827,12 @@ impl<I: IpExt, D: WeakId> PortAllocImpl for IcmpBoundSockets<I, D> {
         // We can safely unwrap here, because the ports received in
         // `is_port_available` are guaranteed to be in `EPHEMERAL_RANGE`.
         let port = NonZeroU16::new(port).unwrap();
+        // TODO(https://fxbug.dev/132092): Remove these panic opportunities once
+        // `DatagramFlowId` holds `SocketIpAddr`.
+        let local_ip = SocketIpAddr::new_from_specified_or_panic(id.local_ip);
+        let remote_ip = SocketIpAddr::new_from_specified_or_panic(id.remote_ip);
         let conn = ConnAddr {
-            ip: ConnIpAddr { local: (id.local_ip, port), remote: (id.remote_ip, ()) },
+            ip: ConnIpAddr { local: (local_ip, port), remote: (remote_ip, ()) },
             device: None,
         };
 
@@ -1198,10 +1202,25 @@ impl<I: IcmpIpExt + IpExt, C: IcmpNonSyncCtx<I>, SC: InnerIcmpContext<I, C>>
         let original_src_ip = match original_src_ip {
             Some(ip) => ip,
             None => {
-                trace!("IcmpIpTransportContext::receive_icmp_error: Got ICMP error message for IP packet with an unspecified destination IP address");
+                trace!("IcmpIpTransportContext::receive_icmp_error: unspecified source IP address");
                 return;
             }
         };
+        let original_src_ip: SocketIpAddr<_> = match original_src_ip.try_into() {
+            Ok(ip) => ip,
+            Err(AddrIsMappedError {}) => {
+                trace!("IcmpIpTransportContext::receive_icmp_error: mapped source IP address");
+                return;
+            }
+        };
+        let original_dst_ip: SocketIpAddr<_> = match original_dst_ip.try_into() {
+            Ok(ip) => ip,
+            Err(AddrIsMappedError {}) => {
+                trace!("IcmpIpTransportContext::receive_icmp_error: mapped destination IP address");
+                return;
+            }
+        };
+
         let id = echo_request.message().id();
         sync_ctx.with_icmp_sockets(|sockets| {
             if let Some(conn) = sockets.bound.conns().get_by_addr(&ConnAddr {
@@ -3024,46 +3043,63 @@ fn receive_icmp_echo_reply<
     seq: u16,
     body: B,
 ) {
-    if let Some(src_ip) = SpecifiedAddr::new(src_ip) {
-        sync_ctx.with_icmp_sockets(|sockets| {
-            if let Some(id) = NonZeroU16::new(id) {
-                if let Some(conn) = sockets.bound.conns().get_by_addr(&ConnAddr {
-                    ip: ConnIpAddr { local: (dst_ip, id), remote: (src_ip, ()) },
-                    device: None,
-                }) {
-                    trace!("receive_icmp_echo_reply: Received echo reply for local socket");
-                    ctx.receive_icmp_echo_reply(
-                        *conn,
-                        src_ip.get(),
-                        dst_ip.get(),
-                        id.get(),
-                        seq,
-                        body,
-                    );
-                    return;
-                }
+    let src_ip = match SpecifiedAddr::new(src_ip) {
+        Some(src_ip) => src_ip,
+        None => {
+            trace!("receive_icmp_echo_reply: unspecified source address");
+            return;
+        }
+    };
+    let src_ip: SocketIpAddr<_> = match src_ip.try_into() {
+        Ok(src_ip) => src_ip,
+        Err(AddrIsMappedError {}) => {
+            trace!("receive_icmp_echo_reply: mapped source address");
+            return;
+        }
+    };
+    let dst_ip: SocketIpAddr<_> = match dst_ip.try_into() {
+        Ok(dst_ip) => dst_ip,
+        Err(AddrIsMappedError {}) => {
+            trace!("receive_icmp_echo_reply: mapped destination address");
+            return;
+        }
+    };
+    sync_ctx.with_icmp_sockets(|sockets| {
+        if let Some(id) = NonZeroU16::new(id) {
+            if let Some(conn) = sockets.bound.conns().get_by_addr(&ConnAddr {
+                ip: ConnIpAddr { local: (dst_ip, id), remote: (src_ip, ()) },
+                device: None,
+            }) {
+                trace!("receive_icmp_echo_reply: Received echo reply for local socket");
+                ctx.receive_icmp_echo_reply(
+                    *conn,
+                    src_ip.addr(),
+                    dst_ip.addr(),
+                    id.get(),
+                    seq,
+                    body,
+                );
+                return;
             }
-            // TODO(fxbug.dev/47952): Neither the ICMPv4 or ICMPv6 RFCs
-            // explicitly state what to do in case we receive an "unsolicited"
-            // echo reply. We only expose the replies if we have a registered
-            // connection for the IcmpAddr of the incoming reply for now. Given
-            // that a reply should only be sent in response to a request, an
-            // ICMP unreachable-type message is probably not appropriate for
-            // unsolicited replies. However, it's also possible that we sent a
-            // request and then closed the socket before receiving the reply, so
-            // this doesn't necessarily indicate a buggy or malicious remote
-            // host. We should figure this out definitively.
-            //
-            // If we do decide to send an ICMP error message, the appropriate
-            // thing to do is probably to have this function return a `Result`,
-            // and then have the top-level implementation of
-            // `BufferIpTransportContext::receive_ip_packet` return the
-            // appropriate error.
-            trace!("receive_icmp_echo_reply: Received echo reply with no local socket");
-        })
-    } else {
-        trace!("receive_icmp_echo_reply: Received echo reply with an unspecified source address");
-    }
+        }
+        // TODO(fxbug.dev/47952): Neither the ICMPv4 or ICMPv6 RFCs
+        // explicitly state what to do in case we receive an "unsolicited"
+        // echo reply. We only expose the replies if we have a registered
+        // connection for the IcmpAddr of the incoming reply for now. Given
+        // that a reply should only be sent in response to a request, an
+        // ICMP unreachable-type message is probably not appropriate for
+        // unsolicited replies. However, it's also possible that we sent a
+        // request and then closed the socket before receiving the reply, so
+        // this doesn't necessarily indicate a buggy or malicious remote
+        // host. We should figure this out definitively.
+        //
+        // If we do decide to send an ICMP error message, the appropriate
+        // thing to do is probably to have this function return a `Result`,
+        // and then have the top-level implementation of
+        // `BufferIpTransportContext::receive_ip_packet` return the
+        // appropriate error.
+        trace!("receive_icmp_echo_reply: Received echo reply with no local socket");
+    })
 }
 
 /// Send an ICMPv4 echo request on an existing connection.
@@ -3147,6 +3183,10 @@ pub enum IcmpSockCreationError {
     /// an existing ICMP socket.
     #[error("addresses conflict with an existing ICMP socket")]
     SockAddrConflict,
+    /// The specified remote address is mapped (i.e. ipv4-mapped-ipv6 address).
+    /// ICMP sockets do not support dual-stack operations.
+    #[error("remote address is mapped")]
+    RemoteAddrIsMapped,
 }
 
 /// Creates a new unbound ICMPv4 socket.
@@ -3277,6 +3317,8 @@ fn connect_icmpv4_inner<C: IcmpNonSyncCtx<Ipv4>, SC: InnerIcmpv4Context<C>>(
     remote_addr: SpecifiedAddr<Ipv4Addr>,
     icmp_id: u16,
 ) -> Result<SocketId<Ipv4>, IcmpSockCreationError> {
+    let remote_addr = SocketIpAddr::<Ipv4Addr>::new_ipv4_specified(remote_addr);
+
     InnerIcmpContext::with_icmp_ctx_and_sockets_mut(
         sync_ctx,
         |ip_transport_ctx, IcmpSockets { bound, id_allocator: _, state }| {
@@ -3285,7 +3327,7 @@ fn connect_icmpv4_inner<C: IcmpNonSyncCtx<Ipv4>, SC: InnerIcmpv4Context<C>>(
                     ctx,
                     None,
                     local_addr,
-                    remote_addr,
+                    remote_addr.into(),
                     Ipv4Proto::Icmp,
                     datagram::IpOptions::default(),
                 )
@@ -3329,6 +3371,10 @@ fn connect_icmpv6_inner<C: IcmpNonSyncCtx<Ipv6>, SC: InnerIcmpv6Context<C>>(
     remote_addr: SpecifiedAddr<Ipv6Addr>,
     icmp_id: u16,
 ) -> Result<SocketId<Ipv6>, IcmpSockCreationError> {
+    let remote_addr: SocketIpAddr<_> = remote_addr
+        .try_into()
+        .map_err(|AddrIsMappedError {}| IcmpSockCreationError::RemoteAddrIsMapped)?;
+
     InnerIcmpContext::with_icmp_ctx_and_sockets_mut(
         sync_ctx,
         |ip_transport_ctx, IcmpSockets { bound, id_allocator: _, state }| {
@@ -3337,7 +3383,7 @@ fn connect_icmpv6_inner<C: IcmpNonSyncCtx<Ipv6>, SC: InnerIcmpv6Context<C>>(
                     ctx,
                     None,
                     local_addr,
-                    remote_addr,
+                    remote_addr.into(),
                     Ipv6Proto::Icmpv6,
                     datagram::IpOptions::default(),
                 )
@@ -3351,13 +3397,16 @@ fn connect_icmp_inner<I: IcmpIpExt + IpExt + datagram::DualStackIpExt, D: WeakId
     state: &mut datagram::SocketsState<I, D, Icmp>,
     bound: &mut IcmpBoundSockets<I, D>,
     id: SocketId<I>,
-    remote_addr: SpecifiedAddr<I::Addr>,
+    remote_addr: SocketIpAddr<I::Addr>,
     icmp_id: u16,
     ip: IpSock<I, D, datagram::IpOptions<I, D, Icmp>>,
 ) -> Result<SocketId<I>, IcmpSockCreationError> {
+    // TODO(https://fxbug.dev/132092): remove panic opportunity once `IpSock`
+    // holds `SocketIpAddr`.
+    let local_ip = SocketIpAddr::new_from_specified_or_panic(*ip.local_ip());
     let addr = ConnAddr {
         ip: ConnIpAddr {
-            local: (*ip.local_ip(), NonZeroU16::new(icmp_id).unwrap()),
+            local: (local_ip, NonZeroU16::new(icmp_id).unwrap()),
             remote: (remote_addr, ()),
         },
         device: None,
@@ -3387,6 +3436,7 @@ mod tests {
     use core::{convert::TryInto, fmt::Debug, num::NonZeroU16, time::Duration};
 
     use ip_test_macro::ip_test;
+    use net_declare::net_ip_v6;
     use net_types::ip::{Ip, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet};
     use packet::{Buf, Serializer};
     use packet_formats::{
@@ -5482,6 +5532,27 @@ mod tests {
             with_errors_per_second_v6,
             send_icmpv6_dest_unreachable_helper,
             SEND_ICMPV6_ERROR_MESSAGE_COUNTER_NAME,
+        );
+    }
+
+    #[test]
+    fn test_connect_dual_stack_fails() {
+        // Verify that connecting to an ipv4-mapped-ipv6 address fails, as ICMP
+        // sockets do not support dual-stack operations.
+        const ICMP_ID: u16 = 0x0F;
+        let mut ctx = Fakev6Ctx::default();
+        let FakeCtx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let unbound = create_icmpv6_unbound_inner(sync_ctx);
+        assert_eq!(
+            connect_icmpv6_inner(
+                sync_ctx,
+                non_sync_ctx,
+                unbound,
+                Some(FAKE_CONFIG_V6.local_ip),
+                SpecifiedAddr::new(net_ip_v6!("::ffff:192.0.2.1")).unwrap(),
+                ICMP_ID
+            ),
+            Err(IcmpSockCreationError::RemoteAddrIsMapped)
         );
     }
 }

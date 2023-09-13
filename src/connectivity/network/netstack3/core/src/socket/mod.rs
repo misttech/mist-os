@@ -927,7 +927,7 @@ mod tests {
 
     use crate::{
         device::testutil::{FakeDeviceId, FakeWeakDeviceId},
-        socket::address::{ConnIpAddr, ListenerIpAddr},
+        socket::address::{ConnIpAddr, ListenerIpAddr, SocketIpAddr},
         testutil::set_logger_for_test,
     };
 
@@ -1153,7 +1153,7 @@ mod tests {
         FakeWeakDeviceId<FakeDeviceId>,
     > = ListenerAddr {
         ip: ListenerIpAddr {
-            addr: Some(unsafe { SpecifiedAddr::new_unchecked(net_ip_v4!("1.2.3.4")) }),
+            addr: Some(unsafe { SocketIpAddr::new_unchecked(net_ip_v4!("1.2.3.4")) }),
             identifier: 0,
         },
         device: None,
@@ -1163,8 +1163,8 @@ mod tests {
         ConnAddr {
             ip: unsafe {
                 ConnIpAddr {
-                    local: (SpecifiedAddr::new_unchecked(net_ip_v4!("5.6.7.8")), 0),
-                    remote: (SpecifiedAddr::new_unchecked(net_ip_v4!("8.7.6.5")), ()),
+                    local: (SocketIpAddr::new_unchecked(net_ip_v4!("5.6.7.8")), 0),
+                    remote: (SocketIpAddr::new_unchecked(net_ip_v4!("8.7.6.5")), ()),
                 }
             },
             device: None,
@@ -1225,7 +1225,7 @@ mod tests {
         ]
         .map(|(ip, identifier)| ListenerAddr {
             device: None,
-            ip: ListenerIpAddr { addr: ip.map(|x| SpecifiedAddr::new(x).unwrap()), identifier },
+            ip: ListenerIpAddr { addr: ip.map(|x| SocketIpAddr::new(x).unwrap()), identifier },
         });
         let conn_addrs = [
             (net_ip_v4!("3.3.3.3"), 3, net_ip_v4!("4.4.4.4")),
@@ -1233,8 +1233,8 @@ mod tests {
         ]
         .map(|(local_ip, local_identifier, remote_ip)| ConnAddr {
             ip: ConnIpAddr {
-                local: (SpecifiedAddr::new(local_ip).unwrap(), local_identifier),
-                remote: (SpecifiedAddr::new(remote_ip).unwrap(), ()),
+                local: (SocketIpAddr::new(local_ip).unwrap(), local_identifier),
+                remote: (SocketIpAddr::new(remote_ip).unwrap(), ()),
             },
             device: None,
         });
@@ -1291,7 +1291,7 @@ mod tests {
                     device: None,
                     ip: ConnIpAddr {
                         local: (addr.ip.addr.unwrap(), addr.ip.identifier),
-                        remote: (SpecifiedAddr::new(net_ip_v4!("1.1.1.1")).unwrap(), ()),
+                        remote: (SocketIpAddr::new(net_ip_v4!("1.1.1.1")).unwrap(), ()),
                     },
                 },
                 'b',
@@ -1345,7 +1345,7 @@ mod tests {
             device: None,
             ip: ConnIpAddr {
                 local: (addr.ip.addr.unwrap(), addr.ip.identifier),
-                remote: (SpecifiedAddr::new(net_ip_v4!("1.1.1.1")).unwrap(), ()),
+                remote: (SocketIpAddr::new(net_ip_v4!("1.1.1.1")).unwrap(), ()),
             },
         };
 
@@ -1397,7 +1397,7 @@ mod tests {
         let first_addr = LISTENER_ADDR;
         let second_addr = ListenerAddr {
             ip: ListenerIpAddr {
-                addr: Some(SpecifiedAddr::new(net_ip_v4!("1.1.1.1")).unwrap()),
+                addr: Some(SocketIpAddr::new(net_ip_v4!("1.1.1.1")).unwrap()),
                 ..LISTENER_ADDR.ip
             },
             ..LISTENER_ADDR

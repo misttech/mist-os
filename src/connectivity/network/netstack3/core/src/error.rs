@@ -103,6 +103,11 @@ pub enum LocalAddressError {
     /// sockets contain IP sockets.
     #[error("{}", _0)]
     Zone(#[from] ZonedAddressError),
+
+    /// The requested address is mapped (i.e. an IPv4-mapped-IPv6 address), but
+    /// the socket is not dual-stack enabled.
+    #[error("Address is mapped")]
+    AddressUnexpectedlyMapped,
 }
 
 /// Indicates a problem related to an address with a zone.
