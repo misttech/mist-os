@@ -82,47 +82,61 @@ def write_file_if_unchanged(path: Path, content: str) -> bool:
     return True
 
 
-def command_args_to_string(args: List) -> str:
-    return " ".join(shlex.quote(str(a)) for a in args)
+def command_args_to_string(args: List, env=None) -> str:
+    elements = []
+    if env:
+        elements += [
+            "%s=%s" % (name, shlex.quote(value))
+            for name, value in sorted(env.items())
+        ]
+    elements += [shlex.quote(str(a)) for a in args]
+    return " ".join(elements)
 
 
-def run_command(args: List, cwd=None):
+def run_command(args: List, cwd=None, env=None):
     """Run a command.
 
     Args:
         args: A list of strings or Path items (each one of them will be
             converted to a string for convenience).
         cwd: If not None, path to the directory where to run the command.
+        env: If not None, a dictionary of environment variables to use.
     Returns:
         a subprocess.run() result value.
     """
-    log('RUN: ' + command_args_to_string(args))
+    log('RUN: ' + command_args_to_string(args, env))
     start_time = time.time()
-    result = subprocess.run([str(a) for a in args], cwd=cwd)
+    if env is not None:
+        new_vars = env
+        env = os.environ.copy()
+        for name, value in new_vars.items():
+            env[name] = value
+    result = subprocess.run([str(a) for a in args], cwd=cwd, env=env)
     end_time = time.time()
     log('DURATION: %.1fs' % (end_time - start_time))
     return result
 
 
-def run_checked_command(args: List, cwd=None):
+def run_checked_command(args: List, cwd=None, env=None):
     """Run a command, return True if succeeds, False otherwise.
 
     Args:
         args: A list of strings or Path items (each one of them will be
             converted to a string for convenience).
         cwd: If not None, path to the directory where to run the command.
+        env: If not None, a dictionary of environment variables to use.
     Returns:
         True on success. In case of failure, print the command line and return False.
     """
     try:
-        ret = run_command(args, cwd)
+        ret = run_command(args, cwd, env)
         if ret.returncode == 0:
             return False
     except KeyboardInterrupt:
         # If the user interrupts a long-running command, do not print anything.
         return True
 
-    args_str = command_args_to_string(args)
+    args_str = command_args_to_string(args, env)
     print(f'ERROR: When running command: {args_str}\n', file=sys.stderr)
     return True
 
@@ -340,8 +354,16 @@ def main():
                     return 1
 
             log(f'{build_dir}: Generating IDK sub-targets')
+
+            # Adjust the NINJA_STATUS environment variable before launching Ninja
+            # in order to add a prefix distinguishing its build actions from
+            # the top-level ones.
+            ninja_status = os.environ.get('NINJA_STATUS', '[%f/%t](%r) ')
+            ninja_status = f"IDK_SUBBUILD_{subtype} " + ninja_status
+            ninja_env = {'NINJA_STATUS': ninja_status}
+
             if run_checked_command([ninja_path, "-C", build_dir] +
-                                   ninja_targets):
+                                   ninja_targets, env=ninja_env):
                 return 1
 
             # Since the merge script does not understand API levels yet,
