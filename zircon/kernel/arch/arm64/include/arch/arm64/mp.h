@@ -86,7 +86,7 @@ inline void arm64_write_percpu_ptr(struct arm64_percpu* percpu) {
 
 inline struct arm64_percpu* arm64_read_percpu_ptr() {
   struct arm64_percpu* p;
-  __asm__("mov %0, x20" : "=r"(p));
+  __asm__ volatile("mov %0, x20" : "=r"(p));
   return p;
 }
 
