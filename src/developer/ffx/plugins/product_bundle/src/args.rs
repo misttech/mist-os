@@ -7,7 +7,9 @@ use ffx_core::ffx_command;
 use pbms::AuthFlowChoice;
 use std::{path::PathBuf, str::FromStr};
 
-/// Discover and access product bundle metadata and image data.
+/// DEPRECATED. Please use `ffx product` instead. More information on how to
+/// map your usage of product-bundle to product can be found in each of the
+/// subcommands.
 #[ffx_command()]
 #[derive(FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "product-bundle")]
@@ -25,7 +27,7 @@ pub enum SubCommand {
     Remove(RemoveCommand),
 }
 
-/// Display a list of product bundle names.
+/// DEPRECATED. Please use `ffx product list` instead.
 #[derive(FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "list")]
 pub struct ListCommand {
@@ -42,7 +44,7 @@ pub struct ListCommand {
     pub oob_auth: bool,
 }
 
-/// Retrieve image data.
+/// DEPRECATED. Please use `ffx product download` instead.
 #[derive(FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "get")]
 pub struct GetCommand {
@@ -116,7 +118,7 @@ impl FromStr for ProductBundleTypes {
     }
 }
 
-/// Create product bundle manifest file.
+/// DEPRECATED. Please use `ffx product create` instead.
 #[derive(FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "create")]
 pub struct CreateCommand {
@@ -153,7 +155,7 @@ pub struct CreateCommand {
     pub out: PathBuf,
 }
 
-/// Remove a product bundle from the product bundle cache.
+/// DEPRECATED. This is no longer supported/required in Product Bundle V2.
 #[derive(FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "remove")]
 pub struct RemoveCommand {
