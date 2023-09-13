@@ -447,7 +447,7 @@ impl SceneManager {
         pointerinjector_flatland: ui_comp::FlatlandProxy,
         scene_flatland: ui_comp::FlatlandProxy,
         a11y_view_provider: a11y_scene::ProviderProxy,
-        display_rotation: i32,
+        display_rotation: u64,
         display_pixel_density: Option<f32>,
         viewing_distance: Option<ViewingDistance>,
     ) -> Result<Self, Error> {

@@ -98,10 +98,11 @@ impl From<InputDeviceType> for PlatformInputDeviceType {
 pub enum ViewingDistance {
     Handheld,
     Close,
-    #[default]
     Near,
     Midrange,
     Far,
+    #[default]
+    Unknown,
 }
 
 impl AsRef<str> for ViewingDistance {
@@ -112,6 +113,7 @@ impl AsRef<str> for ViewingDistance {
             Self::Near => "near",
             Self::Midrange => "midrange",
             Self::Far => "far",
+            Self::Unknown => "unknown",
         }
     }
 }

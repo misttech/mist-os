@@ -367,6 +367,20 @@ void UITestRealm::ConfigureSceneOwner() {
   RouteServices({fuchsia::ui::composition::internal::DisplayOwnership::Name_},
                 /* source = */ ChildRef{kScenicName},
                 /* targets = */ {ChildRef{kSceneManagerName}});
+
+  FX_CHECK(config_.device_pixel_ratio > 0) << "Device pixel ratio must be positive";
+  FX_CHECK(fmodf(static_cast<float>(kDisplayWidthPhysicalPixels), config_.device_pixel_ratio) == 0)
+      << "DPR must result in integer logical display dimensions";
+  FX_CHECK(fmodf(static_cast<float>(kDisplayHeightPhysicalPixels), config_.device_pixel_ratio) == 0)
+      << "DPR must result in integer logical display dimensions";
+  auto display_pixel_density = kLowResolutionDisplayPixelDensity * config_.device_pixel_ratio;
+
+  // Load config for Scene Manager.
+  realm_builder_.InitMutableConfigFromPackage(kSceneManagerName);
+  realm_builder_.SetConfigValue(kSceneManagerName, "display_pixel_density",
+                                ConfigValue(std::to_string(display_pixel_density)));
+  realm_builder_.SetConfigValue(kSceneManagerName, "display_rotation",
+                                ConfigValue::Uint64(config_.display_rotation));
 }
 
 void UITestRealm::Build() {
