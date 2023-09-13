@@ -98,16 +98,6 @@ pub async fn connect_to_instance_protocol_at_dir_root<P: ProtocolMarker>(
     connect_to_instance_protocol_at_path::<P>(moniker, dir_type, P::DEBUG_NAME, realm).await
 }
 
-/// Opens a protocol in a component instance directory, assuming it is located under `/svc`.
-pub async fn connect_to_instance_protocol_at_dir_svc<P: ProtocolMarker>(
-    moniker: &Moniker,
-    dir_type: OpenDirType,
-    realm: &fsys::RealmQueryProxy,
-) -> Result<P::Proxy, OpenError> {
-    let path = format!("/svc/{}", P::DEBUG_NAME);
-    connect_to_instance_protocol_at_path::<P>(moniker, dir_type, &path, realm).await
-}
-
 /// Opens a protocol in a component instance directory at the given |path|.
 pub async fn connect_to_instance_protocol_at_path<P: ProtocolMarker>(
     moniker: &Moniker,
@@ -120,7 +110,7 @@ pub async fn connect_to_instance_protocol_at_path<P: ProtocolMarker>(
     open_in_instance_dir(
         &moniker,
         dir_type,
-        fio::OpenFlags::RIGHT_READABLE,
+        fio::OpenFlags::empty(),
         fio::ModeType::empty(),
         path,
         server_end,
@@ -136,19 +126,7 @@ pub async fn open_instance_dir_root_readable(
     dir_type: OpenDirType,
     realm: &fsys::RealmQueryProxy,
 ) -> Result<fio::DirectoryProxy, OpenError> {
-    let (root_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-    let server_end = server_end.into_channel();
-    open_in_instance_dir(
-        moniker,
-        dir_type,
-        fio::OpenFlags::RIGHT_READABLE,
-        fio::ModeType::empty(),
-        ".",
-        server_end,
-        realm,
-    )
-    .await?;
-    Ok(root_dir)
+    open_instance_subdir_readable(moniker, dir_type, ".", realm).await
 }
 
 /// Opens the subdirectory of a component instance directory with read rights.
@@ -204,4 +182,96 @@ pub async fn open_in_instance_dir(
             fsys::OpenError::FidlError => OpenError::OpenFidlError,
             _ => OpenError::UnknownError,
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use fidl::endpoints::spawn_stream_handler;
+    use fidl_fuchsia_io as fio;
+    use fidl_fuchsia_sys2 as fsys;
+    use moniker::{Moniker, MonikerBase};
+
+    use super::OpenDirType;
+    use super::{
+        connect_to_instance_protocol_at_path, open_instance_dir_root_readable,
+        open_instance_subdir_readable,
+    };
+
+    #[fuchsia::test]
+    async fn test_connect_to_instance_protocol_at_path() {
+        // Ensure that connect_to_instance_protocol_at_path() passes the correct arguments to RealmQuery.
+        let realm = spawn_stream_handler(move |realm_request| async move {
+            match realm_request {
+                fsys::RealmQueryRequest::Open {
+                    moniker,
+                    dir_type,
+                    flags,
+                    mode: _,
+                    path,
+                    object: _,
+                    responder,
+                } => {
+                    assert_eq!(moniker, "moniker");
+                    assert_eq!(dir_type, fsys::OpenDirType::NamespaceDir);
+                    assert_eq!(flags, fio::OpenFlags::empty());
+                    assert_eq!(path, "/path");
+                    responder.send(Ok(())).unwrap();
+                }
+                _ => unreachable!(),
+            };
+        })
+        .unwrap();
+
+        connect_to_instance_protocol_at_path::<fsys::RealmQueryMarker>(
+            &Moniker::parse_str("moniker").unwrap(),
+            OpenDirType::Namespace,
+            "/path",
+            &realm,
+        )
+        .await
+        .unwrap();
+    }
+
+    #[fuchsia::test]
+    async fn test_open_instance_subdir_readable() {
+        // Ensure that open_instance_subdir_readable() passes the correct arguments to RealmQuery.
+        let realm = spawn_stream_handler(move |realm_request| async move {
+            match realm_request {
+                fsys::RealmQueryRequest::Open {
+                    moniker,
+                    dir_type,
+                    flags,
+                    mode: _,
+                    path,
+                    object: _,
+                    responder,
+                } => {
+                    assert_eq!(moniker, "moniker");
+                    assert_eq!(dir_type, fsys::OpenDirType::NamespaceDir);
+                    assert_eq!(flags, fio::OpenFlags::RIGHT_READABLE);
+                    assert_eq!(path, ".");
+                    responder.send(Ok(())).unwrap();
+                }
+                _ => unreachable!(),
+            };
+        })
+        .unwrap();
+
+        open_instance_subdir_readable(
+            &Moniker::parse_str("moniker").unwrap(),
+            OpenDirType::Namespace,
+            ".",
+            &realm,
+        )
+        .await
+        .unwrap();
+
+        open_instance_dir_root_readable(
+            &Moniker::parse_str("moniker").unwrap(),
+            OpenDirType::Namespace,
+            &realm,
+        )
+        .await
+        .unwrap();
+    }
 }
