@@ -6,7 +6,6 @@ use {
     crate::{
         accessor::PerformanceConfig,
         diagnostics::BatchIteratorConnectionStats,
-        identity::MonikerHelper,
         inspect::container::{ReadSnapshot, SnapshotData, UnpopulatedInspectDataContainer},
         moniker_rewriter::OutputRewriter,
     },
@@ -16,6 +15,7 @@ use {
     fuchsia_inspect::reader::PartialNodeHierarchy,
     fuchsia_trace as ftrace, fuchsia_zircon as zx,
     futures::prelude::*,
+    selectors::SelectorMatchExt,
     std::{
         convert::{TryFrom, TryInto},
         sync::Arc,

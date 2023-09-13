@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    identity::{ComponentIdentity, MonikerHelper},
+    identity::ComponentIdentity,
     logs::{
         budget::BudgetHandle,
         buffer::{ArcList, LazyItem},
@@ -33,6 +33,7 @@ use futures::{
     channel::{mpsc, oneshot},
     prelude::*,
 };
+use selectors::SelectorMatchExt;
 use std::{
     cmp::Ordering,
     collections::BTreeMap,

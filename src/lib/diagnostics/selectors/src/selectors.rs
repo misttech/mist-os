@@ -13,6 +13,9 @@ use fidl_fuchsia_diagnostics::{
     SelectorArgument, Severity, StringSelector, StringSelectorUnknown, SubtreeSelector,
     TreeSelector,
 };
+use moniker::{
+    ChildName, ExtendedMoniker, Moniker, MonikerBase, EXTENDED_MONIKER_COMPONENT_MANAGER_STR,
+};
 use std::borrow::{Borrow, Cow};
 use std::fs;
 use std::io::{BufRead, BufReader};
@@ -653,6 +656,181 @@ impl<'a> TokenBuilder<'a> {
             Self::Slice { end: None, .. } => true,
             Self::String(s) => s.is_empty(),
             Self::Init(_) => true,
+        }
+    }
+}
+
+pub trait SelectorMatchExt {
+    fn match_against_selectors<'a, S>(
+        &self,
+        selectors: &'a [S],
+    ) -> Result<Vec<&'a Selector>, anyhow::Error>
+    where
+        S: Borrow<Selector>;
+
+    fn match_against_component_selectors<'a, S>(
+        &self,
+        selectors: &'a [S],
+    ) -> Result<Vec<&'a ComponentSelector>, anyhow::Error>
+    where
+        S: Borrow<ComponentSelector>;
+
+    fn matches_selector(&self, selector: &Selector) -> Result<bool, anyhow::Error>;
+
+    fn matches_component_selector(
+        &self,
+        selector: &ComponentSelector,
+    ) -> Result<bool, anyhow::Error>;
+
+    fn sanitized(&self) -> String;
+}
+
+impl SelectorMatchExt for ExtendedMoniker {
+    fn match_against_selectors<'a, S>(
+        &self,
+        selectors: &'a [S],
+    ) -> Result<Vec<&'a Selector>, anyhow::Error>
+    where
+        S: Borrow<Selector>,
+    {
+        match self {
+            ExtendedMoniker::ComponentManager => match_component_moniker_against_selectors(
+                &[EXTENDED_MONIKER_COMPONENT_MANAGER_STR],
+                selectors,
+            ),
+            ExtendedMoniker::ComponentInstance(moniker) => {
+                moniker.match_against_selectors(selectors)
+            }
+        }
+    }
+
+    fn match_against_component_selectors<'a, S>(
+        &self,
+        selectors: &'a [S],
+    ) -> Result<Vec<&'a ComponentSelector>, anyhow::Error>
+    where
+        S: Borrow<ComponentSelector>,
+    {
+        match self {
+            ExtendedMoniker::ComponentManager => match_moniker_against_component_selectors(
+                &[EXTENDED_MONIKER_COMPONENT_MANAGER_STR],
+                selectors,
+            ),
+            ExtendedMoniker::ComponentInstance(moniker) => {
+                moniker.match_against_component_selectors(selectors)
+            }
+        }
+    }
+
+    fn matches_selector(&self, selector: &Selector) -> Result<bool, anyhow::Error> {
+        match self {
+            ExtendedMoniker::ComponentManager => match_component_moniker_against_selector(
+                &[EXTENDED_MONIKER_COMPONENT_MANAGER_STR],
+                selector,
+            ),
+            ExtendedMoniker::ComponentInstance(moniker) => moniker.matches_selector(selector),
+        }
+    }
+
+    fn matches_component_selector(
+        &self,
+        selector: &ComponentSelector,
+    ) -> Result<bool, anyhow::Error> {
+        match self {
+            ExtendedMoniker::ComponentManager => match_moniker_against_component_selector(
+                [EXTENDED_MONIKER_COMPONENT_MANAGER_STR].into_iter(),
+                selector,
+            ),
+            ExtendedMoniker::ComponentInstance(moniker) => {
+                moniker.matches_component_selector(selector)
+            }
+        }
+    }
+
+    fn sanitized(&self) -> String {
+        match self {
+            ExtendedMoniker::ComponentManager => EXTENDED_MONIKER_COMPONENT_MANAGER_STR.to_string(),
+            ExtendedMoniker::ComponentInstance(moniker) => moniker.sanitized(),
+        }
+    }
+}
+
+impl SelectorMatchExt for Moniker {
+    fn match_against_selectors<'a, S>(
+        &self,
+        selectors: &'a [S],
+    ) -> Result<Vec<&'a Selector>, anyhow::Error>
+    where
+        S: Borrow<Selector>,
+    {
+        let s = SegmentIterator::from(self).collect::<Vec<_>>();
+        match_component_moniker_against_selectors(&s, selectors)
+    }
+
+    fn match_against_component_selectors<'a, S>(
+        &self,
+        selectors: &'a [S],
+    ) -> Result<Vec<&'a ComponentSelector>, anyhow::Error>
+    where
+        S: Borrow<ComponentSelector>,
+    {
+        let s = SegmentIterator::from(self).collect::<Vec<_>>();
+        match_moniker_against_component_selectors(&s, selectors)
+    }
+
+    fn matches_selector(&self, selector: &Selector) -> Result<bool, anyhow::Error> {
+        let s = SegmentIterator::from(self).collect::<Vec<_>>();
+        match_component_moniker_against_selector(&s, selector)
+    }
+
+    fn matches_component_selector(
+        &self,
+        selector: &ComponentSelector,
+    ) -> Result<bool, anyhow::Error> {
+        let s = SegmentIterator::from(self).collect::<Vec<_>>();
+        match_moniker_against_component_selector(s.into_iter(), selector)
+    }
+
+    fn sanitized(&self) -> String {
+        SegmentIterator::from(self)
+            .map(|s| sanitize_string_for_selectors(&s).into_owned())
+            .collect::<Vec<String>>()
+            .join("/")
+    }
+}
+
+enum SegmentIterator<'a> {
+    Iter { path: &'a [ChildName], current_index: usize },
+    Root(bool),
+}
+
+impl<'a> From<&'a Moniker> for SegmentIterator<'a> {
+    fn from(moniker: &'a Moniker) -> Self {
+        let path = moniker.path();
+        if path.len() == 0 {
+            return SegmentIterator::Root(false);
+        }
+        SegmentIterator::Iter { path: path.as_slice(), current_index: 0 }
+    }
+}
+
+impl Iterator for SegmentIterator<'_> {
+    type Item = String;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Iter { path, current_index } => {
+                let Some(segment) = path.get(*current_index) else {
+                    return None;
+                };
+                let result = segment.to_string();
+                *self = Self::Iter { path, current_index: *current_index + 1 };
+                Some(result)
+            }
+            Self::Root(true) => None,
+            Self::Root(done) => {
+                *done = true;
+                Some("<root>".to_string())
+            }
         }
     }
 }

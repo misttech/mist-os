@@ -7,7 +7,7 @@ use crate::{
         router::EventConsumer,
         types::{DiagnosticsReadyPayload, Event, EventPayload},
     },
-    identity::{ComponentIdentity, MonikerHelper},
+    identity::ComponentIdentity,
     inspect::container::{
         InspectArtifactsContainer, InspectHandle, UnpopulatedInspectDataContainer,
     },
@@ -22,6 +22,7 @@ use fuchsia_zircon::Koid;
 use futures::channel::{mpsc, oneshot};
 use futures::prelude::*;
 use moniker::ExtendedMoniker;
+use selectors::SelectorMatchExt;
 use std::{
     collections::HashMap,
     sync::{Arc, Weak},

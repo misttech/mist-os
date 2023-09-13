@@ -25,7 +25,7 @@ pub enum ExtendedMoniker {
 }
 
 /// The string representation of ExtendedMoniker::ComponentManager
-const EXTENDED_MONIKER_COMPONENT_MANAGER_STR: &'static str = "<component_manager>";
+pub const EXTENDED_MONIKER_COMPONENT_MANAGER_STR: &'static str = "<component_manager>";
 
 impl ExtendedMoniker {
     pub fn unwrap_instance_moniker_or<E: std::error::Error>(

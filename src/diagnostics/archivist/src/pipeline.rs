@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 use {
     crate::{
-        configs, constants, diagnostics::AccessorStats, error::Error, identity::MonikerHelper,
+        configs, constants, diagnostics::AccessorStats, error::Error,
         moniker_rewriter::MonikerRewriter,
     },
     async_lock::RwLock,
@@ -12,7 +12,8 @@ use {
     fidl_fuchsia_diagnostics::{self, ArchiveAccessorMarker, Selector},
     fuchsia_inspect as inspect,
     moniker::ExtendedMoniker,
-    std::{collections::HashMap, convert::TryInto, ops::Deref, path::Path, sync::Arc},
+    selectors::SelectorMatchExt,
+    std::{collections::HashMap, ops::Deref, path::Path, sync::Arc},
 };
 
 struct PipelineParameters {

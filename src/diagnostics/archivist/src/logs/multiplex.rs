@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::identity::{ComponentIdentity, MonikerHelper};
+use crate::identity::ComponentIdentity;
 use fidl_fuchsia_diagnostics::Selector;
 use fuchsia_trace as ftrace;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::{Stream, StreamExt};
 use lazy_static::lazy_static;
+use selectors::SelectorMatchExt;
 use std::{
     cmp::Ordering,
     fmt::Debug,
