@@ -4,7 +4,7 @@
 
 use fidl_fuchsia_io as fio;
 use flyweights::FlyStr;
-use static_assertions::assert_eq_size;
+use static_assertions::const_assert_eq;
 use std::{
     borrow::Borrow,
     ffi::{CString, IntoStringError},
@@ -17,7 +17,7 @@ use thiserror::Error;
 /// It is defined to be the same as [`fio::MAX_PATH_LENGTH`] to reduce the distinction
 /// between namespaces and remote filesystems.
 pub const MAX_PATH_LENGTH: usize = fio::MAX_PATH_LENGTH as usize;
-assert_eq_size!(u64, usize);
+const_assert_eq!(MAX_PATH_LENGTH as u64, fio::MAX_PATH_LENGTH);
 
 /// [Path] represents the path of a Zircon process namespace entry.
 ///

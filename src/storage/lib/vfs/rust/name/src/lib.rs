@@ -10,7 +10,7 @@
 //! These should be aligned with the library comments in sdk/fidl/fuchsia.io/io.fidl.
 
 use {
-    fidl_fuchsia_io as fio, fuchsia_zircon_status as zx, static_assertions::assert_eq_size,
+    fidl_fuchsia_io as fio, fuchsia_zircon_status as zx, static_assertions::const_assert_eq,
     std::borrow::Borrow, std::fmt::Display, std::ops::Deref, thiserror::Error,
 };
 
@@ -31,7 +31,7 @@ pub struct Name(String);
 
 /// The maximum length, in bytes, of a single filesystem component.
 pub const MAX_NAME_LENGTH: usize = fio::MAX_NAME_LENGTH as usize;
-assert_eq_size!(u64, usize);
+const_assert_eq!(MAX_NAME_LENGTH as u64, fio::MAX_NAME_LENGTH);
 
 #[derive(Error, Debug, Clone)]
 pub enum ParseNameError {
