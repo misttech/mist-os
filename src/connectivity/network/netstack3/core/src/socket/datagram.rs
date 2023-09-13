@@ -412,15 +412,14 @@ impl<A: Eq + Hash, D: Eq + Hash> IntoIterator for MulticastMemberships<A, D> {
 
 impl<A: IpAddress, D: crate::device::Id> ConnAddr<ConnIpAddr<A, NonZeroU16, NonZeroU16>, D> {
     pub(crate) fn from_protocol_flow_and_local_port(
-        id: &ProtocolFlowId<A>,
+        id: &ProtocolFlowId<SocketIpAddr<A>>,
         local_port: NonZeroU16,
     ) -> Self {
-        // TODO(https://fxbug.dev/132092): Remove these panic opportunities once
-        // `ProtocolFlowId` holds `SocketIpAddr`.
-        let local_ip = SocketIpAddr::new_from_specified_or_panic(*id.local_addr());
-        let remote_ip = SocketIpAddr::new_from_specified_or_panic(*id.remote_addr());
         Self {
-            ip: ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, id.remote_port()) },
+            ip: ConnIpAddr {
+                local: (*id.local_addr(), local_port),
+                remote: (*id.remote_addr(), id.remote_port()),
+            },
             device: None,
         }
     }
@@ -457,8 +456,8 @@ pub(crate) trait LocalIdentifierAllocator<
 
 #[derive(Hash)]
 pub(crate) struct DatagramFlowId<A: IpAddress, RI> {
-    pub(crate) local_ip: SpecifiedAddr<A>,
-    pub(crate) remote_ip: SpecifiedAddr<A>,
+    pub(crate) local_ip: SocketIpAddr<A>,
+    pub(crate) remote_ip: SocketIpAddr<A>,
     pub(crate) remote_id: RI,
 }
 
@@ -2416,8 +2415,10 @@ where
                         Default::default(),
                     )
                     .map_err(|(e, _ip_options)| e)?;
-                    let local_ip = *ip_sock.local_ip();
-                    let remote_ip = *ip_sock.remote_ip();
+                    // TODO(https://fxbug.dev/132092): Remove these panic opportunities once
+                    // `IpSock` to holds `SocketIpAddr`.
+                    let local_ip = SocketIpAddr::new_from_specified_or_panic(*ip_sock.local_ip());
+                    let remote_ip = SocketIpAddr::new_from_specified_or_panic(*ip_sock.remote_ip());
                     let local_id = match local_id {
                         Some(id) => id.clone(),
                         None => allocator
@@ -2432,10 +2433,6 @@ where
                             )
                             .ok_or(ConnectError::CouldNotAllocateLocalPort)?,
                     };
-                    // TODO(https://fxbug.dev/132092): Remove these panic opportunities once
-                    // `IpSock` to holds `SocketIpAddr`.
-                    let local_ip = SocketIpAddr::new_from_specified_or_panic(local_ip);
-                    let remote_ip = SocketIpAddr::new_from_specified_or_panic(remote_ip);
                     let c = ConnAddr {
                         ip: ConnIpAddr {
                             local: (local_ip, local_id),

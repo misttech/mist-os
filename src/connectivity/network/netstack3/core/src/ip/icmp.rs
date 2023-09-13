@@ -827,12 +827,8 @@ impl<I: IpExt, D: WeakId> PortAllocImpl for IcmpBoundSockets<I, D> {
         // We can safely unwrap here, because the ports received in
         // `is_port_available` are guaranteed to be in `EPHEMERAL_RANGE`.
         let port = NonZeroU16::new(port).unwrap();
-        // TODO(https://fxbug.dev/132092): Remove these panic opportunities once
-        // `DatagramFlowId` holds `SocketIpAddr`.
-        let local_ip = SocketIpAddr::new_from_specified_or_panic(id.local_ip);
-        let remote_ip = SocketIpAddr::new_from_specified_or_panic(id.remote_ip);
         let conn = ConnAddr {
-            ip: ConnIpAddr { local: (local_ip, port), remote: (remote_ip, ()) },
+            ip: ConnIpAddr { local: (id.local_ip, port), remote: (id.remote_ip, ()) },
             device: None,
         };
 

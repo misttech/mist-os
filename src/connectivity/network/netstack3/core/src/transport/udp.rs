@@ -748,7 +748,7 @@ fn try_alloc_listen_port<I: IpExt, D: WeakId>(
 
 impl<I: IpExt, D: WeakId> PortAllocImpl for UdpBoundSocketMap<I, D> {
     const EPHEMERAL_RANGE: RangeInclusive<u16> = 49152..=65535;
-    type Id = ProtocolFlowId<I::Addr>;
+    type Id = ProtocolFlowId<SocketIpAddr<I::Addr>>;
 
     fn is_port_available(&self, id: &Self::Id, port: u16) -> bool {
         // We can safely unwrap here, because the ports received in

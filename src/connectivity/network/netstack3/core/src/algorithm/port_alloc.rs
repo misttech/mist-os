@@ -16,7 +16,6 @@ use core::{
 };
 
 use hmac::Mac;
-use net_types::{ip::IpAddress, SpecifiedAddr};
 use rand::RngCore;
 
 type HmacSha256 = hmac::Hmac<sha2::Sha256>;
@@ -33,29 +32,25 @@ pub(crate) type PortNumber = u16;
 /// `ProtocolFlowId` provides the most common 3-tuple needed to be used with a
 /// [`PortAlloc`] structure: local IP, remote IP, and remote port number.
 #[derive(Hash, Debug)]
-pub(crate) struct ProtocolFlowId<I: IpAddress> {
-    local_addr: SpecifiedAddr<I>,
-    remote_addr: SpecifiedAddr<I>,
+pub(crate) struct ProtocolFlowId<A> {
+    local_addr: A,
+    remote_addr: A,
     remote_port: NonZeroU16,
 }
 
-impl<I: IpAddress> ProtocolFlowId<I> {
+impl<A> ProtocolFlowId<A> {
     /// Creates a new `ProtocolFlowId` with given parameters.
-    pub(crate) fn new(
-        local_addr: SpecifiedAddr<I>,
-        remote_addr: SpecifiedAddr<I>,
-        remote_port: NonZeroU16,
-    ) -> Self {
+    pub(crate) fn new(local_addr: A, remote_addr: A, remote_port: NonZeroU16) -> Self {
         Self { local_addr, remote_addr, remote_port }
     }
 
     /// Gets this `ProtocolFlowId`'s local address.
-    pub(crate) fn local_addr(&self) -> &SpecifiedAddr<I> {
+    pub(crate) fn local_addr(&self) -> &A {
         &self.local_addr
     }
 
     /// Gets this `ProtocolFlowId`'s remote address.
-    pub(crate) fn remote_addr(&self) -> &SpecifiedAddr<I> {
+    pub(crate) fn remote_addr(&self) -> &A {
         &self.remote_addr
     }
 
