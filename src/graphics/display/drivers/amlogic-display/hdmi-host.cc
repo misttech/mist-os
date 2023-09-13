@@ -218,23 +218,32 @@ void HdmiHost::HostOff() {
 }
 
 zx_status_t HdmiHost::ModeSet(const display_mode_t& mode) {
-  ConfigurePll();
+  if (!IsDisplayModeSupported(mode)) {
+    zxlogf(ERROR,
+           "Display mode (%" PRIu32 " x %" PRIu32 " @ pixel rate %" PRIu32
+           " kHz) is not supported.",
+           mode.h_addressable, mode.v_addressable, mode.pixel_clock_10khz * 10);
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  cea_timing timings = CalculateDisplayTimings(mode);
+  pll_param clock_params = CalculateClockParameters(mode);
+  ConfigurePll(clock_params);
 
   for (size_t i = 0; ENC_LUT_GEN[i].reg != 0xFFFFFFFF; i++) {
     WRITE32_REG(VPU, ENC_LUT_GEN[i].reg, ENC_LUT_GEN[i].val);
   }
 
-  WRITE32_REG(
-      VPU, VPU_ENCP_VIDEO_MAX_PXCNT,
-      (p_.timings.venc_pixel_repeat) ? ((p_.timings.htotal << 1) - 1) : (p_.timings.htotal - 1));
-  WRITE32_REG(VPU, VPU_ENCP_VIDEO_MAX_LNCNT, p_.timings.vtotal - 1);
+  WRITE32_REG(VPU, VPU_ENCP_VIDEO_MAX_PXCNT,
+              (timings.venc_pixel_repeat) ? ((timings.htotal << 1) - 1) : (timings.htotal - 1));
+  WRITE32_REG(VPU, VPU_ENCP_VIDEO_MAX_LNCNT, timings.vtotal - 1);
 
-  if (p_.timings.venc_pixel_repeat) {
+  if (timings.venc_pixel_repeat) {
     SET_BIT32(VPU, VPU_ENCP_VIDEO_MODE_ADV, 1, 0, 1);
   }
 
   // Configure Encoder with detailed timing info (based on resolution)
-  ConfigEncoder();
+  ConfigEncoder(timings);
 
   // Configure VDAC
   WRITE32_REG(HHI, HHI_VDAC_CNTL0_G12A, 0);
@@ -413,17 +422,7 @@ bool HdmiHost::IsDisplayModeSupported(const display_mode_t& mode) const {
   return true;
 }
 
-zx_status_t HdmiHost::CalculateAndSetHdmiHardwareParams(const display_mode_t& mode) {
-  if (!IsDisplayModeSupported(mode)) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  p_.timings = CalculateDisplayTimings(mode);
-  p_.pll_p_24b = CalculateClockParameters(mode);
-  return ZX_OK;
-}
-
-void HdmiHost::ConfigEncoder() {
+void HdmiHost::ConfigEncoder(const cea_timing& timings) {
   uint32_t h_begin, h_end;
   uint32_t v_begin, v_end;
   uint32_t hs_begin, hs_end;
@@ -431,42 +430,37 @@ void HdmiHost::ConfigEncoder() {
   uint32_t vsync_adjust = 0;
   uint32_t active_lines, total_lines;
   uint32_t venc_total_pixels, venc_active_pixels, venc_fp, venc_hsync;
-  auto* p = &p_;
 
-  active_lines = (p->timings.vactive / (1 + p->timings.interlace_mode));
-  total_lines = (active_lines + p->timings.vblank0) +
-                ((active_lines + p->timings.vblank1) * p->timings.interlace_mode);
+  active_lines = (timings.vactive / (1 + timings.interlace_mode));
+  total_lines = (active_lines + timings.vblank0) +
+                ((active_lines + timings.vblank1) * timings.interlace_mode);
 
   venc_total_pixels =
-      (p->timings.htotal / (p->timings.pixel_repeat + 1)) * (p->timings.venc_pixel_repeat + 1);
+      (timings.htotal / (timings.pixel_repeat + 1)) * (timings.venc_pixel_repeat + 1);
 
   venc_active_pixels =
-      (p->timings.hactive / (p->timings.pixel_repeat + 1)) * (p->timings.venc_pixel_repeat + 1);
+      (timings.hactive / (timings.pixel_repeat + 1)) * (timings.venc_pixel_repeat + 1);
 
-  venc_fp =
-      (p->timings.hfront / (p->timings.pixel_repeat + 1)) * (p->timings.venc_pixel_repeat + 1);
+  venc_fp = (timings.hfront / (timings.pixel_repeat + 1)) * (timings.venc_pixel_repeat + 1);
 
-  venc_hsync =
-      (p->timings.hsync / (p->timings.pixel_repeat + 1)) * (p->timings.venc_pixel_repeat + 1);
+  venc_hsync = (timings.hsync / (timings.pixel_repeat + 1)) * (timings.venc_pixel_repeat + 1);
 
   SET_BIT32(VPU, VPU_ENCP_VIDEO_MODE, 1, 14, 1);  // DE Signal polarity
-  WRITE32_REG(VPU, VPU_ENCP_VIDEO_HAVON_BEGIN, p->timings.hsync + p->timings.hback);
-  WRITE32_REG(VPU, VPU_ENCP_VIDEO_HAVON_END,
-              p->timings.hsync + p->timings.hback + p->timings.hactive - 1);
+  WRITE32_REG(VPU, VPU_ENCP_VIDEO_HAVON_BEGIN, timings.hsync + timings.hback);
+  WRITE32_REG(VPU, VPU_ENCP_VIDEO_HAVON_END, timings.hsync + timings.hback + timings.hactive - 1);
 
-  WRITE32_REG(VPU, VPU_ENCP_VIDEO_VAVON_BLINE, p->timings.vsync + p->timings.vback);
-  WRITE32_REG(VPU, VPU_ENCP_VIDEO_VAVON_ELINE,
-              p->timings.vsync + p->timings.vback + p->timings.vactive - 1);
+  WRITE32_REG(VPU, VPU_ENCP_VIDEO_VAVON_BLINE, timings.vsync + timings.vback);
+  WRITE32_REG(VPU, VPU_ENCP_VIDEO_VAVON_ELINE, timings.vsync + timings.vback + timings.vactive - 1);
 
   WRITE32_REG(VPU, VPU_ENCP_VIDEO_HSO_BEGIN, 0);
-  WRITE32_REG(VPU, VPU_ENCP_VIDEO_HSO_END, p->timings.hsync);
+  WRITE32_REG(VPU, VPU_ENCP_VIDEO_HSO_END, timings.hsync);
 
   WRITE32_REG(VPU, VPU_ENCP_VIDEO_VSO_BLINE, 0);
-  WRITE32_REG(VPU, VPU_ENCP_VIDEO_VSO_ELINE, p->timings.vsync);
+  WRITE32_REG(VPU, VPU_ENCP_VIDEO_VSO_ELINE, timings.vsync);
 
   // Below calculations assume no pixel repeat and progressive mode.
   // HActive Start/End
-  h_begin = p->timings.hsync + p->timings.hback + 2;  // 2 is the HDMI Latency
+  h_begin = timings.hsync + timings.hback + 2;  // 2 is the HDMI Latency
 
   h_begin = h_begin % venc_total_pixels;  // wrap around if needed
   h_end = h_begin + venc_active_pixels;
@@ -475,12 +469,12 @@ void HdmiHost::ConfigEncoder() {
   WRITE32_REG(VPU, VPU_ENCP_DE_H_END, h_end);
 
   // VActive Start/End
-  v_begin = p->timings.vsync + p->timings.vback;
+  v_begin = timings.vsync + timings.vback;
   v_end = v_begin + active_lines;
   WRITE32_REG(VPU, VPU_ENCP_DE_V_BEGIN_EVEN, v_begin);
   WRITE32_REG(VPU, VPU_ENCP_DE_V_END_EVEN, v_end);
 
-  if (p->timings.interlace_mode) {
+  if (timings.interlace_mode) {
     // TODO: Add support for interlace mode
     // We should not even get here
     zxlogf(ERROR, "Interlace mode not supported");
@@ -499,13 +493,12 @@ void HdmiHost::ConfigEncoder() {
   WRITE32_REG(VPU, VPU_ENCP_DVI_HSO_END, hs_end);
 
   // VSync Timings
-  if (v_begin >= (p->timings.vback + p->timings.vsync + (1 - vsync_adjust))) {
-    vs_begin = v_begin - p->timings.vback - p->timings.vsync - (1 - vsync_adjust);
+  if (v_begin >= (timings.vback + timings.vsync + (1 - vsync_adjust))) {
+    vs_begin = v_begin - timings.vback - timings.vsync - (1 - vsync_adjust);
   } else {
-    vs_begin =
-        p->timings.vtotal + v_begin - p->timings.vback - p->timings.vsync - (1 - vsync_adjust);
+    vs_begin = timings.vtotal + v_begin - timings.vback - timings.vsync - (1 - vsync_adjust);
   }
-  vs_end = vs_begin + p->timings.vsync;
+  vs_end = vs_begin + timings.vsync;
   vs_end = vs_end % total_lines;
 
   WRITE32_REG(VPU, VPU_ENCP_DVI_VSO_BLINE_EVN, vs_begin);
@@ -516,9 +509,9 @@ void HdmiHost::ConfigEncoder() {
   WRITE32_REG(VPU, VPU_HDMI_SETTING, 0);
   // hsync, vsync active high. output CbYCr (GRB)
   // TODO: output desired format is hardcoded here to CbYCr (GRB)
-  WRITE32_REG(VPU, VPU_HDMI_SETTING, (p->timings.hpol << 2) | (p->timings.vpol << 3) | (4 << 5));
+  WRITE32_REG(VPU, VPU_HDMI_SETTING, (timings.hpol << 2) | (timings.vpol << 3) | (4 << 5));
 
-  if (p->timings.venc_pixel_repeat) {
+  if (timings.venc_pixel_repeat) {
     SET_BIT32(VPU, VPU_HDMI_SETTING, 1, 8, 1);
   }
 

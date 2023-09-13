@@ -86,11 +86,6 @@ struct cea_timing {
   bool vpol;
 };
 
-struct hdmi_param {
-  pll_param pll_p_24b;
-  struct cea_timing timings;
-};
-
 // HdmiHost has access to the amlogic/designware HDMI block and controls its
 // operation. It also handles functions and keeps track of data that the
 // amlogic/designware block does not need to know about, including clock
@@ -104,7 +99,13 @@ class HdmiHost {
   zx_status_t Init();
   zx_status_t HostOn();
   void HostOff();
+
+  // Configures the HDMI clock, encoder and physical layer to given `mode`.
+  //
+  // Returns ZX_OK and configures the video output module iff the display
+  // timing and clock of `mode` is supported.
   zx_status_t ModeSet(const display_mode_t& mode);
+
   zx_status_t EdidTransfer(const i2c_impl_op_t* op_list, size_t op_count);
 
   void UpdateOutputColorFormat(ColorFormat output_color_format) {
@@ -115,18 +116,9 @@ class HdmiHost {
   // engine driver and can be used in a display configuration.
   bool IsDisplayModeSupported(const display_mode_t& mode) const;
 
-  // Calculates the HDMI hardware parameters for `mode`.
-  //
-  // Returns ZX_ERR_NOT_SUPPORTED if the mode is not supported by the hardware;
-  // otherwise, sets the host controller internal state for `mode` and returns
-  // ZX_OK.
-  //
-  // TODO(fxbug.dev/132602): This should not be exposed as a public interface.
-  zx_status_t CalculateAndSetHdmiHardwareParams(const display_mode_t& mode);
-
  private:
-  void ConfigurePll();
-  void ConfigEncoder();
+  void ConfigurePll(const pll_param& pll_params);
+  void ConfigEncoder(const cea_timing& timings);
   void ConfigPhy();
 
   void ConfigureHpllClkOut(uint32_t hpll);
@@ -141,7 +133,6 @@ class HdmiHost {
   std::optional<fdf::MmioBuffer> hhi_mmio_;
   std::optional<fdf::MmioBuffer> gpio_mux_mmio_;
 
-  hdmi_param p_;
   ColorParam color_{
       .input_color_format = ColorFormat::kCf444,
       .output_color_format = ColorFormat::kCf444,

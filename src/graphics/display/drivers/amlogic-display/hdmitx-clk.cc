@@ -63,19 +63,17 @@ void HdmiHost::WaitForPllLocked() {
   } while (err);
 }
 
-void HdmiHost::ConfigurePll() {
-  const struct pll_param* pll = &p_.pll_p_24b;
-
+void HdmiHost::ConfigurePll(const pll_param& pll_params) {
   // Set VIU Mux Ctrl
-  if (pll->viu_channel == 1) {
+  if (pll_params.viu_channel == 1) {
     VpuVpuViuVencMuxCtrlReg::Get()
         .ReadFrom(&(*vpu_mmio_))
-        .set_viu1_sel_venc(static_cast<uint8_t>(pll->viu_type))
+        .set_viu1_sel_venc(static_cast<uint8_t>(pll_params.viu_type))
         .WriteTo(&(*vpu_mmio_));
   } else {
     VpuVpuViuVencMuxCtrlReg::Get()
         .ReadFrom(&(*vpu_mmio_))
-        .set_viu2_sel_venc(static_cast<uint8_t>(pll->viu_type))
+        .set_viu2_sel_venc(static_cast<uint8_t>(pll_params.viu_type))
         .WriteTo(&(*vpu_mmio_));
   }
   HdmiClockControl::Get()
@@ -86,16 +84,16 @@ void HdmiHost::ConfigurePll() {
       .set_hdmi_tx_system_clock_enabled(true)
       .WriteTo(&*hhi_mmio_);
 
-  ConfigureHpllClkOut(pll->hpll_clk_out);
+  ConfigureHpllClkOut(pll_params.hpll_clk_out);
 
   HhiHdmiPllCntlReg::Get()
       .ReadFrom(&(*hhi_mmio_))
-      .set_hdmi_dpll_od1(pll->od1 >> 1)
-      .set_hdmi_dpll_od2(pll->od2 >> 1)
-      .set_hdmi_dpll_od3(pll->od3 >> 1)
+      .set_hdmi_dpll_od1(pll_params.od1 >> 1)
+      .set_hdmi_dpll_od2(pll_params.od2 >> 1)
+      .set_hdmi_dpll_od3(pll_params.od3 >> 1)
       .WriteTo(&(*hhi_mmio_));
 
-  ConfigureOd3Div(static_cast<uint8_t>(pll->vid_pll_div));
+  ConfigureOd3Div(static_cast<uint8_t>(pll_params.vid_pll_div));
 
   VideoClock1Control::Get()
       .ReadFrom(&*hhi_mmio_)
@@ -103,7 +101,7 @@ void HdmiHost::ConfigurePll() {
       .WriteTo(&*hhi_mmio_);
   VideoClock1Divider::Get()
       .ReadFrom(&(*hhi_mmio_))
-      .SetDivider0((pll->vid_clk_div == 0) ? 1 : (pll->vid_clk_div))
+      .SetDivider0((pll_params.vid_clk_div == 0) ? 1 : (pll_params.vid_clk_div))
       .WriteTo(&(*hhi_mmio_));
   VideoClock1Control::Get()
       .ReadFrom(&*hhi_mmio_)
@@ -122,7 +120,7 @@ void HdmiHost::ConfigurePll() {
       .set_hdmi_tx_pixel_clock_enabled(true)
       .WriteTo(&*hhi_mmio_);
 
-  if (pll->encp_div != (uint32_t)-1) {
+  if (pll_params.encp_div != (uint32_t)-1) {
     VideoClock1Divider::Get()
         .ReadFrom(&(*hhi_mmio_))
         .set_encp_clock_selection(EncoderClockSource::kVideoClock1)
@@ -136,7 +134,7 @@ void HdmiHost::ConfigurePll() {
         .set_divider0_enabled(true)
         .WriteTo(&(*hhi_mmio_));
   }
-  if (pll->enci_div != (uint32_t)-1) {
+  if (pll_params.enci_div != (uint32_t)-1) {
     VideoClock1Divider::Get()
         .ReadFrom(&(*hhi_mmio_))
         .set_enci_clock_selection(EncoderClockSource::kVideoClock1)
