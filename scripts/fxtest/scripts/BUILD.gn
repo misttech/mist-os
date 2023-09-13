@@ -5,6 +5,7 @@
 import("//build/host.gni")
 import("//build/python/python_binary.gni")
 import("//build/python/python_host_test.gni")
+import("//build/rust/rustc_binary.gni")
 
 group("tests") {
   testonly = true
@@ -34,6 +35,21 @@ if (is_host) {
     libraries = shared_deps
   }
 
+  rustc_binary("dldist") {
+    edition = "2021"
+    source_root = "dldist.rs"
+    sources = [ "dldist.rs" ]
+    deps = [
+      "//third_party/rust_crates:anyhow",
+      "//third_party/rust_crates:argh",
+      "//third_party/rust_crates:strsim",
+    ]
+
+    configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+    configs += [ "//build/config:optimize_speed" ]
+    configs += [ "//build/config/rust:lto_thin" ]
+  }
+
   # Rename the resulting .pyz for the host tool
   copy("copy") {
     deps = [ ":fuzzy_matcher" ]
@@ -42,7 +58,13 @@ if (is_host) {
   }
 
   install_host_tools("install") {
-    deps = [ ":copy" ]
-    outputs = [ "search-tests" ]
+    deps = [
+      ":copy",
+      ":dldist",
+    ]
+    outputs = [
+      "search-tests",
+      "dldist",
+    ]
   }
 }
