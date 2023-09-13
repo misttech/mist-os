@@ -639,9 +639,6 @@ mod tests {
         fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
             self.get_ref().inner.downgrade_device_id(device_id)
         }
-        fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool {
-            self.get_ref().inner.is_device_installed(device_id)
-        }
         fn upgrade_weak_device_id(
             &self,
             weak_device_id: &Self::WeakDeviceId,
@@ -655,9 +652,6 @@ mod tests {
         type WeakDeviceId = FakeWeakDeviceId<FakeLinkDeviceId>;
         fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
             FakeWeakDeviceId(device_id.clone())
-        }
-        fn is_device_installed(&self, _device_id: &Self::DeviceId) -> bool {
-            true
         }
         fn upgrade_weak_device_id(
             &self,

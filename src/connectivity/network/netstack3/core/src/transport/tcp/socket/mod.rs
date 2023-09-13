@@ -3218,10 +3218,6 @@ mod tests {
             FakeWeakDeviceId(device_id.clone())
         }
 
-        fn is_device_installed(&self, _device_id: &Self::DeviceId) -> bool {
-            true
-        }
-
         fn upgrade_weak_device_id(
             &self,
             weak_device_id: &Self::WeakDeviceId,

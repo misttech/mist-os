@@ -199,11 +199,6 @@ impl<C: DeviceLayerTypes> LoopbackDeviceId<C> {
         let Self(rc) = self;
         LoopbackWeakDeviceId(StrongRc::downgrade(rc))
     }
-
-    pub(super) fn removed(&self) -> bool {
-        let Self(rc) = self;
-        StrongRc::marked_for_destruction(rc)
-    }
 }
 
 #[derive(Copy, Clone)]
@@ -218,9 +213,6 @@ impl<NonSyncCtx: NonSyncContext, L> DeviceIdContext<LoopbackDevice>
     type WeakDeviceId = LoopbackWeakDeviceId<NonSyncCtx>;
     fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
         device_id.downgrade()
-    }
-    fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool {
-        !device_id.removed()
     }
     fn upgrade_weak_device_id(
         &self,

@@ -995,10 +995,6 @@ pub(crate) mod testutil {
         ) -> Option<DeviceId> {
             self.ip_forwarding_ctx.upgrade_weak_device_id(device_id)
         }
-
-        fn is_device_installed(&self, device_id: &DeviceId) -> bool {
-            self.ip_forwarding_ctx.is_device_installed(device_id)
-        }
     }
 
     fn lookup_route<I: IpDeviceStateIpExt, D: FakeStrongDeviceId, Instant: crate::Instant>(
@@ -1388,10 +1384,6 @@ pub(crate) mod testutil {
             device_id: &FakeWeakDeviceId<DeviceId>,
         ) -> Option<DeviceId> {
             self.ip_forwarding_ctx.upgrade_weak_device_id(device_id)
-        }
-
-        fn is_device_installed(&self, device_id: &DeviceId) -> bool {
-            self.ip_forwarding_ctx.is_device_installed(device_id)
         }
     }
 

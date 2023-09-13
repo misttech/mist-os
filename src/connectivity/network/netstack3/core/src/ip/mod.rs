@@ -2958,10 +2958,6 @@ pub(crate) mod testutil {
         fn upgrade_weak_device_id(&self, device_id: &Self::WeakDeviceId) -> Option<Self::DeviceId> {
             self.get_ref().as_ref().upgrade_weak_device_id(device_id)
         }
-
-        fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool {
-            self.get_ref().as_ref().is_device_installed(device_id)
-        }
     }
 
     impl<Outer, Inner: DeviceIdContext<AnyDevice>> DeviceIdContext<AnyDevice>
@@ -2976,10 +2972,6 @@ pub(crate) mod testutil {
 
         fn upgrade_weak_device_id(&self, device_id: &Self::WeakDeviceId) -> Option<Self::DeviceId> {
             self.inner.upgrade_weak_device_id(device_id)
-        }
-
-        fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool {
-            self.inner.is_device_installed(device_id)
         }
     }
 
@@ -3096,11 +3088,6 @@ pub(crate) mod testutil {
         ) -> Option<DeviceId> {
             let Self { devices_removed } = self;
             (!devices_removed.contains(&device_id)).then(|| device_id.clone())
-        }
-
-        fn is_device_installed(&self, device_id: &DeviceId) -> bool {
-            let Self { devices_removed } = self;
-            !devices_removed.contains(&device_id)
         }
     }
 

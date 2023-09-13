@@ -318,10 +318,6 @@ mod tests {
         ) -> Option<FakeDeviceId> {
             self.ip_device_id_ctx.upgrade_weak_device_id(device_id)
         }
-
-        fn is_device_installed(&self, device_id: &FakeDeviceId) -> bool {
-            self.ip_device_id_ctx.is_device_installed(device_id)
-        }
     }
 
     impl<C> Ipv6DiscoveredRoutesContext<C> for FakeWithDiscoveredRoutesMutCtx {

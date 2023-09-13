@@ -2040,19 +2040,18 @@ pub(crate) fn clear_ipv4_device_state<
     ctx: &mut C,
     device_id: &SC::DeviceId,
 ) {
-    sync_ctx.with_ip_device_configuration(device_id, |config, mut sync_ctx| {
-        let Ipv4DeviceConfiguration {
-            ip_config: IpDeviceConfiguration { gmp_enabled, forwarding_enabled: _ },
-        } = config;
-        let sync_ctx = &mut sync_ctx;
-        let ip_enabled =
-            sync_ctx.with_ip_device_flags(device_id, |IpDeviceFlags { ip_enabled }| *ip_enabled);
+    sync_ctx.with_ip_device_configuration_mut(device_id, |mut sync_ctx| {
+        let ip_enabled = sync_ctx.with_configuration_and_flags_mut(device_id, |_config, flags| {
+            // Start by force-disabling IPv4 so we're sure we won't handle
+            // any more packets.
+            let IpDeviceFlags { ip_enabled } = flags;
+            core::mem::replace(ip_enabled, false)
+        });
 
+        let (config, mut sync_ctx) = sync_ctx.ip_device_configuration_and_ctx();
+        let sync_ctx = &mut sync_ctx;
         if ip_enabled {
             disable_ipv4_device_with_config(sync_ctx, ctx, device_id, config);
-        }
-        if *gmp_enabled {
-            GmpHandler::gmp_handle_disabled(sync_ctx, ctx, device_id);
         }
     })
 }
@@ -2066,23 +2065,18 @@ pub(crate) fn clear_ipv6_device_state<
     ctx: &mut C,
     device_id: &SC::DeviceId,
 ) {
-    sync_ctx.with_ipv6_device_configuration(device_id, |config, mut sync_ctx| {
-        let Ipv6DeviceConfiguration {
-            dad_transmits: _,
-            max_router_solicitations: _,
-            slaac_config: _,
-            ip_config: IpDeviceConfiguration { gmp_enabled, forwarding_enabled: _ },
-        } = config;
-        let sync_ctx = &mut sync_ctx;
-        let ip_enabled =
-            sync_ctx.with_ip_device_flags(device_id, |IpDeviceFlags { ip_enabled }| *ip_enabled);
+    sync_ctx.with_ipv6_device_configuration_mut(device_id, |mut sync_ctx| {
+        let ip_enabled = sync_ctx.with_configuration_and_flags_mut(device_id, |_config, flags| {
+            // Start by force-disabling IPv6 so we're sure we won't handle
+            // any more packets.
+            let IpDeviceFlags { ip_enabled } = flags;
+            core::mem::replace(ip_enabled, false)
+        });
 
+        let (config, mut sync_ctx) = sync_ctx.ipv6_device_configuration_and_ctx();
+        let sync_ctx = &mut sync_ctx;
         if ip_enabled {
             disable_ipv6_device_with_config(sync_ctx, ctx, device_id, config);
-        }
-
-        if *gmp_enabled {
-            GmpHandler::gmp_handle_disabled(sync_ctx, ctx, device_id);
         }
     })
 }

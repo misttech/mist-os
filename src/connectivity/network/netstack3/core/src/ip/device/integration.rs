@@ -687,13 +687,6 @@ impl<'a, Config, C: NonSyncContext, L> DeviceIdContext<AnyDevice>
             weak_device_id,
         )
     }
-
-    fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool {
-        let Self { config: _, sync_ctx } = self;
-        <Locked<&'a SyncCtx<C>, L> as DeviceIdContext<AnyDevice>>::is_device_installed(
-            sync_ctx, device_id,
-        )
-    }
 }
 
 impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> SlaacContext<C>

@@ -126,9 +126,6 @@ pub(crate) trait DeviceIdContext<D: Device> {
     /// Returns `None` if the device has been removed.
     fn upgrade_weak_device_id(&self, weak_device_id: &Self::WeakDeviceId)
         -> Option<Self::DeviceId>;
-
-    /// Returns true if the device has not been removed.
-    fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool;
 }
 
 struct RecvIpFrameMeta<D, I: Ip> {
@@ -1392,11 +1389,6 @@ impl<C: DeviceLayerTypes> EthernetDeviceId<C> {
         // debug ID to help debugging.
         EthernetWeakDeviceId(rc.link.debug_id(), StrongRc::downgrade(rc))
     }
-
-    fn removed(&self) -> bool {
-        let Self(rc) = self;
-        StrongRc::marked_for_destruction(rc)
-    }
 }
 
 /// The identifier for timer events in the device layer.
@@ -1438,10 +1430,6 @@ impl<NonSyncCtx: NonSyncContext, L> DeviceIdContext<EthernetLinkDevice>
         device_id.downgrade()
     }
 
-    fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool {
-        !device_id.removed()
-    }
-
     fn upgrade_weak_device_id(
         &self,
         weak_device_id: &Self::WeakDeviceId,
@@ -1458,11 +1446,6 @@ impl<'a, SC: DeviceIdContext<EthernetLinkDevice>> DeviceIdContext<EthernetLinkDe
     fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
         let Self { sync_ctx, device_id: _ } = self;
         SC::downgrade_device_id(sync_ctx, device_id)
-    }
-
-    fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool {
-        let Self { sync_ctx, device_id: _ } = self;
-        SC::is_device_installed(sync_ctx, device_id)
     }
 
     fn upgrade_weak_device_id(
@@ -1697,13 +1680,6 @@ impl<C: DeviceLayerTypes> DeviceId<C> {
         match self {
             DeviceId::Ethernet(id) => id.downgrade().into(),
             DeviceId::Loopback(id) => id.downgrade().into(),
-        }
-    }
-
-    fn removed(&self) -> bool {
-        match self {
-            DeviceId::Ethernet(id) => id.removed(),
-            DeviceId::Loopback(id) => id.removed(),
         }
     }
 }
@@ -2420,10 +2396,6 @@ impl<NonSyncCtx: NonSyncContext, L> DeviceIdContext<AnyDevice> for Locked<&SyncC
         weak_device_id: &WeakDeviceId<NonSyncCtx>,
     ) -> Option<DeviceId<NonSyncCtx>> {
         weak_device_id.upgrade()
-    }
-
-    fn is_device_installed(&self, device_id: &DeviceId<NonSyncCtx>) -> bool {
-        !device_id.removed()
     }
 }
 

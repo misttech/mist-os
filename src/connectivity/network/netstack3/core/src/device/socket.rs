@@ -1336,9 +1336,6 @@ mod tests {
         fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
             FakeWeakDeviceId(device_id.clone())
         }
-        fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool {
-            self.contains_id(device_id)
-        }
         fn upgrade_weak_device_id(&self, device_id: &Self::WeakDeviceId) -> Option<Self::DeviceId> {
             self.contains_id(&device_id.0).then_some(device_id.0.clone())
         }
@@ -1349,9 +1346,6 @@ mod tests {
         type WeakDeviceId = D::Weak;
         fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
             self.get_ref().device_sockets.downgrade_device_id(device_id)
-        }
-        fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool {
-            self.get_ref().device_sockets.is_device_installed(device_id)
         }
         fn upgrade_weak_device_id(&self, device_id: &Self::WeakDeviceId) -> Option<Self::DeviceId> {
             self.get_ref().device_sockets.upgrade_weak_device_id(device_id)

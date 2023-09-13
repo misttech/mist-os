@@ -799,9 +799,6 @@ impl<I, S, P: DeviceIdContext<AnyDevice>> DeviceIdContext<AnyDevice>
     fn downgrade_device_id(&self, _device_id: &Self::DeviceId) -> Self::WeakDeviceId {
         self.uninstantiable_unreachable()
     }
-    fn is_device_installed(&self, _device_id: &Self::DeviceId) -> bool {
-        self.uninstantiable_unreachable()
-    }
     fn upgrade_weak_device_id(
         &self,
         _weak_device_id: &Self::WeakDeviceId,

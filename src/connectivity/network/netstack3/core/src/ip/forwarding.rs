@@ -424,10 +424,6 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
                 return None;
             }
 
-            if !sync_ctx.is_device_installed(device) {
-                return None;
-            }
-
             if !sync_ctx.is_ip_device_enabled(device) {
                 return None;
             }
@@ -559,10 +555,6 @@ mod testutil_testonly {
     }
 
     impl<D> FakeIpForwardingContext<D> {
-        pub(crate) fn ip_device_id_ctx_mut(&mut self) -> &mut FakeIpDeviceIdCtx<D> {
-            &mut self.ip_device_id_ctx
-        }
-
         pub(crate) fn disabled_devices_mut(&mut self) -> &mut HashSet<D> {
             &mut self.disabled_devices
         }
@@ -1133,12 +1125,6 @@ mod tests {
     }
 
     #[ip_test]
-    #[test_case(|sync_ctx, device, device_unusable| {
-        sync_ctx
-            .get_mut()
-            .ip_device_id_ctx_mut()
-            .set_device_removed(device, device_unusable)
-    }; "device_removed")]
     #[test_case(|sync_ctx, device, device_unusable| {
         let disabled_devices = sync_ctx.get_mut().disabled_devices_mut();
         if device_unusable {
