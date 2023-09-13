@@ -16,14 +16,6 @@ use ffx_core::ffx_command;
 
     $ ffx component graph
 
-    To graph all cmx components in the topology:
-
-    $ ffx component graph --only cmx
-
-    To graph all cml components in the topology:
-
-    $ ffx component graph --only cml
-
     To graph all running components in the topology:
 
     $ ffx component graph --only running
