@@ -327,10 +327,12 @@ mod tests {
         let remote_device_id_clone = remote_eth_device_id.clone();
         let mut net = scopeguard::guard(net, move |mut net| {
             net.with_context("local", |Ctx { sync_ctx, non_sync_ctx }| {
-                remove_ethernet_device(sync_ctx, non_sync_ctx, local_device_id_clone);
+                remove_ethernet_device(sync_ctx, non_sync_ctx, local_device_id_clone)
+                    .into_removed();
             });
             net.with_context("remote", |Ctx { sync_ctx, non_sync_ctx }| {
-                remove_ethernet_device(sync_ctx, non_sync_ctx, remote_device_id_clone);
+                remove_ethernet_device(sync_ctx, non_sync_ctx, remote_device_id_clone)
+                    .into_removed();
             });
         });
 

@@ -1047,3 +1047,24 @@ async fn test_neighbor_table_inspect() {
 
     t
 }
+
+#[fasync::run_singlethreaded(test)]
+async fn device_strong_ids_delay_clean_shutdown() {
+    set_logger_for_test();
+    let mut t = TestSetupBuilder::new().add_empty_stack().build().await;
+    let test_stack = t.get(0);
+    let loopback_id = test_stack.wait_for_loopback_id().await;
+    let loopback_id = test_stack.ctx().non_sync_ctx().devices.get_core_id(loopback_id).unwrap();
+
+    let shutdown = t.shutdown();
+    futures::pin_mut!(shutdown);
+    // Poll shutdown a number of times while yielding to executor to show that
+    // shutdown is stuck because we are holding onto a strong loopback id.
+    for _ in 0..50 {
+        assert_eq!(futures::poll!(&mut shutdown), futures::task::Poll::Pending);
+        async_utils::futures::YieldToExecutorOnce::new().await;
+    }
+    // Now we can finally shutdown.
+    std::mem::drop(loopback_id);
+    shutdown.await;
+}

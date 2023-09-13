@@ -15,6 +15,7 @@ mod state;
 
 use alloc::{boxed::Box, collections::HashMap, vec::Vec};
 use core::{
+    convert::Infallible as Never,
     fmt::{self, Debug, Display, Formatter},
     hash::Hash,
     marker::PhantomData,
@@ -1575,6 +1576,37 @@ impl<C: DeviceLayerTypes> WeakDeviceId<C> {
             WeakDeviceId::Loopback(id) => id.upgrade().map(Into::into),
         }
     }
+
+    /// Creates a [`DebugReferences`] instance for this device.
+    pub fn debug_references(&self) -> DebugReferences<C> {
+        DebugReferences(match self {
+            Self::Loopback(LoopbackWeakDeviceId(w)) => {
+                DebugReferencesInner::Loopback(w.debug_references())
+            }
+            Self::Ethernet(EthernetWeakDeviceId(_id, w)) => {
+                DebugReferencesInner::Ethernet(w.debug_references())
+            }
+        })
+    }
+}
+
+enum DebugReferencesInner<C: DeviceLayerTypes> {
+    Loopback(crate::sync::DebugReferences<LoopbackReferenceState<C>>),
+    Ethernet(crate::sync::DebugReferences<EthernetReferenceState<C>>),
+}
+
+/// A type offering a [`Debug`] implementation that helps debug dangling device
+/// references.
+pub struct DebugReferences<C: DeviceLayerTypes>(DebugReferencesInner<C>);
+
+impl<C: DeviceLayerTypes> Debug for DebugReferences<C> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let Self(inner) = self;
+        match inner {
+            DebugReferencesInner::Loopback(d) => write!(f, "Loopback({d:?})"),
+            DebugReferencesInner::Ethernet(d) => write!(f, "Ethernet({d:?})"),
+        }
+    }
 }
 
 impl<C: DeviceLayerTypes> Id for WeakDeviceId<C> {
@@ -2051,7 +2083,7 @@ pub fn handle_queued_rx_packets<NonSyncCtx: NonSyncContext>(
 trait RemovableDeviceId<C: NonSyncContext>: Into<DeviceId<C>> + Clone {
     /// The external state for this device. Pulled from [`DeviceLayerTypes`]
     /// impl on `C`.
-    type ExternalState;
+    type ExternalState: Send;
     /// The state held inside the [`PrimaryRc`] for this device.
     type ReferenceState;
 
@@ -2111,11 +2143,38 @@ impl<C: NonSyncContext> RemovableDeviceId<C> for LoopbackDeviceId<C> {
     }
 }
 
+/// The result of removing a device from core.
+#[derive(Debug)]
+pub enum RemoveDeviceResult<R, D> {
+    /// The device was synchronously removed and no more references to it exist.
+    Removed(R),
+    /// The device was marked for destruction but there are still references to
+    /// it in existence. The provided receiver can be polled on to observe
+    /// device destruction completion.
+    Deferred(D),
+}
+
+impl<R> RemoveDeviceResult<R, Never> {
+    /// A helper function to unwrap a [`RemovedDeviceResult`] that can never be
+    /// [`RemovedDeviceResult::Deferred`].
+    pub fn into_removed(self) -> R {
+        match self {
+            Self::Removed(r) => r,
+            Self::Deferred(never) => match never {},
+        }
+    }
+}
+
+/// An alias for [`RemoveDeviceResult`] that extracts the receiver type from the
+/// NonSyncContext.
+pub type RemoveDeviceResultWithContext<S, C> =
+    RemoveDeviceResult<S, <C as crate::ReferenceNotifiers>::ReferenceReceiver<S>>;
+
 fn remove_device<NonSyncCtx: NonSyncContext, D: RemovableDeviceId<NonSyncCtx>>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: D,
-) -> D::ExternalState {
+) -> RemoveDeviceResultWithContext<D::ExternalState, NonSyncCtx> {
     // Start cleaning up the device by disabling IP state. This removes timers
     // for the device that would otherwise hold references to defunct device
     // state.
@@ -2133,9 +2192,18 @@ fn remove_device<NonSyncCtx: NonSyncContext, D: RemovableDeviceId<NonSyncCtx>>(
     }
     let (primary, strong) = device.remove(sync_ctx);
     assert!(PrimaryRc::ptr_eq(&primary, &strong));
+    let debug_references = PrimaryRc::debug_references(&primary);
     core::mem::drop(strong);
-    let reference_state = PrimaryRc::unwrap(primary);
-    D::take_external_state(reference_state)
+    match PrimaryRc::unwrap_or_notify_with(primary, || {
+        let (notifier, receiver) =
+            NonSyncCtx::new_reference_notifier::<D::ExternalState, _>(debug_references);
+        let notifier =
+            crate::sync::MapRcNotifier::new(notifier, |state| D::take_external_state(state));
+        (notifier, receiver)
+    }) {
+        Ok(s) => RemoveDeviceResult::Removed(D::take_external_state(s)),
+        Err(receiver) => RemoveDeviceResult::Deferred(receiver),
+    }
 }
 
 /// Removes an Ethernet device from the device layer.
@@ -2147,7 +2215,7 @@ pub fn remove_ethernet_device<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: EthernetDeviceId<NonSyncCtx>,
-) -> NonSyncCtx::EthernetDeviceState {
+) -> RemoveDeviceResultWithContext<NonSyncCtx::EthernetDeviceState, NonSyncCtx> {
     remove_device(sync_ctx, ctx, device)
 }
 
@@ -2160,7 +2228,7 @@ pub fn remove_loopback_device<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: LoopbackDeviceId<NonSyncCtx>,
-) -> NonSyncCtx::LoopbackDeviceState {
+) -> RemoveDeviceResultWithContext<NonSyncCtx::LoopbackDeviceState, NonSyncCtx> {
     remove_device(sync_ctx, ctx, device)
 }
 
@@ -2810,7 +2878,8 @@ mod tests {
             .unwrap();
         }
 
-        crate::device::remove_ethernet_device(&sync_ctx, &mut non_sync_ctx, ethernet_device);
+        crate::device::remove_ethernet_device(&sync_ctx, &mut non_sync_ctx, ethernet_device)
+            .into_removed();
         assert_eq!(non_sync_ctx.timer_ctx().timers(), &[]);
     }
 

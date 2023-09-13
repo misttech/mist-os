@@ -11,6 +11,7 @@ use alloc::{borrow::ToOwned, collections::HashMap, rc::Rc, sync::Arc, vec::Vec};
 use core::time::Duration;
 use core::{
     cell::RefCell,
+    convert::Infallible as Never,
     ffi::CStr,
     fmt::Debug,
     ops::{Deref, DerefMut},
@@ -453,6 +454,25 @@ impl NonSyncContext for FakeNonSyncCtx {
     fn default_buffer_sizes() -> BufferSizes {
         // Use the test-only default impl.
         BufferSizes::default()
+    }
+}
+
+impl crate::ReferenceNotifiers for FakeNonSyncCtx {
+    type ReferenceReceiver<T: 'static> = Never;
+
+    type ReferenceNotifier<T: Send + 'static> = Never;
+
+    fn new_reference_notifier<T: Send + 'static, D: Debug>(
+        debug_references: D,
+    ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>) {
+        // NB: We don't want deferred destruction in core tests. These are
+        // always single-threaded and single-task, and we want to encourage
+        // explicit cleanup.
+        panic!(
+            "FakeNonSyncCtx can't create deferred reference notifiers for type {}: \
+            debug_references={debug_references:?}",
+            core::any::type_name::<T>()
+        );
     }
 }
 

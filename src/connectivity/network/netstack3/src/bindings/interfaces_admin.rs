@@ -62,6 +62,8 @@ use crate::bindings::{
     DeviceIdExt as _, Netstack, StackTime,
 };
 
+use super::BindingsNonSyncCtxImpl;
+
 pub(crate) async fn serve(ns: Netstack, req: fnet_interfaces_admin::InstallerRequestStream) {
     req.filter_map(|req| {
         let req = match req {
@@ -667,26 +669,59 @@ async fn dispatch_control_request(
     .map(|()| ControlRequestResult::Continue)
 }
 
+async fn wait_for_device_removal<T: 'static>(
+    id: BindingId,
+    result: netstack3_core::device::RemoveDeviceResultWithContext<T, BindingsNonSyncCtxImpl>,
+    weak_id: netstack3_core::device::WeakDeviceId<BindingsNonSyncCtxImpl>,
+) -> T {
+    let mut receiver = match result {
+        netstack3_core::device::RemoveDeviceResult::Removed(r) => {
+            tracing::debug!("device {id} removal completed synchronously");
+            return r;
+        }
+        netstack3_core::device::RemoveDeviceResult::Deferred(receiver) => receiver,
+    };
+    let debug_refs = weak_id.debug_references();
+
+    tracing::debug!("device {id} removal is pending references: {debug_refs:?}");
+    // If we get stuck trying to remove the device, log the remaining refs at a
+    // low frequency to aid debugging.
+    let mut interval_logging = fasync::Interval::new(zx::Duration::from_seconds(30))
+        .map(|()| tracing::warn!("device {id} removal is pending references: {debug_refs:?}"))
+        .collect::<()>();
+
+    futures::select! {
+        () = interval_logging => unreachable!("interval channel never completes"),
+        r = receiver => r.expect("sender dropped without notifying")
+    }
+}
+
 /// Cleans up and removes the specified NetDevice interface.
 ///
 /// # Panics
 ///
 /// Panics if `id` points to a loopback device.
 async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
-    let devices::NetdeviceInfo { handler, mac: _, static_common_info: _, dynamic: _ } = {
+    let devices::NetdeviceInfo { handler, mac: _, static_common_info, dynamic: _ } = {
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let core_id =
             non_sync_ctx.devices.remove_device(id).expect("device was not removed since retrieval");
+        // Keep a weak ID around to debug pending destruction.
+        let weak_id = core_id.downgrade();
         match core_id {
-            DeviceId::Ethernet(id) => {
-                netstack3_core::device::remove_ethernet_device(sync_ctx, non_sync_ctx, id)
+            DeviceId::Ethernet(core_id) => {
+                let result =
+                    netstack3_core::device::remove_ethernet_device(sync_ctx, non_sync_ctx, core_id);
+                wait_for_device_removal(id, result, weak_id).await
             }
-            DeviceId::Loopback(id) => {
+            DeviceId::Loopback(core_id) => {
+                let result =
+                    netstack3_core::device::remove_loopback_device(sync_ctx, non_sync_ctx, core_id);
                 let devices::LoopbackInfo {
                     static_common_info: _,
                     dynamic_common_info: _,
                     rx_notifier: _,
-                } = netstack3_core::device::remove_loopback_device(sync_ctx, non_sync_ctx, id);
+                } = wait_for_device_removal(id, result, weak_id).await;
                 // Allow the loopback interface to be removed as part of clean
                 // shutdown, but emit a warning about it.
                 tracing::warn!("loopback interface was removed");
@@ -695,9 +730,12 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
         }
     };
 
+    let crate::bindings::devices::StaticCommonInfo { binding_id: _, name, tx_notifier: _ } =
+        static_common_info;
     handler.uninstall().await.unwrap_or_else(|e| {
         tracing::warn!("error uninstalling netdevice handler for interface {}: {:?}", id, e)
-    })
+    });
+    tracing::info!("device {id}({name}) removal complete");
 }
 
 /// Removes the given `address` from the interface with the given `id`.

@@ -310,6 +310,7 @@ pub mod testutil {
         vec::Vec,
     };
     use core::{
+        convert::Infallible as Never,
         fmt::{self, Debug, Formatter},
         hash::Hash,
         ops::{self, RangeBounds},
@@ -1259,6 +1260,25 @@ pub mod testutil {
         for FakeNonSyncCtx<Id, Event, State>
     {
         type Notifier = FakeLinkResolutionNotifier<D>;
+    }
+
+    impl<Id, Event: Debug, State> crate::ReferenceNotifiers for FakeNonSyncCtx<Id, Event, State> {
+        type ReferenceReceiver<T: 'static> = Never;
+
+        type ReferenceNotifier<T: Send + 'static> = Never;
+
+        fn new_reference_notifier<T: Send + 'static, D: Debug>(
+            debug_references: D,
+        ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>) {
+            // NB: We don't want deferred destruction in core tests. These are
+            // always single-threaded and single-task, and we want to encourage
+            // explicit cleanup.
+            panic!(
+                "FakeNonSyncCtx can't create deferred reference notifiers for type {}: \
+                debug_references={debug_references:?}",
+                core::any::type_name::<T>()
+            );
+        }
     }
 
     #[derive(Debug)]

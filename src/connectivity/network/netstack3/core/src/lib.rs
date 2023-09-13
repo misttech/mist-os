@@ -211,6 +211,22 @@ pub trait BufferNonSyncContext<B: BufferMut>:
 }
 impl<B: BufferMut, C: NonSyncContext + BufferNonSyncContextInner<B>> BufferNonSyncContext<B> for C {}
 
+/// A context trait determining the types to be used for reference notifications.
+pub trait ReferenceNotifiers {
+    /// The receiver for shared reference destruction notifications.
+    type ReferenceReceiver<T: 'static>: 'static;
+    /// The notifier for shared reference destruction notifications.
+    type ReferenceNotifier<T: Send + 'static>: sync::RcNotifier<T> + 'static;
+
+    /// Creates a new Notifier/Receiver pair for `T`.
+    ///
+    /// `debug_references` is given to provide information on outstanding
+    /// references that caused the notifier to be requested.
+    fn new_reference_notifier<T: Send + 'static, D: Debug>(
+        debug_references: D,
+    ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>);
+}
+
 /// The non-synchronized context for the stack.
 pub trait NonSyncContext: CounterContext
     + BufferNonSyncContextInner<Buf<Vec<u8>>>
@@ -229,6 +245,7 @@ pub trait NonSyncContext: CounterContext
     + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
     + device::DeviceLayerEventDispatcher
     + device::socket::NonSyncContext<DeviceId<Self>>
+    + ReferenceNotifiers
     + TracingContext
     + 'static
 {
@@ -254,6 +271,7 @@ impl<
             + device::DeviceLayerEventDispatcher
             + device::socket::NonSyncContext<DeviceId<Self>>
             + TracingContext
+            + ReferenceNotifiers
             + 'static,
     > NonSyncContext for C
 {

@@ -2316,7 +2316,8 @@ mod tests {
         let expected = if remove_device {
             // Don't keep any strong device IDs to the device before removing.
             core::mem::drop(device_id);
-            crate::device::remove_ethernet_device(&sync_ctx, &mut non_sync_ctx, eth_device_id);
+            crate::device::remove_ethernet_device(&sync_ctx, &mut non_sync_ctx, eth_device_id)
+                .into_removed();
             Err(MmsError::NoDevice(ResolveRouteError::Unreachable))
         } else {
             Ok(Mms::from_mtu::<I>(

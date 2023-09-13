@@ -5013,7 +5013,8 @@ mod tests {
         // dropped at the end of the test.
         for (ctx, device) in [("local", local_device), ("remote", remote_device)] {
             net.with_context(ctx, |testutil::FakeCtx { sync_ctx, non_sync_ctx }| {
-                crate::device::remove_ethernet_device(sync_ctx, non_sync_ctx, device);
+                crate::device::remove_ethernet_device(sync_ctx, non_sync_ctx, device)
+                    .into_removed();
             });
         }
     }
@@ -5085,7 +5086,8 @@ mod tests {
         // dropped at the end of the test.
         for (ctx, device) in [("local", local_device), ("remote", remote_device)] {
             net.with_context(ctx, |testutil::FakeCtx { sync_ctx, non_sync_ctx }| {
-                crate::device::remove_ethernet_device(sync_ctx, non_sync_ctx, device);
+                crate::device::remove_ethernet_device(sync_ctx, non_sync_ctx, device)
+                    .into_removed();
             });
         }
     }

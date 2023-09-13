@@ -649,6 +649,37 @@ impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<BindingsNonSy
     }
 }
 
+/// Implements `RcNotifier` for futures oneshot channels.
+///
+/// We need a newtype here because of orphan rules.
+pub(crate) struct ReferenceNotifier<T>(Option<futures::channel::oneshot::Sender<T>>);
+
+impl<T: Send> netstack3_core::sync::RcNotifier<T> for ReferenceNotifier<T> {
+    fn notify(&mut self, data: T) {
+        let Self(inner) = self;
+        inner.take().expect("notified twice").send(data).unwrap_or_else(|_: T| {
+            panic!(
+                "receiver was dropped before notifying for {}",
+                // Print the type name so we don't need Debug bounds.
+                core::any::type_name::<T>()
+            )
+        })
+    }
+}
+
+impl netstack3_core::ReferenceNotifiers for BindingsNonSyncCtxImpl {
+    type ReferenceReceiver<T: 'static> = futures::channel::oneshot::Receiver<T>;
+
+    type ReferenceNotifier<T: Send + 'static> = ReferenceNotifier<T>;
+
+    fn new_reference_notifier<T: Send + 'static, D: std::fmt::Debug>(
+        _debug_references: D,
+    ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>) {
+        let (sender, receiver) = futures::channel::oneshot::channel();
+        (ReferenceNotifier(Some(sender)), receiver)
+    }
+}
+
 impl BindingsNonSyncCtxImpl {
     fn notify_interface_update(
         &self,

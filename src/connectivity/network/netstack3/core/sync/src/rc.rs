@@ -616,6 +616,39 @@ impl<T: Send> Notifier<T> for ArcNotifier<T> {
     }
 }
 
+/// An implementation of [`Notifier`] that wraps another `Notifier` and applies
+/// a function on notified objects.
+pub struct MapNotifier<N, F> {
+    inner: N,
+    map: Option<F>,
+}
+
+impl<N, F> MapNotifier<N, F> {
+    /// Creates a new [`MapNotifier`] that wraps `notifier` with a mapping
+    /// function `F`.
+    pub fn new(notifier: N, map: F) -> Self {
+        Self { inner: notifier, map: Some(map) }
+    }
+}
+
+impl<A, B, N: Notifier<B>, F: FnOnce(A) -> B> Notifier<A> for MapNotifier<N, F>
+where
+    Self: Send,
+{
+    fn notify(&mut self, data: A) {
+        let Self { inner, map } = self;
+        let map = map.take().expect("notified twice");
+        inner.notify(map(data))
+    }
+}
+
+/// A handy implementation for the common Infallible "Never" type.
+impl<T> Notifier<T> for core::convert::Infallible {
+    fn notify(&mut self, _data: T) {
+        match *self {}
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -793,5 +826,14 @@ mod tests {
         assert_eq!(notifier.take(), None);
         core::mem::drop(strong);
         assert_eq!(notifier.take(), Some(10));
+    }
+
+    #[test]
+    fn map_notifier() {
+        let primary = Primary::new(10);
+        let notifier = ArcNotifier::new();
+        let map_notifier = MapNotifier::new(notifier.clone(), |data| (data, data + 1));
+        Primary::unwrap_with_notifier(primary, map_notifier);
+        assert_eq!(notifier.take(), Some((10, 11)));
     }
 }
