@@ -31,7 +31,6 @@ CLIENT_TEST(V1TwoWayNoPayload) {
     ASSERT_TRUE(result.value().fidl_error().has_value());
     ASSERT_EQ(result.value().fidl_error().value(), fidl_clientsuite::FidlErrorKind::kDecodingError);
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -61,7 +60,6 @@ CLIENT_TEST(V1TwoWayStructPayload) {
         ASSERT_EQ(result.value().fidl_error().value(),
                   fidl_clientsuite::FidlErrorKind::kDecodingError);
       });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));

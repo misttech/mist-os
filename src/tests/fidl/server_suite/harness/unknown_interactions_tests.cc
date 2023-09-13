@@ -25,7 +25,6 @@ OPEN_SERVER_TEST(SendStrictEvent) {
     MarkControllerCallbackRun();
     ASSERT_TRUE(result.is_ok());
   });
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(expected_event));
   WAIT_UNTIL_CONTROLLER_CALLBACK_RUN();
 }
@@ -41,7 +40,6 @@ OPEN_SERVER_TEST(SendFlexibleEvent) {
     MarkControllerCallbackRun();
     ASSERT_TRUE(result.is_ok());
   });
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(expected_event));
   WAIT_UNTIL_CONTROLLER_CALLBACK_RUN();
 }
@@ -91,7 +89,6 @@ OPEN_SERVER_TEST(ReceiveFlexibleOneWayMismatchedStrictness) {
 OPEN_SERVER_TEST(StrictTwoWayResponse) {
   Bytes bytes = Header{.txid = kTwoWayTxid, .ordinal = kOrdinalStrictTwoWay};
   ASSERT_OK(client_end().write(bytes));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(bytes));
 }
 
@@ -108,7 +105,6 @@ OPEN_SERVER_TEST(StrictTwoWayResponseMismatchedStrictness) {
       .ordinal = kOrdinalStrictTwoWay,
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(expected_response));
 }
 
@@ -119,7 +115,6 @@ OPEN_SERVER_TEST(StrictTwoWayNonEmptyResponse) {
       encode(fidl_serversuite::OpenTargetStrictTwoWayFieldsRequest(504230)),
   };
   ASSERT_OK(client_end().write(bytes));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(bytes));
 }
 
@@ -131,7 +126,6 @@ OPEN_SERVER_TEST(StrictTwoWayErrorSyntaxResponse) {
       inline_envelope({0x00}),
   };
   ASSERT_OK(client_end().write(bytes));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(bytes));
 }
 
@@ -158,7 +152,6 @@ OPEN_SERVER_TEST(StrictTwoWayErrorSyntaxResponseMismatchedStrictness) {
       payload,
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(expected_response));
 }
 
@@ -170,7 +163,6 @@ OPEN_SERVER_TEST(StrictTwoWayErrorSyntaxNonEmptyResponse) {
       inline_envelope(int32(406601)),
   };
   ASSERT_OK(client_end().write(bytes));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(bytes));
 }
 
@@ -184,7 +176,6 @@ OPEN_SERVER_TEST(FlexibleTwoWayResponse) {
   Bytes request = header;
   Bytes expected_response = {header, union_ordinal(kResultUnionSuccess), inline_envelope({0x00})};
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(expected_response));
 }
 
@@ -205,7 +196,6 @@ OPEN_SERVER_TEST(FlexibleTwoWayResponseMismatchedStrictness) {
       inline_envelope({0x00}),
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(expected_response));
 }
 
@@ -220,7 +210,6 @@ OPEN_SERVER_TEST(FlexibleTwoWayNonEmptyResponse) {
   Bytes request = {header, payload, padding(4)};
   Bytes expected_response = {header, union_ordinal(kResultUnionSuccess), inline_envelope(payload)};
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(expected_response));
 }
 
@@ -236,7 +225,6 @@ OPEN_SERVER_TEST(FlexibleTwoWayErrorSyntaxResponseSuccessResult) {
       inline_envelope({0x00}),
   };
   ASSERT_OK(client_end().write(bytes));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(bytes));
 }
 
@@ -252,7 +240,6 @@ OPEN_SERVER_TEST(FlexibleTwoWayErrorSyntaxResponseErrorResult) {
       inline_envelope(int32(60602293)),
   };
   ASSERT_OK(client_end().write(bytes));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(bytes));
 }
 
@@ -268,7 +255,6 @@ OPEN_SERVER_TEST(FlexibleTwoWayErrorSyntaxNonEmptyResponseSuccessResult) {
       inline_envelope(int32(406601)),
   };
   ASSERT_OK(client_end().write(bytes));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(bytes));
 }
 
@@ -284,7 +270,6 @@ OPEN_SERVER_TEST(FlexibleTwoWayErrorSyntaxNonEmptyResponseErrorResult) {
       inline_envelope(int32(60602293)),
   };
   ASSERT_OK(client_end().write(bytes));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(bytes));
 }
 
@@ -364,7 +349,6 @@ OPEN_SERVER_TEST(UnknownFlexibleTwoWayOpenProtocol) {
       inline_envelope(framework_err_unknown_method()),
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(expected_response));
   WAIT_UNTIL([this]() { return reporter().received_unknown_method().has_value(); });
   ASSERT_EQ(kOrdinalFakeUnknownMethod, reporter().received_unknown_method()->ordinal());
@@ -396,7 +380,6 @@ OPEN_SERVER_TEST(UnknownFlexibleTwoWayHandleOpenProtocol) {
       ExpectedHandles{},
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(expected_response));
   WAIT_UNTIL([this]() { return reporter().received_unknown_method().has_value(); });
   ASSERT_EQ(kOrdinalFakeUnknownMethod, reporter().received_unknown_method()->ordinal());

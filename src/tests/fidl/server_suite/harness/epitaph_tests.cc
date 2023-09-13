@@ -21,7 +21,6 @@ CLOSED_SERVER_TEST(ServerSendsEpitaph) {
       {int32(epitaph), padding(4)},
   };
   ASSERT_TRUE(controller()->CloseWithEpitaph({epitaph}).is_ok());
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(expected));
   ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
   ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));

@@ -67,7 +67,6 @@ CLOSED_SERVER_TEST(ClientSendsTooManyRights) {
       ExpectedHandles{},
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(expected_response));
 }
 
@@ -109,7 +108,6 @@ CLOSED_SERVER_TEST(ClientSendsObjectOverPlainHandle) {
       ExpectedHandles{},
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(expected_response));
 }
 
@@ -161,7 +159,6 @@ CLOSED_SERVER_TEST(ServerSendsTooManyRights) {
       }},
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(expected_response));
 }
 

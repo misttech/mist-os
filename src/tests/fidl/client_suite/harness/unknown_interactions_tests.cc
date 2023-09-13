@@ -22,7 +22,6 @@ CLIENT_TEST(OneWayStrictSend) {
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().success().has_value());
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check(expected_request));
   WAIT_UNTIL_CALLBACK_RUN();
 }
@@ -39,7 +38,6 @@ CLIENT_TEST(OneWayFlexibleSend) {
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().success().has_value());
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check(expected_request));
   WAIT_UNTIL_CALLBACK_RUN();
 }
@@ -52,7 +50,6 @@ CLIENT_TEST(TwoWayStrictSend) {
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().success().has_value());
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(bytes, &bytes.txid()));
   ASSERT_NE(bytes.txid(), 0u);
   ASSERT_OK(server_end().write(bytes));
@@ -76,7 +73,6 @@ CLIENT_TEST(TwoWayStrictSendMismatchedStrictness) {
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().success().has_value());
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -97,7 +93,6 @@ CLIENT_TEST(TwoWayStrictSendNonEmptyPayload) {
         ASSERT_TRUE(result.value().success().has_value());
         ASSERT_EQ(result.value().success().value(), payload);
       });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -114,7 +109,6 @@ CLIENT_TEST(TwoWayStrictErrorSyntaxSendSuccessResponse) {
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().success().has_value());
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -133,7 +127,6 @@ CLIENT_TEST(TwoWayStrictErrorSyntaxSendErrorResponse) {
     ASSERT_TRUE(result.value().application_error().has_value());
     ASSERT_EQ(result.value().application_error().value(), error);
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -156,7 +149,6 @@ CLIENT_TEST(TwoWayStrictErrorSyntaxSendUnknownMethodResponse) {
     ASSERT_TRUE(result.value().fidl_error().has_value());
     ASSERT_EQ(result.value().fidl_error().value(), fidl_clientsuite::FidlErrorKind::kDecodingError);
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -185,7 +177,6 @@ CLIENT_TEST(TwoWayStrictErrorSyntaxSendMismatchedStrictnessUnknownMethodResponse
     ASSERT_TRUE(result.value().fidl_error().has_value());
     ASSERT_EQ(result.value().fidl_error().value(), fidl_clientsuite::FidlErrorKind::kDecodingError);
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -207,7 +198,6 @@ CLIENT_TEST(TwoWayStrictErrorSyntaxSendNonEmptyPayload) {
         ASSERT_TRUE(result.value().success().has_value());
         ASSERT_EQ(result.value().success().value(), payload);
       });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -228,7 +218,6 @@ CLIENT_TEST(TwoWayFlexibleSendSuccessResponse) {
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().success().has_value());
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -255,7 +244,6 @@ CLIENT_TEST(TwoWayFlexibleSendErrorResponse) {
     ASSERT_TRUE(result.value().fidl_error().has_value());
     ASSERT_EQ(result.value().fidl_error().value(), fidl_clientsuite::FidlErrorKind::kDecodingError);
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -281,7 +269,6 @@ CLIENT_TEST(TwoWayFlexibleSendUnknownMethodResponse) {
     ASSERT_TRUE(result.value().fidl_error().has_value());
     ASSERT_EQ(result.value().fidl_error().value(), fidl_clientsuite::FidlErrorKind::kUnknownMethod);
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -309,7 +296,6 @@ CLIENT_TEST(TwoWayFlexibleSendMismatchedStrictnessUnknownMethodResponse) {
     ASSERT_TRUE(result.value().fidl_error().has_value());
     ASSERT_EQ(result.value().fidl_error().value(), fidl_clientsuite::FidlErrorKind::kUnknownMethod);
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -336,7 +322,6 @@ CLIENT_TEST(TwoWayFlexibleSendOtherTransportErrResponse) {
     ASSERT_TRUE(result.value().fidl_error().has_value());
     ASSERT_EQ(result.value().fidl_error().value(), fidl_clientsuite::FidlErrorKind::kDecodingError);
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -362,7 +347,6 @@ CLIENT_TEST(TwoWayFlexibleSendNonEmptyPayloadSuccessResponse) {
         ASSERT_TRUE(result.value().success().has_value());
         ASSERT_EQ(result.value().success().value(), payload);
       });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -392,7 +376,6 @@ CLIENT_TEST(TwoWayFlexibleSendNonEmptyPayloadUnknownMethodResponse) {
         ASSERT_EQ(result.value().fidl_error().value(),
                   fidl_clientsuite::FidlErrorKind::kUnknownMethod);
       });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -413,7 +396,6 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendSuccessResponse) {
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().success().has_value());
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -436,7 +418,6 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendErrorResponse) {
     ASSERT_TRUE(result.value().application_error().has_value());
     ASSERT_EQ(result.value().application_error().value(), error);
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -462,7 +443,6 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendUnknownMethodResponse) {
     ASSERT_TRUE(result.value().fidl_error().has_value());
     ASSERT_EQ(result.value().fidl_error().value(), fidl_clientsuite::FidlErrorKind::kUnknownMethod);
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -490,7 +470,6 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendMismatchedStrictnessUnknownMethodRespon
     ASSERT_TRUE(result.value().fidl_error().has_value());
     ASSERT_EQ(result.value().fidl_error().value(), fidl_clientsuite::FidlErrorKind::kUnknownMethod);
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -517,7 +496,6 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendOtherTransportErrResponse) {
     ASSERT_TRUE(result.value().fidl_error().has_value());
     ASSERT_EQ(result.value().fidl_error().value(), fidl_clientsuite::FidlErrorKind::kDecodingError);
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -544,7 +522,6 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendNonEmptyPayloadSuccessResponse) {
         ASSERT_TRUE(result.value().success().has_value());
         ASSERT_EQ(result.value().success().value(), payload);
       });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -574,7 +551,6 @@ CLIENT_TEST(TwoWayFlexibleErrorSyntaxSendNonEmptyPayloadUnknownMethodResponse) {
         ASSERT_EQ(result.value().fidl_error().value(),
                   fidl_clientsuite::FidlErrorKind::kUnknownMethod);
       });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));

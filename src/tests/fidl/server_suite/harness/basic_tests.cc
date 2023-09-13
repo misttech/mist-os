@@ -31,7 +31,6 @@ CLOSED_SERVER_TEST(OneWayNoPayload) {
 CLOSED_SERVER_TEST(TwoWayNoPayload) {
   Bytes bytes = Header{.txid = kTwoWayTxid, .ordinal = kOrdinalTwoWayNoPayload};
   ASSERT_OK(client_end().write(bytes));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(bytes));
 }
 
@@ -42,7 +41,6 @@ CLOSED_SERVER_TEST(TwoWayStructPayload) {
       {uint8(0xab), padding(7)},
   };
   ASSERT_OK(client_end().write(bytes));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(bytes));
 }
 
@@ -55,7 +53,6 @@ CLOSED_SERVER_TEST(TwoWayTablePayload) {
       inline_envelope(uint8(0xab)),
   };
   ASSERT_OK(client_end().write(bytes));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(bytes));
 }
 
@@ -67,7 +64,6 @@ CLOSED_SERVER_TEST(TwoWayUnionPayload) {
       inline_envelope(uint8(0xab)),
   };
   ASSERT_OK(client_end().write(bytes));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(bytes));
 }
 
@@ -81,7 +77,6 @@ CLOSED_SERVER_TEST(TwoWayResultWithPayload) {
       {{'a', 'b', 'c'}, padding(5)},
   };
   ASSERT_OK(client_end().write(bytes));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(bytes));
 }
 
@@ -93,7 +88,6 @@ CLOSED_SERVER_TEST(TwoWayResultWithError) {
       inline_envelope(uint32(0xab)),
   };
   ASSERT_OK(client_end().write(bytes));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(bytes));
 }
 

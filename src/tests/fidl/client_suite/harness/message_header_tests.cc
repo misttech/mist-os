@@ -90,7 +90,6 @@ CLIENT_TEST(ReceiveResponseBadMagicNumber) {
     ASSERT_TRUE(result.value().fidl_error().has_value());
     EXPECT_EQ(result.value().fidl_error().value(), fidl_clientsuite::FidlErrorKind::kDecodingError);
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -124,7 +123,6 @@ CLIENT_TEST(ReceiveResponseUnexpectedTxid) {
     EXPECT_EQ(result.value().fidl_error().value(),
               fidl_clientsuite::FidlErrorKind::kUnexpectedMessage);
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &right_txid));
   ASSERT_NE(right_txid, 0u);
   ASSERT_NE(right_txid, wrong_txid);
@@ -147,7 +145,6 @@ CLIENT_TEST(ReceiveResponseWrongOrdinalKnown) {
     ASSERT_TRUE(result.value().fidl_error().has_value());
     EXPECT_EQ(result.value().fidl_error().value(), fidl_clientsuite::FidlErrorKind::kDecodingError);
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -168,7 +165,6 @@ CLIENT_TEST(ReceiveResponseWrongOrdinalUnknown) {
     ASSERT_TRUE(result.value().fidl_error().has_value());
     EXPECT_EQ(result.value().fidl_error().value(), fidl_clientsuite::FidlErrorKind::kDecodingError);
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));

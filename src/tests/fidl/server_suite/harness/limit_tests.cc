@@ -25,7 +25,6 @@ CLOSED_SERVER_TEST(RequestMatchesByteLimit) {
   Bytes request = {header, vector_header(count), repeat(0x00).times(count)};
   Bytes expected_response = {header, uint32(count), padding(4)};
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(expected_response));
 }
 
@@ -53,7 +52,6 @@ CLOSED_SERVER_TEST(RequestMatchesHandleLimit) {
       ExpectedHandles{},
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(expected_response));
 }
 
@@ -64,7 +62,6 @@ CLOSED_SERVER_TEST(ResponseMatchesByteLimit) {
   Bytes request = {header, uint32(count), padding(4)};
   Bytes expected_response = {header, vector_header(count), repeat(0x00).times(count)};
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(expected_response));
 }
 
@@ -105,7 +102,6 @@ CLOSED_SERVER_TEST(ResponseMatchesHandleLimit) {
       expected_handles,
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(expected_response));
 }
 

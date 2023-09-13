@@ -26,7 +26,6 @@ CLIENT_TEST(TwoWayNoPayload) {
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_TRUE(result.value().success().has_value());
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(bytes, &bytes.txid()));
   ASSERT_NE(bytes.txid(), 0u);
   ASSERT_OK(server_end().write(bytes));
@@ -47,7 +46,6 @@ CLIENT_TEST(TwoWayStructPayload) {
         ASSERT_TRUE(result.value().success().has_value());
         ASSERT_EQ(result.value().success().value(), payload);
       });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -68,7 +66,6 @@ CLIENT_TEST(TwoWayTablePayload) {
         ASSERT_TRUE(result.value().success().has_value());
         ASSERT_EQ(result.value().success().value(), payload);
       });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -89,7 +86,6 @@ CLIENT_TEST(TwoWayUnionPayload) {
         ASSERT_TRUE(result.value().success().has_value());
         ASSERT_EQ(result.value().success().value(), payload);
       });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -112,7 +108,6 @@ CLIENT_TEST(TwoWayResultWithPayload) {
             ASSERT_TRUE(result.value().success().has_value());
             ASSERT_EQ(result.value().success().value(), payload);
           });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -134,7 +129,6 @@ CLIENT_TEST(TwoWayResultWithError) {
             ASSERT_TRUE(result.value().application_error().has_value());
             ASSERT_EQ(result.value().application_error().value(), error);
           });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -155,7 +149,6 @@ CLIENT_TEST(TwoWayStructRequest) {
             ASSERT_TRUE(result.is_ok()) << result.error_value();
             ASSERT_EQ(result.value(), fidl_clientsuite::EmptyResultClassification::WithSuccess({}));
           });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -175,7 +168,6 @@ CLIENT_TEST(TwoWayTableRequest) {
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_EQ(result.value(), fidl_clientsuite::EmptyResultClassification::WithSuccess({}));
       });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -195,7 +187,6 @@ CLIENT_TEST(TwoWayUnionRequest) {
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_EQ(result.value(), fidl_clientsuite::EmptyResultClassification::WithSuccess({}));
       });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check_unknown_txid(expected_request, &response.txid()));
   ASSERT_NE(response.txid(), 0u);
   ASSERT_OK(server_end().write(response));
@@ -210,7 +201,6 @@ CLIENT_TEST(OneWayNoRequest) {
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     ASSERT_EQ(result.value(), fidl_clientsuite::EmptyResultClassification::WithSuccess({}));
   });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check(expected_request));
   WAIT_UNTIL_CALLBACK_RUN();
 }
@@ -230,7 +220,6 @@ CLIENT_TEST(OneWayStructRequest) {
             ASSERT_TRUE(result.is_ok()) << result.error_value();
             ASSERT_EQ(result.value(), fidl_clientsuite::EmptyResultClassification::WithSuccess({}));
           });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check(expected_request));
   WAIT_UNTIL_CALLBACK_RUN();
 }
@@ -249,7 +238,6 @@ CLIENT_TEST(OneWayTableRequest) {
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_EQ(result.value(), fidl_clientsuite::EmptyResultClassification::WithSuccess({}));
       });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check(expected_request));
   WAIT_UNTIL_CALLBACK_RUN();
 }
@@ -268,7 +256,6 @@ CLIENT_TEST(OneWayUnionRequest) {
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_EQ(result.value(), fidl_clientsuite::EmptyResultClassification::WithSuccess({}));
       });
-  ASSERT_OK(server_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(server_end().read_and_check(expected_request));
   WAIT_UNTIL_CALLBACK_RUN();
 }

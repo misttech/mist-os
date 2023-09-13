@@ -72,7 +72,6 @@ CLOSED_SERVER_TEST(IgnoresUnrecognizedAtRestFlags) {
       .ordinal = kOrdinalTwoWayNoPayload,
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(expected_response));
 }
 
@@ -88,7 +87,6 @@ CLOSED_SERVER_TEST(IgnoresUnrecognizedDynamicFlags) {
       .ordinal = kOrdinalTwoWayNoPayload,
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_READABLE));
   ASSERT_OK(client_end().read_and_check(expected_response));
 }
 

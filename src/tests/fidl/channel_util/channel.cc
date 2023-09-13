@@ -98,9 +98,15 @@ zx_status_t Channel::read_and_check_impl(const char* log_prefix, const ExpectedM
   std::vector<zx_handle_info_t> handles(ZX_CHANNEL_MAX_MSG_HANDLES);
   uint32_t actual_bytes;
   uint32_t actual_handles;
-  zx_status_t status =
-      channel_.read_etc(0, bytes.data(), handles.data(), static_cast<uint32_t>(bytes.size()),
-                        static_cast<uint32_t>(handles.size()), &actual_bytes, &actual_handles);
+  zx_status_t status;
+  status = channel_.wait_one(ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED,
+                             zx::deadline_after(kWaitTimeout), nullptr);
+  if (status != ZX_OK) {
+    printf("read_and_check: object_wait_one() returned status: %s\n", zx_status_get_string(status));
+    return status;
+  }
+  status = channel_.read_etc(0, bytes.data(), handles.data(), static_cast<uint32_t>(bytes.size()),
+                             static_cast<uint32_t>(handles.size()), &actual_bytes, &actual_handles);
   if (status != ZX_OK) {
     printf("%s: channel_read_etc() returned status: %s\n", log_prefix,
            zx_status_get_string(status));
