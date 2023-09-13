@@ -561,7 +561,7 @@ impl UnreachableMode {
                 panic!("cannot calculate exponential backoff in state {self:?}")
             }
         };
-        // TODO(https://fxbug.dev/35185): vary this retransmit timeout by some random
+        // TODO(https://fxbug.dev/133437): vary this retransmit timeout by some random
         // "jitter factor" to avoid synchronization of transmissions from different
         // hosts.
         (sync_ctx.retransmit_timeout() * BACKOFF_MULTIPLE.saturating_pow(probes_sent.get()))
@@ -814,7 +814,7 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
         C: NonSyncContext<I, D, SC::DeviceId, Instant = Time>,
         SC: BufferNudSenderContext<Buf<Vec<u8>>, I, D, C>,
     {
-        // TODO(https://fxbug.dev/35185): if the new state matches the current state,
+        // TODO(https://fxbug.dev/124960): if the new state matches the current state,
         // update the link address as necessary, but do not cancel + reschedule timers.
         let now = ctx.now();
         match self {
@@ -870,7 +870,7 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
         C: NonSyncContext<I, D, SC::DeviceId>,
         SC: BufferNudSenderContext<Buf<Vec<u8>>, I, D, C>,
     {
-        // TODO(https://fxbug.dev/35185): if the new state matches the current state,
+        // TODO(https://fxbug.dev/124960): if the new state matches the current state,
         // update the link address as necessary, but do not cancel + reschedule timers.
         let previous =
             core::mem::replace(self, DynamicNeighborState::Stale(Stale { link_address }));
@@ -2188,7 +2188,7 @@ where
                             let candidate = SortEntry { key: ip, state };
                             if &candidate > minimum {
                                 let _: SortEntry<'_, _, _, _, _> = entries_to_remove.pop().unwrap();
-                                entries_to_remove.push(SortEntry { key: ip, state });
+                                entries_to_remove.push(candidate);
                             }
                         }
                     }

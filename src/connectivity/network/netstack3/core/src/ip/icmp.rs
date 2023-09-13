@@ -1843,7 +1843,7 @@ fn receive_ndp_packet<
                         // so for now we just record the link-layer address in
                         // our neighbor table.
                         //
-                        // TODO(https://fxbug.dev/35185): Support full NUD.
+                        // TODO(https://fxbug.dev/133436): Add support for routers in NUD.
                         NudIpHandler::handle_neighbor_probe(
                             sync_ctx,
                             ctx,
