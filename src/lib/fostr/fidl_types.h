@@ -162,8 +162,7 @@ std::ostream& operator<<(std::ostream& os, const VectorPtr<uint8_t>& value);
 template <>
 std::ostream& operator<<(std::ostream& os, const VectorPtr<int8_t>& value);
 
-template <typename T>
-std::ostream& operator<<(std::ostream& os, const internal::TransportErr& value) {
+inline std::ostream& operator<<(std::ostream& os, const internal::TransportErr& value) {
   if (value == internal::TransportErr::kUnknownMethod) {
     return os << "<unknown method>";
   }
