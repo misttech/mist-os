@@ -5,7 +5,7 @@
 use {
     crate::{
         buffer::{Buffer, BufferRef, MutableBufferRef},
-        buffer_allocator::{BufferAllocator, MemBufferSource},
+        buffer_allocator::{BufferAllocator, BufferSource},
         Device,
     },
     anyhow::{ensure, Error},
@@ -46,10 +46,8 @@ impl FileBackedDevice {
         // TODO(jfsulliv): If file is S_ISBLK, we should use its block size. Rust does not appear to
         // expose this information in a portable way, so we may need to dip into non-portable code
         // to do so.
-        let allocator = BufferAllocator::new(
-            block_size as usize,
-            Box::new(MemBufferSource::new(TRANSFER_HEAP_SIZE)),
-        );
+        let allocator =
+            BufferAllocator::new(block_size as usize, BufferSource::new(TRANSFER_HEAP_SIZE));
         Self { allocator, file, block_count, block_size }
     }
 }

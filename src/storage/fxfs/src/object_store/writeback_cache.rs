@@ -648,7 +648,7 @@ mod tests {
             },
             time::Duration,
         },
-        storage_device::buffer_allocator::{BufferAllocator, MemBufferSource},
+        storage_device::buffer_allocator::{BufferAllocator, BufferSource},
     };
 
     struct FakeReserverInner {
@@ -887,7 +887,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_write_reserving_bytes_fails() {
-        let allocator = BufferAllocator::new(512, Box::new(MemBufferSource::new(16384)));
+        let allocator = BufferAllocator::new(512, BufferSource::new(16384));
         // We size the reserver so that only a one-block write can succeed.
         let reserver = FakeReserver::new(512, 512);
         let cache = WritebackCache::new(8192);
@@ -939,7 +939,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_resize_expand() {
-        let allocator = BufferAllocator::new(512, Box::new(MemBufferSource::new(16384)));
+        let allocator = BufferAllocator::new(512, BufferSource::new(16384));
         let reserver = FakeReserver::new(8192, 1);
         let cache = WritebackCache::new(0);
         let source = FakeObjectHandle::new(Arc::new(FakeObject::new()));
@@ -984,7 +984,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_resize_shrink() {
-        let allocator = BufferAllocator::new(512, Box::new(MemBufferSource::new(16384)));
+        let allocator = BufferAllocator::new(512, BufferSource::new(16384));
         let reserver = FakeReserver::new(8192, 1);
         let cache = WritebackCache::new(0);
         let source = FakeObjectHandle::new(Arc::new(FakeObject::new()));
@@ -1024,7 +1024,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_flush_no_data() {
-        let allocator = BufferAllocator::new(512, Box::new(MemBufferSource::new(8192)));
+        let allocator = BufferAllocator::new(512, BufferSource::new(8192));
         let reserver = FakeReserver::new(1, 1);
         let cache = WritebackCache::new(0);
 
@@ -1044,7 +1044,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_flush_some_data() {
-        let allocator = BufferAllocator::new(512, Box::new(MemBufferSource::new(65536)));
+        let allocator = BufferAllocator::new(512, BufferSource::new(65536));
         let reserver = FakeReserver::new(65536, 512);
         let cache = WritebackCache::new(0);
         let source = FakeObjectHandle::new(Arc::new(FakeObject::new()));
@@ -1105,7 +1105,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_flush_returns_reservation_on_abort() {
-        let allocator = BufferAllocator::new(512, Box::new(MemBufferSource::new(65536)));
+        let allocator = BufferAllocator::new(512, BufferSource::new(65536));
         // Enough room for 2 flushes of 512 bytes each
         let reserver = FakeReserver::new_with_sync_overhead(2048, 512, 512, 1024);
         let cache = WritebackCache::new(0);
@@ -1161,7 +1161,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_flush_most_recent_write_timestamp() {
-        let allocator = BufferAllocator::new(512, Box::new(MemBufferSource::new(65536)));
+        let allocator = BufferAllocator::new(512, BufferSource::new(65536));
         let reserver = FakeReserver::new(65536, 4096);
         let cache = WritebackCache::new(0);
         let source = FakeObjectHandle::new(Arc::new(FakeObject::new()));
@@ -1198,7 +1198,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_flush_explicit_timestamps() {
-        let allocator = BufferAllocator::new(512, Box::new(MemBufferSource::new(65536)));
+        let allocator = BufferAllocator::new(512, BufferSource::new(65536));
         let reserver = FakeReserver::new(65536, 4096);
         let cache = WritebackCache::new(0);
         let source = FakeObjectHandle::new(Arc::new(FakeObject::new()));
@@ -1227,7 +1227,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_resize_while_flushing() {
-        let allocator = BufferAllocator::new(512, Box::new(MemBufferSource::new(8192)));
+        let allocator = BufferAllocator::new(512, BufferSource::new(8192));
         let reserver = FakeReserver::new(65536, 512);
         let cache = WritebackCache::new(0);
         let source = FakeObjectHandle::new(Arc::new(FakeObject::new()));

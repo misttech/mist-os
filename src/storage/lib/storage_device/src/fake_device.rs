@@ -5,7 +5,7 @@
 use {
     crate::{
         buffer::{Buffer, BufferRef, MutableBufferRef},
-        buffer_allocator::{BufferAllocator, MemBufferSource},
+        buffer_allocator::{BufferAllocator, BufferSource},
         Device, DeviceHolder,
     },
     anyhow::{ensure, Error},
@@ -35,10 +35,8 @@ const TRANSFER_HEAP_SIZE: usize = 16 * 1024 * 1024;
 
 impl FakeDevice {
     pub fn new(block_count: u64, block_size: u32) -> Self {
-        let allocator = BufferAllocator::new(
-            block_size as usize,
-            Box::new(MemBufferSource::new(TRANSFER_HEAP_SIZE)),
-        );
+        let allocator =
+            BufferAllocator::new(block_size as usize, BufferSource::new(TRANSFER_HEAP_SIZE));
         Self {
             allocator,
             data: Mutex::new(vec![0 as u8; block_count as usize * block_size as usize]),
@@ -63,10 +61,8 @@ impl FakeDevice {
         mut reader: impl std::io::Read,
         block_size: u32,
     ) -> Result<Self, std::io::Error> {
-        let allocator = BufferAllocator::new(
-            block_size as usize,
-            Box::new(MemBufferSource::new(TRANSFER_HEAP_SIZE)),
-        );
+        let allocator =
+            BufferAllocator::new(block_size as usize, BufferSource::new(TRANSFER_HEAP_SIZE));
         let mut data = Vec::new();
         reader.read_to_end(&mut data)?;
         Ok(Self {
@@ -150,10 +146,8 @@ impl Device for FakeDevice {
     }
 
     fn snapshot(&self) -> Result<DeviceHolder, Error> {
-        let allocator = BufferAllocator::new(
-            self.block_size() as usize,
-            Box::new(MemBufferSource::new(TRANSFER_HEAP_SIZE)),
-        );
+        let allocator =
+            BufferAllocator::new(self.block_size() as usize, BufferSource::new(TRANSFER_HEAP_SIZE));
         Ok(DeviceHolder::new(Self {
             allocator,
             data: Mutex::new(self.data.lock().unwrap().clone()),

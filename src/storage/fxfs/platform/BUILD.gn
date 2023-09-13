@@ -64,6 +64,7 @@ rustc_library("platform") {
       "//src/sys/pkg/lib/fuchsia-hash",
       "//src/sys/pkg/lib/fuchsia-merkle",
       "//third_party/rust_crates:anyhow",
+      "//third_party/rust_crates:async-lock",
       "//third_party/rust_crates:async-trait",
       "//third_party/rust_crates:bincode",
       "//third_party/rust_crates:bitflags",

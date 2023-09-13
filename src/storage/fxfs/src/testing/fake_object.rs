@@ -27,7 +27,7 @@ use {
     },
     storage_device::{
         buffer::{Buffer, BufferRef, MutableBufferRef},
-        buffer_allocator::{BufferAllocator, MemBufferSource},
+        buffer_allocator::{BufferAllocator, BufferSource},
     },
 };
 
@@ -120,8 +120,7 @@ pub struct FakeObjectHandle {
 
 impl FakeObjectHandle {
     pub fn new_with_block_size(object: Arc<FakeObject>, block_size: usize) -> Self {
-        let allocator =
-            BufferAllocator::new(block_size, Box::new(MemBufferSource::new(32 * 1024 * 1024)));
+        let allocator = BufferAllocator::new(block_size, BufferSource::new(32 * 1024 * 1024));
         Self { object, allocator }
     }
     pub fn new(object: Arc<FakeObject>) -> Self {

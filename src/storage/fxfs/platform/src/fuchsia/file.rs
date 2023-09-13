@@ -494,18 +494,14 @@ impl PagerBacked for FxFile {
 
     fn page_in(self: Arc<Self>, mut range: Range<u64>) {
         async_enter!("page_in");
+        assert!(range.end < i64::MAX as u64);
         let aligned_size =
             round_up(self.handle.uncached_size(), zx::system_get_page_size()).unwrap();
-        if aligned_size < range.end {
-            range.end = aligned_size;
-        } else {
-            const READ_AHEAD: u64 = 131_072;
-            if aligned_size - range.end < READ_AHEAD {
-                range.end = aligned_size;
-            } else {
-                range.end += READ_AHEAD;
-            }
-        }
+        // Round up to 128 KiB reads with a minimum of 64 KiB readahead.
+        range.end = std::cmp::min(
+            range.start + round_up(range.end - range.start + 65536, 131072u64).unwrap(),
+            aligned_size,
+        );
         default_page_in(self, range)
     }
 

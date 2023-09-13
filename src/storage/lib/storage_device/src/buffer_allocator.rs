@@ -4,77 +4,108 @@
 
 use {
     crate::buffer::{round_down, round_up, Buffer},
-    std::any::Any,
-    std::cell::UnsafeCell,
     std::collections::BTreeMap,
     std::ops::Range,
-    std::pin::Pin,
     std::sync::Mutex,
     std::vec::Vec,
 };
 
-#[allow(clippy::mut_from_ref)] // TODO(fxbug.dev/95027)
-/// BufferSource is a contiguous range of memory which may have some special properties (such as
-/// being contained within a special memory region that can be used for block transactions, e.g.
-/// a VMO).
-/// This is the backing of a BufferAllocator which the allocator uses to create Buffer objects.
-pub trait BufferSource: Any + std::fmt::Debug + Send + Sync {
-    /// Returns the capacity of the BufferSource.
-    fn size(&self) -> usize;
-    /// Returns a mutable slice covering |range| in the BufferSource.
-    /// Panics if |range| exceeds |self.size()|.
-    ///
-    /// # Safety
-    ///
-    /// This method is unsound if called with overlapping ranges. The caller (BufferAllocator) is
-    /// responsible for ensuring that ranges are not shared across allocations.
-    unsafe fn sub_slice(&self, range: &Range<usize>) -> &mut [u8];
-    fn as_any(&self) -> &dyn Any;
-    fn into_any(self: Box<Self>) -> Box<dyn Any>;
-}
+#[cfg(target_os = "fuchsia")]
+mod buffer_source {
+    use {
+        fuchsia_runtime::vmar_root_self,
+        fuchsia_zircon::{self as zx, AsHandleRef},
+        std::{ffi::CString, ops::Range},
+    };
 
-/// A basic heap-backed memory source.
-#[derive(Debug)]
-pub struct MemBufferSource {
-    // We use an UnsafeCell here because we need interior mutability of the buffer (to hand out
-    // mutable slices to it in |buffer()|), but don't want to pay the cost of wrapping the buffer in
-    // a Mutex. We must guarantee that the Buffer objects we hand out don't overlap, but that is
-    // already a requirement for correctness.
-    data: UnsafeCell<Pin<Vec<u8>>>,
-}
-
-// Safe because none of the fields in MemBufferSource are modified, except the contents of |data|,
-// but that is managed by the BufferAllocator.
-unsafe impl Sync for MemBufferSource {}
-
-impl MemBufferSource {
-    pub fn new(size: usize) -> Self {
-        Self { data: UnsafeCell::new(Pin::new(vec![0 as u8; size])) }
-    }
-}
-
-impl BufferSource for MemBufferSource {
-    fn size(&self) -> usize {
-        // Safe because the reference goes out of scope as soon as we use it.
-        unsafe { (&*self.data.get()).len() }
+    /// A buffer source backed by a VMO.
+    #[derive(Debug)]
+    pub struct BufferSource {
+        base: *mut u8,
+        size: usize,
+        vmo: zx::Vmo,
     }
 
-    unsafe fn sub_slice(&self, range: &Range<usize>) -> &mut [u8] {
-        if range.start >= self.size() || range.end > self.size() {
-            panic!("Invalid range {:?} (BufferSource is {} bytes)", range, self.size());
+    // SAFETY: This is required for the *mut u8 which is just the base address of the VMO mapping
+    // and doesn't stop us making BufferSource Send and Sync.
+    unsafe impl Send for BufferSource {}
+    unsafe impl Sync for BufferSource {}
+
+    impl BufferSource {
+        pub fn new(size: usize) -> Self {
+            let vmo = zx::Vmo::create(size as u64).unwrap();
+            let cname = CString::new("transfer-buf").unwrap();
+            vmo.set_name(&cname).unwrap();
+            let flags = zx::VmarFlags::PERM_READ
+                | zx::VmarFlags::PERM_WRITE
+                | zx::VmarFlags::MAP_RANGE
+                | zx::VmarFlags::REQUIRE_NON_RESIZABLE;
+            let base = vmar_root_self().map(0, &vmo, 0, size, flags).unwrap() as *mut u8;
+            Self { base, size, vmo }
         }
-        assert!(range.start % std::mem::align_of::<u8>() == 0);
-        &mut (&mut *self.data.get())[range.start..range.end]
+
+        pub fn size(&self) -> usize {
+            self.size
+        }
+
+        pub fn vmo(&self) -> &zx::Vmo {
+            &self.vmo
+        }
+
+        #[allow(clippy::mut_from_ref)]
+        pub(super) unsafe fn sub_slice(&self, range: &Range<usize>) -> &mut [u8] {
+            assert!(range.start < self.size && range.end <= self.size);
+            std::slice::from_raw_parts_mut(self.base.add(range.start), range.end - range.start)
+        }
     }
 
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn Any> {
-        self
+    impl Drop for BufferSource {
+        fn drop(&mut self) {
+            // SAFETY: This balances the `map` in `new` above.
+            unsafe {
+                let _ = vmar_root_self().unmap(self.base as usize, self.size);
+            }
+        }
     }
 }
+
+#[cfg(not(target_os = "fuchsia"))]
+mod buffer_source {
+    use std::{cell::UnsafeCell, ops::Range, pin::Pin};
+
+    /// A basic heap-backed buffer source.
+    #[derive(Debug)]
+    pub struct BufferSource {
+        // We use an UnsafeCell here because we need interior mutability of the buffer (to hand out
+        // mutable slices to it in |buffer()|), but don't want to pay the cost of wrapping the
+        // buffer in a Mutex. We must guarantee that the Buffer objects we hand out don't overlap,
+        // but that is already a requirement for correctness.
+        data: UnsafeCell<Pin<Vec<u8>>>,
+    }
+
+    // Safe because none of the fields in BufferSource are modified, except the contents of |data|,
+    // but that is managed by the BufferAllocator.
+    unsafe impl Sync for BufferSource {}
+
+    impl BufferSource {
+        pub fn new(size: usize) -> Self {
+            Self { data: UnsafeCell::new(Pin::new(vec![0 as u8; size])) }
+        }
+
+        pub fn size(&self) -> usize {
+            // Safe because the reference goes out of scope as soon as we use it.
+            unsafe { (&*self.data.get()).len() }
+        }
+
+        #[allow(clippy::mut_from_ref)]
+        pub(super) unsafe fn sub_slice(&self, range: &Range<usize>) -> &mut [u8] {
+            assert!(range.start < self.size() && range.end <= self.size());
+            &mut (&mut *self.data.get())[range.start..range.end]
+        }
+    }
+}
+
+pub use buffer_source::BufferSource;
 
 // Stores a list of offsets into a BufferSource. The size of the free ranges is determined by which
 // FreeList we are looking at.
@@ -95,7 +126,7 @@ struct Inner {
 #[derive(Debug)]
 pub struct BufferAllocator {
     block_size: usize,
-    source: Box<dyn BufferSource>,
+    source: BufferSource,
     inner: Mutex<Inner>,
 }
 
@@ -143,7 +174,7 @@ fn initial_free_lists(size: usize, block_size: usize) -> Vec<FreeList> {
 }
 
 impl BufferAllocator {
-    pub fn new(block_size: usize, source: Box<dyn BufferSource>) -> Self {
+    pub fn new(block_size: usize, source: BufferSource) -> Self {
         let free_lists = initial_free_lists(source.size(), block_size);
         Self {
             block_size,
@@ -156,12 +187,12 @@ impl BufferAllocator {
         self.block_size
     }
 
-    pub fn buffer_source(&self) -> &dyn BufferSource {
-        self.source.as_ref()
+    pub fn buffer_source(&self) -> &BufferSource {
+        &self.source
     }
 
     /// Takes the buffer source from the allocator and consumes the allocator.
-    pub fn take_buffer_source(self) -> Box<dyn BufferSource> {
+    pub fn take_buffer_source(self) -> BufferSource {
         self.source
     }
 
@@ -263,7 +294,7 @@ mod tests {
     use {
         crate::{
             buffer::Buffer,
-            buffer_allocator::{order, BufferAllocator, MemBufferSource},
+            buffer_allocator::{order, BufferAllocator, BufferSource},
         },
         fuchsia_async as fasync,
         futures::future::join_all,
@@ -273,7 +304,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_odd_sized_buffer_source() {
-        let source = Box::new(MemBufferSource::new(123));
+        let source = BufferSource::new(123);
         let allocator = BufferAllocator::new(2, source);
 
         // 123 == 64 + 32 + 16 + 8 + 2 + 1. (The last byte is unusable.)
@@ -288,7 +319,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_allocate_buffer_read_write() {
-        let source = Box::new(MemBufferSource::new(1024 * 1024));
+        let source = BufferSource::new(1024 * 1024);
         let allocator = BufferAllocator::new(8192, source);
 
         let mut buf = allocator.allocate_buffer(8192);
@@ -300,7 +331,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_allocate_buffer_consecutive_calls_do_not_overlap() {
-        let source = Box::new(MemBufferSource::new(1024 * 1024));
+        let source = BufferSource::new(1024 * 1024);
         let allocator = BufferAllocator::new(8192, source);
 
         let buf1 = allocator.allocate_buffer(8192);
@@ -310,7 +341,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_allocate_many_buffers() {
-        let source = Box::new(MemBufferSource::new(1024 * 1024));
+        let source = BufferSource::new(1024 * 1024);
         let allocator = BufferAllocator::new(8192, source);
 
         for _ in 0..10 {
@@ -320,7 +351,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_allocate_small_buffers_dont_overlap() {
-        let source = Box::new(MemBufferSource::new(1024 * 1024));
+        let source = BufferSource::new(1024 * 1024);
         let allocator = BufferAllocator::new(8192, source);
 
         let buf1 = allocator.allocate_buffer(1);
@@ -330,7 +361,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_allocate_large_buffer() {
-        let source = Box::new(MemBufferSource::new(1024 * 1024));
+        let source = BufferSource::new(1024 * 1024);
         let allocator = BufferAllocator::new(8192, source);
 
         let mut buf = allocator.allocate_buffer(1024 * 1024);
@@ -343,7 +374,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_allocate_large_buffer_after_smaller_buffers() {
-        let source = Box::new(MemBufferSource::new(1024 * 1024));
+        let source = BufferSource::new(1024 * 1024);
         let allocator = BufferAllocator::new(8192, source);
 
         {
@@ -358,7 +389,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_allocate_at_limits() {
-        let source = Box::new(MemBufferSource::new(1024 * 1024));
+        let source = BufferSource::new(1024 * 1024);
         let allocator = BufferAllocator::new(8192, source);
 
         let mut buffers = vec![];
@@ -373,7 +404,7 @@ mod tests {
 
     #[fuchsia::test(threads = 10)]
     async fn test_random_allocs_deallocs() {
-        let source = Box::new(MemBufferSource::new(16 * 1024 * 1024));
+        let source = BufferSource::new(16 * 1024 * 1024);
         let bs = 512;
         let allocator = Arc::new(BufferAllocator::new(bs, source));
 
@@ -421,7 +452,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_buffer_refs() {
-        let source = Box::new(MemBufferSource::new(1024 * 1024));
+        let source = BufferSource::new(1024 * 1024);
         let allocator = BufferAllocator::new(512, source);
 
         // Allocate one buffer first so that |buf| is not starting at offset 0. This helps catch
@@ -475,7 +506,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_buffer_split() {
-        let source = Box::new(MemBufferSource::new(1024 * 1024));
+        let source = BufferSource::new(1024 * 1024);
         let allocator = BufferAllocator::new(512, source);
 
         // Allocate one buffer first so that |buf| is not starting at offset 0. This helps catch

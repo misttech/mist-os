@@ -126,6 +126,11 @@ impl<'a> Buffer<'a> {
     pub fn range(&self) -> Range<usize> {
         self.0.range()
     }
+
+    /// Returns a reference to the allocator.
+    pub fn allocator(&self) -> &BufferAllocator {
+        self.0.allocator
+    }
 }
 
 impl<'a> Drop for Buffer<'a> {
