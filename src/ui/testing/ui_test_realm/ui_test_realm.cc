@@ -59,7 +59,6 @@ constexpr auto kDisplayHeightPhysicalPixels = 800;
 
 // Pixel density + usage that result in a DPR of 1.
 constexpr float kLowResolutionDisplayPixelDensity = 4.1668f;
-constexpr auto kDisplayUsageNear = "near";
 
 // Base realm urls.
 constexpr auto kScenicOnlyUrl = "#meta/scenic_only.cm";
@@ -309,38 +308,6 @@ void UITestRealm::ConfigureAccessibility() {
   }
 }
 
-void UITestRealm::RouteConfigData() {
-  auto config_directory_contents = component_testing::DirectoryContents();
-  std::vector<Ref> targets;
-
-  if (config_.use_scene_owner) {
-    // Supply a default display rotation.
-    config_directory_contents.AddFile("display_rotation", std::to_string(config_.display_rotation));
-
-    FX_CHECK(config_.device_pixel_ratio > 0) << "Device pixel ratio must be positive";
-    FX_CHECK(fmodf(static_cast<float>(kDisplayWidthPhysicalPixels), config_.device_pixel_ratio) ==
-             0)
-        << "DPR must result in integer logical display dimensions";
-    FX_CHECK(fmodf(static_cast<float>(kDisplayHeightPhysicalPixels), config_.device_pixel_ratio) ==
-             0)
-        << "DPR must result in integer logical display dimensions";
-
-    // Pick a display usage + pixel density pair that will result in the
-    // desired DPR.
-    config_directory_contents.AddFile("display_usage", kDisplayUsageNear);
-    auto display_pixel_density = kLowResolutionDisplayPixelDensity * config_.device_pixel_ratio;
-    config_directory_contents.AddFile("display_pixel_density",
-                                      std::to_string(display_pixel_density));
-    targets.push_back(ChildRef{kScenicName});
-    targets.push_back(ChildRef{kSceneManagerName});
-  }
-
-  if (!targets.empty()) {
-    realm_builder_.RouteReadOnlyDirectory("config-data", std::move(targets),
-                                          std::move(config_directory_contents));
-  }
-}
-
 void UITestRealm::ConfigureScenic() {
   // Load default config for Scenic.
   realm_builder_.InitMutableConfigFromPackage(kScenicName);
@@ -397,10 +364,6 @@ void UITestRealm::Build() {
 
   // Override flatland flags in Scenic configuration.
   ConfigureScenic();
-
-  // Route config data directories to appropriate recipients (currently, scenic
-  // and scene manager are the only use cases for config files.
-  RouteConfigData();
 
   // Configure Scene Manager if it is in use as the scene owner. This includes:
   // * routing input pipeline config data directories to Scene Manager
