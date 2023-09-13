@@ -60,6 +60,16 @@ std::optional<uint64_t> GetDisplayMode(scenic_structured_config::Config values) 
   return values.i_can_haz_display_mode();
 }
 
+uint64_t GetDisplayRotation(scenic_structured_config::Config values) {
+  uint64_t rotation = values.display_rotation();
+  if (rotation >= 0) {
+    FX_CHECK(rotation < 360) << "Rotation should be less than 360 degrees.";
+    return rotation;
+  }
+  FX_LOGS(WARNING) << "Invalid value for display_rotation. Falling back to the default value 0.";
+  return 0;
+}
+
 // Gets Scenic's structured config values and logs them.
 scenic_structured_config::Config GetConfig() {
   // Retrieve structured configuration
@@ -75,24 +85,9 @@ scenic_structured_config::Config GetConfig() {
                            .value = fuchsia::hardware::display::INVALID_DISP_ID})
                        .value;
   FX_LOGS(INFO) << "Scenic i_can_haz_display_mode: " << GetDisplayMode(values).value_or(0);
+  FX_LOGS(INFO) << "Scenic display_rotation: " << GetDisplayRotation(values);
 
   return values;
-}
-
-// Get Scenic's display rotation config value from its config file.
-uint64_t GetDisplayRotation() {
-  if (std::string display_rotation_config;
-      files::ReadFileToString("/config/data/display_rotation", &display_rotation_config)) {
-    if (int rotation = stoi(display_rotation_config); rotation >= 0) {
-      FX_CHECK(rotation < 360) << "Rotation should be less than 360 degrees.";
-      return rotation;
-    }
-    FX_LOGS(WARNING) << "Invalid value for display_rotation. Falling back to the default value 0.";
-  } else {
-    FX_LOGS(INFO)
-        << "No config file found at /config/data/display_rotation, using default rotation value 0";
-  }
-  return 0;
 }
 
 #ifdef NDEBUG
@@ -521,7 +516,7 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
           return flatland_engine_->GetRenderables(*display);
         },
         std::move(screen_capture_importers), display_info_delegate_->GetDisplayDimensions(),
-        GetDisplayRotation());
+        GetDisplayRotation(config_values_));
 
     fit::function<void(fidl::InterfaceRequest<fuchsia::ui::composition::Screenshot>)> handler =
         fit::bind_member(&screenshot_manager_.value(),

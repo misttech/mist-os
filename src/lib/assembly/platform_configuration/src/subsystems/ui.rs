@@ -43,7 +43,8 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
             .field("pointer_auto_focus", ui_config.pointer_auto_focus)?
             .field("display_composition", ui_config.display_composition)?
             .field("i_can_haz_display_id", -1i64)?
-            .field("i_can_haz_display_mode", -1i64)?;
+            .field("i_can_haz_display_mode", -1i64)?
+            .field("display_rotation", ui_config.display_rotation)?;
 
         let mut scene_manager_config =
             builder.package("scene_manager").component("meta/scene_manager.cm")?;

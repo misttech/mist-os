@@ -39,7 +39,7 @@ pub struct PlatformUiConfig {
 
     // The rotation of the display, counter-clockwise, in 90-degree increments.
     #[serde(default)]
-    pub display_rotation: i64,
+    pub display_rotation: u64,
 
     // TODO(132584): change to float when supported in structured config.
     // The density of the display, in pixels per mm.
