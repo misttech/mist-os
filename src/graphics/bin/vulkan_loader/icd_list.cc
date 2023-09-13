@@ -4,6 +4,8 @@
 
 #include "src/graphics/bin/vulkan_loader/icd_list.h"
 
+#include <lib/syslog/cpp/macros.h>
+
 IcdList::IcdList() = default;
 
 void IcdList::Initialize(inspect::Node* parent_node) {
@@ -22,6 +24,13 @@ bool IcdList::UpdateCurrentComponent() {
       break;
     if (icd->stage() != IcdComponent::LookupStages::kFinished)
       continue;
+
+    for (auto& icd : components_) {
+      if (icd->stage() == IcdComponent::LookupStages::kFinished)
+        continue;
+      FX_LOGS(INFO) << "Note: previous failed lookup for " << icd->component_url()
+                    << " is expected on production devices and is not an error";
+    }
     icd->AddManifestToFs();
     active_icd_.Set(icd->child_instance_name());
     // Only one manifest can be exposed at a time.

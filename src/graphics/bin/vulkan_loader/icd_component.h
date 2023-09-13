@@ -81,6 +81,7 @@ class IcdComponent : public std::enable_shared_from_this<IcdComponent> {
   void AddManifestToFs();
   void RemoveManifestFromFs();
   const std::string& child_instance_name() const { return child_instance_name_; }
+  const std::string& component_url() const { return component_url_; }
 
   fbl::RefPtr<fs::PseudoFile> manifest_file() { return manifest_file_; }
 
