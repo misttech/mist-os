@@ -112,7 +112,10 @@ class HdmiHost {
     color_.output_color_format = output_color_format;
   }
 
-  zx_status_t GetVic(const display_mode_t* disp_timing);
+  // Returns true iff a display mode (timing) is supported by the display
+  // engine driver and can be used in a display configuration.
+  bool IsDisplayModeSupported(const display_mode_t& mode) const;
+
   zx_status_t GetVic(display_mode_t* disp_timing);
 
   zx_status_t ConfigurePll();

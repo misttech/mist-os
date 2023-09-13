@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/hdmi-host.h"
 
+#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/ddk/debug.h>
 
 #include <limits>
@@ -254,16 +255,86 @@ zx_status_t HdmiHost::EdidTransfer(const i2c_impl_op_t* op_list, size_t op_count
   return ZX_OK;
 }
 
-zx_status_t HdmiHost::GetVic(const display_mode_t* disp_timing) {
-  display_mode_t mode;
-  memcpy(&mode, disp_timing, sizeof(display_mode_t));
-  hdmi_param p;
-  return GetVic(&mode, &p);
+namespace {
+
+// Returns true iff the display PLL and clock trees can be programmed to
+// generate a pixel clock of `pixel_clock_khz` kHz.
+bool IsPixelClockSupported(int pixel_clock_khz) {
+  // The minimum valid HDMI PLL VCO frequency doesn't match the frequency
+  // specified in the Amlogic datasheets (3 GHz). However, experiments on
+  // Khadas VIM3 (Amlogic A311D) shows that 2.9 GHz is a valid VCO frequency
+  // and has fewer display glitches than using 5.8 GHz.
+  constexpr int kMinimumValidHdmiPllVcoFrequencyKhz = 2'900'000;
+  constexpr int kMaximumValidHdmiPllVcoFrequencyKhz = 6'000'000;
+
+  // Fixed divisor values.
+  //
+  // HDMI clock tree divisor `vid_pll_div` == 5,
+  // Video tree divisor /N0 `vid_clk_div` == 2,
+  // Video tree ENCP clock selector `encp_div` == 1.
+  //
+  // TODO(fxbug.dev/133175): Factor this out for pixel clock checking and
+  // calculation logics.
+  constexpr int kFixedPllDivisionFactor = 5 * 2 * 1;
+
+  // TODO(fxbug.dev/133175): Factor out ranges for each output frequency
+  // divider so that they can be used for both clock checking and calculation.
+  // OD1 = OD2 = OD3 = 1.
+  constexpr int kMinimumPllDivisionFactor = 1 * 1 * 1;
+  // OD1 = OD2 = OD3 = 4.
+  constexpr int kMaximumPllDivisionFactor = 4 * 4 * 4;
+
+  // The adjustable dividers OD1 / OD2 / OD3 cannot be calculated if the output
+  // frequency using `kMinimumPllDivisionFactor` still exceeds the maximum
+  // allowed value.
+  constexpr int kMaximumAllowedPixelClockKhz =
+      kMaximumValidHdmiPllVcoFrequencyKhz / (kFixedPllDivisionFactor * kMinimumPllDivisionFactor);
+  if (pixel_clock_khz > kMaximumAllowedPixelClockKhz) {
+    return false;
+  }
+
+  // The adjustable dividers OD1 / OD2 / OD3 cannot be calculated if the output
+  // frequency using `kMaximumPllDivisionFactor` is still less than the minimum
+  // allowed value.
+
+  // ceil(kMinimumValidHdmiPllVcoFrequencyKhz / (kFixedPllDivisionFactor *
+  // kMaximumPllDivisionFactor))
+  constexpr int kMinimumAllowedPixelClockKhz =
+      (kMinimumValidHdmiPllVcoFrequencyKhz + kFixedPllDivisionFactor * kMaximumPllDivisionFactor -
+       1) /
+      (kFixedPllDivisionFactor * kMaximumPllDivisionFactor);
+  if (pixel_clock_khz < kMinimumAllowedPixelClockKhz) {
+    return false;
+  }
+
+  return true;
+}
+
+}  // namespace
+
+bool HdmiHost::IsDisplayModeSupported(const display_mode_t& mode) const {
+  // TODO(fxbug.dev/133248): Interlaced modes are not supported.
+  if (mode.flags & MODE_FLAG_INTERLACED) {
+    return false;
+  }
+
+  const int pixel_clock_khz = mode.pixel_clock_10khz * 10;
+  if (!IsPixelClockSupported(pixel_clock_khz)) {
+    return false;
+  }
+
+  return true;
 }
 
 zx_status_t HdmiHost::GetVic(display_mode_t* disp_timing) { return GetVic(disp_timing, &p_); }
 
 zx_status_t HdmiHost::GetVic(display_mode_t* disp_timing, hdmi_param* p) {
+  ZX_DEBUG_ASSERT(disp_timing != nullptr);
+
+  if (!IsDisplayModeSupported(*disp_timing)) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
   if (disp_timing->v_addressable == 2160) {
     zxlogf(INFO, "4K Monitor Detected.");
 
@@ -310,10 +381,6 @@ zx_status_t HdmiHost::GetVic(display_mode_t* disp_timing, hdmi_param* p) {
   // resolutions: 1280x720p60, 1280x720p50, 720x480p60, 720x480i60, 720x576p50, 720x576i50
   // For now, we will simply not support this feature.
   p->timings.venc_pixel_repeat = 0;
-  // Let's make sure we support what we've got so far
-  if (p->timings.interlace_mode) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
 
   if (p->timings.pfreq > 500000) {
     p->phy_mode = 1;
@@ -349,14 +416,18 @@ zx_status_t HdmiHost::GetVic(display_mode_t* disp_timing, hdmi_param* p) {
       p->pll_p_24b.od3 *= 2;
       p->pll_p_24b.hpll_clk_out *= 2;
     } else {
-      return ZX_ERR_OUT_OF_RANGE;
+      ZX_DEBUG_ASSERT_MSG(false,
+                          "Failed to set HDMI PLL to a valid VCO frequency range for pixel clock "
+                          "%d kHz. This should never happen since IsDisplayModeSupported() "
+                          "returned true.",
+                          p->timings.pfreq);
     }
   }
-  if (p->pll_p_24b.hpll_clk_out > 6000000) {
-    zxlogf(ERROR, "Something went wrong in clock calculation (pll_out = %d)",
-           p->pll_p_24b.hpll_clk_out);
-    return ZX_ERR_OUT_OF_RANGE;
-  }
+  ZX_DEBUG_ASSERT_MSG(p->pll_p_24b.hpll_clk_out <= 6000000,
+                      "Calculated HDMI PLL VCO frequency (%" PRIu32
+                      " kHz) exceeds the VCO frequency limit 6GHz. This should never happen since "
+                      "IsDisplayModeSupported() returned true.",
+                      p->pll_p_24b.hpll_clk_out);
 
   return ZX_OK;
 }

@@ -251,7 +251,7 @@ bool Vout::CheckMode(const display_mode_t* mode) {
       return false;
     case kHdmi:
       return memcmp(&hdmi_.cur_display_mode_, mode, sizeof(display_mode_t)) &&
-             (hdmi_.hdmi_host->GetVic(mode) != ZX_OK);
+             !hdmi_.hdmi_host->IsDisplayModeSupported(*mode);
     default:
       return false;
   }
