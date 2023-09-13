@@ -380,8 +380,14 @@ template("bazel_product_bundle") {
     directory_timestamp_outputs = [
       "${files.product_bundle_out_dir}/product_bundle.json",
       "${files.product_bundle_out_dir}/system_a/fuchsia.zbi",
-      "${files.product_bundle_out_dir}/system_a/fvm.blk",
     ]
+    if (fxfs_blob) {
+      directory_timestamp_outputs +=
+          [ "${files.product_bundle_out_dir}/system_a/fxfs.blk" ]
+    } else {
+      directory_timestamp_outputs +=
+          [ "${files.product_bundle_out_dir}/system_a/fvm.blk" ]
+    }
     if (use_vbmeta) {
       directory_timestamp_outputs +=
           [ "${files.product_bundle_out_dir}/system_a/fuchsia.vbmeta" ]
