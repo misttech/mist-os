@@ -177,9 +177,6 @@
                 "ExitTest.SigkillZombieGroup",
                 "ExitTest.SigkillZombieThread",
 
-                // fallocate_test
-                "AllocateTest.FallocateRlimit",
-
                 // fcntl_test
                 "FcntlTest.SetSig",
                 "FcntlTest.SetSigDefaultsToZero",

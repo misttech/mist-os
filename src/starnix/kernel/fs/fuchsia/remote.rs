@@ -598,6 +598,27 @@ impl FsNodeOps for RemoteNode {
         self.zxio.truncate(length).map_err(|status| from_status_like_fdio!(status))
     }
 
+    fn allocate(
+        &self,
+        node: &FsNode,
+        current_task: &CurrentTask,
+        mode: FallocMode,
+        offset: u64,
+        length: u64,
+    ) -> Result<(), Errno> {
+        match mode {
+            FallocMode::Allocate { keep_size: false } => {
+                let allocate_size = offset.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
+                let info = node.refresh_info(current_task)?;
+                if (info.size as u64) < allocate_size {
+                    self.truncate(node, current_task, allocate_size)?;
+                }
+                Ok(())
+            }
+            _ => error!(EINVAL),
+        }
+    }
+
     fn refresh_info<'a>(
         &self,
         _node: &FsNode,
@@ -1938,6 +1959,90 @@ mod test {
             assert!(statfs.f_fsid != 0);
             assert!(statfs.f_namelen > 0);
             assert!(statfs.f_frsize > 0);
+        })
+        .await;
+
+        fixture.close().await;
+    }
+
+    #[::fuchsia::test]
+    async fn test_allocate_workaround() {
+        let fixture = TestFixture::new().await;
+        let (server, client) = zx::Channel::create();
+        fixture
+            .root()
+            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
+            .expect("clone failed");
+
+        let (kernel, current_task) = create_kernel_and_task();
+        fasync::unblock(move || {
+            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+            let fs = RemoteFs::new_fs(
+                &kernel,
+                client,
+                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                rights,
+            )
+            .expect("new_fs failed");
+            let ns = Namespace::new(fs);
+            current_task.fs().set_umask(FileMode::from_bits(0));
+            let root = ns.root();
+
+            const REG_MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits());
+            root.create_node(&current_task, b"file", REG_MODE, DeviceType::NONE)
+                .expect("create_node failed");
+            let mut context = LookupContext::new(SymlinkMode::NoFollow);
+            let reg_node = root
+                .lookup_child(&current_task, &mut context, b"file")
+                .expect("lookup_child failed");
+
+            reg_node
+                .entry
+                .node
+                .fallocate(&current_task, FallocMode::Allocate { keep_size: false }, 0, 20)
+                .expect("truncate failed");
+        })
+        .await;
+
+        fixture.close().await;
+    }
+
+    #[::fuchsia::test]
+    async fn test_allocate_overflow() {
+        let fixture = TestFixture::new().await;
+        let (server, client) = zx::Channel::create();
+        fixture
+            .root()
+            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
+            .expect("clone failed");
+
+        let (kernel, current_task) = create_kernel_and_task();
+        fasync::unblock(move || {
+            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+            let fs = RemoteFs::new_fs(
+                &kernel,
+                client,
+                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                rights,
+            )
+            .expect("new_fs failed");
+            let ns = Namespace::new(fs);
+            current_task.fs().set_umask(FileMode::from_bits(0));
+            let root = ns.root();
+
+            const REG_MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits());
+            root.create_node(&current_task, b"file", REG_MODE, DeviceType::NONE)
+                .expect("create_node failed");
+            let mut context = LookupContext::new(SymlinkMode::NoFollow);
+            let reg_node = root
+                .lookup_child(&current_task, &mut context, b"file")
+                .expect("lookup_child failed");
+
+            reg_node
+                .entry
+                .node
+                .fallocate(&current_task, FallocMode::Allocate { keep_size: false }, 1, u64::MAX)
+                .expect_err("truncate unexpectedly passed");
         })
         .await;
 

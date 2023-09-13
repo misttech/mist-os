@@ -1233,6 +1233,14 @@ impl FsNode {
         offset: u64,
         length: u64,
     ) -> Result<(), Errno> {
+        let allocate_size = offset.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
+        if allocate_size > current_task.thread_group.get_rlimit(Resource::FSIZE) {
+            send_signal(current_task, SignalInfo::default(SIGXFSZ));
+            return error!(EFBIG);
+        }
+
+        self.clear_suid_and_sgid_bits(current_task)?;
+        let _guard = self.append_lock.read(current_task);
         self.ops().allocate(self, current_task, mode, offset, length)?;
         self.update_ctime_mtime();
         Ok(())
