@@ -4098,6 +4098,24 @@ static bool vmo_snapshot_modified_test() {
   ASSERT_NONNULL(slicesnapshot, "snapshot modified root-slice\n");
   slicesnapshot->set_user_id(46);
 
+  // Create a slice of the clone of the root-slice.
+  fbl::RefPtr<VmObject> snapshotslice;
+  status = slicesnapshot->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0,
+                                      kSliceSize, false, AttributionObject::GetKernelAttribution(),
+                                      &snapshotslice);
+  ASSERT_EQ(ZX_OK, status, "slice snapshot-modified-root-slice\n");
+  ASSERT_NONNULL(snapshotslice, "slice snapshot-modified-root-slice\n");
+  snapshotslice->set_user_id(47);
+
+  // Check that snapshot-modified will work again on the snapshot-modified clone of the slice.
+  fbl::RefPtr<VmObject> slicesnapshot2;
+  status = slicesnapshot->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0,
+                                      kSliceSize, false, AttributionObject::GetKernelAttribution(),
+                                      &slicesnapshot2);
+  ASSERT_EQ(ZX_OK, status, "snapshot-modified root-slice-snapshot\n");
+  ASSERT_NONNULL(slicesnapshot2, "snapshot-modified root-slice-snapshot\n");
+  slicesnapshot2->set_user_id(48);
+
   // Create a slice of a clone
   fbl::RefPtr<VmObject> cloneslice;
   ASSERT_OK(clone->CreateChildSlice(0, kSliceSize, false, &cloneslice));
@@ -4109,7 +4127,7 @@ static bool vmo_snapshot_modified_test() {
                                    kSliceSize, false, AttributionObject::GetKernelAttribution(),
                                    &cloneslicesnapshot);
   ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, status, "snapshot-modified clone-slice\n");
-  ASSERT_NULL(cloneslicesnapshot, "snapshot modified clone-slice\n");
+  ASSERT_NULL(cloneslicesnapshot, "snapshot-modified clone-slice\n");
 
   END_TEST;
 }
