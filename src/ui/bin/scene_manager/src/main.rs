@@ -39,8 +39,8 @@ use {
     fuchsia_inspect as inspect, fuchsia_zircon as zx,
     futures::lock::Mutex,
     futures::{StreamExt, TryStreamExt},
+    input_config_lib::Config,
     scene_management::{self, SceneManager, SceneManagerTrait, ViewingDistance},
-    scene_manager_structured_config::Config,
     std::fs::File,
     std::io::Read,
     std::sync::Arc,
@@ -170,35 +170,49 @@ async fn inner_main() -> Result<(), Error> {
         ownership_proxy.get_event().await.expect("Failed to get display ownership.");
     info!("Instantiating SceneManager");
 
-    let Config {
-        supported_input_devices,
-        display_rotation,
-        display_pixel_density,
-        viewing_distance,
-    } = Config::take_from_startup_handle();
-
-    let display_pixel_density = match display_pixel_density.trim().parse::<f32>() {
-        Ok(density) => {
-            if density < 0.0 {
-                None
-            } else {
-                Some(density)
-            }
+    // Read config files to discover display attributes.
+    let display_rotation = match std::fs::read_to_string("/config/data/display_rotation") {
+        Ok(contents) => {
+            let contents = contents.trim();
+            contents.parse::<i32>().context(format!(
+                "Failed to parse /config/data/display_rotation - \
+            expected an integer, got {contents}"
+            ))?
+        }
+        Err(e) => {
+            warn!(
+                "Wasn't able to read config/data/display_rotation, \
+                defaulting to a display rotation of 0 degrees: {}",
+                e
+            );
+            0
+        }
+    };
+    let display_pixel_density = match std::fs::read_to_string("/config/data/display_pixel_density")
+    {
+        Ok(contents) => {
+            let contents = contents.trim();
+            Some(contents.parse::<f32>().context(format!(
+                "Failed to parse /config/data/display_pixel_density - \
+                expected a decimal, got {contents}"
+            ))?)
         }
         Err(_) => {
-            warn!("Failed to parse display_pixel_density value from structured config - expected a decimal, but got: {display_pixel_density}. Falling back to default.");
+            warn!("/config/data/display_pixel_density not there.");
             None
         }
     };
-
-    let viewing_distance = match viewing_distance.to_lowercase().trim() {
-        "handheld" => Some(ViewingDistance::Handheld),
-        "close" => Some(ViewingDistance::Close),
-        "near" => Some(ViewingDistance::Near),
-        "midrange" => Some(ViewingDistance::Midrange),
-        "far" => Some(ViewingDistance::Far),
-        _ => {
-            warn!("No viewing_distance config value provided, falling back to default.");
+    let viewing_distance = match std::fs::read_to_string("/config/data/display_usage") {
+        Ok(s) => Some(match s.trim() {
+            "handheld" => ViewingDistance::Handheld,
+            "close" => ViewingDistance::Close,
+            "near" => ViewingDistance::Near,
+            "midrange" => ViewingDistance::Midrange,
+            "far" => ViewingDistance::Far,
+            unknown => anyhow::bail!("Invalid /config/data/display_usage value: {unknown}"),
+        }),
+        Err(_) => {
+            warn!("/config/data/display_usage not there.");
             None
         }
     };
@@ -231,6 +245,7 @@ async fn inner_main() -> Result<(), Error> {
     let inspect_node = inspector.root().create_child("input_pipeline");
 
     // Start input pipeline.
+    let Config { supported_input_devices, .. } = Config::take_from_startup_handle();
     let has_light_sensor_configuration = light_sensor_configuration.is_some();
     if let Ok(input_pipeline) = input_pipeline::handle_input(
         scene_manager.clone(),

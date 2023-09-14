@@ -93,7 +93,7 @@
         display_rotation: { type: "uint64" },
         display_pixel_density: {
             type: "string",
-            max_size: 8,
+            max_size: 6,
         },
         viewing_distance: {
             type: "string",
