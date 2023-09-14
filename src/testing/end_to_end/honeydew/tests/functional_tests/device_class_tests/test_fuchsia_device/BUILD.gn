@@ -15,14 +15,14 @@ if (is_host) {
       "test_fuchsia_device.py",
     ]
     library_deps =
-        [ "//src/testing/end_to_end/fuchsia_base_test:fuchsia_base_test" ]
+        [ "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test" ]
   }
 
   python_mobly_test("fuchsia_device_test") {
     main_source = "test_fuchsia_device.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
-      "//src/testing/end_to_end/fuchsia_base_test:fuchsia_base_test",
+      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
     params_source = "params.yaml"
     environments = [ emu_env ]
@@ -32,7 +32,7 @@ if (is_host) {
     main_source = "test_fuchsia_device.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
-      "//src/testing/end_to_end/fuchsia_base_test:fuchsia_base_test",
+      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
     params_source = "params.yaml"
     transport = "fuchsia-controller"

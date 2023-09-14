@@ -186,7 +186,7 @@ if (is_host) {
       main_source = "test/$test_name.py"
       libraries = [
         "//src/testing/end_to_end/honeydew",
-        "//src/testing/end_to_end/fuchsia_base_test:fuchsia_base_test",
+        "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
       ]
 
       environments = [
