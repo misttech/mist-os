@@ -1,0 +1,7 @@
+ffx_test_options:
+  - --max-severity-logs
+  - FATAL
+  - --realm
+  - /core/testing:starnix-tests
+ffx_test_url: fuchsia-pkg://fuchsia.com/generic_watch_pixel_test#meta/pixel_test.cm
+timeout_sec: 600

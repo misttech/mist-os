@@ -1,0 +1,27 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/python/python_mobly_test.gni")
+
+assert(is_host)
+
+# This test uses the base Hybrid Mobly test class without extending it further.
+# We can still parameterize the test to run arbitrary hermetic tests by
+# modifying the contents in |params_source|.
+python_mobly_test("simple_hybrid_test_fc") {
+  main_source =
+      "//src/testing/end_to_end/mobly_base_tests/fuchsia_hybrid_base_test.py"
+  libraries = [
+    "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_hybrid_test",
+    "//src/testing/end_to_end/honeydew",
+  ]
+
+  params_source = "pixel_test_params.yaml"
+  transport = "fuchsia-controller"
+}
+
+group("tests") {
+  testonly = true
+  public_deps = [ ":simple_hybrid_test_fc($host_toolchain)" ]
+}

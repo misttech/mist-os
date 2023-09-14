@@ -4,6 +4,8 @@
 
 import("//build/python/python_library.gni")
 
+assert(is_host)
+
 python_library("fuchsia_base_test") {
   testonly = true
   library_name = "fuchsia_base_test"
@@ -15,4 +17,17 @@ python_library("fuchsia_base_test") {
     "//src/testing/end_to_end/mobly_controller",
     "//third_party/mobly",
   ]
+}
+
+python_library("fuchsia_base_hybrid_test") {
+  testonly = true
+
+  # Add "_lib" suffix to avoid import collision in the PYZ file when
+  # `fuchsia_hybrid_base_test` is used as the source in both Python lib and test
+  library_name = "fuchsia_base_hybrid_test_lib"
+  sources = [
+    "__init__.py",
+    "fuchsia_hybrid_base_test.py",
+  ]
+  library_deps = [ ":fuchsia_base_test" ]
 }
