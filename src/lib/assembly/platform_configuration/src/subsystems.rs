@@ -45,6 +45,7 @@ mod starnix;
 mod storage;
 mod swd;
 mod thermal;
+mod timekeeper;
 mod ui;
 mod virtualization;
 
@@ -314,6 +315,9 @@ fn configure_subsystems(
         builder,
     )
     .context("Configuring the 'Forensics' subsystem")?;
+
+    timekeeper::TimekeeperSubsystem::define_configuration(context, &(), builder)
+        .context("Configuring the 'Timekeeper' subsystem")?;
 
     Ok(())
 }

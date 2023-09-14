@@ -515,7 +515,7 @@ assembly_input_bundle("core_realm_networking") {
     "//src/hwinfo",
 
     # System Time
-    "//src/sys/time/timekeeper",
+    "//src/sys/time/timekeeper:timekeeper-without-config",
     "//src/sys/time/httpsdate_time_source:httpsdate-time-source",
     "//src/sys/time/httpsdate_time_source:httpsdate-time-source-pull",
 

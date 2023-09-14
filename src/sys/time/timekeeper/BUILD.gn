@@ -6,6 +6,7 @@ import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
 timekeeper_deps = [
+  # The generated structured config data schema.
   ":timekeeper-config",
   "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
   "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
@@ -111,6 +112,12 @@ fuchsia_package("timekeeper") {
     ":service",
     ":timekeeper-config-values",
   ]
+}
+
+# This package requires structured config from elsewhere.
+fuchsia_package("timekeeper-without-config") {
+  package_name = "timekeeper"
+  deps = [ ":service" ]
 }
 
 resource("testdata") {
