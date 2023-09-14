@@ -113,8 +113,12 @@ function check-if-we-can-start-package-server {
   else
     if is_feature_enabled "foreground_repo_server"; then
       fx-error "It looks like some process is listening on ${port}."
-      fx-error "You probably need to stop that and start a new one here with \"fx serve\""
-
+      fx-error "It may be the background ffx repository server. Try shutting"
+      fx-error "it down by killing any active \"fx serve\" process, or by running:"
+      fx-error ""
+      fx-error "$ ffx repository server stop"
+      fx-error ""
+      fx-error "Then restarting \"fx serve\""
       return 1
     else
       local expected_addr=$(join-repository-ip-port "${expected_ip}" "${expected_port}")
