@@ -61,10 +61,7 @@ pub trait LinkDevice: Device + Debug {
 /// Utilities for testing link devices.
 #[cfg(test)]
 pub(crate) mod testutil {
-    use core::{
-        convert::TryInto,
-        fmt::{self, Display, Formatter},
-    };
+    use core::convert::TryInto;
 
     use zerocopy::{AsBytes, FromBytes, FromZeroes, Unaligned};
 
@@ -117,12 +114,6 @@ pub(crate) mod testutil {
     /// A fake ID identifying a [`FakeLinkDevice`].
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
     pub(crate) struct FakeLinkDeviceId;
-
-    impl Display for FakeLinkDeviceId {
-        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-            write!(f, "{:?}", self)
-        }
-    }
 
     impl StrongId for FakeLinkDeviceId {
         type Weak = FakeWeakDeviceId<Self>;

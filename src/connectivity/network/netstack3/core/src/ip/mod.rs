@@ -21,7 +21,7 @@ use alloc::{borrow::Cow, vec::Vec};
 use core::{
     borrow::Borrow,
     cmp::Ordering,
-    fmt::{self, Debug, Display, Formatter},
+    fmt::Debug,
     hash::Hash,
     num::{NonZeroU32, NonZeroU8},
     sync::atomic::{self, AtomicU16},
@@ -1775,7 +1775,7 @@ pub(crate) fn receive_ipv4_packet<
     }
 
     ctx.increment_debug_counter("receive_ipv4_packet");
-    trace!("receive_ip_packet({})", device);
+    trace!("receive_ip_packet({device:?})");
 
     let mut packet: Ipv4Packet<_> = match try_parse_ip_packet!(buffer) {
         Ok(packet) => packet,
@@ -1962,12 +1962,10 @@ pub(crate) fn receive_ipv4_packet<
             );
         }
         ReceivePacketAction::Drop { reason } => {
+            let src_ip = packet.src_ip();
             debug!(
-                "receive_ipv4_packet: dropping packet from {} to {} received on {}: {}",
-                packet.src_ip(),
-                dst_ip,
-                device,
-                reason
+                "receive_ipv4_packet: dropping packet from {src_ip} to {dst_ip} received on \
+                {device:?}: {reason:?}",
             );
         }
     }
@@ -1993,7 +1991,7 @@ pub(crate) fn receive_ipv6_packet<
     }
 
     ctx.increment_debug_counter("receive_ipv6_packet");
-    trace!("receive_ipv6_packet({})", device);
+    trace!("receive_ipv6_packet({:?})", device);
 
     let mut packet: Ipv6Packet<_> = match try_parse_ip_packet!(buffer) {
         Ok(packet) => packet,
@@ -2252,12 +2250,10 @@ pub(crate) fn receive_ipv6_packet<
         }
         ReceivePacketAction::Drop { reason } => {
             ctx.increment_debug_counter("receive_ipv6_packet::drop");
+            let src_ip = packet.src_ip();
             debug!(
-                "receive_ipv6_packet: dropping packet from {} to {} received on {}: {}",
-                packet.src_ip(),
-                dst_ip,
-                device,
-                reason
+                "receive_ipv6_packet: dropping packet from {src_ip} to {dst_ip} received on \
+                {device:?}: {reason:?}",
             );
         }
     }
@@ -2278,31 +2274,18 @@ enum ReceivePacketAction<A: IpAddress, DeviceId> {
     SendNoRouteToDest,
     /// Silently drop the packet.
     ///
-    /// `reason` describes why the packet was dropped. Its `Display` impl
-    /// provides a human-readable description which is intended for use in
-    /// logging.
+    /// `reason` describes why the packet was dropped.
     Drop { reason: DropReason },
 }
 
-#[cfg_attr(test, derive(Debug, PartialEq))]
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug)]
 enum DropReason {
+    /// Remote packet destined to tentative address.
     Tentative,
+    /// Packet should be forwarded but packet's inbound interface has forwarding
+    /// disabled.
     ForwardingDisabledInboundIface,
-}
-
-impl Display for DropReason {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                DropReason::Tentative => "remote packet destined to tentative address",
-                DropReason::ForwardingDisabledInboundIface => {
-                    "packet should be forwarded but packet's inbound interface has forwarding disabled"
-                }
-            }
-        )
-    }
 }
 
 /// Computes the action to take in order to process a received IPv4 packet.

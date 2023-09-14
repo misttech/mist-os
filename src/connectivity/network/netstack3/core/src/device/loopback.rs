@@ -5,7 +5,7 @@
 //! The loopback device.
 
 use alloc::vec::Vec;
-use core::fmt::{self, Debug, Display, Formatter};
+use core::fmt::{self, Debug, Formatter};
 
 use derivative::Derivative;
 use lock_order::{
@@ -82,13 +82,7 @@ impl<C: DeviceLayerTypes> Eq for LoopbackWeakDeviceId<C> {}
 
 impl<C: DeviceLayerTypes> Debug for LoopbackWeakDeviceId<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Display::fmt(self, f)
-    }
-}
-
-impl<C: DeviceLayerTypes> Display for LoopbackWeakDeviceId<C> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "Weak Loopback")
+        write!(f, "WeakLoopback")
     }
 }
 
@@ -160,12 +154,6 @@ impl<C: DeviceLayerTypes> Ord for LoopbackDeviceId<C> {
 }
 
 impl<C: DeviceLayerTypes> Debug for LoopbackDeviceId<C> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Display::fmt(self, f)
-    }
-}
-
-impl<C: DeviceLayerTypes> Display for LoopbackDeviceId<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "Loopback")
     }

@@ -194,8 +194,7 @@ pub(crate) fn spawn_tx_task(
                     |DeviceSendFrameError::DeviceNotReady(())| {
                         warn!(
                             "TODO(https://fxbug.dev/105921): Support waiting for TX buffers to be \
-                            available, dropping packet for now on device={}",
-                            device_id,
+                            available, dropping packet for now on device={device_id:?}",
                         );
                         netstack3_core::WorkQueueReport::AllDone
                     },

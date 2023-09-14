@@ -444,8 +444,8 @@ fn handle_packet<
         }
         (true, true) => {
             warn!(
-                "got gratuitous ARP packet with our address {} on device {}, dropping...",
-                target_addr, device_id
+                "got gratuitous ARP packet with our address {target_addr} on device {device_id:?}, \
+                dropping...",
             );
             return;
         }

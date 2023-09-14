@@ -588,7 +588,7 @@ impl<D: LinkDevice> Unreachable<D> {
             UnreachableMode::WaitingForPacketSend => {
                 panic!(
                     "timer should not have fired in UNREACHABLE while waiting for packet send; got \
-                    a retransmit multicast probe event for {neighbor} on {device_id}",
+                    a retransmit multicast probe event for {neighbor} on {device_id:?}",
                 );
             }
             UnreachableMode::Backoff { probes_sent, packet_sent } => {

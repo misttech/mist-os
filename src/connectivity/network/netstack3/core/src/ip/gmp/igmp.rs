@@ -268,8 +268,8 @@ impl<C: IgmpNonSyncContext<SC::DeviceId>, SC: IgmpContext<C>> GmpContext<Ipv4, C
         match result {
             Ok(()) => {}
             Err(err) => error!(
-                "error sending IGMP message ({:?}) on device {} for group {}: {}",
-                msg_type, device, group_addr, err
+                "error sending IGMP message ({msg_type:?}) on device {device:?} for group \
+                {group_addr}: {err}",
             ),
         }
     }

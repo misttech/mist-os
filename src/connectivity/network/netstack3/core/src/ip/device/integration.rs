@@ -213,8 +213,8 @@ impl<'a, C: NonSyncContext> SlaacAddresses<C> for SlaacAddrs<'a, C> {
                 Ipv6AddrConfig::Slaac(s) => (addr_sub, s),
                 Ipv6AddrConfig::Manual(_manual_config) => {
                     unreachable!(
-                        "address {} on device {} should have been a SLAAC address; config = {:?}",
-                        addr_sub, *device_id, config
+                        "address {addr_sub} on device {device_id:?} should have been a SLAAC \
+                        address; config = {config:?}",
                     );
                 }
             }

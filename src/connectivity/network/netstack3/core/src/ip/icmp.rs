@@ -1719,8 +1719,8 @@ fn receive_ndp_packet<
                     // TODO(https://fxbug.dev/36238): Signal to bindings
                     // that a duplicate address is detected.
                     error!(
-                        "NA from {} with target address {} that is also assigned on device {}",
-                        src_ip, target_address, device_id
+                        "NA from {src_ip} with target address {target_address} that is also \
+                        assigned on device {device_id:?}",
                     );
                 }
                 IpAddressState::Tentative => {

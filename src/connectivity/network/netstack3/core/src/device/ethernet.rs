@@ -358,7 +358,7 @@ fn send_ethernet_frame<
     ) {
         Ok(()) => Ok(()),
         Err(TransmitQueueFrameError::NoQueue(e)) => {
-            tracing::error!("device {} not ready to send frame: {:?}", device_id, e);
+            tracing::error!("device {device_id:?} not ready to send frame: {e:?}");
             Ok(())
         }
         Err(TransmitQueueFrameError::QueueFull(s) | TransmitQueueFrameError::SerializeError(s)) => {

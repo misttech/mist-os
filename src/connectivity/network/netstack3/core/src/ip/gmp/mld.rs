@@ -262,14 +262,14 @@ impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldContext<C>> GmpContext<Ipv6, C> 
         match result {
             Ok(()) => {}
             Err(err) => error!(
-                "error sending MLD message ({:?}) on device {} for group {}: {}",
-                msg_type, device, group_addr, err
+                "error sending MLD message ({msg_type:?}) on device {device:?} for group \
+                {group_addr}: {err}",
             ),
         }
     }
 
     fn run_actions(&mut self, _ctx: &mut C, device: &SC::DeviceId, actions: Never) {
-        unreachable!("actions ({:?} should not be constructable; device = {}", actions, device)
+        unreachable!("actions ({actions:?} should not be constructable; device = {device:?}")
     }
 
     fn not_a_member_err(addr: Ipv6Addr) -> Self::Err {

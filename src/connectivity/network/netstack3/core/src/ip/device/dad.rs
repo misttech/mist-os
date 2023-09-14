@@ -255,7 +255,7 @@ fn do_duplicate_address_detection<C: DadNonSyncContext<SC::DeviceId>, SC: DadCon
                             }
                         ),
                         None,
-                        "Unexpected DAD timer; addr={}, device_id={}",
+                        "Unexpected DAD timer; addr={}, device_id={:?}",
                         addr.addr(),
                         device_id
                     );

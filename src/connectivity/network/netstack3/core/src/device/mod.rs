@@ -16,7 +16,7 @@ mod state;
 use alloc::{boxed::Box, collections::HashMap, vec::Vec};
 use core::{
     convert::Infallible as Never,
-    fmt::{self, Debug, Display, Formatter},
+    fmt::{self, Debug, Formatter},
     hash::Hash,
     marker::PhantomData,
     num::NonZeroU8,
@@ -96,7 +96,7 @@ pub(crate) enum AnyDevice {}
 impl Device for AnyDevice {}
 
 // An identifier for a device.
-pub(crate) trait Id: Clone + Display + Debug + Eq + Hash + PartialEq + Send + Sync {
+pub(crate) trait Id: Clone + Debug + Eq + Hash + PartialEq + Send + Sync {
     /// Returns true if the device is a loopback device.
     fn is_loopback(&self) -> bool;
 }
@@ -1280,14 +1280,8 @@ impl<C: DeviceLayerTypes> Eq for EthernetWeakDeviceId<C> {}
 
 impl<C: DeviceLayerTypes> Debug for EthernetWeakDeviceId<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Display::fmt(self, f)
-    }
-}
-
-impl<C: DeviceLayerTypes> Display for EthernetWeakDeviceId<C> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let Self(id, _ptr) = self;
-        write!(f, "Weak Ethernet({id})")
+        write!(f, "WeakEthernet({id})")
     }
 }
 
@@ -1346,12 +1340,6 @@ impl<C: DeviceLayerTypes> Ord for EthernetDeviceId<C> {
 }
 
 impl<C: DeviceLayerTypes> Debug for EthernetDeviceId<C> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Display::fmt(self, f)
-    }
-}
-
-impl<C: DeviceLayerTypes> Display for EthernetDeviceId<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let Self(rc) = self;
         let id = rc.link.debug_id();
@@ -1605,18 +1593,12 @@ impl<C: DeviceLayerTypes> WeakId for WeakDeviceId<C> {
     type Strong = DeviceId<C>;
 }
 
-impl<C: DeviceLayerTypes> Display for WeakDeviceId<C> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
-        match self {
-            WeakDeviceId::Ethernet(id) => Display::fmt(id, f),
-            WeakDeviceId::Loopback(id) => Display::fmt(id, f),
-        }
-    }
-}
-
 impl<C: DeviceLayerTypes> Debug for WeakDeviceId<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
-        Display::fmt(self, f)
+        match self {
+            WeakDeviceId::Ethernet(id) => Debug::fmt(id, f),
+            WeakDeviceId::Loopback(id) => Debug::fmt(id, f),
+        }
     }
 }
 
@@ -1697,18 +1679,12 @@ impl<C: DeviceLayerTypes> StrongId for DeviceId<C> {
     type Weak = WeakDeviceId<C>;
 }
 
-impl<C: DeviceLayerTypes> Display for DeviceId<C> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
-        match self {
-            DeviceId::Ethernet(id) => Display::fmt(id, f),
-            DeviceId::Loopback(id) => Display::fmt(id, f),
-        }
-    }
-}
-
 impl<C: DeviceLayerTypes> Debug for DeviceId<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
-        Display::fmt(self, f)
+        match self {
+            DeviceId::Ethernet(id) => Debug::fmt(id, f),
+            DeviceId::Loopback(id) => Debug::fmt(id, f),
+        }
     }
 }
 
@@ -2084,7 +2060,7 @@ impl<C: NonSyncContext> RemovableDeviceId<C> for EthernetDeviceId<C> {
         sync_ctx: &SyncCtx<C>,
     ) -> (PrimaryRc<Self::ReferenceState>, StrongRc<Self::ReferenceState>) {
         let mut devices = sync_ctx.state.device.devices.write();
-        debug!("removing Ethernet device with ID {}", self);
+        debug!("removing Ethernet device with ID {self:?}");
         let EthernetDeviceId(rc) = self;
         let removed = devices
             .ethernet
@@ -2566,12 +2542,6 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<D: Debug> core::fmt::Display for FakeWeakDeviceId<D> {
-        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            core::fmt::Debug::fmt(self, f)
-        }
-    }
-
     impl<D: StrongId<Weak = Self>> WeakId for FakeWeakDeviceId<D> {
         type Strong = D;
     }
@@ -2594,12 +2564,6 @@ pub(crate) mod testutil {
     impl Id for FakeDeviceId {
         fn is_loopback(&self) -> bool {
             false
-        }
-    }
-
-    impl Display for FakeDeviceId {
-        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            write!(f, "FakeDeviceId")
         }
     }
 
@@ -2710,13 +2674,6 @@ pub(crate) mod testutil {
     impl MultipleDevicesId {
         pub(crate) fn all() -> [Self; 3] {
             [Self::A, Self::B, Self::C]
-        }
-    }
-
-    #[cfg(test)]
-    impl core::fmt::Display for MultipleDevicesId {
-        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            core::fmt::Debug::fmt(self, f)
         }
     }
 

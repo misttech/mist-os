@@ -4273,7 +4273,7 @@ mod test {
             assert_eq!(
                 sync_ctx.get_device_state(&device).multicast_groups.read().contains(&addr),
                 expected,
-                "device={}, addr={}",
+                "device={:?}, addr={}",
                 device,
                 addr,
             );
@@ -4298,7 +4298,7 @@ mod test {
             assert_eq!(
                 sync_ctx.get_device_state(&device).multicast_groups.read().contains(&addr),
                 expected,
-                "device={}, addr={}",
+                "device={:?}, addr={}",
                 device,
                 addr,
             );

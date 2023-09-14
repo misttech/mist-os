@@ -1133,8 +1133,7 @@ pub(crate) mod testutil {
                 }
                 assert!(
                     device_state.insert(device.clone(), state).is_none(),
-                    "duplicate entries for {}",
-                    device
+                    "duplicate entries for {device:?}",
                 );
             }
 
@@ -1151,7 +1150,7 @@ pub(crate) mod testutil {
 
         pub(crate) fn get_device_state(&self, device: &D) -> &IpDeviceState<FakeInstant, I> {
             let Self { device_state, table: _, ip_forwarding_ctx: _ } = self;
-            device_state.get(device).unwrap_or_else(|| panic!("no device {}", device))
+            device_state.get(device).unwrap_or_else(|| panic!("no device {device:?}"))
         }
     }
 
@@ -1208,7 +1207,7 @@ pub(crate) mod testutil {
         ) {
             let Self { device_state, table: _, ip_forwarding_ctx: _ } = self;
             let state =
-                device_state.get_mut(device).unwrap_or_else(|| panic!("no device {}", device));
+                device_state.get_mut(device).unwrap_or_else(|| panic!("no device {device:?}"));
             state.multicast_groups.write().join_multicast_group(ctx, addr)
         }
 
@@ -1220,7 +1219,7 @@ pub(crate) mod testutil {
         ) {
             let Self { device_state, table: _, ip_forwarding_ctx: _ } = self;
             let state =
-                device_state.get_mut(device).unwrap_or_else(|| panic!("no device {}", device));
+                device_state.get_mut(device).unwrap_or_else(|| panic!("no device {device:?}"));
             state.multicast_groups.write().leave_multicast_group(addr)
         }
     }
@@ -1293,7 +1292,7 @@ pub(crate) mod testutil {
 
         pub(crate) fn get_device_state(&self, device: &D) -> &DualStackIpDeviceState<FakeInstant> {
             let Self { device_state, table: _, ip_forwarding_ctx: _ } = self;
-            device_state.get(device).unwrap_or_else(|| panic!("no device {}", device))
+            device_state.get(device).unwrap_or_else(|| panic!("no device {device:?}"))
         }
 
         pub(crate) fn find_devices_with_addr<I: IpDeviceStateIpExt>(
@@ -1343,8 +1342,7 @@ pub(crate) mod testutil {
                 }
                 assert!(
                     device_state.insert(device.clone(), state).is_none(),
-                    "duplicate entries for {}",
-                    device
+                    "duplicate entries for {device:?}",
                 );
             }
             Self { table, device_state, ip_forwarding_ctx: FakeIpForwardingCtx::default() }
@@ -1444,7 +1442,7 @@ pub(crate) mod testutil {
         ) {
             let Self { device_state, table: _, ip_forwarding_ctx: _ } = self;
             let state =
-                device_state.get_mut(device).unwrap_or_else(|| panic!("no device {}", device));
+                device_state.get_mut(device).unwrap_or_else(|| panic!("no device {device:?}"));
             let state: &IpDeviceState<_, I> = state.as_ref();
             let mut groups = state.multicast_groups.write();
             groups.join_multicast_group(ctx, addr)
@@ -1458,7 +1456,7 @@ pub(crate) mod testutil {
         ) {
             let Self { device_state, table: _, ip_forwarding_ctx: _ } = self;
             let state =
-                device_state.get_mut(device).unwrap_or_else(|| panic!("no device {}", device));
+                device_state.get_mut(device).unwrap_or_else(|| panic!("no device {device:?}"));
             let state: &IpDeviceState<_, I> = state.as_ref();
             let mut groups = state.multicast_groups.write();
             groups.leave_multicast_group(addr)
