@@ -104,6 +104,7 @@ impl TilesSession for FlatlandTilesSession {
                 view_controller_request_stream,
                 responder,
             } => {
+                info!("Handling GraphicalPresenterPresentView request.");
                 // We have either a view holder token OR a viewport_creation_token, but for
                 // Flatland we can expect a viewport creation token.
                 let viewport_creation_token = match view_spec.viewport_creation_token {
@@ -144,6 +145,7 @@ impl TilesSession for FlatlandTilesSession {
                     .context("GraphicalPresenterPresentView add_child")?;
 
                 // Flush the changes.
+                info!("Presenting to Flatland.");
                 self.flatland
                     .present(ui_comp::PresentArgs {
                         requested_presentation_time: Some(0),
@@ -182,6 +184,7 @@ impl TilesSession for FlatlandTilesSession {
                     error!("Failed to send response for GraphicalPresenter.PresentView(): {}", e);
                 }
 
+                info!("PresentView handled.");
                 Ok(())
             }
             MessageInternal::DismissClient { tile_id, control_handle } => {
@@ -408,6 +411,7 @@ fn run_graphical_presenter_service(
             let result = request_stream.try_next().await;
             match result {
                 Ok(Some(request)) => {
+                    info!("Received a GraphicalPresenterRequest.");
                     internal_sender = handle_graphical_presenter_request(request, internal_sender)
                 }
                 Ok(None) => {
@@ -506,6 +510,8 @@ pub fn run_tile_controller_request_stream(
 
 #[fuchsia::main(logging = true)]
 async fn main() -> Result<(), Error> {
+    info!("Starting.");
+
     let (internal_sender, mut internal_receiver) =
         futures::channel::mpsc::unbounded::<MessageInternal>();
 
@@ -523,6 +529,7 @@ async fn main() -> Result<(), Error> {
     let config = tiles_config::Config::take_from_startup_handle();
     if !config.main_element_url.is_empty() {
         fasync::Task::local(async move {
+            info!("Attempting to ProposeElement to element_manager.");
             let element_manager = connect_to_protocol::<element::ManagerMarker>()
                 .expect("failed to connect to fuchsia.element.Manager");
             element_manager
