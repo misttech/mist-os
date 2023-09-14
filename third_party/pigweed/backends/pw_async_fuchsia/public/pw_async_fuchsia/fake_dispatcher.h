@@ -22,7 +22,8 @@ class NativeFakeDispatcher {
 
   // Synchronously destroys the loop, runs pending tasks with a cancelled status, and frees the loop
   // memory.
-  void DestroyLoop();
+  // Returns true if any task was invoked.
+  bool DestroyLoop();
 
   chrono::SystemClock::time_point now();
 
@@ -32,9 +33,9 @@ class NativeFakeDispatcher {
 
   bool Cancel(Task& task);
 
-  void RunUntilIdle();
-  void RunUntil(chrono::SystemClock::time_point end_time);
-  void RunFor(chrono::SystemClock::duration duration);
+  bool RunUntilIdle();
+  bool RunUntil(chrono::SystemClock::time_point end_time);
+  bool RunFor(chrono::SystemClock::duration duration);
 
  private:
   // FakeAsyncLoop is an adapted version of the Zircon async-loop (implemented in
@@ -48,12 +49,15 @@ class NativeFakeDispatcher {
     explicit FakeAsyncLoop();
     ~FakeAsyncLoop() { Shutdown(); }
 
-    void Shutdown();
+    // Returns true iff any task was invoked.
+    bool Shutdown();
     chrono::SystemClock::time_point Now() const;
     zx_status_t PostTask(async_task_t* task);
     zx_status_t CancelTask(async_task_t* task);
-    zx_status_t RunUntilIdle();
-    zx_status_t Run(zx_time_t deadline, bool once);
+    // Returns true iff any task was invoked.
+    bool RunUntilIdle();
+    // Returns true iff any task was invoked.
+    bool Run(zx_time_t deadline, bool once);
     bool Runnable() const { return state_ == ASYNC_LOOP_RUNNABLE; }
 
    private:
@@ -68,9 +72,12 @@ class NativeFakeDispatcher {
     void InsertTask(async_task_t* task);
     void RestartTimer();
     zx_time_t NextDeadline();
-    zx_status_t RunOnce(zx_time_t deadline);
-    zx_status_t DispatchTasks();
-    void CancelAll();
+    // Sets task_invoked to true iff a task was invoked.
+    zx_status_t RunOnce(zx_time_t deadline, bool* task_invoked);
+    // Returns true iff a task was invoked.
+    bool DispatchTasks();
+    // Returns true iff a task was invoked.
+    bool CancelAll();
 
     // Tracks the current time as viewed by the fake loop.
     zx_time_t now_ = 0;

@@ -11,7 +11,7 @@ namespace pw::async::test::backend {
 NativeFakeDispatcher::NativeFakeDispatcher(Dispatcher& test_dispatcher)
     : dispatcher_(test_dispatcher) {}
 
-void NativeFakeDispatcher::DestroyLoop() { fake_loop_.Shutdown(); }
+bool NativeFakeDispatcher::DestroyLoop() { return fake_loop_.Shutdown(); }
 
 chrono::SystemClock::time_point NativeFakeDispatcher::now() { return fake_loop_.Now(); }
 
@@ -38,24 +38,22 @@ bool NativeFakeDispatcher::Cancel(Task& task) {
   return fake_loop_.Runnable() && fake_loop_.CancelTask(&task.native_type()) == ZX_OK;
 }
 
-void NativeFakeDispatcher::RunUntilIdle() {
+bool NativeFakeDispatcher::RunUntilIdle() {
   if (stop_requested_) {
-    DestroyLoop();
-    return;
+    return DestroyLoop();
   }
-  fake_loop_.RunUntilIdle();
+  return fake_loop_.RunUntilIdle();
 }
 
-void NativeFakeDispatcher::RunUntil(chrono::SystemClock::time_point end_time) {
+bool NativeFakeDispatcher::RunUntil(chrono::SystemClock::time_point end_time) {
   if (stop_requested_) {
-    DestroyLoop();
-    return;
+    return DestroyLoop();
   }
-  fake_loop_.Run(pw_async_fuchsia::TimepointToZxTime(end_time).get(), false);
+  return fake_loop_.Run(pw_async_fuchsia::TimepointToZxTime(end_time).get(), false);
 }
 
-void NativeFakeDispatcher::RunFor(chrono::SystemClock::duration duration) {
-  RunUntil(now() + duration);
+bool NativeFakeDispatcher::RunFor(chrono::SystemClock::duration duration) {
+  return RunUntil(now() + duration);
 }
 
 NativeFakeDispatcher::FakeAsyncLoop::FakeAsyncLoop() {
@@ -107,20 +105,15 @@ zx_status_t NativeFakeDispatcher::FakeAsyncLoop::CancelTask(async_task_t* task) 
   return ZX_OK;
 }
 
-zx_status_t NativeFakeDispatcher::FakeAsyncLoop::RunUntilIdle() {
-  zx_status_t status = Run(now_, false);
-  if (status == ZX_ERR_TIMED_OUT) {
-    status = ZX_OK;
-  }
-  return status;
-}
+bool NativeFakeDispatcher::FakeAsyncLoop::RunUntilIdle() { return Run(now_, false); }
 
-zx_status_t NativeFakeDispatcher::FakeAsyncLoop::Run(zx_time_t deadline, bool once) {
+bool NativeFakeDispatcher::FakeAsyncLoop::Run(zx_time_t deadline, bool once) {
   zx_status_t status;
+  bool task_invoked = false;
   do {
-    status = RunOnce(deadline);
+    status = RunOnce(deadline, &task_invoked);
   } while (status == ZX_OK && !once);
-  return status;
+  return task_invoked;
 }
 
 void NativeFakeDispatcher::FakeAsyncLoop::InsertTask(async_task_t* task) {
@@ -165,7 +158,7 @@ zx_time_t NativeFakeDispatcher::FakeAsyncLoop::NextDeadline() {
   return 0ULL;
 }
 
-zx_status_t NativeFakeDispatcher::FakeAsyncLoop::RunOnce(zx_time_t deadline) {
+zx_status_t NativeFakeDispatcher::FakeAsyncLoop::RunOnce(zx_time_t deadline, bool* task_invoked) {
   if (state_ == ASYNC_LOOP_SHUTDOWN) {
     return ZX_ERR_BAD_STATE;
   }
@@ -181,10 +174,12 @@ zx_status_t NativeFakeDispatcher::FakeAsyncLoop::RunOnce(zx_time_t deadline) {
   // Otherwise, a timer would have expired at or before `deadline`.
   now_ = next_timer_expiration_;
   next_timer_expiration_ = ZX_TIME_INFINITE;
-  return DispatchTasks();
+  *task_invoked |= DispatchTasks();
+  return ZX_OK;
 }
 
-zx_status_t NativeFakeDispatcher::FakeAsyncLoop::DispatchTasks() {
+bool NativeFakeDispatcher::FakeAsyncLoop::DispatchTasks() {
+  bool task_invoked = false;
   // Dequeue and dispatch one task at a time in case an earlier task wants
   // to cancel a later task which has also come due. Timer restarts are suppressed until we run out
   // of tasks to dispatch.
@@ -221,6 +216,7 @@ zx_status_t NativeFakeDispatcher::FakeAsyncLoop::DispatchTasks() {
       async_task_t* task = NodeToTask(node);
 
       task->handler(nullptr, task, ZX_OK);
+      task_invoked = true;
 
       if (state_ != ASYNC_LOOP_RUNNABLE) {
         break;
@@ -232,32 +228,36 @@ zx_status_t NativeFakeDispatcher::FakeAsyncLoop::DispatchTasks() {
     RestartTimer();
   }
 
-  return ZX_OK;
+  return task_invoked;
 }
 
-void NativeFakeDispatcher::FakeAsyncLoop::Shutdown() {
+bool NativeFakeDispatcher::FakeAsyncLoop::Shutdown() {
   if (state_ == ASYNC_LOOP_SHUTDOWN) {
-    return;
+    return false;
   }
   state_ = ASYNC_LOOP_SHUTDOWN;
 
   // Cancel any remaining pending tasks on our queues.
-  CancelAll();
+  return CancelAll();
 }
 
-void NativeFakeDispatcher::FakeAsyncLoop::CancelAll() {
+bool NativeFakeDispatcher::FakeAsyncLoop::CancelAll() {
   ZX_DEBUG_ASSERT(state_ == ASYNC_LOOP_SHUTDOWN);
+  bool task_invoked = false;
 
   list_node_t* node;
 
   while ((node = list_remove_head(&due_list_))) {
     async_task_t* task = NodeToTask(node);
     task->handler(nullptr, task, ZX_ERR_CANCELED);
+    task_invoked = true;
   }
   while ((node = list_remove_head(&task_list_))) {
     async_task_t* task = NodeToTask(node);
     task->handler(nullptr, task, ZX_ERR_CANCELED);
+    task_invoked = true;
   }
+  return task_invoked;
 }
 
 }  // namespace pw::async::test::backend
