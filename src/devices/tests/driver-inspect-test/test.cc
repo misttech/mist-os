@@ -42,8 +42,10 @@ class InspectTestCase : public InspectTestHelper, public zxtest::Test {
 
     ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr_));
 
-    zx::result channel = device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(),
-                                                              "sys/platform/11:13:0/inspect-test");
+    static char path_buf[128];
+    snprintf(path_buf, sizeof(path_buf), "sys/platform/%x:%x:0/inspect-test", PDEV_VID_TEST,
+             PDEV_PID_INSPECT_TEST);
+    zx::result channel = device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(), path_buf);
     ASSERT_OK(channel.status_value());
     client_ = fidl::ClientEnd<TestInspect>{std::move(channel.value())};
   }
