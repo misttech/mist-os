@@ -119,10 +119,10 @@ class Capture {
   // Initialize a Capture instance. Be sure to call GetCapture prior to passing
   // the Capture instance to other systems (such as a Digest).
   //
-  // Tip: This may require services (in your .cmx file) for
+  // Tip: This may require capabilities (in your .cml file) for
   //   fuchsia.kernel.RootJobForInspect and fuchsia.kernel.Stats, e.g.:
-  //   "sandbox": {
-  //       "services": [
+  //   "use": {
+  //       "protocol": [
   //           "fuchsia.kernel.RootJobForInspect",
   //           "fuchsia.kernel.Stats",
   //           ...
