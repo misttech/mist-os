@@ -3,13 +3,6 @@
 # found in the LICENSE file.
 
 if (is_host) {
-  # Group of test cases that will be run in FYI on emulator.
-  group("emulator_tests_fyi") {
-    testonly = true
-    public_deps = [ "test_ffx:ffx_test($host_toolchain)" ]
-  }
-
-  # Group containing all of the HoneyDew transports functional test cases.
   group("tests") {
     testonly = true
     public_deps = [
@@ -17,6 +10,10 @@ if (is_host) {
       "test_ffx:tests",
     ]
   }
+
+  #
+  # Emulator tests
+  #
 
   # Stable infra test groups.
   group("stable_sl4f_emulator_tests") {

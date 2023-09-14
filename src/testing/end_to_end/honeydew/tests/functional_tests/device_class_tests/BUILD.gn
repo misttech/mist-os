@@ -3,23 +3,9 @@
 # found in the LICENSE file.
 
 if (is_host) {
-  # Group of test cases that will be run in CQ on emulator.
-  # Before adding a test case to this group, it first should be added to
-  # `emulator_tests_fyi` group and wait for 200 consecutive successful runs to
-  # make sure test case is stable and does not break CQ.
-  group("emulator_tests") {
-    testonly = true
-    public_deps = [
-      "test_generic_fuchsia_device:generic_fuchsia_device_test($host_toolchain)",
-      "test_generic_fuchsia_device:generic_fuchsia_device_test_fc($host_toolchain)",
-    ]
-  }
-
-  # Group of test cases that will be run in FYI on emulator.
-  group("emulator_tests_fyi") {
-    testonly = true
-    public_deps = [ ":emulator_tests" ]
-  }
+  #
+  # Emulator tests
+  #
 
   # Stable infra test groups.
   group("stable_sl4f_emulator_tests") {
@@ -45,14 +31,9 @@ if (is_host) {
         [ "test_generic_fuchsia_device:unstable_non_sl4f_emulator_tests" ]
   }
 
-  # Group of test cases that will be run in FYI on NUC.
-  group("nuc_tests_fyi") {
-    testonly = true
-    public_deps = [
-      "test_x64:x64_test($host_toolchain)",
-      "test_x64:x64_test_fc($host_toolchain)",
-    ]
-  }
+  #
+  # NUC tests
+  #
 
   # Stable infra test groups.
   group("stable_sl4f_nuc_tests") {
@@ -76,14 +57,9 @@ if (is_host) {
     public_deps = [ "test_x64:unstable_non_sl4f_nuc_tests" ]
   }
 
-  # Group of test cases that will be run in FYI on VIM3.
-  group("vim3_tests_fyi") {
-    testonly = true
-    public_deps = [
-      "test_vim3:vim3_test($host_toolchain)",
-      "test_vim3:vim3_test_fc($host_toolchain)",
-    ]
-  }
+  #
+  # Vim3 tests
+  #
 
   # Stable infra test groups.
   group("stable_sl4f_vim3_tests") {
