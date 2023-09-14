@@ -16,11 +16,12 @@
 ##     -s, --stamp <stamp>    Stamp this file on success
 ##
 ## SUBCOMMANDS:
-##     check-includes         check if given includes are present in a given component manifest
-##     compile                compile a CML file
-##     format                 format a json file
-##     help                   Prints this message or the help of the given subcommand(s)
-##     include                add contents from includes if any
-##     merge                  merge the listed cmx files
-##     validate               validate that one or more cmx files are valid
-##     validate-references    validate component manifest {.cmx|.cml} against package manifest.
+##    check-includes         check if given includes are present in a given component manifest
+##    compile                compile a CML file
+##    format                 format a json file
+##    help                   Prints this message or the help of the given subcommand(s)
+##    include                recursively process contents from includes, and optionally validate the result
+##    merge                  merge the listed manifest files. Does NOT validate the resulting manifest.
+##    print-cml-reference    print generated .cml reference documentation
+##    validate               validate that one or more cml files are valid
+##    validate-references    validate a component manifest against package manifest.

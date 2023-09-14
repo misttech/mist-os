@@ -39,7 +39,7 @@
 ##   │   └── libunwind.so.1
 ##   └── meta
 ##       ├── contents
-##       ├── foo_component.cmx
+##       ├── foo_component.cm
 ##       └── package
 ##
 ##   $ fx unarchive-package foo.far --out-dir foo2  # assuming foo2 doesn't exist

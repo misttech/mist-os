@@ -41,7 +41,7 @@ get_type_list() {
       'dart') SELECTED_FILE_TYPES+=('*.dart');;
       'fidl') SELECTED_FILE_TYPES+=('*.fidl');;
       'service'|'config') SELECTED_FILE_TYPES+=('*.config');;
-      'cm'|'manifest') SELECTED_FILE_TYPES+=('*.cmx' '*.cml');;
+      'cm'|'manifest') SELECTED_FILE_TYPES+=('*.cml');;
       'gn'|'build') SELECTED_FILE_TYPES+=('*.gn' '*.gni');;
       'md'|'doc') SELECTED_FILE_TYPES+=('*.md');;
       *) fx-error "Unsupported file type: $1" && fx-command-help && exit 1;;

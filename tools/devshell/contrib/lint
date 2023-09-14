@@ -212,7 +212,6 @@ function add_file_to_linter() {
     case "${file}" in
       *.c) CLANG_TIDY_FILES+=(${file}) ;;
       *.cc) CLANG_TIDY_FILES+=(${file}) ;;
-      *.cmx) JSON_LINT_FILES+=(${file}) ;;
       *.cpp) CLANG_TIDY_FILES+=(${file}) ;;
       *.dart) DART_LINT_FILES+=(${file}) ;;
       *.fidl) FIDL_LINT_FILES+=(${file}) ;;
