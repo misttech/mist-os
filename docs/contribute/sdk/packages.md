@@ -117,6 +117,12 @@ this section.
 
 To contribute a package to the Fuchsia API surface, follow the guidelines below:
 
+
+1. Prepare to [request a code review][request-a-code-review] from an API council member.
+
+   This member may ask for adjustments to your API surface (see this
+   [example code review][example-code-review] of an SDK package).
+
 1. Create a `sdk_fuchsia_package` target for your SDK package
    ([example][example-build-gn-01]).
 
@@ -174,11 +180,6 @@ To contribute a package to the Fuchsia API surface, follow the guidelines below:
 
       The package manifest of your package targeting x64 will be found at
       `packages/{PACKAGE_DISTRIBUTION_NAME}/x64/release/package_manifest.json`
-
-1. [Request a code review][request-a-code-review] from an API council member.
-
-   This member may ask for adjustments to your API surface (see this
-   [example code review][example-code-review] of an SDK package).
 
 <!-- Reference links -->
 
