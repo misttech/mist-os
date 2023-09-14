@@ -19,15 +19,7 @@ primary node "pdev" {
   fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID == 0;
 }
 
-// TODO(fxbug.dev/132026): Remove when no drivers that binds to this requires
-// the sysmem banjo protocol.
 node "sysmem" {
-  fuchsia.BIND_PROTOCOL == fuchsia.sysmem.BIND_PROTOCOL.DEVICE;
-}
-
-// TODO(fxbug.dev/132026): Rename to "sysmem" once these bind rules do not bind
-// to the sysmem banjo protocol.
-node "sysmem-fidl" {
   fuchsia.BIND_FIDL_PROTOCOL == fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
 }
 
