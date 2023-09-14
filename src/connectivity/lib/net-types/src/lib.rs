@@ -76,7 +76,7 @@ pub mod ip;
 
 use core::{
     convert::TryFrom,
-    fmt::{self, Display, Formatter},
+    fmt::{self, Debug, Display, Formatter},
     ops::Deref,
 };
 
@@ -483,7 +483,7 @@ macro_rules! impl_witness {
 a ", $adj, " address. Note that this guarantee is contingent on a correct
 implementation of the [`", stringify!($trait), "`] trait. Since that trait is
 not `unsafe`, `unsafe` code may NOT rely on this guarantee for its soundness."),
-            #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
+            #[derive(Copy, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
             pub struct $type<A>(A);
         }
 
@@ -579,7 +579,17 @@ more details."),
             }
         }
 
-        impl<A: $trait + Display> Display for $type<A> {
+        impl<A: Display> Display for $type<A> {
+            #[inline]
+            fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+                self.0.fmt(f)
+            }
+        }
+
+        // Witness types help provide type safety for the compiler. The things
+        // they witness should be evident from seeing the contained type so we
+        // save some characters and offer a passthrough Debug impl.
+        impl<A: Debug> Debug for $type<A> {
             #[inline]
             fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
                 self.0.fmt(f)
