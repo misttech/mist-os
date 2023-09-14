@@ -1,7 +1,6 @@
 {
     select: {
         intl_property_provider_disconnected: [
-            "INSPECT:a11y_manager.cmx:root/a11y_manager_app:intl_property_provider_disconnected",
             "INSPECT:core/ui/a11y_manager:root/a11y_manager_app:intl_property_provider_disconnected",
         ],
     },

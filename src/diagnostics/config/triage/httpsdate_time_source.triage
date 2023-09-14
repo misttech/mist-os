@@ -1,19 +1,19 @@
 {
     select: {
-        network_available_monotonic: "INSPECT:httpsdate_time_source.cmx:root:network_check_time",
-        sample_0_counter: "INSPECT:httpsdate_time_source.cmx:root/sample_0:counter",
-        network_error_count: "INSPECT:httpsdate_time_source.cmx:root/failures:NetworkError_count",
+        network_available_monotonic: "INSPECT:core/timekeeper/timesource\\:primary:root:network_check_time",
+        sample_0_counter: "INSPECT:core/timekeeper/timesource\\:primary:root/sample_0:counter",
+        network_error_count: "INSPECT:core/timekeeper/timesource\\:primary:root/failures:NetworkError_count",
 
         // Configuration errors
-        invalid_hostname_count: "INSPECT:httpsdate_time_source.cmx:root/failures:InvalidHostname_count",
-        scheme_not_https_count: "INSPECT:httpsdate_time_source.cmx:root/failures:SchemeNotHttps_count",
+        invalid_hostname_count: "INSPECT:core/timekeeper/timesource\\:primary:root/failures:InvalidHostname_count",
+        scheme_not_https_count: "INSPECT:core/timekeeper/timesource\\:primary:root/failures:SchemeNotHttps_count",
 
         // Bad response errors
-        no_certificates_presented_count: "INSPECT:httpsdate_time_source.cmx:root/failures:NoCertificatesPresented_count",
-        no_date_in_response_count: "INSPECT:httpsdate_time_source.cmx:root/failures:NoDateInResponse_count",
-        invalid_certificate_chain_count: "INSPECT:httpsdate_time_source.cmx:root/failures:InvalidCertificateChain_count",
-        corrupt_leaf_cert_count: "INSPECT:httpsdate_time_source.cmx:root/failures:CorruptLeafCertificate_count",
-        date_format_error_count: "INSPECT:httpsdate_time_source.cmx:root/failures:DateFormatError_count",
+        no_certificates_presented_count: "INSPECT:core/timekeeper/timesource\\:primary:root/failures:NoCertificatesPresented_count",
+        no_date_in_response_count: "INSPECT:core/timekeeper/timesource\\:primary:root/failures:NoDateInResponse_count",
+        invalid_certificate_chain_count: "INSPECT:core/timekeeper/timesource\\:primary:root/failures:InvalidCertificateChain_count",
+        corrupt_leaf_cert_count: "INSPECT:core/timekeeper/timesource\\:primary:root/failures:CorruptLeafCertificate_count",
+        date_format_error_count: "INSPECT:core/timekeeper/timesource\\:primary:root/failures:DateFormatError_count",
     },
     eval: {
         network_unavailable: "Missing(network_available_monotonic)",
@@ -41,12 +41,12 @@
         configuration_issue: {
             type: "Warning",
             trigger: "configuration_errors",
-            print: "Retrieving UTC has failed due to misconfiguration. See httpsdate_time_source.cmx/failures",
+            print: "Retrieving UTC has failed due to misconfiguration. See httpsdate_time_source/failures",
         },
         bad_response_issue: {
             type: "Warning",
             trigger: "bad_response_errors",
-            print: "Retrieving UTC has failed due to an unexpected response from the server. See httpsdate_time_source.cmx/failures",
+            print: "Retrieving UTC has failed due to an unexpected response from the server. See httpsdate_time_source/failures",
         },
     },
     test: {

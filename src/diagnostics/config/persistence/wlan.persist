@@ -5,9 +5,7 @@
         max_bytes: 1200,
         min_seconds_between_fetch: 60,
         selectors: [
-            'INSPECT:wlanstack.cmx:root/client_stats/connect',
             'INSPECT:core/wlanstack:root/client_stats/connect',
-            'INSPECT:wlanstack.cmx:root/client_stats/connect:*',
             'INSPECT:core/wlanstack:root/client_stats/connect:*',
         ],
     },
@@ -17,9 +15,7 @@
         max_bytes: 8000,
         min_seconds_between_fetch: 60,
         selectors: [
-            'INSPECT:wlanstack.cmx:root/client_stats/disconnect',
             'INSPECT:core/wlanstack:root/client_stats/disconnect',
-            'INSPECT:wlanstack.cmx:root/client_stats/disconnect:*',
             'INSPECT:core/wlanstack:root/client_stats/disconnect:*',
         ],
     },
@@ -29,7 +25,6 @@
         max_bytes: 3500,
         min_seconds_between_fetch: 60,
         selectors: [
-            'INSPECT:wlanstack.cmx:root/client_stats/scan',
             'INSPECT:core/wlanstack:root/client_stats/scan',
         ],
     },
@@ -39,9 +34,7 @@
         max_bytes: 200,
         min_seconds_between_fetch: 60,
         selectors: [
-            'INSPECT:wlanstack.cmx:root/client_stats/scan_failures',
             'INSPECT:core/wlanstack:root/client_stats/scan_failures',
-            'INSPECT:wlanstack.cmx:root/client_stats/scan_failures:*',
             'INSPECT:core/wlanstack:root/client_stats/scan_failures:*',
         ],
     },
@@ -52,10 +45,8 @@
         min_seconds_between_fetch: 60,
         selectors: [
             'INSPECT:core/wlanstack:root:latest_active_client_iface',
-            'INSPECT:wlanstack.cmx:root/device_events',
             'INSPECT:core/wlanstack:root/device_events',
             'INSPECT:core/wlandevicemonitor:root/device_events',
-            'INSPECT:wlanstack.cmx:root/device_events:*',
             'INSPECT:core/wlanstack:root/device_events:*',
             'INSPECT:core/wlandevicemonitor:root/device_events:*',
         ],

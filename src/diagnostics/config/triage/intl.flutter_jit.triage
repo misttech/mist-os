@@ -3,19 +3,13 @@
 {
     select: {
         close_status: [
-            "INSPECT:flutter_jit_runner.cmx:root/os:tz_data_close_status",
             "INSPECT:core/session-manager/session\\:session/flutter_jit_runner:root/os:tz_data_close_status",
-            "INSPECT:core/flutter_jit_runner:root/os:tz_data_close_status",
         ],
         dst_status: [
-            "INSPECT:flutter_jit_runner.cmx:root/os:dst_status",
             "INSPECT:core/session-manager/session\\:session/flutter_jit_runner:root/os:dst_status",
-            "INSPECT:core/flutter_jit_runner:root/os:dst_status",
         ],
         tz_data_status: [
-            "INSPECT:flutter_jit_runner.cmx:root/os:tz_data_status",
             "INSPECT:core/session-manager/session\\:session/flutter_jit_runner:root/os:tz_data_status",
-            "INSPECT:core/flutter_jit_runner:root/os:tz_data_status",
         ],
     },
     eval: {

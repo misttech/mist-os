@@ -2,11 +2,9 @@
     select: {
         total: [
             "INSPECT:bootstrap/fshost:root/data_stats/stats:total_bytes",
-            "INSPECT:archivist.cmx:root/data_stats/global_data/stats:total_bytes",
         ],
         used: [
             "INSPECT:bootstrap/fshost:root/data_stats/stats:used_bytes",
-            "INSPECT:archivist.cmx:root/data_stats/global_data/stats:used_bytes",
         ],
     },
     eval: {

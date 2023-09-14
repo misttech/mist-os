@@ -2,47 +2,36 @@
     select: {
         backstop: [
             "INSPECT:core/timekeeper:root:backstop",
-            "INSPECT:timekeeper.cmx:root:backstop",
         ],
         current_mono: [
             "INSPECT:core/timekeeper:root/current:monotonic",
-            "INSPECT:timekeeper.cmx:root/current:monotonic",
         ],
         current_utc: [
             "INSPECT:core/timekeeper:root/current:clock_utc",
-            "INSPECT:timekeeper.cmx:root/current:clock_utc",
         ],
         kernel_utc: [
             "INSPECT:core/timekeeper:root/current:kernel_utc",
-            "INSPECT:timekeeper.cmx:root/current:kernel_utc",
         ],
         primary_source_status: [
             "INSPECT:core/timekeeper:root/primary_time_source:status",
-            "INSPECT:timekeeper.cmx:root/primary_time_source:status",
         ],
         primary_estimate_0_counter: [
             "INSPECT:core/timekeeper:root/primary_track/estimate_0:counter",
-            "INSPECT:timekeeper.cmx:root/primary_track/estimate_0:counter",
         ],
         primary_filter_state_0_counter: [
             "INSPECT:core/timekeeper:root/primary_track/filter_state_0:counter",
-            "INSPECT:timekeeper.cmx:root/primary_track/filter_state_0:counter",
         ],
         rtc_initialization: [
             "INSPECT:core/timekeeper:root/real_time_clock:initialization",
-            "INSPECT:timekeeper.cmx:root/real_time_clock:initialization",
         ],
         rtc_write_failure_count: [
             "INSPECT:core/timekeeper:root/real_time_clock:write_failures",
-            "INSPECT:timekeeper.cmx:root/real_time_clock:write_failures",
         ],
         last_update_mono: [
             "INSPECT:core/timekeeper:root/primary_track/last_update:retrieval_monotonic",
-            "INSPECT:timekeeper.cmx:root/primary_track/last_update:retrieval_monotonic",
         ],
         last_update_error: [
             "INSPECT:core/timekeeper:root/primary_track/last_update:error_bounds",
-            "INSPECT:timekeeper.cmx:root/primary_track/last_update:error_bounds",
         ],
     },
     eval: {
@@ -64,12 +53,12 @@
         not_started_source_initializing: {
             type: "Warning",
             trigger: "And(Not(clock_started), primary_source_initializing)",
-            print: "UTC time not yet available, the primary source is not ready. See timekeeper.cmx/primary_time_source",
+            print: "UTC time not yet available, the primary source is not ready. See timekeeper/primary_time_source",
         },
         not_started_source_unhealthy: {
             type: "Warning",
             trigger: "And(Not(clock_started), primary_source_unhealthy)",
-            print: "UTC time not yet available, the primary source is unhealthy. See timekeeper.cmx/primary_time_source",
+            print: "UTC time not yet available, the primary source is unhealthy. See timekeeper/primary_time_source",
         },
         rtc_time_only: {
             type: "Warning",
@@ -79,7 +68,7 @@
         started_but_source_unhealthy: {
             type: "Warning",
             trigger: "And(clock_started, primary_source_unhealthy)",
-            print: "Time is available but time source is reporting unhealthy. See timekeeper.cmx/primary_time_source",
+            print: "Time is available but time source is reporting unhealthy. See timekeeper/primary_time_source",
         },
         clock_inconsistency: {
             type: "Warning",
@@ -90,13 +79,13 @@
         rtc_could_not_be_read: {
             type: "Warning",
             trigger: "And(rtc_present, Not(rtc_read_ok))",
-            print: "Real time clock present but could not be read. See timekeeper.cmx:root/real_time_clock",
+            print: "Real time clock present but could not be read. See timekeeper:root/real_time_clock",
             file_bug: "Time",
         },
         rtc_write_failures: {
             type: "Warning",
             trigger: "And(rtc_present, rtc_write_failure_count > 0)",
-            print: "Failures while writing to real time clock. See timekeeper.cmx:root/real_time_clock",
+            print: "Failures while writing to real time clock. See timekeeper:root/real_time_clock",
             file_bug: "Time",
         },
         last_update_stale: {
@@ -108,7 +97,7 @@
         error_too_high: {
             type: "Warning",
             trigger: "And(error_available, last_update_error > Seconds(5))",
-            print: "UTC error bound was over 5 seconds, may indicate network problems. See timekeeper.cmx:primary_track/last_update",
+            print: "UTC error bound was over 5 seconds, may indicate network problems. See timekeeper:primary_track/last_update",
         },
         utc_error_bound_ms: {
             type: "Gauge",
