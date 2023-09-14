@@ -220,9 +220,6 @@
                 "stack_unwinding.unwind_through_signal_frame",
                 "stack_unwinding.unwind_through_signal_frame_SA_SIGINFO",
 
-                // These tests are skipped on both arm64 and x86_64.
-                "sys_hwprobe.__riscv_hwprobe",
-
                 // These tests are arm32 specific
                 "aeabi.read_tp",
                 "getauxval.arm_has_AT_HWCAP2",
@@ -265,8 +262,10 @@
                 "stdio.popen_return_value_signal",
                 "stdio_nofortify.popen_return_value_signal",
 
-                // This test is skipped on not riscv architecture, and the
-                // tooling detect this as a failure.
+                // These tests are skipped on not riscv architecture, and the tooling detect this
+                // as a failure.
+                "sys_hwprobe.__riscv_hwprobe",
+                "sys_hwprobe.__riscv_hwprobe_fail",
                 "sys_hwprobe.__riscv_hwprobe_syscall_vdso",
             ],
         },
