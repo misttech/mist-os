@@ -152,7 +152,14 @@ sdk_atom("vulkan_layers") {
              "module_name is required if module_file is not defined: $info")
       _module_file = "$root_out_dir/${_module_name}"
     }
-    _destination = "arch/$target_cpu/dist/" + _module_name
+
+    if (override_target_api_level == -1) {
+      base = "arch/$target_cpu"
+    } else {
+      base = "obj/${target_cpu}-api-${override_target_api_level}"
+    }
+    _destination = "${base}/dist/" + _module_name
+
     _sdk_binaries += [ _destination ]
     files += [
       {

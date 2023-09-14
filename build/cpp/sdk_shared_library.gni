@@ -258,7 +258,11 @@ template("sdk_shared_library") {
   }
 
   # Base path for binaries of this library in SDKs.
-  prebuilt_base = "arch/${target_cpu}"
+  if (override_target_api_level == -1) {
+    prebuilt_base = "arch/$target_cpu"
+  } else {
+    prebuilt_base = "obj/${target_cpu}-api-${override_target_api_level}"
+  }
 
   # Identify dependencies and their metadata files.
   sdk_deps = []

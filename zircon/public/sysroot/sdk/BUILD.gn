@@ -12,7 +12,11 @@
 import("//build/sdk/sdk_atom.gni")
 
 # Collect the metadata for the SDK.
-file_base = "arch/$target_cpu/sysroot"
+if (override_target_api_level == -1) {
+  file_base = "arch/$target_cpu/sysroot"
+} else {
+  file_base = "obj/${target_cpu}-api-${override_target_api_level}/sysroot"
+}
 sdk_files = []
 sdk_api_contents = []
 

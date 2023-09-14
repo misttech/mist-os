@@ -130,7 +130,13 @@ template("sdk_fuchsia_package") {
         get_label_info(_full_package_label, "name") + "/package_manifest.json"
 
     # End output directory, different for each arch and API level.
-    _sdk_package_dir = "${target_out_dir}/sdk_packages/${target_cpu}/release"
+    if (override_target_api_level == -1) {
+      base = "$target_cpu"
+    } else {
+      base = "${target_cpu}-api-${override_target_api_level}"
+    }
+
+    _sdk_package_dir = "${target_out_dir}/sdk_packages/${base}/release"
     _distribution_name = invoker.distribution_name
 
     # Note: Golden file does not support multiple API level currently.
