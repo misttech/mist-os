@@ -16,6 +16,7 @@ pub mod graphics_config;
 pub mod icu_config;
 pub mod identity_config;
 pub mod intl_config;
+pub mod kernel_config;
 pub mod media_config;
 pub mod paravirtualization_config;
 pub mod session_manager_config;
@@ -141,6 +142,9 @@ pub struct PlatformConfig {
     /// NOTE: This is not for use by products! It's for testing assembly itself.
     #[serde(default)]
     pub example_config: example_config::ExampleConfig,
+
+    #[serde(default)]
+    pub kernel: kernel_config::PlatformKernelConfig,
 }
 
 // LINT.IfChange

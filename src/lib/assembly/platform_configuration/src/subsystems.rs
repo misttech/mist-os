@@ -36,6 +36,7 @@ mod graphics;
 mod hwinfo;
 mod identity;
 mod intl;
+mod kernel;
 mod media;
 mod radar;
 mod rcs;
@@ -308,6 +309,9 @@ fn configure_subsystems(
 
     setui::SetUiSubsystem::define_configuration(context, &config.platform.setui, builder)
         .context("Confguring the 'SetUI' subsystem")?;
+
+    kernel::KernelSubsystem::define_configuration(context, &config.platform.kernel, builder)
+        .context("Configuring the 'kernel' subsystem")?;
 
     forensics::ForensicsSubsystem::define_configuration(
         context,

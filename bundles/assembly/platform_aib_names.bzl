@@ -24,6 +24,8 @@ BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
     "fshost_fvm_minfs_migration",
     "fshost_storage",
     "paravirtualization_support",
+    "kernel_anonymous_memory_compression",
+    "kernel_anonymous_memory_compression_eager_lru",
     "kernel_args_user",
     "live_usb",
     "resources",

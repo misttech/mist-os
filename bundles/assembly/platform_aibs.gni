@@ -181,6 +181,10 @@ user_platform_aib_names =
 
       # Forensics
       "feedback_low_memory_product_config",
+
+      # Kernel Compression
+      "kernel_anonymous_memory_compression",
+      "kernel_anonymous_memory_compression_eager_lru",
     ]
 
 if (current_cpu != "riscv64") {

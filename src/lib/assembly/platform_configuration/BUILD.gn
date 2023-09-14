@@ -28,6 +28,7 @@ rustc_library("platform_configuration") {
     "src/subsystems/hwinfo.rs",
     "src/subsystems/identity.rs",
     "src/subsystems/intl.rs",
+    "src/subsystems/kernel.rs",
     "src/subsystems/media.rs",
     "src/subsystems/radar.rs",
     "src/subsystems/rcs.rs",

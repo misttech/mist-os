@@ -2459,3 +2459,20 @@ assembly_input_bundle("fonts_hermetic") {
 assembly_resources_directory("resources") {
   sources = [ "//src/sys/core/core_component_id_index.json5" ]
 }
+
+# Enables in kernel compression of anonymous memory with some common configuration options.
+assembly_input_bundle("kernel_anonymous_memory_compression") {
+  kernel_cmdline = [
+    "kernel.compression.strategy=lz4",
+    "kernel.compression.storage-strategy=tri_page",
+    "kernel.compression.reclaim_anonymous=true",
+    "kernel.compression.reclaim_zero_forks=true",
+    "kernel.compression.at_memory_pressure=true",
+  ]
+}
+
+# Extends compression to happen eagerly as part of queue rotation, only has meaning if
+# "kernel_compression" is also included.
+assembly_input_bundle("kernel_anonymous_memory_compression_eager_lru") {
+  kernel_cmdline = [ "kernel.page-scanner.lru-action=compress_only" ]
+}
