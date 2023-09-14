@@ -236,34 +236,46 @@ async fn bind_listener(
             Ok(listener) => {
                 break listener;
             }
-            Err(_) => match UnixStream::connect(&safe_socket_path)
-                .on_timeout(Duration::from_secs(1), || {
-                    Err(std::io::Error::new(TimedOut, format_err!("connecting to ascendd socket")))
-                })
-                .await
-            {
-                Ok(_) => {
-                    tracing::error!(
-                        "another ascendd is already listening at {}",
-                        sockpath.display()
-                    );
-                    bail!("another ascendd is aleady listening at {}!", sockpath.display());
+            Err(e) if e.kind() == ErrorKind::AddrInUse => {
+                match UnixStream::connect(&safe_socket_path)
+                    .on_timeout(Duration::from_secs(1), || {
+                        Err(std::io::Error::new(
+                            TimedOut,
+                            format_err!("connecting to ascendd socket"),
+                        ))
+                    })
+                    .await
+                {
+                    Ok(_) => {
+                        tracing::error!(
+                            "another ascendd is already listening at {}",
+                            sockpath.display()
+                        );
+                        bail!("another ascendd is aleady listening at {}!", sockpath.display());
+                    }
+                    Err(e) if e.kind() == ErrorKind::ConnectionRefused => {
+                        tracing::info!(
+                            "trying to clean up stale ascendd socket at {} (error: {e:?})",
+                            sockpath.display()
+                        );
+                        std::fs::remove_file(&sockpath)?;
+                    }
+                    Err(e) => {
+                        tracing::info!("An unexpected error occurred while trying to connect to the existing ascendd socket at: {}: {e:?}", sockpath.display());
+                        bail!(
+                            "unexpected error while trying to connect to the existing ascendd socket at: {}: {e}",
+                            sockpath.display()
+                        );
+                    }
                 }
-                Err(e) if e.kind() == ErrorKind::ConnectionRefused => {
-                    tracing::info!(
-                        "trying to clean up stale ascendd socket at {} (error: {e:?})",
-                        sockpath.display()
-                    );
-                    std::fs::remove_file(&sockpath)?;
-                }
-                Err(e) => {
-                    tracing::info!("An unexpected error occurred while trying to bind to the ascendd socket at {}: {e:?}", sockpath.display());
-                    bail!(
-                        "unexpected error while trying to bind to ascendd socket at {}: {e}",
-                        sockpath.display()
-                    );
-                }
-            },
+            }
+            Err(e) => {
+                tracing::info!("An unexpected error occurred while trying to bind to the ascendd socket at {}: {e:?}", sockpath.display());
+                bail!(
+                    "unexpected error while trying to bind to ascendd socket at {}: {e}",
+                    sockpath.display()
+                );
+            }
         }
     };
 
