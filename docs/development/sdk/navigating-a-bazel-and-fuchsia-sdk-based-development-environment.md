@@ -23,8 +23,12 @@ on the host machine.
 
 ## FIDL files in a Fuchsia-SDK-based project {:#fidl-files-in-a-fuchsia-sdk-based-project}
 
-Important: You must run a `bazel build` command first to create symlinks to
-FIDL files in your local project setup.
+Run a `bazel build` command first to create symlinks to
+FIDL files in your local project setup, for example:
+
+```posix-terminal
+bazel build @fuchsia_sdk//:ffx
+```
 
 All FIDL files (`.fidl`) included in a Bazel-and-Fuchsia-SDK-based project
 can be found in the following directory of a local project checkout:
