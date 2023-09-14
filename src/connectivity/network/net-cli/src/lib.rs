@@ -25,6 +25,7 @@ use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as
 use net_types::ip::{Ipv4, Ipv6};
 use netfilter::FidlReturn as _;
 use prettytable::{cell, format, row, Row, Table};
+use ser::AddressAssignmentState;
 use serde_json::{json, value::Value};
 use std::collections::hash_map::HashMap;
 use std::{convert::TryFrom as _, iter::FromIterator as _, str::FromStr as _};
@@ -150,8 +151,19 @@ fn write_tabulated_interfaces_info<
 ) -> Result<(), Error> {
     let mut t = Table::new();
     t.set_format(format::FormatBuilder::new().padding(2, 2).build());
-    for (i, ser::InterfaceView { nicid, name, device_class, online, addresses, mac }) in
-        interfaces.into_iter().enumerate()
+    for (
+        i,
+        ser::InterfaceView {
+            nicid,
+            name,
+            device_class,
+            online,
+            addresses,
+            mac,
+            has_default_ipv4_route,
+            has_default_ipv6_route,
+        },
+    ) in interfaces.into_iter().enumerate()
     {
         if i > 0 {
             let () = add_row(&mut t, row![]);
@@ -175,12 +187,46 @@ fn write_tabulated_interfaces_info<
             ],
         );
         let () = add_row(&mut t, row!["online", online]);
-        let ser::Addresses { ipv4, ipv6 } = addresses;
-        for ser::Subnet { addr, prefix_len } in ipv4 {
-            let () = add_row(&mut t, row!["addr", format!("{}/{}", addr, prefix_len)]);
-        }
-        for ser::Subnet { addr, prefix_len } in ipv6 {
-            let () = add_row(&mut t, row!["addr", format!("{}/{}", addr, prefix_len)]);
+
+        let default_routes: std::borrow::Cow<'_, _> =
+            if has_default_ipv4_route || has_default_ipv6_route {
+                itertools::Itertools::intersperse(
+                    has_default_ipv4_route
+                        .then_some("IPv4")
+                        .into_iter()
+                        .chain(has_default_ipv6_route.then_some("IPv6")),
+                    ",",
+                )
+                .collect::<String>()
+                .into()
+            } else {
+                "-".into()
+            };
+        add_row(&mut t, row!["default routes", default_routes]);
+
+        for ser::Address {
+            subnet: ser::Subnet { addr, prefix_len },
+            valid_until,
+            assignment_state,
+        } in addresses.all_addresses()
+        {
+            let valid_until = valid_until.map(|v| {
+                let v = std::time::Duration::from_nanos(v.try_into().unwrap_or_else(|_| 0))
+                    .as_secs_f32();
+                std::borrow::Cow::Owned(format!("valid until [{v}s]"))
+            });
+            let assignment_state: Option<std::borrow::Cow<'_, _>> = match assignment_state {
+                AddressAssignmentState::Assigned => None,
+                AddressAssignmentState::Tentative => Some("TENTATIVE".into()),
+                AddressAssignmentState::Unavailable => Some("UNAVAILABLE".into()),
+            };
+            let extra_bits = itertools::Itertools::intersperse(
+                assignment_state.into_iter().chain(valid_until),
+                " ".into(),
+            )
+            .collect::<String>();
+
+            let () = add_row(&mut t, row!["addr", format!("{addr}/{prefix_len}"), extra_bits]);
         }
         match mac {
             None => add_row(&mut t, row!["mac", "-"]),
@@ -827,8 +873,8 @@ async fn do_route_list<C: NetCliDepsConnector>(
         froutes_ext::collect_routes_until_idle::<_, Vec<_>>(ipv6_route_event_stream),
     )
     .await;
-    let v4_routes = v4_routes.context("failed to collect all existing IPv4 routes")?;
-    let v6_routes = v6_routes.context("failed to collect all existing IPv6 routes")?;
+    let mut v4_routes = v4_routes.context("failed to collect all existing IPv4 routes")?;
+    let mut v6_routes = v6_routes.context("failed to collect all existing IPv6 routes")?;
     if out.is_machine() {
         fn to_ser<I: net_types::ip::Ip>(
             route: froutes_ext::InstalledRoute<I>,
@@ -866,9 +912,11 @@ async fn do_route_list<C: NetCliDepsConnector>(
             let () = add_row(t, row![destination, next_hop, device_id, metric]);
         }
 
+        v4_routes.sort();
         for route in v4_routes {
             write_route(&mut t, route);
         }
+        v6_routes.sort();
         for route in v6_routes {
             write_route(&mut t, route);
         }
@@ -2446,6 +2494,8 @@ mod tests {
                 "name": "lo",
                 "nicid": 1,
                 "online": true,
+                "has_default_ipv4_route": false,
+                "has_default_ipv6_route": false,
             },
             {
                 "addresses": {
@@ -2457,6 +2507,8 @@ mod tests {
                 "name": "eth001",
                 "nicid": 10,
                 "online": true,
+                "has_default_ipv4_route": false,
+                "has_default_ipv6_route": false,
             },
             {
                 "addresses": {
@@ -2468,6 +2520,46 @@ mod tests {
                 "name": "virt001",
                 "nicid": 20,
                 "online": true,
+                "has_default_ipv4_route": false,
+                "has_default_ipv6_route": false,
+            },
+            {
+                "addresses": {
+                    "ipv4": [
+                        {
+                            "addr": "192.168.0.1",
+                            "assignment_state": "Tentative",
+                            "prefix_len": 24,
+                            "valid_until": 2500000000_u64,
+                        }
+                    ],
+                    "ipv6": [],
+                },
+                "device_class": "Ethernet",
+                "mac": null,
+                "name": "eth002",
+                "nicid": 30,
+                "online": true,
+                "has_default_ipv4_route": false,
+                "has_default_ipv6_route": true,
+            },
+            {
+                "addresses": {
+                    "ipv4": [],
+                    "ipv6": [{
+                        "addr": "2001:db8::1",
+                        "assignment_state": "Unavailable",
+                        "prefix_len": 64,
+                        "valid_until": null,
+                    }],
+                },
+                "device_class": "Ethernet",
+                "mac": null,
+                "name": "eth003",
+                "nicid": 40,
+                "online": true,
+                "has_default_ipv4_route": true,
+                "has_default_ipv6_route": true,
             },
         ])
         .to_string()
@@ -2476,23 +2568,42 @@ mod tests {
     fn wanted_net_if_list_tabular() -> String {
         String::from(
             r#"
-nicid           1
-name            lo
-device class    loopback
-online          true
-mac             00:00:00:00:00:00
+nicid             1
+name              lo
+device class      loopback
+online            true
+default routes    -
+mac               00:00:00:00:00:00
 
-nicid           10
-name            eth001
-device class    ethernet
-online          true
-mac             01:02:03:04:05:06
+nicid             10
+name              eth001
+device class      ethernet
+online            true
+default routes    -
+mac               01:02:03:04:05:06
 
-nicid           20
-name            virt001
-device class    virtual
-online          true
-mac             -
+nicid             20
+name              virt001
+device class      virtual
+online            true
+default routes    -
+mac               -
+
+nicid             30
+name              eth002
+device class      ethernet
+online            true
+default routes    IPv6
+addr              192.168.0.1/24       TENTATIVE valid until [2.5s]
+mac               -
+
+nicid             40
+name              eth003
+device class      ethernet
+online            true
+default routes    IPv4,IPv6
+addr              2001:db8::1/64       UNAVAILABLE
+mac               -
 "#,
         )
     }
@@ -2550,6 +2661,45 @@ mac             -
                 20,
                 "virt001",
                 finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Virtual),
+                None,
+            ),
+            (
+                finterfaces_ext::Properties {
+                    id: 30.try_into().unwrap(),
+                    name: "eth002".to_string(),
+                    device_class: finterfaces::DeviceClass::Device(
+                        fhardware_network::DeviceClass::Ethernet,
+                    ),
+                    online: true,
+                    addresses: vec![finterfaces_ext::Address {
+                        addr: fidl_subnet!("192.168.0.1/24"),
+                        valid_until: std::time::Duration::from_millis(2500)
+                            .as_nanos()
+                            .try_into()
+                            .unwrap(),
+                        assignment_state: finterfaces::AddressAssignmentState::Tentative,
+                    }],
+                    has_default_ipv4_route: false,
+                    has_default_ipv6_route: true,
+                },
+                None,
+            ),
+            (
+                finterfaces_ext::Properties {
+                    id: 40.try_into().unwrap(),
+                    name: "eth003".to_string(),
+                    device_class: finterfaces::DeviceClass::Device(
+                        fhardware_network::DeviceClass::Ethernet,
+                    ),
+                    online: true,
+                    addresses: vec![finterfaces_ext::Address {
+                        addr: fidl_subnet!("2001:db8::1/64"),
+                        valid_until: i64::MAX,
+                        assignment_state: finterfaces::AddressAssignmentState::Unavailable,
+                    }],
+                    has_default_ipv4_route: true,
+                    has_default_ipv6_route: true,
+                },
                 None,
             ),
         ]

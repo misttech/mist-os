@@ -10,7 +10,7 @@ use fidl_fuchsia_net_routes_ext as froutes_ext;
 use net_types::{ip::IpAddress as _, Witness as _};
 use thiserror::Error;
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Ord, PartialOrd, Eq, PartialEq)]
 pub(crate) struct Subnet<T> {
     pub(crate) addr: T,
     pub(crate) prefix_len: u8,
@@ -34,31 +34,92 @@ impl<A: net_types::ip::IpAddress> From<net_types::ip::Subnet<A>> for Subnet<std:
     }
 }
 
-#[derive(serde::Serialize)]
-pub(crate) struct Addresses {
-    pub(crate) ipv4: Vec<Subnet<std::net::Ipv4Addr>>,
-    pub(crate) ipv6: Vec<Subnet<std::net::Ipv6Addr>>,
+#[derive(serde::Serialize, Ord, PartialOrd, Eq, PartialEq)]
+pub(crate) enum AddressAssignmentState {
+    Tentative,
+    Assigned,
+    Unavailable,
 }
 
-impl<I: Iterator<Item = fidl_fuchsia_net_ext::Subnet>> From<I> for Addresses {
+impl From<fidl_fuchsia_net_interfaces::AddressAssignmentState> for AddressAssignmentState {
+    fn from(value: fidl_fuchsia_net_interfaces::AddressAssignmentState) -> Self {
+        match value {
+            fidl_fuchsia_net_interfaces::AddressAssignmentState::Tentative => Self::Tentative,
+            fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned => Self::Assigned,
+            fidl_fuchsia_net_interfaces::AddressAssignmentState::Unavailable => Self::Unavailable,
+        }
+    }
+}
+
+#[derive(serde::Serialize, Ord, PartialOrd, Eq, PartialEq)]
+pub(crate) struct Address<I> {
+    #[serde(flatten)]
+    pub(crate) subnet: Subnet<I>,
+    pub(crate) valid_until: Option<i64>,
+    pub(crate) assignment_state: AddressAssignmentState,
+}
+
+impl<I> Address<I> {
+    fn map<I2, F: Fn(I) -> I2>(self, f: F) -> Address<I2> {
+        let Self { subnet: Subnet { addr, prefix_len }, valid_until, assignment_state } = self;
+        Address { subnet: Subnet { addr: f(addr), prefix_len }, valid_until, assignment_state }
+    }
+}
+
+#[derive(serde::Serialize)]
+pub(crate) struct Addresses {
+    pub(crate) ipv4: Vec<Address<std::net::Ipv4Addr>>,
+    pub(crate) ipv6: Vec<Address<std::net::Ipv6Addr>>,
+}
+
+impl Addresses {
+    pub(crate) fn all_addresses(self) -> impl Iterator<Item = Address<std::net::IpAddr>> {
+        let Self { ipv4, ipv6 } = self;
+        ipv4.into_iter()
+            .map(|a| a.map(Into::into))
+            .chain(ipv6.into_iter().map(|a| a.map(Into::into)))
+    }
+}
+
+impl<I: Iterator<Item = fidl_fuchsia_net_interfaces_ext::Address>> From<I> for Addresses {
     fn from(addresses: I) -> Addresses {
         use itertools::Itertools as _;
 
-        let (ipv4, ipv6): (Vec<_>, Vec<_>) = addresses.into_iter().partition_map(
-            |fidl_fuchsia_net_ext::Subnet {
-                 addr: fidl_fuchsia_net_ext::IpAddress(addr),
-                 prefix_len,
-             }| {
+        let (mut ipv4, mut ipv6): (Vec<_>, Vec<_>) = addresses.into_iter().partition_map(
+            |fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until, assignment_state }| {
+                let fidl_fuchsia_net_ext::Subnet {
+                    addr: fidl_fuchsia_net_ext::IpAddress(addr),
+                    prefix_len,
+                } = addr.into();
+                let assignment_state = assignment_state.into();
+
+                fn new_address<I>(
+                    addr: I,
+                    prefix_len: u8,
+                    valid_until: i64,
+                    assignment_state: AddressAssignmentState,
+                ) -> Address<I> {
+                    let valid_until = (valid_until != i64::MAX).then_some(valid_until);
+                    Address { subnet: Subnet { addr, prefix_len }, valid_until, assignment_state }
+                }
                 match addr {
-                    std::net::IpAddr::V4(addr) => {
-                        itertools::Either::Left(Subnet { addr, prefix_len })
-                    }
-                    std::net::IpAddr::V6(addr) => {
-                        itertools::Either::Right(Subnet { addr, prefix_len })
-                    }
+                    std::net::IpAddr::V4(addr) => itertools::Either::Left(new_address(
+                        addr,
+                        prefix_len,
+                        valid_until,
+                        assignment_state,
+                    )),
+                    std::net::IpAddr::V6(addr) => itertools::Either::Right(new_address(
+                        addr,
+                        prefix_len,
+                        valid_until,
+                        assignment_state,
+                    )),
                 }
             },
         );
+        ipv4.sort();
+        ipv6.sort();
         Addresses { ipv4, ipv6 }
     }
 }
@@ -100,6 +161,8 @@ pub(crate) struct InterfaceView {
     pub(crate) device_class: DeviceClass,
     pub(crate) online: bool,
     pub(crate) addresses: Addresses,
+    pub(crate) has_default_ipv4_route: bool,
+    pub(crate) has_default_ipv6_route: bool,
     pub(crate) mac: Option<fidl_fuchsia_net_ext::MacAddress>,
 }
 
@@ -116,8 +179,8 @@ impl From<(fidl_fuchsia_net_interfaces_ext::Properties, Option<fidl_fuchsia_net:
                 device_class,
                 online,
                 addresses,
-                has_default_ipv4_route: _,
-                has_default_ipv6_route: _,
+                has_default_ipv4_route,
+                has_default_ipv6_route,
             },
             mac,
         ) = t;
@@ -126,22 +189,15 @@ impl From<(fidl_fuchsia_net_interfaces_ext::Properties, Option<fidl_fuchsia_net:
             name,
             device_class: device_class.into(),
             online,
-            addresses: addresses
-                .into_iter()
-                .map(
-                    |fidl_fuchsia_net_interfaces_ext::Address {
-                         addr,
-                         valid_until: _,
-                         assignment_state: _,
-                     }| { addr.into() },
-                )
-                .into(),
+            addresses: addresses.into_iter().into(),
+            has_default_ipv4_route,
+            has_default_ipv6_route,
             mac: mac.map(Into::into),
         }
     }
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Ord, PartialOrd, Eq, PartialEq)]
 /// Intermediary struct for serializing IP forwarding table entries into JSON.
 pub struct ForwardingEntry {
     #[serde(rename = "destination")]

@@ -2429,6 +2429,24 @@ pub struct Subnet<A> {
     prefix: u8,
 }
 
+impl<A: core::cmp::Ord> core::cmp::PartialOrd for Subnet<A> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+/// Subnet ordering always orders from least-specific to most-specific subnet.
+impl<A: core::cmp::Ord> core::cmp::Ord for Subnet<A> {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        let Self { network, prefix } = self;
+        let Self { network: other_network, prefix: other_prefix } = other;
+        match prefix.cmp(other_prefix) {
+            core::cmp::Ordering::Equal => network.cmp(other_network),
+            ord => ord,
+        }
+    }
+}
+
 impl<A> Subnet<A> {
     /// Creates a new subnet without enforcing correctness.
     ///
@@ -3804,6 +3822,26 @@ mod tests {
     #[test_case(Ipv4Addr::new([255, 255, 255, 255]), Ipv4AddressClass::E; "last_class_e")]
     fn ipv4addr_class(addr: Ipv4Addr, class: Ipv4AddressClass) {
         assert_eq!(addr.class(), class)
+    }
+
+    #[test_case(
+        Subnet::new(Ipv4Addr::new([192, 168, 1, 0]), 24).unwrap(),
+        Subnet::new(Ipv4Addr::new([192, 168, 2, 0]), 24).unwrap()
+    ; "ipv4_same_prefix")]
+    #[test_case(
+        Subnet::new(Ipv4Addr::new([192, 168, 2, 0]), 24).unwrap(),
+        Subnet::new(Ipv4Addr::new([192, 168, 1, 0]), 32).unwrap()
+    ; "ipv4_by_prefix")]
+    #[test_case(
+        Subnet::new(Ipv6Addr::new([1, 0, 0, 0, 0, 0, 0, 0]), 64).unwrap(),
+        Subnet::new(Ipv6Addr::new([2, 0, 0, 0, 0, 0, 0, 0]), 64).unwrap()
+    ; "ipv6_same_prefix")]
+    #[test_case(
+        Subnet::new(Ipv6Addr::new([2, 0, 0, 0, 0, 0, 0, 0]), 64).unwrap(),
+        Subnet::new(Ipv6Addr::new([1, 0, 0, 0, 0, 0, 0, 0]), 128).unwrap()
+    ; "ipv6_by_prefix")]
+    fn subnet_ord<A: core::cmp::Ord>(a: Subnet<A>, b: Subnet<A>) {
+        assert!(a < b);
     }
 
     #[cfg(feature = "std")]

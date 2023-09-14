@@ -59,7 +59,7 @@ pub enum NetTypeConversionError {
 
 /// The specified properties of a route. This type enforces that all required
 /// fields from [`fnet_routes::SpecifiedRouteProperties`] are set.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct SpecifiedRouteProperties {
     /// The specified metric of the route.
     pub metric: fnet_routes::SpecifiedMetric,
@@ -89,7 +89,7 @@ impl From<SpecifiedRouteProperties> for fnet_routes::SpecifiedRouteProperties {
 
 /// The effective properties of a route. This type enforces that all required
 /// fields from [`fnet_routes::EffectiveRouteProperties`] are set.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct EffectiveRouteProperties {
     /// The effective metric of the route.
     pub metric: u32,
@@ -119,7 +119,7 @@ impl From<EffectiveRouteProperties> for fnet_routes::EffectiveRouteProperties {
 
 /// The properties of a route, abstracting over
 /// [`fnet_routes::RoutePropertiesV4`] and [`fnet_routes::RoutePropertiesV6`].
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct RouteProperties {
     /// the specified properties of the route.
     pub specified_properties: SpecifiedRouteProperties,
@@ -180,7 +180,7 @@ impl From<RouteProperties> for fnet_routes::RoutePropertiesV6 {
 /// determined to be unicast within the broader context of a subnet, hence they
 /// are only guaranteed to be specified in this context. IPv6 addresses,
 /// however, will be confirmed to be unicast.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct RouteTarget<I: Ip> {
     /// The outbound_interface to use when forwarding packets.
     pub outbound_interface: u64,
@@ -247,7 +247,7 @@ impl From<RouteTarget<Ipv6>> for fnet_routes::RouteTargetV6 {
 /// These fidl types are both defined as flexible unions, which allows the
 /// definition to grow over time. The `Unknown` enum variant accounts for any
 /// new types that are not yet known to the local version of the FIDL bindings.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub enum RouteAction<I: Ip> {
     /// The RouteAction is unknown.
     Unknown,
@@ -312,7 +312,7 @@ impl TryFrom<RouteAction<Ipv6>> for fnet_routes::RouteActionV6 {
 ///
 /// The `destination` subnet is verified to be a valid subnet; e.g. its
 /// prefix-len is a valid value, and its host bits are cleared.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct Route<I: Ip> {
     /// The destination subnet of the route.
     pub destination: Subnet<I::Addr>,
@@ -420,7 +420,7 @@ impl<I: Ip> TryFrom<Route<I>> for fnet_stack::ForwardingEntry {
 
 /// An installed route, abstracting over [`fnet_routes::InstalledRouteV4`] and
 /// [`fnet_routes::InstalledRouteV6`].
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct InstalledRoute<I: Ip> {
     /// The route.
     pub route: Route<I>,
