@@ -1,5 +1,4 @@
-SDK Categories
-==============
+# SDK categories
 
 Each [SDK Atom] has a category that defines which kinds of SDK consumers can see
 the Atom. As SDK Atoms mature, we can increase their visibility, which implies

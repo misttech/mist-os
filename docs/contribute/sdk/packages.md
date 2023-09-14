@@ -20,8 +20,8 @@ in the category of `partner` or `public`. (For more information, see
 ## Create a package API surface {:#create-a-package-api-surface .numbered}
 
 The package API surface is created by populating two parameters in the
-[`sdk_fuchsia_package()`][sdk-fuchsia-package-gni] target: `expected_files_present`.
-and `expected_files_exact`
+[`sdk_fuchsia_package()`][sdk-fuchsia-package-gni] target: `expected_files_present`
+and `expected_files_exact`.
 
 You can use these two parameters to enforce the following:
 
@@ -137,7 +137,7 @@ To contribute a package to the Fuchsia API surface, follow the guidelines below:
    run the following command:
 
    ```posix-terminal
-   fx build final_fuchsia_idk`
+   fx build final_fuchsia_idk
    ```
 
 1. Follow the printed instructions for copying the generated `content_checklist.json`
@@ -153,7 +153,7 @@ To contribute a package to the Fuchsia API surface, follow the guidelines below:
    the `//sdk/manifests/core.manifest` and `//sdk/manifests/atoms/core.golden` files).
 
    ```posix-terminal
-   fx build final_fuchsia_idk`
+   fx build final_fuchsia_idk
    ```
 
 1. **(Optional)** Enter the SDK build directory and preview your SDK package manifest.
