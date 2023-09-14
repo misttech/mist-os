@@ -90,7 +90,7 @@
             },
             max_count: 6,
         },
-        display_rotation: { type: "uint64" },
+        display_rotation: { type: "int64" },
         display_pixel_density: {
             type: "string",
             max_size: 6,

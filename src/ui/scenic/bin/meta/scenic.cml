@@ -95,6 +95,5 @@
         display_composition: { type: "bool" },
         i_can_haz_display_id: { type: "int64" },
         i_can_haz_display_mode: { type: "int64" },
-        display_rotation: { type: "uint64" },
     },
 }
