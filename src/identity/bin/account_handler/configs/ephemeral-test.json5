@@ -1,5 +1,0 @@
-{
-    available_mechanisms: [],
-    is_ephemeral: true,
-    storage_manager: "MINFS",
-}

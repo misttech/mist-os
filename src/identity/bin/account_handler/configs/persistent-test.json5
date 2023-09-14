@@ -1,7 +1,0 @@
-{
-    available_mechanisms: [
-        "TEST",
-    ],
-    is_ephemeral: false,
-    storage_manager: "MINFS",
-}

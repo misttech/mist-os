@@ -1,7 +1,0 @@
-{
-    available_mechanisms: [
-        "PASSWORD",
-    ],
-    is_ephemeral: false,
-    storage_manager: "FXFS",
-}

@@ -29,7 +29,6 @@ group("tests_no_e2e") {
     "fonts:tests",
     "graphics:tests",
     "hwinfo:tests",
-    "identity:tests",
     "intl:tests",
     "lib:tests",
     "media:tests",
