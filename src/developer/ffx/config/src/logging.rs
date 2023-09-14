@@ -237,7 +237,7 @@ async fn init_global_log_file(ctx: &EnvironmentContext, name: &str, rotate: bool
     Ok(())
 }
 
-async fn log_file_with_info(
+pub async fn log_file_with_info(
     ctx: &EnvironmentContext,
     name: &str,
     rotate: bool,
@@ -276,6 +276,11 @@ fn open_log_file(path: &Path) -> Result<std::fs::File> {
 
 pub async fn is_enabled(ctx: &EnvironmentContext) -> bool {
     ctx.query(LOG_ENABLED).get().await.unwrap_or(false)
+}
+
+pub async fn debugging_on(ctx: &EnvironmentContext) -> bool {
+    let level = filter_level(ctx).await;
+    level >= LevelFilter::DEBUG
 }
 
 async fn filter_level(ctx: &EnvironmentContext) -> LevelFilter {

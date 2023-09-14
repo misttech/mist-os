@@ -18,6 +18,7 @@ use std::{
     cell::RefCell,
     collections::VecDeque,
     fmt, io,
+    io::Write,
     net::SocketAddr,
     process::Stdio,
     rc::{Rc, Weak},
@@ -156,6 +157,31 @@ fn setup_watchdogs() {
     });
 }
 
+async fn write_ssh_log(line: &String) {
+    let ctx = match ffx_config::global_env_context() {
+        Some(c) => c,
+        None => {
+            tracing::warn!("Couldn't open ssh log file, due to no global env context");
+            return;
+        }
+    };
+    if !ffx_config::logging::debugging_on(&ctx).await {
+        return;
+    }
+    // Skip keepalives, which will show up in the steady-state
+    if line.contains("keepalive") {
+        return;
+    }
+    let mut f = match ffx_config::logging::log_file_with_info(&ctx, "ssh", true).await {
+        Ok((f, _)) => f,
+        Err(e) => {
+            tracing::warn!("Couldn't open ssh log file: {e:?}");
+            return;
+        }
+    };
+    writeln!(&mut f, "{line}").unwrap_or_else(|e| tracing::warn!("Couldn't write ssh log: {e:?}"));
+}
+
 impl HostPipeChild {
     #[tracing::instrument(skip(stderr_buf, event_queue))]
     async fn new_inner(
@@ -174,6 +200,12 @@ impl HostPipeChild {
 
         args.push("--circuit");
         args.push(id_string.as_str());
+
+        let ctx = ffx_config::global_env_context().expect("Global env context uninitialized");
+        let verbose_ssh = ffx_config::logging::debugging_on(&ctx).await;
+        if verbose_ssh {
+            args.insert(0, "-v");
+        }
 
         // Before running remote_control_runner, we look up the environment
         // variable for $SSH_CONNECTION. This contains the IP address, including
@@ -243,13 +275,21 @@ impl HostPipeChild {
             while let Some(result) = stderr_lines.next().await {
                 match result {
                     Ok(line) => {
-                        tracing::info!("SSH stderr: {}", line);
-                        stderr_buf.push_line(line.clone());
-                        event_queue
-                            .push(TargetEvent::SshHostPipeErr(HostPipeErr::from(line)))
-                            .unwrap_or_else(|e| {
-                                tracing::warn!("queueing host pipe err event: {:?}", e)
-                            });
+                        // TODO(slgrady) -- either remove this once we stop having
+                        // ssh connection problems; or change it so that once we
+                        // know the connection is established, the error messages
+                        // go to the event queue as normal.
+                        if verbose_ssh {
+                            write_ssh_log(&line).await;
+                        } else {
+                            tracing::info!("SSH stderr: {}", line);
+                            stderr_buf.push_line(line.clone());
+                            event_queue
+                                .push(TargetEvent::SshHostPipeErr(HostPipeErr::from(line)))
+                                .unwrap_or_else(|e| {
+                                    tracing::warn!("queueing host pipe err event: {:?}", e)
+                                });
+                        }
                     }
                     Err(e) => tracing::error!("SSH stderr read failure: {:?}", e),
                 }
@@ -379,6 +419,8 @@ async fn parse_ssh_connection<R: AsyncBufRead + Unpin>(
         tracing::error!("Failed to first line");
         return Err(ParseSshConnectionError::Parse(line));
     }
+
+    write_ssh_log(&line).await;
 
     let mut parts = line.split(' ');
 
