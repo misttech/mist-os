@@ -6,7 +6,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/async/default.h>
-#include <lib/inspect/contrib/cpp/archive_reader.h>
+#include <lib/diagnostics/reader/cpp/archive_reader.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/sys/cpp/component_context.h>
 
@@ -123,12 +123,12 @@ class ArchiveReaderTest : public gtest::RealLoopFixture {
   std::unique_ptr<sys::ComponentContext> component_context_;
 };
 
-using ResultType = fpromise::result<std::vector<inspect::contrib::InspectData>, std::string>;
+using ResultType = fpromise::result<std::vector<diagnostics::reader::InspectData>, std::string>;
 
 TEST_F(ArchiveReaderTest, ReadHierarchy) {
   std::cerr << "RUNNING TEST" << std::endl;
-  inspect::contrib::ArchiveReader reader(svc()->Connect<fuchsia::diagnostics::ArchiveAccessor>(),
-                                         {cm1_selector(), cm2_selector()});
+  diagnostics::reader::ArchiveReader reader(svc()->Connect<fuchsia::diagnostics::ArchiveAccessor>(),
+                                            {cm1_selector(), cm2_selector()});
 
   ResultType result;
   executor().schedule_task(
@@ -154,7 +154,7 @@ TEST_F(ArchiveReaderTest, ReadHierarchyWithAlternativeDispatcher) {
   fuchsia::diagnostics::ArchiveAccessorPtr archive;
   svc()->Connect(archive.NewRequest(loop.dispatcher()));
   async::Executor local_executor(loop.dispatcher());
-  inspect::contrib::ArchiveReader reader(std::move(archive), {cm1_selector(), cm2_selector()});
+  diagnostics::reader::ArchiveReader reader(std::move(archive), {cm1_selector(), cm2_selector()});
 
   ResultType result;
   local_executor.schedule_task(
@@ -183,8 +183,8 @@ TEST_F(ArchiveReaderTest, ReadHierarchyWithAlternativeDispatcher) {
 }
 
 TEST_F(ArchiveReaderTest, Sort) {
-  inspect::contrib::ArchiveReader reader(svc()->Connect<fuchsia::diagnostics::ArchiveAccessor>(),
-                                         {cm1_selector(), cm2_selector()});
+  diagnostics::reader::ArchiveReader reader(svc()->Connect<fuchsia::diagnostics::ArchiveAccessor>(),
+                                            {cm1_selector(), cm2_selector()});
 
   ResultType result;
   executor().schedule_task(

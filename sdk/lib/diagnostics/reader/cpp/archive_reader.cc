@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 #include <lib/async/cpp/task.h>
+#include <lib/diagnostics/reader/cpp/archive_reader.h>
+#include <lib/diagnostics/reader/cpp/constants.h>
+#include <lib/diagnostics/reader/cpp/inspect.h>
 #include <lib/fpromise/bridge.h>
-#include <lib/inspect/contrib/cpp/archive_reader.h>
-#include <lib/inspect/contrib/cpp/constants.h>
-#include <lib/inspect/contrib/cpp/inspect.h>
 #include <lib/inspect/cpp/hierarchy.h>
 #include <unistd.h>
 
@@ -22,7 +22,7 @@
 #include <src/lib/fsl/vmo/strings.h>
 #include <src/lib/fxl/strings/join_strings.h>
 
-namespace inspect::contrib {
+namespace diagnostics::reader {
 
 // Time to delay between snapshots to find components.
 // 250ms so that tests are not overly delayed. Missing the component at
@@ -187,4 +187,4 @@ void ArchiveReader::InnerSnapshotInspectUntilPresent(
           .wrap_with(scope_));
 }
 
-}  // namespace inspect::contrib
+}  // namespace diagnostics::reader

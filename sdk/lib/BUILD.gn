@@ -10,6 +10,7 @@ group("tests") {
     "async_patterns:tests",
     "component:tests",
     "device-watcher:tests",
+    "diagnostics:tests",
     "driver:tests",
     "driver_test_realm:tests",
     "fdio:tests",

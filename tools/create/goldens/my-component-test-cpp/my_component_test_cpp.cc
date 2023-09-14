@@ -7,7 +7,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fdio/directory.h>
-#include <lib/inspect/contrib/cpp/archive_reader.h>
+#include <lib/diagnostics/reader/cpp/archive_reader.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/result.h>
 #include <zircon/types.h>
@@ -66,7 +66,7 @@ TEST_F(MyComponentTestCppIntegrationTest, TestMethod) {
   //          fdio_service_connect(
   //              archive_service.c_str(),
   //              accessor.NewRequest(loop.dispatcher()).TakeChannel().release()));
-  //  inspect::contrib::ArchiveReader reader(std::move(accessor),
+  //  diagnostics::reader::ArchiveReader reader(std::move(accessor),
   //      {"hello-world:root"});
   //
   // reader.SnapshotInspectUntilPresent({kComponentSelector}).then(...);

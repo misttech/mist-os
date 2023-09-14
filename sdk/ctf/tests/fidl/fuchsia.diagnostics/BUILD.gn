@@ -21,7 +21,7 @@ ctf_executable("diagnostics-test-bin") {
 
   non_cts_deps = [
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_hlcpp",
-    "//sdk/lib/inspect/contrib/cpp:archive_reader",
+    "//sdk/lib/diagnostics/reader/cpp:archive_reader",
 
     # TODO(81398): Include this in the SDK.
     "//sdk/lib/sys/component/cpp/testing:cpp",
@@ -58,7 +58,7 @@ ctf_executable("diagnostics-log-test-bin") {
 
   non_cts_deps = [
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_hlcpp",
-    "//sdk/lib/inspect/contrib/cpp:archive_reader",
+    "//sdk/lib/diagnostics/reader/cpp:archive_reader",
 
     # TODO(81398): Include this in the SDK.
     "//sdk/lib/sys/component/cpp/testing:cpp",

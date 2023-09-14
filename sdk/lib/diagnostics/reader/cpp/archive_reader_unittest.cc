@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/inspect/contrib/cpp/archive_reader.h>
+#include <lib/diagnostics/reader/cpp/archive_reader.h>
 
 #include <optional>
 
@@ -13,31 +13,31 @@
 
 namespace {
 
-using inspect::contrib::InspectData;
+using diagnostics::reader::InspectData;
 
 TEST(InspectDataTest, ComponentNameExtraction) {
   {
-    std::vector<inspect::contrib::InspectData> data;
+    std::vector<diagnostics::reader::InspectData> data;
     rapidjson::Document doc;
     doc.Parse(R"({"moniker": "root/hub/my_component"})");
-    inspect::contrib::EmplaceInspect(std::move(doc), &data);
+    diagnostics::reader::EmplaceInspect(std::move(doc), &data);
     InspectData &datum = data[0];
     EXPECT_EQ("root/hub/my_component", datum.moniker());
   }
   {
-    std::vector<inspect::contrib::InspectData> data;
+    std::vector<diagnostics::reader::InspectData> data;
     rapidjson::Document doc;
     doc.Parse(R"({"moniker": "abcd"})");
-    inspect::contrib::EmplaceInspect(std::move(doc), &data);
+    diagnostics::reader::EmplaceInspect(std::move(doc), &data);
     InspectData &datum = data[0];
     EXPECT_EQ("abcd", datum.moniker());
   }
   {
     // Can't find path, empty return.
-    std::vector<inspect::contrib::InspectData> data;
+    std::vector<diagnostics::reader::InspectData> data;
     rapidjson::Document doc;
     doc.Parse(R"({"not_moniker": "abcd"})");
-    inspect::contrib::EmplaceInspect(std::move(doc), &data);
+    diagnostics::reader::EmplaceInspect(std::move(doc), &data);
     InspectData &datum = data[0];
     EXPECT_EQ("", datum.moniker());
   }
@@ -45,29 +45,29 @@ TEST(InspectDataTest, ComponentNameExtraction) {
 
 TEST(InspectDataTest, ContentExtraction) {
   {
-    std::vector<inspect::contrib::InspectData> data;
+    std::vector<diagnostics::reader::InspectData> data;
     rapidjson::Document doc;
     doc.Parse(R"({"payload": {"value": "hello", "count": 10}})");
-    inspect::contrib::EmplaceInspect(std::move(doc), &data);
+    diagnostics::reader::EmplaceInspect(std::move(doc), &data);
     InspectData &datum = data[0];
     EXPECT_EQ(rapidjson::Value("hello"), datum.GetByPath({"value"}));
     EXPECT_EQ(rapidjson::Value(10), datum.GetByPath({"count"}));
     EXPECT_EQ(rapidjson::Value(), datum.GetByPath({"value", "1234"}));
   }
   {
-    std::vector<inspect::contrib::InspectData> data;
+    std::vector<diagnostics::reader::InspectData> data;
     rapidjson::Document doc;
     doc.Parse(R"({"payload": {"name/with/slashes": "hello"}})");
-    inspect::contrib::EmplaceInspect(std::move(doc), &data);
+    diagnostics::reader::EmplaceInspect(std::move(doc), &data);
     InspectData &datum = data[0];
     EXPECT_EQ(rapidjson::Value("hello"), datum.GetByPath({"name/with/slashes"}));
   }
   {
     // Content is missing, return nullptr.
-    std::vector<inspect::contrib::InspectData> data;
+    std::vector<diagnostics::reader::InspectData> data;
     rapidjson::Document doc;
     doc.Parse(R"({"moniker": "root/hub/my_component"})");
-    inspect::contrib::EmplaceInspect(std::move(doc), &data);
+    diagnostics::reader::EmplaceInspect(std::move(doc), &data);
     InspectData &datum = data[0];
     EXPECT_EQ(rapidjson::Value(), datum.GetByPath({"value"}));
   }
@@ -75,14 +75,14 @@ TEST(InspectDataTest, ContentExtraction) {
 
 TEST(InspectDataTest, ArrayValueCtor) {
   {
-    std::vector<inspect::contrib::InspectData> data;
+    std::vector<diagnostics::reader::InspectData> data;
     rapidjson::Document doc;
     doc.Parse(R"([
       {"payload": {"value": "hello", "count": 10}},
       {"payload": {"value": "world", "count": 40}}
     ])");
 
-    inspect::contrib::EmplaceInspect(std::move(doc), &data);
+    diagnostics::reader::EmplaceInspect(std::move(doc), &data);
     InspectData &first = data[0];
     InspectData &second = data[1];
 
@@ -98,10 +98,10 @@ TEST(InspectDataTest, ArrayValueCtor) {
 
 TEST(InspectDataTest, ParseJSON) {
   {
-    std::vector<inspect::contrib::InspectData> data;
+    std::vector<diagnostics::reader::InspectData> data;
     rapidjson::Document doc;
     doc.Parse(R"({})");
-    inspect::contrib::EmplaceInspect(std::move(doc), &data);
+    diagnostics::reader::EmplaceInspect(std::move(doc), &data);
     EXPECT_EQ("", data[0].moniker());
     EXPECT_EQ(0, data[0].version());
     EXPECT_EQ("", data[0].metadata().filename);
@@ -111,7 +111,7 @@ TEST(InspectDataTest, ParseJSON) {
     EXPECT_EQ(std::nullopt, data[0].payload());
   }
   {
-    std::vector<inspect::contrib::InspectData> data;
+    std::vector<diagnostics::reader::InspectData> data;
     rapidjson::Document doc;
     doc.Parse(R"({"metadata":
       {
@@ -121,7 +121,7 @@ TEST(InspectDataTest, ParseJSON) {
       },
       "moniker": "bootstrap/archivist",
       "version": 1})");
-    inspect::contrib::EmplaceInspect(std::move(doc), &data);
+    diagnostics::reader::EmplaceInspect(std::move(doc), &data);
     EXPECT_EQ("bootstrap/archivist", data[0].moniker());
     EXPECT_EQ(1, data[0].version());
     EXPECT_EQ("fuchsia.inspect.Tree", data[0].metadata().filename);
@@ -131,7 +131,7 @@ TEST(InspectDataTest, ParseJSON) {
     EXPECT_EQ(std::nullopt, data[0].payload());
   }
   {
-    std::vector<inspect::contrib::InspectData> data;
+    std::vector<diagnostics::reader::InspectData> data;
     rapidjson::Document doc;
     doc.Parse(R"({"metadata":
       {
@@ -167,7 +167,7 @@ TEST(InspectDataTest, ParseJSON) {
       },
       "moniker": "bootstrap/archivist",
       "version": 1})");
-    inspect::contrib::EmplaceInspect(std::move(doc), &data);
+    diagnostics::reader::EmplaceInspect(std::move(doc), &data);
     EXPECT_EQ("bootstrap/archivist", data[0].moniker());
     EXPECT_EQ(1, data[0].version());
     EXPECT_EQ("fuchsia.inspect.Tree", data[0].metadata().filename);

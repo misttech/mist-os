@@ -7,10 +7,10 @@
 #include <fuchsia/sys2/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/diagnostics/reader/cpp/archive_reader.h>
 #include <lib/fpromise/bridge.h>
 #include <lib/fpromise/result.h>
 #include <lib/fpromise/single_threaded_executor.h>
-#include <lib/inspect/contrib/cpp/archive_reader.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/sys/cpp/component_context.h>
@@ -318,13 +318,13 @@ TEST_F(AccessorTest, StreamDiagnosticsInspect) {
 
   auto moniker = "realm_builder\\:" + realm.component().GetChildName() + "/inspect-publisher";
   auto selector = moniker + ":root";
-  inspect::contrib::ArchiveReader reader(std::move(accessor), {selector});
+  diagnostics::reader::ArchiveReader reader(std::move(accessor), {selector});
 
-  fpromise::result<std::vector<inspect::contrib::InspectData>, std::string> actual_result;
+  fpromise::result<std::vector<diagnostics::reader::InspectData>, std::string> actual_result;
   fpromise::single_threaded_executor executor;
 
   executor.schedule_task(reader.SnapshotInspectUntilPresent({moniker}).then(
-      [&](fpromise::result<std::vector<inspect::contrib::InspectData>, std::string>&
+      [&](fpromise::result<std::vector<diagnostics::reader::InspectData>, std::string>&
               result) mutable { actual_result = std::move(result); }));
 
   executor.run();

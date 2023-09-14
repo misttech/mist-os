@@ -5,10 +5,10 @@
 #include <fuchsia/component/cpp/fidl.h>
 #include <fuchsia/component/decl/cpp/fidl.h>
 #include <lib/async/cpp/executor.h>
+#include <lib/diagnostics/reader/cpp/archive_reader.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
-#include <lib/inspect/contrib/cpp/archive_reader.h>
 #include <lib/sys/cpp/component_context.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,7 +21,7 @@
 
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 
-using inspect::contrib::InspectData;
+using diagnostics::reader::InspectData;
 
 constexpr char kTestCollectionName[] = "test_apps";
 constexpr char kTestChildUrl[] = "#meta/memory_monitor_test_app.cm";
@@ -96,7 +96,7 @@ class InspectTest : public gtest::RealLoopFixture {
   fpromise::result<InspectData> GetInspect() {
     fuchsia::diagnostics::ArchiveAccessorPtr archive;
     context_->svc()->Connect(archive.NewRequest());
-    inspect::contrib::ArchiveReader reader(std::move(archive), {ChildSelector()});
+    diagnostics::reader::ArchiveReader reader(std::move(archive), {ChildSelector()});
     fpromise::result<std::vector<InspectData>, std::string> result;
     async::Executor executor(dispatcher());
     executor.schedule_task(

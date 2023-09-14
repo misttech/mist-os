@@ -7,8 +7,8 @@
 
 #include <fuchsia/diagnostics/cpp/fidl.h>
 #include <fuchsia/virtualization/hardware/cpp/fidl.h>
+#include <lib/diagnostics/reader/cpp/archive_reader.h>
 #include <lib/fidl/cpp/binding_set.h>
-#include <lib/inspect/contrib/cpp/archive_reader.h>
 
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/virtualization/bin/vmm/device/phys_mem.h"
@@ -19,7 +19,7 @@ class TestWithDevice : public gtest::RealLoopFixture {
   zx_status_t MakeStartInfo(size_t phys_mem_size,
                             fuchsia::virtualization::hardware::StartInfo* start_info);
 
-  inspect::contrib::InspectData GetInspect(const std::string& selector, const std::string& name);
+  diagnostics::reader::InspectData GetInspect(const std::string& selector, const std::string& name);
 
   zx::event event_;
   PhysMem phys_mem_;

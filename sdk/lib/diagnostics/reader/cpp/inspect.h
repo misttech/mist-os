@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_INSPECT_CONTRIB_CPP_INSPECT_H_
-#define LIB_INSPECT_CONTRIB_CPP_INSPECT_H_
+#ifndef LIB_DIAGNOSTICS_READER_CPP_INSPECT_H_
+#define LIB_DIAGNOSTICS_READER_CPP_INSPECT_H_
 
 #include <fuchsia/diagnostics/cpp/fidl.h>
 #include <lib/async/cpp/executor.h>
@@ -19,7 +19,7 @@
 
 #include "lib/stdcompat/optional.h"
 
-namespace inspect::contrib {
+namespace diagnostics::reader {
 
 // Container for inspect data returned by a component.
 //
@@ -90,12 +90,12 @@ class InspectData {
   InspectMetadata metadata_;
 
   // Payload containing diagnostics data, if the payload exists, else empty.
-  Hierarchy payload_;
+  inspect::Hierarchy payload_;
 
   // Schema version.
   uint64_t version_;
 };
 
-}  // namespace inspect::contrib
+}  // namespace diagnostics::reader
 
-#endif  // LIB_INSPECT_CONTRIB_CPP_INSPECT_H_
+#endif  // LIB_DIAGNOSTICS_READER_CPP_INSPECT_H_

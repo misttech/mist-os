@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_INSPECT_CONTRIB_CPP_ARCHIVE_READER_H_
-#define LIB_INSPECT_CONTRIB_CPP_ARCHIVE_READER_H_
+#ifndef LIB_DIAGNOSTICS_READER_CPP_ARCHIVE_READER_H_
+#define LIB_DIAGNOSTICS_READER_CPP_ARCHIVE_READER_H_
 
 #include <fuchsia/diagnostics/cpp/fidl.h>
 #include <lib/async/cpp/executor.h>
+#include <lib/diagnostics/reader/cpp/inspect.h>
 #include <lib/fpromise/bridge.h>
 #include <lib/fpromise/promise.h>
 #include <lib/fpromise/scope.h>
-#include <lib/inspect/contrib/cpp/inspect.h>
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/stdcompat/optional.h>
 
@@ -19,7 +19,7 @@
 
 #include <rapidjson/document.h>
 
-namespace inspect::contrib {
+namespace diagnostics::reader {
 
 // ArchiveReader supports reading Inspect data from an Archive.
 class ArchiveReader {
@@ -65,6 +65,6 @@ class ArchiveReader {
 
 void EmplaceInspect(rapidjson::Document document, std::vector<InspectData>* out);
 
-}  // namespace inspect::contrib
+}  // namespace diagnostics::reader
 
-#endif  // LIB_INSPECT_CONTRIB_CPP_ARCHIVE_READER_H_
+#endif  // LIB_DIAGNOSTICS_READER_CPP_ARCHIVE_READER_H_

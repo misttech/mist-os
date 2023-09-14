@@ -29,7 +29,7 @@ executable("test") {
   sources = [ "test.cc" ]
 
   deps = [
-    "//sdk/lib/inspect/contrib/cpp:archive_reader",
+    "//sdk/lib/diagnostics/reader/cpp:archive_reader",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl/test:gtest_main",

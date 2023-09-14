@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/inspect/contrib/cpp/archive_reader.h>
-#include <lib/inspect/contrib/cpp/constants.h>
-#include <lib/inspect/contrib/cpp/inspect.h>
+#include <lib/diagnostics/reader/cpp/archive_reader.h>
+#include <lib/diagnostics/reader/cpp/constants.h>
+#include <lib/diagnostics/reader/cpp/inspect.h>
 
 #include <stack>
 
@@ -157,7 +157,7 @@ inspect::Hierarchy ParsePayload(std::string name, const rapidjson::Value::Object
 
 }  // namespace
 
-namespace inspect::contrib {
+namespace diagnostics::reader {
 
 InspectData::InspectData(rapidjson::Document document) : document_(std::move(document)) {
   if (document_.HasMember(kPathName) && document_[kPathName].IsString()) {
@@ -260,4 +260,4 @@ void InspectData::Sort() {
   }
 }
 
-}  // namespace inspect::contrib
+}  // namespace diagnostics::reader

@@ -46,7 +46,7 @@ source_set("test_with_device") {
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.virtualization.hardware:fuchsia.virtualization.hardware_hlcpp",
-    "//sdk/lib/inspect/contrib/cpp:archive_reader",
+    "//sdk/lib/diagnostics/reader/cpp:archive_reader",
     "//src/lib/testing/loop_fixture",
     "//src/virtualization/bin/vmm/device:lib",
     "//zircon/system/ulib/virtio",

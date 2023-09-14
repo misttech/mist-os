@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_INSPECT_CONTRIB_CPP_CONSTANTS_H_
-#define LIB_INSPECT_CONTRIB_CPP_CONSTANTS_H_
+#ifndef LIB_DIAGNOSTICS_READER_CPP_CONSTANTS_H_
+#define LIB_DIAGNOSTICS_READER_CPP_CONSTANTS_H_
 
-namespace inspect::contrib {
+namespace diagnostics::reader {
 
 constexpr char kPathName[] = "moniker";
 constexpr char kContentsName[] = "payload";
@@ -17,6 +17,6 @@ constexpr char kMetadataTimestamp[] = "timestamp";
 constexpr char kMetadataErrors[] = "errors";
 constexpr char kMetadataErrorsMessage[] = "message";
 
-}  // namespace inspect::contrib
+}  // namespace diagnostics::reader
 
-#endif  // LIB_INSPECT_CONTRIB_CPP_CONSTANTS_H_
+#endif  // LIB_DIAGNOSTICS_READER_CPP_CONSTANTS_H_

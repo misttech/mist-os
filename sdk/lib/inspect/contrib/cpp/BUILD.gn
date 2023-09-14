@@ -6,18 +6,12 @@ import("//build/components.gni")
 
 group("cpp") {
   testonly = true
-  deps = [
-    ":archive_reader",
-    ":read_visitor",
-  ]
+  deps = [ ":read_visitor" ]
 }
 
 group("tests") {
   testonly = true
-  deps = [
-    ":inspect_contrib_cpp_tests",
-    "tests",
-  ]
+  deps = [ ":inspect_contrib_cpp_tests" ]
 }
 
 source_set("read_visitor") {
@@ -28,26 +22,6 @@ source_set("read_visitor") {
     "//sdk/lib/fit-promise",
     "//sdk/lib/stdcompat",
     "//zircon/system/ulib/inspect",
-  ]
-}
-
-source_set("archive_reader") {
-  sources = [
-    "archive_reader.cc",
-    "archive_reader.h",
-    "constants.h",
-    "inspect.cc",
-    "inspect.h",
-  ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_hlcpp",
-    "//third_party/rapidjson",
-    "//zircon/system/ulib/inspect",
-  ]
-
-  deps = [
-    "//src/lib/fsl",
-    "//src/lib/fxl",
   ]
 }
 
@@ -81,20 +55,6 @@ executable("read_visitor_test") {
   ]
 }
 
-executable("archive_reader_test") {
-  testonly = true
-  output_name = "archive_reader_test"
-  sources = [ "archive_reader_unittest.cc" ]
-  deps = [
-    ":archive_reader",
-    "//zircon/system/ulib/zxtest",
-  ]
-}
-
-fuchsia_unittest_component("archive_reader_unittest") {
-  deps = [ ":archive_reader_test" ]
-}
-
 fuchsia_unittest_component("read_visitor_unittest") {
   deps = [ ":read_visitor_test" ]
 }
@@ -105,7 +65,6 @@ fuchsia_unittest_component("bounded_list_node_unittest") {
 
 fuchsia_test_package("inspect_contrib_cpp_tests") {
   test_components = [
-    ":archive_reader_unittest",
     ":read_visitor_unittest",
     ":bounded_list_node_unittest",
   ]

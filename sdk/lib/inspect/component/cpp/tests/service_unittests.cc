@@ -9,10 +9,10 @@
 #include <fuchsia/diagnostics/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/incoming/cpp/service.h>
+#include <lib/diagnostics/reader/cpp/archive_reader.h>
 #include <lib/fpromise/promise.h>
 #include <lib/inspect/component/cpp/service.h>
 #include <lib/inspect/component/cpp/testing.h>
-#include <lib/inspect/contrib/cpp/archive_reader.h>
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/cpp/reader.h>
@@ -445,7 +445,7 @@ TEST_F(InspectServiceTest, ReadFromComponentInspector) {
   fuchsia::diagnostics::ArchiveAccessorPtr accessor;
   ASSERT_EQ(ZX_OK, context->svc()->Connect(accessor.NewRequest(dispatcher())));
 
-  inspect::contrib::ArchiveReader reader(std::move(accessor), {});
+  diagnostics::reader::ArchiveReader reader(std::move(accessor), {});
 
   auto result = RunPromise(reader.SnapshotInspectUntilPresent({"inspect_writer_app"}));
 
