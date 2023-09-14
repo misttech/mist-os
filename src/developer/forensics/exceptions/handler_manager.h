@@ -28,7 +28,7 @@ class HandlerManager {
 
   // Spawns a dedicated handler for |exception|. This way if the exception handling logic
   // were to crash, e.g., while generating the minidump from the process, only the sub-process would
-  // be in an exception and exceptions.cmx could still handle exceptions in separate sub-processes.
+  // be in an exception and exceptions.cml could still handle exceptions in separate sub-processes.
   void Handle(zx::exception exception);
 
  private:

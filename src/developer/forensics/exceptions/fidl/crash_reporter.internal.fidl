@@ -6,7 +6,7 @@ library fuchsia.exception.internal;
 using zx;
 using fuchsia.component;
 
-/// Internal protocol that allows exceptions.cmx to build crash reports and send them to the system
+/// Internal protocol that allows exceptions.cml to build crash reports and send them to the system
 /// crash reporter in an isolated process.
 closed protocol CrashReporter {
     /// A CrashReporter needs an optional exception, process, and thread so it can attempt to create

@@ -34,7 +34,7 @@ using testing::ElementsAre;
 using testing::UnorderedElementsAre;
 using testing::UnorderedElementsAreArray;
 
-constexpr char kComponentUrl[] = "fuchsia-pkg://fuchsia.com/my-pkg#meta/my-component.cmx";
+constexpr char kComponentUrl[] = "fuchsia-pkg://fuchsia.com/my-pkg#meta/my-component.cm";
 
 class InspectManagerTest : public UnitTestFixture {
  public:

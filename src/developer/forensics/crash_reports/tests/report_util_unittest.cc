@@ -31,11 +31,10 @@ TEST(Shorten, ShortensCorrectly) {
       // Remove trailing whitespace.
       {"system    ", "system"},
       // Remove "fuchsia-pkg://" prefix.
-      {"fuchsia-pkg://fuchsia.com/foo-bar#meta/foo_bar.cmx",
-       "fuchsia.com:foo-bar#meta:foo_bar.cmx"},
+      {"fuchsia-pkg://fuchsia.com/foo-bar#meta/foo_bar.cm", "fuchsia.com:foo-bar#meta:foo_bar.cm"},
       // Remove leading whitespace and "fuchsia-pkg://" prefix.
-      {"     fuchsia-pkg://fuchsia.com/foo-bar#meta/foo_bar.cmx",
-       "fuchsia.com:foo-bar#meta:foo_bar.cmx"},
+      {"     fuchsia-pkg://fuchsia.com/foo-bar#meta/foo_bar.cm",
+       "fuchsia.com:foo-bar#meta:foo_bar.cm"},
       // Replaces runs of '/' with a single ':'.
       {"//////////test/", ":test:"},
   };

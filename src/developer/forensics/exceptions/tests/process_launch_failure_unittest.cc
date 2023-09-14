@@ -17,7 +17,7 @@ using ProcessLaunchFailureTest = UnitTestFixture;
 // The sandbox this test runs in is not permitted to launch processes so the handler subprocess will
 // not be spawned. When this happens Handle should complete without issue, not loop forever.
 //
-// This is tested because we experienced an error where exceptions.cmx could not successfully launch
+// This is tested because we experienced an error where exceptions.cml could not successfully launch
 // subprocesses and ended up handling the same exception in an unterminated loop. For more
 // information, see fxbug.dev/59246.
 TEST_F(ProcessLaunchFailureTest, HandleOnlyOnce) {

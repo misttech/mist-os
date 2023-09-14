@@ -23,13 +23,13 @@ namespace crash_reports {
 // Shorten |program_name| into a shortname by removing the "fuchsia-pkg://" prefix if present and
 // replacing all '/' with ':'.
 //
-// For example `fuchsia-pkg://fuchsia.com/foo-bar#meta/foo_bar.cmx` becomes
-// `fuchsia.com:foo-bar#meta:foo_bar.cmx`.
+// For example `fuchsia-pkg://fuchsia.com/foo-bar#meta/foo_bar.cm` becomes
+// `fuchsia.com:foo-bar#meta:foo_bar.cm`.
 std::string Shorten(std::string program_name);
 
-// Extract the component name without the ".cmx" suffix from |name|, if one is present.
+// Extract the component name without the ".cm" suffix from |name|, if one is present.
 //
-// For example `fuchsia-pkg://fuchsia.com/foo-bar#meta/foo_bar.cmx` becomes
+// For example `fuchsia-pkg://fuchsia.com/foo-bar#meta/foo_bar.cm` becomes
 // `foo_bar`.
 std::string Logname(std::string name);
 

@@ -37,7 +37,7 @@ using inspect::testing::StringIs;
 using testing::Not;
 using testing::UnorderedElementsAreArray;
 
-constexpr char kComponentUrl[] = "fuchsia-pkg://fuchsia.com/my-pkg#meta/my-component.cmx";
+constexpr char kComponentUrl[] = "fuchsia-pkg://fuchsia.com/my-pkg#meta/my-component.cm";
 
 // Unit-tests the server of fuchsia.feedback.CrashReportingProductRegister.
 //
@@ -108,7 +108,7 @@ TEST_F(CrashRegisterTest, Upsert_Basic) {
                                                            })))),
                                      })))))))));
   EXPECT_EQ(ReadRegisterJson(), R"({
-    "fuchsia-pkg://fuchsia.com/my-pkg#meta/my-component.cmx": {
+    "fuchsia-pkg://fuchsia.com/my-pkg#meta/my-component.cm": {
         "name": "some name",
         "version": "some version",
         "channel": "some channel"
@@ -139,7 +139,7 @@ TEST_F(CrashRegisterTest, UpsertWithAck_Basic) {
                                                            })))),
                                      })))))))));
   EXPECT_EQ(ReadRegisterJson(), R"({
-    "fuchsia-pkg://fuchsia.com/my-pkg#meta/my-component.cmx": {
+    "fuchsia-pkg://fuchsia.com/my-pkg#meta/my-component.cm": {
         "name": "some name",
         "version": "some version",
         "channel": "some channel"
@@ -197,7 +197,7 @@ TEST_F(CrashRegisterTest, Upsert_UpdateIfSameComponentUrl) {
                                                   })))),
                             })))))))));
   EXPECT_EQ(ReadRegisterJson(), R"({
-    "fuchsia-pkg://fuchsia.com/my-pkg#meta/my-component.cmx": {
+    "fuchsia-pkg://fuchsia.com/my-pkg#meta/my-component.cm": {
         "name": "some other name",
         "version": "some other version",
         "channel": "some other channel"
@@ -224,7 +224,7 @@ TEST_F(CrashRegisterTest, GetProduct_FromUpsert) {
   };
   EXPECT_THAT(GetProduct(kComponentUrl), expected);
   EXPECT_EQ(ReadRegisterJson(), R"({
-    "fuchsia-pkg://fuchsia.com/my-pkg#meta/my-component.cmx": {
+    "fuchsia-pkg://fuchsia.com/my-pkg#meta/my-component.cm": {
         "name": "some name",
         "version": "some version",
         "channel": "some channel"
@@ -241,7 +241,7 @@ TEST_F(CrashRegisterTest, GetProduct_DifferentUpsert) {
 
   EXPECT_FALSE(HasProduct("some program name"));
   EXPECT_EQ(ReadRegisterJson(), R"({
-    "fuchsia-pkg://fuchsia.com/my-pkg#meta/my-component.cmx": {
+    "fuchsia-pkg://fuchsia.com/my-pkg#meta/my-component.cm": {
         "name": "some name",
         "version": "some version",
         "channel": "some channel"
@@ -310,7 +310,7 @@ TEST_F(CrashRegisterTest, BuildDefaultProduct) {
 
 TEST_F(CrashRegisterTest, ReinitializesFromJson) {
   constexpr char kOtherComponentUrl[] =
-      "fuchsia-pkg://fuchsia.com/my-other-pkg#meta/my-other-component.cmx";
+      "fuchsia-pkg://fuchsia.com/my-other-pkg#meta/my-other-component.cm";
 
   CrashReportingProduct product;
   product.set_name("some name");
