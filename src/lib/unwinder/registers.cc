@@ -90,9 +90,9 @@ std::string Registers::GetRegName(RegisterID reg_id) const {
       "x22", "x23", "x24", "x25", "x26", "x27", "x28", "x29", "lr",  "sp",  "pc",
   };
   static const char* riscv64_names[] = {
-      "pc", "ra", "sp", "gp", "tp",  "t0",  "t1", "t2", "s0", "s1", "a0",
-      "a1", "a2", "a3", "a4", "a5",  "a6",  "a7", "s2", "s3", "s4", "s5",
-      "s6", "s7", "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6",
+      "zero", "ra", "sp", "gp", "tp",  "t0",  "t1", "t2", "s0", "s1", "a0",
+      "a1",   "a2", "a3", "a4", "a5",  "a6",  "a7", "s2", "s3", "s4", "s5",
+      "s6",   "s7", "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6",
   };
 
   const char** names;
@@ -107,6 +107,9 @@ std::string Registers::GetRegName(RegisterID reg_id) const {
       length = sizeof(arm64_names) / sizeof(char*);
       break;
     case Arch::kRiscv64:
+      if (reg_id == RegisterID::kRiscv64_pc) {
+        return "pc";
+      }
       names = riscv64_names;
       length = sizeof(riscv64_names) / sizeof(char*);
       break;

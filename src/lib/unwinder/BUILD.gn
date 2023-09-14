@@ -90,13 +90,6 @@ test("unwinder_tests_bin") {
 
 fuchsia_unittest_package("unwinder_tests") {
   deps = [ ":unwinder_tests_bin" ]
-
-  if (current_cpu == "riscv64") {
-    # TODO(fxbug.dev/132426): Make the test pass on RISC-V and remove this.
-    test_specs = {
-      environments = []
-    }
-  }
 }
 
 group("tests") {

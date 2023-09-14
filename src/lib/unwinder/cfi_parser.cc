@@ -61,10 +61,11 @@ CfiParser::CfiParser(Registers::Arch arch, uint64_t code_alignment_factor,
   };
 
   static const RegisterID riscv64_preserved[] = {
-      RegisterID::kRiscv64_s0, RegisterID::kRiscv64_s1,  RegisterID::kRiscv64_s2,
-      RegisterID::kRiscv64_s3, RegisterID::kRiscv64_s4,  RegisterID::kRiscv64_s5,
-      RegisterID::kRiscv64_s6, RegisterID::kRiscv64_s7,  RegisterID::kRiscv64_s8,
-      RegisterID::kRiscv64_s9, RegisterID::kRiscv64_s10, RegisterID::kRiscv64_s11,
+      RegisterID::kRiscv64_gp,  RegisterID::kRiscv64_tp,  RegisterID::kRiscv64_s0,
+      RegisterID::kRiscv64_s1,  RegisterID::kRiscv64_s2,  RegisterID::kRiscv64_s3,
+      RegisterID::kRiscv64_s4,  RegisterID::kRiscv64_s5,  RegisterID::kRiscv64_s6,
+      RegisterID::kRiscv64_s7,  RegisterID::kRiscv64_s8,  RegisterID::kRiscv64_s9,
+      RegisterID::kRiscv64_s10, RegisterID::kRiscv64_s11,
   };
 
   const RegisterID* preserved;
