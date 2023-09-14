@@ -449,9 +449,6 @@
                 "PivotRootTest.ChangesCwdForAllProcesses",
                 "PivotRootTest.MovesOldRoot",
 
-                // SignalMask[Blocks/Allows]Signal require timers to send signals.
-                "PpollTest.SignalMaskBlocksSignal",
-
                 // prctl_setuid_test
                 "PrctlKeepCapsSetuidTest.NoKeepCapsAfterNewUserNamespace",
 
@@ -1056,6 +1053,11 @@
 
                 // Panics in process_builder.
                 "ElfTest.PIEOverflow",
+
+                // SignalMask[Blocks/Allows]Signal require timers to send signals.
+                // Passes sometimes, so it has to be skipped.
+                // TODO(b/297438987): Re-enable once timers are implemented.
+                "PpollTest.SignalMaskBlocksSignal",
             ],
         },
     ],
