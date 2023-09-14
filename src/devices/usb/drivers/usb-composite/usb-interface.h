@@ -21,7 +21,7 @@ namespace usb_composite {
 
 class UsbComposite;
 class UsbInterface;
-using UsbInterfaceType = ddk::Device<UsbInterface, ddk::GetProtocolable>;
+using UsbInterfaceType = ddk::Device<UsbInterface, ddk::GetProtocolable, ddk::Unbindable>;
 
 // This class represents a USB interface in a composite device.
 class UsbInterface : public UsbInterfaceType,
@@ -50,6 +50,7 @@ class UsbInterface : public UsbInterfaceType,
 
   // Device protocol implementation.
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
+  void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
 
   // fuchsia_hardware_usb_new::Usb protocol implementation.

@@ -155,6 +155,11 @@ zx_status_t UsbInterface::DdkGetProtocol(uint32_t proto_id, void* protocol) {
   }
 }
 
+void UsbInterface::DdkUnbind(ddk::UnbindTxn txn) {
+  composite_->RemoveInterface(this);
+  txn.Reply();
+}
+
 void UsbInterface::DdkRelease() { delete this; }
 
 // for determining index into active_endpoints[]

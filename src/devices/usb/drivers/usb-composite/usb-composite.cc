@@ -33,6 +33,18 @@ zx_status_t UsbComposite::Create(void* ctx, zx_device_t* parent) {
   return ZX_OK;
 }
 
+void UsbComposite::RemoveInterface(UsbInterface* interface) {
+  size_t index = 0;
+  fbl::AutoLock _(&lock_);
+  for (auto intf : interfaces_) {
+    if (intf == interface) {
+      interfaces_.erase(index);
+      return;
+    }
+    index++;
+  }
+}
+
 // returns whether the interface with the given id was removed.
 bool UsbComposite::RemoveInterfaceById(uint8_t interface_id) {
   size_t index = 0;

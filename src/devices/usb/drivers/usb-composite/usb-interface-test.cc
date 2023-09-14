@@ -59,6 +59,12 @@ zx_status_t UsbComposite::SetInterface(uint8_t interface_id, uint8_t alt_setting
   return ZX_OK;
 }
 
+std::atomic_uint32_t interface_count_ = 0;
+void UsbComposite::RemoveInterface(UsbInterface* interface) {
+  EXPECT_GT(interface_count_.load(), 0);
+  interface_count_--;
+}
+
 template <auto* descriptors>
 class UsbInterfaceTest : public zxtest::Test {
  public:
@@ -78,6 +84,8 @@ class UsbInterfaceTest : public zxtest::Test {
 
     device_async_remove(composite_dev_);
     mock_ddk::ReleaseFlaggedDevices(fake_parent_.get());
+
+    EXPECT_EQ(interface_count_.load(), 0);
   }
 
   void InitTest();
@@ -113,6 +121,7 @@ class UsbInterfaceTest : public zxtest::Test {
 
     EXPECT_OK(ifc->DdkAdd("test-interface", DEVICE_ADD_NON_BINDABLE));
     ifc.release();
+    interface_count_.fetch_add(1);
     auto* child = composite_dev_->GetLatestChild();
     dut_ = child->GetDeviceContext<UsbInterface>();
 

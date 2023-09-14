@@ -43,6 +43,8 @@ class UsbComposite : public UsbCompositeType {
     return reinterpret_cast<usb_configuration_descriptor_t*>(config_desc_.data());
   }
 
+  void RemoveInterface(UsbInterface* interface);
+
  private:
   template <auto* descriptors>
   friend class UsbInterfaceTest;
