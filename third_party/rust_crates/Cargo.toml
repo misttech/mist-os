@@ -311,7 +311,7 @@ tinyjson = "2.5.0"
 # TODO(fxbug.dev/106164) Enable the "rt" and "net" features here once gnaw
 # supports target-specific feature resolution
 tokio = { version = "1.19.2", default-features = false }
-tokio-stream = "0.1"
+tokio-stream = "0.1.14"
 zip = { version = "0.5.5", default-features = false, features = ["deflate"] }
 
 # For crates we don't want to vendor, follow instructions at

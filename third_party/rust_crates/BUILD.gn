@@ -972,7 +972,7 @@ group("tokio-rustls") {
 
 if (!(current_os == "fuchsia")) {
   group("tokio-stream") {
-    public_deps = [ ":tokio-stream-v0_1_11" ]
+    public_deps = [ ":tokio-stream-v0_1_14" ]
   }
 }
 
@@ -11481,10 +11481,10 @@ rust_library("tokio-rustls-v0_22_0") {
   visibility = [ ":*" ]
 }
 
-rust_library("tokio-stream-v0_1_11") {
+rust_library("tokio-stream-v0_1_14") {
   crate_name = "tokio_stream"
-  crate_root = "//third_party/rust_crates/vendor/tokio-stream-0.1.11/src/lib.rs"
-  output_name = "tokio_stream-228fc6dc03fe9295"
+  crate_root = "//third_party/rust_crates/vendor/tokio-stream-0.1.14/src/lib.rs"
+  output_name = "tokio_stream-fc77bc8a6af1f782"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -11496,9 +11496,9 @@ rust_library("tokio-stream-v0_1_11") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=228fc6dc03fe9295",
-    "-Cextra-filename=-228fc6dc03fe9295",
+    "--edition=2021",
+    "-Cmetadata=fc77bc8a6af1f782",
+    "-Cextra-filename=-fc77bc8a6af1f782",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"time\"",
   ]

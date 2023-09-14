@@ -10,10 +10,10 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2018"
-rust-version = "1.49"
+edition = "2021"
+rust-version = "1.56"
 name = "tokio-stream"
-version = "0.1.11"
+version = "0.1.14"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 description = """
 Utilities to work with `Stream` and `tokio`.
@@ -22,14 +22,15 @@ homepage = "https://tokio.rs"
 categories = ["asynchronous"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
+resolver = "1"
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = [
+rustc-args = [
     "--cfg",
     "docsrs",
 ]
-rustc-args = [
+rustdoc-args = [
     "--cfg",
     "docsrs",
 ]
@@ -41,7 +42,7 @@ version = "0.3.0"
 version = "0.2.0"
 
 [dependencies.tokio]
-version = "1.8.0"
+version = "1.15.0"
 features = ["sync"]
 
 [dependencies.tokio-util]
@@ -68,6 +69,14 @@ features = [
 [features]
 default = ["time"]
 fs = ["tokio/fs"]
+full = [
+    "time",
+    "net",
+    "io-util",
+    "fs",
+    "sync",
+    "signal",
+]
 io-util = ["tokio/io-util"]
 net = ["tokio/net"]
 signal = ["tokio/signal"]
@@ -76,6 +85,3 @@ sync = [
     "tokio-util",
 ]
 time = ["tokio/time"]
-
-[target."cfg(not(target_arch = \"wasm32\"))".dev-dependencies.proptest]
-version = "1"

@@ -23,8 +23,8 @@ pin_project! {
     }
 }
 
-/// Error returned by `Timeout`.
-#[derive(Debug, PartialEq)]
+/// Error returned by `Timeout` and `TimeoutRepeating`.
+#[derive(Debug, PartialEq, Eq)]
 pub struct Elapsed(());
 
 impl<S: Stream> Timeout<S> {
