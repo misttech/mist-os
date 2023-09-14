@@ -32,7 +32,7 @@ pub enum BuildNamespaceError {
         "while installing capabilities within the namespace entry `{path}`, \
         failed to convert the namespace entry to Directory"
     )]
-    TryIntoDirectoryError { path: NamespacePath },
+    Conversion { path: NamespacePath },
 }
 
 impl NamespaceBuilder {
@@ -98,9 +98,9 @@ impl NamespaceBuilder {
             .flatten()
             .into_iter()
             .map(|(path, cap)| -> Result<NamespaceEntry, BuildNamespaceError> {
-                let directory: Directory = cap.try_into().map_err(|()| {
-                    BuildNamespaceError::TryIntoDirectoryError { path: path.clone() }
-                })?;
+                let directory: Directory = cap
+                    .try_into()
+                    .map_err(|()| BuildNamespaceError::Conversion { path: path.clone() })?;
                 let (client_end, fut) = Box::new(directory).to_zx_handle();
                 if let Some(fut) = fut {
                     futures.push(fut);

@@ -1,0 +1,38 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.component;
+using fuchsia.component.sandbox;
+
+@available(added=HEAD)
+type NamespaceDictPair = resource struct {
+    path string:MAX_PATH_LENGTH;
+    dict client_end:fuchsia.component.sandbox.Dict;
+};
+
+/// Error returned from methods in [`Namespace`].
+@available(added=HEAD)
+type NamespaceError = flexible enum {
+    /// Path has an embedded nul.
+    EMBEDDED_NUL = 1;
+
+    /// The parent of a parent shares a prefix with another namespace entry
+    SHADOW = 2;
+
+    /// Two entries have the same namespace path.
+    DUPLICATE = 3;
+
+    /// Failed to convert a namespace dictionary to a directory.
+    CONVERSION = 4;
+};
+
+/// Protocol for performing namespace operations.
+@available(added=HEAD)
+@discoverable
+closed protocol Namespace {
+    strict CreateFromDicts(resource struct {
+        entries vector<NamespaceDictPair>:MAX;
+    }) -> (resource struct {
+        entries vector<NamespaceEntry>:MAX;
+    }) error NamespaceError;
+};

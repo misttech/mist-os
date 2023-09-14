@@ -509,6 +509,9 @@ mod tests {
                 let _ = responder.send(Ok(()));
             }
             fcomponent::ControllerRequest::IsStarted { .. } => unimplemented!(),
+            fcomponent::ControllerRequest::GetExposedDict { .. } => {
+                unimplemented!()
+            }
         });
     }
 

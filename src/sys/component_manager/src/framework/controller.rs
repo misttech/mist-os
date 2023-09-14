@@ -80,6 +80,9 @@ pub async fn serve_controller(
                 let component = component.unwrap();
                 responder.send(Ok(component.lock_execution().await.runtime.is_some()))?;
             }
+            fcomponent::ControllerRequest::GetExposedDict { .. } => {
+                unimplemented!();
+            }
         }
     }
     Ok(())

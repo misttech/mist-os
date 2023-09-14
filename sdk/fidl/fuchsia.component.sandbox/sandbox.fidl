@@ -77,3 +77,19 @@ closed protocol Receiver {
         capability Capability;
     });
 };
+
+/// Entrypoint for instantiation of sandbox types.
+@discoverable
+closed protocol Factory {
+    /// Create a connector (pair of `Sender` and `Receiver`).
+    strict CreateConnector(resource struct {
+        sender server_end:Sender;
+        receiver client_end:Receiver;
+    });
+
+    /// Create a dictionary initialized with `items`.
+    strict CreateDict(resource struct {
+        items vector<DictItem>:MAX;
+        server_end server_end:Dict;
+    }) -> () error DictError;
+};

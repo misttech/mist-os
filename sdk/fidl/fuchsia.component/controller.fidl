@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 library fuchsia.component;
 
+using fuchsia.component.sandbox;
 using fuchsia.io;
 using fuchsia.process;
 
@@ -23,6 +24,12 @@ closed protocol Controller {
     strict IsStarted() -> (resource struct {
         is_started bool;
     }) error Error;
+
+    /// Returns the dictionary containing the component's exposed capabilities.
+    @available(added=HEAD)
+    strict GetExposedDict(resource struct {
+        dict server_end:fuchsia.component.sandbox.Dict;
+    });
 };
 
 @available(added=14)

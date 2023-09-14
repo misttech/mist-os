@@ -13,12 +13,14 @@ fidl("fuchsia.component") {
     "controller.fidl",
     "error.fidl",
     "events.fidl",
+    "namespace.fidl",
     "overview.fidl",
     "realm.fidl",
     "types.fidl",
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.component.decl",
+    "//sdk/fidl/fuchsia.component.sandbox",
     "//sdk/fidl/fuchsia.io",
     "//sdk/fidl/fuchsia.process",
     "//sdk/fidl/fuchsia.url",

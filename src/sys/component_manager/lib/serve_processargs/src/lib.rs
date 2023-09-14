@@ -595,7 +595,7 @@ mod tests {
 
         assert_matches!(
             add_to_processargs(dict, &mut processargs, &delivery_map, ignore()).err().unwrap(),
-            DeliveryError::NamespaceError(BuildNamespaceError::TryIntoDirectoryError {
+            DeliveryError::NamespaceError(BuildNamespaceError::Conversion {
                 path, ..
             })
             if path.as_ref() == "/svc"

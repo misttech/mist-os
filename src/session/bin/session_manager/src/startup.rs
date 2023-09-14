@@ -278,6 +278,9 @@ mod tests {
                                 let _ = responder.send(Ok(()));
                             }
                             fcomponent::ControllerRequest::IsStarted { .. } => unimplemented!(),
+                            fcomponent::ControllerRequest::GetExposedDict { .. } => {
+                                unimplemented!()
+                            }
                         }
                     });
 
@@ -323,6 +326,9 @@ mod tests {
                                 let _ = responder.send(Ok(()));
                             }
                             fcomponent::ControllerRequest::IsStarted { .. } => unimplemented!(),
+                            fcomponent::ControllerRequest::GetExposedDict { .. } => {
+                                unimplemented!()
+                            }
                         }
                     });
                     let _ = responder.send(Ok(()));
