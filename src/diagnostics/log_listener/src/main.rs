@@ -11,11 +11,6 @@ use anyhow::{format_err, Error};
 use argh::FromArgs;
 use async_trait::async_trait;
 use chrono::TimeZone;
-use diagnostics_data::LogTextColor;
-use diagnostics_data::LogTextDisplayOptions;
-use diagnostics_data::LogTimeDisplayFormat;
-use diagnostics_data::Timestamp;
-use diagnostics_data::Timezone;
 use ffx_writer::Format;
 use ffx_writer::MachineWriter;
 use fidl_fuchsia_diagnostics::StreamParameters;
@@ -30,16 +25,12 @@ use log_command as log_utils;
 use log_command::log_formatter;
 use log_formatter::dump_logs_from_socket as read_logs_from_socket;
 use log_formatter::DefaultLogFormatter;
-use log_formatter::DeviceOrLocalTimestamp;
 use log_formatter::LogEntry;
-use log_formatter::LogFormatterOptions;
 use log_formatter::Symbolize;
-use log_utils::filter::LogFilterCriteria;
 use log_utils::log_formatter::BootTimeAccessor;
 use log_utils::DumpCommand;
 use log_utils::LogCommand;
 use log_utils::LogSubCommand;
-use log_utils::TimeFormat;
 use log_utils::WatchCommand;
 use regex::{Captures, Regex};
 use selectors::{self, VerboseError};
@@ -1109,11 +1100,11 @@ fn handle_early_exit(early_exit: argh::EarlyExit) -> ! {
 
 /// Main entrypoint for the log_listener rewrite
 async fn new_log_main() -> Result<(), Error> {
-    let (cmd, sub_command) = log_command_from_args(env::args().collect());
     let (sender, receiver) = fuchsia_zircon::Socket::create_stream();
     let proxy = connect_to_protocol::<ArchiveAccessorMarker>().unwrap();
     let is_json =
         std::env::vars().any(|value| value == ("machine".to_string(), "json".to_string()));
+    let (mut cmd, sub_command) = log_command_from_args(env::args().collect());
     let stream_mode = if matches!(sub_command, LogSubCommand::Dump(..)) {
         fidl_fuchsia_diagnostics::StreamMode::Snapshot
     } else {
@@ -1143,72 +1134,11 @@ async fn new_log_main() -> Result<(), Error> {
         )
         .await
         .unwrap();
+    cmd.sub_command = Some(sub_command);
     let boot_ts = fuchsia_runtime::utc_time() - zx::Time::get_monotonic();
-    let mut formatter = DefaultLogFormatter::new(
-        LogFilterCriteria::default(),
+    let mut formatter = DefaultLogFormatter::<MachineWriter<LogEntry>>::new_from_args(
+        &cmd,
         MachineWriter::new(if is_json { Some(Format::Json) } else { None }),
-        LogFormatterOptions {
-            raw: cmd.raw,
-            display: if is_json {
-                None
-            } else {
-                Some(LogTextDisplayOptions {
-                    show_tags: !cmd.hide_tags,
-                    show_file: !cmd.hide_file,
-                    color: if !cmd.no_color {
-                        LogTextColor::BySeverity
-                    } else {
-                        LogTextColor::None
-                    },
-                    time_format: match cmd.clock {
-                        TimeFormat::Monotonic => LogTimeDisplayFormat::Original,
-                        TimeFormat::Local => LogTimeDisplayFormat::WallTime {
-                            tz: Timezone::Local,
-
-                            // This will receive a correct value when logging actually starts,
-                            // see `set_boot_timestamp()` method on the log formatter.
-                            offset: 0,
-                        },
-                        TimeFormat::Utc => LogTimeDisplayFormat::WallTime {
-                            tz: Timezone::Utc,
-
-                            // This will receive a correct value when logging actually starts,
-                            // see `set_boot_timestamp()` method on the log formatter.
-                            offset: 0,
-                        },
-                    },
-                    show_metadata: cmd.show_metadata,
-                    show_full_moniker: cmd.show_full_moniker,
-                })
-            },
-            highlight_spam: false,
-            since: cmd
-                .since
-                .as_ref()
-                .map(|value| DeviceOrLocalTimestamp {
-                    timestamp: Timestamp::from(value.naive_utc().timestamp_nanos()),
-                    is_monotonic: false,
-                })
-                .or_else(|| {
-                    cmd.since_monotonic.map(|value| DeviceOrLocalTimestamp {
-                        timestamp: Timestamp::from(value.as_nanos() as i64),
-                        is_monotonic: true,
-                    })
-                }),
-            until: cmd
-                .until
-                .as_ref()
-                .map(|value| DeviceOrLocalTimestamp {
-                    timestamp: Timestamp::from(value.naive_utc().timestamp_nanos()),
-                    is_monotonic: false,
-                })
-                .or_else(|| {
-                    cmd.until_monotonic.map(|value| DeviceOrLocalTimestamp {
-                        timestamp: Timestamp::from(value.as_nanos() as i64),
-                        is_monotonic: true,
-                    })
-                }),
-        },
     );
     formatter.set_boot_timestamp(boot_ts.into_nanos());
     let _ = read_logs_from_socket(

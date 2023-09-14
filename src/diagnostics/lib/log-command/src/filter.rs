@@ -8,7 +8,7 @@ use moniker::Moniker;
 use std::str::FromStr;
 
 use crate::{
-    log_formatter::{LogData, LogEntry, LogSpamFilter},
+    log_formatter::{LogData, LogEntry},
     LogCommand,
 };
 
@@ -26,8 +26,6 @@ pub struct LogFilterCriteria {
     tags: Vec<String>,
     /// The tags to exclude.
     exclude_tags: Vec<String>,
-    /// Spam filter
-    spam_filter: Option<Box<dyn LogSpamFilter>>,
     /// Filter by PID
     pid: Option<zx_koid_t>,
     /// Filter by TID
@@ -45,16 +43,13 @@ impl Default for LogFilterCriteria {
             exclude_tags: vec![],
             pid: None,
             tid: None,
-            spam_filter: None,
         }
     }
 }
 
-impl TryFrom<&LogCommand> for LogFilterCriteria {
-    type Error = anyhow::Error;
-
-    fn try_from(cmd: &LogCommand) -> Result<Self, Self::Error> {
-        Ok(Self {
+impl From<&LogCommand> for LogFilterCriteria {
+    fn from(cmd: &LogCommand) -> Self {
+        Self {
             min_severity: cmd.severity,
             filters: cmd.filter.clone(),
             tags: cmd.tag.clone(),
@@ -63,8 +58,7 @@ impl TryFrom<&LogCommand> for LogFilterCriteria {
             exclude_tags: cmd.exclude_tags.clone(),
             pid: cmd.pid.clone(),
             tid: cmd.tid.clone(),
-            spam_filter: None,
-        })
+        }
     }
 }
 
@@ -101,40 +95,6 @@ impl LogFilterCriteria {
             }
             LogEntry { data: LogData::FfxEvent(_), .. } => true,
             LogEntry { data: LogData::MalformedTargetLog(_), .. } => true,
-        }
-    }
-
-    /// Returns true if this is spam.
-    pub fn is_spam(&self, entry: &LogEntry) -> bool {
-        match entry {
-            LogEntry { data: LogData::TargetLog(data), .. } => self.inner_is_spam(
-                data.metadata.file.as_ref().map(|value| value.as_str()),
-                data.metadata.line,
-                data.msg().unwrap_or(""),
-            ),
-            LogEntry { data: LogData::SymbolizedTargetLog(data, message), .. } => self
-                .inner_is_spam(
-                    data.metadata.file.as_ref().map(|value| value.as_str()),
-                    data.metadata.line,
-                    message.as_str(),
-                ),
-            _ => false,
-        }
-    }
-
-    /// Sets a spam filter
-    pub fn with_spam_filter<S>(&mut self, spam_filter: S)
-    where
-        S: LogSpamFilter + 'static,
-    {
-        self.spam_filter = Some(Box::new(spam_filter));
-    }
-
-    /// Returns true if the given `LogsData` matches the filter criteria.
-    fn inner_is_spam(&self, file: Option<&str>, line: Option<u64>, msg: &str) -> bool {
-        match &self.spam_filter {
-            None => false,
-            Some(f) => f.is_spam(file, line, msg),
         }
     }
 

@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use diagnostics_data::{LogTextColor, LogTextDisplayOptions, LogTimeDisplayFormat, Timezone};
 use error::LogError;
 use ffx_log_args::FfxLogCommand;
 use fho::{daemon_protocol, FfxMain, FfxTool, MachineWriter, ToolIO};
@@ -12,12 +11,11 @@ use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_diagnostics::{LogSettingsMarker, LogSettingsProxy, StreamParameters};
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
 use log_command::{
-    filter::LogFilterCriteria,
     log_formatter::{
-        dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, DeviceOrLocalTimestamp,
-        LogEntry, LogFormatter, LogFormatterOptions, WriterContainer,
+        dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, LogEntry, LogFormatter,
+        WriterContainer,
     },
-    LogCommand, LogSubCommand, TimeFormat, WatchCommand,
+    LogCommand, LogSubCommand, WatchCommand,
 };
 use log_symbolizer::{LogSymbolizer, Symbolizer};
 use std::io::Write;
@@ -74,55 +72,19 @@ pub async fn log_impl(
 }
 
 // Main logging event loop.
-async fn log_main(
-    writer: impl ToolIO<OutputItem = LogEntry> + Write + 'static,
+async fn log_main<W>(
+    writer: W,
     rcs_proxy: RemoteControlProxy,
     target_collection_proxy: TargetCollectionProxy,
     cmd: LogCommand,
     symbolizer: impl Symbolizer,
-) -> Result<(), LogError> {
-    let is_json = writer.is_machine();
+) -> Result<(), LogError>
+where
+    W: ToolIO<OutputItem = LogEntry> + Write + 'static,
+{
     let node_name = rcs_proxy.identify_host().await??.nodename;
     let target_query = TargetQuery { string_matcher: node_name, ..Default::default() };
-    let formatter = DefaultLogFormatter::new(
-        LogFilterCriteria::try_from(&cmd)?,
-        writer,
-        LogFormatterOptions {
-            // TODO(https://fxbug.dev/121413): Add support for log options.
-            display: if is_json {
-                None
-            } else {
-                Some(LogTextDisplayOptions {
-                    show_tags: !cmd.hide_tags,
-                    color: if cmd.no_color { LogTextColor::None } else { LogTextColor::BySeverity },
-                    show_metadata: cmd.show_metadata,
-                    time_format: match cmd.clock {
-                        TimeFormat::Monotonic => LogTimeDisplayFormat::Original,
-                        TimeFormat::Local => LogTimeDisplayFormat::WallTime {
-                            tz: Timezone::Local,
-                            // This will receive a correct value when logging actually starts,
-                            // see `set_boot_timestamp()` method on the log formatter.
-                            offset: 0,
-                        },
-                        TimeFormat::Utc => LogTimeDisplayFormat::WallTime {
-                            tz: Timezone::Utc,
-                            // This will receive a correct value when logging actually starts,
-                            // see `set_boot_timestamp()` method on the log formatter.
-                            offset: 0,
-                        },
-                    },
-                    show_file: !cmd.hide_file,
-                    show_full_moniker: cmd.show_full_moniker,
-                    ..Default::default()
-                })
-            },
-            raw: cmd.raw,
-            // TODO(https://fxbug.dev/132262): Remove this when possible.
-            highlight_spam: false,
-            since: DeviceOrLocalTimestamp::new(cmd.since.as_ref(), cmd.since_monotonic.as_ref()),
-            until: DeviceOrLocalTimestamp::new(cmd.until.as_ref(), cmd.until_monotonic.as_ref()),
-        },
-    );
+    let formatter = DefaultLogFormatter::<W>::new_from_args(&cmd, writer);
     log_loop(target_collection_proxy, target_query, cmd, formatter, symbolizer).await?;
     Ok(())
 }
@@ -304,7 +266,7 @@ mod tests {
     use futures::{future::poll_fn, Future, StreamExt};
     use log_command::{
         log_formatter::{LogData, TIMESTAMP_FORMAT},
-        parse_seconds_string_as_duration, parse_time, DumpCommand,
+        parse_seconds_string_as_duration, parse_time, DumpCommand, TimeFormat,
     };
     use log_symbolizer::{FakeSymbolizerForTest, NoOpSymbolizer};
     use selectors::parse_log_interest_selector;
