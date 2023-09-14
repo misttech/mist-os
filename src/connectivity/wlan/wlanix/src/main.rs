@@ -553,7 +553,11 @@ async fn serve_nl80211<S: WlanixService>(
     service: &S,
 ) {
     loop {
-        match reqs.select_next_some().await {
+        let Some(req) = reqs.next().await else {
+            warn!("Nl80211 stream terminated. Should only happen during shutdown.");
+            return;
+        };
+        match req {
             Ok(fidl_wlanix::Nl80211Request::Message { payload, responder, .. }) => {
                 if let Some(message) = payload.message {
                     if let Err(e) =
@@ -1072,6 +1076,10 @@ mod tests {
         let next_mcast = mcast_stream.next();
         pin_mut!(next_mcast);
         assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Ready(None));
+
+        // serve_nl80211 should complete successfully.
+        drop(proxy);
+        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Ready(()));
     }
 
     #[test]
