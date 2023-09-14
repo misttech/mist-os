@@ -372,7 +372,7 @@
 #define __CONSTINIT constinit
 #elif defined(__clang__)
 #define __CONSTINIT [[clang::require_constant_initialization]]
-#elif defined(__GNUC__) && __GNUC__ >= 9
+#elif defined(__GNUC__) && __GNUC__ >= 13
 #define __CONSTINIT __constinit
 #else
 #define __CONSTINIT
