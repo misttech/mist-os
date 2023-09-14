@@ -263,6 +263,7 @@ impl api::Package for Package {
         Box<dyn Iterator<Item = (Box<dyn api::Path>, Box<dyn api::Component>)>>,
         api::PackageComponentsError,
     > {
+        let package: Box<dyn api::Package> = Box::new(self.clone());
         let mut components = vec![];
         for (path, meta_blob) in self.meta_blobs() {
             let mut meta_blob_reader = meta_blob.reader_seeker()?;
@@ -270,7 +271,8 @@ impl api::Package for Package {
             meta_blob_reader.read_to_end(&mut bytes)?;
             if let Ok(manifest) = fidl::unpersist::<fdecl::Component>(bytes.as_slice()) {
                 let manifest = manifest.fidl_into_native();
-                let component: Box<dyn api::Component> = Box::new(Component::new(manifest));
+                let component: Box<dyn api::Component> =
+                    Box::new(Component::new(package.clone(), manifest));
                 components.push((path, component));
             }
         }
@@ -281,7 +283,8 @@ impl api::Package for Package {
             content_blob_reader.read_to_end(&mut bytes)?;
             if let Ok(manifest) = fidl::unpersist::<fdecl::Component>(bytes.as_slice()) {
                 let manifest = manifest.fidl_into_native();
-                let component: Box<dyn api::Component> = Box::new(Component::new(manifest));
+                let component: Box<dyn api::Component> =
+                    Box::new(Component::new(package.clone(), manifest));
                 components.push((path, component));
             }
         }
@@ -376,6 +379,65 @@ impl api::Blob for ContentBlob {
 
     fn data_sources(&self) -> Box<dyn Iterator<Item = Box<dyn api::DataSource>>> {
         Box::new(self.data.data_sources.clone().into_iter())
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod test {
+    use super::super::api;
+    use super::super::blob::test::VerifiedMemoryBlobSet;
+    use super::super::blob::BlobSet as _;
+    use super::super::data_source as ds;
+    use super::super::hash::Hash;
+    use super::Package;
+    use fuchsia_merkle::MerkleTree as FuchsiaMerkleTree;
+    use fuchsia_pkg::MetaContents as FuchsiaMetaContents;
+    use fuchsia_pkg::MetaPackage as FuchsiaMetaPackage;
+    use fuchsia_pkg::PackageName;
+    use maplit::btreemap;
+    use maplit::hashmap;
+    use std::io;
+    use std::str::FromStr as _;
+
+    pub(crate) fn placeholder_package() -> Package {
+        let meta_package =
+            FuchsiaMetaPackage::from_name(PackageName::from_str("placeholder").unwrap());
+        let mut meta_package_bytes = vec![];
+        meta_package.serialize(&mut meta_package_bytes).unwrap();
+
+        let meta_contents = FuchsiaMetaContents::from_map(hashmap! {}).unwrap();
+        let mut meta_contents_bytes = vec![];
+        meta_contents.serialize(&mut meta_contents_bytes).unwrap();
+
+        let far_map = btreemap! {
+            FuchsiaMetaPackage::PATH.to_string() => (meta_package_bytes.len() as u64, Box::new(meta_package_bytes.as_slice()) as Box<dyn io::Read>),
+            FuchsiaMetaContents::PATH.to_string() => (meta_contents_bytes.len() as u64, Box::new(meta_contents_bytes.as_slice()) as Box<dyn io::Read>),
+        };
+        let mut far_bytes = vec![];
+        fuchsia_archive::write(&mut far_bytes, far_map).unwrap();
+        let far_fuchsia_hash = FuchsiaMerkleTree::from_reader(far_bytes.as_slice()).unwrap().root();
+
+        let data_source = ds::DataSource::new(ds::DataSourceInfo::new(
+            api::DataSourceKind::BlobDirectory,
+            None,
+            api::DataSourceVersion::Unknown,
+        ));
+
+        let blob_set = VerifiedMemoryBlobSet::new(
+            [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
+            [far_bytes.as_slice()],
+        );
+
+        let meta_far_hash: Box<dyn api::Hash> = Box::new(Hash::from(far_fuchsia_hash));
+        let meta_far_blob = blob_set.blob(meta_far_hash.clone()).unwrap();
+
+        Package::new(
+            Some(data_source),
+            api::PackageResolverUrl::FuchsiaPkgUrl,
+            meta_far_blob,
+            Box::new(blob_set),
+        )
+        .unwrap()
     }
 }
 

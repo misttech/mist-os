@@ -589,6 +589,23 @@ pub trait Package: DynClone {
     ) -> Result<Box<dyn Iterator<Item = (Box<dyn Path>, Box<dyn Component>)>>, PackageComponentsError>;
 }
 
+impl PartialEq for dyn Package {
+    fn eq(&self, other: &Self) -> bool {
+        self.hash() == other.hash()
+    }
+}
+
+impl Eq for dyn Package {}
+
+impl Debug for dyn Package {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("Package(")?;
+        fmt::Debug::fmt(&self.hash(), f)?;
+        f.write_str(")")?;
+        Ok(())
+    }
+}
+
 clone_trait_object!(Package);
 
 #[derive(Debug, Error)]
@@ -684,8 +701,8 @@ pub enum PackageResolverUrl {
 /// situated at a particular point in a runtime component tree. See
 /// https://fuchsia.dev/fuchsia-src/concepts/components/v2 for details.
 pub trait Component {
-    /// Iterate over the known packages that contain the component.
-    fn packages(&self) -> Box<dyn Iterator<Item = Box<dyn Package>>>;
+    /// Returns the package from which this component was constructed.
+    fn package(&self) -> Box<dyn Package>;
 
     /// Iterate over known child component URLs.
     fn children(&self) -> Box<dyn Iterator<Item = PackageResolverUrl>>;
