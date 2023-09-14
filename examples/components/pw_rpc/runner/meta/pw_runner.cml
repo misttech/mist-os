@@ -2,25 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        // Enable logging.
-        "syslog/client.shard.cml",
-    ],
-
-    // Information about the program to run.
+    include: [ "syslog/client.shard.cml" ],
     program: {
-        // Use the built-in ELF runner.
         runner: "elf",
-
-        // The binary to run for this component.
-        binary: "bin/pw_rpc_echo",
+        binary: "bin/pw_runner",
     },
+    capabilities: [
+        {
+            runner: "pigweed",
+            path: "/svc/fuchsia.component.runner.ComponentRunner",
+        },
+    ],
     use: [
         {
             protocol: [
                 "fuchsia.net.name.Lookup",
                 "fuchsia.posix.socket.Provider",
             ],
+        },
+    ],
+    expose: [
+        {
+            runner: "pigweed",
+            from: "self",
         },
     ],
 }

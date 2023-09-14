@@ -11,6 +11,10 @@ group("components") {
     "config_from_parent",
     "echo:echo-example",
     "lifecycle:lifecycle-example",
+
+    # TODO(fxbug.dev/299358404): Uncomment once it's possible to build fuchsia
+    # and pigweed together in CQ.
+    #"pw_rpc",
     "routing:components-routing-example",
     "routing_failed:components-routing-failed-example",
     "services",

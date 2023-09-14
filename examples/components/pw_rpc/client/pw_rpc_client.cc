@@ -2,12 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/syslog/cpp/log_settings.h>
+#include <fidl/fidl.examples.pigweed/cpp/fidl.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/component/incoming/cpp/protocol.h>
+#include <lib/fdio/fd.h>
+#include <lib/syslog/cpp/log_level.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/socket.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <zircon/status.h>
 
 #include <cstdlib>
-#include <iostream>
 
+#include "pw_assert/assert.h"
+#include "pw_bytes/span.h"
 #include "pw_hdlc/rpc_channel.h"
 #include "pw_hdlc/rpc_packets.h"
 #include "pw_rpc/channel.h"
@@ -16,16 +25,13 @@
 #include "pw_span/span.h"
 #include "pw_stream/socket_stream.h"
 
-const char* kEchoHost = "your-ip-address";
-constexpr uint16_t kEchoPort = 33000;
+namespace {
 
 template <typename S, uint32_t kChannelId = 1, size_t kMTU = 1055,
           uint8_t kRpcAddress = pw::hdlc::kDefaultRpcAddress>
 class SocketClient {
  public:
-  SocketClient() = default;
-
-  void Connect(const char* host, uint16_t port) { stream_.Connect(host, port); }
+  explicit SocketClient(int connection_fd) : stream_(connection_fd) {}
 
   typename S::Client* operator->() { return &service_client_; }
 
@@ -40,10 +46,10 @@ class SocketClient {
 
       if (read.status() == pw::Status::OutOfRange()) {
         // Channel closed.
-        should_terminate_.test_and_set();
+        should_terminate_ = true;
       }
 
-      if (should_terminate_.test()) {
+      if (should_terminate_) {
         return;
       }
 
@@ -62,7 +68,7 @@ class SocketClient {
   }
 
   void terminate() {
-    should_terminate_.test_and_set();
+    should_terminate_ = true;
     stream_.Close();
   }
 
@@ -72,19 +78,18 @@ class SocketClient {
   pw::rpc::Channel channel_{pw::rpc::Channel::Create<kChannelId>(&channel_output_)};
   pw::rpc::Client client_{pw::span(&channel_, 1)};
   typename S::Client service_client_{client_, kChannelId};
-  std::atomic_flag should_terminate_ = ATOMIC_FLAG_INIT;
+  bool should_terminate_ = false;
 };
 
-int main(int argc, const char* argv[], char* envp[]) {
-  fuchsia_logging::SetTags({"pw_rpc_echo"});
+void DoConnect(fidl::Result<fidl_examples_pigweed::RemoteEndpoint::Connect>& result) {
+  FX_CHECK(result.is_ok()) << "Failed to connect to remote endpoint: " << result.error_value();
+  int connection_fd;
+  zx_status_t status = fdio_fd_create(result->connection().release(), &connection_fd);
+  FX_CHECK(status == ZX_OK) << "Failed to bind file descriptor: " << zx_status_get_string(status);
 
-  // Print a greeting to syslog
-  FX_SLOG(INFO, "Starting up.");
-
-  SocketClient<pw::rpc::pw_rpc::pwpb::EchoService> sc{};
-  sc.Connect(kEchoHost, kEchoPort);
-
-  auto call = sc->Echo(
+  SocketClient<pw::rpc::pw_rpc::pwpb::EchoService> sc{connection_fd};
+  FX_SLOG(INFO, "Sending echo request.");
+  auto echo_call = sc->Echo(
       {.msg = "Hello, Pigweed"},
       [&](const pw::rpc::pwpb::EchoMessage::Message& message, pw::Status status) {
         FX_SLOG(INFO, "Received echo reply", KV("msg", message.msg.c_str()));
@@ -95,11 +100,32 @@ int main(int argc, const char* argv[], char* envp[]) {
         sc.terminate();
       });
 
-  FX_SLOG(INFO, "Sent echo request.");
-
+  FX_SLOG(INFO, "Processing packets.");
   sc.ProcessPackets();
 
   FX_SLOG(INFO, "Done.");
+}
+
+}  // namespace
+
+int main(int argc, const char* argv[], char* envp[]) {
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+
+  // Print a greeting to syslog
+  FX_SLOG(INFO, "Starting up.");
+  zx::result client_end = component::Connect<fidl_examples_pigweed::RemoteEndpoint>();
+  FX_CHECK(client_end.is_ok()) << "Failed to connect to remote endpoint: "
+                               << client_end.status_string();
+  fidl::Client<fidl_examples_pigweed::RemoteEndpoint> remote_endpoint;
+  remote_endpoint.Bind(std::move(*client_end), loop.dispatcher());
+  remote_endpoint->Connect().ThenExactlyOnce(
+      [&](fidl::Result<fidl_examples_pigweed::RemoteEndpoint::Connect>& result) {
+        DoConnect(result);
+        loop.Quit();
+      });
+
+  loop.Run();
   return 0;
 }
+
 // [END main]

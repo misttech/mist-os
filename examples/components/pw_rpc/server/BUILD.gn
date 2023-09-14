@@ -1,0 +1,20 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+
+group("server") {
+  deps = [ ":package" ]
+}
+
+fuchsia_component("component") {
+  component_name = "pw_rpc_server"
+  manifest = "meta/pw_rpc_server.cml"
+}
+
+fuchsia_package("package") {
+  package_name = "pw_rpc_server"
+  deps = [ ":component" ]
+}

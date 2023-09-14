@@ -1,0 +1,25 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// This component proxies to pigweed's `pw_system_demo` executable running on your Linux machine.
+//
+// Replace `host` and `port` with your machine's IPv6 and the server port (33000, if the default),
+// and follow the instructions in //examples/components/pw_rpc/README.md.
+{
+    include: [ "syslog/client.shard.cml" ],
+    program: {
+        runner: "pigweed",
+        host: "fe80::90e1:f932:2932:243b",
+        port: "33000",
+    },
+    capabilities: [
+        { protocol: "fidl.examples.pigweed.RemoteEndpoint" },
+    ],
+    expose: [
+        {
+            protocol: "fidl.examples.pigweed.RemoteEndpoint",
+            from: "self",
+        },
+    ],
+}

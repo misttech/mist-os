@@ -1,0 +1,17 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library fidl.examples.pigweed;
+
+using zx;
+
+/// Gateway to a remote Pigweed RPC endpoint that a client process can connect
+/// to. This protocol is served by components that use the pigweed runner.
+@discoverable
+open protocol RemoteEndpoint {
+    /// Opens a socket to the remote endpoint.
+    flexible Connect() -> (resource struct {
+        connection zx.Handle:SOCKET;
+    }) error zx.Status;
+};

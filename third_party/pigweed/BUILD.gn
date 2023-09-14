@@ -2,10 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# This file is used to limit visibility to Pigweed modules.
-# Modules may only be added to this file after OSRB approval.
-# Clients may only be added to visibility lists after OSRB approval.
-
 source_set("pw_assert") {
   public_deps = [ "src/pw_assert" ]
   visibility = [ "//src/connectivity/bluetooth/core/bt-host/*" ]
@@ -71,6 +67,19 @@ source_set("pw_log") {
   visibility = [ "//src/connectivity/bluetooth/core/bt-host/*" ]
 }
 
+source_set("pw_log.pwpb.log_service") {
+  public_deps = [
+    "src/pw_log:protos.pwpb",
+    "src/pw_log:protos.raw_rpc",
+  ]
+  visibility = [ "//examples/components/pw_rpc/*" ]
+}
+
+source_set("pw_rpc.raw.client_api") {
+  public_deps = [ "src/pw_rpc/raw:client_api" ]
+  visibility = [ "//examples/components/pw_rpc/*" ]
+}
+
 source_set("pw_rpc_client") {
   public_deps = [ "src/pw_rpc:client" ]
 }
@@ -81,6 +90,10 @@ source_set("pw_hdlc") {
     "src/pw_hdlc:pw_rpc",
     "src/pw_hdlc:rpc_channel_output",
   ]
+}
+
+source_set("pw_stream") {
+  public_deps = [ "src/pw_stream" ]
 }
 
 source_set("pw_stream_socket_stream") {

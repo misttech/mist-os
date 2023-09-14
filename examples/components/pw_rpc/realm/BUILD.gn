@@ -1,0 +1,25 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+
+group("realm") {
+  deps = [ ":package" ]
+}
+
+fuchsia_component("component") {
+  component_name = "pw_rpc_realm"
+  manifest = "meta/pw_rpc_realm.cml"
+}
+
+fuchsia_package("package") {
+  package_name = "pw_rpc_realm"
+  deps = [ ":component" ]
+  subpackages = [
+    "//examples/components/pw_rpc/client:package",
+    "//examples/components/pw_rpc/server:package",
+    "//examples/components/pw_rpc/runner:package",
+  ]
+}

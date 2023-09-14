@@ -1,0 +1,49 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "syslog/offer.shard.cml" ],
+    children: [
+        {
+            name: "pw_runner",
+            url: "pw_runner#meta/pw_runner.cm",
+        },
+        {
+            name: "pw_server",
+            url: "pw_rpc_server#meta/pw_rpc_server.cm",
+            environment: "#pw_env",
+        },
+        {
+            name: "pw_client",
+            url: "pw_rpc_client#meta/pw_rpc_client.cm",
+            startup: "eager",
+        },
+    ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.net.name.Lookup",
+                "fuchsia.posix.socket.Provider",
+            ],
+            from: "parent",
+            to: "#pw_runner",
+        },
+        {
+            protocol: "fidl.examples.pigweed.RemoteEndpoint",
+            from: "#pw_server",
+            to: "#pw_client",
+        },
+    ],
+    environments: [
+        {
+            name: "pw_env",
+            extends: "realm",
+            runners: [
+                {
+                    runner: "pigweed",
+                    from: "#pw_runner",
+                },
+            ],
+        },
+    ],
+}
