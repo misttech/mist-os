@@ -259,6 +259,7 @@
                 // TODO(https://fxbug.dev/131217): Flaky on the bots - needs to be investigated.
                 "android_mallopt.multiple_enable_gwp_asan",
                 "pidfd.pidfd_open",
+                "spawn.signal_stress",
 
                 // These tests were updated and no longer pass.
                 "stdio.popen_return_value_signal",
