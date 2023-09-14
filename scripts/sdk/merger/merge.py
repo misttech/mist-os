@@ -131,6 +131,27 @@ def _ensure_directory(path: Path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
 
+def _write_file_if_changed(path: Path, data: str):
+    '''Write data to a specific path if it does not exist with the same content.'''
+    # Do not do anything if the file exists with the same content.
+    if os.path.exists(path):
+        with open(path) as f:
+            current_data = f.read()
+        if current_data == data:
+            return
+
+        # Remove the existing file, some of them will be hard-links,
+        # and writing directly will modify the timestamp of other
+        # entries in the filesystem, leading to weird
+        # incrementality issues (https://fxbug.dev/133470).
+        os.unlink(path)
+    else:
+        _ensure_directory(path)
+
+    with open(path, 'w') as f:
+        f.write(data)
+
+
 class ElementMeta(object):
     '''Models the metadata of a given SDK element.'''
 
@@ -457,10 +478,9 @@ class MergeState(object):
     def write_json_output(self, path: Path, content: Any, dry_run: bool):
         """Write JSON output file."""
         if not dry_run:
-            _ensure_directory(path)
-            with open(path, 'w') as f:
-                json.dump(
-                    content, f, indent=2, sort_keys=True, separators=(',', ':'))
+            data = json.dumps(
+                content, indent=2, sort_keys=True, separators=(',', ':'))
+            _write_file_if_changed(path, data)
         self.add_output(path)
 
 
