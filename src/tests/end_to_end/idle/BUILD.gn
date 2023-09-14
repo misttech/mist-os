@@ -11,11 +11,7 @@ test("idle_test") {
   sources = [ "idle_test.cc" ]
 
   deps = [ "//third_party/googletest:gtest" ]
-}
 
-test_spec("idle_test_spec") {
-  target = get_label_info(":idle_test", "label_with_toolchain")
-  path = "host_x64/idle_test"
   environments = [
     {
       dimensions = {
@@ -24,5 +20,9 @@ test_spec("idle_test_spec") {
       tags = [ "power-measurement" ]
     },
   ]
-  deps = [ ":idle_test" ]
+}
+
+group("idle_test_spec") {
+  testonly = true
+  deps = [ ":idle_test($host_toolchain)" ]
 }
