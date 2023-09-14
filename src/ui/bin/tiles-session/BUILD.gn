@@ -34,11 +34,7 @@ rustc_binary("bin") {
 
   test_deps = []
 
-  sources = [
-    "src/base.rs",
-    "src/flatland.rs",
-    "src/main.rs",
-  ]
+  sources = [ "src/main.rs" ]
 }
 
 fuchsia_component_manifest("tiles_manifest") {
