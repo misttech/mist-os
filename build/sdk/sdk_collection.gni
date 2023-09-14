@@ -425,7 +425,11 @@ template("sdk_collection") {
   }
 
   group(labels.main) {
-    forward_variables_from(invoker, [ "testonly" ])
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
 
     deps = [
       ":${labels.verify_manifest}",

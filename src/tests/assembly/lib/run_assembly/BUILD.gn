@@ -11,6 +11,6 @@ python_library("run_assembly") {
   ]
   deps = [
     # We need the sdk since ffx assembly product uses the cmc tool
-    "//sdk:host_tools.internal($host_toolchain)",
+    "//src/developer/ffx/build:internal_sdk_tools_for_ffx",
   ]
 }

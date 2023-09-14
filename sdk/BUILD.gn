@@ -316,7 +316,10 @@ sdk_molecule("e2e_testing_tools") {
 # Tools and data used on a 'host' development machine; where host is often
 # Linux or Mac OS.
 sdk_molecule("host_tools") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//tools/docsgen:invoke_clidoc",
+  ]
 
   _host_tools = [
     "//tools/fidl/fidlgen_rust:fidlgen_rust_sdk",
@@ -542,18 +545,6 @@ sdk_collection("core") {
   }
 }
 
-group("host_tools.all") {
-  public_deps = []
-  if (host_os == "linux" && sdk_cross_compile_host_tools) {
-    public_deps += [
-      ":host_tools.internal($host_arm64_toolchain)",
-      ":host_tools.internal($host_x64_toolchain)",
-    ]
-  } else {
-    public_deps += [ ":host_tools.internal($host_toolchain)" ]
-  }
-}
-
 if (is_host) {
   # A collection that only contains host tools that are used by the
   # Fuchsia build system itself. In particular, this is where
@@ -562,9 +553,25 @@ if (is_host) {
     id = sdk_id
     category = "partner"
 
+    # This is a collection of host tools that are used _by_ ffx itself to
+    # perform actions within the build.  As such, it CANNOT have a dependency
+    # the main ffx binary, or any of the subtools, or it will cause all
+    # ffx_action()'s using subtools to be dependent on the compilation of the
+    # main ffx binary (and/or all subtools), adding minutes to any incremental
+    # build of an ffx subtool.
+    assert_no_deps = [
+      "//src/developer/ffx:bin_sdk",
+      "//src/developer/ffx:ffx_tool",
+      "//src/developer/ffx/frontends/ffx:ffx_bin($host_toolchain)",
+    ]
+
+    # This (sorta) restricts the use of this group to instances of the
+    # `ffx_action()` template, which uses the group below (which doesn't have
+    # visibility restrictions to have a dependency on this group.)
+    visibility = [ "//src/developer/ffx/build:internal_sdk_tools_for_ffx" ]
+
     deps = [
       "//src/developer/debug/zxdb:zxdb_sdk",
-      "//src/developer/ffx:bin_sdk",
       "//src/storage/bin/fvm:fvm_sdk",
       "//src/storage/blobfs/tools:blobfs_sdk",
       "//src/storage/minfs/tools:minfs_sdk",

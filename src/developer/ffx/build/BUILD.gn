@@ -3,7 +3,13 @@
 # found in the LICENSE file.
 
 import("//build/python/python_binary.gni")
-import("ffx_action.gni")
+
+# This group exists to provide a visibility  bridge from `ffx_action()`
+# instances trhoughout the tree to the visibility-restricted sdk molecule used
+# to provide additional host tools to those actions.
+group("internal_sdk_tools_for_ffx") {
+  public_deps = [ "//sdk:host_tools.internal" ]
+}
 
 python_binary("gn_generate_plugins") {
   main_source = "gn_generate_plugins.py"

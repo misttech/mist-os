@@ -71,7 +71,7 @@ compiled_action("invoke_clidoc") {
   tool_output_name = "clidoc"
   depfile = "$target_out_dir/$target_name.d"
   deps = [
-    "//sdk:host_tools.all",
+    "//sdk:host_tools",
 
     # TODO(https://fxbug.dev/86553) check if triage belongs in sdk docs.
     "//src/diagnostics/triage:triage_bin",
