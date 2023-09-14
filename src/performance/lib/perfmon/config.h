@@ -111,7 +111,7 @@ class Config {
 
   // Call |func| for each event.
   // The iteration order is unspecified.
-  void IterateOverEvents(IterateFunc func) const;
+  void IterateOverEvents(const IterateFunc& func) const;
 
   // Return a string form of the configuration, for display purposes.
   // The order of appearance of events in the string is unspecified.

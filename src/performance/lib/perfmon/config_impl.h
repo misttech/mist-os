@@ -5,21 +5,17 @@
 #ifndef SRC_PERFORMANCE_LIB_PERFMON_CONFIG_IMPL_H_
 #define SRC_PERFORMANCE_LIB_PERFMON_CONFIG_IMPL_H_
 
-#include <fuchsia/perfmon/cpu/cpp/fidl.h>
+#include <fidl/fuchsia.perfmon.cpu/cpp/fidl.h>
 
 #include "src/performance/lib/perfmon/config.h"
 
 namespace perfmon {
-
-using FidlPerfmonConfig = fuchsia::perfmon::cpu::Config;
-
 namespace internal {
 
 // Convert the config to the FIDL representation.
-void PerfmonToFidlConfig(const Config& config, FidlPerfmonConfig* out_config);
+void PerfmonToFidlConfig(const Config& config, fuchsia_perfmon_cpu::Config* out_config);
 
 }  // namespace internal
-
 }  // namespace perfmon
 
 #endif  // SRC_PERFORMANCE_LIB_PERFMON_CONFIG_IMPL_H_

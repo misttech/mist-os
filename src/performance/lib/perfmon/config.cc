@@ -10,9 +10,6 @@
 #include "src/performance/lib/perfmon/config_impl.h"
 
 namespace perfmon {
-
-using ::fuchsia::perfmon::cpu::EventConfigFlags;
-
 std::string Config::StatusToString(Status status) {
   switch (status) {
     case Status::OK:
@@ -49,7 +46,7 @@ CollectionMode Config::GetMode() const {
   return CollectionMode::kTally;
 }
 
-void Config::IterateOverEvents(IterateFunc func) const {
+void Config::IterateOverEvents(const IterateFunc& func) const {
   for (const auto& event : events_) {
     func(event);
   }
@@ -71,29 +68,30 @@ std::string Config::ToString() {
 }
 
 static void ToFidlEvent(const Config::EventConfig& event, size_t index,
-                        FidlPerfmonConfig* out_config) {
-  out_config->events[index].event = event.event;
-  out_config->events[index].rate = event.rate;
+                        fuchsia_perfmon_cpu::Config* out_config) {
+  out_config->events()[index].event() = event.event;
+  out_config->events()[index].rate() = event.rate;
   if (event.flags & Config::kFlagOs) {
-    out_config->events[index].flags |= EventConfigFlags::COLLECT_OS;
+    out_config->events()[index].flags() |= fuchsia_perfmon_cpu::EventConfigFlags::kCollectOs;
   }
   if (event.flags & Config::kFlagUser) {
-    out_config->events[index].flags |= EventConfigFlags::COLLECT_USER;
+    out_config->events()[index].flags() |= fuchsia_perfmon_cpu::EventConfigFlags::kCollectUser;
   }
   if (event.flags & Config::kFlagPc) {
-    out_config->events[index].flags |= EventConfigFlags::COLLECT_PC;
+    out_config->events()[index].flags() |= fuchsia_perfmon_cpu::EventConfigFlags::kCollectPc;
   }
   if (event.flags & Config::kFlagTimebase) {
-    out_config->events[index].flags |= EventConfigFlags::IS_TIMEBASE;
+    out_config->events()[index].flags() |= fuchsia_perfmon_cpu::EventConfigFlags::kIsTimebase;
   }
   if (event.flags & Config::kFlagLastBranch) {
-    out_config->events[index].flags |= EventConfigFlags::COLLECT_LAST_BRANCH;
+    out_config->events()[index].flags() |=
+        fuchsia_perfmon_cpu::EventConfigFlags::kCollectLastBranch;
   }
 }
 
 namespace internal {
 
-void PerfmonToFidlConfig(const Config& config, FidlPerfmonConfig* out_config) {
+void PerfmonToFidlConfig(const Config& config, fuchsia_perfmon_cpu::Config* out_config) {
   *out_config = {};
   FX_DCHECK(config.GetEventCount() <= kMaxNumEvents);
 

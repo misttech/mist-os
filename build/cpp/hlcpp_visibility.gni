@@ -271,7 +271,6 @@ hlcpp_visibility = [
   "//src/media/testing/mock_profile_provider:*",
   "//src/performance/ktrace_provider:*",
   "//src/performance/lib/gperftools:*",
-  "//src/performance/lib/perfmon:*",
   "//src/performance/trace_manager:*",
   "//src/performance/trace:*",
   "//src/power/fidl/testing:*",

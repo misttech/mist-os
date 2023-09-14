@@ -5,7 +5,7 @@
 #ifndef SRC_PERFORMANCE_LIB_PERFMON_CONTROLLER_IMPL_H_
 #define SRC_PERFORMANCE_LIB_PERFMON_CONTROLLER_IMPL_H_
 
-#include <fuchsia/perfmon/cpu/cpp/fidl.h>
+#include <fidl/fuchsia.perfmon.cpu/cpp/fidl.h>
 
 #include "src/lib/fxl/memory/weak_ptr.h"
 #include "src/performance/lib/perfmon/controller.h"
@@ -13,12 +13,10 @@
 namespace perfmon {
 namespace internal {
 
-using ::fuchsia::perfmon::cpu::ControllerSyncPtr;
-
 class ControllerImpl final : public Controller {
  public:
-  ControllerImpl(ControllerSyncPtr controller_ptr, uint32_t num_traces,
-                 uint32_t buffer_size_in_pages, const Config& config);
+  ControllerImpl(fidl::SyncClient<fuchsia_perfmon_cpu::Controller> controller_ptr,
+                 uint32_t num_traces, uint32_t buffer_size_in_pages, const Config& config);
   ~ControllerImpl() override;
 
   bool Start() override;
@@ -40,7 +38,7 @@ class ControllerImpl final : public Controller {
   void Terminate();
   void Reset();
 
-  ControllerSyncPtr controller_ptr_;
+  fidl::SyncClient<fuchsia_perfmon_cpu::Controller> controller_ptr_;
   // The number of traces we will collect (== #cpus for now).
   uint32_t num_traces_;
   // This is the actual buffer size we use, in pages.

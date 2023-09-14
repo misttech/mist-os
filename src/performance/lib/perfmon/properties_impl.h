@@ -5,21 +5,15 @@
 #ifndef SRC_PERFORMANCE_LIB_PERFMON_PROPERTIES_IMPL_H_
 #define SRC_PERFORMANCE_LIB_PERFMON_PROPERTIES_IMPL_H_
 
-#include <fuchsia/perfmon/cpu/cpp/fidl.h>
+#include <fidl/fuchsia.perfmon.cpu/cpp/fidl.h>
 #include <lib/zircon-internal/device/cpu-trace/perf-mon.h>
 
 #include "src/performance/lib/perfmon/properties.h"
 
-namespace perfmon {
+namespace perfmon::internal {
 
-using FidlPerfmonProperties = fuchsia::perfmon::cpu::Properties;
+void FidlToPerfmonProperties(const fuchsia_perfmon_cpu::Properties& props, Properties* out_props);
 
-namespace internal {
-
-void FidlToPerfmonProperties(const FidlPerfmonProperties& props, Properties* out_props);
-
-}  // namespace internal
-
-}  // namespace perfmon
+}  // namespace perfmon::internal
 
 #endif  // SRC_PERFORMANCE_LIB_PERFMON_PROPERTIES_IMPL_H_
