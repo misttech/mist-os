@@ -54,11 +54,7 @@ bool ReadFileDescriptor(int fd, T* result) {
       return false;
     }
     if (bytes_read == 0) {
-      if (size != 0) {
-        assert(offset == size);
-      } else {
-        result->resize(offset);
-      }
+      result->resize(offset);
       return true;
     }
     offset += bytes_read;

@@ -36,20 +36,26 @@ TEST_F(SysfsPowerTest, SuspendStatsDirectoryContainsExpectedContents) {
               IsSupersetOf({"success", "fail", "last_failed_dev", "last_failed_errno"}));
 }
 
-TEST_F(SysfsPowerTest, SuspendStatsFilesContainDefaults) {
+TEST_F(SysfsPowerTest, SuspendStatsFilesContainDefaultsSuccess) {
   std::string success_str;
   EXPECT_TRUE(files::ReadFileToString("/sys/power/suspend_stats/success", &success_str));
   EXPECT_THAT(success_str, ContainsRegex("^[0-9]+\n"));
+}
 
+TEST_F(SysfsPowerTest, SuspendStatsFilesContainDefaultsFail) {
   std::string fail_str;
   EXPECT_TRUE(files::ReadFileToString("/sys/power/suspend_stats/fail", &fail_str));
   EXPECT_THAT(fail_str, ContainsRegex("^[0-9]+\n"));
+}
 
+TEST_F(SysfsPowerTest, SuspendStatsFilesContainDefaultsLastFailedDev) {
   std::string last_failed_dev_str;
   EXPECT_TRUE(
       files::ReadFileToString("/sys/power/suspend_stats/last_failed_dev", &last_failed_dev_str));
   EXPECT_THAT(last_failed_dev_str, ContainsRegex("^.*\n"));
+}
 
+TEST_F(SysfsPowerTest, SuspendStatsFilesContainDefaultsLastFailedErrno) {
   std::string last_failed_errno_str;
   EXPECT_TRUE(files::ReadFileToString("/sys/power/suspend_stats/last_failed_errno",
                                       &last_failed_errno_str));
