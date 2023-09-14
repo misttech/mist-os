@@ -1115,6 +1115,19 @@ If unset, the prebuilt packages from CIPD will be used.
 
 From //src/chromium/build_args.gni:11
 
+### cipd_assembly_artifact_targets
+
+Targets to be traversed by //:cipd_assembly_artifacts for GN metadata only.
+These targets are expected to set "assembly_inputs" in metadata, which can
+include a JSON file describing artifacts to be uploaded to CPID.
+
+NOTE: These targets are for GN metadata walk only. If the artifacts need to
+be built, they should be included in the build graph through other means.
+
+**Current value (from the default):** `["//build/images:main_assembly"]`
+
+From //build/product.gni:62
+
 ### clang_embed_bitcode
 
 Embed LLVM bitcode as .llvmbc section in ELF files. This is intended
@@ -3053,9 +3066,11 @@ can include a JSON file describing artifacts to be uploaded to CPID.
 NOTE: These targets are for GN metadata walk only. If the artifacts need to
 be built, they should be included in the build graph through other means.
 
+DEPRECATED: Modify cipd_assembly_artifact_targets instead.
+
 **Current value (from the default):** `[]`
 
-From //build/product.gni:62
+From //build/product.gni:72
 
 ### extra_gn_labels_for_bazel_inputs
 
