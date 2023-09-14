@@ -418,7 +418,6 @@
         {
             protocol: [
                 "fuchsia.boot.Items",
-                "fuchsia.boot.RootResource",
                 "fuchsia.kernel.IoportResource",
                 "fuchsia.kernel.IrqResource",
                 "fuchsia.kernel.MmioResource",
@@ -426,6 +425,14 @@
             ],
             from: "parent",
             to: "#boot-drivers",
+        },
+        {
+            protocol: "fuchsia.boot.RootResource",
+            from: "parent",
+            to: [
+                "#boot-drivers",
+                "#pkg-drivers",
+            ],
         },
         {
             protocol: "fuchsia.kernel.InfoResource",

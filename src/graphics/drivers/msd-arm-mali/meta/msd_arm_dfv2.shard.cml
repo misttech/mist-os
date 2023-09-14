@@ -13,6 +13,7 @@
         fallback: "false",
     },
     use: [
+        { protocol: "fuchsia.boot.RootResource" },
         { protocol: "fuchsia.kernel.InfoResource" },
         { protocol: "fuchsia.scheduler.ProfileProvider" },
         { service: "fuchsia.hardware.gpu.mali.Service" },
