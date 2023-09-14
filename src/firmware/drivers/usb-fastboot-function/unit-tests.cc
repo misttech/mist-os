@@ -123,7 +123,8 @@ class UsbFastbootFunctionTest : public zxtest::Test {
   void TearDown() override {
     mock_usb_.Join();
     device_->DdkAsyncRemove();
-    ASSERT_OK(mock_ddk::ReleaseFlaggedDevices(fake_root_.get()));
+    loop_.Shutdown();
+    fake_root_ = nullptr;
     mock_usb_.VerifyAndClear();
   }
 
