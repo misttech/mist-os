@@ -444,12 +444,12 @@ mod test {
             let s = r#"[
             {
                 "data_source": "Inspect",
-                "moniker": "bar.cmx",
+                "moniker": "bar",
                 "payload": { "root": { "bar": 99 }}
             },
             {
                 "data_source": "Inspect",
-                "moniker": "bar2.cmx",
+                "moniker": "bar2",
                 "payload": { "root": { "bar": 90 }}
             }
 
@@ -458,13 +458,13 @@ mod test {
         };
         static ref BAR_99_FILE_FETCHER: FileDataFetcher<'static> = FileDataFetcher::new(&LOCAL_F);
         static ref BAR_SELECTOR: SelectorString =
-            SelectorString::try_from("INSPECT:bar.cmx:root:bar".to_owned()).unwrap();
+            SelectorString::try_from("INSPECT:bar:root:bar".to_owned()).unwrap();
         static ref NEW_BAR_SELECTOR: SelectorString =
-            SelectorString::try_from("INSPECT:bar2.cmx:root:bar".to_owned()).unwrap();
+            SelectorString::try_from("INSPECT:bar2:root:bar".to_owned()).unwrap();
         static ref BAD_COMPONENT_SELECTOR: SelectorString =
-            SelectorString::try_from("INSPECT:bad_component.cmx:root:bar".to_owned()).unwrap();
+            SelectorString::try_from("INSPECT:bad_component:root:bar".to_owned()).unwrap();
         static ref WRONG_SELECTOR: SelectorString =
-            SelectorString::try_from("INSPECT:bar.cmx:root:oops".to_owned()).unwrap();
+            SelectorString::try_from("INSPECT:bar:root:oops".to_owned()).unwrap();
         static ref LOCAL_DUPLICATES_F: Vec<DiagnosticData> = {
             let s = r#"[
                 {
@@ -683,7 +683,7 @@ mod test {
             r#"[
         {"moniker":"asdf/foo/qwer",
          "payload":{"root":{"dataInt":5, "child":{"dataFloat":2.3}}}},
-        {"moniker":"zxcv/bar/hjkl.cmx",
+        {"moniker":"zxcv/bar/hjkl",
          "contents":{"base":{"dataInt":42, "array":[2,3,4], "yes": true}}},
         {"moniker":"fail_component",
          "payload": ["a", "b"]},
@@ -776,13 +776,13 @@ mod test {
     #[fuchsia::test]
     fn test_selector_string_parse() -> Result<(), Error> {
         // Test correct shape of SelectorString and verify no errors on parse for valid selector.
-        let full_selector = "INSPECT:bad_component.cmx:root:bar".to_string();
+        let full_selector = "INSPECT:bad_component:root:bar".to_string();
         let selector_type = SelectorType::Inspect;
-        let body = "bad_component.cmx:root:bar".to_string();
+        let body = "bad_component:root:bar".to_string();
         let parsed_selector = selectors::parse_selector::<VerboseError>(&body)?;
 
         assert_eq!(
-            SelectorString::try_from("INSPECT:bad_component.cmx:root:bar".to_string())?,
+            SelectorString::try_from("INSPECT:bad_component:root:bar".to_string())?,
             SelectorString { full_selector, selector_type, body, parsed_selector }
         );
 

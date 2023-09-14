@@ -761,8 +761,8 @@ TEST(LogMessage, Tags) {
       .expected_error = "Tags must be a string or array of strings",
   });
   cases.emplace_back(ValidationTestCase{
-      .input = fxl::StringPrintf(MONIKER_TEMPLATE, "test.cmx"),
-      .expected_tags = std::vector<std::string>{"test.cmx"},
+      .input = fxl::StringPrintf(MONIKER_TEMPLATE, "test"),
+      .expected_tags = std::vector<std::string>{"test"},
   });
 
   RunValidationCases(std::move(cases));

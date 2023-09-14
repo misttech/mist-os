@@ -910,17 +910,17 @@ a:b:c
         // Note: We provide the full selector syntax but this test is only validating it
         // against the provided moniker
         let passing_test_cases = vec![
-            (r#"echo.cmx:*:*"#, vec!["echo.cmx"]),
-            (r#"*/echo.cmx:*:*"#, vec!["abc", "echo.cmx"]),
-            (r#"ab*/echo.cmx:*:*"#, vec!["abc", "echo.cmx"]),
-            (r#"ab*/echo.cmx:*:*"#, vec!["abcde", "echo.cmx"]),
-            (r#"*/ab*/echo.cmx:*:*"#, vec!["123", "abcde", "echo.cmx"]),
-            (r#"echo.cmx*:*:*"#, vec!["echo.cmx"]),
-            (r#"a/echo*.cmx:*:*"#, vec!["a", "echo1.cmx"]),
-            (r#"a/echo*.cmx:*:*"#, vec!["a", "echo.cmx"]),
-            (r#"ab*/echo.cmx:*:*"#, vec!["ab", "echo.cmx"]),
-            (r#"a/**:*:*"#, vec!["a", "echo.cmx"]),
-            (r#"a/**:*:*"#, vec!["a", "b", "echo.cmx"]),
+            (r#"echo:*:*"#, vec!["echo"]),
+            (r#"*/echo:*:*"#, vec!["abc", "echo"]),
+            (r#"ab*/echo:*:*"#, vec!["abc", "echo"]),
+            (r#"ab*/echo:*:*"#, vec!["abcde", "echo"]),
+            (r#"*/ab*/echo:*:*"#, vec!["123", "abcde", "echo"]),
+            (r#"echo*:*:*"#, vec!["echo"]),
+            (r#"a/echo*:*:*"#, vec!["a", "echo1"]),
+            (r#"a/echo*:*:*"#, vec!["a", "echo"]),
+            (r#"ab*/echo:*:*"#, vec!["ab", "echo"]),
+            (r#"a/**:*:*"#, vec!["a", "echo"]),
+            (r#"a/**:*:*"#, vec!["a", "b", "echo"]),
         ];
 
         for (selector, moniker) in passing_test_cases {
@@ -936,10 +936,10 @@ a:b:c
         // Note: We provide the full selector syntax but this test is only validating it
         // against the provided moniker
         let failing_test_cases = vec![
-            (r#"*:*:*"#, vec!["a", "echo.cmx"]),
-            (r#"*/echo.cmx:*:*"#, vec!["123", "abc", "echo.cmx"]),
-            (r#"a/**:*:*"#, vec!["b", "echo.cmx"]),
-            (r#"e/**:*:*"#, vec!["echo.cmx"]),
+            (r#"*:*:*"#, vec!["a", "echo"]),
+            (r#"*/echo:*:*"#, vec!["123", "abc", "echo"]),
+            (r#"a/**:*:*"#, vec!["b", "echo"]),
+            (r#"e/**:*:*"#, vec!["echo"]),
         ];
 
         for (selector, moniker) in failing_test_cases {
@@ -955,8 +955,8 @@ a:b:c
 
     #[fuchsia::test]
     fn multiple_component_selectors_match_test() {
-        let selectors = vec![r#"*/echo.cmx"#, r#"ab*/echo.cmx"#, r#"abc/m*"#];
-        let moniker = vec!["abc".to_string(), "echo.cmx".to_string()];
+        let selectors = vec![r#"*/echo"#, r#"ab*/echo"#, r#"abc/m*"#];
+        let moniker = vec!["abc".to_string(), "echo".to_string()];
 
         let component_selectors = selectors
             .into_iter()
@@ -1086,8 +1086,6 @@ a:b:c
         assert!(!match_string(&StringSelector::StringPattern("foo\\".into()), "foo\\"));
         assert!(!match_string(&StringSelector::StringPattern("bar*foo".into()), "barxfoox"));
         assert!(!match_string(&StringSelector::StringPattern("m*".into()), "echo.csx"));
-        assert!(!match_string(&StringSelector::StringPattern("mx*".into()), "echo.cmx"));
-        assert!(!match_string(&StringSelector::StringPattern("m*x*".into()), "echo.cmx"));
         assert!(!match_string(&StringSelector::StringPattern("*foo*".into()), "xbary"));
         assert!(!match_string(
             &StringSelector::StringPattern("foo*bar*baz*qux".into()),

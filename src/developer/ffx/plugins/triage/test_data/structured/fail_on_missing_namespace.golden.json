@@ -101,14 +101,14 @@
                 "metric": {
                     "Selector": [
                         {
-                            "full_selector": "INSPECT:missing.cmx:root:not_found",
+                            "full_selector": "INSPECT:missing:root:not_found",
                             "selector_type": "Inspect",
-                            "body": "missing.cmx:root:not_found"
+                            "body": "missing:root:not_found"
                         },
                         {
-                            "full_selector": "INSPECT:not_found.cmx:root/fuchsia.inspect.Health:status",
+                            "full_selector": "INSPECT:not_found:root/fuchsia.inspect.Health:status",
                             "selector_type": "Inspect",
-                            "body": "not_found.cmx:root/fuchsia.inspect.Health:status"
+                            "body": "not_found:root/fuchsia.inspect.Health:status"
                         }
                     ]
                 },

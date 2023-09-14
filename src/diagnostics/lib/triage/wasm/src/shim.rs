@@ -359,8 +359,8 @@ mod test {
             targets = targets_only_log(
                 &mut manager,
                 r#"
-                [3661.123] fatal : my_component.cmx[1234]
-                [3661.124] CRASH: my_component.cmx[1235]
+                [3661.123] fatal : my_component[1234]
+                [3661.124] CRASH: my_component[1235]
                 "#,
             );
             context = empty_context(&mut manager);
@@ -371,8 +371,8 @@ mod test {
                 r#"Plugin 'Process Crashes'
 Errors
 ------
-[ERROR]: my_component.cmx crashed at 1h1m1.123s [3661.123]
-[ERROR]: my_component.cmx crashed at 1h1m1.124s [3661.124]
+[ERROR]: my_component crashed at 1h1m1.123s [3661.123]
+[ERROR]: my_component crashed at 1h1m1.124s [3661.124]
 "#
             ),
             "not found in:\n{}",

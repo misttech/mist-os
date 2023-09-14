@@ -491,7 +491,7 @@ mod tests {
   "poll_rate_sec": 3,
   "metrics": [
     {
-      "selector": "single_counter_test_component.cmx:root:counter",
+      "selector": "single_counter_test_component:root:counter",
       "metric_id": 1,
       "metric_type": "Occurrence",
       "event_codes": [0, 0]
@@ -614,7 +614,7 @@ mod tests {
   "poll_rate_sec": 3,
   "metrics": [
     {
-      "selector": "single_counter_test_component.cmx:root:counter",
+      "selector": "single_counter_test_component:root:counter",
       "metric_id": 1,
       "metric_type": "Occurrence",
       "event_codes": [0, 0]
@@ -680,7 +680,7 @@ mod tests {
                 {
                     id: 43,
                     label: "Bar_43",
-                    moniker: "bar43.cmx",
+                    moniker: "bar43",
                 },
             ]"#,
         )
@@ -774,7 +774,7 @@ mod tests {
                 .iter()
                 .map(|s| s.as_ref().unwrap().selector_string.to_owned())
                 .collect::<Vec<_>>(),
-            vec!["bar43.cmx:root/path:leaf"]
+            vec!["bar43:root/path:leaf"]
         );
         assert_eq!(
             metric_8_42
@@ -795,9 +795,9 @@ mod tests {
                 .map(|s| s.as_ref().unwrap().selector_string.to_owned())
                 .collect::<Vec<_>>(),
             vec![
-                "bar43.cmx:root/path2:leaf2",
-                "foo/bar:root/bar43.cmx:leaf3",
-                "asdf/qwer:root/path4:pre-bar43.cmx-post",
+                "bar43:root/path2:leaf2",
+                "foo/bar:root/bar43:leaf3",
+                "asdf/qwer:root/path4:pre-bar43-post",
             ]
         );
     }

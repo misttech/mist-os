@@ -88,9 +88,6 @@ pub struct InspectLocation {
 
 impl InspectLocation {
     pub fn absolute_path(&self) -> Result<String, Error> {
-        // Note: self.path.canonicalize() returns error for files such as:
-        // /hub/r/test/*/c/iquery_test_component.cmx/*/out/diagnostics/root.inspect
-        // Hence, getting the absolute path manually.
         let current_dir = std::env::current_dir()?.to_string_lossy().to_string();
         let path_string =
             self.path.canonicalize().unwrap_or(self.path.clone()).to_string_lossy().to_string();

@@ -429,7 +429,7 @@ fn help(name: &str) -> String {
             must be one of FATAL|ERROR|WARN|INFO|DEBUG|TRACE.
             Multiple component selections are delimited by commas.
             Examples:
-            --select foo.cmx#DEBUG,bar.cmx#TRACE
+            --select foo#DEBUG,bar#TRACE
 
         --begin <comma-separated-words>
             Filter-in blocks starting with at least one of the specified words.
@@ -2085,14 +2085,12 @@ mod tests {
         #[fuchsia::test]
         fn select_single_loglevel() {
             let mut args = vec!["--select".to_string()];
-            args.push("foo.cmx#DEBUG".to_string());
+            args.push("foo#DEBUG".to_string());
 
             let mut expected = LogListenerOptions::default();
             expected.selectors.push(LogInterestSelector {
-                selector: selectors::parse_component_selector::<VerboseError>(
-                    &"foo.cmx".to_string(),
-                )
-                .unwrap(),
+                selector: selectors::parse_component_selector::<VerboseError>(&"foo".to_string())
+                    .unwrap(),
                 interest: Interest { min_severity: Some(Severity::Debug), ..Default::default() },
             });
             expected.filter.min_severity = LogLevelFilter::Debug;
@@ -2103,14 +2101,12 @@ mod tests {
         fn select_customer_is_always_right() {
             let mut args =
                 vec!["--severity".to_string(), "INFO".to_string(), "--select".to_string()];
-            args.push("foo.cmx#DEBUG".to_string());
+            args.push("foo#DEBUG".to_string());
 
             let mut expected = LogListenerOptions::default();
             expected.selectors.push(LogInterestSelector {
-                selector: selectors::parse_component_selector::<VerboseError>(
-                    &"foo.cmx".to_string(),
-                )
-                .unwrap(),
+                selector: selectors::parse_component_selector::<VerboseError>(&"foo".to_string())
+                    .unwrap(),
                 interest: Interest { min_severity: Some(Severity::Debug), ..Default::default() },
             });
             expected.filter.min_severity = LogLevelFilter::Info;
@@ -2120,14 +2116,12 @@ mod tests {
         #[fuchsia::test]
         fn select_multiple_loglevel() {
             let mut args = vec!["--select".to_string()];
-            args.push("foo.cmx#DEBUG,core/bar#WARN".to_string());
+            args.push("foo#DEBUG,core/bar#WARN".to_string());
 
             let mut expected = LogListenerOptions::default();
             expected.selectors.push(LogInterestSelector {
-                selector: selectors::parse_component_selector::<VerboseError>(
-                    &"foo.cmx".to_string(),
-                )
-                .unwrap(),
+                selector: selectors::parse_component_selector::<VerboseError>(&"foo".to_string())
+                    .unwrap(),
                 interest: Interest { min_severity: Some(Severity::Debug), ..Default::default() },
             });
             expected.selectors.push(LogInterestSelector {
@@ -2144,14 +2138,12 @@ mod tests {
         #[fuchsia::test]
         fn select_loglevel_noseverity() {
             let mut args = vec!["--select".to_string()];
-            args.push("foo.cmx#".to_string());
+            args.push("foo#".to_string());
 
             let mut expected = LogListenerOptions::default();
             expected.selectors.push(LogInterestSelector {
-                selector: selectors::parse_component_selector::<VerboseError>(
-                    &"foo.cmx".to_string(),
-                )
-                .unwrap(),
+                selector: selectors::parse_component_selector::<VerboseError>(&"foo".to_string())
+                    .unwrap(),
                 interest: Interest { min_severity: None, ..Default::default() },
             });
             parse_flag_test_helper(&args, Some(&expected));
@@ -2160,7 +2152,7 @@ mod tests {
         #[fuchsia::test]
         fn select_loglevel_format_error() {
             let mut args = vec!["--select".to_string()];
-            args.push("foo.cmx##DEBUG".to_string());
+            args.push("foo##DEBUG".to_string());
 
             parse_flag_test_helper(&args, None);
         }
@@ -2172,7 +2164,7 @@ mod tests {
             args.push(
                 (0..=MAX_LOG_SELECTORS)
                     .into_iter()
-                    .map(|i| format!("{}.cmx#INFO", i))
+                    .map(|i| format!("{}#INFO", i))
                     .collect::<Vec<_>>()
                     .join(","),
             );

@@ -3,8 +3,8 @@
         total: "INSPECT:bootstrap/bar:root/data_stats/stats:total_bytes",
         used: "INSPECT:bootstrap/bar:root/data_stats/stats:used_bytes",
         foo_health: [
-            "INSPECT:missing.cmx:root:not_found",
-            "INSPECT:not_found.cmx:root/fuchsia.inspect.Health:status",
+            "INSPECT:missing:root:not_found",
+            "INSPECT:not_found:root/fuchsia.inspect.Health:status",
         ],
     },
     eval: {

@@ -59,15 +59,15 @@ mod tests {
     #[fuchsia::test]
     fn test_crashes() {
         let expected_errors: Vec<String> = vec![
-            "[ERROR]: my_component.cmx crashed at 1h1m1.123s [3661.123]",
-            "[ERROR]: my_component.cmx crashed at 1h2m2.345s [3722.345]",
+            "[ERROR]: my_component crashed at 1h1m1.123s [3661.123]",
+            "[ERROR]: my_component crashed at 1h2m2.345s [3722.345]",
         ]
         .into_iter()
         .map(|s| s.to_string())
         .collect::<Vec<_>>();
         let fetcher: TextFetcher = r#"
-[3661.123] fatal : my_component.cmx[333]
-[3722.345] CRASH: my_component.cmx[334]
+[3661.123] fatal : my_component[333]
+[3722.345] CRASH: my_component[334]
 "#
         .into();
 

@@ -53,9 +53,9 @@ mod tests {
     #[fuchsia::test]
     fn test_sandbox_errors() {
         let expected_warnings: Vec<String> = vec![
-            "[WARNING]: my_component.cmx tried to use fuchsia.example.Id, which was not declared in its sandbox",
-            "[WARNING]: my_component.cmx tried to use fuchsia.example.Test, which was not declared in its sandbox",
-            "[WARNING]: test.cmx tried to use fuchsia.example.Test, which was not declared in its sandbox",
+            "[WARNING]: my_component tried to use fuchsia.example.Id, which was not declared in its sandbox",
+            "[WARNING]: my_component tried to use fuchsia.example.Test, which was not declared in its sandbox",
+            "[WARNING]: test tried to use fuchsia.example.Test, which was not declared in its sandbox",
         ]
         .into_iter()
         .map(|s| s.to_string())
@@ -68,11 +68,11 @@ mod tests {
         // - Different component, same service (not duplicate)
         // - Unrelated log line.
         let fetcher: TextFetcher = r#"
-[100.100] `my_component.cmx` is not allowed to connect to `fuchsia.example.Test` because this service is not present in the component's sandbox
-[110.100] `my_component.cmx` is not allowed to connect to `fuchsia.example.Test` because this service is not present in the component's sandbox
-[120.100] `my_component.cmx` is not allowed to connect to `fuchsia.example.Id` because this service is not present in the component's sandbox
-[130.100] `test.cmx` is not allowed to connect to `fuchsia.example.Test` because this service is not present in the component's sandbox
-[140.100] `test.cmx` is not allowed to connect to `component 2`
+[100.100] `my_component` is not allowed to connect to `fuchsia.example.Test` because this service is not present in the component's sandbox
+[110.100] `my_component` is not allowed to connect to `fuchsia.example.Test` because this service is not present in the component's sandbox
+[120.100] `my_component` is not allowed to connect to `fuchsia.example.Id` because this service is not present in the component's sandbox
+[130.100] `test` is not allowed to connect to `fuchsia.example.Test` because this service is not present in the component's sandbox
+[140.100] `test` is not allowed to connect to `component 2`
 "#
         .into();
 
