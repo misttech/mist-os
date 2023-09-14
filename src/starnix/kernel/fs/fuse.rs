@@ -24,6 +24,7 @@ use crate::{
         FileMode, OpenFlags, FUSE_SUPER_MAGIC,
     },
 };
+use bstr::B;
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
     sync::Arc,
@@ -87,9 +88,9 @@ pub fn new_fuse_fs(
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
     let mut mount_options = fs_args::generic_parse_mount_options(&options.params);
-    let fd = fs_args::parse::<FdNumber>(
-        mount_options.remove(b"fd" as &FsStr).ok_or_else(|| errno!(EINVAL))?,
-    )?;
+    let fd =
+        fs_args::parse::<FdNumber>(mount_options.remove(B("fd")).ok_or_else(|| errno!(EINVAL))?)?;
+    let default_permissions = mount_options.remove(B("default_permissions")).is_some();
     let connection = current_task
         .files
         .get(fd)?
@@ -101,7 +102,7 @@ pub fn new_fuse_fs(
     let fs = FileSystem::new(
         current_task.kernel(),
         CacheMode::Cached,
-        FuseFs::new(connection.clone()),
+        FuseFs { connection: connection.clone(), default_permissions },
         options,
     );
     let fuse_node = Arc::new(FuseNode {
@@ -118,15 +119,15 @@ pub fn new_fuse_fs(
     Ok(fs)
 }
 
+pub fn is_fuse_filesystem_without_default_permissions(fs: &FileSystem) -> bool {
+    let Some(fs) = fs.downcast_ops::<FuseFs>() else { return false };
+    !fs.default_permissions
+}
+
 #[derive(Debug)]
 struct FuseFs {
     connection: Arc<FuseConnection>,
-}
-
-impl FuseFs {
-    fn new(connection: Arc<FuseConnection>) -> Self {
-        Self { connection }
-    }
+    default_permissions: bool,
 }
 
 impl FileSystemOps for FuseFs {

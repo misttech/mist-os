@@ -1287,6 +1287,14 @@ impl FsNode {
     /// flags (read, write, or exec). Accounts for capabilities and whether the current user is the
     /// owner or is in the file's group.
     pub fn check_access(&self, current_task: &CurrentTask, access: Access) -> Result<(), Errno> {
+        // HACK: while the access() fuse operation is not wired up, disable all access checks on
+        // any fuse filesystem that doesn't opt in to the default access checks.
+        if current_task.kernel().features.contains("hack_no_fuse_access_checks")
+            && crate::fs::fuse::is_fuse_filesystem_without_default_permissions(&self.fs())
+        {
+            return Ok(());
+        }
+
         let (node_uid, node_gid, mode) = {
             let info = self.info();
             (info.uid, info.gid, info.mode.bits())
