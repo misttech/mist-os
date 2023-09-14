@@ -622,7 +622,7 @@ func (r *RunCommand) runAgainstTarget(ctx context.Context, t targets.FuchsiaTarg
 		testrunnerEnv[constants.IPv6AddrEnvKey] = ipv6.String()
 		if t.UseFFX() {
 			// Add the target address in order to skip MDNS discovery.
-			if err := t.GetFFX().Run(ctx, "target", "add", addr.String(), "--nowait"); err != nil {
+			if err := t.GetFFX().Run(ctx, "target", "add", addr.String()); err != nil {
 				return err
 			}
 		}
