@@ -1702,6 +1702,15 @@ class FidlControlDataProcessor {
       total += StoreControlMessage(IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl));
     }
 
+#if __Fuchsia_API_level__ >= 15
+    if (requested.ip_recvorigdstaddr() && control_data.has_original_destination_address()) {
+      struct sockaddr_storage addr;
+      socklen_t addr_len =
+          fidl_to_sockaddr(control_data.original_destination_address(), &addr, sizeof(addr));
+      total += StoreControlMessage(IPPROTO_IP, IP_RECVORIGDSTADDR, &addr, addr_len);
+    }
+#endif
+
     return total;
   }
 

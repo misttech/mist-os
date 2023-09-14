@@ -748,6 +748,9 @@ closed protocol DatagramSocket {
             IPV6_HOPLIMIT = 0x8;
             /// Identifies whether the `IPV6_RECVPKTINFO` control message is requested.
             IPV6_PKTINFO = 0x10;
+            /// Identifies whether the `IP_RECVORIGDSTADDR` control message is requested.
+            @available(added=15)
+            IP_RECVORIGDSTADDR = 0x20;
         };
     }) error fuchsia.posix.Errno;
 };

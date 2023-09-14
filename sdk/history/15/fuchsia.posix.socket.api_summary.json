@@ -2477,6 +2477,11 @@
     },
     {
         "kind": "bits/member",
+        "name": "fuchsia.posix.socket/CmsgRequests.IP_RECVORIGDSTADDR",
+        "value": "32"
+    },
+    {
+        "kind": "bits/member",
         "name": "fuchsia.posix.socket/CmsgRequests.IP_TOS",
         "value": "1"
     },

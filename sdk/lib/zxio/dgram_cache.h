@@ -41,6 +41,7 @@ class RequestedCmsgSet {
 
   bool ip_tos() const;
   bool ip_ttl() const;
+  bool ip_recvorigdstaddr() const;
   bool ipv6_tclass() const;
   bool ipv6_hoplimit() const;
   bool ipv6_pktinfo() const;
