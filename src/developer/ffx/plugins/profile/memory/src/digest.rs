@@ -743,9 +743,9 @@ mod tests {
     }
 
     // Reproduce a case similar to how blobfs shares the VMOs containing the file content.
-    // `blobfs.cm` shares an unmodified child VMO with `app.cmx`.
+    // `blobfs.cm` shares an unmodified child VMO with `app.cm`.
     // The children VMO has 0 committed pages.
-    // The test verifies that the shared memory charged to `app.cmx` is 0 despite the fact
+    // The test verifies that the shared memory charged to `app.cm` is 0 despite the fact
     // that it owns a VMO that has a parent with committed memory.
     #[test]
     fn code_pages_received_from_blobfs_test() {
@@ -761,11 +761,11 @@ mod tests {
                 }),
                 raw::Process::Data(raw::ProcessData {
                     koid: 3,
-                    name: "app.cmx".to_string(),
+                    name: "app.cm".to_string(),
                     vmos: vec![2],
                 }),
             ],
-            vmo_names: vec!["blob-xxx".to_string(), "app.cmx".to_string()],
+            vmo_names: vec!["blob-xxx".to_string(), "app.cm".to_string()],
             vmos: vec![
                 raw::Vmo::Headers(raw::VmoHeaders::default()),
                 raw::Vmo::Data(raw::VmoData {
@@ -815,7 +815,7 @@ mod tests {
             },
             processed::Process {
                 koid: 3,
-                name: "app.cmx".to_string(),
+                name: "app.cm".to_string(),
                 memory: processed::RetainedMemory {
                     private: 0,
                     scaled: 250,
@@ -825,7 +825,7 @@ mod tests {
                 name_to_vmo_memory: {
                     let mut result = HashMap::new();
                     result.insert(
-                        "app.cmx".to_string(),
+                        "app.cm".to_string(),
                         processed::RetainedMemory {
                             private: 0,
                             scaled: 0,
@@ -884,7 +884,7 @@ mod tests {
             },
             processed::Vmo {
                 koid: 2,
-                name: "app.cmx".to_string(),
+                name: "app.cm".to_string(),
                 parent_koid: 1,
                 committed_bytes: 0,
                 allocated_bytes: 1000,
