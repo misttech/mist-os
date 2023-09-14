@@ -399,7 +399,8 @@ pub(crate) mod test {
     use std::io;
     use std::str::FromStr as _;
 
-    pub(crate) fn placeholder_package() -> Package {
+    // Returns a pair (meta FAR hash, FAR bytes) for a placeholder package definition.
+    pub(crate) fn placeholder_package_far() -> (Box<dyn api::Hash>, Vec<u8>) {
         let meta_package =
             FuchsiaMetaPackage::from_name(PackageName::from_str("placeholder").unwrap());
         let mut meta_package_bytes = vec![];
@@ -415,20 +416,25 @@ pub(crate) mod test {
         };
         let mut far_bytes = vec![];
         fuchsia_archive::write(&mut far_bytes, far_map).unwrap();
-        let far_fuchsia_hash = FuchsiaMerkleTree::from_reader(far_bytes.as_slice()).unwrap().root();
 
+        let far_fuchsia_hash = FuchsiaMerkleTree::from_reader(far_bytes.as_slice()).unwrap().root();
+        let meta_far_hash: Box<dyn api::Hash> = Box::new(Hash::from(far_fuchsia_hash));
+
+        (meta_far_hash, far_bytes)
+    }
+
+    pub(crate) fn placeholder_package() -> Package {
         let data_source = ds::DataSource::new(ds::DataSourceInfo::new(
             api::DataSourceKind::BlobDirectory,
             None,
             api::DataSourceVersion::Unknown,
         ));
 
+        let (meta_far_hash, far_bytes) = placeholder_package_far();
         let blob_set = VerifiedMemoryBlobSet::new(
             [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
             [far_bytes.as_slice()],
         );
-
-        let meta_far_hash: Box<dyn api::Hash> = Box::new(Hash::from(far_fuchsia_hash));
         let meta_far_blob = blob_set.blob(meta_far_hash.clone()).unwrap();
 
         Package::new(

@@ -311,7 +311,16 @@ mod tests {
     use super::super::blob::BlobSet as _;
     use super::super::blob::VerifiedMemoryBlob;
     use super::super::data_source as ds;
+    use super::super::package::test::placeholder_package_far;
+    use super::AdditionalBootConfigurationError;
     use super::Bootfs;
+    use super::BootfsPackageIndexError;
+    use super::ComponentManagerConfigurationError;
+    use super::ADDITIONAL_BOOT_ARGS_PATH;
+    use super::BOOTFS_PACKAGE_INDEX_PATH;
+    use super::COMPONENT_MANAGER_CONFIG_PATH;
+    use fidl::persist;
+    use fidl_fuchsia_component_internal as component_internal;
     use std::collections::HashMap;
     use std::io::Read as _;
 
@@ -335,7 +344,7 @@ mod tests {
         )
         .expect("blob");
         let blobs = [(path_1.clone(), blob_1.clone()), (path_2.clone(), blob_2.clone())];
-        let bootfs = Bootfs::new(data_source, blobs.clone().into_iter());
+        let bootfs = Bootfs::new(data_source, blobs.clone());
         let mut expected = blobs
             .into_iter()
             .map(|(path, verified_memory_blob)| {
@@ -384,7 +393,7 @@ mod tests {
         )
         .expect("blob");
         let blobs = [(path_1.clone(), blob_1.clone()), (path_2.clone(), blob_2.clone())];
-        let bootfs = Bootfs::new(data_source, blobs.clone().into_iter());
+        let bootfs = Bootfs::new(data_source, blobs.clone());
         let mut expected = blobs
             .into_iter()
             .map(|(_path, verified_memory_blob)| {
@@ -438,7 +447,7 @@ mod tests {
             (blob_1_path_2.clone(), blob_1.clone()),
             (blob_2_path.clone(), blob_2.clone()),
         ];
-        let bootfs = Bootfs::new(data_source, blobs.clone().into_iter());
+        let bootfs = Bootfs::new(data_source, blobs.clone());
 
         // Iterate-by-path should contain all 3 entries.
         let mut expected_by_path = blobs
@@ -505,5 +514,265 @@ mod tests {
         assert_eq!(0, expected_by_hash.len());
     }
 
-    // TODO(fxbug.dev/133263): Add unit tests for `api::Bootfs` trait methods on `Bootfs`.
+    #[fuchsia::test]
+    fn bootfs_additional_boot_configuration_valid() {
+        let data_source = ds::DataSource::new(ds::DataSourceInfo::new(
+            api::DataSourceKind::Unknown,
+            None,
+            api::DataSourceVersion::Unknown,
+        ));
+        let path: Box<dyn api::Path> = Box::new(ADDITIONAL_BOOT_ARGS_PATH);
+        let additional_boot_config_str = "key_1=val_1\n# a comment\nkey_2=val_2\nkey_3";
+        let expected = [("key_1", "val_1"), ("key_2", "val_2"), ("key_3", "")]
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect::<Vec<_>>();
+        let blobs = [(
+            path,
+            VerifiedMemoryBlob::new(
+                [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
+                additional_boot_config_str.as_bytes().into(),
+            )
+            .expect("blob"),
+        )];
+        let bootfs = Bootfs::new(data_source, blobs.clone());
+        let additional_boot_config =
+            bootfs.additional_boot_configuration().expect("additional boot configuration");
+
+        assert_eq!(additional_boot_config.get("key_1").unwrap(), "val_1");
+        assert_eq!(additional_boot_config.get("key_2").unwrap(), "val_2");
+        assert_eq!(additional_boot_config.get("key_3").unwrap(), "");
+
+        let mut contents = additional_boot_config.iter().collect::<Vec<_>>();
+        contents.sort();
+        assert_eq!(expected, contents);
+    }
+
+    #[fuchsia::test]
+    fn bootfs_additional_boot_configuration_invalid() {
+        let data_source = ds::DataSource::new(ds::DataSourceInfo::new(
+            api::DataSourceKind::Unknown,
+            None,
+            api::DataSourceVersion::Unknown,
+        ));
+        let path: Box<dyn api::Path> = Box::new(ADDITIONAL_BOOT_ARGS_PATH);
+        let additional_boot_config_str = "=invalid";
+        let blobs = [(
+            path,
+            VerifiedMemoryBlob::new(
+                [Box::new(data_source.clone()) as Box<dyn api::DataSource>].into_iter(),
+                additional_boot_config_str.as_bytes().into(),
+            )
+            .expect("blob"),
+        )];
+        let bootfs = Bootfs::new(data_source, blobs.clone().into_iter());
+        match bootfs.additional_boot_configuration() {
+            Err(api::BootfsError::AdditionalBootConfiguration(AdditionalBootConfigurationError::ParseConfiguration{..})) => {},
+            Err(err) => assert!(false, "Expected error with inner type AdditionalBootConfigurationError::ParseConfiguration, but got: {:?}", err),
+            Ok(_) => assert!(false, "Expected error due to invalid configuration file, but initialization succeeded"),
+        }
+    }
+
+    #[fuchsia::test]
+    fn bootfs_additional_boot_configuration_not_found() {
+        let data_source = ds::DataSource::new(ds::DataSourceInfo::new(
+            api::DataSourceKind::Unknown,
+            None,
+            api::DataSourceVersion::Unknown,
+        ));
+        let path: Box<dyn api::Path> = Box::new("some/other/path");
+        let additional_boot_config_str = "key_1=val_1";
+        let blobs = [(
+            path,
+            VerifiedMemoryBlob::new(
+                [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
+                additional_boot_config_str.as_bytes().into(),
+            )
+            .expect("blob"),
+        )];
+        let bootfs = Bootfs::new(data_source, blobs.clone());
+        match bootfs.additional_boot_configuration() {
+            Err(api::BootfsError::AdditionalBootConfiguration(AdditionalBootConfigurationError::FileNotFound{..})) => {},
+            Err(err) => assert!(false, "Expected error with inner type AdditionalBootConfigurationError::FileNotFound, but got: {:?}", err),
+            Ok(_) => assert!(false, "Expected error due to incorrect configuration file path, but initialization succeeded"),
+        }
+    }
+
+    #[fuchsia::test]
+    fn bootfs_component_manager_configuration_valid() {
+        let data_source = ds::DataSource::new(ds::DataSourceInfo::new(
+            api::DataSourceKind::Unknown,
+            None,
+            api::DataSourceVersion::Unknown,
+        ));
+        let path: Box<dyn api::Path> = Box::new(COMPONENT_MANAGER_CONFIG_PATH);
+        let mut component_manager_config_data = component_internal::Config::default();
+        component_manager_config_data.debug = Some(true);
+        let component_manager_config_bytes = persist(&component_manager_config_data)
+            .expect("serialize component manager configuration fidl");
+        let blobs = [(
+            path,
+            VerifiedMemoryBlob::new(
+                [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
+                component_manager_config_bytes.into(),
+            )
+            .expect("blob"),
+        )];
+        let bootfs = Bootfs::new(data_source, blobs.clone());
+        let component_manager_config =
+            bootfs.component_manager_configuration().expect("component manager configuration");
+        assert_eq!(component_manager_config.debug(), true);
+    }
+
+    #[fuchsia::test]
+    fn bootfs_component_manager_configuration_not_found() {
+        let data_source = ds::DataSource::new(ds::DataSourceInfo::new(
+            api::DataSourceKind::Unknown,
+            None,
+            api::DataSourceVersion::Unknown,
+        ));
+        let path: Box<dyn api::Path> = Box::new("some/other/path");
+        let mut component_manager_config_data = component_internal::Config::default();
+        component_manager_config_data.debug = Some(true);
+        let component_manager_config_bytes = persist(&component_manager_config_data)
+            .expect("serialize component manager configuration fidl");
+        let blobs = [(
+            path,
+            VerifiedMemoryBlob::new(
+                [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
+                component_manager_config_bytes.into(),
+            )
+            .expect("blob"),
+        )];
+        let bootfs = Bootfs::new(data_source, blobs.clone());
+        match bootfs.component_manager_configuration() {
+            Err(api::BootfsError::ComponentManagerConfiguration(ComponentManagerConfigurationError::FileNotFound{..})) => {},
+            Err(err) => assert!(false, "Expected error with inner type ComponentManagerConfigurationError::FileNotFound, but got: {:?}", err),
+            Ok(_) => assert!(false, "Expected error due to incorrect configuration file path, but initialization succeeded"),
+        }
+    }
+
+    #[fuchsia::test]
+    fn bootfs_packages_single_package() {
+        let data_source = ds::DataSource::new(ds::DataSourceInfo::new(
+            api::DataSourceKind::Unknown,
+            None,
+            api::DataSourceVersion::Unknown,
+        ));
+
+        let (meta_far_hash, far_bytes) = placeholder_package_far();
+        let pkg_path: Box<dyn api::Path> = Box::new(format!("blob/{}", meta_far_hash));
+        let pkg_index_str = format!("pkg_1={}", meta_far_hash);
+
+        let blobs = [
+            (
+                Box::new(BOOTFS_PACKAGE_INDEX_PATH) as Box<dyn api::Path>,
+                VerifiedMemoryBlob::new(
+                    [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
+                    pkg_index_str.into_bytes(),
+                )
+                .expect("package index blob"),
+            ),
+            (
+                pkg_path,
+                VerifiedMemoryBlob::new(
+                    [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
+                    far_bytes,
+                )
+                .expect("package blob"),
+            ),
+        ];
+        let bootfs = Bootfs::new(data_source, blobs.clone());
+        let packages = bootfs.packages().expect("bootfs packages").collect::<Vec<_>>();
+        assert_eq!(packages.len(), 1);
+        let package = &packages[0];
+        assert_eq!(meta_far_hash.as_ref(), package.hash().as_ref());
+    }
+
+    // Two packages that have the same contents (and so have the same hash), but that have different names
+    // in the bootfs package index, are considered to be distinct elements of the bootfs package iterator.
+    #[fuchsia::test]
+    fn bootfs_packages_duplicate_package_hash() {
+        let data_source = ds::DataSource::new(ds::DataSourceInfo::new(
+            api::DataSourceKind::Unknown,
+            None,
+            api::DataSourceVersion::Unknown,
+        ));
+
+        let (meta_far_hash, far_bytes) = placeholder_package_far();
+        let pkg_path: Box<dyn api::Path> = Box::new(format!("blob/{}", meta_far_hash));
+        let pkg_index_str = format!("pkg_1={}\npkg_2={}", meta_far_hash, meta_far_hash);
+
+        let blobs = [
+            (
+                Box::new(BOOTFS_PACKAGE_INDEX_PATH) as Box<dyn api::Path>,
+                VerifiedMemoryBlob::new(
+                    [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
+                    pkg_index_str.into_bytes(),
+                )
+                .expect("package index blob"),
+            ),
+            (
+                pkg_path.clone(),
+                VerifiedMemoryBlob::new(
+                    [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
+                    far_bytes.clone(),
+                )
+                .expect("package blob 1"),
+            ),
+            (
+                pkg_path,
+                VerifiedMemoryBlob::new(
+                    [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
+                    far_bytes,
+                )
+                .expect("package blob 2"),
+            ),
+        ];
+        let bootfs = Bootfs::new(data_source, blobs.clone());
+        let packages = bootfs.packages().expect("bootfs packages").collect::<Vec<_>>();
+        assert_eq!(packages.len(), 2);
+        let pkg_1 = &packages[0];
+        let pkg_2 = &packages[1];
+        assert_eq!(pkg_1.hash().as_ref(), meta_far_hash.as_ref());
+        assert_eq!(pkg_2.hash().as_ref(), meta_far_hash.as_ref());
+    }
+
+    #[fuchsia::test]
+    fn bootfs_package_index_not_found() {
+        let data_source = ds::DataSource::new(ds::DataSourceInfo::new(
+            api::DataSourceKind::Unknown,
+            None,
+            api::DataSourceVersion::Unknown,
+        ));
+
+        let (meta_far_hash, far_bytes) = placeholder_package_far();
+        let pkg_path: Box<dyn api::Path> = Box::new(format!("blob/{}", meta_far_hash));
+        let pkg_index_str = format!("pkg_1={}", meta_far_hash);
+
+        let blobs = [
+            (
+                Box::new("some/other/path") as Box<dyn api::Path>,
+                VerifiedMemoryBlob::new(
+                    [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
+                    pkg_index_str.into_bytes(),
+                )
+                .expect("package index blob"),
+            ),
+            (
+                pkg_path,
+                VerifiedMemoryBlob::new(
+                    [Box::new(data_source.clone()) as Box<dyn api::DataSource>],
+                    far_bytes,
+                )
+                .expect("package blob"),
+            ),
+        ];
+        let bootfs = Bootfs::new(data_source, blobs.clone());
+        match bootfs.packages() {
+            Err(api::BootfsError::PackageIndex(BootfsPackageIndexError::IndexNotFound{..})) => {},
+            Err(err) => assert!(false, "Expected error with inner type BootfsPackageIndexError::IndexNotFound, but got: {:?}", err),
+            Ok(_) => assert!(false, "Expected error due to incorrect package index file path, but initialization succeeded"),
+        }
+    }
 }
