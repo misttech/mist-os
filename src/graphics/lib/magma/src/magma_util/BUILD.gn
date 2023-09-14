@@ -83,9 +83,9 @@ source_set("mapped_batch") {
 
   public_deps = [
     ":address_space",
-    "$magma_build_root/include:msd",
     "platform:semaphore",
     "platform:trace",
+    "//src/graphics/magma:msd",
   ]
 }
 

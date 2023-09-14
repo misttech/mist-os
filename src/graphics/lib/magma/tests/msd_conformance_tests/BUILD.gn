@@ -19,7 +19,6 @@ source_set("msd_conformance_tests") {
   ]
 
   deps = [
-    "$magma_build_root/include:msd",
     "$magma_build_root/src/magma_util:short_macros",
     "$magma_build_root/src/magma_util/platform:buffer",
     "$magma_build_root/src/magma_util/platform:semaphore",
@@ -27,6 +26,7 @@ source_set("msd_conformance_tests") {
     "$magma_build_root/tests/helper:msd_stubs",
     "$magma_build_root/tests/helper:platform_msd_device_helper",
     "//src/graphics/drivers/msd-intel-gen/include",
+    "//src/graphics/magma:msd",
     "//third_party/googletest:gtest",
   ]
 }

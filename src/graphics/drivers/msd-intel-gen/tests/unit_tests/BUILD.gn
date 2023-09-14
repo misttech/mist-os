@@ -68,7 +68,6 @@ group("test_deps") {
   testonly = true
 
   public_deps = [
-    "$magma_build_root/include:msd",
     "$magma_build_root/src/magma_util:address_space",
     "$magma_build_root/src/magma_util:macros",
     "$magma_build_root/src/magma_util:registers",
@@ -82,6 +81,7 @@ group("test_deps") {
     "//src/graphics/drivers/msd-intel-gen/include",
     "//src/graphics/drivers/msd-intel-gen/src",
     "//src/graphics/drivers/msd-intel-gen/tests/mock",
+    "//src/graphics/magma:msd",
     "//third_party/googletest:gtest",
   ]
 }

@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma_service/msd.h>
+#include <lib/magma_service/msd_defs.h>
+
 #include <limits>
 
 #include <gtest/gtest.h>
 
 #include "driver_logger_harness.h"
 #include "mock/mock_bus_mapper.h"
-#include "msd.h"
-#include "msd_defs.h"
 #include "src/graphics/drivers/msd-arm-mali/include/magma_arm_mali_types.h"
 #include "src/graphics/drivers/msd-arm-mali/src/address_manager.h"
 #include "src/graphics/drivers/msd-arm-mali/src/gpu_mapping.h"

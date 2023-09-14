@@ -5,10 +5,11 @@
 #ifndef MSD_ARM_BUFFER_H
 #define MSD_ARM_BUFFER_H
 
+#include <lib/magma_service/msd.h>
+
 #include <unordered_set>
 
 #include "magma_util/short_macros.h"
-#include "msd.h"
 #include "platform_buffer.h"
 #include "platform_event.h"
 #include "src/graphics/drivers/msd-arm-mali/src/region.h"

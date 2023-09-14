@@ -12,34 +12,6 @@ source_set("magma_common") {
   public_deps = [ "//sdk/lib/magma_common" ]
 }
 
-config("msd_config") {
-  include_dirs = [
-    "msd",
-    ".",
-  ]
-}
-
-source_set("msd_defs") {
-  public_configs = [ ":msd_config" ]
-  sources = [ "msd/msd_defs.h" ]
-  public_deps = [ ":magma_common" ]
-}
-
-source_set("msd") {
-  sources = [
-    "msd/msd.cc",
-    "msd/msd.h",
-  ]
-
-  public_deps = [
-    ":msd_defs",
-    "//sdk/lib/stdcompat",
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/inspect",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
 # TODO(fxbug.dev/85557) - remove
 group("magma_abi") {
   public_deps = [ ":magma" ]

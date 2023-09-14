@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_COMMAND_BUFFER_H_
 #define SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_COMMAND_BUFFER_H_
 
-#include <msd_defs.h>
+#include <lib/magma_service/msd_defs.h>
 #include <platform_semaphore.h>
 #include <platform_trace.h>
 

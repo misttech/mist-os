@@ -5,10 +5,11 @@
 #ifndef SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_MAGMA_SYSTEM_BUFFER_H_
 #define SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_MAGMA_SYSTEM_BUFFER_H_
 
+#include <lib/magma_service/msd.h>
+
 #include <functional>
 #include <memory>
 
-#include "msd.h"
 #include "platform_buffer.h"
 
 namespace msd {

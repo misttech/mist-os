@@ -70,7 +70,6 @@ source_set("src") {
   ]
 
   deps = [
-    "$magma_build_root/include:msd",
     "$magma_build_root/src/magma_util:address_space",
     "$magma_build_root/src/magma_util:allocator",
     "$magma_build_root/src/magma_util:macros",
@@ -87,6 +86,7 @@ source_set("src") {
     "$magma_build_root/src/magma_util/platform:thread",
     "$magma_build_root/src/magma_util/platform:trace",
     "../include",
+    "//src/graphics/magma:msd",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",

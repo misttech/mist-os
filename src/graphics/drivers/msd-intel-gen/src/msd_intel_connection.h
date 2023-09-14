@@ -5,13 +5,14 @@
 #ifndef MSD_INTEL_CONNECTION_H
 #define MSD_INTEL_CONNECTION_H
 
+#include <lib/magma_service/msd.h>
+
 #include <list>
 #include <memory>
 
 #include "command_buffer.h"
 #include "engine_command_streamer.h"
 #include "magma_util/short_macros.h"
-#include "msd.h"
 #include "msd_intel_pci_device.h"
 
 class MsdIntelContext;

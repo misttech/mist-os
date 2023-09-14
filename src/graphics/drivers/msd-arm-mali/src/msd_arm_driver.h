@@ -6,11 +6,11 @@
 #define MSD_ARM_DRIVER_H
 
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/magma_service/msd.h>
 
 #include <memory>
 
 #include "magma_util/short_macros.h"
-#include "msd.h"
 #include "parent_device.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_device.h"
 

@@ -5,6 +5,8 @@
 #ifndef SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_MAGMA_SYSTEM_CONNECTION_H_
 #define SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_MAGMA_SYSTEM_CONNECTION_H_
 
+#include <lib/magma_service/msd.h>
+
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -14,7 +16,6 @@
 #include "magma_system_buffer.h"
 #include "magma_system_context.h"
 #include "magma_util/macros.h"
-#include "msd.h"
 #include "primary_fidl_server.h"
 
 namespace msd {

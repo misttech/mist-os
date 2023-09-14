@@ -1,0 +1,23 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+config("msd_config") {
+  include_dirs = [ "include" ]
+}
+
+source_set("msd") {
+  public_configs = [ ":msd_config" ]
+  sources = [
+    "include/lib/magma_service/msd.cc",
+    "include/lib/magma_service/msd.h",
+    "include/lib/magma_service/msd_defs.h",
+  ]
+  public_deps = [
+    "//sdk/lib/magma_common",
+    "//sdk/lib/stdcompat",
+    "//zircon/system/ulib/async",
+    "//zircon/system/ulib/inspect",
+    "//zircon/system/ulib/zx",
+  ]
+}

@@ -8,11 +8,10 @@
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <fidl/fuchsia.memorypressure/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/magma_service/msd.h>
 
 #include <ddktl/device.h>
 #include <ddktl/protocol/empty-protocol.h>
-
-#include "src/graphics/lib/magma/include/msd/msd_defs.h"
 
 namespace magma {
 

@@ -4,8 +4,9 @@
 
 #include "src/graphics/drivers/msd-arm-mali/src/job_scheduler.h"
 
+#include <lib/magma_service/msd_defs.h>
+
 #include "magma_util/dlog.h"
-#include "msd_defs.h"
 #include "platform_logger.h"
 #include "platform_trace.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_connection.h"

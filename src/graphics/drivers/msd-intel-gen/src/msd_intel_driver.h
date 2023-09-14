@@ -5,9 +5,9 @@
 #ifndef MSD_DRIVER_H
 #define MSD_DRIVER_H
 
-#include <memory>
+#include <lib/magma_service/msd.h>
 
-#include "msd.h"
+#include <memory>
 
 class MsdIntelDriver : public msd::Driver {
  public:

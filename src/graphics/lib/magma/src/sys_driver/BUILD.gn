@@ -12,7 +12,6 @@ source_set("sys_driver") {
   ]
   public_deps = [
     "$magma_build_root/include:magma",
-    "$magma_build_root/include:msd",
     "$magma_build_root/src/magma_util:macros",
     "$magma_build_root/src/magma_util:status",
     "$magma_build_root/src/magma_util/platform:buffer",
@@ -21,6 +20,7 @@ source_set("sys_driver") {
     "//sdk/lib/stdcompat",
     "//src/graphics/lib/magma/src/magma_util/platform:trace",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
+    "//src/graphics/magma:msd",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 

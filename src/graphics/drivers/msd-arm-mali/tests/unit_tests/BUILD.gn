@@ -114,7 +114,6 @@ group("test_deps") {
   public_deps = [
     "../../include",
     "//src/graphics/drivers/msd-arm-mali/src",
-    "//src/graphics/lib/magma/include:msd",
     "//src/graphics/lib/magma/src/magma_util:macros",
     "//src/graphics/lib/magma/src/magma_util:registers",
     "//src/graphics/lib/magma/src/magma_util/platform:port",
@@ -122,6 +121,7 @@ group("test_deps") {
     "//src/graphics/lib/magma/src/sys_driver",
     "//src/graphics/lib/magma/tests/helper:platform_msd_device_helper",
     "//src/graphics/lib/magma/tests/mock:mmio",
+    "//src/graphics/magma:msd",
     "//third_party/googletest:gtest",
   ]
 }

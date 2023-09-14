@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.gpu.mali/cpp/driver/wire.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fit/defer.h>
+#include <lib/magma_service/msd_defs.h>
 
 #include <bitset>
 #include <chrono>
@@ -18,7 +19,6 @@
 #include "magma_util/dlog.h"
 #include "magma_util/macros.h"
 #include "magma_util/short_macros.h"
-#include "msd_defs.h"
 #include "platform_barriers.h"
 #include "platform_logger.h"
 #include "platform_port.h"

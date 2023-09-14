@@ -5,6 +5,7 @@
 #include "msd_vsi_device.h"
 
 #include <lib/fit/defer.h>
+#include <lib/magma_service/msd.h>
 
 #include <algorithm>
 #include <chrono>
@@ -18,7 +19,6 @@
 #include "instructions.h"
 #include "magma_util/short_macros.h"
 #include "magma_vendor_queries.h"
-#include "msd.h"
 #include "msd_vsi_context.h"
 #include "platform_barriers.h"
 #include "platform_logger.h"

@@ -5,6 +5,8 @@
 #ifndef SRC_GRAPHICS_LIB_MAGMA_TESTS_MOCK_MOCK_MSD_H_
 #define SRC_GRAPHICS_LIB_MAGMA_TESTS_MOCK_MOCK_MSD_H_
 
+#include <lib/magma_service/msd.h>
+#include <lib/magma_service/msd_defs.h>
 #include <lib/sync/cpp/completion.h>
 
 #include <iterator>
@@ -12,8 +14,6 @@
 #include <vector>
 
 #include "magma_util/macros.h"
-#include "msd.h"
-#include "msd_defs.h"
 #include "platform_buffer.h"
 #include "platform_semaphore.h"
 

@@ -4,9 +4,9 @@
 #ifndef SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_MSD_STUBS_H_
 #define SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_MSD_STUBS_H_
 
-#include <cassert>
+#include <lib/magma_service/msd.h>
 
-#include "msd.h"
+#include <cassert>
 
 namespace msd::testing {
 

@@ -6,13 +6,13 @@
 #define MSD_VSI_CONNECTION_H
 
 #include <lib/fit/thread_safety.h>
+#include <lib/magma_service/msd.h>
 
 #include <memory>
 
 #include "address_space.h"
 #include "magma_util/short_macros.h"
 #include "mapped_batch.h"
-#include "msd.h"
 #include "ringbuffer.h"
 
 class MsdVsiConnection {

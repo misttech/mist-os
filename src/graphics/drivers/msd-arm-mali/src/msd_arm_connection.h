@@ -8,6 +8,8 @@
 #include <lib/fit/function.h>
 #include <lib/fit/thread_safety.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/magma_service/msd.h>
+#include <lib/magma_service/msd_defs.h>
 #include <zircon/compiler.h>
 
 #include <deque>
@@ -21,8 +23,6 @@
 
 #include "magma_util/address_space_allocator.h"
 #include "magma_util/short_macros.h"
-#include "msd.h"
-#include "msd_defs.h"
 #include "src/graphics/drivers/msd-arm-mali/include/magma_arm_mali_types.h"
 #include "src/graphics/drivers/msd-arm-mali/src/address_space.h"
 #include "src/graphics/drivers/msd-arm-mali/src/device_request.h"

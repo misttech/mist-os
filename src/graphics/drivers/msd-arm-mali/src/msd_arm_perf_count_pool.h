@@ -7,12 +7,12 @@
 
 #include <lib/fit/thread_checker.h>
 #include <lib/fit/thread_safety.h>
+#include <lib/magma_service/msd_defs.h>
 
 #include <list>
 #include <vector>
 
 #include "magma_util/short_macros.h"
-#include "msd_defs.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_buffer.h"
 #include "src/graphics/drivers/msd-arm-mali/src/performance_counters.h"
 

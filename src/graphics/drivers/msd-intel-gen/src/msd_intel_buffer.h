@@ -5,6 +5,8 @@
 #ifndef MSD_INTEL_BUFFER_H
 #define MSD_INTEL_BUFFER_H
 
+#include <lib/magma_service/msd.h>
+
 #include <atomic>
 #include <memory>
 #include <mutex>
@@ -12,7 +14,6 @@
 #include <vector>
 
 #include "magma_util/short_macros.h"
-#include "msd.h"
 #include "platform_buffer.h"
 #include "platform_event.h"
 #include "types.h"

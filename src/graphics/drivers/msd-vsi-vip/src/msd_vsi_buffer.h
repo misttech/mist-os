@@ -5,8 +5,9 @@
 #ifndef MSD_VSI_BUFFER_H
 #define MSD_VSI_BUFFER_H
 
+#include <lib/magma_service/msd.h>
+
 #include "magma_util/short_macros.h"
-#include "msd.h"
 #include "platform_buffer.h"
 
 class MsdVsiBuffer {

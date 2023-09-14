@@ -359,7 +359,7 @@ the system driver using the Zircon DDK.
 [versionscript]: /src/graphics/lib/magma/scripts/libvulkan.version
 [allowlist]: /src/graphics/lib/magma/gnbuild/imported_symbols.allowlist
 [vmo]: /docs/reference/kernel_objects/vm_object.md
-[msdheader]: /src/graphics/lib/magma/include/msd/msd.h
+[msdheader]: /src/graphics/magma/include/lib/magma_service/msd.h
 [magmaheader]: /sdk/lib/magma_client/include/lib/magma/magma.h
 [l0]: /docs/development/graphics/magma/concepts/contributing.md#l0
 [l1]: /docs/development/graphics/magma/concepts/contributing.md#l1

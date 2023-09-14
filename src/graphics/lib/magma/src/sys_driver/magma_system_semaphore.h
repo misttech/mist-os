@@ -5,9 +5,9 @@
 #ifndef SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_MAGMA_SYSTEM_SEMAPHORE_H_
 #define SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_MAGMA_SYSTEM_SEMAPHORE_H_
 
-#include <memory>
+#include <lib/magma_service/msd.h>
 
-#include "msd.h"
+#include <memory>
 
 namespace msd {
 class MagmaSystemSemaphore {

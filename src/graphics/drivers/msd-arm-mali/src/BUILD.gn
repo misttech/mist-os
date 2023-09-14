@@ -85,7 +85,6 @@ source_set("src") {
     "//sdk/lib/driver/runtime:driver_runtime",
     "//sdk/lib/fit",
     "//src/devices/bin/driver_runtime",
-    "//src/graphics/lib/magma/include:msd",
     "//src/graphics/lib/magma/src/magma_util:allocator",
     "//src/graphics/lib/magma/src/magma_util:macros",
     "//src/graphics/lib/magma/src/magma_util:registers",
@@ -99,16 +98,17 @@ source_set("src") {
     "//src/graphics/lib/magma/src/magma_util/platform:trace",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:interrupt",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:mmio",
+    "//src/graphics/magma:msd",
     "//src/lib/debug:backtrace-request",
   ]
 
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.gpu.mali:fuchsia.hardware.gpu.mali_cpp",
     "//sdk/fidl/fuchsia.hardware.gpu.mali:fuchsia.hardware.gpu.mali_cpp_driver",
-    "//src/graphics/lib/magma/include:msd",
     "//src/graphics/lib/magma/src/magma_util:short_macros",
     "//src/graphics/lib/magma/src/magma_util/platform:interrupt_header",
     "//src/graphics/lib/magma/src/magma_util/platform:mmio_header",
+    "//src/graphics/magma:msd",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/inspect",

@@ -10,7 +10,7 @@ Four major interfaces
 * [Vulkan](https://www.khronos.org/vulkan)
 * [magma](/sdk/lib/magma_client/include/lib/magma/magma.h)
 * [magma FIDL](/sdk/fidl/fuchsia.gpu.magma/magma.fidl)
-* [msd](/src/graphics/lib/magma/include/msd/msd.h)
+* [msd](/src/graphics/magma/include/lib/magma_service/msd.h)
 
 Four major components
 

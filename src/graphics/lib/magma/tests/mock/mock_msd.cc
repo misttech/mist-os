@@ -4,9 +4,10 @@
 
 #include "mock_msd.h"
 
+#include <lib/magma_service/msd.h>
+
 #include <vector>
 
-#include "msd.h"
 #include "platform_handle.h"
 #include "platform_semaphore.h"
 #include "src/graphics/lib/magma/tests/helper/platform_msd_device_helper.h"

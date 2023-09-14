@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_MAGMA_SYSTEM_DEVICE_H_
 
 #include <lib/fit/thread_safety.h>
+#include <lib/magma_service/msd.h>
 
 #include <functional>
 #include <memory>
@@ -16,7 +17,6 @@
 #include <vector>
 
 #include "magma_system_connection.h"
-#include "msd.h"
 #include "primary_fidl_server.h"
 
 namespace msd {

@@ -5,6 +5,8 @@
 #ifndef MSD_INTEL_DEVICE_H
 #define MSD_INTEL_DEVICE_H
 
+#include <lib/magma_service/msd.h>
+
 #include <array>
 #include <list>
 #include <mutex>
@@ -17,7 +19,6 @@
 #include "interrupt_manager.h"
 #include "magma_util/short_macros.h"
 #include "magma_util/thread.h"
-#include "msd.h"
 #include "msd_intel_connection.h"
 #include "msd_intel_context.h"
 #include "msd_intel_pci_device.h"

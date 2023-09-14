@@ -11,10 +11,10 @@ source_set("mock") {
   ]
 
   public_deps = [
-    "$magma_build_root/include:msd",
     "$magma_build_root/src/magma_util:macros",
     "$magma_build_root/src/magma_util/platform:buffer",
     "$msd_intel_gen_build_root/src",
+    "//src/graphics/magma:msd",
   ]
 
   sources = [ "mock_mapped_batch.h" ]

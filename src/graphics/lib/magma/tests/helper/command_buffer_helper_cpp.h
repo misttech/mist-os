@@ -4,11 +4,11 @@
 
 #include <lib/async-loop/loop.h>
 #include <lib/async/cpp/task.h>
+#include <lib/magma_service/msd.h>
 
 #include <gtest/gtest.h>
 
 #include "helper/platform_msd_device_helper.h"
-#include "msd/msd.h"
 #include "platform_semaphore.h"
 #include "sys_driver/magma_system_connection.h"
 #include "sys_driver/magma_system_context.h"

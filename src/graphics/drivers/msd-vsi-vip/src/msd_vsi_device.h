@@ -5,6 +5,8 @@
 #ifndef MSD_VSI_DEVICE_H
 #define MSD_VSI_DEVICE_H
 
+#include <lib/magma_service/msd.h>
+
 #include <list>
 #include <memory>
 #include <mutex>
@@ -19,7 +21,6 @@
 #include "magma_vsi_vip_devices.h"
 #include "magma_vsi_vip_types.h"
 #include "mapped_batch.h"
-#include "msd.h"
 #include "msd_vsi_connection.h"
 #include "msd_vsi_platform_device.h"
 #include "page_table_arrays.h"

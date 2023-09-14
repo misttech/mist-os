@@ -4,6 +4,7 @@
 
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_connection.h"
 
+#include <lib/magma_service/msd_defs.h>
 #include <zircon/compiler.h>
 
 #include <atomic>
@@ -13,7 +14,6 @@
 #include "magma_util/dlog.h"
 #include "magma_util/short_macros.h"
 #include "magma_util/simple_allocator.h"
-#include "msd_defs.h"
 #include "platform_barriers.h"
 #include "platform_logger.h"
 #include "platform_semaphore.h"

@@ -5,13 +5,14 @@
 #ifndef MSD_VSI_CONTEXT_H
 #define MSD_VSI_CONTEXT_H
 
+#include <lib/magma_service/msd.h>
+
 #include <atomic>
 #include <memory>
 
 #include "address_space.h"
 #include "magma_util/short_macros.h"
 #include "mapped_batch.h"
-#include "msd.h"
 #include "msd_vsi_connection.h"
 #include "ringbuffer.h"
 

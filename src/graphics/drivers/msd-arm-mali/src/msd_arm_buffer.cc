@@ -4,7 +4,8 @@
 
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_buffer.h"
 
-#include "msd_defs.h"
+#include <lib/magma_service/msd_defs.h>
+
 #include "src/graphics/drivers/msd-arm-mali/src/gpu_mapping.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_connection.h"
 
