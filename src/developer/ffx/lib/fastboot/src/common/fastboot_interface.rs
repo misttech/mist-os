@@ -25,13 +25,13 @@ pub trait Fastboot {
 
     async fn erase(&mut self, partition_name: &str) -> Result<()>;
 
-    async fn boot(&self) -> Result<()>;
+    async fn boot(&mut self) -> Result<()>;
 
-    async fn reboot(&self) -> Result<()>;
+    async fn reboot(&mut self) -> Result<()>;
 
     async fn reboot_bootloader(&mut self, listener: Sender<RebootEvent>) -> Result<()>;
 
-    async fn continue_boot(&self) -> Result<()>;
+    async fn continue_boot(&mut self) -> Result<()>;
 
     async fn get_staged(&mut self, path: &str) -> Result<()>;
 

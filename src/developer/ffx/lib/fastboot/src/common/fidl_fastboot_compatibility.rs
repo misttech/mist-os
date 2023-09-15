@@ -106,12 +106,12 @@ impl Fastboot for FastbootProxy {
     }
 
     #[tracing::instrument(skip(self))]
-    async fn boot(&self) -> Result<()> {
+    async fn boot(&mut self) -> Result<()> {
         FastbootProxy::boot(self).await.map_err(map_fidl_error)?.map_err(map_fastboot_error)
     }
 
     #[tracing::instrument(skip(self))]
-    async fn reboot(&self) -> Result<()> {
+    async fn reboot(&mut self) -> Result<()> {
         FastbootProxy::reboot(self).await.map_err(map_fidl_error)?.map_err(map_fastboot_error)
     }
 
@@ -136,7 +136,7 @@ impl Fastboot for FastbootProxy {
     }
 
     #[tracing::instrument(skip(self))]
-    async fn continue_boot(&self) -> Result<()> {
+    async fn continue_boot(&mut self) -> Result<()> {
         FastbootProxy::continue_boot(self)
             .await
             .map_err(map_fidl_error)?
