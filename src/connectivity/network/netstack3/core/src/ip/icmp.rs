@@ -297,8 +297,8 @@ impl<Instant, D: WeakId> AsMut<IcmpState<Ipv6, Instant, D>> for Icmpv6State<Inst
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub(crate) struct IcmpAddr<A: IpAddress> {
-    local_addr: SpecifiedAddr<A>,
-    remote_addr: SpecifiedAddr<A>,
+    local_addr: SocketIpAddr<A>,
+    remote_addr: SocketIpAddr<A>,
     icmp_id: u16,
 }
 
@@ -2116,6 +2116,25 @@ fn send_icmp_reply<
 ) -> Result<(), S> {
     trace!("send_icmp_reply({:?}, {}, {})", device, original_src_ip, original_dst_ip);
     ctx.increment_debug_counter("send_icmp_reply");
+
+    // TODO(https://fxbug.dev/132092): Plumb `SocketIpAddr` throughout the ICMP
+    // implementation, so that this error is surfaced earlier in the packet
+    // processing pipeline.
+    let original_src_ip = match original_src_ip.try_into() {
+        Ok(addr) => addr,
+        Err(AddrIsMappedError {}) => {
+            trace!("send_icmpv6_error_message: original_src_ip is mapped");
+            return Ok(());
+        }
+    };
+    let original_dst_ip = match original_dst_ip.try_into() {
+        Ok(addr) => addr,
+        Err(AddrIsMappedError {}) => {
+            trace!("send_icmpv6_error_message: original_dst_ip is mapped");
+            return Ok(());
+        }
+    };
+
     sync_ctx
         .send_oneshot_ip_packet(
             ctx,
@@ -2124,7 +2143,7 @@ fn send_icmp_reply<
             original_src_ip,
             I::ICMP_IP_PROTO,
             DefaultSendOptions,
-            get_body_from_src_ip,
+            |src_ip| get_body_from_src_ip(src_ip.into()),
             None,
         )
         .map_err(|(body, err, DefaultSendOptions {})| {
@@ -2832,6 +2851,17 @@ fn send_icmpv4_error_message<
         return;
     }
 
+    // TODO(https://fxbug.dev/132092): Plumb `SocketIpAddr` throughout the ICMP
+    // implementation, so that this error is surfaced earlier in the packet
+    // processing pipeline.
+    let original_src_ip = match original_src_ip.try_into() {
+        Ok(addr) => addr,
+        Err(AddrIsMappedError {}) => {
+            trace!("send_icmpv6_error_message: original_src_ip is mapped");
+            return;
+        }
+    };
+
     // Per RFC 792, body contains entire IPv4 header + 64 bytes of original
     // body.
     original_packet.shrink_back_to(header_len + 64);
@@ -2850,8 +2880,8 @@ fn send_icmpv4_error_message<
             DefaultSendOptions,
             |local_ip| {
                 original_packet.encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
-                    local_ip,
-                    original_src_ip,
+                    local_ip.addr(),
+                    original_src_ip.addr(),
                     code,
                     message,
                 ))
@@ -2889,6 +2919,17 @@ fn send_icmpv6_error_message<
         return;
     }
 
+    // TODO(https://fxbug.dev/132092): Plumb `SocketIpAddr` throughout the ICMP
+    // implementation, so that this error is surfaced earlier in the packet
+    // processing pipeline.
+    let original_src_ip = match original_src_ip.try_into() {
+        Ok(addr) => addr,
+        Err(AddrIsMappedError {}) => {
+            trace!("send_icmpv6_error_message: original_src_ip is mapped");
+            return;
+        }
+    };
+
     // TODO(https://fxbug.dev/95828): Improve source address selection for ICMP
     // errors sent from unnumbered/router interfaces.
     let _ = try_send_error!(
@@ -2902,8 +2943,12 @@ fn send_icmpv6_error_message<
             Ipv6Proto::Icmpv6,
             DefaultSendOptions,
             |local_ip| {
-                let icmp_builder =
-                    IcmpPacketBuilder::<Ipv6, _>::new(local_ip, original_src_ip, code, message);
+                let icmp_builder = IcmpPacketBuilder::<Ipv6, _>::new(
+                    local_ip.addr(),
+                    original_src_ip.addr(),
+                    code,
+                    message,
+                );
 
                 // Per RFC 4443, body contains as much of the original body as
                 // possible without exceeding IPv6 minimum MTU.
@@ -3158,8 +3203,8 @@ fn send_icmp_echo_request_inner<
             ctx,
             &socket,
             body.encapsulate(IcmpPacketBuilder::<I, _>::new(
-                socket.local_ip().get(),
-                socket.remote_ip().get(),
+                socket.local_ip().addr(),
+                socket.remote_ip().addr(),
                 IcmpUnusedCode,
                 IcmpEchoRequest::new(id, seq_num),
             )),
@@ -3179,6 +3224,10 @@ pub enum IcmpSockCreationError {
     /// an existing ICMP socket.
     #[error("addresses conflict with an existing ICMP socket")]
     SockAddrConflict,
+    /// The specified remote address is mapped (i.e. ipv4-mapped-ipv6 address).
+    /// ICMP sockets do not support dual-stack operations.
+    #[error("local address is mapped")]
+    LocalAddrIsMapped,
     /// The specified remote address is mapped (i.e. ipv4-mapped-ipv6 address).
     /// ICMP sockets do not support dual-stack operations.
     #[error("remote address is mapped")]
@@ -3313,6 +3362,13 @@ fn connect_icmpv4_inner<C: IcmpNonSyncCtx<Ipv4>, SC: InnerIcmpv4Context<C>>(
     remote_addr: SpecifiedAddr<Ipv4Addr>,
     icmp_id: u16,
 ) -> Result<SocketId<Ipv4>, IcmpSockCreationError> {
+    let local_addr = local_addr
+        .map(|local_addr| {
+            local_addr
+                .try_into()
+                .map_err(|AddrIsMappedError {}| IcmpSockCreationError::LocalAddrIsMapped)
+        })
+        .transpose()?;
     let remote_addr = SocketIpAddr::<Ipv4Addr>::new_ipv4_specified(remote_addr);
 
     InnerIcmpContext::with_icmp_ctx_and_sockets_mut(
@@ -3323,7 +3379,7 @@ fn connect_icmpv4_inner<C: IcmpNonSyncCtx<Ipv4>, SC: InnerIcmpv4Context<C>>(
                     ctx,
                     None,
                     local_addr,
-                    remote_addr.into(),
+                    remote_addr,
                     Ipv4Proto::Icmp,
                     datagram::IpOptions::default(),
                 )
@@ -3367,6 +3423,13 @@ fn connect_icmpv6_inner<C: IcmpNonSyncCtx<Ipv6>, SC: InnerIcmpv6Context<C>>(
     remote_addr: SpecifiedAddr<Ipv6Addr>,
     icmp_id: u16,
 ) -> Result<SocketId<Ipv6>, IcmpSockCreationError> {
+    let local_addr = local_addr
+        .map(|local_addr| {
+            local_addr
+                .try_into()
+                .map_err(|AddrIsMappedError {}| IcmpSockCreationError::LocalAddrIsMapped)
+        })
+        .transpose()?;
     let remote_addr: SocketIpAddr<_> = remote_addr
         .try_into()
         .map_err(|AddrIsMappedError {}| IcmpSockCreationError::RemoteAddrIsMapped)?;
@@ -3379,7 +3442,7 @@ fn connect_icmpv6_inner<C: IcmpNonSyncCtx<Ipv6>, SC: InnerIcmpv6Context<C>>(
                     ctx,
                     None,
                     local_addr,
-                    remote_addr.into(),
+                    remote_addr,
                     Ipv6Proto::Icmpv6,
                     datagram::IpOptions::default(),
                 )
@@ -3397,12 +3460,9 @@ fn connect_icmp_inner<I: IcmpIpExt + IpExt + datagram::DualStackIpExt, D: WeakId
     icmp_id: u16,
     ip: IpSock<I, D, datagram::IpOptions<I, D, Icmp>>,
 ) -> Result<SocketId<I>, IcmpSockCreationError> {
-    // TODO(https://fxbug.dev/132092): remove panic opportunity once `IpSock`
-    // holds `SocketIpAddr`.
-    let local_ip = SocketIpAddr::new_from_specified_or_panic(*ip.local_ip());
     let addr = ConnAddr {
         ip: ConnIpAddr {
-            local: (local_ip, NonZeroU16::new(icmp_id).unwrap()),
+            local: (*ip.local_ip(), NonZeroU16::new(icmp_id).unwrap()),
             remote: (remote_addr, ()),
         },
         device: None,

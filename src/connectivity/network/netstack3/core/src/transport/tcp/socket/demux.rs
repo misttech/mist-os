@@ -269,8 +269,8 @@ fn handle_incoming_packet<I, B, C, SC>(
             match ip_transport_ctx.send_oneshot_ip_packet(
                 ctx,
                 None,
-                Some(local_ip.into()),
-                remote_ip.into(),
+                Some(local_ip),
+                remote_ip,
                 IpProto::Tcp.into(),
                 DefaultSendOptions,
                 |_addr| tcp_serialize_segment(seg, conn_addr),
@@ -377,11 +377,11 @@ where
             ip_sock.device().and_then(|weak| ip_transport_ctx.upgrade_weak_device_id(weak));
         if let Some(Destination { next_hop, device }) =
             ip_transport_ctx.with_ip_routing_table(|sync_ctx, routes| {
-                routes.lookup(sync_ctx, device.as_ref(), *remote_ip)
+                routes.lookup(sync_ctx, device.as_ref(), remote_ip.addr())
             })
         {
             let neighbor = match next_hop {
-                NextHop::RemoteAsNeighbor => remote_ip,
+                NextHop::RemoteAsNeighbor => remote_ip.into(),
                 NextHop::Gateway(gateway) => gateway,
             };
             ip_transport_ctx.confirm_reachable(ctx, &device, neighbor);
@@ -551,8 +551,8 @@ where
     let ip_sock = match ip_transport_ctx.new_ip_socket(
         ctx,
         bound_device,
-        Some(local_ip.into()),
-        remote_ip.into(),
+        Some(local_ip),
+        remote_ip,
         IpProto::Tcp.into(),
         DefaultSendOptions,
     ) {

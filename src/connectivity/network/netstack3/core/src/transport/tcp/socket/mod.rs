@@ -67,8 +67,8 @@ use crate::{
     },
     socket::{
         address::{
-            ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr, SocketIpAddr,
-            SocketZonedIpAddr,
+            AddrIsMappedError, ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr,
+            SocketIpAddr, SocketZonedIpAddr,
         },
         AddrVec, Bound, BoundSocketMap, IncompatibleError, InsertError, Inserter, ListenerAddrInfo,
         RemoveResult, Shutdown, SocketMapAddrStateSpec, SocketMapAddrStateUpdateSharingSpec,
@@ -1435,6 +1435,9 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                 };
                 let (remote_ip, device) =
                     crate::transport::resolve_addr_with_device(remote_ip, bound_device.clone())?;
+                // TODO(https://fxbug.dev/21198): Support dual-stack connect.
+                let remote_ip =
+                    remote_ip.try_into().map_err(|AddrIsMappedError {}| ConnectError::NoRoute)?;
 
                 let ip_sock = ip_transport_ctx
                     .new_ip_socket(
@@ -1450,17 +1453,14 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     })?;
 
                 let local_port = local_port.map_or_else(
-                    || {
-                        // TODO(https://fxbug.dev/132092): Delete conversion
-                        // once `IpSock` holds `SocketIpAddr`.
-                        let local_ip =
-                            SocketIpAddr::new_from_specified_or_panic(*ip_sock.local_ip());
-                        match sockets.port_alloc.try_alloc(&Some(local_ip), &sockets.socketmap) {
-                            Some(port) => {
-                                Ok(NonZeroU16::new(port).expect("ephemeral ports must be non-zero"))
-                            }
-                            None => Err(ConnectError::NoPort),
+                    || match sockets
+                        .port_alloc
+                        .try_alloc(&Some(*ip_sock.local_ip()), &sockets.socketmap)
+                    {
+                        Some(port) => {
+                            Ok(NonZeroU16::new(port).expect("ephemeral ports must be non-zero"))
                         }
+                        None => Err(ConnectError::NoPort),
                     },
                     Ok,
                 )?;
@@ -1683,8 +1683,8 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                         .new_ip_socket(
                             ctx,
                             new_device.as_ref().map(EitherDeviceId::Strong),
-                            Some((*local_ip).into()),
-                            (*remote_ip).into(),
+                            Some(*local_ip),
+                            *remote_ip,
                             IpProto::Tcp.into(),
                             Default::default(),
                         )
@@ -2491,17 +2491,16 @@ where
     C: NonSyncContext,
     SC: BufferTransportIpContext<I, C, EmptyBuf>,
 {
-    let isn = isn.generate(
+    let isn = isn.generate::<SocketIpAddr<I::Addr>, NonZeroU16>(
         ctx.now(),
-        (ip_sock.local_ip().clone(), local_port),
-        (ip_sock.remote_ip().clone(), remote_port),
+        (*ip_sock.local_ip(), local_port),
+        (*ip_sock.remote_ip(), remote_port),
     );
-    // TODO(https://fxbug.dev/132092): Delete conversion once `IpSock` uses
-    // `SocketIpAddr`.
-    let local_ip = SocketIpAddr::new_from_specified_or_panic(*ip_sock.local_ip());
-    let remote_ip = SocketIpAddr::new_from_specified_or_panic(*ip_sock.remote_ip());
     let conn_addr = ConnAddr {
-        ip: ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) },
+        ip: ConnIpAddr {
+            local: (*ip_sock.local_ip(), local_port),
+            remote: (*ip_sock.remote_ip(), remote_port),
+        },
         device: ip_sock.device().cloned(),
     };
     let now = ctx.now();

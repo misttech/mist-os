@@ -39,13 +39,14 @@ use crate::{
             IpSockSendError, IpSocketHandler, SendOptions,
         },
         BufferTransportIpContext, EitherDeviceId, HopLimits, MulticastMembershipHandler,
-        TransportIpContext,
+        ResolveRouteError, TransportIpContext,
     },
     socket::{
         self,
         address::{
-            AddrVecIter, ConnAddr, ConnIpAddr, DualStackConnIpAddr, DualStackIpAddr,
-            DualStackListenerIpAddr, ListenerIpAddr, SocketIpAddr, SocketZonedIpAddr,
+            AddrIsMappedError, AddrVecIter, ConnAddr, ConnIpAddr, DualStackConnIpAddr,
+            DualStackIpAddr, DualStackListenerIpAddr, ListenerIpAddr, SocketIpAddr,
+            SocketZonedIpAddr,
         },
         AddrVec, BoundSocketMap, ExistsError, InsertError, ListenerAddr, Shutdown,
         SocketMapAddrSpec, SocketMapConflictPolicy, SocketMapStateSpec,
@@ -2399,6 +2400,17 @@ where
         };
         let (remote_ip, socket_device) =
             crate::transport::resolve_addr_with_device(remote_ip, device.cloned())?;
+
+        // TODO(https://fxbug.dev/21198): Support dual-stack connect.
+        let remote_ip = match remote_ip.try_into() {
+            Ok(ip) => ip,
+            Err(AddrIsMappedError {}) => {
+                return Err(ConnectError::Ip(IpSockCreationError::Route(
+                    ResolveRouteError::Unreachable,
+                )));
+            }
+        };
+
         let clear_device_on_disconnect = device.is_none() && socket_device.is_some();
 
         let (mut ip_sock, bound_addr) =
@@ -2415,10 +2427,6 @@ where
                         Default::default(),
                     )
                     .map_err(|(e, _ip_options)| e)?;
-                    // TODO(https://fxbug.dev/132092): Remove these panic opportunities once
-                    // `IpSock` to holds `SocketIpAddr`.
-                    let local_ip = SocketIpAddr::new_from_specified_or_panic(*ip_sock.local_ip());
-                    let remote_ip = SocketIpAddr::new_from_specified_or_panic(*ip_sock.remote_ip());
                     let local_id = match local_id {
                         Some(id) => id.clone(),
                         None => allocator
@@ -2426,8 +2434,8 @@ where
                                 bound,
                                 ctx,
                                 DatagramFlowId {
-                                    local_ip,
-                                    remote_ip,
+                                    local_ip: *ip_sock.local_ip(),
+                                    remote_ip: *ip_sock.remote_ip(),
                                     remote_id: remote_id.clone(),
                                 },
                             )
@@ -2435,8 +2443,8 @@ where
                     };
                     let c = ConnAddr {
                         ip: ConnIpAddr {
-                            local: (local_ip, local_id),
-                            remote: (remote_ip, remote_id),
+                            local: (*ip_sock.local_ip(), local_id),
+                            remote: (*ip_sock.remote_ip(), remote_id),
                         },
                         device: ip_sock.device().cloned(),
                     };
@@ -2959,14 +2967,11 @@ fn send_oneshot<
         .send_oneshot_ip_packet(
             ctx,
             device.as_ref().map(|d| d.as_ref()),
-            local_ip.map(SocketIpAddr::into),
-            remote_ip.into(),
+            local_ip,
+            remote_ip,
             proto,
             ip_options,
             |local_ip| {
-                // TODO(https://fxbug.dev/132092): Delete panic opportunity once
-                // once `send_oneshot_ip_packet` takes a `SocketIpAddr`.
-                let local_ip = SocketIpAddr::new_from_specified_or_panic(local_ip);
                 S::make_packet(
                     body,
                     &ConnIpAddr { local: (local_ip, local_id), remote: (remote_ip, remote_id) },
@@ -3116,8 +3121,8 @@ pub(crate) fn set_device<
                                     .new_ip_socket(
                                         ctx,
                                         new_device.map(EitherDeviceId::Strong),
-                                        Some(local_ip.into()),
-                                        remote_ip.into(),
+                                        Some(local_ip),
+                                        remote_ip,
                                         socket.proto(),
                                         Default::default(),
                                     )

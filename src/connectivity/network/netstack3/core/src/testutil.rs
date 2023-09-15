@@ -1395,6 +1395,7 @@ mod tests {
             socket::{BufferIpSocketHandler, DefaultSendOptions},
             BufferIpLayerHandler,
         },
+        socket::address::SocketIpAddr,
         TimerIdInner,
     };
 
@@ -1421,7 +1422,7 @@ mod tests {
                 non_sync_ctx,
                 None, // device
                 None, // local_ip
-                FAKE_CONFIG_V4.remote_ip,
+                SocketIpAddr::new_from_specified_or_panic(FAKE_CONFIG_V4.remote_ip),
                 Ipv4Proto::Icmp,
                 DefaultSendOptions,
                 |_| {
@@ -1592,7 +1593,7 @@ mod tests {
                 non_sync_ctx,
                 None, // device
                 None, // local_ip
-                FAKE_CONFIG_V4.remote_ip,
+                SocketIpAddr::new_from_specified_or_panic(FAKE_CONFIG_V4.remote_ip),
                 Ipv4Proto::Icmp,
                 DefaultSendOptions,
                 |_| {

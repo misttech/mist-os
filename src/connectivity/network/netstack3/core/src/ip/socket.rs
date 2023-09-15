@@ -24,6 +24,7 @@ use crate::{
         AnyDevice, DeviceIdContext, EitherDeviceId, IpDeviceContext, IpExt, IpLayerIpExt,
         ResolveRouteError, SendIpPacketMeta,
     },
+    socket::address::SocketIpAddr,
     trace_duration,
 };
 
@@ -51,8 +52,8 @@ pub(crate) trait IpSocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
         &mut self,
         ctx: &mut C,
         device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
-        local_ip: Option<SpecifiedAddr<I::Addr>>,
-        remote_ip: SpecifiedAddr<I::Addr>,
+        local_ip: Option<SocketIpAddr<I::Addr>>,
+        remote_ip: SocketIpAddr<I::Addr>,
         proto: I::Proto,
         options: O,
     ) -> Result<IpSock<I, Self::WeakDeviceId, O>, (IpSockCreationError, O)>;
@@ -95,9 +96,38 @@ pub enum IpSockCreateAndSendError {
     Create(#[from] IpSockCreationError),
 }
 
+/// Extension trait for `Ip` providing socket-specific functionality.
+pub(crate) trait SocketIpExt: Ip + IpExt {
+    /// `Self::LOOPBACK_ADDRESS`, but wrapped in the `SocketIpAddr` type.
+    const LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR: SocketIpAddr<Self::Addr> = unsafe {
+        // SAFETY: The loopback address is a valid SocketIpAddr, as verified
+        // in the `loopback_addr_is_valid_socket_addr` test.
+        SocketIpAddr::new_from_specified_unchecked(Self::LOOPBACK_ADDRESS)
+    };
+}
+
+impl<I: Ip + IpExt> SocketIpExt for I {}
+
+#[cfg(test)]
+mod socket_ip_ext_test {
+    use super::*;
+    use ip_test_macro::ip_test;
+    use net_types::ip::{Ipv4, Ipv6};
+
+    #[ip_test]
+    fn loopback_addr_is_valid_socket_addr<I: Ip + SocketIpExt>() {
+        // `LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR is defined with the "unchecked"
+        // constructor (the only const constructor). Verify here that the
+        // addr actually satisfies all the requirements (protecting against far
+        // away changes)
+        let _addr = SocketIpAddr::new(I::LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR.addr())
+            .expect("loopback address should be a valid SocketIpAddr");
+    }
+}
+
 /// An extension of [`IpSocketHandler`] adding the ability to send packets on an
 /// IP socket.
-pub(crate) trait BufferIpSocketHandler<I: IpExt, C, B: BufferMut>:
+pub(crate) trait BufferIpSocketHandler<I: SocketIpExt, C, B: BufferMut>:
     IpSocketHandler<I, C>
 {
     /// Sends an IP packet on a socket.
@@ -147,14 +177,14 @@ pub(crate) trait BufferIpSocketHandler<I: IpExt, C, B: BufferMut>:
     /// recover that buffer.
     fn send_oneshot_ip_packet<
         S: Serializer<Buffer = B>,
-        F: FnOnce(SpecifiedAddr<I::Addr>) -> S,
+        F: FnOnce(SocketIpAddr<I::Addr>) -> S,
         O: SendOptions<I>,
     >(
         &mut self,
         ctx: &mut C,
         device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
-        local_ip: Option<SpecifiedAddr<I::Addr>>,
-        remote_ip: SpecifiedAddr<I::Addr>,
+        local_ip: Option<SocketIpAddr<I::Addr>>,
+        remote_ip: SocketIpAddr<I::Addr>,
         proto: I::Proto,
         options: O,
         get_body_from_src_ip: F,
@@ -163,9 +193,11 @@ pub(crate) trait BufferIpSocketHandler<I: IpExt, C, B: BufferMut>:
         // We use a `match` instead of `map_err` because `map_err` would require passing a closure
         // which takes ownership of `get_body_from_src_ip`, which we also use in the success case.
         match self.new_ip_socket(ctx, device, local_ip, remote_ip, proto, options) {
-            Err((err, options)) => {
-                Err((get_body_from_src_ip(I::LOOPBACK_ADDRESS), err.into(), options))
-            }
+            Err((err, options)) => Err((
+                get_body_from_src_ip(I::LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR),
+                err.into(),
+                options,
+            )),
             Ok(tmp) => self
                 .send_ip_packet(ctx, &tmp, get_body_from_src_ip(*tmp.local_ip()), mtu)
                 .map_err(|(body, err)| match err {
@@ -258,7 +290,7 @@ pub(crate) struct IpSock<I: IpExt, D, O> {
 #[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub(crate) struct IpSockDefinition<I: IpExt, D> {
-    remote_ip: SpecifiedAddr<I::Addr>,
+    remote_ip: SocketIpAddr<I::Addr>,
     // Guaranteed to be unicast in its subnet since it's always equal to an
     // address assigned to the local device. We can't use the `UnicastAddr`
     // witness type since `Ipv4Addr` doesn't implement `UnicastAddress`.
@@ -267,17 +299,17 @@ pub(crate) struct IpSockDefinition<I: IpExt, D> {
     // issues arise: A) Does the unicast restriction still apply, and is that
     // even well-defined for IPv4 in the absence of a subnet? B) Presumably we
     // have to always bind to a particular interface?
-    local_ip: SpecifiedAddr<I::Addr>,
+    local_ip: SocketIpAddr<I::Addr>,
     device: Option<D>,
     proto: I::Proto,
 }
 
 impl<I: IpExt, D, O> IpSock<I, D, O> {
-    pub(crate) fn local_ip(&self) -> &SpecifiedAddr<I::Addr> {
+    pub(crate) fn local_ip(&self) -> &SocketIpAddr<I::Addr> {
         &self.definition.local_ip
     }
 
-    pub(crate) fn remote_ip(&self) -> &SpecifiedAddr<I::Addr> {
+    pub(crate) fn remote_ip(&self) -> &SocketIpAddr<I::Addr> {
         &self.definition.remote_ip
     }
 
@@ -376,8 +408,8 @@ impl<I: Ip + IpExt + IpDeviceStateIpExt, C: IpSocketNonSyncContext, SC: IpSocket
         &mut self,
         ctx: &mut C,
         device: Option<EitherDeviceId<&SC::DeviceId, &SC::WeakDeviceId>>,
-        local_ip: Option<SpecifiedAddr<I::Addr>>,
-        remote_ip: SpecifiedAddr<I::Addr>,
+        local_ip: Option<SocketIpAddr<I::Addr>>,
+        remote_ip: SocketIpAddr<I::Addr>,
         proto: I::Proto,
         options: O,
     ) -> Result<IpSock<I, SC::WeakDeviceId, O>, (IpSockCreationError, O)> {
@@ -398,15 +430,18 @@ impl<I: Ip + IpExt + IpDeviceStateIpExt, C: IpSocketNonSyncContext, SC: IpSocket
         // we will recalculate it when we send a packet so that the best route
         // available at the time is used for each outgoing packet.
         let ResolvedRoute { src_addr, device: route_device, next_hop: _ } =
-            match self.lookup_route(ctx, device, local_ip, remote_ip) {
+            match self.lookup_route(ctx, device, local_ip.map(|a| a.into()), remote_ip.into()) {
                 Ok(r) => r,
                 Err(e) => return Err((e.into(), options)),
             };
+        // TODO(https://fxbug.dev/132092): Remove this panic opportunity once
+        // `lookup_route` returns a `NonMappedAddr`.
+        let src_addr = SocketIpAddr::new_from_specified_or_panic(src_addr);
 
         // If the source or destination address require a device, make sure to
         // set that in the socket definition. Otherwise defer to what was provided.
-        let socket_device = (crate::socket::must_have_zone(&src_addr)
-            || crate::socket::must_have_zone(&remote_ip))
+        let socket_device = (crate::socket::must_have_zone(src_addr.as_ref())
+            || crate::socket::must_have_zone(remote_ip.as_ref()))
         .then_some(route_device)
         .as_ref()
         .or(device)
@@ -470,6 +505,8 @@ fn send_ip_packet<
 
     let IpSock { definition: IpSockDefinition { remote_ip, local_ip, device, proto }, options } =
         socket;
+    let remote_ip: SpecifiedAddr<_> = (*remote_ip).into();
+    let local_ip: SpecifiedAddr<_> = (*local_ip).into();
 
     let device = if let Some(device) = device {
         let Some(device) = sync_ctx.upgrade_weak_device_id(device) else {
@@ -481,15 +518,15 @@ fn send_ip_packet<
     };
 
     let ResolvedRoute { src_addr: got_local_ip, device, next_hop } =
-        match sync_ctx.lookup_route(ctx, device.as_ref(), Some(*local_ip), *remote_ip) {
+        match sync_ctx.lookup_route(ctx, device.as_ref(), Some(local_ip), remote_ip) {
             Ok(o) => o,
             Err(e) => return Err((body, IpSockSendError::Unroutable(e))),
         };
 
-    assert_eq!(*local_ip, got_local_ip);
+    assert_eq!(local_ip, got_local_ip);
 
     let next_hop = match next_hop {
-        NextHop::RemoteAsNeighbor => remote_ip.clone(),
+        NextHop::RemoteAsNeighbor => remote_ip,
         NextHop::Gateway(gateway) => gateway,
     };
 
@@ -498,10 +535,10 @@ fn send_ip_packet<
         ctx,
         SendIpPacketMeta {
             device: &device,
-            src_ip: *local_ip,
-            dst_ip: *remote_ip,
+            src_ip: local_ip,
+            dst_ip: remote_ip,
             next_hop,
-            ttl: options.hop_limit(remote_ip),
+            ttl: options.hop_limit(&remote_ip),
             proto: *proto,
             mtu,
         },
@@ -555,7 +592,7 @@ impl<
             .transpose()?;
 
         let ResolvedRoute { src_addr: _, device, next_hop: _ } = self
-            .lookup_route(ctx, device.as_ref(), Some(*local_ip), *remote_ip)
+            .lookup_route(ctx, device.as_ref(), Some((*local_ip).into()), (*remote_ip).into())
             .map_err(MmsError::NoDevice)?;
         let mtu = IpDeviceContext::<I, C>::get_mtu(self, &device);
         // TODO(https://fxbug.dev/121911): Calculate the options size when they
@@ -1809,8 +1846,8 @@ mod tests {
             .map(|d| DeviceIdContext::downgrade_device_id(&Locked::new(sync_ctx), d));
         let template = IpSock {
             definition: IpSockDefinition {
-                remote_ip: to_ip,
-                local_ip: expected_from_ip,
+                remote_ip: SocketIpAddr::new_from_specified_or_panic(to_ip),
+                local_ip: SocketIpAddr::new_from_specified_or_panic(expected_from_ip),
                 device: weak_local_device.clone(),
                 proto,
             },
@@ -1821,8 +1858,8 @@ mod tests {
             &mut Locked::new(sync_ctx),
             &mut non_sync_ctx,
             weak_local_device.as_ref().map(EitherDeviceId::Weak),
-            from_ip,
-            to_ip,
+            from_ip.map(SocketIpAddr::new_from_specified_or_panic),
+            SocketIpAddr::new_from_specified_or_panic(to_ip),
             proto,
             WithHopLimit(None),
         )
@@ -1836,8 +1873,8 @@ mod tests {
                 &mut Locked::new(sync_ctx),
                 &mut non_sync_ctx,
                 weak_local_device.as_ref().map(EitherDeviceId::Weak),
-                from_ip,
-                to_ip,
+                from_ip.map(SocketIpAddr::new_from_specified_or_panic),
+                SocketIpAddr::new_from_specified_or_panic(to_ip),
                 proto,
                 WithHopLimit(Some(SPECIFIED_HOP_LIMIT)),
             )
@@ -1935,8 +1972,8 @@ mod tests {
             &mut Locked::new(sync_ctx),
             &mut non_sync_ctx,
             None,
-            from_ip,
-            to_ip,
+            from_ip.map(SocketIpAddr::new_from_specified_or_panic),
+            SocketIpAddr::new_from_specified_or_panic(to_ip),
             I::ICMP_IP_PROTO,
             DefaultSendOptions,
         )
@@ -1999,7 +2036,7 @@ mod tests {
             &mut non_sync_ctx,
             None,
             None,
-            remote_ip,
+            SocketIpAddr::new_from_specified_or_panic(remote_ip),
             proto,
             socket_options,
         )
@@ -2197,8 +2234,8 @@ mod tests {
 
         // Send to two remote addresses: `remote_ip` and `other_remote_ip` and
         // check that the frames were sent with the correct hop limits.
-        send_to(remote_ip);
-        send_to(other_remote_ip);
+        send_to(SocketIpAddr::new_from_specified_or_panic(remote_ip));
+        send_to(SocketIpAddr::new_from_specified_or_panic(other_remote_ip));
 
         let frames = non_sync_ctx.frames_sent();
         let [df_remote, df_other_remote] = assert_matches!(&frames[..], [df1, df2] => [df1, df2]);
@@ -2233,8 +2270,8 @@ mod tests {
         const NEW_OPTION: usize = 55;
         let mut socket = IpSock::<Ipv4, FakeDeviceId, _> {
             definition: IpSockDefinition {
-                remote_ip: Ipv4::LOOPBACK_ADDRESS,
-                local_ip: Ipv4::LOOPBACK_ADDRESS,
+                remote_ip: Ipv4::LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR,
+                local_ip: Ipv4::LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR,
                 device: None,
                 proto: Ipv4Proto::Icmp,
             },
@@ -2297,7 +2334,7 @@ mod tests {
             &mut non_sync_ctx,
             None,
             None,
-            I::multicast_addr(1),
+            SocketIpAddr::new_from_specified_or_panic(I::multicast_addr(1)),
             I::ICMP_IP_PROTO,
             WithHopLimit(None),
         )

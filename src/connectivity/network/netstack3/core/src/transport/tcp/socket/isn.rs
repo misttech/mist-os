@@ -4,12 +4,8 @@
 
 //! Generate initial sequence numbers securely.
 
-use core::{
-    hash::{Hash, Hasher},
-    num::NonZeroU16,
-};
+use core::hash::{Hash, Hasher};
 
-use net_types::{ip::IpAddress, SpecifiedAddr};
 use rand::RngCore;
 use siphasher::sip128::SipHasher24;
 
@@ -36,11 +32,11 @@ impl<I: Instant> IsnGenerator<I> {
         Self { secret, timestamp: now }
     }
 
-    pub(crate) fn generate<A: IpAddress>(
+    pub(crate) fn generate<A: Hash, P: Hash>(
         &self,
         now: I,
-        local: (SpecifiedAddr<A>, NonZeroU16),
-        remote: (SpecifiedAddr<A>, NonZeroU16),
+        local: (A, P),
+        remote: (A, P),
     ) -> SeqNum {
         let Self { secret, timestamp } = self;
 

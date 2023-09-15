@@ -614,6 +614,7 @@ impl IntoErrno for netstack3_core::ip::icmp::IcmpSockCreationError {
             netstack3_core::ip::icmp::IcmpSockCreationError::RemoteAddrIsMapped => {
                 Errno::Enetunreach
             }
+            netstack3_core::ip::icmp::IcmpSockCreationError::LocalAddrIsMapped => Errno::Einval,
         }
     }
 }

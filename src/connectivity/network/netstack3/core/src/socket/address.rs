@@ -4,7 +4,11 @@
 
 //! A collection of types that represent the various parts of socket addresses.
 
-use core::{num::NonZeroU16, ops::Deref};
+use core::{
+    fmt::{self, Display, Formatter},
+    num::NonZeroU16,
+    ops::Deref,
+};
 
 use derivative::Derivative;
 use net_types::{
@@ -50,6 +54,13 @@ impl<A: IpAddress, Z> From<ZonedAddr<SpecifiedAddr<A>, Z>> for SocketZonedIpAddr
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct SocketIpAddr<A: IpAddress>(NonMappedAddr<SpecifiedAddr<A>>);
 
+impl<A: IpAddress> Display for SocketIpAddr<A> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let Self(addr) = self;
+        write!(f, "{}", addr)
+    }
+}
+
 impl<A: IpAddress> SocketIpAddr<A> {
     #[cfg(test)]
     pub(crate) fn new(addr: A) -> Option<SocketIpAddr<A>> {
@@ -60,6 +71,13 @@ impl<A: IpAddress> SocketIpAddr<A> {
     #[cfg(test)]
     pub(crate) const unsafe fn new_unchecked(addr: A) -> SocketIpAddr<A> {
         SocketIpAddr(NonMappedAddr::new_unchecked(SpecifiedAddr::new_unchecked(addr)))
+    }
+
+    /// Callers must ensure that the addr is NonMapped`.
+    pub(crate) const unsafe fn new_from_specified_unchecked(
+        addr: SpecifiedAddr<A>,
+    ) -> SocketIpAddr<A> {
+        SocketIpAddr(NonMappedAddr::new_unchecked(addr))
     }
 
     pub(crate) fn addr(self) -> A {
