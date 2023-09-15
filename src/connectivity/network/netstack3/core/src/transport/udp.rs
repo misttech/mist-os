@@ -1094,7 +1094,7 @@ pub trait BufferNonSyncContext<I: IcmpIpExt, B: BufferMut>: NonSyncContext<I> {
     fn receive_udp(
         &mut self,
         id: SocketId<I>,
-        dst_ip: I::Addr,
+        dst_addr: (I::Addr, NonZeroU16),
         src_addr: (I::Addr, Option<NonZeroU16>),
         body: &B,
     );
@@ -1238,7 +1238,7 @@ fn receive_ip_packet<
         &mut SC,
         &mut C,
         I::DualStackReceivingId<Udp>,
-        I::Addr,
+        (I::Addr, NonZeroU16),
         (I::Addr, Option<NonZeroU16>),
         &B,
     ) -> bool,
@@ -1293,10 +1293,11 @@ fn receive_ip_packet<
     /// [`MAX_EXPECTED_IDS`], this will spill and allocate on the heap.
     type Recipients<Id> = smallvec::SmallVec<[Id; MAX_EXPECTED_IDS]>;
 
+    let dst_port = packet.dst_port();
     let recipients = StateContext::<I, _>::with_bound_state_context(sync_ctx, |sync_ctx| {
         let device_weak = sync_ctx.downgrade_device_id(device);
         DatagramBoundStateContext::with_bound_sockets(sync_ctx, |_sync_ctx, bound_sockets| {
-            lookup(bound_sockets, (src_ip, src_port), (dst_ip, packet.dst_port()), device_weak)
+            lookup(bound_sockets, (src_ip, src_port), (dst_ip, dst_port), device_weak)
                 .map(|result| match result {
                     // TODO(https://fxbug.dev/125489): Make these socket IDs
                     // strongly owned instead of just cloning them to prevent
@@ -1313,7 +1314,7 @@ fn receive_ip_packet<
             sync_ctx,
             ctx,
             lookup_result,
-            dst_ip.addr(),
+            (dst_ip.addr(), dst_port),
             (src_ip.map_or(I::UNSPECIFIED_ADDRESS, SocketIpAddr::addr), src_port),
             &buffer,
         );
@@ -1337,7 +1338,7 @@ fn try_deliver<
     sync_ctx: &mut SC,
     ctx: &mut C,
     id: SocketId<I>,
-    dst_ip: I::Addr,
+    (dst_ip, dst_port): (I::Addr, NonZeroU16),
     (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
     buffer: &B,
 ) -> bool {
@@ -1372,7 +1373,7 @@ fn try_deliver<
             | DatagramSocketState::Unbound(_) => true,
         };
         if should_deliver {
-            ctx.receive_udp(id, dst_ip, (src_ip, src_port), buffer);
+            ctx.receive_udp(id, (dst_ip, dst_port), (src_ip, src_port), buffer);
         }
         should_deliver
     })
@@ -1386,19 +1387,19 @@ fn try_dual_stack_deliver_v4<
     sync_ctx: &mut SC,
     ctx: &mut C,
     found_socket: EitherIpSocket<Udp>,
-    dst_ip: Ipv4Addr,
+    (dst_ip, dst_port): (Ipv4Addr, NonZeroU16),
     (src_ip, src_port): (Ipv4Addr, Option<NonZeroU16>),
     buffer: &B,
 ) -> bool {
     match found_socket {
         EitherIpSocket::V4(v4_id) => {
-            try_deliver(sync_ctx, ctx, v4_id, dst_ip, (src_ip, src_port), buffer)
+            try_deliver(sync_ctx, ctx, v4_id, (dst_ip, dst_port), (src_ip, src_port), buffer)
         }
         EitherIpSocket::V6(v6_id) => try_deliver(
             sync_ctx,
             ctx,
             v6_id,
-            dst_ip.to_ipv6_mapped(),
+            (dst_ip.to_ipv6_mapped(), dst_port),
             (src_ip.to_ipv6_mapped(), src_port),
             buffer,
         ),
@@ -3093,7 +3094,7 @@ mod tests {
         sync_ctx: &mut SC,
         ctx: &mut C,
         found_socket: I::DualStackReceivingId<Udp>,
-        dst_ip: I::Addr,
+        dst: (I::Addr, NonZeroU16),
         src: (I::Addr, Option<NonZeroU16>),
         buffer: &B,
     ) -> bool {
@@ -3109,7 +3110,7 @@ mod tests {
             },
             |WrapIn(id)| id,
         );
-        super::try_deliver(sync_ctx, ctx, found_socket, dst_ip, src, buffer)
+        super::try_deliver(sync_ctx, ctx, found_socket, dst, src, buffer)
     }
 
     #[derive(Derivative)]
@@ -3172,36 +3173,48 @@ mod tests {
         sync_ctx: &mut SC,
         ctx: &mut C,
         found_socket: I::DualStackReceivingId<Udp>,
-        dst_ip: I::Addr,
+        (dst_ip, dst_port): (I::Addr, NonZeroU16),
         (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
         buffer: &B,
     ) -> bool {
         #[derive(GenericOverIp)]
         struct WrapIn<I: Ip + IpExt>(I::DualStackReceivingId<Udp>);
         I::map_ip(
-            (IpInvariant((sync_ctx, ctx, buffer, src_port)), WrapIn(found_socket), dst_ip, src_ip),
-            |(
-                IpInvariant((sync_ctx, ctx, buffer, src_port)),
+            (
+                IpInvariant((sync_ctx, ctx, buffer, src_port, dst_port)),
                 WrapIn(found_socket),
-                dst,
+                dst_ip,
+                src_ip,
+            ),
+            |(
+                IpInvariant((sync_ctx, ctx, buffer, src_port, dst_port)),
+                WrapIn(found_socket),
+                dst_ip,
                 src_ip,
             )| {
                 try_dual_stack_deliver_v4(
                     sync_ctx,
                     ctx,
                     found_socket,
-                    dst,
+                    (dst_ip, dst_port),
                     (src_ip, src_port),
                     buffer,
                 )
             },
             |(
-                IpInvariant((sync_ctx, ctx, buffer, src_port)),
+                IpInvariant((sync_ctx, ctx, buffer, src_port, dst_port)),
                 WrapIn(found_socket),
-                dst,
+                dst_ip,
                 src_ip,
             )| {
-                try_deliver(sync_ctx, ctx, found_socket, dst, (src_ip, src_port), buffer)
+                try_deliver(
+                    sync_ctx,
+                    ctx,
+                    found_socket,
+                    (dst_ip, dst_port),
+                    (src_ip, src_port),
+                    buffer,
+                )
             },
         )
     }
@@ -3210,7 +3223,7 @@ mod tests {
         fn receive_udp(
             &mut self,
             id: SocketId<I>,
-            dst_ip: I::Addr,
+            (dst_ip, _dst_port): (I::Addr, NonZeroU16),
             (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
             body: &B,
         ) {

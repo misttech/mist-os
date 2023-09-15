@@ -553,11 +553,11 @@ where
     fn receive_udp(
         &mut self,
         id: udp::SocketId<I>,
-        dst_ip: <I>::Addr,
+        dst_addr: (<I>::Addr, NonZeroU16),
         src_addr: (<I>::Addr, Option<NonZeroU16>),
         body: &B,
     ) {
-        I::with_collection_mut(self, |c| c.receive_udp(id, dst_ip, src_addr, body))
+        I::with_collection_mut(self, |c| c.receive_udp(id, dst_addr, src_addr, body))
     }
 }
 

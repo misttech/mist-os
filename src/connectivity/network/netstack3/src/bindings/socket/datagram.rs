@@ -24,7 +24,7 @@ use explicit::ResultExt as _;
 use fidl::endpoints::RequestStream as _;
 use fuchsia_zircon::{self as zx, prelude::HandleBased as _, Peered as _};
 use net_types::{
-    ip::{Ip, IpAddress, IpVersion, Ipv4, Ipv6},
+    ip::{Ip, IpVersion, Ipv4, Ipv6},
     MulticastAddr, SpecifiedAddr, ZonedAddr,
 };
 use netstack3_core::{
@@ -600,17 +600,19 @@ impl<I: IpExt, B: BufferMut> udp::BufferNonSyncContext<I, B> for SocketCollectio
     fn receive_udp(
         &mut self,
         id: udp::SocketId<I>,
-        _dst_ip: <I>::Addr,
+        (dst_ip, dst_port): (<I>::Addr, NonZeroU16),
         (src_ip, src_port): (<I>::Addr, Option<NonZeroU16>),
         body: &B,
     ) {
-        let Self { received } = self;
-        let queue = received.get(id.get_key_index()).unwrap();
-        queue.lock().receive(IntoAvailableMessage(
-            src_ip,
-            src_port.map_or(0, NonZeroU16::get),
-            body.as_ref(),
-        ))
+        let queue = self.received.get(id.get_key_index()).unwrap();
+        queue.lock().receive(AvailableMessage {
+            source_addr: src_ip,
+            source_port: src_port.map_or(0, NonZeroU16::get),
+            destination_addr: dst_ip,
+            destination_port: dst_port.get(),
+            data: body.as_ref().to_vec(),
+            _marker: PhantomData,
+        })
     }
 }
 
@@ -619,6 +621,8 @@ impl<I: IpExt, B: BufferMut> udp::BufferNonSyncContext<I, B> for SocketCollectio
 struct AvailableMessage<I: Ip, T> {
     source_addr: I::Addr,
     source_port: u16,
+    destination_addr: I::Addr,
+    destination_port: u16,
     data: Vec<u8>,
     _marker: PhantomData<T>,
 }
@@ -626,22 +630,6 @@ struct AvailableMessage<I: Ip, T> {
 impl<I: Ip, T> BodyLen for AvailableMessage<I, T> {
     fn body_len(&self) -> usize {
         self.data.len()
-    }
-}
-
-struct IntoAvailableMessage<'b, A>(A, u16, &'b [u8]);
-
-impl<A: IpAddress> BodyLen for IntoAvailableMessage<'_, A> {
-    fn body_len(&self) -> usize {
-        let IntoAvailableMessage(_, _, body) = self;
-        body.len()
-    }
-}
-
-impl<I: Ip, T> From<IntoAvailableMessage<'_, I::Addr>> for AvailableMessage<I, T> {
-    fn from(value: IntoAvailableMessage<'_, I::Addr>) -> Self {
-        let IntoAvailableMessage(source_addr, source_port, body) = value;
-        Self { source_addr, source_port, data: Vec::from(body), _marker: Default::default() }
     }
 }
 
@@ -1603,7 +1591,14 @@ where
             }
         });
 
-        let available = match front {
+        let AvailableMessage {
+            source_addr,
+            source_port,
+            destination_addr,
+            destination_port,
+            mut data,
+            _marker: _,
+        } = match front {
             None => {
                 // This is safe from races only because the setting of the
                 // shutdown flag can only be done by the worker executing this
@@ -1629,24 +1624,23 @@ where
         };
         let addr = want_addr.then(|| {
             I::SocketAddress::new(
-                SpecifiedAddr::new(available.source_addr).map(|a| ZonedAddr::Unzoned(a).into()),
-                available.source_port,
+                SpecifiedAddr::new(source_addr).map(|a| ZonedAddr::Unzoned(a).into()),
+                source_port,
             )
             .into_sock_addr()
         });
-        let mut data = available.data;
         let truncated = data.len().saturating_sub(data_len);
         data.truncate(data_len);
 
         let mut ip = None;
         if *ip_receive_original_destination_address {
-            // For now just return the local address of the socket.
             ip.get_or_insert_with(|| fposix_socket::IpRecvControlData::default())
                 .original_destination_address = Some(
-                T::get_socket_info(sync_ctx, non_sync_ctx, id)
-                    .into_fidl()
-                    .try_into_fidl_with_ctx(non_sync_ctx)
-                    .map(SockAddr::into_sock_addr)?,
+                I::SocketAddress::new(
+                    SpecifiedAddr::new(destination_addr).map(|a| ZonedAddr::Unzoned(a).into()),
+                    destination_port,
+                )
+                .into_sock_addr(),
             );
         }
         let mut network = None;

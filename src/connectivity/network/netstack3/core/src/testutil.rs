@@ -1095,7 +1095,7 @@ impl<I: crate::ip::IpExt, B: BufferMut> udp::BufferNonSyncContext<I, B> for Fake
     fn receive_udp(
         &mut self,
         _id: udp::SocketId<I>,
-        _dst_ip: <I>::Addr,
+        _dst_addr: (<I>::Addr, core::num::NonZeroU16),
         _src_addr: (<I>::Addr, Option<core::num::NonZeroU16>),
         _body: &B,
     ) {
