@@ -57,10 +57,6 @@ export_compile_commands = [ "//:default" ]
 # should define a flag that toggles on a behavior that implements the additional logic required by
 # Fuchsia to set the variables.
 default_args = {
-  # Limit the visibility of Pigweed modules to Pigweed integration files and Pigweed itself. Modules
-  # are allowlisted in //third_party/pigweed/BUILD.gn for use in Fuchsia.
-  pw_build_DEFAULT_VISIBILITY = [ "//third_party/pigweed/*" ]
-
   # Specify Pigweed backends for Fuchsia.
   pw_assert_BACKEND = "//third_party/pigweed/backends/pw_assert"
   pw_log_BACKEND = "//third_party/pigweed/backends/pw_log"
