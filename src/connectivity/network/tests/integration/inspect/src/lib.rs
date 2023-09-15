@@ -1503,10 +1503,35 @@ async fn inspect_ns3_routes(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
 
-    // Ensure ns3 has started by connecting to a FIDL protocol.
-    let _interfaces_state = realm
+    let interfaces_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("failed to connect to fuchsia.net.interfaces/State");
+    let loopback_id = fidl_fuchsia_net_interfaces_ext::wait_interface(
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+            &interfaces_state,
+            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .expect("failed to create event stream"),
+        &mut HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new(),
+        |if_map| {
+            if_map.values().find_map(
+                |fidl_fuchsia_net_interfaces_ext::PropertiesAndState {
+                     properties:
+                         fidl_fuchsia_net_interfaces_ext::Properties { device_class, id, .. },
+                     state: (),
+                 }| {
+                    match device_class {
+                        fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
+                            fidl_fuchsia_net_interfaces::Empty {},
+                        ) => Some(id.get()),
+                        fidl_fuchsia_net_interfaces::DeviceClass::Device(_) => None,
+                    }
+                },
+            )
+        },
+    )
+    .await
+    .expect("getting loopback id");
 
     let data =
         get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
@@ -1519,21 +1544,21 @@ async fn inspect_ns3_routes(name: &str) {
         "Routes": {
             "0": {
                 Destination: "255.255.255.255/32",
-                InterfaceId: 1u64,
+                InterfaceId: loopback_id,
                 Gateway: "[NONE]",
                 Metric: 99999u64,
                 MetricTracksInterface: false,
             },
             "1": {
                 Destination: "127.0.0.0/8",
-                InterfaceId: 1u64,
+                InterfaceId: loopback_id,
                 Gateway: "[NONE]",
                 Metric: 100u64,
                 MetricTracksInterface: true,
             },
             "2": {
                 Destination: "224.0.0.0/4",
-                InterfaceId: 1u64,
+                InterfaceId: loopback_id,
                 Gateway: "[NONE]",
                 Metric: 100u64,
                 MetricTracksInterface: true,
