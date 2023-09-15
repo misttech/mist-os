@@ -564,6 +564,12 @@ more details."),
             type Map<T> = $type<T>;
         }
 
+        impl<A: $trait> AsRef<$type<A>> for $type<A> {
+            fn as_ref(&self) -> &$type<A> {
+                self
+            }
+        }
+
         impl<A: $trait> AsRef<A> for $type<A> {
             fn as_ref(&self) -> &A {
                 &self.0
