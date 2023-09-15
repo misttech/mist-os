@@ -6,19 +6,20 @@ import("//build/python/python_mobly_test.gni")
 import("//build/testing/environments.gni")
 
 if (is_host) {
-  python_mobly_test("ffx_test") {
+  python_mobly_test("ffx_test_fc") {
     main_source = "test_ffx.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
     params_source = "params.yaml"
+    transport = "fuchsia-controller"
     environments = [ emu_env ]
   }
 
   group("tests") {
     testonly = true
-    public_deps = [ ":ffx_test($host_toolchain)" ]
+    public_deps = [ ":ffx_test_fc($host_toolchain)" ]
   }
 
   # Stable infra test groups.
@@ -30,6 +31,6 @@ if (is_host) {
   # Unstable infra test groups.
   group("unstable_non_sl4f_emulator_tests") {
     testonly = true
-    public_deps = [ ":ffx_test($host_toolchain)" ]
+    public_deps = [ ":ffx_test_fc($host_toolchain)" ]
   }
 }
