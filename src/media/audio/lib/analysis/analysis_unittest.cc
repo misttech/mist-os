@@ -4,6 +4,7 @@
 #include "src/media/audio/lib/analysis/analysis.h"
 
 #include <iterator>
+#include <limits>
 
 #include <fbl/algorithm.h>
 #include <gmock/gmock.h>
@@ -18,6 +19,8 @@ namespace media::audio {
 namespace {
 
 constexpr double RT_2 = 1.4142135623730950488016887242;
+
+#define EXPECT_AUDIO_TEST_DOUBLE_EQ(X, Y) EXPECT_NEAR(X, Y, std::numeric_limits<double>::epsilon())
 
 // Local version of GenerateCosineAudio that uses doubles, the same type used by our FFT methods.
 void OverwriteCosine(double* buffer, int64_t buf_size, double freq, double magn = 1.0,
@@ -48,7 +51,7 @@ TEST(AnalysisHelpers, GetPhase) {
   static_assert(std::size(expect) == std::size(reals), "buf mismatch");
 
   for (uint32_t idx = 0; idx < std::size(reals); ++idx) {
-    EXPECT_DOUBLE_EQ(expect[idx], internal::GetPhase(reals[idx], imags[idx]));
+    EXPECT_AUDIO_TEST_DOUBLE_EQ(expect[idx], internal::GetPhase(reals[idx], imags[idx]));
   }
 }
 
@@ -57,7 +60,7 @@ TEST(AnalysisHelpers, RectToPolar) {
   double imag[] = {0.0, 1.0, 1.0, 1.0, -0.0, -1.0, -1.0, -1.0, 0.0, -0.0};
   double magn[10];
   double phase[10];
-  const double epsilon = 0.00000001;
+  const double epsilon = std::numeric_limits<float>::epsilon();  // was 0.00000001: ~9% of this
 
   internal::RectangularToPolar(real, imag, std::size(real), magn, phase);
   double expect_magn[] = {1.0, RT_2, 1.0, RT_2, 1.0, RT_2, 1.0, RT_2, 0.0, 0.0};
@@ -78,7 +81,7 @@ TEST(AnalysisHelpers, RectToPolar) {
 TEST(AnalysisHelpers, RealDFT) {
   double reals[16];
   const auto buf_size = std::size(reals);
-  const double epsilon = 0.0000001024;
+  const double epsilon = std::numeric_limits<float>::epsilon();  // was 0.0000001024: ~90% of this
 
   const auto buf_sz_2 = buf_size >> 1;
   double real_freq[9];
@@ -157,7 +160,7 @@ TEST(AnalysisHelpers, IDFT) {
   double reals[16];
   double expects[16];
   const auto buf_size = std::size(reals);
-  const double epsilon = 0.00000002;
+  const double epsilon = std::numeric_limits<float>::epsilon();  // was 0.00000002: ~18% of this
   static_assert(buf_size == std::size(expects), "buf size mismatch");
 
   double real_freq[9];
@@ -233,7 +236,7 @@ TEST(AnalysisHelpers, IDFT) {
 TEST(AnalysisHelpers, FFT) {
   double reals[16];
   double imags[16];
-  const double epsilon = 0.00000015;
+  const double epsilon = 2 * std::numeric_limits<float>::epsilon();  // was 0.00000015: ~68% of this
 
   const auto buf_size = std::size(reals);
   static_assert(std::size(imags) == buf_size, "buf sizes must match");
@@ -323,7 +326,7 @@ TEST(AnalysisHelpers, IFFT) {
   const auto buf_size = std::size(reals);
   const auto buf_sz_2 = buf_size >> 1;
 
-  const double epsilon = 0.00000002;
+  const double epsilon = std::numeric_limits<float>::epsilon();  // was 0.00000002: ~18% of this
   static_assert(buf_size == std::size(imags), "buf size mismatch");
   static_assert(buf_size == std::size(expects), "buf size mismatch");
 
@@ -415,52 +418,52 @@ TEST(AnalysisHelpers, MeasureAudioFreqs_32) {
   r = MeasureAudioFreqs(AudioBufferSlice(&reals), {0});
   EXPECT_EQ(1u, r.magnitudes.size());
   EXPECT_EQ(1u, r.phases.size());
-  EXPECT_DOUBLE_EQ(0, r.phases[0]);
-  EXPECT_DOUBLE_EQ(3.0, r.magnitudes[0]);
-  EXPECT_DOUBLE_EQ(3.0, r.total_magn_signal);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(0, r.phases[0]);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(3.0, r.magnitudes[0]);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(3.0, r.total_magn_signal);
 
   r = MeasureAudioFreqs(AudioBufferSlice(&reals), {1});
   EXPECT_EQ(1u, r.magnitudes.size());
   EXPECT_EQ(1u, r.phases.size());
-  EXPECT_DOUBLE_EQ(M_PI, r.phases[1]);
-  EXPECT_DOUBLE_EQ(4.0, r.magnitudes[1]);
-  EXPECT_DOUBLE_EQ(4.0, r.total_magn_signal);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(M_PI, r.phases[1]);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(4.0, r.magnitudes[1]);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(4.0, r.total_magn_signal);
 
   r = MeasureAudioFreqs(AudioBufferSlice(&reals), {2});
   EXPECT_EQ(1u, r.magnitudes.size());
   EXPECT_EQ(1u, r.phases.size());
-  EXPECT_DOUBLE_EQ(0, r.phases[0]);
-  EXPECT_DOUBLE_EQ(6.0, r.magnitudes[2]);
-  EXPECT_DOUBLE_EQ(6.0, r.total_magn_signal);
-  EXPECT_DOUBLE_EQ(5.0, r.total_magn_other);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(0, r.phases[0]);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(6.0, r.magnitudes[2]);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(6.0, r.total_magn_signal);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(5.0, r.total_magn_other);
 
   r = MeasureAudioFreqs(AudioBufferSlice(&reals), {0, 1});
   EXPECT_EQ(2u, r.magnitudes.size());
   EXPECT_EQ(2u, r.phases.size());
-  EXPECT_DOUBLE_EQ(0, r.phases[0]);
-  EXPECT_DOUBLE_EQ(M_PI, r.phases[1]);
-  EXPECT_DOUBLE_EQ(3.0, r.magnitudes[0]);
-  EXPECT_DOUBLE_EQ(4.0, r.magnitudes[1]);
-  EXPECT_DOUBLE_EQ(5.0, r.total_magn_signal);
-  EXPECT_DOUBLE_EQ(6.0, r.total_magn_other);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(0, r.phases[0]);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(M_PI, r.phases[1]);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(3.0, r.magnitudes[0]);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(4.0, r.magnitudes[1]);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(5.0, r.total_magn_signal);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(6.0, r.total_magn_other);
 
   r = MeasureAudioFreqs(AudioBufferSlice(&reals), {0, 1, 2});
   EXPECT_EQ(3u, r.magnitudes.size());
   EXPECT_EQ(3u, r.phases.size());
-  EXPECT_DOUBLE_EQ(0, r.phases[0]);
-  EXPECT_DOUBLE_EQ(M_PI, r.phases[1]);
-  EXPECT_DOUBLE_EQ(0, r.phases[2]);
-  EXPECT_DOUBLE_EQ(3.0, r.magnitudes[0]);
-  EXPECT_DOUBLE_EQ(4.0, r.magnitudes[1]);
-  EXPECT_DOUBLE_EQ(6.0, r.magnitudes[2]);
-  EXPECT_DOUBLE_EQ(kTotalMagAll, r.total_magn_signal);
-  EXPECT_DOUBLE_EQ(0, r.total_magn_other);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(0, r.phases[0]);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(M_PI, r.phases[1]);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(0, r.phases[2]);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(3.0, r.magnitudes[0]);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(4.0, r.magnitudes[1]);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(6.0, r.magnitudes[2]);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(kTotalMagAll, r.total_magn_signal);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(0, r.total_magn_other);
 
   r = MeasureAudioFreqs(AudioBufferSlice(&reals), {});
   EXPECT_EQ(0u, r.magnitudes.size());
   EXPECT_EQ(0u, r.phases.size());
-  EXPECT_DOUBLE_EQ(0, r.total_magn_signal);
-  EXPECT_DOUBLE_EQ(kTotalMagAll, r.total_magn_other);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(0, r.total_magn_signal);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(kTotalMagAll, r.total_magn_other);
 }
 
 // Test float-based MeasureAudioFreq (only needed to validate OutputProducer).
@@ -480,21 +483,22 @@ TEST(AnalysisHelpers, MeasureAudioFreq_Float) {
   r = MeasureAudioFreq(AudioBufferSlice(&reals), 0);
   EXPECT_EQ(1u, r.magnitudes.size());
   EXPECT_EQ(1u, r.phases.size());
-  EXPECT_DOUBLE_EQ(3.0, r.magnitudes[0]);
-  EXPECT_DOUBLE_EQ(3.0, r.total_magn_signal);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(3.0, r.magnitudes[0]);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(3.0, r.total_magn_signal);
 
   r = MeasureAudioFreq(AudioBufferSlice(&reals), 1);
   EXPECT_EQ(1u, r.magnitudes.size());
   EXPECT_EQ(1u, r.phases.size());
-  EXPECT_DOUBLE_EQ(4.0, r.magnitudes[1]);
-  EXPECT_DOUBLE_EQ(4.0, r.total_magn_signal);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(4.0, r.magnitudes[1]);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(4.0, r.total_magn_signal);
 
   r = MeasureAudioFreq(AudioBufferSlice(&reals), 2);
   EXPECT_EQ(1u, r.magnitudes.size());
   EXPECT_EQ(1u, r.phases.size());
-  EXPECT_DOUBLE_EQ(6.0, r.magnitudes[2]);
-  EXPECT_DOUBLE_EQ(6.0, r.total_magn_signal);  // Magnitude is absolute value (ignore phase)
-  EXPECT_DOUBLE_EQ(5.0, r.total_magn_other);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(6.0, r.magnitudes[2]);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(6.0,
+                              r.total_magn_signal);  // Magnitude is absolute value (ignore phase)
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(5.0, r.total_magn_other);
 }
 
 TEST(AnalysisHelpers, FindImpulseLeadingEdge) {

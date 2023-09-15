@@ -8,10 +8,13 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 #include <gtest/gtest.h>
 
 namespace media::audio::clock {
+
+#define EXPECT_AUDIO_TEST_DOUBLE_EQ(X, Y) EXPECT_NEAR(X, Y, std::numeric_limits<double>::epsilon())
 
 class PidControlTest : public testing::Test {
  protected:
@@ -20,13 +23,13 @@ class PidControlTest : public testing::Test {
     control.Start(zx::time(100));
 
     control.TuneForError(zx::time(110), 50);
-    EXPECT_DOUBLE_EQ(control.Read(), 50 * pFactor);
+    EXPECT_AUDIO_TEST_DOUBLE_EQ(control.Read(), 50 * pFactor);
 
     control.TuneForError(zx::time(125), -10);
-    EXPECT_DOUBLE_EQ(control.Read(), -10 * pFactor);
+    EXPECT_AUDIO_TEST_DOUBLE_EQ(control.Read(), -10 * pFactor);
 
     control.TuneForError(zx::time(130), 20);
-    EXPECT_DOUBLE_EQ(control.Read(), 20 * pFactor);
+    EXPECT_AUDIO_TEST_DOUBLE_EQ(control.Read(), 20 * pFactor);
   }
 
   static void VerifyIntegralOnly(const double iFactor) {
@@ -42,7 +45,7 @@ class PidControlTest : public testing::Test {
 
     // From this, we expect error to change by 50*t*I
     expected += 50.0 * iFactor * static_cast<double>((tune_time - previous_time).get());
-    EXPECT_DOUBLE_EQ(control.Read(), expected);
+    EXPECT_AUDIO_TEST_DOUBLE_EQ(control.Read(), expected);
 
     previous_time = tune_time;
     tune_time += zx::duration(15);
@@ -51,7 +54,7 @@ class PidControlTest : public testing::Test {
 
     // From this, we expect error to change by -100*t*I
     expected += -100.0 * iFactor * static_cast<double>((tune_time - previous_time).get());
-    EXPECT_DOUBLE_EQ(control.Read(), expected);
+    EXPECT_AUDIO_TEST_DOUBLE_EQ(control.Read(), expected);
 
     previous_time = tune_time;
     tune_time += zx::duration(25);
@@ -60,8 +63,8 @@ class PidControlTest : public testing::Test {
 
     // From this, we expect error to change by 0*t*I -- to be zero!
     expected += 40.0 * iFactor * static_cast<double>((tune_time - previous_time).get());
-    EXPECT_DOUBLE_EQ(control.Read(), expected);
-    EXPECT_DOUBLE_EQ(expected, 0.0);
+    EXPECT_AUDIO_TEST_DOUBLE_EQ(control.Read(), expected);
+    EXPECT_AUDIO_TEST_DOUBLE_EQ(expected, 0.0);
   }
 
   static void VerifyDerivativeOnly(double dFactor) {
@@ -81,7 +84,7 @@ class PidControlTest : public testing::Test {
 
     error_rate = (error - previous_error) / static_cast<double>((tune_time - previous_time).get());
     // Reset error to 0 at t=10, from here we expect error to change by 5
-    EXPECT_DOUBLE_EQ(control.Read(), dFactor * error_rate);
+    EXPECT_AUDIO_TEST_DOUBLE_EQ(control.Read(), dFactor * error_rate);
 
     previous_time = tune_time;
     tune_time += zx::duration(5);
@@ -92,7 +95,7 @@ class PidControlTest : public testing::Test {
 
     error_rate = (error - previous_error) / static_cast<double>((tune_time - previous_time).get());
     // Now we expect error to change by -6
-    EXPECT_DOUBLE_EQ(control.Read(), dFactor * error_rate);
+    EXPECT_AUDIO_TEST_DOUBLE_EQ(control.Read(), dFactor * error_rate);
 
     previous_time = tune_time;
     tune_time += zx::duration(20);
@@ -103,7 +106,7 @@ class PidControlTest : public testing::Test {
 
     error_rate = (error - previous_error) / static_cast<double>((tune_time - previous_time).get());
     // Now we expect error to change by 0.5
-    EXPECT_DOUBLE_EQ(control.Read(), dFactor * error_rate);
+    EXPECT_AUDIO_TEST_DOUBLE_EQ(control.Read(), dFactor * error_rate);
   }
 
   static void SmoothlyChaseToClockRate(const int32_t rate_adjust_ppm,

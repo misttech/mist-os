@@ -6,10 +6,14 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#include <limits>
+
 #include <gtest/gtest.h>
 
 namespace media_audio {
 namespace {
+
+#define EXPECT_AUDIO_TEST_DOUBLE_EQ(X, Y) EXPECT_NEAR(X, Y, std::numeric_limits<double>::epsilon())
 
 TEST(LinearFilterTest, Construction) {
   {
@@ -23,7 +27,7 @@ TEST(LinearFilterTest, Construction) {
     EXPECT_EQ(filter.dest_rate(), dest_rate);
     EXPECT_EQ(filter.num_frac_bits(), expected_num_frac_bits);
     EXPECT_EQ(filter.side_length(), expected_side_length);
-    EXPECT_DOUBLE_EQ(filter.rate_conversion_ratio(), 1.0);
+    EXPECT_AUDIO_TEST_DOUBLE_EQ(filter.rate_conversion_ratio(), 1.0);
   }
 
   {
@@ -37,7 +41,7 @@ TEST(LinearFilterTest, Construction) {
     EXPECT_EQ(filter.dest_rate(), dest_rate);
     EXPECT_EQ(filter.num_frac_bits(), expected_num_frac_bits);
     EXPECT_EQ(filter.side_length(), expected_side_length);
-    EXPECT_DOUBLE_EQ(filter.rate_conversion_ratio(), 3.0);
+    EXPECT_AUDIO_TEST_DOUBLE_EQ(filter.rate_conversion_ratio(), 3.0);
   }
 
   {
@@ -51,7 +55,7 @@ TEST(LinearFilterTest, Construction) {
     EXPECT_EQ(filter.dest_rate(), dest_rate);
     EXPECT_EQ(filter.num_frac_bits(), num_frac_bits);
     EXPECT_EQ(filter.side_length(), expected_side_length);
-    EXPECT_DOUBLE_EQ(filter.rate_conversion_ratio(), 0.5);
+    EXPECT_AUDIO_TEST_DOUBLE_EQ(filter.rate_conversion_ratio(), 0.5);
   }
 }
 
@@ -68,7 +72,7 @@ TEST(SincFilterTest, Construction) {
     EXPECT_EQ(filter.dest_rate(), dest_rate);
     EXPECT_EQ(filter.num_frac_bits(), expected_num_frac_bits);
     EXPECT_EQ(filter.side_length(), side_length);
-    EXPECT_DOUBLE_EQ(filter.rate_conversion_ratio(), 1.0);
+    EXPECT_AUDIO_TEST_DOUBLE_EQ(filter.rate_conversion_ratio(), 1.0);
   }
 
   {
@@ -83,7 +87,7 @@ TEST(SincFilterTest, Construction) {
     EXPECT_EQ(filter.dest_rate(), dest_rate);
     EXPECT_EQ(filter.side_length(), side_length);
     EXPECT_EQ(filter.num_frac_bits(), expected_num_frac_bits);
-    EXPECT_DOUBLE_EQ(filter.rate_conversion_ratio(), 3.0);
+    EXPECT_AUDIO_TEST_DOUBLE_EQ(filter.rate_conversion_ratio(), 3.0);
   }
 
   {
@@ -98,7 +102,7 @@ TEST(SincFilterTest, Construction) {
     EXPECT_EQ(filter.dest_rate(), dest_rate);
     EXPECT_EQ(filter.side_length(), side_length);
     EXPECT_EQ(filter.num_frac_bits(), num_frac_bits);
-    EXPECT_DOUBLE_EQ(filter.rate_conversion_ratio(), 0.5);
+    EXPECT_AUDIO_TEST_DOUBLE_EQ(filter.rate_conversion_ratio(), 0.5);
   }
 
   {
@@ -113,7 +117,7 @@ TEST(SincFilterTest, Construction) {
     EXPECT_EQ(filter.dest_rate(), dest_rate);
     EXPECT_EQ(filter.side_length(), side_length);
     EXPECT_EQ(filter.num_frac_bits(), num_frac_bits);
-    EXPECT_DOUBLE_EQ(filter.rate_conversion_ratio(), 6.0);
+    EXPECT_AUDIO_TEST_DOUBLE_EQ(filter.rate_conversion_ratio(), 6.0);
   }
 }
 
@@ -144,7 +148,7 @@ TEST(SincFilterTest, FilterCoefficients_Unity) {
   EXPECT_EQ(filter.dest_rate(), dest_rate);
   EXPECT_EQ(filter.side_length(), side_length);
   EXPECT_EQ(filter.num_frac_bits(), num_frac_bits);
-  EXPECT_DOUBLE_EQ(filter.rate_conversion_ratio(), 1.0);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(filter.rate_conversion_ratio(), 1.0);
 
   EXPECT_FLOAT_EQ(filter[0], 1.0f);
   auto frac_size = 1 << num_frac_bits;
@@ -174,7 +178,7 @@ TEST(SincFilterTest, FilterCoefficients_DownSample) {
   EXPECT_EQ(filter.source_rate(), source_rate);
   EXPECT_EQ(filter.dest_rate(), dest_rate);
   EXPECT_EQ(filter.side_length(), side_length);
-  EXPECT_DOUBLE_EQ(filter.rate_conversion_ratio(), 0.5);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(filter.rate_conversion_ratio(), 0.5);
 }
 
 TEST(SincFilterTest, FilterCoefficients_UpSample) {
@@ -188,7 +192,7 @@ TEST(SincFilterTest, FilterCoefficients_UpSample) {
   EXPECT_EQ(filter.source_rate(), source_rate);
   EXPECT_EQ(filter.dest_rate(), dest_rate);
   EXPECT_EQ(filter.side_length(), side_length);
-  EXPECT_DOUBLE_EQ(filter.rate_conversion_ratio(), 2.0);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(filter.rate_conversion_ratio(), 2.0);
 }
 
 TEST(LinearFilterTest, ComputeSample) {

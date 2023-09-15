@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <limits>
+
 #include "src/media/audio/audio_core/shared/mixer/test/audio_result.h"
 #include "src/media/audio/audio_core/shared/mixer/test/mixer_tests_shared.h"
 #include "src/media/audio/lib/analysis/generators.h"
@@ -9,6 +11,8 @@
 #include "src/media/audio/lib/processing/gain.h"
 
 namespace media::audio::test {
+
+#define EXPECT_AUDIO_TEST_DOUBLE_EQ(X, Y) EXPECT_NEAR(X, Y, std::numeric_limits<double>::epsilon())
 
 // Convenience abbreviations within this source file to shorten names.
 using Resampler = ::media::audio::Mixer::Resampler;
@@ -58,8 +62,8 @@ TEST(DynamicRange, Epsilon) {
   double near_unity_level_db, near_unity_sinad_db;
   MeasureSummaryDynamicRange(AudioResult::kMinGainDbUnity, &near_unity_level_db,
                              &near_unity_sinad_db);
-  EXPECT_DOUBLE_EQ(near_unity_level_db, unity_level_db);
-  EXPECT_DOUBLE_EQ(near_unity_sinad_db, unity_sinad_db);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(near_unity_level_db, unity_level_db);
+  EXPECT_AUDIO_TEST_DOUBLE_EQ(near_unity_sinad_db, unity_sinad_db);
 
   // kMaxGainDbNonUnity is the highest (closest-to-Unity) with observable effect
   // on full-scale (i.e. largest sub-Unity AScale distinguishable from Unity).
