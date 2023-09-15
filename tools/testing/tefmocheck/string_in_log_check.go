@@ -342,19 +342,6 @@ func fuchsiaLogChecks() []FailureModeCheck {
 		// These may be in the output of tests, but the syslogType doesn't contain any test output.
 		&stringInLogCheck{String: "ASSERT FAILED", Type: syslogType},
 		&stringInLogCheck{String: "DEVICE SUSPEND TIMED OUT", Type: syslogType},
-		// For fxbug.dev/61419.
-		// Error is being logged at https://fuchsia.googlesource.com/fuchsia/+/675c6b9cc2452cd7108f075d91e048218b92ae69/garnet/bin/run_test_component/main.cc#431
-		&stringInLogCheck{
-			String: ".cmx canceled due to timeout.",
-			Type:   swarmingOutputType,
-			ExceptBlocks: []*logBlock{
-				{
-					startString: "[ RUN      ] RunFixture.TestTimeout",
-					endString:   "RunFixture.TestTimeout (",
-				},
-			},
-			OnlyOnStates: []string{"TIMED_OUT"},
-		},
 		&stringInLogCheck{
 			String: "Got no package for fuchsia-pkg://",
 			Type:   swarmingOutputType,

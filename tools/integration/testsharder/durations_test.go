@@ -18,7 +18,7 @@ func TestTestDurationsMap(t *testing.T) {
 			MedianDuration: 1,
 		},
 		{
-			Name:           "foo.cmx",
+			Name:           "foo",
 			MedianDuration: 2,
 		},
 		{
@@ -35,8 +35,6 @@ func TestTestDurationsMap(t *testing.T) {
 	}
 
 	assertDurationEquals("unknown-test", 1)
-	assertDurationEquals("foo.cmx", 2)
-	// Should translate new-style legacy component test names to old-style.
-	assertDurationEquals("foo.cm", 2)
+	assertDurationEquals("foo", 2)
 	assertDurationEquals("bar", 3)
 }

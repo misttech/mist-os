@@ -5,8 +5,6 @@
 package testsharder
 
 import (
-	"strings"
-
 	"go.fuchsia.dev/fuchsia/tools/build"
 )
 
@@ -32,15 +30,6 @@ func NewTestDurationsMap(durations []build.TestDuration) TestDurationsMap {
 func (m TestDurationsMap) Get(test Test) build.TestDuration {
 	if testData, ok := m[test.Test.Name]; ok {
 		return testData
-	} else if strings.HasSuffix(test.Test.Name, ".cm") {
-		// TODO(fxbug.dev/83553): This is a hack to ensure we continue to use
-		// existing test duration data for legacy component tests even when the
-		// extension changes from ".cmx" to ".cm". Remove it 3 days after the
-		// migration happens, at which point test duration files will contain
-		// the new names.
-		if testData, ok := m[test.Test.Name+"x"]; ok {
-			return testData
-		}
 	}
 	return m[defaultDurationKey]
 }

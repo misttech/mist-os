@@ -1017,7 +1017,7 @@ func TestCommandForTest(t *testing.T) {
 			useRuntests: true,
 			test: testsharder.Test{
 				Test: build.Test{
-					PackageURL: "fuchsia-pkg://example.com/test.cmx",
+					PackageURL: "fuchsia-pkg://example.com/test.cm",
 				},
 			},
 			wantErr: true,
@@ -1049,17 +1049,6 @@ func TestCommandForTest(t *testing.T) {
 			test: testsharder.Test{
 				Test: build.Test{
 					Path: "/path/to/test",
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name:        "components v1",
-			useRuntests: false,
-			test: testsharder.Test{
-				Test: build.Test{
-					Path:       "/path/to/test",
-					PackageURL: "fuchsia-pkg://example.com/test.cmx",
 				},
 			},
 			wantErr: true,

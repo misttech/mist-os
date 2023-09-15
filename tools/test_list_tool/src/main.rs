@@ -309,16 +309,9 @@ fn update_tags_from_manifest(
 ) -> Result<(), Error> {
     let pkg_url = AbsoluteComponentUrl::parse(&package_url)?;
     let cm_path = pkg_url.resource();
-    // CFv1 manifests don't generate the same FIDL declarations, so just skip generating tags
-    // from them.
-    if &cm_path[cm_path.len() - 3..] == "cmx" {
-        test_tags.legacy_test = Some(true);
-        Ok(())
-    } else {
-        let decl = cm_decl_from_meta_far(&meta_far_path, cm_path)?;
-        update_tags_from_facets(test_tags, &decl.facets.unwrap_or(fdata::Dictionary::default()))?;
-        Ok(())
-    }
+    let decl = cm_decl_from_meta_far(&meta_far_path, cm_path)?;
+    update_tags_from_facets(test_tags, &decl.facets.unwrap_or(fdata::Dictionary::default()))?;
+    Ok(())
 }
 
 fn write_depfile(

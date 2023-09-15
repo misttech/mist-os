@@ -826,8 +826,8 @@ func TestFxb51327(t *testing.T) {
 [00392.026655][276880][276883][test-devmgr] INFO: Running remove task for device 0xc64fcfe910 'Virtual_Audio_Device_(default)'
 [00392.026783][276880][276883][test-devmgr] INFO: Removed device 0xc64fcfe910 'Virtual_Audio_Device_(default)': ZX_OK
 [00392.026793][276880][276883][test-devmgr] INFO: Removing device 0xc64fcfe910 'Virtual_Audio_Device_(default)' parent=0xc64fcfe610
-[00391.063831][276429][279657][audio_pipeline_test] INFO: [hermetic_audio_environment.cc(40)] Using path '/pkg/data/ultrasound' for /config/data directory for fuchsia-pkg://fuchsia.com/audio_core#meta/audio_core_nodevfs_noconfigdata.cmx.
-[00391.064291][276429][279657][audio_pipeline_test] INFO: [hermetic_audio_environment.cc(54)] No config_data provided for fuchsia-pkg://fuchsia.com/virtual_audio_service#meta/virtual_audio_service_nodevfs.cmx
+[00391.063831][276429][279657][audio_pipeline_test] INFO: [hermetic_audio_environment.cc(40)] Using path '/pkg/data/ultrasound' for /config/data directory for fuchsia-pkg://fuchsia.com/audio_core#meta/audio_core_nodevfs_noconfigdata.cm.
+[00391.064291][276429][279657][audio_pipeline_test] INFO: [hermetic_audio_environment.cc(54)] No config_data provided for fuchsia-pkg://fuchsia.com/virtual_audio_service#meta/virtual_audio_service_nodevfs.cm
 [00391.820503][280027][280029][audio_core] INFO: [main.cc(36)] AudioCore starting up
 [00391.891903][280027][280029][audio_core] INFO: [policy_loader.cc(244)] No policy found; using default.
 [00392.007930][280027][280375][audio_core] ERROR: [src/media/audio/audio_core/driver_output.cc(166)] OUTPUT UNDERFLOW: Missed mix target by (worst-case, expected) = (49, 99) ms. Cooling down for 1000 milliseconds.
@@ -937,7 +937,7 @@ func TestFxb51327(t *testing.T) {
 [----------] Global test environment tear-down
 [==========] 13 tests from 3 test suites ran. (10934 ms total)
 [  PASSED  ] 13 tests.
-ok 9 fuchsia-pkg://fuchsia.com/audio_pipeline_tests#meta/audio_pipeline_tests.cmx (12.230948553s)
+ok 9 fuchsia-pkg://fuchsia.com/audio_pipeline_tests#meta/audio_pipeline_tests.cm (12.230948553s)
 `
 	want := []runtests.TestCaseResult{
 		{
@@ -1025,7 +1025,7 @@ test listen_for_syslog ... ok
 test listen_for_klog_routed_stdio ... ok
 test test_observer_stop_api ... ok
 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-ok 61 fuchsia-pkg://fuchsia.com/archivist_integration_tests#meta/logs_integration_rust_tests.cmx (1.04732004s)
+ok 61 fuchsia-pkg://fuchsia.com/archivist_integration_tests#meta/logs_integration_rust_tests.cm (1.04732004s)
 `
 	want := []runtests.TestCaseResult{
 		{
