@@ -180,7 +180,7 @@ impl Control {
         let spline = generate_spline(&brightness_table);
 
         let auto_brightness_abort_handle = None::<AbortHandle>;
-        let mut result = Control {
+        let result = Control {
             backlight,
             sensor,
             set_brightness_abort_handle,
@@ -190,8 +190,8 @@ impl Control {
             auto_sender_channel,
             adjustment_sender_channel,
         };
-        // Startup auto-brightness loop
-        result.start_auto_brightness_task();
+        // Disable startup auto-brightness loop by default
+        // result.start_auto_brightness_task();
         result
     }
 
