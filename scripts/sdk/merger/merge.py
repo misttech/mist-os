@@ -184,7 +184,7 @@ class ElementMeta(object):
             if 'ifs' in self._meta:
                 common_files.add(
                     os.path.join(self._meta['root'], self._meta['ifs']))
-            for arch, binaries in self._meta['binaries'].items():
+            for arch, binaries in self._meta.get('binaries', {}).items():
                 contents = set()
                 contents.add(binaries['link'])
                 if 'dist' in binaries:
@@ -192,6 +192,17 @@ class ElementMeta(object):
                 if 'debug' in binaries:
                     contents.add(binaries['debug'])
                 arch_files[arch] = contents
+            for variant in self._meta.get('variants', []):
+                contents = set()
+                constraint = variant['constraints']['arch'] + '-' + str(
+                    variant['constraints']['api_level'])
+                value = variant['values']
+                contents.add(value['link_lib'])
+                if 'dist_lib' in value:
+                    contents.add(value['dist_lib'])
+                if 'debug' in value:
+                    contents.add(value['debug'])
+                arch_files[constraint] = contents
         elif type == 'cc_source_library':
             common_files.update(self._meta['headers'])
             common_files.update(self._meta['sources'])
@@ -225,13 +236,24 @@ class ElementMeta(object):
         elif type == 'sysroot':
             for ifs_file in self._meta['ifs_files']:
                 common_files.add(os.path.join("pkg", "sysroot", ifs_file))
-            for arch, version in self._meta['versions'].items():
+            for arch, version in self._meta.get('versions', {}).items():
                 contents = set()
                 contents.update(version['headers'])
                 contents.update(version['link_libs'])
                 contents.update(version['dist_libs'])
                 contents.update(version['debug_libs'])
                 arch_files[arch] = contents
+
+            for variant in self._meta.get('variants', []):
+                contents = set()
+                constraint = variant['constraints']['arch'] + '-' + str(
+                    variant['constraints']['api_level'])
+                value = variant['values']
+                contents.update(value['headers'])
+                contents.update(value['link_libs'])
+                contents.update(value['dist_libs'])
+                contents.update(value['debug_libs'])
+                arch_files[constraint] = contents
         elif type == 'documentation':
             common_files.update(self._meta['docs'])
         elif type in ('config', 'license', 'component_manifest'):
@@ -261,7 +283,7 @@ class ElementMeta(object):
         meta = {}
         if type in ('cc_prebuilt_library', 'loadable_module'):
             meta = meta_one
-            meta['binaries'].update(meta_two['binaries'])
+            meta['binaries'].update(meta_two.get('binaries', {}))
         elif type == 'package':
             meta = meta_one
             meta['package_manifests'] += meta_two['package_manifests']
@@ -276,7 +298,7 @@ class ElementMeta(object):
             meta['target_files'].update(meta_two['target_files'])
         elif type == 'sysroot':
             meta = meta_one
-            meta['versions'].update(meta_two['versions'])
+            meta['versions'].update(meta_two.get('versions', {}))
         elif type in ['ffx_tool', 'host_tool', 'companion_host_tool']:
             meta = meta_one
             if not 'target_files' in meta:
@@ -291,6 +313,8 @@ class ElementMeta(object):
             meta = meta_one
         else:
             raise Exception('Unknown element type: ' + type)
+        meta['variants'] = meta_one.get('variants', []) + meta_two.get(
+            'variants', [])
 
         return ElementMeta(meta)
 
@@ -841,7 +865,7 @@ def main(main_args=None):
         )
 
     if len(args.inputs
-           ) == 1 and args.inputs[0].archive and args.output_directory:
+          ) == 1 and args.inputs[0].archive and args.output_directory:
         parser.error(
             'Using a single input archive as input and an output directory is not supported!\n'
             +

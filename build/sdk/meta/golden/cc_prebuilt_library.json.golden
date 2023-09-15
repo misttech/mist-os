@@ -10,8 +10,6 @@
                 "binaries": {
                     "additionalProperties": false,
                     "description": "The binary files for the library, per architecture",
-                    "maxProperties": 2,
-                    "minProperties": 1,
                     "properties": {
                         "arm64": {
                             "$ref": "#/definitions/binaryGroup",
@@ -27,6 +25,14 @@
                         }
                     },
                     "type": "object"
+                },
+                "variants": {
+                    "additionalProperties": false,
+                    "description": "The various variants of the sysroot, per architecture and api level",
+                    "items": {
+                        "$ref": "#/definitions/variant"
+                    },
+                    "type": "array"
                 },
                 "deps": {
                     "description": "List of C/C++ libraries this library depends on",
@@ -80,7 +86,6 @@
                 }
             },
             "required": [
-                "binaries",
                 "deps",
                 "format",
                 "headers",
@@ -114,6 +119,58 @@
             },
             "required": [
                 "link"
+            ],
+            "type": "object"
+        },
+        "variant": {
+            "additionalProperties": false,
+            "description": "A set of binary files compiled for a given architecture and api level",
+            "properties": {
+                "constraints": {
+                    "additionalProperties": false,
+                    "description": "The architecture and api level information",
+                    "properties": {
+                        "api_level": {
+                            "type": "integer",
+                            "description": "API level"
+                        },
+                        "arch": {
+                            "type": "string",
+                            "description": "architecture"
+                        }
+                    },
+                    "type": "object"
+                },
+                "values": {
+                    "additionalProperties": false,
+                    "description": "sysroot files for a given constraint",
+                    "properties": {
+                        "debug": {
+                            "$ref": "common.json#/definitions/file",
+                            "description": "The unstripped version of the library"
+                        },
+                        "dist_lib": {
+                            "$ref": "common.json#/definitions/file",
+                            "description": "The version of the library to add to Fuchsia packages"
+                        },
+                        "dist_lib_dest": {
+                            "$ref": "common.json#/definitions/file",
+                            "description": "Path where the library should be installed in Fuchsia packages"
+                        },
+                        "link_lib": {
+                            "$ref": "common.json#/definitions/file",
+                            "description": "The link-time version of the library"
+                        }
+                    },
+                    "required": [
+                        "link_lib"
+                    ],
+                    "type": "object"
+                }
+            },
+            "required": [
+                "constraints",
+                "values"
             ],
             "type": "object"
         }
