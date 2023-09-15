@@ -19,6 +19,7 @@ rustc_test("routes-admin") {
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
+    "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
     "//src/lib/network/fidl_fuchsia_net_routes_ext",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:futures",

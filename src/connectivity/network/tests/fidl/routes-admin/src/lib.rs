@@ -12,6 +12,7 @@ use std::collections::HashSet;
 use assert_matches::assert_matches;
 use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_net as fnet;
+use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_routes as fnet_routes;
 use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
 use fidl_fuchsia_net_routes_ext::{
@@ -19,11 +20,11 @@ use fidl_fuchsia_net_routes_ext::{
 };
 use fidl_fuchsia_net_stack as fnet_stack;
 use fuchsia_async::TimeoutExt as _;
-use futures::{future::FutureExt as _, pin_mut};
+use futures::{future::FutureExt as _, pin_mut, StreamExt};
 use itertools::Itertools as _;
 use net_declare::{fidl_ip_v4, fidl_ip_v4_with_prefix, fidl_ip_v6, fidl_ip_v6_with_prefix};
 use net_types::{
-    ip::{Ip, Ipv4, Ipv6},
+    ip::{Ip, Ipv4, Ipv6, Subnet},
     SpecifiedAddr,
 };
 use netstack_testing_common::{
@@ -653,4 +654,156 @@ async fn root_route_apis_can_remove_loopback_route<
     })
     .await
     .expect("should succeed");
+}
+
+#[derive(Debug)]
+enum DefaultRouteRemovalCase {
+    DropRouteSet,
+    ExplicitRemove,
+}
+
+#[netstack_test]
+#[test_case(DefaultRouteRemovalCase::DropRouteSet; "drop route set")]
+#[test_case(DefaultRouteRemovalCase::ExplicitRemove; "explicit remove")]
+async fn removing_one_default_route_does_not_flip_presence<
+    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+    N: Netstack,
+>(
+    name: &str,
+    removal_case: DefaultRouteRemovalCase,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let TestSetup { realm: _realm, network: _network, interface, set_provider, state } =
+        TestSetup::<I>::new::<N>(&sandbox, name).await;
+
+    let routes_stream =
+        fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
+    pin_mut!(routes_stream);
+
+    let route_set_1 =
+        fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set");
+    let route_set_2 =
+        fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set");
+
+    let events = interface.get_interface_event_stream().expect("get interface event stream").fuse();
+    pin_mut!(events);
+
+    let default_route = |metric| {
+        let destination =
+            Subnet::new(I::UNSPECIFIED_ADDRESS, 0).expect("unspecified subnet should be valid");
+        fnet_routes_ext::Route {
+            destination,
+            action: fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget::<I> {
+                outbound_interface: interface.id(),
+                next_hop: None,
+            }),
+            properties: fnet_routes_ext::RouteProperties {
+                specified_properties: fnet_routes_ext::SpecifiedRouteProperties { metric },
+            },
+        }
+    };
+    let default_route_1 =
+        default_route(fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty));
+    let default_route_2 = default_route(fnet_routes::SpecifiedMetric::ExplicitMetric(123));
+
+    // Add a default route.
+    assert!(fnet_routes_ext::admin::add_route::<I>(
+        &route_set_1,
+        &default_route_1.clone().try_into().expect("convert to FIDL"),
+    )
+    .await
+    .expect("should not get add route FIDL error")
+    .expect("should not get add route error"));
+
+    let mut interface_state = fnet_interfaces_ext::InterfaceState::Unknown(interface.id());
+
+    fnet_interfaces_ext::wait_interface_with_id(
+        &mut events,
+        &mut interface_state,
+        |fnet_interfaces_ext::PropertiesAndState {
+             state: (),
+             properties:
+                 fnet_interfaces_ext::Properties {
+                     has_default_ipv4_route, has_default_ipv6_route, ..
+                 },
+         }| {
+            (match I::VERSION {
+                net_types::ip::IpVersion::V4 => has_default_ipv4_route,
+                net_types::ip::IpVersion::V6 => has_default_ipv6_route,
+            })
+            .then_some(())
+        },
+    )
+    .await
+    .expect("should have default route");
+
+    // Add a default route with a different metric (so they don't get de-duped).
+    assert!(fnet_routes_ext::admin::add_route::<I>(
+        &route_set_2,
+        &default_route_2.clone().try_into().expect("convert to FIDL"),
+    )
+    .await
+    .expect("should not get add route FIDL error")
+    .expect("should not get add route error"));
+
+    let mut routes_state = HashSet::new();
+
+    // Both routes should be present.
+    fnet_routes_ext::wait_for_routes::<I, _, _>(&mut routes_stream, &mut routes_state, |routes| {
+        routes.iter().any(|route| &route.route == &default_route_1)
+            && routes.iter().any(|route| &route.route == &default_route_2)
+    })
+    .await
+    .expect("should succeed");
+
+    // Remove a default route.
+    let opt_route_set_1 = match removal_case {
+        DefaultRouteRemovalCase::DropRouteSet => {
+            drop(route_set_1);
+            None
+        }
+        DefaultRouteRemovalCase::ExplicitRemove => {
+            assert!(fnet_routes_ext::admin::remove_route::<I>(
+                &route_set_1,
+                &default_route_1.clone().try_into().expect("convert to FIDL"),
+            )
+            .await
+            .expect("should not get remove route FIDL error")
+            .expect("should not get remove route error"));
+            Some(route_set_1)
+        }
+    };
+
+    // `default_route_1` should disappear.
+    fnet_routes_ext::wait_for_routes::<I, _, _>(&mut routes_stream, &mut routes_state, |routes| {
+        !routes.iter().any(|route| &route.route == &default_route_1)
+    })
+    .await
+    .expect("should succeed");
+
+    // Interface should still report having a default route.
+    fnet_interfaces_ext::wait_interface_with_id(
+        &mut events,
+        &mut interface_state,
+        |fnet_interfaces_ext::PropertiesAndState {
+             state: (),
+             properties:
+                 fnet_interfaces_ext::Properties {
+                     has_default_ipv4_route, has_default_ipv6_route, ..
+                 },
+         }| {
+            (match I::VERSION {
+                net_types::ip::IpVersion::V4 => !has_default_ipv4_route,
+                net_types::ip::IpVersion::V6 => !has_default_ipv6_route,
+            })
+            .then_some(())
+        },
+    )
+    .map(|_| panic!("has_default_ipvX_route should still be true"))
+    .on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, || ())
+    .await;
+
+    // Ensure route sets are kept alive all the way through (unless they were
+    // explicitly dropped above).
+    drop((opt_route_set_1, route_set_2));
 }

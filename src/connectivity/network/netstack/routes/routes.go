@@ -557,6 +557,30 @@ func (rt *RouteTable) FindNIC(addr tcpip.Address) (tcpip.NICID, error) {
 	return 0, ErrNoSuchNIC
 }
 
+// GetNICsWithDefaultRoutesLocked returns the set of NICs that have default
+// IPv4 routes.
+func (rt *RouteTable) GetNICsWithDefaultV4RoutesLocked() map[tcpip.NICID]struct{} {
+	set := make(map[tcpip.NICID]struct{})
+	for _, er := range rt.routes {
+		if er.Route.Destination.Equal(header.IPv4EmptySubnet) {
+			set[er.Route.NIC] = struct{}{}
+		}
+	}
+	return set
+}
+
+// GetNICsWithDefaultRoutesLocked returns the set of NICs that have default
+// IPv6 routes.
+func (rt *RouteTable) GetNICsWithDefaultV6RoutesLocked() map[tcpip.NICID]struct{} {
+	set := make(map[tcpip.NICID]struct{})
+	for _, er := range rt.routes {
+		if er.Route.Destination.Equal(header.IPv6EmptySubnet) {
+			set[er.Route.NIC] = struct{}{}
+		}
+	}
+	return set
+}
+
 func (rt *RouteTable) sortRouteTableLocked() {
 	sort.SliceStable(rt.routes, func(i, j int) bool {
 		return Less(&rt.routes[i], &rt.routes[j])
