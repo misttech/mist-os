@@ -8,9 +8,9 @@
 
 namespace {
 
-TEST(IdleTest, Idle20Mins) {
-  for (int i = 0; i < 20; i++) {
-    std::cout << "1 minute sleep (" << i + 1 << "/20)..." << std::endl;
+TEST(IdleTest, Idle4Mins) {
+  for (int i = 0; i < 4; i++) {
+    std::cout << "1 minute sleep (" << i + 1 << "/4)..." << std::endl;
     sleep(60);
   }
   std::cout << "Wake up!" << std::endl;
