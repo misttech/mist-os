@@ -346,9 +346,11 @@ impl<FSC: 'static + FSConfig + Clone + Send + Sync> Environment for FsEnvironmen
             )
             .await;
             let volume_path = get_volume_path(&self.volume_guid).await;
-            let controller =
-                connect_to_protocol_at_path::<ControllerMarker>(volume_path.to_str().unwrap())
-                    .unwrap();
+            let controller = connect_to_protocol_at_path::<ControllerMarker>(&format!(
+                "{}/device_controller",
+                volume_path.to_str().unwrap()
+            ))
+            .unwrap();
 
             let mut fs = Filesystem::new(controller, self.config.clone());
             fs.fsck().await.unwrap();
