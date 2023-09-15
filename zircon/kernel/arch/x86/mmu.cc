@@ -291,7 +291,7 @@ PtFlags X86PageTableMmu::terminal_flags(PageTableLevel level, uint flags) {
         terminal_flags |= X86_MMU_LARGE_PAT_WRITE_COMBINING;
         break;
       default:
-        PANIC_UNIMPLEMENTED;
+        panic("Unexpected flags 0x%x\n", flags);
     }
   } else {
     switch (flags & ARCH_MMU_FLAG_CACHE_MASK) {
@@ -306,7 +306,7 @@ PtFlags X86PageTableMmu::terminal_flags(PageTableLevel level, uint flags) {
         terminal_flags |= X86_MMU_PTE_PAT_WRITE_COMBINING;
         break;
       default:
-        PANIC_UNIMPLEMENTED;
+        panic("Unexpected flags 0x%x\n", flags);
     }
   }
 
@@ -494,7 +494,7 @@ uint X86PageTableMmu::pt_flags_to_mmu_flags(PtFlags flags, PageTableLevel level)
         mmu_flags |= ARCH_MMU_FLAG_WRITE_COMBINING;
         break;
       default:
-        PANIC_UNIMPLEMENTED;
+        panic("Unexpected flags %" PRIx64, flags);
     }
   } else {
     switch (flags & X86_MMU_PTE_PAT_MASK) {
@@ -508,7 +508,7 @@ uint X86PageTableMmu::pt_flags_to_mmu_flags(PtFlags flags, PageTableLevel level)
         mmu_flags |= ARCH_MMU_FLAG_WRITE_COMBINING;
         break;
       default:
-        PANIC_UNIMPLEMENTED;
+        panic("Unexpected flags %" PRIx64, flags);
     }
   }
   return mmu_flags;
@@ -568,7 +568,7 @@ PtFlags X86PageTableEpt::terminal_flags(PageTableLevel level, uint flags) {
       terminal_flags |= X86_EPT_WC;
       break;
     default:
-      PANIC_UNIMPLEMENTED;
+      panic("Unexpected flags 0x%x", flags);
   }
 
   return terminal_flags;
@@ -624,7 +624,7 @@ uint X86PageTableEpt::pt_flags_to_mmu_flags(PtFlags flags, PageTableLevel level)
       mmu_flags |= ARCH_MMU_FLAG_WRITE_COMBINING;
       break;
     default:
-      PANIC_UNIMPLEMENTED;
+      panic("Unexpected flags %" PRIx64, flags);
   }
 
   return mmu_flags;
