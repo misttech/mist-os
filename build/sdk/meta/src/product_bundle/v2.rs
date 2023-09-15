@@ -176,13 +176,15 @@ impl ProductBundleV2 {
 
         // Canonicalize the path. If the path does not exist, print a warning
         // and skip canonicalization.
-        let mut canonicalize_path = |path: &Utf8Path, image_type: Type| -> Utf8PathBuf {
+        let mut canonicalize_path = |path: &Utf8Path, image_types: Vec<Type>| -> Utf8PathBuf {
             let product_bundle_path = product_bundle_dir.join(path);
             match product_bundle_path.canonicalize_utf8() {
                 Ok(p) => p,
                 Err(_) => {
                     eprintln!("Cannot canonicalize {}", &path);
-                    not_supported.insert(image_type);
+                    for image_type in &image_types {
+                        not_supported.insert(image_type.clone());
+                    }
                     product_bundle_dir.join(path).to_owned()
                 }
             }
@@ -190,25 +192,28 @@ impl ProductBundleV2 {
 
         // Canonicalize the partitions.
         for part in &mut self.partitions.bootstrap_partitions {
-            part.image = canonicalize_path(&part.image, Type::Flash);
+            part.image = canonicalize_path(&part.image, vec![Type::Flash]);
         }
         for part in &mut self.partitions.bootloader_partitions {
-            part.image = canonicalize_path(&part.image, Type::Flash);
+            part.image = canonicalize_path(&part.image, vec![Type::Flash]);
         }
         for cred in &mut self.partitions.unlock_credentials {
-            *cred = canonicalize_path(&cred, Type::Flash);
+            *cred = canonicalize_path(&cred, vec![Type::Flash]);
         }
 
         // Canonicalize the systems.
         let mut canonicalize_system = |system: &mut Option<Vec<Image>>| -> Result<()> {
             if let Some(system) = system {
                 for image in system.iter_mut() {
-                    let image_type = match image {
-                        Image::QemuKernel(_) | Image::FVM(_) => Type::Emu,
-                        _ => Type::Flash,
+                    let image_types = match image {
+                        Image::ZBI { path: _, signed: _ } => vec![Type::Emu, Type::Flash],
+                        Image::QemuKernel(_) | Image::FVM(_) => vec![Type::Emu],
+                        Image::FVMFastboot(_) | Image::VBMeta(_) => vec![Type::Flash],
+                        _ => vec![],
                     };
 
-                    image.set_source(&canonicalize_path(&image.source().to_path_buf(), image_type));
+                    image
+                        .set_source(&canonicalize_path(&image.source().to_path_buf(), image_types));
                 }
             }
             Ok(())
@@ -225,7 +230,7 @@ impl ProductBundleV2 {
                     std::fs::create_dir_all(&dir)
                         .with_context(|| format!("Creating the directory: {}", dir))?;
                 }
-                let path = canonicalize_path(path, Type::Update);
+                let path = canonicalize_path(path, vec![Type::Update]);
                 Ok(path)
             };
             repository.metadata_path = canonicalize_dir(&repository.metadata_path)?;
