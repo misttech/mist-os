@@ -236,6 +236,12 @@ class DenyEachBinding_OnlyDenyDart_Result final {
   }
 
   friend ::fidl::Equality<::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Result>;
+  DenyEachBinding_OnlyDenyDart_Result(fpromise::ok_result<int32_t>&& result) {
+    set_response(::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Response{std::move(result.value)});
+  }
+  DenyEachBinding_OnlyDenyDart_Result(fpromise::error_result<uint32_t>&& result) {
+    set_err(std::move(result.error));
+  }
   DenyEachBinding_OnlyDenyDart_Result(fpromise::result<int32_t, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -244,10 +250,6 @@ class DenyEachBinding_OnlyDenyDart_Result final {
       set_err(result.take_error());
     }
   }
-  DenyEachBinding_OnlyDenyDart_Result(fpromise::ok_result<int32_t>&& result)
-      : DenyEachBinding_OnlyDenyDart_Result(fpromise::result<int32_t, uint32_t>(std::move(result))) {}
-  DenyEachBinding_OnlyDenyDart_Result(fpromise::error_result<uint32_t>&& result)
-      : DenyEachBinding_OnlyDenyDart_Result(fpromise::result<int32_t, uint32_t>(std::move(result))) {}
   operator fpromise::result<int32_t, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());
@@ -393,6 +395,12 @@ class DenyEachBinding_OnlyDenyGo_Result final {
   }
 
   friend ::fidl::Equality<::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result>;
+  DenyEachBinding_OnlyDenyGo_Result(fpromise::ok_result<int32_t>&& result) {
+    set_response(::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Response{std::move(result.value)});
+  }
+  DenyEachBinding_OnlyDenyGo_Result(fpromise::error_result<uint32_t>&& result) {
+    set_err(std::move(result.error));
+  }
   DenyEachBinding_OnlyDenyGo_Result(fpromise::result<int32_t, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -401,10 +409,6 @@ class DenyEachBinding_OnlyDenyGo_Result final {
       set_err(result.take_error());
     }
   }
-  DenyEachBinding_OnlyDenyGo_Result(fpromise::ok_result<int32_t>&& result)
-      : DenyEachBinding_OnlyDenyGo_Result(fpromise::result<int32_t, uint32_t>(std::move(result))) {}
-  DenyEachBinding_OnlyDenyGo_Result(fpromise::error_result<uint32_t>&& result)
-      : DenyEachBinding_OnlyDenyGo_Result(fpromise::result<int32_t, uint32_t>(std::move(result))) {}
   operator fpromise::result<int32_t, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());
@@ -550,6 +554,12 @@ class DenyEachBinding_OnlyDenyLibfuzzer_Result final {
   }
 
   friend ::fidl::Equality<::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result>;
+  DenyEachBinding_OnlyDenyLibfuzzer_Result(fpromise::ok_result<int32_t>&& result) {
+    set_response(::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Response{std::move(result.value)});
+  }
+  DenyEachBinding_OnlyDenyLibfuzzer_Result(fpromise::error_result<uint32_t>&& result) {
+    set_err(std::move(result.error));
+  }
   DenyEachBinding_OnlyDenyLibfuzzer_Result(fpromise::result<int32_t, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -558,10 +568,6 @@ class DenyEachBinding_OnlyDenyLibfuzzer_Result final {
       set_err(result.take_error());
     }
   }
-  DenyEachBinding_OnlyDenyLibfuzzer_Result(fpromise::ok_result<int32_t>&& result)
-      : DenyEachBinding_OnlyDenyLibfuzzer_Result(fpromise::result<int32_t, uint32_t>(std::move(result))) {}
-  DenyEachBinding_OnlyDenyLibfuzzer_Result(fpromise::error_result<uint32_t>&& result)
-      : DenyEachBinding_OnlyDenyLibfuzzer_Result(fpromise::result<int32_t, uint32_t>(std::move(result))) {}
   operator fpromise::result<int32_t, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());
@@ -707,6 +713,12 @@ class DenyEachBinding_OnlyDenyRust_Result final {
   }
 
   friend ::fidl::Equality<::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Result>;
+  DenyEachBinding_OnlyDenyRust_Result(fpromise::ok_result<int32_t>&& result) {
+    set_response(::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Response{std::move(result.value)});
+  }
+  DenyEachBinding_OnlyDenyRust_Result(fpromise::error_result<uint32_t>&& result) {
+    set_err(std::move(result.error));
+  }
   DenyEachBinding_OnlyDenyRust_Result(fpromise::result<int32_t, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -715,10 +727,6 @@ class DenyEachBinding_OnlyDenyRust_Result final {
       set_err(result.take_error());
     }
   }
-  DenyEachBinding_OnlyDenyRust_Result(fpromise::ok_result<int32_t>&& result)
-      : DenyEachBinding_OnlyDenyRust_Result(fpromise::result<int32_t, uint32_t>(std::move(result))) {}
-  DenyEachBinding_OnlyDenyRust_Result(fpromise::error_result<uint32_t>&& result)
-      : DenyEachBinding_OnlyDenyRust_Result(fpromise::result<int32_t, uint32_t>(std::move(result))) {}
   operator fpromise::result<int32_t, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());
@@ -864,6 +872,12 @@ class DenyEachBinding_OnlyDenySyzkaller_Result final {
   }
 
   friend ::fidl::Equality<::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Result>;
+  DenyEachBinding_OnlyDenySyzkaller_Result(fpromise::ok_result<int32_t>&& result) {
+    set_response(::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Response{std::move(result.value)});
+  }
+  DenyEachBinding_OnlyDenySyzkaller_Result(fpromise::error_result<uint32_t>&& result) {
+    set_err(std::move(result.error));
+  }
   DenyEachBinding_OnlyDenySyzkaller_Result(fpromise::result<int32_t, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -872,10 +886,6 @@ class DenyEachBinding_OnlyDenySyzkaller_Result final {
       set_err(result.take_error());
     }
   }
-  DenyEachBinding_OnlyDenySyzkaller_Result(fpromise::ok_result<int32_t>&& result)
-      : DenyEachBinding_OnlyDenySyzkaller_Result(fpromise::result<int32_t, uint32_t>(std::move(result))) {}
-  DenyEachBinding_OnlyDenySyzkaller_Result(fpromise::error_result<uint32_t>&& result)
-      : DenyEachBinding_OnlyDenySyzkaller_Result(fpromise::result<int32_t, uint32_t>(std::move(result))) {}
   operator fpromise::result<int32_t, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());

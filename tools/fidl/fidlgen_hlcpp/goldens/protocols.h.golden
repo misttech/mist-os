@@ -601,6 +601,12 @@ class WithErrorSyntax_ResponseAsStruct_Result final {
   }
 
   friend ::fidl::Equality<::test::protocols::WithErrorSyntax_ResponseAsStruct_Result>;
+  WithErrorSyntax_ResponseAsStruct_Result(fpromise::ok_result<::std::tuple<int64_t, int64_t, int64_t>>&& result) {
+    set_response(::test::protocols::WithErrorSyntax_ResponseAsStruct_Response{std::move(result.value)});
+  }
+  WithErrorSyntax_ResponseAsStruct_Result(fpromise::error_result<uint32_t>&& result) {
+      set_err(std::move(result.error));
+  }
   WithErrorSyntax_ResponseAsStruct_Result(fpromise::result<::std::tuple<int64_t, int64_t, int64_t>, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -609,10 +615,6 @@ class WithErrorSyntax_ResponseAsStruct_Result final {
       set_err(result.take_error());
     }
   }
-  WithErrorSyntax_ResponseAsStruct_Result(fpromise::ok_result<::std::tuple<int64_t, int64_t, int64_t>>&& result)
-    : WithErrorSyntax_ResponseAsStruct_Result(fpromise::result<::std::tuple<int64_t, int64_t, int64_t>, uint32_t>(std::move(result))) { }
-  WithErrorSyntax_ResponseAsStruct_Result(fpromise::error_result<uint32_t>&& result)
-    : WithErrorSyntax_ResponseAsStruct_Result(fpromise::result<::std::tuple<int64_t, int64_t, int64_t>, uint32_t>(std::move(result))) { }
   operator fpromise::result<::std::tuple<int64_t, int64_t, int64_t>, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());
@@ -743,6 +745,12 @@ class WithErrorSyntax_ErrorAsPrimitive_Result final {
   }
 
   friend ::fidl::Equality<::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result>;
+  WithErrorSyntax_ErrorAsPrimitive_Result(fpromise::ok_result<void>&& result) {
+    set_response(::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Response{});
+  }
+  WithErrorSyntax_ErrorAsPrimitive_Result(fpromise::error_result<uint32_t>&& result) {
+      set_err(std::move(result.error));
+  }
   WithErrorSyntax_ErrorAsPrimitive_Result(fpromise::result<void, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -751,10 +759,6 @@ class WithErrorSyntax_ErrorAsPrimitive_Result final {
       set_err(result.take_error());
     }
   }
-  WithErrorSyntax_ErrorAsPrimitive_Result(fpromise::ok_result<void>&& result)
-    : WithErrorSyntax_ErrorAsPrimitive_Result(fpromise::result<void, uint32_t>(std::move(result))) { }
-  WithErrorSyntax_ErrorAsPrimitive_Result(fpromise::error_result<uint32_t>&& result)
-    : WithErrorSyntax_ErrorAsPrimitive_Result(fpromise::result<void, uint32_t>(std::move(result))) { }
   operator fpromise::result<void, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());
@@ -885,6 +889,12 @@ class WithErrorSyntax_ErrorAsEnum_Result final {
   }
 
   friend ::fidl::Equality<::test::protocols::WithErrorSyntax_ErrorAsEnum_Result>;
+  WithErrorSyntax_ErrorAsEnum_Result(fpromise::ok_result<void>&& result) {
+    set_response(::test::protocols::WithErrorSyntax_ErrorAsEnum_Response{});
+  }
+  WithErrorSyntax_ErrorAsEnum_Result(fpromise::error_result<::test::protocols::ErrorEnum>&& result) {
+      set_err(std::move(result.error));
+  }
   WithErrorSyntax_ErrorAsEnum_Result(fpromise::result<void, ::test::protocols::ErrorEnum>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -893,10 +903,6 @@ class WithErrorSyntax_ErrorAsEnum_Result final {
       set_err(result.take_error());
     }
   }
-  WithErrorSyntax_ErrorAsEnum_Result(fpromise::ok_result<void>&& result)
-    : WithErrorSyntax_ErrorAsEnum_Result(fpromise::result<void, ::test::protocols::ErrorEnum>(std::move(result))) { }
-  WithErrorSyntax_ErrorAsEnum_Result(fpromise::error_result<::test::protocols::ErrorEnum>&& result)
-    : WithErrorSyntax_ErrorAsEnum_Result(fpromise::result<void, ::test::protocols::ErrorEnum>(std::move(result))) { }
   operator fpromise::result<void, ::test::protocols::ErrorEnum>() && {
     if (is_err()) {
       return fpromise::error(err());
@@ -1035,6 +1041,12 @@ class WithErrorSyntax_HandleInResult_Result final {
   }
 
   friend ::fidl::Equality<::test::protocols::WithErrorSyntax_HandleInResult_Result>;
+  WithErrorSyntax_HandleInResult_Result(fpromise::ok_result<::zx::handle>&& result) {
+    set_response(::test::protocols::WithErrorSyntax_HandleInResult_Response{std::move(result.value)});
+  }
+  WithErrorSyntax_HandleInResult_Result(fpromise::error_result<uint32_t>&& result) {
+      set_err(std::move(result.error));
+  }
   WithErrorSyntax_HandleInResult_Result(fpromise::result<::zx::handle, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -1043,10 +1055,6 @@ class WithErrorSyntax_HandleInResult_Result final {
       set_err(result.take_error());
     }
   }
-  WithErrorSyntax_HandleInResult_Result(fpromise::ok_result<::zx::handle>&& result)
-    : WithErrorSyntax_HandleInResult_Result(fpromise::result<::zx::handle, uint32_t>(std::move(result))) { }
-  WithErrorSyntax_HandleInResult_Result(fpromise::error_result<uint32_t>&& result)
-    : WithErrorSyntax_HandleInResult_Result(fpromise::result<::zx::handle, uint32_t>(std::move(result))) { }
   operator fpromise::result<::zx::handle, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());

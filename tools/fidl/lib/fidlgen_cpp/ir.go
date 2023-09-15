@@ -389,15 +389,9 @@ func (r Result) BuildPayload(varName string) string {
 	return out
 }
 
-// FpromiseResult returns a string representing this result as an
-// fpromise::result for use in HLCPP.
-func (r Result) FpromiseResult() string {
-	return fmt.Sprintf("fpromise::result<%s, %s>", r.ValueDecl, r.FpromiseErrDecl())
-}
-
-// FpromiseErrDecl returns a string representing the error type arg to the
-// fpromise::result used for this Result in HLCPP.
-func (r Result) FpromiseErrDecl() string {
+// CombinedErrorDecl returns either the result's domain error, its framework
+// error, or both combined in std::variant if it has both.
+func (r Result) CombinedErrorDecl() string {
 	if r.HasError && r.HasFrameworkError {
 		return fmt.Sprintf("std::variant<%s, %s>", r.ErrorDecl, transportErr)
 	}

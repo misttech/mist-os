@@ -909,6 +909,12 @@ class SomeProtocol_SomeMethod_Result final {
   }
 
   friend ::fidl::Equality<::test::anonymous::SomeProtocol_SomeMethod_Result>;
+  SomeProtocol_SomeMethod_Result(fpromise::ok_result<::test::anonymous::BitsMember>&& result) {
+    set_response(::test::anonymous::SomeProtocol_SomeMethod_Response{std::move(result.value)});
+  }
+  SomeProtocol_SomeMethod_Result(fpromise::error_result<::test::anonymous::SomeProtocol_SomeMethod_Error>&& result) {
+    set_err(std::move(result.error));
+  }
   SomeProtocol_SomeMethod_Result(fpromise::result<::test::anonymous::BitsMember, ::test::anonymous::SomeProtocol_SomeMethod_Error>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -917,10 +923,6 @@ class SomeProtocol_SomeMethod_Result final {
       set_err(result.take_error());
     }
   }
-  SomeProtocol_SomeMethod_Result(fpromise::ok_result<::test::anonymous::BitsMember>&& result)
-      : SomeProtocol_SomeMethod_Result(fpromise::result<::test::anonymous::BitsMember, ::test::anonymous::SomeProtocol_SomeMethod_Error>(std::move(result))) {}
-  SomeProtocol_SomeMethod_Result(fpromise::error_result<::test::anonymous::SomeProtocol_SomeMethod_Error>&& result)
-      : SomeProtocol_SomeMethod_Result(fpromise::result<::test::anonymous::BitsMember, ::test::anonymous::SomeProtocol_SomeMethod_Error>(std::move(result))) {}
   operator fpromise::result<::test::anonymous::BitsMember, ::test::anonymous::SomeProtocol_SomeMethod_Error>() && {
     if (is_err()) {
       return fpromise::error(err());

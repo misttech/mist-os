@@ -143,46 +143,37 @@ class {{ .Name }} final {
   friend ::fidl::Equality<{{ . }}>;
 
   {{- if .Result }}
-  {{ .Name }}({{ .Result.FpromiseResult }}&& result) {
+  {{ .Name }}(fpromise::ok_result<{{ .Result.ValueDecl }}>&& result) {
+    set_response({{ .Result.ValueTypeDecl }}{
+      {{- if ne 0 .Result.ValueArity }}std::move(result.value){{ end -}}
+    });
+  }
+  {{- end }}
+
+  {{- if and .Result .Result.HasError }}
+  {{ .Name }}(fpromise::error_result<{{ .Result.ErrorDecl }}>&& result) {
+      set_err(std::move(result.error));
+  }
+  {{ .Name }}(fpromise::result<{{ .Result.ValueDecl }}, {{ .Result.ErrorDecl }}>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
-      {{- if eq 0 .Result.ValueArity }}
-      set_response({{ .Result.ValueTypeDecl }}{});
-      {{- else }}
-      set_response({{ .Result.ValueTypeDecl }}{result.take_value()});
-      {{- end }}
+      set_response({{ .Result.ValueTypeDecl }}{
+        {{- if ne 0 .Result.ValueArity }}result.take_value(){{ end -}}
+      });
     } else {
-      {{- if and .Result.HasError .Result.HasFrameworkError }}
-      {{ .Result.FpromiseErrDecl }} errvariant = result.take_error();
-      switch (errvariant.index()) {
-        case 0:
-          set_err(std::get<0>(errvariant));
-          break;
-        case 1:
-          set_transport_err(std::get<1>(errvariant));
-          break;
-        default:
-          ZX_PANIC("Unknown variant index %zu", errvariant.index());
-          break;
-      }
-      {{- else if .Result.HasError }}
       set_err(result.take_error());
-      {{- else }}
-      set_transport_err(result.take_error());
-      {{- end }}
     }
   }
-  {{ .Name }}(fpromise::ok_result<{{ .Result.ValueDecl }}>&& result)
-    : {{ .Name }}({{ .Result.FpromiseResult }}(std::move(result))) { }
-  {{ .Name }}(fpromise::error_result<{{ .Result.FpromiseErrDecl }}>&& result)
-    : {{ .Name }}({{ .Result.FpromiseResult }}(std::move(result))) { }
-  operator {{ .Result.FpromiseResult }}() && {
+  {{- end }}
+
+  {{- if .Result }}
+  operator fpromise::result<{{ .Result.ValueDecl }}, {{ .Result.CombinedErrorDecl }}>() && {
     {{- if and .Result.HasError .Result.HasFrameworkError }}
     if (is_err()) {
-      return fpromise::error({{ .Result.FpromiseErrDecl }}(std::in_place_index<0>, err()));
+      return fpromise::error({{ .Result.CombinedErrorDecl }}(std::in_place_index<0>, err()));
     }
     if (is_transport_err()) {
-      return fpromise::error({{ .Result.FpromiseErrDecl }}(std::in_place_index<1>, transport_err()));
+      return fpromise::error({{ .Result.CombinedErrorDecl }}(std::in_place_index<1>, transport_err()));
     }
     {{- else if .Result.HasError }}
     if (is_err()) {

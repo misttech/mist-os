@@ -724,6 +724,12 @@ class ComposedProtocol_TwoWayAnonComposedWithError_Result final {
   }
 
   friend ::fidl::Equality<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result>;
+  ComposedProtocol_TwoWayAnonComposedWithError_Result(fpromise::ok_result<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Response>&& result) {
+    set_response(::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Response{std::move(result.value)});
+  }
+  ComposedProtocol_TwoWayAnonComposedWithError_Result(fpromise::error_result<uint32_t>&& result) {
+      set_err(std::move(result.error));
+  }
   ComposedProtocol_TwoWayAnonComposedWithError_Result(fpromise::result<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Response, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -732,10 +738,6 @@ class ComposedProtocol_TwoWayAnonComposedWithError_Result final {
       set_err(result.take_error());
     }
   }
-  ComposedProtocol_TwoWayAnonComposedWithError_Result(fpromise::ok_result<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Response>&& result)
-    : ComposedProtocol_TwoWayAnonComposedWithError_Result(fpromise::result<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Response, uint32_t>(std::move(result))) { }
-  ComposedProtocol_TwoWayAnonComposedWithError_Result(fpromise::error_result<uint32_t>&& result)
-    : ComposedProtocol_TwoWayAnonComposedWithError_Result(fpromise::result<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Response, uint32_t>(std::move(result))) { }
   operator fpromise::result<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Response, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());
@@ -990,6 +992,12 @@ class ComposedProtocol_OnAnonComposedWithError_Result final {
   }
 
   friend ::fidl::Equality<::test::protocollayoutssamelibrary::ComposedProtocol_OnAnonComposedWithError_Result>;
+  ComposedProtocol_OnAnonComposedWithError_Result(fpromise::ok_result<::test::protocollayoutssamelibrary::ComposedProtocol_OnAnonComposedWithError_Response>&& result) {
+    set_response(::test::protocollayoutssamelibrary::ComposedProtocol_OnAnonComposedWithError_Response{std::move(result.value)});
+  }
+  ComposedProtocol_OnAnonComposedWithError_Result(fpromise::error_result<uint32_t>&& result) {
+      set_err(std::move(result.error));
+  }
   ComposedProtocol_OnAnonComposedWithError_Result(fpromise::result<::test::protocollayoutssamelibrary::ComposedProtocol_OnAnonComposedWithError_Response, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -998,10 +1006,6 @@ class ComposedProtocol_OnAnonComposedWithError_Result final {
       set_err(result.take_error());
     }
   }
-  ComposedProtocol_OnAnonComposedWithError_Result(fpromise::ok_result<::test::protocollayoutssamelibrary::ComposedProtocol_OnAnonComposedWithError_Response>&& result)
-    : ComposedProtocol_OnAnonComposedWithError_Result(fpromise::result<::test::protocollayoutssamelibrary::ComposedProtocol_OnAnonComposedWithError_Response, uint32_t>(std::move(result))) { }
-  ComposedProtocol_OnAnonComposedWithError_Result(fpromise::error_result<uint32_t>&& result)
-    : ComposedProtocol_OnAnonComposedWithError_Result(fpromise::result<::test::protocollayoutssamelibrary::ComposedProtocol_OnAnonComposedWithError_Response, uint32_t>(std::move(result))) { }
   operator fpromise::result<::test::protocollayoutssamelibrary::ComposedProtocol_OnAnonComposedWithError_Response, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());
@@ -1101,6 +1105,12 @@ class ComposedProtocol_TwoWayNamedComposedWithError_Result final {
   }
 
   friend ::fidl::Equality<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result>;
+  ComposedProtocol_TwoWayNamedComposedWithError_Result(fpromise::ok_result<::test::protocollayoutssamelibrary::UnionPayload>&& result) {
+    set_response(::test::protocollayoutssamelibrary::UnionPayload{std::move(result.value)});
+  }
+  ComposedProtocol_TwoWayNamedComposedWithError_Result(fpromise::error_result<uint32_t>&& result) {
+      set_err(std::move(result.error));
+  }
   ComposedProtocol_TwoWayNamedComposedWithError_Result(fpromise::result<::test::protocollayoutssamelibrary::UnionPayload, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -1109,10 +1119,6 @@ class ComposedProtocol_TwoWayNamedComposedWithError_Result final {
       set_err(result.take_error());
     }
   }
-  ComposedProtocol_TwoWayNamedComposedWithError_Result(fpromise::ok_result<::test::protocollayoutssamelibrary::UnionPayload>&& result)
-    : ComposedProtocol_TwoWayNamedComposedWithError_Result(fpromise::result<::test::protocollayoutssamelibrary::UnionPayload, uint32_t>(std::move(result))) { }
-  ComposedProtocol_TwoWayNamedComposedWithError_Result(fpromise::error_result<uint32_t>&& result)
-    : ComposedProtocol_TwoWayNamedComposedWithError_Result(fpromise::result<::test::protocollayoutssamelibrary::UnionPayload, uint32_t>(std::move(result))) { }
   operator fpromise::result<::test::protocollayoutssamelibrary::UnionPayload, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());
@@ -1212,6 +1218,12 @@ class ComposedProtocol_OnNamedComposedWithError_Result final {
   }
 
   friend ::fidl::Equality<::test::protocollayoutssamelibrary::ComposedProtocol_OnNamedComposedWithError_Result>;
+  ComposedProtocol_OnNamedComposedWithError_Result(fpromise::ok_result<::test::protocollayoutssamelibrary::TablePayload>&& result) {
+    set_response(::test::protocollayoutssamelibrary::TablePayload{std::move(result.value)});
+  }
+  ComposedProtocol_OnNamedComposedWithError_Result(fpromise::error_result<uint32_t>&& result) {
+      set_err(std::move(result.error));
+  }
   ComposedProtocol_OnNamedComposedWithError_Result(fpromise::result<::test::protocollayoutssamelibrary::TablePayload, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -1220,10 +1232,6 @@ class ComposedProtocol_OnNamedComposedWithError_Result final {
       set_err(result.take_error());
     }
   }
-  ComposedProtocol_OnNamedComposedWithError_Result(fpromise::ok_result<::test::protocollayoutssamelibrary::TablePayload>&& result)
-    : ComposedProtocol_OnNamedComposedWithError_Result(fpromise::result<::test::protocollayoutssamelibrary::TablePayload, uint32_t>(std::move(result))) { }
-  ComposedProtocol_OnNamedComposedWithError_Result(fpromise::error_result<uint32_t>&& result)
-    : ComposedProtocol_OnNamedComposedWithError_Result(fpromise::result<::test::protocollayoutssamelibrary::TablePayload, uint32_t>(std::move(result))) { }
   operator fpromise::result<::test::protocollayoutssamelibrary::TablePayload, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());
@@ -1471,6 +1479,12 @@ class MainProtocol_TwoWayLocalWithError_Result final {
   }
 
   friend ::fidl::Equality<::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result>;
+  MainProtocol_TwoWayLocalWithError_Result(fpromise::ok_result<::test::protocollayoutssamelibrary::UnionPayload>&& result) {
+    set_response(::test::protocollayoutssamelibrary::UnionPayload{std::move(result.value)});
+  }
+  MainProtocol_TwoWayLocalWithError_Result(fpromise::error_result<uint32_t>&& result) {
+      set_err(std::move(result.error));
+  }
   MainProtocol_TwoWayLocalWithError_Result(fpromise::result<::test::protocollayoutssamelibrary::UnionPayload, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -1479,10 +1493,6 @@ class MainProtocol_TwoWayLocalWithError_Result final {
       set_err(result.take_error());
     }
   }
-  MainProtocol_TwoWayLocalWithError_Result(fpromise::ok_result<::test::protocollayoutssamelibrary::UnionPayload>&& result)
-    : MainProtocol_TwoWayLocalWithError_Result(fpromise::result<::test::protocollayoutssamelibrary::UnionPayload, uint32_t>(std::move(result))) { }
-  MainProtocol_TwoWayLocalWithError_Result(fpromise::error_result<uint32_t>&& result)
-    : MainProtocol_TwoWayLocalWithError_Result(fpromise::result<::test::protocollayoutssamelibrary::UnionPayload, uint32_t>(std::move(result))) { }
   operator fpromise::result<::test::protocollayoutssamelibrary::UnionPayload, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());
@@ -1582,6 +1592,12 @@ class MainProtocol_OnLocalWithError_Result final {
   }
 
   friend ::fidl::Equality<::test::protocollayoutssamelibrary::MainProtocol_OnLocalWithError_Result>;
+  MainProtocol_OnLocalWithError_Result(fpromise::ok_result<::test::protocollayoutssamelibrary::TablePayload>&& result) {
+    set_response(::test::protocollayoutssamelibrary::TablePayload{std::move(result.value)});
+  }
+  MainProtocol_OnLocalWithError_Result(fpromise::error_result<uint32_t>&& result) {
+      set_err(std::move(result.error));
+  }
   MainProtocol_OnLocalWithError_Result(fpromise::result<::test::protocollayoutssamelibrary::TablePayload, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -1590,10 +1606,6 @@ class MainProtocol_OnLocalWithError_Result final {
       set_err(result.take_error());
     }
   }
-  MainProtocol_OnLocalWithError_Result(fpromise::ok_result<::test::protocollayoutssamelibrary::TablePayload>&& result)
-    : MainProtocol_OnLocalWithError_Result(fpromise::result<::test::protocollayoutssamelibrary::TablePayload, uint32_t>(std::move(result))) { }
-  MainProtocol_OnLocalWithError_Result(fpromise::error_result<uint32_t>&& result)
-    : MainProtocol_OnLocalWithError_Result(fpromise::result<::test::protocollayoutssamelibrary::TablePayload, uint32_t>(std::move(result))) { }
   operator fpromise::result<::test::protocollayoutssamelibrary::TablePayload, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());
@@ -2112,6 +2124,12 @@ class MainProtocol_TwoWayAnonWithError_Result final {
   }
 
   friend ::fidl::Equality<::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result>;
+  MainProtocol_TwoWayAnonWithError_Result(fpromise::ok_result<::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response>&& result) {
+    set_response(::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response{std::move(result.value)});
+  }
+  MainProtocol_TwoWayAnonWithError_Result(fpromise::error_result<uint32_t>&& result) {
+      set_err(std::move(result.error));
+  }
   MainProtocol_TwoWayAnonWithError_Result(fpromise::result<::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -2120,10 +2138,6 @@ class MainProtocol_TwoWayAnonWithError_Result final {
       set_err(result.take_error());
     }
   }
-  MainProtocol_TwoWayAnonWithError_Result(fpromise::ok_result<::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response>&& result)
-    : MainProtocol_TwoWayAnonWithError_Result(fpromise::result<::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response, uint32_t>(std::move(result))) { }
-  MainProtocol_TwoWayAnonWithError_Result(fpromise::error_result<uint32_t>&& result)
-    : MainProtocol_TwoWayAnonWithError_Result(fpromise::result<::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response, uint32_t>(std::move(result))) { }
   operator fpromise::result<::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());
@@ -2393,6 +2407,12 @@ class MainProtocol_OnAnonWithError_Result final {
   }
 
   friend ::fidl::Equality<::test::protocollayoutssamelibrary::MainProtocol_OnAnonWithError_Result>;
+  MainProtocol_OnAnonWithError_Result(fpromise::ok_result<::test::protocollayoutssamelibrary::MainProtocol_OnAnonWithError_Response>&& result) {
+    set_response(::test::protocollayoutssamelibrary::MainProtocol_OnAnonWithError_Response{std::move(result.value)});
+  }
+  MainProtocol_OnAnonWithError_Result(fpromise::error_result<uint32_t>&& result) {
+      set_err(std::move(result.error));
+  }
   MainProtocol_OnAnonWithError_Result(fpromise::result<::test::protocollayoutssamelibrary::MainProtocol_OnAnonWithError_Response, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -2401,10 +2421,6 @@ class MainProtocol_OnAnonWithError_Result final {
       set_err(result.take_error());
     }
   }
-  MainProtocol_OnAnonWithError_Result(fpromise::ok_result<::test::protocollayoutssamelibrary::MainProtocol_OnAnonWithError_Response>&& result)
-    : MainProtocol_OnAnonWithError_Result(fpromise::result<::test::protocollayoutssamelibrary::MainProtocol_OnAnonWithError_Response, uint32_t>(std::move(result))) { }
-  MainProtocol_OnAnonWithError_Result(fpromise::error_result<uint32_t>&& result)
-    : MainProtocol_OnAnonWithError_Result(fpromise::result<::test::protocollayoutssamelibrary::MainProtocol_OnAnonWithError_Response, uint32_t>(std::move(result))) { }
   operator fpromise::result<::test::protocollayoutssamelibrary::MainProtocol_OnAnonWithError_Response, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());

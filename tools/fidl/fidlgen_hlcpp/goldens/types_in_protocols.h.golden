@@ -1102,6 +1102,12 @@ class Protocol_ErrorBasic_Result final {
   }
 
   friend ::fidl::Equality<::test::typesinprotocols::Protocol_ErrorBasic_Result>;
+  Protocol_ErrorBasic_Result(fpromise::ok_result<::std::tuple<uint8_t, uint16_t, uint32_t, uint64_t, int8_t, int16_t, int32_t, int64_t, float, double, ::std::string, ::fidl::StringPtr>>&& result) {
+    set_response(::test::typesinprotocols::Basic{std::move(result.value)});
+  }
+  Protocol_ErrorBasic_Result(fpromise::error_result<uint32_t>&& result) {
+      set_err(std::move(result.error));
+  }
   Protocol_ErrorBasic_Result(fpromise::result<::std::tuple<uint8_t, uint16_t, uint32_t, uint64_t, int8_t, int16_t, int32_t, int64_t, float, double, ::std::string, ::fidl::StringPtr>, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -1110,10 +1116,6 @@ class Protocol_ErrorBasic_Result final {
       set_err(result.take_error());
     }
   }
-  Protocol_ErrorBasic_Result(fpromise::ok_result<::std::tuple<uint8_t, uint16_t, uint32_t, uint64_t, int8_t, int16_t, int32_t, int64_t, float, double, ::std::string, ::fidl::StringPtr>>&& result)
-    : Protocol_ErrorBasic_Result(fpromise::result<::std::tuple<uint8_t, uint16_t, uint32_t, uint64_t, int8_t, int16_t, int32_t, int64_t, float, double, ::std::string, ::fidl::StringPtr>, uint32_t>(std::move(result))) { }
-  Protocol_ErrorBasic_Result(fpromise::error_result<uint32_t>&& result)
-    : Protocol_ErrorBasic_Result(fpromise::result<::std::tuple<uint8_t, uint16_t, uint32_t, uint64_t, int8_t, int16_t, int32_t, int64_t, float, double, ::std::string, ::fidl::StringPtr>, uint32_t>(std::move(result))) { }
   operator fpromise::result<::std::tuple<uint8_t, uint16_t, uint32_t, uint64_t, int8_t, int16_t, int32_t, int64_t, float, double, ::std::string, ::fidl::StringPtr>, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());
@@ -1212,6 +1214,12 @@ class Protocol_ErrorCompound_Result final {
   }
 
   friend ::fidl::Equality<::test::typesinprotocols::Protocol_ErrorCompound_Result>;
+  Protocol_ErrorCompound_Result(fpromise::ok_result<::std::tuple<::test::typesinprotocols::Bits, ::test::typesinprotocols::Enum, ::test::typesinprotocols::Struct, ::test::typesinprotocols::Table, ::test::typesinprotocols::Union, ::std::unique_ptr<::test::typesinprotocols::Struct>, ::std::unique_ptr<::test::typesinprotocols::Union>>>&& result) {
+    set_response(::test::typesinprotocols::Compound{std::move(result.value)});
+  }
+  Protocol_ErrorCompound_Result(fpromise::error_result<uint32_t>&& result) {
+      set_err(std::move(result.error));
+  }
   Protocol_ErrorCompound_Result(fpromise::result<::std::tuple<::test::typesinprotocols::Bits, ::test::typesinprotocols::Enum, ::test::typesinprotocols::Struct, ::test::typesinprotocols::Table, ::test::typesinprotocols::Union, ::std::unique_ptr<::test::typesinprotocols::Struct>, ::std::unique_ptr<::test::typesinprotocols::Union>>, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -1220,10 +1228,6 @@ class Protocol_ErrorCompound_Result final {
       set_err(result.take_error());
     }
   }
-  Protocol_ErrorCompound_Result(fpromise::ok_result<::std::tuple<::test::typesinprotocols::Bits, ::test::typesinprotocols::Enum, ::test::typesinprotocols::Struct, ::test::typesinprotocols::Table, ::test::typesinprotocols::Union, ::std::unique_ptr<::test::typesinprotocols::Struct>, ::std::unique_ptr<::test::typesinprotocols::Union>>>&& result)
-    : Protocol_ErrorCompound_Result(fpromise::result<::std::tuple<::test::typesinprotocols::Bits, ::test::typesinprotocols::Enum, ::test::typesinprotocols::Struct, ::test::typesinprotocols::Table, ::test::typesinprotocols::Union, ::std::unique_ptr<::test::typesinprotocols::Struct>, ::std::unique_ptr<::test::typesinprotocols::Union>>, uint32_t>(std::move(result))) { }
-  Protocol_ErrorCompound_Result(fpromise::error_result<uint32_t>&& result)
-    : Protocol_ErrorCompound_Result(fpromise::result<::std::tuple<::test::typesinprotocols::Bits, ::test::typesinprotocols::Enum, ::test::typesinprotocols::Struct, ::test::typesinprotocols::Table, ::test::typesinprotocols::Union, ::std::unique_ptr<::test::typesinprotocols::Struct>, ::std::unique_ptr<::test::typesinprotocols::Union>>, uint32_t>(std::move(result))) { }
   operator fpromise::result<::std::tuple<::test::typesinprotocols::Bits, ::test::typesinprotocols::Enum, ::test::typesinprotocols::Struct, ::test::typesinprotocols::Table, ::test::typesinprotocols::Union, ::std::unique_ptr<::test::typesinprotocols::Struct>, ::std::unique_ptr<::test::typesinprotocols::Union>>, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());
@@ -1322,6 +1326,12 @@ class Protocol_ErrorArrayBasic_Result final {
   }
 
   friend ::fidl::Equality<::test::typesinprotocols::Protocol_ErrorArrayBasic_Result>;
+  Protocol_ErrorArrayBasic_Result(fpromise::ok_result<::std::tuple<::std::array<uint8_t, 5>, ::std::array<uint16_t, 5>, ::std::array<uint32_t, 5>, ::std::array<uint64_t, 5>, ::std::array<int8_t, 5>, ::std::array<int16_t, 5>, ::std::array<int32_t, 5>, ::std::array<int64_t, 5>, ::std::array<float, 5>, ::std::array<double, 5>, ::std::array<::std::string, 5>, ::std::array<::fidl::StringPtr, 5>>>&& result) {
+    set_response(::test::typesinprotocols::ArrayBasic{std::move(result.value)});
+  }
+  Protocol_ErrorArrayBasic_Result(fpromise::error_result<uint32_t>&& result) {
+      set_err(std::move(result.error));
+  }
   Protocol_ErrorArrayBasic_Result(fpromise::result<::std::tuple<::std::array<uint8_t, 5>, ::std::array<uint16_t, 5>, ::std::array<uint32_t, 5>, ::std::array<uint64_t, 5>, ::std::array<int8_t, 5>, ::std::array<int16_t, 5>, ::std::array<int32_t, 5>, ::std::array<int64_t, 5>, ::std::array<float, 5>, ::std::array<double, 5>, ::std::array<::std::string, 5>, ::std::array<::fidl::StringPtr, 5>>, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -1330,10 +1340,6 @@ class Protocol_ErrorArrayBasic_Result final {
       set_err(result.take_error());
     }
   }
-  Protocol_ErrorArrayBasic_Result(fpromise::ok_result<::std::tuple<::std::array<uint8_t, 5>, ::std::array<uint16_t, 5>, ::std::array<uint32_t, 5>, ::std::array<uint64_t, 5>, ::std::array<int8_t, 5>, ::std::array<int16_t, 5>, ::std::array<int32_t, 5>, ::std::array<int64_t, 5>, ::std::array<float, 5>, ::std::array<double, 5>, ::std::array<::std::string, 5>, ::std::array<::fidl::StringPtr, 5>>>&& result)
-    : Protocol_ErrorArrayBasic_Result(fpromise::result<::std::tuple<::std::array<uint8_t, 5>, ::std::array<uint16_t, 5>, ::std::array<uint32_t, 5>, ::std::array<uint64_t, 5>, ::std::array<int8_t, 5>, ::std::array<int16_t, 5>, ::std::array<int32_t, 5>, ::std::array<int64_t, 5>, ::std::array<float, 5>, ::std::array<double, 5>, ::std::array<::std::string, 5>, ::std::array<::fidl::StringPtr, 5>>, uint32_t>(std::move(result))) { }
-  Protocol_ErrorArrayBasic_Result(fpromise::error_result<uint32_t>&& result)
-    : Protocol_ErrorArrayBasic_Result(fpromise::result<::std::tuple<::std::array<uint8_t, 5>, ::std::array<uint16_t, 5>, ::std::array<uint32_t, 5>, ::std::array<uint64_t, 5>, ::std::array<int8_t, 5>, ::std::array<int16_t, 5>, ::std::array<int32_t, 5>, ::std::array<int64_t, 5>, ::std::array<float, 5>, ::std::array<double, 5>, ::std::array<::std::string, 5>, ::std::array<::fidl::StringPtr, 5>>, uint32_t>(std::move(result))) { }
   operator fpromise::result<::std::tuple<::std::array<uint8_t, 5>, ::std::array<uint16_t, 5>, ::std::array<uint32_t, 5>, ::std::array<uint64_t, 5>, ::std::array<int8_t, 5>, ::std::array<int16_t, 5>, ::std::array<int32_t, 5>, ::std::array<int64_t, 5>, ::std::array<float, 5>, ::std::array<double, 5>, ::std::array<::std::string, 5>, ::std::array<::fidl::StringPtr, 5>>, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());
@@ -1432,6 +1438,12 @@ class Protocol_ErrorArrayCompound_Result final {
   }
 
   friend ::fidl::Equality<::test::typesinprotocols::Protocol_ErrorArrayCompound_Result>;
+  Protocol_ErrorArrayCompound_Result(fpromise::ok_result<::std::tuple<::std::array<::test::typesinprotocols::Bits, 5>, ::std::array<::test::typesinprotocols::Enum, 5>, ::std::array<::test::typesinprotocols::Struct, 5>, ::std::array<::test::typesinprotocols::Table, 5>, ::std::array<::test::typesinprotocols::Union, 5>, ::std::array<::std::unique_ptr<::test::typesinprotocols::Struct>, 5>, ::std::array<::std::unique_ptr<::test::typesinprotocols::Union>, 5>>>&& result) {
+    set_response(::test::typesinprotocols::ArrayCompound{std::move(result.value)});
+  }
+  Protocol_ErrorArrayCompound_Result(fpromise::error_result<uint32_t>&& result) {
+      set_err(std::move(result.error));
+  }
   Protocol_ErrorArrayCompound_Result(fpromise::result<::std::tuple<::std::array<::test::typesinprotocols::Bits, 5>, ::std::array<::test::typesinprotocols::Enum, 5>, ::std::array<::test::typesinprotocols::Struct, 5>, ::std::array<::test::typesinprotocols::Table, 5>, ::std::array<::test::typesinprotocols::Union, 5>, ::std::array<::std::unique_ptr<::test::typesinprotocols::Struct>, 5>, ::std::array<::std::unique_ptr<::test::typesinprotocols::Union>, 5>>, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -1440,10 +1452,6 @@ class Protocol_ErrorArrayCompound_Result final {
       set_err(result.take_error());
     }
   }
-  Protocol_ErrorArrayCompound_Result(fpromise::ok_result<::std::tuple<::std::array<::test::typesinprotocols::Bits, 5>, ::std::array<::test::typesinprotocols::Enum, 5>, ::std::array<::test::typesinprotocols::Struct, 5>, ::std::array<::test::typesinprotocols::Table, 5>, ::std::array<::test::typesinprotocols::Union, 5>, ::std::array<::std::unique_ptr<::test::typesinprotocols::Struct>, 5>, ::std::array<::std::unique_ptr<::test::typesinprotocols::Union>, 5>>>&& result)
-    : Protocol_ErrorArrayCompound_Result(fpromise::result<::std::tuple<::std::array<::test::typesinprotocols::Bits, 5>, ::std::array<::test::typesinprotocols::Enum, 5>, ::std::array<::test::typesinprotocols::Struct, 5>, ::std::array<::test::typesinprotocols::Table, 5>, ::std::array<::test::typesinprotocols::Union, 5>, ::std::array<::std::unique_ptr<::test::typesinprotocols::Struct>, 5>, ::std::array<::std::unique_ptr<::test::typesinprotocols::Union>, 5>>, uint32_t>(std::move(result))) { }
-  Protocol_ErrorArrayCompound_Result(fpromise::error_result<uint32_t>&& result)
-    : Protocol_ErrorArrayCompound_Result(fpromise::result<::std::tuple<::std::array<::test::typesinprotocols::Bits, 5>, ::std::array<::test::typesinprotocols::Enum, 5>, ::std::array<::test::typesinprotocols::Struct, 5>, ::std::array<::test::typesinprotocols::Table, 5>, ::std::array<::test::typesinprotocols::Union, 5>, ::std::array<::std::unique_ptr<::test::typesinprotocols::Struct>, 5>, ::std::array<::std::unique_ptr<::test::typesinprotocols::Union>, 5>>, uint32_t>(std::move(result))) { }
   operator fpromise::result<::std::tuple<::std::array<::test::typesinprotocols::Bits, 5>, ::std::array<::test::typesinprotocols::Enum, 5>, ::std::array<::test::typesinprotocols::Struct, 5>, ::std::array<::test::typesinprotocols::Table, 5>, ::std::array<::test::typesinprotocols::Union, 5>, ::std::array<::std::unique_ptr<::test::typesinprotocols::Struct>, 5>, ::std::array<::std::unique_ptr<::test::typesinprotocols::Union>, 5>>, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());
@@ -1542,6 +1550,12 @@ class Protocol_ErrorVectorBasic_Result final {
   }
 
   friend ::fidl::Equality<::test::typesinprotocols::Protocol_ErrorVectorBasic_Result>;
+  Protocol_ErrorVectorBasic_Result(fpromise::ok_result<::std::tuple<::std::vector<uint8_t>, ::std::vector<uint16_t>, ::std::vector<uint32_t>, ::std::vector<uint64_t>, ::std::vector<int8_t>, ::std::vector<int16_t>, ::std::vector<int32_t>, ::std::vector<int64_t>, ::std::vector<float>, ::std::vector<double>, ::std::vector<::std::string>, ::std::vector<::fidl::StringPtr>>>&& result) {
+    set_response(::test::typesinprotocols::VectorBasic{std::move(result.value)});
+  }
+  Protocol_ErrorVectorBasic_Result(fpromise::error_result<uint32_t>&& result) {
+      set_err(std::move(result.error));
+  }
   Protocol_ErrorVectorBasic_Result(fpromise::result<::std::tuple<::std::vector<uint8_t>, ::std::vector<uint16_t>, ::std::vector<uint32_t>, ::std::vector<uint64_t>, ::std::vector<int8_t>, ::std::vector<int16_t>, ::std::vector<int32_t>, ::std::vector<int64_t>, ::std::vector<float>, ::std::vector<double>, ::std::vector<::std::string>, ::std::vector<::fidl::StringPtr>>, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -1550,10 +1564,6 @@ class Protocol_ErrorVectorBasic_Result final {
       set_err(result.take_error());
     }
   }
-  Protocol_ErrorVectorBasic_Result(fpromise::ok_result<::std::tuple<::std::vector<uint8_t>, ::std::vector<uint16_t>, ::std::vector<uint32_t>, ::std::vector<uint64_t>, ::std::vector<int8_t>, ::std::vector<int16_t>, ::std::vector<int32_t>, ::std::vector<int64_t>, ::std::vector<float>, ::std::vector<double>, ::std::vector<::std::string>, ::std::vector<::fidl::StringPtr>>>&& result)
-    : Protocol_ErrorVectorBasic_Result(fpromise::result<::std::tuple<::std::vector<uint8_t>, ::std::vector<uint16_t>, ::std::vector<uint32_t>, ::std::vector<uint64_t>, ::std::vector<int8_t>, ::std::vector<int16_t>, ::std::vector<int32_t>, ::std::vector<int64_t>, ::std::vector<float>, ::std::vector<double>, ::std::vector<::std::string>, ::std::vector<::fidl::StringPtr>>, uint32_t>(std::move(result))) { }
-  Protocol_ErrorVectorBasic_Result(fpromise::error_result<uint32_t>&& result)
-    : Protocol_ErrorVectorBasic_Result(fpromise::result<::std::tuple<::std::vector<uint8_t>, ::std::vector<uint16_t>, ::std::vector<uint32_t>, ::std::vector<uint64_t>, ::std::vector<int8_t>, ::std::vector<int16_t>, ::std::vector<int32_t>, ::std::vector<int64_t>, ::std::vector<float>, ::std::vector<double>, ::std::vector<::std::string>, ::std::vector<::fidl::StringPtr>>, uint32_t>(std::move(result))) { }
   operator fpromise::result<::std::tuple<::std::vector<uint8_t>, ::std::vector<uint16_t>, ::std::vector<uint32_t>, ::std::vector<uint64_t>, ::std::vector<int8_t>, ::std::vector<int16_t>, ::std::vector<int32_t>, ::std::vector<int64_t>, ::std::vector<float>, ::std::vector<double>, ::std::vector<::std::string>, ::std::vector<::fidl::StringPtr>>, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());
@@ -1652,6 +1662,12 @@ class Protocol_ErrorVectorCompound_Result final {
   }
 
   friend ::fidl::Equality<::test::typesinprotocols::Protocol_ErrorVectorCompound_Result>;
+  Protocol_ErrorVectorCompound_Result(fpromise::ok_result<::std::tuple<::std::vector<::test::typesinprotocols::Bits>, ::std::vector<::test::typesinprotocols::Enum>, ::std::vector<::test::typesinprotocols::Struct>, ::std::vector<::test::typesinprotocols::Table>, ::std::vector<::test::typesinprotocols::Union>, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>>, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>>>>&& result) {
+    set_response(::test::typesinprotocols::VectorCompound{std::move(result.value)});
+  }
+  Protocol_ErrorVectorCompound_Result(fpromise::error_result<uint32_t>&& result) {
+      set_err(std::move(result.error));
+  }
   Protocol_ErrorVectorCompound_Result(fpromise::result<::std::tuple<::std::vector<::test::typesinprotocols::Bits>, ::std::vector<::test::typesinprotocols::Enum>, ::std::vector<::test::typesinprotocols::Struct>, ::std::vector<::test::typesinprotocols::Table>, ::std::vector<::test::typesinprotocols::Union>, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>>, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>>>, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -1660,10 +1676,6 @@ class Protocol_ErrorVectorCompound_Result final {
       set_err(result.take_error());
     }
   }
-  Protocol_ErrorVectorCompound_Result(fpromise::ok_result<::std::tuple<::std::vector<::test::typesinprotocols::Bits>, ::std::vector<::test::typesinprotocols::Enum>, ::std::vector<::test::typesinprotocols::Struct>, ::std::vector<::test::typesinprotocols::Table>, ::std::vector<::test::typesinprotocols::Union>, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>>, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>>>>&& result)
-    : Protocol_ErrorVectorCompound_Result(fpromise::result<::std::tuple<::std::vector<::test::typesinprotocols::Bits>, ::std::vector<::test::typesinprotocols::Enum>, ::std::vector<::test::typesinprotocols::Struct>, ::std::vector<::test::typesinprotocols::Table>, ::std::vector<::test::typesinprotocols::Union>, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>>, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>>>, uint32_t>(std::move(result))) { }
-  Protocol_ErrorVectorCompound_Result(fpromise::error_result<uint32_t>&& result)
-    : Protocol_ErrorVectorCompound_Result(fpromise::result<::std::tuple<::std::vector<::test::typesinprotocols::Bits>, ::std::vector<::test::typesinprotocols::Enum>, ::std::vector<::test::typesinprotocols::Struct>, ::std::vector<::test::typesinprotocols::Table>, ::std::vector<::test::typesinprotocols::Union>, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>>, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>>>, uint32_t>(std::move(result))) { }
   operator fpromise::result<::std::tuple<::std::vector<::test::typesinprotocols::Bits>, ::std::vector<::test::typesinprotocols::Enum>, ::std::vector<::test::typesinprotocols::Struct>, ::std::vector<::test::typesinprotocols::Table>, ::std::vector<::test::typesinprotocols::Union>, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>>, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>>>, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());
@@ -1762,6 +1774,12 @@ class Protocol_ErrorVectorOptional_Result final {
   }
 
   friend ::fidl::Equality<::test::typesinprotocols::Protocol_ErrorVectorOptional_Result>;
+  Protocol_ErrorVectorOptional_Result(fpromise::ok_result<::std::tuple<::fidl::VectorPtr<uint8_t>, ::fidl::VectorPtr<::std::string>, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>>&& result) {
+    set_response(::test::typesinprotocols::VectorOptional{std::move(result.value)});
+  }
+  Protocol_ErrorVectorOptional_Result(fpromise::error_result<uint32_t>&& result) {
+      set_err(std::move(result.error));
+  }
   Protocol_ErrorVectorOptional_Result(fpromise::result<::std::tuple<::fidl::VectorPtr<uint8_t>, ::fidl::VectorPtr<::std::string>, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -1770,10 +1788,6 @@ class Protocol_ErrorVectorOptional_Result final {
       set_err(result.take_error());
     }
   }
-  Protocol_ErrorVectorOptional_Result(fpromise::ok_result<::std::tuple<::fidl::VectorPtr<uint8_t>, ::fidl::VectorPtr<::std::string>, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>>&& result)
-    : Protocol_ErrorVectorOptional_Result(fpromise::result<::std::tuple<::fidl::VectorPtr<uint8_t>, ::fidl::VectorPtr<::std::string>, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>, uint32_t>(std::move(result))) { }
-  Protocol_ErrorVectorOptional_Result(fpromise::error_result<uint32_t>&& result)
-    : Protocol_ErrorVectorOptional_Result(fpromise::result<::std::tuple<::fidl::VectorPtr<uint8_t>, ::fidl::VectorPtr<::std::string>, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>, uint32_t>(std::move(result))) { }
   operator fpromise::result<::std::tuple<::fidl::VectorPtr<uint8_t>, ::fidl::VectorPtr<::std::string>, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());
@@ -1872,6 +1886,12 @@ class Protocol_ErrorArrayVectorNested_Result final {
   }
 
   friend ::fidl::Equality<::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result>;
+  Protocol_ErrorArrayVectorNested_Result(fpromise::ok_result<::std::tuple<::std::array<::std::array<uint8_t, 5>, 5>, ::std::array<::std::vector<uint8_t>, 5>, ::std::vector<::std::array<uint8_t, 5>>, ::std::vector<::std::vector<uint8_t>>>>&& result) {
+    set_response(::test::typesinprotocols::ArrayVectorNested{std::move(result.value)});
+  }
+  Protocol_ErrorArrayVectorNested_Result(fpromise::error_result<uint32_t>&& result) {
+      set_err(std::move(result.error));
+  }
   Protocol_ErrorArrayVectorNested_Result(fpromise::result<::std::tuple<::std::array<::std::array<uint8_t, 5>, 5>, ::std::array<::std::vector<uint8_t>, 5>, ::std::vector<::std::array<uint8_t, 5>>, ::std::vector<::std::vector<uint8_t>>>, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -1880,10 +1900,6 @@ class Protocol_ErrorArrayVectorNested_Result final {
       set_err(result.take_error());
     }
   }
-  Protocol_ErrorArrayVectorNested_Result(fpromise::ok_result<::std::tuple<::std::array<::std::array<uint8_t, 5>, 5>, ::std::array<::std::vector<uint8_t>, 5>, ::std::vector<::std::array<uint8_t, 5>>, ::std::vector<::std::vector<uint8_t>>>>&& result)
-    : Protocol_ErrorArrayVectorNested_Result(fpromise::result<::std::tuple<::std::array<::std::array<uint8_t, 5>, 5>, ::std::array<::std::vector<uint8_t>, 5>, ::std::vector<::std::array<uint8_t, 5>>, ::std::vector<::std::vector<uint8_t>>>, uint32_t>(std::move(result))) { }
-  Protocol_ErrorArrayVectorNested_Result(fpromise::error_result<uint32_t>&& result)
-    : Protocol_ErrorArrayVectorNested_Result(fpromise::result<::std::tuple<::std::array<::std::array<uint8_t, 5>, 5>, ::std::array<::std::vector<uint8_t>, 5>, ::std::vector<::std::array<uint8_t, 5>>, ::std::vector<::std::vector<uint8_t>>>, uint32_t>(std::move(result))) { }
   operator fpromise::result<::std::tuple<::std::array<::std::array<uint8_t, 5>, 5>, ::std::array<::std::vector<uint8_t>, 5>, ::std::vector<::std::array<uint8_t, 5>>, ::std::vector<::std::vector<uint8_t>>>, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());
@@ -1984,6 +2000,12 @@ class Protocol_ErrorResource_Result final {
   }
 
   friend ::fidl::Equality<::test::typesinprotocols::Protocol_ErrorResource_Result>;
+  Protocol_ErrorResource_Result(fpromise::ok_result<::std::tuple<::zx::handle, ::zx::vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, ::test::typesinprotocols::ResourceStruct, ::test::typesinprotocols::ResourceTable, ::test::typesinprotocols::ResourceUnion, ::zx::handle, ::zx::vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct>, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion>, ::std::array<::zx::handle, 5>, ::std::array<::zx::vmo, 5>, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5>, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5>, ::std::array<::test::typesinprotocols::ResourceStruct, 5>, ::std::array<::test::typesinprotocols::ResourceTable, 5>, ::std::array<::test::typesinprotocols::ResourceUnion, 5>, ::std::vector<::zx::handle>, ::std::vector<::zx::vmo>, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>, ::std::vector<::test::typesinprotocols::ResourceStruct>, ::std::vector<::test::typesinprotocols::ResourceTable>, ::std::vector<::test::typesinprotocols::ResourceUnion>>>&& result) {
+    set_response(::test::typesinprotocols::Resource{std::move(result.value)});
+  }
+  Protocol_ErrorResource_Result(fpromise::error_result<uint32_t>&& result) {
+      set_err(std::move(result.error));
+  }
   Protocol_ErrorResource_Result(fpromise::result<::std::tuple<::zx::handle, ::zx::vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, ::test::typesinprotocols::ResourceStruct, ::test::typesinprotocols::ResourceTable, ::test::typesinprotocols::ResourceUnion, ::zx::handle, ::zx::vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct>, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion>, ::std::array<::zx::handle, 5>, ::std::array<::zx::vmo, 5>, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5>, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5>, ::std::array<::test::typesinprotocols::ResourceStruct, 5>, ::std::array<::test::typesinprotocols::ResourceTable, 5>, ::std::array<::test::typesinprotocols::ResourceUnion, 5>, ::std::vector<::zx::handle>, ::std::vector<::zx::vmo>, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>, ::std::vector<::test::typesinprotocols::ResourceStruct>, ::std::vector<::test::typesinprotocols::ResourceTable>, ::std::vector<::test::typesinprotocols::ResourceUnion>>, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -1992,10 +2014,6 @@ class Protocol_ErrorResource_Result final {
       set_err(result.take_error());
     }
   }
-  Protocol_ErrorResource_Result(fpromise::ok_result<::std::tuple<::zx::handle, ::zx::vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, ::test::typesinprotocols::ResourceStruct, ::test::typesinprotocols::ResourceTable, ::test::typesinprotocols::ResourceUnion, ::zx::handle, ::zx::vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct>, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion>, ::std::array<::zx::handle, 5>, ::std::array<::zx::vmo, 5>, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5>, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5>, ::std::array<::test::typesinprotocols::ResourceStruct, 5>, ::std::array<::test::typesinprotocols::ResourceTable, 5>, ::std::array<::test::typesinprotocols::ResourceUnion, 5>, ::std::vector<::zx::handle>, ::std::vector<::zx::vmo>, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>, ::std::vector<::test::typesinprotocols::ResourceStruct>, ::std::vector<::test::typesinprotocols::ResourceTable>, ::std::vector<::test::typesinprotocols::ResourceUnion>>>&& result)
-    : Protocol_ErrorResource_Result(fpromise::result<::std::tuple<::zx::handle, ::zx::vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, ::test::typesinprotocols::ResourceStruct, ::test::typesinprotocols::ResourceTable, ::test::typesinprotocols::ResourceUnion, ::zx::handle, ::zx::vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct>, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion>, ::std::array<::zx::handle, 5>, ::std::array<::zx::vmo, 5>, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5>, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5>, ::std::array<::test::typesinprotocols::ResourceStruct, 5>, ::std::array<::test::typesinprotocols::ResourceTable, 5>, ::std::array<::test::typesinprotocols::ResourceUnion, 5>, ::std::vector<::zx::handle>, ::std::vector<::zx::vmo>, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>, ::std::vector<::test::typesinprotocols::ResourceStruct>, ::std::vector<::test::typesinprotocols::ResourceTable>, ::std::vector<::test::typesinprotocols::ResourceUnion>>, uint32_t>(std::move(result))) { }
-  Protocol_ErrorResource_Result(fpromise::error_result<uint32_t>&& result)
-    : Protocol_ErrorResource_Result(fpromise::result<::std::tuple<::zx::handle, ::zx::vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, ::test::typesinprotocols::ResourceStruct, ::test::typesinprotocols::ResourceTable, ::test::typesinprotocols::ResourceUnion, ::zx::handle, ::zx::vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct>, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion>, ::std::array<::zx::handle, 5>, ::std::array<::zx::vmo, 5>, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5>, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5>, ::std::array<::test::typesinprotocols::ResourceStruct, 5>, ::std::array<::test::typesinprotocols::ResourceTable, 5>, ::std::array<::test::typesinprotocols::ResourceUnion, 5>, ::std::vector<::zx::handle>, ::std::vector<::zx::vmo>, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>, ::std::vector<::test::typesinprotocols::ResourceStruct>, ::std::vector<::test::typesinprotocols::ResourceTable>, ::std::vector<::test::typesinprotocols::ResourceUnion>>, uint32_t>(std::move(result))) { }
   operator fpromise::result<::std::tuple<::zx::handle, ::zx::vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, ::test::typesinprotocols::ResourceStruct, ::test::typesinprotocols::ResourceTable, ::test::typesinprotocols::ResourceUnion, ::zx::handle, ::zx::vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct>, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion>, ::std::array<::zx::handle, 5>, ::std::array<::zx::vmo, 5>, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5>, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5>, ::std::array<::test::typesinprotocols::ResourceStruct, 5>, ::std::array<::test::typesinprotocols::ResourceTable, 5>, ::std::array<::test::typesinprotocols::ResourceUnion, 5>, ::std::vector<::zx::handle>, ::std::vector<::zx::vmo>, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>, ::std::vector<::test::typesinprotocols::ResourceStruct>, ::std::vector<::test::typesinprotocols::ResourceTable>, ::std::vector<::test::typesinprotocols::ResourceUnion>>, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());

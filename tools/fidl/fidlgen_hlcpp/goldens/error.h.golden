@@ -148,6 +148,12 @@ class Example_foo_Result final {
   }
 
   friend ::fidl::Equality<::test::error::Example_foo_Result>;
+  Example_foo_Result(fpromise::ok_result<int64_t>&& result) {
+    set_response(::test::error::Example_foo_Response{std::move(result.value)});
+  }
+  Example_foo_Result(fpromise::error_result<uint32_t>&& result) {
+    set_err(std::move(result.error));
+  }
   Example_foo_Result(fpromise::result<int64_t, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
@@ -156,10 +162,6 @@ class Example_foo_Result final {
       set_err(result.take_error());
     }
   }
-  Example_foo_Result(fpromise::ok_result<int64_t>&& result)
-      : Example_foo_Result(fpromise::result<int64_t, uint32_t>(std::move(result))) {}
-  Example_foo_Result(fpromise::error_result<uint32_t>&& result)
-      : Example_foo_Result(fpromise::result<int64_t, uint32_t>(std::move(result))) {}
   operator fpromise::result<int64_t, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());
