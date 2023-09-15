@@ -44,15 +44,19 @@ where
 {
     let mut txt: Vec<(String, Vec<u8>)> = Vec::new();
 
-    let mut border_agent_state =
-        BorderAgentState::CONNECTION_MODE_PSKC | BorderAgentState::HIGH_AVAILABILITY;
+    let mut border_agent_state = BorderAgentState::HIGH_AVAILABILITY;
 
-    match ot_instance.get_device_role() {
-        ot::DeviceRole::Disabled => {}
-        ot::DeviceRole::Detached => {
-            border_agent_state |= BorderAgentState::THREAD_IF_STATUS_INITIALIZED
+    if ot_instance.border_agent_get_state() != ot::BorderAgentState::Stopped {
+        border_agent_state |= BorderAgentState::CONNECTION_MODE_PSKC;
+    }
+
+    if ot_instance.is_commissioned() {
+        match ot_instance.get_device_role() {
+            ot::DeviceRole::Disabled => {
+                border_agent_state |= BorderAgentState::THREAD_IF_STATUS_INITIALIZED
+            }
+            _ => border_agent_state |= BorderAgentState::THREAD_IF_STATUS_ACTIVE,
         }
-        _ => border_agent_state |= BorderAgentState::THREAD_IF_STATUS_ACTIVE,
     }
 
     // `rv` - Version of TXT record format.
