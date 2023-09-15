@@ -14,21 +14,29 @@ use prost::Message;
 
 use crate::{crash_reporter::ProfileReport, pprof};
 
+pub type StackTrace = Vec<u64>;
+
 /// Represents an allocation for which no deallocation has been
 /// reported.
 #[derive(Clone, Debug, PartialEq)]
 pub struct LiveAllocation {
     pub size: u64,
-    pub stack_trace: Rc<Vec<u64>>,
+    pub stack_trace: Rc<StackTrace>,
 }
 
-/// Represents an allocation for which a deallocation has been
-/// reported.
-#[derive(Clone, Debug, PartialEq)]
-pub struct DeadAllocation {
-    pub size: u64,
-    pub allocation_stack_trace: Rc<Vec<u64>>,
-    pub deallocation_stack_trace: Rc<Vec<u64>>,
+/// Aggregated counter of allocations for which a deallocation has
+/// been recorded.
+#[derive(Clone, Default, Debug)]
+pub struct DeadAllocationCounter {
+    pub total_size: u64,
+    pub count: u64,
+}
+
+/// Aggregated counter of deallocations.
+#[derive(Clone, Default, Debug)]
+pub struct DeallocationCounter {
+    pub total_size: u64,
+    pub count: u64,
 }
 
 /// Accumulator for profiling information.
@@ -36,9 +44,25 @@ pub struct DeadAllocation {
 pub struct ProfileBuilder {
     process_name: String,
     module_map: Vec<ModuleMap>,
+    /// Mapping from addresses to allocations; we assume there can
+    /// only be one live allocation at a given address. Reallocations
+    /// are recorded as a sequence of a deallocation and a new
+    /// allocation.
     live_allocations: HashMap<u64, LiveAllocation>,
-    dead_allocations: Vec<DeadAllocation>,
-    stack_traces: HashSet<Rc<Vec<u64>>>,
+    /// Mapping from a stack trace to a counter of dead
+    /// allocations. This representation aggregates allocations from
+    /// the same call site to save memory.
+    dead_allocations: HashMap<Rc<StackTrace>, DeadAllocationCounter>,
+    /// Mapping from a stack trace to a counter of deallocations. This
+    /// representation aggregates deallocations from the same call
+    /// site to save memory.
+    deallocations: HashMap<Rc<StackTrace>, DeallocationCounter>,
+    /// Set used to hold references to recorded stack traces. This can
+    /// be used to drastically reduce memory usage from allocations
+    /// from an already known call site: additional allocations would
+    /// store a reference, rather than the entire stack trace that
+    /// could be fairly large.
+    stack_traces: HashSet<Rc<StackTrace>>,
 }
 
 impl ProfileBuilder {
@@ -49,7 +73,7 @@ impl ProfileBuilder {
     }
     /// Add the given stack_trace to the cache, if needed, then return
     /// a reference to the cached value.
-    fn cache_stack_trace(&mut self, stack_trace: Vec<u64>) -> Rc<Vec<u64>> {
+    fn cache_stack_trace(&mut self, stack_trace: StackTrace) -> Rc<StackTrace> {
         // Note: `Entry` on `HashSet` would save us from cloning the
         // stack trace here.
         if !self.stack_traces.contains(&stack_trace) {
@@ -61,20 +85,26 @@ impl ProfileBuilder {
     /// deallocation for the same address has been reported. Note that
     /// this assumes that allocations and deallocations at a given
     /// address are ordered.
-    pub fn allocate(&mut self, address: u64, stack_trace: Vec<u64>, size: u64) {
+    pub fn allocate(&mut self, address: u64, stack_trace: StackTrace, size: u64) {
         let stack_trace = self.cache_stack_trace(stack_trace);
         self.live_allocations.insert(address, LiveAllocation { size, stack_trace });
     }
     /// Register a deallocation, if the corresponding allocation has
     /// been registered before.
-    pub fn deallocate(&mut self, address: u64, stack_trace: Vec<u64>) {
+    pub fn deallocate(&mut self, address: u64, stack_trace: StackTrace) {
         self.live_allocations.remove(&address).map(|allocation| {
-            let stack_trace = self.cache_stack_trace(stack_trace);
-            self.dead_allocations.push(DeadAllocation {
-                deallocation_stack_trace: stack_trace,
-                size: allocation.size,
-                allocation_stack_trace: allocation.stack_trace,
-            });
+            {
+                let dead_allocation =
+                    self.dead_allocations.entry(allocation.stack_trace).or_default();
+                dead_allocation.count += 1;
+                dead_allocation.total_size += allocation.size;
+            }
+            {
+                let stack_trace = self.cache_stack_trace(stack_trace);
+                let deallocation = self.deallocations.entry(stack_trace).or_default();
+                deallocation.count += 1;
+                deallocation.total_size += allocation.size;
+            }
         });
     }
     /// Set the process information necessary to produce a profile.
@@ -98,7 +128,8 @@ impl ProfileBuilder {
         let profile = pprof::build_profile(
             self.module_map.iter(),
             self.live_allocations.values(),
-            self.dead_allocations.iter(),
+            self.dead_allocations,
+            self.deallocations,
             &self.stack_traces,
         );
 
@@ -113,14 +144,15 @@ impl ProfileBuilder {
     /// long-lived process, while clearing from memory the state that
     /// will no longer be useful.
     pub fn build_partial_profile(&mut self, iteration: usize) -> Result<ProfileReport, Error> {
-        let dead_allocations = std::mem::replace(&mut self.dead_allocations, vec![]);
-        let profile = pprof::build_profile(
-            self.module_map.iter(),
-            self.live_allocations.values(),
-            dead_allocations.iter(),
-            &self.stack_traces,
-        );
-        drop(dead_allocations);
+        let profile = {
+            pprof::build_profile(
+                self.module_map.iter(),
+                self.live_allocations.values(),
+                std::mem::replace(&mut self.dead_allocations, HashMap::new()),
+                std::mem::replace(&mut self.deallocations, HashMap::new()),
+                &self.stack_traces,
+            )
+        };
         self.prune_cache();
 
         let (vmo, size) = profile_to_vmo(&profile)?;
@@ -140,14 +172,14 @@ fn profile_to_vmo(profile: &pprof::pproto::Profile) -> Result<(Vmo, u64), Error>
     let size = proto_profile.len() as u64;
     let vmo = Vmo::create(size)?;
     vmo.write(&proto_profile[..], 0)?;
-    Ok((vmo, size as u64))
+    Ok((vmo, size))
 }
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
-
-    use crate::profile_builder::{DeadAllocation, ModuleMap, ProfileBuilder};
+    use crate::profile_builder::{
+        DeadAllocationCounter, DeallocationCounter, ModuleMap, ProfileBuilder,
+    };
     use fidl_fuchsia_memory_sampler::ExecutableSegment;
 
     #[fuchsia::test]
@@ -174,9 +206,9 @@ mod test {
 
         builder.deallocate(address, stack_trace);
 
-        let allocations = builder.dead_allocations;
+        let deallocations = builder.deallocations;
 
-        assert_eq!(Vec::<DeadAllocation>::new(), allocations);
+        assert!(deallocations.is_empty());
     }
 
     #[fuchsia::test]
@@ -190,17 +222,30 @@ mod test {
         builder.allocate(address, allocation_stack_trace.clone(), size);
         builder.deallocate(address, deallocation_stack_trace.clone());
 
-        assert_eq!(HashMap::new(), builder.live_allocations);
-        let mut allocations = builder.dead_allocations;
-        assert_eq!(1, allocations.len());
-        let DeadAllocation {
-            size: reported_size,
-            allocation_stack_trace: reported_allocation_stack_trace,
-            deallocation_stack_trace: reported_deallocation_stack_trace,
-        } = allocations.remove(0);
-        assert_eq!(size, reported_size as u64);
-        assert_eq!(allocation_stack_trace, *(reported_allocation_stack_trace));
-        assert_eq!(deallocation_stack_trace, *(reported_deallocation_stack_trace));
+        assert!(builder.live_allocations.is_empty());
+        {
+            let allocations = builder.dead_allocations;
+            assert_eq!(1, allocations.values().len());
+            {
+                let (stack_trace, DeadAllocationCounter { count, total_size }) =
+                    allocations.into_iter().next().unwrap();
+                assert_eq!(size, total_size);
+                assert_eq!(1, count);
+                assert_eq!(allocation_stack_trace, *(stack_trace));
+            }
+        }
+
+        {
+            let deallocations = builder.deallocations;
+            assert_eq!(1, deallocations.values().len());
+            {
+                let (stack_trace, DeallocationCounter { count, total_size }) =
+                    deallocations.into_iter().next().unwrap();
+                assert_eq!(size, total_size);
+                assert_eq!(1, count);
+                assert_eq!(deallocation_stack_trace, *(stack_trace));
+            }
+        }
     }
 
     #[fuchsia::test]

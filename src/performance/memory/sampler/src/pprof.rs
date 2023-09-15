@@ -7,14 +7,6 @@
 //! This crate provides a `build_profile` function that can be used to turn
 //! profiling information gathered by `memory_sampler` into a
 //! `pprof`-compatible profile.
-//!
-//! # Examples
-//!
-//! ```
-//! use pprof;
-//!
-//! let profile = pprof::build_profile(module_map, live_allocations, dead_allocations);
-//! ```
 pub use profile_rust_proto::perfetto::third_party::perftools::profiles as pproto;
 
 use std::{
@@ -26,7 +18,9 @@ use std::{
 use fidl_fuchsia_memory_sampler::ModuleMap;
 use itertools::Itertools;
 
-use crate::profile_builder::{DeadAllocation, LiveAllocation};
+use crate::profile_builder::{
+    DeadAllocationCounter, DeallocationCounter, LiveAllocation, StackTrace,
+};
 
 /// Pprof interns most strings: it keeps a table of known strings and replaces
 /// most occurrences of strings in its data by their index. This structure
@@ -65,7 +59,7 @@ impl Mapping {
     /// Produce a collection of `pprof`'s `Mapping` for use in a
     /// profile, and an index to map an address to the corresponding
     /// mapping.
-    pub fn build<'a>(
+    fn build<'a>(
         modules: impl Iterator<Item = &'a ModuleMap>,
         st: &mut StringTable,
     ) -> (Mapping, Vec<pproto::Mapping>) {
@@ -99,7 +93,7 @@ impl Mapping {
     }
     /// Resolve an address to the corresponding mapping_id, or return
     /// 0 if not found.
-    pub fn resolve(&self, address: u64) -> u64 {
+    fn resolve(&self, address: u64) -> u64 {
         if let Some((memory_limit, (memory_start, mapping_id))) =
             self.ranges.range((Excluded(address), Unbounded)).next()
         {
@@ -117,8 +111,9 @@ impl Mapping {
 pub fn build_profile<'a>(
     modules: impl Iterator<Item = &'a ModuleMap>,
     live_allocations: impl Iterator<Item = &'a LiveAllocation>,
-    dead_allocations: impl Iterator<Item = &'a DeadAllocation>,
-    stack_traces: &'a HashSet<Rc<Vec<u64>>>,
+    dead_allocations: HashMap<Rc<StackTrace>, DeadAllocationCounter>,
+    deallocations: HashMap<Rc<StackTrace>, DeallocationCounter>,
+    stack_traces: &'a HashSet<Rc<StackTrace>>,
 ) -> pproto::Profile {
     let mut st = StringTable::new();
     let mut pprof = pproto::Profile {
@@ -163,56 +158,49 @@ pub fn build_profile<'a>(
 
     // Live allocations
     {
-        let samples = live_allocations.filter_map(|LiveAllocation { size, stack_trace: ast }| {
+        let samples = live_allocations.map(|LiveAllocation { size, stack_trace }| {
             let size = (*size) as i64;
-            Some(pproto::Sample {
+            pproto::Sample {
                 value: vec![1, size, 1, size, 0, 0],
-                location_id: ast.to_vec(),
+                location_id: stack_trace.to_vec(),
                 ..Default::default()
-            })
+            }
         });
         pprof.sample.extend(samples);
     }
-    // Dead allocations and deallocations
+    // Dead allocations
     {
-        let samples = dead_allocations
-            .filter_map(
-                |DeadAllocation {
-                     size,
-                     allocation_stack_trace: ast,
-                     deallocation_stack_trace: dst,
-                 }| {
-                    let size = *size as i64;
-                    Some(vec![
-                        // Dead allocation
-                        pproto::Sample {
-                            value: vec![0, 0, 1, size, 0, 0],
-                            location_id: ast.to_vec(),
-                            ..Default::default()
-                        },
-                        // Deallocation
-                        pproto::Sample {
-                            value: vec![0, 0, 0, 0, 1, size],
-                            location_id: dst.to_vec(),
-                            ..Default::default()
-                        },
-                    ])
-                },
-            )
-            .flatten();
+        let samples = dead_allocations.into_iter().map(
+            |(stack_trace, DeadAllocationCounter { count, total_size })| pproto::Sample {
+                value: vec![0, 0, count as i64, total_size as i64, 0, 0],
+                location_id: stack_trace.to_vec(),
+                ..Default::default()
+            },
+        );
         pprof.sample.extend(samples);
     }
 
+    // DeallocationCounters
+    {
+        let samples = deallocations.into_iter().map(
+            |(stack_trace, DeallocationCounter { count, total_size })| pproto::Sample {
+                value: vec![0, 0, 0, 0, count as i64, total_size as i64],
+                location_id: stack_trace.to_vec(),
+                ..Default::default()
+            },
+        );
+        pprof.sample.extend(samples);
+    }
     pprof.string_table = st.finalize();
     pprof
 }
 
 #[cfg(test)]
 mod test {
-    use fidl_fuchsia_memory_sampler::{ExecutableSegment, ModuleMap};
-
     use super::build_profile;
-    use crate::profile_builder::{DeadAllocation, LiveAllocation};
+    use crate::profile_builder::{DeadAllocationCounter, DeallocationCounter, LiveAllocation};
+    use fidl_fuchsia_memory_sampler::{ExecutableSegment, ModuleMap};
+    use std::collections::HashMap;
 
     mod string_table {
         use crate::pprof::StringTable;
@@ -431,16 +419,17 @@ mod test {
         ];
 
         let live_allocations = vec![LiveAllocation { size: 10, stack_trace: Default::default() }];
-        let dead_allocations = vec![DeadAllocation {
-            size: 20,
-            allocation_stack_trace: Default::default(),
-            deallocation_stack_trace: Default::default(),
-        }];
+        let mut dead_allocations = HashMap::new();
+        dead_allocations
+            .insert(Default::default(), DeadAllocationCounter { total_size: 20, count: 5 });
+        let mut deallocations = HashMap::new();
+        deallocations.insert(Default::default(), DeallocationCounter { total_size: 20, count: 12 });
 
         let profile = build_profile(
             modules.iter(),
             live_allocations.iter(),
-            dead_allocations.iter(),
+            dead_allocations.clone(),
+            deallocations.clone(),
             &Default::default(),
         );
 
@@ -457,7 +446,8 @@ mod test {
         // and one sample per deallocation. There is one allocation
         // per `live_allocations` and per `dead_allocations`, and one
         // deallocation per `dead_allocations`.
-        let allocation_count = live_allocations.len() + 2 * dead_allocations.len();
+        let allocation_count =
+            live_allocations.len() + dead_allocations.values().len() + deallocations.values().len();
         assert_eq!(allocation_count, profile.sample.len(), "Unexpected number of samples.");
 
         // Check that the number of sample value per sample matches

@@ -211,12 +211,19 @@ mod test {
         let (mut tx, mut rx) = mpsc::channel(1);
         const TEST_NAME: &str = "test process";
         let mut builder = ProfileBuilder::default();
+
+        // Pre-fill `builder` with a large number of unique dead
+        // allocations, to trigger a partial profile on the next
+        // request.
         builder.set_process_info(Some(TEST_NAME.to_string()), vec![].into_iter());
+        {
+            (0..DEAD_ALLOCATIONS_PROFILE_THRESHOLD as u64).for_each(|i| {
+                builder.allocate(i, (i..i + 4).collect(), 10);
+                builder.deallocate(i, (i..i + 4).collect());
+            });
+        }
+
         let stack_trace = StackTrace { stack_frames: Some(vec![1000, 1500]), ..Default::default() };
-        (0..DEAD_ALLOCATIONS_PROFILE_THRESHOLD as u64).for_each(|i| {
-            builder.allocate(i, stack_trace.stack_frames.clone().unwrap(), 10);
-            builder.deallocate(i, stack_trace.stack_frames.clone().unwrap());
-        });
         const TEST_INDEX: usize = 42;
         let profile_future = process_sampler_request(
             &mut builder,
