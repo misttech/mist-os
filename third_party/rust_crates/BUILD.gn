@@ -11298,22 +11298,23 @@ rust_proc_macro("thiserror-impl-v1_0_23") {
   visibility = [ ":*" ]
 }
 
-rust_library("thread_local-v1_0_1") {
+rust_library("thread_local-v1_1_7") {
   crate_name = "thread_local"
-  crate_root = "//third_party/rust_crates/vendor/thread_local-1.0.1/src/lib.rs"
-  output_name = "thread_local-c08961bcca26f08e"
+  crate_root = "//third_party/rust_crates/vendor/thread_local-1.1.7/src/lib.rs"
+  output_name = "thread_local-77810a8d2fa10bcb"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":lazy_static-v1_4_0" ]
+  deps += [ ":cfg-if-v1_0_0" ]
+  deps += [ ":once_cell-v1_17_1" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=c08961bcca26f08e",
-    "-Cextra-filename=-c08961bcca26f08e",
+    "--edition=2021",
+    "-Cmetadata=77810a8d2fa10bcb",
+    "-Cextra-filename=-77810a8d2fa10bcb",
   ]
 
   visibility = [ ":*" ]
@@ -11725,7 +11726,7 @@ rust_library("tracing-subscriber-v0_3_1") {
   deps += [ ":regex-v1_5_6" ]
   deps += [ ":sharded-slab-v0_1_4" ]
   deps += [ ":smallvec-v1_8_0" ]
-  deps += [ ":thread_local-v1_0_1" ]
+  deps += [ ":thread_local-v1_1_7" ]
   deps += [ ":tracing-v0_1_34" ]
   deps += [ ":tracing-core-v0_1_26" ]
   deps += [ ":tracing-log-v0_1_2" ]
