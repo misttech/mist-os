@@ -42,7 +42,8 @@ use crate::{
         },
         state::IpLinkDeviceState,
         with_loopback_state, with_loopback_state_and_sync_ctx, Device, DeviceIdContext,
-        DeviceLayerEventDispatcher, DeviceLayerTypes, DeviceSendFrameError, FrameDestination,
+        DeviceIdDebugTag as _, DeviceLayerEventDispatcher, DeviceLayerTypes, DeviceSendFrameError,
+        FrameDestination,
     },
     device::{Id, Mtu, StrongId, WeakId},
     ip::types::RawMetric,
@@ -155,7 +156,10 @@ impl<C: DeviceLayerTypes> Ord for LoopbackDeviceId<C> {
 
 impl<C: DeviceLayerTypes> Debug for LoopbackDeviceId<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "Loopback")
+        let Self(rc) = self;
+        write!(f, "Loopback(")?;
+        rc.external_state.id_debug_tag(f)?;
+        write!(f, ")")
     }
 }
 

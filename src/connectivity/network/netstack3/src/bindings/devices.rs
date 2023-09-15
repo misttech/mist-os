@@ -213,6 +213,13 @@ pub(crate) struct StaticCommonInfo {
     pub(crate) tx_notifier: NeedsDataNotifier,
 }
 
+impl StaticCommonInfo {
+    fn write_id_debug_tag(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self { binding_id, name, .. } = self;
+        write!(f, "{binding_id}=>{name}")
+    }
+}
+
 /// Information common to all devices.
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -263,6 +270,12 @@ impl LoopbackInfo {
     }
 }
 
+impl netstack3_core::device::DeviceIdDebugTag for LoopbackInfo {
+    fn id_debug_tag(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.static_common_info.write_id_debug_tag(f)
+    }
+}
+
 /// Information associated with FIDL Protocol workers.
 #[derive(Debug)]
 pub(crate) struct FidlWorkerInfo<R> {
@@ -302,5 +315,11 @@ impl NetdeviceInfo {
     ) -> O {
         let mut dynamic = self.dynamic.write().unwrap();
         cb(dynamic.deref_mut())
+    }
+}
+
+impl netstack3_core::device::DeviceIdDebugTag for NetdeviceInfo {
+    fn id_debug_tag(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.static_common_info.write_id_debug_tag(f)
     }
 }

@@ -1343,7 +1343,9 @@ impl<C: DeviceLayerTypes> Debug for EthernetDeviceId<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let Self(rc) = self;
         let id = rc.link.debug_id();
-        write!(f, "Ethernet({id})")
+        write!(f, "Ethernet({id}{{")?;
+        rc.external_state.id_debug_tag(f)?;
+        write!(f, "}})")
     }
 }
 
@@ -1910,10 +1912,27 @@ impl<C: DeviceLayerTypes + socket::NonSyncContext<DeviceId<C>>> DeviceLayerState
 /// Provides associated types used in the device layer.
 pub trait DeviceLayerStateTypes: InstantContext {
     /// The state associated with loopback devices.
-    type LoopbackDeviceState: Send + Sync;
+    type LoopbackDeviceState: DeviceIdDebugTag + Send + Sync;
 
     /// The state associated with ethernet devices.
-    type EthernetDeviceState: Send + Sync;
+    type EthernetDeviceState: DeviceIdDebugTag + Send + Sync;
+}
+
+/// Provides ancillary debug information for device states that are added to
+/// DeviceId's fmt::Debug implementations.
+pub trait DeviceIdDebugTag {
+    /// Appends a debug tag for this device to the provided formatter.
+    ///
+    /// This method is used specifically by [`DeviceId`] to tag device debug
+    /// information provided by [`NonSyncCtx`].
+    fn id_debug_tag(&self, f: &mut Formatter<'_>) -> fmt::Result;
+}
+
+/// Provide debug tag implementation when there's no external device state.
+impl DeviceIdDebugTag for () {
+    fn id_debug_tag(&self, _: &mut Formatter<'_>) -> fmt::Result {
+        Ok(())
+    }
 }
 
 /// Provides associated types used in the device layer.
