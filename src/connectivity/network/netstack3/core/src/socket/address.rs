@@ -13,7 +13,7 @@ use core::{
 use derivative::Derivative;
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, Ipv4Addr},
-    NonMappedAddr, SpecifiedAddr, ZonedAddr,
+    NonMappedAddr, ScopeableAddress, SpecifiedAddr, ZonedAddr,
 };
 
 use crate::socket::{datagram::DualStackIpExt, AddrVec, SocketMapAddrSpec};
@@ -143,6 +143,15 @@ impl<A: IpAddress> TryFrom<SpecifiedAddr<A>> for SocketIpAddr<A> {
     type Error = AddrIsMappedError;
     fn try_from(addr: SpecifiedAddr<A>) -> Result<Self, Self::Error> {
         NonMappedAddr::new(addr).map(SocketIpAddr).ok_or(AddrIsMappedError {})
+    }
+}
+
+/// Allows [`SocketIpAddr`] to be used inside of a [`ZonedAddr`].
+impl<A: IpAddress> ScopeableAddress for SocketIpAddr<A> {
+    type Scope = A::Scope;
+    fn scope(&self) -> Self::Scope {
+        let SocketIpAddr(addr) = self;
+        addr.scope()
     }
 }
 

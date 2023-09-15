@@ -62,7 +62,7 @@ pub mod udp;
 use lock_order::{lock::RwLockFor, Locked};
 use net_types::{
     ip::{IpAddress, Ipv4, Ipv6},
-    SpecifiedAddr, ZonedAddr,
+    ScopeableAddress, SpecifiedAddr, ZonedAddr,
 };
 
 use crate::{
@@ -217,11 +217,16 @@ fn maybe_with_zone<A: IpAddress, D>(
 /// for the socket. If `addr` and `device` require inconsistent devices,
 /// or if `addr` requires a zone but there is none specified (by `addr` or
 /// `device`), an error is returned.
-pub(crate) fn resolve_addr_with_device<A: IpAddress, S: PartialEq, W: PartialEq + PartialEq<S>>(
-    addr: SocketZonedIpAddr<A, S>,
+pub(crate) fn resolve_addr_with_device<
+    IA: IpAddress,
+    A: ScopeableAddress + AsRef<SpecifiedAddr<IA>>,
+    S: PartialEq,
+    W: PartialEq + PartialEq<S>,
+>(
+    addr: ZonedAddr<A, S>,
     device: Option<W>,
-) -> Result<(SpecifiedAddr<A>, Option<EitherDeviceId<S, W>>), ZonedAddressError> {
-    let (addr, zone) = addr.into_inner().into_addr_zone();
+) -> Result<(A, Option<EitherDeviceId<S, W>>), ZonedAddressError> {
+    let (addr, zone) = addr.into_addr_zone();
     let device = match (zone, device) {
         (Some(zone), Some(device)) => {
             if device != zone {
@@ -232,7 +237,7 @@ pub(crate) fn resolve_addr_with_device<A: IpAddress, S: PartialEq, W: PartialEq 
         (Some(zone), None) => Some(EitherDeviceId::Strong(zone)),
         (None, Some(device)) => Some(EitherDeviceId::Weak(device)),
         (None, None) => {
-            if crate::socket::must_have_zone(&addr) {
+            if crate::socket::must_have_zone(addr.as_ref()) {
                 return Err(ZonedAddressError::RequiredZoneNotProvided);
             } else {
                 None

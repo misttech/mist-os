@@ -1226,8 +1226,11 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                         // device is either the one from the address or the one
                         // to which the socket was previously bound.
                         let (addr, required_device) =
-                            crate::transport::resolve_addr_with_device(addr, bound_device.clone())
-                                .map_err(LocalAddressError::Zone)?;
+                            crate::transport::resolve_addr_with_device::<I::Addr, _, _, _>(
+                                addr.into_inner(),
+                                bound_device.clone(),
+                            )
+                            .map_err(LocalAddressError::Zone)?;
 
                         let mut assigned_to = ip_transport_ctx.get_devices_with_assigned_addr(addr);
                         if !assigned_to.any(|d| {
@@ -1434,7 +1437,10 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     },
                 };
                 let (remote_ip, device) =
-                    crate::transport::resolve_addr_with_device(remote_ip, bound_device.clone())?;
+                    crate::transport::resolve_addr_with_device::<I::Addr, _, _, _>(
+                        remote_ip.into_inner(),
+                        bound_device.clone(),
+                    )?;
                 // TODO(https://fxbug.dev/21198): Support dual-stack connect.
                 let remote_ip =
                     remote_ip.try_into().map_err(|AddrIsMappedError {}| ConnectError::NoRoute)?;
