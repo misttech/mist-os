@@ -524,10 +524,13 @@ impl<T: Releasable> RefInner<T> {
         loop {
             // Ensure no more `OwnedRef` exists.
             debug_assert_eq!(self.owned_refs_count.load(Ordering::Acquire), 0);
-            // If the strong count of the Arc is 1, there is no existing `TempRef`. None can be
-            // created because `owned_refs_count` is 0. Return.
+            // If the strong count of the Arc is 1, there is no existing real `TempRef`. While some
+            // can be temporarily created in the `WeakRef::upgrade` method, they will be dropped
+            // immediately because `owned_refs_count` is 0. To be noted: the count might be greater
+            // than 1 because of one of these temporary `TempRef`, but the futex call will be woken
+            // up when they are dropped.
+            // Return.
             if Arc::strong_count(self) == 1 {
-                debug_assert_eq!(self.temp_refs_count.load(Ordering::Acquire), 0);
                 return;
             }
             // Compute the current number of temp refs, and wait for it to drop to 0.
@@ -777,5 +780,27 @@ mod test {
         let value = OwnedRef::new(DataWithMutableReleaseContext {});
         let mut context = ();
         value.release(&mut context);
+    }
+
+    // If this test fails, it will almost always be with a very low probability. Any failure is a
+    // real, high priority bug.
+    #[::fuchsia::test]
+    fn upgrade_while_release() {
+        let value = OwnedRef::new(Data {});
+        // Run 10 threads trying to upgrade a weak pointer in a loop.
+        for _ in 0..10 {
+            std::thread::spawn({
+                let weak = OwnedRef::downgrade(&value);
+                move || loop {
+                    if weak.upgrade().is_none() {
+                        return;
+                    }
+                }
+            });
+        }
+        // Release the value after letting the threads make some progress.
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        value.release(());
+        // The test must finish, and no assertion should trigger.
     }
 }
