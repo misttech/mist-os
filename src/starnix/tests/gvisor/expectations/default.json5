@@ -173,10 +173,6 @@
                 "Cases/ElfInterpreterBadPathTest.Test/2",
                 "Cases/ElfInterpreterBadPathTest.Test/3",
 
-                // exit_test
-                "ExitTest.SigkillZombieGroup",
-                "ExitTest.SigkillZombieThread",
-
                 // fcntl_test
                 "FcntlTest.SetSig",
                 "FcntlTest.SetSigDefaultsToZero",
@@ -823,7 +819,6 @@
                 "AllInetTests/UdpSocketTest.TimestampIoctlPersistence/*",
 
                 // wait_test - https://fxbug.dev/79451
-                "WaitTest.KillZombie",
                 "Waiters/WaitAnyChildTest.IgnoredChildRusage/*",
                 "Waiters/WaitSpecificChildTest.SiblingChildrenWNOTHREAD/0",
 

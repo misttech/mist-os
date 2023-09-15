@@ -9,12 +9,38 @@ use std::{
 
 use crate::{task::*, types::*};
 
+#[derive(Default)]
+enum ProcessEntry {
+    #[default]
+    None,
+    ThreadGroup(Weak<ThreadGroup>),
+    Zombie(WeakRef<ZombieProcess>),
+}
+
+impl ProcessEntry {
+    fn is_none(&self) -> bool {
+        matches!(self, Self::None)
+    }
+
+    fn thread_group(&self) -> Option<&Weak<ThreadGroup>> {
+        match self {
+            Self::ThreadGroup(ref group) => Some(group),
+            _ => None,
+        }
+    }
+}
+
 /// Entities identified by a pid.
 #[derive(Default)]
 struct PidEntry {
     task: Option<WeakRef<Task>>,
-    group: Option<Weak<ThreadGroup>>,
+    process: ProcessEntry,
     process_group: Option<Weak<ProcessGroup>>,
+}
+
+pub enum ProcessEntryRef<'a> {
+    Process(Arc<ThreadGroup>),
+    Zombie(TempRef<'a, ZombieProcess>),
 }
 
 #[derive(Default)]
@@ -45,7 +71,7 @@ impl PidTable {
     {
         let entry = self.get_entry_mut(pid);
         do_remove(entry);
-        if entry.task.is_none() && entry.group.is_none() && entry.process_group.is_none() {
+        if entry.task.is_none() && entry.process.is_none() && entry.process_group.is_none() {
             self.table.remove(&pid);
         }
     }
@@ -75,27 +101,50 @@ impl PidTable {
         });
     }
 
-    pub fn get_thread_group(&self, pid: pid_t) -> Option<Arc<ThreadGroup>> {
-        self.get_entry(pid).and_then(|entry| entry.group.as_ref()).and_then(|group| group.upgrade())
+    pub fn get_process(&self, pid: pid_t) -> Option<ProcessEntryRef<'_>> {
+        match self.get_entry(pid) {
+            None => None,
+            Some(PidEntry { process: ProcessEntry::None, .. }) => None,
+            Some(PidEntry { process: ProcessEntry::ThreadGroup(thread_group), .. }) => {
+                let thread_group = thread_group
+                    .upgrade()
+                    .expect("ThreadGroup was released, but not removed from PidTable");
+                Some(ProcessEntryRef::Process(thread_group))
+            }
+            Some(PidEntry { process: ProcessEntry::Zombie(zombie), .. }) => {
+                let zombie = zombie
+                    .upgrade()
+                    .expect("ZombieProcess was released, but not removed from PidTable");
+                Some(ProcessEntryRef::Zombie(zombie))
+            }
+        }
     }
 
     pub fn get_thread_groups(&self) -> Vec<Arc<ThreadGroup>> {
         self.table
             .iter()
-            .flat_map(|(_pid, entry)| entry.group.as_ref().and_then(|g| g.upgrade()))
+            .flat_map(|(_pid, entry)| entry.process.thread_group())
+            .flat_map(|g| g.upgrade())
             .collect()
     }
 
     pub fn add_thread_group(&mut self, thread_group: &Arc<ThreadGroup>) {
         let entry = self.get_entry_mut(thread_group.leader);
-        assert!(entry.group.is_none());
-        entry.group = Some(Arc::downgrade(thread_group));
+        assert!(entry.process.is_none());
+        entry.process = ProcessEntry::ThreadGroup(Arc::downgrade(thread_group));
     }
 
-    pub fn remove_thread_group(&mut self, pid: pid_t) {
+    /// Replace process with the specified `pid` with the `zombie`.
+    pub fn kill_process(&mut self, pid: pid_t, zombie: WeakRef<ZombieProcess>) {
+        let entry = self.get_entry_mut(pid);
+        assert!(matches!(entry.process, ProcessEntry::ThreadGroup(_)));
+        entry.process = ProcessEntry::Zombie(zombie);
+    }
+
+    pub fn remove_zombie(&mut self, pid: pid_t) {
         self.remove_item(pid, |entry| {
-            let removed = entry.group.take();
-            assert!(removed.is_some())
+            assert!(matches!(entry.process, ProcessEntry::Zombie(_)));
+            entry.process = ProcessEntry::None;
         });
     }
 
@@ -118,9 +167,12 @@ impl PidTable {
         });
     }
 
-    /// Returns the process ids for all the currently running processes.
+    /// Returns the process ids for all processes, including zombies.
     pub fn process_ids(&self) -> Vec<pid_t> {
-        self.table.iter().flat_map(|(pid, entry)| entry.group.as_ref().and(Some(*pid))).collect()
+        self.table
+            .iter()
+            .flat_map(|(pid, entry)| if entry.process.is_none() { None } else { Some(*pid) })
+            .collect()
     }
 
     /// Returns the task ids for all the currently running tasks.

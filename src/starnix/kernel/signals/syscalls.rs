@@ -288,9 +288,23 @@ pub fn sys_kill(
         pid if pid > 0 => {
             // "If pid is positive, then signal sig is sent to the process with
             // the ID specified by pid."
-            let weak_task = pids.get_task(pid);
-            let target_task = Task::from_weak(&weak_task)?;
-            let target_thread_group = &target_task.thread_group;
+            let target_thread_group = {
+                match pids.get_process(pid) {
+                    Some(ProcessEntryRef::Process(process)) => process,
+
+                    // Zombies cannot receive signals. Just ignore it.
+                    Some(ProcessEntryRef::Zombie(_zombie)) => return Ok(()),
+
+                    // If we don't have process with `pid` then check if there is a task with
+                    // the `pid`.
+                    None => {
+                        let weak_task = pids.get_task(pid);
+                        let task = Task::from_weak(&weak_task)?;
+                        task.thread_group.clone()
+                    }
+                }
+            };
+
             // SAFETY: target  is kept on the stack. The static is required to ensure the lock on
             // ThreadGroup can be dropped.
             let target = unsafe {
@@ -601,13 +615,13 @@ fn wait_on_pid(
     current_task: &CurrentTask,
     selector: ProcessSelector,
     options: &WaitingOptions,
-) -> Result<Option<ZombieProcess>, Errno> {
+) -> Result<Option<WaitResult>, Errno> {
     let waiter = Waiter::new();
     loop {
         {
-            let pids = current_task.kernel().pids.read();
+            let mut pids = current_task.kernel().pids.write();
             let mut thread_group = current_task.thread_group.write();
-            if let Some(child) = thread_group.get_waitable_child(selector, options, &pids)? {
+            if let Some(child) = thread_group.get_waitable_child(selector, options, &mut pids)? {
                 return Ok(Some(child));
             }
             thread_group.child_status_waiters.wait_async(&waiter);
@@ -705,7 +719,7 @@ pub fn sys_wait4(
     };
 
     if let Some(waitable_process) = wait_on_pid(current_task, selector, &waiting_options)? {
-        let status = waitable_process.exit_status.wait_status();
+        let status = waitable_process.exit_info.status.wait_status();
 
         if !user_rusage.is_null() {
             let usage = rusage {
@@ -1504,12 +1518,10 @@ mod tests {
     async fn test_no_error_when_zombie() {
         let (_kernel, current_task) = create_kernel_and_task();
         let child = current_task.clone_task_for_test(0, Some(SIGCHLD));
-        let expected_zombie = ZombieProcess {
-            exit_signal: Some(SIGCHLD),
+        let expected_result = WaitResult {
             pid: child.id,
-            pgid: child.thread_group.read().process_group.leader,
             uid: 0,
-            exit_status: ExitStatus::Exit(1),
+            exit_info: ProcessExitInfo { status: ExitStatus::Exit(1), exit_signal: Some(SIGCHLD) },
             time_stats: Default::default(),
         };
         child.thread_group.exit(ExitStatus::Exit(1));
@@ -1521,7 +1533,7 @@ mod tests {
                 ProcessSelector::Any,
                 &WaitingOptions::new_for_wait4(0).expect("WaitingOptions")
             ),
-            Ok(Some(expected_zombie))
+            Ok(Some(expected_result))
         );
     }
 

@@ -52,12 +52,7 @@ pub struct ThreadGroupMutableState {
     pub children: BTreeMap<pid_t, Weak<ThreadGroup>>,
 
     /// Child tasks that have exited, but not yet been waited for.
-    ///
-    /// TODO(tbodt): Storing zombies this way is problematic since zombies take up space in the pid
-    /// table and prevent their pid from being reallocated. We should eventually stop using
-    /// ZombieProcess for returning waitpid() results and instead put the information in the pid
-    /// table.
-    pub zombie_children: Vec<ZombieProcess>,
+    pub zombie_children: Vec<OwnedRef<ZombieProcess>>,
 
     /// WaitQueue for updates to the WaitResults of tasks in this group.
     pub child_status_waiters: WaitQueue,
@@ -85,7 +80,7 @@ pub struct ThreadGroupMutableState {
     /// return.
     pub waitable: Option<SignalInfo>,
 
-    pub zombie_leader: Option<ZombieProcess>,
+    pub leader_exit_info: Option<ProcessExitInfo>,
 
     pub terminating: bool,
 
@@ -189,12 +184,44 @@ pub enum ProcessSelector {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProcessExitInfo {
+    pub status: ExitStatus,
+    pub exit_signal: Option<Signal>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WaitResult {
+    pub pid: pid_t,
+    pub uid: uid_t,
+
+    pub exit_info: ProcessExitInfo,
+
+    /// Cumulative time stats for the process and its children.
+    pub time_stats: TaskTimeStats,
+}
+
+impl WaitResult {
+    // According to wait(2) man page, SignalInfo.signal needs to always be set to SIGCHLD
+    pub fn as_signal_info(&self) -> SignalInfo {
+        SignalInfo::new(
+            SIGCHLD,
+            self.exit_info.status.signal_info_code(),
+            SignalDetail::SigChld {
+                pid: self.pid,
+                uid: self.uid,
+                status: self.exit_info.status.signal_info_status(),
+            },
+        )
+    }
+}
+
+#[derive(Debug)]
 pub struct ZombieProcess {
     pub pid: pid_t,
     pub pgid: pid_t,
     pub uid: uid_t,
-    pub exit_status: ExitStatus,
-    pub exit_signal: Option<Signal>,
+
+    pub exit_info: ProcessExitInfo,
 
     /// Cumulative time stats for the process and its children.
     pub time_stats: TaskTimeStats,
@@ -204,32 +231,33 @@ impl ZombieProcess {
     pub fn new(
         thread_group: ThreadGroupStateRef<'_>,
         credentials: &Credentials,
-        exit_status: ExitStatus,
-        exit_signal: Option<Signal>,
-    ) -> Self {
+        exit_info: ProcessExitInfo,
+    ) -> OwnedRef<Self> {
         let time_stats = thread_group.base.time_stats() + thread_group.children_time_stats;
-
-        ZombieProcess {
+        OwnedRef::new(ZombieProcess {
             pid: thread_group.base.leader,
             pgid: thread_group.process_group.leader,
             uid: credentials.uid,
-            exit_status,
-            exit_signal,
+            exit_info,
             time_stats,
-        }
+        })
     }
 
-    // According to wait(2) man page, SignalInfo.signal needs to always be set to SIGCHLD
-    pub fn as_signal_info(&self) -> SignalInfo {
-        SignalInfo::new(
-            SIGCHLD,
-            self.exit_status.signal_info_code(),
-            SignalDetail::SigChld {
-                pid: self.pid,
-                uid: self.uid,
-                status: self.exit_status.signal_info_status(),
-            },
-        )
+    pub fn to_wait_result(&self) -> WaitResult {
+        WaitResult {
+            pid: self.pid,
+            uid: self.uid,
+            exit_info: self.exit_info.clone(),
+            time_stats: self.time_stats,
+        }
+    }
+}
+
+impl Releasable for ZombieProcess {
+    type Context<'a> = &'a mut PidTable;
+
+    fn release(&self, pids: &mut PidTable) {
+        pids.remove_zombie(self.pid);
     }
 }
 
@@ -270,7 +298,7 @@ impl ThreadGroup {
                 stopped: StopState::Awake,
                 stopped_waiters: WaitQueue::default(),
                 waitable: None,
-                zombie_leader: None,
+                leader_exit_info: None,
                 terminating: false,
                 selinux: Default::default(),
                 children_time_stats: Default::default(),
@@ -336,27 +364,27 @@ impl ThreadGroup {
                 return;
             };
 
-        if task.id == state.leader() {
+        if task.id == self.leader {
             let exit_status = task.read().exit_status.clone().unwrap_or_else(|| {
                 log_error!("Exiting without an exit code.");
                 ExitStatus::Exit(u8::MAX)
             });
-            let persistent_info = persistent_info.lock();
-            state.zombie_leader = Some(ZombieProcess {
-                pid: state.leader(),
-                pgid: state.process_group.leader,
-                uid: persistent_info.creds().uid,
-                exit_status,
-                exit_signal: *persistent_info.exit_signal(),
-                time_stats: Default::default(),
+            state.leader_exit_info = Some(ProcessExitInfo {
+                status: exit_status,
+                exit_signal: *persistent_info.lock().exit_signal(),
             });
         }
 
         if state.tasks.is_empty() {
             state.terminating = true;
 
-            // Unregister this object.
-            pids.remove_thread_group(state.leader());
+            // Replace PID table entry with a zombie.
+            let exit_info =
+                state.leader_exit_info.take().expect("Failed to capture leader exit status");
+            let zombie =
+                ZombieProcess::new(state.as_ref(), persistent_info.lock().creds(), exit_info);
+            pids.kill_process(self.leader, OwnedRef::downgrade(&zombie));
+
             state.leave_process_group(&mut pids);
 
             // I have no idea if dropping the lock here is correct, and I don't want to think about
@@ -375,42 +403,44 @@ impl ThreadGroup {
             let parent = self.read().parent.clone();
             let reaper = self.find_reaper();
 
-            // Reparent the children.
-            if let Some(reaper) = reaper {
-                let mut reaper = reaper.write();
-                let mut state = self.write();
-                for (_pid, child) in std::mem::take(&mut state.children) {
-                    if let Some(child) = child.upgrade() {
-                        child.write().parent = Some(Arc::clone(reaper.base));
-                        reaper.children.insert(child.leader, Arc::downgrade(&child));
+            {
+                // Reparent the children.
+                if let Some(reaper) = reaper {
+                    let mut reaper = reaper.write();
+                    let mut state = self.write();
+                    for (_pid, child) in std::mem::take(&mut state.children) {
+                        if let Some(child) = child.upgrade() {
+                            child.write().parent = Some(Arc::clone(reaper.base));
+                            reaper.children.insert(child.leader, Arc::downgrade(&child));
+                        }
+                    }
+                    reaper.zombie_children.append(&mut state.zombie_children);
+                } else {
+                    // If we don't have a reaper then just drop the zombies.
+                    let mut state = self.write();
+                    for zombie in state.zombie_children.drain(..) {
+                        zombie.release(&mut pids);
                     }
                 }
-                reaper.zombie_children.append(&mut state.zombie_children);
             }
 
             if let Some(ref parent) = parent {
-                let time_stats = self.time_stats();
-
                 let mut parent = parent.write();
-                let mut state = self.write();
-                let mut zombie =
-                    state.zombie_leader.take().expect("Failed to capture zombie leader.");
 
-                zombie.time_stats += time_stats;
-                zombie.time_stats += state.children_time_stats;
-
-                parent.children.remove(&state.leader());
+                parent.children.remove(&self.leader);
 
                 // Send signals
-                if let Some(exit_signal) = zombie.exit_signal {
+                if let Some(exit_signal) = zombie.exit_info.exit_signal {
                     if let Some(signal_target) = parent.get_signal_target(&exit_signal.into()) {
-                        let mut signal_info = zombie.as_signal_info();
+                        let mut signal_info = zombie.to_wait_result().as_signal_info();
                         signal_info.signal = exit_signal;
                         send_signal(&signal_target, signal_info);
                     }
                 }
                 parent.zombie_children.push(zombie);
                 parent.child_status_waiters.notify_all();
+            } else {
+                zombie.release(&mut pids);
             }
 
             // TODO: Set the error_code on the Zircon process object. Currently missing a way
@@ -877,30 +907,32 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
         &mut self,
         selector: ProcessSelector,
         options: &WaitingOptions,
-    ) -> Option<ZombieProcess> {
+        pids: &mut PidTable,
+    ) -> Option<WaitResult> {
         // The zombies whose pid matches the pid selector queried.
-        let zombie_matches_pid_selector = |zombie: &ZombieProcess| match selector {
+        let zombie_matches_pid_selector = |zombie: &OwnedRef<ZombieProcess>| match selector {
             ProcessSelector::Any => true,
             ProcessSelector::Pid(pid) => zombie.pid == pid,
             ProcessSelector::Pgid(pgid) => zombie.pgid == pgid,
         };
 
         // The zombies whose exit signal matches the waiting options queried.
-        let zombie_matches_wait_options: fn(&ZombieProcess) -> bool = if options.wait_for_all {
-            |_zombie: &ZombieProcess| true
-        } else if options.wait_for_clone {
-            // A "clone" zombie is one which has delivered no signal, or a signal other than SIGCHLD to its parent upon termination.
-            |zombie: &ZombieProcess| zombie.exit_signal != Some(SIGCHLD)
-        } else {
-            |zombie: &ZombieProcess| zombie.exit_signal == Some(SIGCHLD)
-        };
+        let zombie_matches_wait_options: fn(&OwnedRef<ZombieProcess>) -> bool =
+            if options.wait_for_all {
+                |_zombie| true
+            } else if options.wait_for_clone {
+                // A "clone" zombie is one which has delivered no signal, or a signal other than SIGCHLD to its parent upon termination.
+                |zombie| zombie.exit_info.exit_signal != Some(SIGCHLD)
+            } else {
+                |zombie| zombie.exit_info.exit_signal == Some(SIGCHLD)
+            };
 
         // We look for the last zombie in the vector that matches pid selector and waiting options
         let selected_zombie_position = self
             .zombie_children
             .iter()
             .rev()
-            .position(|zombie: &ZombieProcess| {
+            .position(|zombie: &OwnedRef<ZombieProcess>| {
                 zombie_matches_wait_options(zombie) && zombie_matches_pid_selector(zombie)
             })
             .map(|position_starting_from_the_back| {
@@ -909,10 +941,12 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
 
         selected_zombie_position.map(|position| {
             if options.keep_waitable_state {
-                self.zombie_children[position].clone()
+                self.zombie_children[position].to_wait_result()
             } else {
-                let result = self.zombie_children.remove(position);
-                self.children_time_stats += result.time_stats;
+                let zombie = self.zombie_children.remove(position);
+                self.children_time_stats += zombie.time_stats;
+                let result = zombie.to_wait_result();
+                zombie.release(pids);
                 result
             }
         })
@@ -923,7 +957,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
         selector: ProcessSelector,
         options: &WaitingOptions,
         pids: &PidTable,
-    ) -> Result<Option<ZombieProcess>, Errno> {
+    ) -> Result<Option<WaitResult>, Errno> {
         // The children whose pid matches the pid selector queried.
         let filter_children_by_pid_selector = |child: &Arc<ThreadGroup>| match selector {
             ProcessSelector::Any => true,
@@ -962,9 +996,9 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
         for child in selected_children {
             let child = child.write();
             if child.waitable.is_some() {
-                let build_zombie_process = |mut child: ThreadGroupWriteGuard<'_>,
-                                            exit_status: &dyn Fn(SignalInfo) -> ExitStatus|
-                 -> ZombieProcess {
+                let build_wait_result = |mut child: ThreadGroupWriteGuard<'_>,
+                                         exit_status: &dyn Fn(SignalInfo) -> ExitStatus|
+                 -> WaitResult {
                     let siginfo = if options.keep_waitable_state {
                         child.waitable.clone().unwrap()
                     } else {
@@ -977,18 +1011,21 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
                         exit_status(siginfo)
                     };
                     let info = child.tasks.values().next().unwrap().info();
-                    ZombieProcess::new(
-                        child.as_ref(),
-                        info.creds(),
-                        exit_status,
-                        *info.exit_signal(),
-                    )
+                    WaitResult {
+                        pid: child.base.leader,
+                        uid: info.creds().uid,
+                        exit_info: ProcessExitInfo {
+                            status: exit_status,
+                            exit_signal: *info.exit_signal(),
+                        },
+                        time_stats: child.base.time_stats() + child.children_time_stats,
+                    }
                 };
                 if child.stopped == StopState::Awake && options.wait_for_continued {
-                    return Ok(Some(build_zombie_process(child, &ExitStatus::Continue)));
+                    return Ok(Some(build_wait_result(child, &ExitStatus::Continue)));
                 }
                 if child.stopped == StopState::GroupStopped && options.wait_for_stopped {
-                    return Ok(Some(build_zombie_process(child, &ExitStatus::Stop)));
+                    return Ok(Some(build_wait_result(child, &ExitStatus::Stop)));
                 }
             }
         }
@@ -1005,10 +1042,10 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
         &mut self,
         selector: ProcessSelector,
         options: &WaitingOptions,
-        pids: &PidTable,
-    ) -> Result<Option<ZombieProcess>, Errno> {
+        pids: &mut PidTable,
+    ) -> Result<Option<WaitResult>, Errno> {
         if options.wait_for_exited {
-            if let Some(waitable_zombie) = self.get_waitable_zombie(selector, options) {
+            if let Some(waitable_zombie) = self.get_waitable_zombie(selector, options, pids) {
                 return Ok(Some(waitable_zombie));
             }
         }
@@ -1095,7 +1132,7 @@ mod test {
         child.thread_group.exit(ExitStatus::Exit(42));
         std::mem::drop(child);
         assert_eq!(
-            current_task.thread_group.read().zombie_children[0].exit_status,
+            current_task.thread_group.read().zombie_children[0].exit_info.status,
             ExitStatus::Exit(42)
         );
     }
