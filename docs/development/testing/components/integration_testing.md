@@ -91,6 +91,9 @@ Use the following table to help determine which approach is best for your integr
 
 ### Realm Builder {#realm-builder}
 
+Note: Consider using a [test realm factory] component rather than using Realm
+Builder directly in a test suite.
+
 In cases where realm topology needs to be defined at runtime, or components
 need to be replaced with local mock implementations, you can use the Realm Builder
 library to create the topology dynamically in your test code.
@@ -255,3 +258,4 @@ The child moniker format depends on your [test realm topology](#test-topology):
 [realm-builder-monikers]: /docs/development/testing/components/realm_builder.md#test-component-moniker
 [trf]: test_runner_framework.md
 [test-packages]: /docs/development/components/build.md#test-packages
+[test realm factory]: /docs/development/testing/components/test_realm_factory.md
