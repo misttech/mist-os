@@ -10,4 +10,5 @@
 pub const DEFAULT_SERVICE_INSTANCE: &'static str = "default";
 
 pub mod client;
+pub mod directory;
 pub mod server;

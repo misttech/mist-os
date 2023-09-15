@@ -5,10 +5,9 @@
 //! Tools for starting or connecting to existing Fuchsia applications and services.
 
 use {
-    crate::DEFAULT_SERVICE_INSTANCE,
     anyhow::{format_err, Context as _, Error},
     fidl::endpoints::{
-        DiscoverableProtocolMarker, MemberOpener, ProtocolMarker, Proxy, ServerEnd, ServiceMarker,
+        DiscoverableProtocolMarker, MemberOpener, ProtocolMarker, ServerEnd, ServiceMarker,
         ServiceProxy,
     },
     fidl_fuchsia_component::{RealmMarker, RealmProxy},
@@ -16,6 +15,8 @@ use {
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     std::{borrow::Borrow, marker::PhantomData},
 };
+
+use crate::{directory::AsRefDirectory, DEFAULT_SERVICE_INSTANCE};
 
 /// Path to the service directory in an application's root namespace.
 const SVC_DIR: &'static str = "/svc";
@@ -163,20 +164,20 @@ pub fn connect_to_protocol_at_path<P: ProtocolMarker>(
 
 /// Connect to an instance of a FIDL protocol hosted in `directory`.
 pub fn connect_to_protocol_at_dir_root<P: DiscoverableProtocolMarker>(
-    directory: &fio::DirectoryProxy,
+    directory: &impl AsRefDirectory,
 ) -> Result<P::Proxy, Error> {
     connect_to_named_protocol_at_dir_root::<P>(directory, P::PROTOCOL_NAME)
 }
 
 /// Connect to an instance of a FIDL protocol hosted in `directory` using the given `filename`.
 pub fn connect_to_named_protocol_at_dir_root<P: ProtocolMarker>(
-    directory: &fio::DirectoryProxy,
+    directory: &impl AsRefDirectory,
     filename: &str,
 ) -> Result<P::Proxy, Error> {
     let (proxy, server_end) = fidl::endpoints::create_proxy::<P>()?;
-    fdio::service_connect_at(
-        directory.as_channel().as_ref(),
+    directory.as_ref_directory().open(
         filename,
+        fio::OpenFlags::empty(),
         server_end.into_channel().into(),
     )?;
     Ok(proxy)
@@ -184,7 +185,7 @@ pub fn connect_to_named_protocol_at_dir_root<P: ProtocolMarker>(
 
 /// Connect to an instance of a FIDL protocol hosted in `directory`, in the `svc/` subdir.
 pub fn connect_to_protocol_at_dir_svc<P: DiscoverableProtocolMarker>(
-    directory: &fio::DirectoryProxy,
+    directory: &impl AsRefDirectory,
 ) -> Result<P::Proxy, Error> {
     let protocol_path = format!("{}/{}", SVC_DIR, P::PROTOCOL_NAME);
     // TODO(https://fxbug.dev/117079): Remove the following line when component
@@ -348,6 +349,27 @@ pub fn realm() -> Result<RealmProxy, Error> {
 }
 
 #[cfg(test)]
+pub mod test_util {
+    use super::*;
+    use std::sync::Arc;
+    use vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope};
+
+    #[cfg(test)]
+    pub fn run_directory_server(dir: Arc<dyn DirectoryEntry>) -> fio::DirectoryProxy {
+        let (dir_proxy, dir_server) =
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let scope = ExecutionScope::new();
+        dir.open(
+            scope,
+            fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
+            vfs::path::Path::dot(),
+            ServerEnd::new(dir_server.into_channel()),
+        );
+        dir_proxy
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use {
         super::*,
@@ -355,10 +377,7 @@ mod tests {
             ServiceAMarker, ServiceAProxy, ServiceBMarker, ServiceBProxy,
         },
         fuchsia_async as fasync,
-        vfs::{
-            directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-            file::vmo::read_only, pseudo_directory,
-        },
+        vfs::{file::vmo::read_only, pseudo_directory},
     };
 
     #[fasync::run_singlethreaded(test)]
@@ -386,15 +405,7 @@ mod tests {
         let dir = pseudo_directory! {
             ServiceBMarker::PROTOCOL_NAME => read_only("read_only"),
         };
-        let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
-        let scope = ExecutionScope::new();
-        dir.open(
-            scope,
-            fio::OpenFlags::DIRECTORY,
-            vfs::path::Path::dot(),
-            ServerEnd::new(dir_server.into_channel()),
-        );
-
+        let dir_proxy = test_util::run_directory_server(dir);
         let req = new_protocol_connector_in_dir::<ServiceAMarker>(&dir_proxy);
         assert_matches::assert_matches!(
             req.exists().await.context("error probing invalid service"),

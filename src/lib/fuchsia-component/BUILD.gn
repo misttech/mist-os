@@ -36,6 +36,7 @@ rustc_library("fuchsia-component") {
 
   sources = [
     "src/client.rs",
+    "src/directory.rs",
     "src/lib.rs",
     "src/server/mod.rs",
     "src/server/service.rs",
