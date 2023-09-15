@@ -31,12 +31,14 @@ group("tests") {
   # Make sure we don't accidentally pull in tests that involve large guest images.
   assert_no_deps = [
     "tests",
-    "//src/virtualization/packages:*",
+    "//src/virtualization/packages/debian_guest",
+    "//src/virtualization/packages/termina_guest",
   ]
 
   deps = [
     "bin:tests",
     "lib:tests",
+    "tests/smoke",
 
     # Build some of the components that are normally packaged into some of the
     # larger test images. This allows us to get CQ coverage of building the
