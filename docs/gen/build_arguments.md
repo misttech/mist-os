@@ -7913,7 +7913,7 @@ Whether or not logging is disabled globally.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/BUILD.gn:13
+From //src/starnix/kernel/BUILD.gn:14
 
 ### starnix_disable_tracing
 
@@ -7922,7 +7922,7 @@ NOTE(https://fxbug.dev/124980) this slows down some microbenchmarks.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/BUILD.gn:17
+From //src/starnix/kernel/BUILD.gn:18
 
 ### target_cpu
 
