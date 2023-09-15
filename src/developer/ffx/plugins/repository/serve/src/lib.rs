@@ -8,7 +8,7 @@ use {
     camino::Utf8Path,
     ffx_config::{keys::TARGET_DEFAULT_KEY, EnvironmentContext},
     ffx_repository_serve_args::ServeCommand,
-    fho::{moniker, AvailabilityFlag, FfxContext, FfxMain, FfxTool, Result, SimpleWriter},
+    fho::{AvailabilityFlag, FfxContext, FfxMain, FfxTool, Result, SimpleWriter},
     fidl_fuchsia_developer_ffx::{
         RepositoryError as FfxCliRepositoryError,
         RepositoryStorageType as FfxCliRepositoryStorageType,
@@ -16,8 +16,9 @@ use {
     },
     fidl_fuchsia_developer_ffx::{TargetInfo, TargetProxy},
     fidl_fuchsia_developer_ffx_ext::RepositoryTarget as FfxDaemonRepositoryTarget,
-    fidl_fuchsia_pkg::RepositoryManagerProxy,
-    fidl_fuchsia_pkg_rewrite::EngineProxy,
+    fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
+    fidl_fuchsia_pkg::RepositoryManagerMarker,
+    fidl_fuchsia_pkg_rewrite::EngineMarker,
     fuchsia_async as fasync,
     fuchsia_repo::{
         manager::RepositoryManager, repo_client::RepoClient, repository::PmRepository,
@@ -28,7 +29,10 @@ use {
     timeout::timeout,
 };
 
+const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 const REPO_FOREGROUND_FEATURE_FLAG: &str = "repository.foreground.enabled";
+const REPOSITORY_MANAGER_MONIKER: &str = "/core/pkg-resolver";
+const ENGINE_MONIKER: &str = "/core/pkg-resolver";
 
 #[derive(FfxTool)]
 #[check(AvailabilityFlag(REPO_FOREGROUND_FEATURE_FLAG))]
@@ -37,10 +41,7 @@ pub struct ServeTool {
     cmd: ServeCommand,
     context: EnvironmentContext,
     target_proxy: TargetProxy,
-    #[with(moniker("/core/pkg-resolver"))]
-    repo_proxy: RepositoryManagerProxy,
-    #[with(moniker("/core/pkg-resolver"))]
-    rewrite_engine_proxy: EngineProxy,
+    rcs_proxy: RemoteControlProxy,
 }
 
 fho::embedded_plugin!(ServeTool);
@@ -127,9 +128,31 @@ impl FfxMain for ServeTool {
         };
         let task = fasync::Task::local(server_fut);
 
+        let (repo_proxy, repo_server) = fidl::endpoints::create_proxy::<RepositoryManagerMarker>()
+            .map_err(|e| anyhow!("Failed to create proxy for RepositoryManagerMarker: {:?}", e))?;
+        rcs::connect_with_timeout::<RepositoryManagerMarker>(
+            TIMEOUT,
+            REPOSITORY_MANAGER_MONIKER,
+            &self.rcs_proxy,
+            repo_server.into_channel(),
+        )
+        .await
+        .map_err(|e| anyhow!("Failed to bind RepositoryManager to stream: {:?}", e))?;
+
+        let (engine_proxy, engine_server) = fidl::endpoints::create_proxy::<EngineMarker>()
+            .map_err(|e| anyhow!("Failed to create proxy for EngineMarker: {:?}", e))?;
+        rcs::connect_with_timeout::<EngineMarker>(
+            TIMEOUT,
+            ENGINE_MONIKER,
+            &self.rcs_proxy,
+            engine_server.into_channel(),
+        )
+        .await
+        .map_err(|e| anyhow!("Failed to bind Engine to stream: {:?}", e))?;
+
         register_target_with_fidl_proxies(
-            self.repo_proxy,
-            self.rewrite_engine_proxy,
+            repo_proxy,
+            engine_proxy,
             &repo_target_info,
             &target,
             repo_server_listen_addr,
@@ -158,15 +181,20 @@ mod test {
         assert_matches::assert_matches,
         ffx_config::{ConfigLevel, TestEnv},
         fho::macro_deps::ffx_writer::TestBuffer,
+        fidl::endpoints::DiscoverableProtocolMarker as _,
         fidl_fuchsia_developer_ffx::{
             RepositoryRegistrationAliasConflictMode, RepositoryStorageType, SshHostAddrInfo,
             TargetAddrInfo, TargetIpPort, TargetRequest,
         },
+        fidl_fuchsia_developer_remotecontrol as frcs,
         fidl_fuchsia_net::{IpAddress, Ipv4Address},
         fidl_fuchsia_pkg::{
             MirrorConfig, RepositoryConfig, RepositoryKeyConfig, RepositoryManagerRequest,
+            RepositoryManagerRequestStream,
         },
-        fidl_fuchsia_pkg_rewrite::{EditTransactionRequest, EngineRequest, RuleIteratorRequest},
+        fidl_fuchsia_pkg_rewrite::{
+            EditTransactionRequest, EngineRequest, EngineRequestStream, RuleIteratorRequest,
+        },
         fidl_fuchsia_pkg_rewrite_ext::Rule,
         fuchsia_repo::repository::HttpRepository,
         futures::{channel::mpsc, SinkExt, StreamExt as _, TryStreamExt},
@@ -193,6 +221,45 @@ mod test {
             Rule::new($host_match, $host_replacement, $path_prefix_match, $path_prefix_replacement)
                 .unwrap()
         };
+    }
+
+    struct FakeRcs;
+
+    impl FakeRcs {
+        fn new(repo_manager: FakeRepositoryManager, engine: FakeEngine) -> RemoteControlProxy {
+            let fake_rcs_proxy: RemoteControlProxy =
+                fho::testing::fake_proxy(move |req| match req {
+                    frcs::RemoteControlRequest::ConnectCapability {
+                        moniker: _,
+                        capability_name,
+                        server_chan,
+                        flags: _,
+                        responder,
+                    } => {
+                        match capability_name.as_str() {
+                            RepositoryManagerMarker::PROTOCOL_NAME => repo_manager.spawn(
+                                fidl::endpoints::ServerEnd::<RepositoryManagerMarker>::new(
+                                    server_chan,
+                                )
+                                .into_stream()
+                                .unwrap(),
+                            ),
+                            EngineMarker::PROTOCOL_NAME => engine.spawn(
+                                fidl::endpoints::ServerEnd::<EngineMarker>::new(server_chan)
+                                    .into_stream()
+                                    .unwrap(),
+                            ),
+                            _ => {
+                                unreachable!();
+                            }
+                        }
+                        responder.send(Ok(())).unwrap();
+                    }
+                    _ => panic!("unexpected request: {:?}", req),
+                });
+
+            fake_rcs_proxy
+        }
     }
 
     #[derive(Debug, PartialEq)]
@@ -253,35 +320,46 @@ mod test {
         Add { repo: RepositoryConfig },
     }
 
+    #[derive(Clone)]
     struct FakeRepositoryManager {
         events: Arc<Mutex<Vec<RepositoryManagerEvent>>>,
+        sender: mpsc::Sender<()>,
     }
 
     impl FakeRepositoryManager {
-        fn new() -> (Self, RepositoryManagerProxy, mpsc::Receiver<()>) {
-            let (sender, repo_rx) = mpsc::channel::<()>(1);
+        fn new() -> (Self, mpsc::Receiver<()>) {
+            let (sender, rx) = mpsc::channel::<()>(1);
             let events = Arc::new(Mutex::new(Vec::new()));
-            let events_closure = Arc::clone(&events);
 
-            let repo_proxy: RepositoryManagerProxy =
-                fho::testing::fake_proxy(move |req| match req {
-                    RepositoryManagerRequest::Add { repo, responder } => {
-                        let mut sender = sender.clone();
-                        let events_closure = events_closure.clone();
+            (Self { events, sender }, rx)
+        }
 
-                        fasync::Task::local(async move {
-                            events_closure
-                                .lock()
-                                .unwrap()
-                                .push(RepositoryManagerEvent::Add { repo });
-                            responder.send(Ok(())).unwrap();
-                            let _send = sender.send(()).await.unwrap();
-                        })
-                        .detach();
+        fn spawn(&self, mut stream: RepositoryManagerRequestStream) {
+            let sender = self.sender.clone();
+            let events_closure = Arc::clone(&self.events);
+
+            fasync::Task::local(async move {
+                while let Some(Ok(req)) = stream.next().await {
+                    match req {
+                        RepositoryManagerRequest::Add { repo, responder } => {
+                            let mut sender = sender.clone();
+                            let events_closure = events_closure.clone();
+
+                            fasync::Task::local(async move {
+                                events_closure
+                                    .lock()
+                                    .unwrap()
+                                    .push(RepositoryManagerEvent::Add { repo });
+                                responder.send(Ok(())).unwrap();
+                                let _send = sender.send(()).await.unwrap();
+                            })
+                            .detach();
+                        }
+                        _ => panic!("unexpected request: {:?}", req),
                     }
-                    _ => panic!("unexpected request: {:?}", req),
-                });
-            (Self { events }, repo_proxy, repo_rx)
+                }
+            })
+            .detach();
         }
 
         fn take_events(&self) -> Vec<RepositoryManagerEvent> {
@@ -297,90 +375,99 @@ mod test {
         EditTransactionAdd { rule: Rule },
         EditTransactionCommit,
     }
+
+    #[derive(Clone)]
     struct FakeEngine {
         events: Arc<Mutex<Vec<RewriteEngineEvent>>>,
+        sender: mpsc::Sender<()>,
     }
 
     impl FakeEngine {
-        fn new() -> (Self, EngineProxy, mpsc::Receiver<()>) {
-            Self::with_rules(vec![])
+        fn new() -> (Self, mpsc::Receiver<()>) {
+            let (sender, rx) = mpsc::channel::<()>(1);
+            let events = Arc::new(Mutex::new(Vec::new()));
+
+            (Self { events, sender }, rx)
         }
 
-        fn with_rules(rules: Vec<Rule>) -> (Self, EngineProxy, mpsc::Receiver<()>) {
-            let (sender, rewrite_engine_rx) = mpsc::channel::<()>(1);
-            let rules = Arc::new(Mutex::new(rules));
-            let events = Arc::new(Mutex::new(Vec::new()));
-            let events_closure = Arc::clone(&events);
+        fn spawn(&self, mut stream: EngineRequestStream) {
+            let rules: Arc<Mutex<Vec<Rule>>> = Arc::new(Mutex::new(Vec::<Rule>::new()));
+            let sender = self.sender.clone();
+            let events_closure = Arc::clone(&self.events);
 
-            let rewrite_engine_proxy: EngineProxy =
-                fho::testing::fake_proxy(move |req| match req {
-                    EngineRequest::StartEditTransaction { transaction, control_handle: _ } => {
-                        let mut sender = sender.clone();
-                        let rules = Arc::clone(&rules);
-                        let events_closure = Arc::clone(&events_closure);
+            fasync::Task::local(async move {
+                while let Some(Ok(req)) = stream.next().await {
+                    match req {
+                        EngineRequest::StartEditTransaction { transaction, control_handle: _ } => {
+                            let mut sender = sender.clone();
+                            let rules = Arc::clone(&rules);
+                            let events_closure = Arc::clone(&events_closure);
 
-                        fasync::Task::local(async move {
-                            let mut stream = transaction.into_stream().unwrap();
-                            while let Some(request) = stream.next().await {
-                                let request = request.unwrap();
-                                match request {
-                                    EditTransactionRequest::ResetAll { control_handle: _ } => {
-                                        events_closure
-                                            .lock()
-                                            .unwrap()
-                                            .push(RewriteEngineEvent::ResetAll);
-                                    }
-                                    EditTransactionRequest::ListDynamic {
-                                        iterator,
-                                        control_handle: _,
-                                    } => {
-                                        events_closure
-                                            .lock()
-                                            .unwrap()
-                                            .push(RewriteEngineEvent::ListDynamic);
-                                        let mut stream = iterator.into_stream().unwrap();
-
-                                        let mut rules = rules.lock().unwrap().clone().into_iter();
-
-                                        while let Some(req) = stream.try_next().await.unwrap() {
-                                            let RuleIteratorRequest::Next { responder } = req;
+                            fasync::Task::local(async move {
+                                let mut stream = transaction.into_stream().unwrap();
+                                while let Some(request) = stream.next().await {
+                                    let request = request.unwrap();
+                                    match request {
+                                        EditTransactionRequest::ResetAll { control_handle: _ } => {
                                             events_closure
                                                 .lock()
                                                 .unwrap()
-                                                .push(RewriteEngineEvent::IteratorNext);
+                                                .push(RewriteEngineEvent::ResetAll);
+                                        }
+                                        EditTransactionRequest::ListDynamic {
+                                            iterator,
+                                            control_handle: _,
+                                        } => {
+                                            events_closure
+                                                .lock()
+                                                .unwrap()
+                                                .push(RewriteEngineEvent::ListDynamic);
+                                            let mut stream = iterator.into_stream().unwrap();
 
-                                            if let Some(rule) = rules.next() {
-                                                responder.send(&[rule.into()]).unwrap();
-                                            } else {
-                                                responder.send(&[]).unwrap();
+                                            let mut rules =
+                                                rules.lock().unwrap().clone().into_iter();
+
+                                            while let Some(req) = stream.try_next().await.unwrap() {
+                                                let RuleIteratorRequest::Next { responder } = req;
+                                                events_closure
+                                                    .lock()
+                                                    .unwrap()
+                                                    .push(RewriteEngineEvent::IteratorNext);
+
+                                                if let Some(rule) = rules.next() {
+                                                    responder.send(&[rule.into()]).unwrap();
+                                                } else {
+                                                    responder.send(&[]).unwrap();
+                                                }
                                             }
                                         }
-                                    }
-                                    EditTransactionRequest::Add { rule, responder } => {
-                                        events_closure.lock().unwrap().push(
-                                            RewriteEngineEvent::EditTransactionAdd {
-                                                rule: rule.try_into().unwrap(),
-                                            },
-                                        );
-                                        responder.send(Ok(())).unwrap()
-                                    }
-                                    EditTransactionRequest::Commit { responder } => {
-                                        events_closure
-                                            .lock()
-                                            .unwrap()
-                                            .push(RewriteEngineEvent::EditTransactionCommit);
-                                        let res = responder.send(Ok(())).unwrap();
-                                        let _send = sender.send(()).await.unwrap();
-                                        res
+                                        EditTransactionRequest::Add { rule, responder } => {
+                                            events_closure.lock().unwrap().push(
+                                                RewriteEngineEvent::EditTransactionAdd {
+                                                    rule: rule.try_into().unwrap(),
+                                                },
+                                            );
+                                            responder.send(Ok(())).unwrap()
+                                        }
+                                        EditTransactionRequest::Commit { responder } => {
+                                            events_closure
+                                                .lock()
+                                                .unwrap()
+                                                .push(RewriteEngineEvent::EditTransactionCommit);
+                                            let res = responder.send(Ok(())).unwrap();
+                                            let _send = sender.send(()).await.unwrap();
+                                            res
+                                        }
                                     }
                                 }
-                            }
-                        })
-                        .detach();
+                            })
+                            .detach();
+                        }
+                        _ => panic!("unexpected request: {:?}", req),
                     }
-                    _ => panic!("unexpected request: {:?}", req),
-                });
-            (Self { events }, rewrite_engine_proxy, rewrite_engine_rx)
+                }
+            })
+            .detach();
         }
 
         fn take_events(&self) -> Vec<RewriteEngineEvent> {
@@ -415,8 +502,10 @@ mod test {
             .unwrap();
 
         let (fake_target, fake_target_proxy, mut fake_target_rx) = FakeTarget::new();
-        let (fake_repo, fake_repo_proxy, mut fake_repo_rx) = FakeRepositoryManager::new();
-        let (fake_engine, fake_engine_proxy, mut fake_engine_rx) = FakeEngine::new();
+        let (fake_repo, mut fake_repo_rx) = FakeRepositoryManager::new();
+        let (fake_engine, mut fake_engine_rx) = FakeEngine::new();
+        let fake_rcs_proxy = FakeRcs::new(fake_repo.clone(), fake_engine.clone());
+
         let tmp_port_file = tempfile::NamedTempFile::new().unwrap();
 
         let serve_tool = ServeTool {
@@ -430,9 +519,8 @@ mod test {
                 port_path: Some(tmp_port_file.path().to_string_lossy().into()),
             },
             context: test_env.context.clone(),
+            rcs_proxy: fake_rcs_proxy,
             target_proxy: fake_target_proxy,
-            repo_proxy: fake_repo_proxy,
-            rewrite_engine_proxy: fake_engine_proxy,
         };
 
         let test_stdout = TestBuffer::default();
