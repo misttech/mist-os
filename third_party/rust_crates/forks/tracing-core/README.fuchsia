@@ -12,11 +12,11 @@ No.
 
 # What differs from upstream?
 
-We vendor the exact crate but remove the included copies of spin which are only
-used in no_std environments. If upstream stops shipping vendored code with
-different licenses which won't be used in our build from the main crate, we can
-un-fork (see http://fxbug.dev/132950). This should happen when
-https://github.com/tokio-rs/tracing/issues/492 is resolved.
+We vendor the exact crate but remove the included copies of spin and lazy_static which are only
+used in no_std environments. If upstream stops shipping vendored code with different licenses
+which won't be used in our build from the main crate, we can un-fork. This should happen when both
+https://github.com/matklad/once_cell/issues/61 and https://github.com/tokio-rs/tracing/issues/1165
+are resolved.
 
 # Are there any restrictions to how it should be rolled?
 

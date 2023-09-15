@@ -16,9 +16,9 @@
 //! will contain any fields attached to each event.
 //!
 //! `tracing` represents values as either one of a set of Rust primitives
-//! (`i64`, `u64`, `f64`, `i128`, `u128`, `bool`, and `&str`) or using a
-//! `fmt::Display` or `fmt::Debug` implementation. `Subscriber`s are provided
-//! these primitive value types as `dyn Value` trait objects.
+//! (`i64`, `u64`, `f64`, `bool`, and `&str`) or using a `fmt::Display` or
+//! `fmt::Debug` implementation. `Subscriber`s are provided these primitive
+//! value types as `dyn Value` trait objects.
 //!
 //! These trait objects can be formatted using `fmt::Debug`, but may also be
 //! recorded as typed data by calling the [`Value::record`] method on these
@@ -100,6 +100,7 @@
 //! [`record_value`]: Visit::record_value
 //! [`record_debug`]: Visit::record_debug
 //!
+//! [`Value`]: Value
 //! [span]: super::span
 //! [`Event`]: super::event::Event
 //! [`Metadata`]: super::metadata::Metadata
@@ -109,6 +110,7 @@
 //! [`record`]: super::subscriber::Subscriber::record
 //! [`event`]:  super::subscriber::Subscriber::event
 //! [`Value::record`]: Value::record
+//! [`Visit`]: Visit
 use crate::callsite;
 use crate::stdlib::{
     borrow::Borrow,
@@ -116,7 +118,6 @@ use crate::stdlib::{
     hash::{Hash, Hasher},
     num,
     ops::Range,
-    string::String,
 };
 
 use self::private::ValidLen;
@@ -145,16 +146,6 @@ pub struct Field {
 pub struct Empty;
 
 /// Describes the fields present on a span.
-///
-/// ## Equality
-///
-/// In well-behaved applications, two `FieldSet`s [initialized] with equal
-/// [callsite identifiers] will have identical fields. Consequently, in release
-/// builds, [`FieldSet::eq`] *only* checks that its arguments have equal
-/// callsites. However, the equality of field names is checked in debug builds.
-///
-/// [initialized]: Self::new
-/// [callsite identifiers]: callsite::Identifier
 pub struct FieldSet {
     /// The names of each field on the described span.
     names: &'static [&'static str],
@@ -258,11 +249,13 @@ pub struct Iter {
 /// <code>std::error::Error</code> trait.
 /// </pre></div>
 ///
+/// [`Value`]: Value
 /// [recorded]: Value::record
 /// [`Subscriber`]: super::subscriber::Subscriber
 /// [records an `Event`]: super::subscriber::Subscriber::event
 /// [set of `Value`s added to a `Span`]: super::subscriber::Subscriber::record
 /// [`Event`]: super::event::Event
+/// [`ValueSet`]: ValueSet
 pub trait Visit {
     /// Visits an arbitrary type implementing the [`valuable`] crate's `Valuable` trait.
     ///
@@ -288,16 +281,6 @@ pub trait Visit {
         self.record_debug(field, &value)
     }
 
-    /// Visit a signed 128-bit integer value.
-    fn record_i128(&mut self, field: &Field, value: i128) {
-        self.record_debug(field, &value)
-    }
-
-    /// Visit an unsigned 128-bit integer value.
-    fn record_u128(&mut self, field: &Field, value: u128) {
-        self.record_debug(field, &value)
-    }
-
     /// Visit a boolean value.
     fn record_bool(&mut self, field: &Field, value: bool) {
         self.record_debug(field, &value)
@@ -315,7 +298,6 @@ pub trait Visit {
     /// <strong>Note</strong>: This is only enabled when the Rust standard library is
     /// present.
     /// </pre>
-    /// </div>
     #[cfg(feature = "std")]
     #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     fn record_error(&mut self, field: &Field, value: &(dyn std::error::Error + 'static)) {
@@ -511,8 +493,6 @@ impl_values! {
     record_u64(usize, u32, u16, u8 as u64),
     record_i64(i64),
     record_i64(isize, i32, i16, i8 as i64),
-    record_u128(u128),
-    record_i128(i128),
     record_bool(bool),
     record_f64(f64, f32 as f64)
 }
@@ -617,13 +597,6 @@ where
     #[inline]
     fn record(&self, key: &Field, visitor: &mut dyn Visit) {
         self.as_ref().record(key, visitor)
-    }
-}
-
-impl crate::sealed::Sealed for String {}
-impl Value for String {
-    fn record(&self, key: &Field, visitor: &mut dyn Visit) {
-        visitor.record_str(key, self.as_str())
     }
 }
 
@@ -820,7 +793,6 @@ impl FieldSet {
     ///
     /// [`Identifier`]: super::callsite::Identifier
     /// [`Callsite`]: super::callsite::Callsite
-    #[inline]
     pub(crate) fn callsite(&self) -> callsite::Identifier {
         callsite::Identifier(self.callsite.0)
     }
@@ -858,7 +830,6 @@ impl FieldSet {
     }
 
     /// Returns an iterator over the `Field`s in this `FieldSet`.
-    #[inline]
     pub fn iter(&self) -> Iter {
         let idxs = 0..self.len();
         Iter {
@@ -924,45 +895,10 @@ impl fmt::Display for FieldSet {
     }
 }
 
-impl Eq for FieldSet {}
-
-impl PartialEq for FieldSet {
-    fn eq(&self, other: &Self) -> bool {
-        if core::ptr::eq(&self, &other) {
-            true
-        } else if cfg!(not(debug_assertions)) {
-            // In a well-behaving application, two `FieldSet`s can be assumed to
-            // be totally equal so long as they share the same callsite.
-            self.callsite == other.callsite
-        } else {
-            // However, when debug-assertions are enabled, do NOT assume that
-            // the application is well-behaving; check every the field names of
-            // each `FieldSet` for equality.
-
-            // `FieldSet` is destructured here to ensure a compile-error if the
-            // fields of `FieldSet` change.
-            let Self {
-                names: lhs_names,
-                callsite: lhs_callsite,
-            } = self;
-
-            let Self {
-                names: rhs_names,
-                callsite: rhs_callsite,
-            } = &other;
-
-            // Check callsite equality first, as it is probably cheaper to do
-            // than str equality.
-            lhs_callsite == rhs_callsite && lhs_names == rhs_names
-        }
-    }
-}
-
 // ===== impl Iter =====
 
 impl Iterator for Iter {
     type Item = Field;
-    #[inline]
     fn next(&mut self) -> Option<Field> {
         let i = self.idxs.next()?;
         Some(Field {
@@ -1003,19 +939,6 @@ impl<'a> ValueSet<'a> {
         }
     }
 
-    /// Returns the number of fields in this `ValueSet` that would be visited
-    /// by a given [visitor] to the [`ValueSet::record()`] method.
-    ///
-    /// [visitor]: Visit
-    /// [`ValueSet::record()`]: ValueSet::record()
-    pub fn len(&self) -> usize {
-        let my_callsite = self.callsite();
-        self.values
-            .iter()
-            .filter(|(field, _)| field.callsite() == my_callsite)
-            .count()
-    }
-
     /// Returns `true` if this `ValueSet` contains a value for the given `Field`.
     pub(crate) fn contains(&self, field: &Field) -> bool {
         field.callsite() == self.callsite()
@@ -1026,7 +949,7 @@ impl<'a> ValueSet<'a> {
     }
 
     /// Returns true if this `ValueSet` contains _no_ values.
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         let my_callsite = self.callsite();
         self.values
             .iter()
