@@ -197,20 +197,6 @@ syntax, which is going to be fixed up below.
 
 From //build/assembly/sshd_config.gni:18
 
-### auto_update_packages
-
-Controls the behavior of sysmgr's PackageUpdatingLoader (v1) and the
-full-resolver (v2). If true, when resolving a component an attempt to
-update the component's package is first made through the Software Delivery
-system (specifically, through the package resolver,
-fuchsia.pkg.PackageResolver). If false, no attempt to update is made and
-components are loaded only from packages already available locally (for
-example, because the package is in base).
-
-**Current value (from the default):** `true`
-
-From //build/security.gni:227
-
 ### avb_algorithm
 
 **Current value (from the default):** `"DEPRECATED"`
