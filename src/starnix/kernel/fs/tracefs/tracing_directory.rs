@@ -2,35 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::auth::FsCred;
 use crate::fs::buffers::InputBuffer;
 use crate::fs::*;
 use crate::task::CurrentTask;
 use crate::types::*;
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use fuchsia_trace::*;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::sys::zx_ticks_t;
 
-const TRACE_MARKER_FILENAME: &[u8] = b"trace_marker";
-
-pub struct TracingDirectory {
-    trace_marker: FsNodeHandle,
-}
-
-impl TracingDirectory {
-    pub fn new(fs: &FileSystemHandle) -> Arc<TracingDirectory> {
-        let trace_marker = fs.create_node(
-            TraceMarkerFile::new_node(),
-            FsNodeInfo::new_factory(mode!(IFREG, 0o666), FsCred::root()),
-        );
-        Arc::new(TracingDirectory { trace_marker })
-    }
-}
-
+/// trace_marker, used by applications to write trace events
 struct TraceMarkerFileSource;
 
 impl DynamicFileSource for TraceMarkerFileSource {
@@ -39,7 +23,7 @@ impl DynamicFileSource for TraceMarkerFileSource {
     }
 }
 
-struct TraceMarkerFile {
+pub struct TraceMarkerFile {
     source: DynamicFile<TraceMarkerFileSource>,
     event_stacks: Mutex<HashMap<u64, Vec<(String, zx_ticks_t)>>>,
 }
@@ -65,7 +49,9 @@ impl FileOps for TraceMarkerFile {
         _offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        if let Some(context) = TraceCategoryContext::acquire(cstr!("starnix:atrace")) {
+        if let Some(context) =
+            TraceCategoryContext::acquire(fuchsia_trace::cstr!(trace_category_atrace!()))
+        {
             let bytes = data.read_all()?;
             if let Ok(mut event_stacks) = self.event_stacks.lock() {
                 let now = zx::ticks_get();
@@ -90,36 +76,6 @@ impl FileOps for TraceMarkerFile {
             Ok(bytes.len())
         } else {
             Ok(data.drain())
-        }
-    }
-}
-
-impl FsNodeOps for Arc<TracingDirectory> {
-    fs_node_impl_dir_readonly!();
-
-    fn create_file_ops(
-        &self,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        _flags: OpenFlags,
-    ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(VecDirectory::new_file(vec![VecDirectoryEntry {
-            entry_type: DirectoryEntryType::REG,
-            name: TRACE_MARKER_FILENAME.to_vec(),
-            inode: Some(self.trace_marker.node_id),
-        }]))
-    }
-
-    fn lookup(
-        &self,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        name: &FsStr,
-    ) -> Result<FsNodeHandle, Errno> {
-        if name == TRACE_MARKER_FILENAME {
-            Ok(self.trace_marker.clone())
-        } else {
-            error!(ENOENT)
         }
     }
 }

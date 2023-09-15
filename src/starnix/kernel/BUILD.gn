@@ -7,6 +7,7 @@ import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_macro.gni")
 import("//build/rust/rustc_test.gni")
 import("//src/starnix/kernel/starnix.gni")
+import("//tools/protobuf/rust_proto_library.gni")
 
 declare_args() {
   # Whether or not logging is disabled globally.
@@ -15,6 +16,16 @@ declare_args() {
   # Whether or not tracing is disabled globally.
   # NOTE(https://fxbug.dev/124980) this slows down some microbenchmarks.
   starnix_disable_tracing = false
+}
+
+rust_proto_library("perfetto_consumer_proto") {
+  sources = [
+    "//third_party/perfetto/protos/perfetto/ipc/consumer_port.proto",
+    "//third_party/perfetto/protos/perfetto/ipc/wire_protocol.proto",
+  ]
+  packages = [ "perfetto.protos" ]
+  include_dirs = [ "//third_party/perfetto" ]
+  deps = [ "//third_party/rust_crates:prost" ]
 }
 
 group("kernel") {
@@ -44,6 +55,7 @@ rustc_binary("starnix_kernel_bin") {
 
   source_root = "main.rs"
   deps = [
+    ":perfetto_consumer_proto",
     ":starnix_kernel_config",
     ":vdso-data($target_linux_toolchain)",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
@@ -91,6 +103,7 @@ rustc_binary("starnix_kernel_bin") {
     "//src/lib/fuchsia-sync",
     "//src/lib/process_builder",
     "//src/lib/trace/rust:trace",
+    "//src/lib/trace/rust:trace-observer",
     "//src/lib/trace/rust:trace-provider",
     "//src/lib/ui/flatland-frame-scheduling:flatland-frame-scheduling-lib",
     "//src/lib/ui/fuchsia-framebuffer",
@@ -133,6 +146,7 @@ rustc_binary("starnix_kernel_bin") {
     "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:paste",
+    "//third_party/rust_crates:prost",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:ref-cast",
     "//third_party/rust_crates:regex",
@@ -190,6 +204,7 @@ rustc_binary("starnix_kernel_bin") {
     "device/mem.rs",
     "device/misc.rs",
     "device/mod.rs",
+    "device/perfetto_consumer.rs",
     "device/registry.rs",
     "device/remote_binder.rs",
     "device/starnix.rs",

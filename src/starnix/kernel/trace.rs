@@ -21,6 +21,12 @@ fuchsia_trace::string_name_macro!(trace_category_starnix_task_runtime, "starnix:
 // The name used to track the duration in Starnix while executing a task.
 fuchsia_trace::string_name_macro!(trace_name_run_task, "RunTask");
 
+// The trace category used for atrace events generated within starnix.
+fuchsia_trace::string_name_macro!(trace_category_atrace, "starnix:atrace");
+
+// The name used to identify blob records from the container's Perfetto daemon.
+fuchsia_trace::string_name_macro!(trace_name_perfetto_blob, "starnix_perfetto");
+
 // The name used to track the duration in Starnix while executing a syscall.
 fuchsia_trace::string_name_macro!(trace_name_normal_mode, "NormalMode");
 

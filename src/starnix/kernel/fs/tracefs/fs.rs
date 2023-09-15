@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use super::tracing_directory::*;
+use crate::auth::FsCred;
 use crate::fs::*;
 use crate::task::*;
 use crate::types::*;
@@ -28,7 +29,48 @@ impl FileSystemOps for Arc<TraceFs> {
 impl TraceFs {
     pub fn new_fs(kernel: &Arc<Kernel>, options: FileSystemOptions) -> FileSystemHandle {
         let fs = FileSystem::new(kernel, CacheMode::Uncached, Arc::new(TraceFs), options);
-        fs.set_root(TracingDirectory::new(&fs));
+        let mut dir = StaticDirectoryBuilder::new(&fs);
+
+        dir.node(
+            b"trace",
+            fs.create_node(
+                ConstFile::new_node(vec![]),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
+            ),
+        );
+        // The remaining contents of the fs are a minimal set of files that we want to exist so
+        // that Perfetto's ftrace controller will not error out. None of them provide any real
+        // functionality.
+        dir.subdir(b"per_cpu", 0o755, |dir| {
+            for cpu in 0..fuchsia_zircon::system_get_num_cpus() {
+                let dir_name = format!("cpu{}", cpu);
+                dir.subdir(Box::leak(dir_name.into_boxed_str()).as_bytes(), 0o755, |dir| {
+                    dir.node(
+                        b"trace_pipe_raw",
+                        fs.create_node(
+                            ConstFile::new_node(vec![]),
+                            FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
+                        ),
+                    );
+                });
+            }
+        });
+        dir.node(
+            b"tracing_on",
+            fs.create_node(
+                ConstFile::new_node(b"0".to_vec()),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
+            ),
+        );
+        dir.node(
+            b"trace_marker",
+            fs.create_node(
+                TraceMarkerFile::new_node(),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
+            ),
+        );
+        dir.build_root();
+
         fs
     }
 }

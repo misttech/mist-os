@@ -5,7 +5,7 @@
 use crate::{
     device::{
         binder::create_binders, framebuffer::fb_device_init, input::init_input_devices,
-        starnix::magma_device_init,
+        perfetto_consumer::start_perfetto_consumer_thread, starnix::magma_device_init,
     },
     logging::log_warn,
     task::Kernel,
@@ -23,7 +23,8 @@ use fidl_fuchsia_ui_views as fuiviews;
 /// function.
 pub fn run_features(entries: &Vec<String>, kernel: &Arc<Kernel>) -> Result<(), Errno> {
     for entry in entries {
-        match entry.as_str() {
+        let entry_type = entry.split_once(':').map(|(ty, _)| ty).unwrap_or(entry);
+        match entry_type {
             "binder" => {
                 // Creates the various binder drivers (/dev/binder, /dev/hwbinder, /dev/vndbinder).
                 create_binders(kernel)?;
@@ -38,6 +39,13 @@ pub fn run_features(entries: &Vec<String>, kernel: &Arc<Kernel>) -> Result<(), E
             }
             "test_data" => {}
             "custom_artifacts" => {}
+            "perfetto" => {
+                let socket_path = entry
+                    .split_once(':')
+                    .expect("Perfetto feature must have a socket path specified")
+                    .1;
+                start_perfetto_consumer_thread(kernel, socket_path.as_bytes())?;
+            }
             feature => {
                 log_warn!("Unsupported feature: {:?}", feature);
             }

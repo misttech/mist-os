@@ -284,6 +284,43 @@ impl DynamicFileBuf {
     }
 }
 
+/// A file whose contents are fixed even if writes occur.
+pub struct ConstFile(DynamicFile<ConstFileSource>);
+
+struct ConstFileSource {
+    data: Vec<u8>,
+}
+
+impl DynamicFileSource for ConstFileSource {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+        sink.write(&self.data);
+        Ok(())
+    }
+}
+
+impl ConstFile {
+    /// Create a file with the given contents.
+    pub fn new_node(data: Vec<u8>) -> impl FsNodeOps {
+        SimpleFileNode::new(move || {
+            Ok(Self(DynamicFile::new(ConstFileSource { data: data.clone() })))
+        })
+    }
+}
+
+impl FileOps for ConstFile {
+    fileops_impl_delegate_read_and_seek!(self, self.0);
+
+    fn write(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: usize,
+        data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        Ok(data.drain())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

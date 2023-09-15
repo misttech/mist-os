@@ -729,6 +729,7 @@ impl SocketOps for UnixSocket {
                 SO_REUSEADDR => (self.get_reuseaddr() as u32).as_bytes().to_vec(),
                 SO_REUSEPORT => (self.get_reuseport() as u32).as_bytes().to_vec(),
                 SO_KEEPALIVE => (self.get_keepalive() as u32).as_bytes().to_vec(),
+                SO_ERROR => (0u32).as_bytes().to_vec(),
                 _ => return error!(ENOPROTOOPT),
             },
             _ => return error!(ENOPROTOOPT),
