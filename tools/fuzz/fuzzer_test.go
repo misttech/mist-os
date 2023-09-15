@@ -35,25 +35,6 @@ func TestIsExample(t *testing.T) {
 	}
 }
 
-func TestIsV2(t *testing.T) {
-	build, _ := newMockBuild()
-	f, err := build.Fuzzer("foo/bar")
-	if err != nil {
-		t.Fatalf("failed to load fuzzer: %s", err)
-	}
-	if f.isV2() {
-		t.Fatalf("incorrect version detection for fuzzer %s", f.Name)
-	}
-
-	f, err = build.Fuzzer("cff/fuzzer")
-	if err != nil {
-		t.Fatalf("failed to load fuzzer: %s", err)
-	}
-	if !f.isV2() {
-		t.Fatalf("incorrect version detection for fuzzer %s", f.Name)
-	}
-}
-
 func TestUseFuzzCtl(t *testing.T) {
 	build, _ := newMockBuild()
 	f, err := build.Fuzzer("cff/fuzzer")
@@ -103,11 +84,11 @@ func TestAbsPath(t *testing.T) {
 	}
 
 	absPaths := map[string]string{
-		"pkg/data/relpath":  "/pkgfs/packages/foo/0/data/relpath",
+		"pkg/data/relpath":  "/tmp/fuzz_ctl/fuchsia.com/foo/bar/pkg/data/relpath",
 		"/pkg/data/relpath": "/pkg/data/relpath",
-		"data/relpath":      "/tmp/r/sys/fuchsia.com:foo:0#meta:bar.cmx/relpath",
+		"data/relpath":      "/tmp/fuzz_ctl/fuchsia.com/foo/bar/relpath",
 		"/data/relpath":     "/data/relpath",
-		"relpath":           "/relpath",
+		"relpath":           "/tmp/fuzz_ctl/fuchsia.com/foo/bar/relpath",
 		"/relpath":          "/relpath",
 	}
 	for relpath, expected := range absPaths {
@@ -302,7 +283,7 @@ func TestPrepare(t *testing.T) {
 		t.Fatalf("incorrect ffx history: %v", conn.FfxHistory)
 	}
 
-	if !reflect.DeepEqual(conn.CmdHistory, []string{"pkgctl", "killall", "rm"}) {
+	if !reflect.DeepEqual(conn.CmdHistory, []string{"fuzz_ctl"}) {
 		t.Fatalf("incorrect command history: %v", conn.CmdHistory)
 	}
 }

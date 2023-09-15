@@ -259,7 +259,7 @@ func TestInstance(t *testing.T) {
 	out := outBuf.String()
 
 	// Just a basic check here, more are done in fuzzer_tests
-	if !strings.Contains(out, "fuchsia-pkg://fuchsia.com/foo#meta/bar.cmx") {
+	if !strings.Contains(out, "fuchsia-pkg://fuchsia.com/foo#meta/bar.cm") {
 		t.Fatalf("fuzzer output missing package: %q", out)
 	}
 
@@ -274,7 +274,7 @@ func TestInstance(t *testing.T) {
 	}
 
 	expected := []transferCmd{
-		{"/tmp/r/sys/fuchsia.com:foo:0#meta:bar.cmx/path/to/remoteFile",
+		{"/tmp/fuzz_ctl/fuchsia.com/foo/bar/path/to/remoteFile",
 			tmpDir}}
 	got := i.Connector.(*mockConnector).PathsGot
 	if !reflect.DeepEqual(got, expected) {
@@ -291,7 +291,7 @@ func TestInstance(t *testing.T) {
 	}
 
 	expected = []transferCmd{{tmpFile,
-		"/tmp/r/sys/fuchsia.com:foo:0#meta:bar.cmx/path/to/otherFile"}}
+		"/tmp/fuzz_ctl/fuchsia.com/foo/bar/path/to/otherFile"}}
 	got = i.Connector.(*mockConnector).PathsPut
 	if !reflect.DeepEqual(got, expected) {
 		t.Fatalf("incorrect file put list: %v", got)
@@ -340,7 +340,7 @@ func TestInstanceRunFuzzerWithArtifactFetch(t *testing.T) {
 		t.Fatalf("fuzzer output missing host artifact path: %q", out)
 	}
 
-	expected := []transferCmd{{"/tmp/r/sys/fuchsia.com:foo:0#meta:bar.cmx/wow/xcrash-1312",
+	expected := []transferCmd{{"/tmp/fuzz_ctl/fuchsia.com/foo/bar/wow/xcrash-1312",
 		hostArtifactDir}}
 	got := i.Connector.(*mockConnector).PathsGot
 	if !reflect.DeepEqual(got, expected) {

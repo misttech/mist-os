@@ -40,7 +40,7 @@ func (c *mockInstanceCmd) getOutput() ([]byte, error) {
 		return nil, fmt.Errorf("unknown command: %q", c.name)
 	}
 
-	re := regexp.MustCompile(`fuchsia-pkg://fuchsia\.com/([^#]+)#meta/([^\.]+)\.cmx?`)
+	re := regexp.MustCompile(`fuchsia-pkg://fuchsia\.com/([^#]+)#meta/([^\.]+)\.cm`)
 	m := re.FindStringSubmatch(args[0])
 	if m == nil {
 		return nil, fmt.Errorf("unexpected %s argument: %q", c.name, args[0])

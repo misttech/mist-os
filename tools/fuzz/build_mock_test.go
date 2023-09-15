@@ -64,13 +64,13 @@ func (b *mockBuild) enableQemu(t *testing.T, fakeType string) (tmpDir string) {
 func (b *mockBuild) Fuzzer(name string) (*Fuzzer, error) {
 	switch name {
 	case "example-fuzzers/noop_fuzzer":
-		return NewV1Fuzzer(b, "example-fuzzers", "noop_fuzzer"), nil
+		return NewV2Fuzzer(b, "example-fuzzers", "noop_fuzzer", b.useFfxFuzz), nil
 	case "foo/bar":
-		return NewV1Fuzzer(b, "foo", "bar"), nil
+		return NewV2Fuzzer(b, "foo", "bar", b.useFfxFuzz), nil
 	case "fail/nopid":
-		return NewV1Fuzzer(b, "fail", "nopid"), nil
+		return NewV2Fuzzer(b, "fail", "nopid", b.useFfxFuzz), nil
 	case "fail/notfound":
-		return NewV1Fuzzer(b, "fail", "notfound"), nil
+		return NewV2Fuzzer(b, "fail", "notfound", b.useFfxFuzz), nil
 	case "cff/fuzzer":
 		return NewV2Fuzzer(b, "cff", "fuzzer", b.useFfxFuzz), nil
 	case "cff/broken":

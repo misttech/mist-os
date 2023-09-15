@@ -46,10 +46,6 @@ var expectedFuzzerReturnCodes = []int{
 	77, // libFuzzer crash
 }
 
-// NewV1Fuzzer and NewV2Fuzzer construct a fuzzer object with the given pkg/fuzzer name
-func NewV1Fuzzer(build Build, pkg, component string) *Fuzzer {
-	return newFuzzer(build, pkg, component, "cmx", false)
-}
 func NewV2Fuzzer(build Build, pkg, component string, useFfx bool) *Fuzzer {
 	return newFuzzer(build, pkg, component, "cm", useFfx)
 }
@@ -75,19 +71,14 @@ func (f *Fuzzer) IsExample() bool {
 			f.Name == "example-fuzzers/toy_example_arbitrary")
 }
 
-// Return whether or not this is a Component Fuzzing Framework fuzzer
-func (f *Fuzzer) isV2() bool {
-	return strings.HasSuffix(f.manifest, ".cm")
-}
-
 // Return whether or not undercoat should command the fuzzer using `ffx fuzz`.
 func (f *Fuzzer) useFfxFuzz() bool {
-	return f.isV2() && f.useFfx
+	return f.useFfx
 }
 
 // Return whether or not undercoat should command the fuzzer using `fuzz_ctl`.
 func (f *Fuzzer) useFuzzCtl() bool {
-	return f.isV2() && !f.useFfxFuzz()
+	return !f.useFfxFuzz()
 }
 
 // Map paths as referenced by ClusterFuzz to internally-used paths as seen by
@@ -706,15 +697,6 @@ func (f *Fuzzer) Run(conn Connector, out io.Writer, hostArtifactDir string) ([]s
 	fuzzerOutput, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, fmt.Errorf("error getting fuzzer stdout: %s", err)
-	}
-	if !f.isV2() {
-		// `ffx fuzz` and `fuzz_ctl` combine stdout and stderr into stdout for
-		// us already, but for v1 fuzzers we need to do this ourself
-		fuzzerStderr, err := cmd.StderrPipe()
-		if err != nil {
-			return nil, fmt.Errorf("error getting fuzzer stderr: %s", err)
-		}
-		fuzzerOutput = parallelMultiReader(fuzzerOutput, fuzzerStderr)
 	}
 
 	if err := cmd.Start(); err != nil {

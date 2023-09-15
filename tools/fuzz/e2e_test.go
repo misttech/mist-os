@@ -571,11 +571,6 @@ func TestFuzzNoisy(t *testing.T) {
 		"-max_total_time=1")
 	glog.Info(out)
 
-	// v1 fuzzers cannot suppress stdout/syslog.
-	if strings.Contains(out, "noisy_fuzzer.cmx") {
-		return
-	}
-
 	if !strings.Contains(out, "libFuzzer starting") {
 		t.Fatalf("output missing stderr: %s", out)
 	}

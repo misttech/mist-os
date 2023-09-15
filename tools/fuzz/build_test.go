@@ -115,19 +115,6 @@ func TestFindToolPath(t *testing.T) {
 func TestLoadFuzzers(t *testing.T) {
 	build := newBaseBuild()
 
-	data := `[
-	{"label": "//src/foo:bar", "package": "foo", "package_url": "fuchsia-pkg://fuchsia.com/foo"},
-	{"label": "//src/foo:bar", "fuzzer": "bar-fuzzer", "manifest": "bar-fuzzer.cmx"},
-	{"label": "//src/foo:baz", "package": "foo", "package_url": "fuchsia-pkg://fuchsia.com/foo"},
-	{"label": "//src/foo:baz", "fuzzer": "baz-fuzzer", "manifest": "baz-fuzzer.cmx"},
-	{"label": "//src/foo:baz", "corpus": "//src/foo/baz-corpus"}
-	]`
-
-	filename := createTempfileWithContents(t, data, "json")
-	defer os.Remove(filename)
-
-	build.Paths["fuzzers.json"] = filename
-
 	testData := `[{
     "environments": [
       {
@@ -153,6 +140,32 @@ func TestLoadFuzzers(t *testing.T) {
       "package_url": "fuchsia-pkg://fuchsia.com/example-fuzzers#meta/crash_fuzzer.cm",
       "runtime_deps": "gen/examples/fuzzers/crash_fuzzer_component_test.deps.json"
     }
+  },
+  {
+    "environments": [
+      {
+        "dimensions": {
+          "device_type": "AEMU"
+        },
+        "is_emu": true
+      }
+    ],
+    "test": {
+      "build_rule": "fuchsia_fuzzer_package",
+      "cpu": "x64",
+      "label": "//foo/fuzzers:foo-fuzzer_package(//build/toolchain/fuchsia:x64)",
+      "log_settings": {
+        "max_severity": "WARN"
+      },
+      "name": "fuchsia-pkg://fuchsia.com/foo-fuzzers#meta/crash_fuzzer.cm",
+      "os": "fuchsia",
+      "package_label": "//foo/fuzzers:foo-fuzzers_fuzzed(//build/toolchain/fuchsia:x64)",
+      "package_manifests": [
+        "obj/foo/fuzzers/foo-fuzzer_package/package_manifest.json"
+      ],
+      "package_url": "fuchsia-pkg://fuchsia.com/foo-fuzzers#meta/crash_fuzzer.cm",
+      "runtime_deps": "gen/foo/fuzzers/crash_fuzzer_component_test.deps.json"
+    }
   }]`
 
 	testFilename := createTempfileWithContents(t, testData, "json")
@@ -164,55 +177,12 @@ func TestLoadFuzzers(t *testing.T) {
 		t.Fatalf("error loading fuzzers: %s", err)
 	}
 
-	if _, err := build.Fuzzer("foo/bar-fuzzer"); err != nil {
+	if _, err := build.Fuzzer("example-fuzzers/crash_fuzzer"); err != nil {
 		t.Fatalf("missing expected fuzzer")
-	}
-
-	f, err := build.Fuzzer("foo/baz-fuzzer")
-	if err != nil {
-		t.Fatalf("missing expected fuzzer")
-	}
-	if f.isV2() {
-		t.Fatalf("incorrect version detection for fuzzer %s", f.Name)
-	}
-
-	f, err = build.Fuzzer("example-fuzzers/crash_fuzzer")
-	if err != nil {
-		t.Fatalf("missing expected fuzzer")
-	}
-	if !f.isV2() {
-		t.Fatalf("incorrect version detection for fuzzer %s", f.Name)
-	}
-}
-
-func TestListFuzzers(t *testing.T) {
-	build := newBaseBuild()
-
-	data := `[
-	{"label": "//src/foo:bar", "package": "foo", "package_url": "fuchsia-pkg://fuchsia.com/foo"},
-	{"label": "//src/foo:bar", "fuzzer": "bar-fuzzer", "manifest": "bar-fuzzer.cmx"},
-	{"label": "//src/example-fuzzers:baz", "package": "example-fuzzers",
-		"package_url": "fuchsia-pkg://fuchsia.com/example-fuzzers"},
-	{"label": "//src/example-fuzzers:baz", "fuzzer": "baz-fuzzer", "manifest": "baz-fuzzer.cmx"}
-	]`
-
-	filename := createTempfileWithContents(t, data, "json")
-	defer os.Remove(filename)
-
-	build.Paths["fuzzers.json"] = filename
-
-	// While the Build path needs to be defined, loading fuzzers should still
-	// succeed even if tests.json does not actually exist.
-	build.Paths["tests.json"] = invalidPath
-
-	if err := build.LoadFuzzers(); err != nil {
-		t.Fatalf("error loading fuzzers: %s", err)
 	}
 
 	fuzzers := build.ListFuzzers()
-
-	// Example fuzzer should be excluded
-	if !reflect.DeepEqual(fuzzers, []string{"foo/bar-fuzzer"}) {
+	if !reflect.DeepEqual(fuzzers, []string{"foo-fuzzers/crash_fuzzer"}) {
 		t.Fatalf("incorrect fuzzer list: %v", fuzzers)
 	}
 }
