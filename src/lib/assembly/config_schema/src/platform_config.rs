@@ -101,7 +101,8 @@ pub struct PlatformConfig {
     pub session: session_manager_config::PlatformSessionManagerConfig,
 
     /// Platform configuration options for the SWD subsystem.
-    pub software_delivery: Option<swd_config::SwdConfig>,
+    #[serde(default)]
+    pub software_delivery: swd_config::SwdConfig,
 
     /// Platform configuration options for the starnix area.
     #[serde(default)]

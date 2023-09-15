@@ -58,34 +58,31 @@ impl DefaultByBuildType for SwdConfig {
 }
 
 pub(crate) struct SwdSubsystemConfig;
-impl DefineSubsystemConfiguration<Option<SwdConfig>> for SwdSubsystemConfig {
-    /// Configures the SWD system. If |subsystem_config| is None, no SWD system
-    /// is configured by this call.
-    /// Configures the SWD system. If |subsystem_config| is None, the default
-    /// is set based on the build type and/or feature set level.
+impl DefineSubsystemConfiguration<SwdConfig> for SwdSubsystemConfig {
+    /// Configures the SWD system. If a specific field is not specified, a
+    /// default will be used based on the feature set level and the build type.
     fn define_configuration(
         context: &ConfigurationContext<'_>,
-        subsystem_config: &Option<SwdConfig>,
+        subsystem_config: &SwdConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        match subsystem_config {
-            // Add the checker according to the configuration
-            Some(SwdConfig { update_checker: Some(update_checker), .. }) => {
-                Self::set_update_checker(Some(update_checker), builder)?;
+        match &subsystem_config.update_checker {
+            // The product set a specific update checker. Use that one.
+            Some(update_checker) => {
+                Self::set_update_checker(&update_checker, builder)?;
             }
-            // No checker is set or there is no SWD config at all, set based on
-            // feature set level
-            Some(SwdConfig { update_checker: None, .. }) | None => {
+            // The product does not specify. Set based on feature set level.
+            None => {
                 match context.feature_set_level {
                     // Minimal has an update checker
                     FeatureSupportLevel::Minimal => {
                         let update_checker =
                             UpdateChecker::default_by_build_type(context.build_type);
-                        Self::set_update_checker(Some(&update_checker), builder)?;
+                        Self::set_update_checker(&update_checker, builder)?;
                     }
                     // Utility has no update checker
                     FeatureSupportLevel::Utility => {
-                        Self::set_update_checker(None, builder)?;
+                        builder.platform_bundle("no_update_checker");
                     }
                     // Bootstrap has neither an update checker nor the system-update realm,
                     // so do not include `no_update_checker` AIB that requires the realm.
@@ -94,10 +91,8 @@ impl DefineSubsystemConfiguration<Option<SwdConfig>> for SwdSubsystemConfig {
             }
         }
 
-        if let Some(SwdConfig { include_configurator, .. }) = subsystem_config {
-            if *include_configurator {
-                builder.platform_bundle("system_update_configurator");
-            }
+        if subsystem_config.include_configurator {
+            builder.platform_bundle("system_update_configurator");
         }
 
         Ok(())
@@ -107,11 +102,11 @@ impl DefineSubsystemConfiguration<Option<SwdConfig>> for SwdSubsystemConfig {
 impl SwdSubsystemConfig {
     /// Configure which AIB to select based on the UpdateChecker
     fn set_update_checker(
-        update_checker: Option<&UpdateChecker>,
+        update_checker: &UpdateChecker,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
         match update_checker {
-            Some(UpdateChecker::OmahaClient(OtaConfigs { policy_config, .. })) => {
+            UpdateChecker::OmahaClient(OtaConfigs { policy_config, .. }) => {
                 builder.platform_bundle("omaha_client");
                 let mut omaha_config =
                     builder.package("omaha-client").component("meta/omaha-client-service.cm")?;
@@ -122,11 +117,8 @@ impl SwdSubsystemConfig {
                     .field("retry_delay_seconds", policy_config.retry_delay_seconds)?
                     .field("fuzz_percentage_range", policy_config.fuzz_percentage_range)?;
             }
-            Some(UpdateChecker::SystemUpdateChecker) => {
+            UpdateChecker::SystemUpdateChecker => {
                 builder.platform_bundle("system_update_checker");
-            }
-            None => {
-                builder.platform_bundle("no_update_checker");
             }
         }
         Ok(())
