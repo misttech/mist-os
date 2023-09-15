@@ -39,8 +39,6 @@ fuchsia_driver("wlantap_driver-driver") {
     ":wlantapctl_bind",
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_hlcpp",
-    "//sdk/fidl/fuchsia.wlan.device:fuchsia.wlan.device_hlcpp",
-    "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_cpp",
     "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_bindlib_cpp",
     "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
     "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_bindlib_cpp",

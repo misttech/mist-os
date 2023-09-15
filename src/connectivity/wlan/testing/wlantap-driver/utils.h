@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.wlan.softmac/cpp/driver/wire.h>
 #include <fidl/fuchsia.wlan.tap/cpp/wire.h>
 #include <fuchsia/wlan/common/cpp/fidl.h>
-#include <fuchsia/wlan/device/cpp/fidl.h>
 
 #include <string>
 
