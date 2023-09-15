@@ -391,6 +391,7 @@ sdk_molecule("core_lib") {
     "//sdk/lib/fdio:fdio_sdk",
     "//sdk/lib/fidl/cpp:cpp_sdk",
     "//sdk/lib/fidl/cpp/wire:wire_sdk",
+    "//sdk/lib/fidl_driver:fidl_driver_natural_sdk",
     "//sdk/lib/fidl_driver:fidl_driver_sdk",
     "//sdk/lib/fit-promise:fit-promise_sdk",
     "//sdk/lib/input_report_reader:input_report_reader_sdk",

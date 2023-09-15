@@ -41,6 +41,7 @@ cc_source_library://pkg/fidl_cpp_sync
 cc_source_library://pkg/fidl_cpp_v2
 cc_source_library://pkg/fidl_cpp_wire
 cc_source_library://pkg/fidl_driver
+cc_source_library://pkg/fidl_driver_natural
 cc_source_library://pkg/fidl_driver_transport
 cc_source_library://pkg/fit
 cc_source_library://pkg/fit-promise

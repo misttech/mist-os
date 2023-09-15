@@ -182,6 +182,7 @@
 //sdk/lib/fidl/cpp:cpp_sync_sdk
 //sdk/lib/fidl:fidl_sdk
 //sdk/lib/fidl_base:fidl_base_sdk
+//sdk/lib/fidl_driver:fidl_driver_natural_sdk
 //sdk/lib/fidl_driver:fidl_driver_sdk
 //sdk/lib/fidl_driver:fidl_driver_transport_sdk
 //sdk/lib/fit-promise:fit-promise_sdk
