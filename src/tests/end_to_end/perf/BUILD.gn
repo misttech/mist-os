@@ -22,7 +22,6 @@ test_list = [
   "diagnostics_benchmarks_test",
   "extended_pstate_benchmarks_test",
   "fidlc_microbenchmarks_test",
-  "flatland_benchmarks_test",
   "input_latency_benchmarks_test",
   "kernel_boot_stats_test",
   "microbenchmarks_test",

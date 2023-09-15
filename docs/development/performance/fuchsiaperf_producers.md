@@ -29,11 +29,6 @@ assumptions about the type of performance test being written.
         produce performance results. In that case, it is common to
         modify the software-under-test to generate extra trace events.
 
-        An example is
-        [`flatland_benchmarks_test.dart`](/src/tests/end_to_end/perf/test/flatland_benchmarks_test.dart),
-        which uses the `trace_processing` library by defining a
-        `MetricsSpecSet`.
-
     *   **Low level:** You can use the [`TestCaseResults`
         class][metrics_results] to generate entries for
         `fuchsiaperf.json` files. This is commonly used with the
