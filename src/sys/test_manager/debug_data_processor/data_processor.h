@@ -62,7 +62,7 @@ class DataProcessor : public AbstractDataProcessor {
   /// {
   ///   "tests":[
   ///      {
-  ///         "name":"test_url1.cmx",
+  ///         "name":"test_url1.cm",
   ///         "data_sinks":{
   ///            "test1_sink1":[
   ///               {

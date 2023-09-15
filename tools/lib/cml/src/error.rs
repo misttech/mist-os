@@ -21,7 +21,7 @@ pub struct Location {
     pub column: usize,
 }
 
-/// Enum type that can represent any error encountered by a cmx operation.
+/// Enum type that can represent any error encountered by a cml operation.
 #[derive(Debug)]
 pub enum Error {
     DuplicateRights(String),

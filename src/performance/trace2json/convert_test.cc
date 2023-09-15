@@ -109,9 +109,11 @@ TEST(ConvertTest, DISABLED_SimpleTrace) {
 TEST(ConvertTest, DISABLED_ExampleBenchmark) {
   // example_benchmark.fxt is the trace written by the program in
   // garnet/examples/benchmark, in this case run on qemu. To collect the trace,
-  // include //src/examples/benchmark in your build and then run
-  // `fx traceutil record -binary -spawn /bin/run
-  // fuchsia-pkg://fuchsia.com/benchmark#meta/benchmark.cmx`
+  // include //src/examples/benchmark in your build and then run:
+  // ffx trace start --duration 10 --categories "benchmark"
+  // ffx component run /core/ffx-laboratory:benchmark
+  // "fuchsia-pkg://fuchsia.com/benchmark#meta/benchmark.cm"
+
   std::string test_data_path = GetTestDataPath();
   ConvertSettings settings;
   settings.input_file_name = test_data_path + "example_benchmark.fxt";

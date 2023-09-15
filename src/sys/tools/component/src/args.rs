@@ -126,7 +126,7 @@ pub struct CapabilityArgs {
 #[argh(subcommand, name = "list", description = "Same as `ffx component list`")]
 pub struct ListArgs {
     #[argh(option, long = "only", short = 'o')]
-    /// filter the instance list by a criteria: cmx, cml, running, stopped, ancestors:<component_name>, descendants:<component_name>, or relatives:<component_name>
+    /// filter the instance list by a criteria: running, stopped, ancestors:<component_name>, descendants:<component_name>, or relatives:<component_name>
     pub filter: Option<ListFilter>,
 
     #[argh(switch, long = "verbose", short = 'v')]

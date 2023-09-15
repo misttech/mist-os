@@ -45,8 +45,8 @@ impl PackageBuildManifest {
     ///     "lib/mylib.so".to_string() => "build/system/path/mylib.so".to_string()
     /// };
     /// let far_contents = btreemap! {
-    ///     "meta/my_component_manifest.cmx".to_string() =>
-    ///         "other/build/system/path/my_component_manifest.cmx".to_string()
+    ///     "meta/my_component_manifest.cm".to_string() =>
+    ///         "other/build/system/path/my_component_manifest.cm".to_string()
     /// };
     /// let creation_manifest =
     ///     PackageBuildManifest::from_external_and_far_contents(external_contents, far_contents)
