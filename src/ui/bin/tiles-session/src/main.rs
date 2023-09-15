@@ -4,15 +4,12 @@
 
 use {
     anyhow::{Context, Error},
-    async_trait::async_trait,
     fidl::endpoints::{create_proxy, ControlHandle, Proxy, RequestStream},
     fidl_fuchsia_element as element, fidl_fuchsia_session_scene as scene,
     fidl_fuchsia_ui_composition as ui_comp, fidl_fuchsia_ui_views as ui_views,
     fuchsia_async as fasync,
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs, server::ServiceObj},
-    fuchsia_scenic::{
-        flatland::IdGenerator as FlatlandIdGenerator, flatland::ViewCreationTokenPair, ViewRefPair,
-    },
+    fuchsia_scenic::{flatland::IdGenerator, flatland::ViewCreationTokenPair, ViewRefPair},
     fuchsia_zircon as zx,
     futures::{channel::mpsc::UnboundedSender, StreamExt, TryStreamExt},
     std::collections::HashMap,
@@ -52,30 +49,26 @@ pub enum MessageInternal {
     },
 }
 
-#[async_trait]
-pub trait TilesSession {
-    async fn handle_message(&mut self, message: MessageInternal) -> Result<(), Error>;
-}
-struct FlatlandChildView {
+struct ChildView {
     viewport_transform_id: ui_comp::TransformId,
     viewport_content_id: ui_comp::ContentId,
 }
 
-pub struct FlatlandTilesSession {
+pub struct TilesSession {
     internal_sender: UnboundedSender<MessageInternal>,
     flatland: ui_comp::FlatlandProxy,
-    id_generator: FlatlandIdGenerator,
+    id_generator: IdGenerator,
     view_focuser: ui_views::FocuserProxy,
     root_transform_id: ui_comp::TransformId,
     layout_info: ui_comp::LayoutInfo,
-    tiles: HashMap<TileId, FlatlandChildView>,
+    tiles: HashMap<TileId, ChildView>,
     next_tile_id: u64,
 }
 
-impl Drop for FlatlandTilesSession {
+impl Drop for TilesSession {
     fn drop(&mut self) {
+        info!("dropping TilesSession");
         let flatland = &self.flatland;
-        let root_transform = &mut self.root_transform_id;
         let tiles = &mut self.tiles;
         tiles.retain(|key, tile| {
             if let Err(e) = Self::release_tile_resources(flatland, tile) {
@@ -83,17 +76,13 @@ impl Drop for FlatlandTilesSession {
             }
             false
         });
-        if let Err(e) = flatland.release_transform(root_transform) {
-            error!("Error releasing root transform: {e}");
-        }
-        if let Err(e) = flatland.release_view() {
-            error!("Error releasing view: {e}");
+        if let Err(e) = flatland.clear() {
+            error!("Error clearing Flatland: {e}");
         }
     }
 }
 
-#[async_trait]
-impl TilesSession for FlatlandTilesSession {
+impl TilesSession {
     async fn handle_message(&mut self, message: MessageInternal) -> Result<(), Error> {
         match message {
             // The ElementManager has asked us (via GraphicalPresenter::PresentView()) to display
@@ -156,10 +145,8 @@ impl TilesSession for FlatlandTilesSession {
                 // Track all of the child view's resources.
                 let new_tile_id = TileId(self.next_tile_id);
                 self.next_tile_id += 1;
-                self.tiles.insert(
-                    new_tile_id,
-                    FlatlandChildView { viewport_transform_id, viewport_content_id },
-                );
+                self.tiles
+                    .insert(new_tile_id, ChildView { viewport_transform_id, viewport_content_id });
 
                 // Alert the client that the view has been presented, then begin servicing ViewController requests.
                 let view_controller_request_stream = view_controller_request_stream.unwrap();
@@ -229,12 +216,10 @@ impl TilesSession for FlatlandTilesSession {
             }
         }
     }
-}
 
-impl FlatlandTilesSession {
     pub async fn new(
         internal_sender: UnboundedSender<MessageInternal>,
-    ) -> Result<FlatlandTilesSession, Error> {
+    ) -> Result<TilesSession, Error> {
         // TODO(fxbug.dev/88656): do something like this to instantiate the library component that knows
         // how to generate a Flatland scene to lay views out on a tiled grid.  It will be used in the
         // event loop below.
@@ -250,24 +235,24 @@ impl FlatlandTilesSession {
         // would deadlock.  Conversely, if we just dropped the future, then scene_manager would barf
         // because it would try to reply to present_root_view() on a closed channel.  So we kick off
         // the async FIDL request (which is not idiomatic for Rust, where typically the "future
-        // doesn't do anything" until awaited), and then call create_flatland_tiles_session() so
+        // doesn't do anything" until awaited), and then call create_tiles_session() so
         // that present_root_view() eventually returns a result.
         let ViewCreationTokenPair { view_creation_token, viewport_creation_token } =
             ViewCreationTokenPair::new()?;
         let fut = scene_manager.present_root_view(viewport_creation_token);
         let tiles_session =
-            Self::create_flatland_tiles_session(view_creation_token, internal_sender).await?;
+            Self::create_tiles_session(view_creation_token, internal_sender).await?;
         let _ = fut.await?;
         Ok(tiles_session)
     }
 
-    async fn create_flatland_tiles_session(
+    async fn create_tiles_session(
         view_creation_token: ui_views::ViewCreationToken,
         internal_sender: UnboundedSender<MessageInternal>,
-    ) -> Result<FlatlandTilesSession, Error> {
+    ) -> Result<TilesSession, Error> {
         let flatland = connect_to_protocol::<ui_comp::FlatlandMarker>()
             .expect("failed to connect to fuchsia.ui.flatland.Flatland");
-        let mut id_generator = FlatlandIdGenerator::new();
+        let mut id_generator = IdGenerator::new();
 
         // Create the root transform for tiles.
         let root_transform_id = id_generator.next_transform_id();
@@ -304,9 +289,9 @@ impl FlatlandTilesSession {
         let layout_info = parent_viewport_watcher.get_layout().await?;
         Self::watch_layout(parent_viewport_watcher, internal_sender.clone());
 
-        Ok(FlatlandTilesSession {
+        Ok(TilesSession {
             internal_sender,
-            flatland: flatland,
+            flatland,
             id_generator,
             view_focuser,
             root_transform_id,
@@ -318,7 +303,7 @@ impl FlatlandTilesSession {
 
     fn release_tile_resources(
         flatland: &ui_comp::FlatlandProxy,
-        tile: &mut FlatlandChildView,
+        tile: &mut ChildView,
     ) -> Result<(), Error> {
         let _ = flatland.release_viewport(&tile.viewport_content_id);
         flatland.release_transform(&tile.viewport_transform_id)?;
@@ -486,9 +471,9 @@ fn handle_graphical_presenter_request(
     return internal_sender;
 }
 
-// Serve the fuchsia.element.ViewController protocol.  This merely redispatches the requests onto
-// onto the `MessageInternal` handler; these messages are handled by the concrete implementation of
-// the `TilesSession` trait.
+// Serve the fuchsia.element.ViewController protocol. This merely redispatches
+// the requests onto the `MessageInternal` handler, which are handled by
+// `TilesSession::handle_message`.
 pub fn run_tile_controller_request_stream(
     tile_id: TileId,
     mut request_stream: fidl_fuchsia_element::ViewControllerRequestStream,
@@ -520,8 +505,7 @@ async fn main() -> Result<(), Error> {
     let fs = expose_services()?;
 
     // Connect to the scene owner and attach our tiles view to it.
-    let mut tiles_session: Box<dyn TilesSession> =
-        Box::new(FlatlandTilesSession::new(internal_sender.clone()).await?);
+    let mut tiles_session = Box::new(TilesSession::new(internal_sender.clone()).await?);
 
     // Serve the FIDL services on the message loop, proxying them into internal messages.
     run_services(fs, internal_sender.clone());
