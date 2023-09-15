@@ -6,6 +6,9 @@
 
 import abc
 
+from honeydew.custom_types import BluetoothAcceptPairing
+from honeydew.custom_types import BluetoothTransport
+
 
 class BluetoothCommon(abc.ABC):
     """Abstract base class for BluetoothCommon affordance."""
@@ -14,6 +17,68 @@ class BluetoothCommon(abc.ABC):
     @abc.abstractmethod
     def sys_init(self) -> None:
         """Initializes bluetooth stack."""
+
+    @abc.abstractmethod
+    def accept_pairing(
+            self, input_mode: BluetoothAcceptPairing,
+            output_mode: BluetoothAcceptPairing) -> None:
+        """Sets device to accept Bluetooth pairing.
+
+        Args:
+            input: input mode of device
+            output: output mode of device
+
+        Raises:
+            errors.FuchsiaDeviceError: On failure.
+        """
+
+    @abc.abstractmethod
+    def connect_device(
+            self, identifier: str, transport: BluetoothTransport) -> None:
+        """Connect device to target remote device via Bluetooth.
+
+        Args:
+            identifier: the identifier of target remote device.
+            transport:
+                1 -> Bluetooth classic transport.
+                2 -> Bluetooth LE (low energy) transport.
+        """
+
+    @abc.abstractmethod
+    def forget_device(self, identifier: str) -> None:
+        """Forget device to target remote device via Bluetooth.
+
+        Args:
+            identifier: the identifier of target remote device.
+        """
+
+    @abc.abstractmethod
+    def get_active_adapter_address(self) -> str:
+        """Retrieves the device's active BT adapter address.
+
+        Returns:
+            The mac address of the active adapter.
+        """
+
+    @abc.abstractmethod
+    def get_known_remote_devices(self) -> dict:
+        """Retrieves all known remote devices received by device.
+
+        Returns:
+            A dict of all known remote devices.
+        """
+
+    @abc.abstractmethod
+    def pair_device(
+            self, identifier: str, transport: BluetoothTransport) -> None:
+        """Pair device to target remote device via Bluetooth.
+
+        Args:
+            identifier: the identifier of target remote device.
+            transport:
+                1 -> Bluetooth classic transport.
+                2 -> Bluetooth LE (low energy) transport.
+        """
 
     @abc.abstractmethod
     def request_discovery(self, discovery: bool) -> None:

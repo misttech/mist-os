@@ -21,6 +21,18 @@ class LEVEL(enum.Enum):
     ERROR = enum.auto()
 
 
+class BluetoothTransport(enum.Enum):
+    """Transport type of Bluetooth pair and/or connections."""
+    CLASSIC = 1
+    LOW_ENERGY = 2
+
+
+class BluetoothAcceptPairing(enum.StrEnum):
+    """Pairing modes for Bluetooth Accept Pairing."""
+    DEFAULT_INPUT_MODE = "NONE"
+    DEFAULT_OUTPUT_MODE = "NONE"
+
+
 class IpPort(NamedTuple):
     """Tuple that contains an IP Address and Port
 

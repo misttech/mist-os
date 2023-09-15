@@ -8,6 +8,8 @@ import unittest
 
 from honeydew.affordances.fuchsia_controller.bluetooth.profiles import \
     bluetooth_gap as fc_bluetooth_gap
+from honeydew.custom_types import BluetoothAcceptPairing
+from honeydew.custom_types import BluetoothTransport
 
 
 class BluetoothFCTests(unittest.TestCase):
@@ -25,6 +27,40 @@ class BluetoothFCTests(unittest.TestCase):
         """Test for Bluetooth.sys_init() method."""
         with self.assertRaises(NotImplementedError):
             self.bluetooth_obj.sys_init()
+
+    def test_accept_pairing(self) -> None:
+        """Test for Bluetooth.accept_pairing() method."""
+        with self.assertRaises(NotImplementedError):
+            self.bluetooth_obj.accept_pairing(
+                BluetoothAcceptPairing.DEFAULT_INPUT_MODE,
+                BluetoothAcceptPairing.DEFAULT_OUTPUT_MODE)
+
+    def test_connect_device(self) -> None:
+        """Test for Bluetooth.connect_device() method."""
+        with self.assertRaises(NotImplementedError):
+            self.bluetooth_obj.connect_device(
+                identifier="0", transport=BluetoothTransport.CLASSIC)
+
+    def test_forget_device(self) -> None:
+        """Test for Bluetooth.forget_device() method."""
+        with self.assertRaises(NotImplementedError):
+            self.bluetooth_obj.forget_device(identifier="0")
+
+    def test_get_active_adapter_address(self) -> None:
+        """Test for Bluetooth.get_active_adapter_address() method."""
+        with self.assertRaises(NotImplementedError):
+            self.bluetooth_obj.get_active_adapter_address()
+
+    def test_get_known_remote_devices(self) -> None:
+        """Test for Bluetooth.get_known_remote_devices() method."""
+        with self.assertRaises(NotImplementedError):
+            self.bluetooth_obj.get_known_remote_devices()
+
+    def test_pair_device(self) -> None:
+        """Test for Bluetooth.pair_device() method."""
+        with self.assertRaises(NotImplementedError):
+            self.bluetooth_obj.pair_device(
+                identifier="0", transport=BluetoothTransport.CLASSIC)
 
     def test_request_discovery(self) -> None:
         """Test for Bluetooth.request_discovery() method."""

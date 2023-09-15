@@ -4,8 +4,6 @@
 # found in the LICENSE file.
 """Bluetooth Gap affordance implementation using SL4F."""
 
-from typing import Dict
-
 from honeydew.affordances.sl4f.bluetooth import bluetooth_common
 from honeydew.interfaces.affordances.bluetooth.profiles import bluetooth_gap
 
