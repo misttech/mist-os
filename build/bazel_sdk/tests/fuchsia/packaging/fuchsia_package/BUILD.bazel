@@ -3,87 +3,40 @@
 # found in the LICENSE file.
 
 load(":fuchsia_package_checker_test.bzl", "fuchsia_package_checker_test")
-load("//test_utils:make_file.bzl", "make_file")
-load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_component", "fuchsia_component_manifest", "fuchsia_package", "fuchsia_package_resource")
 
 fuchsia_package_checker_test(
     name = "cc_pkg_test",
     package_name = "pkg_for_test",
     size = "small",
+    expected_blobs_to_file_names = {
+        "bin/cc_bin": "cc_bin_native_stripped",
+        "data/text_file.txt": "text_file.txt",
+
+        # Common files that should automatically be added
+        "lib/ld.so.1": "ld.so.1_stripped",
+        "lib/libc++.so.2": "libc++.so.2_stripped",
+        "lib/libc++abi.so.1": "libc++abi.so.1_stripped",
+        "lib/libunwind.so.1": "libunwind.so.1_stripped",
+    },
     manifests = [
         "meta/cc_component.cm",
         "meta/empty_component.cm",
     ],
-    package_under_test = ":pkg",
-    stripped_blobs = [
-        ":cc_bin_resource",
-    ],
-    unstripped_blobs = [":simple_file_resource"],
+    package_under_test = "//fuchsia/packaging/fuchsia_package/cc_component:pkg",
     visibility = ["//visibility:public"],
 )
 
-# Test Resources
-make_file(
-    name = "simple_file",
-    content = "foo",
-    filename = "text_file.txt",
-)
-
-fuchsia_package_resource(
-    name = "simple_file_resource",
-    src = ":simple_file",
-    dest = "data/text_file.txt",
-)
-
-make_file(
-    name = "cc_main",
-    content = "int main() { return 0; } \n",
-    filename = "main.cc",
-)
-
-cc_binary(
-    name = "cc_bin",
-    srcs = [":cc_main"],
-)
-
-fuchsia_package_resource(
-    name = "cc_bin_resource",
-    src = ":cc_bin",
-    dest = "bin/cc_bin",
-)
-
-fuchsia_component_manifest(
-    name = "manifest",
-    component_name = "cc_component",
-    content = "{}",
-)
-
-fuchsia_component(
-    name = "cc_component",
-    manifest = ":manifest",
-    deps = [
-        ":cc_bin_resource",
-    ],
-)
-
-fuchsia_component_manifest(
-    name = "empty_component_manifest",
-    component_name = "empty_component",
-    content = "{}",
-)
-
-fuchsia_component(
-    name = "empty_component",
-    manifest = ":empty_component_manifest",
-    deps = [],
-)
-
-fuchsia_package(
-    name = "pkg",
-    package_name = "pkg_for_test",
-    components = [
-        ":cc_component",
-        ":empty_component",
-    ],
-    resources = [":simple_file_resource"],
+fuchsia_package_checker_test(
+    name = "cc_driver_pkg_test",
+    package_name = "test_driver",
+    size = "small",
+    bind_bytecode = "meta/bind/test_driver.bindbc",
+    expected_blobs_to_file_names = {
+        "driver/libtest_driver.so": "libtest_driver.so_stripped",
+        # Note; we do not currently add libraries to drivers. This will need to
+        # be fixed when we have a dynamic linker.
+    },
+    manifests = ["meta/test_driver.cm"],
+    package_under_test = "//fuchsia/packaging/fuchsia_package/cc_driver:pkg",
+    visibility = ["//visibility:public"],
 )

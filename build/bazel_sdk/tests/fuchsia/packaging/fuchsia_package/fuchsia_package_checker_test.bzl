@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 # buildifier: disable=module-docstring
-load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaPackageInfo", "FuchsiaPackageResourcesInfo")
+load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 load("//test_utils:py_test_utils.bzl", "PY_TOOLCHAIN_DEPS", "populate_py_test_sh_script")
 
 def _fuchsia_package_checker_test_impl(ctx):
@@ -14,44 +14,40 @@ def _fuchsia_package_checker_test_impl(ctx):
     script = ctx.actions.declare_file(ctx.label.name + ".sh")
     args = [
         "--far={}".format(sdk.far.short_path),
-        "--merkleroot={}".format(sdk.merkleroot.short_path),
+        "--ffx={}".format(sdk.ffx.short_path),
         "--meta_far={}".format(meta_far.short_path),
         "--package_name={}".format(ctx.attr.package_name),
     ]
 
-    # apped the components
-    args.extend(["--manifests={}".format(m) for m in ctx.attr.manifests])
-
     runfiles = [
         meta_far,
         sdk.far,
-        sdk.merkleroot,
+        sdk.ffx,
     ]
 
-    # Flatten the list of stripped blobs
-    expected_stripped_blobs = [
-        blob
-        for resources in [r[FuchsiaPackageResourcesInfo].resources for r in ctx.attr.stripped_blobs]
-        for blob in resources
-    ]
+    # Find all of our blobs
+    dest_to_resource = {}
+    for resource in package_info.package_resources:
+        dest_to_resource[resource.dest] = resource
 
-    for blob in expected_stripped_blobs:
-        # find the stripeed version of the blob
-        for resource in package_info.package_resources:
-            if (blob.dest == resource.dest) and blob.src.basename + "_stripped" == resource.src.basename:
-                args.append("--blobs={}={}".format(blob.dest, resource.src.short_path))
+    for (dest, name) in ctx.attr.expected_blobs_to_file_names.items():
+        if dest in dest_to_resource:
+            resource = dest_to_resource[dest]
+            src_path = resource.src.short_path
+            if src_path.endswith(name):
+                args.append("--blobs={}={}".format(dest, resource.src.short_path))
                 runfiles.append(resource.src)
-                break
+            else:
+                fail("Expected blob {} does not match expected filename {}".format(dest, name))
+        else:
+            fail("Expected blob {} not in resources {}".format(dest, dest_to_resource))
 
-    expected_unstripped_blobs = [
-        blob
-        for resources in [r[FuchsiaPackageResourcesInfo].resources for r in ctx.attr.unstripped_blobs]
-        for blob in resources
-    ]
+    # apped the components
+    args.extend(["--manifests={}".format(m) for m in ctx.attr.manifests])
 
-    for blob in expected_unstripped_blobs:
-        args.append("--blobs={}={}".format(blob.dest, blob.src.short_path))
-        runfiles.append(blob.src)
+    # append the bind bytecode
+    if ctx.attr.bind_bytecode:
+        args.append("--bind_bytecode={}".format(ctx.attr.bind_bytecode))
 
     populate_py_test_sh_script(ctx, script, ctx.executable._package_checker, args)
 
@@ -83,18 +79,15 @@ fuchsia_package_checker_test = rule(
             doc = "A list of expected manifests in meta/foo.cm form",
             mandatory = True,
         ),
-        "stripped_blobs": attr.label_list(
-            doc = """
-            A list of package resources which will have been attempted to be
-            stripped of debug symbols.
-        """,
+        "bind_bytecode": attr.string(
+            doc = "A path to the bind bytecode for the driver in meta/bind/foo.bindbc form",
             mandatory = False,
         ),
-        "unstripped_blobs": attr.label_list(
-            doc = """
-            A list of package resources which will not have been attempted to be
-            stripped of debug symbols.
-        """,
+        "expected_blobs_to_file_names": attr.string_dict(
+            doc = """The list of blobs we expect in the package.
+
+            The key is the install location and the value is the local file name.
+            """,
             mandatory = False,
         ),
         "_package_checker": attr.label(

@@ -1,0 +1,66 @@
+# Copyright 2021 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_bind_library",
+    "fuchsia_cc_driver",
+    "fuchsia_component_manifest",
+    "fuchsia_driver_bind_bytecode",
+    "fuchsia_driver_component",
+    "fuchsia_package",
+)
+
+fuchsia_bind_library(
+    name = "test.driver.bind",
+    srcs = [
+        "test.bind",
+    ],
+)
+
+fuchsia_driver_bind_bytecode(
+    name = "bind_bytecode",
+    output = "test_driver.bindbc",
+    rules = "test_driver.bind",
+    deps = [
+        ":test.driver.bind",
+    ],
+)
+
+cc_library(
+    name = "test_driver_lib",
+    srcs = [
+        "cc_test_driver.cc",
+    ],
+    hdrs = [
+        "cc_test_driver.h",
+    ],
+    deps = ["@fuchsia_sdk//pkg/driver_component_cpp"],
+)
+
+fuchsia_cc_driver(
+    name = "test_driver",
+    deps = [":test_driver_lib"],
+)
+
+fuchsia_component_manifest(
+    name = "manifest",
+    src = "test_driver.cml",
+)
+
+fuchsia_driver_component(
+    name = "component",
+    bind_bytecode = ":bind_bytecode",
+    driver_lib = ":test_driver",
+    manifest = ":manifest",
+)
+
+fuchsia_package(
+    name = "pkg",
+    package_name = "test_driver",
+    components = [
+        ":component",
+    ],
+    visibility = ["//visibility:public"],
+)

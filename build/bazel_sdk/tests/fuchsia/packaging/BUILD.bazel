@@ -5,6 +5,7 @@
 test_suite(
     name = "tests",
     tests = [
+        "//fuchsia/packaging/fuchsia_package:cc_driver_pkg_test",
         "//fuchsia/packaging/fuchsia_package:cc_pkg_test",
         "//fuchsia/packaging/provider_tests:tests",
     ],

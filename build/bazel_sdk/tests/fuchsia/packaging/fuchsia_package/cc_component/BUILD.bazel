@@ -1,0 +1,67 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("//test_utils:make_file.bzl", "make_file")
+load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_cc_binary", "fuchsia_component", "fuchsia_component_manifest", "fuchsia_package", "fuchsia_package_resource")
+
+fuchsia_package(
+    name = "pkg",
+    package_name = "pkg_for_test",
+    components = [
+        ":cc_component",
+        ":empty_component",
+    ],
+    resources = [":simple_file_resource"],
+    visibility = ["//visibility:public"],
+)
+
+# Test Resources
+make_file(
+    name = "simple_file",
+    content = "foo",
+    filename = "text_file.txt",
+)
+
+fuchsia_package_resource(
+    name = "simple_file_resource",
+    src = ":simple_file",
+    dest = "data/text_file.txt",
+)
+
+make_file(
+    name = "cc_main",
+    content = "int main() { return 0; } \n",
+    filename = "main.cc",
+)
+
+fuchsia_cc_binary(
+    name = "cc_bin",
+    srcs = [":cc_main"],
+)
+
+fuchsia_component_manifest(
+    name = "manifest",
+    component_name = "cc_component",
+    content = "{}",
+)
+
+fuchsia_component(
+    name = "cc_component",
+    manifest = ":manifest",
+    deps = [
+        ":cc_bin",
+    ],
+)
+
+fuchsia_component_manifest(
+    name = "empty_component_manifest",
+    component_name = "empty_component",
+    content = "{}",
+)
+
+fuchsia_component(
+    name = "empty_component",
+    manifest = ":empty_component_manifest",
+    deps = [],
+)
