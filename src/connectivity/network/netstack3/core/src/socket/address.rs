@@ -5,7 +5,7 @@
 //! A collection of types that represent the various parts of socket addresses.
 
 use core::{
-    fmt::{self, Display, Formatter},
+    fmt::{self, Debug, Display, Formatter},
     num::NonZeroU16,
     ops::Deref,
 };
@@ -19,8 +19,15 @@ use net_types::{
 use crate::socket::{datagram::DualStackIpExt, AddrVec, SocketMapAddrSpec};
 
 /// A [`ZonedAddr`] whose addr is witness to the properties required by sockets.
-#[derive(Copy, Clone, Debug, Eq, GenericOverIp, Hash, PartialEq)]
+#[derive(Copy, Clone, Eq, GenericOverIp, Hash, PartialEq)]
 pub struct SocketZonedIpAddr<A: IpAddress, Z>(ZonedAddr<SpecifiedAddr<A>, Z>);
+
+impl<A: IpAddress, Z: Debug> Debug for SocketZonedIpAddr<A, Z> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let Self(addr) = self;
+        write!(f, "{:?}", addr)
+    }
+}
 
 impl<A: IpAddress, Z> SocketZonedIpAddr<A, Z> {
     /// Convert self the inner [`ZonedAddr`]
@@ -51,13 +58,20 @@ impl<A: IpAddress, Z> From<ZonedAddr<SpecifiedAddr<A>, Z>> for SocketZonedIpAddr
 /// Requires `NonMappedAddr` because mapped addresses (i.e. ipv4-mapped-ipv6
 /// addresses) are converted from their original IP version to their target IP
 /// version when entering the stack.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub(crate) struct SocketIpAddr<A: IpAddress>(NonMappedAddr<SpecifiedAddr<A>>);
 
 impl<A: IpAddress> Display for SocketIpAddr<A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let Self(addr) = self;
         write!(f, "{}", addr)
+    }
+}
+
+impl<A: IpAddress> Debug for SocketIpAddr<A> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let Self(addr) = self;
+        write!(f, "{:?}", addr)
     }
 }
 
