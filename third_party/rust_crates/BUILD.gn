@@ -989,7 +989,7 @@ group("tracing") {
 }
 
 group("tracing-core") {
-  public_deps = [ ":tracing-core-v0_1_26" ]
+  public_deps = [ ":tracing-core-v0_1_31" ]
 }
 
 group("tracing-log") {
@@ -11582,7 +11582,7 @@ rust_library("tracing-v0_1_34") {
   deps += [ ":cfg-if-v1_0_0" ]
   deps += [ ":pin-project-lite-v0_2_9" ]
   deps += [ ":tracing-attributes-v0_1_22($host_toolchain)" ]
-  deps += [ ":tracing-core-v0_1_26" ]
+  deps += [ ":tracing-core-v0_1_31" ]
   if (!(current_os == "fuchsia")) {
     deps += [ ":log-v0_4_20" ]
   }
@@ -11630,14 +11630,14 @@ rust_proc_macro("tracing-attributes-v0_1_22") {
   visibility = [ ":*" ]
 }
 
-rust_library("tracing-core-v0_1_26") {
+rust_library("tracing-core-v0_1_31") {
   crate_name = "tracing_core"
   crate_root = "//third_party/rust_crates/forks/tracing-core/src/lib.rs"
-  output_name = "tracing_core-f5d1cc0bbda6a32b"
+  output_name = "tracing_core-81bafb5c25495bc2"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":lazy_static-v1_4_0" ]
+  deps += [ ":once_cell-v1_17_1" ]
   if (false) {
     deps += [ ":valuable-v0_1_0" ]
   }
@@ -11647,10 +11647,10 @@ rust_library("tracing-core-v0_1_26") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=f5d1cc0bbda6a32b",
-    "-Cextra-filename=-f5d1cc0bbda6a32b",
+    "-Cmetadata=81bafb5c25495bc2",
+    "-Cextra-filename=-81bafb5c25495bc2",
     "--cfg=feature=\"default\"",
-    "--cfg=feature=\"lazy_static\"",
+    "--cfg=feature=\"once_cell\"",
     "--cfg=feature=\"std\"",
     "--cfg=feature=\"valuable\"",
   ]
@@ -11667,7 +11667,7 @@ rust_library("tracing-log-v0_1_2") {
   deps = []
   deps += [ ":lazy_static-v1_4_0" ]
   deps += [ ":log-v0_4_20" ]
-  deps += [ ":tracing-core-v0_1_26" ]
+  deps += [ ":tracing-core-v0_1_31" ]
 
   rustenv = []
 
@@ -11728,7 +11728,7 @@ rust_library("tracing-subscriber-v0_3_1") {
   deps += [ ":smallvec-v1_8_0" ]
   deps += [ ":thread_local-v1_1_7" ]
   deps += [ ":tracing-v0_1_34" ]
-  deps += [ ":tracing-core-v0_1_26" ]
+  deps += [ ":tracing-core-v0_1_31" ]
   deps += [ ":tracing-log-v0_1_2" ]
 
   rustenv = []
