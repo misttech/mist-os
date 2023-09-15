@@ -21,71 +21,82 @@ use {
         ops::Range,
         vec::Vec,
     },
-    storage_benchmarks::{trace_duration, Benchmark, OperationDuration, OperationTimer},
+    storage_benchmarks::{
+        trace_duration, Benchmark, CacheClearableFilesystem as _, OperationDuration, OperationTimer,
+    },
 };
 
 const RNG_SEED: u64 = 0xda782a0c3ce1819a;
 
-#[derive(Clone)]
-pub struct TimeToFirstByte {
-    resource_path: String,
-}
-
-impl TimeToFirstByte {
-    pub fn new(resource_path: String) -> Self {
-        Self { resource_path }
-    }
-}
-
-#[async_trait]
-impl Benchmark<PkgDirInstance> for TimeToFirstByte {
-    async fn run(&self, fs: &mut PkgDirInstance) -> Vec<OperationDuration> {
-        if self.resource_path.starts_with("meta") {
-            trace_duration!("benchmark", "TimeToFirstByteMetaFarBlob");
-        } else {
-            trace_duration!("benchmark", "TimeToFirstByteContentBlob");
-        }
-        let package = PackageBuilder::new("pkg")
-            .add_resource_at(&self.resource_path, "data".as_bytes())
-            .build()
-            .await
-            .unwrap();
-        let (meta, map) = package.contents();
-
-        fs.write_blob(&DeliveryBlob::new(meta.contents, CompressionMode::Always)).await;
-        for (_, content) in map.clone() {
-            fs.write_blob(&DeliveryBlob::new(content, CompressionMode::Always)).await;
+macro_rules! open_and_get_vmo_benchmark {
+    ($benchmark:ident, $resource_path:expr) => {
+        #[derive(Clone)]
+        pub struct $benchmark {
+            resource_path: String,
         }
 
-        let pkgdir_client_end =
-            fs.pkgdir_proxy().open_package_directory(&meta.merkle).await.unwrap().unwrap();
-        let mut durations = Vec::with_capacity(map.len());
-        let pkgdir = pkgdir_client_end.into_proxy().unwrap();
+        impl $benchmark {
+            pub fn new() -> Self {
+                Self { resource_path: $resource_path.to_string() }
+            }
 
-        let mut buf = vec![0; 1];
-        let timer = OperationTimer::start();
-        let file = fuchsia_fs::directory::open_file(
-            &pkgdir,
-            &self.resource_path,
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .expect("failed to open blob");
-        let vmo = file.get_backing_memory(fio::VmoFlags::READ).await.unwrap().unwrap();
-        vmo.read(&mut buf[..], 0).unwrap();
-        durations.push(timer.stop());
+            async fn run_test(&self, pkgdir: fio::DirectoryProxy) -> Vec<OperationDuration> {
+                let timer = OperationTimer::start();
 
-        durations
-    }
+                let file = {
+                    trace_duration!("benchmark", "open-file");
+                    fuchsia_fs::directory::open_file(
+                        &pkgdir,
+                        &self.resource_path,
+                        fio::OpenFlags::RIGHT_READABLE,
+                    )
+                    .await
+                    .expect("failed to open blob")
+                };
+                trace_duration!("benchmark", "get-vmo");
+                let _ = file.get_backing_memory(fio::VmoFlags::READ).await.unwrap().unwrap();
 
-    fn name(&self) -> String {
-        if self.resource_path.starts_with("meta") {
-            "TimeToFirstByteMetaFarBlob".to_string()
-        } else {
-            "TimeToFirstByteContentBlob".to_string()
+                vec![timer.stop()]
+            }
         }
-    }
+
+        #[async_trait]
+        impl Benchmark<PkgDirInstance> for $benchmark {
+            async fn run(&self, fs: &mut PkgDirInstance) -> Vec<OperationDuration> {
+                trace_duration!("benchmark", stringify!($benchmark));
+                let package = PackageBuilder::new("pkg")
+                    .add_resource_at(&self.resource_path, "data".as_bytes())
+                    .build()
+                    .await
+                    .unwrap();
+                let (meta, map) = package.contents();
+
+                {
+                    trace_duration!("benchmark", "write-package");
+                    fs.write_blob(&DeliveryBlob::new(meta.contents, CompressionMode::Always)).await;
+                    for (_, content) in map.clone() {
+                        fs.write_blob(&DeliveryBlob::new(content, CompressionMode::Always)).await;
+                    }
+                }
+
+                fs.clear_cache().await;
+
+                let pkgdir_client_end =
+                    fs.pkgdir_proxy().open_package_directory(&meta.merkle).await.unwrap().unwrap();
+                let pkgdir = pkgdir_client_end.into_proxy().unwrap();
+
+                self.run_test(pkgdir).await
+            }
+
+            fn name(&self) -> String {
+                stringify!($benchmark).to_string()
+            }
+        }
+    };
 }
+
+open_and_get_vmo_benchmark!(OpenAndGetVmoMetaFarBlob, "meta/bar");
+open_and_get_vmo_benchmark!(OpenAndGetVmoContentBlob, "data/foo");
 
 macro_rules! page_in_benchmark {
     ($benchmark:ident, $data_gen_fn:ident, $page_iter_gen_fn:ident) => {
@@ -431,15 +442,13 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn time_to_first_byte_blobfs_test() {
-        check_benchmark(TimeToFirstByte::new("meta/bar".to_string()), PkgDirTest::new_blobfs(), 1)
-            .await;
+    async fn open_and_get_vmo_blobfs_test() {
+        check_benchmark(OpenAndGetVmoContentBlob::new(), PkgDirTest::new_blobfs(), 1).await;
     }
 
     #[fuchsia::test]
-    async fn time_to_first_byte_fxblob_test() {
-        check_benchmark(TimeToFirstByte::new("data/foo".to_string()), PkgDirTest::new_fxblob(), 1)
-            .await;
+    async fn open_and_get_vmo_fxblob_test() {
+        check_benchmark(OpenAndGetVmoContentBlob::new(), PkgDirTest::new_fxblob(), 1).await;
     }
 
     #[fuchsia::test]
