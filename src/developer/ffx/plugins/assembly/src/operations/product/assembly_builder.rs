@@ -4,7 +4,6 @@
 
 use crate::compiled_package::CompiledPackageBuilder;
 use anyhow::{anyhow, ensure, Context, Result};
-use assembly_bootfs_file_map::BootfsFileMap;
 use assembly_config_data::ConfigDataBuilder;
 use assembly_config_schema::{
     assembly_config::{AssemblyInputBundle, CompiledPackageDefinition, ShellCommands},
@@ -13,6 +12,7 @@ use assembly_config_schema::{
     product_config::{ProductConfigData, ProductPackageDetails, ProductPackagesConfig},
     DriverDetails, FileEntry,
 };
+use assembly_named_file_map::NamedFileMap;
 
 use assembly_domain_config::DomainConfigPackage;
 use assembly_driver_manifest::{
@@ -58,7 +58,7 @@ pub struct ImageAssemblyConfigBuilder {
     boot_args: BTreeSet<String>,
 
     /// The bootfs_files from the AssemblyInputBundles
-    bootfs_files: BootfsFileMap,
+    bootfs_files: NamedFileMap,
 
     /// Modifications that must be made to structured config within bootfs.
     bootfs_structured_config: ComponentConfigs,
@@ -130,7 +130,7 @@ impl ImageAssemblyConfigBuilder {
             bootfs_packages: PackageSet::new("bootfs packages"),
             boot_args: BTreeSet::default(),
             shell_commands: ShellCommands::default(),
-            bootfs_files: BootfsFileMap::new(),
+            bootfs_files: NamedFileMap::new("bootfs files"),
             bootfs_structured_config: ComponentConfigs::new("component configs"),
             package_configs: PackageConfigs::new("package configs"),
             domain_configs: DomainConfigs::new("domain configs"),

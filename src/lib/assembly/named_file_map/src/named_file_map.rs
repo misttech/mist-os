@@ -11,7 +11,7 @@ use fuchsia_pkg::BlobInfo;
 use serde::Serialize;
 use utf8_path::path_relative_from_current_dir;
 
-/// A paired source and optional merkle for a bootfs file.
+/// A paired source and optional merkle for a file.
 #[derive(Debug, Serialize, PartialEq)]
 pub struct SourceMerklePair {
     pub source: Utf8PathBuf,
@@ -38,14 +38,14 @@ fn relativize_entry(entry: FileEntry) -> Result<FileEntry> {
 
 /// A named set of file entries, keyed by file destination.
 #[derive(Debug, Serialize)]
-pub struct BootfsFileMap {
+pub struct NamedFileMap {
     map: NamedMap<SourceMerklePair>,
 }
 
-impl BootfsFileMap {
-    /// Construct a BootfsFileMap.
-    pub fn new() -> Self {
-        BootfsFileMap { map: NamedMap::new("bootfs_files") }
+impl NamedFileMap {
+    /// Construct a NamedFileMap.
+    pub fn new(name: &str) -> Self {
+        NamedFileMap { map: NamedMap::new(name) }
     }
 
     /// Add a single FileEntry to the map, if the 'destination' path is a
@@ -94,7 +94,7 @@ impl BootfsFileMap {
                     }
                 }
                 return Err(anyhow!(
-                    r#"Bootfs file has the same destination but a different merkle
+                    r#"File has the same destination but a different merkle
             destination     = {}
             previous_merkle = {:?}
             merkle          = {:?}"#,
@@ -106,7 +106,7 @@ impl BootfsFileMap {
         }
     }
 
-    /// Return the contents of the BootfsFileMap as a Vec<FileEntry>.
+    /// Return the contents of the NamedFileMap as a Vec<FileEntry>.
     pub fn into_file_entries(self) -> Vec<FileEntry> {
         self.map
             .entries
@@ -116,7 +116,7 @@ impl BootfsFileMap {
     }
 }
 
-impl std::ops::Deref for BootfsFileMap {
+impl std::ops::Deref for NamedFileMap {
     type Target = NamedMap<SourceMerklePair>;
 
     fn deref(&self) -> &Self::Target {
@@ -124,7 +124,7 @@ impl std::ops::Deref for BootfsFileMap {
     }
 }
 
-impl std::ops::DerefMut for BootfsFileMap {
+impl std::ops::DerefMut for NamedFileMap {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.map
     }
@@ -136,7 +136,7 @@ mod tests {
 
     #[test]
     fn entries_diff_src_diff_dest() {
-        let mut map = BootfsFileMap::new();
+        let mut map = NamedFileMap::new("test");
         map.add_entry(FileEntry { source: "src1".into(), destination: "dest1".into() }).unwrap();
         map.add_entry(FileEntry { source: "src2".into(), destination: "dest2".into() }).unwrap();
 
@@ -151,7 +151,7 @@ mod tests {
 
     #[test]
     fn entries_same_src_diff_dest() {
-        let mut map = BootfsFileMap::new();
+        let mut map = NamedFileMap::new("test");
         map.add_entry(FileEntry { source: "src1".into(), destination: "dest1".into() }).unwrap();
         map.add_entry(FileEntry { source: "src1".into(), destination: "dest2".into() }).unwrap();
 
@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn entries_same_src_same_dest() {
-        let mut map = BootfsFileMap::new();
+        let mut map = NamedFileMap::new("test");
         map.add_entry(FileEntry { source: "src1".into(), destination: "dest1".into() }).unwrap();
         let res = map.add_entry(FileEntry { source: "src1".into(), destination: "dest1".into() });
         assert!(res.is_err());
@@ -179,7 +179,7 @@ mod tests {
 
     #[test]
     fn blobs_diff_src_diff_dest() {
-        let mut map = BootfsFileMap::new();
+        let mut map = NamedFileMap::new("test");
         map.add_blob(BlobInfo {
             source_path: "src1".into(),
             path: "dest1".into(),
@@ -210,7 +210,7 @@ mod tests {
 
     #[test]
     fn blobs_same_src_diff_dest() {
-        let mut map = BootfsFileMap::new();
+        let mut map = NamedFileMap::new("test");
         map.add_blob(BlobInfo {
             source_path: "src1".into(),
             path: "dest1".into(),
@@ -241,7 +241,7 @@ mod tests {
 
     #[test]
     fn blobs_same_src_same_dest_same_merkle() {
-        let mut map = BootfsFileMap::new();
+        let mut map = NamedFileMap::new("test");
         map.add_blob(BlobInfo {
             source_path: "src1".into(),
             path: "dest1".into(),
@@ -269,7 +269,7 @@ mod tests {
 
     #[test]
     fn blobs_same_src_same_dest_diff_merkle() {
-        let mut map = BootfsFileMap::new();
+        let mut map = NamedFileMap::new("test");
         map.add_blob(BlobInfo {
             source_path: "src1".into(),
             path: "dest1".into(),
@@ -297,7 +297,7 @@ mod tests {
 
     #[test]
     fn blob_and_entry_diff_src_diff_dest() {
-        let mut map = BootfsFileMap::new();
+        let mut map = NamedFileMap::new("test");
         map.add_blob(BlobInfo {
             source_path: "src1".into(),
             path: "dest1".into(),
@@ -320,7 +320,7 @@ mod tests {
 
     #[test]
     fn blob_and_entry_same_src_diff_dest() {
-        let mut map = BootfsFileMap::new();
+        let mut map = NamedFileMap::new("test");
         map.add_blob(BlobInfo {
             source_path: "src1".into(),
             path: "dest1".into(),
@@ -343,7 +343,7 @@ mod tests {
 
     #[test]
     fn blob_and_entry_same_src_same_dest() {
-        let mut map = BootfsFileMap::new();
+        let mut map = NamedFileMap::new("test");
         map.add_blob(BlobInfo {
             source_path: "src1".into(),
             path: "dest1".into(),

@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, bail, Context, Result};
-use assembly_bootfs_file_map::BootfsFileMap;
 use assembly_components::ComponentBuilder;
 use assembly_config_schema::{
     assembly_config::{CompiledPackageDefinition, MainPackageDefinition},
     FileEntry,
 };
+use assembly_named_file_map::NamedFileMap;
 use assembly_tool::Tool;
 use assembly_util::{DuplicateKeyError, InsertUniqueExt, MapEntry};
 use camino::{Utf8Path, Utf8PathBuf};
@@ -158,7 +158,7 @@ impl CompiledPackageBuilder {
     fn build_bootfs(
         &self,
         cmc_tool: &dyn Tool,
-        bootfs_files: &mut BootfsFileMap,
+        bootfs_files: &mut NamedFileMap,
         main_definition: &MainPackageDefinition,
         outdir: impl AsRef<Utf8Path>,
     ) -> Result<()> {
@@ -229,7 +229,7 @@ impl CompiledPackageBuilder {
     pub fn build(
         self,
         cmc_tool: &dyn Tool,
-        bootfs_files: &mut BootfsFileMap,
+        bootfs_files: &mut NamedFileMap,
         outdir: impl AsRef<Utf8Path>,
     ) -> Result<Option<Utf8PathBuf>> {
         let main_definition = &self.main_definition.as_ref().context("no main definition")?;
@@ -325,7 +325,7 @@ mod tests {
         let tools = FakeToolProvider::default();
         let outdir_tmp = TempDir::new().unwrap();
         let outdir = Utf8Path::from_path(outdir_tmp.path()).unwrap();
-        let mut bootfs_files = BootfsFileMap::new();
+        let mut bootfs_files = NamedFileMap::new("test");
         make_test_package_and_components(outdir);
 
         compiled_package_builder

@@ -5,8 +5,8 @@
 //! Utilities for working with structured configuration during the product assembly process.
 
 use anyhow::{ensure, format_err, Context};
-use assembly_bootfs_file_map::BootfsFileMap;
 use assembly_config_schema::FileEntry;
+use assembly_named_file_map::NamedFileMap;
 use assembly_validate_util::PkgNamespace;
 use camino::{Utf8Path, Utf8PathBuf};
 use cm_rust::{FidlIntoNative, NativeIntoFidl};
@@ -44,8 +44,8 @@ impl Repackager<PackageBuilder> {
     }
 }
 
-impl<'f> Repackager<&'f mut BootfsFileMap> {
-    pub fn for_bootfs(files: &'f mut BootfsFileMap, outdir: impl Into<Utf8PathBuf>) -> Self {
+impl<'f> Repackager<&'f mut NamedFileMap> {
+    pub fn for_bootfs(files: &'f mut NamedFileMap, outdir: impl Into<Utf8PathBuf>) -> Self {
         Self { builder: files, outdir: outdir.into() }
     }
 }
@@ -116,7 +116,7 @@ impl PkgNamespaceBuilder for PackageBuilder {
     }
 }
 
-impl PkgNamespaceBuilder for &mut BootfsFileMap {
+impl PkgNamespaceBuilder for &mut NamedFileMap {
     fn read_contents(&self, path: &str) -> anyhow::Result<Vec<u8>> {
         let src_path = &self.get(path).ok_or_else(|| format_err!("missing {path}"))?.source;
         Ok(std::fs::read(src_path).with_context(|| format!("reading {}", src_path))?)

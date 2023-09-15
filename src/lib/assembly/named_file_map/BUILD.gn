@@ -7,9 +7,9 @@ import("//build/rust/rustc_library.gni")
 
 assert(is_host, "Assembly libraries are host-only")
 
-rustc_library("bootfs_file_map") {
+rustc_library("named_file_map") {
   edition = "2021"
-  name = "assembly_bootfs_file_map"
+  name = "assembly_named_file_map"
   version = "0.1.0"
   with_unit_tests = true
 
@@ -24,12 +24,12 @@ rustc_library("bootfs_file_map") {
     "//third_party/rust_crates:serde",
   ]
   sources = [
-    "src/bootfs_file_map.rs",
     "src/lib.rs",
+    "src/named_file_map.rs",
   ]
 }
 
 group("host_tests") {
   testonly = true
-  deps = [ ":bootfs_file_map_test" ]
+  deps = [ ":named_file_map_test" ]
 }

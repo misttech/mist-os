@@ -4,8 +4,8 @@
 
 #![deny(missing_docs)]
 
-//! Map that ensures that all bootfs files have unique destinations and hashes.
+//! Map that ensures that all files have unique destinations and hashes.
 
-mod bootfs_file_map;
+mod named_file_map;
 
-pub use bootfs_file_map::BootfsFileMap;
+pub use named_file_map::NamedFileMap;
