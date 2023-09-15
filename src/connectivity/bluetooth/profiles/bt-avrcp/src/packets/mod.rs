@@ -352,57 +352,6 @@ impl From<PlaybackStatus> for fidl_avrcp::PlaybackStatus {
     }
 }
 
-decodable_enum! {
-    pub enum PlayerApplicationSettingAttributeId<u8, Error, InvalidParameter> {
-        Equalizer = 0x01,
-        RepeatStatusMode = 0x02,
-        ShuffleMode = 0x03,
-        ScanMode = 0x04,
-    }
-}
-
-impl From<fidl_avrcp::PlayerApplicationSettingAttributeId> for PlayerApplicationSettingAttributeId {
-    fn from(
-        src: fidl_avrcp::PlayerApplicationSettingAttributeId,
-    ) -> PlayerApplicationSettingAttributeId {
-        match src {
-            fidl_avrcp::PlayerApplicationSettingAttributeId::Equalizer => {
-                PlayerApplicationSettingAttributeId::Equalizer
-            }
-            fidl_avrcp::PlayerApplicationSettingAttributeId::RepeatStatusMode => {
-                PlayerApplicationSettingAttributeId::RepeatStatusMode
-            }
-            fidl_avrcp::PlayerApplicationSettingAttributeId::ShuffleMode => {
-                PlayerApplicationSettingAttributeId::ShuffleMode
-            }
-            fidl_avrcp::PlayerApplicationSettingAttributeId::ScanMode => {
-                PlayerApplicationSettingAttributeId::ScanMode
-            }
-        }
-    }
-}
-
-impl From<PlayerApplicationSettingAttributeId> for fidl_avrcp::PlayerApplicationSettingAttributeId {
-    fn from(
-        src: PlayerApplicationSettingAttributeId,
-    ) -> fidl_avrcp::PlayerApplicationSettingAttributeId {
-        match src {
-            PlayerApplicationSettingAttributeId::Equalizer => {
-                fidl_avrcp::PlayerApplicationSettingAttributeId::Equalizer
-            }
-            PlayerApplicationSettingAttributeId::RepeatStatusMode => {
-                fidl_avrcp::PlayerApplicationSettingAttributeId::RepeatStatusMode
-            }
-            PlayerApplicationSettingAttributeId::ShuffleMode => {
-                fidl_avrcp::PlayerApplicationSettingAttributeId::ShuffleMode
-            }
-            PlayerApplicationSettingAttributeId::ScanMode => {
-                fidl_avrcp::PlayerApplicationSettingAttributeId::ScanMode
-            }
-        }
-    }
-}
-
 /// The preamble at the start of all vendor dependent commands, responses, and rejections.
 pub struct VendorDependentPreamble {
     pub pdu_id: u8,
