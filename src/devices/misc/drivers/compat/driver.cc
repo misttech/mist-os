@@ -10,7 +10,6 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/binding_priv.h>
 #include <lib/driver/compat/cpp/connect.h>
-#include <lib/driver/component/cpp/internal/lifecycle.h>
 #include <lib/driver/component/cpp/internal/start_args.h>
 #include <lib/driver/component/cpp/internal/symbols.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
@@ -24,6 +23,7 @@
 #include <zircon/dlfcn.h>
 
 #include "src/devices/lib/log/log.h"
+#include "src/devices/misc/drivers/compat/compat_driver_server.h"
 #include "src/devices/misc/drivers/compat/loader.h"
 #include "src/lib/driver_symbols/symbols.h"
 
@@ -731,28 +731,6 @@ zx::result<std::string> Driver::GetVariable(const char* name) {
   return zx::ok(std::string(result->value.data(), result->value.size()));
 }
 
-void DriverFactory::CreateDriver(fdf::DriverStartArgs start_args,
-                                 fdf::UnownedSynchronizedDispatcher driver_dispatcher,
-                                 fdf::StartCompleter completer) {
-  auto compat_device = fdf_internal::GetSymbol<const device_t*>(start_args.symbols(), kDeviceSymbol,
-                                                                &kDefaultDevice);
-  const zx_protocol_device_t* ops =
-      fdf_internal::GetSymbol<const zx_protocol_device_t*>(start_args.symbols(), kOps);
-
-  // Open the compat driver's binary within the package.
-  auto compat = fdf_internal::ProgramValue(start_args.program(), "compat");
-  if (compat.is_error()) {
-    completer(compat.take_error());
-    return;
-  }
-
-  auto driver = std::make_unique<Driver>(std::move(start_args), std::move(driver_dispatcher),
-                                         *compat_device, ops, "/pkg/" + *compat);
-  fdf::DriverBase* driver_ptr = driver.get();
-  completer.set_driver(std::move(driver));
-  driver_ptr->Start(std::move(completer));
-}
-
 zx_status_t Driver::ServeDiagnosticsDir() {
   diagnostics_vfs_ = std::make_unique<fs::SynchronousVfs>(dispatcher());
 
@@ -814,5 +792,5 @@ zx_status_t Driver::GetFragmentProtocol(const char* fragment, uint32_t proto_id,
 
 }  // namespace compat
 
-using record = fdf_internal::Lifecycle<compat::Driver, compat::DriverFactory>;
-FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(record);
+EXPORT_FUCHSIA_DRIVER_REGISTRATION_V1(compat::CompatDriverServer::initialize,
+                                      compat::CompatDriverServer::destroy);

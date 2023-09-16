@@ -100,6 +100,6 @@ void Driver::ServeSimulator(
   fidl::BindServer(dispatcher(), std::move(server), std::move(server_impl));
 }
 
-FUCHSIA_DRIVER_EXPORT(fake_battery::Driver);
-
 }  // namespace fake_battery
+
+FUCHSIA_DRIVER_EXPORT(fake_battery::Driver);

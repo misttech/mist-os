@@ -30,6 +30,7 @@
 #include <mock-boot-arguments/server.h>
 
 #include "lib/driver/testing/cpp/driver_runtime.h"
+#include "src/devices/misc/drivers/compat/compat_driver_server.h"
 #include "src/devices/misc/drivers/compat/v1_test.h"
 #include "src/storage/lib/vfs/cpp/managed_vfs.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
@@ -499,33 +500,18 @@ class DriverTest : public testing::Test {
     });
 
     // Start driver.
-    struct Context {
-      zx_status_t* status;
-      void** driver;
-    };
-    void* driver = nullptr;
-    zx_status_t status = ZX_ERR_INTERNAL;
-    Context ctx = {
-        .status = &status,
-        .driver = &driver,
-    };
+    std::optional<zx_status_t> status = std::nullopt;
     fdf::StartCompleter start_completer(
-        [](void* context, zx_status_t status, void* driver) {
-          auto* ctx = static_cast<Context*>(context);
-          *ctx->status = status;
-          *ctx->driver = driver;
-        },
-        &ctx);
-
-    compat::DriverFactory::CreateDriver(
+        [&status](zx::result<> result) { status.emplace(result.status_value()); });
+    void* driver = compat::CompatDriverServer::CreateDriver(
         std::move(start_args),
         fdf::UnownedSynchronizedDispatcher(fdf::Dispatcher::GetCurrent()->get()),
         std::move(start_completer));
 
-    while (driver == nullptr) {
+    while (status == std::nullopt) {
       fdf_testing_run_until_idle();
     };
-    EXPECT_EQ(status, args.expected_driver_status);
+    EXPECT_EQ(status.value(), args.expected_driver_status);
     if (status != ZX_OK) {
       EXPECT_NE(driver, nullptr);
     }
@@ -536,11 +522,7 @@ class DriverTest : public testing::Test {
   void UnbindAndFreeDriver(std::unique_ptr<compat::Driver> driver) {
     libsync::Completion completion;
 
-    fdf::PrepareStopCompleter completer(
-        [](void* cookie, zx_status_t status) {
-          static_cast<libsync::Completion*>(cookie)->Signal();
-        },
-        &completion);
+    fdf::PrepareStopCompleter completer([&completion](zx::result<>) { completion.Signal(); });
     driver->PrepareStop(std::move(completer));
 
     // Keep running the test loop while we're waiting for a signal on the dispatcher thread.

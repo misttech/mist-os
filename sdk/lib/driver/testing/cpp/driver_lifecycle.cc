@@ -6,12 +6,15 @@
 
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
 
+#if __Fuchsia_API_level__ < FUCHSIA_HEAD
 #include <chrono>
 
 #include "lib/fdf/testing.h"
+#endif
 
 namespace fdf_testing {
 
+#if __Fuchsia_API_level__ < FUCHSIA_HEAD
 namespace internal {
 
 void StartDriverV3(const DriverLifecycle& lifecycle, EncodedDriverStartArgs encoded_start_args,
@@ -65,8 +68,8 @@ void PrepareStopV2(const DriverLifecycle& lifecycle, void* driver, fdf_dispatche
 
 DriverUnderTestBase::DriverUnderTestBase(DriverLifecycle driver_lifecycle_symbol)
     : driver_dispatcher_(fdf::Dispatcher::GetCurrent()->get()),
-      driver_lifecycle_symbol_(driver_lifecycle_symbol),
-      checker_(fdf_dispatcher_get_async_dispatcher(driver_dispatcher_)) {}
+      checker_(fdf_dispatcher_get_async_dispatcher(driver_dispatcher_)),
+      driver_lifecycle_symbol_(driver_lifecycle_symbol) {}
 
 DriverUnderTestBase::~DriverUnderTestBase() {
   if (driver_.has_value()) {
@@ -74,9 +77,58 @@ DriverUnderTestBase::~DriverUnderTestBase() {
     ZX_ASSERT_MSG(ZX_OK == result.status_value(), "Stop failed.");
   }
 }
+#else
+DriverUnderTestBase::DriverUnderTestBase(DriverRegistration driver_registration_symbol)
+    : driver_dispatcher_(fdf::Dispatcher::GetCurrent()->get()),
+      checker_(fdf_dispatcher_get_async_dispatcher(driver_dispatcher_)),
+      driver_registration_symbol_(driver_registration_symbol) {
+  zx::result endpoints = fdf::CreateEndpoints<fuchsia_driver_framework::Driver>();
+  ZX_ASSERT_MSG(endpoints.is_ok(), "Failed to create fdf::Driver endpoints: %s",
+                endpoints.status_string());
+  void* token = driver_registration_symbol_.v1.initialize(endpoints->server.TakeHandle().release());
+  driver_client_.Bind(std::move(endpoints->client), driver_dispatcher_, this);
+  token_.emplace(token);
+}
+
+DriverUnderTestBase::~DriverUnderTestBase() {
+  ZX_ASSERT(token_.has_value());
+  driver_registration_symbol_.v1.destroy(token_.value());
+}
+
+void DriverUnderTestBase::on_fidl_error(fidl::UnbindInfo error) {
+  std::lock_guard guard(checker_);
+  if (stop_completer_.has_value()) {
+    stop_completer_.value().complete_ok(zx::ok());
+    stop_completer_.reset();
+  }
+}
+
+void DriverUnderTestBase::handle_unknown_event(
+    fidl::UnknownEventMetadata<fuchsia_driver_framework::Driver> metadata) {}
+#endif
 
 DriverRuntime::AsyncTask<zx::result<>> DriverUnderTestBase::Start(fdf::DriverStartArgs start_args) {
   std::lock_guard guard(checker_);
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+  fdf::Arena arena('STRT');
+  fpromise::bridge<zx::result<>> bridge;
+  driver_client_.buffer(arena)
+      ->Start(fidl::ToWire(arena, std::move(start_args)))
+      .Then([completer = bridge.completer.bind()](
+                fdf::WireUnownedResult<fuchsia_driver_framework::Driver::Start>& result) mutable {
+        if (!result.ok()) {
+          completer(zx::make_result(result.error().status()));
+          return;
+        }
+
+        if (result.value().is_error()) {
+          completer(result->take_error());
+          return;
+        }
+
+        completer(zx::ok());
+      });
+#else
   ZX_ASSERT_MSG(!driver_.has_value(), "Cannot start driver more than once.");
 
   fidl::OwnedEncodeResult encoded = fidl::StandaloneEncode(std::move(start_args));
@@ -121,11 +173,14 @@ DriverRuntime::AsyncTask<zx::result<>> DriverUnderTestBase::Start(fdf::DriverSta
     driver_.emplace(zx::make_result(status, out_driver));
     bridge.completer.complete_ok(zx::make_result(status));
   }
-
+#endif
   return DriverRuntime::AsyncTask<zx::result<>>(bridge.consumer.promise());
 }
 
 DriverRuntime::AsyncTask<zx::result<>> DriverUnderTestBase::PrepareStop() {
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+  return Stop();
+#else
   std::lock_guard guard(checker_);
   ZX_ASSERT_MSG(driver_.has_value(), "Driver does not exist.");
   ZX_ASSERT_MSG(driver_.value().is_ok(), "Driver start did not succeed: %s.",
@@ -146,9 +201,23 @@ DriverRuntime::AsyncTask<zx::result<>> DriverUnderTestBase::PrepareStop() {
   }
 
   return DriverRuntime::AsyncTask<zx::result<>>(bridge.consumer.promise());
+#endif
 }
 
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+DriverRuntime::AsyncTask<zx::result<>> DriverUnderTestBase::Stop() {
+#else
 zx::result<> DriverUnderTestBase::Stop() {
+#endif
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+  std::lock_guard guard(checker_);
+  fpromise::bridge<zx::result<>> bridge;
+  stop_completer_.emplace(std::move(bridge.completer));
+  fdf::Arena arena('STOP');
+  fidl::OneWayStatus status = driver_client_.buffer(arena)->Stop();
+  ZX_ASSERT_MSG(status.ok(), "Failed to send Stop request.");
+  return DriverRuntime::AsyncTask<zx::result<>>(bridge.consumer.promise());
+#else
   std::lock_guard guard(checker_);
   ZX_ASSERT_MSG(driver_.has_value(), "Driver does not exist.");
   ZX_ASSERT_MSG(driver_.value().is_ok(), "Driver start did not succeed: %s.",
@@ -158,14 +227,7 @@ zx::result<> DriverUnderTestBase::Stop() {
   zx_status_t status = driver_lifecycle_symbol_.v1.stop(driver_.value().value());
   driver_.reset();
   return zx::make_result(status);
-}
-
-void* DriverUnderTestBase::GetDriver() {
-  std::lock_guard guard(checker_);
-  ZX_ASSERT_MSG(driver_.has_value(), "Driver does not exist.");
-  ZX_ASSERT_MSG(driver_.value().is_ok(), "Driver start did not succeed: %s.",
-                driver_.value().status_string());
-  return driver_.value().value();
+#endif
 }
 
 }  // namespace fdf_testing

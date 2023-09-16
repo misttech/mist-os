@@ -44,6 +44,7 @@ source_set("common") {
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp_wire",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/devfs/cpp",
+    "//src/devices/bin/driver_runtime",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/mmio",

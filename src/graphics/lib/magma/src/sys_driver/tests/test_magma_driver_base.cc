@@ -16,7 +16,7 @@
 #include "sys_driver/magma_driver_base.h"
 
 namespace msd {
-namespace {
+
 class FakeTestDriver : public MagmaTestDriverBase {
  public:
   FakeTestDriver(fdf::DriverStartArgs start_args,
@@ -40,8 +40,7 @@ class FakeTestDriver : public MagmaTestDriverBase {
   }
 };
 
-// Export the |FakeTestDriver| for the |fdf_testing::DriverUnderTest<FakeTestDriver>| to use.
-FUCHSIA_DRIVER_EXPORT(FakeTestDriver);
+namespace {
 
 class FakeDriver : public MagmaProductionDriverBase {
  public:
@@ -106,9 +105,9 @@ class MagmaDriverStarted : public testing::Test {
   }
 
   void TearDown() override {
-    zx::result prepare_stop_result = runtime_.RunToCompletion(
+    zx::result stop_result = runtime_.RunToCompletion(
         driver_.SyncCall(&fdf_testing::DriverUnderTest<FakeTestDriver>::PrepareStop));
-    ASSERT_EQ(ZX_OK, prepare_stop_result.status_value());
+    ASSERT_EQ(ZX_OK, stop_result.status_value());
   }
 
   async_patterns::TestDispatcherBound<fdf_testing::TestNode>& node_server() { return node_server_; }
@@ -209,3 +208,6 @@ TEST_F(MagmaDriverStarted, DependencyInjection) {
 }  // namespace
 
 }  // namespace msd
+
+// Export the |FakeTestDriver| for the |fdf_testing::DriverUnderTest<FakeTestDriver>| to use.
+FUCHSIA_DRIVER_EXPORT(msd::FakeTestDriver);

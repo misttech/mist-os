@@ -142,13 +142,6 @@ class Driver : public fdf::DriverBase {
   fpromise::scope scope_;
 };
 
-class DriverFactory {
- public:
-  static void CreateDriver(fdf::DriverStartArgs start_args,
-                           fdf::UnownedSynchronizedDispatcher driver_dispatcher,
-                           fdf::StartCompleter completer);
-};
-
 // |GlobalLoggerList| is global for the entire driver host process. It maintains a
 // |LoggerInstances| for each driver_path that is active.
 class GlobalLoggerList {

@@ -1,12 +1,13 @@
 {
   "pkg/driver_component_cpp/include/lib/driver/component/cpp/composite_node_spec.h": "202227870e89181c93a946c88e45b60c",
-  "pkg/driver_component_cpp/include/lib/driver/component/cpp/driver_base.h": "935850ab9ac29a820abc175fe49b83e5",
-  "pkg/driver_component_cpp/include/lib/driver/component/cpp/driver_export.h": "4f085ab2bdda615c6692e42014e78495",
-  "pkg/driver_component_cpp/include/lib/driver/component/cpp/internal/basic_factory.h": "47b7e19c89cba8fa40404d91475d06b4",
-  "pkg/driver_component_cpp/include/lib/driver/component/cpp/internal/lifecycle.h": "109017fe6ef271fc353ec52f99f5d758",
+  "pkg/driver_component_cpp/include/lib/driver/component/cpp/driver_base.h": "571c67bb4c35a2f7ccf3a463619e79d7",
+  "pkg/driver_component_cpp/include/lib/driver/component/cpp/driver_export.h": "e3fbe93dd6b50dc6d97956e7159b7dcf",
+  "pkg/driver_component_cpp/include/lib/driver/component/cpp/internal/basic_factory.h": "f1d01389b21f93423d8096936731a4fc",
+  "pkg/driver_component_cpp/include/lib/driver/component/cpp/internal/driver_server.h": "80d5320e82e31e8a7bb5707de3b496e1",
+  "pkg/driver_component_cpp/include/lib/driver/component/cpp/internal/lifecycle.h": "e8bff42d556f4bb228cc282c692e0050",
   "pkg/driver_component_cpp/include/lib/driver/component/cpp/internal/start_args.h": "6dc1d8874f91f802b09ed362d8cc3dd3",
   "pkg/driver_component_cpp/include/lib/driver/component/cpp/internal/symbols.h": "e5442f57ad007cde17c724accf8b3234",
   "pkg/driver_component_cpp/include/lib/driver/component/cpp/node_add_args.h": "016edd788060d09a4444de4073c3aa27",
-  "pkg/driver_component_cpp/include/lib/driver/component/cpp/prepare_stop_completer.h": "cf7d8331fb8131313d5f4ff6d0452a57",
-  "pkg/driver_component_cpp/include/lib/driver/component/cpp/start_completer.h": "75f67c711448a99b0e2498cd183fac38"
+  "pkg/driver_component_cpp/include/lib/driver/component/cpp/prepare_stop_completer.h": "a744631ebff8156a5332b14d491d4ab2",
+  "pkg/driver_component_cpp/include/lib/driver/component/cpp/start_completer.h": "edde1745e4027176edd12da2f1ebb581"
 }

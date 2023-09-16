@@ -5,7 +5,10 @@
 #ifndef LIB_DRIVER_COMPONENT_CPP_INTERNAL_BASIC_FACTORY_H_
 #define LIB_DRIVER_COMPONENT_CPP_INTERNAL_BASIC_FACTORY_H_
 
+#include <zircon/availability.h>
+
 #if __Fuchsia_API_level__ >= 13
+#if __Fuchsia_API_level__ < FUCHSIA_HEAD
 
 #include <lib/driver/component/cpp/driver_base.h>
 
@@ -38,6 +41,7 @@ class BasicFactory {
 
 }  // namespace fdf_internal
 
+#endif
 #endif
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_INTERNAL_BASIC_FACTORY_H_

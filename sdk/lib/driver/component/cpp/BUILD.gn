@@ -24,6 +24,7 @@ sdk_source_set("cpp") {
     "driver_base.h",
     "driver_export.h",
     "internal/basic_factory.h",
+    "internal/driver_server.h",
     "internal/lifecycle.cc",
     "internal/lifecycle.h",
     "internal/start_args.h",
@@ -38,6 +39,7 @@ sdk_source_set("cpp") {
 
   sdk_headers_for_internal_use = [
     "internal/basic_factory.h",
+    "internal/driver_server.h",
     "internal/lifecycle.cc",
     "internal/lifecycle.h",
     "internal/start_args.h",
@@ -47,12 +49,14 @@ sdk_source_set("cpp") {
   public_deps = [
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
+    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp_driver_wire",
     "//sdk/lib/driver/incoming/cpp",
     "//sdk/lib/driver/logging/cpp",
     "//sdk/lib/driver/outgoing/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/driver/symbols",
     "//sdk/lib/fidl",
+    "//sdk/lib/fidl_driver",
   ]
 }
 

@@ -83,8 +83,8 @@ class TestForegroundDriverBackgroundEnv : public ::testing::Test {
   }
 
   void TearDown() override {
-    zx::result prepare_stop_result = runtime_.RunToCompletion(driver_.PrepareStop());
-    EXPECT_EQ(ZX_OK, prepare_stop_result.status_value());
+    zx::result stop_result = runtime_.RunToCompletion(driver_.PrepareStop());
+    EXPECT_EQ(ZX_OK, stop_result.status_value());
   }
 
   fdf_testing::DriverUnderTest<TestDriver>& driver() { return driver_; }

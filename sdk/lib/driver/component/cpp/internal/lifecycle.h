@@ -5,7 +5,10 @@
 #ifndef LIB_DRIVER_COMPONENT_CPP_INTERNAL_LIFECYCLE_H_
 #define LIB_DRIVER_COMPONENT_CPP_INTERNAL_LIFECYCLE_H_
 
+#include <zircon/availability.h>
+
 #if __Fuchsia_API_level__ >= 13
+#if __Fuchsia_API_level__ < FUCHSIA_HEAD
 
 #include <lib/driver/component/cpp/internal/basic_factory.h>
 
@@ -93,6 +96,7 @@ class Lifecycle {
 
 }  // namespace fdf_internal
 
+#endif
 #endif
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_INTERNAL_LIFECYCLE_H_

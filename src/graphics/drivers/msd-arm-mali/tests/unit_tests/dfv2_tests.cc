@@ -157,8 +157,8 @@ TEST(MsdArmDFv2, LoadDriver) {
   // Hook ownership should have been taken by the driver.
   EXPECT_FALSE(hook_s);
 
-  zx::result prepare_stop_result = runtime.RunToCompletion(driver.PrepareStop());
-  ASSERT_EQ(ZX_OK, prepare_stop_result.status_value());
+  zx::result stop_result = runtime.RunToCompletion(driver.PrepareStop());
+  ASSERT_EQ(ZX_OK, stop_result.status_value());
 }
 
 }  // namespace

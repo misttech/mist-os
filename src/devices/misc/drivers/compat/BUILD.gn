@@ -25,6 +25,8 @@ add_node_names_to_log_tags = false
 source_set("lib") {
   sources = [
     "api.cc",
+    "compat_driver_server.cc",
+    "compat_driver_server.h",
     "composite.cc",
     "composite.h",
     "device.cc",
