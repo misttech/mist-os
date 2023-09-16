@@ -418,6 +418,16 @@ template("assembly_input_bundle") {
         ]
       }
     }
+    system = []
+    if (defined(invoker.system_packages)) {
+      foreach(_target, invoker.system_packages) {
+        system += [
+          {
+            package_target = _target
+          },
+        ]
+      }
+    }
     bootfs = []
     if (defined(invoker.bootfs_packages)) {
       foreach(_target, invoker.bootfs_packages) {
@@ -445,6 +455,7 @@ template("assembly_input_bundle") {
           [
             "base",
             "cache",
+            "system",
             "base-drivers",
             "bootfs",
             "boot-drivers",

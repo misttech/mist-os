@@ -34,6 +34,9 @@ def create_bundle(args: argparse.Namespace) -> None:
     if args.cache_pkg_list:
         add_pkg_list_from_file(aib_creator, args.cache_pkg_list, "cache")
 
+    if args.system_pkg_list:
+        add_pkg_list_from_file(aib_creator, args.system_pkg_list, "system")
+
     if args.bootfs_pkg_list:
         add_pkg_list_from_file(
             aib_creator, args.bootfs_pkg_list, "bootfs_packages")
@@ -459,6 +462,11 @@ def main():
         type=argparse.FileType('r'),
         help=
         "Path to a json list of package manifests for the 'cache' package set")
+    bundle_creation_parser.add_argument(
+        "--system-pkg-list",
+        type=argparse.FileType('r'),
+        help=
+        "Path to a json list of package manifests for the 'system' package set")
     bundle_creation_parser.add_argument(
         "--kernel-cmdline",
         type=argparse.FileType('r'),
