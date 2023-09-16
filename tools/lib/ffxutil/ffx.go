@@ -206,6 +206,20 @@ func (f *FFXInstance) RunWithTarget(ctx context.Context, args ...string) error {
 	return f.Run(ctx, args...)
 }
 
+// RunAndGetOutput runs ffx with the provided args and returns the stdout.
+func (f *FFXInstance) RunAndGetOutput(ctx context.Context, args ...string) (string, error) {
+	origStdout := f.stdout
+	var output bytes.Buffer
+	f.stdout = io.MultiWriter(&output, origStdout)
+	defer func() {
+		f.stdout = origStdout
+	}()
+	if err := f.Run(ctx, args...); err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(output.String()), nil
+}
+
 // WaitForDaemon tries a few times to check that the daemon is up
 // and returns an error if it fails to respond.
 func (f *FFXInstance) WaitForDaemon(ctx context.Context) error {
@@ -315,21 +329,11 @@ func (f *FFXInstance) GetConfig(ctx context.Context) error {
 
 // GetImageFromPB returns an image from a product bundle.
 func (f *FFXInstance) GetImageFromPB(ctx context.Context, pbPath string, slot string, imageType string) (*bootserver.Image, error) {
-	oldStdout := f.stdout
-
-	var buf []byte
-	stdout := bytes.NewBuffer(buf)
-
-	// Set to new stdout before execution
-	f.stdout = io.MultiWriter(stdout, oldStdout)
-
-	err := f.Run(ctx, "product", "get-image-path", pbPath, "-r", "--slot", slot, "--image-type", imageType)
-	f.stdout = oldStdout
+	relImagePath, err := f.RunAndGetOutput(ctx, "product", "get-image-path", pbPath, "-r", "--slot", slot, "--image-type", imageType)
 	if err != nil {
 		return nil, err
 	}
 
-	relImagePath := strings.TrimSpace(stdout.String())
 	imagePath := filepath.Join(pbPath, relImagePath)
 	buildImg := build.Image{Name: relImagePath, Path: imagePath}
 
