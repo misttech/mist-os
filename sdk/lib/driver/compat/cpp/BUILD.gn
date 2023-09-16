@@ -11,6 +11,7 @@ sdk_source_set("cpp") {
   sdk_name = "driver_compat"
   include_base = "//sdk"
   sources = [
+    "banjo_server.h",
     "compat.h",
     "connect.cc",
     "connect.h",
@@ -21,7 +22,9 @@ sdk_source_set("cpp") {
   ]
 
   public_deps = [
+    ":symbols",
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
@@ -36,7 +39,10 @@ source_set("logging") {
   public_deps = [ "//sdk/lib/driver/logging/cpp" ]
 }
 
-source_set("symbols") {
+sdk_source_set("symbols") {
+  category = "internal"
+  sdk_name = "driver_compat_symbols"
+  include_base = "//sdk"
   sources = [ "symbols.h" ]
 }
 

@@ -5,6 +5,7 @@
 #ifndef LIB_DRIVER_COMPAT_CPP_COMPAT_H_
 #define LIB_DRIVER_COMPAT_CPP_COMPAT_H_
 
+#include <lib/driver/compat/cpp/banjo_server.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/compat/cpp/service_offers.h>
 

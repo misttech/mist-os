@@ -8,12 +8,7 @@
 #include <lib/driver/compat/cpp/symbols.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/driver_export.h>
-#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
-
-namespace fdf {
-using namespace ::fuchsia_driver_framework;
-}
 
 namespace banjo_transport {
 
@@ -27,24 +22,12 @@ class ParentBanjoTransportDriver : public fdf::DriverBase,
   zx::result<> Start() override {
     node_.Bind(std::move(node()));
 
-    child_ = compat::DeviceServer(
-        std::string(name()), ZX_PROTOCOL_MISC, "TODO", std::nullopt,
-        [this](uint32_t protocol) -> zx::result<compat::DeviceServer::GenericProtocol> {
-          if (protocol == ZX_PROTOCOL_MISC) {
-            return zx::ok(proto());
-          }
-          return zx::error(ZX_ERR_NOT_SUPPORTED);
-        });
+    child_ = compat::DeviceServer(std::string(name()), ZX_PROTOCOL_MISC, "TODO", std::nullopt,
+                                  banjo_server_.callback());
     zx_status_t status = child_->Serve(dispatcher(), outgoing().get());
     if (status != ZX_OK) {
       return zx::error(status);
     }
-
-    // Set the symbols of the node that a driver will have access to.
-    compat_device_.name = name().data();
-    compat_device_.context = this;
-    compat_device_.proto_ops.id = ZX_PROTOCOL_MISC;
-    compat_device_.proto_ops.ops = &misc_protocol_ops_;
 
     if (zx::result result = AddChild(); result.is_error()) {
       FDF_SLOG(ERROR, "Failed to add child node", KV("status", result.status_string()));
@@ -57,18 +40,11 @@ class ParentBanjoTransportDriver : public fdf::DriverBase,
   // Add a child device node and offer the service capabilities.
   zx::result<> AddChild() {
     // Offer `fuchsia.examples.gizmo.Service` to the driver that binds to the node.
-    auto symbol = fdf::NodeSymbol{{
-        .name = compat::kDeviceSymbol,
-        .address = reinterpret_cast<uint64_t>(&compat_device_),
-    }};
-
-    auto property = fdf::MakeProperty(1 /*BIND_PROTOCOL */, ZX_PROTOCOL_MISC);
-
-    auto args = fdf::NodeAddArgs({
+    auto args = fuchsia_driver_framework::NodeAddArgs({
         .name = std::string(name()),
         .offers = child_->CreateOffers(),
-        .symbols = {{symbol}},
-        .properties = {{property}},
+        .symbols = {{banjo_server_.symbol()}},
+        .properties = {{banjo_server_.property()}},
     });
 
     // Create endpoints of the `NodeController` for the node.
@@ -103,14 +79,10 @@ class ParentBanjoTransportDriver : public fdf::DriverBase,
   }
 
  private:
-  compat::DeviceServer::GenericProtocol proto() {
-    return {.ops = &misc_protocol_ops_, .ctx = this};
-  }
-
   fidl::SyncClient<fuchsia_driver_framework::Node> node_;
   fidl::Client<fuchsia_driver_framework::NodeController> controller_;
 
-  compat::device_t compat_device_ = compat::kDefaultDevice;
+  compat::BanjoServer banjo_server_{name().data(), ZX_PROTOCOL_MISC, this, &misc_protocol_ops_};
   std::optional<compat::DeviceServer> child_;
 };
 
