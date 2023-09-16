@@ -30,8 +30,7 @@
 # to this file, but each entry needs a ticket assigned to the assembly team with
 # an agreed upon solution for how to address the tech-debt.
 
-# We use the minimal legacy AIB for workbench.
-import("//products/common/minimal.gni")
+include_shell_commands_package = true
 
 # Use Bazel-built images
 use_bazel_images_only = true
@@ -43,7 +42,7 @@ fuchsia_product_assembly_config_label = "//products/minimal"
 zedboot_product_assembly_config_label = "//products/zedboot"
 
 # Kernel command line arguments.
-product_bootfs_labels += [
+product_bootfs_labels = [
   "//products/kernel_cmdline:oom.reboot-timeout--low",
   "//src/sys/component_manager:component_manager_bootfs_config",
 ]
@@ -57,19 +56,14 @@ extra_bazel_assembly_targets =
 extra_gn_labels_for_bazel_inputs =
     [ "//src/ui/bin/tiles-session:tiles_session_bazel_inputs" ]
 
-# We need to skip the fshost configuration in Assembly for workbench until
-# minimal.gni supports configuring fshost via Assembly
-# TODO(fxbug.dev/121405): Remove once fshost is no longer configured via GN
-assembly_fshost = true
-
 # BEGIN: Baseline eng support
 #
 # Support for `ffx`, `fx log`, and `fx shell`, and devhost registration.
 #
 # TODO(fxbug.dev/121402): Delete this section and do the equivalent via
 # assembly.
-legacy_base_package_labels += [ "//src/connectivity:tools" ]
+legacy_base_package_labels = [ "//src/connectivity:tools" ]
 
 # Debugging support
-discoverable_package_labels += [ "//src/developer/debug/debug_agent" ]
+discoverable_package_labels = [ "//src/developer/debug/debug_agent" ]
 # END: Baseline eng support

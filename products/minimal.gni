@@ -9,15 +9,15 @@
 # team ship a mechanism for updating Fuchsia that does not require IP networking, that functionality
 # should be moved to a higher-level product definition.
 
-import("//products/common/minimal.gni")
+include_shell_commands_package = true
 
 # Kernel command line arguments.
-product_bootfs_labels += [
+product_bootfs_labels = [
   "//products/kernel_cmdline:oom.reboot-timeout--low",
   "//src/sys/component_manager:component_manager_bootfs_config",
 ]
 
-legacy_base_package_labels += [ "//src/developer/memory/buckets" ]
+legacy_base_package_labels = [ "//src/developer/memory/buckets" ]
 
 # Use the product assembly config target to specify the product configuration.
 #
@@ -35,4 +35,4 @@ extra_bazel_assembly_targets =
 assembly_fshost = true
 
 # Packages to be published to universe that do not go through assembly.
-discoverable_package_labels += [ "//src/developer/debug/debug_agent" ]
+discoverable_package_labels = [ "//src/developer/debug/debug_agent" ]

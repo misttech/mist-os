@@ -152,9 +152,6 @@ if (is_fuchsia) {
 
     core_realm_definition = ":core_realm"
 
-    # Include the product-defined meta package labels.
-    meta_packages = meta_package_labels
-
     base_driver_packages = [
       "//:developer_base_driver_packages",
       "//:legacy_base_driver_packages",

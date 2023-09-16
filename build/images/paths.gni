@@ -46,8 +46,6 @@ labels = {
     assembly_name = "fuchsia"
 
     fuchsia_netboot = "${_images_without_toolchain}:netboot"
-
-    meta_packages = "${_images_without_toolchain}:fuchsia.meta_packages"
   }
 
   _qemu_deps = qemu_boot_shim.deps

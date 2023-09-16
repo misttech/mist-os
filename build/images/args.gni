@@ -93,11 +93,6 @@ declare_args() {
   # This is primarily meant to be used by the clang canary builders.
   check_vtables_in_rodata = false
 
-  # A list of labels for packages that are appended to the set of base packages,
-  # but depend on all the other base, cache, and universe packages, therefore
-  # they must be separated into their own list.
-  meta_package_labels = []
-
   # Arguments to `fx flash` script (along with any `firmware_prebuilts` which
   # specify a partition).
   #

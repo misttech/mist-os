@@ -87,13 +87,6 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     however they may contribute to the config-data and shell-commands meta
 #     packages.
 #
-#   meta_packages (optional)
-#     [list of labels] The packages to build in addition to the base and cache
-#     sets, but are base_packages themselves.  These are packages that contain
-#     files that are generated based on other packages in the base, cache,
-#     and/or universe sets, and therefore cannot be part of those sets directly,
-#     or a GN dependency cycle will result.
-#
 #   bootfs_labels (required)
 #     [list of labels] The objects installed on the bootfs partition of the
 #     generated ZBI.
@@ -333,7 +326,6 @@ template("assembled_system") {
   labels = {
     base_packages_group = "${_namespace}.base_packages"
     cache_packages_group = "${_namespace}.cache_packages"
-    meta_packages_group = "${_namespace}.meta_packages"
     all_packages_group = "${_namespace}.packages"
     legacy_assembly_input_bundle = "${_namespace}.legacy_input_bundle"
     fshost = "${legacy_assembly_input_bundle}.fshost"
@@ -498,16 +490,12 @@ template("assembled_system") {
   _boot_driver_packages = []
   _cache_packages = []
   _universe_packages = []
-  _meta_packages = []
 
   if (defined(invoker.cache_packages)) {
     _cache_packages = invoker.cache_packages
   }
   if (defined(invoker.universe_packages)) {
     _universe_packages = invoker.universe_packages
-  }
-  if (defined(invoker.meta_packages)) {
-    _meta_packages = invoker.meta_packages
   }
 
   # Split out driver packages into a separate list so that we
@@ -558,14 +546,6 @@ template("assembled_system") {
     public_deps = _cache_packages
   }
 
-  # The group of generated packages that contain files that depend on metadata
-  # walks of the base/cache/universe package sets and therefore cannot be part
-  # of those package sets.
-  group(labels.meta_packages_group) {
-    forward_variables_from(invoker, [ "testonly" ])
-    public_deps = _meta_packages
-  }
-
   #######
   # Build the images using the Image Assembler.
   #
@@ -587,7 +567,6 @@ template("assembled_system") {
       include_config_data = true
       supports_blobs = _supports_blobs
       base_packages = _must_exist.base_packages
-      meta_packages = []
       cache_packages = _must_exist.cache_packages
       universe_packages = _universe_packages
       additional_boot_args = []
@@ -646,7 +625,6 @@ template("assembled_system") {
 
     supports_blobs = _supports_blobs
     base_packages = _base_packages
-    meta_packages = _meta_packages
     cache_packages = _cache_packages
     universe_packages = _universe_packages
     additional_boot_args = _additional_boot_args

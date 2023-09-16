@@ -127,7 +127,6 @@ template("assemble_security_pkg_test_system") {
     repository_config = "${assembly_name}_repository_config"
     packages_json = "${assembly_name}_packages_json"
     update_package = "${assembly_name}_update_package"
-    meta_packages = "${assembly_name}.meta_packages"
     root_ssl_certificates = "${assembly_name}_root_ssl_certificates"
     root_ssl_certificates_resource_group =
         "${assembly_name}_root_ssl_certificates_resource_group"

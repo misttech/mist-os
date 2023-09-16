@@ -74,9 +74,6 @@ import("//build/python/python_action.gni")
 #   base_packages [required]
 #     [list of labels] The set of base packages.
 #
-#   meta_packages [required]
-#     [list of labels] The set of meta packages.
-#
 #   cache_packages [required]
 #     [list of labels] The set of cache packages.
 #
@@ -96,7 +93,6 @@ template("legacy_assembly_input_bundle") {
 
   assert(defined(invoker.supports_blobs), "Need to define supports_blobs")
   assert(defined(invoker.base_packages), "Need to define base_packages")
-  assert(defined(invoker.meta_packages), "Need to define meta_packages")
   assert(defined(invoker.cache_packages), "Need to define cache_packages")
   assert(defined(invoker.universe_packages), "Need to define universe_packages")
   assert(defined(invoker.additional_boot_args),
@@ -408,10 +404,7 @@ template("legacy_assembly_input_bundle") {
     base_packages = []
     if (invoker.supports_blobs) {
       base_packages = invoker.base_packages
-      base_packages += invoker.meta_packages
       cache_packages = invoker.cache_packages
-    } else {
-      not_needed(invoker, [ "meta_packages" ])
     }
 
     include_config_data = _include_config_data
