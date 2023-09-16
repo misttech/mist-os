@@ -11,6 +11,7 @@ sdk_source_set("cpp") {
   sdk_name = "driver_compat"
   include_base = "//sdk"
   sources = [
+    "banjo_client.h",
     "banjo_server.h",
     "compat.h",
     "connect.cc",

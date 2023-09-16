@@ -8,7 +8,6 @@
 #include <lib/driver/compat/cpp/symbols.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/driver_export.h>
-#include <lib/driver/component/cpp/internal/symbols.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
 
 namespace banjo_transport {
@@ -23,11 +22,12 @@ class ChildBanjoTransportDriver : public fdf::DriverBase {
     parent_node_.Bind(std::move(node()));
 
     // Connect to the `fuchsia.examples.gizmo.Misc` protocol provided by the parent.
-    zx::result result = ConnectMiscProtocol();
-    if (result.is_error()) {
-      FDF_SLOG(ERROR, "Failed to connect client", KV("status", result.status_string()));
-      return result.take_error();
+    zx::result client = compat::ConnectBanjo<ddk::MiscProtocolClient>(symbols());
+    if (client.is_error()) {
+      FDF_SLOG(ERROR, "Failed to connect client", KV("status", client.status_string()));
+      return client.take_error();
     }
+    client_ = *client;
 
     zx_status_t status = QueryParent();
     if (status != ZX_OK) {
@@ -35,35 +35,11 @@ class ChildBanjoTransportDriver : public fdf::DriverBase {
       return zx::error(status);
     }
 
-    result = AddChild();
+    zx::result result = AddChild();
     if (result.is_error()) {
       FDF_SLOG(ERROR, "Failed to add child", KV("status", result.status_string()));
       return result.take_error();
     }
-
-    return zx::ok();
-  }
-
-  // Connect to the parent's offered service.
-  zx::result<> ConnectMiscProtocol() {
-    auto parent_symbol =
-        fdf_internal::GetSymbol<compat::device_t*>(symbols(), compat::kDeviceSymbol);
-
-    misc_protocol_t proto = {};
-    if (parent_symbol->proto_ops.id != ZX_PROTOCOL_MISC) {
-      FDF_SLOG(ERROR, "Didn't find gizmo misc protocol",
-               KV("proto_ops.id", parent_symbol->proto_ops.id));
-      return zx::error(ZX_ERR_NOT_FOUND);
-    }
-    proto.ctx = parent_symbol->context;
-    proto.ops = reinterpret_cast<const misc_protocol_ops_t*>(parent_symbol->proto_ops.ops);
-
-    ddk::MiscProtocolClient misc_client(&proto);
-    if (!misc_client.is_valid()) {
-      FDF_LOG(ERROR, "Failed to find gizmo misc protocol");
-      return zx::error(ZX_ERR_INTERNAL);
-    }
-    client_ = std::move(misc_client);
 
     return zx::ok();
   }
