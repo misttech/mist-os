@@ -10,7 +10,6 @@
     program: {
         runner: "driver",
         bind: "meta/bind/nelson-brownout-protection-bind.bindbc",
-        colocate: "false",
         compat: "driver/nelson-brownout-protection.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",

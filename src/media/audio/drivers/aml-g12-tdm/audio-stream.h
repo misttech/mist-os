@@ -6,7 +6,6 @@
 #define SRC_MEDIA_AUDIO_DRIVERS_AML_G12_TDM_AUDIO_STREAM_H_
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
-#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/io-buffer.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fzl/pinned-vmo.h>

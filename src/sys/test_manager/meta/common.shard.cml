@@ -608,7 +608,7 @@
             to: [ "#system-tests" ],
         },
 
-        // CPU Profiling tests require access to the /dev/sys/cpu-trace device
+        // CPU Profiling tests require access to the /dev/sys/platform/00:00:1d device
         {
             directory: "sys",
             from: "parent",

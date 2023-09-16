@@ -9,7 +9,6 @@ group("drivers") {
     "drivers/pci/test:pci_fake",
     "drivers/pci/test:pci_protocol_test_driver",
     "drivers/platform:platform-bus",
-    "drivers/platform:platform-bus.proxy",
     "drivers/platform/test:test-board",
     "drivers/platform/test:test-bti",
     "drivers/platform/test:test-bti-board",

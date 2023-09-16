@@ -716,6 +716,7 @@ mod tests {
             colocate: false,
             device_categories: vec![],
             fallback: false,
+            use_fidl_proxy: false,
             package_type: DriverPackageType::Base,
             package_hash: None,
         }

@@ -26,27 +26,6 @@ constexpr char kName[] = "test device";
 
 namespace fhpd = fuchsia_hardware_platform_device;
 
-TEST(PDevTest, GetInterrupt) {
-  constexpr zx_handle_t kFakeHandle = 3;
-  pdev_protocol_ops_t fake_ops{
-      .get_interrupt =
-          [](void* ctx, uint32_t index, uint32_t flags, zx_handle_t* out_irq) {
-            *out_irq = kFakeHandle;
-            return ZX_OK;
-          },
-  };
-
-  pdev_protocol_t fake_proto{
-      .ops = &fake_ops,
-      .ctx = nullptr,
-  };
-
-  ddk::PDev pdev(&fake_proto);
-  zx::interrupt out;
-  ASSERT_OK(pdev.GetInterrupt(0, 0, &out));
-  ASSERT_EQ(out.get(), kFakeHandle);
-}
-
 class DeviceServer : public fidl::testing::WireTestBase<fuchsia_hardware_platform_device::Device> {
  public:
   zx_status_t Connect(fidl::ServerEnd<fhpd::Device> request) {
@@ -262,7 +241,7 @@ TEST(PDevFidlTest, GetDeviceInfo) {
   zx::result client_channel = infra.Start({
       .device_info =
           []() {
-            pdev_device_info_t device_info{
+            fake_pdev::DeviceInfo device_info{
                 .vid = kVid,
                 .pid = kPid,
             };
@@ -284,7 +263,7 @@ TEST(PDevFidlTest, GetBoardInfo) {
   FakePDevFidlWithThread infra;
   zx::result client_channel = infra.Start({
       .board_info =
-          pdev_board_info_t{
+          fake_pdev::BoardInfo{
               .vid = kVid,
               .pid = kPid,
           },

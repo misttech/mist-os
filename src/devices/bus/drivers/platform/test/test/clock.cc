@@ -4,12 +4,12 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fuchsia/hardware/clockimpl/cpp/banjo.h>
-#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fdf/cpp/arena.h>
 
 #include <memory>
@@ -84,18 +84,16 @@ zx_status_t TestClockDevice::Init() {
 
 zx_status_t TestClockDevice::Create(zx_device_t* parent) {
   auto dev = std::make_unique<TestClockDevice>(parent);
-  pdev_protocol_t pdev;
-  zx_status_t status;
 
   zxlogf(INFO, "TestClockDevice::Create: %s", DRIVER_NAME);
 
-  status = device_get_protocol(parent, ZX_PROTOCOL_PDEV, &pdev);
-  if (status != ZX_OK) {
+  zx::result pdev = ddk::PDevFidl::Create(parent);
+  if (pdev.is_error()) {
     zxlogf(ERROR, "%s: could not get ZX_PROTOCOL_PDEV", __func__);
-    return status;
+    return pdev.status_value();
   }
 
-  status = dev->DdkAdd(
+  zx_status_t status = dev->DdkAdd(
       ddk::DeviceAddArgs("test-clock").forward_metadata(parent, DEVICE_METADATA_CLOCK_IDS));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: DdkAdd failed: %d", __func__, status);

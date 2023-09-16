@@ -658,7 +658,7 @@ zx_status_t Coordinator::AttemptBind(const MatchedDriverInfo matched_driver,
   // We should prepare a FIDL proxy if the driver has set `colocate = false`, because we only set
   // that flag if the driver is going to be using FIDL.
   zx_status_t status;
-  if (!matched_driver.colocate) {
+  if (!matched_driver.colocate || matched_driver.use_fidl_proxy) {
     VLOGF(1, "Preparing FIDL proxy for %s", dev->name().data());
     fbl::RefPtr<Device> fidl_proxy;
     status = PrepareFidlProxy(dev, nullptr /* target_driver_host */, &fidl_proxy);

@@ -5,8 +5,6 @@
 #include "aml-uart.h"
 
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
-#include <fuchsia/hardware/platform/device/c/banjo.h>
-#include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/serial/c/banjo.h>
 #include <fuchsia/hardware/serialimpl/async/c/banjo.h>
 #include <lib/async-loop/default.h>
@@ -200,7 +198,7 @@ class AmlUartHarness : public zxtest::Test {
   DeviceState& device_state() { return state_; }
 
  private:
-  DeviceState state_; // Must not be destructed before fake_parent_.
+  DeviceState state_;  // Must not be destructed before fake_parent_.
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
   async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),

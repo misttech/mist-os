@@ -4,11 +4,11 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fuchsia/hardware/gpioimpl/cpp/banjo.h>
-#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
+#include <lib/device-protocol/pdev-fidl.h>
 
 #include <memory>
 
@@ -96,18 +96,16 @@ zx_status_t TestGpioDevice::Init() {
 
 zx_status_t TestGpioDevice::Create(zx_device_t* parent) {
   auto dev = std::make_unique<TestGpioDevice>(parent);
-  pdev_protocol_t pdev;
-  zx_status_t status;
 
   zxlogf(INFO, "TestGpioDevice::Create: %s ", DRIVER_NAME);
 
-  status = device_get_protocol(parent, ZX_PROTOCOL_PDEV, &pdev);
-  if (status != ZX_OK) {
+  zx::result pdev = ddk::PDevFidl::Create(parent);
+  if (pdev.is_error()) {
     zxlogf(ERROR, "%s: could not get ZX_PROTOCOL_PDEV", __func__);
-    return status;
+    return pdev.status_value();
   }
 
-  status = dev->DdkAdd(
+  zx_status_t status = dev->DdkAdd(
       ddk::DeviceAddArgs("test-gpio").forward_metadata(parent, DEVICE_METADATA_GPIO_PINS));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: DdkAdd failed: %d", __func__, status);

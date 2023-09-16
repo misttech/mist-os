@@ -10,7 +10,6 @@
     program: {
         runner: "driver",
         bind: "meta/bind/sysdev-bind.bindbc",
-        colocate: "false",
         compat: "driver/sysdev.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",

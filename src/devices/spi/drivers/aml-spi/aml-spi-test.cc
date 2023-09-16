@@ -6,7 +6,6 @@
 
 #include <endian.h>
 #include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
-#include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
@@ -37,9 +36,7 @@ struct IncomingNamespace {
 
 class AmlSpiTest : public zxtest::Test {
  public:
-  AmlSpiTest()
-      : mmio_region_(sizeof(uint32_t), 17),
-        root_(MockDevice::FakeRootParent()) {}
+  AmlSpiTest() : mmio_region_(sizeof(uint32_t), 17), root_(MockDevice::FakeRootParent()) {}
 
   virtual void SetUpInterrupt(fake_pdev::FakePDevFidl::Config& config) {
     ASSERT_OK(zx::interrupt::create({}, 0, ZX_INTERRUPT_VIRTUAL, &interrupt_));
@@ -55,7 +52,7 @@ class AmlSpiTest : public zxtest::Test {
 
   void SetUp() override {
     fake_pdev::FakePDevFidl::Config config;
-    config.device_info = pdev_device_info_t{
+    config.device_info = fake_pdev::DeviceInfo{
         .mmio_count = 1,
         .irq_count = 1u,
     };
@@ -137,7 +134,7 @@ class AmlSpiTest : public zxtest::Test {
       },
   };
 
-  ddk_fake::FakeMmioRegRegion mmio_region_; // Must be destructed after root_.
+  ddk_fake::FakeMmioRegRegion mmio_region_;  // Must be destructed after root_.
   std::shared_ptr<MockDevice> root_;
   zx::vmo mmio_;
   fzl::VmoMapper mmio_mapper_;

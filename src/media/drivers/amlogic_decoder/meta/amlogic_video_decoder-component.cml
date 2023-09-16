@@ -10,7 +10,6 @@
     program: {
         runner: "driver",
         bind: "meta/bind/amlogic_video_bind.bindbc",
-        colocate: "false",
         compat: "driver/amlogic_video_decoder.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",

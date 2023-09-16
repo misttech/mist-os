@@ -4,7 +4,6 @@
 
 #include "test_device_ctx.h"
 
-#include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/namespace.h>
 

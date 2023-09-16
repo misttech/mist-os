@@ -10,12 +10,13 @@
     program: {
         runner: "driver",
         bind: "meta/bind/msd_vsi_test_bind.bindbc",
-        colocate: "true",
+        colocate: "false",
         compat: "driver/libmsd_vsi_test.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
     use: [
         { protocol: "fuchsia.scheduler.ProfileProvider" },
+        { service: "fuchsia.hardware.platform.device.Service" },
     ],
 }

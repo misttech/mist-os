@@ -10,7 +10,6 @@
     program: {
         runner: "driver",
         bind: "meta/bind/goldfish_address_space-bind.bindbc",
-        colocate: "false",
         compat: "driver/goldfish_address_space.so",
     },
     capabilities: [

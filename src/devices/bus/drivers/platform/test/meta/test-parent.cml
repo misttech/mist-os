@@ -9,10 +9,12 @@
     ],
     program: {
         runner: "driver",
-        bind: "meta/bind/platform-bus.bindbc",
-        compat: "driver/platform-bus.proxy.so",
+        bind: "meta/bind/test-parent-bind.bindbc",
+        compat: "driver/test-parent.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
-    use: [],
+    use: [
+        { service: "fuchsia.hardware.platform.device.Service" },
+    ],
 }

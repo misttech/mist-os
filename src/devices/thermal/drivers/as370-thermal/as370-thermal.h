@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fidl/fuchsia.hardware.power/cpp/wire.h>
 #include <fidl/fuchsia.hardware.thermal/cpp/fidl.h>
-#include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/mmio/mmio.h>
 
 #include <ddktl/device.h>

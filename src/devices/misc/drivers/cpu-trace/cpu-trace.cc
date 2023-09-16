@@ -4,7 +4,6 @@
 
 // See the README.md in this directory for documentation.
 
-#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>

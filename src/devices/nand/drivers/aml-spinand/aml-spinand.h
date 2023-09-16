@@ -4,7 +4,6 @@
 #ifndef SRC_DEVICES_NAND_DRIVERS_AML_SPINAND_AML_SPINAND_H_
 #define SRC_DEVICES_NAND_DRIVERS_AML_SPINAND_AML_SPINAND_H_
 
-#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/rawnand/cpp/banjo.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev-fidl.h>

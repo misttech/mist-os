@@ -94,7 +94,7 @@ void FakePDevFidl::GetDeviceInfo(GetDeviceInfoCompleter::Sync& completer) {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
     return;
   }
-  pdev_device_info_t& info = config_.device_info.value();
+  DeviceInfo& info = config_.device_info.value();
   fidl::Arena arena;
   completer.ReplySuccess(fuchsia_hardware_platform_device::wire::DeviceInfo::Builder(arena)
                              .vid(info.vid)
@@ -114,7 +114,7 @@ void FakePDevFidl::GetBoardInfo(GetBoardInfoCompleter::Sync& completer) {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
     return;
   }
-  pdev_board_info_t& info = config_.board_info.value();
+  BoardInfo& info = config_.board_info.value();
   fidl::Arena arena;
   completer.ReplySuccess(fuchsia_hardware_platform_device::wire::BoardInfo::Builder(arena)
                              .vid(info.vid)

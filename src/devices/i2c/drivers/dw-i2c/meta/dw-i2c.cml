@@ -10,7 +10,6 @@
     program: {
         runner: "driver",
         bind: "meta/bind/dw_i2c-bind.bindbc",
-        colocate: "true",
         compat: "driver/dw-i2c.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",

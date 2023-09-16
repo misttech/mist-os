@@ -13,6 +13,7 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
         compat: "driver/aml-gpio.so",
         colocate: "true",
+        use_fidl_proxy: "true",
     },
     use: [
         { service: "fuchsia.hardware.platform.bus.Service" },

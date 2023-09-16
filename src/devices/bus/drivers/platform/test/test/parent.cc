@@ -2,13 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <stdlib.h>
+
+#include <iterator>
 
 #define DRIVER_NAME "test-parent"
 
@@ -24,18 +26,15 @@ static zx_protocol_device_t test_device_protocol = {
 };
 
 static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
-  pdev_protocol_t pdev;
-  zx_status_t status;
-
   zxlogf(INFO, "test_bind: %s ", DRIVER_NAME);
 
-  status = device_get_protocol(parent, ZX_PROTOCOL_PDEV, &pdev);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: could not get ZX_PROTOCOL_PDEV", DRIVER_NAME);
-    return status;
+  zx::result pdev = ddk::PDevFidl::Create(parent);
+  if (pdev.is_error()) {
+    zxlogf(ERROR, "%s: could not get ZX_PROTOCOL_PDEV", __func__);
+    return pdev.status_value();
   }
 
-  test_t* test = calloc(1, sizeof(test_t));
+  auto* test = reinterpret_cast<test_t*>(calloc(1, sizeof(test_t)));
   if (!test) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -52,10 +51,10 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
       .ctx = test,
       .ops = &test_device_protocol,
       .props = child_props,
-      .prop_count = countof(child_props),
+      .prop_count = std::size(child_props),
   };
 
-  status = device_add(parent, &child_args, &test->zxdev);
+  zx_status_t status = device_add(parent, &child_args, &test->zxdev);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: device_add failed: %d", DRIVER_NAME, status);
     free(test);
@@ -74,7 +73,7 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
       .ctx = test,
       .ops = &test_device_protocol,
       .props = node_props,
-      .prop_count = countof(node_props),
+      .prop_count = std::size(node_props),
   };
 
   status = device_add(parent, &node_args, &test->zxdev);

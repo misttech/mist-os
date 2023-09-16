@@ -7,8 +7,8 @@
 #include "perf-mon.h"
 
 #include <assert.h>
-#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/debug.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/zircon-internal/device/cpu-trace/perf-mon.h>
 #include <lib/zircon-internal/mtrace.h>
 #include <stddef.h>
@@ -625,14 +625,13 @@ zx_status_t perfmon_bind(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  pdev_protocol_t pdev;
-  status = device_get_protocol(parent, ZX_PROTOCOL_PDEV, &pdev);
-  if (status != ZX_OK) {
-    return status;
+  ddk::PDevFidl pdev(parent);
+  if (!pdev.is_valid()) {
+    return ZX_ERR_NO_RESOURCES;
   }
 
   zx::bti bti;
-  status = pdev_get_bti(&pdev, 0, bti.reset_and_get_address());
+  status = pdev.GetBti(0, &bti);
   if (status != ZX_OK) {
     return status;
   }

@@ -5,9 +5,9 @@
 #include "../optee-controller.h"
 
 #include <fidl/fuchsia.hardware.rpmb/cpp/wire.h>
-#include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fake-object/object.h>
@@ -28,6 +28,7 @@
 
 #include "../optee-smc.h"
 #include "../tee-smc.h"
+#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 struct SharedMemoryInfo {
@@ -103,65 +104,11 @@ zx_status_t zx_smc_call(zx_handle_t handle, const zx_smc_parameters_t* parameter
 namespace optee {
 namespace {
 
-class FakePDev : public ddk::PDevProtocol<FakePDev, ddk::base_protocol> {
+class IncomingNamespace {
  public:
-  FakePDev() {}
+  explicit IncomingNamespace() : outgoing_(async_get_default_dispatcher()) {}
 
-  const pdev_protocol_ops_t* proto_ops() const { return &pdev_protocol_ops_; }
-
-  zx_status_t PDevGetMmio(uint32_t index, pdev_mmio_t* out_mmio) {
-    EXPECT_EQ(index, 0);
-    constexpr size_t kSecureWorldMemorySize = 0x20000;
-
-    EXPECT_OK(zx::vmo::create_contiguous(*fake_bti_, 0x20000, 0, &fake_vmo_));
-
-    // Briefly pin the vmo to get the paddr for populating the gSharedMemory object
-    zx_paddr_t secure_world_paddr;
-    zx::pmt pmt;
-    EXPECT_OK(fake_bti_->pin(ZX_BTI_PERM_READ | ZX_BTI_CONTIGUOUS, fake_vmo_, 0,
-                             kSecureWorldMemorySize, &secure_world_paddr, 1, &pmt));
-    // Use the second half of the secure world range to use as shared memory
-    gSharedMemory.address = secure_world_paddr + (kSecureWorldMemorySize / 2);
-    gSharedMemory.size = kSecureWorldMemorySize / 2;
-    EXPECT_OK(pmt.unpin());
-
-    out_mmio->vmo = fake_vmo_.get();
-    out_mmio->offset = 0;
-    out_mmio->size = kSecureWorldMemorySize;
-    return ZX_OK;
-  }
-
-  zx_status_t PDevGetBti(uint32_t index, zx::bti* out_bti) {
-    zx_status_t status = fake_bti_create(out_bti->reset_and_get_address());
-    // Stash an unowned copy of it, for the purposes of creating a contiguous vmo to back the secure
-    // world memory
-    fake_bti_ = out_bti->borrow();
-    return status;
-  }
-
-  zx_status_t PDevGetSmc(uint32_t index, zx::resource* out_resource) {
-    // Just use a fake root resource for now, which is technically eligible for SMC calls. A more
-    // appropriate object would be to use the root resource to mint an SMC resource type.
-    return fake_root_resource_create(out_resource->reset_and_get_address());
-  }
-
-  zx_status_t PDevGetInterrupt(uint32_t index, uint32_t flags, zx::interrupt* out_irq) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  zx_status_t PDevGetDeviceInfo(pdev_device_info_t* out_info) { return ZX_ERR_NOT_SUPPORTED; }
-  zx_status_t PDevGetBoardInfo(pdev_board_info_t* out_info) { return ZX_ERR_NOT_SUPPORTED; }
-
- private:
-  zx::unowned_bti fake_bti_;
-  zx::vmo fake_vmo_;
-};
-
-class FakeRpmbService {
- public:
-  FakeRpmbService() : outgoing_(loop_.dispatcher()) {}
-  ~FakeRpmbService() { loop_.Shutdown(); }
-
-  fidl::ClientEnd<fuchsia_io::Directory> Connect() {
+  fidl::ClientEnd<fuchsia_io::Directory> ConnectRpmb() {
     auto device_handler = [](fidl::ServerEnd<fuchsia_hardware_rpmb::Rpmb> request) {};
     fuchsia_hardware_rpmb::Service::InstanceHandler handler({.device = std::move(device_handler)});
 
@@ -175,8 +122,22 @@ class FakeRpmbService {
     return std::move(endpoints->client);
   }
 
+  fidl::ClientEnd<fuchsia_io::Directory> ConnectPdev() {
+    auto service_result = outgoing_.AddService<fuchsia_hardware_platform_device::Service>(
+        std::move(pdev_.GetInstanceHandler()));
+    ZX_ASSERT(service_result.is_ok());
+
+    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ZX_ASSERT(endpoints.is_ok());
+    ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
+
+    return std::move(endpoints->client);
+  }
+
+  fake_pdev::FakePDevFidl& pdev() { return pdev_; }
+
  private:
-  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
+  fake_pdev::FakePDevFidl pdev_;
   component::OutgoingDirectory outgoing_;
 };
 
@@ -225,14 +186,30 @@ class FakeTeeService : public fidl::WireServer<fuchsia_hardware_tee::DeviceConne
 
 class FakeDdkOptee : public zxtest::Test {
  public:
-  FakeDdkOptee() : clients_loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
+  FakeDdkOptee() : clients_loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
+    incoming_loop_.StartThread("Incoming loop");
+  }
 
   void SetUp() override {
+    fake_pdev::FakePDevFidl::Config config;
+    config.smcs[0] = {};
+    ASSERT_OK(fake_root_resource_create(config.smcs[0].reset_and_get_address()));
+    config.btis[0] = {};
+    ASSERT_OK(fake_bti_create(config.btis[0].reset_and_get_address()));
+    config.mmios[0] = CreateMmio(config.btis[0].borrow());
+    incoming_.SyncCall([config = std::move(config)](IncomingNamespace* incoming) mutable {
+      incoming->pdev().SetConfig(std::move(config));
+    });
+
     ASSERT_OK(clients_loop_.StartThread());
     ASSERT_OK(clients_loop_.StartThread());
     ASSERT_OK(clients_loop_.StartThread());
-    parent_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto_ops(), &pdev_, "pdev");
-    parent_->AddFidlService(fuchsia_hardware_rpmb::Service::Name, rpmb_service_.Connect(), "rpmb");
+    parent_->AddFidlService(
+        fuchsia_hardware_platform_device::Service::Name,
+        incoming_.SyncCall([](auto* incoming) { return incoming->ConnectPdev(); }), "pdev");
+    parent_->AddFidlService(
+        fuchsia_hardware_rpmb::Service::Name,
+        incoming_.SyncCall([](auto* incoming) { return incoming->ConnectRpmb(); }), "rpmb");
 
     ASSERT_OK(OpteeController::Create(nullptr, parent_.get()));
     optee_ = parent_->GetLatestChild()->GetDeviceContext<OpteeController>();
@@ -256,9 +233,33 @@ class FakeDdkOptee : public zxtest::Test {
     EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(parent_.get()));
   }
 
+  static fake_pdev::MmioInfo CreateMmio(const zx::unowned_bti& fake_bti) {
+    constexpr size_t kSecureWorldMemorySize = 0x20000;
+
+    zx::vmo fake_vmo;
+    EXPECT_OK(zx::vmo::create_contiguous(*fake_bti, 0x20000, 0, &fake_vmo));
+
+    // Briefly pin the vmo to get the paddr for populating the gSharedMemory object
+    zx_paddr_t secure_world_paddr;
+    zx::pmt pmt;
+    EXPECT_OK(fake_bti->pin(ZX_BTI_PERM_READ | ZX_BTI_CONTIGUOUS, fake_vmo, 0,
+                            kSecureWorldMemorySize, &secure_world_paddr, 1, &pmt));
+    // Use the second half of the secure world range to use as shared memory
+    gSharedMemory.address = secure_world_paddr + (kSecureWorldMemorySize / 2);
+    gSharedMemory.size = kSecureWorldMemorySize / 2;
+    EXPECT_OK(pmt.unpin());
+
+    return fake_pdev::MmioInfo{
+        .vmo = std::move(fake_vmo),
+        .offset = 0,
+        .size = kSecureWorldMemorySize,
+    };
+  }
+
  protected:
-  FakePDev pdev_;
-  FakeRpmbService rpmb_service_;
+  async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
+                                                                   std::in_place};
 
   fdf_testing::DriverRuntime runtime_;
 

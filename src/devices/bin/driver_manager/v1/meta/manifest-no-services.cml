@@ -9,7 +9,6 @@
     program: {
         runner: "driver",
         bind: "meta/bind/manifest-test.bindbc",
-        colocate: "false",
         compat: "driver/manifest-test.so",
     },
     use: [

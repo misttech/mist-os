@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/channel.h>
@@ -16,7 +15,6 @@
 #include <ddktl/device.h>
 #include <fbl/vector.h>
 
-#include "proxy-protocol.h"
 #include "src/devices/bus/drivers/platform/platform-interrupt.h"
 
 // This class, along with PlatformProxyDevice, represent a platform device.
@@ -69,15 +67,13 @@ class RestrictPlatformBus : public fdf::WireServer<fuchsia_hardware_platform_bus
 };
 
 class PlatformDevice;
-using PlatformDeviceType =
-    ddk::Device<PlatformDevice, ddk::GetProtocolable, ddk::Rxrpcable, ddk::Initializable>;
+using PlatformDeviceType = ddk::Device<PlatformDevice, ddk::GetProtocolable, ddk::Initializable>;
 
 // This class represents a platform device attached to the platform bus.
 // Instances of this class are created by PlatformBus at boot time when the board driver
 // calls the platform bus protocol method pbus_device_add().
 
 class PlatformDevice : public PlatformDeviceType,
-                       public ddk::PDevProtocol<PlatformDevice, ddk::base_protocol>,
                        public fidl::WireServer<fuchsia_hardware_platform_device::Device> {
  public:
   enum Type {
@@ -105,18 +101,8 @@ class PlatformDevice : public PlatformDeviceType,
 
   // Device protocol implementation.
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
-  zx_status_t DdkRxrpc(zx_handle_t channel);
   void DdkInit(ddk::InitTxn txn);
   void DdkRelease();
-
-  // Platform device protocol implementation, for devices that run in-process.
-  zx_status_t PDevGetMmio(uint32_t index, pdev_mmio_t* out_mmio);
-  zx_status_t PDevGetInterrupt(uint32_t index, uint32_t flags, zx::interrupt* out_irq);
-  zx_status_t PDevGetBti(uint32_t index, zx::bti* out_handle);
-  zx_status_t PDevGetSmc(uint32_t index, zx::resource* out_resource);
-  zx_status_t PDevGetDeviceInfo(pdev_device_info_t* out_info);
-  zx_status_t PDevGetBoardInfo(pdev_board_info_t* out_info);
-  zx_status_t PDevDeviceAdd(uint32_t index, const device_add_args_t* args, zx_device_t** device);
 
   // Platform device protocol FIDL implementation.
   void GetMmio(GetMmioRequestView request, GetMmioCompleter::Sync& completer) override;
@@ -130,22 +116,23 @@ class PlatformDevice : public PlatformDeviceType,
   // Starts the underlying devmgr device.
   zx_status_t Start();
 
+  zx::result<zx::interrupt> GetInterrupt(uint32_t index, uint32_t flags);
+
  private:
+  struct Mmio {
+    zx_off_t offset;
+    uint64_t size;
+    zx::vmo vmo;
+  };
+
   // *flags* contains zero or more PDEV_ADD_* flags from the platform bus protocol.
   explicit PlatformDevice(zx_device_t* parent, PlatformBus* bus, Type type,
                           fuchsia_hardware_platform_bus::Node node);
   zx_status_t Init();
 
-  // Handlers for RPCs from PlatformProxy.
-  zx_status_t RpcGetMmio(uint32_t index, zx_paddr_t* out_paddr, size_t* out_length,
-                         zx_handle_t* out_handle, uint32_t* out_handle_count);
-  zx_status_t RpcGetInterrupt(uint32_t index, uint32_t* out_irq, uint32_t* out_mode,
-                              zx_handle_t* out_handle, uint32_t* out_handle_count);
-  zx_status_t RpcGetBti(uint32_t index, zx_handle_t* out_handle, uint32_t* out_handle_count);
-  zx_status_t RpcGetSmc(uint32_t index, zx_handle_t* out_handle, uint32_t* out_handle_count);
-  zx_status_t RpcGetDeviceInfo(pdev_device_info_t* out_info);
-  zx_status_t RpcGetMetadata(uint32_t index, uint32_t* out_type, uint8_t* buf, uint32_t buf_size,
-                             uint32_t* actual);
+  zx::result<Mmio> GetMmio(uint32_t index);
+  zx::result<zx::bti> GetBti(uint32_t index);
+  zx::result<zx::resource> GetSmc(uint32_t index);
 
   zx_status_t CreateInterruptFragments();
 

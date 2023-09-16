@@ -6,7 +6,7 @@
 #define SRC_DEVICES_ML_DRIVERS_AML_NNA_AML_NNA_H_
 
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
-#include <fuchsia/hardware/platform/device/c/banjo.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
@@ -23,10 +23,9 @@ constexpr uint32_t kNnaPowerDomain = 1;
 namespace aml_nna {
 
 class AmlNnaDevice;
-using AmlNnaDeviceType = ddk::Device<AmlNnaDevice, ddk::GetProtocolable>;
+using AmlNnaDeviceType = ddk::Device<AmlNnaDevice>;
 
-class AmlNnaDevice : public AmlNnaDeviceType,
-                     public ddk::PDevProtocol<AmlNnaDevice, ddk::base_protocol> {
+class AmlNnaDevice : public AmlNnaDeviceType {
  public:
   struct NnaPowerDomainBlock {
     // Power Domain MMIO.
@@ -62,38 +61,25 @@ class AmlNnaDevice : public AmlNnaDeviceType,
   explicit AmlNnaDevice(zx_device_t* parent, fdf::MmioBuffer hiu_mmio, fdf::MmioBuffer power_mmio,
                         fdf::MmioBuffer memory_pd_mmio,
                         fidl::ClientEnd<fuchsia_hardware_registers::Device> reset,
-                        ddk::PDevFidl pdev, NnaBlock nna_block, zx::resource smc_monitor)
+                        NnaBlock nna_block, zx::resource smc_monitor,
+                        async_dispatcher_t* dispatcher)
       : AmlNnaDeviceType(parent),
-        pdev_(std::move(pdev)),
         hiu_mmio_(std::move(hiu_mmio)),
         power_mmio_(std::move(power_mmio)),
         memory_pd_mmio_(std::move(memory_pd_mmio)),
         reset_(std::move(reset)),
         nna_block_(nna_block),
-        smc_monitor_(std::move(smc_monitor)) {}
+        smc_monitor_(std::move(smc_monitor)),
+        outgoing_(dispatcher) {}
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
   zx_status_t Init();
 
   zx_status_t PowerDomainControl(bool turn_on);
 
-  // Methods required by the ddk.
-  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
   void DdkRelease();
 
-  // Platform device protocol implementation.
-  // TODO(fxbug.dev/124172): Remove implementation of PDevProtocol and
-  // ddk::GetProtocolable. Update child drivers to use the PlatformDevice FIDL
-  // instead.
-  zx_status_t PDevGetMmio(uint32_t index, pdev_mmio_t* out_mmio);
-  zx_status_t PDevGetInterrupt(uint32_t index, uint32_t flags, zx::interrupt* out_irq);
-  zx_status_t PDevGetBti(uint32_t index, zx::bti* out_handle);
-  zx_status_t PDevGetSmc(uint32_t index, zx::resource* out_resource);
-  zx_status_t PDevGetDeviceInfo(pdev_device_info_t* out_info);
-  zx_status_t PDevGetBoardInfo(pdev_board_info_t* out_info);
-
  private:
-  ddk::PDevFidl pdev_;
   fdf::MmioBuffer hiu_mmio_;
   fdf::MmioBuffer power_mmio_;
   fdf::MmioBuffer memory_pd_mmio_;
@@ -103,6 +89,8 @@ class AmlNnaDevice : public AmlNnaDeviceType,
 
   // Control PowerDomain
   zx::resource smc_monitor_;
+
+  component::OutgoingDirectory outgoing_;
 };
 
 }  // namespace aml_nna

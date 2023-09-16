@@ -61,7 +61,7 @@ zx::result<> BtiVisitor::Visit(Node& node, const devicetree::PropertyDecoder& de
         .iommu_index = iommus[i][0],
         .bti_id = iommus[i][1],
     }};
-    FDF_LOG(DEBUG, "BTI (0x%0x, 0x%0x) added to node '%s'.", *bti.iommu_index(), *bti.bti_id(),
+    FDF_LOG(DEBUG, "BTI (0x%0x, 0x%0lx) added to node '%s'.", *bti.iommu_index(), *bti.bti_id(),
             node.name().data());
     node.AddBti(bti);
   }

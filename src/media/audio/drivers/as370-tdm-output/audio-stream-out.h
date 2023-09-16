@@ -6,8 +6,6 @@
 #define SRC_MEDIA_AUDIO_DRIVERS_AS370_TDM_OUTPUT_AUDIO_STREAM_OUT_H_
 
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
-#include <fuchsia/hardware/platform/device/c/banjo.h>
-#include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/ddk/io-buffer.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fzl/pinned-vmo.h>

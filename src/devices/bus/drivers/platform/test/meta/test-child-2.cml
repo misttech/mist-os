@@ -9,9 +9,8 @@
     ],
     program: {
         runner: "driver",
-        bind: "meta/bind/test-power-sensor-bind.bindbc",
-        colocate: "true",
-        compat: "driver/test-power-sensor.so",
+        bind: "meta/bind/test-child-2-bind.bindbc",
+        compat: "driver/test-child-2.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },

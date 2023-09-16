@@ -32,11 +32,14 @@ fuchsia_driver("aml-nna-driver") {
   deps = [
     ":aml_nna_bind",
     "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp_wire",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//src/devices/bind/fuchsia.verisilicon.platform:fuchsia.verisilicon.platform_cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver:driver",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/mmio",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
@@ -59,6 +62,7 @@ test("aml-nna-test-bin") {
   deps = [
     ":aml_nna_bind",
     "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp_wire",
+    "//sdk/lib/component/outgoing/cpp",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//src/devices/bind/fuchsia.verisilicon.platform:fuchsia.verisilicon.platform_cpp",
     "//src/devices/bus/lib/device-protocol-pdev",

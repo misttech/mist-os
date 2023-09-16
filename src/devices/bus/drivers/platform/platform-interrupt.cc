@@ -15,12 +15,11 @@
 namespace platform_bus {
 
 void PlatformInterruptFragment::Get(GetCompleter::Sync& completer) {
-  zx::interrupt out;
-  zx_status_t status = pdev_->PDevGetInterrupt(index_, 0, &out);
-  if (status != ZX_OK) {
-    completer.ReplyError(status);
+  zx::result result = pdev_->GetInterrupt(index_, 0);
+  if (result.is_error()) {
+    completer.ReplyError(result.status_value());
   } else {
-    completer.ReplySuccess(std::move(out));
+    completer.ReplySuccess(std::move(*result));
   }
 }
 

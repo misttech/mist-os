@@ -181,7 +181,7 @@ class OpteeController : public OpteeControllerBase,
       Uuid application_uuid, fidl::ClientEnd<fuchsia_tee_manager::Provider> service_provider,
       fidl::ServerEnd<fuchsia_tee::Application> application_request);
 
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
   async::Loop loop_;
   std::list<async::Loop> custom_loops_;
   std::map<Uuid, std::list<async::Loop>::iterator> uuid_config_;

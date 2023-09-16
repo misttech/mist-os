@@ -102,7 +102,7 @@ zx_status_t PDevFidl::GetMmio(uint32_t index, pdev_mmio_t* out_mmio) const {
   return ZX_OK;
 }
 
-zx_status_t PDevFidl::GetInterrupt(uint32_t index, uint32_t flags, zx::interrupt* out_irq) {
+zx_status_t PDevFidl::GetInterrupt(uint32_t index, uint32_t flags, zx::interrupt* out_irq) const {
   fidl::WireResult result = pdev_->GetInterrupt(index, flags);
   if (result.status() != ZX_OK) {
     return result.status();
@@ -114,7 +114,7 @@ zx_status_t PDevFidl::GetInterrupt(uint32_t index, uint32_t flags, zx::interrupt
   return ZX_OK;
 }
 
-zx_status_t PDevFidl::GetBti(uint32_t index, zx::bti* out_bti) {
+zx_status_t PDevFidl::GetBti(uint32_t index, zx::bti* out_bti) const {
   fidl::WireResult result = pdev_->GetBti(index);
   if (result.status() != ZX_OK) {
     return result.status();
@@ -138,7 +138,7 @@ zx_status_t PDevFidl::GetSmc(uint32_t index, zx::resource* out_smc) const {
   return ZX_OK;
 }
 
-zx_status_t PDevFidl::GetDeviceInfo(pdev_device_info_t* out_info) {
+zx_status_t PDevFidl::GetDeviceInfo(pdev_device_info_t* out_info) const {
   fidl::WireResult result = pdev_->GetDeviceInfo();
   if (result.status() != ZX_OK) {
     return result.status();
@@ -208,6 +208,18 @@ zx_status_t PDevFidl::GetBoardInfo(pdev_board_info_t* out_info) const {
     out_info->board_revision = result->value()->board_revision();
   }
   return ZX_OK;
+}
+
+// Regular implementation for drivers. Tests might override this.
+[[gnu::weak]] zx_status_t PDevMakeMmioBufferWeak(const pdev_mmio_t& pdev_mmio,
+                                                 std::optional<fdf::MmioBuffer>* mmio,
+                                                 uint32_t cache_policy) {
+  zx::result<fdf::MmioBuffer> result =
+      MmioBuffer::Create(pdev_mmio.offset, pdev_mmio.size, zx::vmo(pdev_mmio.vmo), cache_policy);
+  if (result.is_ok()) {
+    *mmio = std::move(result.value());
+  }
+  return result.status_value();
 }
 
 }  // namespace ddk

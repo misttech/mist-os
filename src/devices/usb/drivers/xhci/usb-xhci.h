@@ -6,7 +6,6 @@
 #define SRC_DEVICES_USB_DRIVERS_XHCI_USB_XHCI_H_
 
 #include <fidl/fuchsia.hardware.usb.hci/cpp/fidl.h>
-#include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/usb/bus/cpp/banjo.h>
 #include <fuchsia/hardware/usb/hci/cpp/banjo.h>
 #include <fuchsia/hardware/usb/phy/cpp/banjo.h>

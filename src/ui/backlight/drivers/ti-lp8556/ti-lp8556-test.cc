@@ -473,7 +473,7 @@ TEST_F(Lp8556DeviceTest, GetBackLightPower) {
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming{incoming_loop.dispatcher(),
                                                                   std::in_place};
   fake_pdev::FakePDevFidl::Config config;
-  config.board_info = pdev_board_info_t{
+  config.board_info = fake_pdev::BoardInfo{
       .pid = PDEV_PID_NELSON,
   };
 
@@ -532,7 +532,7 @@ TEST_F(Lp8556DeviceTest, GetPowerWatts) {
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming{incoming_loop.dispatcher(),
                                                                   std::in_place};
   fake_pdev::FakePDevFidl::Config config;
-  config.board_info = pdev_board_info_t{
+  config.board_info = fake_pdev::BoardInfo{
       .pid = PDEV_PID_NELSON,
   };
 

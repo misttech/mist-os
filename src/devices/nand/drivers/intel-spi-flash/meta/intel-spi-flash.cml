@@ -10,7 +10,6 @@
     program: {
         runner: "driver",
         bind: "meta/bind/intel_spi_flash_bind.bindbc",
-        colocate: "false",
         compat: "driver/intel-spi-flash.so",
     },
     use: [

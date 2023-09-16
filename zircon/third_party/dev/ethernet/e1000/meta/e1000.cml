@@ -10,7 +10,6 @@
     program: {
         runner: "driver",
         bind: "meta/bind/e1000_bind.bindbc",
-        colocate: "false",
         compat: "driver/e1000.so",
     },
     use: [

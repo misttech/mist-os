@@ -4,7 +4,6 @@
 
 #include "src/devices/usb/drivers/aml-usb-crg-phy-v2/aml-usb-crg-phy.h"
 
-#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
@@ -30,88 +29,42 @@
 #include <fbl/mutex.h>
 #include <zxtest/zxtest.h>
 
+#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/registers/testing/mock-registers/mock-registers.h"
+#include "src/devices/testing/fake-mmio-reg/include/fake-mmio-reg/fake-mmio-reg.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/devices/usb/drivers/aml-usb-crg-phy-v2/usb-phy-regs.h"
 
 namespace aml_usb_crg_phy {
 
+constexpr auto kRegisterBanks = 3;
+constexpr auto kRegisterCount = 2048;
 enum class RegisterIndex : size_t {
   Control = 0,
   Phy0 = 1,
   Phy1 = 2,
 };
 
-constexpr auto kRegisterBanks = 3;
-constexpr auto kRegisterCount = 2048;
-
-class FakePDev : public ddk::PDevProtocol<FakePDev, ddk::base_protocol> {
+class FakeMmio {
  public:
-  FakePDev() : pdev_({&pdev_protocol_ops_, this}) {
-    // Initialize register read/write hooks.
-    for (size_t i = 0; i < kRegisterBanks; i++) {
-      regions_[i].emplace(sizeof(uint32_t), kRegisterCount);
-
-      for (size_t c = 0; c < kRegisterCount; c++) {
-        (*regions_[i])[c * sizeof(uint32_t)].SetReadCallback(
-            [this, i, c]() { return reg_values_[i][c]; });
-
-        (*regions_[i])[c * sizeof(uint32_t)].SetWriteCallback([this, i, c](uint64_t value) {
-          reg_values_[i][c] = value;
-          if (callback_) {
-            (*callback_)(i, c, value);
-          }
-        });
-      }
+  FakeMmio() : mmio_(sizeof(uint32_t), kRegisterCount) {
+    for (size_t c = 0; c < kRegisterCount; c++) {
+      mmio_[c].SetReadCallback([this, c]() { return reg_values_[c]; });
+      mmio_[c].SetWriteCallback([this, c](uint64_t value) { reg_values_[c] = value; });
     }
-    ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq_));
   }
 
-  void SetWriteCallback(fit::function<void(size_t bank, size_t reg, uint64_t value)> callback) {
-    callback_ = std::move(callback);
-  }
+  fdf::MmioBuffer mmio() { return mmio_.GetMmioBuffer(); }
 
-  const pdev_protocol_t* proto() const { return &pdev_; }
-
-  zx_status_t PDevGetMmio(uint32_t index, pdev_mmio_t* out_mmio) {
-    out_mmio->offset = reinterpret_cast<size_t>(&regions_[index]);
-    return ZX_OK;
-  }
-
-  fdf::MmioBuffer mmio(RegisterIndex index) {
-    return fdf::MmioBuffer(regions_[static_cast<size_t>(index)]->GetMmioBuffer());
-  }
-
-  zx_status_t PDevGetInterrupt(uint32_t index, uint32_t flags, zx::interrupt* out_irq) {
-    irq_signaller_ = zx::unowned_interrupt(irq_);
-    *out_irq = std::move(irq_);
-    return ZX_OK;
-  }
-
-  void Interrupt() { irq_signaller_->trigger(0, zx::clock::get_monotonic()); }
-
-  zx_status_t PDevGetBti(uint32_t index, zx::bti* out_bti) { return ZX_ERR_NOT_SUPPORTED; }
-
-  zx_status_t PDevGetSmc(uint32_t index, zx::resource* out_resource) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  zx_status_t PDevGetDeviceInfo(pdev_device_info_t* out_info) { return ZX_ERR_NOT_SUPPORTED; }
-
-  zx_status_t PDevGetBoardInfo(pdev_board_info_t* out_info) { return ZX_ERR_NOT_SUPPORTED; }
-
-  ~FakePDev() {}
+  ddk_fake::FakeMmioReg& reg(size_t ix) { return mmio_[ix]; }
 
  private:
-  std::optional<fit::function<void(size_t bank, size_t reg, uint64_t value)>> callback_;
-  zx::unowned_interrupt irq_signaller_;
-  zx::interrupt irq_;
-  uint64_t reg_values_[kRegisterBanks][kRegisterCount] = {};
-  std::optional<ddk_fake::FakeMmioRegRegion> regions_[kRegisterBanks];
-  pdev_protocol_t pdev_;
+  uint64_t reg_values_[kRegisterCount] = {};
+  ddk_fake::FakeMmioRegRegion mmio_;
 };
 
 struct IncomingNamespace {
+  fake_pdev::FakePDevFidl pdev_server;
   mock_registers::MockRegisters registers{async_get_default_dispatcher()};
   component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
 };
@@ -127,19 +80,39 @@ class AmlUsbCrgPhyTest : public zxtest::Test {
 
     loop_.StartThread("incoming-ns-thread");
 
+    fake_pdev::FakePDevFidl::Config config;
+    config.irqs[0] = {};
+    ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
+    irq_signaller_ = config.irqs[0].borrow();
+    config.mmios[0] = mmio_[0].mmio();
+    fprintf(stderr, "mmio 0 virtual address: %p\n", mmio_[0].mmio().get());
+    config.mmios[1] = mmio_[1].mmio();
+    config.mmios[2] = mmio_[2].mmio();
+    config.device_info = {
+        .mmio_count = 3,
+        .irq_count = 1,
+    };
+
     zx::result registers_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_OK(registers_endpoints);
-    incoming_.SyncCall([registers_server = std::move(registers_endpoints->server)](
-                           IncomingNamespace* incoming) mutable {
-      ASSERT_OK(incoming->outgoing.AddService<fuchsia_hardware_registers::Service>(
-          incoming->registers.GetInstanceHandler()));
-      ASSERT_OK(incoming->outgoing.Serve(std::move(registers_server)));
-    });
+    zx::result pdev_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(pdev_endpoints);
+    incoming_.SyncCall(
+        [config = std::move(config), registers_server = std::move(registers_endpoints->server),
+         pdev_server_end = std::move(pdev_endpoints->server)](IncomingNamespace* incoming) mutable {
+          ASSERT_OK(incoming->outgoing.AddService<fuchsia_hardware_registers::Service>(
+              incoming->registers.GetInstanceHandler()));
+          ASSERT_OK(incoming->outgoing.Serve(std::move(registers_server)));
+          ASSERT_OK(incoming->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
+              incoming->pdev_server.GetInstanceHandler()));
+          ASSERT_OK(incoming->outgoing.Serve(std::move(pdev_server_end)));
+          incoming->pdev_server.SetConfig(std::move(config));
+        });
     ASSERT_NO_FATAL_FAILURE();
     root_device_->AddFidlService(fuchsia_hardware_registers::Service::Name,
                                  std::move(registers_endpoints->client), "register-reset");
-
-    root_device_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx, "pdev");
+    root_device_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
+                                 std::move(pdev_endpoints->client), "pdev");
 
     incoming_.SyncCall([](IncomingNamespace* incoming) {
       incoming->registers.ExpectWrite<uint32_t>(RESET0_LEVEL_OFFSET,
@@ -168,6 +141,8 @@ class AmlUsbCrgPhyTest : public zxtest::Test {
     ASSERT_NO_FATAL_FAILURE();
   }
 
+  void Interrupt() { irq_signaller_->trigger(0, zx::clock::get_monotonic()); }
+
   zx_device_t* parent() { return root_device_.get(); }
 
  protected:
@@ -175,15 +150,14 @@ class AmlUsbCrgPhyTest : public zxtest::Test {
   std::shared_ptr<MockDevice> root_device_;
   AmlUsbCrgPhy* dut_;
   MockDevice* mock_dev_;
-  FakePDev pdev_;
+  zx::unowned_interrupt irq_signaller_;
+  FakeMmio mmio_[kRegisterBanks];
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{loop_.dispatcher(),
                                                                    std::in_place};
 };
 
 TEST_F(AmlUsbCrgPhyTest, SetMode) {
-  ddk::PDev client(pdev_.proto());
-  std::optional<fdf::MmioBuffer> usbctrl_mmio;
-  ASSERT_OK(client.MapMmio(0, &usbctrl_mmio));
+  fdf::MmioBuffer usbctrl_mmio = mmio_[0].mmio();
 
   // The aml-usb-phy device was added in SetUp().
   ASSERT_EQ(dut_->mode(), AmlUsbCrgPhy::UsbMode::HOST);
@@ -191,9 +165,9 @@ TEST_F(AmlUsbCrgPhyTest, SetMode) {
   auto* xhci_dev_ = mock_dev_->GetLatestChild();
 
   // Switch to peripheral mode. This will be read by the irq thread.
-  USB_R5_V2::Get().FromValue(0).set_iddig_curr(1).WriteTo(&usbctrl_mmio.value());
+  USB_R5_V2::Get().FromValue(0).set_iddig_curr(1).WriteTo(&usbctrl_mmio);
   // Wake up the irq thread.
-  pdev_.Interrupt();
+  Interrupt();
   xhci_dev_->WaitUntilAsyncRemoveCalled();
   mock_ddk::ReleaseFlaggedDevices(mock_dev_);
 
@@ -202,9 +176,9 @@ TEST_F(AmlUsbCrgPhyTest, SetMode) {
   auto* udc_dev_ = mock_dev_->GetLatestChild();
 
   // Switch back to host mode. This will be read by the irq thread.
-  USB_R5_V2::Get().FromValue(0).set_iddig_curr(0).WriteTo(&usbctrl_mmio.value());
+  USB_R5_V2::Get().FromValue(0).set_iddig_curr(0).WriteTo(&usbctrl_mmio);
   // Wake up the irq thread.
-  pdev_.Interrupt();
+  Interrupt();
   udc_dev_->WaitUntilAsyncRemoveCalled();
   mock_ddk::ReleaseFlaggedDevices(mock_dev_);
 
@@ -213,15 +187,3 @@ TEST_F(AmlUsbCrgPhyTest, SetMode) {
 }
 
 }  // namespace aml_usb_crg_phy
-
-zx_status_t ddk::PDev::MapMmio(uint32_t index, std::optional<MmioBuffer>* mmio,
-                               uint32_t cache_policy) {
-  pdev_mmio_t pdev_mmio;
-  zx_status_t status = GetMmio(index, &pdev_mmio);
-  if (status != ZX_OK) {
-    return status;
-  }
-  auto* src = reinterpret_cast<ddk_fake::FakeMmioRegRegion*>(pdev_mmio.offset);
-  mmio->emplace(src->GetMmioBuffer());
-  return ZX_OK;
-}

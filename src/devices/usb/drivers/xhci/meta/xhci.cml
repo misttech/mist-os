@@ -10,7 +10,6 @@
     program: {
         runner: "driver",
         bind: "meta/bind/xhci.bindbc",
-        colocate: "false",
         compat: "driver/xhci.so",
     },
     capabilities: [

@@ -10,7 +10,7 @@
     program: {
         runner: "driver",
         bind: "meta/bind/fake_pci_bus_driver_bind.bindbc",
-        colocate: "true",
+        colocate: "false",
         compat: "driver/pci_fake.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",

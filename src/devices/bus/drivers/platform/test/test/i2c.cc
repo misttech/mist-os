@@ -3,15 +3,17 @@
 // found in the LICENSE file.
 
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
-#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
+#include <lib/device-protocol/pdev-fidl.h>
 
 #include <memory>
 
 #include <ddktl/device.h>
+
+#include "src/devices/bus/lib/device-protocol-pdev/include/lib/device-protocol/pdev-fidl.h"
 
 #define DRIVER_NAME "test-i2c"
 
@@ -38,15 +40,14 @@ class TestI2cDevice : public DeviceType,
 };
 
 zx_status_t TestI2cDevice::Create(zx_device_t* parent) {
-  pdev_protocol_t pdev;
-  zx_status_t status = device_get_protocol(parent, ZX_PROTOCOL_PDEV, &pdev);
-  if (status != ZX_OK) {
+  zx::result pdev = ddk::PDevFidl::Create(parent);
+  if (pdev.is_error()) {
     zxlogf(ERROR, "%s: could not get ZX_PROTOCOL_PDEV", __func__);
-    return status;
+    return pdev.status_value();
   }
 
   pdev_device_info_t dev_info;
-  status = pdev_get_device_info(&pdev, &dev_info);
+  zx_status_t status = pdev->GetDeviceInfo(&dev_info);
   if (status != ZX_OK) {
     zxlogf(ERROR, "pdev_get_device_info failed: %s", zx_status_get_string(status));
     return status;

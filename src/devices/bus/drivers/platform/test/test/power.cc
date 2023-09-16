@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/powerimpl/cpp/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <zircon/errors.h>
 
 #include <memory>
@@ -59,20 +59,18 @@ class TestPowerDevice : public DeviceType,
 
 zx_status_t TestPowerDevice::Create(zx_device_t* parent) {
   auto dev = std::make_unique<TestPowerDevice>(parent);
-  pdev_protocol_t pdev;
-  zx_status_t status;
 
   zxlogf(INFO, "TestPowerDevice::Create: %s ", DRIVER_NAME);
 
-  status = device_get_protocol(parent, ZX_PROTOCOL_PDEV, &pdev);
-  if (status != ZX_OK) {
+  zx::result pdev = ddk::PDevFidl::Create(parent);
+  if (pdev.is_error()) {
     zxlogf(ERROR, "%s: could not get ZX_PROTOCOL_PDEV", __func__);
-    return status;
+    return pdev.status_value();
   }
 
-  status = dev->DdkAdd(ddk::DeviceAddArgs("test-power")
-                           .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
-                           .forward_metadata(parent, DEVICE_METADATA_POWER_DOMAINS));
+  zx_status_t status = dev->DdkAdd(ddk::DeviceAddArgs("test-power")
+                                       .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
+                                       .forward_metadata(parent, DEVICE_METADATA_POWER_DOMAINS));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: DdkAdd failed: %d", __func__, status);
     return status;

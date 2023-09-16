@@ -10,10 +10,11 @@
     program: {
         runner: "driver",
         bind: "meta/bind/test-pci-bind.bindbc",
-        colocate: "true",
         compat: "driver/test-pci.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
-    use: [],
+    use: [
+        { service: "fuchsia.hardware.platform.device.Service" },
+    ],
 }

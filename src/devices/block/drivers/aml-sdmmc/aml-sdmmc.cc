@@ -5,7 +5,6 @@
 #include "aml-sdmmc.h"
 
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
-#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/sdmmc/c/banjo.h>
 #include <inttypes.h>
 #include <lib/ddk/binding_driver.h>

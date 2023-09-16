@@ -29,7 +29,7 @@ class MockRegisters {
 
     global_registers_mock_->Init(std::move(endpoints->server));
 
-    ddk::PDev pdev;
+    ddk::PDevFidl pdev;
     auto device = std::make_unique<As370NnaDevice>(
         fake_parent_.get(), fidl::WireSyncClient(std::move(endpoints->client)), std::move(pdev));
     ASSERT_NOT_NULL(device);

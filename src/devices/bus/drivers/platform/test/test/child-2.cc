@@ -6,9 +6,12 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
+#include <lib/ddk/platform-defs.h>
 #include <stdlib.h>
 
-#define DRIVER_NAME "test-child-3"
+#include <iterator>
+
+#define DRIVER_NAME "test-child-2"
 
 typedef struct {
   zx_device_t* zxdev;
@@ -16,9 +19,19 @@ typedef struct {
 
 static void test_release(void* ctx) { free(ctx); }
 
+static zx_status_t test_rxrpc(void* ctx, zx_handle_t channel) {
+  if (channel == ZX_HANDLE_INVALID) {
+    return ZX_OK;
+  }
+  // This won't actually get called, since the other half doesn't send
+  // messages at the moment
+  __builtin_trap();
+}
+
 static zx_protocol_device_t test_device_protocol = {
     .version = DEVICE_OPS_VERSION,
     .release = test_release,
+    .rxrpc = test_rxrpc,
 };
 
 static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
@@ -26,16 +39,25 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
 
   zxlogf(INFO, "test_bind: %s ", DRIVER_NAME);
 
-  test_t* test = calloc(1, sizeof(test_t));
+  auto* test = reinterpret_cast<test_t*>(calloc(1, sizeof(test_t)));
   if (!test) {
     return ZX_ERR_NO_MEMORY;
   }
 
+  zx_device_prop_t child_props[] = {
+      {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_TEST},
+      {BIND_PLATFORM_DEV_PID, 0, PDEV_PID_PBUS_TEST},
+      {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_TEST_CHILD_4},
+  };
+
   device_add_args_t args = {
       .version = DEVICE_ADD_ARGS_VERSION,
-      .name = "child-3",
+      .name = "child-4",
       .ctx = test,
       .ops = &test_device_protocol,
+      .props = child_props,
+      .prop_count = std::size(child_props),
+      .flags = DEVICE_ADD_MUST_ISOLATE | DEVICE_ADD_ALLOW_MULTI_COMPOSITE,
   };
 
   status = device_add(parent, &args, &test->zxdev);
@@ -53,4 +75,4 @@ static zx_driver_ops_t test_driver_ops = {
     .bind = test_bind,
 };
 
-ZIRCON_DRIVER(test_child_3, test_driver_ops, "zircon", "0.1");
+ZIRCON_DRIVER(test_child_2, test_driver_ops, "zircon", "0.1");

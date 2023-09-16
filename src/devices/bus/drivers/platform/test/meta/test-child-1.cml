@@ -9,12 +9,10 @@
     ],
     program: {
         runner: "driver",
-        bind: "meta/bind/ufs_bind.bindbc",
-        compat: "driver/ufs.so",
+        bind: "meta/bind/test-child-1-bind.bindbc",
+        compat: "driver/test-child-1.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
-    use: [
-        { service: "fuchsia.hardware.pci.Service" },
-    ],
+    use: [],
 }

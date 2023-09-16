@@ -56,6 +56,9 @@ struct MatchedDriverInfo {
   // If this is true, the driver should only be bound after /system/ comes up.
   bool is_fallback = false;
 
+  // If this is true, use a fidl proxy instead of banjo proxy.
+  bool use_fidl_proxy = false;
+
   // The type of package the driver is in.
   fuchsia_driver_index::DriverPackageType package_type;
 

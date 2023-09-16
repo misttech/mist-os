@@ -10,7 +10,6 @@
     program: {
         runner: "driver",
         bind: "meta/bind/metadata-test-bind.bindbc",
-        colocate: "true",
         compat: "driver/isolateddevmgr-test-driver.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",

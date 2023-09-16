@@ -10,7 +10,6 @@
     program: {
         runner: "driver",
         bind: "meta/bind/aml-gpu.bindbc",
-        colocate: "false",
         compat: "driver/aml-gpu.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",

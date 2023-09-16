@@ -10,7 +10,6 @@
     program: {
         runner: "driver",
         bind: "meta/bind/test-lifecycle-bind.bindbc",
-        colocate: "true",
         compat: "driver/ddk-lifecycle-test.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",

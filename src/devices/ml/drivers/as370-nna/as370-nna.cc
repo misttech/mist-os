@@ -23,19 +23,6 @@
 
 namespace as370_nna {
 
-// This is to be compatible with magma::ZirconPlatformDevice.
-zx_status_t As370NnaDevice::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
-  auto* proto = static_cast<ddk::AnyProtocol*>(out_protocol);
-  proto->ctx = parent_pdev_.ctx;
-  switch (proto_id) {
-    case ZX_PROTOCOL_PDEV:
-      proto->ops = parent_pdev_.ops;
-      return ZX_OK;
-    default:
-      return ZX_ERR_NOT_SUPPORTED;
-  }
-}
-
 zx_status_t As370NnaDevice::Init() {
   // Reset NNA HW
   auto clear_result =
@@ -99,7 +86,7 @@ zx_status_t As370NnaDevice::Init() {
 zx_status_t As370NnaDevice::Create(void* ctx, zx_device_t* parent) {
   zx_status_t status;
 
-  ddk::PDev pdev = ddk::PDev::FromFragment(parent);
+  ddk::PDevFidl pdev = ddk::PDevFidl::FromFragment(parent);
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "Could not get platform device protocol");
     return ZX_ERR_NOT_SUPPORTED;

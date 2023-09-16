@@ -676,7 +676,7 @@ TEST_F(AmlI2cTest, MmioIrqCountInvalid) {
       [server = std::move(outgoing_endpoints->server)](IncomingNamespace* infra) mutable {
         infra->pdev_server.SetConfig(fake_pdev::FakePDevFidl::Config{
             .device_info =
-                pdev_device_info_t{
+                fake_pdev::DeviceInfo{
                     .mmio_count = 2,
                     .irq_count = 2,
                 },

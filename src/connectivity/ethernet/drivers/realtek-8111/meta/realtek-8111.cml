@@ -10,7 +10,6 @@
     program: {
         runner: "driver",
         bind: "meta/bind/realtek_rtl8111_bind.bindbc",
-        colocate: "false",
         compat: "driver/realtek-81111.so",
     },
     use: [

@@ -5,7 +5,6 @@
 #include "imx8m-i2c.h"
 
 #include <fuchsia/hardware/i2cimpl/c/banjo.h>
-#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>

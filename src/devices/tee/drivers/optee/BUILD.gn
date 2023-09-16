@@ -105,10 +105,12 @@ test("optee-controller-test-bin") {
   output_name = "optee-controller-test"
   deps = [
     ":optee_lib",
+    "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/driver/runtime:driver_runtime_env",
     "//sdk/lib/driver/runtime/testing/cpp",
+    "//src/devices/bus/testing/fake-pdev",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/fake-resource",

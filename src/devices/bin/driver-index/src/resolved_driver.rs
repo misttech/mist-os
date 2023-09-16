@@ -37,6 +37,7 @@ pub struct ResolvedDriver {
     pub colocate: bool,
     pub device_categories: Vec<fdi::DeviceCategory>,
     pub fallback: bool,
+    pub use_fidl_proxy: bool,
     pub package_type: DriverPackageType,
     pub package_hash: Option<fpkg::BlobId>,
 }
@@ -153,6 +154,7 @@ impl ResolvedDriver {
             device_categories: Some(self.device_categories.clone()),
             package_type: fdi::DriverPackageType::from_primitive(self.package_type as u8),
             is_fallback: Some(self.fallback),
+            use_fidl_proxy: Some(self.use_fidl_proxy),
             ..Default::default()
         }
     }
@@ -245,16 +247,22 @@ pub async fn load_driver(
         Some(s) => s == "true",
         None => false,
     };
+    let use_fidl_proxy = get_rules_string_value(&component, "use_fidl_proxy");
+    let use_fidl_proxy = match use_fidl_proxy {
+        Some(s) => s == "true",
+        None => false,
+    };
 
     let device_categories = get_rules_device_categories_vec(&component).unwrap();
     Ok(ResolvedDriver {
-        component_url: component_url,
-        v1_driver_path: v1_driver_path,
-        bind_rules: bind_rules,
+        component_url,
+        v1_driver_path,
+        bind_rules,
         bind_bytecode: bind,
-        colocate: colocate,
-        device_categories: device_categories,
-        fallback: fallback,
+        colocate,
+        device_categories,
+        fallback,
+        use_fidl_proxy,
         package_type,
         package_hash,
     })

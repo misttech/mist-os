@@ -40,7 +40,6 @@
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
 
-#include "src/devices/bus/drivers/platform/cpu-trace.h"
 #include "src/devices/bus/drivers/platform/node-util.h"
 
 namespace {
@@ -204,7 +203,7 @@ zx::result<> AppendParentSpecs(ddk::CompositeNodeSpec& spec,
 
 namespace platform_bus {
 
-zx_status_t PlatformBus::IommuGetBti(uint32_t iommu_index, uint32_t bti_id, zx::bti* out_bti) {
+zx_status_t PlatformBus::IommuGetBti(uint32_t iommu_index, uint64_t bti_id, zx::bti* out_bti) {
   if (iommu_index != 0) {
     return ZX_ERR_OUT_OF_RANGE;
   }
@@ -219,7 +218,7 @@ zx_status_t PlatformBus::IommuGetBti(uint32_t iommu_index, uint32_t bti_id, zx::
     }
 
     char name[ZX_MAX_NAME_LEN]{};
-    snprintf(name, std::size(name) - 1, "pbus bti %02x:%02x", iommu_index, bti_id);
+    snprintf(name, std::size(name) - 1, "pbus bti %02x:%02lx", iommu_index, bti_id);
     status = new_bti.set_property(ZX_PROP_NAME, name, std::size(name));
     if (status != ZX_OK) {
       zxlogf(WARNING, "Couldn't set name for BTI '%s': %s", name, zx_status_get_string(status));
@@ -863,24 +862,6 @@ static void sys_device_release(void* ctx) {
   delete p;
 }
 
-// cpu-trace provides access to the cpu's tracing and performance counters.
-// As such the "device" is the cpu itself.
-static void InitCpuTrace(zx_device_t* parent, const zx::iommu& dummy_iommu) {
-  zx::bti cpu_trace_bti;
-  zx_status_t status = zx::bti::create(dummy_iommu, 0, CPU_TRACE_BTI_ID, &cpu_trace_bti);
-  if (status != ZX_OK) {
-    // This is not fatal.
-    zxlogf(ERROR, "platform-bus: error %d in bti_create(cpu_trace_bti)", status);
-    return;
-  }
-
-  status = publish_cpu_trace(cpu_trace_bti.release(), parent);
-  if (status != ZX_OK) {
-    // This is not fatal.
-    zxlogf(INFO, "publish_cpu_trace returned %d", status);
-  }
-}
-
 static zx_protocol_device_t sys_device_proto = []() {
   zx_protocol_device_t result = {};
 
@@ -934,15 +915,6 @@ zx_status_t PlatformBus::Create(zx_device_t* parent, const char* name, zx::chann
   // devmgr is now in charge of the device.
   platform_bus::PlatformBus* bus_ptr = bus.release();
   suspend_ptr->pbus_instance = bus_ptr;
-
-  // Create /dev/sys/cpu-trace.
-  // But only do so if we have an iommu handle. Normally we do, but tests
-  // may create us without a root resource, and thus without the iommu
-  // handle.
-  if (bus_ptr->iommu_handle_.is_valid()) {
-    // Failure is not fatal. Error message already printed.
-    InitCpuTrace(suspend_ptr->sys_root, bus_ptr->iommu_handle_);
-  }
 
   return ZX_OK;
 }
@@ -1176,6 +1148,30 @@ void PlatformBus::DdkInit(ddk::InitTxn txn) {
   status = NodeAddInternal(device);
   if (status.is_error()) {
     return txn.Reply(status.error_value());
+  }
+  if (iommu_handle_.is_valid()) {
+    // Create /dev/sys/platform/00:00:1d.
+    // But only do so if we have an iommu handle. Normally we do, but tests
+    // may create us without a root resource, and thus without the iommu
+    // handle.
+
+    // "CPUTRACE"
+    constexpr uint64_t kCpuTraceBtiId = 0x4350555452414345UL;
+
+    device.name() = "cpu-trace";
+    device.vid() = PDEV_VID_GENERIC;
+    device.pid() = PDEV_PID_GENERIC;
+    device.did() = PDEV_DID_CPU_TRACE;
+    device.bti() = std::vector<fuchsia_hardware_platform_bus::Bti>{
+        {{
+            .iommu_index = 0,
+            .bti_id = kCpuTraceBtiId,
+        }},
+    };
+    status = NodeAddInternal(device);
+    if (status.is_error()) {
+      return txn.Reply(status.error_value());
+    }
   }
 
   device.name() = "fake-battery";

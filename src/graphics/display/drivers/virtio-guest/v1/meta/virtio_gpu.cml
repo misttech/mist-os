@@ -10,7 +10,6 @@
     program: {
         runner: "driver",
         bind: "meta/bind/virtio_gpu_bind.bindbc",
-        colocate: "false",
         compat: "driver/virtio_gpu.so",
     },
     use: [

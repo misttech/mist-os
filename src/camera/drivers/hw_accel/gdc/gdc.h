@@ -11,7 +11,6 @@
 #include <threads.h>
 #endif
 #include <fuchsia/hardware/gdc/cpp/banjo.h>
-#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/interrupt.h>

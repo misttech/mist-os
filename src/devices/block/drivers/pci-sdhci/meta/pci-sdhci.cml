@@ -10,7 +10,6 @@
     program: {
         runner: "driver",
         bind: "meta/bind/pci-sdhci-bind.bindbc",
-        colocate: "false",
         compat: "driver/pci-sdhci.so",
     },
     use: [

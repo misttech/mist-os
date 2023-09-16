@@ -10,7 +10,6 @@
     program: {
         runner: "driver",
         bind: "meta/bind/gvnic.bindbc",
-        colocate: "false",
         compat: "driver/gvnic.so",
     },
     use: [

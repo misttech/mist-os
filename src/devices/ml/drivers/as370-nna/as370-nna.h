@@ -16,30 +16,24 @@
 namespace as370_nna {
 
 class As370NnaDevice;
-using As370NnaDeviceType = ddk::Device<As370NnaDevice, ddk::GetProtocolable>;
+using As370NnaDeviceType = ddk::Device<As370NnaDevice>;
 
 class As370NnaDevice : public As370NnaDeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_NNA> {
  public:
   explicit As370NnaDevice(zx_device_t* parent,
                           fidl::WireSyncClient<fuchsia_hardware_registers::Device> global_registers,
-                          ddk::PDev pdev)
+                          ddk::PDevFidl pdev)
       : As370NnaDeviceType(parent),
         pdev_(std::move(pdev)),
-        global_registers_(std::move(global_registers)) {
-    pdev_.GetProto(&parent_pdev_);
-  }
+        global_registers_(std::move(global_registers)) {}
   static zx_status_t Create(void* ctx, zx_device_t* parent);
   zx_status_t Init();
 
-  // Methods required by the ddk.
-  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
   void DdkRelease();
 
  private:
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
   fidl::WireSyncClient<fuchsia_hardware_registers::Device> global_registers_;
-
-  pdev_protocol_t parent_pdev_;
 };
 
 }  // namespace as370_nna

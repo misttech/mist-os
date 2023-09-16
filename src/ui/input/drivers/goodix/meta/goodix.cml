@@ -11,7 +11,6 @@
         runner: "driver",
         bind: "meta/bind/goodix.bindbc",
         compat: "driver/goodix.so",
-        colocate: "false",
         default_dispatcher_opts: [ "allow_sync_calls" ],
     },
     use: [
