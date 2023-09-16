@@ -6,6 +6,7 @@
 #define SIMPLE_ALLOCATOR_H
 
 #include <list>
+#include <memory>
 
 #include "address_space_allocator.h"
 
