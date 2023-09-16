@@ -34,7 +34,7 @@ use fuchsia_url::UnpinnedAbsolutePackageUrl;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 
-const DEDUP_CONFIG_DATA: bool = false;
+const DEDUP_CONFIG_DATA: bool = true;
 
 #[derive(Debug, Serialize)]
 pub struct ImageAssemblyConfigBuilder {

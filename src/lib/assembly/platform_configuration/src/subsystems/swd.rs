@@ -3,9 +3,13 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
+use anyhow::{Context, Result};
 use assembly_config_schema::platform_config::swd_config::{
     OtaConfigs, PolicyConfig, PolicyLabels, SwdConfig, UpdateChecker, VerificationFailureAction,
 };
+use assembly_config_schema::FileEntry;
+use camino::Utf8PathBuf;
+use std::fs::File;
 
 #[allow(dead_code)]
 const FUZZ_PERCENTAGE_RANGE: u32 = 25;
@@ -70,6 +74,7 @@ impl DefineSubsystemConfiguration<SwdConfig> for SwdSubsystemConfig {
             // The product set a specific update checker. Use that one.
             Some(update_checker) => {
                 Self::set_update_checker(&update_checker, builder)?;
+                Self::set_policy_by_build_type(&context.build_type, context, builder)?;
             }
             // The product does not specify. Set based on feature set level.
             None => {
@@ -79,6 +84,7 @@ impl DefineSubsystemConfiguration<SwdConfig> for SwdSubsystemConfig {
                         let update_checker =
                             UpdateChecker::default_by_build_type(context.build_type);
                         Self::set_update_checker(&update_checker, builder)?;
+                        Self::set_policy_by_build_type(&context.build_type, context, builder)?;
                     }
                     // Utility has no update checker
                     FeatureSupportLevel::Utility => {
@@ -121,6 +127,53 @@ impl SwdSubsystemConfig {
                 builder.platform_bundle("system_update_checker");
             }
         }
+        Ok(())
+    }
+
+    fn set_policy_by_build_type(
+        build_type: &BuildType,
+        context: &ConfigurationContext<'_>,
+        builder: &mut dyn ConfigurationBuilder,
+    ) -> anyhow::Result<()> {
+        let gendir = context.get_gendir().context("Getting gendir for swd")?;
+
+        let policy = PolicyLabels::default_by_build_type(build_type);
+        let policy = PolicyLabelDetails::from_policy_labels(&policy);
+
+        let write_config = |name: &str, value: serde_json::Value| -> Result<Utf8PathBuf> {
+            let path = gendir.join(name);
+            let file = File::create(&path).with_context(|| format!("Creating config: {}", name))?;
+            serde_json::to_writer_pretty(file, &value)
+                .with_context(|| format!("Writing config: {}", name))?;
+            Ok(path)
+        };
+
+        if policy.persisted_repos_dir {
+            let source = write_config(
+                "pkg_resolver_repo_config.json",
+                serde_json::json!({
+                    "persisted_repos_dir": "repos",
+                }),
+            )?;
+            builder
+                .package("pkg-resolver")
+                .config_data(FileEntry { source, destination: "persisted_repos_dir.json".into() })
+                .context("Adding persisted repos dir config")?;
+        }
+
+        if policy.enable_dynamic_configuration {
+            let source = write_config(
+                "pkg_resolver_config.json",
+                serde_json::json!({
+                    "enable_dynamic_configuration": true,
+                }),
+            )?;
+            builder
+                .package("pkg-resolver")
+                .config_data(FileEntry { source, destination: "config.json".into() })
+                .context("Adding dynamic configuration config")?;
+        }
+
         Ok(())
     }
 }
