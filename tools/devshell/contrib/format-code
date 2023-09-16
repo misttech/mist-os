@@ -342,13 +342,8 @@ for file in "${FILES[@]}"; do
     # TODO(fxbug.dev/82386): Move all formatters into SHAC to ensure parity
     # between the formatters enforced by the infrastructure and those enforced
     # locally.
-    *.bazel |\
-    *.bzl |\
-    *.bzlmod |\
-    BUILD |\
-    WORKSPACE |\
-    *.gn |\
-    *.gni |\
+    *.bazel | *.bzl | *.bzlmod | *.star | BUILD | WORKSPACE |\
+    *.gn | *.gni |\
     *.go |\
     *.rs)
       shac_files+=("$file")
