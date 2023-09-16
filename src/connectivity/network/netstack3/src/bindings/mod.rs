@@ -85,7 +85,6 @@ use netstack3_core::{
         types::RawMetric,
         IpExt,
     },
-    sync::Mutex as CoreMutex,
     transport::udp,
     NonSyncContext, SyncCtx, TimerId,
 };
@@ -273,7 +272,6 @@ pub(crate) struct BindingsNonSyncCtxImplInner {
     timers: timers::TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>>,
     devices: Devices<DeviceId<BindingsNonSyncCtxImpl>>,
     udp_sockets: UdpSockets,
-    route_update_dispatcher: CoreMutex<routes_fidl_worker::RouteUpdateDispatcher>,
     routes: routes::ChangeSink,
 }
 
@@ -283,7 +281,6 @@ impl BindingsNonSyncCtxImplInner {
             timers: Default::default(),
             devices: Default::default(),
             udp_sockets: Default::default(),
-            route_update_dispatcher: Default::default(),
             routes: routes_change_sink,
         }
     }
@@ -637,13 +634,10 @@ impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<BindingsNonSy
                 })
             }
             netstack3_core::ip::IpLayerEvent::DeviceRemoved(device, routes_removed) => {
-                // TODO(https://fxbug.dev/132990): When we can properly wait for
-                // reference-y devices to be cleaned up, we can move this to
-                // bindings rather than needing to dispatch the event here.
-                crate::bindings::routes::notify_removed_routes::<I>(self, routes_removed);
-                self.routes.fire_change_and_forget(routes::Change::<I::Addr>::DeviceRemoved(
-                    device.downgrade(),
-                ))
+                self.routes.fire_change_and_forget(routes::Change::<I::Addr>::DeviceRemoved {
+                    device: device.downgrade(),
+                    routes_removed,
+                });
             }
         };
     }
@@ -1063,6 +1057,9 @@ impl NetstackSeed {
         let timers_task =
             NamedTask::new("timers", netstack.ctx.non_sync_ctx().timers.spawn(netstack.clone()));
 
+        let (route_update_dispatcher_v4, route_update_dispatcher_v6) =
+            routes_change_runner.route_update_dispatchers();
+
         // Start executing routes changes.
         let routes_change_task = NamedTask::spawn("routes_changes", {
             let ctx = netstack.ctx.clone();
@@ -1205,10 +1202,12 @@ impl NetstackSeed {
                             routes_fidl_worker::serve_state(rs, netstack.ctx.clone()).await
                         }
                         Service::RoutesStateV4(rs) => {
-                            routes_fidl_worker::serve_state_v4(rs, netstack.ctx.clone()).await
+                            routes_fidl_worker::serve_state_v4(rs, &route_update_dispatcher_v4)
+                                .await
                         }
                         Service::RoutesStateV6(rs) => {
-                            routes_fidl_worker::serve_state_v6(rs, netstack.ctx.clone()).await
+                            routes_fidl_worker::serve_state_v6(rs, &route_update_dispatcher_v6)
+                                .await
                         }
                         Service::Interfaces(interfaces) => {
                             interfaces

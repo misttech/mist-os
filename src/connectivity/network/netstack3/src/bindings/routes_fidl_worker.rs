@@ -173,10 +173,13 @@ async fn resolve_ethernet_link_addr<A: IpAddress>(
 }
 
 /// Serve the `fuchsia.net.routes/StateV4` protocol.
-pub(crate) async fn serve_state_v4(rs: fnet_routes::StateV4RequestStream, ctx: Ctx) {
+pub(crate) async fn serve_state_v4(
+    rs: fnet_routes::StateV4RequestStream,
+    dispatcher: &RouteUpdateDispatcher<Ipv4>,
+) {
     rs.try_for_each_concurrent(None, |req| match req {
         fnet_routes::StateV4Request::GetWatcherV4 { options: _, watcher, control_handle: _ } => {
-            serve_watcher::<Ipv4>(watcher, ctx.clone()).map(|result| {
+            serve_watcher::<Ipv4>(watcher, dispatcher).map(|result| {
                 Ok(result.unwrap_or_else(|e| {
                     warn!("error serving {}: {:?}", fnet_routes::WatcherV4Marker::DEBUG_NAME, e)
                 }))
@@ -190,10 +193,13 @@ pub(crate) async fn serve_state_v4(rs: fnet_routes::StateV4RequestStream, ctx: C
 }
 
 /// Serve the `fuchsia.net.routes/StateV6` protocol.
-pub(crate) async fn serve_state_v6(rs: fnet_routes::StateV6RequestStream, ctx: Ctx) {
+pub(crate) async fn serve_state_v6(
+    rs: fnet_routes::StateV6RequestStream,
+    dispatcher: &RouteUpdateDispatcher<Ipv6>,
+) {
     rs.try_for_each_concurrent(None, |req| match req {
         fnet_routes::StateV6Request::GetWatcherV6 { options: _, watcher, control_handle: _ } => {
-            serve_watcher::<Ipv6>(watcher, ctx.clone()).map(|result| {
+            serve_watcher::<Ipv6>(watcher, dispatcher).map(|result| {
                 Ok(result.unwrap_or_else(|e| {
                     warn!("error serving {}: {:?}", fnet_routes::WatcherV6Marker::DEBUG_NAME, e)
                 }))
@@ -221,14 +227,15 @@ enum ServeWatcherError {
 // Serve a single client of the `WatcherV4` or `WatcherV6` protocol.
 async fn serve_watcher<I: fnet_routes_ext::FidlRouteIpExt>(
     server_end: fidl::endpoints::ServerEnd<I::WatcherMarker>,
-    mut ctx: Ctx,
+    RouteUpdateDispatcher(dispatcher): &RouteUpdateDispatcher<I>,
 ) -> Result<(), ServeWatcherError> {
     let request_stream =
         server_end.into_stream().expect("failed to acquire request_stream from server_end");
 
-    let non_sync_ctx = ctx.non_sync_ctx_mut();
-
-    let mut watcher = non_sync_ctx.route_update_dispatcher.lock().connect_new_client::<I>();
+    let mut watcher = {
+        let mut dispatcher = dispatcher.lock().await;
+        dispatcher.connect_new_client()
+    };
 
     let canceled_fut = watcher.canceled.wait();
 
@@ -262,7 +269,11 @@ async fn serve_watcher<I: fnet_routes_ext::FidlRouteIpExt>(
             };
         }
     };
-    non_sync_ctx.route_update_dispatcher.lock().disconnect_client::<I>(watcher);
+    {
+        let mut dispatcher = dispatcher.lock().await;
+        dispatcher.disconnect_client(watcher);
+    }
+
     result
 }
 
@@ -321,11 +332,10 @@ pub(crate) enum RoutingTableUpdate<I: Ip> {
 
 // Consumes updates to the system routing table and dispatches them to clients
 // of the `fuchsia.net.routes/WatcherV{4,6}` protocols.
-#[derive(Default)]
-pub(crate) struct RouteUpdateDispatcher {
-    inner_v4: RouteUpdateDispatcherInner<Ipv4>,
-    inner_v6: RouteUpdateDispatcherInner<Ipv6>,
-}
+#[derive(Default, Clone)]
+pub(crate) struct RouteUpdateDispatcher<I: Ip>(
+    std::sync::Arc<futures::lock::Mutex<RouteUpdateDispatcherInner<I>>>,
+);
 
 // The inner representation of a `RouteUpdateDispatcher` holding state for the
 // given IP protocol.
@@ -348,27 +358,11 @@ pub(crate) enum RouteUpdateNotifyError<I: Ip> {
     NotFound(fnet_routes_ext::InstalledRoute<I>),
 }
 
-impl RouteUpdateDispatcher {
-    // Returns the associated inner state for the given IP protocol.
-    fn as_inner_mut<I: Ip>(&mut self) -> &mut RouteUpdateDispatcherInner<I> {
-        #[derive(GenericOverIp)]
-        struct Holder<'a, I: Ip>(&'a mut RouteUpdateDispatcherInner<I>);
-        let RouteUpdateDispatcher { inner_v4, inner_v6 } = self;
-        let Holder(inner) = I::map_ip(
-            IpInvariant((inner_v4, inner_v6)),
-            |IpInvariant((inner_v4, _inner_v6))| Holder(inner_v4),
-            |IpInvariant((_inner_v4, inner_v6))| Holder(inner_v6),
-        );
-        inner
-    }
-
+impl<I: Ip> RouteUpdateDispatcherInner<I> {
     // Notify this `RouteUpdateDispatcher` of an update to the routing table.
     // The update will be dispatched to all active watcher clients.
-    pub(crate) fn notify<I: Ip>(
-        &mut self,
-        update: RoutingTableUpdate<I>,
-    ) -> Result<(), RouteUpdateNotifyError<I>> {
-        let RouteUpdateDispatcherInner { routes, clients } = self.as_inner_mut::<I>();
+    fn notify(&mut self, update: RoutingTableUpdate<I>) -> Result<(), RouteUpdateNotifyError<I>> {
+        let RouteUpdateDispatcherInner { routes, clients } = self;
         let event = match update {
             RoutingTableUpdate::RouteAdded(route) => {
                 if routes.insert(route.clone()) {
@@ -392,16 +386,16 @@ impl RouteUpdateDispatcher {
     }
 
     // Register a new client with this `RouteUpdateDispatcher`.
-    fn connect_new_client<I: Ip>(&mut self) -> RoutesWatcher<I> {
-        let RouteUpdateDispatcherInner { routes, clients } = self.as_inner_mut::<I>();
+    fn connect_new_client(&mut self) -> RoutesWatcher<I> {
+        let RouteUpdateDispatcherInner { routes, clients } = self;
         let (watcher, sink) = RoutesWatcher::new_with_existing_routes(routes.iter().cloned());
         clients.push(sink);
         watcher
     }
 
     // Disconnect the given watcher from this `RouteUpdateDispatcher`.
-    fn disconnect_client<I: Ip>(&mut self, watcher: RoutesWatcher<I>) {
-        let RouteUpdateDispatcherInner { routes: _, clients } = self.as_inner_mut::<I>();
+    fn disconnect_client(&mut self, watcher: RoutesWatcher<I>) {
+        let RouteUpdateDispatcherInner { routes: _, clients } = self;
         let (idx, _): (usize, &RoutesWatcherSink<I>) = clients
             .iter()
             .enumerate()
@@ -412,6 +406,15 @@ impl RouteUpdateDispatcher {
     }
 }
 
+impl<I: Ip> RouteUpdateDispatcher<I> {
+    pub(crate) async fn notify(
+        &self,
+        update: RoutingTableUpdate<I>,
+    ) -> Result<(), RouteUpdateNotifyError<I>> {
+        let Self(inner) = self;
+        inner.lock().await.notify(update)
+    }
+}
 // Consumes events for a single client of the
 // `fuchsia.net.routes/WatcherV{4,6}` protocols.
 #[derive(Debug)]
@@ -532,7 +535,7 @@ mod tests {
     fn dispatcher_fails_to_remove_non_existent<I: Ip>() {
         let route = arbitrary_route_on_interface::<I>(1);
         assert_eq!(
-            RouteUpdateDispatcher::default()
+            RouteUpdateDispatcherInner::default()
                 .notify(RoutingTableUpdate::RouteRemoved(route.clone())),
             Err(RouteUpdateNotifyError::NotFound(route))
         );
@@ -542,7 +545,7 @@ mod tests {
     // `AddRoute` update for an already existing route.
     #[ip_test]
     fn dispatcher_fails_to_add_existing<I: Ip>() {
-        let mut dispatcher = RouteUpdateDispatcher::default();
+        let mut dispatcher = RouteUpdateDispatcherInner::default();
         let route = arbitrary_route_on_interface::<I>(1);
         assert_eq!(dispatcher.notify(RoutingTableUpdate::RouteAdded(route)), Ok(()));
         assert_eq!(
@@ -555,10 +558,10 @@ mod tests {
     // `RouteWatcherSink`, and `RouteWatcher`.
     #[ip_test]
     fn notify_dispatch_watch<I: Ip>() {
-        let mut dispatcher = RouteUpdateDispatcher::default();
+        let mut dispatcher = RouteUpdateDispatcherInner::default();
 
         // Add a new watcher and verify there are no existing routes.
-        let mut watcher1 = dispatcher.connect_new_client::<I>();
+        let mut watcher1 = dispatcher.connect_new_client();
         assert_eq!(watcher1.watch().now_or_never().unwrap(), [fnet_routes_ext::Event::<I>::Idle]);
 
         // Add a route and verify that the watcher is notified.
@@ -570,7 +573,7 @@ mod tests {
         );
 
         // Connect a second watcher and verify it sees the route as `Existing`.
-        let mut watcher2 = dispatcher.connect_new_client::<I>();
+        let mut watcher2 = dispatcher.connect_new_client();
         assert_eq!(
             watcher2.watch().now_or_never().unwrap(),
             [fnet_routes_ext::Event::Existing(route), fnet_routes_ext::Event::<I>::Idle]
@@ -612,7 +615,7 @@ mod tests {
             assert_eq!(num_observed_events, num_required_events);
         }
 
-        let mut dispatcher = RouteUpdateDispatcher::default();
+        let mut dispatcher = RouteUpdateDispatcherInner::default();
         // `Existing` routes shouldn't count against the client's quota.
         // Exceed the quota, and then verify new clients can still connect.
         // Note that `EXCESS` is 2, because mpsc::channel implicitly adds +1 to
@@ -624,8 +627,8 @@ mod tests {
             let route = arbitrary_route_on_interface::<I>(i.try_into().unwrap());
             dispatcher.notify(RoutingTableUpdate::RouteAdded(route)).expect("failed to notify");
         }
-        let mut watcher1 = dispatcher.connect_new_client::<I>();
-        let mut watcher2 = dispatcher.connect_new_client::<I>();
+        let mut watcher1 = dispatcher.connect_new_client();
+        let mut watcher2 = dispatcher.connect_new_client();
         assert_eq!(watcher1.canceled.wait().now_or_never(), None);
         assert_eq!(watcher2.canceled.wait().now_or_never(), None);
         // Drain all of the `Existing` events (and +1 for the `Idle` event).

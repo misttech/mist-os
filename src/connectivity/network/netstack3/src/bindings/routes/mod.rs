@@ -39,8 +39,18 @@ type DeviceId = netstack3_core::device::DeviceId<crate::bindings::BindingsNonSyn
 pub(crate) enum Change<A: IpAddress> {
     Add(netstack3_core::ip::types::AddableEntry<A, WeakDeviceId>),
     RemoveToSubnet(Subnet<A>),
-    RemoveMatching { subnet: Subnet<A>, device: WeakDeviceId, gateway: Option<SpecifiedAddr<A>> },
-    DeviceRemoved(WeakDeviceId),
+    RemoveMatching {
+        subnet: Subnet<A>,
+        device: WeakDeviceId,
+        gateway: Option<SpecifiedAddr<A>>,
+    },
+    DeviceRemoved {
+        device: WeakDeviceId,
+        // TODO(https://fxbug.dev/132990): When we can properly wait for
+        // reference-y devices to be cleaned up, we can move this to
+        // bindings rather than needing to dispatch the routes with an event.
+        routes_removed: Vec<netstack3_core::ip::types::Entry<A, DeviceId>>,
+    },
 }
 
 pub(crate) enum ChangeEither {
@@ -103,13 +113,14 @@ pub(crate) struct WorkItem<A: IpAddress> {
     pub(crate) responder: Option<oneshot::Sender<Result<(), Error>>>,
 }
 
-pub(crate) struct State<A: IpAddress> {
-    receiver: mpsc::UnboundedReceiver<WorkItem<A>>,
+pub(crate) struct State<I: Ip> {
+    receiver: mpsc::UnboundedReceiver<WorkItem<I::Addr>>,
     generation: netstack3_core::ip::types::Generation,
     table: HashMap<
-        netstack3_core::ip::types::AddableEntry<A, WeakDeviceId>,
+        netstack3_core::ip::types::AddableEntry<I::Addr, WeakDeviceId>,
         netstack3_core::ip::types::Generation,
     >,
+    update_dispatcher: crate::bindings::routes_fidl_worker::RouteUpdateDispatcher<I>,
 }
 
 #[derive(derivative::Derivative)]
@@ -118,13 +129,14 @@ pub(crate) struct Changes<A: IpAddress> {
     sender: mpsc::UnboundedSender<WorkItem<A>>,
 }
 
-impl<A: IpAddress> State<A> {
-    pub(crate) async fn run_changes<I: Ip<Addr = A>>(&mut self, mut ctx: Ctx) {
-        let State { receiver, table, generation } = self;
+impl<I: Ip> State<I> {
+    pub(crate) async fn run_changes(&mut self, mut ctx: Ctx) {
+        let State { receiver, table, generation, update_dispatcher } = self;
         pin_mut!(receiver);
 
         while let Some(WorkItem { change, responder }) = receiver.next().await {
-            let result = handle_change::<I>(table, generation, &mut ctx, change);
+            let result =
+                handle_change::<I>(table, generation, &mut ctx, change, update_dispatcher).await;
             if let Some(responder) = responder {
                 match responder.send(result) {
                     Ok(()) => (),
@@ -143,7 +155,7 @@ impl<A: IpAddress> State<A> {
     }
 }
 
-fn handle_change<I: Ip>(
+async fn handle_change<I: Ip>(
     table: &mut HashMap<
         netstack3_core::ip::types::AddableEntry<I::Addr, WeakDeviceId>,
         netstack3_core::ip::types::Generation,
@@ -151,6 +163,7 @@ fn handle_change<I: Ip>(
     generation: &mut netstack3_core::ip::types::Generation,
     ctx: &mut Ctx,
     change: Change<I::Addr>,
+    route_update_dispatcher: &crate::bindings::routes_fidl_worker::RouteUpdateDispatcher<I>,
 ) -> Result<(), Error> {
     let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
 
@@ -197,7 +210,7 @@ fn handle_change<I: Ip>(
             *table = kept;
             TableChange::<I>::Remove(removed)
         }
-        Change::DeviceRemoved(device) => {
+        Change::DeviceRemoved { device, routes_removed } => {
             let (_removed, kept) = std::mem::take(table)
                 .into_iter()
                 .partition::<HashMap<_, _>, _>(|(entry, _generation)| &entry.device == &device);
@@ -206,12 +219,14 @@ fn handle_change<I: Ip>(
             // This is simply keeping the bindings route table up to date with
             // routes that were removed by core as a result of removing a
             // device, so we do no additional work to commit the changes to core
-            // here or notify watchers -- that work has to be done synchronously
-            // in the event context before the device is removed from core.
+            // here. We only notify the update dispatcher that the routes have
+            // been removed.
+            //
             // TODO(https://fxbug.dev/132990): Allowing core to unilaterally
             // remove routes on device removal (as opposed to going through
             // bindings) is confusing; this should be removed once we can await
             // strong device ID cleanup.
+            notify_removed_routes(non_sync_ctx, route_update_dispatcher, routes_removed).await;
             return Ok(());
         }
     };
@@ -250,12 +265,11 @@ fn handle_change<I: Ip>(
             let installed_route = entry
                 .try_into_fidl_with_ctx(non_sync_ctx)
                 .expect("failed to convert route to FIDL");
-            non_sync_ctx
-                .route_update_dispatcher
-                .lock()
+            route_update_dispatcher
                 .notify(crate::bindings::routes_fidl_worker::RoutingTableUpdate::<I>::RouteAdded(
                     installed_route,
                 ))
+                .await
                 .expect("failed to notify route update dispatcher");
         }
         TableChange::Remove(removed) => {
@@ -285,12 +299,14 @@ fn handle_change<I: Ip>(
             } else {
                 notify_removed_routes::<I>(
                     non_sync_ctx,
+                    route_update_dispatcher,
                     removed.into_iter().map(
                         |netstack3_core::ip::types::EntryAndGeneration { entry, generation: _ }| {
                             entry
                         },
                     ),
-                );
+                )
+                .await;
             }
         }
     };
@@ -298,11 +314,11 @@ fn handle_change<I: Ip>(
     Ok(())
 }
 
-pub(crate) fn notify_removed_routes<I: Ip>(
+async fn notify_removed_routes<I: Ip>(
     non_sync_ctx: &mut crate::bindings::BindingsNonSyncCtxImpl,
+    dispatcher: &crate::bindings::routes_fidl_worker::RouteUpdateDispatcher<I>,
     removed_routes: impl IntoIterator<Item = netstack3_core::ip::types::Entry<I::Addr, DeviceId>>,
 ) {
-    let mut dispatcher = non_sync_ctx.route_update_dispatcher.lock();
     for entry in removed_routes {
         if entry.subnet.prefix() == 0 {
             // TODO(https://fxbug.dev/132990): This is not strictly correct, as
@@ -324,6 +340,7 @@ pub(crate) fn notify_removed_routes<I: Ip>(
             .notify(crate::bindings::routes_fidl_worker::RoutingTableUpdate::<I>::RouteRemoved(
                 installed_route,
             ))
+            .await
             .expect("failed to notify route update dispatcher");
     }
 }
@@ -336,31 +353,42 @@ pub(crate) struct ChangeSink {
 
 #[must_use = "route changes won't be applied without running the ChangeRunner"]
 pub(crate) struct ChangeRunner {
-    v4: State<Ipv4Addr>,
-    v6: State<Ipv6Addr>,
+    v4: State<Ipv4>,
+    v6: State<Ipv6>,
 }
 
 impl ChangeRunner {
+    pub(crate) fn route_update_dispatchers(
+        &self,
+    ) -> (
+        crate::bindings::routes_fidl_worker::RouteUpdateDispatcher<Ipv4>,
+        crate::bindings::routes_fidl_worker::RouteUpdateDispatcher<Ipv6>,
+    ) {
+        let Self { v4, v6 } = self;
+        (v4.update_dispatcher.clone(), v6.update_dispatcher.clone())
+    }
+
     pub(crate) async fn run(&mut self, ctx: Ctx) {
         let Self { v4, v6 } = self;
-        let v4_fut = v4.run_changes::<Ipv4>(ctx.clone());
-        let v6_fut = v6.run_changes::<Ipv6>(ctx);
+        let v4_fut = v4.run_changes(ctx.clone());
+        let v6_fut = v6.run_changes(ctx);
         let ((), ()) = futures::future::join(v4_fut, v6_fut).await;
     }
 }
 
 pub(crate) fn create_sink_and_runner() -> (ChangeSink, ChangeRunner) {
-    fn create<A: IpAddress>() -> (Changes<A>, State<A>) {
+    fn create<I: Ip>() -> (Changes<I::Addr>, State<I>) {
         let (sender, receiver) = mpsc::unbounded();
         let state = State {
             receiver,
             table: HashMap::new(),
             generation: netstack3_core::ip::types::Generation::initial(),
+            update_dispatcher: Default::default(),
         };
         (Changes { sender }, state)
     }
-    let (v4, v4_state) = create::<Ipv4Addr>();
-    let (v6, v6_state) = create::<Ipv6Addr>();
+    let (v4, v4_state) = create::<Ipv4>();
+    let (v6, v6_state) = create::<Ipv6>();
     (ChangeSink { v4, v6 }, ChangeRunner { v4: v4_state, v6: v6_state })
 }
 
