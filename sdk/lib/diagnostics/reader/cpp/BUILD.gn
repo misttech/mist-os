@@ -24,6 +24,8 @@ source_set("archive_reader") {
     "constants.h",
     "inspect.cc",
     "inspect.h",
+    "logs.cc",
+    "logs.h",
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_hlcpp",

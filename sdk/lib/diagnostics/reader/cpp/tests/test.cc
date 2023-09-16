@@ -117,24 +117,42 @@ class ArchiveReaderTest : public gtest::RealLoopFixture {
     return "realm_builder\\:" + realm_->component().GetChildName() + "/test_app_2";
   }
 
+  void CheckLog(std::optional<diagnostics::reader::LogsData> maybeLog,
+                fuchsia::diagnostics::Severity severity, const std::string& message,
+                const std::vector<std::string>& tags) {
+    ASSERT_TRUE(maybeLog.has_value());
+    auto& log = maybeLog.value();
+    EXPECT_EQ(log.moniker(), "realm_builder:" + realm_->component().GetChildName() + "/test_app");
+    EXPECT_EQ(log.version(), 1u);
+    EXPECT_EQ(log.message(), message);
+    auto metadata = log.metadata();
+    std::string url_ending = "/test_app";
+    EXPECT_TRUE(
+        std::equal(url_ending.rbegin(), url_ending.rend(), metadata.component_url.rbegin()));
+    EXPECT_NE(metadata.timestamp, 0u);
+    EXPECT_EQ(metadata.severity, severity);
+    EXPECT_EQ(metadata.tags, tags);
+    EXPECT_TRUE(metadata.pid.has_value());
+    EXPECT_TRUE(metadata.tid.has_value());
+  }
+
  private:
   std::unique_ptr<RealmRoot> realm_;
   async::Executor executor_;
   std::unique_ptr<sys::ComponentContext> component_context_;
 };
 
-using ResultType = fpromise::result<std::vector<diagnostics::reader::InspectData>, std::string>;
+using InspectResult = fpromise::result<std::vector<diagnostics::reader::InspectData>, std::string>;
+using LogsResult = fpromise::result<std::optional<diagnostics::reader::LogsData>, std::string>;
 
 TEST_F(ArchiveReaderTest, ReadHierarchy) {
   std::cerr << "RUNNING TEST" << std::endl;
   diagnostics::reader::ArchiveReader reader(svc()->Connect<fuchsia::diagnostics::ArchiveAccessor>(),
                                             {cm1_selector(), cm2_selector()});
 
-  ResultType result;
-  executor().schedule_task(
-      reader.SnapshotInspectUntilPresent({cm1_moniker(), cm2_moniker()}).then([&](ResultType& r) {
-        result = std::move(r);
-      }));
+  InspectResult result;
+  executor().schedule_task(reader.SnapshotInspectUntilPresent({cm1_moniker(), cm2_moniker()})
+                               .then([&](InspectResult& r) { result = std::move(r); }));
   RunLoopUntil([&] { return !!result; });
 
   ASSERT_TRUE(result.is_ok()) << "Error: " << result.error();
@@ -156,11 +174,9 @@ TEST_F(ArchiveReaderTest, ReadHierarchyWithAlternativeDispatcher) {
   async::Executor local_executor(loop.dispatcher());
   diagnostics::reader::ArchiveReader reader(std::move(archive), {cm1_selector(), cm2_selector()});
 
-  ResultType result;
-  local_executor.schedule_task(
-      reader.SnapshotInspectUntilPresent({cm1_moniker(), cm2_moniker()}).then([&](ResultType& r) {
-        result = std::move(r);
-      }));
+  InspectResult result;
+  local_executor.schedule_task(reader.SnapshotInspectUntilPresent({cm1_moniker(), cm2_moniker()})
+                                   .then([&](InspectResult& r) { result = std::move(r); }));
 
   // Use the alternate loop.
   while (true) {
@@ -186,11 +202,9 @@ TEST_F(ArchiveReaderTest, Sort) {
   diagnostics::reader::ArchiveReader reader(svc()->Connect<fuchsia::diagnostics::ArchiveAccessor>(),
                                             {cm1_selector(), cm2_selector()});
 
-  ResultType result;
-  executor().schedule_task(
-      reader.SnapshotInspectUntilPresent({cm1_moniker(), cm2_moniker()}).then([&](ResultType& r) {
-        result = std::move(r);
-      }));
+  InspectResult result;
+  executor().schedule_task(reader.SnapshotInspectUntilPresent({cm1_moniker(), cm2_moniker()})
+                               .then([&](InspectResult& r) { result = std::move(r); }));
   RunLoopUntil([&] { return !!result; });
 
   ASSERT_TRUE(result.is_ok()) << "Error: " << result.error();
@@ -222,6 +236,26 @@ TEST_F(ArchiveReaderTest, Sort) {
 
   EXPECT_EQ(CM1_EXPECTED_DATA, cm1_expected_json);
   EXPECT_EQ(CM2_EXPECTED_DATA, cm2_expected_json);
+}
+
+TEST_F(ArchiveReaderTest, ReadLogs) {
+  diagnostics::reader::ArchiveReader reader(svc()->Connect<fuchsia::diagnostics::ArchiveAccessor>(),
+                                            {cm1_selector()});
+
+  auto subscription = reader.GetLogs(fuchsia::diagnostics::StreamMode::SNAPSHOT_THEN_SUBSCRIBE);
+
+  auto next_log = [&]() -> std::optional<diagnostics::reader::LogsData> {
+    LogsResult result;
+    executor().schedule_task(
+        subscription.Next().then([&](LogsResult& r) { result = std::move(r); }));
+    RunLoopUntil([&] { return !!result; });
+    return result.take_value();
+  };
+
+  CheckLog(next_log(), fuchsia::diagnostics::Severity::INFO, "I'm an info log",
+           {"test_program", "hello"});
+  CheckLog(next_log(), fuchsia::diagnostics::Severity::WARN, "I'm a warn log", {"test_program"});
+  CheckLog(next_log(), fuchsia::diagnostics::Severity::ERROR, "I'm an error log", {"test_program"});
 }
 
 }  // namespace

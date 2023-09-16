@@ -166,9 +166,9 @@ inspect::Hierarchy ParsePayload(std::string name, const rapidjson::Value::Object
 namespace diagnostics::reader {
 
 InspectData::InspectData(rapidjson::Document document) : document_(std::move(document)) {
-  if (document_.HasMember(kPathName) && document_[kPathName].IsString()) {
-    std::string val = document_[kPathName].GetString();
-    moniker_ = document_[kPathName].GetString();
+  if (document_.HasMember(kMonikerName) && document_[kMonikerName].IsString()) {
+    std::string val = document_[kMonikerName].GetString();
+    moniker_ = document_[kMonikerName].GetString();
   }
   if (document_.HasMember(kVersionName) && document_[kVersionName].IsNumber()) {
     version_ = document_[kVersionName].GetInt64();
@@ -204,8 +204,8 @@ InspectData::InspectData(rapidjson::Document document) : document_(std::move(doc
       metadata_.errors = std::make_optional(inspectErrors);
     }
   }
-  if (document_.HasMember(kContentsName) && document_[kContentsName].IsObject()) {
-    const auto& payload = document_[kContentsName].GetObject();
+  if (document_.HasMember(kPayloadName) && document_[kPayloadName].IsObject()) {
+    const auto& payload = document_[kPayloadName].GetObject();
     if (payload.MemberBegin() != payload.MemberEnd() && payload.MemberBegin()->value.IsObject()) {
       payload_ = ParsePayload(payload.MemberBegin()->name.GetString(),
                               payload.MemberBegin()->value.GetObject());
@@ -216,11 +216,11 @@ InspectData::InspectData(rapidjson::Document document) : document_(std::move(doc
 const rapidjson::Value& InspectData::content() const {
   static rapidjson::Value default_ret;
 
-  if (!document_.IsObject() || !document_.HasMember(kContentsName)) {
+  if (!document_.IsObject() || !document_.HasMember(kPayloadName)) {
     return default_ret;
   }
 
-  return document_[kContentsName];
+  return document_[kPayloadName];
 }
 
 const rapidjson::Value& InspectData::GetByPath(const std::vector<std::string>& path) const {

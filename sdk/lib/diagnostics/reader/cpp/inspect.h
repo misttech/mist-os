@@ -11,13 +11,12 @@
 #include <lib/fpromise/promise.h>
 #include <lib/fpromise/scope.h>
 #include <lib/inspect/cpp/hierarchy.h>
+#include <lib/stdcompat/optional.h>
 
 #include <cstdint>
 #include <optional>
 
 #include <rapidjson/document.h>
-
-#include "lib/stdcompat/optional.h"
 
 namespace diagnostics::reader {
 

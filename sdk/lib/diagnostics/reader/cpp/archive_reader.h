@@ -8,6 +8,7 @@
 #include <fuchsia/diagnostics/cpp/fidl.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/diagnostics/reader/cpp/inspect.h>
+#include <lib/diagnostics/reader/cpp/logs.h>
 #include <lib/fpromise/bridge.h>
 #include <lib/fpromise/promise.h>
 #include <lib/fpromise/scope.h>
@@ -45,10 +46,16 @@ class ArchiveReader {
   fpromise::promise<std::vector<InspectData>, std::string> SnapshotInspectUntilPresent(
       std::vector<std::string> component_names);
 
+  // Subscribes to logs using the given `mode`.
+  LogsSubscription GetLogs(fuchsia::diagnostics::StreamMode mode);
+
  private:
   void InnerSnapshotInspectUntilPresent(
       fpromise::completer<std::vector<InspectData>, std::string> bridge,
       std::vector<std::string> component_names);
+
+  fuchsia::diagnostics::BatchIteratorPtr GetBatchIterator(
+      fuchsia::diagnostics::DataType data_type, fuchsia::diagnostics::StreamMode stream_mode);
 
   // The pointer to the archive this object is connected to.
   fuchsia::diagnostics::ArchiveAccessorPtr archive_;

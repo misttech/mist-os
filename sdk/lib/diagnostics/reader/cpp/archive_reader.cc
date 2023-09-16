@@ -187,4 +187,37 @@ void ArchiveReader::InnerSnapshotInspectUntilPresent(
           .wrap_with(scope_));
 }
 
+LogsSubscription ArchiveReader::GetLogs(fuchsia::diagnostics::StreamMode mode) {
+  auto iterator = GetBatchIterator(fuchsia::diagnostics::DataType::LOGS, std::move(mode));
+  return LogsSubscription(std::move(iterator));
+}
+
+fuchsia::diagnostics::BatchIteratorPtr ArchiveReader::GetBatchIterator(
+    fuchsia::diagnostics::DataType data_type, fuchsia::diagnostics::StreamMode stream_mode) {
+  std::vector<fuchsia::diagnostics::SelectorArgument> selector_args;
+  for (const auto& selector : selectors_) {
+    fuchsia::diagnostics::SelectorArgument arg;
+    arg.set_raw_selector(selector);
+    selector_args.emplace_back(std::move(arg));
+  }
+
+  fuchsia::diagnostics::StreamParameters params;
+  params.set_data_type(std::move(data_type));
+  params.set_stream_mode(std::move(stream_mode));
+  params.set_format(fuchsia::diagnostics::Format::JSON);
+
+  fuchsia::diagnostics::ClientSelectorConfiguration client_selector_config;
+  if (!selector_args.empty()) {
+    client_selector_config.set_selectors(std::move(selector_args));
+  } else {
+    client_selector_config.set_select_all(true);
+  }
+
+  params.set_client_selector_configuration(std::move(client_selector_config));
+
+  fuchsia::diagnostics::BatchIteratorPtr iterator;
+  archive_->StreamDiagnostics(std::move(params), iterator.NewRequest(archive_.dispatcher()));
+  return iterator;
+}
+
 }  // namespace diagnostics::reader

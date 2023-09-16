@@ -7,8 +7,8 @@
 
 namespace diagnostics::reader {
 
-constexpr char kPathName[] = "moniker";
-constexpr char kContentsName[] = "payload";
+constexpr char kMonikerName[] = "moniker";
+constexpr char kPayloadName[] = "payload";
 constexpr char kVersionName[] = "version";
 constexpr char kMetadataName[] = "metadata";
 constexpr char kMetadataFilename[] = "filename";
@@ -16,6 +16,16 @@ constexpr char kMetadataComponentURL[] = "component_url";
 constexpr char kMetadataTimestamp[] = "timestamp";
 constexpr char kMetadataErrors[] = "errors";
 constexpr char kMetadataErrorsMessage[] = "message";
+
+constexpr char kMetadataFile[] = "file";
+constexpr char kMetadataLine[] = "line";
+constexpr char kMetadataPid[] = "pid";
+constexpr char kMetadataSeverity[] = "severity";
+constexpr char kMetadataTags[] = "tags";
+constexpr char kMetadataTid[] = "tid";
+constexpr char kPayloadMessage[] = "message";
+constexpr char kPayloadRoot[] = "root";
+constexpr char kPayloadMessageValue[] = "value";
 
 }  // namespace diagnostics::reader
 
