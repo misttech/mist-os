@@ -96,6 +96,20 @@ TEST(InspectDataTest, ArrayValueCtor) {
   }
 }
 
+TEST(InspectDataTest, EmptyArray) {
+  std::vector<diagnostics::reader::InspectData> data;
+  rapidjson::Document doc;
+  doc.Parse(R"({"payload": { "root": { "test_array": []}}})");
+  diagnostics::reader::EmplaceInspect(std::move(doc), &data);
+  EXPECT_EQ(true, data[0].payload().has_value());
+  EXPECT_EQ("root", data[0].payload().value()->name());
+
+  auto *values =
+      data[0].payload().value()->node().get_property<inspect::IntArrayValue>("test_array");
+  ASSERT_NOT_NULL(values);
+  ASSERT_EQ(0ul, values->value().size());
+}
+
 TEST(InspectDataTest, ParseJSON) {
   {
     std::vector<diagnostics::reader::InspectData> data;

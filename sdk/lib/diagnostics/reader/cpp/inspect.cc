@@ -47,6 +47,12 @@ struct StackItem {
 
 void ParseArray(const std::string& name, const rapidjson::Value::Array& arr,
                 inspect::NodeValue* node_ptr) {
+  if (arr.Empty()) {
+    node_ptr->add_property(inspect::PropertyValue(
+        name, inspect::IntArrayValue(std::vector<int64_t>{}, inspect::ArrayDisplayFormat::kFlat)));
+    return;
+  }
+
   switch (arr.Begin()->GetType()) {
     case rapidjson::kStringType: {
       std::vector<std::string> values;
