@@ -14,7 +14,7 @@ From //zircon/system/ulib/acpica/acpica.gni:7
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:118
+From //build/images/args.gni:113
 
 ### add_qemu_to_build_archives
 
@@ -23,7 +23,7 @@ archives.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:124
+From //build/images/args.gni:119
 
 ### additional_boot_args
 
@@ -43,7 +43,7 @@ with specific boards, due to driver and hardware challenges.
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:130
+From //build/images/args.gni:125
 
 ### all_cpu_kernel_boot_tests
 
@@ -96,7 +96,7 @@ Build boot images that prefer Zedboot over local boot (only for EFI).
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:145
+From //build/images/args.gni:140
 
 ### api_compatibility_testing
 
@@ -146,7 +146,7 @@ From //products/bringup.gni:9
 
 **Overridden from the default:** `false`
 
-From //build/images/args.gni:182
+From //build/images/args.gni:177
 
 **Current value for `target_cpu = "x64"`:** `true`
 
@@ -154,7 +154,7 @@ From //products/bringup.gni:9
 
 **Overridden from the default:** `false`
 
-From //build/images/args.gni:182
+From //build/images/args.gni:177
 
 ### assembly_generate_fvm_fastboot
 
@@ -164,7 +164,7 @@ suitable for flashing through fastboot for eMMC devices.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:153
+From //build/images/args.gni:148
 
 ### assembly_generate_fvm_nand
 
@@ -176,7 +176,7 @@ room to initialize on boot.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:160
+From //build/images/args.gni:155
 
 ### authorized_ssh_keys_label
 
@@ -324,7 +324,7 @@ From //build/bazel/bazel_fuchsia_sdk.gni:11
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:210
+From //build/images/args.gni:205
 
 ### bazel_product_bundle_prefix
 
@@ -349,7 +349,7 @@ The actual bazel_product_bundle used for Bazel assembly is:
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:209
+From //build/images/args.gni:204
 
 ### bazel_quiet
 
@@ -1067,7 +1067,7 @@ non-production GN labels. Build will fail if such dependency is found.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:136
+From //build/images/args.gni:131
 
 ### check_repeatability
 
@@ -1289,7 +1289,7 @@ that we want the legacy AIB packaged and archived for a given product:
 
 **Current value (from the default):** `false`
 
-From //build/images/fuchsia/BUILD.gn:28
+From //build/images/fuchsia/BUILD.gn:26
 
 ### cts_version
 
@@ -1501,7 +1501,7 @@ This arg is for local developer only, products should not set this arg.
 
 **Current value (from the default):** `1`
 
-From //build/images/args.gni:142
+From //build/images/args.gni:137
 
 ### deny_warnings
 
@@ -2385,7 +2385,7 @@ source code.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/github.com/google/emboss/src"`
 
-From //.gn:90
+From //.gn:86
 
 **Overridden from the default:** `""`
 
@@ -2393,7 +2393,7 @@ From //third_party/pigweed/src/third_party/emboss/emboss.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/github.com/google/emboss/src"`
 
-From //.gn:90
+From //.gn:86
 
 **Overridden from the default:** `""`
 
@@ -2406,7 +2406,7 @@ mirror of the few Fuchsia source files it uses.
 
 **Current value for `target_cpu = "arm64"`:** `"//"`
 
-From //.gn:84
+From //.gn:80
 
 **Overridden from the default:** `"//third_party/pigweed/src/third_party/fuchsia/repo"`
 
@@ -2414,7 +2414,7 @@ From //third_party/pigweed/src/third_party/fuchsia/fuchsia.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//"`
 
-From //.gn:84
+From //.gn:80
 
 **Overridden from the default:** `"//third_party/pigweed/src/third_party/fuchsia/repo"`
 
@@ -3041,7 +3041,7 @@ useful for including verification and other Bazel assembly specific targets.
 
 **Current value (from the default):** `[]`
 
-From //build/images/args.gni:214
+From //build/images/args.gni:209
 
 ### extra_cipd_assembly_artifact_targets
 
@@ -3149,7 +3149,7 @@ From //build/images/vbmeta.gni:37
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:119
+From //build/images/args.gni:114
 
 ### ffmpeg_profile
 
@@ -3430,7 +3430,7 @@ From //zircon/kernel/params.gni:60
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:116
+From //build/images/args.gni:111
 
 ### fxfs_blob
 
@@ -3446,7 +3446,7 @@ From //src/storage/fshost/generated_fshost_config.gni:17
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:117
+From //build/images/args.gni:112
 
 ### gcc_tool_dir
 
@@ -3896,7 +3896,7 @@ Include an account partition in the FVM image if set to true.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:148
+From //build/images/args.gni:143
 
 ### include_clippy
 
@@ -3931,7 +3931,7 @@ assembled_system().  See documentation there.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:178
+From //build/images/args.gni:173
 
 ### include_zxdb_large_tests
 
@@ -4609,16 +4609,6 @@ Configuration file for MbedTLS.
 **Current value (from the default):** `"mbedtls-config.h"`
 
 From //third_party/openthread/third_party/mbedtls/BUILD.gn:30
-
-### meta_package_labels
-
-A list of labels for packages that are appended to the set of base packages,
-but depend on all the other base, cache, and universe packages, therefore
-they must be separated into their own list.
-
-**Current value (from the default):** `[]`
-
-From //build/images/args.gni:99
 
 ### min_crashlog_size
 
@@ -5482,31 +5472,11 @@ Used to control whether board definitions include PMM checker options.
 
 From //boards/kernel_cmdline/BUILD.gn:60
 
-### policy_labels
-
-Default policy_labels definition to ease with the transition away from
-manually defining SWD policies across different product gni files.
-The transition process will be as follows:
-1. Define all SWD policies.
-2. Add dependency on SWD policies in base_package_deps and
-   system_image_deps, but do not apply a SWD policy to retain existing
-   product behavior.
-3. Apply SWD policies in product definitions alongside the existing
-   SWD targets configuration. Assert that product configuration has not
-   changed.
-4. Remove manually defined SWD targets in product definitions, rely solely
-   on defined SWD policies.
-This is initially empty as part of the first step of the transition.
-
-**Current value (from the default):** `{ }`
-
-From //build/security/policies.gni:21
-
 ### pre_erase_flash
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:120
+From //build/images/args.gni:115
 
 ### prebuilt_dart_sdk
 
@@ -5682,7 +5652,7 @@ Backend for the pw_assert module's CHECK facade.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_assert"`
 
-From //.gn:65
+From //.gn:61
 
 **Overridden from the default:** `""`
 
@@ -5690,7 +5660,7 @@ From //third_party/pigweed/src/pw_assert/backend.gni:19
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_assert"`
 
-From //.gn:65
+From //.gn:61
 
 **Overridden from the default:** `""`
 
@@ -5725,7 +5695,7 @@ WARNING: This is experimental and *not* guaranteed to work.
 
 **Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/backends/pw_async_fuchsia:*", "//third_party/pigweed:*"]`
 
-From //.gn:93
+From //.gn:89
 
 **Overridden from the default:** `[]`
 
@@ -5733,7 +5703,7 @@ From //third_party/pigweed/src/pw_async/async.gni:21
 
 **Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/backends/pw_async_fuchsia:*", "//third_party/pigweed:*"]`
 
-From //.gn:93
+From //.gn:89
 
 **Overridden from the default:** `[]`
 
@@ -5745,7 +5715,7 @@ Configures the backend to use for the //pw_async:fake_dispatcher facade.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_async_fuchsia:fake_dispatcher"`
 
-From //.gn:101
+From //.gn:97
 
 **Overridden from the default:** `""`
 
@@ -5753,7 +5723,7 @@ From //third_party/pigweed/src/pw_async/backend.gni:22
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_async_fuchsia:fake_dispatcher"`
 
-From //.gn:101
+From //.gn:97
 
 **Overridden from the default:** `""`
 
@@ -5765,7 +5735,7 @@ Configures the backend to use for the //pw_async:task facade.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_async_fuchsia:task"`
 
-From //.gn:98
+From //.gn:94
 
 **Overridden from the default:** `""`
 
@@ -5773,7 +5743,7 @@ From //third_party/pigweed/src/pw_async/backend.gni:19
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_async_fuchsia:task"`
 
-From //.gn:98
+From //.gn:94
 
 **Overridden from the default:** `""`
 
@@ -5844,19 +5814,7 @@ at least include the Pigweed repository ("$dir_pigweed/*").
 
 Explicitly setting a target's visibility overrides this default.
 
-**Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/*"]`
-
-From //.gn:62
-
-**Overridden from the default:** `"*"`
-
-From //third_party/pigweed/src/pw_build/defaults.gni:38
-
-**Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/*"]`
-
-From //.gn:62
-
-**Overridden from the default:** `"*"`
+**Current value (from the default):** `"*"`
 
 From //third_party/pigweed/src/pw_build/defaults.gni:38
 
@@ -5894,7 +5852,7 @@ libraries such as pw_assert.
 
 **Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/src/pw_assert:impl", "//third_party/pigweed/src/pw_log:impl"]`
 
-From //.gn:78
+From //.gn:74
 
 **Overridden from the default:** `[]`
 
@@ -5902,7 +5860,7 @@ From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:24
 
 **Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/src/pw_assert:impl", "//third_party/pigweed/src/pw_log:impl"]`
 
-From //.gn:78
+From //.gn:74
 
 **Overridden from the default:** `[]`
 
@@ -6047,7 +6005,7 @@ Backend for the pw_chrono module's system_clock.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_chrono_stl:system_clock"`
 
-From //.gn:68
+From //.gn:64
 
 **Overridden from the default:** `""`
 
@@ -6055,7 +6013,7 @@ From //third_party/pigweed/src/pw_chrono/backend.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_chrono_stl:system_clock"`
 
-From //.gn:68
+From //.gn:64
 
 **Overridden from the default:** `""`
 
@@ -6187,7 +6145,7 @@ public config (which may -include a file or add defines directly).
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_function:define_overrides"`
 
-From //.gn:75
+From //.gn:71
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_build:empty"`
 
@@ -6195,7 +6153,7 @@ From //third_party/pigweed/src/pw_function/BUILD.gn:27
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_function:define_overrides"`
 
-From //.gn:75
+From //.gn:71
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_build:empty"`
 
@@ -6207,7 +6165,7 @@ Backend for the pw_log module.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_log"`
 
-From //.gn:66
+From //.gn:62
 
 **Overridden from the default:** `""`
 
@@ -6215,7 +6173,7 @@ From //third_party/pigweed/src/pw_log/backend.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_log"`
 
-From //.gn:66
+From //.gn:62
 
 **Overridden from the default:** `""`
 
@@ -6359,7 +6317,7 @@ To override the protobuf compiler used set this to the path, relative to the roo
 
 **Current value for `target_cpu = "arm64"`:** `"host_x64/protoc"`
 
-From //.gn:105
+From //.gn:101
 
 **Overridden from the default:** `""`
 
@@ -6367,7 +6325,7 @@ From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:39
 
 **Current value for `target_cpu = "x64"`:** `"host_x64/protoc"`
 
-From //.gn:105
+From //.gn:101
 
 **Overridden from the default:** `""`
 
@@ -6379,7 +6337,7 @@ To override the protobuf compiler used set this to the GN target that builds the
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/protobuf:protoc"`
 
-From //.gn:104
+From //.gn:100
 
 **Overridden from the default:** `""`
 
@@ -6387,7 +6345,7 @@ From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:36
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/protobuf:protoc"`
 
-From //.gn:104
+From //.gn:100
 
 **Overridden from the default:** `""`
 
@@ -6523,7 +6481,7 @@ Backend for the pw_sync module's mutex.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_sync_baremetal:mutex"`
 
-From //.gn:69
+From //.gn:65
 
 **Overridden from the default:** `""`
 
@@ -6531,7 +6489,7 @@ From //third_party/pigweed/src/pw_sync/backend.gni:26
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_sync_baremetal:mutex"`
 
-From //.gn:69
+From //.gn:65
 
 **Overridden from the default:** `""`
 
@@ -6585,7 +6543,7 @@ Backend for the pw_sys_io facade.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_sys_io_stdio"`
 
-From //.gn:70
+From //.gn:66
 
 **Overridden from the default:** `""`
 
@@ -6593,7 +6551,7 @@ From //third_party/pigweed/src/pw_sys_io/backend.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_sys_io_stdio"`
 
-From //.gn:70
+From //.gn:66
 
 **Overridden from the default:** `""`
 
@@ -6608,7 +6566,7 @@ use Pigweed's boringssl exclusively.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/boringssl"`
 
-From //.gn:87
+From //.gn:83
 
 **Overridden from the default:** `""`
 
@@ -6616,7 +6574,7 @@ From //third_party/pigweed/src/third_party/boringssl/boringssl.gni:25
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/boringssl"`
 
-From //.gn:87
+From //.gn:83
 
 **Overridden from the default:** `""`
 
@@ -6678,7 +6636,7 @@ Backend for the pw_thread module's pw::thread::sleep_{for,until}.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_thread_stl:sleep"`
 
-From //.gn:71
+From //.gn:67
 
 **Overridden from the default:** `""`
 
@@ -6686,7 +6644,7 @@ From //third_party/pigweed/src/pw_thread/backend.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_thread_stl:sleep"`
 
-From //.gn:71
+From //.gn:67
 
 **Overridden from the default:** `""`
 
@@ -7113,7 +7071,7 @@ Example value: "//build/images/recovery"
 
 **Current value (from the default):** `"//build/images/zedboot"`
 
-From //build/images/args.gni:169
+From //build/images/args.gni:164
 
 ### recovery_logo_path
 
@@ -8344,7 +8302,7 @@ exactly what you are doing.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:189
+From //build/images/args.gni:184
 
 ### use_blink
 
@@ -8648,19 +8606,19 @@ From //build/fuchsia/sdk.gni:8
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:113
+From //build/images/args.gni:108
 
 ### vbmeta_b_partition
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:114
+From //build/images/args.gni:109
 
 ### vbmeta_r_partition
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:115
+From //build/images/args.gni:110
 
 ### vboot_keys
 
@@ -8687,7 +8645,7 @@ is meant solely for developer debugging.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:174
+From //build/images/args.gni:169
 
 ### vim3_mcu_fan_default_level
 
@@ -8909,7 +8867,7 @@ doesn't require the FVM or SSH keys.
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:110
+From //build/images/args.gni:105
 
 ### zircon_asserts
 
@@ -8921,7 +8879,7 @@ From //build/config/fuchsia/BUILD.gn:150
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:111
+From //build/images/args.gni:106
 
 ### zircon_kernel_disable_asserts
 
@@ -8951,7 +8909,7 @@ From //build/config/zircon/levels.gni:22
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:112
+From //build/images/args.gni:107
 
 ### zircon_toolchain
 
