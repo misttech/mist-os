@@ -336,4 +336,21 @@ void DriverDevelopmentService::RemoveTestNode(RemoveTestNodeRequestView request,
   completer.ReplySuccess();
 }
 
+void DriverDevelopmentService::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_driver_development::DriverDevelopment> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  std::string method_type;
+  switch (metadata.unknown_method_type) {
+    case fidl::UnknownMethodType::kOneWay:
+      method_type = "one-way";
+      break;
+    case fidl::UnknownMethodType::kTwoWay:
+      method_type = "two-way";
+      break;
+  };
+
+  LOGF(WARNING, "DriverDevelopmentService received unknown %s method. Ordinal: %lu",
+       method_type.c_str(), metadata.method_ordinal);
+}
+
 }  // namespace driver_manager

@@ -42,6 +42,9 @@ class DriverDevelopmentService
   void AddTestNode(AddTestNodeRequestView request, AddTestNodeCompleter::Sync& completer) override;
   void RemoveTestNode(RemoveTestNodeRequestView request,
                       RemoveTestNodeCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_driver_development::DriverDevelopment> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
   dfv2::DriverRunner& driver_runner_;
   // A map of the test nodes that have been created.

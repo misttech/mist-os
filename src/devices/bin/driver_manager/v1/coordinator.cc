@@ -896,6 +896,23 @@ void Coordinator::RemoveTestNode(RemoveTestNodeRequestView request,
   completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
+void Coordinator::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_driver_development::DriverDevelopment> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  std::string method_type;
+  switch (metadata.unknown_method_type) {
+    case fidl::UnknownMethodType::kOneWay:
+      method_type = "one-way";
+      break;
+    case fidl::UnknownMethodType::kTwoWay:
+      method_type = "two-way";
+      break;
+  };
+
+  LOGF(WARNING, "Coordinator received unknown %s method. Ordinal: %lu", method_type.c_str(),
+       metadata.method_ordinal);
+}
+
 void Coordinator::ShutdownAllDrivers(fit::callback<void()> callback) {
   suspend_resume_manager().Suspend(
       suspend_resume_manager().GetSuspendFlagsFromSystemPowerState(shutdown_system_state()),

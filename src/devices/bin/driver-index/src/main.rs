@@ -163,6 +163,13 @@ async fn run_driver_development_server(
                         .or_else(ignore_peer_closed)
                         .context("error responding to Disable")?;
                 }
+                fdd::DriverIndexRequest::_UnknownMethod { ordinal, method_type, .. } => {
+                    tracing::warn!(
+                        "DriverIndexRequest::UnknownMethod {:?} with ordinal {}",
+                        method_type,
+                        ordinal
+                    );
+                }
             }
             Ok(())
         })
