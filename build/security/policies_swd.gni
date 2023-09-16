@@ -55,7 +55,6 @@ policies_swd = [
       "//src/sys/pkg/bin/pkg-resolver:enable_dynamic_configuration",
       "//src/sys/pkg/bin/pkg-resolver:persisted_repos_dir",
     ]
-    system_image_deps =
-        [ "//src/sys/pkg:pkgfs-disable-executability-restrictions" ]
+    system_image_deps = []
   },
 ]

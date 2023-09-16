@@ -235,6 +235,7 @@ eng_only_platform_aib_names =
 
       # SWD (Software Delivery)
       "system_update_checker",
+      "pkgfs_disable_executability_restrictions",
 
       # Testing Support
       "testing_support",

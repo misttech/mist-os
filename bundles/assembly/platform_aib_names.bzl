@@ -153,6 +153,7 @@ ENG_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_ENG_PLATFORM_AIB_NAMES + USERDEBUG_PL
     "minimal_eng",
     "networking_test_collection",
     "system_update_checker",
+    "pkgfs_disable_executability_restrictions",
     "testing_support",
     "ui_eng",
     "ui_eng.icu_default_{}".format(icu_flavors.default_git_commit),

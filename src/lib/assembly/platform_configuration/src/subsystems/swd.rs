@@ -174,6 +174,10 @@ impl SwdSubsystemConfig {
                 .context("Adding dynamic configuration config")?;
         }
 
+        if policy.disable_executability_restrictions {
+            builder.platform_bundle("pkgfs_disable_executability_restrictions");
+        }
+
         Ok(())
     }
 }

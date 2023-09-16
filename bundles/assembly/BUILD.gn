@@ -1760,6 +1760,11 @@ assembly_input_bundle("system_update_configurator") {
   ]
 }
 
+assembly_input_bundle("pkgfs_disable_executability_restrictions") {
+  system_packages =
+      [ "//src/sys/pkg/bin/pkg-cache:disable-executability-restrictions" ]
+}
+
 # AIB to enable virtualization support.
 #
 # optional: product must specify its inclusion

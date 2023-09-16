@@ -237,5 +237,8 @@ fuchsia_system_package("disable-executability-restrictions") {
     ":disable-executability-restrictions-resource",
     "//build/validate:non_production_tag",
   ]
-  visibility = [ "//src/sys/pkg:*" ]
+  visibility = [
+    "//bundles/assembly:*",
+    "//src/sys/pkg:*",
+  ]
 }
