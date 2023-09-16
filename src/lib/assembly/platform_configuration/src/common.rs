@@ -10,6 +10,7 @@ use tempfile::TempDir;
 
 use assembly_config_schema::platform_config::icu_config::{ICUMap, Revision, ICU_CONFIG_INFO};
 use assembly_config_schema::{BoardInformation, BuildType, FileEntry, ICUConfig};
+use assembly_named_file_map::NamedFileMap;
 use assembly_util::NamedMap;
 
 /// The platform's base service level.
@@ -317,7 +318,7 @@ pub struct PackageConfiguration {
     pub components: ComponentConfigs,
 
     /// A map of config data entries, keyed by the destination path.
-    pub config_data: NamedMap<FileEntry>,
+    pub config_data: NamedFileMap,
 
     /// The package name.
     pub name: String,
@@ -328,7 +329,7 @@ impl PackageConfiguration {
     pub fn new(name: impl AsRef<str>) -> Self {
         PackageConfiguration {
             components: ComponentConfigs::new("component configs"),
-            config_data: NamedMap::new("config data"),
+            config_data: NamedFileMap::new("config data"),
             name: name.as_ref().into(),
         }
     }
@@ -409,7 +410,7 @@ impl ConfigurationBuilder for ConfigurationBuilderImpl {
         self.package_configs.entry(name.to_string()).or_insert_with_key(|name| {
             PackageConfiguration {
                 components: ComponentConfigs::new("component configs"),
-                config_data: NamedMap::new("config data"),
+                config_data: NamedFileMap::new("config data"),
                 name: name.to_owned(),
             }
         })
@@ -491,7 +492,7 @@ impl PackageConfigBuilder for PackageConfiguration {
 
     fn config_data(&mut self, file_entry: FileEntry) -> Result<&mut dyn PackageConfigBuilder> {
         self.config_data
-            .try_insert_unique(file_entry.destination.clone(), file_entry)
+            .add_entry_as_blob(file_entry)
             .context("A config data destination can only be set once for a package")?;
         Ok(self)
     }
@@ -718,7 +719,11 @@ impl ConfigurationContext<'_> {
 mod tests {
     use super::*;
     use assembly_images_config::BoardFilesystemConfig;
+    use assembly_named_file_map::SourceMerklePair;
     use lazy_static::lazy_static;
+    use std::io::Write;
+    use tempfile::TempDir;
+    use utf8_path::path_relative_from_current_dir;
 
     lazy_static! {
         pub(crate) static ref BOARD_INFORMATION_FOR_TESTS: BoardInformation = BoardInformation {
@@ -734,8 +739,20 @@ mod tests {
     fn test_config_builder() {
         let mut builder = ConfigurationBuilderImpl::default();
 
+        let temp_dir = TempDir::new().unwrap();
+        let write_temp_file = |name: &str, contents: &str| -> Utf8PathBuf {
+            let p = Utf8PathBuf::from_path_buf(temp_dir.path().join(name)).unwrap();
+            let mut f = std::fs::File::create(&p).unwrap();
+            write!(&mut f, "{}", contents).unwrap();
+            p
+        };
+        let one = write_temp_file("config_data1", "one");
+        let two = write_temp_file("config_data2", "two");
+        let relative_one = path_relative_from_current_dir(&one).unwrap();
+        let relative_two = path_relative_from_current_dir(&two).unwrap();
+
         // using an inner
-        fn make_config(builder: &mut dyn ConfigurationBuilder) -> Result<()> {
+        let make_config = |builder: &mut dyn ConfigurationBuilder| -> Result<()> {
             builder.bootfs().component("some/bootfs_component")?.field("key", "value")?;
 
             builder
@@ -752,21 +769,18 @@ mod tests {
                 .field("key_b1", "value_b1")?
                 .field("key_b2", "value_b2")?;
 
-            builder.package("package_a").config_data(FileEntry {
-                destination: "config/one".into(),
-                source: "config_data1".into(),
-            })?;
-            builder.package("package_a").config_data(FileEntry {
-                destination: "config/two".into(),
-                source: "config_data2".into(),
-            })?;
-            builder.package("package_b").config_data(FileEntry {
-                destination: "config/one".into(),
-                source: "config_data1".into(),
-            })?;
+            builder
+                .package("package_a")
+                .config_data(FileEntry { destination: "config/one".into(), source: one.clone() })?;
+            builder
+                .package("package_a")
+                .config_data(FileEntry { destination: "config/two".into(), source: two.clone() })?;
+            builder
+                .package("package_b")
+                .config_data(FileEntry { destination: "config/one".into(), source: one.clone() })?;
 
             Ok(())
-        }
+        };
         assert!(make_config(&mut builder).is_ok());
         let config = builder.build();
 
@@ -810,25 +824,27 @@ mod tests {
                     ]
                     .into(),
                 },
-                config_data: NamedMap {
-                    name: "config data".into(),
-                    entries: [
-                        (
-                            "config/one".into(),
-                            FileEntry {
-                                destination: "config/one".into(),
-                                source: "config_data1".into(),
-                            }
-                        ),
-                        (
-                            "config/two".into(),
-                            FileEntry {
-                                destination: "config/two".into(),
-                                source: "config_data2".into(),
-                            }
-                        ),
-                    ]
-                    .into(),
+                config_data: NamedFileMap {
+                    map: NamedMap {
+                        name: "config data".into(),
+                        entries: [
+                            (
+                                "config/one".into(),
+                                SourceMerklePair {
+                                    merkle: Some("dc966c915497607d4b7fdfef3b57d03fd4583771f255837545d1c7319a992566".parse().unwrap()),
+                                    source: relative_one.clone(),
+                                }
+                            ),
+                            (
+                                "config/two".into(),
+                                SourceMerklePair {
+                                    merkle: Some("08a4e9e7edc4d4c049f045870d4bd809956a1a0e3e3846003fa19fdc2ea79fc4".parse().unwrap()),
+                                    source: relative_two.clone(),
+                                }
+                            ),
+                        ]
+                        .into(),
+                    },
                 },
             }
         );
@@ -854,16 +870,18 @@ mod tests {
                     )]
                     .into(),
                 },
-                config_data: NamedMap {
-                    name: "config data".into(),
-                    entries: [(
-                        "config/one".into(),
-                        FileEntry {
-                            destination: "config/one".into(),
-                            source: "config_data1".into(),
-                        }
-                    )]
-                    .into(),
+                config_data: NamedFileMap {
+                    map: NamedMap {
+                        name: "config data".into(),
+                        entries: [(
+                            "config/one".into(),
+                            SourceMerklePair {
+                                merkle: Some("dc966c915497607d4b7fdfef3b57d03fd4583771f255837545d1c7319a992566".parse().unwrap()),
+                                source: relative_one.clone(),
+                            }
+                        )]
+                        .into(),
+                    },
                 },
             }
         );
@@ -871,6 +889,7 @@ mod tests {
 
     #[test]
     fn test_multiple_adds_fail() {
+        let temp_dir = TempDir::new().unwrap();
         let mut builder = ConfigurationBuilderImpl::default();
 
         assert!(builder.bootfs().component("foo").is_ok());
@@ -885,17 +904,31 @@ mod tests {
         assert!(component.field("key2", "value2").is_ok());
         assert!(component.field("key2", "value2").is_err());
 
+        let write_temp_file = |name: &str, contents: &str| -> Utf8PathBuf {
+            let p = Utf8PathBuf::from_path_buf(temp_dir.path().join(name)).unwrap();
+            let mut f = std::fs::File::create(&p).unwrap();
+            write!(&mut f, "{}", contents).unwrap();
+            p
+        };
+        let baz = write_temp_file("baz", "baz");
+        let cat = write_temp_file("cat", "cat");
+        let diz = write_temp_file("diz", "diz");
+
         assert!(builder
             .package("foo")
-            .config_data(FileEntry { destination: "bar".into(), source: "baz".into() })
+            .config_data(FileEntry { destination: "bar".into(), source: baz })
             .is_ok());
         assert!(builder
             .package("foo")
-            .config_data(FileEntry { destination: "cat".into(), source: "baz".into() })
+            .config_data(FileEntry { destination: "cat".into(), source: cat.clone() })
             .is_ok());
         assert!(builder
             .package("foo")
-            .config_data(FileEntry { destination: "cat".into(), source: "diz".into() })
+            .config_data(FileEntry { destination: "cat".into(), source: cat })
+            .is_ok());
+        assert!(builder
+            .package("foo")
+            .config_data(FileEntry { destination: "cat".into(), source: diz })
             .is_err());
     }
 

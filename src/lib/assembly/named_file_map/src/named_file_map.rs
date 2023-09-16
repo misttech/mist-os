@@ -12,9 +12,11 @@ use serde::Serialize;
 use utf8_path::path_relative_from_current_dir;
 
 /// A paired source and optional merkle for a file.
-#[derive(Debug, Serialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct SourceMerklePair {
+    /// The source path.
     pub source: Utf8PathBuf,
+    /// The merkle of the file at the source path.
     pub merkle: Option<Hash>,
 }
 
@@ -37,9 +39,10 @@ fn relativize_entry(entry: FileEntry) -> Result<FileEntry> {
 }
 
 /// A named set of file entries, keyed by file destination.
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct NamedFileMap {
-    map: NamedMap<SourceMerklePair>,
+    /// Map from destination path to source path and merkle.
+    pub map: NamedMap<SourceMerklePair>,
 }
 
 impl NamedFileMap {

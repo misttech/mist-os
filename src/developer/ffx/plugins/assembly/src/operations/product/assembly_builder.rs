@@ -34,6 +34,8 @@ use fuchsia_url::UnpinnedAbsolutePackageUrl;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 
+const DEDUP_CONFIG_DATA: bool = false;
+
 #[derive(Debug, Serialize)]
 pub struct ImageAssemblyConfigBuilder {
     /// The base packages from the AssemblyInputBundles
@@ -491,18 +493,23 @@ impl ImageAssemblyConfigBuilder {
     /// Add an entry to `config_data` for the given package.  If the entry
     /// duplicates an existing entry, return an error.
     fn add_config_data_entry(&mut self, package: impl AsRef<str>, entry: FileEntry) -> Result<()> {
-        self.package_configs
+        let config_data = &mut self
+            .package_configs
             .entry(package.as_ref().into())
             .or_insert_with(|| PackageConfiguration::new(package.as_ref()))
-            .config_data
-            .try_insert_unique(entry.destination.clone(), entry)
-            .map_err(|dup| {
-                anyhow!(
-                    "duplicate config data file found for package: {}\n  error: {}",
-                    package.as_ref(),
-                    dup,
-                )
-            })
+            .config_data;
+        let result = if DEDUP_CONFIG_DATA {
+            config_data.add_entry_as_blob(entry)
+        } else {
+            config_data.add_entry(entry)
+        };
+        result.map_err(|dup| {
+            anyhow!(
+                "duplicate config data file found for package: {}\n  error: {}",
+                package.as_ref(),
+                dup,
+            )
+        })
     }
 
     fn add_shell_command_entry(
@@ -721,11 +728,11 @@ impl ImageAssemblyConfigBuilder {
         if !base.is_empty() || !cache.is_empty() || !system.is_empty() {
             let mut config_data_builder = ConfigDataBuilder::default();
             for (package_name, config) in &package_configs {
-                for (_, entry) in config.config_data.iter() {
+                for (destination, source_merkle_pair) in config.config_data.iter() {
                     config_data_builder.add_entry(
                         package_name,
-                        entry.destination.clone().into(),
-                        entry.source.clone(),
+                        destination.clone().into(),
+                        source_merkle_pair.source.clone(),
                     )?;
                 }
             }
@@ -799,6 +806,7 @@ mod tests {
         AdditionalPackageContents, MainPackageDefinition, ShellCommands,
     };
     use assembly_driver_manifest::DriverManifest;
+    use assembly_named_file_map::SourceMerklePair;
     use assembly_package_utils::PackageManifestPathBuf;
     use assembly_test_util::generate_test_manifest;
     use assembly_tool::testing::FakeToolProvider;
@@ -1128,16 +1136,18 @@ mod tests {
                 PackageConfiguration {
                     components: ComponentConfigs::new("component configs"),
                     name: vars.config_data_target_package_name.clone(),
-                    config_data: NamedMap {
-                        name: "config data".into(),
-                        entries: [(
-                            "dest/platform/configuration".into(),
-                            FileEntry {
-                                destination: "dest/platform/configuration".into(),
-                                source: vars.config_data_file_path,
-                            },
-                        )]
-                        .into(),
+                    config_data: NamedFileMap {
+                        map: NamedMap {
+                            name: "config data".into(),
+                            entries: [(
+                                "dest/platform/configuration".into(),
+                                SourceMerklePair {
+                                    merkle: None,
+                                    source: vars.config_data_file_path,
+                                },
+                            )]
+                            .into(),
+                        },
                     },
                 },
             )
@@ -1716,10 +1726,19 @@ mod tests {
         let mut first_aib = make_test_assembly_bundle(root, root);
         let mut second_aib = AssemblyInputBundle::default();
 
-        let config_data_file_entry = FileEntry {
-            source: "source/path/to/file".into(),
-            destination: "dest/file/path".into(),
-        };
+        // Write the config data files.
+        std::fs::create_dir(root.join("second")).unwrap();
+
+        let config = root.join("config_data");
+        let mut f = File::create(&config).unwrap();
+        write!(&mut f, "config_data").unwrap();
+
+        let config = root.join("second/config_data");
+        let mut f = File::create(&config).unwrap();
+        write!(&mut f, "config_data2").unwrap();
+
+        let config_data_file_entry =
+            FileEntry { source: "config_data".into(), destination: "dest/file/path".into() };
 
         first_aib.config_data.insert("base_package0".into(), vec![config_data_file_entry.clone()]);
         second_aib.config_data.insert("base_package0".into(), vec![config_data_file_entry]);
