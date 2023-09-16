@@ -3,11 +3,15 @@
 // found in the LICENSE file.
 
 use super::api;
+use super::api::Bootfs as _;
+use super::api::BootfsError;
 use super::api::System as _;
 use super::blob::BlobDirectoryError;
+use super::blob::BlobOpenError;
 use super::blob::BlobSet;
 use super::blob::CompositeBlobSet;
 use super::hash::Hash;
+use super::package::Error as PackageError;
 use super::package::Package;
 use super::product_bundle as pb;
 use super::system::Error as SystemError;
@@ -26,6 +30,18 @@ pub enum Error {
     System(#[from] SystemError),
     #[error("failed to construct bootfs from system's zbi: {0}")]
     Zbi(#[from] api::ZbiError),
+    #[error("failed to gather packages: {0}")]
+    Package(#[from] ProductBundlePackageError),
+    #[error("failed to gather packages from bootfs: {0}")]
+    BootfsPackages(#[from] BootfsError),
+}
+
+#[derive(Debug, Error)]
+pub enum ProductBundlePackageError {
+    #[error("failed to locate package blob: {0}")]
+    Locate(#[from] BlobOpenError),
+    #[error("failed to open package: {0}")]
+    Open(#[from] PackageError),
 }
 
 pub(crate) struct Scrutiny(Rc<ScrutinyData>);
@@ -41,11 +57,34 @@ impl Scrutiny {
 
         let system: System = System::new(product_bundle.clone(), variant)?;
 
+        let product_bundle_data_source = product_bundle.data_source();
+        let product_bundle_blob_set = product_bundle.blob_set()?;
+        let bootfs = system.zbi().bootfs()?;
         let blob_set: Box<dyn BlobSet> = Box::new(CompositeBlobSet::new([
-            product_bundle.blob_set()?,
-            Box::new(system.zbi().bootfs()?.clone()),
+            product_bundle_blob_set.clone(),
+            Box::new(bootfs.clone()),
         ]));
-        Ok(Self(Rc::new(ScrutinyData { product_bundle, blob_set, system })))
+
+        let packages = system
+            .update_package()
+            .packages()
+            .clone()
+            .into_iter()
+            .map(move |url| -> Result<_, ProductBundlePackageError> {
+                let meta_far_blob: Box<dyn api::Blob> =
+                    product_bundle_blob_set.blob(Box::new(Hash::from(url.hash())))?;
+                let package: Box<dyn api::Package> = Box::new(Package::new(
+                    Some(product_bundle_data_source.clone()),
+                    api::PackageResolverUrl::Package(AbsolutePackageUrl::from(url).into()),
+                    meta_far_blob,
+                    product_bundle_blob_set.clone(),
+                )?);
+                Ok(package)
+            })
+            .chain(bootfs.packages()?.map(Ok))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(Self(Rc::new(ScrutinyData { product_bundle, blob_set, packages, system })))
     }
 }
 
@@ -69,23 +108,8 @@ impl api::Scrutiny for Scrutiny {
     }
 
     #[tracing::instrument(level = "trace", skip_all)]
-    fn packages(
-        &self,
-    ) -> Box<dyn Iterator<Item = Result<Box<dyn api::Package>, api::ScrutinyPackagesError>>> {
-        let scrutiny_data = self.0.clone();
-        Box::new(scrutiny_data.system.update_package().packages().clone().into_iter().map(
-            move |url| {
-                let meta_far_blob: Box<dyn api::Blob> =
-                    scrutiny_data.blob_set.blob(Box::new(Hash::from(url.hash())))?;
-                let package: Box<dyn api::Package> = Box::new(Package::new(
-                    Some(scrutiny_data.product_bundle.data_source().clone()),
-                    api::PackageResolverUrl::Package(AbsolutePackageUrl::from(url).into()),
-                    meta_far_blob,
-                    scrutiny_data.blob_set.clone(),
-                )?);
-                Ok(package)
-            },
-        ))
+    fn packages(&self) -> Box<dyn Iterator<Item = Box<dyn api::Package>>> {
+        Box::new(self.0.packages.clone().into_iter())
     }
 
     fn package_resolvers(&self) -> Box<dyn Iterator<Item = Box<dyn api::PackageResolver>>> {
@@ -120,5 +144,6 @@ impl api::Scrutiny for Scrutiny {
 struct ScrutinyData {
     product_bundle: pb::ProductBundle,
     blob_set: Box<dyn BlobSet>,
+    packages: Vec<Box<dyn api::Package>>,
     system: System,
 }

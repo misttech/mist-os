@@ -7,7 +7,6 @@ use super::bootfs::AdditionalBootConfigurationError;
 use super::bootfs::BootfsPackageError;
 use super::bootfs::BootfsPackageIndexError;
 use super::bootfs::ComponentManagerConfigurationError;
-use super::package::Error as PackageError;
 use dyn_clone::clone_trait_object;
 use dyn_clone::DynClone;
 use fuchsia_url as furl;
@@ -76,8 +75,7 @@ pub trait Scrutiny {
     fn blobs(&self) -> Box<dyn Iterator<Item = Box<dyn Blob>>>;
 
     /// Iterate over all packages from all system data sources.
-    fn packages(&self)
-        -> Box<dyn Iterator<Item = Result<Box<dyn Package>, ScrutinyPackagesError>>>;
+    fn packages(&self) -> Box<dyn Iterator<Item = Box<dyn Package>>>;
 
     /// Iterate over all package resolvers in the system.
     fn package_resolvers(&self) -> Box<dyn Iterator<Item = Box<dyn PackageResolver>>>;
@@ -99,16 +97,6 @@ pub trait Scrutiny {
     fn component_instance_capabilities(
         &self,
     ) -> Box<dyn Iterator<Item = Box<dyn ComponentInstanceCapability>>>;
-}
-
-#[derive(Debug, Error)]
-pub enum ScrutinyPackagesError {
-    #[error("ambiguous package URL: {0}")]
-    Ambiguous(furl::UnpinnedAbsolutePackageUrl),
-    #[error("failed to locate package blob: {0}")]
-    Locate(#[from] BlobOpenError),
-    #[error("failed to open package: {0}")]
-    Open(#[from] PackageError),
 }
 
 /// High-level metadata about the system inspected by a [`Scrutiny`] instance.

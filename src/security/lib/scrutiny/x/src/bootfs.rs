@@ -45,14 +45,8 @@ const BOOTFS_PACKAGE_INDEX_PATH: &str = "data/bootfs_packages";
 #[derive(Clone)]
 pub(crate) struct Bootfs(Rc<BootfsData>);
 
-struct BootfsData {
-    data_source: ds::DataSource,
-    blobs_by_path: HashMap<Box<dyn api::Path>, VerifiedMemoryBlob>,
-    blobs_by_hash: HashMap<Box<dyn api::Hash>, VerifiedMemoryBlob>,
-}
-
 impl Bootfs {
-    pub(crate) fn new<
+    pub fn new<
         BlobsByPath: Clone + IntoIterator<Item = (Box<dyn api::Path>, VerifiedMemoryBlob)>,
     >(
         data_source: ds::DataSource,
@@ -165,6 +159,12 @@ impl BlobSet for Bootfs {
     fn data_sources(&self) -> Box<dyn Iterator<Item = Box<dyn api::DataSource>>> {
         Box::new([Box::new(self.0.data_source.clone()) as Box<dyn api::DataSource>].into_iter())
     }
+}
+
+struct BootfsData {
+    data_source: ds::DataSource,
+    blobs_by_path: HashMap<Box<dyn api::Path>, VerifiedMemoryBlob>,
+    blobs_by_hash: HashMap<Box<dyn api::Hash>, VerifiedMemoryBlob>,
 }
 
 #[derive(Debug, Error)]

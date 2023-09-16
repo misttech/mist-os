@@ -114,11 +114,10 @@ fn output_blobs(scrutiny: &dyn scrutiny::Scrutiny) {
 
 #[tracing::instrument(level = "trace", skip_all)]
 fn output_packages(scrutiny: &dyn scrutiny::Scrutiny) {
-    for package_result in scrutiny.packages() {
-        match package_result {
-            Ok(package) => output_package(package.as_ref()),
-            Err(error) => panic!("package error: {}", error),
-        }
+    for package in scrutiny.packages() {
+        output_package(package.as_ref());
+        // TODO: Expose `Package::data_source()` and expect at least one package from the product
+        // bundle, and at least one package from zbi/bootfs.
     }
 }
 
