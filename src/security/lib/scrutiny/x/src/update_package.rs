@@ -10,6 +10,7 @@ use super::data_source as ds;
 use super::data_source::DataSource;
 use super::package::Error as PackageError;
 use super::package::Package;
+use fuchsia_url::PackageUrl;
 use fuchsia_url::PinnedAbsolutePackageUrl;
 use std::io;
 use std::io::Read as _;
@@ -57,12 +58,8 @@ impl UpdatePackage {
     ) -> Result<Self, Error> {
         let update_package_blob = blob_set.blob(update_package_hash.clone())?;
 
-        let package = Package::new(
-            parent_data_source,
-            api::PackageResolverUrl::FuchsiaPkgUrl,
-            update_package_blob,
-            blob_set,
-        )?;
+        let package =
+            Package::new(parent_data_source, update_package_url(), update_package_blob, blob_set)?;
         let packages_json: Box<dyn api::Path> = Box::new("packages.json");
         let (_, packages_json_blob) = package
             .content_blobs()
@@ -120,6 +117,12 @@ impl api::UpdatePackage for UpdatePackage {
     fn packages(&self) -> &Vec<PinnedAbsolutePackageUrl> {
         &self.packages_json
     }
+}
+
+fn update_package_url() -> api::PackageResolverUrl {
+    api::PackageResolverUrl::Package(
+        PackageUrl::parse("update").expect("relative update package url"),
+    )
 }
 
 #[cfg(test)]

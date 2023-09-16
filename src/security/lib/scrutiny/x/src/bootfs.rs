@@ -13,6 +13,7 @@ use super::package::Package;
 use fidl::unpersist;
 use fidl::Error as FidlError;
 use fidl_fuchsia_component_internal as component_internal;
+use fuchsia_url::boot_url::BootUrl;
 use routing::config::RuntimeConfig;
 use scrutiny_utils::key_value::parse_key_value;
 use std::collections::HashMap;
@@ -118,7 +119,7 @@ impl api::Bootfs for Bootfs {
 
         let packages = pkg_index
             .iter()
-            .map(|(_name_and_variant, merkle)| {
+            .map(|(name_and_variant, merkle)| {
                 let pkg_path: Box<dyn api::Path> =
                     Box::new([format!("blob/{}", merkle)].iter().collect::<PathBuf>());
                 let meta_far = match self.0.blobs_by_path.get(&pkg_path) {
@@ -127,7 +128,10 @@ impl api::Bootfs for Bootfs {
                 }?;
                 let package = Package::new(
                     Some(self.0.data_source.clone()),
-                    api::PackageResolverUrl::FuchsiaBootUrl,
+                    api::PackageResolverUrl::Boot(
+                        BootUrl::new_path(format!("/{}", name_and_variant))
+                            .expect("fuchsia boot url from package name and variant"),
+                    ),
                     meta_far,
                     Box::new(self.clone()),
                 )

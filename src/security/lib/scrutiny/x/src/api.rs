@@ -10,8 +10,7 @@ use super::bootfs::ComponentManagerConfigurationError;
 use super::package::Error as PackageError;
 use dyn_clone::clone_trait_object;
 use dyn_clone::DynClone;
-use fuchsia_url::PinnedAbsolutePackageUrl;
-use fuchsia_url::UnpinnedAbsolutePackageUrl;
+use fuchsia_url as furl;
 use std::cmp;
 use std::collections::HashMap;
 use std::fmt;
@@ -105,7 +104,7 @@ pub trait Scrutiny {
 #[derive(Debug, Error)]
 pub enum ScrutinyPackagesError {
     #[error("ambiguous package URL: {0}")]
-    Ambiguous(UnpinnedAbsolutePackageUrl),
+    Ambiguous(furl::UnpinnedAbsolutePackageUrl),
     #[error("failed to locate package blob: {0}")]
     Locate(#[from] BlobOpenError),
     #[error("failed to open package: {0}")]
@@ -668,7 +667,7 @@ impl Debug for dyn MetaContents {
 
 pub trait UpdatePackage: Package {
     /// Returns a borrowed listing of package URLs described by this update package.
-    fn packages(&self) -> &Vec<PinnedAbsolutePackageUrl>;
+    fn packages(&self) -> &Vec<furl::PinnedAbsolutePackageUrl>;
 }
 
 clone_trait_object!(UpdatePackage);
@@ -690,10 +689,10 @@ pub trait PackageResolver {
 // for those URLs, and have each of these variants wrap a representation of a URL.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PackageResolverUrl {
-    /// A URL identifying a package in bootfs.
-    FuchsiaBootUrl,
-    /// A URL identifying a package in a repository.
-    FuchsiaPkgUrl,
+    // A URL identifying a package in bootfs.
+    Boot(furl::boot_url::BootUrl),
+    // A URL identifying a package in a repository.
+    Package(furl::PackageUrl),
 }
 
 /// Model for a Fuchsia component. Note that this model is of a component as described by a

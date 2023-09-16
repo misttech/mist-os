@@ -394,12 +394,39 @@ pub(crate) mod test {
     use fuchsia_pkg::MetaContents as FuchsiaMetaContents;
     use fuchsia_pkg::MetaPackage as FuchsiaMetaPackage;
     use fuchsia_pkg::PackageName;
+    use fuchsia_url::boot_url::BootUrl;
+    use fuchsia_url::PackageUrl;
     use maplit::btreemap;
     use maplit::hashmap;
     use std::io;
     use std::str::FromStr as _;
 
-    // Returns a pair (meta FAR hash, FAR bytes) for a placeholder package definition.
+    /// Returns the URL used for a placeholder package.
+    pub(crate) fn placeholder_package_url() -> api::PackageResolverUrl {
+        api::PackageResolverUrl::Package(
+            PackageUrl::parse("fuchsia-pkg://fuchsia.com/placeholder")
+                .expect("placeholder package url"),
+        )
+    }
+
+    /// Returns the URL used for a placeholder boot package.
+    pub(crate) fn placeholder_boot_package_url() -> api::PackageResolverUrl {
+        api::PackageResolverUrl::Boot(
+            BootUrl::parse("fuchsia-boot:///placeholder").expect("placeholder boot package url"),
+        )
+    }
+
+    /// Returns a placeholder [`super::Package`].
+    pub(crate) fn placeholder_package() -> Package {
+        placeholder_package_of_kind(PlaceholderUrlKind::Package)
+    }
+
+    /// Returns a placeholder boot [`super::Package`].
+    pub(crate) fn placeholder_boot_package() -> Package {
+        placeholder_package_of_kind(PlaceholderUrlKind::Boot)
+    }
+
+    /// Returns a pair (meta FAR hash, FAR bytes) for a placeholder package definition.
     pub(crate) fn placeholder_package_far() -> (Box<dyn api::Hash>, Vec<u8>) {
         let meta_package =
             FuchsiaMetaPackage::from_name(PackageName::from_str("placeholder").unwrap());
@@ -423,7 +450,7 @@ pub(crate) mod test {
         (meta_far_hash, far_bytes)
     }
 
-    pub(crate) fn placeholder_package() -> Package {
+    fn placeholder_package_of_kind(url_kind: PlaceholderUrlKind) -> Package {
         let data_source = ds::DataSource::new(ds::DataSourceInfo::new(
             api::DataSourceKind::BlobDirectory,
             None,
@@ -439,11 +466,19 @@ pub(crate) mod test {
 
         Package::new(
             Some(data_source),
-            api::PackageResolverUrl::FuchsiaPkgUrl,
+            match url_kind {
+                PlaceholderUrlKind::Package => placeholder_package_url(),
+                PlaceholderUrlKind::Boot => placeholder_boot_package_url(),
+            },
             meta_far_blob,
             Box::new(blob_set),
         )
         .unwrap()
+    }
+
+    enum PlaceholderUrlKind {
+        Package,
+        Boot,
     }
 }
 
@@ -457,6 +492,7 @@ mod tests {
     use super::super::blob::VerifiedMemoryBlob;
     use super::super::data_source as ds;
     use super::super::hash::Hash;
+    use super::test::placeholder_package_url;
     use super::Error;
     use super::MetaContents;
     use super::MetaPackage;
@@ -527,7 +563,7 @@ mod tests {
         // Construct package.
         let package = Package::new(
             Some(blob_set_data_source),
-            api::PackageResolverUrl::FuchsiaPkgUrl,
+            placeholder_package_url(),
             meta_far_blob,
             Box::new(blob_set),
         )
@@ -637,7 +673,7 @@ mod tests {
             VerifiedMemoryBlob::new([], bad_far_contents.clone()).expect("bad far blob");
         match Package::new(
             None,
-            api::PackageResolverUrl::FuchsiaPkgUrl,
+            placeholder_package_url(),
             Box::new(bad_far_blob),
             Box::new(VerifiedMemoryBlobSet::new([], iter::empty::<&[u8]>())),
         ) {
@@ -671,12 +707,8 @@ mod tests {
         let blob_set = VerifiedMemoryBlobSet::new([], iter::empty::<&[u8]>());
 
         // Attempt to construct package; expect FarError due to missing meta/package.
-        match Package::new(
-            None,
-            api::PackageResolverUrl::FuchsiaPkgUrl,
-            Box::new(far_blob),
-            Box::new(blob_set),
-        ) {
+        match Package::new(None, placeholder_package_url(), Box::new(far_blob), Box::new(blob_set))
+        {
             Err(Error::Far(_)) => {}
             Ok(_) => {
                 assert!(false, "Expected Error, but package initialization succeeded");
@@ -708,12 +740,8 @@ mod tests {
         let blob_set = VerifiedMemoryBlobSet::new([], iter::empty::<&[u8]>());
 
         // Attempt to construct package; expect FarError due to missing meta/package.
-        match Package::new(
-            None,
-            api::PackageResolverUrl::FuchsiaPkgUrl,
-            Box::new(far_blob),
-            Box::new(blob_set),
-        ) {
+        match Package::new(None, placeholder_package_url(), Box::new(far_blob), Box::new(blob_set))
+        {
             Err(Error::Far(_)) => {}
             Ok(_) => {
                 assert!(false, "Expected Error, but package initialization succeeded");
@@ -769,12 +797,8 @@ mod tests {
         // Attempt to construct package. This will construct content blobs that store their metadata
         // such as their data source. Locating the content blob that is missing from `blob_set`
         // should fail.
-        match Package::new(
-            None,
-            api::PackageResolverUrl::FuchsiaPkgUrl,
-            Box::new(far_blob),
-            Box::new(blob_set),
-        ) {
+        match Package::new(None, placeholder_package_url(), Box::new(far_blob), Box::new(blob_set))
+        {
             Err(Error::MissingContent(BlobOpenError::BlobNotFound { hash, directory })) => {
                 assert_eq!(content_blob_hash.as_ref(), hash.as_ref());
                 assert_eq!(None, directory);

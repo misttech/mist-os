@@ -12,6 +12,7 @@ use super::package::Package;
 use super::product_bundle as pb;
 use super::system::Error as SystemError;
 use super::system::System;
+use fuchsia_url::AbsolutePackageUrl;
 use std::rc::Rc;
 use thiserror::Error;
 
@@ -78,7 +79,7 @@ impl api::Scrutiny for Scrutiny {
                     scrutiny_data.blob_set.blob(Box::new(Hash::from(url.hash())))?;
                 let package: Box<dyn api::Package> = Box::new(Package::new(
                     Some(scrutiny_data.product_bundle.data_source().clone()),
-                    api::PackageResolverUrl::FuchsiaPkgUrl,
+                    api::PackageResolverUrl::Package(AbsolutePackageUrl::from(url).into()),
                     meta_far_blob,
                     scrutiny_data.blob_set.clone(),
                 )?);
