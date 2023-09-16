@@ -192,6 +192,9 @@ private:
 
 class SynchronousPrimitiveProtocolClient {
 public:
+    using Proto = synchronous_primitive_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_SYNCHRONOUS_PRIMITIVE;
+
     SynchronousPrimitiveProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     SynchronousPrimitiveProtocolClient(const synchronous_primitive_protocol_t* proto)
@@ -377,6 +380,9 @@ private:
 
 class AsyncPrimitiveProtocolClient {
 public:
+    using Proto = async_primitive_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_ASYNC_PRIMITIVE;
+
     AsyncPrimitiveProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     AsyncPrimitiveProtocolClient(const async_primitive_protocol_t* proto)

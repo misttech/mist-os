@@ -224,6 +224,9 @@ private:
 
 class BakerProtocolClient {
 public:
+    using Proto = baker_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_BAKER;
+
     BakerProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     BakerProtocolClient(const baker_protocol_t* proto)

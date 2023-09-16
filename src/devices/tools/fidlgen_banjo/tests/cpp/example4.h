@@ -75,6 +75,9 @@ private:
 
 class InterfaceProtocolClient {
 public:
+    using Proto = interface_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_INTERFACE;
+
     InterfaceProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     InterfaceProtocolClient(const interface_protocol_t* proto)

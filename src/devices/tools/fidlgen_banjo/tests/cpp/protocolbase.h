@@ -164,6 +164,9 @@ private:
 
 class SynchronousBaseProtocolClient {
 public:
+    using Proto = synchronous_base_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_SYNCHRONOUS_BASE;
+
     SynchronousBaseProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     SynchronousBaseProtocolClient(const synchronous_base_protocol_t* proto)
@@ -286,6 +289,9 @@ private:
 
 class DriverTransportProtocolClient {
 public:
+    using Proto = driver_transport_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_DRIVER_TRANSPORT;
+
     DriverTransportProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     DriverTransportProtocolClient(const driver_transport_protocol_t* proto)
@@ -407,6 +413,9 @@ private:
 
 class AsyncBaseProtocolClient {
 public:
+    using Proto = async_base_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_ASYNC_BASE;
+
     AsyncBaseProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     AsyncBaseProtocolClient(const async_base_protocol_t* proto)

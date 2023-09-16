@@ -237,6 +237,9 @@ private:
 
 class ArrayofArraysProtocolClient {
 public:
+    using Proto = arrayof_arrays_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_ARRAYOF_ARRAYS;
+
     ArrayofArraysProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     ArrayofArraysProtocolClient(const arrayof_arrays_protocol_t* proto)
@@ -430,6 +433,9 @@ private:
 
 class ArrayProtocolClient {
 public:
+    using Proto = array_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_ARRAY;
+
     ArrayProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     ArrayProtocolClient(const array_protocol_t* proto)
@@ -623,6 +629,9 @@ private:
 
 class Array2ProtocolClient {
 public:
+    using Proto = array2_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_ARRAY2;
+
     Array2ProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     Array2ProtocolClient(const array2_protocol_t* proto)

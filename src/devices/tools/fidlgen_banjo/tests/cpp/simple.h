@@ -96,6 +96,9 @@ private:
 
 class DrawingProtocolClient {
 public:
+    using Proto = drawing_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_DRAWING;
+
     DrawingProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     DrawingProtocolClient(const drawing_protocol_t* proto)

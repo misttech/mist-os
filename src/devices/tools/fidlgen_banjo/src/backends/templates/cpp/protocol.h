@@ -16,6 +16,9 @@ private:
 
 class {protocol_name}ProtocolClient {{
 public:
+    using Proto = {protocol_name_snake}_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_{protocol_name_uppercase};
+
     {protocol_name}ProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {{}}
     {protocol_name}ProtocolClient(const {protocol_name_snake}_protocol_t* proto)

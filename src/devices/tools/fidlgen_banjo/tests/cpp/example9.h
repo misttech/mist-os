@@ -114,6 +114,9 @@ private:
 
 class EchoProtocolClient {
 public:
+    using Proto = echo_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_ECHO;
+
     EchoProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     EchoProtocolClient(const echo_protocol_t* proto)

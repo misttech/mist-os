@@ -243,6 +243,9 @@ private:
 
 class OtherTypesReferenceProtocolClient {
 public:
+    using Proto = other_types_reference_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_OTHER_TYPES_REFERENCE;
+
     OtherTypesReferenceProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     OtherTypesReferenceProtocolClient(const other_types_reference_protocol_t* proto)
@@ -395,6 +398,9 @@ private:
 
 class OtherTypesProtocolClient {
 public:
+    using Proto = other_types_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_OTHER_TYPES;
+
     OtherTypesProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     OtherTypesProtocolClient(const other_types_protocol_t* proto)
@@ -552,6 +558,9 @@ private:
 
 class OtherTypesAsyncProtocolClient {
 public:
+    using Proto = other_types_async_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_OTHER_TYPES_ASYNC;
+
     OtherTypesAsyncProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     OtherTypesAsyncProtocolClient(const other_types_async_protocol_t* proto)
@@ -697,6 +706,9 @@ private:
 
 class OtherTypesAsyncReferenceProtocolClient {
 public:
+    using Proto = other_types_async_reference_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_OTHER_TYPES_ASYNC_REFERENCE;
+
     OtherTypesAsyncReferenceProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     OtherTypesAsyncReferenceProtocolClient(const other_types_async_reference_protocol_t* proto)
@@ -830,6 +842,9 @@ private:
 
 class InterfaceProtocolClient {
 public:
+    using Proto = interface_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_INTERFACE;
+
     InterfaceProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     InterfaceProtocolClient(const interface_protocol_t* proto)

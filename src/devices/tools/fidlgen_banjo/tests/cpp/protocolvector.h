@@ -237,6 +237,9 @@ private:
 
 class VectorOfVectorsProtocolClient {
 public:
+    using Proto = vector_of_vectors_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_VECTOR_OF_VECTORS;
+
     VectorOfVectorsProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     VectorOfVectorsProtocolClient(const vector_of_vectors_protocol_t* proto)
@@ -430,6 +433,9 @@ private:
 
 class VectorProtocolClient {
 public:
+    using Proto = vector_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_VECTOR;
+
     VectorProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     VectorProtocolClient(const vector_protocol_t* proto)
@@ -623,6 +629,9 @@ private:
 
 class Vector2ProtocolClient {
 public:
+    using Proto = vector2_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_VECTOR2;
+
     Vector2ProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     Vector2ProtocolClient(const vector2_protocol_t* proto)

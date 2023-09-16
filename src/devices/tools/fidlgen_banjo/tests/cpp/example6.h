@@ -75,6 +75,9 @@ private:
 
 class HelloProtocolClient {
 public:
+    using Proto = hello_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_HELLO;
+
     HelloProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     HelloProtocolClient(const hello_protocol_t* proto)

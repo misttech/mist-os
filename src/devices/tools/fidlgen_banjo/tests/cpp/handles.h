@@ -82,6 +82,9 @@ private:
 
 class DoerProtocolClient {
 public:
+    using Proto = doer_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_DOER;
+
     DoerProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     DoerProtocolClient(const doer_protocol_t* proto)

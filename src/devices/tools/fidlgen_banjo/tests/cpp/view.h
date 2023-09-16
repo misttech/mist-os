@@ -76,6 +76,9 @@ private:
 
 class ViewProtocolClient {
 public:
+    using Proto = view_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_VIEW;
+
     ViewProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     ViewProtocolClient(const view_protocol_t* proto)

@@ -307,6 +307,9 @@ private:
 
 class ApiProtocolClient {
 public:
+    using Proto = api_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_API;
+
     ApiProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     ApiProtocolClient(const api_protocol_t* proto)

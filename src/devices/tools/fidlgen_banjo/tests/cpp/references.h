@@ -87,6 +87,9 @@ private:
 
 class InOutProtocolProtocolClient {
 public:
+    using Proto = in_out_protocol_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_IN_OUT_PROTOCOL;
+
     InOutProtocolProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     InOutProtocolProtocolClient(const in_out_protocol_protocol_t* proto)

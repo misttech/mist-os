@@ -83,6 +83,9 @@ private:
 
 class ActionProtocolProtocolClient {
 public:
+    using Proto = action_protocol_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_ACTION_PROTOCOL;
+
     ActionProtocolProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     ActionProtocolProtocolClient(const action_protocol_protocol_t* proto)

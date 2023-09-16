@@ -75,6 +75,9 @@ private:
 
 class SomeMethodsProtocolClient {
 public:
+    using Proto = some_methods_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_SOME_METHODS;
+
     SomeMethodsProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     SomeMethodsProtocolClient(const some_methods_protocol_t* proto)

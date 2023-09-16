@@ -340,6 +340,9 @@ private:
 
 class SynchronousHandleProtocolClient {
 public:
+    using Proto = synchronous_handle_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_SYNCHRONOUS_HANDLE;
+
     SynchronousHandleProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     SynchronousHandleProtocolClient(const synchronous_handle_protocol_t* proto)
@@ -573,6 +576,9 @@ private:
 
 class AsyncHandleProtocolClient {
 public:
+    using Proto = async_handle_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_ASYNC_HANDLE;
+
     AsyncHandleProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     AsyncHandleProtocolClient(const async_handle_protocol_t* proto)
@@ -746,6 +752,9 @@ private:
 
 class AnotherSynchronousHandleProtocolClient {
 public:
+    using Proto = another_synchronous_handle_protocol_t;
+    static constexpr uint32_t kProtocolId = ZX_PROTOCOL_ANOTHER_SYNCHRONOUS_HANDLE;
+
     AnotherSynchronousHandleProtocolClient()
         : ops_(nullptr), ctx_(nullptr) {}
     AnotherSynchronousHandleProtocolClient(const another_synchronous_handle_protocol_t* proto)
