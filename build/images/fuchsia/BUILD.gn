@@ -13,8 +13,6 @@ import("//build/images/vboot/vboot.gni")
 import("//build/product.gni")
 import("//build/sdk/product_bundle.gni")
 import("//build/security.gni")
-import("//build/security/policies.gni")
-import("//build/security/policies_swd.gni")
 import("//build/testing/host_test_data.gni")
 import("//src/security/bin/scrutiny_x_smoke_test/scrutiny_x_smoke_test.gni")
 import("//src/sys/core/build/core.gni")
@@ -156,15 +154,6 @@ if (is_fuchsia) {
 
     # Include the product-defined meta package labels.
     meta_packages = meta_package_labels
-
-    # Add the base package labels for the selected SWD policy.
-    if (defined(policy_labels.swd)) {
-      foreach(policy, policies_swd) {
-        if (policy.name == policy_labels.swd) {
-          base_packages += policy.base_package_deps
-        }
-      }
-    }
 
     base_driver_packages = [
       "//:developer_base_driver_packages",

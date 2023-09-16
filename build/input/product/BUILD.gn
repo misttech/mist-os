@@ -4,8 +4,6 @@
 
 import("//build/product.gni")
 import("//build/security.gni")
-import("//build/security/policies.gni")
-import("//build/security/policies_swd.gni")
 
 if (is_host) {
   group("host") {
@@ -38,12 +36,5 @@ if (is_host) {
   group("system_image_deps") {
     testonly = fuchsia_zbi_testonly
     deps = product_system_image_deps
-    if (defined(policy_labels.swd)) {
-      foreach(policy, policies_swd) {
-        if (policy.name == policy_labels.swd) {
-          deps += policy.system_image_deps
-        }
-      }
-    }
   }
 }

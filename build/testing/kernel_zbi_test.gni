@@ -18,7 +18,6 @@ cuckoo_kernel_zbi_test_params = {
     "network",
     "debug",
     "test",
-    "swd_policy.unrestricted",
   ]
 }
 
