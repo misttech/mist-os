@@ -6,6 +6,7 @@
 #define SRC_DEVICES_USB_DRIVERS_DWC2_DWC2_H_
 
 #include <fidl/fuchsia.hardware.usb.dci/cpp/fidl.h>
+#include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/usb/dci/cpp/banjo.h>
 #include <fuchsia/hardware/usb/phy/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>

@@ -46,6 +46,9 @@ zx_status_t FragmentProxy::DdkGetProtocol(uint32_t proto_id, void* out) {
     case ZX_PROTOCOL_GPIO:
       proto->ops = &gpio_protocol_ops_;
       return ZX_OK;
+    case ZX_PROTOCOL_PDEV:
+      proto->ops = &pdev_protocol_ops_;
+      return ZX_OK;
     case ZX_PROTOCOL_SPI:
       proto->ops = &spi_protocol_ops_;
       return ZX_OK;
@@ -234,6 +237,95 @@ zx_status_t FragmentProxy::GpioWrite(uint8_t value) {
   req.value = value;
 
   return Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
+}
+
+zx_status_t FragmentProxy::PDevGetMmio(uint32_t index, pdev_mmio_t* out_mmio) {
+  PdevProxyRequest req = {};
+  PdevProxyResponse resp = {};
+  req.header.proto_id = ZX_PROTOCOL_PDEV;
+  req.op = PdevOp::GET_MMIO;
+  req.index = index;
+
+  auto status = Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp), nullptr, 0,
+                    &out_mmio->vmo, 1, nullptr);
+  if (status == ZX_OK) {
+    out_mmio->offset = resp.offset;
+    out_mmio->size = resp.size;
+  }
+  return status;
+}
+
+zx_status_t FragmentProxy::PDevGetInterrupt(uint32_t index, uint32_t flags,
+                                            zx::interrupt* out_irq) {
+  PdevProxyRequest req = {};
+  PdevProxyResponse resp = {};
+  req.header.proto_id = ZX_PROTOCOL_PDEV;
+  req.op = PdevOp::GET_INTERRUPT;
+  req.index = index;
+  req.flags = flags;
+
+  return Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp), nullptr, 0,
+             out_irq->reset_and_get_address(), 1, nullptr);
+}
+
+zx_status_t FragmentProxy::PDevGetBti(uint32_t index, zx::bti* out_bti) {
+  PdevProxyRequest req = {};
+  PdevProxyResponse resp = {};
+  req.header.proto_id = ZX_PROTOCOL_PDEV;
+  req.op = PdevOp::GET_BTI;
+  req.index = index;
+
+  return Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp), nullptr, 0,
+             out_bti->reset_and_get_address(), 1, nullptr);
+}
+
+zx_status_t FragmentProxy::PDevGetSmc(uint32_t index, zx::resource* out_resource) {
+  PdevProxyRequest req = {};
+  PdevProxyResponse resp = {};
+  req.header.proto_id = ZX_PROTOCOL_PDEV;
+  req.op = PdevOp::GET_SMC;
+  req.index = index;
+
+  return Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp), nullptr, 0,
+             out_resource->reset_and_get_address(), 1, nullptr);
+}
+
+zx_status_t FragmentProxy::PDevGetDeviceInfo(pdev_device_info_t* out_info) {
+  PdevProxyRequest req = {};
+  PdevProxyResponse resp = {};
+  req.header.proto_id = ZX_PROTOCOL_PDEV;
+  req.op = PdevOp::GET_DEVICE_INFO;
+
+  auto status = Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
+  if (status != ZX_OK) {
+    return status;
+  }
+  memcpy(out_info, &resp.device_info, sizeof(*out_info));
+  return ZX_OK;
+}
+
+zx_status_t FragmentProxy::PDevGetBoardInfo(pdev_board_info_t* out_info) {
+  PdevProxyRequest req = {};
+  PdevProxyResponse resp = {};
+  req.header.proto_id = ZX_PROTOCOL_PDEV;
+  req.op = PdevOp::GET_BOARD_INFO;
+
+  auto status = Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
+  if (status != ZX_OK) {
+    return status;
+  }
+  memcpy(out_info, &resp.board_info, sizeof(*out_info));
+  return ZX_OK;
+}
+
+zx_status_t FragmentProxy::PDevDeviceAdd(uint32_t index, const device_add_args_t* args,
+                                         zx_device_t** device) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
+zx_status_t FragmentProxy::PDevGetProtocol(uint32_t proto_id, uint32_t index, void* out_protocol,
+                                           size_t protocol_size, size_t* protocol_actual) {
+  return ZX_ERR_NOT_SUPPORTED;
 }
 
 zx_status_t FragmentProxy::SpiTransmit(const uint8_t* txdata_list, size_t txdata_count) {

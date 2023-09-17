@@ -184,8 +184,423 @@ zx_status_t PlatformDevice::Init() {
   return ZX_OK;
 }
 
+zx_status_t PlatformDevice::PDevGetMmio(uint32_t index, pdev_mmio_t* out_mmio) {
+  if (node_.mmio() == std::nullopt || index >= node_.mmio()->size()) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+
+  const auto& mmio = node_.mmio().value()[index];
+  if (unlikely(!IsValid(mmio))) {
+    return ZX_ERR_INTERNAL;
+  }
+  if (mmio.base() == std::nullopt) {
+    return ZX_ERR_NOT_FOUND;
+  }
+  const zx_paddr_t vmo_base = ZX_ROUNDDOWN(mmio.base().value(), ZX_PAGE_SIZE);
+  const size_t vmo_size =
+      ZX_ROUNDUP(mmio.base().value() + mmio.length().value() - vmo_base, ZX_PAGE_SIZE);
+  zx::vmo vmo;
+
+  zx_status_t status = zx::vmo::create_physical(*bus_->GetResource(), vmo_base, vmo_size, &vmo);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: creating vmo failed %d", __FUNCTION__, status);
+    return status;
+  }
+
+  char name[32];
+  snprintf(name, sizeof(name), "mmio %u", index);
+  status = vmo.set_property(ZX_PROP_NAME, name, sizeof(name));
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: setting vmo name failed %d", __FUNCTION__, status);
+    return status;
+  }
+
+  out_mmio->offset = mmio.base().value() - vmo_base;
+  out_mmio->vmo = vmo.release();
+  out_mmio->size = mmio.length().value();
+  return ZX_OK;
+}
+
+zx_status_t PlatformDevice::PDevGetInterrupt(uint32_t index, uint32_t flags,
+                                             zx::interrupt* out_irq) {
+  if (node_.irq() == std::nullopt || index >= node_.irq()->size()) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+  if (out_irq == nullptr) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  const auto& irq = node_.irq().value()[index];
+  if (unlikely(!IsValid(irq))) {
+    return ZX_ERR_INTERNAL;
+  }
+  if (flags == 0) {
+    flags = irq.mode().value();
+  }
+  zx_status_t status =
+      zx::interrupt::create(*bus_->GetResource(), irq.irq().value(), flags, out_irq);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "platform_dev_map_interrupt: zx_interrupt_create failed %d", status);
+    return status;
+  }
+  return status;
+}
+
+zx_status_t PlatformDevice::PDevGetBti(uint32_t index, zx::bti* out_bti) {
+  if (node_.bti() == std::nullopt || index >= node_.bti()->size()) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+  if (out_bti == nullptr) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  const auto& bti = node_.bti().value()[index];
+  if (unlikely(!IsValid(bti))) {
+    return ZX_ERR_INTERNAL;
+  }
+
+  return bus_->IommuGetBti(bti.iommu_index().value(), bti.bti_id().value(), out_bti);
+}
+
+zx_status_t PlatformDevice::PDevGetSmc(uint32_t index, zx::resource* out_resource) {
+  if (node_.smc() == std::nullopt || index >= node_.smc()->size()) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+  if (out_resource == nullptr) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  const auto& smc = node_.smc().value()[index];
+  if (unlikely(!IsValid(smc))) {
+    return ZX_ERR_INTERNAL;
+  }
+
+  uint32_t options = ZX_RSRC_KIND_SMC;
+  if (smc.exclusive().value())
+    options |= ZX_RSRC_FLAG_EXCLUSIVE;
+  char rsrc_name[ZX_MAX_NAME_LEN];
+  snprintf(rsrc_name, ZX_MAX_NAME_LEN - 1, "%s.pbus[%u]", name_, index);
+  return zx::resource::create(*bus_->GetResource(), options, smc.service_call_num_base().value(),
+                              smc.count().value(), rsrc_name, sizeof(rsrc_name), out_resource);
+}
+
+zx_status_t PlatformDevice::PDevGetDeviceInfo(pdev_device_info_t* out_info) {
+  pdev_device_info_t info = {
+      .vid = vid_,
+      .pid = pid_,
+      .did = did_,
+      .mmio_count = static_cast<uint32_t>(node_.mmio().has_value() ? node_.mmio()->size() : 0),
+      .irq_count = static_cast<uint32_t>(node_.irq().has_value() ? node_.irq()->size() : 0),
+      .bti_count = static_cast<uint32_t>(node_.bti().has_value() ? node_.bti()->size() : 0),
+      .smc_count = static_cast<uint32_t>(node_.smc().has_value() ? node_.smc()->size() : 0),
+      .metadata_count =
+          static_cast<uint32_t>(node_.metadata().has_value() ? node_.metadata()->size() : 0),
+      .reserved = {},
+      .name = {},
+  };
+  static_assert(sizeof(info.name) == sizeof(name_), "");
+  memcpy(info.name, name_, sizeof(out_info->name));
+  memcpy(out_info, &info, sizeof(info));
+
+  return ZX_OK;
+}
+
+zx_status_t PlatformDevice::PDevGetBoardInfo(pdev_board_info_t* out_info) {
+  auto info = bus_->board_info();
+  out_info->pid = info.pid();
+  out_info->vid = info.vid();
+  out_info->board_revision = info.board_revision();
+  strlcpy(out_info->board_name, info.board_name().data(), sizeof(out_info->board_name));
+  return ZX_OK;
+}
+
+zx_status_t PlatformDevice::PDevDeviceAdd(uint32_t index, const device_add_args_t* args,
+                                          zx_device_t** device) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
+// Create a resource and pass it back to the proxy along with necessary metadata
+// to create/map the VMO in the driver process.
+zx_status_t PlatformDevice::RpcGetMmio(uint32_t index, zx_paddr_t* out_paddr, size_t* out_length,
+                                       zx_handle_t* out_handle, uint32_t* out_handle_count) {
+  if (node_.mmio() == std::nullopt || index >= node_.mmio()->size()) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+  const auto& root_rsrc = bus_->GetResource();
+  if (!root_rsrc->is_valid()) {
+    return ZX_ERR_NO_RESOURCES;
+  }
+
+  const auto& mmio = node_.mmio().value()[index];
+  if (unlikely(!IsValid(mmio))) {
+    return ZX_ERR_INTERNAL;
+  }
+  zx::resource resource;
+  char rsrc_name[ZX_MAX_NAME_LEN];
+  snprintf(rsrc_name, ZX_MAX_NAME_LEN - 1, "%s.pbus[%u]", name_, index);
+  zx_status_t status =
+      zx::resource::create(*root_rsrc, ZX_RSRC_KIND_MMIO, mmio.base().value(),
+                           mmio.length().value(), rsrc_name, sizeof(rsrc_name), &resource);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: pdev_rpc_get_mmio: zx_resource_create failed: %d", name_, status);
+    return status;
+  }
+
+  *out_paddr = mmio.base().value();
+  *out_length = mmio.length().value();
+  *out_handle_count = 1;
+  *out_handle = resource.release();
+  return ZX_OK;
+}
+
+// Create a resource and pass it back to the proxy along with necessary metadata
+// to create the IRQ in the driver process.
+zx_status_t PlatformDevice::RpcGetInterrupt(uint32_t index, uint32_t* out_irq, uint32_t* out_mode,
+                                            zx_handle_t* out_handle, uint32_t* out_handle_count) {
+  if (node_.irq() == std::nullopt || index >= node_.irq()->size()) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+
+  const auto& root_rsrc = bus_->GetResource();
+  if (!root_rsrc->is_valid()) {
+    return ZX_ERR_NO_RESOURCES;
+  }
+
+  zx::resource resource;
+  const auto& irq = node_.irq().value()[index];
+  if (unlikely(!IsValid(irq))) {
+    return ZX_ERR_INTERNAL;
+  }
+  uint32_t options = ZX_RSRC_KIND_IRQ | ZX_RSRC_FLAG_EXCLUSIVE;
+  char rsrc_name[ZX_MAX_NAME_LEN];
+  snprintf(rsrc_name, ZX_MAX_NAME_LEN - 1, "%s.pbus[%u]", name_, index);
+  zx_status_t status = zx::resource::create(*root_rsrc, options, irq.irq().value(), 1, rsrc_name,
+                                            sizeof(rsrc_name), &resource);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  *out_irq = irq.irq().value();
+  *out_mode = irq.mode().value();
+  *out_handle_count = 1;
+  *out_handle = resource.release();
+  return ZX_OK;
+}
+
+zx_status_t PlatformDevice::RpcGetBti(uint32_t index, zx_handle_t* out_handle,
+                                      uint32_t* out_handle_count) {
+  if (node_.bti() == std::nullopt || index >= node_.bti()->size()) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+
+  const auto& bti = node_.bti().value()[index];
+  if (unlikely(!IsValid(bti))) {
+    return ZX_ERR_INTERNAL;
+  }
+
+  zx::bti out_bti;
+  zx_status_t status = bus_->IommuGetBti(bti.iommu_index().value(), bti.bti_id().value(), &out_bti);
+  *out_handle = out_bti.release();
+
+  if (status == ZX_OK) {
+    *out_handle_count = 1;
+  }
+
+  return status;
+}
+
+zx_status_t PlatformDevice::RpcGetSmc(uint32_t index, zx_handle_t* out_handle,
+                                      uint32_t* out_handle_count) {
+  if (node_.smc() == std::nullopt || index >= node_.smc()->size()) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+
+  const auto& root_rsrc = bus_->GetResource();
+  if (!root_rsrc->is_valid()) {
+    return ZX_ERR_NO_RESOURCES;
+  }
+
+  zx::resource resource;
+  const auto& smc = node_.smc().value()[index];
+  if (unlikely(!IsValid(smc))) {
+    return ZX_ERR_INTERNAL;
+  }
+  uint32_t options = ZX_RSRC_KIND_SMC;
+  if (smc.exclusive().value())
+    options |= ZX_RSRC_FLAG_EXCLUSIVE;
+  char rsrc_name[ZX_MAX_NAME_LEN];
+  snprintf(rsrc_name, ZX_MAX_NAME_LEN - 1, "%s.pbus[%u]", name_, index);
+  zx_status_t status =
+      zx::resource::create(*root_rsrc, options, smc.service_call_num_base().value(),
+                           smc.count().value(), rsrc_name, sizeof(rsrc_name), &resource);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: pdev_rpc_get_smc: zx_resource_create failed: %d", name_, status);
+    return status;
+  }
+
+  *out_handle_count = 1;
+  *out_handle = resource.release();
+  return ZX_OK;
+}
+
+zx_status_t PlatformDevice::RpcGetDeviceInfo(pdev_device_info_t* out_info) {
+  pdev_device_info_t info = {
+      .vid = vid_,
+      .pid = pid_,
+      .did = did_,
+      .mmio_count = static_cast<uint32_t>(node_.mmio().has_value() ? node_.mmio()->size() : 0),
+      .irq_count = static_cast<uint32_t>(node_.irq().has_value() ? node_.irq()->size() : 0),
+      .bti_count = static_cast<uint32_t>(node_.bti().has_value() ? node_.bti()->size() : 0),
+      .smc_count = static_cast<uint32_t>(node_.smc().has_value() ? node_.smc()->size() : 0),
+      .metadata_count =
+          static_cast<uint32_t>(node_.metadata().has_value() ? node_.metadata()->size() : 0),
+
+      .reserved = {},
+      .name = {},
+  };
+  static_assert(sizeof(info.name) == sizeof(name_), "");
+  memcpy(info.name, name_, sizeof(out_info->name));
+  memcpy(out_info, &info, sizeof(info));
+
+  return ZX_OK;
+}
+
+zx_status_t PlatformDevice::RpcGetMetadata(uint32_t index, uint32_t* out_type, uint8_t* buf,
+                                           uint32_t buf_size, uint32_t* actual) {
+  size_t normal_metadata = (node_.metadata() == std::nullopt ? 0 : node_.metadata()->size());
+  size_t max_metadata =
+      normal_metadata + (node_.boot_metadata() == std::nullopt ? 0 : node_.boot_metadata()->size());
+  if (index >= max_metadata) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+
+  if (index < normal_metadata) {
+    const auto& metadata = node_.metadata().value()[index];
+    if (unlikely(!IsValid(metadata))) {
+      return ZX_ERR_INTERNAL;
+    }
+    if (metadata.data()->size() > buf_size) {
+      return ZX_ERR_BUFFER_TOO_SMALL;
+    }
+    memcpy(buf, metadata.data()->data(), metadata.data()->size());
+    *out_type = *metadata.type();
+    *actual = static_cast<uint32_t>(metadata.data()->size());
+    return ZX_OK;
+  }
+
+  // boot_metadata indices follow metadata indices.
+  index -= static_cast<uint32_t>(normal_metadata);
+
+  const auto& metadata = node_.boot_metadata().value()[index];
+  if (!IsValid(metadata)) {
+    return ZX_ERR_INTERNAL;
+  }
+  zx::result metadata_bi =
+      bus_->GetBootItem(metadata.zbi_type().value(), metadata.zbi_extra().value());
+  if (metadata_bi.is_error()) {
+    return metadata_bi.status_value();
+  } else if (metadata_bi->length > buf_size) {
+    return ZX_ERR_BUFFER_TOO_SMALL;
+  }
+
+  auto& [vmo, length] = *metadata_bi;
+  auto status = vmo.read(buf, 0, length);
+  if (status != ZX_OK) {
+    return status;
+  }
+  *out_type = metadata.zbi_type().value();
+  *actual = length;
+  return ZX_OK;
+}
+
 zx_status_t PlatformDevice::DdkGetProtocol(uint32_t proto_id, void* out) {
-  return bus_->DdkGetProtocol(proto_id, out);
+  if (proto_id == ZX_PROTOCOL_PDEV) {
+    auto proto = static_cast<pdev_protocol_t*>(out);
+    proto->ops = &pdev_protocol_ops_;
+    proto->ctx = this;
+    return ZX_OK;
+  } else {
+    return bus_->DdkGetProtocol(proto_id, out);
+  }
+}
+
+zx_status_t PlatformDevice::DdkRxrpc(zx_handle_t channel) {
+  if (channel == ZX_HANDLE_INVALID) {
+    // proxy device has connected
+    return ZX_OK;
+  }
+
+  uint8_t req_buf[PROXY_MAX_TRANSFER_SIZE];
+  uint8_t resp_buf[PROXY_MAX_TRANSFER_SIZE];
+  auto* req_header = reinterpret_cast<platform_proxy_req_t*>(&req_buf);
+  auto* resp_header = reinterpret_cast<platform_proxy_rsp_t*>(&resp_buf);
+  uint32_t actual;
+  zx_handle_t req_handles[ZX_CHANNEL_MAX_MSG_HANDLES];
+  zx_handle_t resp_handles[ZX_CHANNEL_MAX_MSG_HANDLES];
+  uint32_t req_handle_count;
+  uint32_t resp_handle_count = 0;
+
+  auto status = zx_channel_read(channel, 0, &req_buf, req_handles, sizeof(req_buf),
+                                std::size(req_handles), &actual, &req_handle_count);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "platform_dev_rxrpc: zx_channel_read failed %d", status);
+    return status;
+  }
+
+  resp_header->txid = req_header->txid;
+  uint32_t resp_len;
+
+  auto req = reinterpret_cast<rpc_pdev_req_t*>(&req_buf);
+  if (actual < sizeof(*req)) {
+    zxlogf(ERROR, "%s received %u, expecting %zu (PDEV)", __func__, actual, sizeof(*req));
+    return ZX_ERR_INTERNAL;
+  }
+  auto resp = reinterpret_cast<rpc_pdev_rsp_t*>(&resp_buf);
+  resp_len = sizeof(*resp);
+
+  switch (req_header->op) {
+    case PDEV_GET_MMIO:
+      status =
+          RpcGetMmio(req->index, &resp->paddr, &resp->length, resp_handles, &resp_handle_count);
+      break;
+    case PDEV_GET_INTERRUPT:
+      status =
+          RpcGetInterrupt(req->index, &resp->irq, &resp->mode, resp_handles, &resp_handle_count);
+      break;
+    case PDEV_GET_BTI:
+      status = RpcGetBti(req->index, resp_handles, &resp_handle_count);
+      break;
+    case PDEV_GET_SMC:
+      status = RpcGetSmc(req->index, resp_handles, &resp_handle_count);
+      break;
+    case PDEV_GET_DEVICE_INFO:
+      status = RpcGetDeviceInfo(&resp->device_info);
+      break;
+    case PDEV_GET_BOARD_INFO:
+      status = PDevGetBoardInfo(&resp->board_info);
+      break;
+    case PDEV_GET_METADATA: {
+      auto resp = reinterpret_cast<rpc_pdev_metadata_rsp_t*>(resp_buf);
+      static_assert(sizeof(*resp) == sizeof(resp_buf), "");
+      auto buf_size = static_cast<uint32_t>(sizeof(resp_buf) - sizeof(*resp_header));
+      status = RpcGetMetadata(req->index, &resp->pdev.metadata_type, resp->metadata, buf_size,
+                              &resp->pdev.metadata_length);
+      resp_len += resp->pdev.metadata_length;
+      break;
+    }
+    default:
+      zxlogf(ERROR, "%s: unknown pdev op %u", __func__, req_header->op);
+      return ZX_ERR_INTERNAL;
+  }
+
+  // set op to match request so zx_channel_write will return our response
+  resp_header->status = status;
+  status = zx_channel_write(channel, 0, resp_header, resp_len,
+                            (resp_handle_count ? resp_handles : nullptr), resp_handle_count);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "platform_dev_rxrpc: zx_channel_write failed %d", status);
+  }
+  return status;
 }
 
 void PlatformDevice::DdkRelease() { delete this; }
@@ -332,180 +747,90 @@ void PlatformDevice::DdkInit(ddk::InitTxn txn) {
   return txn.Reply(ZX_OK);
 }
 
-zx::result<PlatformDevice::Mmio> PlatformDevice::GetMmio(uint32_t index) {
-  if (node_.mmio() == std::nullopt || index >= node_.mmio()->size()) {
-    return zx::error(ZX_ERR_OUT_OF_RANGE);
-  }
-
-  const auto& mmio = node_.mmio().value()[index];
-  if (unlikely(!IsValid(mmio))) {
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-  if (mmio.base() == std::nullopt) {
-    return zx::error(ZX_ERR_NOT_FOUND);
-  }
-  const zx_paddr_t vmo_base = ZX_ROUNDDOWN(mmio.base().value(), ZX_PAGE_SIZE);
-  const size_t vmo_size =
-      ZX_ROUNDUP(mmio.base().value() + mmio.length().value() - vmo_base, ZX_PAGE_SIZE);
-  zx::vmo vmo;
-
-  zx_status_t status = zx::vmo::create_physical(*bus_->GetResource(), vmo_base, vmo_size, &vmo);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: creating vmo failed %d", __FUNCTION__, status);
-    return zx::error(status);
-  }
-
-  char name[32];
-  snprintf(name, sizeof(name), "mmio %u", index);
-  status = vmo.set_property(ZX_PROP_NAME, name, sizeof(name));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: setting vmo name failed %d", __FUNCTION__, status);
-    return zx::error(status);
-  }
-  return zx::ok(PlatformDevice::Mmio{
-      .offset = mmio.base().value() - vmo_base,
-      .size = mmio.length().value(),
-      .vmo = std::move(vmo),
-  });
-}
-
 void PlatformDevice::GetMmio(GetMmioRequestView request, GetMmioCompleter::Sync& completer) {
-  zx::result result = GetMmio(request->index);
-  if (result.is_error()) {
-    completer.ReplyError(result.status_value());
+  pdev_mmio_t banjo_mmio;
+  zx_status_t status = PDevGetMmio(request->index, &banjo_mmio);
+  if (status != ZX_OK) {
+    completer.ReplyError(status);
     return;
   }
 
   fidl::Arena arena;
   fuchsia_hardware_platform_device::wire::Mmio mmio =
       fuchsia_hardware_platform_device::wire::Mmio::Builder(arena)
-          .offset(result->offset)
-          .size(result->size)
-          .vmo(std::move(result->vmo))
+          .offset(banjo_mmio.offset)
+          .size(banjo_mmio.size)
+          .vmo(zx::vmo(banjo_mmio.vmo))
           .Build();
   completer.ReplySuccess(std::move(mmio));
 }
 
-zx::result<zx::interrupt> PlatformDevice::GetInterrupt(uint32_t index, uint32_t flags) {
-  if (node_.irq() == std::nullopt || index >= node_.irq()->size()) {
-    return zx::error(ZX_ERR_OUT_OF_RANGE);
-  }
-
-  const auto& irq = node_.irq().value()[index];
-  if (unlikely(!IsValid(irq))) {
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-  if (flags == 0) {
-    flags = irq.mode().value();
-  }
-
-  zx::interrupt out_irq;
-  zx_status_t status =
-      zx::interrupt::create(*bus_->GetResource(), irq.irq().value(), flags, &out_irq);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "platform_dev_map_interrupt: zx_interrupt_create failed %d", status);
-    return zx::error(status);
-  }
-  return zx::ok(std::move(out_irq));
-}
-
 void PlatformDevice::GetInterrupt(GetInterruptRequestView request,
                                   GetInterruptCompleter::Sync& completer) {
-  zx::result result = GetInterrupt(request->index, request->flags);
-  if (result.is_ok()) {
-    completer.ReplySuccess(std::move(*result));
+  zx::interrupt interrupt;
+  zx_status_t status = PDevGetInterrupt(request->index, request->flags, &interrupt);
+  if (status == ZX_OK) {
+    completer.ReplySuccess(std::move(interrupt));
   } else {
-    completer.ReplyError(result.status_value());
+    completer.ReplyError(status);
   }
-}
-
-zx::result<zx::bti> PlatformDevice::GetBti(uint32_t index) {
-  if (node_.bti() == std::nullopt || index >= node_.bti()->size()) {
-    return zx::error(ZX_ERR_OUT_OF_RANGE);
-  }
-  const auto& bti = node_.bti().value()[index];
-  if (unlikely(!IsValid(bti))) {
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-
-  zx::bti out_bti;
-  zx_status_t status = bus_->IommuGetBti(bti.iommu_index().value(), bti.bti_id().value(), &out_bti);
-  if (status != ZX_OK) {
-    return zx::error(status);
-  }
-  return zx::ok(std::move(out_bti));
 }
 
 void PlatformDevice::GetBti(GetBtiRequestView request, GetBtiCompleter::Sync& completer) {
-  zx::result result = GetBti(request->index);
-  if (result.is_ok()) {
-    completer.ReplySuccess(std::move(*result));
+  zx::bti bti;
+  zx_status_t status = PDevGetBti(request->index, &bti);
+  if (status == ZX_OK) {
+    completer.ReplySuccess(std::move(bti));
   } else {
-    completer.ReplyError(result.status_value());
+    completer.ReplyError(status);
   }
-}
-
-zx::result<zx::resource> PlatformDevice::GetSmc(uint32_t index) {
-  if (node_.smc() == std::nullopt || index >= node_.smc()->size()) {
-    return zx::error(ZX_ERR_OUT_OF_RANGE);
-  }
-
-  const auto& smc = node_.smc().value()[index];
-  if (unlikely(!IsValid(smc))) {
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-
-  uint32_t options = ZX_RSRC_KIND_SMC;
-  if (smc.exclusive().value())
-    options |= ZX_RSRC_FLAG_EXCLUSIVE;
-  char rsrc_name[ZX_MAX_NAME_LEN];
-  snprintf(rsrc_name, ZX_MAX_NAME_LEN - 1, "%s.pbus[%u]", name_, index);
-
-  zx::resource out_resource;
-  zx_status_t status =
-      zx::resource::create(*bus_->GetResource(), options, smc.service_call_num_base().value(),
-                           smc.count().value(), rsrc_name, sizeof(rsrc_name), &out_resource);
-  if (status != ZX_OK) {
-    return zx::error(status);
-  }
-  return zx::ok(std::move(out_resource));
 }
 
 void PlatformDevice::GetSmc(GetSmcRequestView request, GetSmcCompleter::Sync& completer) {
-  zx::result result = GetSmc(request->index);
-  if (result.is_ok()) {
-    completer.ReplySuccess(std::move(*result));
+  zx::resource resource;
+  zx_status_t status = PDevGetSmc(request->index, &resource);
+  if (status == ZX_OK) {
+    completer.ReplySuccess(std::move(resource));
   } else {
-    completer.ReplyError(result.status_value());
+    completer.ReplyError(status);
   }
 }
 
 void PlatformDevice::GetDeviceInfo(GetDeviceInfoCompleter::Sync& completer) {
-  fidl::Arena arena;
-  completer.ReplySuccess(
-      fuchsia_hardware_platform_device::wire::DeviceInfo::Builder(arena)
-          .vid(vid_)
-          .pid(pid_)
-          .did(did_)
-          .mmio_count(static_cast<uint32_t>(node_.mmio().has_value() ? node_.mmio()->size() : 0))
-          .irq_count(static_cast<uint32_t>(node_.irq().has_value() ? node_.irq()->size() : 0))
-          .bti_count(static_cast<uint32_t>(node_.bti().has_value() ? node_.bti()->size() : 0))
-          .smc_count(static_cast<uint32_t>(node_.smc().has_value() ? node_.smc()->size() : 0))
-          .metadata_count(
-              static_cast<uint32_t>(node_.metadata().has_value() ? node_.metadata()->size() : 0))
-          .name(name_)
-          .Build());
+  pdev_device_info_t banjo_info;
+  zx_status_t status = PDevGetDeviceInfo(&banjo_info);
+  if (status == ZX_OK) {
+    fidl::Arena arena;
+    completer.ReplySuccess(fuchsia_hardware_platform_device::wire::DeviceInfo::Builder(arena)
+                               .vid(banjo_info.vid)
+                               .pid(banjo_info.pid)
+                               .did(banjo_info.did)
+                               .mmio_count(banjo_info.mmio_count)
+                               .irq_count(banjo_info.irq_count)
+                               .bti_count(banjo_info.bti_count)
+                               .smc_count(banjo_info.smc_count)
+                               .metadata_count(banjo_info.metadata_count)
+                               .name(banjo_info.name)
+                               .Build());
+  } else {
+    completer.ReplyError(status);
+  }
 }
 
 void PlatformDevice::GetBoardInfo(GetBoardInfoCompleter::Sync& completer) {
-  auto info = bus_->board_info();
-  fidl::Arena arena;
-  completer.ReplySuccess(fuchsia_hardware_platform_device::wire::BoardInfo::Builder(arena)
-                             .vid(info.pid())
-                             .pid(info.pid())
-                             .board_name(info.board_name())
-                             .board_revision(info.board_revision())
-                             .Build());
+  pdev_board_info_t banjo_info;
+  zx_status_t status = PDevGetBoardInfo(&banjo_info);
+  if (status == ZX_OK) {
+    fidl::Arena arena;
+    completer.ReplySuccess(fuchsia_hardware_platform_device::wire::BoardInfo::Builder(arena)
+                               .vid(banjo_info.vid)
+                               .pid(banjo_info.pid)
+                               .board_name(banjo_info.board_name)
+                               .board_revision(banjo_info.board_revision)
+                               .Build());
+  } else {
+    completer.ReplyError(status);
+  }
 }
 
 }  // namespace platform_bus

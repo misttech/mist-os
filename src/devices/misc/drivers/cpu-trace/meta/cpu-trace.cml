@@ -10,12 +10,12 @@
     program: {
         runner: "driver",
         bind: "meta/bind/cpu-trace.bindbc",
+        colocate: "true",
         compat: "driver/cpu-trace.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
     use: [
         { protocol: "fuchsia.boot.RootResource" },
-        { service: "fuchsia.hardware.platform.device.Service" },
     ],
 }

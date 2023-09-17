@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_NAND_DRIVERS_AML_RAWNAND_AML_RAWNAND_H_
 #define SRC_DEVICES_NAND_DRIVERS_AML_RAWNAND_AML_RAWNAND_H_
 
+#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/rawnand/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/io-buffer.h>

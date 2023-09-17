@@ -10,6 +10,7 @@
     program: {
         runner: "driver",
         bind: "meta/bind/ufs_bind.bindbc",
+        colocate: "false",
         compat: "driver/ufs.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",

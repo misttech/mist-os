@@ -20,7 +20,7 @@
 
 namespace perfmon {
 
-const char kPerfMonDev[] = "/dev/sys/platform/00:00:1d/perfmon";
+const char kPerfMonDev[] = "/dev/sys/cpu-trace/perfmon";
 
 static uint32_t RoundUpToPages(uint32_t value) {
   uint32_t size = fbl::round_up(value, Controller::kPageSize);

@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_SERIAL_DRIVERS_AML_UART_AML_UART_H_
 #define SRC_DEVICES_SERIAL_DRIVERS_AML_UART_AML_UART_H_
 
+#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/serial/c/banjo.h>
 #include <fuchsia/hardware/serialimpl/async/c/banjo.h>
 #include <fuchsia/hardware/serialimpl/async/cpp/banjo.h>

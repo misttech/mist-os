@@ -4,6 +4,7 @@
 
 #include "zircon_platform_device.h"
 
+#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/zx/bti.h>
@@ -101,11 +102,11 @@ std::unique_ptr<PlatformDevice> PlatformDevice::Create(void* device_handle) {
 
   zx_device_t* zx_device = static_cast<zx_device_t*>(device_handle);
 
-  ddk::PDevFidl pdev(zx_device);
-  zx_status_t status = ZX_OK;
-  if (!pdev.is_valid()) {
+  pdev_protocol_t pdev;
+  zx_status_t status = device_get_protocol(zx_device, ZX_PROTOCOL_PDEV, &pdev);
+  if (status != ZX_OK) {
     // if ZX_PROTOCOL_PDEV is not available, try using find via fragment.
-    status = ddk::PDevFidl::FromFragment(zx_device, &pdev);
+    status = device_get_fragment_protocol(zx_device, "pdev", ZX_PROTOCOL_PDEV, &pdev);
   }
 
   if (status == ZX_ERR_NOT_SUPPORTED) {
@@ -114,12 +115,11 @@ std::unique_ptr<PlatformDevice> PlatformDevice::Create(void* device_handle) {
 
   if (status == ZX_OK) {
     pdev_device_info_t device_info;
-    zx_status_t status = pdev.GetDeviceInfo(&device_info);
+    zx_status_t status = pdev_get_device_info(&pdev, &device_info);
     if (status != ZX_OK)
       return DRETP(nullptr, "pdev_get_device_info failed: %d", status);
 
-    return std::make_unique<ZirconPlatformDevice>(zx_device, std::move(pdev),
-                                                  device_info.mmio_count);
+    return std::make_unique<ZirconPlatformDevice>(zx_device, pdev, device_info.mmio_count);
   }
 
   return DRETP(nullptr, "Error requesting protocol: %d", status);

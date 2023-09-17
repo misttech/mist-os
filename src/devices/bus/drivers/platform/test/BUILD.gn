@@ -49,6 +49,7 @@ fuchsia_driver("test-board-driver") {
   ]
   deps = [
     ":test-board-bind",
+    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
@@ -92,8 +93,8 @@ fuchsia_driver("test-gpio-driver") {
     ":test-gpio-bind",
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_banjo_cpp",
+    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
@@ -124,8 +125,8 @@ fuchsia_driver("test-power-driver") {
   sources = [ "test/power.cc" ]
   deps = [
     ":test-power-bind",
+    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.powerimpl:fuchsia.hardware.powerimpl_banjo_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
@@ -157,8 +158,8 @@ fuchsia_driver("test-clock-driver") {
   deps = [
     ":test-clock-bind",
     "//sdk/banjo/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_banjo_cpp",
+    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
@@ -190,7 +191,7 @@ fuchsia_driver("test-i2c-driver") {
   deps = [
     ":test-i2c-bind",
     "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
+    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
@@ -221,9 +222,9 @@ fuchsia_driver("test-spi-driver") {
   sources = [ "test/spi.cc" ]
   deps = [
     ":test-spi-bind",
+    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.spi:fuchsia.hardware.spi_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl_banjo_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
@@ -277,14 +278,14 @@ driver_bind_rules("test-composite-bind") {
 fuchsia_driver("test-composite-driver") {
   output_name = "test-composite"
   configs += [ "//build/config:all_source" ]
-  sources = [ "test/composite.cc" ]
+  sources = [ "test/composite.c" ]
   deps = [
     ":test-composite-bind",
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
+    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.spi:fuchsia.hardware.spi_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.test:fuchsia.hardware.test_banjo_cpp",
     "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
 
@@ -317,10 +318,10 @@ foreach(driver, simple_drivers) {
   fuchsia_driver("test-$driver-driver") {
     output_name = "test-$driver"
     configs += [ "//build/config:all_source" ]
-    sources = [ "test/$driver.cc" ]
+    sources = [ "test/$driver.c" ]
     deps = [
       ":test-${driver}-bind",
-      "//src/devices/bus/lib/device-protocol-pdev",
+      "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
       "//src/devices/lib/driver",
       "//src/lib/ddk",
     ]
@@ -333,7 +334,7 @@ foreach(driver, simple_drivers) {
     component_name = "test-$driver"
     deps = [ ":test-$driver-driver" ]
     info = "test-driver-info.json"
-    manifest = "meta/test-$driver.cml"
+    colocate = true
   }
 }
 
@@ -409,6 +410,7 @@ fuchsia_driver("test-bti-driver") {
   deps = [
     ":fuchsia.hardware.btitest_cpp_wire",
     ":test-bti-bind",
+    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/driver",
     "//src/lib/ddk",

@@ -5,6 +5,7 @@
 #include "src/devices/mailbox/drivers/aml-fifo-mailbox/aml-fifo-mailbox.h"
 
 #include <fidl/fuchsia.hardware.mailbox/cpp/markers.h>
+#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/fdf/cpp/dispatcher.h>

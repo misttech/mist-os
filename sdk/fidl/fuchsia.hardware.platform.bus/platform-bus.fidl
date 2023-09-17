@@ -28,7 +28,7 @@ type Irq = table {
 
 type Bti = table {
     1: iommu_index uint32;
-    2: bti_id uint64;
+    2: bti_id uint32;
 };
 
 type Smc = table {

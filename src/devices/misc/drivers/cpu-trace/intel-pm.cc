@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <cpuid.h>
+#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/debug.h>
 
 #include <fbl/alloc_checker.h>

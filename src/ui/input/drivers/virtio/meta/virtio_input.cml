@@ -10,6 +10,7 @@
     program: {
         runner: "driver",
         bind: "meta/bind/virtio_input_bind.bindbc",
+        colocate: "false",
         compat: "driver/virtio_input.so",
     },
     use: [

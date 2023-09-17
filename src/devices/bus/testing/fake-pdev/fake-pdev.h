@@ -5,6 +5,7 @@
 #define SRC_DEVICES_BUS_TESTING_FAKE_PDEV_FAKE_PDEV_H_
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire_test_base.h>
+#include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/async/default.h>
 #include <lib/mmio/mmio.h>
 
@@ -21,26 +22,6 @@ struct MmioInfo {
   zx::vmo vmo;
   zx_off_t offset;
   size_t size;
-};
-
-struct DeviceInfo {
-  uint32_t vid;
-  uint32_t pid;
-  uint32_t did;
-  uint32_t mmio_count;
-  uint32_t irq_count;
-  uint32_t bti_count;
-  uint32_t smc_count;
-  uint32_t metadata_count;
-  uint32_t reserved[8];
-  char name[32];
-};
-
-struct BoardInfo {
-  uint32_t vid;
-  uint32_t pid;
-  char board_name[32];
-  uint32_t board_revision;
 };
 
 using Mmio = std::variant<MmioInfo, fdf::MmioBuffer>;
@@ -62,8 +43,8 @@ class FakePDevFidl : public fidl::WireServer<fuchsia_hardware_platform_device::D
     std::map<uint32_t, zx::bti> btis;
     std::map<uint32_t, zx::resource> smcs;
 
-    std::optional<DeviceInfo> device_info;
-    std::optional<BoardInfo> board_info;
+    std::optional<pdev_device_info_t> device_info;
+    std::optional<pdev_board_info_t> board_info;
   };
 
   FakePDevFidl() = default;

@@ -75,7 +75,7 @@ class AmlUsbCrgPhy : public AmlUsbCrgPhyType,
   zx_status_t Init();
   int IrqThread();
 
-  ddk::PDevFidl pdev_;
+  ddk::PDev pdev_;
   fidl::WireSyncClient<fuchsia_hardware_registers::Device> reset_register_;
   std::optional<fdf::MmioBuffer> usbctrl_mmio_;
   std::optional<fdf::MmioBuffer> usbphy_mmio_;

@@ -10,12 +10,12 @@
     program: {
         runner: "driver",
         bind: "meta/bind/as370-nna.bindbc",
+        colocate: "true",
         compat: "driver/as370-nna.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
     use: [
-        { service: "fuchsia.hardware.platform.device.Service" },
         { service: "fuchsia.hardware.registers.Service" },
     ],
 }

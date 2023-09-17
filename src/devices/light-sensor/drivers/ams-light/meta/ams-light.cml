@@ -12,6 +12,7 @@
         bind: "meta/bind/ams-light.bindbc",
         compat: "driver/ams-light.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
+        colocate: "false",
     },
     use: [
         { service: "fuchsia.hardware.gpio.Service" },

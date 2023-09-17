@@ -4,6 +4,7 @@
 
 #include "aml-ram.h"
 
+#include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
@@ -54,7 +55,7 @@ class AmlRamDeviceTest : public zxtest::Test {
     irq_signaller_ = config.irqs[0].borrow();
     config.mmios[0] = mmio_.mmio();
 
-    config.device_info = fake_pdev::DeviceInfo{
+    config.device_info = pdev_device_info_t{
         .pid = PDEV_PID_AMLOGIC_T931,
     };
 

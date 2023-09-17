@@ -461,7 +461,6 @@ mod tests {
             url: Some(url),
             driver_url: Some(driver_url),
             colocate: Some(colocate),
-            use_fidl_proxy: Some(false),
             device_categories: Some(device_categories),
             package_type: fdi::DriverPackageType::from_primitive(package_type as u8),
             is_fallback: Some(fallback),
@@ -726,7 +725,6 @@ mod tests {
             colocate: false,
             device_categories: vec![],
             fallback: false,
-            use_fidl_proxy: false,
             package_type: DriverPackageType::Base,
             package_hash: None,
         },]);
@@ -750,7 +748,6 @@ mod tests {
             let expected_result = fdi::MatchedDriver::Driver(fdi::MatchedDriverInfo {
                 url: Some("fuchsia-pkg://fuchsia.com/package#driver/my-driver.cm".to_string()),
                 colocate: Some(false),
-                use_fidl_proxy: Some(false),
                 device_categories: Some(vec![]),
                 package_type: Some(fdi::DriverPackageType::Base),
                 is_fallback: Some(false),
@@ -800,7 +797,6 @@ mod tests {
             colocate: false,
             device_categories: vec![],
             fallback: false,
-            use_fidl_proxy: false,
             package_type: DriverPackageType::Base,
             package_hash: None,
         },]);
@@ -824,7 +820,6 @@ mod tests {
             let expected_result = fdi::MatchedDriver::Driver(fdi::MatchedDriverInfo {
                 url: Some("fuchsia-pkg://fuchsia.com/package#driver/my-driver.cm".to_string()),
                 colocate: Some(false),
-                use_fidl_proxy: Some(false),
                 package_type: Some(fdi::DriverPackageType::Base),
                 is_fallback: Some(false),
                 device_categories: Some(vec![]),
@@ -867,7 +862,6 @@ mod tests {
                 colocate: false,
                 device_categories: vec![],
                 fallback: false,
-                use_fidl_proxy: false,
                 package_type: DriverPackageType::Boot,
                 package_hash: None,
             },
@@ -879,7 +873,6 @@ mod tests {
                 colocate: false,
                 device_categories: vec![],
                 fallback: false,
-                use_fidl_proxy: false,
                 package_type: DriverPackageType::Boot,
                 package_hash: None,
             },
@@ -937,7 +930,6 @@ mod tests {
                 colocate: false,
                 device_categories: vec![],
                 fallback: false,
-                use_fidl_proxy: false,
                 package_type: DriverPackageType::Boot,
                 package_hash: None,
             },
@@ -949,7 +941,6 @@ mod tests {
                 colocate: false,
                 device_categories: vec![],
                 fallback: false,
-                use_fidl_proxy: false,
                 package_type: DriverPackageType::Boot,
                 package_hash: None,
             },
@@ -1042,7 +1033,6 @@ mod tests {
                 colocate: false,
                 device_categories: vec![],
                 fallback: false,
-                use_fidl_proxy: false,
                 package_type: DriverPackageType::Boot,
                 package_hash: None,
             },
@@ -1054,7 +1044,6 @@ mod tests {
                 colocate: false,
                 device_categories: vec![],
                 fallback: false,
-                use_fidl_proxy: false,
                 package_type: DriverPackageType::Boot,
                 package_hash: None,
             },
@@ -1193,7 +1182,6 @@ mod tests {
                 colocate: false,
                 device_categories: vec![],
                 fallback: true,
-                use_fidl_proxy: false,
                 package_type: DriverPackageType::Boot,
                 package_hash: None,
             },
@@ -1205,7 +1193,6 @@ mod tests {
                 colocate: false,
                 device_categories: vec![],
                 fallback: false,
-                use_fidl_proxy: false,
                 package_type: DriverPackageType::Boot,
                 package_hash: None,
             },
@@ -1286,7 +1273,6 @@ mod tests {
             colocate: false,
             device_categories: vec![],
             fallback: true,
-            use_fidl_proxy: false,
             package_type: DriverPackageType::Boot,
             package_hash: None,
         }];
@@ -1300,7 +1286,6 @@ mod tests {
                 colocate: false,
                 device_categories: vec![],
                 fallback: true,
-                use_fidl_proxy: false,
                 package_type: DriverPackageType::Base,
                 package_hash: None,
             },
@@ -1312,7 +1297,6 @@ mod tests {
                 colocate: false,
                 device_categories: vec![],
                 fallback: false,
-                use_fidl_proxy: false,
                 package_type: DriverPackageType::Base,
                 package_hash: None,
             },
@@ -1599,7 +1583,6 @@ mod tests {
             colocate: false,
             device_categories: vec![],
             fallback: true,
-            use_fidl_proxy: false,
             package_type: DriverPackageType::Boot,
             package_hash: None,
         }];
@@ -1635,7 +1618,6 @@ mod tests {
             colocate: false,
             device_categories: vec![],
             fallback: true,
-            use_fidl_proxy: false,
             package_type: DriverPackageType::Boot,
             package_hash: None,
         }];
@@ -1906,7 +1888,6 @@ mod tests {
             colocate: false,
             device_categories: vec![],
             fallback: false,
-            use_fidl_proxy: false,
             package_type: DriverPackageType::Base,
             package_hash: None,
         },]);
@@ -2108,7 +2089,6 @@ mod tests {
             colocate: false,
             device_categories: vec![],
             fallback: false,
-            use_fidl_proxy: false,
             package_type: DriverPackageType::Base,
             package_hash: None,
         },]);
@@ -2310,7 +2290,6 @@ mod tests {
             colocate: false,
             device_categories: vec![],
             fallback: false,
-            use_fidl_proxy: false,
             package_type: DriverPackageType::Base,
             package_hash: None,
         },]);
@@ -2560,7 +2539,6 @@ mod tests {
                     colocate: false,
                     device_categories: vec![],
                     fallback: false,
-                    use_fidl_proxy: false,
                     package_type: DriverPackageType::Base,
                     package_hash: None,
                 });
@@ -2759,7 +2737,6 @@ mod tests {
                     colocate: false,
                     device_categories: vec![],
                     fallback: false,
-                    use_fidl_proxy: false,
                     package_type: DriverPackageType::Base,
                     package_hash: None,
                 });
@@ -2967,7 +2944,6 @@ mod tests {
                     colocate: false,
                     device_categories: vec![],
                     fallback: false,
-                    use_fidl_proxy: false,
                     package_type: DriverPackageType::Base,
                     package_hash: None,
                 });
@@ -3023,7 +2999,6 @@ mod tests {
             colocate: false,
             device_categories: vec![],
             fallback: false,
-            use_fidl_proxy: false,
             package_type: DriverPackageType::Base,
             package_hash: None,
         },]);
@@ -3125,7 +3100,6 @@ mod tests {
             colocate: false,
             device_categories: vec![],
             fallback: false,
-            use_fidl_proxy: false,
             package_type: DriverPackageType::Base,
             package_hash: None,
         },]);
@@ -3355,7 +3329,6 @@ mod tests {
             colocate: false,
             device_categories: vec![],
             fallback: false,
-            use_fidl_proxy: false,
             package_type: DriverPackageType::Base,
             package_hash: None,
         }]);
@@ -3419,7 +3392,6 @@ mod tests {
             colocate: false,
             device_categories: vec![],
             fallback: false,
-            use_fidl_proxy: false,
             package_type: DriverPackageType::Boot,
             package_hash: None,
         }];

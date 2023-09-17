@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fuchsia/hardware/gpio/c/banjo.h>
+#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/spi/c/banjo.h>
 #include <fuchsia/hardware/test/c/banjo.h>
 #include <lib/ddk/binding_driver.h>
@@ -11,7 +12,6 @@
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <zircon/assert.h>
@@ -130,18 +130,21 @@ static zx_status_t test_spi(spi_protocol_t* spi) {
 }
 
 static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
+  zx_status_t status;
+
   zxlogf(INFO, "test_bind: %s ", DRIVER_NAME);
 
-  zx::result pdev = ddk::PDevFidl::Create(parent, "pdev");
-  if (pdev.is_error()) {
-    zxlogf(ERROR, "%s: could not get ZX_PROTOCOL_PDEV", __func__);
-    return pdev.status_value();
+  pdev_protocol_t pdev;
+  status = device_get_fragment_protocol(parent, "pdev", ZX_PROTOCOL_PDEV, &pdev);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: could not get protocol ZX_PROTOCOL_PDEV", DRIVER_NAME);
+    return status;
   }
 
   size_t size;
   composite_test_metadata metadata;
-  zx_status_t status = device_get_fragment_metadata(parent, "pdev", DEVICE_METADATA_PRIVATE,
-                                                    &metadata, sizeof(metadata), &size);
+  status = device_get_fragment_metadata(parent, "pdev", DEVICE_METADATA_PRIVATE, &metadata,
+                                        sizeof(metadata), &size);
   if (status != ZX_OK || size != sizeof(composite_test_metadata)) {
     zxlogf(ERROR, "%s: device_get_metadata failed: %d", DRIVER_NAME, status);
     return ZX_ERR_INTERNAL;
@@ -177,7 +180,7 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
     }
   }
 
-  auto* test = reinterpret_cast<test_t*>(calloc(1, sizeof(test_t)));
+  test_t* test = calloc(1, sizeof(test_t));
   if (!test) {
     return ZX_ERR_NO_MEMORY;
   }

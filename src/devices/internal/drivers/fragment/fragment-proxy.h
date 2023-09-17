@@ -7,6 +7,7 @@
 
 #include <fuchsia/hardware/audio/cpp/banjo.h>
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
+#include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/spi/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/ddk/debug.h>
@@ -26,6 +27,7 @@ using FragmentProxyBase = ddk::Device<FragmentProxy, ddk::GetProtocolable>;
 class FragmentProxy : public FragmentProxyBase,
                       public ddk::GpioProtocol<FragmentProxy>,
                       public ddk::DaiProtocol<FragmentProxy>,
+                      public ddk::PDevProtocol<FragmentProxy>,
                       public ddk::SpiProtocol<FragmentProxy>,
                       public ddk::SysmemProtocol<FragmentProxy> {
  public:
@@ -67,6 +69,16 @@ class FragmentProxy : public FragmentProxyBase,
   zx_status_t GpioSetPolarity(gpio_polarity_t polarity);
   zx_status_t GpioSetDriveStrength(uint64_t ds_ua, uint64_t* out_actual_ds_ua);
   zx_status_t GpioGetDriveStrength(uint64_t* ds_ua);
+  zx_status_t PDevGetMmio(uint32_t index, pdev_mmio_t* out_mmio);
+  zx_status_t PDevGetInterrupt(uint32_t index, uint32_t flags, zx::interrupt* out_irq);
+  zx_status_t PDevGetBti(uint32_t index, zx::bti* out_bti);
+  zx_status_t PDevGetSmc(uint32_t index, zx::resource* out_smc);
+  zx_status_t PDevGetDeviceInfo(pdev_device_info_t* out_info);
+  zx_status_t PDevGetBoardInfo(pdev_board_info_t* out_info);
+  zx_status_t PDevDeviceAdd(uint32_t index, const device_add_args_t* args,
+                            zx_device_t** out_device);
+  zx_status_t PDevGetProtocol(uint32_t proto_id, uint32_t index, void* out_out_protocol_buffer,
+                              size_t out_protocol_size, size_t* out_out_protocol_actual);
   zx_status_t SpiTransmit(const uint8_t* txdata_list, size_t txdata_count);
   zx_status_t SpiReceive(uint32_t size, uint8_t* out_rxdata_list, size_t rxdata_count,
                          size_t* out_rxdata_actual);

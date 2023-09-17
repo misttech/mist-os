@@ -11,7 +11,6 @@
         runner: "driver",
         bind: "meta/bind/aml-i2c.bindbc",
         colocate: "true",
-        use_fidl_proxy: "true",
         compat: "driver/aml-i2c.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",

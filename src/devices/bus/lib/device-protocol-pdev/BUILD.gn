@@ -6,11 +6,17 @@ import("//build/zircon/zx_library.gni")
 
 zx_library("device-protocol-pdev") {
   sdk = "source"
-  sdk_headers = [ "lib/device-protocol/pdev-fidl.h" ]
-  sources = [ "pdev-fidl.cc" ]
+  sdk_headers = [
+    "lib/device-protocol/pdev.h",
+    "lib/device-protocol/pdev-fidl.h",
+  ]
+  sources = [
+    "pdev-fidl.cc",
+    "pdev.cc",
+  ]
   public_deps = [
+    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp_wire",
-    "//src/devices/lib/mmio",
     "//src/lib/ddk",
     "//src/lib/ddktl",
   ]

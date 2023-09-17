@@ -30,7 +30,7 @@ using fuchsia_device::wire::kMaxDevicePerformanceStates;
 using CpuCtrlClient = fidl::WireSyncClient<fuchsia_cpuctrl::Device>;
 using inspect::InspectTestHelper;
 
-#define MHZ(x) ((x) * 1000000)
+#define MHZ(x) ((x)*1000000)
 
 constexpr uint32_t kPdArmA53 = 1;
 
@@ -248,7 +248,7 @@ class AmlCpuBindingTest : public zxtest::Test {
       infra->pdev_server.SetConfig(fake_pdev::FakePDevFidl::Config{
           .mmios = std::move(mmios),
           .device_info =
-              fake_pdev::DeviceInfo{
+              pdev_device_info_t{
                   .pid = PDEV_PID_ASTRO,
               },
       });

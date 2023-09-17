@@ -135,6 +135,70 @@ zx_status_t Fragment::RpcGpio(const uint8_t* req_buf, uint32_t req_size, uint8_t
   }
 }
 
+zx_status_t Fragment::RpcPdev(const uint8_t* req_buf, uint32_t req_size, uint8_t* resp_buf,
+                              uint32_t* out_resp_size, zx::handle* req_handles,
+                              uint32_t req_handle_count, zx::handle* resp_handles,
+                              uint32_t* resp_handle_count) {
+  if (!pdev_client_.proto_client().is_valid()) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  auto* req = reinterpret_cast<const PdevProxyRequest*>(req_buf);
+  if (req_size < sizeof(*req)) {
+    zxlogf(ERROR, "%s received %u, expecting %zu", __func__, req_size, sizeof(*req));
+    return ZX_ERR_INTERNAL;
+  }
+  auto* resp = reinterpret_cast<PdevProxyResponse*>(resp_buf);
+  *out_resp_size = sizeof(*resp);
+
+  switch (req->op) {
+    case PdevOp::GET_MMIO: {
+      pdev_mmio_t mmio;
+      auto status = pdev_client_.proto_client().GetMmio(req->index, &mmio);
+      if (status == ZX_OK) {
+        resp->offset = mmio.offset;
+        resp->size = mmio.size;
+        resp_handles[0].reset(mmio.vmo);
+        *resp_handle_count = 1;
+      }
+      return status;
+    }
+    case PdevOp::GET_INTERRUPT: {
+      zx::interrupt irq;
+      auto status = pdev_client_.proto_client().GetInterrupt(req->index, req->flags, &irq);
+      if (status == ZX_OK) {
+        resp_handles[0] = std::move(irq);
+        *resp_handle_count = 1;
+      }
+      return status;
+    }
+    case PdevOp::GET_BTI: {
+      zx::bti bti;
+      auto status = pdev_client_.proto_client().GetBti(req->index, &bti);
+      if (status == ZX_OK) {
+        resp_handles[0] = std::move(bti);
+        *resp_handle_count = 1;
+      }
+      return status;
+    }
+    case PdevOp::GET_SMC: {
+      zx::resource resource;
+      auto status = pdev_client_.proto_client().GetSmc(req->index, &resource);
+      if (status == ZX_OK) {
+        resp_handles[0] = std::move(resource);
+        *resp_handle_count = 1;
+      }
+      return status;
+    }
+    case PdevOp::GET_DEVICE_INFO:
+      return pdev_client_.proto_client().GetDeviceInfo(&resp->device_info);
+    case PdevOp::GET_BOARD_INFO:
+      return pdev_client_.proto_client().GetBoardInfo(&resp->board_info);
+    default:
+      zxlogf(ERROR, "%s: unknown pdev op %u", __func__, static_cast<uint32_t>(req->op));
+      return ZX_ERR_INTERNAL;
+  }
+}
+
 zx_status_t Fragment::RpcSpi(const uint8_t* req_buf, uint32_t req_size, uint8_t* resp_buf,
                              uint32_t* out_resp_size, zx::handle* req_handles,
                              uint32_t req_handle_count, zx::handle* resp_handles,
@@ -291,6 +355,10 @@ zx_status_t Fragment::ReadFidlFromChannel() {
       status = RpcGpio(req_buf, actual, resp_buf, &resp_len, req_handles, req_handle_count,
                        resp_handles, &resp_handle_count);
       break;
+    case ZX_PROTOCOL_PDEV:
+      status = RpcPdev(req_buf, actual, resp_buf, &resp_len, req_handles, req_handle_count,
+                       resp_handles, &resp_handle_count);
+      break;
     case ZX_PROTOCOL_SPI:
       status = RpcSpi(req_buf, actual, resp_buf, &resp_len, req_handles, req_handle_count,
                       resp_handles, &resp_handle_count);
@@ -340,6 +408,13 @@ zx_status_t Fragment::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
         return ZX_ERR_NOT_SUPPORTED;
       }
       dai_client_.proto_client().GetProto(static_cast<dai_protocol_t*>(out_protocol));
+      return ZX_OK;
+    }
+    case ZX_PROTOCOL_PDEV: {
+      if (!pdev_client_.proto_client().is_valid()) {
+        return ZX_ERR_NOT_SUPPORTED;
+      }
+      pdev_client_.proto_client().GetProto(static_cast<pdev_protocol_t*>(out_protocol));
       return ZX_OK;
     }
     case ZX_PROTOCOL_SPI: {

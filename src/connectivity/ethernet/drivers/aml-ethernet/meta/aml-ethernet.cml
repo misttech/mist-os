@@ -11,6 +11,7 @@
         runner: "driver",
         bind: "meta/bind/aml_eth_bind.bindbc",
         compat: "driver/aml-ethernet.so",
+        colocate: "false",
         default_dispatcher_opts: [ "allow_sync_calls" ],
     },
     capabilities: [

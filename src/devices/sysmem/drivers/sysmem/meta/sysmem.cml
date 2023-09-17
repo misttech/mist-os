@@ -10,6 +10,7 @@
     program: {
         runner: "driver",
         bind: "meta/bind/sysmem.bindbc",
+        colocate: "false",
         compat: "driver/sysmem.so",
     },
     capabilities: [

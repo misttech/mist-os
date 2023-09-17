@@ -11,6 +11,7 @@
         runner: "driver",
         bind: "meta/bind/focaltech.bindbc",
         compat: "driver/focaltech.so",
+        colocate: "false",
         default_dispatcher_opts: [ "allow_sync_calls" ],
     },
     use: [

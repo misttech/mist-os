@@ -393,7 +393,7 @@ void AmlUsbCrgPhy::RemoveUdcDevice(SetModeCompletion completion) {
 
 zx_status_t AmlUsbCrgPhy::Init() {
   zx_status_t status = ZX_OK;
-  pdev_ = ddk::PDevFidl::FromFragment(parent());
+  pdev_ = ddk::PDev::FromFragment(parent());
   if (!pdev_.is_valid()) {
     zxlogf(ERROR, "AmlUsbCrgPhy::Init: could not get platform device protocol");
     return ZX_ERR_NOT_SUPPORTED;

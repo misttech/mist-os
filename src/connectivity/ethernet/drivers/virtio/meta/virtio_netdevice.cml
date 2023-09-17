@@ -10,6 +10,7 @@
     program: {
         runner: "driver",
         bind: "meta/bind/virtio_ethernet_bind.bindbc",
+        colocate: "false",
         compat: "driver/virtio_netdevice.so",
     },
     use: [

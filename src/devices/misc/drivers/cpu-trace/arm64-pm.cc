@@ -5,6 +5,7 @@
 // See the README.md in this directory for documentation.
 
 #include <assert.h>
+#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/debug.h>
 
 #include "perf-mon.h"

@@ -39,6 +39,7 @@
 #include <sdk/lib/component/outgoing/cpp/outgoing_directory.h>
 
 #include "platform-device.h"
+#include "proxy-protocol.h"
 
 namespace platform_bus {
 
@@ -91,7 +92,7 @@ class PlatformBus : public PlatformBusType,
   void GetInterruptControllerInfo(GetInterruptControllerInfoCompleter::Sync& completer) override;
 
   // IOMMU protocol implementation.
-  zx_status_t IommuGetBti(uint32_t iommu_index, uint64_t bti_id, zx::bti* out_bti);
+  zx_status_t IommuGetBti(uint32_t iommu_index, uint32_t bti_id, zx::bti* out_bti);
 
   // Returns the resource handle to be used for creating MMIO regions, IRQs, and SMC ranges.
   // Currently this just returns the root resource, but we may change this to a more

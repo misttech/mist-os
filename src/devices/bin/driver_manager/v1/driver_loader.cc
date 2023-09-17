@@ -73,7 +73,8 @@ void DriverLoader::WaitForBaseDrivers(fit::callback<void()> callback) {
       });
 }
 
-const Driver* DriverLoader::LoadDriverUrl(const std::string& manifest_url, bool use_full_resolver) {
+const Driver* DriverLoader::LoadDriverUrl(const std::string& manifest_url,
+                                          bool use_full_resolver) {
   // Check if we've already loaded this driver. If we have then return it.
   if (const Driver* driver = UrlToDriver(manifest_url); driver != nullptr) {
     return driver;
@@ -236,9 +237,6 @@ const std::vector<MatchedDriver> DriverLoader::MatchPropertiesDriverIndex(
 
   if (fidl_driver_info.has_colocate()) {
     matched_driver_info.colocate = fidl_driver_info.colocate();
-  }
-  if (fidl_driver_info.has_use_fidl_proxy()) {
-    matched_driver_info.use_fidl_proxy = fidl_driver_info.use_fidl_proxy();
   }
   if (fidl_driver_info.has_package_type()) {
     matched_driver_info.package_type = fidl_driver_info.package_type();

@@ -39,11 +39,12 @@ class MockRegistersInternal {
     auto& [client_end, server_end] = endpoints.value();
     reset_mock_->Init(std::move(server_end));
 
+    ddk::PDevFidl pdev;
     zx::resource smc_monitor;
     auto device = std::make_unique<AmlNnaDevice>(
         fake_parent_.get(), hiu_mock_.GetMmioBuffer(), power_mock_.GetMmioBuffer(),
-        memory_pd_mock_.GetMmioBuffer(), std::move(client_end), nna_block, std::move(smc_monitor),
-        device_loop_.dispatcher());
+        memory_pd_mock_.GetMmioBuffer(), std::move(client_end), std::move(pdev), nna_block,
+        std::move(smc_monitor));
     ASSERT_NOT_NULL(device);
     EXPECT_OK(device->Init());
 
@@ -63,7 +64,6 @@ class MockRegistersInternal {
 
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
-  async::Loop device_loop_{&kAsyncLoopConfigNeverAttachToThread};
   std::unique_ptr<mock_registers::MockRegisters> reset_mock_;
 };
 

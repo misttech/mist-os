@@ -46,9 +46,6 @@ type MatchedDriverInfo = table {
 
     /// Device categories
     6: device_categories vector<DeviceCategory>:MAX;
-
-    /// If this is true then the driver should use the fidl proxy.
-    7: use_fidl_proxy bool;
 };
 
 /// Information for a composite driver matched by the driver index.

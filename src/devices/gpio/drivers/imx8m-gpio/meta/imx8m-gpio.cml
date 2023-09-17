@@ -12,6 +12,7 @@
         bind: "meta/bind/imx8m-gpio.bindbc",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         compat: "driver/imx8m-gpio.so",
+        colocate: "true",
     },
     use: [
         { service: "fuchsia.hardware.platform.bus.Service" },

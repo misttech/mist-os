@@ -10,6 +10,7 @@
     program: {
         runner: "driver",
         bind: "meta/bind/intel-i915-bind.bindbc",
+        colocate: "false",
         compat: "driver/intel-i915.so",
     },
     use: [

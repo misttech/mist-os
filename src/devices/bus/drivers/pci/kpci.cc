@@ -5,6 +5,7 @@
 #include "src/devices/bus/drivers/pci/kpci.h"
 
 #include <fuchsia/hardware/pciroot/cpp/banjo.h>
+#include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
@@ -135,11 +136,11 @@ zx_status_t pci_get_bti(kpci_device* device, uint32_t index, zx::bti* out_bti) {
                  (static_cast<uint32_t>(device->info.dev_id) << 3) | device->info.func_id;
   if (device->pciroot.ops) {
     st = pciroot_get_bti(&device->pciroot, bdf, index, out_bti->reset_and_get_address());
-  } else if (device->pdev.is_valid()) {
+  } else if (device->pdev.ops) {
     // TODO(teisenbe): This isn't quite right. We need to develop a way to
     // resolve which BTI should go to downstream. However, we don't currently
     // support any SMMUs for ARM, so this will work for now.
-    st = device->pdev.GetBti(0, out_bti);
+    st = pdev_get_bti(&device->pdev, 0, out_bti->reset_and_get_address());
   }
 
   return st;
@@ -189,7 +190,7 @@ static zx_status_t pci_init_child(zx_device_t* parent, uint32_t index,
   // Store the PCIROOT protocol for use with get_bti in the pci protocol It is
   // not fatal if this fails, but bti protocol methods will not work.
   device_get_protocol(parent, ZX_PROTOCOL_PCIROOT, &device.pciroot);
-  device.pdev = ddk::PDevFidl(parent);
+  device_get_protocol(parent, ZX_PROTOCOL_PDEV, &device.pdev);
 
   bool uses_acpi = false;
   for (size_t i = 0; i < plat_info->acpi_bdfs_count; i++) {
@@ -203,7 +204,7 @@ static zx_status_t pci_init_child(zx_device_t* parent, uint32_t index,
 
   snprintf(device.name, sizeof(device.name), "%02x:%02x.%1x", device.info.bus_id,
            device.info.dev_id, device.info.func_id);
-  status = KernelPci::CreateComposite(parent, std::move(device), uses_acpi);
+  status = KernelPci::CreateComposite(parent, device, uses_acpi);
   if (status != ZX_OK) {
     zxlogf(ERROR, "failed to create FIDL kPCI for %#02x:%#02x.%1x (%#04x:%#04x)", info.bus_id,
            info.dev_id, info.func_id, info.vendor_id, info.device_id);
@@ -229,7 +230,7 @@ zx_status_t KernelPci::CreateComposite(zx_device_t* parent, kpci_device device, 
 
   async_dispatcher_t* dispatcher =
       fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher());
-  auto kpci = std::make_unique<KernelPci>(parent, std::move(device), dispatcher);
+  auto kpci = std::make_unique<KernelPci>(parent, device, dispatcher);
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {
@@ -283,10 +284,7 @@ zx_status_t KernelPci::CreateComposite(zx_device_t* parent, kpci_device device, 
 }
 
 KernelPci::KernelPci(zx_device_t* parent, kpci_device device, async_dispatcher_t* dispatcher)
-    : KernelPciType(parent),
-      device_(std::move(device)),
-      dispatcher_(dispatcher),
-      outgoing_(dispatcher) {}
+    : KernelPciType(parent), device_(device), dispatcher_(dispatcher), outgoing_(dispatcher) {}
 
 void KernelPci::DdkRelease() {
   if (device_.handle != ZX_HANDLE_INVALID) {

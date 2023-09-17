@@ -8,7 +8,10 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 group("platform") {
-  deps = [ ":platform-bus" ]
+  deps = [
+    ":platform-bus",
+    ":platform-bus.proxy",
+  ]
 }
 
 driver_bind_rules("platform-bus-bind") {
@@ -19,6 +22,7 @@ driver_bind_rules("platform-bus-bind") {
 fuchsia_driver("platform-bus-driver") {
   output_name = "platform-bus"
   sources = [
+    "cpu-trace.cc",
     "platform-bus.cc",
     "platform-device.cc",
     "platform-interrupt.cc",
@@ -64,11 +68,39 @@ fuchsia_driver_component("platform-bus") {
 
 fuchsia_driver_package("package") {
   package_name = "platform-bus"
-  driver_components = [ ":platform-bus" ]
+  driver_components = [
+    ":platform-bus",
+    ":platform-bus.proxy",
+  ]
+}
+
+fuchsia_driver("platform-bus.proxy-driver") {
+  output_name = "platform-bus.proxy"
+  sources = [ "platform-proxy.cc" ]
+  deps = [
+    ":platform-bus-bind",
+    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
+    "//src/devices/lib/driver",
+    "//src/lib/ddk",
+    "//src/lib/ddktl",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/zircon-internal",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+fuchsia_driver_component("platform-bus.proxy") {
+  visibility = [ ":*" ]
+  component_name = "platform-bus.proxy"
+  deps = [ ":platform-bus.proxy-driver" ]
+  info = "platform-bus.proxy-info.json"
+  manifest = "meta/platform-bus.proxy.cml"
 }
 
 test("platform-bus-unittest") {
   sources = [
+    "cpu-trace.cc",
     "platform-bus-unittest.cc",
     "platform-bus.cc",
     "platform-device.cc",

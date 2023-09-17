@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.hardware.dsi/cpp/wire.h>
 #include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
+#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/dispatcher.h>

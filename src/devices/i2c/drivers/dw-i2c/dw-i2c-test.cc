@@ -5,6 +5,7 @@
 #include "dw-i2c.h"
 
 #include <fuchsia/hardware/i2cimpl/c/banjo.h>
+#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
@@ -34,7 +35,8 @@ class DwI2cTester {
  public:
   static constexpr uint32_t kBufferDepth = 0x80;
   DwI2cTester()
-      : mock_i2c_regs_(kRegSize, kRegCount), mmio_buffer_(mock_i2c_regs_.GetMmioBuffer()) {
+      : mock_i2c_regs_(kRegSize, kRegCount),
+        mmio_buffer_(mock_i2c_regs_.GetMmioBuffer()) {
     SetupRegisters();
 
     fbl::AllocChecker ac;

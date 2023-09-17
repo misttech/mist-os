@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.dsp/cpp/markers.h>
 #include <fidl/fuchsia.hardware.mailbox/cpp/markers.h>
+#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>

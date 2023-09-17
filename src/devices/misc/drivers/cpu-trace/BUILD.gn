@@ -35,8 +35,8 @@ if (current_cpu != "arm64" && current_cpu != "x64") {
     ]
 
     deps = [
+      "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
       "//sdk/fidl/fuchsia.perfmon.cpu:fuchsia.perfmon.cpu_cpp_wire",
-      "//src/devices/bus/lib/device-protocol-pdev",
       "//src/devices/lib/driver:driver_runtime",
       "//zircon/system/ulib/fbl",
       "//zircon/system/ulib/zircon-internal",

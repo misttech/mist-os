@@ -13,10 +13,8 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
         compat: "driver/test-gpio.so",
         colocate: "true",
-        use_fidl_proxy: "true",
     },
     use: [
         { service: "fuchsia.hardware.platform.bus.Service" },
-        { service: "fuchsia.hardware.platform.device.Service" },
     ],
 }

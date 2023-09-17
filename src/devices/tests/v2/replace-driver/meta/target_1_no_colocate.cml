@@ -9,6 +9,7 @@
     program: {
         runner: "driver",
         binary: "driver/reload_test_target_1_driver.so",
+        colocate: "false",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         bind: "meta/bind/target_1.bindbc",
     },

@@ -11,6 +11,7 @@
         runner: "driver",
         bind: "meta/bind/vim3-pwm-backlight.bindbc",
         compat: "driver/vim3-pwm-backlight.so",
+        colocate: "false",
         default_dispatcher_opts: [ "allow_sync_calls" ],
     },
     use: [

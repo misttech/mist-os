@@ -9,8 +9,6 @@
 #include <lib/ddk/platform-defs.h>
 #include <stdlib.h>
 
-#include <iterator>
-
 #define DRIVER_NAME "test-child-1"
 
 typedef struct {
@@ -29,7 +27,7 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
 
   zxlogf(INFO, "test_bind: %s ", DRIVER_NAME);
 
-  auto* child_2 = reinterpret_cast<test_t*>(calloc(1, sizeof(test_t)));
+  test_t* child_2 = calloc(1, sizeof(test_t));
   if (!child_2) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -46,7 +44,7 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
       .ctx = child_2,
       .ops = &test_device_protocol,
       .props = child_2_props,
-      .prop_count = std::size(child_2_props),
+      .prop_count = countof(child_2_props),
   };
 
   status = device_add(parent, &child_2_args, &child_2->zxdev);
@@ -56,7 +54,7 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
     return status;
   }
 
-  auto* child_3 = reinterpret_cast<test_t*>(calloc(1, sizeof(test_t)));
+  test_t* child_3 = calloc(1, sizeof(test_t));
   if (!child_3) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -73,7 +71,7 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
       .ctx = child_3,
       .ops = &test_device_protocol,
       .props = child_3_props,
-      .prop_count = std::size(child_3_props),
+      .prop_count = countof(child_3_props),
   };
 
   status = device_add(parent, &child_3_args, &child_3->zxdev);

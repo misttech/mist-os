@@ -12,6 +12,7 @@
         bind: "meta/bind/imx8m-i2c.bindbc",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         compat: "driver/imx8m-i2c.so",
+        colocate: "true",
     },
     use: [
         { service: "fuchsia.hardware.platform.bus.Service" },

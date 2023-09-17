@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_CRG_UDC_CRG_UDC_H_
 #define SRC_DEVICES_USB_DRIVERS_CRG_UDC_CRG_UDC_H_
 
+#include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/usb/dci/cpp/banjo.h>
 #include <fuchsia/hardware/usb/phy/cpp/banjo.h>
 #include <lib/ddk/debug.h>
