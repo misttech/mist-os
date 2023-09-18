@@ -103,7 +103,7 @@ INSTANTIATE_TEST_SUITE_P(
                                        "my realm", "~", "`", "!", "@", "$", "%", "^", "&", "*", "(",
                                        ")", "=", "+", "{", "}", "[", "]", "|", "?", ";", "'", "\"",
                                        "<", ">", ",",
-                                       "fuchsia-pkg://fuchsia.com/abcd#meta/abcd.cmx"),
+                                       "fuchsia-pkg://fuchsia.com/abcd#meta/abcd.cm"),
                       ::zxtest::Bool()));
 
 class ConstructorTestParent : public zxtest::TestWithParam<int> {

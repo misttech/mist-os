@@ -34,7 +34,7 @@ class ProtoEventTest : public ::testing::Test {
     decode_options_.output_mode = OutputMode::kStandard;
     dispatcher_ =
         std::make_unique<SyscallDisplayDispatcher>(loader_, decode_options_, display_options_, ss_);
-    Process* process = dispatcher_->CreateProcess("my_process.cmx", kPid, nullptr);
+    Process* process = dispatcher_->CreateProcess("my_process", kPid, nullptr);
     dispatcher_->CreateThread(kTid, process);
   }
 
@@ -79,17 +79,17 @@ TEST_PROTO_EVENT(ProcessMonitoredFailed,
                  std::make_shared<ProcessMonitoredEvent>(kEventTimestamp,
                                                          dispatcher()->SearchProcess(kPid),
                                                          "got an error"),
-                 "\n0 Can't monitor my_process.cmx koid=1234 : got an error\n")
+                 "\n0 Can't monitor my_process koid=1234 : got an error\n")
 
 TEST_PROTO_EVENT(ProcessMonitoredOk,
                  std::make_shared<ProcessMonitoredEvent>(kEventTimestamp,
                                                          dispatcher()->SearchProcess(kPid), ""),
-                 "\n0 Monitoring my_process.cmx koid=1234\n")
+                 "\n0 Monitoring my_process koid=1234\n")
 
 TEST_PROTO_EVENT(StopMonitoring,
                  std::make_shared<StopMonitoringEvent>(kEventTimestamp,
                                                        dispatcher()->SearchProcess(kPid)),
-                 "\n0 Stop monitoring my_process.cmx koid 1234\n")
+                 "\n0 Stop monitoring my_process koid 1234\n")
 
 TEST_F(ProtoEventTest, InvokedAndOutputEvent) {
   Syscall* syscall = dispatcher()->SearchSyscall("zx_channel_create");
@@ -134,7 +134,7 @@ TEST_F(ProtoEventTest, InvokedAndOutputEvent) {
   ASSERT_EQ(
       result,
       "\n"
-      "0.010000 my_process.cmx 1234:5678 zx_channel_create(options: uint32 = 0)\n"
+      "0.010000 my_process 1234:5678 zx_channel_create(options: uint32 = 0)\n"
       "0.020000   -> ZX_OK (out0: handle = Channel:0000abcd, out1: handle = Channel:0000beef)\n");
 }
 
@@ -151,9 +151,9 @@ TEST_F(ProtoEventTest, Exception) {
   std::string result = GetResult();
   ASSERT_EQ(result,
             "\n"
-            "0.000000 my_process.cmx 1234:5678 at tools/fidlcat/main.cc:10:20 main\n"
-            "0.000000 my_process.cmx 1234:5678 at tools/fidlcat/foo.cc:100:2 foo\n"
-            "0.000000 my_process.cmx 1234:5678 thread stopped on exception\n");
+            "0.000000 my_process 1234:5678 at tools/fidlcat/main.cc:10:20 main\n"
+            "0.000000 my_process 1234:5678 at tools/fidlcat/foo.cc:100:2 foo\n"
+            "0.000000 my_process 1234:5678 thread stopped on exception\n");
 }
 
 }  // namespace fidlcat

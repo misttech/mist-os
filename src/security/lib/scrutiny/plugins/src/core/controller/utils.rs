@@ -119,7 +119,7 @@ mod tests {
 
         let comp = make_component(
             123,
-            "fuchsia-pkg://fuchsia.com/fake#meta/fake.cmx",
+            "fuchsia-pkg://fuchsia.com/fake#meta/fake.cm",
             0,
             fake_component_src_pkg(),
         );
@@ -138,7 +138,7 @@ mod tests {
 
         let comp = make_component(
             123,
-            "fuchsia-pkg://fuchsia.com/fake#meta/fake.cmx",
+            "fuchsia-pkg://fuchsia.com/fake#meta/fake.cm",
             0,
             fake_component_src_pkg(),
         );
@@ -156,7 +156,7 @@ mod tests {
         let model = fake_data_model();
         let comp = make_component(
             123,
-            "fuchsia-pkg://fuchsia.com/fake#meta/fake.cmx",
+            "fuchsia-pkg://fuchsia.com/fake#meta/fake.cm",
             0,
             fake_component_src_pkg(),
         );
@@ -165,7 +165,7 @@ mod tests {
         model.set(components).unwrap();
         let request = DefaultComponentRequest {
             component_id: None,
-            url: Some("fuchsia-pkg://fuchsia.com/fake#meta/fake.cmx".to_string()),
+            url: Some("fuchsia-pkg://fuchsia.com/fake#meta/fake.cm".to_string()),
         };
         let component_id = request.component_id(model).unwrap();
         assert_eq!(component_id, 123);
@@ -176,7 +176,7 @@ mod tests {
         let model = fake_data_model();
         let comp = make_component(
             123,
-            "fuchsia-pkg://fuchsia.com/fake#meta/fake.cmx",
+            "fuchsia-pkg://fuchsia.com/fake#meta/fake.cm",
             0,
             fake_component_src_pkg(),
         );
@@ -192,7 +192,7 @@ mod tests {
         let model = fake_data_model();
         let comp = make_component(
             123,
-            "fuchsia-pkg://fuchsia.com/fake#meta/fake.cmx",
+            "fuchsia-pkg://fuchsia.com/fake#meta/fake.cm",
             0,
             fake_component_src_pkg(),
         );

@@ -60,7 +60,7 @@ class SessionAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         self.device.session.start()
 
         wrong_url = "fuchsia-pkg://fuchsia.com/flatland-examples#meta/" \
-                    "flatland-view-provider.cmx"
+                    "flatland-view-provider.cm"
 
         with asserts.assert_raises(errors.SessionError):
             self.device.session.add_component(wrong_url)

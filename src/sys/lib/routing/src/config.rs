@@ -762,7 +762,7 @@ mod tests {
         std::path::PathBuf, tempfile::TempDir,
     };
 
-    const FOO_PKG_URL: &str = "fuchsia-pkg://fuchsia.com/foo#meta/foo.cmx";
+    const FOO_PKG_URL: &str = "fuchsia-pkg://fuchsia.com/foo#meta/foo.cm";
 
     macro_rules! test_function_ok {
         ( $function:path, $($test_name:ident => ($input:expr, $expected:expr)),+ ) => {

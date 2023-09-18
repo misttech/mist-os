@@ -521,7 +521,7 @@ where
 }
 
 fn is_component_manifest(s: &str) -> bool {
-    s.ends_with(".cm") || s.ends_with(".cmx")
+    s.ends_with(".cm")
 }
 
 pub(crate) async fn get_tuf_client<R>(
@@ -718,22 +718,13 @@ mod tests {
                     hash: Some(PKG1_HASH.into()),
                     size: Some(24603),
                     modified: Some(pkg1_modified),
-                    entries: Some(vec![
-                        PackageEntry {
-                            path: Some("meta/package1.cm".into()),
-                            hash: None,
-                            size: Some(11),
-                            modified: Some(pkg1_modified),
-                            ..Default::default()
-                        },
-                        PackageEntry {
-                            path: Some("meta/package1.cmx".into()),
-                            hash: None,
-                            size: Some(12),
-                            modified: Some(pkg1_modified),
-                            ..Default::default()
-                        },
-                    ]),
+                    entries: Some(vec![PackageEntry {
+                        path: Some("meta/package1.cm".into()),
+                        hash: None,
+                        size: Some(11),
+                        modified: Some(pkg1_modified),
+                        ..Default::default()
+                    },]),
                     ..Default::default()
                 },
                 RepositoryPackage {
@@ -741,22 +732,13 @@ mod tests {
                     hash: Some(PKG2_HASH.into()),
                     size: Some(24603),
                     modified: Some(pkg2_modified),
-                    entries: Some(vec![
-                        PackageEntry {
-                            path: Some("meta/package2.cm".into()),
-                            hash: None,
-                            size: Some(11),
-                            modified: Some(pkg2_modified),
-                            ..Default::default()
-                        },
-                        PackageEntry {
-                            path: Some("meta/package2.cmx".into()),
-                            hash: None,
-                            size: Some(12),
-                            modified: Some(pkg2_modified),
-                            ..Default::default()
-                        },
-                    ]),
+                    entries: Some(vec![PackageEntry {
+                        path: Some("meta/package2.cm".into()),
+                        hash: None,
+                        size: Some(11),
+                        modified: Some(pkg2_modified),
+                        ..Default::default()
+                    },]),
                     ..Default::default()
                 },
             ],

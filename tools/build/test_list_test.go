@@ -16,7 +16,7 @@ func TestLoadTestList(t *testing.T) {
 	  "schema_id": "experimental",
 	  "data": [
 	    {
-	      "name": "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component1.cmx",
+	      "name": "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component1.cm",
 	      "labels": [
 	        "//garnet/bin/fuchsia:fuchsia_pkg_test_component1(//build/toolchain/fuchsia:x64)"
 	      ],
@@ -28,7 +28,7 @@ func TestLoadTestList(t *testing.T) {
 	      ]
 	    },
 	    {
-	      "name": "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component2.cmx",
+	      "name": "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component2.cm",
 	      "labels": [
 	        "//garnet/bin/fuchsia:fuchsia_pkg(//build/toolchain/fuchsia:x64)"
 	      ],
@@ -44,7 +44,7 @@ func TestLoadTestList(t *testing.T) {
 	      ]
 	    },
 	    {
-	      "name": "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component3.cmx",
+	      "name": "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component3.cm",
 	      "labels": [
 	        "//garnet/bin/fuchsia:fuchsia_pkg(//build/toolchain/fuchsia:x64)"
 	      ]
@@ -52,18 +52,18 @@ func TestLoadTestList(t *testing.T) {
 	  ]
 	}`
 	expected := map[string]TestListEntry{
-		"fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component1.cmx": {
-			Name:   "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component1.cmx",
+		"fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component1.cm": {
+			Name:   "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component1.cm",
 			Labels: []string{"//garnet/bin/fuchsia:fuchsia_pkg_test_component1(//build/toolchain/fuchsia:x64)"},
 			Tags:   []TestTag{{Key: "key", Value: "value"}},
 		},
-		"fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component2.cmx": {
-			Name:   "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component2.cmx",
+		"fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component2.cm": {
+			Name:   "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component2.cm",
 			Labels: []string{"//garnet/bin/fuchsia:fuchsia_pkg(//build/toolchain/fuchsia:x64)"},
 			Tags:   []TestTag{{Key: "key", Value: "value"}, {Key: "key2", Value: "value2"}},
 		},
-		"fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component3.cmx": {
-			Name:   "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component3.cmx",
+		"fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component3.cm": {
+			Name:   "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component3.cm",
 			Labels: []string{"//garnet/bin/fuchsia:fuchsia_pkg(//build/toolchain/fuchsia:x64)"},
 		},
 	}
@@ -83,7 +83,7 @@ func TestLoadTestListVersionMismatch(t *testing.T) {
 	  "schema_id": "1234",
 	  "data": [
 	    {
-	      "name": "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component1.cmx",
+	      "name": "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component1.cm",
 	      "labels": [
 	        "//garnet/bin/fuchsia:fuchsia_pkg_test_component1(//build/toolchain/fuchsia:x64)"
 	      ],
@@ -112,7 +112,7 @@ func TestLoadTestListVersionMissing(t *testing.T) {
 	manifest := `{
 	  "data": [
 	    {
-	      "name": "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component1.cmx",
+	      "name": "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component1.cm",
 	      "labels": [
 	        "//garnet/bin/fuchsia:fuchsia_pkg_test_component1(//build/toolchain/fuchsia:x64)"
 	      ],

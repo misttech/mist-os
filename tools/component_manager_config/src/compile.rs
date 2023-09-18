@@ -585,7 +585,7 @@ mod tests {
                 }
             ],
             num_threads: 321,
-            root_component_url: "fuchsia-pkg://fuchsia.com/foo#meta/foo.cmx",
+            root_component_url: "fuchsia-pkg://fuchsia.com/foo#meta/foo.cm",
             component_id_index_path: "/this/is/an/absolute/path",
             log_destination: "klog",
             log_all_events: true,
@@ -697,7 +697,7 @@ mod tests {
                     }),
                 ]),
                 num_threads: Some(321),
-                root_component_url: Some("fuchsia-pkg://fuchsia.com/foo#meta/foo.cmx".to_string()),
+                root_component_url: Some("fuchsia-pkg://fuchsia.com/foo#meta/foo.cm".to_string()),
                 component_id_index_path: Some("/this/is/an/absolute/path".to_string()),
                 log_destination: Some(component_internal::LogDestination::Klog),
                 log_all_events: Some(true),

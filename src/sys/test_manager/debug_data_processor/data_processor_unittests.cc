@@ -103,7 +103,7 @@ TEST_F(WriteSummaryFileTest, OneTestWithMultipleDataSinks) {
   data_sink_map["sink2"] = {{"path/path2_0", "path2_0"}, {"path/path2", "path2"}};
   data_sink_map["sink3"] = {{"path/path3", "path3"}};
 
-  map["simple_test.cmx"] = std::move(data_sink_map);
+  map["simple_test.cm"] = std::move(data_sink_map);
 
   auto fd = GetTempDirFd();
   processor()->WriteSummaryFile(fd, map);
@@ -118,28 +118,28 @@ TEST_F(WriteSummaryFileTest, MultipleTestWithMultipleDataSinks) {
   data_sink_map["test1_sink2"] = {{"path/path2_0", "path2_0"}, {"path/path2", "path2"}};
   data_sink_map["test1_sink3"] = {{"path/path3", "path3"}};
 
-  map["test_url1.cmx"] = std::move(data_sink_map);
+  map["test_url1.cm"] = std::move(data_sink_map);
 
   data_sink_map = DataSinkMap();
   data_sink_map["sink1"] = {{"path/path1", "path1"}, {"path/path1_1", "path1_1"}};
   data_sink_map["sink2"] = {{"path/path2_0", "path2_0"}, {"path/path2", "path2"}};
   data_sink_map["sink3"] = {{"path/path3", "path3"}};
 
-  map["test_url2.cmx"] = std::move(data_sink_map);
+  map["test_url2.cm"] = std::move(data_sink_map);
 
   data_sink_map = DataSinkMap();
   data_sink_map["test3_sink1"] = {{"path/path1", "path1"}, {"path/path1_1", "path1_1"}};
   data_sink_map["test3_sink2"] = {{"path/path2_0", "path2_0"}, {"path/path2", "path2"}};
   data_sink_map["test3_sink3"] = {{"path/path3", "path3"}};
 
-  map["test_url3.cmx"] = std::move(data_sink_map);
+  map["test_url3.cm"] = std::move(data_sink_map);
 
   data_sink_map = DataSinkMap();
   data_sink_map["sink1"] = {{"path/path1", "path1"}, {"path/path1_1", "path1_1"}};
   data_sink_map["sink2"] = {{"path/path2_0", "path2_0"}, {"path/path2", "path2"}};
   data_sink_map["sink3"] = {{"path/path3", "path3"}};
 
-  map["test_url4.cmx"] = std::move(data_sink_map);
+  map["test_url4.cm"] = std::move(data_sink_map);
 
   auto fd = GetTempDirFd();
   processor()->WriteSummaryFile(fd, map);
@@ -154,14 +154,14 @@ TEST_F(WriteSummaryFileTest, MultipleWriteSummaryFileCalls) {
   data_sink_map["sink2"] = {{"path/path2_0", "path2_0"}, {"path/path2", "path2"}};
   data_sink_map["sink3"] = {{"path/path3", "path3"}};
 
-  map["test_url1.cmx"] = std::move(data_sink_map);
+  map["test_url1.cm"] = std::move(data_sink_map);
 
   data_sink_map = DataSinkMap();
   data_sink_map["sink1"] = {{"path/path1", "path1"}, {"path/path1_1", "path1_1"}};
   data_sink_map["sink2"] = {{"path/path2_0", "path2_0"}, {"path/path2", "path2"}};
   data_sink_map["sink3"] = {{"path/path3", "path3"}};
 
-  map["test_url2.cmx"] = std::move(data_sink_map);
+  map["test_url2.cm"] = std::move(data_sink_map);
 
   // test that reading empty tets url doesn't lead to crash
   data_sink_map = DataSinkMap();
@@ -180,21 +180,21 @@ TEST_F(WriteSummaryFileTest, MultipleWriteSummaryFileCalls) {
       {"path/path2",
        "path2_modified"}};  // we will keep old one and not override it in summary.json.
 
-  data_sink_map["sink4"] = {{"path/path4", "path4"}};   // add new sink.
-  new_map["test_url1.cmx"] = std::move(data_sink_map);  // should still come back as FAIL
+  data_sink_map["sink4"] = {{"path/path4", "path4"}};  // add new sink.
+  new_map["test_url1.cm"] = std::move(data_sink_map);  // should still come back as FAIL
 
   data_sink_map = DataSinkMap();
   data_sink_map["sink1"] = {{"path/path1", "path1"}, {"path/path1_1", "path1_1"}};
   data_sink_map["sink2"] = {{"path/path2_0", "path2_0"}, {"path/path2", "path2"}};
   data_sink_map["sink3"] = {{"path/path3", "path3"}};
 
-  new_map["test_url3.cmx"] = std::move(data_sink_map);
+  new_map["test_url3.cm"] = std::move(data_sink_map);
   processor()->WriteSummaryFile(fd, new_map);
 
   auto expected_map = std::move(map);
-  expected_map["test_url1.cmx"]["sink1"]["path/path1_2"] = "path1_2";
-  expected_map["test_url1.cmx"]["sink4"] = {{"path/path4", "path4"}};
-  expected_map["test_url3.cmx"] = new_map["test_url3.cmx"];
+  expected_map["test_url1.cm"]["sink1"]["path/path1_2"] = "path1_2";
+  expected_map["test_url1.cm"]["sink4"] = {{"path/path4", "path4"}};
+  expected_map["test_url3.cm"] = new_map["test_url3.cm"];
 
   AssertSummaryJson(expected_map, std::move(fd));
   ASSERT_FALSE(testing::Test::HasFailure());

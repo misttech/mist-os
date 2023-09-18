@@ -360,7 +360,7 @@ mod tests {
             Ok(read_len) => {
                 let msg = diagnostics_message::from_structured(
                     MonikerWithUrl {
-                        moniker: "test-pkg/test-component.cmx".to_string(),
+                        moniker: "test-pkg/test-component".to_string(),
                         url: "fuchsia-pkg://fuchsia.com/test-pkg#meta/test-component.cm"
                             .to_string(),
                     },

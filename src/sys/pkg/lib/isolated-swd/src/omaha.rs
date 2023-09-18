@@ -276,7 +276,7 @@ mod tests {
         let test_package = PackageBuilder::new("test_package")
             .add_resource_at("bin/hello", "this is a test".as_bytes())
             .add_resource_at("data/file", "this is a file".as_bytes())
-            .add_resource_at("meta/test_package.cmx", "{}".as_bytes())
+            .add_resource_at("meta/test_package.cm", "{}".as_bytes())
             .build()
             .await
             .context("Building test_package")?;

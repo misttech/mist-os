@@ -21,9 +21,9 @@ func TestUnmarshalTest(t *testing.T) {
 				"max_severity": "ERROR",
 				"min_severity": "DEBUG"
 			  },
-			  "name": "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component1.cmx",
+			  "name": "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component1.cm",
 			  "os": "fuchsia",
-			  "package_url": "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component1.cmx",
+			  "package_url": "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component1.cm",
 			  "package_label": "//garnet/bin/fuchsia:fuchsia_pkg(//build/toolchain/fuchsia:x64)",
 			  "path": "",
 			  "parallel": 2
@@ -36,9 +36,9 @@ func TestUnmarshalTest(t *testing.T) {
 			  "label": "//garnet/bin/fuchsia:fuchsia_pkg(//build/toolchain/fuchsia:x64)",
 			  "log_settings": {
 			  },
-			  "name": "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component2.cmx",
+			  "name": "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component2.cm",
 			  "os": "fuchsia",
-			  "package_url": "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component2.cmx",
+			  "package_url": "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component2.cm",
 			  "path": ""
 			}
 		  },
@@ -53,9 +53,9 @@ func TestUnmarshalTest(t *testing.T) {
 			"test": {
 			  "cpu": "x64",
 			  "label": "//garnet/bin/fuchsia:fuchsia_pkg(//build/toolchain/fuchsia:x64)",
-			  "name": "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component3.cmx",
+			  "name": "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component3.cm",
 			  "os": "fuchsia",
-			  "package_url": "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component3.cmx",
+			  "package_url": "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component3.cm",
 			  "path": ""
 			}
 		  }
@@ -63,8 +63,8 @@ func TestUnmarshalTest(t *testing.T) {
 	expected := []TestSpec{
 		{
 			Test: Test{
-				Name:            "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component1.cmx",
-				PackageURL:      "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component1.cmx",
+				Name:            "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component1.cm",
+				PackageURL:      "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component1.cm",
 				PackageLabel:    "//garnet/bin/fuchsia:fuchsia_pkg(//build/toolchain/fuchsia:x64)",
 				Path:            "",
 				Label:           "//garnet/bin/fuchsia:fuchsia_pkg_test_component1(//build/toolchain/fuchsia:x64)",
@@ -78,8 +78,8 @@ func TestUnmarshalTest(t *testing.T) {
 		},
 		{
 			Test: Test{
-				Name:            "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component2.cmx",
-				PackageURL:      "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component2.cmx",
+				Name:            "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component2.cm",
+				PackageURL:      "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component2.cm",
 				Path:            "",
 				Label:           "//garnet/bin/fuchsia:fuchsia_pkg(//build/toolchain/fuchsia:x64)",
 				OS:              "fuchsia",
@@ -92,8 +92,8 @@ func TestUnmarshalTest(t *testing.T) {
 		},
 		{
 			Test: Test{
-				Name:            "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component3.cmx",
-				PackageURL:      "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component3.cmx",
+				Name:            "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component3.cm",
+				PackageURL:      "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component3.cm",
 				Path:            "",
 				Label:           "//garnet/bin/fuchsia:fuchsia_pkg(//build/toolchain/fuchsia:x64)",
 				OS:              "fuchsia",
@@ -126,14 +126,6 @@ func TestIsComponentV2(t *testing.T) {
 		test          Test
 		isComponentV2 bool
 	}{
-		{
-			name: "component v1",
-			test: Test{
-				Name:       "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component.cmx",
-				PackageURL: "fuchsia-pkg://fuchsia.com/fuchsia_pkg#meta/component.cmx",
-			},
-			isComponentV2: false,
-		},
 		{
 			name: "component v2",
 			test: Test{
