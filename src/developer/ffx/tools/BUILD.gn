@@ -6,6 +6,7 @@ import("//src/developer/ffx/config.gni")
 
 # The list of tools under this directory
 _tools = [
+  "//src/developer/ffx/plugins/audio",
   "echo",
   "profiler",
   "starnix",

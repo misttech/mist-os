@@ -34,3 +34,19 @@ ffx_tool("ffx_audio_tool") {
   sdk_target_name = "sdk"
   sdk_category = "partner"
 }
+
+group("audio") {
+  public_deps = [
+    ":ffx_audio_tool",
+    ":ffx_audio_tool_host_tool",
+  ]
+}
+
+group("bin") {
+  public_deps = [ ":ffx_audio_tool_versioned" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":ffx_audio_tests($host_toolchain)" ]
+}
