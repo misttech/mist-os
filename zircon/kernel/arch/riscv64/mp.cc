@@ -40,7 +40,7 @@ riscv64_percpu riscv64_percpu_array[SMP_MAX_CPUS];
 // local helper routine to help convert cpu masks to hart masks
 template <typename Callback>
 void for_every_hart_in_cpu_mask(cpu_mask_t cmask, Callback callback) {
-  for (cpu_num_t cpu = 0; cpu < SMP_MAX_CPUS && cmask; cpu++, cmask >>= 1) {
+  for (cpu_num_t cpu = 0; cpu < riscv64_num_cpus && cmask; cpu++, cmask >>= 1) {
     if (cmask & 1) {
       auto hart = cpu_to_hart_map[cpu];
       callback(hart, cpu);
