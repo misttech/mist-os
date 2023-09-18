@@ -595,7 +595,20 @@ if (is_host) {
 }
 
 # Firmware IDK. See /src/firmware/README.md
-sdk_collection("firmware") {
+generate_final_idk("firmware") {
+  output_name = "firmware"
+  sdk_target_labels = [ ":firmware_collection" ]
+  validation_target_labels = []
+  final_validation_target_labels = [ ":firmware_manifest_golden" ]
+}
+
+sdk_final_manifest_golden("firmware_manifest_golden") {
+  golden = "manifests/firmware.manifest"
+  idk_name = "firmware"
+  idk_exported_label = ":firmware.exported"
+}
+
+sdk_collection("firmware_collection") {
   category = "experimental"
 
   deps = [
@@ -608,9 +621,6 @@ sdk_collection("firmware") {
     "//third_party/android/platform/external/avb:avb_sdk",
     "//zircon/public/sysroot/sdk:sysroot_sdk",
   ]
-
-  # An archive is always needed when building this target.
-  generate_archive = true
 }
 
 # Tools Fuchsia driver developers used on the host platform; where host is often

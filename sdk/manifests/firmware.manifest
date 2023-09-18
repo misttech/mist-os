@@ -1,0 +1,15 @@
+cc_source_library://pkg/abr
+cc_source_library://pkg/avb
+cc_source_library://pkg/firmware_sdk_storage
+cc_source_library://pkg/libsparse_sparse_format
+cc_source_library://pkg/storage_sdk_sparse
+cc_source_library://pkg/vboot_firmware_2lib_headers
+cc_source_library://pkg/vboot_firmware_headers
+cc_source_library://pkg/vboot_firmware_lib_gpt_misc
+cc_source_library://pkg/vboot_firmware_lib_headers
+cc_source_library://pkg/zbi
+cc_source_library://pkg/zbi-format
+cc_source_library://pkg/zircon_boot
+documentation://docs/firmware.json
+documentation://docs/metadata_schemas.json
+sysroot://pkg/sysroot
