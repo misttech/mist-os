@@ -34,7 +34,10 @@ zx_library("llvm-profdata") {
     # There's no way to reconcile direct use of the __llvm_profile_raw_version
     # symbol in the source with the compiler-generated COMDAT definition in the
     # same translation unit.
-    _profile_configs = [ "//build/config/profile" ]
+    _profile_configs = [
+      "//build/config/profile:coverage",
+      "//build/config/profile:profile",
+    ]
     configs += _profile_configs
     configs -= _profile_configs
   }
