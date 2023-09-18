@@ -38,6 +38,7 @@ rustc_library("elf_runner") {
     "//src/sys/component_manager/lib/logger",
     "//src/sys/lib/fidl-connector",
     "//src/sys/lib/moniker",
+    "//src/sys/lib/namespace",
     "//src/sys/lib/routing",
     "//src/sys/lib/runner",
     "//src/sys/lib/socket_parsing",

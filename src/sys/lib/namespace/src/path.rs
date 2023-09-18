@@ -93,12 +93,16 @@ impl Path {
 
     /// Splits the path according to "/".
     pub fn split(&self) -> Vec<String> {
-        self.to_string()
+        self.iter_segments().map(|s| s.to_string()).collect()
+    }
+
+    /// Iterate the path segments as separated by "/".
+    pub fn iter_segments(&self) -> impl Iterator<Item = &str> {
+        self.path
+            .as_str()
             .split("/")
             // `split("/")` produces empty segments if there is nothing before or after a slash.
             .filter(|s| !s.is_empty())
-            .map(|s| s.to_string())
-            .collect()
     }
 
     /// Path to the containing directory, or "/" if the path is "/".

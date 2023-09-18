@@ -8,7 +8,7 @@ use {
     anyhow::{anyhow, Context},
     async_trait::async_trait,
     fidl::endpoints::create_proxy,
-    fidl::endpoints::{ProtocolMarker, Proxy, ServerEnd},
+    fidl::endpoints::{ClientEnd, ProtocolMarker, Proxy, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_io as fio,
     fidl_fuchsia_ldsvc::LoaderMarker,
@@ -22,7 +22,7 @@ use {
     fuchsia_zircon::{self as zx, AsHandleRef},
     futures::future::abortable,
     futures::{future::BoxFuture, prelude::*},
-    runner::component::ComponentNamespace,
+    namespace::Namespace,
     std::{
         boxed::Box,
         convert::{TryFrom, TryInto},
@@ -143,7 +143,7 @@ pub struct Component {
     pub environ: Option<Vec<String>>,
 
     /// Namespace to pass to test process.
-    pub ns: ComponentNamespace,
+    pub ns: Namespace,
 
     /// Parent job in which all test processes should be executed.
     pub job: zx::Job,
@@ -175,7 +175,7 @@ pub struct BuilderArgs {
     pub environ: Option<Vec<String>>,
 
     /// Namespace to pass to test process.
-    pub ns: ComponentNamespace,
+    pub ns: Namespace,
 
     /// Parent job in which all test processes should be executed.
     pub job: zx::Job,
@@ -221,7 +221,7 @@ impl Component {
         let is_shared_process = runner::get_bool(program, "is_shared_process").unwrap_or(false);
 
         let ns = start_info.ns.ok_or_else(|| ComponentError::MissingNamespace(url.clone()))?;
-        let ns = ComponentNamespace::try_from(ns)
+        let ns = Namespace::try_from(ns)
             .map_err(|e| ComponentError::InvalidArgs(url.clone(), e.into()))?;
 
         let outgoing_dir =
@@ -230,9 +230,9 @@ impl Component {
         let runtime_dir =
             start_info.runtime_dir.ok_or_else(|| ComponentError::MissingRuntimeDir(url.clone()))?;
 
-        let (pkg_proxy, lib_proxy) = get_pkg_and_lib_proxy(&ns, &url)?;
+        let (pkg_dir, lib_proxy) = get_pkg_and_lib_proxy(&ns, &url)?;
 
-        let executable_vmo = library_loader::load_vmo(pkg_proxy, &binary)
+        let executable_vmo = library_loader::load_vmo(pkg_dir, &binary)
             .await
             .map_err(|e| ComponentError::LoadingExecutable(binary.clone(), e))?;
         let lib_loader_cache_builder = connect_to_protocol::<LibraryLoaderCacheBuilderMarker>()
@@ -280,8 +280,8 @@ impl Component {
     }
 
     pub async fn create_for_tests(args: BuilderArgs) -> Result<Self, ComponentError> {
-        let (pkg_proxy, lib_proxy) = get_pkg_and_lib_proxy(&args.ns, &args.url)?;
-        let executable_vmo = library_loader::load_vmo(pkg_proxy, &args.binary)
+        let (pkg_dir, lib_proxy) = get_pkg_and_lib_proxy(&args.ns, &args.url)?;
+        let executable_vmo = library_loader::load_vmo(pkg_dir, &args.binary)
             .await
             .map_err(|e| ComponentError::LoadingExecutable(args.url.clone(), e))?;
         let lib_loader_cache_builder = connect_to_protocol::<LibraryLoaderCacheBuilderMarker>()
@@ -320,26 +320,24 @@ fn vmo_create_child(vmo: &zx::Vmo) -> Result<zx::Vmo, anyhow::Error> {
     .context("cannot create child vmo")
 }
 
-// returns (pkg_proxy, lib_proxy)
+// returns (pkg_dir, lib_proxy)
 fn get_pkg_and_lib_proxy<'a>(
-    ns: &'a ComponentNamespace,
+    ns: &'a Namespace,
     url: &String,
-) -> Result<(&'a fio::DirectoryProxy, fio::DirectoryProxy), ComponentError> {
+) -> Result<(&'a ClientEnd<fio::DirectoryMarker>, fio::DirectoryProxy), ComponentError> {
     // Locate the '/pkg' directory proxy previously added to the new component's namespace.
-    let (_, pkg_proxy) = ns
-        .items()
-        .iter()
-        .find(|(p, _)| p.as_str() == PKG_PATH)
+    let pkg_dir = ns
+        .get(&PKG_PATH.try_into().unwrap())
         .ok_or_else(|| ComponentError::MissingPkg(url.clone()))?;
 
-    let lib_proxy = fuchsia_fs::directory::open_directory_no_describe(
-        pkg_proxy,
+    let lib_proxy = fuchsia_component::directory::open_directory_no_describe(
+        pkg_dir,
         "lib",
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
     )
     .map_err(Into::into)
     .map_err(|e| ComponentError::LibraryLoadError(url.clone(), e))?;
-    Ok((pkg_proxy, lib_proxy))
+    Ok((pkg_dir, lib_proxy))
 }
 
 #[async_trait]
@@ -588,13 +586,13 @@ mod tests {
         fidl_fuchsia_test::{Invocation, RunListenerProxy},
         fuchsia_runtime::job_default,
         futures::future::{AbortHandle, Aborted},
-        runner::component::{ComponentNamespace, ComponentNamespaceError},
+        namespace::{Namespace, NamespaceError},
         std::sync::Weak,
     };
 
     fn create_ns_from_current_ns(
         dir_paths: Vec<(&str, fio::OpenFlags)>,
-    ) -> Result<ComponentNamespace, ComponentNamespaceError> {
+    ) -> Result<Namespace, NamespaceError> {
         let mut ns = vec![];
         for (path, permission) in dir_paths {
             let chan = fuchsia_fs::directory::open_in_namespace(path, permission)
@@ -610,7 +608,7 @@ mod tests {
                 ..Default::default()
             });
         }
-        ComponentNamespace::try_from(ns)
+        Namespace::try_from(ns)
     }
 
     macro_rules! child_job {

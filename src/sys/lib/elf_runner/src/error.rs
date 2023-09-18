@@ -3,14 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    ::routing::policy::PolicyError,
-    clonable_error::ClonableError,
-    fuchsia_zircon as zx,
-    runner::component::{ComponentNamespaceError, LaunchError},
-    runner::StartInfoProgramError,
-    std::ffi::CString,
-    thiserror::Error,
-    tracing::error,
+    ::routing::policy::PolicyError, clonable_error::ClonableError, fuchsia_zircon as zx,
+    namespace::NamespaceError, runner::component::LaunchError, runner::StartInfoProgramError,
+    std::ffi::CString, thiserror::Error, tracing::error,
 };
 
 /// Errors produced when starting a component.
@@ -43,7 +38,7 @@ pub enum StartComponentError {
     #[error("failed to process the component's config data: {_0}")]
     ConfigDataError(#[source] ConfigDataError),
     #[error("could not create component namespace, {_0}")]
-    ComponentNamespaceError(#[source] ComponentNamespaceError),
+    NamespaceError(#[source] NamespaceError),
     #[error("error configuring process launcher: {_0}")]
     ConfigureLauncherError(#[source] LaunchError),
     #[error("invalid start info: {_0}")]
@@ -54,7 +49,7 @@ impl StartComponentError {
     /// Convert this error into its approximate `zx::Status` equivalent.
     pub fn as_zx_status(&self) -> zx::Status {
         match self {
-            StartComponentError::ComponentNamespaceError(_) => zx::Status::INVALID_ARGS,
+            StartComponentError::NamespaceError(_) => zx::Status::INVALID_ARGS,
             StartComponentError::ConfigureLauncherError(_) => zx::Status::UNAVAILABLE,
             StartComponentError::StartInfoError(err) => err.as_zx_status(),
             _ => zx::Status::INTERNAL,

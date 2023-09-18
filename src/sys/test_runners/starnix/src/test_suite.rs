@@ -16,7 +16,7 @@ use {
     frunner::{ComponentRunnerMarker, ComponentRunnerProxy},
     fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES,
     futures::TryStreamExt,
-    runner::component::ComponentNamespace,
+    namespace::Namespace,
     rust_measure_tape_for_case::Measurable as _,
     test_runners_lib::elf::SuiteServerError,
     tracing::debug,
@@ -43,13 +43,10 @@ async fn component_runner_from_start_info(
 ) -> Result<ComponentRunnerProxy, Error> {
     debug!("use component runner from namespace");
     let ns = start_info.ns.ok_or_else(|| anyhow!("start info does not have namespace"))?;
-    let ns = ComponentNamespace::try_from(ns)?;
-    let svc = &ns
-        .items()
-        .iter()
-        .find(|e| e.0 == "/svc")
-        .ok_or_else(|| anyhow!("test component namespace does not have /svc"))?
-        .1;
+    let ns = Namespace::try_from(ns)?;
+    let svc = ns
+        .get(&"/svc".try_into().unwrap())
+        .ok_or_else(|| anyhow!("test component namespace does not have /svc"))?;
     return Ok(
         fuchsia_component::client::connect_to_protocol_at_dir_root::<ComponentRunnerMarker>(svc)?,
     );

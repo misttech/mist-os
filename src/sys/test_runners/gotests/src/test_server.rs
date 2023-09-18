@@ -17,6 +17,7 @@ use {
         stream, AsyncReadExt as _, FutureExt as _, StreamExt as _, TryStreamExt as _,
     },
     lazy_static::lazy_static,
+    namespace::NamespaceError,
     regex::bytes::Regex,
     std::{
         collections::HashSet,

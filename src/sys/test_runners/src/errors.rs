@@ -7,11 +7,12 @@
 use {
     crate::{elf::ComponentError, elf::KernelError, launch::LaunchError, logs::LogError},
     fuchsia_zircon as zx,
-    runner::component::ComponentNamespaceError,
+    namespace::NamespaceError,
     serde_json,
     std::sync::Arc,
     thiserror::Error,
 };
+
 /// Error encountered while enumerating test.
 ///
 /// This must be `Clone`-able because enumeration futures are memoized.
@@ -95,13 +96,6 @@ pub enum IoError {
 
     #[error("can't read file: {:?}", _0)]
     File(#[source] anyhow::Error),
-}
-
-/// Error encountered while working runner::component::ComponentNamespace.
-#[derive(Debug, Error)]
-pub enum NamespaceError {
-    #[error("can't clone namespace: {:?}", _0)]
-    Clone(#[from] ComponentNamespaceError),
 }
 
 /// Error returned when validating arguments.

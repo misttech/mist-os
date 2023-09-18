@@ -10,7 +10,7 @@ use {
     fidl_fuchsia_process as fproc,
     fuchsia_component::client::connect_to_protocol,
     fuchsia_runtime as runtime, fuchsia_zircon as zx,
-    runner::component::ComponentNamespace,
+    namespace::Namespace,
     runtime::{HandleInfo, HandleType},
     thiserror::Error,
     zx::{AsHandleRef, HandleBased, Process, Rights, Task},
@@ -60,7 +60,7 @@ pub struct LaunchProcessArgs<'a> {
     /// Job used launch process, if None, a new child of default_job() is used.
     pub job: Option<zx::Job>,
     /// Namespace for binary process to be launched.
-    pub ns: ComponentNamespace,
+    pub ns: Namespace,
     /// Arguments to binary. Binary name is automatically appended as first argument.
     pub args: Option<Vec<String>>,
     /// Extra names to add to namespace. by default only names from `ns` are added.

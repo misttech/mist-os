@@ -18,6 +18,7 @@ rustc_library("namespace") {
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/flyweights",
     "//src/storage/lib/vfs/rust/name",

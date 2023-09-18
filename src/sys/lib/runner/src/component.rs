@@ -5,11 +5,7 @@
 use {
     anyhow::Error,
     async_trait::async_trait,
-    fidl::{
-        endpoints::{ClientEnd, ServerEnd},
-        epitaph::ChannelEpitaphExt,
-        prelude::*,
-    },
+    fidl::{endpoints::ServerEnd, epitaph::ChannelEpitaphExt, prelude::*},
     fidl_fuchsia_component as fcomp, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_io as fio, fidl_fuchsia_process as fproc, fuchsia_async as fasync,
     fuchsia_runtime::{job_default, HandleInfo, HandleType},
@@ -21,6 +17,7 @@ use {
     },
     lazy_static::lazy_static,
     library_loader,
+    namespace::{Namespace, Path},
     std::convert::{TryFrom, TryInto},
     std::path::PathBuf,
     thiserror::Error,
@@ -28,7 +25,7 @@ use {
 };
 
 lazy_static! {
-    pub static ref PKG_PATH: PathBuf = PathBuf::from("/pkg");
+    pub static ref PKG_PATH: Path = "/pkg".try_into().unwrap();
 }
 
 /// Object implementing this type can be killed by calling kill function.
@@ -182,95 +179,6 @@ impl<C: Controllable> Controller<C> {
     }
 }
 
-/// An error encountered trying convert Vec<fcrunner::ComponentNamespaceEntry>
-#[derive(Clone, Debug, Error)]
-pub enum ComponentNamespaceError {
-    #[error("cannot convert directory handle to proxy: {}.", _0)]
-    IntoProxy(fidl::Error),
-
-    #[error("cannot convert directory proxy to handle: {:?}.", _0)]
-    IntoChannel(fio::DirectoryProxy),
-
-    #[error("missing path in namespace entry")]
-    MissingPath,
-}
-
-/// This represents Component namespace which is easier for other functions in this library to read
-/// and operate on.
-#[derive(Debug, Default)]
-pub struct ComponentNamespace {
-    /// Pair representing path and directory proxy.
-    items: Vec<(String, fio::DirectoryProxy)>,
-}
-
-impl TryInto<Vec<fcrunner::ComponentNamespaceEntry>> for ComponentNamespace {
-    type Error = ComponentNamespaceError;
-
-    fn try_into(self) -> Result<Vec<fcrunner::ComponentNamespaceEntry>, Self::Error> {
-        self.items
-            .into_iter()
-            .map(|(path, proxy)| {
-                let dir_channel: zx::Channel =
-                    proxy.into_channel().map_err(ComponentNamespaceError::IntoChannel)?.into();
-                Ok(fcrunner::ComponentNamespaceEntry {
-                    path: Some(path.clone()),
-                    directory: Some(dir_channel.into()),
-                    ..Default::default()
-                })
-            })
-            .collect()
-    }
-}
-
-impl TryFrom<Vec<fcrunner::ComponentNamespaceEntry>> for ComponentNamespace {
-    type Error = ComponentNamespaceError;
-
-    fn try_from(mut ns: Vec<fcrunner::ComponentNamespaceEntry>) -> Result<Self, Self::Error> {
-        let mut new_ns = Self { items: Vec::with_capacity(ns.len()) };
-
-        while let Some(entry) = ns.pop() {
-            let path = entry.path.ok_or(ComponentNamespaceError::MissingPath)?;
-            if let Some(dir) = entry.directory {
-                new_ns
-                    .items
-                    .push((path, dir.into_proxy().map_err(ComponentNamespaceError::IntoProxy)?));
-            }
-        }
-
-        Ok(new_ns)
-    }
-}
-
-impl Clone for ComponentNamespace {
-    fn clone(&self) -> Self {
-        let mut ns = Self { items: Vec::with_capacity(self.items.len()) };
-        for (path, proxy) in &self.items {
-            // The test runner needs to be able to clone the namespace, so it can hand out a valid
-            // namespace to different invocations of the test, but the test runner is not
-            // responsible for nor capable of fixing namespaces that hold invalid caapability
-            // routes. If the test component uses some directory and the routing for that
-            // capability is bad, then this clone operation may fail.
-            //
-            // While the exact semantics are technically different, practically a namespace holding
-            // a closed channel for a path has the same impact on a component as a namespace
-            // lacking a channel for that path entirely. Thus if we encounter any errors cloning
-            // here, we opt to omit the path we failed to clone from the namespace, as that's
-            // simpler than generating some handle to put in the namespace that we'd need to then
-            // later close.
-            if let Ok(client_proxy) = fuchsia_fs::directory::clone_no_describe(proxy, None) {
-                ns.items.push((path.clone(), client_proxy));
-            }
-        }
-        ns
-    }
-}
-
-impl ComponentNamespace {
-    pub fn items(&self) -> &Vec<(String, fio::DirectoryProxy)> {
-        &self.items
-    }
-}
-
 /// An error encountered trying to launch a component.
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 pub enum LaunchError {
@@ -331,7 +239,7 @@ pub struct LauncherConfigArgs<'a> {
     pub args: Option<Vec<String>>,
 
     /// Namespace for binary process to be launched.
-    pub ns: ComponentNamespace,
+    pub ns: Namespace,
 
     /// Job in which process is launched. If None, a child job would be created in default one.
     pub job: Option<zx::Job>,
@@ -363,13 +271,7 @@ pub async fn configure_launcher(
     config_args: LauncherConfigArgs<'_>,
 ) -> Result<fproc::LaunchInfo, LaunchError> {
     // Locate the '/pkg' directory proxy previously added to the new component's namespace.
-    let pkg_str = PKG_PATH.to_str().unwrap();
-    let (_, pkg_proxy) = config_args
-        .ns
-        .items
-        .iter()
-        .find(|(p, _)| p.as_str() == pkg_str)
-        .ok_or(LaunchError::MissingPkg)?;
+    let pkg_dir = config_args.ns.get(&PKG_PATH).ok_or(LaunchError::MissingPkg)?;
 
     // library_loader provides a helper function that we use to load the main executable from the
     // package directory as a VMO in the same way that dynamic libraries are loaded. Doing this
@@ -377,7 +279,7 @@ pub async fn configure_launcher(
     // loaded with ZX_RIGHT_EXECUTE from the package directory.
     let executable_vmo = match config_args.executable_vmo {
         Some(v) => v,
-        None => library_loader::load_vmo(pkg_proxy, &config_args.bin_path)
+        None => library_loader::load_vmo(pkg_dir, &config_args.bin_path)
             .await
             .map_err(|e| LaunchError::LoadingExecutable(e.to_string()))?,
     };
@@ -387,8 +289,8 @@ pub async fn configure_launcher(
             // The loader service should only be able to load files from `/pkg/lib`. Giving it a larger
             // scope is potentially a security vulnerability, as it could make it trivial for parts of
             // applications to get handles to things the application author didn't intend.
-            let lib_proxy = fuchsia_fs::directory::open_directory_no_describe(
-                pkg_proxy,
+            let lib_proxy = fuchsia_component::directory::open_directory_no_describe(
+                pkg_dir,
                 "lib",
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
             )
@@ -407,7 +309,7 @@ pub async fn configure_launcher(
         .unwrap_or(job_default().create_child_job().map_err(LaunchError::JobCreation)?);
 
     // Build the command line args for the new process and send them to the launcher.
-    let bin_arg = PKG_PATH
+    let bin_arg = PathBuf::from(PKG_PATH.as_str())
         .join(&config_args.bin_path)
         .to_str()
         .ok_or(LaunchError::InvalidBinaryPath(config_args.bin_path.to_string()))?
@@ -458,18 +360,11 @@ pub async fn configure_launcher(
             .map_err(|e| LaunchError::AddEnvirons(e.to_string()))?;
     }
 
-    // Combine any manually provided namespace entries with the provided ComponentNamespace, and
+    // Combine any manually provided namespace entries with the provided Namespace, and
     // then send the new process's namespace to the launcher.
     let mut name_infos = config_args.name_infos.unwrap_or(vec![]);
-    for (path, directory) in config_args.ns.items {
-        let directory = ClientEnd::new(
-            directory
-                .into_channel()
-                .map_err(|_| LaunchError::DirectoryToChannel)?
-                .into_zx_channel(),
-        );
-        name_infos.push(fproc::NameInfo { path, directory });
-    }
+    let ns: Vec<_> = config_args.ns.into();
+    name_infos.extend(ns.into_iter());
     config_args.launcher.add_names(name_infos).map_err(|e| LaunchError::AddNames(e.to_string()))?;
 
     let name = truncate_str(config_args.name, zx::sys::ZX_MAX_NAME_LEN).to_owned();
@@ -509,8 +404,8 @@ pub fn report_start_error(
 mod tests {
     use {
         super::{
-            configure_launcher, truncate_str, ChannelEpitaph, ComponentNamespace,
-            ComponentNamespaceError, Controllable, Controller, LaunchError, LauncherConfigArgs,
+            configure_launcher, truncate_str, ChannelEpitaph, Controllable, Controller,
+            LaunchError, LauncherConfigArgs,
         },
         anyhow::{Context, Error},
         assert_matches::assert_matches,
@@ -521,6 +416,7 @@ mod tests {
         fuchsia_runtime::{HandleInfo, HandleType},
         fuchsia_zircon::{self as zx, HandleBased},
         futures::{future::BoxFuture, poll, prelude::*},
+        namespace::{Namespace, NamespaceError},
         std::{
             boxed::Box,
             convert::{TryFrom, TryInto},
@@ -750,7 +646,7 @@ mod tests {
 
         use {super::*, anyhow::format_err, futures::channel::oneshot, std::mem::drop};
 
-        fn setup_empty_namespace() -> Result<ComponentNamespace, ComponentNamespaceError> {
+        fn setup_empty_namespace() -> Result<Namespace, NamespaceError> {
             setup_namespace(false, vec![])
         }
 
@@ -759,7 +655,7 @@ mod tests {
             // All the handles created for this will have server end closed.
             // Clients cannot send messages on those handles in ns.
             extra_paths: Vec<&str>,
-        ) -> Result<ComponentNamespace, ComponentNamespaceError> {
+        ) -> Result<Namespace, NamespaceError> {
             let mut ns = Vec::<fcrunner::ComponentNamespaceEntry>::new();
             if include_pkg {
                 let pkg_path = "/pkg".to_string();
@@ -788,7 +684,7 @@ mod tests {
                     ..Default::default()
                 });
             }
-            ComponentNamespace::try_from(ns)
+            Namespace::try_from(ns)
         }
 
         #[derive(Default)]
@@ -1059,12 +955,13 @@ mod tests {
 
             let ls = recv.await?;
 
+            let mut names = ls.names;
+            names.sort();
             assert_eq!(
-                ls.names,
+                names,
                 vec!("/pkg", "/some_path1", "/some_path2")
                     .into_iter()
                     .map(|s| s.to_string())
-                    .rev()
                     .collect::<Vec<String>>()
             );
 
@@ -1108,12 +1005,13 @@ mod tests {
             let ls = recv.await?;
 
             let mut paths = vec!["/pkg", "/some_path1", "/some_path2"];
-            paths.extend(extra_paths.into_iter().rev());
+            paths.extend(extra_paths.into_iter());
+            paths.sort();
 
-            assert_eq!(
-                ls.names,
-                paths.into_iter().map(|s| s.to_string()).rev().collect::<Vec<String>>()
-            );
+            let mut ls_names = ls.names;
+            ls_names.sort();
+
+            assert_eq!(ls_names, paths.into_iter().map(|s| s.to_string()).collect::<Vec<String>>());
 
             Ok(())
         }

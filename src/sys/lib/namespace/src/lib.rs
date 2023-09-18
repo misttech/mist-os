@@ -8,6 +8,7 @@ use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_runner as fcrunner;
 use fidl_fuchsia_io as fio;
+use fidl_fuchsia_process as fprocess;
 use thiserror::Error;
 
 mod path;
@@ -54,6 +55,10 @@ impl Namespace {
     ) -> Result<(), NamespaceError> {
         self.tree.add(path, directory)?;
         Ok(())
+    }
+
+    pub fn get(&self, path: &Path) -> Option<&ClientEnd<fio::DirectoryMarker>> {
+        self.tree.get(path)
     }
 
     pub fn remove(&mut self, path: &Path) -> Option<ClientEnd<fio::DirectoryMarker>> {
@@ -130,6 +135,12 @@ impl From<Namespace> for Vec<fcrunner::ComponentNamespaceEntry> {
     }
 }
 
+impl From<Namespace> for Vec<fprocess::NameInfo> {
+    fn from(namespace: Namespace) -> Self {
+        namespace.flatten().into_iter().map(Into::into).collect()
+    }
+}
+
 #[cfg(target_os = "fuchsia")]
 impl From<Namespace> for Vec<process_builder::NamespaceEntry> {
     fn from(namespace: Namespace) -> Self {
@@ -151,6 +162,16 @@ impl TryFrom<Vec<fcomponent::NamespaceEntry>> for Namespace {
     type Error = NamespaceError;
 
     fn try_from(entries: Vec<fcomponent::NamespaceEntry>) -> Result<Self, Self::Error> {
+        let entries: Vec<Entry> =
+            entries.into_iter().map(TryInto::try_into).collect::<Result<Vec<_>, EntryError>>()?;
+        entries.try_into()
+    }
+}
+
+impl TryFrom<Vec<fprocess::NameInfo>> for Namespace {
+    type Error = NamespaceError;
+
+    fn try_from(entries: Vec<fprocess::NameInfo>) -> Result<Self, Self::Error> {
         let entries: Vec<Entry> =
             entries.into_iter().map(TryInto::try_into).collect::<Result<Vec<_>, EntryError>>()?;
         entries.try_into()
@@ -198,6 +219,12 @@ impl From<Entry> for fcomponent::NamespaceEntry {
     }
 }
 
+impl From<Entry> for fprocess::NameInfo {
+    fn from(entry: Entry) -> Self {
+        Self { path: entry.path.into(), directory: entry.directory }
+    }
+}
+
 #[cfg(target_os = "fuchsia")]
 impl From<Entry> for process_builder::NamespaceEntry {
     fn from(entry: Entry) -> Self {
@@ -236,6 +263,14 @@ impl TryFrom<fcomponent::NamespaceEntry> for Entry {
             path: entry.path.ok_or_else(|| EntryError::MissingPath)?.try_into()?,
             directory: entry.directory.ok_or_else(|| EntryError::MissingDirectory)?,
         })
+    }
+}
+
+impl TryFrom<fprocess::NameInfo> for Entry {
+    type Error = EntryError;
+
+    fn try_from(entry: fprocess::NameInfo) -> Result<Self, Self::Error> {
+        Ok(Self { path: entry.path.try_into()?, directory: entry.directory })
     }
 }
 

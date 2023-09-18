@@ -262,8 +262,8 @@ impl ElfRunner {
         .map_err(StartComponentError::ExceptionRegistrationFailed)?;
 
         // Convert the directories into proxies, so we can find "/pkg" and open "lib" and bin_path
-        let ns = runner::component::ComponentNamespace::try_from(start_info.namespace)
-            .map_err(StartComponentError::ComponentNamespaceError)?;
+        let ns = namespace::Namespace::try_from(start_info.namespace)
+            .map_err(StartComponentError::NamespaceError)?;
 
         let config_vmo = start_info
             .encoded_config

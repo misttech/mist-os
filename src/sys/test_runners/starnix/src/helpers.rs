@@ -14,7 +14,7 @@ use {
     fuchsiaperf::FuchsiaPerfBenchmarkResult,
     futures::StreamExt,
     gtest_runner_lib::parser::read_file,
-    runner::component::ComponentNamespace,
+    namespace::Namespace,
     tracing::debug,
 };
 
@@ -120,7 +120,7 @@ pub fn append_program_args(new_args: Vec<String>, program: &mut fdata::Dictionar
 pub fn clone_start_info(
     start_info: &mut frunner::ComponentStartInfo,
 ) -> Result<frunner::ComponentStartInfo, Error> {
-    let ns = ComponentNamespace::try_from(start_info.ns.take().unwrap())?;
+    let ns = Namespace::try_from(start_info.ns.take().unwrap())?;
     // Reset the namespace of the start_info, since it was moved out above.
     start_info.ns = Some(ns.clone().try_into()?);
 

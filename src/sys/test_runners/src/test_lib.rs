@@ -21,8 +21,8 @@ use {
     fuchsia_zircon as zx,
     futures::channel::mpsc,
     futures::prelude::*,
-    runner::component::ComponentNamespace,
-    runner::component::ComponentNamespaceError,
+    namespace::Namespace,
+    namespace::NamespaceError,
     std::collections::HashMap,
     std::convert::TryFrom,
     std::sync::Arc,
@@ -300,7 +300,7 @@ pub async fn connect_to_test_manager() -> Result<ftest_manager::RunBuilderProxy,
 
 fn create_ns_from_current_ns(
     dir_paths: Vec<(&str, fio::OpenFlags)>,
-) -> Result<ComponentNamespace, ComponentNamespaceError> {
+) -> Result<Namespace, NamespaceError> {
     let mut ns = vec![];
     for (path, permission) in dir_paths {
         let chan = fuchsia_fs::directory::open_in_namespace(path, permission)
@@ -316,7 +316,7 @@ fn create_ns_from_current_ns(
             ..Default::default()
         });
     }
-    ComponentNamespace::try_from(ns)
+    Namespace::try_from(ns)
 }
 
 /// Create a new component object for testing purposes.

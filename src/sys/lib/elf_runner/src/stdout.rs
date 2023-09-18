@@ -12,8 +12,9 @@ use {
     fuchsia_runtime::{HandleInfo, HandleType},
     fuchsia_zircon as zx,
     futures::StreamExt,
+    lazy_static::lazy_static,
+    namespace::{Namespace, Path},
     once_cell::unsync::OnceCell,
-    runner::component::ComponentNamespace,
     socket_parsing::{NewlineChunker, NewlineChunkerError},
     std::{boxed::Box, sync::Arc},
     tracing::{info, warn, Subscriber},
@@ -22,7 +23,10 @@ use {
 
 const STDOUT_FD: i32 = 1;
 const STDERR_FD: i32 = 2;
-const SVC_DIRECTORY_PATH: &str = "/svc";
+
+lazy_static! {
+    static ref SVC_DIRECTORY_PATH: Path = "/svc".try_into().unwrap();
+}
 
 /// Max size for message when draining input stream socket. This number is
 /// slightly smaller than size allowed by Archivist (LogSink service implementation).
@@ -39,7 +43,7 @@ const MAX_MESSAGE_SIZE: usize = 30720;
 // function returns both the task for each file descriptor and its
 // corresponding HandleInfo.
 pub fn bind_streams_to_syslog(
-    ns: &ComponentNamespace,
+    ns: &Namespace,
     stdout_sink: StreamSink,
     stderr_sink: StreamSink,
 ) -> (Vec<fasync::Task<()>>, Vec<fproc::HandleInfo>) {
@@ -71,9 +75,8 @@ pub fn bind_streams_to_syslog(
     (tasks, handles)
 }
 
-fn create_namespace_logger(ns: &ComponentNamespace) -> Option<ScopedLogger> {
-    let svc_dir =
-        ns.items().iter().find_map(|(path, dir)| (path == SVC_DIRECTORY_PATH).then_some(dir))?;
+fn create_namespace_logger(ns: &Namespace) -> Option<ScopedLogger> {
+    let svc_dir = ns.get(&SVC_DIRECTORY_PATH)?;
     let logsink = connect_to_named_protocol_at_dir_root::<flogger::LogSinkMarker>(
         svc_dir,
         flogger::LogSinkMarker::PROTOCOL_NAME,
@@ -341,8 +344,7 @@ mod tests {
         ns_entries: Vec<fcrunner::ComponentNamespaceEntry>,
         message: &[u8],
     ) -> Result<(), Error> {
-        let ns = ComponentNamespace::try_from(ns_entries)
-            .context("Failed to create ComponentNamespace")?;
+        let ns = Namespace::try_from(ns_entries).context("Failed to create Namespace")?;
         let logger = create_namespace_logger(&ns).context("Failed to create ScopedLogger")?;
         let mut writer = SyslogWriter::new(Arc::new(logger), OutputLevel::Info);
         writer.write(message).await;

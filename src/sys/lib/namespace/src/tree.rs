@@ -28,13 +28,15 @@ impl<T> Tree<T> {
     }
 
     pub fn get_mut(&mut self, path: &Path) -> Option<&mut T> {
-        let names = path.split();
-        self.root.get_mut(names.into_iter())
+        self.root.get_mut(path.iter_segments())
+    }
+
+    pub fn get(&self, path: &Path) -> Option<&T> {
+        self.root.get(path.iter_segments())
     }
 
     pub fn remove(&mut self, path: &Path) -> Option<T> {
-        let names = path.split();
-        self.root.remove(names.into_iter().peekable())
+        self.root.remove(path.iter_segments().peekable())
     }
 
     pub fn flatten(self) -> Vec<(Path, T)> {
@@ -104,11 +106,15 @@ impl<T> Node<T> {
         }
     }
 
-    fn get_mut(&mut self, mut path: std::vec::IntoIter<String>) -> Option<&mut T> {
+    fn get_mut<I, V>(&mut self, mut path: I) -> Option<&mut T>
+    where
+        I: Iterator<Item = V>,
+        V: AsRef<str> + std::hash::Hash + std::cmp::Eq,
+    {
         match path.next() {
             Some(name) => match self {
                 Node::Leaf(_) => None,
-                Node::Internal(children) => match children.get_mut(&name) {
+                Node::Internal(children) => match children.get_mut(name.as_ref()) {
                     Some(node) => node.get_mut(path),
                     None => None,
                 },
@@ -120,22 +126,46 @@ impl<T> Node<T> {
         }
     }
 
-    fn remove(&mut self, mut path: std::iter::Peekable<std::vec::IntoIter<String>>) -> Option<T> {
+    fn get<I, V>(&self, mut path: I) -> Option<&T>
+    where
+        I: Iterator<Item = V>,
+        V: AsRef<str> + std::hash::Hash + std::cmp::Eq,
+    {
+        match path.next() {
+            Some(name) => match self {
+                Node::Leaf(_) => None,
+                Node::Internal(children) => match children.get(name.as_ref()) {
+                    Some(node) => node.get(path),
+                    None => None,
+                },
+            },
+            None => match self {
+                Node::Internal(_) => None,
+                Node::Leaf(ref n) => Some(n),
+            },
+        }
+    }
+
+    fn remove<I, V>(&mut self, mut path: std::iter::Peekable<I>) -> Option<T>
+    where
+        I: Iterator<Item = V>,
+        V: AsRef<str> + std::hash::Hash + std::cmp::Eq,
+    {
         match path.next() {
             Some(name) => match self {
                 Node::Leaf(_) => None,
                 Node::Internal(children) => {
                     if path.peek().is_none() {
-                        match children.remove(&name) {
+                        match children.remove(name.as_ref()) {
                             Some(Node::Leaf(n)) => Some(n),
                             Some(Node::Internal(c)) => {
-                                children.insert(name, Node::Internal(c));
+                                children.insert(name.as_ref().to_owned(), Node::Internal(c));
                                 return None;
                             }
                             None => None,
                         }
                     } else {
-                        match children.get_mut(&name) {
+                        match children.get_mut(name.as_ref()) {
                             Some(node) => node.remove(path),
                             None => None,
                         }
@@ -236,6 +266,19 @@ mod tests {
         assert_eq!(*tree.get_mut(&ns_path("/a/b")).unwrap(), 1);
         *tree.get_mut(&ns_path("/a/b")).unwrap() = 2;
         assert_eq!(*tree.get_mut(&ns_path("/a/b")).unwrap(), 2);
+    }
+
+    #[test]
+    fn test_get() {
+        let mut tree = Tree::new();
+        assert_eq!(tree.get(&ns_path("/foo")), None);
+        tree.add(&ns_path("/foo"), 1).unwrap();
+        assert_eq!(*tree.get(&ns_path("/foo")).unwrap(), 1);
+
+        tree.add(&ns_path("/a/b"), 1).unwrap();
+        assert_matches!(tree.get_mut(&ns_path("/a")), None);
+        assert_eq!(*tree.get(&ns_path("/a/b")).unwrap(), 1);
+        assert_matches!(tree.get_mut(&ns_path("/a/b/c")), None);
     }
 
     #[test]

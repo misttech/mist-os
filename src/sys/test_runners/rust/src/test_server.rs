@@ -14,6 +14,7 @@ use {
         prelude::*,
     },
     lazy_static::lazy_static,
+    namespace::NamespaceError,
     regex::Regex,
     std::{
         collections::HashSet,

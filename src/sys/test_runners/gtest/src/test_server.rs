@@ -19,6 +19,7 @@ use {
     },
     gtest_runner_lib::parser::*,
     lazy_static::lazy_static,
+    namespace::NamespaceError,
     std::{
         num::NonZeroUsize,
         str::from_utf8,

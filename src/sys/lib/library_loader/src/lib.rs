@@ -93,17 +93,17 @@ pub fn start_with_multiple_dirs(lib_dirs: Vec<Arc<fio::DirectoryProxy>>, chan: z
     .detach();
 }
 
-/// load_vmo will attempt to open the provided name in `dir_proxy` and return an executable VMO
+/// load_vmo will attempt to open the provided name in `dir` and return an executable VMO
 /// with the contents.
 ///
-/// `dir_proxy` must have been opened with at minimum OPEN_RIGHT_READABLE and OPEN_RIGHT_EXECUTABLE
+/// `dir` must have been opened with at minimum OPEN_RIGHT_READABLE and OPEN_RIGHT_EXECUTABLE
 /// rights.
 pub async fn load_vmo<'a>(
-    dir_proxy: &'a fio::DirectoryProxy,
+    dir: &impl fuchsia_component::directory::AsRefDirectory,
     object_name: &'a str,
 ) -> Result<zx::Vmo, Error> {
-    let file_proxy = fuchsia_fs::directory::open_file_no_describe(
-        dir_proxy,
+    let file_proxy = fuchsia_component::directory::open_file_no_describe(
+        dir,
         object_name,
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
     )?;
