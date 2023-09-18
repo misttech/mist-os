@@ -111,6 +111,7 @@
 ##                         provided delimited by commas or the --with-host
 ##                         argument can be provided multiple times.
 ##   --cargo-toml-gen      Enable generation of Cargo.toml files.
+##   --include_clippy      Run clippy as part of `fx build` (defaults to `true`)
 ##   --fint-params-path    Used to specify a path to a fint parameters file, as
 ##                         selected by `fx repro`. If set, no other flags that
 ##                         influence the build configuration should be set.

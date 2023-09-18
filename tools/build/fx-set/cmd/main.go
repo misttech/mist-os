@@ -175,6 +175,7 @@ type setArgs struct {
 	enableRbe     bool // deprecated
 	enableRustRbe bool
 	enableCxxRbe  bool
+	includeClippy bool
 
 	isRelease        bool
 	netboot          bool
@@ -223,6 +224,7 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 	flagSet.BoolVar(&cmd.useGoma, "goma", false, "")
 	flagSet.BoolVar(&cmd.noGoma, "no-goma", false, "")
 	flagSet.BoolVar(&cmd.noEnsureGoma, "no-ensure-goma", false, "")
+	flagSet.BoolVar(&cmd.includeClippy, "include-clippy", true, "")
 	// TODO(haowei): Remove --goma-dir once no other scripts use it.
 	// We don't bother validating its value because the value isn't used
 	// anywhere.
@@ -392,6 +394,10 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 
 	if args.netboot {
 		gnArgs = append(gnArgs, "enable_netboot=true")
+	}
+
+	if args.includeClippy {
+		gnArgs = append(gnArgs, "include_clippy=true")
 	}
 
 	hostLabels := args.hostLabels

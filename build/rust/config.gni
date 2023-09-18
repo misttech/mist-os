@@ -67,8 +67,9 @@ declare_args() {
   clippy_cause_failure = true
 
   # Turns rust targets into a group with both the normal target and clippy target. This
-  # causes clippy targets to get included in the build by default.
-  include_clippy = true
+  # causes clippy targets to get included in the build. This gets enabled by default with
+  # `fx set`, but is defaulted off in GN so it won't be on in infra.
+  include_clippy = false
 }
 
 if (rustc_prefix == default_rustc_prefix &&
