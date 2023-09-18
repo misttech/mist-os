@@ -19,7 +19,7 @@ bazel_product_bundle("workbench_eng.x64") {
     "//build/images/flash:esp.bazel_input",
     "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
     "//build/images/zedboot:zedboot.bazel_legacy_aib",
-    "//src/ui/bin/tiles-session:tiles_session_bazel_inputs",
+    "//products/workbench/workbench_session:workbench_session_bazel_inputs",
   ]
 }
 
@@ -36,7 +36,7 @@ bazel_product_bundle("workbench_eng.qemu-x64") {
     "//build/images/flash:esp.bazel_input",
     "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
     "//build/images/zedboot:zedboot.bazel_legacy_aib",
-    "//src/ui/bin/tiles-session:tiles_session_bazel_inputs",
+    "//products/workbench/workbench_session:workbench_session_bazel_inputs",
   ]
 }
 
@@ -52,6 +52,6 @@ bazel_product_bundle("workbench_eng.vim3") {
     "//build/images/flash:esp.bazel_input",
     "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
     "//build/images/zedboot:zedboot.bazel_legacy_aib",
-    "//src/ui/bin/tiles-session:tiles_session_bazel_inputs",
+    "//products/workbench/workbench_session:workbench_session_bazel_inputs",
   ]
 }

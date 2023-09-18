@@ -54,7 +54,7 @@ extra_bazel_assembly_targets =
     [ "//build/bazel/assembly/assembly_outputs:verifications" ]
 
 extra_gn_labels_for_bazel_inputs =
-    [ "//src/ui/bin/tiles-session:tiles_session_bazel_inputs" ]
+    [ "//products/workbench/workbench_session:workbench_session_bazel_inputs" ]
 
 # BEGIN: Baseline eng support
 #

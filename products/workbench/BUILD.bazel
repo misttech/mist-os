@@ -114,18 +114,18 @@ fuchsia_virtual_device(
 fuchsia_product_configuration(
     name = "assembly_config_eng",
     cache_packages = [
-        ":tiles_session",
+        ":workbench_session",
     ],
     json_config = {
         "platform": workbench_platform_config,
         "product": {
-            "session_url": "fuchsia-pkg://fuchsia.com/tiles-session#meta/tiles-session.cm",
+            "session_url": "fuchsia-pkg://fuchsia.com/workbench_session#meta/workbench_session.cm",
             "build_info": DEFAULT_PRODUCT_BUILD_INFO,
         },
     },
 )
 
 fuchsia_prebuilt_package(
-    name = "tiles_session",
-    archive = "@legacy_ninja_build_outputs//:tiles-session.far",
+    name = "workbench_session",
+    archive = "@legacy_ninja_build_outputs//:workbench_session.far",
 )
