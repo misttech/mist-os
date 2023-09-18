@@ -206,20 +206,6 @@ an official IDK.
 
 ## GN build arguments
 
-##### `build_sdk_archives`
-
-Setting the deprecated `build_sdk_archives` build argument to `true` in
-`args.gn` will force the generation _by_ _default_ of a compressed archive
-for a few collections defined in `//sdk/BUILD.gn`.
-
-It will appear under `$OUTPUT_DIR/sdk/archive/<name>.tar.gz`. This is disabled
-by default since it is time-consuming and is only needed for a few legacy
-cases. Once all these use cases have been updated, this feature will be
-removed.
-
-For consistency reasons, IDK archives should be used instead whenever
-something needs to be distributed outside of the Fuchsia team.
-
 ##### `warn_on_sdk_changes`
 
 For each element in the SDK, a reference file representing its API is checked

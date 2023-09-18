@@ -277,10 +277,6 @@ sdk_collection("zircon_sysroot") {
   category = "internal"
 
   deps = [ "//zircon/public/sysroot/sdk:sysroot_sdk" ]
-
-  # A compressed archive is never needed for this collection, only its
-  # export directory should be used by Fuchsia team developers.
-  generate_archive = false
 }
 
 # A set of SDK atoms related to developing end-to-end tests.
@@ -295,11 +291,6 @@ sdk_collection("e2e_testing") {
     ":e2e_testing_tools",
     "//sdk/testing/sl4f/client:client_sdk($dart_toolchain)",
   ]
-
-  # TODO(https://fxbug.dev/133353): Remove this.
-  if (build_sdk_archives) {
-    generate_archive = true
-  }
 }
 
 sdk_molecule("e2e_testing_tools") {
@@ -540,11 +531,6 @@ sdk_collection("core") {
   if (!sdk_no_host_tools) {
     deps += [ ":host_tools" ]
   }
-
-  # TODO(https://fxbug.dev/133353): Remove this.
-  if (build_sdk_archives) {
-    generate_archive = true
-  }
 }
 
 if (is_host) {
@@ -716,12 +702,6 @@ sdk_collection("driver") {
   ]
   if (!sdk_no_host_tools) {
     deps += [ ":driver_host_tools" ]
-  }
-
-  # TODO(https://fxbug.dev/133353): Remove this.
-  if (build_sdk_archives) {
-    # TODO(fxbug.dev/116642): the driver SDK archive will soon be removed.
-    generate_archive = true
   }
 }
 
