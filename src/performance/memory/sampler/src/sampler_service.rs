@@ -6,7 +6,6 @@
 //! service. It defines functions to process a stream of profiling
 //! requests and produce a complete profile, as well as utilities to
 //! persist it.
-
 use crate::{crash_reporter::ProfileReport, profile_builder::ProfileBuilder};
 
 use anyhow::{Context, Error};
@@ -16,24 +15,31 @@ use fidl_fuchsia_memory_sampler::{
 use fuchsia_async::Task;
 use fuchsia_component::server::ServiceFs;
 use futures::{channel::mpsc, prelude::*};
+use std::time::{Duration, Instant};
 
-/// The threshold of recorded dead allocations to trigger a partial
-/// report. The overhead for each dead allocation is of the order of 1
-/// KiB; keeping this below 10 000 should keep the residual memory
-/// *for a single profiled process* roughly under ~10 MiB.
-const DEAD_ALLOCATIONS_PROFILE_THRESHOLD: usize = 10000;
+/// The threshold of recorded stack traces to trigger a partial
+/// report. The overhead for each stack trace is of the order of 1
+/// KiB; keeping this below 1000 should keep the residual memory
+/// *for a single profiled process* roughly under ~1 MiB.
+const RECLAIMABLE_STACK_TRACES_PROFILE_THRESHOLD: usize = 1000;
 
 /// Upper bound on the number of concurrent connections served.
 const MAX_CONCURRENT_REQUESTS: usize = 10;
 
+/// Upper bound on the elapsed time between producing two partial
+/// profiles.
+const MAX_DURATION_BETWEEN_PARTIAL_PROFILES: Duration = Duration::from_secs(12 * 60 * 60);
+
 /// Accumulate profiling information in the builder. May send a
-/// partial profile depending on the amount of recorded data.
+/// partial profile depending on the amount of recorded data, at least
+/// once every `MAX_DURATION_BETWEEN_PARTIAL_PROFILES`.
 async fn process_sampler_request<'a>(
     builder: &'a mut ProfileBuilder,
     tx: &'a mut mpsc::Sender<ProfileReport>,
     request: SamplerRequest,
     index: usize,
-) -> Result<(&'a mut ProfileBuilder, &'a mut mpsc::Sender<ProfileReport>), Error> {
+    mut time_of_last_profile: Instant,
+) -> Result<(&'a mut ProfileBuilder, &'a mut mpsc::Sender<ProfileReport>, Instant), Error> {
     match request {
         SamplerRequest::RecordAllocation { address, stack_trace, size, .. } => {
             builder.allocate(address, stack_trace.stack_frames.unwrap_or_default(), size);
@@ -46,11 +52,24 @@ async fn process_sampler_request<'a>(
             builder.set_process_info(process_name, module_map.into_iter().flatten());
         }
     };
-    if builder.get_dead_allocations_count() >= DEAD_ALLOCATIONS_PROFILE_THRESHOLD {
+
+    // File a partial profile under one of two conditions:
+    //
+    // * The recorded data reached a size threshold, and it's time to
+    //   file a profile to reclaim some memory.
+    //
+    // * MAX_DURATION_BETWEEN_PARTIAL_PROFILES has elapsed since the
+    //   last time we filed a partial profile for this process.
+    let now = Instant::now();
+    if (now - time_of_last_profile >= MAX_DURATION_BETWEEN_PARTIAL_PROFILES)
+        || (builder.get_approximate_reclaimable_stack_traces_count()
+            >= RECLAIMABLE_STACK_TRACES_PROFILE_THRESHOLD)
+    {
         let profile = builder.build_partial_profile(index)?;
         tx.send(profile).await?;
+        time_of_last_profile = now;
     }
-    Ok((builder, tx))
+    Ok((builder, tx, time_of_last_profile))
 }
 
 /// Build a profile from a stream of profiling requests. Requests are
@@ -63,9 +82,12 @@ async fn process_sampler_requests(
     stream
         .enumerate()
         .map(|(i, request)| request.context("failed request").map(|r| (i, r)))
-        .try_fold((&mut profile_builder, tx), |(builder, tx), (index, request)| {
-            process_sampler_request(builder, tx, request, index)
-        })
+        .try_fold(
+            (&mut profile_builder, tx, Instant::now()),
+            |(builder, tx, time_of_last_profile), (index, request)| {
+                process_sampler_request(builder, tx, request, index, time_of_last_profile)
+            },
+        )
         .await?;
     profile_builder.build()
 }
@@ -127,13 +149,14 @@ mod test {
     use futures::{channel::mpsc, join, StreamExt};
     use itertools::{assert_equal, sorted};
     use prost::Message;
+    use std::time::Instant;
 
     use crate::{
         crash_reporter::ProfileReport,
         pprof::pproto::{Location, Mapping, Profile},
         sampler_service::{
             process_sampler_request, process_sampler_requests, ProfileBuilder,
-            DEAD_ALLOCATIONS_PROFILE_THRESHOLD,
+            MAX_DURATION_BETWEEN_PARTIAL_PROFILES, RECLAIMABLE_STACK_TRACES_PROFILE_THRESHOLD,
         },
     };
 
@@ -206,7 +229,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_process_sampler_request_partial_profile() -> Result<(), Error> {
+    async fn test_process_sampler_request_partial_profile_on_size() -> Result<(), Error> {
         let (_client, request_stream) = create_proxy_and_stream::<SamplerMarker>()?;
         let (mut tx, mut rx) = mpsc::channel(1);
         const TEST_NAME: &str = "test process";
@@ -217,7 +240,7 @@ mod test {
         // request.
         builder.set_process_info(Some(TEST_NAME.to_string()), vec![].into_iter());
         {
-            (0..DEAD_ALLOCATIONS_PROFILE_THRESHOLD as u64).for_each(|i| {
+            (0..RECLAIMABLE_STACK_TRACES_PROFILE_THRESHOLD as u64).for_each(|i| {
                 builder.allocate(i, (i..i + 4).collect(), 10);
                 builder.deallocate(i, (i..i + 4).collect());
             });
@@ -229,12 +252,13 @@ mod test {
             &mut builder,
             &mut tx,
             SamplerRequest::RecordAllocation {
-                address: DEAD_ALLOCATIONS_PROFILE_THRESHOLD as u64,
+                address: RECLAIMABLE_STACK_TRACES_PROFILE_THRESHOLD as u64,
                 stack_trace,
                 size: 10,
                 control_handle: request_stream.control_handle(),
             },
             TEST_INDEX,
+            Instant::now(),
         );
         let (_, report) = join!(profile_future, rx.next());
         let report = report.unwrap();
@@ -245,7 +269,45 @@ mod test {
                 // This test assumes that every single allocation ends
                 // up as a sample in the produced profile.
                 let profile = deserialize_profile(profile, size);
-                assert!(profile.sample.len() > DEAD_ALLOCATIONS_PROFILE_THRESHOLD);
+                assert!(profile.sample.len() > RECLAIMABLE_STACK_TRACES_PROFILE_THRESHOLD);
+            }
+            _ => assert!(false),
+        };
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_process_sampler_request_partial_profile_on_time() -> Result<(), Error> {
+        let (_client, request_stream) = create_proxy_and_stream::<SamplerMarker>()?;
+        let (mut tx, mut rx) = mpsc::channel(1);
+        const TEST_NAME: &str = "test process";
+        let mut builder = ProfileBuilder::default();
+        builder.set_process_info(Some(TEST_NAME.to_string()), vec![].into_iter());
+
+        let stack_trace = StackTrace { stack_frames: Some(vec![1000, 1500]), ..Default::default() };
+        const TEST_INDEX: usize = 42;
+        let profile_future = process_sampler_request(
+            &mut builder,
+            &mut tx,
+            SamplerRequest::RecordAllocation {
+                address: 1,
+                stack_trace,
+                size: 10,
+                control_handle: request_stream.control_handle(),
+            },
+            TEST_INDEX,
+            Instant::now() - MAX_DURATION_BETWEEN_PARTIAL_PROFILES,
+        );
+        let (_, report) = join!(profile_future, rx.next());
+        let report = report.unwrap();
+        match report {
+            ProfileReport::Partial { process_name, iteration, profile, size } => {
+                assert_eq!(process_name, TEST_NAME.to_string());
+                assert_eq!(iteration, TEST_INDEX);
+                // This test assumes that every single allocation ends
+                // up as a sample in the produced profile.
+                let profile = deserialize_profile(profile, size);
+                assert_eq!(1, profile.sample.len());
             }
             _ => assert!(false),
         };

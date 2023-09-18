@@ -74,6 +74,8 @@ the SDK; stay tuned.
 
 ## Memory Profiles
 
+### Content
+
 The profiles produced by `memory_sampler` contain 6 types of samples:
 
   * `residual_allocated_objects`: a count of (sampled) allocations that are
@@ -99,6 +101,19 @@ accurate profile than a process that performs a lot of very small
 allocations). Nevertheless, outliers are still likelier to get sampled; chances
 are that if your process suffers from an unforeseen pathological allocation
 pattern, they will tend to show up on profiles.
+
+### Profile filing frequency
+
+`memory_sampler` produces profiles under roughly three conditions:
+
+  1. A partial profile once the recorded allocation data reaches a
+     certain size, to reduce memory use. This can be somewhat
+     unpredictable, because it depends on the (de)allocation patterns
+     and call sites.
+
+  2. A partial profile at least once every 12 hours.
+
+  3. A final profile when the instrumented process exits.
 
 ### Partial vs final profiles
 
@@ -147,6 +162,11 @@ performance knobs follow:
     number decreases the memory footprint `memory_sampler`, at the expense of
     storage space and bandwidth (because more, smaller profiles get filed as a
     result).
+  * `memory_sampler::sampler_service::MAX_DURATION_BETWEEN_PROFILES`:
+    the maximum elpased time between two partial profiles. Reducing
+    this duration will increase the frequency of partial profiles,
+    which should in turn reduce the memory consumption of the
+    profiler.
 
 Note also that `memory_sampler` comes with built-in throttling of filed
 profiles, to limit the rate of filing crash reports; in an `eng` build,

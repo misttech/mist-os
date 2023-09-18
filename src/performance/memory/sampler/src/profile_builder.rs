@@ -66,9 +66,13 @@ pub struct ProfileBuilder {
 }
 
 impl ProfileBuilder {
-    /// Remove all stack traces that are not referenced outside of the
-    /// cache.
-    fn prune_cache(&mut self) {
+    /// Remove all stack traces that are no longer referenced by any
+    /// recorded allocation.
+    ///
+    /// Note: this function can be used to reclaim memory after
+    /// consuming allocations/deallocations (e.g. by producing a
+    /// partial profile).
+    fn prune_unreferenced_stack_traces(&mut self) {
         self.stack_traces.retain(|st| Rc::strong_count(st) > 1);
     }
     /// Add the given stack_trace to the cache, if needed, then return
@@ -118,10 +122,16 @@ impl ProfileBuilder {
         }
         self.module_map.extend(module_map);
     }
-    /// Returns the total amount of dead allocations currently
+    /// Returns the approximate amount of stack traces currently
     /// recorded in this instance.
-    pub fn get_dead_allocations_count(&self) -> usize {
-        self.dead_allocations.len()
+    ///
+    /// Note: Consuming past allocation events (e.g. by producing a
+    /// partial profile) can be followed by a call to
+    /// `self.prune_unereferenced_stack_traces` to reclaim space; this
+    /// function can be used as an heuristic to estimate the amount of
+    /// memory that can be reclaimed.
+    pub fn get_approximate_reclaimable_stack_traces_count(&self) -> usize {
+        self.dead_allocations.len() + self.deallocations.len()
     }
     /// Finalize the profile. Consumes this builder.
     pub fn build(self) -> Result<ProfileReport, Error> {
@@ -153,7 +163,7 @@ impl ProfileBuilder {
                 &self.stack_traces,
             )
         };
-        self.prune_cache();
+        self.prune_unreferenced_stack_traces();
 
         let (vmo, size) = profile_to_vmo(&profile)?;
         Ok(ProfileReport::Partial {
@@ -246,6 +256,23 @@ mod test {
                 assert_eq!(deallocation_stack_trace, *(stack_trace));
             }
         }
+    }
+
+    #[fuchsia::test]
+    fn test_build_partial_profile_prunes_stack_traces() {
+        let mut builder = ProfileBuilder::default();
+        let address = 0x1000;
+        let allocation_stack_trace = vec![1, 2];
+        let deallocation_stack_trace = vec![3, 4];
+        let size = 10;
+        let test_index = 42;
+
+        builder.allocate(address, allocation_stack_trace.clone(), size);
+        builder.deallocate(address, deallocation_stack_trace.clone());
+
+        assert_ne!(0, builder.get_approximate_reclaimable_stack_traces_count());
+        let _ = builder.build_partial_profile(test_index).unwrap();
+        assert_eq!(0, builder.get_approximate_reclaimable_stack_traces_count());
     }
 
     #[fuchsia::test]
