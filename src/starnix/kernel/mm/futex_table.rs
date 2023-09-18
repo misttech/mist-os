@@ -4,17 +4,14 @@
 
 use fuchsia_zircon as zx;
 use futures::channel::oneshot;
-use starnix_sync::{InterruptibleEvent, WakeReason};
+use starnix_sync::InterruptibleEvent;
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
     hash::Hash,
     sync::{Arc, Weak},
 };
 
-use crate::{
-    lock::Mutex, logging::impossible_error, mm::ProtectionFlags, signals::RunState, task::*,
-    types::*,
-};
+use crate::{lock::Mutex, logging::impossible_error, mm::ProtectionFlags, task::*, types::*};
 
 /// A table of futexes.
 ///
@@ -60,12 +57,7 @@ impl<Key: FutexKey> FutexTable<Key> {
         });
         std::mem::drop(state);
 
-        current_task.run_in_state(RunState::Event(event.clone()), move || {
-            guard.block_until(deadline).map_err(|e| match e {
-                WakeReason::Interrupted => errno!(EINTR),
-                WakeReason::DeadlineExpired => errno!(ETIMEDOUT),
-            })
-        })
+        current_task.block_until(guard, deadline)
     }
 
     /// Wake the given number of waiters on futex at the given address. Returns the number of

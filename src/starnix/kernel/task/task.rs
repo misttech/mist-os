@@ -7,6 +7,7 @@ use fuchsia_zircon::{
     self as zx, sys::zx_thread_state_general_regs_t, AsHandleRef, Signals, Task as _,
 };
 use once_cell::sync::OnceCell;
+use starnix_sync::{EventWaitGuard, WakeReason};
 use std::{
     cmp,
     convert::TryFrom,
@@ -1361,6 +1362,15 @@ impl CurrentTask {
         };
 
         result
+    }
+
+    pub fn block_until(&self, guard: EventWaitGuard<'_>, deadline: zx::Time) -> Result<(), Errno> {
+        self.run_in_state(RunState::Event(guard.event().clone()), move || {
+            guard.block_until(deadline).map_err(|e| match e {
+                WakeReason::Interrupted => errno!(EINTR),
+                WakeReason::DeadlineExpired => errno!(ETIMEDOUT),
+            })
+        })
     }
 
     /// Determine namespace node indicated by the dir_fd.

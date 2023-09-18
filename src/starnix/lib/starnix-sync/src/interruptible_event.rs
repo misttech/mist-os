@@ -26,7 +26,7 @@ use crate::zx::{zx_futex_wait, zx_futex_wake};
 /// perform some related work, and then start blocking. This approach ensures that clients do not
 /// miss notifications that arrive after they perform the related work but before they actually
 /// start blocking.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct InterruptibleEvent {
     futex: sys::zx_futex_t,
 }
@@ -56,10 +56,15 @@ const INTERRUPTED: i32 = 3;
 /// A guard object to enforce that clients call `begin_wait` before `block_until`.
 #[must_use = "call block_until to advance the event state machine"]
 pub struct EventWaitGuard<'a> {
-    event: &'a InterruptibleEvent,
+    event: &'a Arc<InterruptibleEvent>,
 }
 
 impl<'a> EventWaitGuard<'a> {
+    /// The underlying event associated with this guard.
+    pub fn event(&self) -> &'a Arc<InterruptibleEvent> {
+        self.event
+    }
+
     /// Block the thread until either `deadline` expires, the event is notified, or the event is
     /// interrupted.
     pub fn block_until(self, deadline: zx::Time) -> Result<(), WakeReason> {
@@ -79,7 +84,7 @@ pub enum WakeReason {
 
 impl InterruptibleEvent {
     pub fn new() -> Arc<Self> {
-        Arc::new(Self::default())
+        Arc::new(InterruptibleEvent { futex: Default::default() })
     }
 
     /// Called to initiate a wait.
@@ -89,7 +94,7 @@ impl InterruptibleEvent {
     ///
     /// Once called, this function cannot be called again until `block_until` returns. Otherwise,
     /// this function will panic.
-    pub fn begin_wait(&self) -> EventWaitGuard<'_> {
+    pub fn begin_wait<'a>(self: &'a Arc<Self>) -> EventWaitGuard<'a> {
         self.futex
             .compare_exchange(READY, WAITING, Ordering::Relaxed, Ordering::Relaxed)
             .expect("Tried to begin waiting on an event when not ready.");
