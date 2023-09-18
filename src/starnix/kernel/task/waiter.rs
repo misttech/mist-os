@@ -5,7 +5,6 @@
 use fuchsia_zircon as zx;
 use std::{
     collections::HashMap,
-    ops::DerefMut,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, Weak,
@@ -90,8 +89,6 @@ enum WaitEvents {
     All,
     /// Wait on the set of FdEvents.
     Fd(FdEvents),
-    /// Wait on the given mask.
-    Mask(u64),
     /// Wait for the specified value.
     Value(u64),
 }
@@ -102,8 +99,7 @@ impl WaitEvents {
         match ordinal {
             0 => Self::All,
             1 => Self::Fd(FdEvents::from_u64(value)),
-            2 => Self::Mask(value),
-            3 => Self::Value(value),
+            2 => Self::Value(value),
             _ => panic!("Unknown ordinal"),
         }
     }
@@ -113,7 +109,6 @@ impl WaitEvents {
         match (self, other) {
             (Self::All, _) | (_, Self::All) => true,
             (Self::Fd(m1), Self::Fd(m2)) => m1.bits() & m2.bits() != 0,
-            (Self::Mask(m1), Self::Mask(m2)) => m1 & m2 != 0,
             (Self::Value(v1), Self::Value(v2)) => v1 == v2,
             _ => false,
         }
@@ -124,8 +119,7 @@ impl WaitEvents {
         match self {
             Self::All => (0, 0),
             Self::Fd(events) => (1, events.bits() as u64),
-            Self::Mask(value) => (2, *value),
-            Self::Value(value) => (3, *value),
+            Self::Value(value) => (2, *value),
         }
     }
 }
@@ -495,10 +489,6 @@ impl Default for Waiter {
 pub struct WaiterRef(Weak<PortWaiter>);
 
 impl WaiterRef {
-    pub fn empty() -> Self {
-        Self::default()
-    }
-
     pub fn is_valid(&self) -> bool {
         self.0.strong_count() != 0
     }
@@ -586,7 +576,7 @@ impl WaitQueue {
     /// call the [`Waiter::wait`] function on the waiter.
     ///
     /// Returns a `WaitCanceler` that can be used to cancel the wait.
-    fn wait_async_on_entry(&self, waiter: &Waiter, entry: WaitEntry) -> WaitCanceler {
+    fn wait_async_entry(&self, waiter: &Waiter, entry: WaitEntry) -> WaitCanceler {
         let key = entry.key;
         self.0.waiters.lock().push(entry);
         let weak_self = Arc::downgrade(&self.0);
@@ -610,19 +600,6 @@ impl WaitQueue {
         })
     }
 
-    /// Establish a wait for the given event mask.
-    ///
-    /// The waiter will be notified when an event matching the events mask
-    /// occurs.
-    ///
-    /// This function does not actually block the waiter. To block the waiter,
-    /// call the [`Waiter::wait`] function on the waiter.
-    ///
-    /// Returns a `WaitCanceler` that can be used to cancel the wait.
-    pub fn wait_async_mask(&self, waiter: &Waiter, mask: u64) -> WaitCanceler {
-        self.wait_async_on_entry(waiter, waiter.create_wait_entry(WaitEvents::Mask(mask)))
-    }
-
     /// Establish a wait for the given value event.
     ///
     /// The waiter will be notified when an event with the same value occurs.
@@ -632,7 +609,25 @@ impl WaitQueue {
     ///
     /// Returns a `WaitCanceler` that can be used to cancel the wait.
     pub fn wait_async_value(&self, waiter: &Waiter, value: u64) -> WaitCanceler {
-        self.wait_async_on_entry(waiter, waiter.create_wait_entry(WaitEvents::Value(value)))
+        self.wait_async_entry(waiter, waiter.create_wait_entry(WaitEvents::Value(value)))
+    }
+
+    /// Establish a wait for the given FdEvents.
+    ///
+    /// The waiter will be notified when an event matching the `events` occurs.
+    ///
+    /// This function does not actually block the waiter. To block the waiter,
+    /// call the [`Waiter::wait`] function on the waiter.
+    ///
+    /// Returns a `WaitCanceler` that can be used to cancel the wait.
+    pub fn wait_async_fd_events(
+        &self,
+        waiter: &Waiter,
+        events: FdEvents,
+        handler: EventHandler,
+    ) -> WaitCanceler {
+        let entry = waiter.create_wait_entry_with_handler(WaitEvents::Fd(events), handler);
+        self.wait_async_entry(waiter, entry)
     }
 
     /// Establish a wait for any event.
@@ -644,25 +639,7 @@ impl WaitQueue {
     ///
     /// Returns a `WaitCanceler` that can be used to cancel the wait.
     pub fn wait_async(&self, waiter: &Waiter) -> WaitCanceler {
-        self.wait_async_on_entry(waiter, waiter.create_wait_entry(WaitEvents::All))
-    }
-
-    /// Establish a wait for the given events.
-    ///
-    /// The waiter will be notified when an event matching the `events` occurs.
-    ///
-    /// This function does not actually block the waiter. To block the waiter,
-    /// call the [`Waiter::wait`] function on the waiter.
-    ///
-    /// Returns a `WaitCanceler` that can be used to cancel the wait.
-    pub fn wait_async_events(
-        &self,
-        waiter: &Waiter,
-        events: FdEvents,
-        handler: EventHandler,
-    ) -> WaitCanceler {
-        let entry = waiter.create_wait_entry_with_handler(WaitEvents::Fd(events), handler);
-        self.wait_async_on_entry(waiter, entry)
+        self.wait_async_entry(waiter, waiter.create_wait_entry(WaitEvents::All))
     }
 
     fn notify_events_count(&self, events: WaitEvents, mut limit: usize) -> usize {
@@ -680,28 +657,11 @@ impl WaitQueue {
         woken
     }
 
-    /// Notify any waiters that the given events have occurred.
-    ///
-    /// Walks the wait queue and wakes and removes each waiter that is waiting
-    /// on an event that matches the given mask.
-    ///
-    /// The waiters will wake up on their own threads to handle these events.
-    /// They are not called synchronously by this function.
-    ///
-    /// Returns the number of waiters woken.
-    pub fn notify_mask_count(&self, mask: u64, limit: usize) -> usize {
-        self.notify_events_count(WaitEvents::Mask(mask), limit)
-    }
-
-    pub fn notify_mask(&self, mask: u64) {
-        self.notify_mask_count(mask, usize::MAX);
-    }
-
     pub fn notify_fd_events(&self, events: FdEvents) {
         self.notify_events_count(WaitEvents::Fd(events), usize::MAX);
     }
 
-    pub fn notify_value_event(&self, value: u64) {
+    pub fn notify_value(&self, value: u64) {
         self.notify_events_count(WaitEvents::Value(value), usize::MAX);
     }
 
@@ -711,11 +671,6 @@ impl WaitQueue {
 
     pub fn notify_all(&self) {
         self.notify_count(usize::MAX);
-    }
-
-    pub fn transfer(&self, other: &WaitQueue) {
-        let mut other_entries = std::mem::take(other.0.waiters.lock().deref_mut());
-        self.0.waiters.lock().append(&mut other_entries);
     }
 
     /// Returns whether there is no active waiters waiting on this `WaitQueue`.
@@ -898,30 +853,6 @@ mod tests {
         queue.notify_count(3);
         assert!(waiter0.wait_until(&current_task, zx::Time::ZERO).is_err());
         assert!(waiter1.wait_until(&current_task, zx::Time::ZERO).is_err());
-        assert!(waiter2.wait_until(&current_task, zx::Time::ZERO).is_err());
-    }
-
-    #[::fuchsia::test]
-    async fn test_wait_queue_mask() {
-        let (_kernel, current_task) = create_kernel_and_task();
-        let queue = WaitQueue::default();
-
-        let waiter0 = Waiter::new();
-        let waiter1 = Waiter::new();
-        let waiter2 = Waiter::new();
-
-        queue.wait_async_mask(&waiter0, 0x13);
-        queue.wait_async_mask(&waiter1, 0x11);
-        queue.wait_async_mask(&waiter2, 0x12);
-
-        queue.notify_mask_count(0x2, 2);
-        assert!(waiter0.wait_until(&current_task, zx::Time::ZERO).is_ok());
-        assert!(waiter1.wait_until(&current_task, zx::Time::ZERO).is_err());
-        assert!(waiter2.wait_until(&current_task, zx::Time::ZERO).is_ok());
-
-        queue.notify_mask_count(0x1, usize::MAX);
-        assert!(waiter0.wait_until(&current_task, zx::Time::ZERO).is_err());
-        assert!(waiter1.wait_until(&current_task, zx::Time::ZERO).is_ok());
         assert!(waiter2.wait_until(&current_task, zx::Time::ZERO).is_err());
     }
 }

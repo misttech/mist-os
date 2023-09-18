@@ -252,7 +252,7 @@ impl NetlinkSocketInner {
         events: FdEvents,
         handler: EventHandler,
     ) -> WaitCanceler {
-        self.waiters.wait_async_events(waiter, events, handler)
+        self.waiters.wait_async_fd_events(waiter, events, handler)
     }
 
     fn query_events(&self) -> FdEvents {

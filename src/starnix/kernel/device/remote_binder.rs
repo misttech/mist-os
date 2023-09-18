@@ -382,7 +382,7 @@ impl RemoteBinderHandleState {
                 self.exit(error!(EINVAL));
                 return;
             }
-            self.waiters.notify_value_event(tid as u64);
+            self.waiters.notify_value(tid as u64);
         } else if let Some(tid) = self.unassigned_tasks.iter().next().copied() {
             // There was no task associated with the koid, but there exists an unassigned task.
             // Associated the task with the koid, and insert the pending request.
@@ -395,7 +395,7 @@ impl RemoteBinderHandleState {
                 self.exit(error!(EINVAL));
                 return;
             }
-            self.waiters.notify_value_event(tid as u64);
+            self.waiters.notify_value(tid as u64);
         } else {
             // And add the request to the unassigned queue.
             self.unassigned_requests.push_back(request);

@@ -794,7 +794,7 @@ impl SeccompNotifier {
                 return Some(errno!(EINPROGRESS));
             }
             entry.resp = Some(resp);
-            self.waiters.notify_value_event(resp.id);
+            self.waiters.notify_value(resp.id);
             None
         } else {
             Some(errno!(EINVAL))
@@ -832,7 +832,7 @@ impl FileOps for SeccompNotifierFileObject {
 
         for (cookie, notification) in state.pending_notifications.iter() {
             if !notification.consumed {
-                state.waiters.notify_value_event(*cookie);
+                state.waiters.notify_value(*cookie);
                 state.waiters.notify_fd_events(FdEvents::POLLIN | FdEvents::POLLRDNORM);
             } else if notification.resp.is_none() {
                 state.waiters.notify_fd_events(FdEvents::POLLOUT | FdEvents::POLLWRNORM);
@@ -896,7 +896,7 @@ impl FileOps for SeccompNotifierFileObject {
                         if notif.is_some() {
                             break;
                         }
-                        notifier.waiters.wait_async_events(
+                        notifier.waiters.wait_async_fd_events(
                             &waiter,
                             FdEvents::POLLIN | FdEvents::POLLHUP,
                             Box::new(|_: FdEvents| {}),
@@ -962,7 +962,7 @@ impl FileOps for SeccompNotifierFileObject {
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
         let notifier = self.notifier.lock();
-        Some(notifier.waiters.wait_async_events(waiter, events, handler))
+        Some(notifier.waiters.wait_async_fd_events(waiter, events, handler))
     }
 
     fn query_events(

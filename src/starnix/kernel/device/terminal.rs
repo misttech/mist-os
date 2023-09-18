@@ -429,7 +429,7 @@ impl TerminalMutableState<Base = Terminal> {
         events: FdEvents,
         handler: EventHandler,
     ) -> WaitCanceler {
-        self.main_wait_queue.wait_async_events(waiter, events, handler)
+        self.main_wait_queue.wait_async_fd_events(waiter, events, handler)
     }
 
     /// `query_events` implementation of the main side of the terminal.
@@ -487,7 +487,7 @@ impl TerminalMutableState<Base = Terminal> {
         events: FdEvents,
         handler: EventHandler,
     ) -> WaitCanceler {
-        self.replica_wait_queue.wait_async_events(waiter, events, handler)
+        self.replica_wait_queue.wait_async_fd_events(waiter, events, handler)
     }
 
     /// `query_events` implementation of the replica side of the terminal.

@@ -132,7 +132,7 @@ impl FileOps for EventFdFileObject {
         events: FdEvents,
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        Some(self.inner.lock().wait_queue.wait_async_events(waiter, events, handler))
+        Some(self.inner.lock().wait_queue.wait_async_fd_events(waiter, events, handler))
     }
 
     fn query_events(

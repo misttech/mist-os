@@ -971,7 +971,7 @@ impl FuseConnection {
         events: FdEvents,
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        Some(self.state.lock().waiters.wait_async_events(waiter, events, handler))
+        Some(self.state.lock().waiters.wait_async_fd_events(waiter, events, handler))
     }
 
     fn query_events(&self) -> FdEvents {
@@ -1051,7 +1051,7 @@ impl FuseMutableState {
         debug_assert!(self.configuration.is_none());
         log_trace!("Fuse configuration: {configuration:?}");
         self.configuration = Some(Arc::new(configuration));
-        self.waiters.notify_value_event(CONFIGURATION_AVAILABLE_EVENT);
+        self.waiters.notify_value(CONFIGURATION_AVAILABLE_EVENT);
     }
 
     /// Disconnect the mount. Happens on unmount. Every filesystem operation will fail with EINTR,
@@ -1191,7 +1191,7 @@ impl FuseMutableState {
         if data.available() < remainder {
             return error!(EINVAL);
         }
-        self.waiters.notify_value_event(header.unique);
+        self.waiters.notify_value(header.unique);
         let running_operation =
             self.operations.get_mut(&header.unique).ok_or_else(|| errno!(EINVAL))?;
         let operation = running_operation.operation.clone();

@@ -380,7 +380,7 @@ impl FileOps for PipeFileObject {
         if !flags.can_write() {
             events.remove(FdEvents::POLLOUT);
         }
-        Some(self.pipe.lock().waiters.wait_async_events(waiter, events, handler))
+        Some(self.pipe.lock().waiters.wait_async_fd_events(waiter, events, handler))
     }
 
     fn query_events(

@@ -344,7 +344,7 @@ impl CommandQueueWithWaitQueue {
         events: FdEvents,
         handler: EventHandler,
     ) -> WaitCanceler {
-        self.waiters.wait_async_events(waiter, events, handler)
+        self.waiters.wait_async_fd_events(waiter, events, handler)
     }
 
     fn notify_all(&self) {
@@ -3644,7 +3644,7 @@ impl BinderDriver {
             std::mem::replace(old_handler.lock().deref_mut(), Box::new(|_| {}))(e)
         });
         let w1 = thread_state.command_queue.wait_async_events(waiter, events, handler.clone());
-        let w2 = proc_command_queue.waiters.wait_async_events(waiter, events, handler);
+        let w2 = proc_command_queue.waiters.wait_async_fd_events(waiter, events, handler);
         WaitCanceler::new(move || w1.cancel() || w2.cancel())
     }
 }

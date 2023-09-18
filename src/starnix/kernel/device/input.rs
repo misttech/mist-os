@@ -534,7 +534,7 @@ impl FileOps for Arc<InputFile> {
         events: FdEvents,
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        Some(self.inner.lock().waiters.wait_async_events(waiter, events, handler))
+        Some(self.inner.lock().waiters.wait_async_fd_events(waiter, events, handler))
     }
 
     fn query_events(

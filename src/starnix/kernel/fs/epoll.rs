@@ -474,7 +474,7 @@ impl FileOps for EpollFileObject {
         events: FdEvents,
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        Some(self.state.read().waiters.wait_async_events(waiter, events, handler))
+        Some(self.state.read().waiters.wait_async_fd_events(waiter, events, handler))
     }
 
     fn query_events(
