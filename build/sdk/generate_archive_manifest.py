@@ -55,12 +55,12 @@ def main():
         dest = os.path.normpath(dest_path)
         src = os.path.normpath(src_path)
         if dest in all_files:
-            # `sdk://fuchsia_packages/blobs/` and `sdk://fuchsia_packages/subpackage_manifests/`
+            # `sdk://packages/blobs/` and `sdk://packages/subpackage_manifests/`
             # directories may contain duplicate files, named as the hash of their
             # content. File content will match, and no concern on collision.
             _ignored_prefixes = (
-                "fuchsia_packages/blobs/",
-                "fuchsia_packages/subpackage_manifests/",
+                "packages/blobs/",
+                "packages/subpackage_manifests/",
             )
             if dest.startswith(_ignored_prefixes):
                 pass
