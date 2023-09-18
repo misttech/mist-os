@@ -12,10 +12,23 @@ __BEGIN_CDECLS
 
 // Binds the current process to the provided process registry.
 //
-// `registry_channel` must be connected to the `fuchsia.memory.heapdump.process.Registry` server.
+// `registry_channel` must be the client end of a `fuchsia.memory.heapdump.process.Registry` channel
+// connected to heapdump's collector. Calling this function is necessary to make the current process
+// visible to the collector and, in turn, to its `ffx profile heapdump` client commands.
+//
+// Since a process cannot be bound to multiple registries, this function can only be called at most
+// once during the lifetime of a process. This is enforced by the function itself, which will print
+// an error and abort if called twice.
+//
+// Note: Allocations and snapshots captured before calling this function are internally buffered.
+// Therefore, while it is expected that programs will call this function as early as possible, no
+// data will be lost if they start to allocate before doing so.
 void heapdump_bind_with_channel(zx_handle_t registry_channel);
 
 // Binds the current process to the process registry, using `fdio_service_connect` to locate it.
+//
+// This function wraps `heapdump_bind_with_channel` and implements the common case of using fdio to
+// connect to the process registry.
 void heapdump_bind_with_fdio(void);
 
 __END_CDECLS

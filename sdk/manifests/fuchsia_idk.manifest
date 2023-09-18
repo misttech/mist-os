@@ -2,6 +2,7 @@ cc_prebuilt_library://pkg/async-default
 cc_prebuilt_library://pkg/async-loop-default
 cc_prebuilt_library://pkg/driver_runtime_shared_lib
 cc_prebuilt_library://pkg/fdio
+cc_prebuilt_library://pkg/heapdump_instrumentation
 cc_prebuilt_library://pkg/magma_client
 cc_prebuilt_library://pkg/svc
 cc_prebuilt_library://pkg/sync

@@ -11,6 +11,9 @@
 __BEGIN_CDECLS
 
 // Publishes a named snapshot of all the current live allocations.
+//
+// The published snapshots can be listed with `ffx profile heapdump list` and retrieved with
+// `ffx profile heapdump download`.
 void heapdump_take_named_snapshot(const char *snapshot_name);
 
 __END_CDECLS

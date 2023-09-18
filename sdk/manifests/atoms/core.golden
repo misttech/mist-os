@@ -234,6 +234,7 @@
 //src/lib/fidl/cpp:natural_ostream_sdk
 //src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_sdk
 //src/lib/vulkan:vulkan_layers
+//src/performance/memory/heapdump/instrumentation:instrumentation_sdk_manifest
 //src/storage/bin/fvm:fvm_sdk
 //src/storage/blobfs/tools:blobfs_sdk
 //src/storage/minfs/tools:minfs_sdk

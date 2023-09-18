@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/cpp/sdk_shared_library.gni")
 import("//build/rust/rustc_staticlib.gni")
 
 group("tests") {
@@ -41,10 +42,18 @@ rustc_staticlib("core") {
 
 # Processes that link to this library must call either `heapdump_bind_with_channel`
 # or `heapdump_bind_with_fdio` themselves.
-shared_library("instrumentation") {
+sdk_shared_library("instrumentation") {
   output_name = "heapdump_instrumentation"
+  category = "partner"
+  symbols_api = "heapdump_instrumentation.ifs"
 
   sources = [ "bind_with_fdio.cc" ]
+  public_configs = [ ":include" ]
+  public = [
+    "include/heapdump/bind.h",
+    "include/heapdump/snapshot.h",
+    "include/heapdump/stats.h",
+  ]
 
   deps = [
     ":core",
@@ -53,7 +62,7 @@ shared_library("instrumentation") {
     "//src/zircon/lib/zircon",
   ]
 
-  public_deps = [ ":instrumentation.headers" ]
+  runtime_deps = [ "//sdk/lib/fdio:fdio_sdk" ]
 
   # For each symbol that we want to export, tell the linker that:
   #  - It must not be hidden (--retain-symbols-file)
@@ -70,15 +79,9 @@ shared_library("instrumentation") {
   configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
 }
 
-library_headers("instrumentation.headers") {
+config("include") {
   visibility = [ ":*" ]
-
-  include_dir = "include"
-  headers = [
-    "heapdump/bind.h",
-    "heapdump/snapshot.h",
-    "heapdump/stats.h",
-  ]
+  include_dirs = [ "include" ]
 }
 
 fuchsia_unittest_package("rust-tests") {
