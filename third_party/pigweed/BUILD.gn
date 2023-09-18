@@ -14,8 +14,10 @@ source_set("pw_async_heap_dispatcher") {
   public_deps = [ "src/pw_async:heap_dispatcher" ]
 }
 
-# TODO(fxbug.dev/125377): Add "backends/pw_async_fuchsia:tests" to deps.
 group("tests") {
   testonly = true
-  deps = [ "backends/pw_random:tests" ]
+  deps = [
+    "backends/pw_async_fuchsia:tests",
+    "backends/pw_random:tests",
+  ]
 }

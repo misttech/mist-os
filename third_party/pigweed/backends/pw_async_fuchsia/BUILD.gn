@@ -79,11 +79,10 @@ executable("pigweed_backend_pw_async_fuchsia_tests_executable") {
     ":dispatcher",
     ":fake_dispatcher_fixture",
     "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
   ]
 }
 
-# TODO(fxbug.dev/125377): Add this target to pigweed:tests group once API is stable.
-# In order to run these tests, manually include this target in your build.
 fuchsia_unittest_package("tests") {
   package_name = "pigweed-backend-pw-async-fuchsia-tests"
   deps = [ ":pigweed_backend_pw_async_fuchsia_tests_executable" ]

@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 
 #include "pw_async_fuchsia/util.h"
+#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 #define ASSERT_OK(status) ASSERT_EQ(OkStatus(), status)
 #define ASSERT_CANCELLED(status) ASSERT_EQ(Status::Cancelled(), status)
@@ -15,31 +16,31 @@ using namespace std::chrono_literals;
 
 namespace pw::async::fuchsia {
 
-TEST(DispatcherFuchsiaTest, TimeConversions) {
+using DispatcherFuchsiaTest = ::gtest::TestLoopFixture;
+
+TEST_F(DispatcherFuchsiaTest, TimeConversions) {
   zx::time time{timespec{123, 456}};
   chrono::SystemClock::time_point tp = pw_async_fuchsia::ZxTimeToTimepoint(time);
   EXPECT_EQ(tp.time_since_epoch(), 123s + 456ns);
   EXPECT_EQ(pw_async_fuchsia::TimepointToZxTime(tp), time);
 }
 
-TEST(DispatcherFuchsiaTest, Basic) {
-  FuchsiaDispatcher dispatcher;
+TEST_F(DispatcherFuchsiaTest, Basic) {
+  FuchsiaDispatcher fuchsia_dispatcher(dispatcher());
 
   bool set = false;
   Task task([&set](Context& ctx, Status status) {
     ASSERT_OK(status);
     set = true;
   });
-  dispatcher.Post(task);
+  fuchsia_dispatcher.Post(task);
 
-  dispatcher.RunUntilIdle();
+  RunLoopUntilIdle();
   EXPECT_TRUE(set);
 }
 
-TEST(DispatcherFuchsiaTest, DelayedTasks) {
-  // This test relies on delays which introduce nondeterminism & slowness, so skip by default.
-  GTEST_SKIP();
-  FuchsiaDispatcher dispatcher;
+TEST_F(DispatcherFuchsiaTest, DelayedTasks) {
+  FuchsiaDispatcher fuchsia_dispatcher(dispatcher());
 
   int c = 0;
   Task first([&c](Context& ctx, Status status) {
@@ -55,22 +56,22 @@ TEST(DispatcherFuchsiaTest, DelayedTasks) {
     c = c * 10 + 3;
   });
 
-  dispatcher.PostAfter(third, 20ms);
-  dispatcher.PostAfter(first, 5ms);
-  dispatcher.PostAfter(second, 10ms);
+  fuchsia_dispatcher.PostAfter(third, 20ms);
+  fuchsia_dispatcher.PostAfter(first, 5ms);
+  fuchsia_dispatcher.PostAfter(second, 10ms);
 
-  dispatcher.RunFor(25ms);
+  RunLoopFor(zx::msec(25));
   EXPECT_EQ(c, 123);
 }
 
-TEST(DispatcherFuchsiaTest, CancelTask) {
-  FuchsiaDispatcher dispatcher;
+TEST_F(DispatcherFuchsiaTest, CancelTask) {
+  FuchsiaDispatcher fuchsia_dispatcher(dispatcher());
 
   Task task([](Context& ctx, Status status) { FAIL(); });
-  dispatcher.Post(task);
-  EXPECT_TRUE(dispatcher.Cancel(task));
+  fuchsia_dispatcher.Post(task);
+  EXPECT_TRUE(fuchsia_dispatcher.Cancel(task));
 
-  dispatcher.RunUntilIdle();
+  RunLoopUntilIdle();
 }
 
 class DestructionChecker {
@@ -90,36 +91,36 @@ class DestructionChecker {
   bool* flag_;
 };
 
-TEST(DispatcherFuchsiaTest, HeapAllocatedTasks) {
-  FuchsiaDispatcher dispatcher;
+TEST_F(DispatcherFuchsiaTest, HeapAllocatedTasks) {
+  FuchsiaDispatcher fuchsia_dispatcher(dispatcher());
 
   int c = 0;
   for (int i = 0; i < 3; i++) {
-    pw_async_fuchsia::Post(&dispatcher, [&c](Context& ctx, Status status) {
+    pw_async_fuchsia::Post(&fuchsia_dispatcher, [&c](Context& ctx, Status status) {
       ASSERT_OK(status);
       c++;
     });
   }
 
   EXPECT_EQ(c, 0);
-  dispatcher.RunUntilIdle();
+  RunLoopUntilIdle();
   EXPECT_EQ(c, 3);
 
   // Test that the lambda is destroyed after being called.
   bool flag = false;
-  pw_async_fuchsia::Post(&dispatcher,
+  pw_async_fuchsia::Post(&fuchsia_dispatcher,
                          [checker = DestructionChecker(&flag)](Context& ctx, Status status) {});
   EXPECT_FALSE(flag);
-  dispatcher.RunUntilIdle();
+  RunLoopUntilIdle();
   EXPECT_TRUE(flag);
 }
 
-TEST(DispatcherFuchsiaTest, ChainedTasks) {
-  FuchsiaDispatcher dispatcher;
+TEST_F(DispatcherFuchsiaTest, ChainedTasks) {
+  FuchsiaDispatcher fuchsia_dispatcher(dispatcher());
 
   int c = 0;
 
-  pw_async_fuchsia::Post(&dispatcher, [&c](Context& ctx, Status status) {
+  pw_async_fuchsia::Post(&fuchsia_dispatcher, [&c](Context& ctx, Status status) {
     ASSERT_OK(status);
     c++;
     pw_async_fuchsia::Post(ctx.dispatcher, [&c](Context& ctx, Status status) {
@@ -132,50 +133,7 @@ TEST(DispatcherFuchsiaTest, ChainedTasks) {
     });
   });
 
-  dispatcher.RunUntilIdle();
-  EXPECT_EQ(c, 3);
-}
-
-TEST(DispatcherFuchsiaTest, DestroyLoopInsideTask) {
-  FuchsiaDispatcher dispatcher;
-
-  int c = 0;
-  auto inc_count = [&c](Context& ctx, Status status) {
-    ASSERT_CANCELLED(status);
-    ++c;
-  };
-
-  // These tasks are never executed and cleaned up in RequestStop().
-  Task task0(inc_count), task1(inc_count);
-  dispatcher.PostAfter(task0, 20s);
-  dispatcher.PostAfter(task1, 21s);
-
-  Task stop_task([&c](Context& ctx, Status status) {
-    ASSERT_OK(status);
-    ++c;
-    static_cast<FuchsiaDispatcher*>(ctx.dispatcher)->DestroyLoop();
-  });
-  dispatcher.Post(stop_task);
-
-  dispatcher.RunUntilIdle();
-  EXPECT_EQ(c, 3);
-}
-
-TEST(DispatcherFuchsiaTest, TasksCancelledByDispatcherDestructor) {
-  int c = 0;
-  auto inc_count = [&c](Context& ctx, Status status) {
-    ASSERT_CANCELLED(status);
-    ++c;
-  };
-  Task task0(inc_count), task1(inc_count), task2(inc_count);
-
-  {
-    FuchsiaDispatcher dispatcher;
-    dispatcher.PostAfter(task0, 10s);
-    dispatcher.PostAfter(task1, 10s);
-    dispatcher.PostAfter(task2, 10s);
-  }
-
+  RunLoopUntilIdle();
   EXPECT_EQ(c, 3);
 }
 
