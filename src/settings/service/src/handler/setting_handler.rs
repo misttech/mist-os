@@ -417,7 +417,7 @@ pub mod persist {
                 "read_setting_info receive",
                 "setting_type" => format!("{:?}", T::SETTING_TYPE).as_str()
             );
-            while let Ok((payload, _)) = receptor.next_of::<storage::Payload>().await {
+            if let Ok((payload, _)) = receptor.next_of::<storage::Payload>().await {
                 if let storage::Payload::Response(storage::StorageResponse::Read(
                     StorageInfo::SettingInfo(setting_info),
                 )) = payload
