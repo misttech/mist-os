@@ -156,7 +156,7 @@ To contribute a package to the Fuchsia API surface, follow the guidelines below:
    and repeat the previous build step.
 
 1. Build the IDK target after fixing any other SDK manifest-related changes (including updating
-   the `//sdk/manifests/core.manifest` and `//sdk/manifests/atoms/core.golden` files).
+   the `//sdk/manifests/fuchsia_idk.manifest` and `//sdk/manifests/atoms/core.golden` files).
 
    ```posix-terminal
    fx build final_fuchsia_idk
