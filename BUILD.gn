@@ -1267,7 +1267,7 @@ build_api_module("cipd_assembly_artifacts") {
   data_keys = [ "assembly_inputs" ]
   walk_keys = [ "assembly_inputs_barrier" ]
 
-  deps = cipd_assembly_artifact_targets + extra_cipd_assembly_artifact_targets
+  deps = cipd_assembly_artifact_targets
 }
 
 # This describes the locations of archives for the out-of-tree assembly inputs
