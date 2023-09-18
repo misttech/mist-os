@@ -5,29 +5,48 @@
 import("//build/python/python_mobly_test.gni")
 import("//build/testing/environments.gni")
 
-if (is_host) {
-  python_mobly_test("soft_reboot_test") {
-    main_source = "test_soft_reboot.py"
-    libraries = [
-      "//src/testing/end_to_end/honeydew",
-      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
-    ]
+assert(is_host, "Python E2E tests are host-only")
 
-    params_source = "params.yaml"
+python_mobly_test("soft_reboot_test") {
+  main_source = "test_soft_reboot.py"
+  libraries = [
+    "//src/testing/end_to_end/honeydew",
+    "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+  ]
 
-    environments = [ emu_env ]
-  }
+  params_source = "params.yaml"
 
-  python_mobly_test("soft_reboot_test_fc") {
-    main_source = "test_soft_reboot.py"
-    libraries = [
-      "//src/testing/end_to_end/honeydew",
-      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
-    ]
+  environments = [ emu_env ]
+}
 
-    params_source = "params.yaml"
-    transport = "fuchsia-controller"
+python_mobly_test("soft_reboot_test_fc") {
+  main_source = "test_soft_reboot.py"
+  libraries = [
+    "//src/testing/end_to_end/honeydew",
+    "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+  ]
 
-    environments = [ emu_env ]
-  }
+  params_source = "params.yaml"
+  transport = "fuchsia-controller"
+
+  environments = [ emu_env ]
+}
+
+group("tests") {
+  testonly = true
+  public_deps = [
+    ":soft_reboot_test($host_toolchain)",
+    ":soft_reboot_test_fc($host_toolchain)",
+  ]
+}
+
+# Stable infra test groups.
+group("stable_sl4f_emulator_tests") {
+  testonly = true
+  public_deps = [ ":soft_reboot_test($host_toolchain)" ]
+}
+
+group("stable_non_sl4f_emulator_tests") {
+  testonly = true
+  public_deps = [ ":soft_reboot_test_fc($host_toolchain)" ]
 }

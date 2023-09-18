@@ -2,13 +2,23 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-assert(is_host)
+assert(is_host, "Python E2E tests are host-only")
 
 group("tests") {
   testonly = true
   public_deps = [
     "test_hybrid:tests",
-    "test_soft_reboot:soft_reboot_test($host_toolchain)",
-    "test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
+    "test_soft_reboot:tests",
   ]
+}
+
+# Stable infra test groups.
+group("stable_sl4f_emulator_tests") {
+  testonly = true
+  public_deps = [ "test_soft_reboot:stable_sl4f_emulator_tests" ]
+}
+
+group("stable_non_sl4f_emulator_tests") {
+  testonly = true
+  public_deps = [ "test_soft_reboot:stable_non_sl4f_emulator_tests" ]
 }
