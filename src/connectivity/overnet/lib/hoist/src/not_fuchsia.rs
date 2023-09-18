@@ -8,15 +8,14 @@ use anyhow::{bail, format_err, Context, Error};
 use fidl::endpoints::{create_proxy, create_proxy_and_stream};
 use fidl_fuchsia_overnet::{
     HostOvernetMarker, HostOvernetProxy, HostOvernetRequest, HostOvernetRequestStream,
-    MeshControllerMarker, MeshControllerProxy, MeshControllerRequest, ServiceConsumerMarker,
-    ServiceConsumerProxy, ServiceConsumerRequest, ServicePublisherMarker, ServicePublisherProxy,
-    ServicePublisherRequest,
+    ServiceConsumerMarker, ServiceConsumerProxy, ServiceConsumerRequest, ServicePublisherMarker,
+    ServicePublisherProxy, ServicePublisherRequest,
 };
 use fuchsia_async::TimeoutExt;
 use fuchsia_async::{Task, Timer};
 use futures::channel::mpsc::unbounded;
 use futures::prelude::*;
-use overnet_core::{log_errors, ListPeersContext, Router, RouterOptions, SecurityContext};
+use overnet_core::{log_errors, ListPeersContext, Router, RouterOptions};
 use std::io::ErrorKind::{self, TimedOut};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -25,7 +24,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use stream_link::run_stream_link;
 
 pub static CIRCUIT_ID: [u8; 8] = *b"CIRCUIT\0";
 
@@ -56,12 +54,6 @@ impl super::OvernetInstance for HostOvernet {
         self.proxy.connect_service_publisher(s)?;
         Ok(c)
     }
-
-    fn connect_as_mesh_controller(&self) -> Result<MeshControllerProxy, Error> {
-        let (c, s) = create_proxy::<MeshControllerMarker>()?;
-        self.proxy.connect_mesh_controller(s)?;
-        Ok(c)
-    }
 }
 
 impl HostOvernet {
@@ -81,10 +73,7 @@ pub struct Hoist {
 }
 
 impl Hoist {
-    pub fn with_cache_dir_maybe_router(
-        cache_path: &Path,
-        router_update_interval: Option<std::time::Duration>,
-    ) -> Result<Self, Error> {
+    pub fn new(router_update_interval: Option<std::time::Duration>) -> Result<Self, Error> {
         let node_id = overnet_core::generate_node_id();
         tracing::trace!(hoist_node_id = node_id.0);
         let router_options = RouterOptions::new()
@@ -95,14 +84,10 @@ impl Hoist {
         } else {
             router_options
         };
-        let node = Router::new(router_options, Box::new(hard_coded_security_context(cache_path)))?;
+        let node = Router::new(router_options)?;
         let host_overnet = Arc::new(HostOvernet::new(node.clone())?);
 
         Ok(Self { host_overnet, node })
-    }
-
-    pub fn new() -> Result<Self, Error> {
-        Self::with_cache_dir_maybe_router(&std::env::temp_dir(), None)
     }
 
     /// Runs a circuit link over the given socket. Assumes it is connected as a client.
@@ -245,10 +230,6 @@ impl super::OvernetInstance for Hoist {
     fn connect_as_service_publisher(&self) -> Result<ServicePublisherProxy, Error> {
         self.host_overnet.connect_as_service_publisher()
     }
-
-    fn connect_as_mesh_controller(&self) -> Result<MeshControllerProxy, Error> {
-        self.host_overnet.connect_as_mesh_controller()
-    }
 }
 
 async fn run_ascendd_connection<'a>(
@@ -334,25 +315,6 @@ async fn handle_publisher_request(
     node.register_service(service_name, provider).await
 }
 
-#[tracing::instrument(level = "info")]
-async fn handle_controller_request(
-    node: Arc<Router>,
-    r: MeshControllerRequest,
-) -> Result<(), Error> {
-    let MeshControllerRequest::AttachSocketLink { socket, control_handle: _ } = r;
-    let (mut rx, mut tx) = fidl::AsyncSocket::from_socket(socket)?.split();
-    let config = Box::new(|| {
-        Some(fidl_fuchsia_overnet_protocol::LinkConfig::Socket(
-            fidl_fuchsia_overnet_protocol::Empty {},
-        ))
-    });
-    if let Err(e) = run_stream_link(node, None, &mut rx, &mut tx, Default::default(), config).await
-    {
-        tracing::warn!("Socket link failed: {:#?}", e);
-    }
-    Ok(())
-}
-
 static NEXT_LOG_ID: AtomicU64 = AtomicU64::new(0);
 
 fn log_request<
@@ -399,14 +361,8 @@ async fn handle_request(node: Arc<Router>, req: HostOvernetRequest) -> Result<()
                 )
                 .await?
         }
-        HostOvernetRequest::ConnectMeshController { svc, control_handle: _ } => {
-            svc.into_stream()?
-                .map_err(Into::<Error>::into)
-                .try_for_each_concurrent(
-                    None,
-                    log_request(move |r| handle_controller_request(node.clone(), r)),
-                )
-                .await?
+        HostOvernetRequest::ConnectMeshController { .. } => {
+            unreachable!()
         }
     }
     Ok(())
@@ -430,22 +386,6 @@ async fn run_overnet(node: Arc<Router>, rx: HostOvernetRequestStream) -> Result<
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Hacks to hardcode a resource file without resources
-
-pub fn hard_coded_security_context(cache_path: &Path) -> impl SecurityContext {
-    return overnet_core::MemoryBuffers {
-        node_cert: include_bytes!(
-            "../../../../../../third_party/rust_crates/mirrors/quiche/quiche/examples/cert.crt"
-        ),
-        node_private_key: include_bytes!(
-            "../../../../../../third_party/rust_crates/mirrors/quiche/quiche/examples/cert.key"
-        ),
-        root_cert: include_bytes!(
-            "../../../../../../third_party/rust_crates/mirrors/quiche/quiche/examples/rootca.crt"
-        ),
-    }
-    .into_security_context(cache_path)
-    .unwrap();
-}
 
 const OVERNET_CONNECTION_LABEL: &'static str = "OVERNET_CONNECTION_LABEL";
 

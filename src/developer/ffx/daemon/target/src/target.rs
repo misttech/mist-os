@@ -1287,7 +1287,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_from_rcs_connection_internal_err() {
-        let local_hoist = Hoist::new().unwrap();
+        let local_hoist = Hoist::new(None).unwrap();
 
         // TODO(awdavies): Do some form of PartialEq implementation for
         // the RcsConnectionError enum to avoid the nested matches.
@@ -1310,7 +1310,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_from_rcs_connection_nodename_none() {
-        let local_hoist = Hoist::new().unwrap();
+        let local_hoist = Hoist::new(None).unwrap();
 
         let conn = RcsConnection::new_with_proxy(
             &local_hoist,
@@ -1328,7 +1328,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_from_rcs_connection_no_err() {
-        let local_hoist = Hoist::new().unwrap();
+        let local_hoist = Hoist::new(None).unwrap();
 
         let conn = RcsConnection::new_with_proxy(
             &local_hoist,
@@ -1376,7 +1376,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_rcs_states() {
-        let local_hoist = Hoist::new().unwrap();
+        let local_hoist = Hoist::new(None).unwrap();
 
         for test in vec![
             RcsStateTest {
@@ -1454,7 +1454,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_event_synthesis_wait() {
-        let local_hoist = Hoist::new().unwrap();
+        let local_hoist = Hoist::new(None).unwrap();
 
         let conn = RcsConnection::new_with_proxy(
             &local_hoist,
@@ -1476,7 +1476,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_event_fire() {
-        let local_hoist = Hoist::new().unwrap();
+        let local_hoist = Hoist::new(None).unwrap();
 
         let t = Target::new_named("balaowihf");
         let conn = RcsConnection::new_with_proxy(
@@ -1505,7 +1505,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_connection_state_will_not_drop_rcs_on_mdns_events() {
-        let local_hoist = Hoist::new().unwrap();
+        let local_hoist = Hoist::new(None).unwrap();
 
         let t = Target::new_named("hello-kitty");
         let rcs_state = TargetConnectionState::Rcs(
@@ -1522,7 +1522,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_connection_state_will_not_drop_rcs_on_manual_events() {
-        let local_hoist = Hoist::new().unwrap();
+        let local_hoist = Hoist::new(None).unwrap();
 
         let t = Target::new_named("hello-kitty");
         let rcs_state = TargetConnectionState::Rcs(
@@ -1995,7 +1995,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_update_connection_state_manual_disconnect() {
-        let local_hoist = Hoist::new().unwrap();
+        let local_hoist = Hoist::new(None).unwrap();
 
         let target = Target::new();
         target.addrs_insert_entry(TargetAddrEntry::new(
@@ -2026,7 +2026,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_update_connection_state_expired_ephemeral_disconnect() {
-        let local_hoist = Hoist::new().unwrap();
+        let local_hoist = Hoist::new(None).unwrap();
 
         let target = Target::new();
         target.addrs_insert_entry(TargetAddrEntry::new(
@@ -2057,7 +2057,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_update_connection_state_ephemeral_disconnect() {
-        let local_hoist = Hoist::new().unwrap();
+        let local_hoist = Hoist::new(None).unwrap();
 
         let target = Target::new();
         target.addrs_insert_entry(TargetAddrEntry::new(
@@ -2100,7 +2100,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_host_pipe_state_borrow() {
-        let local_hoist = Hoist::new().unwrap();
+        let local_hoist = Hoist::new(None).unwrap();
         let (done_send, done_recv) = channel::oneshot::channel::<()>();
 
         let target = Target::new();

@@ -5,15 +5,14 @@
 use super::{
     IntoProxied, Message, Proxyable, ProxyableRW, ReadValue, RouterHolder, Serializer, IO,
 };
-use crate::coding::{self, decode_fidl_with_context, encode_fidl_with_context};
-use crate::peer::{MessageStats, PeerConnRef};
+use crate::coding::{decode_fidl, encode_fidl};
+use crate::peer::PeerConnRef;
 use anyhow::{Context as _, Error};
 use fidl::{AsHandleRef, AsyncChannel, HandleBased, Peered, Signals};
 use fidl_fuchsia_overnet_protocol::{ZirconChannelMessage, ZirconHandle};
 use fuchsia_zircon_status as zx_status;
 use futures::{prelude::*, ready};
 use std::pin::Pin;
-use std::sync::Arc;
 use std::task::{Context, Poll};
 
 #[cfg(not(target_os = "fuchsia"))]
@@ -156,16 +155,14 @@ impl Serializer for ChannelMessageParser {
         msg: &mut Self::Message,
         serialized: &mut Vec<u8>,
         conn: PeerConnRef<'_>,
-        stats: &Arc<MessageStats>,
         router: &mut RouterHolder<'_>,
         fut_ctx: &mut Context<'_>,
-        coding_context: coding::Context,
     ) -> Poll<Result<(), Error>> {
         tracing::trace!(?msg, ?serialized, ?self, "ChannelMessageParser::poll_ser",);
         match self {
             ChannelMessageParser::New => {
                 let ZirconChannelMessage { mut bytes, handles: unbound_handles } =
-                    decode_fidl_with_context(coding_context, serialized)?;
+                    decode_fidl(serialized)?;
                 // Special case no handles case to avoid allocation dance
                 if unbound_handles.is_empty() {
                     msg.handles.clear();
@@ -174,7 +171,6 @@ impl Serializer for ChannelMessageParser {
                     return Poll::Ready(Ok(()));
                 }
                 let closure_conn = conn.into_peer_conn();
-                let closure_stats = stats.clone();
                 let closure_router = router.get()?.clone();
                 *self = ChannelMessageParser::Pending {
                     bytes,
@@ -184,7 +180,7 @@ impl Serializer for ChannelMessageParser {
                             handles.push(
                                 closure_router
                                     .clone()
-                                    .recv_proxied(hdl, closure_conn.as_ref(), closure_stats.clone())
+                                    .recv_proxied(hdl, closure_conn.as_ref())
                                     .await?,
                             );
                         }
@@ -192,7 +188,7 @@ impl Serializer for ChannelMessageParser {
                     }
                     .boxed(),
                 };
-                self.poll_ser(msg, serialized, conn, stats, router, fut_ctx, coding_context)
+                self.poll_ser(msg, serialized, conn, router, fut_ctx)
             }
             ChannelMessageParser::Pending { ref mut bytes, handles } => {
                 let mut handles = ready!(handles.as_mut().poll(fut_ctx))?;
@@ -222,10 +218,8 @@ impl Serializer for ChannelMessageSerializer {
         msg: &mut Self::Message,
         serialized: &mut Vec<u8>,
         conn: PeerConnRef<'_>,
-        stats: &Arc<MessageStats>,
         router: &mut RouterHolder<'_>,
         fut_ctx: &mut Context<'_>,
-        coding_context: coding::Context,
     ) -> Poll<Result<(), Error>> {
         let self_val = match self {
             ChannelMessageSerializer::New => "New",
@@ -238,18 +232,14 @@ impl Serializer for ChannelMessageSerializer {
                 let handles = std::mem::replace(&mut msg.handles, Vec::new());
                 // Special case no handles case to avoid allocation dance
                 if handles.is_empty() {
-                    *serialized = encode_fidl_with_context(
-                        coding_context,
-                        &mut ZirconChannelMessage {
-                            bytes: std::mem::replace(&mut msg.bytes, Vec::new()),
-                            handles: Vec::new(),
-                        },
-                    )?;
+                    *serialized = encode_fidl(&mut ZirconChannelMessage {
+                        bytes: std::mem::replace(&mut msg.bytes, Vec::new()),
+                        handles: Vec::new(),
+                    })?;
                     *self = ChannelMessageSerializer::Done;
                     return Poll::Ready(Ok(()));
                 }
                 let closure_conn = conn.into_peer_conn();
-                let closure_stats = stats.clone();
                 let closure_router = router.get()?.clone();
                 *self = ChannelMessageSerializer::Pending(
                     async move {
@@ -259,11 +249,7 @@ impl Serializer for ChannelMessageSerializer {
                             let raw_handle = handle.raw_handle();
                             send_handles.push(
                                 closure_router
-                                    .send_proxied(
-                                        handle,
-                                        closure_conn.as_ref(),
-                                        closure_stats.clone(),
-                                    )
+                                    .send_proxied(handle, closure_conn.as_ref())
                                     .await
                                     .with_context(|| format!("Sending handle {:?}", raw_handle))?,
                             );
@@ -272,17 +258,14 @@ impl Serializer for ChannelMessageSerializer {
                     }
                     .boxed(),
                 );
-                self.poll_ser(msg, serialized, conn, stats, router, fut_ctx, coding_context)
+                self.poll_ser(msg, serialized, conn, router, fut_ctx)
             }
             ChannelMessageSerializer::Pending(handles) => {
                 let handles = ready!(handles.as_mut().poll(fut_ctx))?;
-                *serialized = encode_fidl_with_context(
-                    coding_context,
-                    &mut ZirconChannelMessage {
-                        bytes: std::mem::replace(&mut msg.bytes, Vec::new()),
-                        handles,
-                    },
-                )?;
+                *serialized = encode_fidl(&mut ZirconChannelMessage {
+                    bytes: std::mem::replace(&mut msg.bytes, Vec::new()),
+                    handles,
+                })?;
                 *self = ChannelMessageSerializer::Done;
                 Poll::Ready(Ok(()))
             }

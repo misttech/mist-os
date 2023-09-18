@@ -3,39 +3,10 @@
 // found in the LICENSE file.
 
 use futures::prelude::*;
-use overnet_core::SecurityContext;
 use rand::Rng;
 use std::collections::VecDeque;
 use std::pin::Pin;
 use std::task::{Context, Poll, Waker};
-
-#[cfg(not(target_os = "fuchsia"))]
-pub fn test_security_context() -> Box<dyn SecurityContext> {
-    return Box::new(
-        overnet_core::MemoryBuffers {
-            node_cert: include_bytes!(
-                "../../../../../../third_party/rust_crates/mirrors/quiche/quiche/examples/cert.crt"
-            ),
-            node_private_key: include_bytes!(
-                "../../../../../../third_party/rust_crates/mirrors/quiche/quiche/examples/cert.key"
-            ),
-            root_cert: include_bytes!(
-                "../../../../../../third_party/rust_crates/mirrors/quiche/quiche/examples/rootca.crt"
-            ),
-        }
-        .into_security_context(&std::env::temp_dir())
-        .unwrap(),
-    );
-}
-
-#[cfg(target_os = "fuchsia")]
-pub fn test_security_context() -> Box<dyn SecurityContext> {
-    Box::new(overnet_core::SimpleSecurityContext {
-        node_cert: "/pkg/data/cert.crt",
-        node_private_key: "/pkg/data/cert.key",
-        root_cert: "/pkg/data/rootca.crt",
-    })
-}
 
 pub struct LosslessPipe {
     queue: VecDeque<u8>,

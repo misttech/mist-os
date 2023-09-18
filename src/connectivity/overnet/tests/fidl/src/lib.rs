@@ -4,15 +4,14 @@
 
 #![cfg(test)]
 
-use anyhow::Error;
+use circuit::multi_stream::multi_stream_node_connection;
+use circuit::stream::stream;
 use fidl::HandleBased;
 use fuchsia_async::Task;
 use futures::prelude::*;
-use overnet_core::{log_errors, LinkReceiver, LinkSender, NodeId, NodeIdGenerator, Router};
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Arc,
-};
+use overnet_core::{log_errors, NodeId, NodeIdGenerator, Router};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 mod channel;
 mod socket;
@@ -51,18 +50,33 @@ struct Fixture {
     _service_task: Task<()>,
 }
 
-async fn forward(mut sender: LinkSender, mut receiver: LinkReceiver) -> Result<(), Error> {
-    while let Some(mut packet) = sender.next_send().await {
-        packet.drop_inner_locks();
-        receiver.received_frame(packet.bytes_mut()).await;
-    }
-    Ok(())
-}
-
 async fn link(a: Arc<Router>, b: Arc<Router>) {
-    let (ab_tx, ab_rx) = a.new_link(Default::default(), Box::new(|| None));
-    let (ba_tx, ba_rx) = b.new_link(Default::default(), Box::new(|| None));
-    futures::future::try_join(forward(ab_tx, ba_rx), forward(ba_tx, ab_rx)).await.map(drop).unwrap()
+    let a = a.circuit_node();
+    let b = b.circuit_node();
+    let (a_reader, b_writer) = stream();
+    let (b_reader, a_writer) = stream();
+    let (error_sink, _) = futures::channel::mpsc::unbounded();
+    let a = multi_stream_node_connection(
+        a,
+        a_reader,
+        a_writer,
+        true,
+        circuit::Quality::IN_PROCESS,
+        error_sink.clone(),
+        "b".to_string(),
+    );
+    let b = multi_stream_node_connection(
+        b,
+        b_reader,
+        b_writer,
+        false,
+        circuit::Quality::IN_PROCESS,
+        error_sink,
+        "a".to_string(),
+    );
+    if let Err(error) = futures::try_join!(a, b) {
+        tracing::warn!(?error, "Link forward returned an error");
+    }
 }
 
 #[derive(Clone, Copy, Debug)]

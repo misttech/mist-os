@@ -16,7 +16,6 @@ use hoist::Hoist;
 use std::path::PathBuf;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
-use tempfile::TempDir;
 
 fn fxe<E: std::fmt::Debug>(e: E) -> anyhow::Error {
     ffx_error!("{e:?}").into()
@@ -31,7 +30,6 @@ pub struct FfxConfigEntry {
 pub struct EnvContext {
     lib_ctx: Weak<LibContext>,
     injector: Box<dyn Injector + Send + Sync>,
-    _hoist_cache_dir: TempDir,
     #[allow(unused)]
     context: EnvironmentContext,
 }
@@ -82,8 +80,7 @@ impl EnvContext {
         };
         let cache_path = context.get_cache_path()?;
         std::fs::create_dir_all(&cache_path)?;
-        let _hoist_cache_dir = tempfile::tempdir_in(&cache_path)?;
-        let hoist = Hoist::with_cache_dir_maybe_router(_hoist_cache_dir.path(), None)?;
+        let hoist = Hoist::new(None)?;
         let target = ffx_target::resolve_default_target(&context).await?;
         let injector = Box::new(Injection::new(
             context.clone(),
@@ -92,7 +89,7 @@ impl EnvContext {
             None,
             target,
         ));
-        Ok(Self { context, injector, _hoist_cache_dir, lib_ctx })
+        Ok(Self { context, injector, lib_ctx })
     }
 
     pub async fn connect_daemon_protocol(&self, protocol: String) -> Result<zx_types::zx_handle_t> {

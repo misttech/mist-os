@@ -34,7 +34,6 @@ rustc_staticlib("lib") {
     "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:futures-lite",
     "//third_party/rust_crates:nix",
-    "//third_party/rust_crates:tempfile",
     "//third_party/rust_crates:tracing",
   ]
 

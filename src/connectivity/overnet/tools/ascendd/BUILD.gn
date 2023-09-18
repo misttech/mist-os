@@ -17,7 +17,6 @@ if (is_host) {
       "//src/lib/fuchsia",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:argh",
-      "//third_party/rust_crates:blocking",
     ]
 
     non_rust_deps = [ "//third_party/boringssl" ]
