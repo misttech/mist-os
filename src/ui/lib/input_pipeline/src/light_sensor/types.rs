@@ -137,7 +137,7 @@ where
 }
 #[derive(Deserialize, Debug)]
 pub struct Configuration {
-    pub calibration: CalibrationConfiguration,
+    pub calibration: Option<CalibrationConfiguration>,
     pub sensor: SensorConfiguration,
 }
 

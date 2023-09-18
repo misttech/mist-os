@@ -4,8 +4,8 @@
 
 use super::{
     correlated_color_temperature, div_round_closest, div_round_up, process_reading, saturated,
-    to_us, ActiveSetting, LightSensorHandler, SaturatedError, MAX_SATURATION_BLUE,
-    MAX_SATURATION_CLEAR, MAX_SATURATION_GREEN, MAX_SATURATION_RED,
+    to_us, ActiveSetting, ActiveSettingState, LightSensorHandler, SaturatedError,
+    MAX_SATURATION_BLUE, MAX_SATURATION_CLEAR, MAX_SATURATION_GREEN, MAX_SATURATION_RED,
 };
 use crate::input_device::{Handled, InputDeviceDescriptor, InputDeviceEvent, InputEvent};
 use crate::input_handler::{InputHandler, InputHandlerStatus};
@@ -122,7 +122,7 @@ fn cct() {
 fn cct_saturation() {
     let rgbc = Rgbc { red: 0.0, green: 0.0, blue: 0.0, clear: 1.0 };
     let result = correlated_color_temperature(rgbc);
-    assert_matches!(result, Err(SaturatedError::Saturated));
+    assert_matches!(result, None);
 }
 
 fn get_mock_device_proxy(
@@ -154,7 +154,7 @@ fn get_mock_device_proxy_with_response(
                                     reporting_state: Some(SensorReportingState::ReportAllEvents),
                                     threshold_high: Some(vec![1]),
                                     threshold_low: Some(vec![1]),
-                                    sampling_rate: Some(100),
+                                    sampling_rate: Some(to_us(100) as i64),
                                     ..Default::default()
                                 }),
                                 ..Default::default()
@@ -179,7 +179,7 @@ async fn active_setting_adjusts_down_on_saturation() {
     let (device_proxy, called, task) = get_mock_device_proxy();
     let mut active_setting = ActiveSetting::new(get_adjustment_settings(), 1);
     let result = active_setting
-        .adjust(Rgbc { red: 21_067, green: 20_395, blue: 20_939, clear: 65_085 }, device_proxy)
+        .adjust(Rgbc { red: 21_067, green: 20_395, blue: 20_939, clear: 65_085 }, &device_proxy)
         .await;
     assert_matches!(result, Err(SaturatedError::Saturated));
     assert_matches!(&*called.borrow(), &Some(FeatureReport {
@@ -191,6 +191,7 @@ async fn active_setting_adjusts_down_on_saturation() {
         }),
         ..
     }) if gains.len() == 1 && gains.contains(&1));
+    drop(device_proxy);
     task.await;
 }
 
@@ -222,7 +223,7 @@ async fn active_setting_adjusts_down_on_saturation() {
 async fn active_setting_adjusts_down_on_single_channel_saturation(rgbc: Rgbc<u16>) {
     let (device_proxy, called, task) = get_mock_device_proxy();
     let mut active_setting = ActiveSetting::new(get_adjustment_settings(), 1);
-    let result = active_setting.adjust(rgbc, device_proxy).await;
+    let result = active_setting.adjust(rgbc, &device_proxy).await;
     // Result is err because adjusting down occurs due to saturation.
     assert_matches!(result, Err(SaturatedError::Saturated));
     assert_matches!(&*called.borrow(), &Some(FeatureReport {
@@ -234,6 +235,7 @@ async fn active_setting_adjusts_down_on_single_channel_saturation(rgbc: Rgbc<u16
         }),
         ..
     }) if gains.len() == 1 && gains.contains(&1));
+    drop(device_proxy);
     task.await;
 }
 
@@ -271,9 +273,9 @@ async fn active_setting_adjusts_down_on_single_channel_saturation(rgbc: Rgbc<u16
 async fn active_setting_adjusts_up_on_low_readings(rgbc: Rgbc<u16>) {
     let (device_proxy, called, task) = get_mock_device_proxy();
     let mut active_setting = ActiveSetting::new(get_adjustment_settings(), 1);
-    let result = active_setting.adjust(rgbc, device_proxy).await;
-    // Result is ok because adjusting up does not occur due to saturation.
-    assert_matches!(result, Ok(()));
+    let result = active_setting.adjust(rgbc, &device_proxy).await;
+    // Ok-true signifies the adjustment was pulled up to a higher sensitivity.
+    assert_matches!(result, Ok(true));
     assert_matches!(&*called.borrow(), &Some(FeatureReport {
         sensor: Some(SensorFeatureReport {
             sensitivity: Some(ref gains),
@@ -283,6 +285,7 @@ async fn active_setting_adjusts_up_on_low_readings(rgbc: Rgbc<u16>) {
         }),
         ..
     }) if gains.len() == 1 && gains.contains(&16));
+    drop(device_proxy);
     task.await;
 }
 
@@ -315,8 +318,9 @@ async fn active_setting_adjusts_up_on_low_readings(rgbc: Rgbc<u16>) {
 async fn active_setting_does_not_adjust_on_high_readings(rgbc: Rgbc<u16>) {
     let (device_proxy, called, task) = get_mock_device_proxy();
     let mut active_setting = ActiveSetting::new(get_adjustment_settings(), 1);
-    active_setting.adjust(rgbc, device_proxy).await.expect("should succeed");
+    active_setting.adjust(rgbc, &device_proxy).await.expect("should succeed");
     assert_matches!(&*called.borrow(), &None);
+    drop(device_proxy);
     task.await;
 }
 
@@ -326,9 +330,10 @@ async fn active_setting_adjusts_down_on_saturation_reports_error() {
         get_mock_device_proxy_with_response(None, Err(zx::sys::ZX_ERR_CONNECTION_RESET));
     let mut active_setting = ActiveSetting::new(get_adjustment_settings(), 1);
     active_setting
-        .adjust(Rgbc { red: 21_067, green: 20_395, blue: 20_939, clear: 65_085 }, device_proxy)
+        .adjust(Rgbc { red: 21_067, green: 20_395, blue: 20_939, clear: 65_085 }, &device_proxy)
         .await
         .expect_err("should fail");
+    drop(device_proxy);
     task.await;
 }
 
@@ -338,9 +343,10 @@ async fn active_setting_adjusts_down_on_single_channel_saturation_reports_error(
         get_mock_device_proxy_with_response(None, Err(zx::sys::ZX_ERR_CONNECTION_RESET));
     let mut active_setting = ActiveSetting::new(get_adjustment_settings(), 1);
     active_setting
-        .adjust(Rgbc { red: 65_535, green: 0, blue: 0, clear: 0 }, device_proxy)
+        .adjust(Rgbc { red: 65_535, green: 0, blue: 0, clear: 0 }, &device_proxy)
         .await
         .expect_err("should fail");
+    drop(device_proxy);
     task.await;
 }
 
@@ -350,9 +356,10 @@ async fn active_setting_adjusts_up_on_low_readings_reports_error() {
         get_mock_device_proxy_with_response(None, Err(zx::sys::ZX_ERR_CONNECTION_RESET));
     let mut active_setting = ActiveSetting::new(get_adjustment_settings(), 1);
     active_setting
-        .adjust(Rgbc { red: 14_745, green: 0, blue: 0, clear: 0 }, device_proxy)
+        .adjust(Rgbc { red: 14_745, green: 0, blue: 0, clear: 0 }, &device_proxy)
         .await
         .expect_err("should fail");
+    drop(device_proxy);
     task.await;
 }
 
@@ -414,7 +421,7 @@ async fn light_sensor_handler_no_calibrator_returns_uncalibrated() {
         LightSensorHandler::<DoublingCalibrator>::new(None, sensor_configuration, inspect_status);
     // The first reading is always saturated as it initializing the device settings.
     let reading = handler
-        .get_calibrated_data(Rgbc { red: 1, green: 2, blue: 3, clear: 14747 }, device_proxy.clone())
+        .get_calibrated_data(Rgbc { red: 1, green: 2, blue: 3, clear: 14747 }, &device_proxy)
         .await;
     assert_matches!(reading, Err(SaturatedError::Saturated));
     // The call should have adjusted the sensor.
@@ -429,7 +436,7 @@ async fn light_sensor_handler_no_calibrator_returns_uncalibrated() {
         }) if gains.len() == 1 && gains.contains(&1));
 
     let reading = handler
-        .get_calibrated_data(Rgbc { red: 1, green: 2, blue: 3, clear: 14747 }, device_proxy.clone())
+        .get_calibrated_data(Rgbc { red: 1, green: 2, blue: 3, clear: 14747 }, &device_proxy)
         .await;
     let reading = reading.expect("calibration should succeed");
 
@@ -469,7 +476,7 @@ async fn light_sensor_handler_no_calibrator_returns_uncalibrated() {
     //       = (-0.34625086 - 0.3320) / (0.1858 - -0.008344517) = -3.493536
     // Ok(449.0 * n.powi(3) + 3525.0 * n.powi(2) + 6823.3 * n + 5520.33)
     //  = 5560.375
-    assert!((reading.cct - 5560.375).abs() <= f32::EPSILON);
+    assert!((reading.cct.unwrap() - 5560.375).abs() <= f32::EPSILON);
     assert!(!reading.is_calibrated);
     drop(device_proxy);
 
@@ -517,9 +524,10 @@ async fn light_sensor_handler_get_calibrated_data() {
     let handler = LightSensorHandler::new(DoublingCalibrator, sensor_configuration, inspect_status);
     // The first reading is always saturated as it initializing the device settings.
     let reading = handler
-        .get_calibrated_data(Rgbc { red: 1, green: 2, blue: 3, clear: 14747 }, device_proxy.clone())
+        .get_calibrated_data(Rgbc { red: 1, green: 2, blue: 3, clear: 14747 }, &device_proxy)
         .await;
     assert_matches!(reading, Err(SaturatedError::Saturated));
+
     // The last call should have adjusted the sensor.
     assert_matches!(&*called.borrow(), &Some(FeatureReport {
         sensor: Some(SensorFeatureReport {
@@ -534,7 +542,7 @@ async fn light_sensor_handler_get_calibrated_data() {
     let result = handler
         // Set a high clear reading so the sensor is not adjusted up. This simplifies the test
         // setup below so we don't have to account for skipped readings due to saturated inputs.
-        .get_calibrated_data(Rgbc { red: 1, green: 2, blue: 3, clear: 14747 }, device_proxy.clone())
+        .get_calibrated_data(Rgbc { red: 1, green: 2, blue: 3, clear: 14747 }, &device_proxy)
         .await;
     let reading = result.expect("calibration should succeed");
 
@@ -579,14 +587,13 @@ async fn light_sensor_handler_get_calibrated_data() {
     // let n = (x - 0.3320) / (0.1858 - y)
     //       = (-0.34625086 - 0.3320) / (0.1858 - -0.008344517) = -3.493536
     // cct = 449.0 * n.powi(3) + 3525.0 * n.powi(2) + 6823.3 * n + 5520.33
-    assert!((reading.cct - 5560.375).abs() <= f32::EPSILON);
+    assert!((reading.cct.unwrap() - 5560.375).abs() <= f32::EPSILON);
     assert!(reading.is_calibrated);
 
     // Attempt to read a low value so the sensor increases the gain.
-    let reading = handler
-        .get_calibrated_data(Rgbc { red: 0, green: 0, blue: 0, clear: 0 }, device_proxy.clone())
+    let _reading = handler
+        .get_calibrated_data(Rgbc { red: 0, green: 0, blue: 0, clear: 0 }, &device_proxy)
         .await;
-    assert_matches!(reading, Err(SaturatedError::Saturated));
 
     // The last call should have adjusted the sensor.
     assert_matches!(&*called.borrow(), &Some(FeatureReport {
@@ -601,7 +608,7 @@ async fn light_sensor_handler_get_calibrated_data() {
 
     // Since the sensor is adjusted, reading the same values should now return a different result.
     let reading = handler
-        .get_calibrated_data(Rgbc { red: 1, green: 2, blue: 3, clear: 14747 }, device_proxy)
+        .get_calibrated_data(Rgbc { red: 1, green: 2, blue: 3, clear: 14747 }, &device_proxy)
         .await;
     let reading = reading.expect("calibration should succeed");
     // r = round(1 * 16 * 256 / (256 - 100)) = 26
@@ -645,14 +652,15 @@ async fn light_sensor_handler_get_calibrated_data() {
     //       = (-0.32919776 - 0.3320) / (0.1858 - 0.0012666045) = -3.583079
     // Ok(449.0 * n.powi(3) + 3525.0 * n.powi(2) + 6823.3 * n + 5520.33)
     //  = 5672.924
-    assert!((reading.cct - 5672.924).abs() <= f32::EPSILON);
+    assert!((reading.cct.unwrap() - 5672.924).abs() <= f32::EPSILON);
     assert!(reading.is_calibrated);
 
+    drop(device_proxy);
     task.await;
 }
 
 #[fuchsia::test(allow_stalls = false)]
-async fn light_sensor_handler_get_calibrated_data_should_proxy_error() {
+async fn light_sensor_handler_get_calibrated_data_should_fallback_on_proxy_error() {
     let sensor_configuration = SensorConfiguration {
         vendor_id: VENDOR_ID,
         product_id: PRODUCT_ID,
@@ -672,9 +680,11 @@ async fn light_sensor_handler_get_calibrated_data_should_proxy_error() {
     );
     let handler = LightSensorHandler::new(DoublingCalibrator, sensor_configuration, inspect_status);
     let reading = handler
-        .get_calibrated_data(Rgbc { red: 1, green: 2, blue: 3, clear: 4 }, device_proxy)
+        .get_calibrated_data(Rgbc { red: 1, green: 2, blue: 3, clear: 4 }, &device_proxy)
         .await;
-    reading.expect_err("calibration should fail");
+    reading.expect("Should process reading");
+    assert_matches!(&*handler.active_setting.borrow(), &ActiveSettingState::Static(..));
+    drop(device_proxy);
     task.await;
 }
 
@@ -905,7 +915,7 @@ async fn light_sensor_handler_inspect_counts_events() {
 
     // Called so we can initialize ActiveSettingState
     let _ = Rc::clone(&handler)
-        .get_calibrated_data(Rgbc { red: 1, green: 1, blue: 1, clear: 1 }, device_proxy.clone())
+        .get_calibrated_data(Rgbc { red: 1, green: 1, blue: 1, clear: 1 }, &device_proxy)
         .await;
 
     let input_event = InputEvent {

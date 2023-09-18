@@ -50,13 +50,14 @@ struct LightReading {
     si_rgbc: Rgbc<f32>,
     is_calibrated: bool,
     lux: f32,
-    cct: f32,
+    cct: Option<f32>,
 }
 
 fn num_cycles(atime: u32) -> u32 {
     MAX_ATIME - atime
 }
 
+#[cfg_attr(test, derive(Debug))]
 struct ActiveSetting {
     settings: Vec<AdjustmentSetting>,
     idx: usize,
@@ -67,11 +68,14 @@ impl ActiveSetting {
         Self { settings, idx }
     }
 
+    /// Update sensor if it's near or past a saturation point. Returns a saturation error if the
+    /// sensor is saturated, `true` if the sensor is not saturated but still pulled up, and `false`
+    /// otherwise.
     async fn adjust(
         &mut self,
         reading: Rgbc<u16>,
-        device_proxy: InputDeviceProxy,
-    ) -> Result<(), SaturatedError> {
+        device_proxy: &InputDeviceProxy,
+    ) -> Result<bool, SaturatedError> {
         let saturation_point =
             (num_cycles(self.active_setting().atime) * MAX_COUNT_PER_CYCLE).min(MAX_SATURATION);
         let gain_up_margin = saturation_point / GAIN_UP_MARGIN_DIVISOR;
@@ -82,7 +86,7 @@ impl ActiveSetting {
         if saturated(reading) {
             if self.adjust_down() {
                 tracing::info!("adjusting down due to saturation sentinel");
-                self.update_device(device_proxy).await.context("updating light sensor device")?;
+                self.update_device(&device_proxy).await.context("updating light sensor device")?;
             }
             return Err(SaturatedError::Saturated);
         }
@@ -92,7 +96,7 @@ impl ActiveSetting {
             if value >= saturation_point {
                 if self.adjust_down() {
                     tracing::info!("adjusting down due to saturation point");
-                    self.update_device(device_proxy)
+                    self.update_device(&device_proxy)
                         .await
                         .context("updating light sensor device")?;
                 }
@@ -105,14 +109,15 @@ impl ActiveSetting {
         if pull_up {
             if self.adjust_up() {
                 tracing::info!("adjusting up");
-                self.update_device(device_proxy).await.context("updating light sensor device")?;
+                self.update_device(&device_proxy).await.context("updating light sensor device")?;
+                return Ok(true);
             }
         }
 
-        Ok(())
+        Ok(false)
     }
 
-    async fn update_device(&self, device_proxy: InputDeviceProxy) -> Result<(), Error> {
+    async fn update_device(&self, device_proxy: &InputDeviceProxy) -> Result<(), Error> {
         let active_setting = self.active_setting();
         let feature_report = device_proxy
             .get_feature_report()
@@ -155,7 +160,6 @@ impl ActiveSetting {
         if self.idx == 0 {
             false
         } else {
-            tracing::info!("adjusting down");
             self.idx -= 1;
             true
         }
@@ -178,7 +182,6 @@ impl ActiveSetting {
         if self.idx == self.settings.len() - 1 {
             false
         } else {
-            tracing::info!("adjusting up");
             self.idx += 1;
             true
         }
@@ -208,9 +211,11 @@ pub struct LightSensorHandler<T> {
     clients_connected_count: fuchsia_inspect::UintProperty,
 }
 
+#[cfg_attr(test, derive(Debug))]
 enum ActiveSettingState {
     Uninitialized(Vec<AdjustmentSetting>),
     Initialized(ActiveSetting),
+    Static(AdjustmentSetting),
 }
 
 pub type CalibratedLightSensorHandler = LightSensorHandler<Calibrator<LedWatcherHandle>>;
@@ -349,35 +354,45 @@ where
     async fn get_calibrated_data(
         &self,
         reading: Rgbc<u16>,
-        device_proxy: InputDeviceProxy,
+        device_proxy: &InputDeviceProxy,
     ) -> Result<LightReading, SaturatedError> {
         // Update the sensor after the active setting has been used for calculations, since it may
         // change after this call.
-        let initial_setting = {
+        let (initial_setting, pulled_up) = {
             let mut active_setting_state = self.active_setting.borrow_mut();
             match &mut *active_setting_state {
                 ActiveSettingState::Uninitialized(ref mut adjustment_settings) => {
-                    // Initial setting is unset. Reading cannot be properly adjusted, so override
-                    // the current settings on the device and report a saturated error so this
-                    // reading is not sent to any clients.
                     let active_setting = ActiveSetting::new(std::mem::take(adjustment_settings), 0);
-                    active_setting
-                        .update_device(device_proxy)
-                        .await
-                        .context("Unable to set initial settings for sensor")?;
-                    *active_setting_state = ActiveSettingState::Initialized(active_setting);
-                    return Err(SaturatedError::Saturated);
+                    if let Err(e) = active_setting.update_device(&device_proxy).await {
+                        tracing::error!(
+                            "Unable to set initial settings for sensor. Falling back \
+                                         to static setting: {e:?}"
+                        );
+                        // Switch to a static state because this sensor cannot change its settings.
+                        let setting = active_setting.settings[0];
+                        *active_setting_state = ActiveSettingState::Static(setting);
+                        (setting, false)
+                    } else {
+                        // Initial setting is unset. Reading cannot be properly adjusted, so
+                        // override the current settings on the device and report a saturated error
+                        // so this reading is not sent to any clients.
+                        *active_setting_state = ActiveSettingState::Initialized(active_setting);
+                        return Err(SaturatedError::Saturated);
+                    }
                 }
                 ActiveSettingState::Initialized(ref mut active_setting) => {
                     let initial_setting = active_setting.active_setting();
-                    active_setting.adjust(reading, device_proxy).await.map_err(|e| match e {
-                        SaturatedError::Saturated => SaturatedError::Saturated,
-                        SaturatedError::Anyhow(e) => {
-                            SaturatedError::Anyhow(e.context("adjusting active setting"))
-                        }
-                    })?;
-                    initial_setting
+                    let pulled_up = active_setting.adjust(reading, device_proxy).await.map_err(
+                        |e| match e {
+                            SaturatedError::Saturated => SaturatedError::Saturated,
+                            SaturatedError::Anyhow(e) => {
+                                SaturatedError::Anyhow(e.context("adjusting active setting"))
+                            }
+                        },
+                    )?;
+                    (initial_setting, pulled_up)
                 }
+                ActiveSettingState::Static(setting) => (*setting, false),
             }
         };
         let uncalibrated_rgbc = process_reading(reading, initial_setting);
@@ -389,7 +404,13 @@ where
 
         let si_rgbc = (self.si_scaling_factors * rgbc).map(|c| c / ADC_SCALING_FACTOR);
         let lux = self.calculate_lux(si_rgbc);
-        let cct = correlated_color_temperature(si_rgbc)?;
+        let cct = correlated_color_temperature(si_rgbc);
+        // Only return saturation error if the cct is invalid and the sensor was also adjusted. If
+        // only the cct is invalid, it means the sensor is not undersaturated but reading
+        // pitch-black at the highest sensitivity.
+        if cct.is_none() && pulled_up {
+            return Err(SaturatedError::Saturated);
+        }
 
         let rgbc = uncalibrated_rgbc.map(|c| c as f32 / TRANSITION_SCALING_FACTOR);
         Ok(LightReading { rgbc, si_rgbc, is_calibrated: self.calibrator.is_some(), lux, cct })
@@ -428,7 +449,8 @@ fn saturated(reading: Rgbc<u16>) -> bool {
 
 // See http://ams.com/eng/content/view/download/145158 for the detail of the
 // following calculation.
-fn correlated_color_temperature(reading: Rgbc<f32>) -> Result<f32, SaturatedError> {
+/// Returns `None` when the reading is under or over saturated.
+fn correlated_color_temperature(reading: Rgbc<f32>) -> Option<f32> {
     // TODO(https://fxbug.dev/121854): Move color_temp calculation out of common code
     let big_x = -0.7687 * reading.red + 9.7764 * reading.green + -7.4164 * reading.blue;
     let big_y = -1.7475 * reading.red + 9.9603 * reading.green + -5.6755 * reading.blue;
@@ -436,13 +458,13 @@ fn correlated_color_temperature(reading: Rgbc<f32>) -> Result<f32, SaturatedErro
 
     let div = big_x + big_y + big_z;
     if div.abs() < f32::EPSILON {
-        return Err(SaturatedError::Saturated);
+        return None;
     }
 
     let x = big_x / div;
     let y = big_y / div;
     let n = (x - 0.3320) / (0.1858 - y);
-    Ok(449.0 * n.powi(3) + 3525.0 * n.powi(2) + 6823.3 * n + 5520.33)
+    Some(449.0 * n.powi(3) + 3525.0 * n.powi(2) + 6823.3 * n + 5520.33)
 }
 
 #[async_trait(?Send)]
@@ -472,10 +494,7 @@ where
                 return vec![input_event];
             }
             let LightReading { rgbc, si_rgbc, is_calibrated, lux, cct } = match self
-                .get_calibrated_data(
-                    light_sensor_event.rgbc,
-                    light_sensor_event.device_proxy.clone(),
-                )
+                .get_calibrated_data(light_sensor_event.rgbc, &light_sensor_event.device_proxy)
                 .await
             {
                 Ok(data) => data,
@@ -519,7 +538,7 @@ struct LightSensorData {
     si_rgbc: Rgbc<f32>,
     is_calibrated: bool,
     calculated_lux: f32,
-    correlated_color_temperature: f32,
+    correlated_color_temperature: Option<f32>,
 }
 
 impl From<LightSensorData> for FidlLightSensorData {
@@ -529,7 +548,7 @@ impl From<LightSensorData> for FidlLightSensorData {
             si_rgbc: Some(FidlRgbc::from(data.si_rgbc)),
             is_calibrated: Some(data.is_calibrated),
             calculated_lux: Some(data.calculated_lux),
-            correlated_color_temperature: Some(data.correlated_color_temperature),
+            correlated_color_temperature: data.correlated_color_temperature,
             ..Default::default()
         }
     }

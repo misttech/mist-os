@@ -170,72 +170,53 @@ impl LightSensorBinding {
             format_err!("empty device info for device_id: {}", device_id)
         })?;
         match descriptor.sensor {
-            Some(SensorDescriptor {
-                input: Some(input_descriptors),
-                feature: Some(features),
-                ..
-            }) => {
-                let (_sensitivity, _sampling_rate, sensor_layout) = input_descriptors
+            Some(SensorDescriptor { input: Some(input_descriptors), .. }) => {
+                let sensor_layout = input_descriptors
                     .into_iter()
-                    .zip(features.into_iter())
-                    .filter_map(|(input_descriptor, feature)| {
-                        input_descriptor
-                            .values
-                            .and_then(|values| {
-                                let mut red_value = None;
-                                let mut green_value = None;
-                                let mut blue_value = None;
-                                let mut clear_value = None;
-                                for (i, value) in values.iter().enumerate() {
-                                    let old = match value.type_ {
-                                        SensorType::LightRed => {
-                                            std::mem::replace(&mut red_value, Some(i))
-                                        }
-                                        SensorType::LightGreen => {
-                                            std::mem::replace(&mut green_value, Some(i))
-                                        }
-                                        SensorType::LightBlue => {
-                                            std::mem::replace(&mut blue_value, Some(i))
-                                        }
-                                        SensorType::LightIlluminance => {
-                                            std::mem::replace(&mut clear_value, Some(i))
-                                        }
-                                        type_ => {
-                                            tracing::warn!(
-                                                "unexpected sensor type {type_:?} found on light \
-                                                sensor device"
-                                            );
-                                            None
-                                        }
-                                    };
-                                    if old.is_some() {
-                                        tracing::warn!(
-                                            "existing index for light sensor {:?} replaced",
-                                            value.type_
-                                        );
+                    .filter_map(|input_descriptor| {
+                        input_descriptor.values.and_then(|values| {
+                            let mut red_value = None;
+                            let mut green_value = None;
+                            let mut blue_value = None;
+                            let mut clear_value = None;
+                            for (i, value) in values.iter().enumerate() {
+                                let old = match value.type_ {
+                                    SensorType::LightRed => {
+                                        std::mem::replace(&mut red_value, Some(i))
                                     }
+                                    SensorType::LightGreen => {
+                                        std::mem::replace(&mut green_value, Some(i))
+                                    }
+                                    SensorType::LightBlue => {
+                                        std::mem::replace(&mut blue_value, Some(i))
+                                    }
+                                    SensorType::LightIlluminance => {
+                                        std::mem::replace(&mut clear_value, Some(i))
+                                    }
+                                    type_ => {
+                                        tracing::warn!(
+                                            "unexpected sensor type {type_:?} found on light \
+                                                sensor device"
+                                        );
+                                        None
+                                    }
+                                };
+                                if old.is_some() {
+                                    tracing::warn!(
+                                        "existing index for light sensor {:?} replaced",
+                                        value.type_
+                                    );
                                 }
+                            }
 
-                                red_value.and_then(|red| {
-                                    green_value.and_then(|green| {
-                                        blue_value.and_then(|blue| {
-                                            clear_value.map(|clear| Rgbc {
-                                                red,
-                                                green,
-                                                blue,
-                                                clear,
-                                            })
-                                        })
+                            red_value.and_then(|red| {
+                                green_value.and_then(|green| {
+                                    blue_value.and_then(|blue| {
+                                        clear_value.map(|clear| Rgbc { red, green, blue, clear })
                                     })
                                 })
                             })
-                            .and_then(|sensor_layout| {
-                                feature.sampling_rate.and_then(|sampling_rate| {
-                                    feature.sensitivity.map(|sensitivity| {
-                                        (sensitivity, sampling_rate, sensor_layout)
-                                    })
-                                })
-                            })
+                        })
                     })
                     .next()
                     .ok_or_else(|| {

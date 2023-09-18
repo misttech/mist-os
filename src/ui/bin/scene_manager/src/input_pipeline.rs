@@ -108,15 +108,23 @@ pub async fn handle_input(
                 .context("unable to connect to factory proxy for light sensor")?;
             let factory_file_loader = FactoryFileLoader::new(factory_store_proxy)
                 .context("unable to connect to factory file loader for light sensor")?;
-            let calibration = LightSensorCalibration::new(
-                light_sensor_configuration.calibration,
-                &factory_file_loader,
-            )
-            .await
-            .map_err(|e| {
-                warn!("Calculations will use uncalibrated data. No light sensor calibration: {e:?}")
-            })
-            .ok();
+            let calibration = if let Some(configuration) = light_sensor_configuration.calibration {
+                LightSensorCalibration::new(configuration, &factory_file_loader)
+                    .await
+                    .map_err(|e| {
+                        warn!(
+                            "Calculations will use uncalibrated data. No light sensor \
+                               calibration: {e:?}"
+                        )
+                    })
+                    .ok()
+            } else {
+                info!(
+                    "Calculations will use uncalibrated data. No light sensor \
+                           calibration: Configuration not supplied"
+                );
+                None
+            };
             let (handler, task) = make_light_sensor_handler_and_spawn_led_watcher(
                 light_proxy,
                 brightness_proxy,
