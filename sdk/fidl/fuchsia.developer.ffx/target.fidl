@@ -58,6 +58,33 @@ type FastbootInterface = strict enum {
     TCP = 2;
 };
 
+/// State of the compatibility between the host tools and the target.
+type CompatibilityState = flexible enum {
+    /// An error was encountered determining the compatibility status.
+    ERROR = 0;
+    /// The compatibility information is not present.
+    ABSENT = 1;
+    /// ABI revision is supported
+    SUPPORTED = 2;
+    ///  ABI revision was not recognized.
+    UNKNOWN = 3;
+    ///  ABI revision it presented is not supported.
+    UNSUPPORTED = 4;
+};
+
+
+/// Compatibility information about the target
+type CompatibilityInfo = struct {
+    /// The state of the compatibity between the host tools and the target.
+    state CompatibilityState;
+    /// The ABI revision of the target platform.
+    // Note: aliases that create newtypes for existing types is not supported
+    // so the basic type is used directly.
+    platform_abi uint64;
+    /// A status message string suitable for displaying to english reading users.
+    message string:255;
+};
+
 type TargetInfo = table {
     1: nodename string:fuchsia.device.DEVICE_NAME_MAX;
     2: addresses vector<TargetAddrInfo>:256;
@@ -79,6 +106,8 @@ type TargetInfo = table {
    11: fastboot_interface FastbootInterface;
     /// The address of the ssh host as seen by the target.
    12: ssh_host_address SshHostAddrInfo;
+    /// Compatibility status between host tools and target.
+   13: compatibility CompatibilityInfo;
 };
 
 type TargetRebootError = strict enum {

@@ -11,7 +11,12 @@ rustc_library("lib") {
 
   sources = [ "src/lib.rs" ]
 
-  deps = [ "//third_party/rust_crates:serde" ]
+  deps = [
+    "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_rust",
+    "//src/lib/versioning/version-history/rust:version-history",
+    "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:serde_json",
+  ]
 }
 
 group("tests") {

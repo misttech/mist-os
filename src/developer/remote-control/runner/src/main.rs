@@ -5,7 +5,7 @@
 use {
     anyhow::{Context as _, Result},
     argh::FromArgs,
-    compat_info::{CompatibilityInfo, ConnectionInfo},
+    compat_info::{CompatibilityInfo, CompatibilityState, ConnectionInfo},
     fidl_fuchsia_developer_remotecontrol::RemoteControlMarker,
     fuchsia_component::client::connect_to_protocol,
     futures::future::select,
@@ -32,15 +32,15 @@ fn zx_socket_from_fd(fd: i32) -> Result<fidl::AsyncSocket> {
         .context("making fidl::AsyncSocket from fidl::Socket")
 }
 
-fn print_prelude_info(message: String, status: String, platform_abi: u64) -> Result<()> {
+fn print_prelude_info(
+    message: String,
+    status: CompatibilityState,
+    platform_abi: u64,
+) -> Result<()> {
     let ssh_connection = std::env::var("SSH_CONNECTION")?;
     let info = ConnectionInfo {
         ssh_connection: ssh_connection.clone(),
-        compatibility: CompatibilityInfo {
-            status,
-            platform_abi: platform_abi.to_string(),
-            message: message.clone(),
-        },
+        compatibility: CompatibilityInfo { status, platform_abi, message: message.clone() },
     };
 
     let encoded_message = serde_json::to_string(&info)?;
@@ -76,18 +76,17 @@ async fn main() -> Result<()> {
     if let Some(abi) = args.abi_revision {
         let daemon_revision = AbiRevision(abi);
         let platform_abi = version_history::get_latest_abi_revision();
-        let status: String;
+        let status: CompatibilityState;
         let message = match check_abi_revision(Some(daemon_revision)) {
             Ok(_) => {
                 tracing::info!("Daemon is running supported revision: {daemon_revision}");
-                status = "OK".into();
+                status = CompatibilityState::Supported;
                 "Daemon is running supported revision".to_string()
             }
             Err(e) => {
-                status = e.to_string();
+                status = e.clone().into();
                 let warning = format!("abi revision {daemon_revision} not supported: {e}");
                 tracing::warn!("{warning}");
-                eprintln!("{warning}");
                 warning
             }
         };
