@@ -5,5 +5,10 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.sdmmc") {
-  sources = [ "metadata.fidl" ]
+  sources = [
+    "metadata.fidl",
+    "sdmmc.fidl",
+  ]
+  public_deps = [ "//zircon/vdso/zx" ]
+  contains_drivers = true
 }
