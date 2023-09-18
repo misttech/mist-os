@@ -920,17 +920,6 @@ Whether to build product bundle version 1 related tools and artifacts.
 
 From //build/product.gni:7
 
-### build_sdk_archives
-
-Whether to build archives for certain sdk_collection() targets by default.
-This is deprecated, archives should instead be created through
-generate_final_idk().
-TODO(fxbug.dev/133353): Delete this.
-
-**Current value (from the default):** `false`
-
-From //build/sdk/config.gni:10
-
 ### build_should_trace_actions
 
 If enabled, all filesystem activity by actions will be traced and checked
@@ -3043,21 +3032,6 @@ useful for including verification and other Bazel assembly specific targets.
 
 From //build/images/args.gni:209
 
-### extra_cipd_assembly_artifact_targets
-
-Extra targets to be traversed by //:cipd_assembly_artifacts for GN metadata
-only. These targets are expected to set "assembly_inputs" in metadata, which
-can include a JSON file describing artifacts to be uploaded to CPID.
-
-NOTE: These targets are for GN metadata walk only. If the artifacts need to
-be built, they should be included in the build graph through other means.
-
-DEPRECATED: Modify cipd_assembly_artifact_targets instead.
-
-**Current value (from the default):** `[]`
-
-From //build/product.gni:72
-
 ### extra_gn_labels_for_bazel_inputs
 
 A list of extra labels to bazel_input_xxx() targets that complement
@@ -3901,11 +3875,12 @@ From //build/images/args.gni:143
 ### include_clippy
 
 Turns rust targets into a group with both the normal target and clippy target. This
-causes clippy targets to get included in the build by default.
+causes clippy targets to get included in the build. This gets enabled by default with
+`fx set`, but is defaulted off in GN so it won't be on in infra.
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
-From //build/rust/config.gni:71
+From //build/rust/config.gni:72
 
 ### include_internal_fonts
 
@@ -4506,7 +4481,7 @@ From //src/graphics/lib/magma/gnbuild/magma.gni:11
 
 **Current value (from the default):** `false`
 
-From //src/graphics/lib/magma/src/magma_util/BUILD.gn:14
+From //src/graphics/lib/magma/src/magma_util/BUILD.gn:15
 
 ### magma_enable_tracing
 
@@ -5993,9 +5968,17 @@ From //third_party/pigweed/src/third_party/chre/chre.gni:22
 
 ### pw_chre_PLATFORM_BACKEND
 
-CHRE's platform backend. The default is the pigweed backend.
+CHRE's platform backend implementation. The default is the Pigweed backend.
 
 **Current value (from the default):** `"//pw_chre:chre_backend"`
+
+From //third_party/pigweed/src/third_party/chre/chre.gni:28
+
+### pw_chre_PLATFORM_BACKEND_HEADERS
+
+CHRE's platform backend headers. The default is the Pigweed backend.
+
+**Current value (from the default):** `"//pw_chre:chre_backend_headers"`
 
 From //third_party/pigweed/src/third_party/chre/chre.gni:25
 
@@ -7581,7 +7564,7 @@ actions.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:23
+From //build/sdk/config.gni:17
 
 ### sdk_no_host_tools
 
@@ -7589,7 +7572,7 @@ Whether to omit host tools from the generated IDKs.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:17
+From //build/sdk/config.gni:11
 
 ### sdk_with_all_supported_api_levels
 
@@ -8756,7 +8739,7 @@ If false, any unacknowledged SDK change will cause a build failure.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:14
+From //build/sdk/config.gni:8
 
 ### wayland_bridge_protocol_logging
 
