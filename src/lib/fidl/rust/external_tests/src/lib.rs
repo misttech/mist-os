@@ -7,6 +7,7 @@
 mod data_types;
 #[cfg(target_os = "fuchsia")]
 mod handle_rights;
+mod message;
 mod persistence;
 #[cfg(target_os = "fuchsia")]
 mod stream_handler_test;

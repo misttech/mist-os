@@ -887,6 +887,14 @@ unsafe impl TypeMarker for EmptyPayload {
     }
 }
 
+impl ValueTypeMarker for EmptyPayload {
+    type Borrowed<'a> = ();
+    #[inline(always)]
+    fn borrow(value: &Self::Owned) -> Self::Borrowed<'_> {
+        *value
+    }
+}
+
 unsafe impl Encode<EmptyPayload> for () {
     #[inline(always)]
     unsafe fn encode(

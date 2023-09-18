@@ -30,6 +30,7 @@ fidl_rust_sources = [
   "src/endpoints.rs",
   "src/epitaph.rs",
   "src/error.rs",
+  "src/for_fidl_message_crate.rs",
   "src/handle.rs",
   "src/lib.rs",
   "src/persistence.rs",

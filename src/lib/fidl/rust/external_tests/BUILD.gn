@@ -21,6 +21,7 @@ rustc_test("fidl_rust_external_tests_bin") {
   deps = [
     ":test.external_rust",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fidl/rust/fidl_message",
     "//third_party/rust_crates:assert_matches",
   ]
   if (is_fuchsia) {
@@ -37,6 +38,7 @@ rustc_test("fidl_rust_external_tests_bin") {
     "src/data_types.rs",
     "src/handle_rights.rs",
     "src/lib.rs",
+    "src/message.rs",
     "src/persistence.rs",
     "src/stream_handler_test.rs",
     "src/unknown_interactions.rs",
