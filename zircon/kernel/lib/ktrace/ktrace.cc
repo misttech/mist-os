@@ -676,6 +676,28 @@ static void ktrace_init(unsigned level) {
   dprintf(INFO, "ktrace_init: syscalls_enabled=%d bufsize=%u grpmask=%x\n", syscalls_enabled,
           bufsize, initial_grpmask);
 
+  //
+  // BEGIN CAREFUL BLOCK
+  //
+  // Regardless of whether tracing is enabled at boot, the following setup
+  // ensures that trace points do not take runtime initialization branches and
+  // incur unnecessary overhead.
+  //
+  // TODO(fxbug.dev/27083): The runtime initialization branches in trace points
+  // can be removed when GCC properly supports section attributes on static
+  // template members.
+  //
+
+  fxt::InternedString::SetMapStringCallback(fxt_string_record);
+  fxt::InternedString::PreRegister();
+
+  SetupCategoryBits();
+  fxt::InternedCategory::PreRegister();
+
+  //
+  // END CAREFUL BLOCK
+  //
+
   if (!bufsize) {
     dprintf(INFO, "ktrace: disabled\n");
     return;
@@ -683,12 +705,6 @@ static void ktrace_init(unsigned level) {
 
   // Allocate koids for each CPU.
   ktrace::CpuContextMap::Init();
-
-  fxt::InternedString::SetMapStringCallback(fxt_string_record);
-  fxt::InternedString::PreRegister();
-
-  SetupCategoryBits();
-  fxt::InternedCategory::PreRegister();
 
   dprintf(INFO, "Trace categories: \n");
   for (const fxt::InternedCategory& category : fxt::InternedCategory::IterateList) {
