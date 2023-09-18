@@ -1246,7 +1246,7 @@ impl XdgToplevel {
 
                 // See previous comment about only supporting a single view.  Here, we ensure that
                 // our client never asks us to create a second view.
-                while let Some(request) = stream.try_next().await.unwrap() {
+                if let Some(request) = stream.try_next().await.unwrap() {
                     panic!("unsupported view provider request: {:?}", request)
                 }
 
