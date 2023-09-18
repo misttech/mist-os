@@ -881,12 +881,17 @@ bool SocketDevice::Connection::Rx(void* data, size_t len) {
 SocketDevice::CreditInfo SocketDevice::Connection::GetCreditInfo() {
   zx_info_socket_t info;
   zx_status_t status = data_.get_info(ZX_INFO_SOCKET, &info, sizeof(info), nullptr, nullptr);
-  if (status == ZX_OK) {
-    return CreditInfo(static_cast<uint32_t>(info.tx_buf_max),
-                      static_cast<uint32_t>(info.tx_buf_size));
-  } else {
-    return CreditInfo();
+  if (status != ZX_OK) {
+    return {};
   }
+  // We want to find the number of bytes that have been received.
+  // We can do this by taking the total number of bytes written to the socket, and subtract
+  // the bytes still sitting in the buffer.
+  uint32_t fwd_count = rx_count_ - static_cast<uint32_t>(info.tx_buf_size);
+  return CreditInfo{
+      .buf_alloc = static_cast<uint32_t>(info.tx_buf_max),
+      .fwd_count = fwd_count,
+  };
 }
 
 virtio_vsock_hdr_t SocketDevice::Connection::MakeHdr(uint16_t op) {

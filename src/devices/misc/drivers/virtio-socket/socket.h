@@ -92,13 +92,13 @@ class SocketDevice : public Device,
   };
 
   struct CreditInfo {
-    CreditInfo() : buf_alloc(0), fwd_count(0) {}
-    CreditInfo(uint32_t buf, uint32_t fwd) : buf_alloc(buf), fwd_count(fwd) {}
-    uint32_t buf_alloc;
-    uint32_t fwd_count;
+    // The size of the buffer in bytes.
+    uint32_t buf_alloc = 0;
+
+    // The number of bytes that have been received.
+    uint32_t fwd_count = 0;
   };
 
- private:
   // Wrapper around a virtio Ring that uses a single contiguous io_buffer to
   // fill the descriptors.
   class IoBufferRing {
@@ -348,6 +348,7 @@ class SocketDevice : public Device,
     DISALLOW_COPY_ASSIGN_AND_MOVE(Connection);
   };
 
+ private:
   using ConnectionHashTable =
       fbl::TaggedHashTable<ConnectionKey, fbl::RefPtr<Connection>, ConnectionHashTag>;
   using ConnectionIterator = ConnectionHashTable::iterator;

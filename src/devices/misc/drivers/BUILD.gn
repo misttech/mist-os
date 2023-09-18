@@ -10,5 +10,6 @@ group("tests") {
     "cpu-trace:tests",
     "test:tests",
     "virtio-rng:tests",
+    "virtio-socket:tests",
   ]
 }
