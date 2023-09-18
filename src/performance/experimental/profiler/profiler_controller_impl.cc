@@ -472,4 +472,5 @@ void profiler::ProfilerControllerImpl::Reset() {
   socket_.reset();
   targets_.Clear();
   state_ = ProfilingState::Unconfigured;
+  component_target_.reset();
 }

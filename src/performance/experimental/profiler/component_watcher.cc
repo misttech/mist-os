@@ -13,18 +13,18 @@ zx::result<> profiler::ComponentWatcher::Watch() {
     FX_LOGS(ERROR) << "Failed to connect to event stream";
     return client_end.take_error();
   }
-  stream_client_ = fidl::Client(std::move(*client_end), dispatcher_);
-
-  stream_client_->WaitForReady().Then(
-      [this](fidl::Result<fuchsia_component::EventStream::WaitForReady> &res) {
-        if (res.is_error()) {
-          FX_LOGS(ERROR) << "Failed to wait for EventStream to start";
-          return;
-        }
-        stream_client_->GetNext().Then(
-            [this](fidl::Result<fuchsia_component::EventStream::GetNext> &res) {
-              this->HandleEvent(res);
-            });
+  fidl::SyncClient sync_stream_client{std::move(*client_end)};
+  fidl::Result<fuchsia_component::EventStream::WaitForReady> ready_result =
+      sync_stream_client->WaitForReady();
+  if (ready_result.is_error()) {
+    zx_status_t err = ready_result.error_value().status();
+    FX_PLOGS(ERROR, err) << "Failed to wait for ready";
+    return zx::error(err);
+  }
+  stream_client_ = fidl::Client(sync_stream_client.TakeClientEnd(), dispatcher_);
+  stream_client_->GetNext().Then(
+      [this](fidl::Result<fuchsia_component::EventStream::GetNext> &res) {
+        this->HandleEvent(res);
       });
   return zx::ok();
 }
