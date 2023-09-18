@@ -191,7 +191,7 @@ void Scheduler::DumpThreadLocked(FILE* output_target) {
               "\t-> name=%s weight=%s start=%" PRId64 " finish=%" PRId64 " ts=%" PRId64
               " ema=%" PRId64 "\n",
               active_thread_->name(), Format(ep.fair.weight).c_str(), state.start_time_.raw_value(),
-              state.finish_time_.raw_value(), state.time_slice_ns_.raw_value(),
+              state.finish_time_.raw_value(), state.remaining_time_slice_ns().raw_value(),
               state.expected_runtime_ns_.raw_value());
     } else {
       fprintf(output_target,
@@ -199,7 +199,7 @@ void Scheduler::DumpThreadLocked(FILE* output_target) {
               " ts=%" PRId64 " ema=%" PRId64 "\n",
               active_thread_->name(), ep.deadline.capacity_ns.raw_value(),
               ep.deadline.deadline_ns.raw_value(), state.start_time_.raw_value(),
-              state.finish_time_.raw_value(), state.time_slice_ns_.raw_value(),
+              state.finish_time_.raw_value(), state.remaining_time_slice_ns().raw_value(),
               state.expected_runtime_ns_.raw_value());
     }
   }
@@ -212,7 +212,7 @@ void Scheduler::DumpThreadLocked(FILE* output_target) {
             " ts=%" PRId64 " ema=%" PRId64 "\n",
             thread.name(), ep.deadline.capacity_ns.raw_value(), ep.deadline.deadline_ns.raw_value(),
             state.start_time_.raw_value(), state.finish_time_.raw_value(),
-            state.time_slice_ns_.raw_value(), state.expected_runtime_ns_.raw_value());
+            state.remaining_time_slice_ns().raw_value(), state.expected_runtime_ns_.raw_value());
   }
 
   for (const Thread& thread : fair_run_queue_) {
@@ -222,7 +222,7 @@ void Scheduler::DumpThreadLocked(FILE* output_target) {
             "\t   name=%s weight=%s start=%" PRId64 " finish=%" PRId64 " ts=%" PRId64
             " ema=%" PRId64 "\n",
             thread.name(), Format(ep.fair.weight).c_str(), state.start_time_.raw_value(),
-            state.finish_time_.raw_value(), state.time_slice_ns_.raw_value(),
+            state.finish_time_.raw_value(), state.remaining_time_slice_ns().raw_value(),
             state.expected_runtime_ns_.raw_value());
   }
 }
@@ -964,7 +964,7 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
   // demand could be due to threads entering or leaving the run queue, or due
   // to weights changing in the current or enqueued threads.
   if (IsThreadAdjustable(current_thread) && weight_total_ != scheduled_weight_total_ &&
-      total_runtime_ns < current_state->time_slice_ns_) {
+      total_runtime_ns < current_state->remaining_time_slice_ns()) {
     ktrace::Scope trace_adjust_rate = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "adjust_rate");
     EffectiveProfile& ep = current_state->effective_profile_;
     scheduled_weight_total_ = weight_total_;
@@ -973,7 +973,7 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
     const SchedDuration remaining_time_slice_ns =
         time_slice_ns * ep.fair.normalized_timeslice_remainder;
 
-    const bool timeslice_changed = time_slice_ns != ep.fair.initial_time_slice_ns;
+    const bool timeslice_changed = time_slice_ns != current_state->time_slice_ns_;
     const bool timeslice_remaining = total_runtime_ns < remaining_time_slice_ns;
 
     // Update the preemption timer if necessary.
@@ -984,20 +984,20 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
       percpu::Get(current_cpu).timer_queue.PreemptReset(preemption_time_ns.raw_value());
     }
 
-    ep.fair.initial_time_slice_ns = time_slice_ns;
-    current_state->time_slice_ns_ = remaining_time_slice_ns;
+    current_state->time_slice_ns_ = time_slice_ns;
+    current_state->time_slice_used_ns_ = time_slice_ns - remaining_time_slice_ns;
     trace_adjust_rate =
         KTRACE_END_SCOPE(("remaining time slice", Round<uint64_t>(remaining_time_slice_ns)),
                          ("total runtime", Round<uint64_t>(total_runtime_ns)));
   }
 
-  // Update the time slice of a deadline task before evaluating the next task.
+  // Update the used time slice of a deadline task before evaluating the next task.
   if (IsDeadlineThread(current_thread)) {
     // Scale the actual runtime of the deadline task by the relative performance
     // of the CPU, effectively increasing the capacity of the task in proportion
     // to the performance ratio. The remaining time slice may become negative
     // due to scheduler overhead.
-    current_state->time_slice_ns_ -= ScaleDown(actual_runtime_ns);
+    current_state->time_slice_used_ns_ += ScaleDown(actual_runtime_ns);
   }
 
   // Rounding in the scaling above may result in a small non-zero time slice
@@ -1016,24 +1016,28 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
   //   up late.
   const bool timeslice_expired =
       IsFairThread(current_thread)
-          ? total_runtime_ns >= current_state->time_slice_ns_
+          ? total_runtime_ns >= current_state->remaining_time_slice_ns()
           : now >= current_state->finish_time_ ||
-                current_state->time_slice_ns_ <= deadline_time_slice_epsilon;
+                current_state->remaining_time_slice_ns() <= deadline_time_slice_epsilon;
 
   // Check the consistency of the target preemption time and the current time
   // slice.
   [[maybe_unused]] const auto& ep = current_state->effective_profile_;
   DEBUG_ASSERT_MSG(
       now < target_preemption_time_ns_ || timeslice_expired,
-      "capacity_ns=%" PRId64 " deadline_ns=%" PRId64 " now=%" PRId64
-      " target_preemption_time_ns=%" PRId64 " total_runtime_ns=%" PRId64
-      " actual_runtime_ns=%" PRId64 " finish_time=%" PRId64 " time_slice_ns=%" PRId64
-      " start_of_current_time_slice_ns=%" PRId64,
-      IsDeadlineThread(current_thread) ? ep.deadline.capacity_ns.raw_value() : 0,
-      IsDeadlineThread(current_thread) ? ep.deadline.deadline_ns.raw_value() : 0, now.raw_value(),
-      target_preemption_time_ns_.raw_value(), total_runtime_ns.raw_value(),
-      actual_runtime_ns.raw_value(), current_state->finish_time_.raw_value(),
-      current_state->time_slice_ns_.raw_value(), start_of_current_time_slice_ns_.raw_value());
+      "cpu=%u capacity_ns=%" PRId64 " deadline_ns=%" PRId64
+      "\nfinish_time                   =%16" PRId64 "\nnow                           =%16" PRId64
+      "\ntarget_preemption_time_ns     =%16" PRId64 "\nstart_of_current_time_slice_ns=%16" PRId64
+      "\ntotal_runtime_ns              =%16" PRId64 "\nactual_runtime_ns             =%16" PRId64
+      "\ntime_slice_ns                 =%16" PRId64 "\ntime_slice_used_ns            =%16" PRId64
+      "\nremaining_time_slice_ns       =%16" PRId64,
+      this_cpu(), IsDeadlineThread(current_thread) ? ep.deadline.capacity_ns.raw_value() : 0,
+      IsDeadlineThread(current_thread) ? ep.deadline.deadline_ns.raw_value() : 0,
+      current_state->finish_time_.raw_value(), now.raw_value(),
+      target_preemption_time_ns_.raw_value(), start_of_current_time_slice_ns_.raw_value(),
+      total_runtime_ns.raw_value(), actual_runtime_ns.raw_value(),
+      current_state->time_slice_ns_.raw_value(), current_state->time_slice_used_ns().raw_value(),
+      current_state->remaining_time_slice_ns().raw_value());
 
   // Select a thread to run.
   Thread* const next_thread =
@@ -1209,13 +1213,13 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
   DEBUG_ASSERT(next_thread->IsIdle() || percpu::Get(current_cpu).timer_queue.PreemptArmed());
 
   if (next_thread != current_thread) {
-    LOCAL_KTRACE(
-        DETAILED, "switch_threads",
-        ("total threads", runnable_fair_task_count_ + runnable_deadline_task_count_),
-        ("total weight", weight_total_.raw_value()),
-        ("current thread time slice",
-         Round<uint64_t>(current_thread->scheduler_state().time_slice_ns_)),
-        ("next thread time slice", Round<uint64_t>(next_thread->scheduler_state().time_slice_ns_)));
+    LOCAL_KTRACE(DETAILED, "switch_threads",
+                 ("total threads", runnable_fair_task_count_ + runnable_deadline_task_count_),
+                 ("total weight", weight_total_.raw_value()),
+                 ("current thread time slice",
+                  Round<uint64_t>(current_thread->scheduler_state().remaining_time_slice_ns())),
+                 ("next thread time slice",
+                  Round<uint64_t>(next_thread->scheduler_state().remaining_time_slice_ns())));
 
     // Release queue lock before context switching.
     queue_guard.Release();
@@ -1344,8 +1348,8 @@ SchedTime Scheduler::NextThreadTimeslice(Thread* thread, SchedTime now) {
     DEBUG_ASSERT(time_slice_ns > 0);
     DEBUG_ASSERT(remaining_time_slice_ns > 0);
 
-    ep.fair.initial_time_slice_ns = time_slice_ns;
-    state->time_slice_ns_ = remaining_time_slice_ns;
+    state->time_slice_ns_ = time_slice_ns;
+    state->time_slice_used_ns_ = time_slice_ns - remaining_time_slice_ns;
     target_preemption_time_ns = now + remaining_time_slice_ns;
 
     DEBUG_ASSERT_MSG(state->time_slice_ns_ > 0 && target_preemption_time_ns > now,
@@ -1363,7 +1367,7 @@ SchedTime Scheduler::NextThreadTimeslice(Thread* thread, SchedTime now) {
     // the performance of the CPU and clamped to the deadline. This increases
     // capacity on slower processors, however, bandwidth isolation is preserved
     // because CPU selection attempts to keep scaled total capacity below one.
-    const SchedDuration scaled_time_slice_ns = ScaleUp(state->time_slice_ns_);
+    const SchedDuration scaled_time_slice_ns = ScaleUp(state->remaining_time_slice_ns());
     target_preemption_time_ns =
         ktl::min<SchedTime>(now + scaled_time_slice_ns, state->finish_time_);
 
@@ -1390,7 +1394,7 @@ void Scheduler::QueueThread(Thread* thread, Placement placement, SchedTime now,
     // Account for the consumed fair time slice. The consumed time is zero when
     // the thread is unblocking, migrating, or adjusting queue position. The
     // remaining time slice may become negative due to scheduler overhead.
-    state->time_slice_ns_ -= total_runtime_ns;
+    state->time_slice_used_ns_ += total_runtime_ns;
 
     // Compute the ratio of remaining time slice to ideal time slice. This may
     // be less than 1.0 due to time slice consumed or due to previous preemption
@@ -1401,14 +1405,14 @@ void Scheduler::QueueThread(Thread* thread, Placement placement, SchedTime now,
     // insertion operation.  These member variables lost their meaning when the
     // thread blocked, if they were even defined at the time of blocking at all.
     const SchedRemainder normalized_timeslice_remainder =
-        (placement == Placement::Insertion)
+        placement == Placement::Insertion
             ? SchedRemainder{0}
-            : state->time_slice_ns_ / ktl::max(ep.fair.initial_time_slice_ns, SchedDuration{1});
+            : state->remaining_time_slice_ns() / ktl::max(state->time_slice_ns_, SchedDuration{1});
 
     DEBUG_ASSERT_MSG(normalized_timeslice_remainder <= SchedRemainder{1},
-                     "time_slice_ns=%" PRId64 " initial_time_slice_ns=%" PRId64
-                     " remainder=%" PRId64 "\n",
-                     state->time_slice_ns_.raw_value(), ep.fair.initial_time_slice_ns.raw_value(),
+                     "time_slice_ns=%" PRId64 " time_slice_used_ns=%" PRId64 " remainder=%" PRId64
+                     "\n",
+                     state->time_slice_ns_.raw_value(), state->time_slice_used_ns_.raw_value(),
                      normalized_timeslice_remainder.raw_value());
 
     // If we are unblocking (placement is Insertion), or we have exhausted our
@@ -1426,7 +1430,7 @@ void Scheduler::QueueThread(Thread* thread, Placement placement, SchedTime now,
       state->start_time_ = ktl::max(state->finish_time_, virtual_time_);
       ep.fair.normalized_timeslice_remainder = SchedRemainder{1};
     } else if (placement == Placement::Preemption) {
-      DEBUG_ASSERT(state->time_slice_ns_ > 0);
+      DEBUG_ASSERT(state->remaining_time_slice_ns() > 0);
       ep.fair.normalized_timeslice_remainder = normalized_timeslice_remainder;
     }
 
@@ -1450,12 +1454,13 @@ void Scheduler::QueueThread(Thread* thread, Placement placement, SchedTime now,
       // Determine how much time is left before the deadline. This might be less
       // than the remaining time slice or negative if the thread blocked.
       const SchedDuration time_until_deadline_ns = state->finish_time_ - now;
-      if (time_until_deadline_ns <= 0 || state->time_slice_ns_ <= 0) {
+      if (time_until_deadline_ns <= 0 || state->remaining_time_slice_ns() <= 0) {
         const SchedTime period_finish_ns = state->start_time_ + ep.deadline.deadline_ns;
 
         state->start_time_ = now >= period_finish_ns ? now : period_finish_ns;
         state->finish_time_ = state->start_time_ + ep.deadline.deadline_ns;
         state->time_slice_ns_ = ep.deadline.capacity_ns;
+        state->time_slice_used_ns_ = SchedDuration{0};
       }
       deadline_trace =
           KTRACE_END_SCOPE(("time until deadline", Round<uint64_t>(time_until_deadline_ns)),
@@ -1739,12 +1744,11 @@ void Scheduler::Yield() {
 
       // Set the time slice to expire now.
       current_thread->set_ready();
-      current_state->time_slice_ns_ = SchedDuration{0};
+      current_state->time_slice_used_ns_ = current_state->time_slice_ns_;
 
       // The thread is re-evaluated with zero lag against other competing threads
       // and may skip lower priority threads with similar arrival times.
       current_state->finish_time_ = current->virtual_time_;
-      ep.fair.initial_time_slice_ns = current_state->time_slice_ns_;
       ep.fair.normalized_timeslice_remainder = SchedRemainder{1};
     }
 

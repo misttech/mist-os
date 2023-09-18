@@ -162,7 +162,7 @@ struct WaitQueueOrderingTests {
     // The initial time slice, NSTR, and the virtual finish time are all
     // meaningless for a thread which is currently blocked. Just default them to
     // 0 for now.
-    ss.effective_profile_.fair.initial_time_slice_ns = SchedDuration{0};
+    ss.time_slice_ns_ = SchedDuration{0};
     ss.effective_profile_.fair.normalized_timeslice_remainder = SchedRemainder{0};
     ss.finish_time_ = SchedTime{0};
   }
