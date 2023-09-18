@@ -10,6 +10,7 @@
 #include <optional>
 
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
+#include "tools/fidl/fidlc/include/fidl/experimental_flags.h"
 #include "tools/fidl/fidlc/include/fidl/flat/attribute_schema.h"
 #include "tools/fidl/fidlc/include/fidl/flat/name.h"
 #include "tools/fidl/fidlc/include/fidl/flat/type_resolver.h"
@@ -1196,6 +1197,9 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
 }
 
 void CompileStep::ValidateDomainErrorType(const Union* result_union) {
+  if (experimental_flags().IsFlagEnabled(ExperimentalFlags::Flag::kAllowArbitraryErrorTypes)) {
+    return;
+  }
   auto& error_member = result_union->members[1];
   if (!error_member.maybe_used) {
     return;

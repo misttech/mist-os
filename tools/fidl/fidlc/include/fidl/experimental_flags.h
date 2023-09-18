@@ -50,6 +50,9 @@ class ExperimentalFlags {
     // used, so this has no effect.
     // TODO(fxbug.dev/88366): Remove once unknown interactions are supported.
     kUnknownInteractionsNewDefaults = 1 << 9,
+
+    // Allow any types in error syntax, not just (u)int32 or enums thereof.
+    kAllowArbitraryErrorTypes = 1 << 10,
   };
 
   ExperimentalFlags() = default;

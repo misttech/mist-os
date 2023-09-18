@@ -4,6 +4,7 @@
 
 #include <zxtest/zxtest.h>
 
+#include "tools/fidl/fidlc/include/fidl/flat/types.h"
 #include "tools/fidl/fidlc/tests/error_test.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
@@ -193,4 +194,23 @@ TEST(ErrorsTests, BadErrorEmptyFile) {
 
   ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnexpectedIdentifier);
 }
+
+TEST(ErrorsTests, ExperimentalAllowArbitraryErrorTypes) {
+  TestLibrary library(R"FIDL(
+library example;
+protocol Example {
+    Method() -> () error table {};
+};
+)FIDL");
+  library.EnableFlag(fidl::ExperimentalFlags::Flag::kAllowArbitraryErrorTypes);
+  ASSERT_COMPILED(library);
+
+  auto result_id = static_cast<const fidl::flat::IdentifierType*>(
+      library.LookupProtocol("Example")->methods.at(0).maybe_response->type);
+  auto result_union = static_cast<const fidl::flat::Union*>(result_id->type_decl);
+  auto error_id = static_cast<const fidl::flat::IdentifierType*>(
+      result_union->members.at(1).maybe_used->type_ctor->type);
+  ASSERT_EQ(error_id->type_decl->kind, fidl::flat::Decl::Kind::kTable);
+}
+
 }  // namespace
