@@ -35,6 +35,11 @@ const uint ARCH_ASPACE_FLAG_KERNEL = (1u << 0);
 const uint ARCH_ASPACE_FLAG_GUEST = (1u << 1);
 
 // per arch base class api to encapsulate the mmu routines on an aspace
+//
+// Beyond construction/destruction lifetimes users of this object must ensure that none of the
+// main methods are called before calling Init or after calling Destroy. Doing so is allowed to
+// cause a panic.
+// Aside from Init and Destroy, the main methods are all thread-safe.
 class ArchVmAspaceInterface {
  public:
   ArchVmAspaceInterface() = default;
@@ -61,6 +66,8 @@ class ArchVmAspaceInterface {
   // indicate incomplete cleanup at the higher layers.
   //
   // It is safe to call Destroy even if Init failed.
+  // Once destroy has been called it is a user error to call any of the other methods on the aspace,
+  // unless specifically stated otherwise, and doing so may cause a panic.
   virtual zx_status_t Destroy() = 0;
 
   // main methods

@@ -1277,6 +1277,10 @@ zx_status_t X86PageTableBase::HarvestAccessed(vaddr_t vaddr, size_t count,
 void X86PageTableBase::Destroy(vaddr_t base, size_t size) {
   canary_.Assert();
 
+  // This lock should be uncontended since Destroy is not supposed to be called in parallel with
+  // any other operation, but hold it anyway so we can clear virt_ and attempt to surface any bugs.
+  Guard<Mutex> a{&lock_};
+
   if constexpr (DEBUG_ASSERT_IMPLEMENTED) {
     PageTableLevel top = top_level();
     if (virt_) {
@@ -1299,4 +1303,7 @@ void X86PageTableBase::Destroy(vaddr_t base, size_t size) {
     pmm_free_page(paddr_to_vm_page(phys_));
     phys_ = 0;
   }
+  // Clear virt_ to indicate we are now destroyed, and prevent any misuses of the ArchVmAspace API
+  // from performing use-after-free on the PT.
+  virt_ = nullptr;
 }
