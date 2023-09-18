@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 source_set("performance_counter_device") {
+  public_configs = [ "../../../..:src_config" ]
   sources = [
     "magma_performance_counter_device.cc",
     "magma_performance_counter_device.h",
@@ -22,6 +23,7 @@ source_set("performance_counter_device") {
 }
 
 source_set("dependency_injection_device") {
+  public_configs = [ "../../../..:src_config" ]
   sources = [
     "magma_dependency_injection_device.cc",
     "magma_dependency_injection_device.h",
@@ -40,6 +42,7 @@ source_set("dependency_injection_device") {
 }
 
 source_set("device_impl") {
+  public_configs = [ "../../../..:src_config" ]
   sources = [ "magma_device_impl.h" ]
 
   public_deps = [

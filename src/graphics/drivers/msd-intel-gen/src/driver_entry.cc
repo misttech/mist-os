@@ -8,6 +8,7 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/magma_service/msd_defs.h>
+#include <lib/magma_service/sys_driver/dfv1/magma_device_impl.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/resource.h>
 #include <stdint.h>
@@ -28,7 +29,6 @@
 #include "magma_util/dlog.h"
 #include "msd_intel_pci_device.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
-#include "src/graphics/lib/magma/src/sys_driver/dfv1/magma_device_impl.h"
 
 #if MAGMA_TEST_DRIVER
 zx_status_t magma_indriver_test(magma::PlatformPciDevice* platform_device);

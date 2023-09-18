@@ -5,14 +5,14 @@
 #include <lib/async-loop/loop.h>
 #include <lib/async/cpp/task.h>
 #include <lib/magma_service/msd.h>
+#include <lib/magma_service/sys_driver/magma_system_connection.h>
+#include <lib/magma_service/sys_driver/magma_system_context.h>
+#include <lib/magma_service/sys_driver/magma_system_device.h>
 
 #include <gtest/gtest.h>
 
 #include "helper/platform_msd_device_helper.h"
 #include "platform_semaphore.h"
-#include "sys_driver/magma_system_connection.h"
-#include "sys_driver/magma_system_context.h"
-#include "sys_driver/magma_system_device.h"
 
 // a class to create and own the command buffer were trying to execute
 class CommandBufferHelper final : public msd::NotificationHandler {

@@ -21,3 +21,8 @@ source_set("msd") {
     "//zircon/system/ulib/zx",
   ]
 }
+
+config("src_config") {
+  visibility = [ "./*" ]
+  include_dirs = [ "." ]
+}

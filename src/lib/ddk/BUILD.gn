@@ -382,6 +382,7 @@ sdk_static_library("ddk") {
     "//src/graphics/lib/magma/src/magma_util/platform:*",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:*",
     "//src/graphics/lib/magma/src/sys_driver/dfv1:*",
+    "//src/graphics/magma/lib/magma_service/sys_driver/dfv1:*",
     "//src/lib/ddk:*",
     "//src/lib/ddk/tests:*",
     "//src/lib/ddktl:*",

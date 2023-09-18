@@ -23,12 +23,12 @@ source_set("magma_system_tests") {
     "$magma_build_root/src/magma_util:short_macros",
     "$magma_build_root/src/magma_util/platform:connection_client",
     "$magma_build_root/src/magma_util/platform:event",
-    "$magma_build_root/src/sys_driver",
     "$magma_build_root/tests/helper:command_buffer_helper_cpp",
     "$magma_build_root/tests/helper:logger_init_helper",
     "$magma_build_root/tests/helper:platform_device_helper",
     "$magma_build_root/tests/mock:msd_cpp",
     "//sdk/lib/fit",
+    "//src/graphics/magma/lib/magma_service/sys_driver",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/sync:sync-cpp",
   ]
@@ -44,10 +44,10 @@ executable("magma_system_dfv2_test_executable") {
   sources = [ "test_magma_driver_base.cc" ]
 
   deps = [
-    "$magma_build_root/src/sys_driver:magma_driver_base",
     "$magma_build_root/tests/mock:msd_cpp",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/testing/cpp",
+    "//src/graphics/magma/lib/magma_service/sys_driver:magma_driver_base",
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/trace",
   ]

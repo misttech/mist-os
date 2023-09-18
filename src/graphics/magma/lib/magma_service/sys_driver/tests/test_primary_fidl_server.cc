@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma_service/sys_driver/primary_fidl_server.h>
 #include <lib/sync/cpp/completion.h>
 #include <poll.h>
 
@@ -17,7 +18,6 @@
 #include "platform_handle.h"
 #include "platform_port.h"
 #include "platform_semaphore.h"
-#include "src/graphics/lib/magma/src/sys_driver/primary_fidl_server.h"
 
 #if defined(__Fuchsia__)
 #include "zircon/zircon_platform_connection_client.h"  // nogncheck

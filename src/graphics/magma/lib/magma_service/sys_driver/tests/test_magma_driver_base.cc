@@ -8,12 +8,12 @@
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
+#include <lib/magma_service/sys_driver/magma_driver_base.h>
 #include <lib/zx/result.h>
 
 #include <gtest/gtest.h>
 
 #include "src/graphics/lib/magma/tests/mock/mock_msd.h"
-#include "sys_driver/magma_driver_base.h"
 
 namespace msd {
 

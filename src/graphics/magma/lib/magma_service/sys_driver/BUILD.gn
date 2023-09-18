@@ -10,6 +10,7 @@ source_set("sys_driver") {
     "//src/devices/bin/driver_host:driver",
     "//zircon/system/ulib/async-default",
   ]
+  public_configs = [ "../../..:src_config" ]
   public_deps = [
     "$magma_build_root/include:magma",
     "$magma_build_root/src/magma_util:macros",

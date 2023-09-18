@@ -4,11 +4,11 @@
 
 #include "magma_system_device.h"
 
+#include <lib/magma_service/sys_driver/primary_fidl_server.h>
 #include <zircon/types.h>
 
 #include "magma_system_connection.h"
 #include "magma_util/macros.h"
-#include "sys_driver/primary_fidl_server.h"
 
 namespace msd {
 uint32_t MagmaSystemDevice::GetDeviceId() {

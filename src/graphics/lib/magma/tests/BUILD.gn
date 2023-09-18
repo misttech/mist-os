@@ -17,8 +17,8 @@ group("tests") {
     "codegen",
     "icd_strip",
     "//src/graphics/lib/magma/src/libmagma:verify_magma",
-    "//src/graphics/lib/magma/src/sys_driver/tests",
     "//src/graphics/lib/magma/src/tools:tests",
+    "//src/graphics/magma/lib/magma_service/sys_driver/tests",
   ]
 
   # Add driver dependencies:

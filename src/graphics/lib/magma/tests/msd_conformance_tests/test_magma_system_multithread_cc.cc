@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma_service/sys_driver/magma_system_connection.h>
+#include <lib/magma_service/sys_driver/magma_system_context.h>
+#include <lib/magma_service/sys_driver/magma_system_device.h>
 #include <magma_intel_gen_defs.h>
 
 #include <thread>
@@ -10,9 +13,6 @@
 #include <gtest/gtest.h>
 
 #include "helper/platform_msd_device_helper.h"
-#include "sys_driver/magma_system_connection.h"
-#include "sys_driver/magma_system_context.h"
-#include "sys_driver/magma_system_device.h"
 
 namespace msd {
 namespace {

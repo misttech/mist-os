@@ -8,12 +8,12 @@
 #include <lib/async-loop/loop.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fidl/cpp/binding_set.h>
+#include <lib/magma_service/sys_driver/dfv1/magma_dependency_injection_device.h>
 #include <lib/sync/completion.h>
 
 #include <gtest/gtest.h>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
-#include "src/graphics/lib/magma/src/sys_driver/dfv1/magma_dependency_injection_device.h"
 
 namespace {
 class TestOwner : public magma::MagmaDependencyInjectionDevice::Owner {

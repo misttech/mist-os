@@ -101,7 +101,7 @@ dfv2_entry_deps = [
   "//src/graphics/lib/magma/src/magma_util/platform:trace",
   "//src/graphics/lib/magma/src/magma_util/platform/zircon:logger_for_dfv2",
   "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
-  "//src/graphics/lib/magma/src/sys_driver",
+  "//src/graphics/magma/lib/magma_service/sys_driver",
   "//zircon/system/ulib/trace",
   "//zircon/system/ulib/trace-vthread",
   "//zircon/system/ulib/zx",
@@ -109,8 +109,9 @@ dfv2_entry_deps = [
 
 source_set("msd_arm_entry_dfv2") {
   sources = [ "src/driver_entry_dfv2.cc" ]
-  deps = dfv2_entry_deps +
-         [ "//src/graphics/lib/magma/src/sys_driver:magma_driver_base" ]
+  deps =
+      dfv2_entry_deps +
+      [ "//src/graphics/magma/lib/magma_service/sys_driver:magma_driver_base" ]
 }
 
 source_set("msd_arm_test_entry_dfv2") {
@@ -120,13 +121,14 @@ source_set("msd_arm_test_entry_dfv2") {
     "src/driver_test_gtest.cc",
   ]
   defines = [ "MAGMA_TEST_DRIVER=1" ]
-  deps = dfv2_entry_deps + [
-           "tests/unit_tests:tests_requiring_hardware",
-           "//src/graphics/lib/magma/src/sys_driver:magma_driver_base",
-           "//src/graphics/lib/magma/tests/helper:platform_msd_device_helper",
-           "//src/graphics/lib/magma/tests/msd_conformance_tests",
-           "//third_party/googletest:gtest",
-         ]
+  deps =
+      dfv2_entry_deps + [
+        "tests/unit_tests:tests_requiring_hardware",
+        "//src/graphics/lib/magma/tests/helper:platform_msd_device_helper",
+        "//src/graphics/lib/magma/tests/msd_conformance_tests",
+        "//src/graphics/magma/lib/magma_service/sys_driver:magma_driver_base",
+        "//third_party/googletest:gtest",
+      ]
 }
 
 fuchsia_driver("msd_arm-dfv2-driver") {
@@ -202,8 +204,8 @@ entry_deps = [
   "//src/graphics/lib/magma/src/magma_util/platform:trace",
   "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
   "//src/graphics/lib/magma/src/magma_util/platform/zircon:thread_profile",
-  "//src/graphics/lib/magma/src/sys_driver",
-  "//src/graphics/lib/magma/src/sys_driver/dfv1:device_impl",
+  "//src/graphics/magma/lib/magma_service/sys_driver",
+  "//src/graphics/magma/lib/magma_service/sys_driver/dfv1:device_impl",
   "//src/lib/ddk",
   "//src/lib/ddktl",
   "//zircon/system/ulib/trace",

@@ -285,7 +285,7 @@ group("driver") {
     "//src/graphics/drivers/msd-intel-gen:*",
     "//src/graphics/drivers/msd-vsi-vip:*",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:*",
-    "//src/graphics/lib/magma/src/sys_driver/dfv1:*",
+    "//src/graphics/magma/lib/magma_service/sys_driver/dfv1:*",
     "//src/lib/ddktl/tests:*",
     "//src/media/audio/drivers/aml-dsp:*",
     "//src/media/audio/drivers/aml-dsp/aml-g12-pdm-dsp:*",

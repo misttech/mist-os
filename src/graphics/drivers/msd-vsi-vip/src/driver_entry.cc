@@ -9,6 +9,8 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/fidl/cpp/wire/arena.h>
 #include <lib/fit/thread_safety.h>
+#include <lib/magma_service/sys_driver/dfv1/magma_device_impl.h>
+#include <lib/magma_service/sys_driver/magma_system_device.h>
 #include <zircon/process.h>
 #include <zircon/time.h>
 #include <zircon/types.h>
@@ -24,8 +26,6 @@
 #include "magma_util/short_macros.h"
 #include "platform_handle.h"
 #include "platform_logger.h"
-#include "src/graphics/lib/magma/src/sys_driver/dfv1/magma_device_impl.h"
-#include "sys_driver/magma_system_device.h"
 
 #if MAGMA_TEST_DRIVER
 zx_status_t magma_indriver_test(zx_device_t* device);
