@@ -24,77 +24,16 @@ if is-remote-workflow-device; then
   fx-command-run host-tool ffx target add --nowait $(get-device-pair)
 fi
 
-# NOTE: this could be improved if it knew enough about ffx args to
-# short-circuit once it hits a command, but not all global flags take arguments
-# (e.g. -v, --help), so it would be hard to keep those in sync. For now we
-# accept the concession that something other than the global --target flag
-# being spelled exactly --target as an argument is highly unlikely.
-found_target=false
-args=(
-  --config "repository.default=$(ffx-default-repository-name)"
-)
-
-while [[ $# -gt 0 ]]; do
-  arg="$1"
-  args+=("$1")
-  shift
-
-  # Handle global flags explicitly, separating those which have parameters from
-  # those that do not, searching for --target. As soon as a non-known argument
-  # is discovered, pass all other flags as-is.
-  # This case should be kept in sync with the ffx global flags.
-  case "$arg" in
-    # target special case.
-    -t|--target)
-      found_target=true
-      args+=("$1")
-      shift
-      ;;
-
-    # ffx global flags that have parameters.
-    -c|--config|-e|--env|-T|--timeout|--machine)
-      args+=("$1")
-      shift
-      ;;
-
-    # ffx global flags that do not accept parameters.
-    -v|--verbose|-h|--help)
-      :
-      ;;
-
-    # Any other flag results in all flags being passed forward as-is and the
-    # loop is terminated.
-    *)
-      args+=("$@")
-      break
-      ;;
-  esac
-done
-
-if ! ${found_target}; then
-  # Note: the quotes around get-device-raw are critical, if no fx default
-  # device is set, we explicitly want to pass "" here.
-  args=(--target "$(get-device-raw)" "${args[@]}")
+declare -a device
+# If DEVICE_NAME was passed in fx -d, pass it in as a config arg to ffx
+if [[ "${FUCHSIA_DEVICE_NAME+isset}" == "isset" ]]; then
+  if is-remote-workflow-device && [[ -z "${FX_REMOTE_INVOCATION}" ]]; then
+    fx-warn "The -d flag does not work on this end of the remote workflow"
+    fx-warn "in order to adjust target devices in the remote workflow, use"
+    fx-warn "-d or fx set-device on the local side of the configuration"
+    fx-warn "and restart serve-remote"
+  fi
+  device=("--config" "target.default=${FUCHSIA_DEVICE_NAME}")
 fi
 
-if [[ "${args[*]}" =~ "repository default set" || "${args[*]}" =~ "repository default unset" ]]; then
-  fx-warn "Inside the Fuchsia tree, ffx has a repository specified by fx"
-  fx-warn "Using default repositories via ffx repository default may have undefined behavior"
-  fx-warn "See http://fxbug.dev/90067 for more information."
-  fx-warn "Prefer:"
-  fx-warn "   fx use"
-fi
-
-if [[ "${args[*]}" =~ "target default set" || "${args[*]}" =~ "target default unset" ]] && [[ -f "${FUCHSIA_BUILD_DIR}.device" ]]; then
-  fx-warn "Inside the Fuchsia tree, the default target device for your build"
-  fx-warn "must be kept in sync, and using ffx to change your default device may"
-  fx-warn "cause them to lose sync and cause issues. It's recommended to continue"
-  fx-warn "using fx commands like below to set your default device until"
-  fx-warn "https://fxrev.dev/822032 is merged."
-  fx-warn "See https://fxbug.dev/290948818 for more information."
-  fx-warn "Prefer:"
-  fx-warn "   fx set-device"
-  fx-warn "   fx unset-device"
-fi
-
-fx-command-exec host-tool ffx "${args[@]}"
+fx-command-exec host-tool ffx "${device[@]}" "$@"
