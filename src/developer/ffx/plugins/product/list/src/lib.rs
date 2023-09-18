@@ -52,7 +52,7 @@ pub async fn pb_list(
             writeln!(writer, "{}", pb_string)?;
         }
     } else {
-        ffx_bail!("Currently we need the sdk version to exsit for the lookup")
+        ffx_bail!("Currently we need the sdk version to exist for the lookup")
     }
 
     Ok(())
