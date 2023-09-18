@@ -70,10 +70,7 @@ fuchsia_component("test_realm_proxy_component_fxblob") {
   visibility = [ ":*" ]
   component_name = "default"
   manifest = "meta/default-fxblob.cml"
-  deps = [
-    ":bin-fxblob",
-    "//src/sys/pkg/bin/pm:pm_bin",
-  ]
+  deps = [ ":bin-fxblob" ]
 }
 
 fuchsia_package("test_realm_proxy") {

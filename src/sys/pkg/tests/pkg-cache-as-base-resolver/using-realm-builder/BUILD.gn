@@ -56,7 +56,6 @@ fuchsia_component("component") {
     ":driver",
     "//src/storage/testing:storage_driver_test_realm",
     "//src/sys/pkg/bin/pkg-cache:production-component-and-config",
-    "//src/sys/pkg/bin/pm:pm_bin",
   ]
 }
 
@@ -67,7 +66,6 @@ fuchsia_component("component_fxblob") {
     ":driver_fxblob",
     "//src/storage/testing:storage_driver_test_realm",
     "//src/sys/pkg/bin/pkg-cache:production-component-and-config",
-    "//src/sys/pkg/bin/pm:pm_bin",
   ]
 }
 

@@ -375,7 +375,6 @@ fuchsia_test_package("system_recovery_tests") {
     ":instructions",
     ":recovery_logo",
     ":roboto_regular",
-    "//src/sys/pkg/bin/pm:pm_bin",
     "//src/sys/pkg/lib/fuchsia-pkg-testing/certs",
     "//src/sys/pkg/tests/pkg-resolver:empty-repo",
   ]
@@ -461,7 +460,6 @@ fuchsia_test_package("system_recovery_installer_tests") {
     ":instructions",
     ":recovery_logo",
     ":roboto_regular",
-    "//src/sys/pkg/bin/pm:pm_bin",
     "//src/sys/pkg/lib/fuchsia-pkg-testing/certs",
     "//src/sys/pkg/tests/pkg-resolver:empty-repo",
   ]

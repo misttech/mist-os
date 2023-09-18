@@ -48,7 +48,6 @@ fuchsia_test_component("ota_integration_test_component") {
     "//src/recovery/system:component_ota",
     "//src/storage/testing:storage_driver_test_realm",
     "//src/storage/tools/blobfs-compression",
-    "//src/sys/pkg/bin/pm:pm_bin",
     "//src/sys/pkg/lib/fuchsia-pkg-testing/certs",
     "//src/sys/pkg/tests/pkg-resolver:empty-repo",
   ]

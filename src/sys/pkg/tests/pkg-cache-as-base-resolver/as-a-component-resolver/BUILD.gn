@@ -81,7 +81,6 @@ fuchsia_component("fake-dependencies-fxblob") {
   deps = [
     ":fake_dependencies_fxblob_bin",
     "//src/storage/testing:storage_driver_test_realm",
-    "//src/sys/pkg/bin/pm:pm_bin",
   ]
 }
 
@@ -100,7 +99,6 @@ fuchsia_component("fake-dependencies") {
   deps = [
     ":fake_dependencies_bin",
     "//src/storage/testing:storage_driver_test_realm",
-    "//src/sys/pkg/bin/pm:pm_bin",
   ]
 }
 

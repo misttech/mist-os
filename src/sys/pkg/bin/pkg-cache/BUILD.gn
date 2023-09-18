@@ -213,10 +213,7 @@ fuchsia_test_package("pkg-cache-tests") {
     }
   }
   test_components = [ ":pkg-cache-test" ]
-  deps = [
-    "//src/storage/testing:storage_driver_test_realm",
-    "//src/sys/pkg/bin/pm:pm_bin",
-  ]
+  deps = [ "//src/storage/testing:storage_driver_test_realm" ]
 }
 
 group("tests") {
