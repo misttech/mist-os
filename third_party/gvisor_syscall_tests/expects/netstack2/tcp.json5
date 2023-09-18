@@ -22,6 +22,18 @@
                 // https://fxbug.dev/112041
                 "AllInetTests/SimpleTcpSocketTest.SynRcvdOnListenerShutdown/*",
 
+                // https://fxbug.dev/73028
+                "AllTCPSockets/TCPSocketPairTest.RSTCausesPollHUP/*",
+
+                // https://fxbug.dev/73031
+                "AllTCPSockets/TCPSocketPairTest.RSTSentOnCloseWithUnreadDataAllowsReadBuffered/*",
+
+                // https://fxbug.dev/70837
+                // Skip this test as it flakes often because of reaching file descriptor
+                // resource limits on Fuchsia. Bumping up the resource limit in Fuchsia might
+                // be more involved.
+                "AllTCPSockets/TCPSocketPairTest.TCPResetDuringClose/*",
+
                 // This test hangs until cl/390312274 is in the Fuchsia SDK.
                 "AllInetTests/TcpSocketTest.SendUnblocksOnSendBufferIncrease/*",
 
@@ -45,6 +57,18 @@
         {
             type: "expect_failure",
             matchers: [
+                // third_party/gvisor/test/syscalls/linux/socket_ip_tcp_generic.cc:125
+                // Value of: RetryEINTR(read)(sockets->first_fd(), buf, sizeof(buf))
+                // Expected: -1 (failure), with errno PosixError(errno=104 0)
+                //   Actual: 0 (of type long)
+                "AllTCPSockets/TCPSocketPairTest.RSTSentOnCloseWithUnreadData/*",
+
+                // https://fxbug.dev/73032
+                "AllTCPSockets/TCPSocketPairTest.ShutdownRdUnreadDataShouldCauseNoPacketsUnlessClosed/*",
+
+                // https://fxbug.dev/20628
+                "AllTCPSockets/TCPSocketPairTest.MsgTruncMsgPeek/*",
+
                 // TODO(https://fxbug.dev/45262): support sendmmsg
                 "AllTCPSockets/AllSocketPairTest.BasicSendmmsg/*",
                 "AllTCPSockets/AllSocketPairTest.SendmmsgIsLimitedByMAXIOV/*",
@@ -95,6 +119,9 @@
 
                 // https://fxbug.dev/41617
                 "AllInetTests/TcpSocketTest.TcpSCMPriority/*",
+
+                // https://fxbug.dev/20628
+                "AllTCPSockets/TCPSocketPairTest.MsgTruncMsgPeek/*",
             ],
         },
     ],
