@@ -28,7 +28,7 @@ use {
             OpenOptions, RouteRequest,
         },
     },
-    crate::runner::builtin::RemoteRunner,
+    crate::runner::RemoteRunner,
     crate::sandbox_util::Sandbox,
     ::namespace::Entry as NamespaceEntry,
     ::routing::{

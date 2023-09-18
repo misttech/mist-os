@@ -15,7 +15,7 @@ use {
         namespace::create_namespace,
         routing::{route_and_open_capability, OpenOptions, RouteRequest},
     },
-    crate::runner::builtin::RemoteRunner,
+    crate::runner::RemoteRunner,
     ::namespace::Entry as NamespaceEntry,
     ::routing::{component_instance::ComponentInstanceInterface, policy::GlobalPolicyChecker},
     async_trait::async_trait,
