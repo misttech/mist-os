@@ -77,18 +77,17 @@ zx_status_t map(const StackType& type, fbl::RefPtr<VmObjectPaged>& vmo, uint64_t
   LTRACEF("%s vmar at %#" PRIxPTR "\n", type.name, kstack_vmar->base());
 
   // create a mapping offset kStackPaddingSize into the vmar we created
-  fbl::RefPtr<VmMapping> kstack_mapping;
-  status = kstack_vmar->CreateVmMapping(kStackPaddingSize, type.size, 0, VMAR_FLAG_SPECIFIC, vmo,
-                                        *offset, ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE,
-                                        type.name, &kstack_mapping);
-  if (status != ZX_OK) {
-    return status;
+  zx::result<VmAddressRegion::MapResult> mapping_result = kstack_vmar->CreateVmMapping(
+      kStackPaddingSize, type.size, 0, VMAR_FLAG_SPECIFIC, vmo, *offset,
+      ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE, type.name);
+  if (mapping_result.is_error()) {
+    return mapping_result.status_value();
   }
 
-  LTRACEF("%s mapping at %#" PRIxPTR "\n", type.name, kstack_mapping->base_locked());
+  LTRACEF("%s mapping at %#" PRIxPTR "\n", type.name, mapping_result->base);
 
   // fault in all the pages so we dont demand fault in the stack
-  status = kstack_mapping->MapRange(0, type.size, true);
+  status = mapping_result->mapping->MapRange(0, type.size, true);
   if (status != ZX_OK) {
     return status;
   }

@@ -1328,18 +1328,17 @@ static zx_status_t x86_map_mchbar_stat_registers(PerfmonState* state) {
   auto vmar = VmAspace::kernel_aspace()->RootVmar();
   uint32_t vmar_flags = 0;
   uint32_t arch_mmu_flags = ARCH_MMU_FLAG_PERM_READ;
-  fbl::RefPtr<VmMapping> mapping;
-  status = vmar->CreateVmMapping(0, PAGE_SIZE, /*align_pow2*/ 0, vmar_flags, ktl::move(vmo), 0,
-                                 arch_mmu_flags, name, &mapping);
+  zx::result<VmAddressRegion::MapResult> mapping_result = vmar->CreateVmMapping(
+      0, PAGE_SIZE, /*align_pow2*/ 0, vmar_flags, ktl::move(vmo), 0, arch_mmu_flags, name);
+  if (mapping_result.is_error())
+    return mapping_result.status_value();
+
+  status = mapping_result->mapping->MapRange(0, PAGE_SIZE, false);
   if (status != ZX_OK)
     return status;
 
-  status = mapping->MapRange(0, PAGE_SIZE, false);
-  if (status != ZX_OK)
-    return status;
-
-  state->mchbar_data.mapping = mapping;
-  state->mchbar_data.stats_addr = reinterpret_cast<void*>(mapping->base_locking() + begin_offset);
+  state->mchbar_data.mapping = mapping_result->mapping;
+  state->mchbar_data.stats_addr = reinterpret_cast<void*>(mapping_result->base + begin_offset);
 
   // Record the current values of these so that the trace will only include
   // the delta since tracing started.
@@ -1361,8 +1360,7 @@ static zx_status_t x86_map_mchbar_stat_registers(PerfmonState* state) {
   INIT_MC_COUNT(active_gt_engine_cycles);
 #undef INIT_MC_COUNT
 
-  LTRACEF("memory stats mapped: begin 0x%lx, %zu bytes\n", mapping->base_locking(),
-          num_bytes_to_map);
+  LTRACEF("memory stats mapped: begin 0x%lx, %zu bytes\n", mapping_result->base, num_bytes_to_map);
 
   return ZX_OK;
 }
@@ -1389,13 +1387,15 @@ static zx_status_t x86_perfmon_map_buffers_locked(PerfmonState* state, Guard<Mut
       TRACEF("error %d pinning buffer: cpu %u, size 0x%zx\n", status, cpu, size);
       break;
     }
-    status = VmAspace::kernel_aspace()->RootVmar()->CreateVmMapping(
+    auto mapping_result = VmAspace::kernel_aspace()->RootVmar()->CreateVmMapping(
         0 /* ignored */, size, 0 /* align pow2 */, 0 /* vmar flags */, data->buffer_vmo, vmo_offset,
-        arch_mmu_flags, name, &data->buffer_mapping);
-    if (status != ZX_OK) {
-      TRACEF("error %d mapping buffer: cpu %u, size 0x%zx\n", status, cpu, size);
+        arch_mmu_flags, name);
+    if (mapping_result.is_error()) {
+      TRACEF("error %d mapping buffer: cpu %u, size 0x%zx\n", mapping_result.status_value(), cpu,
+             size);
       break;
     }
+    data->buffer_mapping = ktl::move(mapping_result->mapping);
     // Pass true for |commit| so that we get our pages mapped up front.
     // Otherwise we'll need to allow for a page fault to happen in the
     // PMI handler.
@@ -1407,7 +1407,7 @@ static zx_status_t x86_perfmon_map_buffers_locked(PerfmonState* state, Guard<Mut
       break;
     }
     data->buffer_start =
-        reinterpret_cast<perfmon::BufferHeader*>(data->buffer_mapping->base_locking() + vmo_offset);
+        reinterpret_cast<perfmon::BufferHeader*>(mapping_result->base + vmo_offset);
     data->buffer_end = reinterpret_cast<char*>(data->buffer_start) + size;
     data->pinned_buffer = ktl::move(buf_pin);
     LTRACEF("buffer mapped: cpu %u, start %p, end %p\n", cpu, data->buffer_start, data->buffer_end);

@@ -83,19 +83,19 @@ zx_status_t MapStructs2_1(const smbios::EntryPoint2_1* ep, fbl::RefPtr<VmMapping
   if (status != ZX_OK) {
     return status;
   }
-  fbl::RefPtr<VmMapping> m;
-  status = vmar->CreateVmMapping(0, len, 0, 0 /* vmar_flags */, ktl::move(vmo), 0,
-                                 ARCH_MMU_FLAG_CACHED | ARCH_MMU_FLAG_PERM_READ, "smbios", &m);
-  if (status != ZX_OK) {
-    return status;
+  zx::result<VmAddressRegion::MapResult> mapping_result =
+      vmar->CreateVmMapping(0, len, 0, 0 /* vmar_flags */, ktl::move(vmo), 0,
+                            ARCH_MMU_FLAG_CACHED | ARCH_MMU_FLAG_PERM_READ, "smbios");
+  if (mapping_result.is_error()) {
+    return mapping_result.status_value();
   }
   // Prepopulate the mapping's page tables so there are no page faults taken.
-  status = m->MapRange(0, len, true);
+  status = mapping_result->mapping->MapRange(0, len, true);
   if (status != ZX_OK) {
     return status;
   }
-  *struct_table_virt = m->base_locking() + subpage_offset;
-  *mapping = ktl::move(m);
+  *struct_table_virt = mapping_result->base + subpage_offset;
+  *mapping = ktl::move(mapping_result->mapping);
   return ZX_OK;
 }
 

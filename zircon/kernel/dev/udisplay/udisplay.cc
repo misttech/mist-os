@@ -52,23 +52,24 @@ zx_status_t udisplay_set_framebuffer(fbl::RefPtr<VmObject> vmo) {
   udisplay_clear_framebuffer_vmo();
 
   const size_t size = vmo->size();
-  fbl::RefPtr<VmMapping> mapping;
-  zx_status_t status = VmAspace::kernel_aspace()->RootVmar()->CreateVmMapping(
-      0 /* ignored */, size, 0 /* align pow2 */, 0 /* vmar flags */, ktl::move(vmo), 0,
-      kFramebufferArchMmuFlags, "framebuffer_vmo", &mapping);
-  if (status != ZX_OK)
-    return status;
+  zx::result<VmAddressRegion::MapResult> mapping_result =
+      VmAspace::kernel_aspace()->RootVmar()->CreateVmMapping(
+          0 /* ignored */, size, 0 /* align pow2 */, 0 /* vmar flags */, ktl::move(vmo), 0,
+          kFramebufferArchMmuFlags, "framebuffer_vmo");
+  if (mapping_result.is_error()) {
+    return mapping_result.status_value();
+  }
 
-  status = mapping->MapRange(0, size, true);
+  zx_status_t status = mapping_result->mapping->MapRange(0, size, true);
   if (status != ZX_OK) {
-    mapping->Destroy();
+    mapping_result->mapping->Destroy();
     return status;
   }
 
-  g_udisplay.framebuffer_virt = reinterpret_cast<void*>(mapping->base_locking());
+  g_udisplay.framebuffer_virt = reinterpret_cast<void*>(mapping_result->base);
 
   g_udisplay.framebuffer_size = size;
-  g_udisplay.framebuffer_vmo_mapping = mapping;
+  g_udisplay.framebuffer_vmo_mapping = mapping_result->mapping;
   return ZX_OK;
 }
 

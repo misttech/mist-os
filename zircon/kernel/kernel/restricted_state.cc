@@ -44,26 +44,25 @@ zx::result<ktl::unique_ptr<RestrictedState>> RestrictedState::Create(
   // Create a mapping of this VMO in the kernel aspace.
   fbl::RefPtr<VmAddressRegion> kernel_vmar =
       VmAspace::kernel_aspace()->RootVmar()->as_vm_address_region();
-  fbl::RefPtr<VmMapping> state_mapping;
-  status = kernel_vmar->CreateVmMapping(0, kStateVmoSize, 0, 0, state_vmo, 0,
-                                        ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE,
-                                        "restricted state", &state_mapping);
-  if (status != ZX_OK) {
-    return zx::error_result(status);
+  zx::result<VmAddressRegion::MapResult> state_mapping_result = kernel_vmar->CreateVmMapping(
+      0, kStateVmoSize, 0, 0, state_vmo, 0, ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE,
+      "restricted state");
+  if (state_mapping_result.is_error()) {
+    return state_mapping_result.take_error();
   }
-  auto unmap = fit::defer([&]() { state_mapping->Destroy(); });
+  auto unmap = fit::defer([&]() { state_mapping_result->mapping->Destroy(); });
 
-  LTRACEF("%s mapping at %#" PRIxPTR "\n", "", state_mapping->base_locking());
+  LTRACEF("%s mapping at %#" PRIxPTR "\n", "", state_mapping_result->base);
 
   // Eagerly fault in all the pages so we don't demand fault the mapping.
-  status = state_mapping->MapRange(0, kStateVmoSize, true);
+  status = state_mapping_result->mapping->MapRange(0, kStateVmoSize, true);
   if (status != ZX_OK) {
     return zx::error_result(status);
   }
 
   fbl::AllocChecker ac;
   ktl::unique_ptr<RestrictedState> rs(
-      new (&ac) RestrictedState(std::move(state_vmo), std::move(state_mapping)));
+      new (&ac) RestrictedState(std::move(state_vmo), std::move(state_mapping_result->mapping)));
   if (!ac.check()) {
     return zx::error_result(ZX_ERR_NO_MEMORY);
   }

@@ -641,9 +641,16 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
   zx_status_t CreateSubVmar(size_t offset, size_t size, uint8_t align_pow2, uint32_t vmar_flags,
                             const char* name, fbl::RefPtr<VmAddressRegion>* out);
   // Create a VmMapping within this region
-  zx_status_t CreateVmMapping(size_t mapping_offset, size_t size, uint8_t align_pow2,
-                              uint32_t vmar_flags, fbl::RefPtr<VmObject> vmo, uint64_t vmo_offset,
-                              uint arch_mmu_flags, const char* name, fbl::RefPtr<VmMapping>* out);
+  struct MapResult {
+    // This will never be null
+    fbl::RefPtr<VmMapping> mapping;
+    // Represents the virtual address of |mapping| at the time of creation, which is equivalent to
+    // |mapping->base_locking()|.
+    vaddr_t base;
+  };
+  zx::result<MapResult> CreateVmMapping(size_t mapping_offset, size_t size, uint8_t align_pow2,
+                                        uint32_t vmar_flags, fbl::RefPtr<VmObject> vmo,
+                                        uint64_t vmo_offset, uint arch_mmu_flags, const char* name);
 
   // Find the child region that contains the given addr.  If addr is in a gap,
   // returns nullptr.  This is a non-recursive search.
@@ -746,7 +753,7 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
   zx_status_t CreateSubVmarInternal(size_t offset, size_t size, uint8_t align_pow2,
                                     uint32_t vmar_flags, fbl::RefPtr<VmObject> vmo,
                                     uint64_t vmo_offset, uint arch_mmu_flags, const char* name,
-                                    fbl::RefPtr<VmAddressRegionOrMapping>* out);
+                                    vaddr_t* base_out, fbl::RefPtr<VmAddressRegionOrMapping>* out);
 
   // Create a new VmMapping within this region, overwriting any existing
   // mappings that are in the way.  If the range crosses a subregion, the call

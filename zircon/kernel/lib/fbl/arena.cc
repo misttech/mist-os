@@ -99,39 +99,39 @@ zx_status_t Arena::Init(const char* name, size_t ob_size, size_t count) {
   auto destroy_vmar = fit::defer([&vmar]() { vmar->Destroy(); });
 
   // Create a mapping for the control pool.
-  fbl::RefPtr<VmMapping> control_mapping;
-  st = vmar->CreateVmMapping(
+  zx::result<VmAddressRegion::MapResult> control_mapping_result = vmar->CreateVmMapping(
       0,  // mapping_offset
       control_mem_sz,
       false,  // align_pow2
       VMAR_FLAG_SPECIFIC | VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING, control_vmo,
       0,  // vmo_offset
-      ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE, "control", &control_mapping);
-  if (st != ZX_OK || control_mapping == nullptr) {
-    LTRACEF("Arena '%s': can't create %zu-byte control mapping (%d)\n", name, control_mem_sz, st);
+      ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE, "control");
+  if (control_mapping_result.is_error()) {
+    LTRACEF("Arena '%s': can't create %zu-byte control mapping (%d)\n", name, control_mem_sz,
+            control_mapping_result.status_value());
     return ZX_ERR_NO_MEMORY;
   }
 
   // Create a mapping for the data pool, leaving an unmapped gap
   // between it and the control pool.
-  fbl::RefPtr<VmMapping> data_mapping;
-  st = vmar->CreateVmMapping(control_mem_sz + guard_sz,  // mapping_offset
-                             data_mem_sz,
-                             false,  // align_pow2
-                             VMAR_FLAG_SPECIFIC | VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING, data_vmo,
-                             0,  // vmo_offset
-                             ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE, "data",
-                             &data_mapping);
-  if (st != ZX_OK || data_mapping == nullptr) {
-    LTRACEF("Arena '%s': can't create %zu-byte data mapping (%d)\n", name, data_mem_sz, st);
+  zx::result<VmAddressRegion::MapResult> data_mapping_result =
+      vmar->CreateVmMapping(control_mem_sz + guard_sz,  // mapping_offset
+                            data_mem_sz,
+                            false,  // align_pow2
+                            VMAR_FLAG_SPECIFIC | VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING, data_vmo,
+                            0,  // vmo_offset
+                            ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE, "data");
+  if (data_mapping_result.is_error()) {
+    LTRACEF("Arena '%s': can't create %zu-byte data mapping (%d)\n", name, data_mem_sz,
+            data_mapping_result.status_value());
     return ZX_ERR_NO_MEMORY;
   }
 
   // TODO(dbort): Add a VmMapping flag that says "do not demand page",
   // requiring and ensuring that we commit our pages manually.
 
-  control_.Init("control", control_vmo, control_mapping, sizeof(Node));
-  data_.Init("data", data_vmo, data_mapping, ob_size);
+  control_.Init("control", control_vmo, control_mapping_result->mapping, sizeof(Node));
+  data_.Init("data", data_vmo, data_mapping_result->mapping, ob_size);
 
   count_ = 0u;
 

@@ -26,25 +26,23 @@ ktl::unique_ptr<UserMemory> UserMemory::CreateInAspace(fbl::RefPtr<VmObject> vmo
   DEBUG_ASSERT(root_vmar);
   constexpr uint32_t vmar_flags =
       VMAR_FLAG_CAN_MAP_READ | VMAR_FLAG_CAN_MAP_WRITE | VMAR_FLAG_CAN_MAP_EXECUTE;
-  fbl::RefPtr<VmMapping> mapping;
   constexpr uint arch_mmu_flags =
       ARCH_MMU_FLAG_PERM_USER | ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE;
-  zx_status_t status =
-      root_vmar->CreateVmMapping(/* offset= */ 0, size, /* align_pow2= */ 0, vmar_flags, vmo, 0,
-                                 arch_mmu_flags, "unittest", &mapping);
-  if (status != ZX_OK) {
-    unittest_printf("CreateVmMapping failed: %d\n", status);
+  auto mapping_result = root_vmar->CreateVmMapping(/* offset= */ 0, size, /* align_pow2= */ 0,
+                                                   vmar_flags, vmo, 0, arch_mmu_flags, "unittest");
+  if (mapping_result.is_error()) {
+    unittest_printf("CreateVmMapping failed: %d\n", mapping_result.status_value());
     return nullptr;
   }
   auto unmap = fit::defer([&]() {
-    if (mapping) {
-      zx_status_t status = mapping->Destroy();
+    if (mapping_result.is_ok()) {
+      zx_status_t status = mapping_result->mapping->Destroy();
       DEBUG_ASSERT(status == ZX_OK);
     }
   });
 
   fbl::AllocChecker ac;
-  ktl::unique_ptr<UserMemory> mem(new (&ac) UserMemory(mapping, vmo, tag));
+  ktl::unique_ptr<UserMemory> mem(new (&ac) UserMemory(mapping_result->mapping, vmo, tag));
   if (!ac.check()) {
     unittest_printf("failed to allocate from heap\n");
     return nullptr;

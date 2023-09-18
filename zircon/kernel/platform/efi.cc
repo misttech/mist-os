@@ -108,14 +108,13 @@ zx_status_t MapUnalignedRegion(VmAspace* aspace, paddr_t base, size_t size, cons
     vmar_flags |= VMAR_FLAG_CAN_MAP_EXECUTE;
   }
 
-  fbl::RefPtr<VmMapping> mapping;
-  status = vmar->CreateVmMapping(aligned_base, aligned_size, ZX_PAGE_SHIFT, vmar_flags, vmo, 0,
-                                 arch_mmu_flags, name, &mapping);
-  if (status != ZX_OK) {
-    return status;
+  zx::result<VmAddressRegion::MapResult> mapping_result = vmar->CreateVmMapping(
+      aligned_base, aligned_size, ZX_PAGE_SHIFT, vmar_flags, vmo, 0, arch_mmu_flags, name);
+  if (mapping_result.is_error()) {
+    return mapping_result.status_value();
   }
 
-  status = mapping->MapRange(0, aligned_size, true);
+  status = mapping_result->mapping->MapRange(0, aligned_size, true);
   if (status != ZX_OK) {
     return status;
   }

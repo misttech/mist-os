@@ -86,14 +86,14 @@ zx_status_t MsiInterruptDispatcher::Create(fbl::RefPtr<MsiAllocation> alloc, uin
   uint32_t vector = base_irq_id + msi_id;
   ktl::array<char, ZX_MAX_NAME_LEN> name{};
   snprintf(name.data(), name.max_size(), "msi id %u (vector %u)", msi_id, vector);
-  fbl::RefPtr<VmMapping> mapping;
-  st = vmar->CreateVmMapping(0, vmo->size(), 0, 0, vmo, 0,
-                             ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE, name.data(),
-                             &mapping);
-  if (st != ZX_OK) {
-    LTRACEF("Failed to create MSI mapping: %d\n", st);
-    return st;
+  zx::result<VmAddressRegion::MapResult> mapping_result =
+      vmar->CreateVmMapping(0, vmo->size(), 0, 0, vmo, 0,
+                            ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE, name.data());
+  if (mapping_result.is_error()) {
+    LTRACEF("Failed to create MSI mapping: %d\n", mapping_result.status_value());
+    return mapping_result.status_value();
   }
+  fbl::RefPtr<VmMapping> mapping = ktl::move(mapping_result->mapping);
 
   st = mapping->MapRange(0, vmo->size(), true);
   if (st != ZX_OK) {
@@ -102,7 +102,7 @@ zx_status_t MsiInterruptDispatcher::Create(fbl::RefPtr<MsiAllocation> alloc, uin
   }
 
   LTRACEF("Mapping mapped at %#lx, size %zx, vmo size %lx, vmo_offset = %#lx\n",
-          mapping->base_locked(), mapping->size_locked(), vmo->size(), vmo_offset);
+          mapping_result->base, mapping->size_locked(), vmo->size(), vmo_offset);
   fbl::AllocChecker ac;
   fbl::RefPtr<MsiInterruptDispatcher> disp;
 
@@ -124,7 +124,7 @@ zx_status_t MsiInterruptDispatcher::Create(fbl::RefPtr<MsiAllocation> alloc, uin
     disp = fbl::AdoptRef<MsiInterruptDispatcher>(new (&ac) MsixDispatcherImpl(
         ktl::move(alloc), base_irq_id, msi_id, ktl::move(mapping), vmo_offset, register_int_fn));
   } else {
-    auto* cap = reinterpret_cast<MsiCapability*>(mapping->base_locking() + vmo_offset);
+    auto* cap = reinterpret_cast<MsiCapability*>(mapping_result->base + vmo_offset);
     if (cap->id != kMsiCapabilityId) {
       return ZX_ERR_INVALID_ARGS;
     }

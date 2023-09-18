@@ -564,14 +564,17 @@ static bool vmaspace_merge_mapping_test() {
                                             VMAR_FLAG_SPECIFIC | VMAR_FLAG_CAN_MAP_SPECIFIC |
                                                 VMAR_FLAG_CAN_MAP_READ | VMAR_FLAG_CAN_MAP_WRITE,
                                             "sub vmar", &vmars[i]));
-              ASSERT_OK(vmars[i]->CreateVmMapping(0, PAGE_SIZE, 0, VMAR_FLAG_SPECIFIC,
-                                                  test.mappings[i].vmo, test.mappings[i].vmo_offset,
-                                                  mmu_flags, "test mapping", &mappings[i]));
+              auto map_result = vmars[i]->CreateVmMapping(
+                  0, PAGE_SIZE, 0, VMAR_FLAG_SPECIFIC, test.mappings[i].vmo,
+                  test.mappings[i].vmo_offset, mmu_flags, "test mapping");
+              ASSERT_OK(map_result.status_value());
+              mappings[i] = ktl::move(map_result->mapping);
             } else {
-              ASSERT_OK(vmar->CreateVmMapping(test.mappings[i].vmar_offset, PAGE_SIZE, 0,
-                                              VMAR_FLAG_SPECIFIC, test.mappings[i].vmo,
-                                              test.mappings[i].vmo_offset, mmu_flags,
-                                              "test mapping", &mappings[i]));
+              auto map_result = vmar->CreateVmMapping(
+                  test.mappings[i].vmar_offset, PAGE_SIZE, 0, VMAR_FLAG_SPECIFIC,
+                  test.mappings[i].vmo, test.mappings[i].vmo_offset, mmu_flags, "test mapping");
+              ASSERT_OK(map_result.status_value());
+              mappings[i] = ktl::move(map_result->mapping);
             }
           }
           // By default we assume merging happens as declared in the test, unless either this our
@@ -663,10 +666,9 @@ static bool vmaspace_priority_propagation_test() {
                                              AttributionObject::GetKernelAttribution(), &vmo);
   ASSERT_OK(status);
 
-  fbl::RefPtr<VmMapping> mapping;
-  status = vmar->CreateVmMapping(0, PAGE_SIZE * 4, 0, 0, vmo, 0, kArchRwUserFlags, "test-mapping",
-                                 &mapping);
-  ASSERT_OK(status);
+  auto mapping_result =
+      vmar->CreateVmMapping(0, PAGE_SIZE * 4, 0, 0, vmo, 0, kArchRwUserFlags, "test-mapping");
+  ASSERT_OK(mapping_result.status_value());
 
   // Set the priority in our vmar and validate it propagates to the VMO and the aspace.
   status = vmar->SetMemoryPriority(VmAddressRegion::MemoryPriority::HIGH);
@@ -688,10 +690,9 @@ static bool vmaspace_priority_propagation_test() {
                                  AttributionObject::GetKernelAttribution(), &vmo2);
   ASSERT_OK(status);
 
-  fbl::RefPtr<VmMapping> mapping2;
-  status = sub_vmar->CreateVmMapping(0, PAGE_SIZE * 4, 0, 0, vmo2, 0, kArchRwUserFlags,
-                                     "test-mapping", &mapping2);
-  ASSERT_OK(status);
+  auto mapping2_result =
+      sub_vmar->CreateVmMapping(0, PAGE_SIZE * 4, 0, 0, vmo2, 0, kArchRwUserFlags, "test-mapping");
+  ASSERT_OK(mapping2_result.status_value());
   EXPECT_TRUE(vmo2->DebugGetCowPages()->DebugIsHighMemoryPriority());
 
   // Change the priority of the sub vmar. It should not effect the original vmar / vmo priority.
@@ -726,10 +727,9 @@ static bool vmaspace_priority_unmap_test() {
                                              AttributionObject::GetKernelAttribution(), &vmo);
   ASSERT_OK(status);
 
-  fbl::RefPtr<VmMapping> mapping;
-  status = vmar->CreateVmMapping(0, PAGE_SIZE * 8, 0, 0, vmo, 0, kArchRwUserFlags, "test-mapping",
-                                 &mapping);
-  ASSERT_OK(status);
+  auto mapping_result =
+      vmar->CreateVmMapping(0, PAGE_SIZE * 8, 0, 0, vmo, 0, kArchRwUserFlags, "test-mapping");
+  ASSERT_OK(mapping_result.status_value());
 
   // Set the priority in our vmar and validate it propagates to the VMO and the aspace.
   status = vmar->SetMemoryPriority(VmAddressRegion::MemoryPriority::HIGH);
@@ -738,7 +738,7 @@ static bool vmaspace_priority_unmap_test() {
   EXPECT_TRUE(vmo->DebugGetCowPages()->DebugIsHighMemoryPriority());
   EXPECT_TRUE(aspace->IsHighMemoryPriority());
 
-  const vaddr_t base = mapping->base_locking();
+  const vaddr_t base = mapping_result->base;
 
   // Unmap one page from either end of the mapping, ensuring memory priority did not change.
   EXPECT_OK(vmar->Unmap(base, PAGE_SIZE, VmAddressRegionOpChildren::No));
@@ -788,10 +788,10 @@ static bool vmaspace_priority_mapping_overwrite_test() {
                                              AttributionObject::GetKernelAttribution(), &vmo);
   ASSERT_OK(status);
 
-  fbl::RefPtr<VmMapping> mapping;
-  status =
-      vmar->CreateVmMapping(0, PAGE_SIZE, 0, 0, vmo, 0, kArchRwUserFlags, "test-mapping", &mapping);
-  ASSERT_OK(status);
+  auto mapping_result =
+      vmar->CreateVmMapping(0, PAGE_SIZE, 0, 0, vmo, 0, kArchRwUserFlags, "test-mapping");
+  ASSERT_OK(mapping_result.status_value());
+  fbl::RefPtr<VmMapping> mapping = ktl::move(mapping_result->mapping);
 
   status = vmar->SetMemoryPriority(VmAddressRegion::MemoryPriority::HIGH);
   EXPECT_OK(status);
@@ -805,10 +805,10 @@ static bool vmaspace_priority_mapping_overwrite_test() {
                                  AttributionObject::GetKernelAttribution(), &vmo2);
   ASSERT_OK(status);
 
-  status = vmar->CreateVmMapping(mapping->base_locking() - vmar->base_locking(),
-                                 mapping->size_locking(), 0, VMAR_FLAG_SPECIFIC_OVERWRITE, vmo2, 0,
-                                 kArchRwUserFlags, "test-mapping2", &mapping);
-  ASSERT_OK(status);
+  mapping_result = vmar->CreateVmMapping(mapping->base_locking() - vmar->base(),
+                                         mapping->size_locking(), 0, VMAR_FLAG_SPECIFIC_OVERWRITE,
+                                         vmo2, 0, kArchRwUserFlags, "test-mapping2");
+  ASSERT_OK(mapping_result.status_value());
 
   // Original VMO should have lost its priority, and the VMO for our new mapping should have gained.
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugIsHighMemoryPriority());
@@ -841,32 +841,31 @@ static bool vmaspace_priority_merged_mapping_test() {
   ASSERT_OK(status);
 
   // Create a mapping for the first page of the VMO, and mark it mergeable
-  fbl::RefPtr<VmMapping> mapping;
-  status = vmar->CreateVmMapping(PAGE_SIZE, PAGE_SIZE, 0, VMAR_FLAG_SPECIFIC_OVERWRITE, vmo, 0,
-                                 kArchRwUserFlags, "test-mapping", &mapping);
-  ASSERT_OK(status);
+  auto mapping_result = vmar->CreateVmMapping(PAGE_SIZE, PAGE_SIZE, 0, VMAR_FLAG_SPECIFIC_OVERWRITE,
+                                              vmo, 0, kArchRwUserFlags, "test-mapping");
+  ASSERT_OK(mapping_result.status_value());
 
   EXPECT_TRUE(vmo->DebugGetCowPages()->DebugIsHighMemoryPriority());
   EXPECT_TRUE(aspace->IsHighMemoryPriority());
 
-  VmMapping::MarkMergeable(ktl::move(mapping));
+  VmMapping::MarkMergeable(ktl::move(mapping_result->mapping));
 
   // Map in the second page.
-  status = vmar->CreateVmMapping(PAGE_SIZE * 2, PAGE_SIZE, 0, VMAR_FLAG_SPECIFIC_OVERWRITE, vmo,
-                                 PAGE_SIZE, kArchRwUserFlags, "test-mapping", &mapping);
-  ASSERT_OK(status);
+  mapping_result = vmar->CreateVmMapping(PAGE_SIZE * 2, PAGE_SIZE, 0, VMAR_FLAG_SPECIFIC_OVERWRITE,
+                                         vmo, PAGE_SIZE, kArchRwUserFlags, "test-mapping");
+  ASSERT_OK(mapping_result.status_value());
 
-  VmMapping::MarkMergeable(ktl::move(mapping));
+  VmMapping::MarkMergeable(ktl::move(mapping_result->mapping));
 
   // Query the vmar, should have a single mapping of the combined size.
   fbl::RefPtr<VmAddressRegionOrMapping> region = vmar->FindRegion(vmar->base() + PAGE_SIZE);
   ASSERT(region);
-  mapping = region->as_vm_mapping();
-  ASSERT(mapping);
-  EXPECT_EQ(static_cast<size_t>(PAGE_SIZE * 2u), mapping->size_locking());
+  fbl::RefPtr<VmMapping> map = region->as_vm_mapping();
+  ASSERT(map);
+  EXPECT_EQ(static_cast<size_t>(PAGE_SIZE * 2u), map->size_locking());
 
   // Now destroy the mapping and check the VMO loses priority.
-  EXPECT_OK(mapping->Destroy());
+  EXPECT_OK(map->Destroy());
 
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugIsHighMemoryPriority());
   EXPECT_TRUE(aspace->IsHighMemoryPriority());
@@ -896,10 +895,9 @@ static bool vmaspace_priority_bidir_clone_test() {
                                  AttributionObject::GetKernelAttribution(), &vmo);
   ASSERT_OK(status);
 
-  fbl::RefPtr<VmMapping> mapping;
-  status = vmar->CreateVmMapping(PAGE_SIZE, PAGE_SIZE, 0, VMAR_FLAG_SPECIFIC_OVERWRITE, vmo, 0,
-                                 kArchRwUserFlags, "test-mapping", &mapping);
-  ASSERT_OK(status);
+  auto mapping_result = vmar->CreateVmMapping(PAGE_SIZE, PAGE_SIZE, 0, VMAR_FLAG_SPECIFIC_OVERWRITE,
+                                              vmo, 0, kArchRwUserFlags, "test-mapping");
+  ASSERT_OK(mapping_result.status_value());
 
   EXPECT_TRUE(vmo->DebugGetCowPages()->DebugIsHighMemoryPriority());
   EXPECT_TRUE(aspace->IsHighMemoryPriority());
@@ -921,7 +919,7 @@ static bool vmaspace_priority_bidir_clone_test() {
   EXPECT_TRUE(aspace->IsHighMemoryPriority());
 
   // Remove the mapping.
-  EXPECT_OK(mapping->Destroy());
+  EXPECT_OK(mapping_result->mapping->Destroy());
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugIsHighMemoryPriority());
 
   // Create a new clone of the VMO and map in the clone.
@@ -931,9 +929,9 @@ static bool vmaspace_priority_bidir_clone_test() {
   childp = reinterpret_cast<VmObjectPaged*>(vmo_child.get());
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugIsHighMemoryPriority());
   EXPECT_FALSE(childp->DebugGetCowPages()->DebugIsHighMemoryPriority());
-  status = vmar->CreateVmMapping(PAGE_SIZE, PAGE_SIZE, 0, VMAR_FLAG_SPECIFIC_OVERWRITE, vmo_child,
-                                 0, kArchRwUserFlags, "test-mapping", &mapping);
-  ASSERT_OK(status);
+  mapping_result = vmar->CreateVmMapping(PAGE_SIZE, PAGE_SIZE, 0, VMAR_FLAG_SPECIFIC_OVERWRITE,
+                                         vmo_child, 0, kArchRwUserFlags, "test-mapping");
+  ASSERT_OK(mapping_result.status_value());
 
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugIsHighMemoryPriority());
   EXPECT_TRUE(childp->DebugGetCowPages()->DebugIsHighMemoryPriority());
@@ -968,10 +966,9 @@ static bool vmaspace_priority_slice_test() {
                                  AttributionObject::GetKernelAttribution(), &vmo);
   ASSERT_OK(status);
 
-  fbl::RefPtr<VmMapping> mapping;
-  status = vmar->CreateVmMapping(PAGE_SIZE, PAGE_SIZE, 0, VMAR_FLAG_SPECIFIC_OVERWRITE, vmo, 0,
-                                 kArchRwUserFlags, "test-mapping", &mapping);
-  ASSERT_OK(status);
+  auto mapping_result = vmar->CreateVmMapping(PAGE_SIZE, PAGE_SIZE, 0, VMAR_FLAG_SPECIFIC_OVERWRITE,
+                                              vmo, 0, kArchRwUserFlags, "test-mapping");
+  ASSERT_OK(mapping_result.status_value());
 
   EXPECT_TRUE(vmo->DebugGetCowPages()->DebugIsHighMemoryPriority());
   EXPECT_TRUE(aspace->IsHighMemoryPriority());
@@ -1035,10 +1032,9 @@ static bool vmaspace_priority_pager_test() {
   VmObjectPaged* childp = reinterpret_cast<VmObjectPaged*>(vmo_child.get());
 
   // Map in the clone.
-  fbl::RefPtr<VmMapping> mapping;
-  status = vmar->CreateVmMapping(PAGE_SIZE, PAGE_SIZE, 0, VMAR_FLAG_SPECIFIC_OVERWRITE, vmo_child,
-                                 0, kArchRwUserFlags, "test-mapping", &mapping);
-  ASSERT_OK(status);
+  auto mapping_result = vmar->CreateVmMapping(PAGE_SIZE, PAGE_SIZE, 0, VMAR_FLAG_SPECIFIC_OVERWRITE,
+                                              vmo_child, 0, kArchRwUserFlags, "test-mapping");
+  ASSERT_OK(mapping_result.status_value());
 
   // Validate the root and clone received the priority.
   EXPECT_TRUE(childp->DebugGetCowPages()->DebugIsHighMemoryPriority());
@@ -1090,10 +1086,9 @@ static bool vmaspace_priority_reference_test() {
                                  AttributionObject::GetKernelAttribution(), &vmo);
   ASSERT_OK(status);
 
-  fbl::RefPtr<VmMapping> mapping;
-  status = vmar->CreateVmMapping(PAGE_SIZE, PAGE_SIZE, 0, VMAR_FLAG_SPECIFIC_OVERWRITE, vmo, 0,
-                                 kArchRwUserFlags, "test-mapping", &mapping);
-  ASSERT_OK(status);
+  auto mapping_result = vmar->CreateVmMapping(PAGE_SIZE, PAGE_SIZE, 0, VMAR_FLAG_SPECIFIC_OVERWRITE,
+                                              vmo, 0, kArchRwUserFlags, "test-mapping");
+  ASSERT_OK(mapping_result.status_value());
 
   EXPECT_TRUE(vmo->DebugGetCowPages()->DebugIsHighMemoryPriority());
   EXPECT_TRUE(aspace->IsHighMemoryPriority());
@@ -1109,14 +1104,14 @@ static bool vmaspace_priority_reference_test() {
   EXPECT_TRUE(refp->DebugGetCowPages()->DebugIsHighMemoryPriority());
 
   // Remove the original mapping.
-  mapping->Destroy();
+  mapping_result->mapping->Destroy();
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugIsHighMemoryPriority());
   EXPECT_FALSE(refp->DebugGetCowPages()->DebugIsHighMemoryPriority());
 
   // Now map in the reference.
-  status = vmar->CreateVmMapping(PAGE_SIZE, PAGE_SIZE, 0, VMAR_FLAG_SPECIFIC_OVERWRITE,
-                                 vmo_reference, 0, kArchRwUserFlags, "test-mapping", &mapping);
-  ASSERT_OK(status);
+  mapping_result = vmar->CreateVmMapping(PAGE_SIZE, PAGE_SIZE, 0, VMAR_FLAG_SPECIFIC_OVERWRITE,
+                                         vmo_reference, 0, kArchRwUserFlags, "test-mapping");
+  ASSERT_OK(mapping_result.status_value());
 
   // Reference and vmo should have same priority.
   EXPECT_TRUE(vmo->DebugGetCowPages()->DebugIsHighMemoryPriority());
@@ -1151,11 +1146,11 @@ static bool vm_mapping_attribution_commit_decommit_test() {
             verify_object_page_attribution(vmo.get(), expected_vmo_gen_count, AttributionCounts{}));
 
   // Map the left half of the VMO.
-  fbl::RefPtr<VmMapping> mapping;
   EXPECT_EQ(aspace->is_user(), true);
-  status = aspace->RootVmar()->CreateVmMapping(0, 8 * PAGE_SIZE, 0, 0, vmo, 0, kArchRwUserFlags,
-                                               "test-mapping", &mapping);
-  EXPECT_EQ(ZX_OK, status);
+  auto mapping_result = aspace->RootVmar()->CreateVmMapping(0, 8 * PAGE_SIZE, 0, 0, vmo, 0,
+                                                            kArchRwUserFlags, "test-mapping");
+  EXPECT_EQ(ZX_OK, mapping_result.status_value());
+  fbl::RefPtr<VmMapping> mapping = ktl::move(mapping_result->mapping);
 
   EXPECT_EQ(true,
             verify_object_page_attribution(vmo.get(), expected_vmo_gen_count, AttributionCounts{}));
@@ -1250,11 +1245,11 @@ static bool vm_mapping_attribution_map_unmap_test() {
             verify_object_page_attribution(vmo.get(), expected_vmo_gen_count, AttributionCounts{}));
 
   // Map the left half of the VMO.
-  fbl::RefPtr<VmMapping> mapping;
   EXPECT_EQ(aspace->is_user(), true);
-  status = aspace->RootVmar()->CreateVmMapping(0, 8 * PAGE_SIZE, 0, 0, vmo, 0, kArchRwUserFlags,
-                                               "test-mapping", &mapping);
-  EXPECT_EQ(ZX_OK, status);
+  auto mapping_result = aspace->RootVmar()->CreateVmMapping(0, 8 * PAGE_SIZE, 0, 0, vmo, 0,
+                                                            kArchRwUserFlags, "test-mapping");
+  EXPECT_EQ(ZX_OK, mapping_result.status_value());
+  fbl::RefPtr<VmMapping> mapping = ktl::move(mapping_result->mapping);
 
   EXPECT_EQ(true,
             verify_object_page_attribution(vmo.get(), expected_vmo_gen_count, AttributionCounts{}));
@@ -1353,10 +1348,10 @@ static bool vm_mapping_attribution_merge_test() {
   uint64_t offset = 0;
   static constexpr uint64_t kSize = 4 * PAGE_SIZE;
   for (int i = 0; i < 4; i++) {
-    status =
-        aspace->RootVmar()->CreateVmMapping(offset, kSize, 0, VMAR_FLAG_SPECIFIC, vmo, offset,
-                                            kArchRwUserFlags, "test-mapping", &mappings[i].ref);
-    ASSERT_EQ(ZX_OK, status);
+    auto mapping_result = aspace->RootVmar()->CreateVmMapping(
+        offset, kSize, 0, VMAR_FLAG_SPECIFIC, vmo, offset, kArchRwUserFlags, "test-mapping");
+    ASSERT_EQ(ZX_OK, mapping_result.status_value());
+    mappings[i].ref = ktl::move(mapping_result->mapping);
     mappings[i].ptr = mappings[i].ref.get();
     EXPECT_EQ(true, verify_object_page_attribution(vmo.get(), expected_vmo_gen_count,
                                                    AttributionCounts{}));
@@ -1965,9 +1960,10 @@ class EnumeratorTestHelper {
       const size_t size = (region.page_offset_end - region.page_offset_begin) * PAGE_SIZE;
       zx_status_t status;
       if (region.mapping) {
-        fbl::RefPtr<VmMapping> new_mapping;
-        status = vmar->CreateVmMapping(offset, size, 0, VMAR_FLAG_CAN_MAP_READ | VMAR_FLAG_SPECIFIC,
-                                       vmo_, 0, ARCH_MMU_FLAG_PERM_READ, "mapping", &new_mapping);
+        auto new_mapping_result =
+            vmar->CreateVmMapping(offset, size, 0, VMAR_FLAG_CAN_MAP_READ | VMAR_FLAG_SPECIFIC,
+                                  vmo_, 0, ARCH_MMU_FLAG_PERM_READ, "mapping");
+        status = new_mapping_result.status_value();
       } else {
         fbl::RefPtr<VmAddressRegion> new_vmar;
         status = vmar->CreateSubVmar(

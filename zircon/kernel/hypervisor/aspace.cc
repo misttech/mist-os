@@ -71,18 +71,17 @@ zx::result<> GuestPhysicalAspace::MapInterruptController(zx_gpaddr_t guest_paddr
 
   // The root VMAR will maintain a reference to the VmMapping internally so
   // we don't need to maintain a long-lived reference to the mapping here.
-  fbl::RefPtr<VmMapping> mapping;
-  status = RootVmar()->CreateVmMapping(guest_paddr, vmo->size(), /* align_pow2*/ 0,
-                                       VMAR_FLAG_SPECIFIC, vmo, /* vmo_offset */ 0,
-                                       kInterruptMmuFlags, "guest_interrupt_vmo", &mapping);
-  if (status != ZX_OK) {
-    return zx::error(status);
+  zx::result<VmAddressRegion::MapResult> mapping_result = RootVmar()->CreateVmMapping(
+      guest_paddr, vmo->size(), /* align_pow2*/ 0, VMAR_FLAG_SPECIFIC, vmo, /* vmo_offset */ 0,
+      kInterruptMmuFlags, "guest_interrupt_vmo");
+  if (mapping_result.is_error()) {
+    return mapping_result.take_error();
   }
 
   // Write mapping to page table.
-  status = mapping->MapRange(0, vmo->size(), true);
+  status = mapping_result->mapping->MapRange(0, vmo->size(), true);
   if (status != ZX_OK) {
-    mapping->Destroy();
+    mapping_result->mapping->Destroy();
     return zx::error(status);
   }
 
@@ -170,22 +169,23 @@ zx::result<GuestPtr> GuestPhysicalAspace::CreateGuestPtr(zx_gpaddr_t guest_paddr
     return zx::error(status);
   }
 
-  fbl::RefPtr<VmMapping> host_mapping;
-  status = VmAspace::kernel_aspace()->RootVmar()->CreateVmMapping(
-      /* mapping_offset */ 0, mapping_len,
-      /* align_pow2 */ false,
-      /* vmar_flags */ 0, vmo, mapping_object_offset + intra_mapping_offset, kGuestMmuFlags, name,
-      &host_mapping);
-  if (status != ZX_OK) {
-    return zx::error(status);
+  zx::result<VmAddressRegion::MapResult> host_mapping_result =
+      VmAspace::kernel_aspace()->RootVmar()->CreateVmMapping(
+          /* mapping_offset */ 0, mapping_len,
+          /* align_pow2 */ false,
+          /* vmar_flags */ 0, vmo, mapping_object_offset + intra_mapping_offset, kGuestMmuFlags,
+          name);
+  if (host_mapping_result.is_error()) {
+    return host_mapping_result.take_error();
   }
   // Pre-populate the page tables so there's no need for kernel page faults.
-  status = host_mapping->MapRange(0, mapping_len, true);
+  status = host_mapping_result->mapping->MapRange(0, mapping_len, true);
   if (status != ZX_OK) {
     return zx::error(status);
   }
 
-  return zx::ok(GuestPtr(ktl::move(host_mapping), ktl::move(pinned_vmo), guest_paddr - begin));
+  return zx::ok(GuestPtr(ktl::move(host_mapping_result->mapping), ktl::move(pinned_vmo),
+                         guest_paddr - begin));
 }
 
 fbl::RefPtr<VmMapping> GuestPhysicalAspace::FindMapping(zx_gpaddr_t guest_paddr) const {

@@ -33,8 +33,9 @@ class VmAddressRegionDispatcher final
 
   zx_status_t Destroy();
 
-  zx_status_t Map(size_t vmar_offset, fbl::RefPtr<VmObject> vmo, uint64_t vmo_offset, size_t len,
-                  uint32_t flags, fbl::RefPtr<VmMapping>* out);
+  using MapResult = VmAddressRegion::MapResult;
+  zx::result<MapResult> Map(size_t vmar_offset, fbl::RefPtr<VmObject> vmo, uint64_t vmo_offset,
+                            size_t len, uint32_t flags);
 
   zx_status_t Protect(vaddr_t base, size_t len, uint32_t flags,
                       VmAddressRegionOpChildren op_children);

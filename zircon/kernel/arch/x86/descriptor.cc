@@ -172,28 +172,26 @@ void gdt_setup() {
   const size_t gdt_real_map_size = ROUNDUP(gdt_real_size, PAGE_SIZE);
 
   // Create the read/write real gdt mapping.
-  fbl::RefPtr<VmMapping> mapping;
-  status = vmar->CreateVmMapping(
+  zx::result<VmAddressRegion::MapResult> mapping_result = vmar->CreateVmMapping(
       /*mapping_offset*/ 0u, gdt_real_map_size, PAGE_SIZE_SHIFT, VMAR_FLAG_SPECIFIC, vmo,
-      /*vmo_offset*/ 0u, ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE, "gdt-rw", &mapping);
-  ASSERT(status == ZX_OK);
+      /*vmo_offset*/ 0u, ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE, "gdt-rw");
+  ASSERT(mapping_result.is_ok());
 
-  status = mapping->MapRange(0, gdt_real_map_size, /*commit*/ false);
+  status = mapping_result->mapping->MapRange(0, gdt_real_map_size, /*commit*/ false);
   ASSERT(status == ZX_OK);
 
   // Create the read-only mapping to the maximal GDT size
-  fbl::RefPtr<VmMapping> ro_mapping;
   const size_t gdt_ro_size = gdt_size - gdt_real_map_size;
-  status = vmar->CreateVmMapping(
+  zx::result<VmAddressRegion::MapResult> ro_mapping_result = vmar->CreateVmMapping(
       /*mapping_offset*/ gdt_real_map_size, gdt_ro_size, PAGE_SIZE_SHIFT, VMAR_FLAG_SPECIFIC,
       ktl::move(vmo),
-      /*vmo_offset*/ gdt_real_map_size, ARCH_MMU_FLAG_PERM_READ, "gdt-ro", &ro_mapping);
+      /*vmo_offset*/ gdt_real_map_size, ARCH_MMU_FLAG_PERM_READ, "gdt-ro");
+  ASSERT(ro_mapping_result.is_ok());
+
+  status = ro_mapping_result->mapping->MapRange(0, gdt_ro_size, /*commit*/ false);
   ASSERT(status == ZX_OK);
 
-  status = ro_mapping->MapRange(0, gdt_ro_size, /*commit*/ false);
-  ASSERT(status == ZX_OK);
-
-  gdt = mapping->base_locking();
+  gdt = mapping_result->base;
   gdt_load(gdt_get());
 }
 

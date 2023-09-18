@@ -74,7 +74,7 @@ zx_status_t VmAddressRegion::CreateRootLocked(VmAspace& aspace, uint32_t vmar_fl
 zx_status_t VmAddressRegion::CreateSubVmarInternal(size_t offset, size_t size, uint8_t align_pow2,
                                                    uint32_t vmar_flags, fbl::RefPtr<VmObject> vmo,
                                                    uint64_t vmo_offset, uint arch_mmu_flags,
-                                                   const char* name,
+                                                   const char* name, vaddr_t* base_out,
                                                    fbl::RefPtr<VmAddressRegionOrMapping>* out) {
   DEBUG_ASSERT(out);
   MemoryPriority memory_priority;
@@ -131,6 +131,7 @@ zx_status_t VmAddressRegion::CreateSubVmarInternal(size_t offset, size_t size, u
       }
       if (!subregions_.IsRangeAvailable(new_base, size)) {
         if (is_specific_overwrite) {
+          *base_out = new_base;
           return OverwriteVmMappingLocked(new_base, size, vmar_flags, vmo, vmo_offset,
                                           arch_mmu_flags, out);
         }
@@ -192,6 +193,7 @@ zx_status_t VmAddressRegion::CreateSubVmarInternal(size_t offset, size_t size, u
     }();
 
     memory_priority = memory_priority_;
+    *base_out = new_base;
   }
 
   if (memory_priority == MemoryPriority::HIGH) {
@@ -217,8 +219,9 @@ zx_status_t VmAddressRegion::CreateSubVmar(size_t offset, size_t size, uint8_t a
   }
 
   fbl::RefPtr<VmAddressRegionOrMapping> res;
+  vaddr_t base;
   zx_status_t status = CreateSubVmarInternal(offset, size, align_pow2, vmar_flags, nullptr, 0,
-                                             ARCH_MMU_FLAG_INVALID, name, &res);
+                                             ARCH_MMU_FLAG_INVALID, name, &base, &res);
   if (status != ZX_OK) {
     return status;
   }
@@ -226,36 +229,34 @@ zx_status_t VmAddressRegion::CreateSubVmar(size_t offset, size_t size, uint8_t a
   return ZX_OK;
 }
 
-zx_status_t VmAddressRegion::CreateVmMapping(size_t mapping_offset, size_t size, uint8_t align_pow2,
-                                             uint32_t vmar_flags, fbl::RefPtr<VmObject> vmo,
-                                             uint64_t vmo_offset, uint arch_mmu_flags,
-                                             const char* name, fbl::RefPtr<VmMapping>* out) {
-  DEBUG_ASSERT(out);
+zx::result<VmAddressRegion::MapResult> VmAddressRegion::CreateVmMapping(
+    size_t mapping_offset, size_t size, uint8_t align_pow2, uint32_t vmar_flags,
+    fbl::RefPtr<VmObject> vmo, uint64_t vmo_offset, uint arch_mmu_flags, const char* name) {
   LTRACEF("%p %#zx %#zx %x\n", this, mapping_offset, size, vmar_flags);
 
   // Check that only allowed flags have been set
   if (vmar_flags & ~(VMAR_FLAG_SPECIFIC | VMAR_FLAG_SPECIFIC_OVERWRITE | VMAR_CAN_RWX_FLAGS |
                      VMAR_FLAG_OFFSET_IS_UPPER_LIMIT | VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING)) {
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error{ZX_ERR_INVALID_ARGS};
   }
 
   // Validate that arch_mmu_flags does not contain any prohibited flags
   if (!is_valid_mapping_flags(arch_mmu_flags)) {
-    return ZX_ERR_ACCESS_DENIED;
+    return zx::error{ZX_ERR_ACCESS_DENIED};
   }
 
   if (!IS_PAGE_ALIGNED(vmo_offset)) {
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error{ZX_ERR_INVALID_ARGS};
   }
 
   size_t mapping_size = ROUNDUP_PAGE_SIZE(size);
   // Make sure that rounding up the page size did not overflow.
   if (mapping_size < size) {
-    return ZX_ERR_OUT_OF_RANGE;
+    return zx::error{ZX_ERR_OUT_OF_RANGE};
   }
   // Make sure that a mapping of this size wouldn't overflow the vmo offset.
   if (vmo_offset + mapping_size < vmo_offset) {
-    return ZX_ERR_OUT_OF_RANGE;
+    return zx::error{ZX_ERR_OUT_OF_RANGE};
   }
 
   // If we're mapping it with a specific permission, we should allow
@@ -271,13 +272,14 @@ zx_status_t VmAddressRegion::CreateVmMapping(size_t mapping_offset, size_t size,
   }
 
   fbl::RefPtr<VmAddressRegionOrMapping> res;
+  vaddr_t base;
   zx_status_t status = CreateSubVmarInternal(mapping_offset, mapping_size, align_pow2, vmar_flags,
-                                             vmo, vmo_offset, arch_mmu_flags, name, &res);
+                                             vmo, vmo_offset, arch_mmu_flags, name, &base, &res);
   if (status != ZX_OK) {
-    return status;
+    return zx::error{status};
   }
-  *out = VmAddressRegionOrMapping::downcast_as_vm_mapping(&res);
-  return ZX_OK;
+  fbl::RefPtr<VmMapping> map = res->downcast_as_vm_mapping(&res);
+  return zx::ok(MapResult{ktl::move(map), base});
 }
 
 zx_status_t VmAddressRegion::OverwriteVmMappingLocked(vaddr_t base, size_t size,
@@ -1097,12 +1099,11 @@ zx_status_t VmAddressRegion::ReserveSpace(const char* name, vaddr_t base, size_t
   // allocate a region and put it in the aspace list.
   // Need to set the VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING since we are 'cheating' with this fake
   // zero-length VMO and so the checks that the pages in that VMO are pinned would otherwise fail.
-  fbl::RefPtr<VmMapping> r(nullptr);
-  status =
+  zx::result<VmAddressRegion::MapResult> r =
       CreateVmMapping(offset, size, 0, VMAR_FLAG_SPECIFIC | VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING,
-                      vmo, 0, arch_mmu_flags, name, &r);
-  if (status != ZX_OK) {
-    return status;
+                      vmo, 0, arch_mmu_flags, name);
+  if (r.is_error()) {
+    return r.status_value();
   }
   // Directly invoke a protect on the hardware aspace to modify the protection of the existing
   // mappings. If the desired protection flags is "no permissions" then we need to use unmap instead

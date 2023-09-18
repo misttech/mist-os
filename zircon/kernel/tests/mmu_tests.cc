@@ -511,19 +511,18 @@ static bool test_large_region_atomic() {
 
     const uint arch_rw_flags = ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE;
 
-    fbl::RefPtr<VmMapping> mapping;
-    status = vmar->CreateVmMapping(
+    auto mapping_result = vmar->CreateVmMapping(
         0, alloc_size, 0,
         VMAR_FLAG_CAN_MAP_READ | VMAR_FLAG_CAN_MAP_WRITE | VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING,
-        vmo, 0, arch_rw_flags, "test", &mapping);
+        vmo, 0, arch_rw_flags, "test");
+    ASSERT_OK(mapping_result.status_value());
+
+    status = mapping_result->mapping->MapRange(0, alloc_size, false);
     ASSERT_OK(status);
 
-    status = mapping->MapRange(0, alloc_size, false);
-    ASSERT_OK(status);
+    const vaddr_t va = mapping_result->base;
 
-    const vaddr_t va = mapping->base_locking();
-
-    auto cleanup_mapping = fit::defer([&] { mapping->Destroy(); });
+    auto cleanup_mapping = fit::defer([&] { mapping_result->mapping->Destroy(); });
 
     // Spin up a thread to start touching pages in the mapping.
     struct State {

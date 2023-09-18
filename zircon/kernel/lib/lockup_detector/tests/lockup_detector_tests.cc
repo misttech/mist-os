@@ -210,16 +210,16 @@ bool GetBacktraceFromDapStateTest() {
   fbl::RefPtr<VmObjectPaged> vmo;
   ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kAlwaysPinned, kVmoSize,
                                   AttributionObject::GetKernelAttribution(), &vmo));
-  fbl::RefPtr<VmMapping> mapping;
-  ASSERT_OK(vmar->CreateVmMapping(PAGE_SIZE, kVmoSize, 0, VMAR_FLAG_SPECIFIC, ktl::move(vmo), 0,
-                                  ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE, kName,
-                                  &mapping));
+  auto mapping_result =
+      vmar->CreateVmMapping(PAGE_SIZE, kVmoSize, 0, VMAR_FLAG_SPECIFIC, ktl::move(vmo), 0,
+                            ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE, kName);
+  ASSERT_OK(mapping_result.status_value());
   // Eagerly fault in the pages.
-  ASSERT_OK(mapping->MapRange(0, kVmoSize, true));
+  ASSERT_OK(mapping_result->mapping->MapRange(0, kVmoSize, true));
 
   // Fill the two middle pages with some "return addresses".
   const size_t num_elements = kVmoSize / sizeof(vaddr_t);
-  auto* p = reinterpret_cast<vaddr_t*>(mapping->base_locking());
+  auto* p = reinterpret_cast<vaddr_t*>(mapping_result->base);
   for (uint64_t i = 0; i < num_elements; ++i) {
     p[i] = i;
   }

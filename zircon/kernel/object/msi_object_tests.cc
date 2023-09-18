@@ -76,22 +76,23 @@ zx_status_t create_valid_msi_vmo(fbl::RefPtr<VmObject>* out_vmo,
   if (status != ZX_OK)
     return status;
 
-  fbl::RefPtr<VmMapping> mapping;
-  status = VmAspace::kernel_aspace()->RootVmar()->CreateVmMapping(
+  auto mapping_result = VmAspace::kernel_aspace()->RootVmar()->CreateVmMapping(
       /*mapping_offset=*/0, /*size=*/vmo_size, /*align_pow2=*/0, /*vmar_flags=*/0, vmo,
       /*vmo_offset=*/0, ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE,
-      /*name=*/nullptr, &mapping);
-  if (status == ZX_OK) {
-    // Prepopulate the mapping so no page faults are needed in kernel mode.
-    status = mapping->MapRange(/*offset=*/0, vmo_size, /*commit=*/true);
+      /*name=*/nullptr);
+  if (mapping_result.is_error()) {
+    return mapping_result.status_value();
   }
+
+  // Prepopulate the mapping so no page faults are needed in kernel mode.
+  status = mapping_result->mapping->MapRange(/*offset=*/0, vmo_size, /*commit=*/true);
   if (status != ZX_OK) {
     return status;
   }
 
   *out_vmo = ktl::move(vmo);
-  *out_mapping = ktl::move(mapping);
-  *out_cap = reinterpret_cast<MsiCapability*>(out_mapping->get()->base_locking());
+  *out_mapping = ktl::move(mapping_result->mapping);
+  *out_cap = reinterpret_cast<MsiCapability*>(mapping_result->base);
   (*out_cap)->id = kMsiCapabilityId;
 
   return ZX_OK;

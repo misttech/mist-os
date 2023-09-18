@@ -54,21 +54,21 @@ zx_status_t EmbeddedVmo::MapSegment(fbl::RefPtr<VmAddressRegionDispatcher> vmar,
 
   size_t len = end_offset - start_offset;
 
-  fbl::RefPtr<VmMapping> mapping;
-  zx_status_t status = vmar->Map(vmar_offset, vmo_->vmo(), start_offset, len, flags, &mapping);
+  zx::result<VmAddressRegion::MapResult> mapping_result =
+      vmar->Map(vmar_offset, vmo_->vmo(), start_offset, len, flags);
 
   const char* segment_name = code ? "code" : "rodata";
-  if (status != ZX_OK) {
+  if (mapping_result.is_error()) {
     dprintf(CRITICAL, "userboot: %s %s mapping %#zx @ %#" PRIxPTR " size %#zx failed %d\n", name_,
-            segment_name, start_offset, vmar->vmar()->base() + vmar_offset, len, status);
+            segment_name, start_offset, vmar->vmar()->base() + vmar_offset, len,
+            mapping_result.status_value());
   } else {
-    Guard<CriticalMutex> guard{mapping->lock()};
-    DEBUG_ASSERT(mapping->base_locked() == vmar->vmar()->base() + vmar_offset);
+    DEBUG_ASSERT(mapping_result->base == vmar->vmar()->base() + vmar_offset);
     dprintf(SPEW, "userboot: %-8s %-6s %#7zx @ [%#" PRIxPTR ",%#" PRIxPTR ")\n", name_,
-            segment_name, start_offset, mapping->base_locked(), mapping->base_locked() + len);
+            segment_name, start_offset, mapping_result->base, mapping_result->base + len);
   }
 
-  return status;
+  return mapping_result.status_value();
 }
 
 zx_status_t RoDso::Map(fbl::RefPtr<VmAddressRegionDispatcher> vmar, size_t offset) const {

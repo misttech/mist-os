@@ -20,15 +20,18 @@ zx_status_t KernelMappedVmo::Init(fbl::RefPtr<VmObject> vmo, size_t offset, size
   size = ROUNDUP_PAGE_SIZE(size);
   zx_status_t status =
       PinnedVmObject::Create(ktl::move(vmo), offset, size, /*write=*/true, &pinned_vmo_);
-  if (status == ZX_OK) {
-    status = VmAspace::kernel_aspace()->RootVmar()->CreateVmMapping(
-        0, size, 0, VMAR_FLAG_CAN_MAP_READ | VMAR_FLAG_CAN_MAP_WRITE, pinned_vmo_.vmo(), offset,
-        ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE, name, &mapping_);
+  if (status != ZX_OK) {
+    return status;
   }
-  if (status == ZX_OK) {
-    status = mapping_->MapRange(0, size, true);
+  zx::result<VmAddressRegion::MapResult> map_result =
+      VmAspace::kernel_aspace()->RootVmar()->CreateVmMapping(
+          0, size, 0, VMAR_FLAG_CAN_MAP_READ | VMAR_FLAG_CAN_MAP_WRITE, pinned_vmo_.vmo(), offset,
+          ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE, name);
+  if (map_result.is_error()) {
+    return map_result.status_value();
   }
-  return status;
+  mapping_ = ktl::move(map_result->mapping);
+  return mapping_->MapRange(0, size, true);
 }
 
 KernelMappedVmo::~KernelMappedVmo() {

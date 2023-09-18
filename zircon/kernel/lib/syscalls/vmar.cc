@@ -156,27 +156,27 @@ zx_status_t vmar_map_common(zx_vm_option_t options, fbl::RefPtr<VmAddressRegionD
     options |= ZX_VM_CAN_MAP_EXECUTE;
   }
 
-  fbl::RefPtr<VmMapping> vm_mapping;
-  zx_status_t status =
-      vmar->Map(vmar_offset, ktl::move(vmo), vmo_offset, len, options, &vm_mapping);
-  if (status != ZX_OK) {
-    return status;
+  zx::result<VmAddressRegionDispatcher::MapResult> map_result =
+      vmar->Map(vmar_offset, ktl::move(vmo), vmo_offset, len, options);
+  if (map_result.is_error()) {
+    return map_result.status_value();
   }
 
   // Setup a handler to destroy the new mapping if the syscall is unsuccessful.
-  auto cleanup_handler = fit::defer([&vm_mapping]() { vm_mapping->Destroy(); });
+  auto cleanup_handler = fit::defer([&map_result]() { map_result->mapping->Destroy(); });
 
   if (do_map_range) {
     // Mappings may have already been created due to memory priority, so need to ignore existing.
     // Ignoring existing mappings is safe here as we are always free to populate and destroy page
     // table mappings for user addresses.
-    status = vm_mapping->MapRange(0, len, /*commit=*/false, /*ignore_existing=*/true);
+    zx_status_t status =
+        map_result->mapping->MapRange(0, len, /*commit=*/false, /*ignore_existing=*/true);
     if (status != ZX_OK) {
       return status;
     }
   }
 
-  status = mapped_addr.copy_to_user(vm_mapping->base_locking());
+  zx_status_t status = mapped_addr.copy_to_user(map_result->base);
 
   if (status != ZX_OK) {
     return status;
@@ -186,7 +186,7 @@ zx_status_t vmar_map_common(zx_vm_option_t options, fbl::RefPtr<VmAddressRegionD
 
   // This mapping will now always be used via the aspace so it is free to be merged into different
   // actual mapping objects.
-  VmMapping::MarkMergeable(ktl::move(vm_mapping));
+  VmMapping::MarkMergeable(ktl::move(map_result->mapping));
 
   return ZX_OK;
 }

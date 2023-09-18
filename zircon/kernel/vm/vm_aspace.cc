@@ -356,17 +356,16 @@ zx_status_t VmAspace::MapObjectInternal(fbl::RefPtr<VmObject> vmo, const char* n
   }
 
   // allocate a region and put it in the aspace list
-  fbl::RefPtr<VmMapping> r(nullptr);
-  status = RootVmar()->CreateVmMapping(vmar_offset, size, align_pow2, vmar_flags, vmo, offset,
-                                       arch_mmu_flags, name, &r);
-  if (status != ZX_OK) {
-    return status;
+  zx::result<VmAddressRegion::MapResult> r = RootVmar()->CreateVmMapping(
+      vmar_offset, size, align_pow2, vmar_flags, vmo, offset, arch_mmu_flags, name);
+  if (r.is_error()) {
+    return r.status_value();
   }
 
   // if we're committing it, map the region now
   // TODO: Enforce all callers to be passing VMM_FLAG_COMMIT.
   if (vmm_flags & VMM_FLAG_COMMIT) {
-    status = r->MapRange(0, size, true);
+    status = r->mapping->MapRange(0, size, true);
     if (status != ZX_OK) {
       return status;
     }
@@ -374,7 +373,7 @@ zx_status_t VmAspace::MapObjectInternal(fbl::RefPtr<VmObject> vmo, const char* n
 
   // return the vaddr if requested
   if (ptr) {
-    *ptr = (void*)r->base_locking();
+    *ptr = (void*)r->base;
   }
 
   return ZX_OK;

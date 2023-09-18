@@ -400,11 +400,10 @@ void userboot_init(uint) {
     ASSERT(status == ZX_OK);
     stack_vmo->set_name(kStackVmoName, sizeof(kStackVmoName) - 1);
 
-    fbl::RefPtr<VmMapping> stack_mapping;
-    status = vmar->Map(0, ktl::move(stack_vmo), 0, stack_size, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE,
-                       &stack_mapping);
-    ASSERT(status == ZX_OK);
-    stack_base = stack_mapping->base_locking();
+    zx::result<VmAddressRegion::MapResult> stack_mapping_result =
+        vmar->Map(0, ktl::move(stack_vmo), 0, stack_size, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
+    ASSERT(stack_mapping_result.is_ok());
+    stack_base = stack_mapping_result->base;
   }
   uintptr_t sp = elfldltl::AbiTraits<>::InitialStackPointer(stack_base, stack_size);
 

@@ -914,12 +914,11 @@ static bool vmo_demand_paged_map_test() {
   vmm_set_active_aspace(aspace.get());
 
   static constexpr const uint kArchFlags = kArchRwFlags | ARCH_MMU_FLAG_PERM_USER;
-  fbl::RefPtr<VmMapping> mapping;
-  status = aspace->RootVmar()->CreateVmMapping(0, alloc_size, 0, 0, vmo, 0, kArchFlags, "test",
-                                               &mapping);
-  ASSERT_EQ(status, ZX_OK, "mapping object");
+  auto mapping_result =
+      aspace->RootVmar()->CreateVmMapping(0, alloc_size, 0, 0, vmo, 0, kArchFlags, "test");
+  ASSERT_MSG(mapping_result.is_ok(), "mapping object");
 
-  auto uptr = make_user_inout_ptr(reinterpret_cast<void*>(mapping->base_locking()));
+  auto uptr = make_user_inout_ptr(reinterpret_cast<void*>(mapping_result->base));
 
   // fill with known pattern and test
   if (!fill_and_test_user(uptr, alloc_size)) {
@@ -2984,15 +2983,14 @@ static bool vmo_discard_failure_test() {
   vmm_set_active_aspace(aspace.get());
 
   // Map the vmo.
-  fbl::RefPtr<VmMapping> mapping;
   constexpr uint64_t kMapSize = 3 * PAGE_SIZE;
   static constexpr const uint kArchFlags = kArchRwFlags | ARCH_MMU_FLAG_PERM_USER;
-  status = aspace->RootVmar()->CreateVmMapping(0, kMapSize, 0, 0, vmo, kSize - kMapSize, kArchFlags,
-                                               "test", &mapping);
-  ASSERT_EQ(ZX_OK, status);
+  auto mapping_result = aspace->RootVmar()->CreateVmMapping(0, kMapSize, 0, 0, vmo,
+                                                            kSize - kMapSize, kArchFlags, "test");
+  ASSERT(mapping_result.is_ok());
 
   // Fill with a known pattern through the mapping, and verify the contents.
-  auto uptr = make_user_inout_ptr(reinterpret_cast<void*>(mapping->base_locking()));
+  auto uptr = make_user_inout_ptr(reinterpret_cast<void*>(mapping_result->base));
   fill_region_user(0x88, uptr, kMapSize);
   EXPECT_TRUE(test_region_user(0x88, uptr, kMapSize));
 
@@ -3024,10 +3022,9 @@ static bool vmo_discard_failure_test() {
   EXPECT_EQ(0u, vmo->AttributedPages().uncompressed);
 
   // Creating a mapping succeeds.
-  fbl::RefPtr<VmMapping> mapping2;
-  status = aspace->RootVmar()->CreateVmMapping(0, kMapSize, 0, 0, vmo, kSize - kMapSize, kArchFlags,
-                                               "test2", &mapping2);
-  ASSERT_EQ(ZX_OK, status);
+  auto mapping2_result = aspace->RootVmar()->CreateVmMapping(0, kMapSize, 0, 0, vmo,
+                                                             kSize - kMapSize, kArchFlags, "test2");
+  ASSERT(mapping2_result.is_ok());
   EXPECT_EQ(0u, vmo->AttributedPages().uncompressed);
 
   // Lock the vmo again.
@@ -3052,7 +3049,7 @@ static bool vmo_discard_failure_test() {
   EXPECT_TRUE(test_region_user(0xaa, uptr, kMapSize));
 
   // Verify contents via the second mapping created when discarded.
-  uptr = make_user_inout_ptr(reinterpret_cast<void*>(mapping2->base_locking()));
+  uptr = make_user_inout_ptr(reinterpret_cast<void*>(mapping2_result->base));
   EXPECT_TRUE(test_region_user(0xaa, uptr, kMapSize));
 
   // The unmapped pages should still be intact after the Write() above.

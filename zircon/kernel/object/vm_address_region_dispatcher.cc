@@ -160,13 +160,13 @@ zx_status_t VmAddressRegionDispatcher::Destroy() {
   return vmar_->Destroy();
 }
 
-zx_status_t VmAddressRegionDispatcher::Map(size_t vmar_offset, fbl::RefPtr<VmObject> vmo,
-                                           uint64_t vmo_offset, size_t len, uint32_t flags,
-                                           fbl::RefPtr<VmMapping>* out) {
+zx::result<VmAddressRegionDispatcher::MapResult> VmAddressRegionDispatcher::Map(
+    size_t vmar_offset, fbl::RefPtr<VmObject> vmo, uint64_t vmo_offset, size_t len,
+    uint32_t flags) {
   canary_.Assert();
 
   if (!is_valid_mapping_protection(flags)) {
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error{ZX_ERR_INVALID_ARGS};
   }
 
   // Split flags into vmar_flags and arch_mmu_flags
@@ -175,13 +175,13 @@ zx_status_t VmAddressRegionDispatcher::Map(size_t vmar_offset, fbl::RefPtr<VmObj
   uint8_t alignment = 0;
   zx_status_t status = split_syscall_flags(flags, &vmar_flags, &arch_mmu_flags, &alignment);
   if (status != ZX_OK) {
-    return status;
+    return zx::error{status};
   }
 
   if (vmar_flags & VMAR_FLAG_REQUIRE_NON_RESIZABLE) {
     vmar_flags &= ~VMAR_FLAG_REQUIRE_NON_RESIZABLE;
     if (vmo->is_resizable()) {
-      return ZX_ERR_NOT_SUPPORTED;
+      return zx::error{ZX_ERR_NOT_SUPPORTED};
     }
   }
 
@@ -191,19 +191,12 @@ zx_status_t VmAddressRegionDispatcher::Map(size_t vmar_offset, fbl::RefPtr<VmObj
     // TODO(fxbug.dev/34483): Add additional checks once all clients (resizable and pager-backed
     // VMOs) start using the VMAR_FLAG_ALLOW_FAULTS flag.
     if (vmo->is_discardable()) {
-      return ZX_ERR_NOT_SUPPORTED;
+      return zx::error{ZX_ERR_NOT_SUPPORTED};
     }
   }
 
-  fbl::RefPtr<VmMapping> result(nullptr);
-  status = vmar_->CreateVmMapping(vmar_offset, len, alignment, vmar_flags, ktl::move(vmo),
-                                  vmo_offset, arch_mmu_flags, "useralloc", &result);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  *out = ktl::move(result);
-  return ZX_OK;
+  return vmar_->CreateVmMapping(vmar_offset, len, alignment, vmar_flags, ktl::move(vmo), vmo_offset,
+                                arch_mmu_flags, "useralloc");
 }
 
 zx_status_t VmAddressRegionDispatcher::Protect(vaddr_t base, size_t len, uint32_t flags,

@@ -56,9 +56,10 @@ static zx_status_t commit_vmo(fbl::RefPtr<VmObjectPaged> vmo) {
 
 static zx_status_t create_mapping(fbl::RefPtr<VmAddressRegion> vmar, fbl::RefPtr<VmObjectPaged> vmo,
                                   zx_gpaddr_t addr, uint mmu_flags = kMmuFlags) {
-  fbl::RefPtr<VmMapping> mapping;
-  return vmar->CreateVmMapping(addr, vmo->size(), 0 /* align_pow2 */, VMAR_FLAG_SPECIFIC, vmo,
-                               0 /* vmo_offset */, mmu_flags, "vmo", &mapping);
+  return vmar
+      ->CreateVmMapping(addr, vmo->size(), 0 /* align_pow2 */, VMAR_FLAG_SPECIFIC, vmo,
+                        0 /* vmo_offset */, mmu_flags, "vmo")
+      .status_value();
 }
 
 static zx_status_t create_sub_vmar(fbl::RefPtr<VmAddressRegion> vmar, size_t offset, size_t size,
@@ -237,15 +238,14 @@ static bool guest_phyiscal_address_space_single_vmo_multiple_mappings() {
   EXPECT_EQ(ZX_OK, status, "Failed to create VMO\n");
 
   // Map a single page of this four page VMO at offset 0x1000 and offset 0x3000.
-  fbl::RefPtr<VmMapping> mapping;
-  status =
+  auto mapping_result =
       gpa->RootVmar()->CreateVmMapping(PAGE_SIZE, PAGE_SIZE, 0 /* align_pow2 */, VMAR_FLAG_SPECIFIC,
-                                       vmo, PAGE_SIZE, kMmuFlags, "vmo", &mapping);
-  EXPECT_EQ(ZX_OK, status, "Failed to create first mapping\n");
-  status = gpa->RootVmar()->CreateVmMapping(PAGE_SIZE * 3, PAGE_SIZE, 0 /* align_pow2 */,
-                                            VMAR_FLAG_SPECIFIC, vmo, PAGE_SIZE * 3, kMmuFlags,
-                                            "vmo", &mapping);
-  EXPECT_EQ(ZX_OK, status, "Failed to create second mapping\n");
+                                       vmo, PAGE_SIZE, kMmuFlags, "vmo");
+  EXPECT_EQ(ZX_OK, mapping_result.status_value(), "Failed to create first mapping\n");
+  mapping_result =
+      gpa->RootVmar()->CreateVmMapping(PAGE_SIZE * 3, PAGE_SIZE, 0 /* align_pow2 */,
+                                       VMAR_FLAG_SPECIFIC, vmo, PAGE_SIZE * 3, kMmuFlags, "vmo");
+  EXPECT_EQ(ZX_OK, mapping_result.status_value(), "Failed to create second mapping\n");
 
   status = commit_vmo(vmo);
   EXPECT_EQ(ZX_OK, status, "Failed to commit VMO\n");
@@ -438,11 +438,11 @@ static bool guest_physical_aspace_query() {
   ASSERT_OK(gpa.status_value());
 
   for (const uint flags : kMmuFlagTests) {
-    fbl::RefPtr<VmMapping> mapping;
-    status = gpa->RootVmar()->CreateVmMapping(0, PAGE_SIZE, 0 /* align_pow2 */, VMAR_FLAG_SPECIFIC,
-                                              vmo, 0 /* vmo_offset */, flags, "vmo", &mapping);
-    EXPECT_OK(status);
-    status = mapping->MapRange(0, PAGE_SIZE, true, false);
+    auto mapping_result =
+        gpa->RootVmar()->CreateVmMapping(0, PAGE_SIZE, 0 /* align_pow2 */, VMAR_FLAG_SPECIFIC, vmo,
+                                         0 /* vmo_offset */, flags, "vmo");
+    EXPECT_OK(mapping_result.status_value());
+    status = mapping_result->mapping->MapRange(0, PAGE_SIZE, true, false);
     EXPECT_OK(status);
 
     uint query_flags = 0;
@@ -451,7 +451,7 @@ static bool guest_physical_aspace_query() {
     EXPECT_EQ(flags, query_flags);
 
     // Cleanup the mapping for next iteration.
-    status = mapping->Destroy();
+    status = mapping_result->mapping->Destroy();
     EXPECT_OK(status);
   }
 

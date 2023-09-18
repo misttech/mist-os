@@ -190,19 +190,20 @@ class __OWNER(void) GPArena {
       vmar_.reset();
     });
 
-    st = vmar_->CreateVmMapping(0,  // mapping_offset
-                                mem_sz,
-                                false,  // align_pow2
-                                VMAR_FLAG_SPECIFIC | VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING, vmo,
-                                0,  // vmo_offset
-                                ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE, "gparena",
-                                &mapping_);
-    if (st != ZX_OK || mapping_ == nullptr) {
-      return ZX_ERR_NO_MEMORY;
+    zx::result<VmAddressRegion::MapResult> map_result =
+        vmar_->CreateVmMapping(0,  // mapping_offset
+                               mem_sz,
+                               false,  // align_pow2
+                               VMAR_FLAG_SPECIFIC | VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING, vmo,
+                               0,  // vmo_offset
+                               ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE, "gparena");
+    if (map_result.is_error()) {
+      return map_result.status_value();
     }
+    mapping_ = ktl::move(map_result->mapping);
 
     vmo_ = ktl::move(vmo);
-    top_ = committed_ = start_ = mapping_->base_locking();
+    top_ = committed_ = start_ = map_result->base;
     end_ = start_ + mem_sz;
 
     DEBUG_ASSERT(IS_PAGE_ALIGNED(start_));

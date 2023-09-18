@@ -542,13 +542,16 @@ static zx_status_t arm64_perfmon_map_buffers_locked(PerfmonState* state, Guard<M
       TRACEF("error %d pinning buffer: cpu %u, size 0x%zx\n", status, cpu, size);
       break;
     }
-    status = VmAspace::kernel_aspace()->RootVmar()->CreateVmMapping(
-        0 /* ignored */, size, 0 /* align pow2 */, 0 /* vmar flags */, data->buffer_vmo, vmo_offset,
-        arch_mmu_flags, name, &data->buffer_mapping);
-    if (status != ZX_OK) {
-      TRACEF("error %d mapping buffer: cpu %u, size 0x%zx\n", status, cpu, size);
+    zx::result<VmAddressRegion::MapResult> mapping_result =
+        VmAspace::kernel_aspace()->RootVmar()->CreateVmMapping(
+            0 /* ignored */, size, 0 /* align pow2 */, 0 /* vmar flags */, data->buffer_vmo,
+            vmo_offset, arch_mmu_flags, name);
+    if (mapping_result.is_error()) {
+      TRACEF("error %d mapping buffer: cpu %u, size 0x%zx\n", mapping_result.status_value(), cpu,
+             size);
       break;
     }
+    data->buffer_mapping = ktl::move(mapping_result->mapping);
     // Pass true for |commit| so that we get our pages mapped up front.
     // Otherwise we'll need to allow for a page fault to happen in the
     // PMI handler.
