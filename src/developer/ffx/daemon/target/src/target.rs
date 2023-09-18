@@ -18,7 +18,7 @@ use ffx_fastboot::usb_discovery::open_interface_with_serial;
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx::TargetState;
 use fidl_fuchsia_developer_remotecontrol::{IdentifyHostResponse, RemoteControlProxy};
-use fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address, Subnet};
+use fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address};
 use fuchsia_async::Task;
 use netext::IsLocalAddr;
 use rand::random;
@@ -862,19 +862,6 @@ impl Target {
         if let Some(t) = identify.boot_timestamp_nanos {
             target.boot_timestamp_nanos.borrow_mut().replace(t);
         }
-        if let Some(addrs) = identify.addresses {
-            let mut taddrs = target.addrs.borrow_mut();
-            let now = Utc::now();
-            for addr in addrs.iter().copied().map(|Subnet { addr, prefix_len: _ }| {
-                let addr = match addr {
-                    IpAddress::Ipv4(Ipv4Address { addr }) => addr.into(),
-                    IpAddress::Ipv6(Ipv6Address { addr }) => addr.into(),
-                };
-                TargetAddrEntry::new(TargetAddr::new(addr, 0, 0), now.clone(), TargetAddrType::Ssh)
-            }) {
-                taddrs.insert(addr);
-            }
-        }
         Ok(target)
     }
 
@@ -1206,6 +1193,7 @@ mod test {
     use fidl;
     use fidl_fuchsia_developer_remotecontrol as rcs;
     use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
+    use fidl_fuchsia_net::Subnet;
     use fidl_fuchsia_overnet_protocol::NodeId;
     use fuchsia_async::Timer;
     use futures::{channel, prelude::*};
@@ -1339,7 +1327,7 @@ mod test {
             Ok(t) => {
                 assert_eq!(t.nodename().unwrap(), "foo".to_string());
                 assert_eq!(t.rcs().unwrap().overnet_id.id, 1234u64);
-                assert_eq!(t.addrs().len(), 1);
+                assert_eq!(t.addrs().len(), 0);
                 assert_eq!(
                     t.build_config().unwrap(),
                     BuildConfig {
@@ -1465,7 +1453,7 @@ mod test {
             Ok(t) => {
                 assert_eq!(t.nodename().unwrap(), "foo".to_string());
                 assert_eq!(t.rcs().unwrap().overnet_id.id, 1234u64);
-                assert_eq!(t.addrs().len(), 1);
+                assert_eq!(t.addrs().len(), 0);
                 t
             }
             Err(_) => unimplemented!("this branch should never happen"),
