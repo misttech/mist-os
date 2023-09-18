@@ -291,6 +291,7 @@ class SchedulerState {
     union {
       struct {
         SchedWeight weight{0};
+        SchedDuration initial_time_slice_ns{0};
         SchedRemainder normalized_timeslice_remainder{0};
       } fair;
       SchedDeadlineParams deadline;
@@ -300,10 +301,10 @@ class SchedulerState {
   // Values stored in the SchedulerState of Thread instances which tracks the
   // aggregate profile values inherited from upstream contributors.
   struct InheritedProfileValues {
-    // Inherited from fair threads.
+    // Inherited from fair threads
     SchedWeight total_weight{0};
 
-    // Inherited from deadline threads.
+    // Inherited from deadline threads
     SchedUtilization uncapped_utilization{0};
     SchedDuration min_deadline{SchedDuration::Max()};
   };
@@ -323,7 +324,6 @@ class SchedulerState {
         ASSERT(start_time == SchedTime{0});
         ASSERT(finish_time == SchedTime{0});
         ASSERT(time_slice_ns == SchedTime{0});
-        ASSERT(time_slice_used_ns == SchedTime{0});
       }
     }
 
@@ -331,7 +331,6 @@ class SchedulerState {
     SchedTime start_time{0};  // TODO(johngro): Do we need this?
     SchedTime finish_time{0};
     SchedDuration time_slice_ns{0};
-    SchedDuration time_slice_used_ns{0};
   };
 
   // Converts from kernel priority value in the interval [0, 31] to weight in
@@ -395,16 +394,12 @@ class SchedulerState {
   uint64_t flow_id() const { return flow_id_; }
 
   zx_time_t last_started_running() const { return last_started_running_.raw_value(); }
+  zx_duration_t time_slice_ns() const { return time_slice_ns_.raw_value(); }
   zx_duration_t runtime_ns() const { return runtime_ns_.raw_value(); }
+  zx_duration_t expected_runtime_ns() const { return expected_runtime_ns_.raw_value(); }
 
-  SchedDuration expected_runtime_ns() const { return expected_runtime_ns_; }
-  SchedDuration time_slice_ns() const { return time_slice_ns_; }
-  SchedDuration time_slice_used_ns() const { return time_slice_used_ns_; }
-  SchedDuration remaining_time_slice_ns() const { return time_slice_ns_ - time_slice_used_ns_; }
-
-  SchedTime start_time() const { return start_time_; }
-  SchedTime finish_time() const { return finish_time_; }
-
+  const SchedTime start_time() const { return start_time_; }
+  const SchedTime finish_time() const { return finish_time_; }
   cpu_mask_t hard_affinity() const { return hard_affinity_; }
   cpu_mask_t soft_affinity() const { return soft_affinity_; }
 
@@ -495,9 +490,6 @@ class SchedulerState {
 
   // The current timeslice allocated to the thread.
   SchedDuration time_slice_ns_{0};
-
-  // The runtime used in the current period.
-  SchedDuration time_slice_used_ns_{0};
 
   // The total time in THREAD_RUNNING state. If the thread is currently in
   // THREAD_RUNNING state, this excludes the time accrued since it last left the

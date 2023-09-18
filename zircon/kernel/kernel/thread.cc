@@ -1676,7 +1676,7 @@ void ThreadDumper::DumpLocked(const Thread* t, bool full_dump) {
             thread_state_to_str(t->state()), (int)t->scheduler_state().curr_cpu(),
             (int)t->scheduler_state().last_cpu(), t->scheduler_state().hard_affinity(),
             t->scheduler_state().soft_affinity(), profile_str,
-            t->scheduler_state().remaining_time_slice_ns().raw_value());
+            t->scheduler_state().time_slice_ns());
     dprintf(INFO, "\truntime_ns %" PRIi64 ", runtime_s %" PRIi64 "\n", runtime,
             runtime / 1000000000);
     t->stack().DumpInfo(INFO);

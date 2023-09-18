@@ -7,11 +7,11 @@
 #include <lib/fit/defer.h>
 
 #include <kernel/owned_wait_queue.h>
-#include <kernel/scheduler.h>
 #include <kernel/scheduler_internal.h>
-#include <kernel/scheduler_state.h>
 #include <ktl/algorithm.h>
 #include <ktl/type_traits.h>
+
+#include "kernel/scheduler.h"
 
 // Profile inheritance graphs (like all graphs) are directed graphs made up of a
 // set of nodes which express the relationship between various threads and the
@@ -56,10 +56,6 @@ class Scheduler::PiNodeAdapter<Thread> {
   SchedTime& start_time() { return thread_.scheduler_state().start_time_; }
   SchedTime& finish_time() { return thread_.scheduler_state().finish_time_; }
   SchedDuration& time_slice_ns() { return thread_.scheduler_state().time_slice_ns_; }
-  SchedDuration time_slice_ns() const { return thread_.scheduler_state().time_slice_ns_; }
-  SchedDuration& time_slice_used_ns() { return thread_.scheduler_state().time_slice_used_ns_; }
-  SchedDuration time_slice_used_ns() const { return thread_.scheduler_state().time_slice_used_ns_; }
-  SchedDuration remaining_time_slice_ns() const { return time_slice_ns() - time_slice_used_ns(); }
 
  private:
   Thread& thread_;
@@ -115,16 +111,6 @@ class Scheduler::PiNodeAdapter<OwnedWaitQueue> {
   SchedTime& start_time() { return owq_.inherited_scheduler_state_storage()->start_time; }
   SchedTime& finish_time() { return owq_.inherited_scheduler_state_storage()->finish_time; }
   SchedDuration& time_slice_ns() { return owq_.inherited_scheduler_state_storage()->time_slice_ns; }
-  SchedDuration time_slice_ns() const {
-    return owq_.inherited_scheduler_state_storage()->time_slice_ns;
-  }
-  SchedDuration& time_slice_used_ns() {
-    return owq_.inherited_scheduler_state_storage()->time_slice_used_ns;
-  }
-  SchedDuration time_slice_used_ns() const {
-    return owq_.inherited_scheduler_state_storage()->time_slice_used_ns;
-  }
-  SchedDuration remaining_time_slice_ns() const { return time_slice_ns() - time_slice_used_ns(); }
 
  private:
   OwnedWaitQueue& owq_;
@@ -146,33 +132,37 @@ inline void Scheduler::HandlePiInteractionCommon(SchedTime now, PiNodeAdapter<Ta
       Scheduler& scheduler = *Get(curr_cpu);
       Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&scheduler.queue_lock_, SOURCE_TAG};
       scheduler.ValidateInvariants();
+      SchedulerState& tss = thread.scheduler_state();
 
       if (thread.state() == THREAD_READY) {
         // If the thread is in the READY state, we need to remove it from its
         // scheduler's run queue before updating the effective profile.  We'll
         // put it back in when we are done with the update.
-        DEBUG_ASSERT(ss.active());
+        DEBUG_ASSERT(tss.active());
         scheduler.EraseFromQueue(&thread);
       } else {
         // The target thread's state is RUNNING.  Make sure to update its TSR
         // before we update either the dynamic parameters, or the scheduler's
         // parameters which depend on our static profile parameters.
-        const SchedDuration actual_runtime_ns = now - ss.last_started_running_;
-        const SchedDuration scaled_actual_runtime_ns = ss.effective_profile().IsDeadline()
+        const SchedDuration actual_runtime_ns = now - tss.last_started_running_;
+        const SchedDuration scaled_actual_runtime_ns = tss.effective_profile().IsDeadline()
                                                            ? scheduler.ScaleDown(actual_runtime_ns)
                                                            : actual_runtime_ns;
 
-        ss.runtime_ns_ += actual_runtime_ns;
-        ss.time_slice_used_ns_ += scaled_actual_runtime_ns;
+        tss.runtime_ns_ += actual_runtime_ns;
         thread.UpdateSchedulerStats({.state = thread.state(),
                                      .state_time = now.raw_value(),
                                      .cpu_time = actual_runtime_ns.raw_value()});
-        if (EffectiveProfile& cur_ep = ss.effective_profile_; cur_ep.IsFair()) {
+        const SchedDuration new_tsr = (tss.time_slice_ns_ <= scaled_actual_runtime_ns)
+                                          ? SchedDuration{0}
+                                          : (tss.time_slice_ns_ - scaled_actual_runtime_ns);
+        tss.time_slice_ns_ = new_tsr;
+        if (EffectiveProfile& cur_ep = tss.effective_profile_; cur_ep.IsFair()) {
           cur_ep.fair.normalized_timeslice_remainder =
-              ss.remaining_time_slice_ns() / ktl::max(ss.time_slice_ns_, SchedDuration{1});
+              new_tsr / ktl::max(cur_ep.fair.initial_time_slice_ns, SchedDuration{1});
         };
 
-        ss.last_started_running_ = now;
+        tss.last_started_running_ = now;
         scheduler.start_of_current_time_slice_ns_ = now;
       }
 
@@ -211,16 +201,8 @@ inline void Scheduler::HandlePiInteractionCommon(SchedTime now, PiNodeAdapter<Ta
         scheduler.QueueThread(&thread, Placement::Adjustment);
       } else {
         DEBUG_ASSERT(thread.state() == THREAD_RUNNING);
-        if (new_ep.IsFair()) {
-          scheduler.target_preemption_time_ns_ =
-              scheduler.start_of_current_time_slice_ns_ + ss.remaining_time_slice_ns();
-        } else {
-          const SchedDuration scaled_remaining_time_slice_ns =
-              scheduler.ScaleUp(ss.remaining_time_slice_ns());
-          scheduler.target_preemption_time_ns_ = ktl::min<SchedTime>(
-              scheduler.start_of_current_time_slice_ns_ + scaled_remaining_time_slice_ns,
-              ss.finish_time_);
-        }
+        scheduler.target_preemption_time_ns_ =
+            scheduler.start_of_current_time_slice_ns_ + scheduler.ScaleUp(tss.time_slice_ns_);
       }
 
       // We have made a change to this scheduler's state, we need to trigger a
@@ -281,7 +263,7 @@ void Scheduler::ThreadBaseProfileChanged(Thread& thread) {
       ss.start_time_ = CurrentTime() + new_ep.deadline.deadline_ns;
       ss.finish_time_ = ss.start_time_ + new_ep.deadline.deadline_ns;
     }
-    ss.time_slice_used_ns_ = ss.time_slice_ns_;
+    ss.time_slice_ns_ = SchedDuration{0};
   };
   HandlePiInteractionCommon(now, target, f);
 }
@@ -324,13 +306,13 @@ void Scheduler::UpstreamThreadBaseProfileChanged(Thread& _upstream, TargetType& 
     if (ep.IsFair()) {
       target.start_time() = virt_now;
       target.finish_time() = virt_now;
+      target.time_slice_ns() = SchedDuration{0};
     } else {
       DEBUG_ASSERT(target.effective_profile().IsDeadline());
       target.start_time() = CurrentTime() + ep.deadline.deadline_ns;
       target.finish_time() = target.start_time() + ep.deadline.deadline_ns;
+      target.time_slice_ns() = SchedDuration{0};
     }
-    target.time_slice_ns() = SchedDuration{0};
-    target.time_slice_used_ns() = SchedDuration{0};
   };
   HandlePiInteractionCommon(now, target, f);
 }
@@ -376,7 +358,6 @@ void Scheduler::JoinNodeToPiGraph(UpstreamType& _upstream, TargetType& _target) 
       target.start_time() = upstream.start_time();
       target.finish_time() = upstream.finish_time();
       target.time_slice_ns() = upstream.time_slice_ns();
-      target.time_slice_used_ns() = upstream.time_slice_used_ns();
     } else {
       // The target was already a deadline thread, then we need to recompute the
       // target's dynamic deadline parameters using the lag equation.
@@ -391,8 +372,7 @@ void Scheduler::JoinNodeToPiGraph(UpstreamType& _upstream, TargetType& _target) 
       target.finish_time() = ktl::min(target.finish_time(), upstream.finish_time());
       target.start_time() = target.finish_time() - target_new_ep.deadline.deadline_ns;
 
-      const SchedDuration new_tsr = target.remaining_time_slice_ns() +
-                                    upstream.remaining_time_slice_ns() +
+      const SchedDuration new_tsr = target.time_slice_ns() + upstream.time_slice_ns() +
                                     (target_new_ep.deadline.utilization * combined_ttad) -
                                     (target_old_ep.deadline.utilization * target_ttad) -
                                     (upstream_ep.deadline.utilization * upstream_ttad);
@@ -402,19 +382,7 @@ void Scheduler::JoinNodeToPiGraph(UpstreamType& _upstream, TargetType& _target) 
       //
       // TODO(johngro): If we did have to clamp the TSR, the amount we clamp by
       // needs to turn into carried lag.
-      const SchedDuration clamped_tsr =
-          ktl::clamp<SchedDuration>(new_tsr, SchedDuration{0}, combined_ttad);
-      if (clamped_tsr > target_new_ep.deadline.capacity_ns) {
-        target.time_slice_ns() = clamped_tsr;
-        target.time_slice_used_ns() = SchedDuration{0};
-      } else {
-        target.time_slice_ns() = target_new_ep.deadline.capacity_ns;
-        target.time_slice_used_ns() = target_new_ep.deadline.capacity_ns - clamped_tsr;
-      }
-      DEBUG_ASSERT_MSG(target.time_slice_used_ns() >= 0,
-                       "capacity=%" PRId64 " new_tsr=%" PRId64 " combined_ttad=%" PRId64,
-                       target_new_ep.deadline.capacity_ns.raw_value(), new_tsr.raw_value(),
-                       combined_ttad.raw_value());
+      target.time_slice_ns() = ktl::clamp<SchedDuration>(new_tsr, SchedDuration{0}, combined_ttad);
       target.finish_time() = ktl::min(target.finish_time(), upstream.finish_time());
       target.start_time() = target.finish_time() - target_new_ep.deadline.deadline_ns;
     }
@@ -460,7 +428,6 @@ void Scheduler::SplitNodeFromPiGraph(UpstreamType& _upstream, TargetType& _targe
       upstream.start_time() = target.start_time();
       upstream.finish_time() = target.finish_time();
       upstream.time_slice_ns() = target.time_slice_ns();
-      upstream.time_slice_used_ns() = target.time_slice_used_ns();
 
       // Make sure that our fair parameters have been reset.  If we are
       // an active thread, we will now re-arrive with our new parameters.
@@ -508,9 +475,7 @@ void Scheduler::SplitNodeFromPiGraph(UpstreamType& _upstream, TargetType& _targe
 
           // TODO(johngro): This also changes when carried lag comes into
           // play.
-          upstream.time_slice_ns() = upstream_ep.deadline.capacity_ns;
-          upstream.time_slice_used_ns() =
-              upstream_ep.deadline.capacity_ns - ktl::max(new_upstream_tsr, SchedDuration{0});
+          upstream.time_slice_ns() = ktl::max(new_upstream_tsr, SchedDuration{0});
         }
 
         // TODO(johngro): Fix this.  Logically, it is not correct to
@@ -541,9 +506,7 @@ void Scheduler::SplitNodeFromPiGraph(UpstreamType& _upstream, TargetType& _targe
         const SchedDuration new_target_tsr = target.time_slice_ns() * utilization_ratio;
 
         // TODO(johngro): once again, need to consider carried lag here.
-        target.time_slice_ns() = target_new_ep.deadline.capacity_ns;
-        target.time_slice_used_ns() =
-            target_new_ep.deadline.capacity_ns - ktl::max(new_target_tsr, SchedDuration{0});
+        target.time_slice_ns() = ktl::max(new_target_tsr, SchedDuration{0});
       }
     }
   };
