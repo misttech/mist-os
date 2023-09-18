@@ -112,154 +112,143 @@ mod test {
     #[test]
     fn test_info() {
         let info_prefix = vec![b'I', b'N', b'F', b'O'];
-        let reply = Reply::try_from(info_prefix.clone()).unwrap();
+        let reply = Reply::try_from(info_prefix.as_slice()).unwrap();
         assert_eq!(reply, Reply::Info("".to_string()));
 
         let info_prefix_mix_case = vec![b'I', b'n', b'f', b'O'];
-        let reply_mix_case = Reply::try_from(info_prefix_mix_case.clone()).unwrap();
+        let reply_mix_case = Reply::try_from(info_prefix_mix_case.as_slice()).unwrap();
         assert_eq!(reply_mix_case, Reply::Info("".to_string()));
 
         let info_message = vec![b'T', b'e', b's', b't'];
         let concat = [&info_prefix[..], &info_message[..]].concat();
-        let reply_with_message = Reply::try_from(concat).unwrap();
+        let reply_with_message = Reply::try_from(concat.as_slice()).unwrap();
         assert_eq!(reply_with_message, Reply::Info("Test".to_string()));
 
         let max_message = vec![b'X'; MAX_REPLY_LENGTH - MIN_REPLY_LENGTH];
         let max = [&info_prefix[..], &max_message[..]].concat();
-        let reply_with_max = Reply::try_from(max);
+        let reply_with_max = Reply::try_from(max.as_slice());
         assert!(
             !reply_with_max.is_err(),
-            format!(
-                "Max message length of {} bytes should not be an error",
-                MAX_REPLY_LENGTH - MIN_REPLY_LENGTH
-            )
+            "Max message length of {} bytes should not be an error",
+            MAX_REPLY_LENGTH - MIN_REPLY_LENGTH
         );
         assert_eq!(reply_with_max.unwrap(), Reply::Info(String::from_utf8(max_message).unwrap()));
 
         let overflow_message = vec![b'X'; MAX_REPLY_LENGTH - MIN_REPLY_LENGTH + 1];
         let overflow = [&info_prefix[..], &overflow_message[..]].concat();
-        let reply_with_overflow = Reply::try_from(overflow);
+        let reply_with_overflow = Reply::try_from(overflow.as_slice());
         assert!(
             reply_with_overflow.is_err(),
-            format!(
-                "Messages over {} bytes should throw an error",
-                MAX_REPLY_LENGTH - MIN_REPLY_LENGTH
-            )
+            "Messages over {} bytes should throw an error",
+            MAX_REPLY_LENGTH - MIN_REPLY_LENGTH
         );
     }
 
     #[test]
     fn test_fail() {
         let fail_prefix = vec![b'F', b'A', b'I', b'L'];
-        let reply = Reply::try_from(fail_prefix.clone()).unwrap();
+        let reply = Reply::try_from(fail_prefix.as_slice()).unwrap();
         assert_eq!(reply, Reply::Fail("".to_string()));
 
         let fail_prefix_mix_case = vec![b'f', b'A', b'i', b'L'];
-        let reply_mix_case = Reply::try_from(fail_prefix_mix_case.clone()).unwrap();
+        let reply_mix_case = Reply::try_from(fail_prefix_mix_case.as_slice()).unwrap();
         assert_eq!(reply_mix_case, Reply::Fail("".to_string()));
 
         let fail_message = vec![b'T', b'e', b's', b't'];
         let concat = [&fail_prefix[..], &fail_message[..]].concat();
-        let reply_with_message = Reply::try_from(concat).unwrap();
+        let reply_with_message = Reply::try_from(concat.as_slice()).unwrap();
         assert_eq!(reply_with_message, Reply::Fail("Test".to_string()));
 
         let max_message = vec![b'X'; MAX_REPLY_LENGTH - MIN_REPLY_LENGTH];
         let max = [&fail_prefix[..], &max_message[..]].concat();
-        let reply_with_max = Reply::try_from(max);
+        let reply_with_max = Reply::try_from(max.as_slice());
         assert!(
             !reply_with_max.is_err(),
-            format!(
-                "Max message length of {} bytes should not be an error",
-                MAX_REPLY_LENGTH - MIN_REPLY_LENGTH
-            )
+            "Max message length of {} bytes should not be an error",
+            MAX_REPLY_LENGTH - MIN_REPLY_LENGTH
         );
         assert_eq!(reply_with_max.unwrap(), Reply::Fail(String::from_utf8(max_message).unwrap()));
 
         let overflow_message = vec![b'X'; MAX_REPLY_LENGTH - MIN_REPLY_LENGTH + 1];
         let overflow = [&fail_prefix[..], &overflow_message[..]].concat();
-        let reply_with_overflow = Reply::try_from(overflow);
+        let reply_with_overflow = Reply::try_from(overflow.as_slice());
         assert!(
             reply_with_overflow.is_err(),
-            format!(
-                "Messages over {} bytes should throw an error",
-                MAX_REPLY_LENGTH - MIN_REPLY_LENGTH
-            )
+            "Messages over {} bytes should throw an error",
+            MAX_REPLY_LENGTH - MIN_REPLY_LENGTH
         );
     }
 
     #[test]
     fn test_okay() {
         let okay_prefix = vec![b'O', b'K', b'A', b'Y'];
-        let reply = Reply::try_from(okay_prefix.clone()).unwrap();
+        let reply = Reply::try_from(okay_prefix.as_slice()).unwrap();
         assert_eq!(reply, Reply::Okay("".to_string()));
 
         let okay_prefix_mix_case = vec![b'O', b'k', b'A', b'y'];
-        let reply_mix_case = Reply::try_from(okay_prefix_mix_case.clone()).unwrap();
+        let reply_mix_case = Reply::try_from(okay_prefix_mix_case.as_slice()).unwrap();
         assert_eq!(reply_mix_case, Reply::Okay("".to_string()));
 
         let okay_message = vec![b'T', b'e', b's', b't'];
         let concat = [&okay_prefix[..], &okay_message[..]].concat();
-        let reply_with_message = Reply::try_from(concat).unwrap();
+        let reply_with_message = Reply::try_from(concat.as_slice()).unwrap();
         assert_eq!(reply_with_message, Reply::Okay("Test".to_string()));
 
         let max_message = vec![b'X'; MAX_REPLY_LENGTH - MIN_REPLY_LENGTH];
         let max = [&okay_prefix[..], &max_message[..]].concat();
-        let reply_with_max = Reply::try_from(max);
+        let reply_with_max = Reply::try_from(max.as_slice());
         assert!(
             !reply_with_max.is_err(),
-            format!(
-                "Max message length of {} bytes should not be an error",
-                MAX_REPLY_LENGTH - MIN_REPLY_LENGTH
-            )
+            "Max message length of {} bytes should not be an error",
+            MAX_REPLY_LENGTH - MIN_REPLY_LENGTH
         );
         assert_eq!(reply_with_max.unwrap(), Reply::Okay(String::from_utf8(max_message).unwrap()));
 
         let overflow_message = vec![b'X'; MAX_REPLY_LENGTH - MIN_REPLY_LENGTH + 1];
         let overflow = [&okay_prefix[..], &overflow_message[..]].concat();
-        let reply_with_overflow = Reply::try_from(overflow);
+        let reply_with_overflow = Reply::try_from(overflow.as_slice());
         assert!(
             reply_with_overflow.is_err(),
-            format!(
-                "Messages over {} bytes should throw an error",
-                MAX_REPLY_LENGTH - MIN_REPLY_LENGTH
-            )
+            "Messages over {} bytes should throw an error",
+            MAX_REPLY_LENGTH - MIN_REPLY_LENGTH
         );
     }
 
     #[test]
     fn test_data() {
         let data_prefix = vec![b'D', b'A', b'T', b'A'];
-        let reply_with_no_size = Reply::try_from(data_prefix.clone());
+        let reply_with_no_size = Reply::try_from(data_prefix.as_slice());
         assert!(
             reply_with_no_size.is_err(),
-            format!("DATA replies must have an {} byte size associated", DATA_SIZE_LENGTH)
+            "DATA replies must have an {} byte size associated",
+            DATA_SIZE_LENGTH
         );
 
         let zero = vec![b'0'; DATA_SIZE_LENGTH];
         let concat_zero = [&data_prefix[..], &zero[..]].concat();
-        let reply = Reply::try_from(concat_zero.clone()).unwrap();
+        let reply = Reply::try_from(concat_zero.as_slice()).unwrap();
         assert_eq!(reply, Reply::Data(0));
 
         let data_prefix_mix_case = vec![b'd', b'A', b'T', b'A'];
         let concat_zero_mix_case = [&data_prefix_mix_case[..], &zero[..]].concat();
-        let reply_mix_case = Reply::try_from(concat_zero_mix_case.clone()).unwrap();
+        let reply_mix_case = Reply::try_from(concat_zero_mix_case.as_slice()).unwrap();
         assert_eq!(reply_mix_case, Reply::Data(0));
 
         let data_max = vec![b'f'; DATA_SIZE_LENGTH];
         let concat = [&data_prefix[..], &data_max[..]].concat();
-        let reply_with_message = Reply::try_from(concat).unwrap();
+        let reply_with_message = Reply::try_from(concat.as_slice()).unwrap();
         assert_eq!(reply_with_message, Reply::Data(0xffffffff));
 
         let data_message_uppercase = vec![b'F'; DATA_SIZE_LENGTH];
         let concat_uppercase = [&data_prefix[..], &data_message_uppercase[..]].concat();
-        let reply_with_message_uppercase = Reply::try_from(concat_uppercase).unwrap();
+        let reply_with_message_uppercase = Reply::try_from(concat_uppercase.as_slice()).unwrap();
         assert_eq!(reply_with_message_uppercase, Reply::Data(0xffffffff));
     }
 
     #[test]
     fn test_unknown() {
         let unknown_prefix = vec![b'T', b'e', b's', b't'];
-        let unknown_reply = Reply::try_from(unknown_prefix.clone());
+        let unknown_reply = Reply::try_from(unknown_prefix.as_slice());
         assert!(unknown_reply.is_err(), "Unknown replies throw an error");
     }
 }

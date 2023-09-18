@@ -22,6 +22,7 @@ group("tests") {
     "adb:tests",
     "build_info:tests",
     "debug:tests",
+    "fastboot:tests",
     "ffx:package_deps_for_host_tests",
     "ffx:tests",
     "forensics:tests",

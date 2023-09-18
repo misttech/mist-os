@@ -164,118 +164,118 @@ mod test {
 
     #[test]
     fn test_get_var() {
-        let version = Vec::<u8>::try_from(Command::GetVar(ClientVariable::Version));
+        let version = Vec::<u8>::try_from(&Command::GetVar(ClientVariable::Version));
         assert!(!version.is_err());
         assert_eq!(version.unwrap(), b"getvar:version".to_vec());
 
         let version_boot_loader =
-            Vec::<u8>::try_from(Command::GetVar(ClientVariable::VersionBootLoader));
+            Vec::<u8>::try_from(&Command::GetVar(ClientVariable::VersionBootLoader));
         assert!(!version_boot_loader.is_err());
         assert_eq!(version_boot_loader.unwrap(), b"getvar:version-bootloader".to_vec());
 
         let version_base_band =
-            Vec::<u8>::try_from(Command::GetVar(ClientVariable::VersionBaseBand));
+            Vec::<u8>::try_from(&Command::GetVar(ClientVariable::VersionBaseBand));
         assert!(!version_base_band.is_err());
         assert_eq!(version_base_band.unwrap(), b"getvar:version-baseband".to_vec());
 
-        let product = Vec::<u8>::try_from(Command::GetVar(ClientVariable::Product));
+        let product = Vec::<u8>::try_from(&Command::GetVar(ClientVariable::Product));
         assert!(!product.is_err());
         assert_eq!(product.unwrap(), b"getvar:product".to_vec());
 
-        let serial_number = Vec::<u8>::try_from(Command::GetVar(ClientVariable::SerialNumber));
+        let serial_number = Vec::<u8>::try_from(&Command::GetVar(ClientVariable::SerialNumber));
         assert!(!serial_number.is_err());
         assert_eq!(serial_number.unwrap(), b"getvar:serialno".to_vec());
 
-        let secure = Vec::<u8>::try_from(Command::GetVar(ClientVariable::Secure));
+        let secure = Vec::<u8>::try_from(&Command::GetVar(ClientVariable::Secure));
         assert!(!secure.is_err());
         assert_eq!(secure.unwrap(), b"getvar:secure".to_vec());
 
-        let is_user_space = Vec::<u8>::try_from(Command::GetVar(ClientVariable::IsUserSpace));
+        let is_user_space = Vec::<u8>::try_from(&Command::GetVar(ClientVariable::IsUserSpace));
         assert!(!is_user_space.is_err());
         assert_eq!(is_user_space.unwrap(), b"getvar:is-userspace".to_vec());
     }
 
     #[test]
     fn test_download() {
-        let download = Vec::<u8>::try_from(Command::Download(u32::min_value()));
+        let download = Vec::<u8>::try_from(&Command::Download(u32::min_value()));
         assert!(!download.is_err());
         assert_eq!(download.unwrap(), b"download:00000000".to_vec());
 
-        let download_max = Vec::<u8>::try_from(Command::Download(u32::max_value()));
+        let download_max = Vec::<u8>::try_from(&Command::Download(u32::max_value()));
         assert!(!download_max.is_err());
-        assert_eq!(download_max.unwrap(), b"download:FFFFFFFF".to_vec());
+        assert_eq!(download_max.unwrap(), b"download:ffffffff".to_vec());
 
         // Test something in between.
-        let download_fifteen = Vec::<u8>::try_from(Command::Download(15));
+        let download_fifteen = Vec::<u8>::try_from(&Command::Download(15));
         assert!(!download_fifteen.is_err());
-        assert_eq!(download_fifteen.unwrap(), b"download:0000000F".to_vec());
+        assert_eq!(download_fifteen.unwrap(), b"download:0000000f".to_vec());
     }
 
     #[test]
     fn test_upload() {
-        let byte_vector = Vec::<u8>::try_from(Command::Upload);
+        let byte_vector = Vec::<u8>::try_from(&Command::Upload);
         assert!(!byte_vector.is_err());
         assert_eq!(byte_vector.unwrap(), b"upload".to_vec());
     }
 
     #[test]
     fn test_flash() {
-        let byte_vector = Vec::<u8>::try_from(Command::Flash("test".to_string()));
+        let byte_vector = Vec::<u8>::try_from(&Command::Flash("test".to_string()));
         assert!(!byte_vector.is_err());
         assert_eq!(byte_vector.unwrap(), b"flash:test".to_vec());
 
         let max_partition_name = vec![b'X'; MAX_COMMAND_LENGTH - b"flash:".len()];
         let max_vector =
-            Vec::<u8>::try_from(Command::Flash(String::from_utf8(max_partition_name).unwrap()));
+            Vec::<u8>::try_from(&Command::Flash(String::from_utf8(max_partition_name).unwrap()));
         assert!(!max_vector.is_err());
 
         let over_partition_name = vec![b'X'; MAX_COMMAND_LENGTH - b"flash:".len() + 1];
         let over_vector =
-            Vec::<u8>::try_from(Command::Flash(String::from_utf8(over_partition_name).unwrap()));
+            Vec::<u8>::try_from(&Command::Flash(String::from_utf8(over_partition_name).unwrap()));
         assert!(over_vector.is_err());
     }
 
     #[test]
     fn test_erase() {
-        let byte_vector = Vec::<u8>::try_from(Command::Erase("test".to_string()));
+        let byte_vector = Vec::<u8>::try_from(&Command::Erase("test".to_string()));
         assert!(!byte_vector.is_err());
         assert_eq!(byte_vector.unwrap(), b"erase:test".to_vec());
 
         let max_partition_name = vec![b'X'; MAX_COMMAND_LENGTH - b"erase:".len()];
         let max_vector =
-            Vec::<u8>::try_from(Command::Erase(String::from_utf8(max_partition_name).unwrap()));
+            Vec::<u8>::try_from(&Command::Erase(String::from_utf8(max_partition_name).unwrap()));
         assert!(!max_vector.is_err());
 
         let over_partition_name = vec![b'X'; MAX_COMMAND_LENGTH - b"erase:".len() + 1];
         let over_vector =
-            Vec::<u8>::try_from(Command::Erase(String::from_utf8(over_partition_name).unwrap()));
+            Vec::<u8>::try_from(&Command::Erase(String::from_utf8(over_partition_name).unwrap()));
         assert!(over_vector.is_err());
     }
 
     #[test]
     fn test_boot() {
-        let byte_vector = Vec::<u8>::try_from(Command::Boot);
+        let byte_vector = Vec::<u8>::try_from(&Command::Boot);
         assert!(!byte_vector.is_err());
         assert_eq!(byte_vector.unwrap(), b"boot".to_vec());
     }
 
     #[test]
     fn test_continue() {
-        let byte_vector = Vec::<u8>::try_from(Command::Continue);
+        let byte_vector = Vec::<u8>::try_from(&Command::Continue);
         assert!(!byte_vector.is_err());
         assert_eq!(byte_vector.unwrap(), b"continue".to_vec());
     }
 
     #[test]
     fn test_reboot() {
-        let byte_vector = Vec::<u8>::try_from(Command::Reboot);
+        let byte_vector = Vec::<u8>::try_from(&Command::Reboot);
         assert!(!byte_vector.is_err());
         assert_eq!(byte_vector.unwrap(), b"reboot".to_vec());
     }
 
     #[test]
     fn test_reboot_bootloader() {
-        let byte_vector = Vec::<u8>::try_from(Command::RebootBootLoader);
+        let byte_vector = Vec::<u8>::try_from(&Command::RebootBootLoader);
         assert!(!byte_vector.is_err());
         assert_eq!(byte_vector.unwrap(), b"reboot-bootloader".to_vec());
     }
@@ -283,19 +283,19 @@ mod test {
     #[test]
     fn test_update_super() {
         let byte_vector =
-            Vec::<u8>::try_from(Command::UpdateSuper("test".to_string(), "test2".to_string()));
+            Vec::<u8>::try_from(&Command::UpdateSuper("test".to_string(), "test2".to_string()));
         assert!(!byte_vector.is_err());
         assert_eq!(byte_vector.unwrap(), b"update-super:test:test2".to_vec());
 
         let max_partition_name = vec![b'X'; MAX_COMMAND_LENGTH - b"update-super:".len() - 1];
-        let max_vector = Vec::<u8>::try_from(Command::UpdateSuper(
+        let max_vector = Vec::<u8>::try_from(&Command::UpdateSuper(
             String::from_utf8(max_partition_name).unwrap(),
             "".to_string(),
         ));
         assert!(!max_vector.is_err());
 
         let over_partition_name = vec![b'X'; MAX_COMMAND_LENGTH - b"update-super:".len()];
-        let over_vector = Vec::<u8>::try_from(Command::UpdateSuper(
+        let over_vector = Vec::<u8>::try_from(&Command::UpdateSuper(
             String::from_utf8(over_partition_name).unwrap(),
             "".to_string(),
         ));
@@ -305,13 +305,13 @@ mod test {
     #[test]
     fn test_create_logical_partition() {
         let byte_vector =
-            Vec::<u8>::try_from(Command::CreateLogicalPartition("test".to_string(), 5));
+            Vec::<u8>::try_from(&Command::CreateLogicalPartition("test".to_string(), 5));
         assert!(!byte_vector.is_err());
         assert_eq!(byte_vector.unwrap(), b"create-logical-partition:test:5".to_vec());
 
         let max_partition_name =
             vec![b'X'; MAX_COMMAND_LENGTH - b"create-logical-partition:".len() - 2];
-        let max_vector = Vec::<u8>::try_from(Command::CreateLogicalPartition(
+        let max_vector = Vec::<u8>::try_from(&Command::CreateLogicalPartition(
             String::from_utf8(max_partition_name).unwrap(),
             0,
         ));
@@ -319,7 +319,7 @@ mod test {
 
         let over_partition_name =
             vec![b'X'; MAX_COMMAND_LENGTH - b"create-logical-partition:".len()];
-        let over_vector = Vec::<u8>::try_from(Command::CreateLogicalPartition(
+        let over_vector = Vec::<u8>::try_from(&Command::CreateLogicalPartition(
             String::from_utf8(over_partition_name).unwrap(),
             0,
         ));
@@ -328,20 +328,20 @@ mod test {
 
     #[test]
     fn test_delete_logical_partition() {
-        let byte_vector = Vec::<u8>::try_from(Command::DeleteLogicalPartition("test".to_string()));
+        let byte_vector = Vec::<u8>::try_from(&Command::DeleteLogicalPartition("test".to_string()));
         assert!(!byte_vector.is_err());
         assert_eq!(byte_vector.unwrap(), b"delete-logical-partition:test".to_vec());
 
         let max_partition_name =
             vec![b'X'; MAX_COMMAND_LENGTH - b"delete-logical-partition:".len()];
-        let max_vector = Vec::<u8>::try_from(Command::DeleteLogicalPartition(
+        let max_vector = Vec::<u8>::try_from(&Command::DeleteLogicalPartition(
             String::from_utf8(max_partition_name).unwrap(),
         ));
         assert!(!max_vector.is_err());
 
         let over_partition_name =
             vec![b'X'; MAX_COMMAND_LENGTH - b"delete-logical-partition:".len() + 1];
-        let over_vector = Vec::<u8>::try_from(Command::DeleteLogicalPartition(
+        let over_vector = Vec::<u8>::try_from(&Command::DeleteLogicalPartition(
             String::from_utf8(over_partition_name).unwrap(),
         ));
         assert!(over_vector.is_err());
@@ -350,13 +350,13 @@ mod test {
     #[test]
     fn test_resize_logical_partition() {
         let byte_vector =
-            Vec::<u8>::try_from(Command::ResizeLogicalPartition("test".to_string(), 5));
+            Vec::<u8>::try_from(&Command::ResizeLogicalPartition("test".to_string(), 5));
         assert!(!byte_vector.is_err());
         assert_eq!(byte_vector.unwrap(), b"resize-logical-partition:test:5".to_vec());
 
         let max_partition_name =
             vec![b'X'; MAX_COMMAND_LENGTH - b"resize-logical-partition:".len() - 2];
-        let max_vector = Vec::<u8>::try_from(Command::ResizeLogicalPartition(
+        let max_vector = Vec::<u8>::try_from(&Command::ResizeLogicalPartition(
             String::from_utf8(max_partition_name).unwrap(),
             0,
         ));
@@ -364,7 +364,7 @@ mod test {
 
         let over_partition_name =
             vec![b'X'; MAX_COMMAND_LENGTH - b"resize-logical-partition:".len()];
-        let over_vector = Vec::<u8>::try_from(Command::ResizeLogicalPartition(
+        let over_vector = Vec::<u8>::try_from(&Command::ResizeLogicalPartition(
             String::from_utf8(over_partition_name).unwrap(),
             0,
         ));
@@ -373,17 +373,18 @@ mod test {
 
     #[test]
     fn test_is_logical() {
-        let byte_vector = Vec::<u8>::try_from(Command::IsLogical("test".to_string()));
+        let byte_vector = Vec::<u8>::try_from(&Command::IsLogical("test".to_string()));
         assert!(!byte_vector.is_err());
         assert_eq!(byte_vector.unwrap(), b"is-logical:test".to_vec());
 
         let max_partition_name = vec![b'X'; MAX_COMMAND_LENGTH - b"is-logical:".len()];
-        let max_vector =
-            Vec::<u8>::try_from(Command::IsLogical(String::from_utf8(max_partition_name).unwrap()));
+        let max_vector = Vec::<u8>::try_from(&Command::IsLogical(
+            String::from_utf8(max_partition_name).unwrap(),
+        ));
         assert!(!max_vector.is_err());
 
         let over_partition_name = vec![b'X'; MAX_COMMAND_LENGTH - b"is-logical:".len() + 1];
-        let over_vector = Vec::<u8>::try_from(Command::IsLogical(
+        let over_vector = Vec::<u8>::try_from(&Command::IsLogical(
             String::from_utf8(over_partition_name).unwrap(),
         ));
         assert!(over_vector.is_err());
@@ -391,50 +392,50 @@ mod test {
 
     #[test]
     fn test_set_active() {
-        let byte_vector = Vec::<u8>::try_from(Command::SetActive("a".to_string()));
+        let byte_vector = Vec::<u8>::try_from(&Command::SetActive("a".to_string()));
         assert!(!byte_vector.is_err());
         assert_eq!(byte_vector.unwrap(), b"set_active:a".to_vec());
 
         let max_slot_name = vec![b'X'; MAX_COMMAND_LENGTH - b"set_active:".len()];
         let max_vector =
-            Vec::<u8>::try_from(Command::SetActive(String::from_utf8(max_slot_name).unwrap()));
+            Vec::<u8>::try_from(&Command::SetActive(String::from_utf8(max_slot_name).unwrap()));
         assert!(!max_vector.is_err());
 
         let over_slot_name = vec![b'X'; MAX_COMMAND_LENGTH - b"set_active:".len() + 1];
         let over_vector =
-            Vec::<u8>::try_from(Command::SetActive(String::from_utf8(over_slot_name).unwrap()));
+            Vec::<u8>::try_from(&Command::SetActive(String::from_utf8(over_slot_name).unwrap()));
         assert!(over_vector.is_err());
     }
 
     #[test]
     fn test_oem_variables() {
-        let oem_variable_vector = Vec::<u8>::try_from(ClientVariable::Oem("test".to_string()));
+        let oem_variable_vector = Vec::<u8>::try_from(&ClientVariable::Oem("test".to_string()));
         assert!(!oem_variable_vector.is_err());
         assert_eq!(oem_variable_vector.unwrap(), b"test".to_vec());
 
         let max_variable_name =
             String::from_utf8(vec![b'X'; MAX_COMMAND_LENGTH - b"getvar:".len()]).unwrap();
-        let max_vector = Vec::<u8>::try_from(ClientVariable::Oem(max_variable_name));
+        let max_vector = Vec::<u8>::try_from(&ClientVariable::Oem(max_variable_name));
         assert!(!max_vector.is_err());
 
         let over_variable_name =
             String::from_utf8(vec![b'X'; MAX_COMMAND_LENGTH - b"getvar:".len() + 1]).unwrap();
-        let over_vector = Vec::<u8>::try_from(ClientVariable::Oem(over_variable_name));
+        let over_vector = Vec::<u8>::try_from(&ClientVariable::Oem(over_variable_name));
         assert!(over_vector.is_err());
     }
 
     #[test]
     fn test_oem_command() {
-        let byte_vector = Vec::<u8>::try_from(Command::Oem("test".to_string()));
+        let byte_vector = Vec::<u8>::try_from(&Command::Oem("test".to_string()));
         assert!(!byte_vector.is_err());
-        assert_eq!(byte_vector.unwrap(), b"test".to_vec());
+        assert_eq!(byte_vector.unwrap(), b"oem test".to_vec());
 
-        let max_command_name = String::from_utf8(vec![b'X'; MAX_COMMAND_LENGTH]).unwrap();
-        let max_command = Vec::<u8>::try_from(Command::Oem(max_command_name));
+        let max_command_name = String::from_utf8(vec![b'X'; MAX_COMMAND_LENGTH - 7]).unwrap();
+        let max_command = Vec::<u8>::try_from(&Command::Oem(max_command_name));
         assert!(!max_command.is_err());
 
         let over_command_name = String::from_utf8(vec![b'X'; MAX_COMMAND_LENGTH + 1]).unwrap();
-        let over_command = Vec::<u8>::try_from(Command::Oem(over_command_name));
+        let over_command = Vec::<u8>::try_from(&Command::Oem(over_command_name));
         assert!(over_command.is_err());
     }
 }
