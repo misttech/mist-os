@@ -79,11 +79,10 @@ async fn run_tests(
     let mut signals = Signals::new(&[SIGINT, SIGTERM]).unwrap();
     // signals.forever() is blocking, so we need to spawn a thread rather than use async.
     std::thread::spawn(move || {
-        for signal in signals.forever() {
+        if let Some(signal) = signals.forever().next() {
             match signal {
                 SIGINT | SIGTERM => {
                     let _ = cancel_sender.send(());
-                    break;
                 }
                 _ => unreachable!(),
             }
