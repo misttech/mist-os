@@ -154,18 +154,13 @@ impl WaitCallback {
     }
 }
 
-/// A type that can put a thread to sleep waiting for a condition.
-pub struct Waiter {
-    inner: Arc<WaiterImpl>,
-}
-
 /// Implementation of Waiter. We put the Waiter data in an Arc so that WaitQueue can tell when the
 /// Waiter has been destroyed by keeping a Weak reference. But this is an implementation detail and
 /// a Waiter should have a single owner. So the Arc is hidden inside Waiter.
-struct WaiterImpl {
+struct PortWaiter {
     /// The underlying Zircon port that the thread sleeps in.
     port: zx::Port,
-    key_map: Mutex<HashMap<WaitKey, WaitCallback>>, // the key 0 is reserved for 'no handler'
+    callbacks: Mutex<HashMap<WaitKey, WaitCallback>>, // the key 0 is reserved for 'no handler'
     next_key: AtomicU64,
     ignore_signals: bool,
 
@@ -176,87 +171,20 @@ struct WaiterImpl {
     wait_queues: Mutex<HashMap<WaitKey, Weak<WaitQueueImpl>>>,
 }
 
-impl Waiter {
+impl PortWaiter {
     /// Internal constructor.
-    fn new_internal(ignore_signals: bool) -> Self {
-        Self {
-            inner: Arc::new(WaiterImpl {
-                port: zx::Port::create(),
-                key_map: Mutex::new(HashMap::new()),
-                next_key: AtomicU64::new(1),
-                ignore_signals,
-                wait_queues: Default::default(),
-            }),
-        }
+    fn new(ignore_signals: bool) -> Arc<Self> {
+        Arc::new(PortWaiter {
+            port: zx::Port::create(),
+            callbacks: Default::default(),
+            next_key: AtomicU64::new(1),
+            ignore_signals,
+            wait_queues: Default::default(),
+        })
     }
 
-    /// Create a new waiter.
-    pub fn new() -> Self {
-        Self::new_internal(false)
-    }
-
-    /// Create a new waiter that doesn't wake up when a signal is received.
-    pub fn new_ignoring_signals() -> Self {
-        Self::new_internal(true)
-    }
-
-    /// Create a weak reference to this waiter.
-    pub fn weak(&self) -> WaiterRef {
-        WaiterRef(Arc::downgrade(&self.inner))
-    }
-
-    /// Wait until the waiter is woken up.
-    ///
-    /// If the wait is interrupted (see [`Waiter::interrupt`]), this function returns EINTR.
-    pub fn wait(&self, current_task: &CurrentTask) -> Result<(), Errno> {
-        self.wait_until(current_task, zx::Time::INFINITE)
-    }
-
-    /// Wait until the given deadline has passed or the waiter is woken up.
-    ///
-    /// If the wait deadline is nonzero and is interrupted (see [`Waiter::interrupt`]), this
-    /// function returns EINTR. Callers must take special care not to lose any accumulated data or
-    /// local state when EINTR is received as this is a normal and recoverable situation.
-    ///
-    /// Using a 0 deadline (no waiting, useful for draining pending events) will not wait and is
-    /// guaranteed not to issue EINTR.
-    ///
-    /// It the timeout elapses with no events, this function returns ETIMEDOUT.
-    ///
-    /// Processes at most one event. If the caller is interested in draining the events, it should
-    /// repeatedly call this function with a 0 deadline until it reports ETIMEDOUT. (This case is
-    /// why a 0 deadline must not return EINTR, as previous calls to wait_until() may have
-    /// accumulated state that would be lost when returning EINTR to userspace.)
-    pub fn wait_until(&self, current_task: &CurrentTask, deadline: zx::Time) -> Result<(), Errno> {
-        let is_waiting = deadline.into_nanos() > 0;
-
-        let callback = || {
-            // We are susceptible to spurious wakeups because interrupt() posts a message to the port
-            // queue. In addition to more subtle races, there could already be valid messages in the
-            // port queue that will immediately wake us up, leaving the interrupt message in the queue
-            // for subsequent waits (which by then may not have any signals pending) to read.
-            //
-            // It's impossible to non-racily guarantee that a signal is pending so there might always
-            // be an EINTR result here with no signal. But any signal we get when !is_waiting we know is
-            // leftover from before: the top of this function only sets ourself as the
-            // current_task.signals.run_state when there's a nonzero timeout, and that waiter reference
-            // is what is used to signal the interrupt().
-            loop {
-                let wait_result = self.wait_internal(deadline);
-                if let Err(errno) = &wait_result {
-                    if errno.code == EINTR && !is_waiting {
-                        continue; // Spurious wakeup.
-                    }
-                }
-                return wait_result;
-            }
-        };
-
-        if is_waiting {
-            current_task.run_in_state(RunState::Waiter(self.weak()), callback)
-        } else {
-            callback()
-        }
+    fn weak(self: &Arc<Self>) -> WaiterRef {
+        WaiterRef(Arc::downgrade(&self))
     }
 
     /// Waits until the given deadline has passed or the waiter is woken up. See wait_until().
@@ -265,15 +193,14 @@ impl Waiter {
         // current thread should not own any local ref that might delay the release of a resource
         // while doing so.
         debug_assert_no_local_temp_ref();
-        match self.inner.port.wait(deadline) {
+        match self.port.wait(deadline) {
             Ok(packet) => match packet.status() {
                 zx::sys::ZX_OK => {
                     let contents = packet.contents();
                     let key = WaitKey { raw: packet.key() };
                     match contents {
                         zx::PacketContents::SignalOne(sigpkt) => {
-                            let handler = self.inner.key_map.lock().remove(&key);
-                            if let Some(callback) = handler {
+                            if let Some(callback) = self.remove_callback(&key) {
                                 match callback {
                                     WaitCallback::SignalHandler(handler) => {
                                         handler(sigpkt.observed())
@@ -286,8 +213,7 @@ impl Waiter {
                         }
                         zx::PacketContents::User(usrpkt) => {
                             let events: WaitEvents = usrpkt.into();
-                            let handler = self.inner.key_map.lock().remove(&key);
-                            if let Some(callback) = handler {
+                            if let Some(callback) = self.remove_callback(&key) {
                                 match callback {
                                     WaitCallback::EventHandler(handler) => {
                                         let fd_events = match events {
@@ -320,8 +246,44 @@ impl Waiter {
         }
     }
 
+    fn wait_until(
+        self: &Arc<Self>,
+        current_task: &CurrentTask,
+        deadline: zx::Time,
+    ) -> Result<(), Errno> {
+        let is_waiting = deadline.into_nanos() > 0;
+
+        let callback = || {
+            // We are susceptible to spurious wakeups because interrupt() posts a message to the port
+            // queue. In addition to more subtle races, there could already be valid messages in the
+            // port queue that will immediately wake us up, leaving the interrupt message in the queue
+            // for subsequent waits (which by then may not have any signals pending) to read.
+            //
+            // It's impossible to non-racily guarantee that a signal is pending so there might always
+            // be an EINTR result here with no signal. But any signal we get when !is_waiting we know is
+            // leftover from before: the top of this function only sets ourself as the
+            // current_task.signals.run_state when there's a nonzero timeout, and that waiter reference
+            // is what is used to signal the interrupt().
+            loop {
+                let wait_result = self.wait_internal(deadline);
+                if let Err(errno) = &wait_result {
+                    if errno.code == EINTR && !is_waiting {
+                        continue; // Spurious wakeup.
+                    }
+                }
+                return wait_result;
+            }
+        };
+
+        if is_waiting {
+            current_task.run_in_state(RunState::Waiter(self.weak()), callback)
+        } else {
+            callback()
+        }
+    }
+
     fn next_key(&self) -> WaitKey {
-        let key = self.inner.next_key.fetch_add(1, Ordering::Relaxed);
+        let key = self.next_key.fetch_add(1, Ordering::Relaxed);
         // TODO - find a better reaction to wraparound
         assert!(key != 0, "bad key from u64 wraparound");
         WaitKey { raw: key }
@@ -330,16 +292,140 @@ impl Waiter {
     fn register_callback(&self, callback: WaitCallback) -> WaitKey {
         let key = self.next_key();
         assert!(
-            self.inner.key_map.lock().insert(key, callback).is_none(),
+            self.callbacks.lock().insert(key, callback).is_none(),
             "unexpected callback already present for key {key:?}"
         );
         key
     }
 
-    pub fn wake_immediately(&self, events: FdEvents, handler: EventHandler) {
+    fn remove_callback(&self, key: &WaitKey) -> Option<WaitCallback> {
+        self.callbacks.lock().remove(&key)
+    }
+
+    fn wake_immediately(&self, events: FdEvents, handler: EventHandler) {
         let callback = WaitCallback::EventHandler(handler);
         let key = self.register_callback(callback);
-        self.inner.queue_events(&key, WaitEvents::Fd(events));
+        self.queue_events(&key, WaitEvents::Fd(events));
+    }
+
+    /// Establish an asynchronous wait for the signals on the given Zircon handle (not to be
+    /// confused with POSIX signals), optionally running a FnOnce.
+    ///
+    /// Returns a `HandleWaitCanceler` that can be used to cancel the wait.
+    fn wake_on_zircon_signals(
+        self: &Arc<Self>,
+        handle: &dyn zx::AsHandleRef,
+        zx_signals: zx::Signals,
+        handler: SignalHandler,
+    ) -> Result<HandleWaitCanceler, zx::Status> {
+        let callback = WaitCallback::SignalHandler(handler);
+        let key = self.register_callback(callback);
+        handle.wait_async_handle(
+            &self.port,
+            key.raw,
+            zx_signals,
+            zx::WaitAsyncOpts::EDGE_TRIGGERED,
+        )?;
+        let weak_self = Arc::downgrade(self);
+        Ok(HandleWaitCanceler::new(move |handle_ref| {
+            if let Some(waiter) = weak_self.upgrade() {
+                let cancelled = waiter.port.cancel(&handle_ref, key.raw).is_ok();
+                waiter.remove_callback(&key);
+                cancelled
+            } else {
+                false
+            }
+        }))
+    }
+
+    fn queue_events(&self, key: &WaitKey, events: WaitEvents) {
+        self.queue_user_packet_data(key, zx::sys::ZX_OK, events)
+    }
+
+    /// Queue a packet to the underlying Zircon port, which will cause the
+    /// waiter to wake up.
+    fn queue_user_packet_data(&self, key: &WaitKey, status: i32, events: WaitEvents) {
+        let packet = zx::Packet::from_user_packet(key.raw, status, events.into());
+        self.port.queue(&packet).map_err(impossible_error).unwrap();
+    }
+
+    fn interrupt(&self) {
+        if self.ignore_signals {
+            return;
+        }
+        self.queue_user_packet_data(&WaitKey::empty(), zx::sys::ZX_ERR_CANCELED, WaitEvents::All);
+    }
+}
+
+impl std::fmt::Debug for PortWaiter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PortWaiter").field("port", &self.port).finish_non_exhaustive()
+    }
+}
+
+/// A type that can put a thread to sleep waiting for a condition.
+#[derive(Debug)]
+pub struct Waiter {
+    inner: Arc<PortWaiter>,
+}
+
+impl Waiter {
+    /// Create a new waiter.
+    pub fn new() -> Self {
+        Self { inner: PortWaiter::new(false) }
+    }
+
+    /// Create a new waiter that doesn't wake up when a signal is received.
+    pub fn new_ignoring_signals() -> Self {
+        Self { inner: PortWaiter::new(true) }
+    }
+
+    /// Create a weak reference to this waiter.
+    fn weak(&self) -> WaiterRef {
+        self.inner.weak()
+    }
+
+    /// Wait until the waiter is woken up.
+    ///
+    /// If the wait is interrupted (see [`Waiter::interrupt`]), this function returns EINTR.
+    pub fn wait(&self, current_task: &CurrentTask) -> Result<(), Errno> {
+        self.inner.wait_until(current_task, zx::Time::INFINITE)
+    }
+
+    /// Wait until the given deadline has passed or the waiter is woken up.
+    ///
+    /// If the wait deadline is nonzero and is interrupted (see [`Waiter::interrupt`]), this
+    /// function returns EINTR. Callers must take special care not to lose any accumulated data or
+    /// local state when EINTR is received as this is a normal and recoverable situation.
+    ///
+    /// Using a 0 deadline (no waiting, useful for draining pending events) will not wait and is
+    /// guaranteed not to issue EINTR.
+    ///
+    /// It the timeout elapses with no events, this function returns ETIMEDOUT.
+    ///
+    /// Processes at most one event. If the caller is interested in draining the events, it should
+    /// repeatedly call this function with a 0 deadline until it reports ETIMEDOUT. (This case is
+    /// why a 0 deadline must not return EINTR, as previous calls to wait_until() may have
+    /// accumulated state that would be lost when returning EINTR to userspace.)
+    pub fn wait_until(&self, current_task: &CurrentTask, deadline: zx::Time) -> Result<(), Errno> {
+        self.inner.wait_until(current_task, deadline)
+    }
+
+    fn create_wait_entry(&self, filter: WaitEvents) -> WaitEntry {
+        WaitEntry { waiter: self.weak(), filter, key: self.inner.next_key() }
+    }
+
+    fn create_wait_entry_with_handler(
+        &self,
+        filter: WaitEvents,
+        handler: EventHandler,
+    ) -> WaitEntry {
+        let key = self.inner.register_callback(WaitCallback::EventHandler(handler));
+        WaitEntry { waiter: self.weak(), filter, key }
+    }
+
+    pub fn wake_immediately(&self, events: FdEvents, handler: EventHandler) {
+        self.inner.wake_immediately(events, handler);
     }
 
     /// Establish an asynchronous wait for the signals on the given Zircon handle (not to be
@@ -352,24 +438,7 @@ impl Waiter {
         zx_signals: zx::Signals,
         handler: SignalHandler,
     ) -> Result<HandleWaitCanceler, zx::Status> {
-        let callback = WaitCallback::SignalHandler(handler);
-        let key = self.register_callback(callback);
-        handle.wait_async_handle(
-            &self.inner.port,
-            key.raw,
-            zx_signals,
-            zx::WaitAsyncOpts::EDGE_TRIGGERED,
-        )?;
-        let waiter_impl = Arc::downgrade(&self.inner);
-        Ok(HandleWaitCanceler::new(move |handle_ref| {
-            if let Some(waiter_impl) = waiter_impl.upgrade() {
-                let cancelled = waiter_impl.port.cancel(&handle_ref, key.raw).is_ok();
-                waiter_impl.key_map.lock().remove(&key);
-                cancelled
-            } else {
-                false
-            }
-        }))
+        self.inner.wake_on_zircon_signals(handle, zx_signals, handler)
     }
 
     /// Return a WaitCanceler representing a wait that will never complete. Useful for stub
@@ -388,11 +457,6 @@ impl Waiter {
         })
     }
 
-    fn wake_on_events(&self, handler: EventHandler) -> WaitKey {
-        let callback = WaitCallback::EventHandler(handler);
-        self.register_callback(callback)
-    }
-
     /// Interrupt the waiter to deliver a signal. The wait operation will return EINTR, and a
     /// typical caller should then unwind to the syscall dispatch loop to let the signal be
     /// processed. See wait_until() for more details.
@@ -400,26 +464,6 @@ impl Waiter {
     /// Ignored if the waiter was created with new_ignoring_signals().
     pub fn interrupt(&self) {
         self.inner.interrupt();
-    }
-}
-
-impl WaiterImpl {
-    fn queue_events(&self, key: &WaitKey, event: WaitEvents) {
-        self.queue_user_packet_data(key, zx::sys::ZX_OK, event)
-    }
-
-    /// Queue a packet to the underlying Zircon port, which will cause the
-    /// waiter to wake up.
-    fn queue_user_packet_data(&self, key: &WaitKey, status: i32, events: WaitEvents) {
-        let packet = zx::Packet::from_user_packet(key.raw, status, events.into());
-        self.port.queue(&packet).map_err(impossible_error).unwrap();
-    }
-
-    fn interrupt(&self) {
-        if self.ignore_signals {
-            return;
-        }
-        self.queue_user_packet_data(&WaitKey::empty(), zx::sys::ZX_ERR_CANCELED, WaitEvents::All);
     }
 }
 
@@ -439,18 +483,6 @@ impl Drop for Waiter {
     }
 }
 
-impl std::fmt::Debug for WaiterImpl {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Waiter").field("port", &self.port).finish_non_exhaustive()
-    }
-}
-
-impl std::fmt::Debug for Waiter {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.inner.fmt(f)
-    }
-}
-
 impl Default for Waiter {
     fn default() -> Self {
         Self::new()
@@ -459,8 +491,8 @@ impl Default for Waiter {
 
 /// A weak reference to a Waiter. Intended for holding in wait queues or stashing elsewhere for
 /// calling queue_events later.
-#[derive(Default, Clone)]
-pub struct WaiterRef(Weak<WaiterImpl>);
+#[derive(Debug, Default, Clone)]
+pub struct WaiterRef(Weak<PortWaiter>);
 
 impl WaiterRef {
     pub fn empty() -> Self {
@@ -472,33 +504,40 @@ impl WaiterRef {
     }
 
     pub fn interrupt(&self) {
-        self.access(|waiter| {
-            if let Some(waiter) = waiter {
-                waiter.interrupt();
-            }
-        });
+        if let Some(waiter) = self.0.upgrade() {
+            waiter.interrupt();
+        }
     }
 
-    /// Call the closure with a reference to the insides of the waiter if this weak ref is valid,
-    /// or None if it isn't.
+    fn remove_callback(&self, key: &WaitKey) {
+        if let Some(waiter) = self.0.upgrade() {
+            waiter.remove_callback(key);
+        }
+    }
+
+    /// Called by the WaitQueue when this waiter is about to be removed from the queue.
     ///
-    /// This doesn't return &Waiter because that would require creating a new Waiter object, and
-    /// Waiter's Drop is used for cleanup, and we don't want this function to end up running the
-    /// cleanup using the shared WaiterImpl.
-    fn access<R>(&self, f: impl FnOnce(Option<&WaiterImpl>) -> R) -> R {
-        f(self.0.upgrade().as_ref().map(|w| w.as_ref()))
+    /// TODO(abarth): This function does not appear to be called when the WaitQueue is dropped,
+    /// which appears to be a leak.
+    fn will_remove_from_wait_queue(&self, key: &WaitKey) {
+        if let Some(waiter) = self.0.upgrade() {
+            waiter.wait_queues.lock().remove(key);
+        }
+    }
+
+    fn queue_events(&self, key: &WaitKey, events: WaitEvents) -> bool {
+        if let Some(waiter) = self.0.upgrade() {
+            waiter.queue_events(key, events);
+            true
+        } else {
+            false
+        }
     }
 }
 
 impl PartialEq<Waiter> for WaiterRef {
     fn eq(&self, other: &Waiter) -> bool {
         self.0.as_ptr() == Arc::as_ptr(&other.inner)
-    }
-}
-
-impl std::fmt::Debug for WaiterRef {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.access(|waiter| f.debug_tuple("WaiterRef").field(&waiter).finish())
     }
 }
 
@@ -555,15 +594,11 @@ impl WaitQueue {
         let waiter = waiter.weak();
         WaitCanceler::new(move || {
             let mut cancelled = false;
-            if let Some(strong_self) = weak_self.upgrade() {
-                waiter.access(|waiter| {
-                    if let Some(waiter) = waiter {
-                        waiter.key_map.lock().remove(&key);
-                    }
-                });
+            if let Some(wait_queue) = weak_self.upgrade() {
+                waiter.remove_callback(&key);
                 // TODO(steveaustin) Maybe make waiters a map to avoid linear search
-                Self::filter_waiters(&mut strong_self.waiters.lock(), |entry| {
-                    if entry.waiter.0.as_ptr() == waiter.0.as_ptr() && entry.key == key {
+                Self::filter_waiters(&mut wait_queue.waiters.lock(), |entry| {
+                    if entry.key == key && entry.waiter == waiter {
                         cancelled = true;
                         Retention::Drop
                     } else {
@@ -585,11 +620,7 @@ impl WaitQueue {
     ///
     /// Returns a `WaitCanceler` that can be used to cancel the wait.
     pub fn wait_async_mask(&self, waiter: &Waiter, mask: u64) -> WaitCanceler {
-        let key = waiter.next_key();
-        self.wait_async_on_entry(
-            waiter,
-            WaitEntry { waiter: waiter.weak(), filter: WaitEvents::Mask(mask), key },
-        )
+        self.wait_async_on_entry(waiter, waiter.create_wait_entry(WaitEvents::Mask(mask)))
     }
 
     /// Establish a wait for the given value event.
@@ -601,11 +632,7 @@ impl WaitQueue {
     ///
     /// Returns a `WaitCanceler` that can be used to cancel the wait.
     pub fn wait_async_value(&self, waiter: &Waiter, value: u64) -> WaitCanceler {
-        let key = waiter.next_key();
-        self.wait_async_on_entry(
-            waiter,
-            WaitEntry { waiter: waiter.weak(), filter: WaitEvents::Value(value), key },
-        )
+        self.wait_async_on_entry(waiter, waiter.create_wait_entry(WaitEvents::Value(value)))
     }
 
     /// Establish a wait for any event.
@@ -617,11 +644,7 @@ impl WaitQueue {
     ///
     /// Returns a `WaitCanceler` that can be used to cancel the wait.
     pub fn wait_async(&self, waiter: &Waiter) -> WaitCanceler {
-        let key = waiter.next_key();
-        self.wait_async_on_entry(
-            waiter,
-            WaitEntry { waiter: waiter.weak(), filter: WaitEvents::All, key },
-        )
+        self.wait_async_on_entry(waiter, waiter.create_wait_entry(WaitEvents::All))
     }
 
     /// Establish a wait for the given events.
@@ -638,33 +661,21 @@ impl WaitQueue {
         events: FdEvents,
         handler: EventHandler,
     ) -> WaitCanceler {
-        let key = waiter.wake_on_events(handler);
-        self.wait_async_on_entry(
-            waiter,
-            WaitEntry { waiter: waiter.weak(), filter: WaitEvents::Fd(events), key },
-        )
+        let entry = waiter.create_wait_entry_with_handler(WaitEvents::Fd(events), handler);
+        self.wait_async_on_entry(waiter, entry)
     }
 
     fn notify_events_count(&self, events: WaitEvents, mut limit: usize) -> usize {
         let mut woken = 0;
         Self::filter_waiters(&mut self.0.waiters.lock(), |entry| {
-            entry.waiter.access(|waiter| {
-                // Drop entries whose waiter no longer exists.
-                let waiter = if let Some(waiter) = waiter {
-                    waiter
-                } else {
-                    return Retention::Drop;
-                };
-
-                if limit > 0 && entry.filter.intercept(&events) {
-                    waiter.queue_events(&entry.key, events);
+            if limit > 0 && entry.filter.intercept(&events) {
+                if entry.waiter.queue_events(&entry.key, events) {
                     limit -= 1;
                     woken += 1;
-                    return Retention::Drop;
                 }
-
-                Retention::Keep
-            })
+                return Retention::Drop;
+            }
+            Retention::Keep
         });
         woken
     }
@@ -727,11 +738,7 @@ impl WaitQueue {
         waiters.retain(move |entry| match filter(entry) {
             Retention::Keep => true,
             Retention::Drop => {
-                entry.waiter.access(|waiter| {
-                    if let Some(waiter) = waiter {
-                        waiter.wait_queues.lock().remove(&entry.key);
-                    }
-                });
+                entry.waiter.will_remove_from_wait_queue(&entry.key);
                 false
             }
         })
