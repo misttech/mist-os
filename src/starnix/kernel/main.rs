@@ -63,7 +63,7 @@ fn maybe_serve_lifecycle() {
                 fidl::endpoints::ServerEnd::<flifecycle::LifecycleMarker>::new(lifecycle.into())
                     .into_stream()
             {
-                while let Ok(Some(request)) = stream.try_next().await {
+                if let Ok(Some(request)) = stream.try_next().await {
                     match request {
                         flifecycle::LifecycleRequest::Stop { control_handle } => {
                             control_handle.shutdown();
