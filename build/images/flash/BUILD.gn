@@ -564,11 +564,14 @@ if (board_is_emu) {
   virtual_device_specification("virtual_device_specification_large") {
     testonly = true
     name = "${device_name}-large"
-    description =
-        "Larger configuration for running this product with extra storage"
+    description = "Larger configuration for running this product with extra storage and memory"
     output = "$root_build_dir/virtual_device_large.json"
     storage = {
       quantity = 10
+      units = "gigabytes"
+    }
+    memory = {
+      quantity = 28
       units = "gigabytes"
     }
   }
