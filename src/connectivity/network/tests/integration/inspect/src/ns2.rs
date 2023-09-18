@@ -113,7 +113,8 @@ impl fuchsia_inspect::testing::PropertyAssertion for AddressMatcher {
 }
 
 #[netstack_test]
-async fn inspect_nic<N: Netstack>(name: &str) {
+async fn inspect_nic(name: &str) {
+    type N = netstack_testing_common::realms::Netstack2;
     // The number of IPv6 addresses that the stack will assign to an interface.
     const EXPECTED_NUM_IPV6_ADDRESSES: usize = 1;
 
@@ -355,7 +356,8 @@ async fn inspect_nic<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
-async fn inspect_routing_table<N: Netstack>(name: &str) {
+async fn inspect_routing_table(name: &str) {
+    type N = netstack_testing_common::realms::Netstack2;
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
 
@@ -455,11 +457,12 @@ const INVALID_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(1234));
             port: dhcpv4::protocol::CLIENT_PORT,
         }
     ]; "multiple_invalid_port_and_single_invalid_trans_proto")]
-async fn inspect_dhcp<N: Netstack>(
+async fn inspect_dhcp(
     netstack_test_name: &str,
     test_case_name: &str,
     inbound_packets: Vec<PacketAttributes>,
 ) {
+    type N = netstack_testing_common::realms::Netstack2;
     // TODO(https://fxbug.dev/79556): Extend this test to cover the stat tracking frames discarded
     // due to an invalid PacketType.
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
@@ -643,7 +646,8 @@ async fn inspect_dhcp<N: Netstack>(
 // serves as a change detector to acknowledge any possible additions
 // or deletions when importing code from upstream.
 #[netstack_test]
-async fn inspect_stat_counters<N: Netstack>(name: &str) {
+async fn inspect_stat_counters(name: &str) {
+    type N = netstack_testing_common::realms::Netstack2;
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
     // Connect to netstack service to spawn a netstack instance.
@@ -997,7 +1001,8 @@ async fn inspect_stat_counters<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
-async fn inspect_socket_stats<N: Netstack>(name: &str) {
+async fn inspect_socket_stats(name: &str) {
+    type N = netstack_testing_common::realms::Netstack2;
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
 
@@ -1467,167 +1472,8 @@ async fn inspect_socket_stats<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
-async fn inspect_ns3_sockets(name: &str) {
-    type N = netstack_testing_common::realms::Netstack3;
-    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
-
-    // Ensure ns3 has started and that there is a Socket to collect inspect data about.
-    let _tcp_socket = realm
-        .stream_socket(fposix_socket::Domain::Ipv4, fposix_socket::StreamSocketProtocol::Tcp)
-        .await
-        .expect("create TCP socket");
-
-    let data =
-        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
-            .await
-            .expect("inspect data should be present");
-
-    // Debug print the tree to make debugging easier in case of failures.
-    println!("Got inspect data: {:#?}", data);
-    fuchsia_inspect::assert_data_tree!(data, "root": contains {
-        "Sockets": {
-            "0": {
-                LocalAddress: "[NOT BOUND]",
-                RemoteAddress: "[NOT CONNECTED]",
-                TransportProtocol: "TCP",
-                NetworkProtocol: "IPv4"
-            }
-        }
-    })
-}
-
-#[netstack_test]
-async fn inspect_ns3_routes(name: &str) {
-    type N = netstack_testing_common::realms::Netstack3;
-    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
-
-    let interfaces_state = realm
-        .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
-        .expect("failed to connect to fuchsia.net.interfaces/State");
-    let loopback_id = fidl_fuchsia_net_interfaces_ext::wait_interface(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-            &interfaces_state,
-            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
-        )
-        .expect("failed to create event stream"),
-        &mut HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new(),
-        |if_map| {
-            if_map.values().find_map(
-                |fidl_fuchsia_net_interfaces_ext::PropertiesAndState {
-                     properties:
-                         fidl_fuchsia_net_interfaces_ext::Properties { device_class, id, .. },
-                     state: (),
-                 }| {
-                    match device_class {
-                        fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
-                            fidl_fuchsia_net_interfaces::Empty {},
-                        ) => Some(id.get()),
-                        fidl_fuchsia_net_interfaces::DeviceClass::Device(_) => None,
-                    }
-                },
-            )
-        },
-    )
-    .await
-    .expect("getting loopback id");
-
-    let data =
-        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
-            .await
-            .expect("inspect data should be present");
-
-    // Debug print the tree to make debugging easier in case of failures.
-    println!("Got inspect data: {:#?}", data);
-    fuchsia_inspect::assert_data_tree!(data, "root": contains {
-        "Routes": {
-            "0": {
-                Destination: "255.255.255.255/32",
-                InterfaceId: loopback_id,
-                Gateway: "[NONE]",
-                Metric: 99999u64,
-                MetricTracksInterface: false,
-            },
-            "1": {
-                Destination: "127.0.0.0/8",
-                InterfaceId: loopback_id,
-                Gateway: "[NONE]",
-                Metric: 100u64,
-                MetricTracksInterface: true,
-            },
-            "2": {
-                Destination: "224.0.0.0/4",
-                InterfaceId: loopback_id,
-                Gateway: "[NONE]",
-                Metric: 100u64,
-                MetricTracksInterface: true,
-            },
-        }
-    })
-}
-
-#[netstack_test]
-async fn inspect_ns3_devices(name: &str) {
-    type N = netstack_testing_common::realms::Netstack3;
-    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let network = sandbox.create_network("net").await.expect("failed to create network");
-    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
-
-    // Install netdevice device so that non-Loopback device Inspect properties can be asserted upon.
-    const NETDEV_NAME: &str = "test-eth";
-    let max_frame_size = netemul::DEFAULT_MTU
-        + u16::try_from(ETHERNET_HDR_LEN_NO_TAG)
-            .expect("should fit ethernet header length in a u16");
-    let netdev = realm
-        .join_network_with(
-            &network,
-            "netdev-ep",
-            netemul::new_endpoint_config(max_frame_size, Some(fidl_mac!("02:00:00:00:00:01"))),
-            netemul::InterfaceConfig { name: Some(NETDEV_NAME.into()), metric: None },
-        )
-        .await
-        .expect("failed to join network with netdevice endpoint");
-    netdev
-        .add_address_and_subnet_route(fidl_subnet!("192.168.0.1/24"))
-        .await
-        .expect("configure address");
-
-    let data =
-        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
-            .await
-            .expect("inspect data should be present");
-
-    // Debug print the tree to make debugging easier in case of failures.
-    println!("Got inspect data: {:#?}", data);
-    fuchsia_inspect::assert_data_tree!(data, "root": contains {
-        "Devices": {
-            "1": {
-                Name: "lo",
-                InterfaceId: 1u64,
-                AdminEnabled: true,
-                MTU: 65536u64,
-                Loopback: true,
-                IpAddresses: Vec::<String>::new(),
-            },
-            "2": {
-                Name: NETDEV_NAME,
-                InterfaceId: 2u64,
-                AdminEnabled: true,
-                MTU: u64::from(netemul::DEFAULT_MTU),
-                Loopback: false,
-                IpAddresses: vec!["192.168.0.1".to_string()],
-                NetworkDevice: {
-                    MacAddress: "2:0:0:0:0:1",
-                    PhyUp: true,
-                },
-            }
-        }
-    })
-}
-
-#[netstack_test]
-async fn inspect_for_sampler<N: Netstack>(name: &str) {
+async fn inspect_for_sampler(name: &str) {
+    type N = netstack_testing_common::realms::Netstack2;
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
     // Connect to netstack service to spawn a netstack instance.
@@ -1738,7 +1584,7 @@ const CONFIG_DATA_NONEXISTENT: &str = "/pkg/netstack/idontexist.json";
     false, "INFO", "2m0s", true, true, CONFIG_DATA_NONEXISTENT, None;
     "config-data file is nonexistent"
 )]
-async fn inspect_config<N: Netstack>(
+async fn inspect_config(
     name: &str,
     log_packets: bool,
     verbosity: &str,
@@ -1750,8 +1596,9 @@ async fn inspect_config<N: Netstack>(
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = {
-        let mut netstack =
-            fidl_fuchsia_netemul::ChildDef::from(&KnownServiceProvider::Netstack(N::VERSION));
+        let mut netstack = fidl_fuchsia_netemul::ChildDef::from(&KnownServiceProvider::Netstack(
+            netstack_testing_common::realms::Netstack2::VERSION,
+        ));
         let fidl_fuchsia_netemul::ChildDef { program_args, .. } = &mut netstack;
         *program_args = Some(vec![
             format!("--log-packets={log_packets}"),

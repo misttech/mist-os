@@ -2,11 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components.gni")
 import("//build/rust/rustc_test.gni")
 
-rustc_test("inspect") {
+rustc_test("netstack2_inspect_tests") {
   edition = "2021"
-  output_name = "netstack_inspect_integration_test"
   deps = [
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
@@ -38,9 +38,83 @@ rustc_test("inspect") {
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:test-case",
   ]
-  sources = [ "src/lib.rs" ]
+
+  source_root = "src/ns2.rs"
+  sources = [ "src/ns2.rs" ]
+
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 
   # TODO(fxbug.dev/132041) Delete this line when clippy ICE is fixed upstream
   disable_clippy = true
+}
+
+rustc_test("netstack3_inspect_tests") {
+  edition = "2021"
+  deps = [
+    "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
+    "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
+    "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
+    "//src/connectivity/lib/net-declare",
+    "//src/connectivity/lib/packet-formats",
+    "//src/connectivity/network/testing/netemul/rust:lib",
+    "//src/connectivity/network/tests/integration/common:netstack_testing_common",
+    "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
+    "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/fuchsia-async",
+    "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
+  ]
+
+  source_root = "src/ns3.rs"
+  sources = [ "src/ns3.rs" ]
+
+  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+
+  # TODO(fxbug.dev/132041) Delete this line when clippy ICE is fixed upstream
+  disable_clippy = true
+}
+
+fuchsia_unittest_package("netstack2-inspect-integration-test") {
+  deps = [
+    ":netstack-empty-netemul-config",
+    ":netstack-specified-procs-netemul-config",
+    ":netstack2_inspect_tests",
+    ":sampler-config",
+    "//src/connectivity/network/netstack:component-debug",
+    "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
+    "//src/sys/stash:stash_secure_v2",
+  ]
+}
+
+resource("netstack-empty-netemul-config") {
+  testonly = true
+  sources = [ "config/empty.json" ]
+  outputs = [ "netstack/empty.json" ]
+}
+
+resource("netstack-specified-procs-netemul-config") {
+  testonly = true
+  sources = [ "config/specified_procs.json" ]
+  outputs = [ "netstack/specified_procs.json" ]
+}
+
+resource("sampler-config") {
+  sources = [ "//src/diagnostics/config/sampler/netstack.json" ]
+  outputs = [ "data/sampler-config/netstack.json" ]
+}
+
+fuchsia_unittest_package("netstack3-inspect-integration-test") {
+  deps = [
+    ":netstack3_inspect_tests",
+    "//src/connectivity/network/netstack3:component-debug",
+    "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
+  ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":netstack3-inspect-integration-test" ]
+  if (target_cpu != "riscv64") {
+    # Netstack2 is not available on RISCV.
+    deps += [ ":netstack2-inspect-integration-test" ]
+  }
 }

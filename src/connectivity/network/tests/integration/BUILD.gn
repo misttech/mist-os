@@ -9,10 +9,7 @@ import(
 import(
     "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
 
-tests = [
-  "inspect",
-  "sys",
-]
+tests = [ "sys" ]
 
 tests_with_err_logs = [
   {
@@ -81,19 +78,12 @@ package_deps = [
   # netemul-sandbox is used to create hermetic test realms.
   "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
 
-  # netstack is under test.
-  ":netstack-empty-netemul-config",
-  ":netstack-specified-procs-netemul-config",
-
   # netstack3 is under test.
   "//src/connectivity/network/netstack3:component",
   "//src/connectivity/network/netstack3:component-debug",
 
   # reachability monitor is under test.
   "//src/connectivity/network/reachability:component_with_fake_time",
-
-  # sampler config is tested as part of inspect integration tests.
-  ":sampler-config",
 
   # stash_secure is used by dhcpd and netstack.
   "//src/sys/stash:stash_secure_v2",
@@ -219,23 +209,6 @@ resource("netcfg-with-iface-name-prefix") {
   outputs = [ "netcfg/iface_prefix.json" ]
 }
 
-resource("netstack-empty-netemul-config") {
-  testonly = true
-  sources = [ "inspect/config/empty.json" ]
-  outputs = [ "netstack/empty.json" ]
-}
-
-resource("netstack-specified-procs-netemul-config") {
-  testonly = true
-  sources = [ "inspect/config/specified_procs.json" ]
-  outputs = [ "netstack/specified_procs.json" ]
-}
-
-resource("sampler-config") {
-  sources = [ "//src/diagnostics/config/sampler/netstack.json" ]
-  outputs = [ "data/sampler-config/netstack.json" ]
-}
-
 # We keep tests that involve the virtualization stack (and especially guest
 # images) restricted to a separate builder.  See https://fxbug.dev/122994 for
 # more details.
@@ -252,6 +225,7 @@ group("tests") {
   deps = [
            ":netstack-integration-tests",
            "guest:build-only",
+           "inspect:tests",
            "macros:netstack_testing_macros_test",
          ] + err_log_package_deps
 
