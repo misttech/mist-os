@@ -24,7 +24,26 @@ namespace diagnostics::reader {
 // This class provides methods for parsing common fields from diagnostics output.
 class LogsData {
  public:
-  struct LogsMetadata final {
+  struct DroppedLogsError {
+    uint64_t count;
+  };
+
+  struct RolledOutLogsError {
+    uint64_t count;
+  };
+
+  struct FailedToParseRecordError {
+    std::string message;
+  };
+
+  struct OtherError {
+    std::string message;
+  };
+
+  using Error =
+      std::variant<DroppedLogsError, RolledOutLogsError, FailedToParseRecordError, OtherError>;
+
+  struct Metadata final {
     std::string component_url;
     uint64_t timestamp;
     fuchsia::diagnostics::Severity severity;
@@ -33,7 +52,7 @@ class LogsData {
     std::optional<uint64_t> tid;
     std::optional<std::string> file;
     std::optional<uint64_t> line;
-    // TODO(b/300181458): process errors.
+    std::vector<Error> errors;
   };
 
   // Create a new LogsData wrapper from a JSON document.
@@ -52,7 +71,7 @@ class LogsData {
   uint64_t version() const { return version_; }
 
   // Return the metadata of the component that created this data.
-  const LogsData::LogsMetadata& metadata() const { return metadata_; }
+  const LogsData::Metadata& metadata() const { return metadata_; }
 
   // Return the message of the log.
   const std::string& message() const { return message_; }
@@ -62,7 +81,7 @@ class LogsData {
   std::string moniker_;
 
   // The metadata for the diagnostics payload.
-  LogsMetadata metadata_;
+  Metadata metadata_;
 
   // The message of this log.
   std::string message_;

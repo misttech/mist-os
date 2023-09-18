@@ -23,9 +23,15 @@ constexpr char kMetadataPid[] = "pid";
 constexpr char kMetadataSeverity[] = "severity";
 constexpr char kMetadataTags[] = "tags";
 constexpr char kMetadataTid[] = "tid";
-constexpr char kPayloadMessage[] = "message";
 constexpr char kPayloadRoot[] = "root";
 constexpr char kPayloadMessageValue[] = "value";
+
+constexpr char kErrorDroppedLogs[] = "dropped_logs";
+constexpr char kErrorRolledOutLogs[] = "rolled_out_logs";
+constexpr char kErrorParseRecord[] = "parse_record";
+constexpr char kErrorOther[] = "other";
+constexpr char kMessage[] = "message";
+constexpr char kCount[] = "count";
 
 }  // namespace diagnostics::reader
 

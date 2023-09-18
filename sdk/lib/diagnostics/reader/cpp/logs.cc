@@ -161,21 +161,55 @@ LogsData::LogsData(rapidjson::Document document) {
       metadata_.line = std::make_optional(metadata[kMetadataLine].GetUint64());
     }
 
-    // TODO(b/300181458): do process errors.
-    // TODO(b/300181458): do process key values.
+    if (metadata.HasMember(kMetadataErrors) && metadata[kMetadataErrors].IsArray()) {
+      const auto& errors = metadata[kMetadataErrors].GetArray();
+      for (auto item = errors.Begin(); item != errors.End(); item++) {
+        if (!item->IsObject()) {
+          continue;
+        }
+        const auto& error = item->GetObject();
+        if (error.HasMember(kErrorDroppedLogs)) {
+          const auto& dropped = error[kErrorDroppedLogs];
+          if (dropped.IsObject() && dropped.HasMember(kCount) && dropped[kCount].IsUint64()) {
+            LogsData::Error error{DroppedLogsError{dropped[kCount].GetUint64()}};
+            metadata_.errors.push_back(std::move(error));
+          }
+        } else if (error.HasMember(kErrorRolledOutLogs)) {
+          const auto& rolled_out = error[kErrorRolledOutLogs];
+          if (rolled_out.IsObject() && rolled_out.HasMember(kCount) &&
+              rolled_out[kCount].IsUint64()) {
+            LogsData::Error error{RolledOutLogsError{rolled_out[kCount].GetUint64()}};
+            metadata_.errors.push_back(std::move(error));
+          }
+        } else if (error.HasMember(kErrorParseRecord)) {
+          const auto& failed_to_parse_record = error[kErrorParseRecord];
+          if (failed_to_parse_record.IsString()) {
+            LogsData::Error error{FailedToParseRecordError{failed_to_parse_record.GetString()}};
+            metadata_.errors.push_back(std::move(error));
+          }
+        } else if (error.HasMember(kErrorOther)) {
+          const auto& other = error[kErrorOther];
+          if (other.IsObject() && other.HasMember(kMessage) && other[kMessage].IsString()) {
+            LogsData::Error error{OtherError{other[kMessage].GetString()}};
+            metadata_.errors.push_back(std::move(error));
+          }
+        }
+      }
+    }
   }
 
   if (document.HasMember(kPayloadName) && document[kPayloadName].IsObject()) {
     const auto& payload = document[kPayloadName].GetObject();
     if (payload.HasMember(kPayloadRoot) && payload[kPayloadRoot].IsObject()) {
       const auto& root = payload[kPayloadRoot].GetObject();
-      if (root.HasMember(kPayloadMessage) && root[kPayloadMessage].IsObject()) {
-        const auto& message = root[kPayloadMessage].GetObject();
+      if (root.HasMember(kMessage) && root[kMessage].IsObject()) {
+        const auto& message = root[kMessage].GetObject();
         if (message.HasMember(kPayloadMessageValue) && message[kPayloadMessageValue].IsString()) {
           message_ = message[kPayloadMessageValue].GetString();
         }
       }
     }
+    // TODO(b/300181458): do process key values.
   }
 }
 

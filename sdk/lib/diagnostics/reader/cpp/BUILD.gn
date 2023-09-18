@@ -42,7 +42,10 @@ source_set("archive_reader") {
 executable("archive_reader_test") {
   testonly = true
   output_name = "archive_reader_test"
-  sources = [ "archive_reader_unittest.cc" ]
+  sources = [
+    "inspect_unittest.cc",
+    "logs_unittest.cc",
+  ]
   deps = [
     ":archive_reader",
     "//zircon/system/ulib/zxtest",
