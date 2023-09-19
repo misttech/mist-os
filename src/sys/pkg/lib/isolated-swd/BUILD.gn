@@ -81,8 +81,8 @@ fuchsia_test_package("isolated-swd-tests") {
   test_components = [ ":isolated-swd-tests-component" ]
 
   deps = [
+    "//src/connectivity/network:netstack-for-tests",
     "//src/connectivity/network/dns:component",
-    "//src/connectivity/network/netstack:component",
     "//src/storage/testing:storage_driver_test_realm",
     "//src/storage/tools/blobfs-compression",
     "//src/sys/pkg/bin/fake-system-update-committer",

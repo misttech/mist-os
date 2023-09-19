@@ -85,8 +85,8 @@ fuchsia_unittest_package("fuchsia-pkg-testing-tests") {
   manifest = "meta/fuchsia-pkg-testing-tests.cml"
   deps = [
     ":fuchsia-pkg-testing_test",
+    "//src/connectivity/network:netstack-for-tests",
     "//src/connectivity/network/dns:component",
-    "//src/connectivity/network/netstack:component",
     "//src/storage/tools/blobfs-compression",
   ]
 }

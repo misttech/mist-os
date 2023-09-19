@@ -41,8 +41,8 @@ fuchsia_unittest_package("mock-omaha-server-lib-tests") {
   manifest = "meta/mock-omaha-server-lib-test.cml"
   deps = [
     ":mock-omaha-server_test",
+    "//src/connectivity/network:netstack-for-tests",
     "//src/connectivity/network/dns:component",
-    "//src/connectivity/network/netstack:component",
   ]
   test_specs = {
     log_settings = {

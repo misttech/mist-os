@@ -58,8 +58,8 @@ fuchsia_unittest_package("omaha-client-fuchsia-tests") {
 
   deps = [
     ":omaha-client-fuchsia-tests-test-driver",
+    "//src/connectivity/network:netstack-for-tests",
     "//src/connectivity/network/dns:component",
-    "//src/connectivity/network/netstack:component",
     "//src/power/shutdown-shim/tests:shutdown_shim_component",
     "//src/sys/pkg/bin/fake-channel-control:fake-channel-control",
     "//src/sys/stash:stash2_v2",
