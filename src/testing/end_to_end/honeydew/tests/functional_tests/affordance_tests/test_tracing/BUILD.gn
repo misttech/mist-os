@@ -41,7 +41,7 @@ if (is_host) {
 
   group("stable_non_sl4f_emulator_tests") {
     testonly = true
-    public_deps = []
+    public_deps = [ ":tracing_test_fc($host_toolchain)" ]
   }
 
   # Unstable infra test groups.
@@ -52,6 +52,6 @@ if (is_host) {
 
   group("unstable_non_sl4f_emulator_tests") {
     testonly = true
-    public_deps = [ ":tracing_test_fc($host_toolchain)" ]
+    public_deps = []
   }
 }
