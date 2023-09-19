@@ -161,10 +161,6 @@ void ArchiveReader::InnerSnapshotInspectUntilPresent(
             std::set<std::string> remaining(monikers.begin(), monikers.end());
             for (const auto& val : value) {
               remaining.erase(val.moniker());
-              // TODO(fxb/77979) This is a workaround to make tests pass during
-              // the migration. Remove after migration
-              auto name = val.moniker().substr(val.moniker().find_last_of("/") + 1);
-              remaining.erase(name);
             }
 
             if (remaining.empty()) {
