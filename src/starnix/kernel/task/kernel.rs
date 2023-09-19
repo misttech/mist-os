@@ -14,7 +14,7 @@ use std::{
     collections::{BTreeMap, HashSet},
     iter::FromIterator,
     sync::{
-        atomic::{AtomicU16, AtomicU32, AtomicU64},
+        atomic::{AtomicI32, AtomicU16, AtomicU32, AtomicU64},
         Arc, Weak,
     },
 };
@@ -27,6 +27,7 @@ use crate::{
     diagnostics::CoreDumpList,
     fs::{
         devtmpfs::devtmpfs_create_device,
+        inotify::InotifyLimits,
         kobject::*,
         socket::{
             GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
@@ -182,11 +183,7 @@ pub struct Kernel {
     /// Unique cookie used to link two inotify events, usually an IN_MOVE_FROM/IN_MOVE_TO pair.
     pub next_inotify_cookie: AtomicU32,
 
-    /// Max inotify event queue size.
-    ///
-    /// This value is used during the creation of an inotify instance.
-    /// TODO(b/297439734): Link to /proc/sys/fs/inotify/max_queued_events.
-    pub inotify_max_queued_events: AtomicU64,
+    pub inotify_limits: InotifyLimits,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -284,7 +281,11 @@ impl Kernel {
             next_peer_group_id: AtomicU64::new(1),
             next_namespace_id: AtomicU64::new(1),
             next_inotify_cookie: AtomicU32::new(1),
-            inotify_max_queued_events: AtomicU64::new(16384),
+            inotify_limits: InotifyLimits {
+                max_queued_events: AtomicI32::new(16384),
+                max_user_instances: AtomicI32::new(128),
+                max_user_watches: AtomicI32::new(1048576),
+            },
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle

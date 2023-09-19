@@ -3,9 +3,13 @@
 // found in the LICENSE file.
 
 use std::{
+    borrow::Cow,
     collections::{HashMap, VecDeque},
     mem::size_of,
-    sync::{atomic::Ordering, Arc},
+    sync::{
+        atomic::{AtomicI32, Ordering},
+        Arc,
+    },
 };
 use zerocopy::AsBytes;
 
@@ -87,12 +91,13 @@ impl InotifyFileObject {
         let flags =
             OpenFlags::RDONLY | if non_blocking { OpenFlags::NONBLOCK } else { OpenFlags::empty() };
         let max_queued_events =
-            current_task.kernel().inotify_max_queued_events.load(Ordering::Relaxed);
+            current_task.kernel().inotify_limits.max_queued_events.load(Ordering::Relaxed);
+        assert!(max_queued_events >= 0);
         Anon::new_file(
             current_task,
             Box::new(InotifyFileObject {
                 state: InotifyState {
-                    events: InotifyEventQueue::new_with_max(max_queued_events),
+                    events: InotifyEventQueue::new_with_max(max_queued_events as usize),
                     watches: Default::default(),
                     last_watch_id: 0,
                 }
@@ -272,12 +277,8 @@ impl FileOps for InotifyFileObject {
 }
 
 impl InotifyEventQueue {
-    fn new_with_max(max_queued_events: u64) -> Self {
-        InotifyEventQueue {
-            queue: Default::default(),
-            size_bytes: 0,
-            max_queued_events: max_queued_events as usize,
-        }
+    fn new_with_max(max_queued_events: usize) -> Self {
+        InotifyEventQueue { queue: Default::default(), size_bytes: 0, max_queued_events }
     }
 
     fn enqueue(&mut self, mut event: InotifyEvent) {
@@ -472,6 +473,76 @@ impl Kernel {
         cookie
     }
 }
+
+/// Corresponds to files in /proc/sys/fs/inotify/, but cannot be negative.
+pub struct InotifyLimits {
+    // This value is used when creating an inotify instance.
+    // Updating this value does not affect already-created inotify instances.
+    pub max_queued_events: AtomicI32,
+
+    // TODO(b/297439734): Make this a real user limit on inotify instances.
+    pub max_user_instances: AtomicI32,
+
+    // TODO(b/297439734): Make this a real user limit on inotify watches.
+    pub max_user_watches: AtomicI32,
+}
+
+pub trait AtomicGetter {
+    fn get_atomic<'a>(current_task: &'a CurrentTask) -> &'a AtomicI32;
+}
+
+pub struct MaxQueuedEventsGetter;
+impl AtomicGetter for MaxQueuedEventsGetter {
+    fn get_atomic<'a>(current_task: &'a CurrentTask) -> &'a AtomicI32 {
+        &current_task.kernel().inotify_limits.max_queued_events
+    }
+}
+
+pub struct MaxUserInstancesGetter;
+impl AtomicGetter for MaxUserInstancesGetter {
+    fn get_atomic<'a>(current_task: &'a CurrentTask) -> &'a AtomicI32 {
+        &current_task.kernel().inotify_limits.max_user_instances
+    }
+}
+
+pub struct MaxUserWatchesGetter;
+impl AtomicGetter for MaxUserWatchesGetter {
+    fn get_atomic<'a>(current_task: &'a CurrentTask) -> &'a AtomicI32 {
+        &current_task.kernel().inotify_limits.max_user_watches
+    }
+}
+
+pub struct InotifyLimitProcFile<G: AtomicGetter + Send + Sync + 'static> {
+    marker: std::marker::PhantomData<G>,
+}
+
+impl<G: AtomicGetter + Send + Sync + 'static> InotifyLimitProcFile<G> {
+    pub fn new_node() -> impl FsNodeOps {
+        BytesFile::new_node(Self { marker: Default::default() })
+    }
+}
+
+impl<G: AtomicGetter + Send + Sync + 'static> BytesFileOps for InotifyLimitProcFile<G> {
+    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
+            return error!(EPERM);
+        }
+        let value = fs_args::parse::<i32>(&data)?;
+        if value < 0 {
+            return error!(EINVAL);
+        }
+        G::get_atomic(current_task).store(value, Ordering::Relaxed);
+        Ok(())
+    }
+
+    fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        Ok(G::get_atomic(current_task).load(Ordering::Relaxed).to_string().into_bytes().into())
+    }
+}
+
+pub type InotifyMaxQueuedEvents = InotifyLimitProcFile<MaxQueuedEventsGetter>;
+pub type InotifyMaxUserInstances = InotifyLimitProcFile<MaxUserInstancesGetter>;
+pub type InotifyMaxUserWatches = InotifyLimitProcFile<MaxUserWatchesGetter>;
 
 #[cfg(test)]
 mod tests {

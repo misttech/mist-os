@@ -50,13 +50,9 @@ pub fn sysctl_directory(fs: &FileSystemHandle, kernel: &Arc<Kernel>) -> FsNodeHa
     });
     dir.subdir(b"fs", 0o555, |dir| {
         dir.subdir(b"inotify", 0o555, |dir| {
-            dir.node(
-                b"max_queued_events",
-                fs.create_node(
-                    BytesFile::new_node(b"16384".to_vec()),
-                    FsNodeInfo::new_factory(mode, FsCred::root()),
-                ),
-            );
+            dir.entry(b"max_queued_events", inotify::InotifyMaxQueuedEvents::new_node(), mode);
+            dir.entry(b"max_user_instances", inotify::InotifyMaxUserInstances::new_node(), mode);
+            dir.entry(b"max_user_watches", inotify::InotifyMaxUserWatches::new_node(), mode);
         });
     });
     dir.build()
