@@ -61,6 +61,17 @@ struct ResolverDefinition {
   const Module* module_ = nullptr;
 };
 
+enum class ResolverPolicy : bool {
+  // The first symbol found takes precedence, searching ends after finding the
+  // first.
+  kStrictLinkOrder,
+
+  // This follows LD_DYNAMIC_WEAK=1 semantics, the resolver will resolve to the
+  // first STB_GLOBAL symbol even if an STB_WEAK symbol was seen earlier.
+  // If no global symbol was found the first STB_WEAK symbol will prevail.
+  kStrongOverWeak,
+};
+
 // Returns a callable object which can be used for RelocateSymbolic's `resolve`
 // argument. This takes a SymbolInfo object which is used for finding the name
 // of the symbol given by RelocateSymbolic. The `modules` argument is a list of
@@ -70,11 +81,12 @@ struct ResolverDefinition {
 // passed to MakeSymbolResolver should outlive the returned object.
 template <class SymbolInfo, class ModuleList, class Diagnostics>
 constexpr auto MakeSymbolResolver(const SymbolInfo& ref_info, const ModuleList& modules,
-                                  Diagnostics& diag) {
+                                  Diagnostics& diag,
+                                  ResolverPolicy policy = ResolverPolicy::kStrictLinkOrder) {
   using Module = std::decay_t<decltype(*std::declval<ModuleList>().begin())>;
   using Definition = ResolverDefinition<Module>;
 
-  return [&](const auto& ref, elfldltl::RelocateTls tls_type) -> std::optional<Definition> {
+  return [&, policy](const auto& ref, elfldltl::RelocateTls tls_type) -> std::optional<Definition> {
     // TODO(fxbug.dev/118060): Support thread local symbols. For now we just use
     // FormatError, which isn't preferable, but this is just a temporary error.
     if (tls_type != RelocateTls::kNone) {
@@ -89,14 +101,39 @@ constexpr auto MakeSymbolResolver(const SymbolInfo& ref_info, const ModuleList& 
       return std::nullopt;
     }
 
+    Definition weak_def = Definition::UndefinedWeak();
     for (const auto& module : modules) {
       if (const auto* sym = name.Lookup(module.symbol_info())) {
-        return Definition{sym, std::addressof(module)};
+        const Definition module_def{sym, &module};
+        switch (sym->bind()) {
+          case ElfSymBind::kWeak:
+            // In kStrongOverWeak policy the first weak definition will prevail
+            // if no global symbol is found later.
+            if (policy == ResolverPolicy::kStrongOverWeak) {
+              if (weak_def.undefined_weak()) {
+                weak_def = module_def;
+              }
+              break;
+            }
+            [[fallthrough]];
+          case ElfSymBind::kGlobal:
+            // The first (strong) global always prevails regardless of policy.
+            return module_def;
+          case ElfSymBind::kLocal:
+            diag.FormatWarning("STB_LOCAL found in hash table");
+            break;
+          case ElfSymBind::kUnique:
+            diag.FormatError("STB_GNU_UNIQUE not supported");
+            return {};
+          default:
+            diag.FormatError("Unkown symbol bind", static_cast<unsigned>(sym->bind()));
+            return {};
+        }
       }
     }
 
-    if (ref.bind() == ElfSymBind::kWeak) {
-      return Definition::UndefinedWeak();
+    if (!weak_def.undefined_weak() || ref.bind() == ElfSymBind::kWeak) {
+      return weak_def;
     }
 
     diag.UndefinedSymbol(name);

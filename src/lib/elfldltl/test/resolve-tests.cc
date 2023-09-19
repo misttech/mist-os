@@ -109,6 +109,8 @@ TYPED_TEST_SUITE(ElfldltlResolveTests, elfldltl::testing::AllFormatsTypedTest);
 
 constexpr elfldltl::SymbolName kASymbol("a"sv);
 constexpr elfldltl::SymbolName kBSymbol("b"sv);
+constexpr elfldltl::SymbolName kCSymbol("c"sv);
+constexpr elfldltl::SymbolName kWeakBothSymbol("weak_both"sv);
 
 TYPED_TEST(ElfldltlResolveTests, SingleModule) {
   using Elf = typename TestFixture::Elf;
@@ -204,10 +206,126 @@ TYPED_TEST(ElfldltlResolveTests, UndefinedWeak) {
 
   elfldltl::SymbolInfoForSingleLookup<Elf> si{"noexist", elfldltl::ElfSymType::kNoType,
                                               elfldltl::ElfSymBind::kWeak};
-  auto resolve = elfldltl::MakeSymbolResolver(si, modules, diag);
-  auto found = resolve(si.symbol(), elfldltl::RelocateTls::kNone);
-  ASSERT_TRUE(found);
-  EXPECT_TRUE(found->undefined_weak());
+  auto check_resolver = [&](auto&& resolve, std::string_view identifier) {
+    auto found = resolve(si.symbol(), elfldltl::RelocateTls::kNone);
+    ASSERT_TRUE(found) << identifier;
+    EXPECT_TRUE(found->undefined_weak()) << identifier;
+  };
+
+  check_resolver(
+      elfldltl::MakeSymbolResolver(si, modules, diag, elfldltl::ResolverPolicy::kStrictLinkOrder),
+      "kStrictLinkOrder");
+  check_resolver(
+      elfldltl::MakeSymbolResolver(si, modules, diag, elfldltl::ResolverPolicy::kStrongOverWeak),
+      "kStrongOverWeak");
+}
+
+TYPED_TEST(ElfldltlResolveTests, DefaultWeakPolicy) {
+  using Elf = typename TestFixture::Elf;
+  using Sym = typename Elf::Sym;
+  using TestModule = typename ElfldltlResolveTests<Elf>::TestModule;
+
+  auto diag = ExpectOkDiagnostics();
+
+  std::array modules{TestModule("first"), TestModule("second")};
+  if (this->HasFatalFailure()) {
+    return;
+  }
+
+  auto& si1 = modules[0].symbol_info();
+  auto& si2 = modules[1].symbol_info();
+
+  const Sym* c_weak = kCSymbol.Lookup(si1);
+  ASSERT_NE(c_weak, nullptr);
+  const Sym* c_strong = kCSymbol.Lookup(si2);
+  ASSERT_NE(c_strong, nullptr);
+
+  elfldltl::SymbolInfoForSingleLookup<Elf> si{"c"};
+
+  auto check_resolver = [&](auto&& resolve, std::string_view identifier) {
+    auto found = resolve(si.symbol(), elfldltl::RelocateTls::kNone);
+    ASSERT_TRUE(found) << identifier;
+    ASSERT_FALSE(found->undefined_weak()) << identifier;
+    EXPECT_EQ(&found->symbol(), c_weak) << identifier;
+    EXPECT_EQ(found->symbol().value, 1ul) << identifier;
+  };
+
+  check_resolver(elfldltl::MakeSymbolResolver(si, modules, diag), "default");
+  check_resolver(
+      elfldltl::MakeSymbolResolver(si, modules, diag, elfldltl::ResolverPolicy::kStrictLinkOrder),
+      "specified");
+}
+
+TYPED_TEST(ElfldltlResolveTests, DynamicWeakPolicy) {
+  using Elf = typename TestFixture::Elf;
+  using Sym = typename Elf::Sym;
+  using TestModule = typename ElfldltlResolveTests<Elf>::TestModule;
+
+  auto diag = ExpectOkDiagnostics();
+
+  std::array modules{TestModule("first"), TestModule("second")};
+  if (this->HasFatalFailure()) {
+    return;
+  }
+
+  auto& si1 = modules[0].symbol_info();
+  auto& si2 = modules[1].symbol_info();
+
+  {
+    const Sym* c_weak = kCSymbol.Lookup(si1);
+    ASSERT_NE(c_weak, nullptr);
+    const Sym* c_strong = kCSymbol.Lookup(si2);
+    ASSERT_NE(c_strong, nullptr);
+
+    elfldltl::SymbolInfoForSingleLookup<Elf> si{"c"};
+
+    auto resolve =
+        elfldltl::MakeSymbolResolver(si, modules, diag, elfldltl::ResolverPolicy::kStrongOverWeak);
+    auto found = resolve(si.symbol(), elfldltl::RelocateTls::kNone);
+    ASSERT_TRUE(found);
+    ASSERT_FALSE(found->undefined_weak());
+    EXPECT_EQ(&found->symbol(), c_strong);
+    EXPECT_EQ(found->symbol().value, 2ul);
+  }
+  {
+    const Sym* weak_both1 = kWeakBothSymbol.Lookup(si1);
+    ASSERT_TRUE(weak_both1);
+    const Sym* weak_both2 = kWeakBothSymbol.Lookup(si2);
+    ASSERT_TRUE(weak_both2);
+
+    elfldltl::SymbolInfoForSingleLookup<Elf> si{"weak_both"};
+
+    auto resolve =
+        elfldltl::MakeSymbolResolver(si, modules, diag, elfldltl::ResolverPolicy::kStrongOverWeak);
+    auto found = resolve(si.symbol(), elfldltl::RelocateTls::kNone);
+    ASSERT_TRUE(found);
+    ASSERT_FALSE(found->undefined_weak());
+    EXPECT_EQ(&found->symbol(), weak_both1);
+    EXPECT_EQ(found->symbol().value, 1ul);
+  }
+}
+
+TYPED_TEST(ElfldltlResolveTests, GnuUniqueError) {
+  using Elf = typename TestFixture::Elf;
+  using Sym = typename Elf::Sym;
+  using TestModule = typename ElfldltlResolveTests<Elf>::TestModule;
+
+  ExpectedSingleError expected("STB_GNU_UNIQUE not supported");
+
+  TestModule module("gnu_unique");
+  if (this->HasFatalFailure()) {
+    return;
+  }
+
+  auto& si = module.symbol_info();
+
+  const Sym* a = kASymbol.Lookup(si);
+  ASSERT_NE(a, nullptr);
+
+  cpp20::span modules{&module, 1};
+  auto resolve = elfldltl::MakeSymbolResolver(si, modules, expected.diag());
+  auto found = resolve(*a, elfldltl::RelocateTls::kNone);
+  EXPECT_FALSE(found);
 }
 
 TYPED_TEST(ElfldltlResolveTests, Undefined) {

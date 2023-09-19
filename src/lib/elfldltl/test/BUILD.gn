@@ -76,6 +76,10 @@ resolve_dsos = [
   "data/second-32le.so",
   "data/second-64be.so",
   "data/second-64le.so",
+  "data/gnu_unique-32be.so",
+  "data/gnu_unique-32le.so",
+  "data/gnu_unique-64be.so",
+  "data/gnu_unique-64le.so",
 ]
 
 if (is_host) {

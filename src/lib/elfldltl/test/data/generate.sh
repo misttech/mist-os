@@ -11,12 +11,24 @@ compile() {
 // used in the test along with Symbol address to ensure we resolved to the correct
 // one.
 
-#ifdef FIRST
+#ifdef GNU_UNIQUE
+
+.global a
+.type a, %gnu_unique_object
+.set a, 1
+
+#elif defined(FIRST)
 
 .global a
 .set a, 1
 
-#else
+.weak c
+.set c, 1
+
+.weak weak_both
+.set weak_both, 1
+
+#elif defined(SECOND)
 
 .global a
 .set a, 2
@@ -24,11 +36,19 @@ compile() {
 .global b
 .set b, 2
 
+.global c
+.set c, 2
+
+.weak weak_both
+.set weak_both, 2
+
+#else
+#error "Bad defines"
 #endif
 EOF
 }
 
-for f in first second
+for f in first second gnu_unique
 do
     for arch_width in aarch64,64 arm,32
     do
