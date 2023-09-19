@@ -30,10 +30,6 @@ bool FuchsiaPkgUrl::IsFuchsiaPkgScheme(const std::string& url) {
   return url.compare(0, kFuchsiaPkgPrefix.length(), kFuchsiaPkgPrefix) == 0;
 }
 
-std::string FuchsiaPkgUrl::GetDefaultComponentCmxPath() const {
-  return fxl::Substitute("meta/$0.cmx", package_name());
-}
-
 bool FuchsiaPkgUrl::Parse(const std::string& url) {
   package_name_.clear();
   resource_path_.clear();

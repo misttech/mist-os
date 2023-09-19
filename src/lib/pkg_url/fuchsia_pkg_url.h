@@ -21,10 +21,6 @@ class FuchsiaPkgUrl {
 
   static bool IsFuchsiaPkgScheme(const std::string& url);
 
-  // Returns the default component's .cmx path of this package, i.e.
-  // meta/<package_name>.cmx
-  std::string GetDefaultComponentCmxPath() const;
-
   bool Parse(const std::string& url);
 
   bool operator==(const FuchsiaPkgUrl&) const;

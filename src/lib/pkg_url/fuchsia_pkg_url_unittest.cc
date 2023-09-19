@@ -9,17 +9,11 @@
 namespace component {
 namespace {
 
-FuchsiaPkgUrl ParseFuchsiaPkgUrl(const std::string& s) {
-  FuchsiaPkgUrl url;
-  EXPECT_TRUE(url.Parse(s));
-  return url;
-}
-
 TEST(FuchsiaPkgUrl, Parse) {
   FuchsiaPkgUrl fp;
   EXPECT_FALSE(fp.Parse(""));
   EXPECT_FALSE(fp.Parse("{}"));
-  EXPECT_FALSE(fp.Parse("file://fuchsia.com/component_hello_world#meta/hello_world.cmx"));
+  EXPECT_FALSE(fp.Parse("file://fuchsia.com/component_hello_world#meta/hello_world.cm"));
   EXPECT_FALSE(fp.Parse("#meta/stuff"));
   EXPECT_FALSE(fp.Parse("fuchsia-pkg://fuchsia.com/component_hello_world#"));
 
@@ -31,12 +25,12 @@ TEST(FuchsiaPkgUrl, Parse) {
   EXPECT_EQ("", fp.resource_path());
   EXPECT_EQ("fuchsia-pkg://fuchsia.com/component_hello_world/0", fp.package_path());
 
-  EXPECT_TRUE(fp.Parse("fuchsia-pkg://fuchsia.com/component_hello_world#meta/hello_world.cmx"));
+  EXPECT_TRUE(fp.Parse("fuchsia-pkg://fuchsia.com/component_hello_world#meta/hello_world.cm"));
   EXPECT_EQ("fuchsia.com", fp.host_name());
   EXPECT_EQ("component_hello_world", fp.package_name());
   EXPECT_EQ("0", fp.variant());
   EXPECT_EQ("", fp.hash());
-  EXPECT_EQ("meta/hello_world.cmx", fp.resource_path());
+  EXPECT_EQ("meta/hello_world.cm", fp.resource_path());
   EXPECT_EQ("fuchsia-pkg://fuchsia.com/component_hello_world/0", fp.package_path());
 
   EXPECT_TRUE(fp.Parse("fuchsia-pkg://fuchsia.com/component_hello_world#meta/stuff"));
@@ -84,36 +78,36 @@ TEST(FuchsiaPkgUrl, Equality) {
   }
   {
     FuchsiaPkgUrl fp1;
-    ASSERT_TRUE(fp1.Parse("fuchsia-pkg://fuchsia.com/hello#meta/hello.cmx"));
+    ASSERT_TRUE(fp1.Parse("fuchsia-pkg://fuchsia.com/hello#meta/hello.cm"));
     auto fp2 = fp1;
     FuchsiaPkgUrl fp3;
     ASSERT_TRUE(fp3.Parse("fuchsia-pkg://fuchsia.com/hello"));
     FuchsiaPkgUrl fp4;
-    ASSERT_TRUE(fp4.Parse("fuchsia-pkg://fuchsia.com/hello#meta/goodbye.cmx"));
+    ASSERT_TRUE(fp4.Parse("fuchsia-pkg://fuchsia.com/hello#meta/goodbye.cm"));
     EXPECT_EQ(fp1, fp2);
     EXPECT_NE(fp1, fp3);
     EXPECT_NE(fp1, fp4);
   }
   {
     FuchsiaPkgUrl fp1;
-    ASSERT_TRUE(fp1.Parse("fuchsia-pkg://fuchsia.com/hello/1#meta/hello.cmx"));
+    ASSERT_TRUE(fp1.Parse("fuchsia-pkg://fuchsia.com/hello/1#meta/hello.cm"));
     auto fp2 = fp1;
     FuchsiaPkgUrl fp3;
-    ASSERT_TRUE(fp3.Parse("fuchsia-pkg://fuchsia.com/hello#meta/hello.cmx"));
+    ASSERT_TRUE(fp3.Parse("fuchsia-pkg://fuchsia.com/hello#meta/hello.cm"));
     FuchsiaPkgUrl fp4;
-    ASSERT_TRUE(fp4.Parse("fuchsia-pkg://fuchsia.com/hello/2#meta/hello.cmx"));
+    ASSERT_TRUE(fp4.Parse("fuchsia-pkg://fuchsia.com/hello/2#meta/hello.cm"));
     EXPECT_EQ(fp1, fp2);
     EXPECT_NE(fp1, fp3);
     EXPECT_NE(fp1, fp4);
   }
   {
     FuchsiaPkgUrl fp1;
-    ASSERT_TRUE(fp1.Parse("fuchsia-pkg://fuchsia.com/hello/1?hash=123#meta/hello.cmx"));
+    ASSERT_TRUE(fp1.Parse("fuchsia-pkg://fuchsia.com/hello/1?hash=123#meta/hello.cm"));
     auto fp2 = fp1;
     FuchsiaPkgUrl fp3;
-    ASSERT_TRUE(fp3.Parse("fuchsia-pkg://fuchsia.com/hello/1#meta/hello.cmx"));
+    ASSERT_TRUE(fp3.Parse("fuchsia-pkg://fuchsia.com/hello/1#meta/hello.cm"));
     FuchsiaPkgUrl fp4;
-    ASSERT_TRUE(fp4.Parse("fuchsia-pkg://fuchsia.com/hello/1?hash=456#meta/hello.cmx"));
+    ASSERT_TRUE(fp4.Parse("fuchsia-pkg://fuchsia.com/hello/1?hash=456#meta/hello.cm"));
     EXPECT_EQ(fp1, fp2);
     EXPECT_NE(fp1, fp3);
     EXPECT_NE(fp1, fp4);
@@ -122,20 +116,13 @@ TEST(FuchsiaPkgUrl, Equality) {
 
 TEST(FuchsiaPkgUrl, pkgfs_dir_path) {
   FuchsiaPkgUrl fp;
-  EXPECT_TRUE(fp.Parse("fuchsia-pkg://fuchsia.com/component_hello_world#meta/hello_world.cmx"));
+  EXPECT_TRUE(fp.Parse("fuchsia-pkg://fuchsia.com/component_hello_world#meta/hello_world.cm"));
   EXPECT_EQ("/pkgfs/packages/component_hello_world/0", fp.pkgfs_dir_path());
 
   EXPECT_TRUE(
       fp.Parse("fuchsia-pkg://fuchsia.com/component_hello_world/variant123#meta/"
-               "hello_world.cmx"));
+               "hello_world.cm"));
   EXPECT_EQ("/pkgfs/packages/component_hello_world/variant123", fp.pkgfs_dir_path());
-}
-
-TEST(FuchsiaPkgUrl, GetComponentDefaults) {
-  EXPECT_EQ("meta/sysmgr.cmx",
-            ParseFuchsiaPkgUrl("fuchsia-pkg://fuchsia.com/sysmgr").GetDefaultComponentCmxPath());
-  EXPECT_EQ("meta/sysmgr.cmx", ParseFuchsiaPkgUrl("fuchsia-pkg://fuchsia.com/sysmgr#meta/blah.cmx")
-                                   .GetDefaultComponentCmxPath());
 }
 
 }  // namespace
