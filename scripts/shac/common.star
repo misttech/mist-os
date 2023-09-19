@@ -16,3 +16,15 @@ def cipd_platform_name(ctx):
         "amd64": "x64",
     }.get(ctx.platform.arch, ctx.platform.arch)
     return "%s-%s" % (os, arch)
+
+def compiled_tool_path(ctx, tool_name):
+    """Returns the path to a compiled tool in the build directory."""
+    build_dir = ctx.vars.get("fuchsia_build_dir")
+    tools = json.decode(str(ctx.io.read_file(build_dir + "/tool_paths.json")))
+    for tool in tools:
+        if (
+            tool["name"] == tool_name and
+            "%s-%s" % (tool["os"], tool["cpu"]) == cipd_platform_name(ctx)
+        ):
+            return build_dir + "/" + tool["path"]
+    fail("no such tool in tool_paths.json: %s" % tool_name)

@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 load("./common.star", "FORMATTER_MSG", "cipd_platform_name")
+load("./fidl.star", "register_fidl_checks")
 load("./go.star", "register_go_checks")
 load("./python.star", "register_python_checks")
 load("./rust.star", "register_rust_checks")
@@ -49,6 +50,7 @@ def register_all_checks():
     file.
     """
     shac.register_check(shac.check(_gn_format, formatter = True))
+    register_fidl_checks()
     register_go_checks()
     register_python_checks()
     register_rust_checks()
