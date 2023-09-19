@@ -418,11 +418,6 @@
 	url = https://fuchsia.googlesource.com/third_party/re2
 	name = third_party/re2
 	ignore = all
-[submodule "third_party/rust_crates/mirrors/quiche"]
-	path = third_party/rust_crates/mirrors/quiche
-	url = https://fuchsia.googlesource.com/third_party/rust-mirrors/quiche
-	name = third_party/rust-mirrors/quiche
-	ignore = all
 [submodule "third_party/rust_crates/mirrors/serde_json5"]
 	path = third_party/rust_crates/mirrors/serde_json5
 	url = https://fuchsia.googlesource.com/third_party/github.com/google/serde_json5
