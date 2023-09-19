@@ -278,6 +278,65 @@ fn map_categories_to_providers(categories: &Vec<String>) -> TraceConfig {
     trace_config
 }
 
+fn ir_files_list(env_ctx: &EnvironmentContext, input_ir_files: Vec<String>) -> Option<Vec<String>> {
+    let build_dir = env_ctx.build_dir().unwrap_or(&std::path::Path::new(""));
+    let all_fidl_json_path = build_dir.join("all_fidl_json.txt");
+    let file_list = std::fs::read_to_string(all_fidl_json_path);
+    if file_list.is_err() {
+        return None;
+    }
+    let mut ir_files = input_ir_files;
+    for line in file_list.unwrap().lines() {
+        if let Some(ir_file_path) = build_dir.join(line).to_str() {
+            ir_files.push(ir_file_path.to_string());
+        }
+    }
+    return Some(ir_files);
+}
+
+fn symbolize_ordinal(ordinal: u64, ir_files: Vec<String>, mut writer: Writer) -> Result<()> {
+    // Scan through the list of ir files and look for the provided ordinal in the json contents.
+    for ir_file in ir_files {
+        let json_string = match std::fs::read_to_string(ir_file.clone()) {
+            Ok(content) => content,
+            Err(e) => {
+                writer.line(format!("WARNING: Failed to read {ir_file}. Reason: {e}"))?;
+                continue;
+            }
+        };
+        let fidl_json: serde_json::Value = match serde_json::from_str(&json_string) {
+            Ok(serialized_json) => serialized_json,
+            Err(_) => {
+                writer.line(format!("WARNING: Failed to parse json in IR file {ir_file}"))?;
+                continue;
+            }
+        };
+        let Some(protocols) = fidl_json["protocol_declarations"].as_array() else {
+            continue;
+        };
+        for protocol in protocols {
+            // Protocol should have a name, but it is missing for some reason.
+            let protocol_name = protocol["name"].as_str().unwrap_or("-");
+            let Some(methods) = protocol["methods"].as_array() else {
+                continue;
+            };
+            for method in methods {
+                let Some(method_ordinal) = method["ordinal"].as_u64() else { continue; };
+                if method_ordinal == ordinal {
+                    let method_name = method["name"].as_str().unwrap_or("-");
+                    writer.line(format!("{} -> {}.{}", ordinal, protocol_name, method_name))?;
+                    return Ok(());
+                }
+            }
+        }
+    }
+    writer
+        .line(format!("Unable to symbolize ordinal {}. This could be because either:", ordinal))?;
+    writer.line("1. The ordinal is incorrect")?;
+    writer.line("2. The ordinal is not found in IR files in $FUCHSIA_BUILD_DIR/all_fidl_json.txt or the input IR files")?;
+    Ok(())
+}
+
 // Print as a grid that fills the width of the terminal. Falls back to one value
 // per line if any value is wider than the terminal.
 fn print_grid(writer: &mut Writer, values: Vec<String>) -> Result<()> {
@@ -442,6 +501,16 @@ pub async fn trace(
             stop_tracing(&context, &proxy, output, writer, opts.verbose).await?;
         }
         TraceSubCommand::Status(_opts) => status(&proxy, writer).await?,
+        TraceSubCommand::Symbolize(opts) => {
+            let ir_files = ir_files_list(&context, opts.ir_path);
+            if ir_files.is_none() {
+                writer.line("Unable to read list of FIDL IR files from $FUCHSIA_BUILD_DIR/all_fidl_json.txt.")?;
+                writer.line("Only input IR files will be searched.")?;
+                symbolize_ordinal(opts.ordinal, vec![], writer)?;
+            } else {
+                symbolize_ordinal(opts.ordinal, ir_files.unwrap(), writer)?;
+            }
+        }
     }
     Ok(())
 }
@@ -652,7 +721,7 @@ fn canonical_path(output_path: String) -> Result<String> {
 mod tests {
     use super::*;
     use errors::ResultExt as _;
-    use ffx_trace_args::{ListCategories, ListProviders, Start, Status, Stop};
+    use ffx_trace_args::{ListCategories, ListProviders, Start, Status, Stop, Symbolize};
     use ffx_writer::{Format, TestBuffers};
     use fidl::endpoints::{ControlHandle, Responder};
     use fidl_fuchsia_developer_ffx as ffx;
@@ -662,7 +731,9 @@ mod tests {
     use pretty_assertions::assert_eq;
     use regex::Regex;
     use serde_json::json;
+    use std::io::Write;
     use std::matches;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn test_canonical_path_has_root() {
@@ -881,6 +952,70 @@ mod tests {
         let output = test_buffers.into_stdout_str();
         let want = "input  kernel  kernel:arch  kernel:ipc\n\n";
         assert_eq!(want, output);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_symbolize_success() {
+        let env = ffx_config::test_init().await.unwrap();
+        let fake_ir_json = json!({
+           "unrelated_key": "unrelated_value",
+           "protocol_declarations": [
+                {
+                    "name": "fake_protocol_name",
+                    "methods": [
+                        {
+                            "ordinal": 12345678,
+                            "name": "fake_method_name",
+                        },
+                    ],
+                },
+            ],
+        });
+        let mut temp_file = NamedTempFile::new().expect("Failed to create temp IR file");
+        temp_file
+            .write_all(fake_ir_json.to_string().as_bytes())
+            .expect("Failed to write IR string to file");
+        let test_buffers = TestBuffers::default();
+        let writer = Writer::new_test(None, &test_buffers);
+        let fake_ir_path =
+            temp_file.path().to_str().expect("Unable to convert fake IR path to string");
+        run_trace_test(
+            env.context.clone(),
+            TraceCommand {
+                sub_cmd: TraceSubCommand::Symbolize(Symbolize {
+                    ordinal: 12345678,
+                    ir_path: vec![fake_ir_path.to_string()],
+                }),
+            },
+            writer,
+        )
+        .await;
+        let output = test_buffers.into_stdout_str();
+        let want = "12345678 -> fake_protocol_name.fake_method_name\n";
+        assert_eq!(want, output);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_symbolize_fail() {
+        let env = ffx_config::test_init().await.unwrap();
+        let test_buffers = TestBuffers::default();
+        let writer = Writer::new_test(None, &test_buffers);
+        run_trace_test(
+            env.context.clone(),
+            TraceCommand {
+                sub_cmd: TraceSubCommand::Symbolize(Symbolize {
+                    ordinal: 12345678,
+                    ir_path: vec![],
+                }),
+            },
+            writer,
+        )
+        .await;
+        let output = test_buffers.into_stdout_str();
+        let want = "Unable to symbolize ordinal 12345678. This could be because either:\n\
+                    1. The ordinal is incorrect\n\
+                    2. The ordinal is not found in IR files in $FUCHSIA_BUILD_DIR/all_fidl_json.txt or the input IR files\n";
+        assert!(output.contains(want));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
