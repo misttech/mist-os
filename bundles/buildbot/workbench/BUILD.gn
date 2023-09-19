@@ -14,3 +14,43 @@ group("workbench") {
 
   deps = []
 }
+
+# For use with the 'hermetic_test_package_labels' GN build argument.
+# WARNING: Known to infrastructure
+group("hermetic_tests") {
+  testonly = true
+  deps = []
+  public_deps = []
+  data_deps = []
+
+  # Ensure that no tests are added to the non-hermetic tests group
+  assert(
+      deps + public_deps + data_deps == [],
+      "The workbench product does not support the running of non-hermetic tests in infra.")
+}
+
+# For use with the 'test_package_labels' GN build argument.
+group("non_hermetic_tests") {
+  testonly = true
+  deps = []
+  public_deps = []
+  data_deps = []
+
+  # Ensure that no tests are added to the non-hermetic tests group
+  assert(
+      deps + public_deps + data_deps == [],
+      "The workbench product does not support the running of non-hermetic tests in infra.")
+}
+
+# For use with the 'e2e_test_labels' GN build argument.
+group("e2e_tests") {
+  testonly = true
+  deps = []
+  public_deps = []
+  data_deps = []
+
+  # Ensure that no tests are added to the e2e_tests tests group
+  assert(
+      deps + public_deps + data_deps == [],
+      "The workbench product does not support the running of end-to-end tests in infra.")
+}

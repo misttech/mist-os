@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+assert(is_fuchsia, "These can only be defined in the default toolchain")
+
 # WARNING: Known to infrastructure.
 group("terminal") {
   testonly = true
@@ -20,4 +22,44 @@ group("terminal") {
     "//src/tests/end_to_end/bundles:end_to_end_deps",
     "//src/tests/end_to_end/bundles:terminal_end_to_end_deps",
   ]
+}
+
+# For use with the 'hermetic_test_package_labels' GN build argument.
+# WARNING: Known to infrastructure
+group("hermetic_tests") {
+  testonly = true
+  deps = []
+  public_deps = []
+  data_deps = []
+
+  # Ensure that no tests are added to the non-hermetic tests group
+  assert(
+      deps + public_deps + data_deps == [],
+      "The terminal product does not support the running of non-hermetic tests in infra.")
+}
+
+# For use with the 'test_package_labels' GN build argument.
+group("non_hermetic_tests") {
+  testonly = true
+  deps = []
+  public_deps = []
+  data_deps = []
+
+  # Ensure that no tests are added to the non-hermetic tests group
+  assert(
+      deps + public_deps + data_deps == [],
+      "The terminal product does not support the running of non-hermetic tests in infra.")
+}
+
+# For use with the 'e2e_test_labels' GN build argument.
+group("e2e_tests") {
+  testonly = true
+  deps = []
+  public_deps = []
+  data_deps = []
+
+  # Ensure that no tests are added to the e2e_tests tests group
+  assert(
+      deps + public_deps + data_deps == [],
+      "The terminal product does not support the running of end-to-end tests in infra.")
 }
