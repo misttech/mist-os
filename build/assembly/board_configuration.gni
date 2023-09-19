@@ -37,6 +37,12 @@ import("//build/python/python_action.gni")
 #    The list if valid strings is currently an unstable API between boards and
 #    assembly and can change at any time.
 #
+#  main_bundle (optional)
+#    [GN label] The GN label of the "main" Board Input Bundle for this board.
+#    This must be the label of a board_input_bundle() target.  If the target
+#    isn't a board_input_bundle() target, it will cause an error like:
+#      "no dependency provides the input <target_name>/board_input_bundle.json"
+#
 #  filesystems (optional)
 #    [scope] A GN scope that describes configuration to use for various
 #    different filesystems in order to use them with this board.  This doesn't
@@ -47,43 +53,15 @@ import("//build/python/python_action.gni")
 #    NOTE:  This template converts GN paths for vbmeta keys into the correctly
 #    rebased form automatically.
 #
-#  verify_against (optional)
-#    [GN file path] A static file to compare against the output of this
-#    template.
-#
-#  Main Hardware Support Bundle
-#
-#   drivers (optional)
-#     [list, GN scopes] A list of GN scopes that hold the driver packages to
-#     include. Packages listed will be included automatically in the specified
-#     package set.
-#
-#     The scope must have the following fields:
-#      - `package_target` pointing to the GN target of the fuchsia_package
-#      - `package_set` naming the appropriate set for the package, which is one
-#         of the following:
-#           - base
-#           - bootfs
-#      - `driver_components` containing a list of relative paths to driver
-#        components provided by the package, e.g. "meta/driver.cm"
-#
-#     Example:
-#
-#     {
-#       package_target = "//path/to/package:target"
-#       package_set = "base"
-#       driver_components = [ "meta/my_driver" ]
-#     }
 #
 #  Outputs
 #    A directory structure and manifest
 #
 #   manifest path:
-#     $target_out_dir/$target_name/hardware_support_bundle.json
+#     $target_out_dir/$target_name/board_configuration.json
 #
 #     or if the defaults are overridden:
-#     $bundle_dir/$name/hardware_support_bundle.json
-#
+#     $bundle_dir/$name/board_configuration.json
 #
 # GN usual meanings
 #  testonly, visibility
@@ -99,35 +77,55 @@ template("board_configuration") {
   labels = {
     main_target = target_name
 
-    # Intermediate groups of deps
-    driver_packages = "${target_name}.driver_packages"
+    # Outputs
+    bazel_inputs = "${target_name}_bazel_inputs"
+
+    # Inputs
+    if (defined(invoker.main_bundle)) {
+      main_bundle = invoker.main_bundle
+      validate_main_bundle = "${main_target}.validate_main_bundle_input"
+    }
 
     # Intermediate Files
     base_info = "${target_name}.base_info"
-    driver_packages_list = "${target_name}.driver_packages.list"
-
-    bazel_inputs = "${target_name}_bazel_inputs"
-
     kernel_cmdline = "${target_name}.kernel_cmdline"
   }
 
   files = {
-    # The directory where the board configuration file and main hardware support
-    # bundle contents are written to.  This is named for the target, not the
-    # name of the board, if passed in differently.
+    # Outputs
+
+    # The directory where the board configuration file is written to.  This is
+    # named for the target, not the name of the board, if the name is being
+    # overridden.
+    #
+    # This allows other templates to compute the path to the main configuration
+    # file based on just the label.
     board_configuration_dir = "${bundles_dir}/${target_name}"
 
     # The "official" output board configuration file
     board_configuration = "${board_configuration_dir}/board_configuration.json"
 
     # The files that we create as book-keeping between our tasks.
-    depfile = "${board_configuration_dir}.d"
+    depfile = "${bundles_dir}/${target_name}.d"
 
-    _gen_files = "${target_gen_dir}/${target_name}"
+    # Inputs
+    if (defined(labels.main_bundle)) {
+      main_bundle_input_dir =
+          get_label_info(labels.main_bundle, "target_out_dir") + "/" +
+          get_label_info(labels.main_bundle, "name")
+
+      main_bundle_input_file =
+          "${main_bundle_input_dir}/board_input_bundle.json"
+
+      main_bundle_output_dir = "${board_configuration_dir}/main_bundle"
+
+      main_bundle_output_file =
+          "${main_bundle_output_dir}/board_input_bundle.json"
+    }
 
     # Intermediate Files
+    _gen_files = "${target_gen_dir}/${target_name}"
     base_info = "${_gen_files}.base_info.json"
-    driver_packages_list = "${_gen_files}.driver_packages.list"
 
     # The output path for the generated file which collects kernel cmdline
     # arguments.
@@ -156,6 +154,7 @@ template("board_configuration") {
         _vbmeta_rebased.key = "vbmeta/${_vbmeta_key_filename}"
 
         copy("${target_name}.vbmeta.key") {
+          visibility = [ ":${labels.main_target}" ]
           sources = [ _vbmeta.key ]
           outputs =
               [ "${files.board_configuration_dir}/${_vbmeta_rebased.key}" ]
@@ -172,6 +171,7 @@ template("board_configuration") {
         _vbmeta_rebased.key_metadata = "vbmeta/${_vbmeta_key_metadata_filename}"
 
         copy("${target_name}.vbmeta.key_metadata") {
+          visibility = [ ":${labels.main_target}" ]
           sources = [ _vbmeta.key_metadata ]
           outputs = [
             "${files.board_configuration_dir}/${_vbmeta_rebased.key_metadata}",
@@ -194,134 +194,67 @@ template("board_configuration") {
     }
   }
 
-  # Iterate over any provided drivers, and add them to the board config's main
-  # HSB, validating that they are package targets using a group_with_inputs().
-  #
-  if (defined(invoker.drivers) && invoker.drivers != []) {
-    # The list of package dependencies
-    _package_targets = []
-
-    # The driver manifest entries for creating the main hsb with
-    _manifest_entries = []
-
-    # The list of package manifest files, for validating that the package
-    # targets are all actually package targets.
-    _package_manifests = []
-
-    foreach(details, invoker.drivers) {
-      assert(defined(details.package_target),
-             "A target must be defined for each driver package.")
-      assert(defined(details.package_set),
-             "A package set to place the driver in must be specified.")
-      assert(defined(details.driver_components),
-             "driver_components must be specified for driver targets")
-
-      # add the label to the list of package labels to use as dependencies
-      _package_targets += [ details.package_target ]
-
-      # calculate the path to the package manifest for this label
-      _package_out_dir =
-          get_label_info(details.package_target, "target_out_dir")
-      _package_name = get_label_info(details.package_target, "name")
-      _manifest_path =
-          "${_package_out_dir}/${_package_name}/package_manifest.json"
-      _package_manifests += [ _manifest_path ]
-
-      _manifest_path_rebased = rebase_path(_manifest_path, root_build_dir)
-      _manifest_entries += [
-        {
-          package_target = _manifest_path_rebased
-          package_set = details.package_set
-          driver_components = details.driver_components
-        },
-      ]
-    }
-
-    group_with_inputs(labels.driver_packages) {
+  if (defined(labels.main_bundle)) {
+    # Validate that the main bundle target is actually a board_input_bundle()
+    # target.
+    group_with_inputs(labels.validate_main_bundle) {
       forward_variables_from(invoker, [ "testonly" ])
-      visibility = [ ":${labels.driver_packages_list}" ]
-      inputs = _package_manifests
-      deps = _package_targets
+      visibility = [ ":${labels.main_target}.main_bundle_copy" ]
+      deps = [ labels.main_bundle ]
+      inputs = [ files.main_bundle_input_file ]
     }
 
-    # Generate the list of driver packages, for handing off to the hsb creator
-    generated_file(labels.driver_packages_list) {
+    # Copy the Board Input Bundle into the board's own directory, to make the
+    # whole board portable.
+    action("${target_name}.main_bundle_copy") {
       forward_variables_from(invoker, [ "testonly" ])
       visibility = [ ":${labels.main_target}" ]
+      script = "//build/copy_tree.py"
+      deps = [ ":${labels.validate_main_bundle}" ]
+      depfile = "${target_out_dir}/${target_name}.d"
 
-      deps = [ ":${labels.driver_packages}" ]
+      outputs = [ files.main_bundle_output_file ]
 
-      outputs = [ "${files.driver_packages_list}" ]
-      output_conversion = "json"
+      # The contents of these folders are dynamic, and managed entirely by this
+      # action.  Further, this action will need to delete items from these
+      # directories that are not added back (on an incremental build, if an item
+      # is removed from one of these sets)
+      hermetic_action_ignored_prefixes = [ "${files.main_bundle_output_dir}" ]
 
-      contents = _manifest_entries
+      args = [
+        rebase_path(files.main_bundle_input_dir, root_build_dir),
+        rebase_path(files.main_bundle_output_dir, root_build_dir),
+        rebase_path(outputs[0], root_build_dir),
+        "--depfile",
+        rebase_path(depfile, root_build_dir),
+      ]
     }
-    creation_deps += [ ":${labels.driver_packages_list}" ]
+    creation_deps += [ ":${target_name}.main_bundle_copy" ]
+  }
+
+  base_info_contents = {
+    name = board_name
+
+    if (defined(_filesystems)) {
+      filesystems = _filesystems
+    }
+
+    if (defined(files.main_bundle_output_dir)) {
+      main_bundle = rebase_path(files.main_bundle_output_dir,
+                                files.board_configuration_dir)
+    }
+
+    forward_variables_from(invoker, [ "provided_features" ])
   }
 
   generated_file(labels.base_info) {
     forward_variables_from(invoker, [ "testonly" ])
-    visibility = [
-      ":${labels.main_target}",
-      ":${labels.main_target}.copy",
-    ]
+    visibility = [ ":${labels.main_target}" ]
 
-    outputs = [ files.base_info ]
+    outputs = [ files.board_configuration ]
     output_conversion = "json"
 
-    contents = {
-      name = board_name
-
-      if (defined(_filesystems)) {
-        filesystems = _filesystems
-      }
-
-      forward_variables_from(invoker, [ "provided_features" ])
-    }
-  }
-
-  # TODO:  Replace this with a generation of the bundle that includes the
-  # drivers.
-  copy("${target_name}.copy") {
-    forward_variables_from(invoker, [ "testonly" ])
-    deps = [ ":${labels.base_info}" ] + creation_deps
-    sources = [ files.base_info ]
-    outputs = [ files.board_configuration ]
-  }
-
-  if (defined(invoker.verify_against)) {
-    # If a file is specified to verify the generated one against, then do so.
-    python_action("${target_name}.verify") {
-      forward_variables_from(invoker, [ "testonly" ])
-      visibility = [ ":${labels.main_target}" ]
-
-      depfile = "${target_gen_dir}/${target_name}.d"
-
-      inputs = [
-        files.board_configuration,
-        invoker.verify_against,
-      ]
-      outputs = [ "${target_out_dir}/${target_name}.diff" ]
-
-      deps = [ ":${labels.main_target}.copy" ]
-
-      binary_label = "//build/bazel/assembly/board_configurations:verify_board_configuration"
-      args = [
-        "--generated_board_config",
-        rebase_path(inputs[0], root_build_dir),
-        "--generated_root_dir",
-        ".",
-        "--golden_json5",
-        rebase_path(inputs[1], root_build_dir),
-        "--golden_root_dir",
-        ".",
-        "--depfile",
-        rebase_path(depfile, root_build_dir),
-        "--output",
-        rebase_path(outputs[0], root_build_dir),
-      ]
-    }
-    creation_deps += [ ":${target_name}.verify" ]
+    contents = base_info_contents
   }
 
   group(target_name) {
@@ -330,7 +263,7 @@ template("board_configuration") {
                              "testonly",
                              "visibility",
                            ])
-    public_deps = [ ":${target_name}.copy" ]
+    public_deps = [ ":${labels.base_info}" ]
     deps = creation_deps
   }
 

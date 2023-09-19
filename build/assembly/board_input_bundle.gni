@@ -1,0 +1,259 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bazel/bazel_inputs.gni")
+import("//build/group_with_inputs.gni")
+import("//build/python/python_action.gni")
+import("//src/developer/ffx/build/ffx_action.gni")
+
+# Creates a Board Input Bundle, which provides packages and drivers to
+# assembly to provide support for some piece of hardware (such as a board, or a
+# peripheral used by multiple boards).
+#
+# NOTE: This template DOES NOT use GN metadata, all labels for packages must be
+# the actual target that creates the package.
+#
+# Parameters
+#
+#  Main Board Input Bundle
+#
+#   drivers (optional)
+#     [list, GN scopes] A list of GN scopes that hold the driver packages to
+#     include. Packages listed will be included automatically in the specified
+#     package set.
+#
+#     The scope must have the following fields:
+#      - `package_target` pointing to the GN target of the fuchsia_package
+#      - `package_set` naming the appropriate set for the package, which is one
+#         of the following:
+#           - base
+#           - bootfs
+#      - `driver_components` containing a list of relative paths to driver
+#        components provided by the package, e.g. "meta/driver.cm"
+#
+#     Example:
+#
+#     {
+#       package_target = "//path/to/package:target"
+#       package_set = "base"
+#       driver_components = [ "meta/my_driver" ]
+#     }
+#
+#  base_packages, bootfs_packages
+#    [list, GN labels] A list of GN labels of fuchsia_package targets to
+#    include in the base or bootfs package set (respectively).
+#
+#    Note: These are direct labels for specific targets, not deps to walk for
+#    metadata.  If the target isn't a package target, it will cause an error
+#    like:
+#      "no dependency provides the input <package_name>/package_manifest.json"
+#
+#  Outputs
+#    A directory structure and manifest
+#
+#   manifest path:
+#     $target_out_dir/$target_name/board_input_bundle.json
+#
+# GN usual meanings
+#  testonly, visibility
+#
+template("board_input_bundle") {
+  labels = {
+    main_target = target_name
+
+    driver_packages = "${target_name}.driver_packages"
+    driver_packages_list = "${target_name}.driver_packages.list"
+
+    bazel_inputs = "${target_name}_bazel_inputs"
+  }
+
+  files = {
+    # The directory where the board input bundle contents are written to.
+    bundle_dir = "${target_out_dir}/${target_name}"
+
+    # The "official" output
+    bundle_file = "${bundle_dir}/board_input_bundle.json"
+
+    # The files that we create as book-keeping between our tasks.
+    depfile = "${target_out_dir}/${target_name}.d"
+
+    # Intermediate Files
+    _gen_files = "${target_gen_dir}/${target_name}"
+    driver_packages_list = "${_gen_files}.driver_packages.list"
+  }
+
+  creation_deps = []
+  creation_inputs = []
+  creation_args = []
+
+  # Iterate over any provided drivers, and add them to the bundle, validating
+  # that they are package targets using a group_with_inputs().
+  #
+  if (defined(invoker.drivers) && invoker.drivers != []) {
+    # The list of package dependencies
+    _package_targets = []
+
+    # The driver manifest entries for creating the bundle with
+    _manifest_entries = []
+
+    # The list of package manifest files, for validating that the package
+    # targets are all actually package targets.
+    _package_manifests = []
+
+    foreach(details, invoker.drivers) {
+      assert(defined(details.package_target),
+             "A target must be defined for each driver package.")
+      assert(defined(details.package_set),
+             "A package set to place the driver in must be specified.")
+      assert(defined(details.driver_components),
+             "driver_components must be specified for driver targets")
+
+      # add the label to the list of package labels to use as dependencies
+      _package_targets += [ details.package_target ]
+
+      # calculate the path to the package manifest for this label
+      _package_out_dir =
+          get_label_info(details.package_target, "target_out_dir")
+      _package_name = get_label_info(details.package_target, "name")
+      _manifest_path =
+          "${_package_out_dir}/${_package_name}/package_manifest.json"
+      _package_manifests += [ _manifest_path ]
+
+      _manifest_path_rebased = rebase_path(_manifest_path, root_build_dir)
+
+      # This needs to match the 'DriverInformation' struct defined in:
+      # //src/developer/ffx/plugins/assembly/src/operations/board.rs
+      # LINT.IfChange
+      _manifest_entries += [
+        {
+          package = _manifest_path_rebased
+          set = details.package_set
+          components = details.driver_components
+        },
+        # LINT.ThenChange(//src/developer/ffx/plugins/assembly/src/operations/board.rs)
+      ]
+    }
+
+    group_with_inputs(labels.driver_packages) {
+      forward_variables_from(invoker, [ "testonly" ])
+      visibility = [ ":${labels.driver_packages_list}" ]
+      inputs = _package_manifests
+      deps = _package_targets
+    }
+
+    # Generate the list of driver packages, for handing off to the board input
+    # bundle creator
+    generated_file(labels.driver_packages_list) {
+      forward_variables_from(invoker, [ "testonly" ])
+      visibility = [ ":${labels.main_target}" ]
+
+      deps = [ ":${labels.driver_packages}" ]
+
+      outputs = [ files.driver_packages_list ]
+      output_conversion = "json"
+
+      # This needs to match the 'DriversHelper' struct defined in:
+      # //src/developer/ffx/plugins/assembly/src/operations/board.rs
+      # LINT.IfChange
+      contents = {
+        drivers = _manifest_entries
+      }
+
+      # LINT.ThenChange(//src/developer/ffx/plugins/assembly/src/operations/board.rs)
+    }
+    creation_deps += [ ":${labels.driver_packages_list}" ]
+    creation_inputs += [ files.driver_packages_list ]
+    creation_args += [
+      "--drivers",
+      rebase_path(files.driver_packages_list, root_build_dir),
+    ]
+  }
+
+  foreach(package_set,
+          [
+            "base_packages",
+            "bootfs_packages",
+          ]) {
+    if (defined(invoker[package_set])) {
+      # The list of package manifest files, for validating that the package
+      # targets are all actually package targets.
+      _package_manifests = []
+
+      # Calculate the path to the package manifest for each label
+      foreach(package, invoker[package_set]) {
+        _package_out_dir = get_label_info(package, "target_out_dir")
+        _package_name = get_label_info(package, "name")
+        _manifest_path =
+            "${_package_out_dir}/${_package_name}/package_manifest.json"
+        _package_manifests += [ _manifest_path ]
+      }
+
+      # Create a group that depends on each package-creating label, and lists
+      # each computed package manifest path as an input file.  This allows the
+      # template to enforce that the labels used are instantiations of the
+      # `fuchsia_package()` template.
+      group_with_inputs("${target_name}.${package_set}") {
+        forward_variables_from(invoker, [ "testonly" ])
+        visibility = [ ":${labels.main_target}" ]
+        deps = invoker[package_set]
+        inputs = _package_manifests
+      }
+
+      # Add the group to the deps of the bundle.
+      creation_deps += [ ":${target_name}.${package_set}" ]
+
+      # Add all the package manifests to the creation args.
+      creation_args += [ string_replace("--${package_set}", "_", "-") ] +
+                       rebase_path(_package_manifests, root_build_dir)
+
+      # Because of a bug in GN, where using `invoker[package_set]` doesn't mark
+      # invoker.base_packages (etc.) as having been used...
+      not_needed(invoker, [ package_set ])
+    }
+  }
+
+  ffx_action(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+
+    ffx_tool = "//src/developer/ffx/plugins/assembly:ffx_assembly_tool"
+    ffx_tool_output_name = "ffx-assembly"
+
+    # The contents of these folders are dynamic, and managed entirely by this
+    # action.  Further, this action will need to delete items from these
+    # directories that are not added back (on an incremental build, if an item
+    # is removed from one of these sets)
+    hermetic_action_ignored_prefixes = [
+      "${files.bundle_dir}/packages",
+      "${files.bundle_dir}/subpackages",
+      "${files.bundle_dir}/blobs",
+    ]
+
+    inputs = creation_inputs
+    outputs = [ files.bundle_file ]
+    depfile = files.depfile
+    deps = creation_deps
+    args = [
+             "--config",
+             "assembly_enabled=true",
+             "assembly",
+             "board-input-bundle",
+             "--outdir",
+             rebase_path(files.bundle_dir, root_build_dir),
+             "--depfile",
+             rebase_path(files.depfile, root_build_dir),
+           ] + creation_args
+  }
+
+  # Make board configuration and board input bundle available to Bazel
+  bazel_input_resource_directory("${target_name}.bazel_input") {
+    forward_variables_from(invoker, [ "testonly" ])
+    source_dir = files.bundle_dir
+    dest_dir = rebase_path(files.bundle_dir, root_out_dir)
+    deps = [ ":${labels.main_target}" ]
+  }
+}

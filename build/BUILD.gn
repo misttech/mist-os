@@ -69,9 +69,12 @@ group("non_hermetic_deps") {
   ]
 
   # TODO(http://fxbug.dev/92612): Remove entries when
-  # assembly input bundle creation no longer triggers false-positives in the
-  # action_tracer.py due to how it cleans it's dynamic outputs.
-  visibility += [ "//bundles/assembly/*" ]
+  # assembly and board input bundle creation no longer triggers false-positives
+  # in the action_tracer.py due to how it cleans it's dynamic outputs.
+  visibility += [
+    "//boards/*",
+    "//bundles/assembly/*",
+  ]
 
   # //build/images/assemble_system.gni needs `hermetic_deps = false`, and that
   # will not be resolved except by moving to Bazel.
