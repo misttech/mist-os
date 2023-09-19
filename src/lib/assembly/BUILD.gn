@@ -20,6 +20,7 @@ if (is_host) {
       "fxfs:host_tests",
       "images_config:host_tests",
       "named_file_map:host_tests",
+      "package_copy:host_tests",
       "package_list:host_tests",
       "package_utils:host_tests",
       "partitions_config:host_tests",
