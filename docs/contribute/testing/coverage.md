@@ -383,7 +383,6 @@ Lastly, on the coverage variant components may use the
 make assumptions about precisely what capabilities components use. See for
 instance:
 
-- [Issue 77206: Failing test on coverage builder: fuchsia-pkg://fuchsia.com/hub_integration_test#meta/hub_integration_test.cmx][fxb77206]
 - [Issue 89446: realm_builder_server_test fails on coverage variant][fxb89446]
 
 An immediate fix would be to disable your test under coverage (see the GN
