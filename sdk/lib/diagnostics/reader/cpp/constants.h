@@ -25,6 +25,7 @@ constexpr char kMetadataTags[] = "tags";
 constexpr char kMetadataTid[] = "tid";
 constexpr char kPayloadRoot[] = "root";
 constexpr char kPayloadMessageValue[] = "value";
+constexpr char kPayloadKeys[] = "keys";
 
 constexpr char kErrorDroppedLogs[] = "dropped_logs";
 constexpr char kErrorRolledOutLogs[] = "rolled_out_logs";

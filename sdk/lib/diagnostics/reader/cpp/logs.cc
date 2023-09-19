@@ -138,7 +138,7 @@ LogsData::LogsData(rapidjson::Document document) {
 
     if (metadata.HasMember(kMetadataTags) && metadata[kMetadataTags].IsArray()) {
       const auto& tags = metadata[kMetadataTags].GetArray();
-      for (auto tag = tags.Begin(); tag != tags.End(); tag++) {
+      for (auto tag = tags.Begin(); tag != tags.End(); ++tag) {
         if (tag->IsString()) {
           metadata_.tags.push_back(tag->GetString());
         }
@@ -163,7 +163,7 @@ LogsData::LogsData(rapidjson::Document document) {
 
     if (metadata.HasMember(kMetadataErrors) && metadata[kMetadataErrors].IsArray()) {
       const auto& errors = metadata[kMetadataErrors].GetArray();
-      for (auto item = errors.Begin(); item != errors.End(); item++) {
+      for (auto item = errors.Begin(); item != errors.End(); ++item) {
         if (!item->IsObject()) {
           continue;
         }
@@ -208,9 +208,92 @@ LogsData::LogsData(rapidjson::Document document) {
           message_ = message[kPayloadMessageValue].GetString();
         }
       }
+
+      if (root.HasMember(kPayloadKeys) && root[kPayloadKeys].IsObject()) {
+        const auto& keys = root[kPayloadKeys].GetObject();
+        for (auto it = keys.MemberBegin(); it != keys.MemberEnd(); ++it) {
+          auto name = it->name.GetString();
+          switch (it->value.GetType()) {
+            case rapidjson::kNullType:
+              break;
+            case rapidjson::kFalseType:
+            case rapidjson::kTrueType:
+              keys_.emplace_back(
+                  inspect::PropertyValue(name, inspect::BoolPropertyValue(it->value.GetBool())));
+              break;
+            case rapidjson::kStringType:
+              keys_.emplace_back(inspect::PropertyValue(
+                  name, inspect::StringPropertyValue(it->value.GetString())));
+              break;
+            case rapidjson::kNumberType:
+              if (it->value.IsInt64()) {
+                keys_.emplace_back(
+                    inspect::PropertyValue(name, inspect::IntPropertyValue(it->value.GetInt64())));
+              } else if (it->value.IsUint64()) {
+                keys_.emplace_back(inspect::PropertyValue(
+                    name, inspect::UintPropertyValue(it->value.GetUint64())));
+              } else {
+                keys_.emplace_back(inspect::PropertyValue(
+                    name, inspect::DoublePropertyValue(it->value.GetDouble())));
+              }
+              break;
+            case rapidjson::kArrayType:
+              LoadArray(name, it->value.GetArray());
+              break;
+            default:
+              break;
+          }
+        }
+      }
     }
-    // TODO(b/300181458): do process key values.
   }
 }
 
+void LogsData::LoadArray(const std::string& name, const rapidjson::Value::Array& arr) {
+  if (arr.Empty()) {
+    keys_.emplace_back(inspect::PropertyValue(
+        name, inspect::IntArrayValue(std::vector<int64_t>{}, inspect::ArrayDisplayFormat::kFlat)));
+    return;
+  }
+
+  switch (arr.Begin()->GetType()) {
+    case rapidjson::kStringType: {
+      std::vector<std::string> values;
+      for (auto& v : arr) {
+        values.emplace_back(v.GetString());
+      }
+      keys_.emplace_back(inspect::PropertyValue(
+          name, inspect::StringArrayValue(std::move(values), inspect::ArrayDisplayFormat::kFlat)));
+      break;
+    }
+    case rapidjson::kNumberType: {
+      if (arr.Begin()->IsInt64()) {
+        std::vector<std::int64_t> values;
+        for (auto& v : arr) {
+          values.emplace_back(v.GetInt64());
+        }
+        keys_.emplace_back(inspect::PropertyValue(
+            name, inspect::IntArrayValue(std::move(values), inspect::ArrayDisplayFormat::kFlat)));
+      } else if (arr.Begin()->IsUint64()) {
+        std::vector<std::uint64_t> values;
+        for (auto& v : arr) {
+          values.emplace_back(v.GetUint64());
+        }
+        keys_.emplace_back(inspect::PropertyValue(
+            name, inspect::UintArrayValue(std::move(values), inspect::ArrayDisplayFormat::kFlat)));
+      } else if (arr.Begin()->IsDouble()) {
+        std::vector<double> values;
+        for (auto& v : arr) {
+          values.emplace_back(v.GetDouble());
+        }
+        keys_.emplace_back(inspect::PropertyValue(
+            name,
+            inspect::DoubleArrayValue(std::move(values), inspect::ArrayDisplayFormat::kFlat)));
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
 }  // namespace diagnostics::reader

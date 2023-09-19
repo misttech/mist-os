@@ -9,6 +9,7 @@
 #include <lib/fpromise/bridge.h>
 #include <lib/fpromise/promise.h>
 #include <lib/fpromise/scope.h>
+#include <lib/inspect/cpp/hierarchy.h>
 #include <lib/stdcompat/optional.h>
 
 #include <cstdint>
@@ -76,6 +77,9 @@ class LogsData {
   // Return the message of the log.
   const std::string& message() const { return message_; }
 
+  // Return the structured keys of the log.
+  const std::vector<inspect::PropertyValue>& keys() const { return keys_; }
+
  private:
   // Moniker of the component that generated the payload.
   std::string moniker_;
@@ -86,8 +90,13 @@ class LogsData {
   // The message of this log.
   std::string message_;
 
+  /// The structured keys in the message and their values.
+  std::vector<inspect::PropertyValue> keys_;
+
   // Schema version.
   uint64_t version_;
+
+  void LoadArray(const std::string& name, const rapidjson::Value::Array& arr);
 };
 
 class LogsSubscription {
