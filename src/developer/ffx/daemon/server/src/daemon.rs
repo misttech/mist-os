@@ -540,12 +540,11 @@ impl Daemon {
         let mut signals = Signals::new(&[SIGHUP, SIGINT, SIGTERM]).unwrap();
         // signals.forever() is blocking, so we need to spawn a thread rather than use async.
         let _signal_handle_thread = std::thread::spawn(move || {
-            for signal in signals.forever() {
+            if let Some(signal) = signals.forever().next() {
                 match signal {
                     SIGHUP | SIGINT | SIGTERM => {
                         tracing::info!("Received signal {signal}, quitting");
                         let _ = block_on(quit_tx.send(())).ok();
-                        break;
                     }
                     _ => unreachable!(),
                 }
