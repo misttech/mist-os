@@ -482,7 +482,12 @@ void Dispatcher::ShutdownAsync() {
     // ever happen on a thread at once. If the irq gets triggered in the meanwhile,
     // |QueueIrq| will return early.
 
-    timer_.Cancel();
+    zx_status_t status = timer_.Cancel();
+    // If we could not cancel the timer, it is going to run / is already running in another
+    // thread, and we don't want |CompleteShutdown| to run until after that completes.
+    if (status != ZX_OK) {
+      shutdown_waiting_for_timer_ = true;
+    }
     shutdown_queue_.splice(shutdown_queue_.end(), delayed_tasks_);
 
     // To avoid race conditions with attempting to cancel a wait that might be scheduled to
@@ -703,7 +708,7 @@ void Dispatcher::ResetTimerLocked() {
   // without risking the need to cancel the task.
 
   if (timer_.current_deadline() > deadline && timer_.Cancel() == ZX_OK) {
-    timer_.BeginWait(process_shared_dispatcher_, deadline);
+    timer_.BeginWait(deadline);
   }
 }
 
@@ -740,15 +745,21 @@ void Dispatcher::CheckDelayedTasksLocked() {
   }
 }
 
-void Dispatcher::CheckDelayedTasks() {
-  fbl::AutoLock al(&callback_lock_);
-  CheckDelayedTasksLocked();
-}
-
 void Dispatcher::Timer::Handler() {
-  current_deadline_ = zx::time::infinite();
-  dispatcher_->CheckDelayedTasks();
+  {
+    fbl::AutoLock al(&dispatcher_->callback_lock_);
+    current_deadline_ = zx::time::infinite();
+    dispatcher_->CheckDelayedTasksLocked();
+  }
   dispatcher_->thread_pool()->OnThreadWakeup();
+  {
+    fbl::AutoLock lock(&dispatcher_->callback_lock_);
+    // Check if the dispatcher is shutting down and waiting for the handler to complete.
+    if (!dispatcher_->IsRunningLocked()) {
+      dispatcher_->shutdown_waiting_for_timer_ = false;
+      dispatcher_->IdleCheckLocked();
+    }
+  }
 }
 
 zx_status_t Dispatcher::PostTask(async_task_t* task) {
@@ -764,7 +775,6 @@ zx_status_t Dispatcher::PostTask(async_task_t* task) {
         std::make_unique<driver_runtime::CallbackRequest>(CallbackRequest::RequestType::kTask);
     callback_request->SetCallback(static_cast<fdf_dispatcher_t*>(this), std::move(callback), task);
     CallbackRequest* callback_ptr = callback_request.get();
-    // TODO(92878): handle task deadlines.
     callback_request = RegisterCallbackWithoutQueueing(std::move(callback_request));
     // Dispatcher returned callback request as queueing failed.
     if (callback_request) {
@@ -1279,7 +1289,9 @@ bool Dispatcher::IsIdleLocked() {
          (!event_waiter_ || !event_waiter_->signaled());
 }
 
-bool Dispatcher::HasFutureOpsScheduledLocked() { return !waits_.is_empty() || timer_.is_armed(); }
+bool Dispatcher::HasFutureOpsScheduledLocked() {
+  return !waits_.is_empty() || timer_.is_armed() || shutdown_waiting_for_timer_;
+}
 
 void Dispatcher::IdleCheckLocked() {
   if (IsIdleLocked()) {
