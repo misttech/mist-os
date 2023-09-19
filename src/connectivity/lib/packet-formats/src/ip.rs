@@ -9,7 +9,7 @@ use core::cmp::PartialEq;
 use core::convert::Infallible as Never;
 use core::fmt::{Debug, Display};
 
-use net_types::ip::{Ip, IpAddr, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+use net_types::ip::{GenericOverIp, Ip, IpAddr, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use packet::{BufferViewMut, PacketBuilder, ParsablePacket, ParseMetadata};
 use zerocopy::{ByteSlice, ByteSliceMut};
 
@@ -26,7 +26,15 @@ pub trait IpProtoExt: Ip {
     /// The type representing an IPv4 or IPv6 protocol number.
     ///
     /// For IPv4, this is [`Ipv4Proto`], and for IPv6, this is [`Ipv6Proto`].
-    type Proto: IpProtocol + Copy + Clone + Debug + Display + PartialEq;
+    type Proto: IpProtocol
+        + GenericOverIp<Self, Type = Self::Proto>
+        + GenericOverIp<Ipv4, Type = Ipv4Proto>
+        + GenericOverIp<Ipv6, Type = Ipv6Proto>
+        + Copy
+        + Clone
+        + Debug
+        + Display
+        + PartialEq;
 }
 
 impl IpProtoExt for Ipv4 {
@@ -283,6 +291,9 @@ create_protocol_enum!(
 );
 
 impl IpProtocol for Ipv4Proto {}
+impl<I: Ip + IpProtoExt> GenericOverIp<I> for Ipv4Proto {
+    type Type = I::Proto;
+}
 impl Sealed for Ipv4Proto {}
 
 create_protocol_enum!(
@@ -302,6 +313,9 @@ create_protocol_enum!(
 );
 
 impl IpProtocol for Ipv6Proto {}
+impl<I: Ip + IpProtoExt> GenericOverIp<I> for Ipv6Proto {
+    type Type = I::Proto;
+}
 impl Sealed for Ipv6Proto {}
 
 create_protocol_enum!(

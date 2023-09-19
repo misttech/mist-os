@@ -22,7 +22,7 @@ use net_types::{
     MulticastAddr, MulticastAddress as _, NonMappedAddr, SpecifiedAddr, ZonedAddr,
 };
 use packet::{BufferMut, Serializer};
-use packet_formats::ip::{IpProto, IpProtoExt};
+use packet_formats::ip::IpProtoExt;
 use thiserror::Error;
 
 use crate::{
@@ -1380,6 +1380,9 @@ pub(crate) trait DatagramSocketSpec {
     /// The sharing state for a socket that hasn't yet been bound.
     type UnboundSharingState<I: IpExt>: Clone + Debug + Default;
 
+    /// Returns the IP protocol of this datagram specification.
+    fn ip_proto<I: IpProtoExt>() -> I::Proto;
+
     /// Converts [`Self::SocketId`] to [`DatagramSocketMapSpec::ReceivingId`].
     ///
     /// Constructs a socket identifier to its in-demultiplexing map form. For
@@ -2307,7 +2310,6 @@ pub(crate) fn connect<
     id: S::SocketId<I>,
     remote_ip: SocketZonedIpAddr<I::Addr, SC::DeviceId>,
     remote_id: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
-    proto: IpProto,
 ) -> Result<(), ConnectError>
 where
     <S::SocketMapSpec<I, SC::WeakDeviceId> as SocketMapStateSpec>::ListenerSharingState:
@@ -2441,7 +2443,7 @@ where
                         socket_device.as_ref().map(|d| d.as_ref()),
                         local_ip.map(SocketIpAddr::into),
                         remote_ip,
-                        proto.into(),
+                        S::ip_proto::<I>(),
                         Default::default(),
                     )
                     .map_err(|(e, _ip_options)| e)?;
@@ -2844,7 +2846,6 @@ pub(crate) fn send_to<
     id: S::SocketId<I>,
     remote_ip: SocketZonedIpAddr<I::Addr, SC::DeviceId>,
     remote_identifier: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
-    proto: <I as IpProtoExt>::Proto,
     body: B,
 ) -> Result<(), Either<(B, LocalAddressError), SendToError<B, S::Serializer<I, B>>>>
 where
@@ -2861,7 +2862,7 @@ where
             SocketState::Unbound(_) => panic!("expected bound socket"),
             SocketState::Bound(state) => state,
         };
-        let (local, device, ip_options, proto) = match state {
+        let (local, device, ip_options) = match state {
             BoundSocketState::Connected { state, sharing: _ } => {
                 let ConnState {
                     socket,
@@ -2889,7 +2890,7 @@ where
                 }
                 let (local_ip, local_id) = local;
 
-                ((Some(*local_ip), local_id.clone()), device, socket.options(), socket.proto())
+                ((Some(*local_ip), local_id.clone()), device, socket.options())
             }
             BoundSocketState::Listener { state, sharing: _ } => {
                 let ListenerState { ip_options, addr: ListenerAddr { ip, device } } = state;
@@ -2915,7 +2916,7 @@ where
                     }
                 };
 
-                ((local_ip, local_port), device, ip_options, proto)
+                ((local_ip, local_port), device, ip_options)
             }
         };
 
@@ -2943,7 +2944,6 @@ where
                     remote_identifier,
                     device,
                     ip_options,
-                    proto,
                     body,
                 )
             })
@@ -2968,7 +2968,6 @@ fn send_oneshot<
     remote_id: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     device: &Option<SC::WeakDeviceId>,
     ip_options: &IpOptions<I, SC::WeakDeviceId, S>,
-    proto: <I as IpProtoExt>::Proto,
     body: B,
 ) -> Result<(), SendToError<B, S::Serializer<I, B>>> {
     let (remote_ip, device) = match crate::transport::resolve_addr_with_device::<I::Addr, _, _, _>(
@@ -2989,7 +2988,7 @@ fn send_oneshot<
             device.as_ref().map(|d| d.as_ref()),
             local_ip,
             remote_ip,
-            proto,
+            S::ip_proto::<I>(),
             ip_options,
             |local_ip| {
                 S::make_packet(
@@ -3632,6 +3631,7 @@ mod test {
     use ip_test_macro::ip_test;
     use net_types::ip::{Ip, Ipv4, Ipv6};
     use packet::Buf;
+    use packet_formats::ip::{Ipv4Proto, Ipv6Proto};
     use test_case::test_case;
 
     use crate::{
@@ -3706,6 +3706,9 @@ mod test {
         }
     }
 
+    const FAKE_DATAGRAM_IPV4_PROTOCOL: Ipv4Proto = Ipv4Proto::Other(253);
+    const FAKE_DATAGRAM_IPV6_PROTOCOL: Ipv6Proto = Ipv6Proto::Other(254);
+
     impl DatagramSocketSpec for FakeStateSpec {
         type AddrSpec = FakeAddrSpec;
         type SocketId<I: IpExt> = Id;
@@ -3717,6 +3720,10 @@ mod test {
         type ConnIpAddr<I: IpExt> = ConnIpAddr<I::Addr, u8, char>;
         type ConnState<I: IpExt, D: Debug + Eq + Hash> =
             ConnState<I, D, Self, IpOptions<I, D, Self>>;
+
+        fn ip_proto<I: IpProtoExt>() -> I::Proto {
+            I::map_ip((), |()| FAKE_DATAGRAM_IPV4_PROTOCOL, |()| FAKE_DATAGRAM_IPV6_PROTOCOL)
+        }
 
         fn make_receiving_map_id<I: IpExt, D: device::WeakId>(
             s: Self::SocketId<I>,
@@ -4207,7 +4214,6 @@ mod test {
             socket,
             ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into(),
             'a',
-            IpProto::Udp.into(),
             body,
         )
         .expect("succeeds");
@@ -4242,7 +4248,6 @@ mod test {
                 socket,
                 ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into(),
                 'a',
-                IpProto::Udp.into(),
                 body,
             ),
             Err(Either::Right(SendToError::CreateAndSend(_, _)))

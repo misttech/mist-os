@@ -26,7 +26,7 @@ use net_types::{
 use packet::{BufferMut, Nested, ParsablePacket, ParseBuffer, Serializer};
 use packet_formats::{
     error::ParseError,
-    ip::IpProto,
+    ip::{IpProto, IpProtoExt},
     udp::{UdpPacket, UdpPacketBuilder, UdpPacketRaw, UdpParseArgs},
 };
 use tracing::trace;
@@ -427,6 +427,10 @@ impl DatagramSocketSpec for Udp {
     type ListenerSharingState = Sharing;
 
     type Serializer<I: IpExt, B: BufferMut> = Nested<B, UdpPacketBuilder<I::Addr>>;
+
+    fn ip_proto<I: IpProtoExt>() -> I::Proto {
+        IpProto::Udp.into()
+    }
 
     fn make_receiving_map_id<I: IpExt, D: WeakId>(
         s: Self::SocketId<I>,
@@ -1601,7 +1605,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         remote_ip: SocketZonedIpAddr<<I>::Addr, Self::DeviceId>,
         remote_port: NonZeroU16,
     ) -> Result<(), ConnectError> {
-        datagram::connect(self, ctx, id, remote_ip, remote_port, IpProto::Udp)
+        datagram::connect(self, ctx, id, remote_ip, remote_port)
     }
 
     fn set_device(
@@ -1848,33 +1852,29 @@ impl<
         remote_port: NonZeroU16,
         body: B,
     ) -> Result<(), (B, Either<LocalAddressError, SendToError>)> {
-        datagram::send_to(self, ctx, id, remote_ip, remote_port, IpProto::Udp.into(), body).map_err(
-            |e| match e {
-                Either::Left((body, e)) => (body, Either::Left(e)),
-                Either::Right(e) => {
-                    let (body, err) = match e {
-                        datagram::SendToError::NotWriteable(body) => {
-                            (body, SendToError::NotWriteable)
-                        }
-                        datagram::SendToError::Zone(body, e) => (body, SendToError::Zone(e)),
-                        datagram::SendToError::CreateAndSend(s, e) => (
-                            s.into_inner(),
-                            match e {
-                                IpSockCreateAndSendError::Mtu => SendToError::Mtu,
-                                IpSockCreateAndSendError::Create(e) => SendToError::CreateSock(e),
-                            },
-                        ),
-                        datagram::SendToError::RemoteUnexpectedlyMapped(body) => (
-                            body,
-                            SendToError::CreateSock(IpSockCreationError::Route(
-                                ResolveRouteError::Unreachable,
-                            )),
-                        ),
-                    };
-                    (body, Either::Right(err))
-                }
-            },
-        )
+        datagram::send_to(self, ctx, id, remote_ip, remote_port, body).map_err(|e| match e {
+            Either::Left((body, e)) => (body, Either::Left(e)),
+            Either::Right(e) => {
+                let (body, err) = match e {
+                    datagram::SendToError::NotWriteable(body) => (body, SendToError::NotWriteable),
+                    datagram::SendToError::Zone(body, e) => (body, SendToError::Zone(e)),
+                    datagram::SendToError::CreateAndSend(s, e) => (
+                        s.into_inner(),
+                        match e {
+                            IpSockCreateAndSendError::Mtu => SendToError::Mtu,
+                            IpSockCreateAndSendError::Create(e) => SendToError::CreateSock(e),
+                        },
+                    ),
+                    datagram::SendToError::RemoteUnexpectedlyMapped(body) => (
+                        body,
+                        SendToError::CreateSock(IpSockCreationError::Route(
+                            ResolveRouteError::Unreachable,
+                        )),
+                    ),
+                };
+                (body, Either::Right(err))
+            }
+        })
     }
 }
 

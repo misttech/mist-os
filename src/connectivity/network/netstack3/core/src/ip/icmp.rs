@@ -37,7 +37,7 @@ use packet_formats::{
         Icmpv6DestUnreachableCode, Icmpv6Packet, Icmpv6PacketTooBig, Icmpv6ParameterProblem,
         Icmpv6ParameterProblemCode, Icmpv6TimeExceededCode, MessageBody, OriginalPacket,
     },
-    ip::{Ipv4Proto, Ipv6Proto},
+    ip::{IpProtoExt, Ipv4Proto, Ipv6Proto},
     ipv4::{Ipv4FragmentType, Ipv4Header},
     ipv6::{ExtHdrParseError, Ipv6Header},
 };
@@ -733,6 +733,10 @@ impl DatagramSocketSpec for Icmp {
     type SocketMapSpec<I: datagram::IpExt + datagram::DualStackIpExt, D: WeakId> = (Self, I, D);
 
     type UnboundSharingState<I: datagram::IpExt> = ();
+
+    fn ip_proto<I: IpProtoExt>() -> I::Proto {
+        I::map_ip((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6)
+    }
 
     fn make_receiving_map_id<I: datagram::IpExt, D: WeakId>(
         s: Self::SocketId<I>,
