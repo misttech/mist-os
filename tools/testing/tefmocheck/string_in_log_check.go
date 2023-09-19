@@ -510,6 +510,11 @@ func infraToolLogChecks() []FailureModeCheck {
 			String: "FFX Daemon was told not to autostart",
 			Type:   swarmingOutputType,
 		},
+		// For fxbug.dev/133846.
+		&stringInLogCheck{
+			String: "Timed out waiting for the ffx daemon on the Overnet mesh over socket",
+			Type:   swarmingOutputType,
+		},
 		// This error happens when `botanist run` exceeds its timeout, e.g.
 		// because many tests are taking too long. If botanist exceeds its timeout,
 		// it will terminate subprocesses which can lead to the errors below.
