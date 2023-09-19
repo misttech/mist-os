@@ -421,6 +421,14 @@ void BufferCollectionToken::CombinedTokenServer::IsAlternateForV2(
                                                                                        completer);
 }
 
+void BufferCollectionToken::CombinedTokenServer::GetBufferCollectionIdV2(
+    GetBufferCollectionIdV2Completer::Sync& completer) {
+  parent_.GetBufferCollectionIdImplV2<
+      GetBufferCollectionIdV2Completer::Sync,
+      fuchsia_sysmem2_internal::CombinedBufferCollectionTokenGetBufferCollectionIdV2Response>(
+      completer);
+}
+
 BufferCollectionToken::BufferCollectionToken(
     fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection_param,
     NodeProperties* new_node_properties, const TokenServerEnd& server_end)

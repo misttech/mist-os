@@ -158,6 +158,8 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
 
   bool is_verbose_logging() const { return is_verbose_logging_; }
 
+  uint64_t buffer_collection_id() const { return buffer_collection_id_; }
+
   static fit::result<zx_status_t, BufferCollectionToken*> CommonConvertToken(
       Device* parent_device, zx::channel buffer_collection_token,
       const ClientDebugInfo* client_debug_info, const char* fidl_message_name);
@@ -683,14 +685,20 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
     bool waiting_ = {};
   };
 
+  // This does not actually need to be a koid, but for now we do get the value from a koid, so we
+  // want the initial value at the start of the constructor to be the invalid koid value, until we
+  // set this to a real koid value that's unique to "this".
+  uint64_t buffer_collection_id_ = ZX_KOID_INVALID;
+
   // From buffers_remaining to server_end.
   std::multimap<uint32_t, zx::eventpair> lifetime_tracking_;
 
-  // It's nice for members containing timers to be last for destruction order purposes, but the
-  // destructor also explicitly cancels timers to avoid any brittle-ness from members potentially
-  // added after these.
   using ParentVmoMap = std::map<zx_handle_t, std::unique_ptr<TrackedParentVmo>>;
   ParentVmoMap parent_vmos_;
+
+  // It's nice for members containing timers to be last for destruction order purposes, but the
+  // destructor also explicitly cancels timers to avoid any brittle-ness from members potentially
+  // added below creation_timer_ (so this doesn't actually need to be last).
   async::TaskMethod<LogicalBufferCollection, &LogicalBufferCollection::CreationTimedOut>
       creation_timer_{this};
 

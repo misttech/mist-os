@@ -144,6 +144,10 @@ closed protocol CombinedBufferCollectionToken {
     }) -> (table {
         1: is_alternate bool;
     }) error zx.Status;
+    @selector("fuchsia.sysmem2/Node.GetBufferCollectionId")
+    strict GetBufferCollectionIdV2() -> (table {
+        1: buffer_collection_id uint64;
+    });
 
     // fuchsia.sysmem2/BufferCollectionToken, with de-conflicted names:
     @selector("fuchsia.sysmem2/BufferCollectionToken.DuplicateSync")

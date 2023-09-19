@@ -535,6 +535,10 @@ void BufferCollection::V2::IsAlternateFor(IsAlternateForRequest& request,
   parent_.IsAlternateForImplV2(request, completer);
 }
 
+void BufferCollection::V2::GetBufferCollectionId(GetBufferCollectionIdCompleter::Sync& completer) {
+  parent_.GetBufferCollectionIdImplV2(completer);
+}
+
 void BufferCollection::V1::Close(CloseCompleter::Sync& completer) { parent_.CloseImpl(completer); }
 
 void BufferCollection::V2::Close(CloseCompleter::Sync& completer) { parent_.CloseImpl(completer); }

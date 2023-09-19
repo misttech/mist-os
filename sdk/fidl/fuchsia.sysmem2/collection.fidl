@@ -303,6 +303,33 @@ closed protocol Node {
     }) -> (table {
         1: is_alternate bool;
     }) error zx.Status;
+
+    /// Get the LogicalBufferCollection ID. This ID is also available from
+    /// Allocator.GetVmoInfo (along with the buffer_index within the
+    /// collection).
+    ///
+    /// This call is mainly useful in situations where we can't convey a
+    /// BufferCollectionToken or BufferCollection directly, but can only convey
+    /// a VMO handle, which can be joined back up with a BufferCollection
+    /// client_end that was created via a different path. Prefer to convey a
+    /// BufferCollectionToken or BufferCollection directly when feasible.
+    ///
+    /// Trusting a buffer_collection_id value from a source other than sysmem is
+    /// analogous to trusting a koid value from a source other than zircon. Both
+    /// should be avoided unless really necessary, and both require caution. In
+    /// some situations it may be reasonable to refer to a pre-established
+    /// BufferCollection by buffer_collection_id via a protocol for efficiency
+    /// reasons, but an incoming value purporting to be a buffer_collection_id
+    /// is not sufficient alone to justify granting the sender any capability.
+    /// The sender must first prove to a receiver that the sender has/had a VMO
+    /// or has/had a BufferCollectionToken to the same collection by sending a
+    /// handle that sysmem confirms is a valid sysmem handle and which sysmem
+    /// maps to the buffer_collection_id value. The receiver should take care to
+    /// avoid assuming that a sender had a BufferCollectionToken in cases where
+    /// the sender has only proven that the sender had a VMO.
+    strict GetBufferCollectionId() -> (table {
+        1: buffer_collection_id uint64;
+    });
 };
 
 /// A `BufferCollectionToken` is not a `BufferCollection`, but rather a way to
@@ -595,7 +622,7 @@ closed protocol BufferCollection {
     /// `BindSharedCollection`.  `SetConstraints` should be called on that
     /// `BufferCollection` channel.
     ///
-    /// A success result from `WaitForBuffersAllocated` means the new
+    /// A success result from `WaitForAllBuffersAllocated` means the new
     /// participant's constraints were satisfiable using the already-existing
     /// logical buffer collection, the already-established
     /// `BufferCollectionInfo` including image format constraints, and the

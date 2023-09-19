@@ -13,6 +13,7 @@
 #include <lib/zbi-format/graphics.h>
 #include <lib/zbitl/items/graphics.h>
 #include <lib/zx/clock.h>
+#include <zircon/types.h>
 
 #include <random>
 
@@ -341,6 +342,13 @@ void set_picky_constraints_v2(fidl::SyncClient<v2::BufferCollection>& collection
   buffer_memory.inaccessible_domain_supported() = false;
   ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
   ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
+  v2::BufferCollectionSetConstraintsRequest set_constraints_request;
+  set_constraints_request.constraints() = std::move(constraints);
+  EXPECT_TRUE(collection->SetConstraints(std::move(set_constraints_request)).is_ok());
+}
+
+void set_empty_constraints_v2(fidl::SyncClient<v2::BufferCollection>& collection) {
+  v2::BufferCollectionConstraints constraints;
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
   set_constraints_request.constraints() = std::move(constraints);
   EXPECT_TRUE(collection->SetConstraints(std::move(set_constraints_request)).is_ok());
@@ -5596,4 +5604,46 @@ TEST(Sysmem, VmoInspectRight) {
       vmo.get_info(ZX_INFO_HANDLE_BASIC, &basic_info, sizeof(basic_info), nullptr, nullptr);
   // ZX_RIGHT_INSPECT right allows get_info to work.
   ASSERT_EQ(ZX_OK, status);
+}
+
+TEST(Sysmem, GetBufferCollectionId) {
+  auto token = create_initial_token_v2();
+  auto get_from_token_result = token->GetBufferCollectionId();
+  ASSERT_TRUE(get_from_token_result.is_ok());
+  uint64_t token_buffer_collection_id = get_from_token_result->buffer_collection_id().value();
+  ASSERT_NE(ZX_KOID_INVALID, token_buffer_collection_id, "0?");
+  ASSERT_NE(ZX_KOID_KERNEL, token_buffer_collection_id, "unexpected value");
+
+  auto group = create_group_under_token_v2(token);
+  auto get_from_group_result = group->GetBufferCollectionId();
+  ASSERT_TRUE(get_from_group_result.is_ok());
+  uint64_t group_buffer_collection_id = get_from_group_result->buffer_collection_id().value();
+  ASSERT_EQ(token_buffer_collection_id, group_buffer_collection_id,
+            "id via token and group must match");
+
+  auto collection = convert_token_to_collection_v2(std::move(token));
+  auto get_from_collection_result = collection->GetBufferCollectionId();
+  ASSERT_TRUE(get_from_collection_result.is_ok());
+  uint64_t collection_buffer_collection_id =
+      get_from_collection_result->buffer_collection_id().value();
+  ASSERT_EQ(token_buffer_collection_id, collection_buffer_collection_id,
+            "id via token and collection must match");
+
+  // This nop (empty constraints) child is just to make the group happy, since a zero-child group
+  // intentionally fails.
+  auto nop_child_token = create_token_under_group_v2(group);
+  auto nop_child_collection = convert_token_to_collection_v2(std::move(nop_child_token));
+  set_empty_constraints_v2(nop_child_collection);
+  // This indicates that the group is ready for allocation (simimlar to SetConstraints for
+  // collection).
+  auto all_present_result = group->AllChildrenPresent();
+  ASSERT_TRUE(all_present_result.is_ok());
+
+  // Indicate that collection is ready for allocation.
+  set_picky_constraints_v2(collection, zx_system_get_page_size());
+
+  auto wait_result = collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(wait_result.is_ok());
+  auto& info = *wait_result->buffer_collection_info();
+  ASSERT_EQ(token_buffer_collection_id, *info.buffer_collection_id());
 }

@@ -68,6 +68,7 @@ source_set("sysmem_common_srcs") {
     "//src/devices/sysmem/metrics",
     "//src/lib/ddk",
     "//src/lib/ddktl",
+    "//src/lib/fsl",
     "//src/lib/memory_barriers",
     "//src/lib/metrics_buffer",
     "//zircon/system/ulib/async:async-cpp",

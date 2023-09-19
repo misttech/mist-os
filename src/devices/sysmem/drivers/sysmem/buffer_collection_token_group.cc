@@ -49,6 +49,11 @@ void BufferCollectionTokenGroup::V2::IsAlternateFor(IsAlternateForRequest& reque
   parent_.IsAlternateForImplV2(request, completer);
 }
 
+void BufferCollectionTokenGroup::V2::GetBufferCollectionId(
+    GetBufferCollectionIdCompleter::Sync& completer) {
+  parent_.GetBufferCollectionIdImplV2(completer);
+}
+
 void BufferCollectionTokenGroup::V1::SetName(SetNameRequest& request,
                                              SetNameCompleter::Sync& completer) {
   parent_.SetNameImplV1(request, completer);
@@ -254,6 +259,10 @@ void BufferCollectionTokenGroup::CommonAllChildrenPresent(Completer& completer) 
     return;
   }
   if (node_properties().child_count() < 1) {
+    // If this restriction creates a hassle, we could add a non-default per-group bool to allow zero
+    // children under a group if a client indicates that it may happen for a specific group. For now
+    // a client can add a child that sets empty constraints, if it turns out after creating a group
+    // that the group won't need to have any children.
     FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "AllChildrenPresent() without any children");
     return;
   }

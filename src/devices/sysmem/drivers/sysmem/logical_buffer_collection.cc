@@ -41,6 +41,7 @@
 #include "macros.h"
 #include "node_properties.h"
 #include "orphaned_node.h"
+#include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/memory_barriers/memory_barriers.h"
 #include "usage_pixel_format_cost.h"
 
@@ -844,11 +845,25 @@ LogicalBufferCollection::LogicalBufferCollection(Device* parent_device)
     : parent_device_(parent_device) {
   TRACE_DURATION("gfx", "LogicalBufferCollection::LogicalBufferCollection", "this", this);
   LogInfo(FROM_HERE, "LogicalBufferCollection::LogicalBufferCollection()");
+
+  // For now, we create+get a koid that's unique to this LogicalBufferCollection, to be absolutely
+  // certain that the buffer_collection_id_ will be unique per boot. We're using an event here only
+  // because it's a fairly cheap object to create/delete.
+  zx::event dummy_event;
+  zx_status_t status = zx::event::create(0, &dummy_event);
+  ZX_ASSERT(status == ZX_OK);
+  zx_koid_t koid = fsl::GetKoid(dummy_event.get());
+  ZX_ASSERT(koid != ZX_KOID_INVALID);
+  dummy_event.reset();
+  buffer_collection_id_ = koid;
+  ZX_DEBUG_ASSERT(buffer_collection_id_ != ZX_KOID_INVALID);
+  ZX_DEBUG_ASSERT(buffer_collection_id_ != ZX_KOID_KERNEL);
+
   parent_device_->AddLogicalBufferCollection(this);
   inspect_node_ =
       parent_device_->collections_node().CreateChild(CreateUniqueName("logical-collection-"));
 
-  zx_status_t status = creation_timer_.PostDelayed(parent_device_->dispatcher(), zx::sec(5));
+  status = creation_timer_.PostDelayed(parent_device_->dispatcher(), zx::sec(5));
   ZX_ASSERT(status == ZX_OK);
   // nothing else to do here
 }
@@ -3192,6 +3207,8 @@ LogicalBufferCollection::GenerateUnpopulatedBufferCollectionInfo(
 
   fuchsia_sysmem2::BufferCollectionInfo result;
 
+  result.buffer_collection_id() = buffer_collection_id_;
+
   uint32_t min_buffer_count = *constraints.min_buffer_count_for_camping() +
                               *constraints.min_buffer_count_for_dedicated_slack() +
                               *constraints.min_buffer_count_for_shared_slack();
@@ -3702,10 +3719,10 @@ fpromise::result<zx::vmo> LogicalBufferCollection::AllocateVmo(
     return fpromise::error();
   }
 
-  zx_info_handle_basic_t child_info{};
-  local_child_vmo.get_info(ZX_INFO_HANDLE_BASIC, &child_info, sizeof(child_info), nullptr, nullptr);
-  tracked_parent_vmo->set_child_koid(child_info.koid);
-  TRACE_INSTANT("gfx", "Child VMO created", TRACE_SCOPE_THREAD, "koid", child_info.koid);
+  zx_koid_t child_koid = fsl::GetKoid(local_child_vmo.get());
+  ZX_ASSERT(child_koid != ZX_KOID_INVALID);
+  tracked_parent_vmo->set_child_koid(child_koid);
+  TRACE_INSTANT("gfx", "Child VMO created", TRACE_SCOPE_THREAD, "koid", child_koid);
 
   // Now that we know at least one child of raw_parent_vmo exists, we can StartWait() and add to
   // map.  From this point, ZX_VMO_ZERO_CHILDREN is the only way that allocator.Delete() gets
@@ -3717,6 +3734,8 @@ fpromise::result<zx::vmo> LogicalBufferCollection::AllocateVmo(
     return fpromise::error();
   }
   zx_handle_t raw_parent_vmo_handle = tracked_parent_vmo->vmo().get();
+  // parent_vmo_ref is a reference to the target of a unique_ptr<>, so the target doesn't move
+  // during lifetime of the parent_vmo_ref reference
   TrackedParentVmo& parent_vmo_ref = *tracked_parent_vmo;
   auto emplace_result = parent_vmos_.emplace(raw_parent_vmo_handle, std::move(tracked_parent_vmo));
   ZX_DEBUG_ASSERT(emplace_result.second);
@@ -3724,6 +3743,10 @@ fpromise::result<zx::vmo> LogicalBufferCollection::AllocateVmo(
   // Now inform the allocator about the child VMO before we return it.
   //
   // We copy / clone settings to buffer_settings parameter.
+  //
+  // TODO(b/298584551): This only works if local_child_vmo is the exact VMO delivered by sysmem to
+  // clients, which will soon only work for sysmem "strong" VMOs not sysmem "weak" VMOs, so this
+  // protocol should switch to using buffer_id instead of the local_child_vmo koid.
   status = allocator->SetupChildVmo(parent_vmo_ref.vmo(), local_child_vmo, settings);
   if (status != ZX_OK) {
     LogError(FROM_HERE, "allocator.SetupChildVmo() failed - status: %d", status);

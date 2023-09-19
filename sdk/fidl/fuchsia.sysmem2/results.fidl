@@ -63,6 +63,19 @@ type BufferCollectionInfo = resource table {
     /// a participant to know the vmo_usable_start values, in case that's of any
     /// use to the participant.
     2: buffers vector<VmoBuffer>:MAX_COUNT_BUFFER_COLLECTION_INFO_BUFFERS;
+
+    /// This number is unique among all logical buffer collections per boot.
+    ///
+    /// This ID number will be the same for all BufferCollectionToken(s),
+    /// BufferCollection(s), and BufferCollectionTokenGroup(s) associated with
+    /// the same logical buffer collection (derived from the same root token
+    /// created with fuchsia.sysmem2.Allocator.CreateSharedCollection, or with
+    /// CreateNonSharedCollection).
+    ///
+    /// The same ID can be retrieved from a BufferCollectionToken,
+    /// BufferCollection, or BufferCollectionTokenGroup using
+    /// GetBufferCollectionId (at the cost of a round-trip to sysmem and back).
+    3: buffer_collection_id uint64;
 };
 
 /// These settings and constraints apply to all the buffers in the collection.

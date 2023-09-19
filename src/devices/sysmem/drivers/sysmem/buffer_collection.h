@@ -143,6 +143,7 @@ class BufferCollection : public Node {
     void GetNodeRef(GetNodeRefCompleter::Sync& completer) override;
     void IsAlternateFor(IsAlternateForRequest& request,
                         IsAlternateForCompleter::Sync& completer) override;
+    void GetBufferCollectionId(GetBufferCollectionIdCompleter::Sync& completer) override;
     void SetName(SetNameRequest& request, SetNameCompleter::Sync& completer) override;
     void SetDebugClientInfo(SetDebugClientInfoRequest& request,
                             SetDebugClientInfoCompleter::Sync& completer) override;

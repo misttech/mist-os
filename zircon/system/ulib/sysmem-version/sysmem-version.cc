@@ -1568,6 +1568,9 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, zx_status_t> V2CloneBuff
       buffer_collection_info.buffers()->at(i) = clone_result.take_value();
     }
   }
+  if (src.buffer_collection_id().has_value()) {
+    buffer_collection_info.buffer_collection_id() = src.buffer_collection_id().value();
+  }
   return fpromise::ok(std::move(buffer_collection_info));
 }
 
@@ -1590,6 +1593,9 @@ V2CloneBufferCollectionInfo(fidl::AnyArena& allocator,
       }
       buffer_collection_info.buffers()[i] = clone_result.take_value();
     }
+  }
+  if (src.has_buffer_collection_id()) {
+    buffer_collection_info.set_buffer_collection_id(allocator, src.buffer_collection_id());
   }
   return fpromise::ok(buffer_collection_info);
 }
