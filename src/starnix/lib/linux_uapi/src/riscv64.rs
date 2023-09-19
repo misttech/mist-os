@@ -11949,11 +11949,22 @@ pub struct StdAtomicU32 {
     pub _bindgen_opaque_blob: u32,
 }
 #[repr(C)]
+#[repr(align(8))]
+#[derive(Debug, Default)]
+pub struct StdAtomicU64 {
+    pub _bindgen_opaque_blob: u64,
+}
+#[repr(C)]
 #[derive(Debug, Default)]
 pub struct vvar_data {
     pub raw_ticks_to_ticks_offset: std::sync::atomic::AtomicI64,
     pub ticks_to_mono_numerator: std::sync::atomic::AtomicU32,
     pub ticks_to_mono_denominator: std::sync::atomic::AtomicU32,
+    pub seq_num: std::sync::atomic::AtomicU64,
+    pub mono_to_utc_reference_offset: std::sync::atomic::AtomicI64,
+    pub mono_to_utc_synthetic_offset: std::sync::atomic::AtomicI64,
+    pub mono_to_utc_reference_ticks: std::sync::atomic::AtomicU32,
+    pub mono_to_utc_synthetic_ticks: std::sync::atomic::AtomicU32,
 }
 pub const _SECCOMP_IOCTL_NOTIF_RECV: __u32 = 3226476800;
 pub const SECCOMP_IOCTL_NOTIF_RECV: __u32 = 3226476800;

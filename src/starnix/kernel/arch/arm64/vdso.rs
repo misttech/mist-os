@@ -6,17 +6,15 @@ use fuchsia_zircon as zx;
 use process_builder::elf_parse;
 use zerocopy::AsBytes;
 
-use crate::{
-    types::{errno, from_status_like_fdio, Errno},
-    vdso::vdso_loader::VvarInitialValues,
-};
+use crate::types::{errno, from_status_like_fdio, Errno};
 
 pub const HAS_VDSO: bool = true;
 
-pub fn get_vvar_values() -> VvarInitialValues {
-    // Returns an empty struct since vvar_data is currently unused in this architecture
-    // TODO(fxb/129367): Implement gettimeofday() in aarch64.
-    VvarInitialValues::default()
+pub fn calculate_ticks_offset() -> i64 {
+    // Returns 0 as calculate_ticks_offset is currently unimplemented in this architecture.
+    // This isn't a problem as vvar_data is currently unused in this architecture.
+    // TODO(fxb/129367): Implement gettimeofday() in arm64.
+    0
 }
 
 pub fn get_sigreturn_offset(vdso_vmo: &zx::Vmo) -> Result<Option<u64>, Errno> {

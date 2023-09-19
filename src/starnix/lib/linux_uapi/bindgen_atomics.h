@@ -25,5 +25,6 @@
 
 typedef Atomic(int64_t) StdAtomicI64;
 typedef Atomic(uint32_t) StdAtomicU32;
+typedef Atomic(uint64_t) StdAtomicU64;
 
 #endif  // SRC_STARNIX_LIB_LINUX_UAPI_BINDGEN_ATOMICS_H_

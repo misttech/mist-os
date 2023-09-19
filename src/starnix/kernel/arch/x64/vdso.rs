@@ -5,7 +5,7 @@
 use core::arch::x86_64::_rdtsc;
 use fuchsia_zircon as zx;
 
-use crate::{types::Errno, vdso::vdso_loader::VvarInitialValues};
+use crate::types::Errno;
 
 pub const HAS_VDSO: bool = true;
 
@@ -32,18 +32,6 @@ pub fn calculate_ticks_offset() -> i64 {
         }
     }
     ticks_offset
-}
-
-pub fn get_vvar_values() -> VvarInitialValues {
-    let clock = zx::Clock::create(zx::ClockOpts::MONOTONIC | zx::ClockOpts::AUTO_START, None)
-        .expect("failed to create clock");
-    let details = clock.get_details().expect("Failed to get clock details");
-    let ticks_offset = calculate_ticks_offset();
-    VvarInitialValues {
-        raw_ticks_to_ticks_offset: ticks_offset,
-        ticks_to_mono_numerator: details.ticks_to_synthetic.rate.synthetic_ticks,
-        ticks_to_mono_denominator: details.ticks_to_synthetic.rate.reference_ticks,
-    }
 }
 
 pub fn get_sigreturn_offset(_vdso_vmo: &zx::Vmo) -> Result<Option<u64>, Errno> {

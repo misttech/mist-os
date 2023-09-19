@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::{lock::Mutex, logging::log_warn, vdso::vdso_loader::MemoryMappedVvar};
 use fuchsia_runtime::duplicate_utc_clock_handle;
-use fuchsia_zircon::{self as zx, AsHandleRef};
+use fuchsia_zircon::{self as zx, AsHandleRef, ClockTransformation};
 use once_cell::sync::Lazy;
-
-use crate::lock::Mutex;
-use crate::logging::log_warn;
 
 #[derive(Debug)]
 enum UtcClockSource {
@@ -35,10 +33,30 @@ impl UtcClockSource {
             }
         }
     }
+
+    fn get_transform(&self) -> ClockTransformation {
+        match self {
+            UtcClockSource::MonotonicWithOffset(offset) => ClockTransformation {
+                reference_offset: 0,
+                synthetic_offset: (*offset).into_nanos(),
+                rate: zx::sys::zx_clock_rate_t { synthetic_ticks: 1, reference_ticks: 1 },
+            },
+            UtcClockSource::Clock(clock) => clock.get_details().unwrap().mono_to_synthetic,
+        }
+    }
+
+    pub fn write_vvar_data_transform_to(&self, dest: &MemoryMappedVvar) {
+        let new_transform = self.get_transform();
+        dest.update_utc_data_transform(&new_transform);
+    }
 }
 
 static UTC_CLOCK_SOURCE: Lazy<Mutex<UtcClockSource>> =
     Lazy::new(|| Mutex::new(UtcClockSource::new()));
+
+pub fn utc_write_vvar_data_transform_to(dest: &MemoryMappedVvar) {
+    (*UTC_CLOCK_SOURCE).lock().write_vvar_data_transform_to(dest);
+}
 
 pub fn utc_now() -> zx::Time {
     #[cfg(test)]
