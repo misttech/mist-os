@@ -3083,7 +3083,7 @@ vendor/acme/proprietary:build_installer with Ninja:
 
 **Current value (from the default):** `[]`
 
-From //build/bazel/legacy_ninja_build_outputs.gni:121
+From //build/bazel/legacy_ninja_build_outputs.gni:122
 
 ### extra_package_labels
 
@@ -5578,7 +5578,7 @@ Example JNI include paths for a Linux system:
 
 **Current value (from the default):** `[]`
 
-From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:306
+From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:304
 
 ### pw_arduino_build_BOARD
 
