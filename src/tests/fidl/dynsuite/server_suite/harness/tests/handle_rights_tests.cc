@@ -22,8 +22,7 @@ CLOSED_SERVER_TEST(16, ClientSendsTooFewHandles) {
       {handle_present(), padding(4)},
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kDecodeFailure);
 }
 
 // The server should tear down when it receives the wrong handle type.
@@ -41,8 +40,7 @@ CLOSED_SERVER_TEST(17, ClientSendsWrongHandleType) {
       },
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kDecodeFailure);
 }
 
 // When a handle with too many rights is sent, the rights should be reduced.
@@ -87,8 +85,7 @@ CLOSED_SERVER_TEST(19, ClientSendsTooFewRights) {
       },
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kDecodeFailure);
 }
 
 // The server should handle ZX_OBJ_TYPE_NONE and ZX_RIGHT_SAME_RIGHTS correctly.
@@ -127,8 +124,7 @@ CLOSED_SERVER_TEST(21, ServerSendsWrongHandleType) {
       },
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kWriteFailure);
 }
 
 // When the server sends a handle with too many rights, the rights should be reduced.
@@ -182,8 +178,7 @@ CLOSED_SERVER_TEST(23, ServerSendsTooFewRights) {
       },
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kWriteFailure);
 }
 
 }  // namespace

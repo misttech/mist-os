@@ -17,24 +17,22 @@ using namespace ::channel_util;
 CLOSED_SERVER_TEST(24, ServerSendsEpitaph) {
   zx_status_t epitaph = 456;
   Bytes expected = {
-      Header{.txid = 0, .ordinal = kOrdinal_ClosedTarget_Epitaph},
+      Header{.txid = 0, .ordinal = kOrdinalEpitaph},
       {int32(epitaph), padding(4)},
   };
-  ASSERT_TRUE(controller()->CloseWithEpitaph({epitaph}).is_ok());
+  ASSERT_RESULT_OK(runner()->ShutdownWithEpitaph({epitaph}));
   ASSERT_OK(client_end().read_and_check(expected));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kVoluntaryShutdown);
 }
 
 // It is not permissible to send epitaphs to servers.
 CLOSED_SERVER_TEST(25, ServerReceivesEpitaphInvalid) {
   Bytes request = {
-      Header{.txid = 0, .ordinal = kOrdinal_ClosedTarget_Epitaph},
+      Header{.txid = 0, .ordinal = kOrdinalEpitaph},
       {int32(456), padding(4)},
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kUnexpectedMessage);
 }
 
 }  // namespace

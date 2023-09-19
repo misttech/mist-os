@@ -14,6 +14,7 @@ go_binary("bin") {
 
 go_library("lib") {
   deps = [
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_go($go_toolchain)",
     "//src/lib/component",
     "//src/lib/syslog/go",
     "//src/tests/fidl/dynsuite/server_suite/fidl:fidl.serversuite_go($go_toolchain)",

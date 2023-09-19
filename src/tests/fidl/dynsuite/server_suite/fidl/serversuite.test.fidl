@@ -7,9 +7,26 @@ library fidl.serversuite;
 using zx;
 
 // An incrementing integer used to coordinate breaking changes across repositories.
-const SERVER_SUITE_VERSION uint64 = 0;
+const SERVER_SUITE_VERSION uint64 = 1;
 
-// The Runner coordinates test activity and is shared by multiple tests.
+// The Runner is used by the harness to coordinate with the runner component.
+// It's for communication *about* tests, not under test itself like the Target.
+//
+// For each test, the harness performs these steps:
+//
+// 1. Connect to the Runner server.
+// 2. Call GetVersion().
+//    - If the version is too old for the test to work, skip the test.
+// 3. Call Start(), passing a Target server end.
+//    - If it returns TEST_DISABLED, skip the test.
+// 4. Interact with the Target server and assert on its behavior. Optionally:
+//    - Call a Runner method telling it to do something to the Target.
+//    - Wait for a Runner event saying that something happened to the Target.
+// 5. (If normal termination is expected) Close the Target channel.
+// 6. Wait for OnTeardown() and assert on the teardown reason.
+// 7. Call CheckAlive() to make sure the runner hasn't crashed.
+// 8. Close the Runner channel.
+//
 @discoverable
 closed protocol Runner {
     // Returns SERVER_SUITE_VERSION. This allows the harness to determine if the
@@ -18,152 +35,85 @@ closed protocol Runner {
         version uint64;
     });
 
-    // Check if a test with a given name is enabled before running it.
-    strict IsTestEnabled(struct {
-        test Test;
-    }) -> (struct {
-        is_enabled bool;
-    });
+    // A two-way method to test that the Runner is still responding.
+    strict CheckAlive() -> ();
 
-    // Check if the runner supports determining fine-grained teardown reasons.
-    // If false, then the server under test should still notify on teardown,
-    // but it should only send back [`TeardownReason.OTHER`].
-    strict IsTeardownReasonSupported() -> (struct {
-        is_supported bool;
-    });
-
-    // Create a Target to run tests against.
+    // Start the test, binding the given endpoint to a Target server.
     strict Start(resource struct {
-        // Target server end to bind for this test.
-        target AnyTarget;
+        test Test;
+        any_target strict resource union {
+            1: closed server_end:ClosedTarget;
+            2: ajar server_end:AjarTarget;
+            3: open server_end:OpenTarget;
+        };
+    }) -> () error @generated_name("StartError") strict enum {
+        TEST_DISABLED = 1;
+    };
+
+    // Report that the Target server was torn down. This must be sent once. For
+    // most tests, the reason is PEER_CLOSED because the harness closed its end.
+    // If the reason has multiple bits set, it means the bindings are unable to
+    // differentiate between those reasons and it could be any of them.
+    strict -> OnTeardown(struct {
+        reason @generated_name("TeardownReason") strict bits : uint32 {
+            // The Target channel was closed by the peer (the harness).
+            // This is normal termination, not an error.
+            PEER_CLOSED = 0x1;
+            // The Target server voluntarily shut itself down,
+            // e.g. when instructed to do so via ShutdownWithEpitaph().
+            VOLUNTARY_SHUTDOWN = 0x2;
+            // The Target server received a message that, based on its magic
+            // number or at-rest flags, is incompatible and cannot be decoded.
+            INCOMPATIBLE_FORMAT = 0x4;
+            // The Target server received a message that, based on its txid,
+            // dynamic flags, or ordinal, was unexpected.
+            UNEXPECTED_MESSAGE = 0x8;
+            // The Target server failed to encode an outgoing message.
+            // Note: Use WRITE_FAILURE instead for zx_channel_write_etc errors,
+            // even if they are checked preemptively during encoding.
+            ENCODE_FAILURE = 0x10;
+            // The Target server failed to decode an incoming message.
+            // This includes the header, but header decoding only fails when
+            // there are less than 16 bytes. When the *value* of header fields
+            // is the problem, use INCOMPATIBLE_FORMAT or UNEXPECTED_MESSAGE.
+            DECODE_FAILURE = 0x20;
+            // The Target server encoded an outgoing message successfully, but
+            // failed to write it to the channel. This happens when the message
+            // is too large or when handle dispositions are incorrect.
+            WRITE_FAILURE = 0x40;
+        };
+    });
+
+    // Report that the Target server ran the unknown method handler.
+    strict -> OnReceivedUnknownMethod(@generated_name("UnknownMethodInfo") struct {
+        ordinal uint64;
+        unknown_method_type @generated_name("UnknownMethodType") strict enum {
+            ONE_WAY = 1;
+            TWO_WAY = 2;
+        };
+    });
+
+    // Shut down the Target server with an epitaph.
+    strict ShutdownWithEpitaph(struct {
+        epitaph_status int32;
     }) -> ();
 
-    // A two-way function to test that the Runner is still responding.
-    strict CheckAlive() -> ();
+    // Send an event from the Target server.
+    strict SendOpenTargetStrictEvent() -> ();
+    strict SendOpenTargetFlexibleEvent() -> ();
+
+    // Report that the Target server received a one-way call.
+    strict -> OnReceivedClosedTargetOneWayNoPayload();
+    strict -> OnReceivedOpenTargetStrictOneWay();
+    strict -> OnReceivedOpenTargetFlexibleOneWay();
 };
 
-// Type which can hold the server end of any target type. The test case will
-// create the channel and pass it to the runner in Start.
-type AnyTarget = strict resource union {
-    1: closed_target @generated_name("ClosedTargetServerPair") resource struct {
-        controller server_end:ClosedTargetController;
-        sut server_end:ClosedTarget;
-    };
-    2: ajar_target @generated_name("AjarTargetServerPair") resource struct {
-        controller server_end:AjarTargetController;
-        sut server_end:AjarTarget;
-    };
-    3: open_target @generated_name("OpenTargetServerPair") resource struct {
-        controller server_end:OpenTargetController;
-        sut server_end:OpenTarget;
-    };
-};
-
-// Empty type used for valid but empty union variants.
-type Empty = struct {};
-
-// Error classification for errors from sending an event. This is used for the
-// error value from all methods on the `<Name>TargetController` protocols which
-// request that the system under test send an event.
-type SendEventError = strict enum : int32 {
-    // Any error which isn't otherwise classified.
-    OTHER_ERROR = 1;
-};
-
-// Identifies which type of unknown method was received in the unknown
-// interaction handler.
-type UnknownMethodType = strict enum {
-    // Unknown method was a one-way method, like "SomeMethod(...);"
-    ONE_WAY = 1;
-    // Unknown method was a two-way method, like "SomeMethod(...) -> (...);"
-    TWO_WAY = 2;
-};
-
-type UnknownMethodInfo = struct {
-    // Ordinal that was received in the interaction handler.
-    ordinal uint64;
-    // Whether the unknown method is one-way or two-way.
-    unknown_method_type UnknownMethodType;
-};
-
-// TODO(fxbug.dev/102339): These could probably be combined with the GIDL error codes for common
-// cases in some way.
-type EncodingFailureKind = strict enum {
-    // Remove this placeholder when adding members here.
-    PLACEHOLDER = 1;
-};
-
-type EncodingFailureInfo = struct {
-    kind EncodingFailureKind;
-};
-
-// Under particular test cases, the test harness may expect that the server
-// bindings experience an error that requires it to teardown the connection.
-// This enum provides classifications for the possible kinds of FIDL errors at
-// the level of granularity needed to make assertions in tests. It does not
-// taxonomize all the possible errors that might be returned in bindings.
+// The Target is the protocol under test. The harness tests the behavior of the
+// Target's generated server bindings. It does so using raw channel operations,
+// *not* using the Target's generated client bindings.
 //
-// When handling connection teardown, the target in that language should
-// classify the reported error into one of these.
-type TeardownReason = strict enum {
-    // All other reasons. Many reasons are irrelevant in the situations
-    // being tested here, so all those errors can broadly be globbed together
-    // here.
-    OTHER = 1;
-    // Any error encountered during decoding. In particular, transactional
-    // message headers may also fail to decode.
-    DECODING_ERROR = 2;
-    // Errors due to the channel being closed by the peer.
-    CHANNEL_PEER_CLOSED = 3;
-    // The server received an unknown strict method or unknown flexible method
-    // on a protocol that doesn't allow it.
-    UNEXPECTED_MESSAGE = 4;
-};
-
-// Protocol which should be composed by every target controller.
-closed protocol TeardownReasonReporterMixin {
-    // Report that the server bindings will teardown the [`AnyTarget`] `sut`
-    // connection because of the attached reason.
-    //
-    // The server bindings under test should send at most one reason
-    // per [`Runner.Start`] call. It should not check the result of this
-    // call, because the test harness may have already broken away if
-    // the harness is not interested. TODO(fxbug.dev/113160): servers can
-    // start checking the result if one-way calls do not report peer-closed
-    // errors.
-    strict -> WillTeardown(struct {
-        reason TeardownReason;
-    });
-};
-
-// Protocol which should be composed by all controllers for protocols which
-// support unknown interactions.
-closed protocol UnknownInteractionReporterMixin {
-    // Report that the unknown interaction handler ran.
-    strict -> ReceivedUnknownMethod(UnknownMethodInfo);
-};
-
-// Protocol which can be composed by a controller that needs to report encoding
-// errors from sending method replies.
-closed protocol ReplyEncodingReporterMixin {
-    // Report that an encoding failure occurred when sending a reply.
-    strict -> ReplyEncodingFailed(EncodingFailureInfo);
-};
-
-closed protocol ClosedTargetController {
-    compose TeardownReasonReporterMixin;
-
-    // Report receiving the OneWayNoPayload method call.
-    strict -> ReceivedOneWayNoPayload();
-
-    strict CloseWithEpitaph(struct {
-        epitaph_status int32;
-    });
-};
-
-// The Target is the server under test. This target is used for tests which use
-// a closed protocol, or which don't care whether the protocol is open or
-// closed.
+// ClosedTarget is a closed protocol; there are also ajar and open Targets.
+// Prefer using ClosedTarget unless specifically testing ajar or open behavior.
 closed protocol ClosedTarget {
     strict OneWayNoPayload();
 
@@ -198,7 +148,7 @@ closed protocol ClosedTarget {
         // Plain handle, there should be no rights or type checking.
         handle zx.Handle;
     }) -> (struct {
-            // Rights should be obtained by calling zx_object_get_info on |handle|
+            // Rights should be obtained by calling zx_object_get_info on `handle`
             // with topic ZX_INFO_HANDLE_BASIC.
         rights zx.Rights;
     });
@@ -206,7 +156,7 @@ closed protocol ClosedTarget {
     strict GetSignalableEventRights(resource struct {
         handle zx.Handle:<EVENT, zx.Rights.SIGNAL>;
     }) -> (struct {
-        // Rights should be obtained by calling zx_object_get_info on |handle|
+        // Rights should be obtained by calling zx_object_get_info on `handle`
         // with topic ZX_INFO_HANDLE_BASIC.
         rights zx.Rights;
     });
@@ -243,34 +193,10 @@ closed protocol ClosedTarget {
     });
 };
 
-closed protocol AjarTargetController {
-    compose TeardownReasonReporterMixin;
-    compose UnknownInteractionReporterMixin;
-};
-
-// This is a version of Target only used for tests which care about having an
-// ajar protocol. This is mostly used for Unknown Interaction testing.
+// Like ClosedTarget, but ajar. This is used to test unknown interactions.
 ajar protocol AjarTarget {};
 
-// Protocol used to report one-way method calls received by the OpenTarget and
-// to command the OpenTarget to send events.
-closed protocol OpenTargetController {
-    compose TeardownReasonReporterMixin;
-    compose UnknownInteractionReporterMixin;
-
-    // Ask the server to send StrictEvent.
-    strict SendStrictEvent() -> () error SendEventError;
-    // Ask the server to send FlexibleEvent.
-    strict SendFlexibleEvent() -> () error SendEventError;
-
-    // Report receiving the StrictOneWay method call.
-    strict -> ReceivedStrictOneWay();
-    // Report receiving the FlexibleOneWay method call.
-    strict -> ReceivedFlexibleOneWay();
-};
-
-// This is a version of Target only used for tests which care about having an
-// open protocol. This is mostly used for Unknown Interaction testing.
+// Like ClosedTarget, but open. This is used to test unknown interactions.
 open protocol OpenTarget {
     strict -> StrictEvent();
     flexible -> FlexibleEvent();
@@ -312,6 +238,9 @@ open protocol OpenTarget {
         some_field int32;
     }) error int32;
 };
+
+// TODO(fxbug.dev/7913): Add a built-in unit type to FIDL.
+type Empty = struct {};
 
 type Test = flexible enum : uint32 {
     // ////////////////////////////////////////////////////////////////////////

@@ -2,58 +2,62 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::{endpoints::ControlHandle, AsHandleRef, Event, MethodType, Status},
-    fidl_fidl_serversuite::{
-        AjarTargetControlHandle, AjarTargetControllerControlHandle,
-        AjarTargetControllerRequestStream, AjarTargetRequest, AjarTargetRequestStream,
-        AjarTargetServerPair, AnyTarget, ClosedTargetControlHandle,
-        ClosedTargetControllerControlHandle, ClosedTargetControllerRequest,
-        ClosedTargetControllerRequestStream, ClosedTargetRequest, ClosedTargetRequestStream,
-        ClosedTargetServerPair, ClosedTargetTwoWayResultRequest,
-        ClosedTargetTwoWayTablePayloadResponse, ClosedTargetTwoWayUnionPayloadRequest,
-        ClosedTargetTwoWayUnionPayloadResponse, Empty, OpenTargetControlHandle,
-        OpenTargetControllerControlHandle, OpenTargetControllerRequest,
-        OpenTargetControllerRequestStream, OpenTargetFlexibleTwoWayErrRequest,
-        OpenTargetFlexibleTwoWayFieldsErrRequest, OpenTargetRequest, OpenTargetRequestStream,
-        OpenTargetServerPair, OpenTargetStrictTwoWayErrRequest,
-        OpenTargetStrictTwoWayFieldsErrRequest, RunnerRequest, RunnerRequestStream, SendEventError,
-        Test, UnknownMethodType, SERVER_SUITE_VERSION,
-    },
-    fuchsia_component::server::ServiceFs,
-    futures::prelude::*,
+use fidl::{endpoints::ControlHandle, prelude::*, Event, MethodType, Status};
+use fidl_fidl_serversuite::{
+    AjarTargetControlHandle, AjarTargetRequest, AjarTargetRequestStream, AnyTarget,
+    ClosedTargetControlHandle, ClosedTargetRequest, ClosedTargetRequestStream,
+    ClosedTargetTwoWayResultRequest, ClosedTargetTwoWayTablePayloadResponse,
+    ClosedTargetTwoWayUnionPayloadRequest, ClosedTargetTwoWayUnionPayloadResponse, Empty,
+    OpenTargetControlHandle, OpenTargetFlexibleTwoWayErrRequest,
+    OpenTargetFlexibleTwoWayFieldsErrRequest, OpenTargetRequest, OpenTargetRequestStream,
+    OpenTargetStrictTwoWayErrRequest, OpenTargetStrictTwoWayFieldsErrRequest, RunnerControlHandle,
+    RunnerRequest, RunnerRequestStream, StartError, TeardownReason, Test, UnknownMethodType,
+    SERVER_SUITE_VERSION,
 };
+use fuchsia_component::server::ServiceFs;
+use futures::{
+    future::{BoxFuture, Fuse},
+    prelude::*,
+    select,
+};
+use tracing::info;
 
 const DISABLED_TESTS: &[Test] = &[
-    // This is always disabled so that we can make sure IsTestEnabled() works.
+    // This is for testing the test disabling functionality itself.
     Test::IgnoreDisabled,
     // TODO(fxbug.dev/99738): Should reject V1 wire format.
     Test::V1TwoWayNoPayload,
     Test::V1TwoWayStructPayload,
-    // TODO(fxbug.dev/74241): There are many tests where the harness sends
-    // something invalid and expects a PEER_CLOSED. Right now the Rust bindings
-    // don't actually close the channel until everything is dropped, so to make
-    // things get dropped and avoid tests hanging, we shut down the controller
-    // after sending WillTeardown. That works for most tests, but breaks
-    // EventSendingDoNotReportPeerClosed where the harness calls SendStrictEvent
-    // after closing the target channel. Once we make channel closure happen
-    // more promptly, we can remove the ctl_handle.shutdown() calls below and
-    // re-enable this test.
+    // TODO(fxbug.dev/81036): Bindings *do* hide PEER_CLOSED from event sending.
+    // But because we send events through an Option<TargetControlHandle>, and we
+    // have to set it to None at the end (see the other comment about
+    // fxbug.dev/81036 below), we effectively re-introduce the race condition.
     Test::EventSendingDoNotReportPeerClosed,
 ];
 
-fn get_teardown_reason(error: Option<fidl::Error>) -> fidl_fidl_serversuite::TeardownReason {
-    use fidl_fidl_serversuite::TeardownReason;
-    let error = match error {
-        // TODO(fxbug.dev/120696): This is not always correct. The stream also
-        // completes without error when shutdown() is called.
-        None => return TeardownReason::ChannelPeerClosed,
-        Some(e) => e,
+// TestTag displays as the GoogleTest test name from the server suite harness.
+// This helps to clarify which logs belong to which test.
+#[derive(Copy, Clone)]
+struct TestTag(Option<Test>);
+
+impl std::fmt::Display for TestTag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0 {
+            None => write!(f, "[ServerTest_?]"),
+            Some(test) => write!(f, "[ServerTest_{}]", test.into_primitive()),
+        }
+    }
+}
+
+fn get_teardown_reason(error: Option<fidl::Error>) -> TeardownReason {
+    let Some(error) = error else {
+        // When the request stream completes without an error, it could be
+        // PEER_CLOSED or a voluntary shutdown.
+        return TeardownReason::PEER_CLOSED | TeardownReason::VOLUNTARY_SHUTDOWN;
     };
     match error {
         fidl::Error::InvalidBoolean
         | fidl::Error::InvalidHeader
-        | fidl::Error::IncompatibleMagicNumber(_)
         | fidl::Error::Invalid
         | fidl::Error::OutOfRange
         | fidl::Error::ExtraBytes
@@ -72,24 +76,24 @@ fn get_teardown_reason(error: Option<fidl::Error>) -> fidl_fidl_serversuite::Tea
         | fidl::Error::InvalidNumBytesInEnvelope
         | fidl::Error::InvalidHostHandle
         | fidl::Error::IncorrectHandleSubtype { .. }
-        | fidl::Error::MissingExpectedHandleRights { .. } => TeardownReason::DecodingError,
+        | fidl::Error::MissingExpectedHandleRights { .. } => TeardownReason::DECODE_FAILURE,
 
-        fidl::Error::UnknownOrdinal { .. }
-        | fidl::Error::InvalidRequestTxid
-        | fidl::Error::InvalidResponseTxid => TeardownReason::UnexpectedMessage,
+        fidl::Error::IncompatibleMagicNumber(_) => TeardownReason::INCOMPATIBLE_FORMAT,
+
+        fidl::Error::InvalidRequestTxid
+        | fidl::Error::InvalidResponseTxid
+        | fidl::Error::UnknownOrdinal { .. } => TeardownReason::UNEXPECTED_MESSAGE,
+
+        fidl::Error::ServerResponseWrite(_) => TeardownReason::WRITE_FAILURE,
 
         fidl::Error::UnsupportedMethod { .. }
         | fidl::Error::ClientChannelClosed { .. }
         | fidl::Error::UnexpectedSyncResponse { .. } => {
-            panic!("{error:?} should not be seen on server side")
+            panic!("get_teardown_reason: this error should not happen in a server: {error:?}")
         }
 
-        _ => TeardownReason::Other,
+        _ => panic!("get_teardown_reason: missing a match arm for this error: {error:?}"),
     }
-}
-
-fn classify_send_event_error(_err: fidl::Error) -> SendEventError {
-    SendEventError::OtherError
 }
 
 /// Returns the FIDL method name for a request/event enum value.
@@ -109,34 +113,20 @@ fn method_name(request_or_event: &impl std::fmt::Debug) -> String {
 
 // This is the error return type for functions that run a target server. They
 // should only return an error when it is expected to occur during tests. On
-// other errors (e.g. reply sending that never fails), they should panic.
+// other errors (e.g. reply sending that should never fail), they should panic.
 type ErrorExpectedUnderTest = fidl::Error;
 
-async fn run_closed_target_controller_server(
-    mut stream: ClosedTargetControllerRequestStream,
-    sut_handle: &ClosedTargetControlHandle,
-) {
-    println!("Running ClosedTargetController");
-    while let Some(request) = stream.try_next().await.unwrap() {
-        println!("Handling ClosedTargetController request: {}", method_name(&request));
-        match request {
-            ClosedTargetControllerRequest::CloseWithEpitaph { epitaph_status, .. } => {
-                sut_handle.shutdown_with_epitaph(Status::from_raw(epitaph_status));
-            }
-        }
-    }
-}
-
-async fn run_closed_target_server(
+async fn serve_closed_target(
     mut stream: ClosedTargetRequestStream,
-    ctl_handle: &ClosedTargetControllerControlHandle,
+    runner_ctrl: RunnerControlHandle,
+    tag: TestTag,
 ) -> Result<(), ErrorExpectedUnderTest> {
-    println!("Running ClosedTarget");
+    info!("{tag} Serving ClosedTarget...");
     while let Some(request) = stream.try_next().await? {
-        println!("Handling ClosedTarget request: {}", method_name(&request));
+        info!("{tag} Handling ClosedTarget request: {}", method_name(&request));
         match request {
             ClosedTargetRequest::OneWayNoPayload { .. } => {
-                ctl_handle.send_received_one_way_no_payload().unwrap();
+                runner_ctrl.send_on_received_closed_target_one_way_no_payload().unwrap();
             }
             ClosedTargetRequest::TwoWayNoPayload { responder } => {
                 responder.send().unwrap();
@@ -154,7 +144,7 @@ async fn run_closed_target_server(
             }
             ClosedTargetRequest::TwoWayUnionPayload { payload, responder } => {
                 let ClosedTargetTwoWayUnionPayloadRequest::V(v) = payload else {
-                    panic!("unexpected union value: {payload:?}");
+                    panic!("{tag} unexpected union value: {payload:?}");
                 };
                 responder.send(&ClosedTargetTwoWayUnionPayloadResponse::V(v)).unwrap();
             }
@@ -201,28 +191,18 @@ async fn run_closed_target_server(
     Ok(())
 }
 
-async fn run_ajar_target_controller_server(
-    mut stream: AjarTargetControllerRequestStream,
-    _sut_handle: &AjarTargetControlHandle,
-) {
-    println!("Running AjarTargetController");
-    while let Some(request) = stream.try_next().await.unwrap() {
-        println!("Handling AjarTargetController request: {}", method_name(&request));
-        match request {}
-    }
-}
-
-async fn run_ajar_target_server(
+async fn serve_ajar_target(
     mut stream: AjarTargetRequestStream,
-    ctl_handle: &AjarTargetControllerControlHandle,
+    runner_ctrl: RunnerControlHandle,
+    tag: TestTag,
 ) -> Result<(), ErrorExpectedUnderTest> {
-    println!("Running AjarTarget");
+    info!("{tag} Serving AjarTarget...");
     while let Some(request) = stream.try_next().await? {
-        println!("Handling AjarTarget request: {}", method_name(&request));
+        info!("{tag} Handling AjarTarget request: {}", method_name(&request));
         match request {
             AjarTargetRequest::_UnknownMethod { ordinal, .. } => {
-                ctl_handle
-                    .send_received_unknown_method(ordinal, UnknownMethodType::OneWay)
+                runner_ctrl
+                    .send_on_received_unknown_method(ordinal, UnknownMethodType::OneWay)
                     .unwrap();
             }
         }
@@ -230,39 +210,20 @@ async fn run_ajar_target_server(
     Ok(())
 }
 
-async fn run_open_target_controller_server(
-    mut stream: OpenTargetControllerRequestStream,
-    sut_handle: &OpenTargetControlHandle,
-) {
-    println!("Running OpenTargetController");
-    while let Some(request) = stream.try_next().await.unwrap() {
-        println!("Handling OpenTargetController request: {}", method_name(&request));
-        match request {
-            OpenTargetControllerRequest::SendStrictEvent { responder } => {
-                let res = sut_handle.send_strict_event().map_err(classify_send_event_error);
-                responder.send(res).unwrap();
-            }
-            OpenTargetControllerRequest::SendFlexibleEvent { responder } => {
-                let res = sut_handle.send_flexible_event().map_err(classify_send_event_error);
-                responder.send(res).unwrap();
-            }
-        }
-    }
-}
-
-async fn run_open_target_server(
+async fn serve_open_target(
     mut stream: OpenTargetRequestStream,
-    ctl_handle: &OpenTargetControllerControlHandle,
+    runner_ctrl: RunnerControlHandle,
+    tag: TestTag,
 ) -> Result<(), ErrorExpectedUnderTest> {
-    println!("Running OpenTarget");
+    info!("{tag} Serving OpenTarget...");
     while let Some(request) = stream.try_next().await? {
-        println!("Handling OpenTarget request: {}", method_name(&request));
+        info!("{tag} Handling OpenTarget request: {}", method_name(&request));
         match request {
             OpenTargetRequest::StrictOneWay { .. } => {
-                ctl_handle.send_received_strict_one_way().unwrap();
+                runner_ctrl.send_on_received_open_target_strict_one_way().unwrap();
             }
             OpenTargetRequest::FlexibleOneWay { .. } => {
-                ctl_handle.send_received_flexible_one_way().unwrap();
+                runner_ctrl.send_on_received_open_target_flexible_one_way().unwrap();
             }
             OpenTargetRequest::StrictTwoWay { responder } => {
                 responder.send().unwrap();
@@ -313,71 +274,130 @@ async fn run_open_target_server(
                     MethodType::OneWay => UnknownMethodType::OneWay,
                     MethodType::TwoWay => UnknownMethodType::TwoWay,
                 };
-                ctl_handle.send_received_unknown_method(ordinal, unknown_method_type).unwrap();
+                runner_ctrl.send_on_received_unknown_method(ordinal, unknown_method_type).unwrap();
             }
         }
     }
     Ok(())
 }
 
-async fn handle_runner_request(request: RunnerRequest) {
-    match request {
-        RunnerRequest::CheckAlive { responder } => {
-            responder.send().unwrap();
+enum TargetControlHandle {
+    Closed(ClosedTargetControlHandle),
+    Ajar(AjarTargetControlHandle),
+    Open(OpenTargetControlHandle),
+}
+
+impl TargetControlHandle {
+    fn as_trait(&self) -> &dyn ControlHandle {
+        match self {
+            TargetControlHandle::Closed(ctrl) => ctrl,
+            TargetControlHandle::Ajar(ctrl) => ctrl,
+            TargetControlHandle::Open(ctrl) => ctrl,
         }
-        RunnerRequest::GetVersion { responder } => {
-            responder.send(SERVER_SUITE_VERSION).unwrap();
+    }
+
+    fn as_open(&self) -> &OpenTargetControlHandle {
+        match self {
+            TargetControlHandle::Open(ctrl) => ctrl,
+            _ => panic!("target is not OpenTarget"),
         }
-        RunnerRequest::IsTestEnabled { test, responder } => {
-            responder.send(!DISABLED_TESTS.contains(&test)).unwrap()
-        }
-        RunnerRequest::IsTeardownReasonSupported { responder } => {
-            responder.send(true).unwrap();
-        }
-        RunnerRequest::Start { target, responder } => match target {
-            AnyTarget::ClosedTarget(ClosedTargetServerPair { controller: ctl, sut }) => {
-                let (ctl_stream, ctl_handle) = ctl.into_stream_and_control_handle().unwrap();
-                let (sut_stream, sut_handle) = sut.into_stream_and_control_handle().unwrap();
-                let ctl_fut = run_closed_target_controller_server(ctl_stream, &sut_handle);
-                let sut_fut = run_closed_target_server(sut_stream, &ctl_handle).map(|result| {
-                    if let Err(ref err) = result {
-                        println!("ClosedTarget failed: {err:?}");
-                    }
-                    ctl_handle.send_will_teardown(get_teardown_reason(result.err())).unwrap();
-                    ctl_handle.shutdown();
-                });
-                responder.send().unwrap();
-                future::join(ctl_fut, sut_fut).await;
+    }
+}
+
+struct RunnerServer {
+    target_ctrl: Option<TargetControlHandle>,
+    target_serve_fut: Fuse<BoxFuture<'static, Result<(), ErrorExpectedUnderTest>>>,
+    tag: TestTag,
+}
+
+impl RunnerServer {
+    fn new() -> RunnerServer {
+        RunnerServer { target_ctrl: None, target_serve_fut: Fuse::terminated(), tag: TestTag(None) }
+    }
+
+    fn target_ctrl(&self) -> &TargetControlHandle {
+        self.target_ctrl.as_ref().expect(
+            "the Runner is trying to access the Target either before Start() or after OnTeardown()",
+        )
+    }
+
+    async fn serve(mut self, mut stream: RunnerRequestStream) {
+        info!("Serving Runner...");
+        loop {
+            select! {
+                request = stream.select_next_some() => {
+                    self.handle_request(request.unwrap()).await;
+                }
+                result = &mut self.target_serve_fut => {
+                    // TODO(fxbug.dev/81036): The control handle keeps the Target channel alive.
+                    // We must drop it otherwise the harness will hang waiting for PEER_CLOSED.
+                    // This shouldn't be necessary: control handles should hold weak references.
+                    self.target_ctrl = None;
+                    info!("{} Target completed: {:?}", self.tag, &result);
+                    let reason = get_teardown_reason(result.err());
+                    info!("{} Sending OnTeardown event: {:?}", self.tag, reason);
+                    stream.control_handle().send_on_teardown(reason).unwrap();
+                }
+                complete => break,
             }
-            AnyTarget::AjarTarget(AjarTargetServerPair { controller: ctl, sut }) => {
-                let (ctl_stream, ctl_handle) = ctl.into_stream_and_control_handle().unwrap();
-                let (sut_stream, sut_handle) = sut.into_stream_and_control_handle().unwrap();
-                let ctl_fut = run_ajar_target_controller_server(ctl_stream, &sut_handle);
-                let sut_fut = run_ajar_target_server(sut_stream, &ctl_handle).map(|result| {
-                    if let Err(ref err) = result {
-                        println!("AjarTarget failed: {err:?}");
-                    }
-                    ctl_handle.send_will_teardown(get_teardown_reason(result.err())).unwrap();
-                    ctl_handle.shutdown();
-                });
-                responder.send().unwrap();
-                future::join(ctl_fut, sut_fut).await;
+        }
+    }
+
+    async fn handle_request(&mut self, request: RunnerRequest) {
+        if let RunnerRequest::Start { test, .. } = request {
+            self.tag = TestTag(Some(test));
+        };
+        info!("{} Handling Runner request: {}", self.tag, method_name(&request));
+        match request {
+            RunnerRequest::GetVersion { responder } => {
+                responder.send(SERVER_SUITE_VERSION).unwrap();
             }
-            AnyTarget::OpenTarget(OpenTargetServerPair { controller: ctl, sut }) => {
-                let (ctl_stream, ctl_handle) = ctl.into_stream_and_control_handle().unwrap();
-                let (sut_stream, sut_handle) = sut.into_stream_and_control_handle().unwrap();
-                let ctl_fut = run_open_target_controller_server(ctl_stream, &sut_handle);
-                let sut_fut = run_open_target_server(sut_stream, &ctl_handle).map(|result| {
-                    if let Err(ref err) = result {
-                        println!("OpenTarget failed: {err:?}");
-                    }
-                    ctl_handle.send_will_teardown(get_teardown_reason(result.err())).unwrap();
-                    ctl_handle.shutdown();
-                });
+            RunnerRequest::CheckAlive { responder } => {
                 responder.send().unwrap();
-                future::join(ctl_fut, sut_fut).await;
             }
-        },
+            RunnerRequest::Start { test, any_target, responder } => {
+                assert!(self.target_ctrl.is_none(), "must only call Start() once");
+                if DISABLED_TESTS.contains(&test) {
+                    responder.send(Err(StartError::TestDisabled)).unwrap();
+                    return;
+                }
+                let runner_ctrl = responder.control_handle().clone();
+                match any_target {
+                    AnyTarget::Closed(target) => {
+                        let (stream, ctrl) = target.into_stream_and_control_handle().unwrap();
+                        self.target_ctrl = Some(TargetControlHandle::Closed(ctrl));
+                        self.target_serve_fut =
+                            serve_closed_target(stream, runner_ctrl, self.tag).boxed().fuse();
+                    }
+                    AnyTarget::Ajar(target) => {
+                        let (stream, ctrl) = target.into_stream_and_control_handle().unwrap();
+                        self.target_ctrl = Some(TargetControlHandle::Ajar(ctrl));
+                        self.target_serve_fut =
+                            serve_ajar_target(stream, runner_ctrl, self.tag).boxed().fuse();
+                    }
+                    AnyTarget::Open(target) => {
+                        let (stream, ctrl) = target.into_stream_and_control_handle().unwrap();
+                        self.target_ctrl = Some(TargetControlHandle::Open(ctrl));
+                        self.target_serve_fut =
+                            serve_open_target(stream, runner_ctrl, self.tag).boxed().fuse();
+                    }
+                }
+                responder.send(Ok(())).unwrap();
+            }
+            RunnerRequest::ShutdownWithEpitaph { epitaph_status, responder } => {
+                let status = Status::from_raw(epitaph_status);
+                self.target_ctrl().as_trait().shutdown_with_epitaph(status);
+                responder.send().unwrap();
+            }
+            RunnerRequest::SendOpenTargetStrictEvent { responder } => {
+                self.target_ctrl().as_open().send_strict_event().unwrap();
+                responder.send().unwrap();
+            }
+            RunnerRequest::SendOpenTargetFlexibleEvent { responder } => {
+                self.target_ctrl().as_open().send_flexible_event().unwrap();
+                responder.send().unwrap();
+            }
+        }
     }
 }
 
@@ -385,20 +405,15 @@ enum IncomingService {
     Runner(RunnerRequestStream),
 }
 
-#[fuchsia::main]
+#[fuchsia::main(logging_tags = ["rust"])]
 async fn main() {
     let mut fs = ServiceFs::new();
     fs.dir("svc").add_fidl_service(IncomingService::Runner);
     fs.take_and_serve_directory_handle().unwrap();
-
-    println!("Listening for incoming connections...");
     const MAX_CONCURRENT: usize = 10_000;
-    fs.for_each_concurrent(MAX_CONCURRENT, |IncomingService::Runner(mut stream)| async move {
-        println!("Received connection, serving requests...");
-        while let Some(request) = stream.try_next().await.unwrap() {
-            println!("Handling Runner request: {}", method_name(&request));
-            handle_runner_request(request).await;
-        }
+    info!("Rust serversuite server: ready!");
+    fs.for_each_concurrent(MAX_CONCURRENT, |IncomingService::Runner(stream)| {
+        RunnerServer::new().serve(stream)
     })
     .await;
 }

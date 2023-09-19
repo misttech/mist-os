@@ -24,7 +24,7 @@ CLOSED_SERVER_TEST(107, IgnoreDisabled) { FAIL() << "This test should be skipped
 CLOSED_SERVER_TEST(2, OneWayNoPayload) {
   Bytes request = Header{.txid = 0, .ordinal = kOrdinal_ClosedTarget_OneWayNoPayload};
   ASSERT_OK(client_end().write(request));
-  WAIT_UNTIL([this]() { return reporter().received_one_way_no_payload(); });
+  ASSERT_RUNNER_EVENT(RunnerEvent::kOnReceivedClosedTargetOneWayNoPayload);
 }
 
 // The server should reply to a two-way method request (no payload).

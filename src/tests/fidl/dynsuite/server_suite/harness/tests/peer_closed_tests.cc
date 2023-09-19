@@ -15,13 +15,9 @@ using namespace ::channel_util;
 // should hide it and return successfully. This helps prevent race conditions.
 OPEN_SERVER_TEST(109, EventSendingDoNotReportPeerClosed) {
   client_end().reset();
-  controller()->SendStrictEvent().ThenExactlyOnce([&](auto result) {
-    MarkControllerCallbackRun();
-    ASSERT_TRUE(result.is_ok()) << result.error_value();
-  });
-  WAIT_UNTIL([this]() { return reporter().teardown_reason().has_value(); });
-  EXPECT_TEARDOWN_REASON(fidl_serversuite::TeardownReason::kChannelPeerClosed);
-  WAIT_UNTIL_CONTROLLER_CALLBACK_RUN();
+  ASSERT_RESULT_OK(runner()->SendOpenTargetStrictEvent());
+  // If sending the event fails, the Runner will panic instead of tearing down normally.
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kPeerClosed);
 }
 
 // When sending a reply, if channel_write returns PEER_CLOSED, the bindings
@@ -30,8 +26,8 @@ CLOSED_SERVER_TEST(110, ReplySendingDoNotReportPeerClosed) {
   Bytes request = Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload};
   ASSERT_OK(client_end().write(request));
   client_end().reset();
-  WAIT_UNTIL([this]() { return reporter().teardown_reason().has_value(); });
-  EXPECT_TEARDOWN_REASON(fidl_serversuite::TeardownReason::kChannelPeerClosed);
+  // If sending the reply fails, the Runner will panic instead of tearing down normally.
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kPeerClosed);
 }
 
 // The server should drain out messages buffered by a client, even when the
@@ -40,7 +36,8 @@ CLOSED_SERVER_TEST(111, ReceiveOneWayNoPayloadFromPeerClosedChannel) {
   Bytes request = Header{.txid = 0, .ordinal = kOrdinal_ClosedTarget_OneWayNoPayload};
   ASSERT_OK(client_end().write(request));
   client_end().reset();
-  WAIT_UNTIL([this]() { return reporter().received_one_way_no_payload(); });
+  ASSERT_RUNNER_EVENT(RunnerEvent::kOnReceivedClosedTargetOneWayNoPayload);
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kPeerClosed);
 }
 
 // This test isn't really necessary, since the test fixture does this implicitly
@@ -48,8 +45,7 @@ CLOSED_SERVER_TEST(111, ReceiveOneWayNoPayloadFromPeerClosedChannel) {
 // We include it here just to be explicit that this behavior is covered.
 CLOSED_SERVER_TEST(113, ServerTearsDownWhenPeerClosed) {
   client_end().reset();
-  WAIT_UNTIL([this]() { return reporter().teardown_reason().has_value(); });
-  EXPECT_TEARDOWN_REASON(fidl_serversuite::TeardownReason::kChannelPeerClosed);
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kPeerClosed);
 }
 
 }  // namespace

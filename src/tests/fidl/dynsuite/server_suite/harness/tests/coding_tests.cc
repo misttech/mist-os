@@ -23,8 +23,7 @@ CLOSED_SERVER_TEST(15, BadPayloadEncoding) {
       out_of_line_envelope(0),
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kDecodeFailure);
 }
 
 // The server should reject V1 messages (no payload).
@@ -35,8 +34,7 @@ CLOSED_SERVER_TEST(105, V1TwoWayNoPayload) {
       .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload,
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kIncompatibleFormat);
 }
 
 // The server should reject V1 messages (struct payload).
@@ -50,8 +48,7 @@ CLOSED_SERVER_TEST(106, V1TwoWayStructPayload) {
       {int8(0), padding(7)},
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kIncompatibleFormat);
 }
 
 }  // namespace

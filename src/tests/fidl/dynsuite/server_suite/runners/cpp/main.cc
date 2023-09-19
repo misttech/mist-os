@@ -2,72 +2,95 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fidl.serversuite/cpp/common_types.h>
 #include <fidl/fidl.serversuite/cpp/fidl.h>
+#include <fidl/fidl.serversuite/cpp/natural_types.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async/dispatcher.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fidl/cpp/wire/status.h>
+#include <lib/syslog/cpp/log_settings.h>
+#include <lib/syslog/cpp/macros.h>
 
 #include <iostream>
+#include <set>
+#include <variant>
 
-#include "fidl/fidl.serversuite/cpp/natural_types.h"
-#include "src/tests/fidl/dynsuite/server_suite/runners/cpp_util/error_util.h"
+#include "src/tests/fidl/dynsuite/server_suite/runners/cpp_util/teardown_reason.h"
 
-class ClosedTargetControllerServer : public fidl::Server<fidl_serversuite::ClosedTargetController> {
- public:
-  ClosedTargetControllerServer() = default;
+namespace {
 
-  void CloseWithEpitaph(CloseWithEpitaphRequest& request,
-                        CloseWithEpitaphCompleter::Sync& completer) override {
-    sut_binding_->Close(request.epitaph_status());
-  }
-
-  void set_sut_binding(fidl::ServerBindingRef<fidl_serversuite::ClosedTarget> sut_binding) {
-    ZX_ASSERT_MSG(!sut_binding_, "sut binding already set");
-    sut_binding_ = std::move(sut_binding);
-  }
-
- private:
-  std::optional<fidl::ServerBindingRef<fidl_serversuite::ClosedTarget>> sut_binding_;
+const std::set<fidl_serversuite::Test> kDisabledTests = {
+    // This is for testing the test disabling functionality itself.
+    fidl_serversuite::Test::kIgnoreDisabled,
+    // TODO(fxbug.dev/129824): Should validate txid.
+    fidl_serversuite::Test::kOneWayWithNonZeroTxid,
+    fidl_serversuite::Test::kTwoWayNoPayloadWithZeroTxid,
 };
 
-class ClosedTargetServer : public fidl::Server<fidl_serversuite::ClosedTarget> {
+template <typename Protocol>
+class TargetServer : public fidl::Server<Protocol> {
  public:
-  ClosedTargetServer() = default;
+  explicit TargetServer(async_dispatcher_t* dispatcher, fidl::ServerEnd<Protocol> server_end,
+                        const fidl::ServerBindingRef<fidl_serversuite::Runner>& runner_binding,
+                        const char* tag)
+      : binding_(fidl::BindServer(dispatcher, std::move(server_end), this,
+                                  std::mem_fn(&TargetServer::OnUnbound))),
+        runner_binding_(runner_binding),
+        tag_(tag) {}
+
+  void OnUnbound(fidl::UnbindInfo info, fidl::ServerEnd<Protocol> server_end) {
+    FX_LOGST(INFO, tag_) << "Target completed: " << info;
+    auto reason = cpp_util::GetTeardownReason(info);
+    FX_LOGST(INFO, tag_) << "Sending OnTeardown event: 0x" << std::hex
+                         << static_cast<uint32_t>(reason) << std::dec;
+    ZX_ASSERT(fidl::SendEvent(runner_binding_)->OnTeardown({reason}).is_ok());
+  }
+
+  fidl::ServerBindingRef<Protocol> binding_;
+  const fidl::ServerBindingRef<fidl_serversuite::Runner>& runner_binding_;
+  const char* tag_;
+};
+
+class ClosedTargetServer : public TargetServer<fidl_serversuite::ClosedTarget> {
+ public:
+  using TargetServer::TargetServer;
 
   void OneWayNoPayload(OneWayNoPayloadCompleter::Sync& completer) override {
-    std::cout << "ClosedTarget.OneWayNoPayload()" << std::endl;
-    auto result = fidl::SendEvent(controller_binding_.value())->ReceivedOneWayNoPayload();
-    ZX_ASSERT(result.is_ok());
+    FX_LOGST(INFO, tag_) << "Handling ClosedTarget request: OneWayNoPayload";
+    ZX_ASSERT(fidl::SendEvent(runner_binding_)->OnReceivedClosedTargetOneWayNoPayload().is_ok());
   }
 
   void TwoWayNoPayload(TwoWayNoPayloadCompleter::Sync& completer) override {
-    std::cout << "ClosedTarget.TwoWayNoPayload()" << std::endl;
+    FX_LOGST(INFO, tag_) << "Handling ClosedTarget request: TwoWayNoPayload";
     completer.Reply();
   }
 
   void TwoWayStructPayload(TwoWayStructPayloadRequest& request,
                            TwoWayStructPayloadCompleter::Sync& completer) override {
-    std::cout << "ClosedTarget.TwoWayStructPayload()" << std::endl;
+    FX_LOGST(INFO, tag_) << "Handling ClosedTarget request: TwoWayStructPayload";
     completer.Reply(request.v());
   }
 
   void TwoWayTablePayload(TwoWayTablePayloadRequest& request,
                           TwoWayTablePayloadCompleter::Sync& completer) override {
-    std::cout << "ClosedTarget.TwoWayTablePayload()" << std::endl;
+    FX_LOGST(INFO, tag_) << "Handling ClosedTarget request: TwoWayTablePayload";
     fidl_serversuite::ClosedTargetTwoWayTablePayloadResponse response({.v = request.v()});
     completer.Reply(response);
   }
 
   void TwoWayUnionPayload(TwoWayUnionPayloadRequest& request,
                           TwoWayUnionPayloadCompleter::Sync& completer) override {
-    std::cout << "ClosedTarget.TwoWayUnionPayload()" << std::endl;
+    FX_LOGST(INFO, tag_) << "Handling ClosedTarget request: TwoWayUnionPayload";
     ZX_ASSERT(request.v().has_value());
     completer.Reply(
         fidl_serversuite::ClosedTargetTwoWayUnionPayloadResponse::WithV(request.v().value()));
   }
 
   void TwoWayResult(TwoWayResultRequest& request, TwoWayResultCompleter::Sync& completer) override {
-    std::cout << "ClosedTarget.TwoWayResult()" << std::endl;
+    FX_LOGST(INFO, tag_) << "Handling ClosedTarget request: TwoWayResult";
     switch (request.Which()) {
       case TwoWayResultRequest::Tag::kPayload:
         completer.Reply(fit::ok(request.payload().value()));
@@ -81,6 +104,7 @@ class ClosedTargetServer : public fidl::Server<fidl_serversuite::ClosedTarget> {
 
   void GetHandleRights(GetHandleRightsRequest& request,
                        GetHandleRightsCompleter::Sync& completer) override {
+    FX_LOGST(INFO, tag_) << "Handling ClosedTarget request: GetHandleRights";
     zx_info_handle_basic_t info;
     ZX_ASSERT(ZX_OK == request.handle().get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr,
                                                  nullptr));
@@ -89,6 +113,7 @@ class ClosedTargetServer : public fidl::Server<fidl_serversuite::ClosedTarget> {
 
   void GetSignalableEventRights(GetSignalableEventRightsRequest& request,
                                 GetSignalableEventRightsCompleter::Sync& completer) override {
+    FX_LOGST(INFO, tag_) << "Handling ClosedTarget request: GetSignalableEventRights";
     zx_info_handle_basic_t info;
     ZX_ASSERT(ZX_OK == request.handle().get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr,
                                                  nullptr));
@@ -98,126 +123,82 @@ class ClosedTargetServer : public fidl::Server<fidl_serversuite::ClosedTarget> {
   void EchoAsTransferableSignalableEvent(
       EchoAsTransferableSignalableEventRequest& request,
       EchoAsTransferableSignalableEventCompleter::Sync& completer) override {
+    FX_LOGST(INFO, tag_) << "Handling ClosedTarget request: EchoAsTransferableSignalableEvent";
     completer.Reply(zx::event(request.handle().release()));
   }
 
   void ByteVectorSize(ByteVectorSizeRequest& request,
                       ByteVectorSizeCompleter::Sync& completer) override {
+    FX_LOGST(INFO, tag_) << "Handling ClosedTarget request: ByteVectorSize";
     completer.Reply(static_cast<uint32_t>(request.vec().size()));
   }
 
   void HandleVectorSize(HandleVectorSizeRequest& request,
                         HandleVectorSizeCompleter::Sync& completer) override {
+    FX_LOGST(INFO, tag_) << "Handling ClosedTarget request: HandleVectorSize";
     completer.Reply(static_cast<uint32_t>(request.vec().size()));
   }
 
   void CreateNByteVector(CreateNByteVectorRequest& request,
                          CreateNByteVectorCompleter::Sync& completer) override {
+    FX_LOGST(INFO, tag_) << "Handling ClosedTarget request: CreateNByteVector";
     std::vector<uint8_t> bytes(request.n());
     completer.Reply(std::move(bytes));
   }
 
   void CreateNHandleVector(CreateNHandleVectorRequest& request,
                            CreateNHandleVectorCompleter::Sync& completer) override {
+    FX_LOGST(INFO, tag_) << "Handling ClosedTarget request: CreateNHandleVector";
     std::vector<zx::event> handles(request.n());
     for (auto& handle : handles) {
       ZX_ASSERT(ZX_OK == zx::event::create(0, &handle));
     }
     completer.Reply(std::move(handles));
   }
-
-  void OnUnbound(fidl::UnbindInfo info, fidl::ServerEnd<fidl_serversuite::ClosedTarget>) {
-    if (!info.is_dispatcher_shutdown() && !info.is_user_initiated() && !info.is_peer_closed()) {
-      std::cout << "ClosedTarget unbound with error: " << info.FormatDescription() << std::endl;
-    }
-    (void)fidl::SendEvent(controller_binding_.value())
-        ->WillTeardown({{.reason = servertest_util::ClassifyTeardownReason(info)}});
-  }
-
-  void set_controller_binding(
-      fidl::ServerBindingRef<fidl_serversuite::ClosedTargetController> controller_binding) {
-    ZX_ASSERT_MSG(!controller_binding_, "controller binding already set");
-    controller_binding_ = std::move(controller_binding);
-  }
-
- private:
-  std::optional<fidl::ServerBindingRef<fidl_serversuite::ClosedTargetController>>
-      controller_binding_;
 };
 
-class AjarTargetServer : public fidl::Server<fidl_serversuite::AjarTarget> {
+class AjarTargetServer : public TargetServer<fidl_serversuite::AjarTarget> {
  public:
-  explicit AjarTargetServer(fidl::ServerEnd<fidl_serversuite::AjarTargetController> controller)
-      : controller_(std::move(controller)) {}
+  using TargetServer::TargetServer;
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fidl_serversuite::AjarTarget> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override {
-    auto result = fidl::SendEvent(controller_)
-                      ->ReceivedUnknownMethod(fidl_serversuite::UnknownMethodInfo(
+    FX_LOGST(INFO, tag_) << "Handling AjarTarget request: (unknown method)";
+    auto result = fidl::SendEvent(runner_binding_)
+                      ->OnReceivedUnknownMethod(fidl_serversuite::UnknownMethodInfo(
                           metadata.method_ordinal, fidl_serversuite::UnknownMethodType::kOneWay));
     ZX_ASSERT(result.is_ok());
   }
-
-  void OnUnbound(fidl::UnbindInfo info, fidl::ServerEnd<fidl_serversuite::AjarTarget>) {
-    if (!info.is_dispatcher_shutdown() && !info.is_user_initiated() && !info.is_peer_closed()) {
-      std::cout << "AjarTarget unbound with error: " << info.FormatDescription() << std::endl;
-    }
-    (void)fidl::SendEvent(controller_)
-        ->WillTeardown({{.reason = servertest_util::ClassifyTeardownReason(info)}});
-  }
-
- private:
-  fidl::ServerEnd<fidl_serversuite::AjarTargetController> controller_;
 };
 
-class OpenTargetControllerServer : public fidl::Server<fidl_serversuite::OpenTargetController> {
+class OpenTargetServer : public TargetServer<fidl_serversuite::OpenTarget> {
  public:
-  OpenTargetControllerServer() = default;
-
-  void SendStrictEvent(SendStrictEventCompleter::Sync& completer) override {
-    auto result = fidl::SendEvent(sut_binding_.value())->StrictEvent();
-    completer.Reply(result.map_error(
-        [](auto error) { return servertest_util::ClassifySendEventError(error); }));
-  }
-
-  void SendFlexibleEvent(SendFlexibleEventCompleter::Sync& completer) override {
-    auto result = fidl::SendEvent(sut_binding_.value())->FlexibleEvent();
-    completer.Reply(result.map_error(
-        [](auto error) { return servertest_util::ClassifySendEventError(error); }));
-  }
-
-  void set_sut_binding(fidl::ServerBindingRef<fidl_serversuite::OpenTarget> sut_binding) {
-    ZX_ASSERT_MSG(!sut_binding_, "sut binding already set");
-    sut_binding_ = std::move(sut_binding);
-  }
-
- private:
-  std::optional<fidl::ServerBindingRef<fidl_serversuite::OpenTarget>> sut_binding_;
-};
-
-class OpenTargetServer : public fidl::Server<fidl_serversuite::OpenTarget> {
- public:
-  OpenTargetServer() = default;
+  using TargetServer::TargetServer;
 
   void StrictOneWay(StrictOneWayCompleter::Sync& completer) override {
-    auto result = fidl::SendEvent(controller_binding_.value())->ReceivedStrictOneWay();
-    ZX_ASSERT(result.is_ok());
+    FX_LOGST(INFO, tag_) << "Handling OpenTarget request: StrictOneWay";
+    ZX_ASSERT(fidl::SendEvent(runner_binding_)->OnReceivedOpenTargetStrictOneWay().is_ok());
   }
 
   void FlexibleOneWay(FlexibleOneWayCompleter::Sync& completer) override {
-    auto result = fidl::SendEvent(controller_binding_.value())->ReceivedFlexibleOneWay();
-    ZX_ASSERT(result.is_ok());
+    FX_LOGST(INFO, tag_) << "Handling OpenTarget request: FlexibleOneWay";
+    ZX_ASSERT(fidl::SendEvent(runner_binding_)->OnReceivedOpenTargetFlexibleOneWay().is_ok());
   }
 
-  void StrictTwoWay(StrictTwoWayCompleter::Sync& completer) override { completer.Reply(); }
+  void StrictTwoWay(StrictTwoWayCompleter::Sync& completer) override {
+    FX_LOGST(INFO, tag_) << "Handling OpenTarget request: StrictTwoWay";
+    completer.Reply();
+  }
 
   void StrictTwoWayFields(StrictTwoWayFieldsRequest& request,
                           StrictTwoWayFieldsCompleter::Sync& completer) override {
+    FX_LOGST(INFO, tag_) << "Handling OpenTarget request: StrictTwoWayFields";
     completer.Reply(request.reply_with());
   }
 
   void StrictTwoWayErr(StrictTwoWayErrRequest& request,
                        StrictTwoWayErrCompleter::Sync& completer) override {
+    FX_LOGST(INFO, tag_) << "Handling OpenTarget request: StrictTwoWayErr";
     switch (request.Which()) {
       case fidl_serversuite::OpenTargetStrictTwoWayErrRequest::Tag::kReplySuccess:
         completer.Reply(fit::ok());
@@ -230,6 +211,7 @@ class OpenTargetServer : public fidl::Server<fidl_serversuite::OpenTarget> {
 
   void StrictTwoWayFieldsErr(StrictTwoWayFieldsErrRequest& request,
                              StrictTwoWayFieldsErrCompleter::Sync& completer) override {
+    FX_LOGST(INFO, tag_) << "Handling OpenTarget request: StrictTwoWayFieldsErr";
     switch (request.Which()) {
       case fidl_serversuite::OpenTargetStrictTwoWayFieldsErrRequest::Tag::kReplySuccess:
         completer.Reply(fit::ok(request.reply_success().value()));
@@ -240,15 +222,20 @@ class OpenTargetServer : public fidl::Server<fidl_serversuite::OpenTarget> {
     }
   }
 
-  void FlexibleTwoWay(FlexibleTwoWayCompleter::Sync& completer) override { completer.Reply(); }
+  void FlexibleTwoWay(FlexibleTwoWayCompleter::Sync& completer) override {
+    FX_LOGST(INFO, tag_) << "Handling OpenTarget request: FlexibleTwoWay";
+    completer.Reply();
+  }
 
   void FlexibleTwoWayFields(FlexibleTwoWayFieldsRequest& request,
                             FlexibleTwoWayFieldsCompleter::Sync& completer) override {
+    FX_LOGST(INFO, tag_) << "Handling OpenTarget request: FlexibleTwoWayFields";
     completer.Reply(request.reply_with());
   }
 
   void FlexibleTwoWayErr(FlexibleTwoWayErrRequest& request,
                          FlexibleTwoWayErrCompleter::Sync& completer) override {
+    FX_LOGST(INFO, tag_) << "Handling OpenTarget request: FlexibleTwoWayErr";
     switch (request.Which()) {
       case fidl_serversuite::OpenTargetFlexibleTwoWayErrRequest::Tag::kReplySuccess:
         completer.Reply(fit::ok());
@@ -261,6 +248,7 @@ class OpenTargetServer : public fidl::Server<fidl_serversuite::OpenTarget> {
 
   void FlexibleTwoWayFieldsErr(FlexibleTwoWayFieldsErrRequest& request,
                                FlexibleTwoWayFieldsErrCompleter::Sync& completer) override {
+    FX_LOGST(INFO, tag_) << "Handling OpenTarget request: FlexibleTwoWayFieldsErr";
     switch (request.Which()) {
       case fidl_serversuite::OpenTargetFlexibleTwoWayFieldsErrRequest::Tag::kReplySuccess:
         completer.Reply(fit::ok(request.reply_success().value()));
@@ -273,6 +261,7 @@ class OpenTargetServer : public fidl::Server<fidl_serversuite::OpenTarget> {
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fidl_serversuite::OpenTarget> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override {
+    FX_LOGST(INFO, tag_) << "Handling OpenTarget request: (unknown method)";
     fidl_serversuite::UnknownMethodType method_type;
     switch (metadata.unknown_method_type) {
       case fidl::UnknownMethodType::kOneWay:
@@ -282,143 +271,117 @@ class OpenTargetServer : public fidl::Server<fidl_serversuite::OpenTarget> {
         method_type = fidl_serversuite::UnknownMethodType::kTwoWay;
         break;
     }
-    auto result = fidl::SendEvent(controller_binding_.value())
-                      ->ReceivedUnknownMethod(fidl_serversuite::UnknownMethodInfo(
+    auto result = fidl::SendEvent(runner_binding_)
+                      ->OnReceivedUnknownMethod(fidl_serversuite::UnknownMethodInfo(
                           metadata.method_ordinal, method_type));
     ZX_ASSERT(result.is_ok());
   }
-
-  void OnUnbound(fidl::UnbindInfo info, fidl::ServerEnd<fidl_serversuite::OpenTarget>) {
-    if (!info.is_dispatcher_shutdown() && !info.is_user_initiated() && !info.is_peer_closed()) {
-      std::cout << "OpenTarget unbound with error: " << info.FormatDescription() << std::endl;
-    }
-    (void)fidl::SendEvent(controller_binding_.value())
-        ->WillTeardown({{.reason = servertest_util::ClassifyTeardownReason(info)}});
-  }
-
-  void set_controller_binding(
-      fidl::ServerBindingRef<fidl_serversuite::OpenTargetController> controller_binding) {
-    ZX_ASSERT_MSG(!controller_binding_, "controller binding already set");
-    controller_binding_ = std::move(controller_binding);
-  }
-
- private:
-  std::optional<fidl::ServerBindingRef<fidl_serversuite::OpenTargetController>> controller_binding_;
 };
 
 class RunnerServer : public fidl::Server<fidl_serversuite::Runner> {
  public:
-  explicit RunnerServer(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
+  explicit RunnerServer(async_dispatcher_t* dispatcher,
+                        fidl::ServerEnd<fidl_serversuite::Runner> server_end)
+      : dispatcher_(dispatcher),
+        binding_(fidl::BindServer(dispatcher, std::move(server_end), this,
+                                  std::mem_fn(&RunnerServer::OnUnbound))) {}
 
   void GetVersion(GetVersionCompleter::Sync& completer) override {
+    FX_LOGST(INFO, tag_) << "Handling Runner request: GetVersion";
     completer.Reply(fidl_serversuite::kServerSuiteVersion);
   }
 
-  void IsTestEnabled(IsTestEnabledRequest& request,
-                     IsTestEnabledCompleter::Sync& completer) override {
-    bool is_enabled = [request]() {
-      switch (request.test()) {
-        case fidl_serversuite::Test::kIgnoreDisabled:
-          // This case will forever be false, as it is intended to validate the "test disabling"
-          // functionality of the runner itself.
-          return false;
-
-        case fidl_serversuite::Test::kOneWayWithNonZeroTxid:
-        case fidl_serversuite::Test::kTwoWayNoPayloadWithZeroTxid:
-          return false;
-
-        default:
-          return true;
-      }
-    }();
-    completer.Reply(is_enabled);
-  }
-
-  void IsTeardownReasonSupported(IsTeardownReasonSupportedCompleter::Sync& completer) override {
-    completer.Reply({{.is_supported = true}});
+  void CheckAlive(CheckAliveCompleter::Sync& completer) override {
+    FX_LOGST(INFO, tag_) << "Handling Runner request: CheckAlive";
+    completer.Reply();
   }
 
   void Start(StartRequest& request, StartCompleter::Sync& completer) override {
-    std::cout << "Runner.Start()" << std::endl;
-
-    switch (request.target().Which()) {
-      case fidl_serversuite::AnyTarget::Tag::kClosedTarget: {
-        auto& server_pair = request.target().closed_target().value();
-        auto controller_server = std::make_shared<ClosedTargetControllerServer>();
-        auto sut_server = std::make_shared<ClosedTargetServer>();
-
-        auto controller_binding =
-            fidl::BindServer(dispatcher_, std::move(server_pair.controller()), controller_server,
-                             [](auto*, fidl::UnbindInfo info, auto) {
-                               if (!info.is_dispatcher_shutdown() && !info.is_user_initiated() &&
-                                   !info.is_peer_closed()) {
-                                 std::cerr << "ClosedTargetController unbound with error: "
-                                           << info.FormatDescription() << std::endl;
-                               }
-                             });
-        auto sut_binding = fidl::BindServer(dispatcher_, std::move(server_pair.sut()), sut_server,
-                                            std::mem_fn(&ClosedTargetServer::OnUnbound));
-
-        // This is thread safe because the new server runs in the same
-        // dispatcher thread as the request to start it.
-        controller_server->set_sut_binding(sut_binding);
-        sut_server->set_controller_binding(controller_binding);
-
-        completer.Reply();
+    // Include the GoogleTest test name from the server suite harness.
+    // This helps to clarify which logs belong to which test.
+    snprintf(tag_, sizeof tag_, "ServerTest_%u", static_cast<uint32_t>(request.test()));
+    FX_LOGST(INFO, tag_) << "Handling Runner request: Start";
+    ZX_ASSERT_MSG(std::holds_alternative<std::monostate>(target_), "must only call Start() once");
+    if (kDisabledTests.count(request.test()) != 0) {
+      return completer.Reply(fit::error(fidl_serversuite::StartError::kTestDisabled));
+    }
+    switch (request.any_target().Which()) {
+      case fidl_serversuite::AnyTarget::Tag::kClosed:
+        FX_LOGST(INFO, tag_) << "Serving ClosedTarget...";
+        target_.emplace<ClosedTargetServer>(
+            dispatcher_, std::move(request.any_target().closed().value()), binding_, tag_);
         break;
-      }
-      case fidl_serversuite::AnyTarget::Tag::kAjarTarget: {
-        auto& server_pair = request.target().ajar_target().value();
-        auto sut_server = std::make_unique<AjarTargetServer>(std::move(server_pair.controller()));
-        fidl::BindServer(dispatcher_, std::move(server_pair.sut()), std::move(sut_server),
-                         std::mem_fn(&AjarTargetServer::OnUnbound));
-        completer.Reply();
+      case fidl_serversuite::AnyTarget::Tag::kAjar:
+        FX_LOGST(INFO, tag_) << "Serving AjarTarget...";
+        target_.emplace<AjarTargetServer>(
+            dispatcher_, std::move(request.any_target().ajar().value()), binding_, tag_);
         break;
-      }
-      case fidl_serversuite::AnyTarget::Tag::kOpenTarget: {
-        auto& server_pair = request.target().open_target().value();
-        auto controller_server = std::make_shared<OpenTargetControllerServer>();
-        auto sut_server = std::make_shared<OpenTargetServer>();
-
-        auto controller_binding = fidl::BindServer(
-            dispatcher_, std::move(server_pair.controller()), controller_server,
-            [](auto*, fidl::UnbindInfo info, auto) {
-              if (!info.is_dispatcher_shutdown() && !info.is_user_initiated() &&
-                  !info.is_peer_closed()) {
-                std::cerr << "OpenTargetController unbound with error: " << info.FormatDescription()
-                          << std::endl;
-              }
-            });
-        auto sut_binding = fidl::BindServer(dispatcher_, std::move(server_pair.sut()), sut_server,
-                                            std::mem_fn(&OpenTargetServer::OnUnbound));
-
-        // This is thread safe because the new server runs in the same
-        // dispatcher thread as the request to start it.
-        controller_server->set_sut_binding(sut_binding);
-        sut_server->set_controller_binding(controller_binding);
-        completer.Reply();
+      case fidl_serversuite::AnyTarget::Tag::kOpen: {
+        FX_LOGST(INFO, tag_) << "Serving OpenTarget...";
+        target_.emplace<OpenTargetServer>(
+            dispatcher_, std::move(request.any_target().open().value()), binding_, tag_);
         break;
       }
     }
+    completer.Reply(fit::ok());
   }
 
-  void CheckAlive(CheckAliveCompleter::Sync& completer) override { completer.Reply(); }
+  void ShutdownWithEpitaph(ShutdownWithEpitaphRequest& request,
+                           ShutdownWithEpitaphCompleter::Sync& completer) override {
+    FX_LOGST(INFO, tag_) << "Handling Runner request: ShutdownWithEpitaph";
+    if (auto* target = std::get_if<ClosedTargetServer>(&target_)) {
+      target->binding_.Close(request.epitaph_status());
+    } else if (auto* target = std::get_if<AjarTargetServer>(&target_)) {
+      target->binding_.Close(request.epitaph_status());
+    } else if (auto* target = std::get_if<OpenTargetServer>(&target_)) {
+      target->binding_.Close(request.epitaph_status());
+    } else {
+      ZX_PANIC("the target is not set");
+    }
+    completer.Reply();
+  }
+
+  void SendOpenTargetStrictEvent(SendOpenTargetStrictEventCompleter::Sync& completer) override {
+    FX_LOGST(INFO, tag_) << "Handling Runner request: SendOpenTargetStrictEvent";
+    ZX_ASSERT(fidl::SendEvent(std::get<OpenTargetServer>(target_).binding_)->StrictEvent().is_ok());
+    completer.Reply();
+  }
+
+  void SendOpenTargetFlexibleEvent(SendOpenTargetFlexibleEventCompleter::Sync& completer) override {
+    FX_LOGST(INFO, tag_) << "Handling Runner request: SendOpenTargetFlexibleEvent";
+    ZX_ASSERT(
+        fidl::SendEvent(std::get<OpenTargetServer>(target_).binding_)->FlexibleEvent().is_ok());
+    completer.Reply();
+  }
 
  private:
+  void OnUnbound(fidl::UnbindInfo info, fidl::ServerEnd<fidl_serversuite::Runner> server_end) {
+    if (!info.is_peer_closed()) {
+      ZX_PANIC("Runner failed: %s", info.FormatDescription().c_str());
+    }
+    delete this;
+  }
+
   async_dispatcher_t* dispatcher_;
+  fidl::ServerBindingRef<fidl_serversuite::Runner> binding_;
+  std::variant<std::monostate, ClosedTargetServer, AjarTargetServer, OpenTargetServer> target_;
+  char tag_[32] = "";
 };
 
-int main(int argc, const char** argv) {
-  std::cout << "CPP server: main" << std::endl;
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+}  // namespace
 
+int main(int argc, const char** argv) {
+  fuchsia_logging::SetTags({"cpp"});
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   auto outgoing = component::OutgoingDirectory(loop.dispatcher());
   ZX_ASSERT(outgoing.ServeFromStartupInfo().is_ok());
-  RunnerServer runner_server(loop.dispatcher());
-  auto result = outgoing.AddProtocol<fidl_serversuite::Runner>(
-      std::make_unique<RunnerServer>(loop.dispatcher()));
+  auto result = outgoing.AddUnmanagedProtocol<fidl_serversuite::Runner>(
+      [&](fidl::ServerEnd<fidl_serversuite::Runner> server_end) {
+        FX_LOGS(INFO) << "Serving Runner...";
+        // RunnerServer deletes itself when it unbinds.
+        new RunnerServer(loop.dispatcher(), std::move(server_end));
+      });
   ZX_ASSERT(result.is_ok());
-
-  std::cout << "CPP server: ready!" << std::endl;
+  FX_LOGS(INFO) << "CPP serversuite server: ready!";
   return loop.Run();
 }

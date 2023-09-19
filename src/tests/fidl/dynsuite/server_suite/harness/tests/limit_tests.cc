@@ -73,8 +73,7 @@ CLOSED_SERVER_TEST(30, ResponseExceedsByteLimit) {
       {uint32(count), padding(4)},
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kWriteFailure);
 }
 
 // The server should be able to send a response with the maximum number of handles.
@@ -113,8 +112,7 @@ CLOSED_SERVER_TEST(31, ResponseExceedsHandleLimit) {
       {uint32(count), padding(4)},
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kWriteFailure);
 }
 
 }  // namespace

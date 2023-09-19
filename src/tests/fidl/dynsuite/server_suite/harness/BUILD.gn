@@ -27,13 +27,11 @@ executable("bin") {
     "//sdk/lib/fidl",
     "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",
-    "//src/lib/testing/loop_fixture",
     "//src/lib/testing/predicates",
     "//src/tests/fidl/dynsuite/channel_util",
     "//src/tests/fidl/dynsuite/server_suite/fidl:fidl.serversuite_cpp",
+    "//src/tests/fidl/dynsuite/server_suite/fidl:fidl.serversuite_cpp_natural_ostream",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

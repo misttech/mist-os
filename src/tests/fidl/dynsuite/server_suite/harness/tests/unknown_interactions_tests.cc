@@ -21,12 +21,8 @@ using namespace ::channel_util;
 // The server should send a strict event.
 OPEN_SERVER_TEST(32, SendStrictEvent) {
   Bytes expected_event = Header{.txid = 0, .ordinal = kOrdinal_OpenTarget_StrictEvent};
-  controller()->SendStrictEvent().ThenExactlyOnce([&](auto result) {
-    MarkControllerCallbackRun();
-    ASSERT_TRUE(result.is_ok());
-  });
+  ASSERT_RESULT_OK(runner()->SendOpenTargetStrictEvent());
   ASSERT_OK(client_end().read_and_check(expected_event));
-  WAIT_UNTIL_CONTROLLER_CALLBACK_RUN();
 }
 
 // The server should send a flexible event.
@@ -36,20 +32,15 @@ OPEN_SERVER_TEST(33, SendFlexibleEvent) {
       .dynamic_flags = kDynamicFlagsFlexible,
       .ordinal = kOrdinal_OpenTarget_FlexibleEvent,
   };
-  controller()->SendFlexibleEvent().ThenExactlyOnce([&](auto result) {
-    MarkControllerCallbackRun();
-    ASSERT_TRUE(result.is_ok());
-  });
+  ASSERT_RESULT_OK(runner()->SendOpenTargetFlexibleEvent());
   ASSERT_OK(client_end().read_and_check(expected_event));
-  WAIT_UNTIL_CONTROLLER_CALLBACK_RUN();
 }
 
 // The server should receive a strict one-way method.
 OPEN_SERVER_TEST(34, ReceiveStrictOneWay) {
   Bytes request = Header{.txid = 0, .ordinal = kOrdinal_OpenTarget_StrictOneWay};
   ASSERT_OK(client_end().write(request));
-  WAIT_UNTIL([this]() { return reporter().received_strict_one_way(); });
-  ;
+  ASSERT_RUNNER_EVENT(RunnerEvent::kOnReceivedOpenTargetStrictOneWay);
 }
 
 // The server should receive a one-way method, despite the schema (strict)
@@ -61,8 +52,7 @@ OPEN_SERVER_TEST(35, ReceiveStrictOneWayMismatchedStrictness) {
       .ordinal = kOrdinal_OpenTarget_StrictOneWay,
   };
   ASSERT_OK(client_end().write(request));
-  WAIT_UNTIL([this]() { return reporter().received_strict_one_way(); });
-  ;
+  ASSERT_RUNNER_EVENT(RunnerEvent::kOnReceivedOpenTargetStrictOneWay);
 }
 
 // The server should receive a flexible one-way method.
@@ -73,8 +63,7 @@ OPEN_SERVER_TEST(36, ReceiveFlexibleOneWay) {
       .ordinal = kOrdinal_OpenTarget_FlexibleOneWay,
   };
   ASSERT_OK(client_end().write(request));
-  WAIT_UNTIL([this]() { return reporter().received_flexible_one_way(); });
-  ;
+  ASSERT_RUNNER_EVENT(RunnerEvent::kOnReceivedOpenTargetFlexibleOneWay);
 }
 
 // The server should receive a one-way method, despite the schema (flexible)
@@ -82,7 +71,7 @@ OPEN_SERVER_TEST(36, ReceiveFlexibleOneWay) {
 OPEN_SERVER_TEST(37, ReceiveFlexibleOneWayMismatchedStrictness) {
   Bytes request = Header{.txid = 0, .ordinal = kOrdinal_OpenTarget_FlexibleOneWay};
   ASSERT_OK(client_end().write(request));
-  WAIT_UNTIL([this]() { return reporter().received_flexible_one_way(); });
+  ASSERT_RUNNER_EVENT(RunnerEvent::kOnReceivedOpenTargetFlexibleOneWay);
 }
 
 // The server should reply to a strict two-way method.
@@ -277,9 +266,7 @@ OPEN_SERVER_TEST(48, FlexibleTwoWayErrorSyntaxNonEmptyResponseErrorResult) {
 OPEN_SERVER_TEST(49, UnknownStrictOneWayOpenProtocol) {
   Bytes request = Header{.txid = 0, .ordinal = kOrdinalFakeUnknownMethod};
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
-  ASSERT_FALSE(reporter().received_unknown_method());
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kUnexpectedMessage);
 }
 
 // The server should run the unknown method handler when it receives an unknown
@@ -291,11 +278,10 @@ OPEN_SERVER_TEST(50, UnknownFlexibleOneWayOpenProtocol) {
       .ordinal = kOrdinalFakeUnknownMethod,
   };
   ASSERT_OK(client_end().write(request));
-  WAIT_UNTIL([this]() { return reporter().received_unknown_method().has_value(); });
-  ASSERT_EQ(kOrdinalFakeUnknownMethod, reporter().received_unknown_method()->ordinal());
-  ASSERT_EQ(fidl_serversuite::UnknownMethodType::kOneWay,
-            reporter().received_unknown_method()->unknown_method_type());
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
+  ASSERT_RUNNER_EVENT(RunnerEvent::kOnReceivedUnknownMethod);
+  auto info = std::get<fidl_serversuite::UnknownMethodInfo>(runner_event_payload());
+  ASSERT_EQ(info.ordinal(), kOrdinalFakeUnknownMethod);
+  ASSERT_EQ(info.unknown_method_type(), fidl_serversuite::UnknownMethodType::kOneWay);
 }
 
 // The server should close handles in an unknown flexible one-way method request.
@@ -317,11 +303,10 @@ OPEN_SERVER_TEST(51, UnknownFlexibleOneWayHandleOpenProtocol) {
       },
   };
   ASSERT_OK(client_end().write(request));
-  WAIT_UNTIL([this]() { return reporter().received_unknown_method().has_value(); });
-  ASSERT_EQ(kOrdinalFakeUnknownMethod, reporter().received_unknown_method()->ordinal());
-  ASSERT_EQ(fidl_serversuite::UnknownMethodType::kOneWay,
-            reporter().received_unknown_method()->unknown_method_type());
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
+  ASSERT_RUNNER_EVENT(RunnerEvent::kOnReceivedUnknownMethod);
+  auto info = std::get<fidl_serversuite::UnknownMethodInfo>(runner_event_payload());
+  ASSERT_EQ(info.ordinal(), kOrdinalFakeUnknownMethod);
+  ASSERT_EQ(info.unknown_method_type(), fidl_serversuite::UnknownMethodType::kOneWay);
   ASSERT_OK(event2.wait_one(ZX_EVENTPAIR_PEER_CLOSED, zx::time::infinite_past(), nullptr));
 }
 
@@ -329,9 +314,7 @@ OPEN_SERVER_TEST(51, UnknownFlexibleOneWayHandleOpenProtocol) {
 OPEN_SERVER_TEST(52, UnknownStrictTwoWayOpenProtocol) {
   Bytes request = Header{.txid = kTwoWayTxid, .ordinal = kOrdinalFakeUnknownMethod};
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
-  ASSERT_FALSE(reporter().received_unknown_method());
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kUnexpectedMessage);
 }
 
 // The server should send an automatic reply and run the unknown method handler
@@ -350,11 +333,10 @@ OPEN_SERVER_TEST(53, UnknownFlexibleTwoWayOpenProtocol) {
   };
   ASSERT_OK(client_end().write(request));
   ASSERT_OK(client_end().read_and_check(expected_response));
-  WAIT_UNTIL([this]() { return reporter().received_unknown_method().has_value(); });
-  ASSERT_EQ(kOrdinalFakeUnknownMethod, reporter().received_unknown_method()->ordinal());
-  ASSERT_EQ(fidl_serversuite::UnknownMethodType::kTwoWay,
-            reporter().received_unknown_method()->unknown_method_type());
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
+  ASSERT_RUNNER_EVENT(RunnerEvent::kOnReceivedUnknownMethod);
+  auto info = std::get<fidl_serversuite::UnknownMethodInfo>(runner_event_payload());
+  ASSERT_EQ(info.ordinal(), kOrdinalFakeUnknownMethod);
+  ASSERT_EQ(info.unknown_method_type(), fidl_serversuite::UnknownMethodType::kTwoWay);
 }
 
 // The server should close handles in an unknown flexible two-way method request.
@@ -381,11 +363,10 @@ OPEN_SERVER_TEST(54, UnknownFlexibleTwoWayHandleOpenProtocol) {
   };
   ASSERT_OK(client_end().write(request));
   ASSERT_OK(client_end().read_and_check(expected_response));
-  WAIT_UNTIL([this]() { return reporter().received_unknown_method().has_value(); });
-  ASSERT_EQ(kOrdinalFakeUnknownMethod, reporter().received_unknown_method()->ordinal());
-  ASSERT_EQ(fidl_serversuite::UnknownMethodType::kTwoWay,
-            reporter().received_unknown_method()->unknown_method_type());
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
+  ASSERT_RUNNER_EVENT(RunnerEvent::kOnReceivedUnknownMethod);
+  auto info = std::get<fidl_serversuite::UnknownMethodInfo>(runner_event_payload());
+  ASSERT_EQ(info.ordinal(), kOrdinalFakeUnknownMethod);
+  ASSERT_EQ(info.unknown_method_type(), fidl_serversuite::UnknownMethodType::kTwoWay);
   ASSERT_OK(event2.wait_one(ZX_EVENTPAIR_PEER_CLOSED, zx::time::infinite_past(), nullptr));
 }
 
@@ -393,9 +374,7 @@ OPEN_SERVER_TEST(54, UnknownFlexibleTwoWayHandleOpenProtocol) {
 AJAR_SERVER_TEST(55, UnknownStrictOneWayAjarProtocol) {
   Bytes request = Header{.txid = 0, .ordinal = kOrdinalFakeUnknownMethod};
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
-  ASSERT_FALSE(reporter().received_unknown_method());
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kUnexpectedMessage);
 }
 
 // The ajar server should run the unknown method handler when it receives an unknown
@@ -407,20 +386,17 @@ AJAR_SERVER_TEST(56, UnknownFlexibleOneWayAjarProtocol) {
       .ordinal = kOrdinalFakeUnknownMethod,
   };
   ASSERT_OK(client_end().write(request));
-  WAIT_UNTIL([this]() { return reporter().received_unknown_method().has_value(); });
-  ASSERT_EQ(kOrdinalFakeUnknownMethod, reporter().received_unknown_method()->ordinal());
-  ASSERT_EQ(fidl_serversuite::UnknownMethodType::kOneWay,
-            reporter().received_unknown_method()->unknown_method_type());
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
+  ASSERT_RUNNER_EVENT(RunnerEvent::kOnReceivedUnknownMethod);
+  auto info = std::get<fidl_serversuite::UnknownMethodInfo>(runner_event_payload());
+  ASSERT_EQ(info.ordinal(), kOrdinalFakeUnknownMethod);
+  ASSERT_EQ(info.unknown_method_type(), fidl_serversuite::UnknownMethodType::kOneWay);
 }
 
 // The ajar server should tear down when it receives an unknown strict two-way method.
 AJAR_SERVER_TEST(57, UnknownStrictTwoWayAjarProtocol) {
   Bytes request = Header{.txid = kTwoWayTxid, .ordinal = kOrdinalFakeUnknownMethod};
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
-  ASSERT_FALSE(reporter().received_unknown_method());
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kUnexpectedMessage);
 }
 
 // The ajar server should tear down when it receives an unknown flexible two-way method.
@@ -431,18 +407,14 @@ AJAR_SERVER_TEST(58, UnknownFlexibleTwoWayAjarProtocol) {
       .ordinal = kOrdinalFakeUnknownMethod,
   };
   ASSERT_OK(client_end().write(request));
-
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
-  ASSERT_FALSE(reporter().received_unknown_method());
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kUnexpectedMessage);
 }
 
 // The closed server should tear down when it receives an unknown strict one-way method.
 CLOSED_SERVER_TEST(59, UnknownStrictOneWayClosedProtocol) {
   Bytes request = Header{.txid = 0, .ordinal = kOrdinalFakeUnknownMethod};
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kUnexpectedMessage);
 }
 
 // The closed server should tear down when it receives an unknown flexible one-way method.
@@ -453,16 +425,14 @@ CLOSED_SERVER_TEST(60, UnknownFlexibleOneWayClosedProtocol) {
       .ordinal = kOrdinalFakeUnknownMethod,
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kUnexpectedMessage);
 }
 
 // The closed server should tear down when it receives an unknown strict two-way method.
 CLOSED_SERVER_TEST(61, UnknownStrictTwoWayClosedProtocol) {
   Bytes request = Header{.txid = kTwoWayTxid, .ordinal = kOrdinalFakeUnknownMethod};
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kUnexpectedMessage);
 }
 
 // The closed server should tear down when it receives an unknown flexible two-way method.
@@ -473,8 +443,7 @@ CLOSED_SERVER_TEST(62, UnknownFlexibleTwoWayClosedProtocol) {
       .ordinal = kOrdinalFakeUnknownMethod,
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kUnexpectedMessage);
 }
 
 }  // namespace

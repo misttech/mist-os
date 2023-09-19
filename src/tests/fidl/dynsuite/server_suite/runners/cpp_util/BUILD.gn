@@ -4,7 +4,7 @@
 
 source_set("cpp_util") {
   testonly = true
-  sources = [ "error_util.h" ]
+  sources = [ "teardown_reason.h" ]
   public_deps = [
     "//sdk/lib/fidl",
     "//src/lib/fidl/cpp",

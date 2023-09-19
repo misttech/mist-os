@@ -20,30 +20,21 @@ using namespace ::channel_util;
 CLOSED_SERVER_TEST(9, OneWayWithNonZeroTxid) {
   Bytes request = Header{.txid = kTwoWayTxid, .ordinal = kOrdinal_ClosedTarget_OneWayNoPayload};
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
-  WAIT_UNTIL([this]() { return reporter().teardown_reason().has_value(); });
-  EXPECT_TEARDOWN_REASON(fidl_serversuite::TeardownReason::kUnexpectedMessage);
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kUnexpectedMessage);
 }
 
 // The server should tear down when it receives a two-way request with zero txid.
 CLOSED_SERVER_TEST(10, TwoWayNoPayloadWithZeroTxid) {
   Bytes request = Header{.txid = 0, .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload};
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
-  WAIT_UNTIL([this]() { return reporter().teardown_reason().has_value(); });
-  EXPECT_TEARDOWN_REASON(fidl_serversuite::TeardownReason::kUnexpectedMessage);
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kUnexpectedMessage);
 }
 
 // The closed server should tear down when it receives a request with an unknown ordinal.
 CLOSED_SERVER_TEST(11, UnknownOrdinalCausesClose) {
   Bytes request = Header{.txid = 0, .ordinal = kOrdinalFakeUnknownMethod};
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
-  WAIT_UNTIL([this]() { return reporter().teardown_reason().has_value(); });
-  EXPECT_TEARDOWN_REASON(fidl_serversuite::TeardownReason::kUnexpectedMessage);
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kUnexpectedMessage);
 }
 
 // The server should tear down when it receives a request with an invalid magic number.
@@ -54,10 +45,7 @@ CLOSED_SERVER_TEST(12, BadMagicNumberCausesClose) {
       .ordinal = kOrdinal_ClosedTarget_TwoWayNoPayload,
   };
   ASSERT_OK(client_end().write(request));
-  ASSERT_OK(client_end().wait_for_signal(ZX_CHANNEL_PEER_CLOSED));
-  ASSERT_FALSE(client_end().is_signal_present(ZX_CHANNEL_READABLE));
-  WAIT_UNTIL([this]() { return reporter().teardown_reason().has_value(); });
-  EXPECT_TEARDOWN_REASON(fidl_serversuite::TeardownReason::kDecodingError);
+  ASSERT_SERVER_TEARDOWN(fidl_serversuite::TeardownReason::kIncompatibleFormat);
 }
 
 // The server should ignore unrecognized at-rest flags.

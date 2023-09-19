@@ -13,8 +13,8 @@ namespace server_suite {
 To find all ordinals:
 
 grep 'constexpr.*k.*Target_.*Ordinal' \
-out/default/fidling/gen/src/tests/fidl/dynsuite/server_suite/fidl/fidl.serversuite/cpp/fidl/fidl.serversuite/cpp/wire_messaging.cc
-\ | sed -E 's/.* k(\w+Target_.*)_Ordinal = (.*);$/const uint64_t kOrdinal_\1 = \2;/'
+out/default/fidling/gen/src/tests/fidl/dynsuite/server_suite/fidl/fidl.serversuite/cpp/fidl/fidl.serversuite/cpp/wire_messaging.cc\
+| sed -E 's/.* k(\w+Target_.*)_Ordinal = (.*);$/const uint64_t kOrdinal_\1 = \2;/'
 
 We define ordinals here even though they're accessible in the C++ bindings
 because the harness is designed to never use the bindings-under-test.
@@ -48,7 +48,7 @@ const uint64_t kOrdinal_OpenTarget_FlexibleTwoWayErr = 372287587009602464lu;
 const uint64_t kOrdinal_OpenTarget_FlexibleTwoWayFieldsErr = 1925250685993373878lu;
 
 // Epitaph ordinal
-const uint64_t kOrdinal_ClosedTarget_Epitaph = 0xfffffffffffffffflu;
+const uint64_t kOrdinalEpitaph = 0xfffffffffffffffflu;
 
 // A fake ordinal that's unknown to the server
 const uint64_t kOrdinalFakeUnknownMethod = 0x10ff10ff10ff10fflu;
