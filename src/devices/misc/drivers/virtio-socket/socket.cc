@@ -337,6 +337,17 @@ void SocketDevice::ProcessRxDescriptor(virtio_vsock_hdr_t* header, void* data, u
     } else {
       if (!conn->Rx(data, data_len)) {
         NotifyAndCleanupConLocked(conn.CopyPointer());
+      } else {
+        // We send a credit update here to help report changes in buffer space
+        // during periods of high write (incoming) data traffic. Without some
+        // credit updates the device may stop sending as it believes our buffer
+        // has been filled up.
+        //
+        // TODO(b/300933744): This should instead be implemented using
+        // ZX_SOCKET_WRITE_THRESHOLD such that we can send credit updates once
+        // buffer space drops below some low-water mark.
+        zx::nanosleep(zx::deadline_after(zx::msec(1)));
+        SendOpLocked(conn.CopyPointer(), VIRTIO_VSOCK_OP_CREDIT_UPDATE);
       }
     }
   } else {
