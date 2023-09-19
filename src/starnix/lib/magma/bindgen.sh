@@ -63,6 +63,11 @@ PATH="$PWD/prebuilt/third_party/rust/linux-x64/bin:$PATH" \
   --with-derive-default \
   --explicit-padding \
   --raw-line "${RAW_LINES}" \
+  --allowlist-function 'magma_.*' \
+  --allowlist-type 'magma_.*' \
+  --allowlist-type 'virtmagma_.*' \
+  --allowlist-type 'virtio_magma_.*' \
+  --allowlist-var 'MAGMA_.*' \
   -o src/starnix/lib/magma/src/magma.rs \
   src/starnix/lib/magma/wrapper.h \
   -- \
@@ -71,6 +76,7 @@ PATH="$PWD/prebuilt/third_party/rust/linux-x64/bin:$PATH" \
   -I src/graphics/lib/magma/src \
   -I src/graphics/lib/magma/include \
   -I sdk/lib/magma_client/include \
+  -I sdk/lib/magma_common/include \
   -I $temp_include_dir \
   -I $(pwd)
 
