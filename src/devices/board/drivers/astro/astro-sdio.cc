@@ -125,7 +125,6 @@ static const fpbus::Node sd_emmc_dev = []() {
   dev.irq() = sd_emmc_irqs;
   dev.bti() = sd_emmc_btis;
   dev.metadata() = sd_emmc_metadata;
-  dev.boot_metadata() = wifi_boot_metadata;
   return dev;
 }();
 
@@ -251,6 +250,7 @@ zx_status_t Astro::SdioInit() {
   wifi_dev.pid() = PDEV_PID_BCM43458;
   wifi_dev.did() = PDEV_DID_BCM_WIFI;
   wifi_dev.metadata() = wifi_metadata;
+  wifi_dev.boot_metadata() = wifi_boot_metadata;
 
   fdf::Arena wifi_arena('WIFI');
   fdf::WireUnownedResult wifi_result =

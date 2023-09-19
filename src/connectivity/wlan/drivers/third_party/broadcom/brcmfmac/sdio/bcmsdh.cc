@@ -104,8 +104,13 @@ zx_status_t brcmf_sdiod_get_bootloader_macaddr(struct brcmf_sdio_dev* sdiodev, u
   zx_status_t ret = sdiodev->drvr->device->DeviceGetMetadata(
       DEVICE_METADATA_MAC_ADDRESS, bootloader_macaddr, sizeof(bootloader_macaddr), &actual_len);
 
-  if (ret != ZX_OK || actual_len < ETH_ALEN) {
+  if (ret != ZX_OK) {
     return ret;
+  }
+  if (actual_len != ETH_ALEN) {
+    BRCMF_ERR("Incorrect metadata size: Expected %lu bytes but actual is %lu bytes", ETH_ALEN,
+              actual_len);
+    return ZX_ERR_INTERNAL;
   }
   memcpy(macaddr, bootloader_macaddr, 6);
   BRCMF_DBG(SDIO, "got bootloader mac address");

@@ -94,7 +94,8 @@ zx_status_t SdioDevice::Create(zx_device_t* parent_device) {
                .set_inspect_vmo(device->inspect_->inspector().DuplicateVmo())
                .set_runtime_service_offers(offers)
                .set_outgoing_dir(endpoints->client.TakeChannel())
-               .forward_metadata(parent_device, DEVICE_METADATA_WIFI_CONFIG))) != ZX_OK) {
+               .forward_metadata(parent_device, DEVICE_METADATA_WIFI_CONFIG)
+               .forward_metadata(parent_device, DEVICE_METADATA_MAC_ADDRESS))) != ZX_OK) {
     return status;
   }
   device.release();  // This now has its lifecycle managed by the devhost.
