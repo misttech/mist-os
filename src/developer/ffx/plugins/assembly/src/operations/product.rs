@@ -4,7 +4,9 @@
 
 use crate::operations::product::assembly_builder::ImageAssemblyConfigBuilder;
 use anyhow::{Context, Result};
-use assembly_config_schema::{AssemblyConfig, BoardInformation, BoardInputBundle};
+use assembly_config_schema::{
+    AssemblyConfig, BoardInformation, BoardInputBundle, FeatureSupportLevel,
+};
 use assembly_file_relative_path::SupportsFileRelativePaths;
 use assembly_images_config::ImagesConfig;
 use assembly_tool::SdkToolProvider;
@@ -73,9 +75,14 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         let bundle = bundle.resolve_paths_from_file(&main_bundle).with_context(|| {
             format!("resolving paths in main board input bundle: {main_bundle}")
         })?;
-        builder.add_board_input_bundle(bundle).with_context(|| {
-            format!("Adding the board's main board input bundle from: {main_bundle}")
-        })?;
+        builder
+            .add_board_input_bundle(
+                bundle,
+                config.platform.feature_set_level == FeatureSupportLevel::Bootstrap,
+            )
+            .with_context(|| {
+                format!("Adding the board's main board input bundle from: {main_bundle}")
+            })?;
     }
 
     // Add the platform Assembly Input Bundles that were chosen by the configuration.

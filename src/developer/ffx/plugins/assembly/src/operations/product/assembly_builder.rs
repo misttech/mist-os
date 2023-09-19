@@ -88,7 +88,7 @@ pub struct ImageAssemblyConfigBuilder {
 
 /// An enum representing unique identifiers for the 4 types of supported package sets in the
 /// ImageAssemblyConfigBuilder. Used to dereference PackageSet fields on the builder by name
-#[derive(Debug)]
+#[derive(Debug, PartialEq, PartialOrd)]
 #[allow(clippy::upper_case_acronyms)]
 enum PackageSets {
     BASE,
@@ -266,7 +266,11 @@ impl ImageAssemblyConfigBuilder {
     ///
     /// If any of the items it's trying to add are duplicates (either of itself
     /// or others, this will return an error).
-    pub fn add_board_input_bundle(&mut self, bundle: BoardInputBundle) -> Result<()> {
+    pub fn add_board_input_bundle(
+        &mut self,
+        bundle: BoardInputBundle,
+        bootstrap_only: bool,
+    ) -> Result<()> {
         for PackagedDriverDetails { package, set, components } in bundle.drivers {
             // These need to be consolidated into a single type so that they are
             // less cumbersome.
@@ -279,19 +283,23 @@ impl ImageAssemblyConfigBuilder {
                 }
             };
 
-            self.add_unique_package_from_path(&package, &package_set)?;
+            // Always add the drivers if bootfs, and only add non-bootfs drivers
+            // if this is not a bootstrap_only build.
+            if package_set == PackageSets::BOOTFS || !bootstrap_only {
+                self.add_unique_package_from_path(&package, &package_set)?;
 
-            let package_url =
-                DriverManifestBuilder::get_package_url(driver_package_type, &package)?;
+                let package_url =
+                    DriverManifestBuilder::get_package_url(driver_package_type, &package)?;
 
-            let driver_set = match &set {
-                assembly_config_schema::PackageSet::Base => &mut self.base_drivers,
-                assembly_config_schema::PackageSet::BootFS => &mut self.boot_drivers,
-            };
-            driver_set.try_insert_unique(
-                package_url,
-                DriverDetails { package: package.into(), components },
-            )?;
+                let driver_set = match &set {
+                    assembly_config_schema::PackageSet::Base => &mut self.base_drivers,
+                    assembly_config_schema::PackageSet::BootFS => &mut self.boot_drivers,
+                };
+                driver_set.try_insert_unique(
+                    package_url,
+                    DriverDetails { package: package.into(), components },
+                )?;
+            }
         }
 
         for PackageDetails { package, set } in bundle.packages {
@@ -299,7 +307,11 @@ impl ImageAssemblyConfigBuilder {
                 assembly_config_schema::PackageSet::Base => PackageSets::BASE,
                 assembly_config_schema::PackageSet::BootFS => PackageSets::BOOTFS,
             };
-            self.add_unique_package_from_path(package, &package_set)?;
+            // Always add the package if bootfs, and only add non-bootfs packages
+            // if this is not a bootstrap_only build.
+            if package_set == PackageSets::BOOTFS || !bootstrap_only {
+                self.add_unique_package_from_path(package, &package_set)?;
+            }
         }
 
         Ok(())
