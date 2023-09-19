@@ -3,6 +3,7 @@
 
 #include "src/media/audio/audio_core/v1/audio_capturer.h"
 
+#include <fuchsia/media/cpp/fidl.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/vmo.h>
@@ -160,6 +161,142 @@ TEST_F(AudioCapturerTest, DefaultClockIsClockMonotonic) {
 
   clock::testing::VerifyIsSystemMonotonic(fidl_clock);
   clock::testing::VerifyIsSystemMonotonic(*capturer_->reference_clock());
+}
+
+class AudioCapturerBadFormatTest : public testing::ThreadingModelFixture {
+ protected:
+  void TearDown() override {
+    // Dropping the channel queues a reference to the Capturer through its error handler, which
+    // won't work since the rest of the class is destructed before the loop and its queued
+    // functions. Here, we ensure the error handler runs before this class' destructors run.
+    { auto r = std::move(fidl_capturer_); }
+    RunLoopUntilIdle();
+
+    testing::ThreadingModelFixture::TearDown();
+  }
+
+  AudioCapturer* capturer_;
+  fuchsia::media::AudioCapturerPtr fidl_capturer_;
+
+  fuchsia::media::AudioStreamType stream_type_ = {
+      .sample_format = fuchsia::media::AudioSampleFormat::FLOAT,
+      .channels = 1,
+      .frames_per_second = kAudioCapturerUnittestFrameRate,
+  };
+};
+
+// If given a malformed format (channels == 0), an AudioCapturer should disconnect.
+TEST_F(AudioCapturerBadFormatTest, ChannelsTooLowShouldDisconnect) {
+  fuchsia::media::InputAudioCapturerConfiguration input_configuration;
+  input_configuration.set_usage(fuchsia::media::AudioCaptureUsage::BACKGROUND);
+  std::optional<Format> format;
+  auto capturer = AudioCapturer::Create(
+      fuchsia::media::AudioCapturerConfiguration::WithInput(std::move(input_configuration)), format,
+      fidl_capturer_.NewRequest(), &context());
+  context().route_graph().AddCapturer(std::move(capturer));
+
+  stream_type_.channels = fuchsia::media::MIN_PCM_CHANNEL_COUNT - 1;
+  std::optional<zx_status_t> received_status;
+  fidl_capturer_.set_error_handler([&received_status](auto status) { received_status = status; });
+
+  fidl_capturer_->SetPcmStreamType(stream_type_);
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_status.has_value());
+  EXPECT_EQ(*received_status, ZX_ERR_PEER_CLOSED);
+}
+
+// AudioCapturers are limited to a maximum channel count of 4.
+TEST_F(AudioCapturerBadFormatTest, ChannelsTooHighShouldDisconnect) {
+  fuchsia::media::InputAudioCapturerConfiguration input_configuration;
+  input_configuration.set_usage(fuchsia::media::AudioCaptureUsage::BACKGROUND);
+  std::optional<Format> format;
+  auto capturer = AudioCapturer::Create(
+      fuchsia::media::AudioCapturerConfiguration::WithInput(std::move(input_configuration)), format,
+      fidl_capturer_.NewRequest(), &context());
+  context().route_graph().AddCapturer(std::move(capturer));
+
+  stream_type_.channels = 5;  // AudioCapturers limit this to 4 instead of MAX_PCM_CHANNEL_COUNT
+  std::optional<zx_status_t> received_status;
+  fidl_capturer_.set_error_handler([&received_status](auto status) { received_status = status; });
+
+  fidl_capturer_->SetPcmStreamType(stream_type_);
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_status.has_value());
+  EXPECT_EQ(*received_status, ZX_ERR_PEER_CLOSED);
+}
+
+// AudioCapturers are limited to a minimum frame rate of 1000 Hz.
+TEST_F(AudioCapturerBadFormatTest, FrameRateTooLowShouldDisconnect) {
+  fuchsia::media::InputAudioCapturerConfiguration input_configuration;
+  input_configuration.set_usage(fuchsia::media::AudioCaptureUsage::BACKGROUND);
+  std::optional<Format> format;
+  auto capturer = AudioCapturer::Create(
+      fuchsia::media::AudioCapturerConfiguration::WithInput(std::move(input_configuration)), format,
+      fidl_capturer_.NewRequest(), &context());
+  context().route_graph().AddCapturer(std::move(capturer));
+
+  stream_type_.frames_per_second = fuchsia::media::MIN_PCM_FRAMES_PER_SECOND - 1;
+  std::optional<zx_status_t> received_status;
+  fidl_capturer_.set_error_handler([&received_status](auto status) { received_status = status; });
+
+  fidl_capturer_->SetPcmStreamType(stream_type_);
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_status.has_value());
+  EXPECT_EQ(*received_status, ZX_ERR_PEER_CLOSED);
+}
+
+// AudioCapturers are limited to a maximum frame rate of 192000 Hz.
+TEST_F(AudioCapturerBadFormatTest, FrameRateTooHighShouldDisconnect) {
+  fuchsia::media::InputAudioCapturerConfiguration input_configuration;
+  input_configuration.set_usage(fuchsia::media::AudioCaptureUsage::BACKGROUND);
+  std::optional<Format> format;
+  auto capturer = AudioCapturer::Create(
+      fuchsia::media::AudioCapturerConfiguration::WithInput(std::move(input_configuration)), format,
+      fidl_capturer_.NewRequest(), &context());
+  context().route_graph().AddCapturer(std::move(capturer));
+
+  stream_type_.frames_per_second = fuchsia::media::MAX_PCM_FRAMES_PER_SECOND + 1;
+  std::optional<zx_status_t> received_status;
+  fidl_capturer_.set_error_handler([&received_status](auto status) { received_status = status; });
+
+  fidl_capturer_->SetPcmStreamType(stream_type_);
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_status.has_value());
+  EXPECT_EQ(*received_status, ZX_ERR_PEER_CLOSED);
+}
+
+// AudioCapturers cannot call SetPcmStreamType whiole a payload buffer has been added.
+TEST_F(AudioCapturerBadFormatTest, SetFormatAfterAddPayloadBufferShouldDisconnect) {
+  fuchsia::media::InputAudioCapturerConfiguration input_configuration;
+  input_configuration.set_usage(fuchsia::media::AudioCaptureUsage::BACKGROUND);
+  std::optional<Format> format;
+  auto capturer = AudioCapturer::Create(
+      fuchsia::media::AudioCapturerConfiguration::WithInput(std::move(input_configuration)), format,
+      fidl_capturer_.NewRequest(), &context());
+  std::optional<zx_status_t> received_status;
+  fidl_capturer_.set_error_handler([&received_status](auto status) { received_status = status; });
+
+  context().route_graph().AddCapturer(std::move(capturer));
+  fidl_capturer_->SetPcmStreamType(stream_type_);
+  RunLoopUntilIdle();
+  ASSERT_FALSE(received_status.has_value());
+
+  fzl::VmoMapper vmo_mapper;
+  zx::vmo vmo, duplicate;
+  ASSERT_EQ(vmo_mapper.CreateAndMap(kAudioCapturerUnittestVmarSize,
+                                    /*flags=*/0, nullptr, &vmo),
+            ZX_OK);
+  ASSERT_EQ(
+      vmo.duplicate(ZX_RIGHT_TRANSFER | ZX_RIGHT_WRITE | ZX_RIGHT_READ | ZX_RIGHT_MAP, &duplicate),
+      ZX_OK);
+  fidl_capturer_->AddPayloadBuffer(0, std::move(duplicate));
+  RunLoopUntilIdle();
+  ASSERT_FALSE(received_status.has_value());
+
+  fidl_capturer_->SetPcmStreamType(stream_type_);
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_status.has_value());
+  EXPECT_EQ(*received_status, ZX_ERR_PEER_CLOSED);
 }
 
 }  // namespace

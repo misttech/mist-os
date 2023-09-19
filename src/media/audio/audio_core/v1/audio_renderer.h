@@ -44,7 +44,7 @@ class AudioRenderer : public BaseRenderer,
 
   // |fuchsia::media::AudioRenderer|
   void SetReferenceClock(zx::clock ref_clock) final;
-  void SetPcmStreamType(fuchsia::media::AudioStreamType format) final;
+  void SetPcmStreamType(fuchsia::media::AudioStreamType stream_type) final;
   void SetUsage(fuchsia::media::AudioRenderUsage usage) override;
   void BindGainControl(fidl::InterfaceRequest<fuchsia::media::audio::GainControl> request) final;
 

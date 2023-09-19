@@ -269,21 +269,14 @@ std::shared_ptr<Sampler> CreateWith(const Format& source_format, const Format& d
     case 2:
       return CreateWith<SourceSampleType, SourceChannelCount, 2>(source_format, dest_format);
     case 3:
-      if constexpr (SourceChannelCount <= 3) {
-        return CreateWith<SourceSampleType, SourceChannelCount, 3>(source_format, dest_format);
-      }
-      break;
+      return CreateWith<SourceSampleType, SourceChannelCount, 3>(source_format, dest_format);
     case 4:
-      if constexpr (SourceChannelCount != 3) {
-        return CreateWith<SourceSampleType, SourceChannelCount, 4>(source_format, dest_format);
-      }
-      break;
+      return CreateWith<SourceSampleType, SourceChannelCount, 4>(source_format, dest_format);
     default:
-      break;
+      FX_LOGS(WARNING) << "SincSampler does not support this channelization: " << SourceChannelCount
+                       << " -> " << dest_format.channels();
+      return nullptr;
   }
-  FX_LOGS(WARNING) << "SincSampler does not support this channelization: " << SourceChannelCount
-                   << " -> " << dest_format.channels();
-  return nullptr;
 }
 
 template <typename SourceSampleType>

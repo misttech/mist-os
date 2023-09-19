@@ -29,8 +29,8 @@ using ::testing::NotNull;
 using ::testing::Pointwise;
 
 constexpr std::pair<uint32_t, uint32_t> kChannelConfigs[] = {
-    {1, 1}, {1, 2}, {1, 3}, {1, 4}, {2, 1}, {2, 2}, {2, 3}, {2, 4}, {3, 1},
-    {3, 2}, {3, 3}, {4, 1}, {4, 2}, {4, 4}, {5, 5}, {6, 6}, {7, 7}, {8, 8},
+    {1, 1}, {1, 2}, {1, 3}, {1, 4}, {2, 1}, {2, 2}, {2, 3}, {2, 4},
+    {3, 1}, {3, 2}, {3, 3}, {3, 4}, {4, 1}, {4, 2}, {4, 3}, {4, 4},
 };
 
 constexpr uint32_t kFrameRates[] = {
@@ -79,8 +79,7 @@ TEST(PointSamplerTest, CreateFailsWithMismatchingFrameRates) {
 
 TEST(PointSamplerTest, CreateFailsWithUnsupportedChannelConfigs) {
   const std::pair<uint32_t, uint32_t> unsupported_channel_configs[] = {
-      {1, 5}, {1, 8}, {1, 9}, {2, 5}, {2, 8}, {2, 9}, {3, 5},
-      {3, 8}, {3, 9}, {4, 5}, {4, 7}, {4, 9}, {5, 1}, {9, 1},
+      {1, 5}, {2, 5}, {3, 5}, {4, 5}, {5, 1}, {5, 5}, {6, 2}, {6, 6}, {9, 1},
   };
   for (const auto& [source_channel_count, dest_channel_count] : unsupported_channel_configs) {
     for (const auto& frame_rate : kFrameRates) {

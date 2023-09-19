@@ -138,6 +138,12 @@ void AudioCapturer::SetPcmStreamType(fuchsia::media::AudioStreamType stream_type
     return;
   }
 
+  if (stream_type.channels > 4) {
+    FX_LOGS(WARNING) << "AudioCapturer::PcmStreamType specified channels (" << stream_type.channels
+                     << ") is too large";
+    return;
+  }
+
   // Success, record our new format.
   UpdateFormat(format_result.take_value());
 

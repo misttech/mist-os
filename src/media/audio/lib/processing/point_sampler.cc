@@ -160,51 +160,18 @@ std::shared_ptr<Sampler> CreateWith(int64_t dest_channel_count) {
     case 2:
       return CreateWith<SourceSampleType, SourceChannelCount, 2>();
     case 3:
-      if constexpr (SourceChannelCount <= 3) {
-        return CreateWith<SourceSampleType, SourceChannelCount, 3>();
-      }
-      break;
+      return CreateWith<SourceSampleType, SourceChannelCount, 3>();
     case 4:
-      if constexpr (SourceChannelCount != 3) {
-        return CreateWith<SourceSampleType, SourceChannelCount, 4>();
-      }
-      break;
+      return CreateWith<SourceSampleType, SourceChannelCount, 4>();
     default:
-      break;
+      FX_LOGS(WARNING) << "PointSampler does not support this channelization: "
+                       << SourceChannelCount << " -> " << dest_channel_count;
+      return nullptr;
   }
-  FX_LOGS(WARNING) << "PointSampler does not support this channelization: " << SourceChannelCount
-                   << " -> " << dest_channel_count;
-  return nullptr;
 }
 
 template <typename SourceSampleType>
 std::shared_ptr<Sampler> CreateWith(int64_t source_channel_count, int64_t dest_channel_count) {
-  // N -> N channel configuration.
-  if (source_channel_count == dest_channel_count) {
-    switch (source_channel_count) {
-      case 1:
-        return CreateWith<SourceSampleType, 1, 1>();
-      case 2:
-        return CreateWith<SourceSampleType, 2, 2>();
-      case 3:
-        return CreateWith<SourceSampleType, 3, 3>();
-      case 4:
-        return CreateWith<SourceSampleType, 4, 4>();
-      case 5:
-        return CreateWith<SourceSampleType, 5, 5>();
-      case 6:
-        return CreateWith<SourceSampleType, 6, 6>();
-      case 7:
-        return CreateWith<SourceSampleType, 7, 7>();
-      case 8:
-        return CreateWith<SourceSampleType, 8, 8>();
-      default:
-        FX_LOGS(WARNING) << "PointSampler does not support this channelization: "
-                         << source_channel_count << " -> " << dest_channel_count;
-        return nullptr;
-    }
-  }
-
   // M -> N channel configuration.
   switch (source_channel_count) {
     case 1:

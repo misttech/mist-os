@@ -150,9 +150,9 @@ void AudioRenderer::SetReferenceClock(zx::clock ref_clock) {
 
 void AudioRenderer::SetPcmStreamType(fuchsia::media::AudioStreamType stream_type) {
   TRACE_DURATION("audio", "AudioRenderer::SetPcmStreamType");
-  std::lock_guard<std::mutex> lock(mutex_);
-
   auto cleanup = fit::defer([this]() { context().route_graph().RemoveRenderer(*this); });
+
+  std::lock_guard<std::mutex> lock(mutex_);
 
   // We cannot change the format while we are currently operational
   if (IsOperating()) {
@@ -165,6 +165,12 @@ void AudioRenderer::SetPcmStreamType(fuchsia::media::AudioStreamType stream_type
     FX_LOGS(WARNING) << "AudioRenderer: PcmStreamType is invalid";
     return;
   }
+  if (stream_type.channels > 4) {
+    FX_LOGS(WARNING) << "AudioRenderer::PcmStreamType specified channels (" << stream_type.channels
+                     << ") is too large";
+    return;
+  }
+
   format_ = {format_result.take_value()};
 
   // Only create a PowerChecker if enabled, and if the renderer fits our specifications

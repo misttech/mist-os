@@ -95,6 +95,16 @@ TEST(ChannelMapperTest, ThreeChannelsToStereo) {
   }
 }
 
+TEST(ChannelMapperTest, ThreeChannelsToFour) {
+  ChannelMapper<float, 3, 4> mapper;
+
+  const std::vector<float> source_frame = {-0.4f, 0.0f, 0.7f};
+  const std::vector<float> expected = {-0.4f, 0.0f, 0.7f, 0.1f};
+  for (size_t channel = 0; channel < expected.size(); ++channel) {
+    EXPECT_FLOAT_EQ(mapper.Map(source_frame.data(), channel), expected[channel]);
+  }
+}
+
 TEST(ChannelMapperTest, FourChannelsToMono) {
   ChannelMapper<float, 4, 1> mapper;
 
@@ -116,6 +126,21 @@ TEST(ChannelMapperTest, FourChannelsToStereo) {
   } else {
     EXPECT_FLOAT_EQ(mapper.Map(source_frame.data(), 0), 1.5f);
     EXPECT_FLOAT_EQ(mapper.Map(source_frame.data(), 1), 3.0f);
+  }
+}
+
+TEST(ChannelMapperTest, FourChannelsToThree) {
+  ChannelMapper<float, 4, 3> mapper;
+
+  const std::vector<float> source_frame = {-1.0f, -0.5, 0.25f, 0.9f};
+  if constexpr (kEnable4ChannelWorkaround) {
+    EXPECT_FLOAT_EQ(mapper.Map(source_frame.data(), 0), -1.0f);
+    EXPECT_FLOAT_EQ(mapper.Map(source_frame.data(), 1), -0.5f);
+    EXPECT_FLOAT_EQ(mapper.Map(source_frame.data(), 2), -0.75f);
+  } else {
+    EXPECT_FLOAT_EQ(mapper.Map(source_frame.data(), 0), -0.30455173f);
+    EXPECT_FLOAT_EQ(mapper.Map(source_frame.data(), 1), 0.01243557f);
+    EXPECT_FLOAT_EQ(mapper.Map(source_frame.data(), 2), 0.48791651f);
   }
 }
 
