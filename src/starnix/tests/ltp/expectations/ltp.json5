@@ -121,7 +121,6 @@
                 "getpriority02",
                 "getrusage02",
                 "init_module01",
-                "inotify11",
                 "input01",
                 "input02",
                 "input04",

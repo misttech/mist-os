@@ -21,7 +21,7 @@ use crate::{
     lock::Mutex,
     mm::{vmo::round_up_to_increment, MemoryAccessorExt},
     syscalls::*,
-    task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
+    task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
     types::*,
 };
 
@@ -59,6 +59,10 @@ struct InotifyEventQueue {
     // if more events arrive.
     queue: VecDeque<InotifyEvent>,
 
+    // Waiters to notify of new inotify events.
+    waiters: WaitQueue,
+
+    // Total size of InotifyEvent objects in queue, when serialized into inotify_event.
     size_bytes: usize,
 
     // This value is copied from /proc/sys/fs/inotify/max_queued_events on creation and is
@@ -198,33 +202,34 @@ impl FileOps for InotifyFileObject {
 
     fn read(
         &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
+        file: &FileObject,
+        current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
 
-        let mut state = self.state.lock();
-        if let Some(front) = state.events.front() {
-            if data.available() < front.size() {
-                return error!(EINVAL);
+        file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
+            let mut state = self.state.lock();
+            if let Some(front) = state.events.front() {
+                if data.available() < front.size() {
+                    return error!(EINVAL);
+                }
+            } else {
+                return error!(EAGAIN);
             }
-        } else {
-            // TODO(fxbug.dev/79283): implement blocking read.
-            return error!(EAGAIN);
-        }
 
-        let mut bytes_read: usize = 0;
-        while let Some(front) = state.events.front() {
-            if data.available() < front.size() {
-                break;
+            let mut bytes_read: usize = 0;
+            while let Some(front) = state.events.front() {
+                if data.available() < front.size() {
+                    break;
+                }
+                // Linux always dequeues an available event as long as there's enough buffer space to
+                // copy it out, even if the copy below fails. Emulate this behaviour.
+                bytes_read += state.events.dequeue().unwrap().write_to(data)?;
             }
-            // Linux always dequeues an available event as long as there's enough buffer space to
-            // copy it out, even if the copy below fails. Emulate this behaviour.
-            bytes_read += state.events.dequeue().unwrap().write_to(data)?;
-        }
-        Ok(bytes_read)
+            Ok(bytes_read)
+        })
     }
 
     fn ioctl(
@@ -250,10 +255,10 @@ impl FileOps for InotifyFileObject {
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
-        _events: FdEvents,
-        _handler: EventHandler,
+        events: FdEvents,
+        handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        Some(waiter.fake_wait())
+        Some(self.state.lock().events.waiters.wait_async_fd_events(waiter, events, handler))
     }
 
     fn query_events(
@@ -261,7 +266,11 @@ impl FileOps for InotifyFileObject {
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
-        Ok(FdEvents::empty())
+        if self.available() > 0 {
+            Ok(FdEvents::POLLIN)
+        } else {
+            Ok(FdEvents::empty())
+        }
     }
 
     fn close(&self, file: &FileObject) {
@@ -278,7 +287,12 @@ impl FileOps for InotifyFileObject {
 
 impl InotifyEventQueue {
     fn new_with_max(max_queued_events: usize) -> Self {
-        InotifyEventQueue { queue: Default::default(), size_bytes: 0, max_queued_events }
+        InotifyEventQueue {
+            queue: Default::default(),
+            waiters: Default::default(),
+            size_bytes: 0,
+            max_queued_events,
+        }
     }
 
     fn enqueue(&mut self, mut event: InotifyEvent) {
@@ -304,6 +318,7 @@ impl InotifyEventQueue {
         }
         self.size_bytes += event.size();
         self.queue.push_back(event);
+        self.waiters.notify_fd_events(FdEvents::POLLIN);
     }
 
     fn front(&self) -> Option<&InotifyEvent> {
