@@ -19,7 +19,10 @@ driver_bind_rules("virtio_socket_bind") {
 
 group("tests") {
   testonly = true
-  deps = [ ":test_package" ]
+  deps = [
+    ":test_package",
+    ":virtio_socket_bind_test",
+  ]
 }
 
 source_set("common") {
