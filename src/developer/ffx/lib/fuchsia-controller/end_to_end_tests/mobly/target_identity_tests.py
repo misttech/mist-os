@@ -3,13 +3,12 @@
 # found in the LICENSE file.
 
 import asyncio
-from typing import Awaitable
-from typing import Callable
 from typing import List
 
 import fidl.fuchsia_developer_ffx as ffx
 import fidl.fuchsia_device as device
 import fidl.fuchsia_feedback as feedback
+import fidl.fuchsia_hardware_power_statecontrol as power_statecontrol
 import fidl.fuchsia_io as io
 from fuchsia_controller_py import Channel
 from fuchsia_controller_py import ZxStatus
@@ -18,23 +17,7 @@ from mobly import base_test
 from mobly import test_runner
 
 from mobly_controller import fuchsia_device
-
-
-def asynctest(func: Callable[[base_test.BaseTestClass], Awaitable[None]]):
-    """Simple wrapper around async tests.
-
-    Args:
-        func: The test which is being wrapped.
-
-    Returns:
-        The wrapped function. Runs the body of the `func` in asyncio.run()
-    """
-
-    def wrapper(*args, **kwargs):
-        coro = func(*args, **kwargs)
-        asyncio.run(coro)
-
-    return wrapper
+from mobly_controller.fuchsia_device import asynctest
 
 
 class FuchsiaControllerTests(base_test.BaseTestClass):
