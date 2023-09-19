@@ -230,7 +230,7 @@ func (f *FFXInstance) WaitForDaemon(ctx context.Context) error {
 	defer func() {
 		f.stderr = origStderr
 	}()
-	return retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(500*time.Millisecond), 3), func() error {
+	return retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), 3), func() error {
 		return f.Run(ctx, "daemon", "echo")
 	}, nil)
 }
