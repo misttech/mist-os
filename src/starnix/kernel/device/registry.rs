@@ -29,7 +29,6 @@ pub enum DeviceMode {
     Block,
 }
 
-// TODO(fxb/130452): Remove Clone in all DeviceOps impls after RangeMap refactor.
 pub trait DeviceOps: DynClone + Send + Sync + 'static {
     fn open(
         &self,
@@ -46,7 +45,6 @@ clone_trait_object!(DeviceOps);
 #[derive(Clone)]
 struct DeviceOpsHandle(Arc<dyn DeviceOps>);
 
-// TODO(fxb/130452): Remove equality comparison after RangeMap refactor.
 impl PartialEq for DeviceOpsHandle {
     fn eq(&self, _other: &Self) -> bool {
         false
