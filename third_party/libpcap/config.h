@@ -1,4 +1,4 @@
-// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -77,8 +77,8 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #define HAVE_INTTYPES_H 1
 
-/* Define to 1 if you have the `dag' library (-ldag). */
-/* #undef HAVE_LIBDAG */
+/* Define to 1 if you have the `bsd' library (-lbsd). */
+/* #undef HAVE_LIBBSD */
 
 /* if libdlpi exists */
 /* #undef HAVE_LIBDLPI */
@@ -134,9 +134,6 @@
 /* Define to 1 if you have the <net/pfilt.h> header file. */
 /* #undef HAVE_NET_PFILT_H */
 
-/* Define to 1 if you have the <net/pfvar.h> header file. */
-/* #undef HAVE_NET_PFVAR_H */
-
 /* Define to 1 if you have the <net/raw.h> header file. */
 /* #undef HAVE_NET_RAW_H */
 
@@ -145,9 +142,6 @@
 
 /* if there's an os_proto.h for this platform, to use additional prototypes */
 /* #undef HAVE_OS_PROTO_H */
-
-/* define if net/pfvar.h defines PF_NAT through PF_NORDR */
-/* #undef HAVE_PF_NAT_THROUGH_PF_NORDR */
 
 /* Define to 1 if you have a POSIX-style `strerror_r' function. */
 #define HAVE_POSIX_STRERROR_R /**/
@@ -276,9 +270,6 @@
 /* IPv6 */
 #define INET6 1
 
-/* path for device for USB sniffing */
-/* #undef LINUX_USB_MON_DEV */
-
 /* Define to 1 if netinet/ether.h declares `ether_hostton' */
 #define NETINET_ETHER_H_DECLARES_ETHER_HOSTTON /**/
 
@@ -298,7 +289,7 @@
 #define PACKAGE_NAME "pcap"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "pcap 1.10.1"
+#define PACKAGE_STRING "pcap 1.10.4"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "pcap"
@@ -307,7 +298,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "1.10.1"
+#define PACKAGE_VERSION "1.10.4"
 
 /* target host supports Bluetooth sniffing */
 /* #undef PCAP_SUPPORT_BT */
@@ -332,6 +323,12 @@
 
 /* target host supports RDMA sniffing */
 /* #undef PCAP_SUPPORT_RDMASNIFF */
+
+/* The size of `const void *', as computed by sizeof. */
+/* #undef SIZEOF_CONST_VOID_P */
+
+/* The size of `void *', as computed by sizeof. */
+#define SIZEOF_VOID_P 8
 
 /* Define to 1 if all of the C90 standard headers exist (not just the ones
    required in a freestanding environment). This macro is provided for

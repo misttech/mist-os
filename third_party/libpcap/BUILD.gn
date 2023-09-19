@@ -19,6 +19,8 @@ shared_library("libpcap") {
     "src/nametoaddr.c",
     "src/optimize.c",
     "src/pcap-common.c",
+    "src/pcap-usb-linux-common.c",
+    "src/pcap-util.c",
     "src/pcap.c",
     "src/savefile.c",
     "src/scanner.c",
@@ -72,5 +74,6 @@ config("suppress_warnings") {
   cflags = [
     "-Wno-implicit-fallthrough",
     "-Wno-int-conversion",
+    "-Wno-unused-but-set-variable",
   ]
 }
