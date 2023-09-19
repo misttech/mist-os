@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use fidl::endpoints::{create_endpoints, ClientEnd, ProtocolMarker, Proxy};
+use fidl::AsHandleRef;
 use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
@@ -432,6 +433,10 @@ impl Kernel {
             let tg = thread_group.read();
 
             let tg_node = thread_groups.create_child(format!("{}", thread_group.leader));
+            if let Ok(koid) = &thread_group.process.get_koid() {
+                tg_node.record_int("koid", koid.raw_koid() as i64);
+            }
+            tg_node.record_int("pid", thread_group.leader as i64);
             tg_node.record_int("ppid", tg.get_ppid() as i64);
             tg_node.record_bool("stopped", tg.stopped == StopState::GroupStopped);
 
