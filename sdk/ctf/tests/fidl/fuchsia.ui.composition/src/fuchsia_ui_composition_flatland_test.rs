@@ -46,14 +46,12 @@ async fn test_flatland_connection_is_ok() -> Result<(), Error> {
 
     flatland_proxy.present(PresentArgs::default()).expect("flatland present");
 
-    // Note: Because the commands flushed by `Present` never make it to a
-    // display, we only receive `OnNextFrameBegin` and not `OnFramePresented`.
-    let onfb = flatland_event_stream
+    let ofp = flatland_event_stream
         .next()
         .await
         .unwrap()
         .expect("get FlatlandEvent")
-        .into_on_next_frame_begin();
-    assert!(onfb.is_some());
+        .into_on_frame_presented();
+    assert!(ofp.is_some());
     Ok(())
 }

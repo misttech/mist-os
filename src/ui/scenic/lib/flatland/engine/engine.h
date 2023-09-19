@@ -57,6 +57,9 @@ class Engine {
   // Returns all renderables reachable from the display's root transform.
   Renderables GetRenderables(const FlatlandDisplay& display);
 
+  // Signal all release fences and skip rendering.
+  void SkipRender(scheduling::FramePresentedCallback callback);
+
  private:
   // Initialize all inspect::Nodes, so that the Engine state can be observed.
   void InitializeInspectObjects();

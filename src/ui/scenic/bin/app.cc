@@ -681,18 +681,14 @@ void App::InitializeHeartbeat(display::Display& display) {
       /*render_scheduled_frame*/
       [this](auto frame_number, auto presentation_time, auto callback) {
         TRACE_DURATION("gfx", "App render_scheduled_frame");
-        FX_CHECK(flatland_frame_count_ == frame_number - 1);
+        FX_CHECK(flatland_frame_count_ + skipped_frame_count_ == frame_number - 1);
         if (auto display = flatland_manager_->GetPrimaryFlatlandDisplayForRendering()) {
           flatland_engine_->RenderScheduledFrame(++flatland_frame_count_, presentation_time,
                                                  *display, std::move(callback));
         } else {
-          // TODO: Consider how Flatland should behave when there is no
-          // FlatlandDisplay.
-          //
-          // On one hand, Engine::RenderScheduledFrame could explicitly handle
-          // a null display by pinging the release fences. OTOH, this causes
-          // edge cases with respect to client state when dynamically
-          // connecting a display. Further investigation needed.
+          FX_LOGS(INFO) << "No FlatlandDisplay; skipping render scheduled frame.";
+          skipped_frame_count_++;
+          flatland_engine_->SkipRender(std::move(callback));
         }
       });
 }

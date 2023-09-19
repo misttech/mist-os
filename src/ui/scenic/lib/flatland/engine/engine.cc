@@ -148,9 +148,7 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
   // invoke |callback| to continue the render loop.
   if (!first_frame_with_image_is_rendered_) {
     if (scene_state.images.empty()) {
-      SignalAll(flatland_presenter_->TakeReleaseFences());
-      const auto now = async::Now(async_get_default_dispatcher());
-      callback({now, now});
+      SkipRender(std::move(callback));
       return;
     }
     first_frame_with_image_is_rendered_ = true;
@@ -224,6 +222,12 @@ Engine::SceneState::SceneState(Engine& engine, TransformHandle root_transform) {
       ComputeGlobalRectangles(FilterByIndices(global_matrices, image_indices),
                               FilterByIndices(global_image_sample_regions, image_indices),
                               FilterByIndices(global_clip_regions, image_indices), images);
+}
+
+void Engine::SkipRender(scheduling::FramePresentedCallback callback) {
+  SignalAll(flatland_presenter_->TakeReleaseFences());
+  const auto now = async::Now(async_get_default_dispatcher());
+  callback({now, now});
 }
 
 }  // namespace flatland

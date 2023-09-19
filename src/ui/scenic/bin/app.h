@@ -134,6 +134,7 @@ class App {
   view_tree::ScopedRegistry scoped_observer_registry_;
 
   uint64_t flatland_frame_count_ = 0;
+  uint64_t skipped_frame_count_ = 0;
 
   AnnotationRegistry annotation_registry_;
 
