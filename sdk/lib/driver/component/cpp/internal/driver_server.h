@@ -59,10 +59,18 @@ class DriverServer : public fdf::WireServer<fuchsia_driver_framework::Driver> {
              StartCompleter::Sync& completer) override {
     driver_ = std::make_unique<DriverBaseImpl>(fidl::ToNatural(request->start_args),
                                                fdf::UnownedSynchronizedDispatcher(dispatcher_));
-    driver_->Start(fdf::StartCompleter(
-        [arena = std::move(arena), completer = completer.ToAsync()](zx::result<> result) mutable {
-          completer.buffer(arena).Reply(result);
-        }));
+
+    fdf::StartCompleter start_completer(
+        [reply_arena = std::move(arena), reply_completer = completer.ToAsync()](
+            zx::result<> result) mutable { reply_completer.buffer(reply_arena).Reply(result); });
+
+    // Post a task to do this so that the WireServerDispatcher, the caller of this method,
+    // can clean up correctly. Otherwise the destruction of the arena from the callback could
+    // run too early, causing use-after-frees during the cleanup of the request.
+    async::PostTask(fdf_dispatcher_get_async_dispatcher(dispatcher_),
+                    [this, inner_completer = std::move(start_completer)]() mutable {
+                      driver_->Start(std::move(inner_completer));
+                    });
   }
 
   void Stop(fdf::Arena& arena, StopCompleter::Sync& completer) override {

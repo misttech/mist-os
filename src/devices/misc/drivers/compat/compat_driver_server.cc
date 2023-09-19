@@ -61,13 +61,21 @@ Driver* CompatDriverServer::CreateDriver(fuchsia_driver_framework::DriverStartAr
 void CompatDriverServer::Start(StartRequestView request, fdf::Arena& arena,
                                StartCompleter::Sync& completer) {
   fdf::DriverStartArgs start_args = fidl::ToNatural(request->start_args);
+
   fdf::StartCompleter start_completer(
-      [arena = std::move(arena), completer = completer.ToAsync()](zx::result<> result) mutable {
-        completer.buffer(arena).Reply(result);
-      });
-  driver_.emplace(CreateDriver(std::move(start_args),
-                               fdf::UnownedSynchronizedDispatcher(dispatcher_),
-                               std::move(start_completer)));
+      [reply_arena = std::move(arena), reply_completer = completer.ToAsync()](
+          zx::result<> result) mutable { reply_completer.buffer(reply_arena).Reply(result); });
+
+  // Post a task to do this so that the WireServerDispatcher, the caller of this method,
+  // can clean up correctly. Otherwise the destruction of the arena from the callback could
+  // run too early, causing use-after-frees during the cleanup of the request.
+  async::PostTask(fdf_dispatcher_get_async_dispatcher(dispatcher_),
+                  [this, moved_start_args = std::move(start_args),
+                   moved_start_completer = std::move(start_completer)]() mutable {
+                    driver_.emplace(CreateDriver(std::move(moved_start_args),
+                                                 fdf::UnownedSynchronizedDispatcher(dispatcher_),
+                                                 std::move(moved_start_completer)));
+                  });
 }
 
 void CompatDriverServer::Stop(fdf::Arena& arena, StopCompleter::Sync& completer) {
