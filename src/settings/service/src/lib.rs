@@ -27,8 +27,7 @@ use fuchsia_component::server::{ServiceFs, ServiceFsDir, ServiceObj};
 use fuchsia_fs::OpenFlags;
 use fuchsia_inspect::component;
 use fuchsia_zircon::{Duration, DurationNum};
-use futures::lock::Mutex;
-use futures::StreamExt;
+use futures::{lock::Mutex, StreamExt};
 use settings_storage::device_storage::DeviceStorage;
 use settings_storage::fidl_storage::FidlStorage;
 
