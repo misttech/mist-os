@@ -15,10 +15,6 @@
             environment: "#core-env",
         },
         {
-            name: "debug-dash-launcher",
-            url: "fuchsia-pkg://fuchsia.com/debug-dash-launcher#meta/debug_dash_launcher.cm",
-        },
-        {
             name: "session-manager",
             url: "fuchsia-pkg://fuchsia.com/session_manager#meta/session_manager.cm",
             startup: "eager",
@@ -297,16 +293,6 @@
             subdir: "pkg-resolver",
         },
         {
-            protocol: "fuchsia.hardware.pty.Device",
-            from: "parent",
-            to: "#debug-dash-launcher",
-        },
-        {
-            protocol: "fuchsia.pkg.PackageResolver",
-            from: "#pkg-resolver",
-            to: "#debug-dash-launcher",
-        },
-        {
             protocol: [
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.paver.Paver",
@@ -375,17 +361,6 @@
             protocol: "fuchsia.kernel.Stats",
             from: "parent",
             to: "#cobalt_system_metrics",
-        },
-        {
-            protocol: "fuchsia.process.Launcher",
-            from: "parent",
-            to: "#debug-dash-launcher",
-        },
-        {
-            protocol: "fuchsia.sys2.RealmQuery.root",
-            from: "parent",
-            as: "fuchsia.sys2.RealmQuery",
-            to: "#debug-dash-launcher",
         },
         {
             protocol: [ "fuchsia.ui.display.internal.DisplayPower" ],
@@ -642,6 +617,11 @@
         },
     ],
     expose: [
+        {
+            protocol: [ "fuchsia.dash.Launcher" ],
+            from: "#debug-dash-launcher",
+            source_availability: "unknown",
+        },
         {
             protocol: "fuchsia.component.Binder",
             from: "framework",

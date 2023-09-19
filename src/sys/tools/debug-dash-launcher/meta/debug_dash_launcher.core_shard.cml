@@ -23,11 +23,26 @@
             from: "parent",
             to: "#debug-dash-launcher",
         },
-    ],
-    expose: [
         {
-            protocol: [ "fuchsia.dash.Launcher" ],
-            from: "#debug-dash-launcher",
+            protocol: "fuchsia.hardware.pty.Device",
+            from: "parent",
+            to: "#debug-dash-launcher",
+        },
+        {
+            protocol: "fuchsia.pkg.PackageResolver",
+            from: "#pkg-resolver",
+            to: "#debug-dash-launcher",
+        },
+        {
+            protocol: "fuchsia.process.Launcher",
+            from: "parent",
+            to: "#debug-dash-launcher",
+        },
+        {
+            protocol: "fuchsia.sys2.RealmQuery.root",
+            from: "parent",
+            as: "fuchsia.sys2.RealmQuery",
+            to: "#debug-dash-launcher",
         },
     ],
 }
