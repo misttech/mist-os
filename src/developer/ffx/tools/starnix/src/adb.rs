@@ -61,14 +61,10 @@ pub async fn starnix_adb(
     let mut signals = Signals::new(&[SIGINT]).unwrap();
     let handle = signals.handle();
     let thread = std::thread::spawn(move || {
-        for signal in signals.forever() {
-            match signal {
-                SIGINT => {
-                    eprintln!("Caught interrupt. Shutting down starnix adb bridge...");
-                    std::process::exit(0);
-                }
-                _ => unreachable!(),
-            }
+        if let Some(signal) = signals.forever().next() {
+            assert_eq!(signal, SIGINT);
+            eprintln!("Caught interrupt. Shutting down starnix adb bridge...");
+            std::process::exit(0);
         }
     });
 
