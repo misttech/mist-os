@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma/platform/platform_connection_client.h>
+#include <lib/magma/platform/platform_handle.h>
+#include <lib/magma/platform/platform_port.h>
+#include <lib/magma/platform/platform_semaphore.h>
 #include <lib/magma_service/sys_driver/primary_fidl_server.h>
 #include <lib/sync/cpp/completion.h>
 #include <poll.h>
@@ -14,13 +18,9 @@
 #include <gtest/gtest.h>
 
 #include "fidl/fuchsia.gpu.magma/cpp/wire_types.h"
-#include "platform_connection_client.h"
-#include "platform_handle.h"
-#include "platform_port.h"
-#include "platform_semaphore.h"
 
 #if defined(__Fuchsia__)
-#include "zircon/zircon_platform_connection_client.h"  // nogncheck
+#include <lib/magma/platform/zircon/zircon_platform_connection_client.h>  // nogncheck
 #elif defined(__linux__)
 #include "linux/linux_platform_connection_client.h"  // nogncheck
 #endif

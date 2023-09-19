@@ -13,8 +13,7 @@
 // Files #including macros.h may assume that it #includes inttypes.h.
 // So, for convenience, they don't need to follow "#include-what-you-use" for that header.
 #include <inttypes.h>
-
-#include "platform_logger.h"
+#include <lib/magma/platform/platform_logger.h>
 
 #ifndef MAGMA_DEBUG_INTERNAL_USE_ONLY
 #error MAGMA_DEBUG_INTERNAL_USE_ONLY not defined, your gn foo needs magma_util_config

@@ -4,9 +4,9 @@
 #ifndef SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_PLATFORM_PCI_DEVICE_HELPER_H_
 #define SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_PLATFORM_PCI_DEVICE_HELPER_H_
 
-#include <memory>
+#include <lib/magma/platform/platform_pci_device.h>
 
-#include "platform_pci_device.h"
+#include <memory>
 
 class TestPlatformPciDevice {
  public:

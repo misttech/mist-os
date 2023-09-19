@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <gtest/gtest.h>
+#include <lib/magma/platform/platform_trace_provider.h>
+#include <lib/magma/platform/platform_trace_provider_with_fdio.h>
 
-#include "platform_trace_provider.h"
-#include "platform_trace_provider_with_fdio.h"
+#include <gtest/gtest.h>
 
 #if MAGMA_ENABLE_TRACING
 

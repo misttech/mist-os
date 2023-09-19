@@ -5,13 +5,13 @@
 #ifndef SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_ADDRESS_SPACE_H_
 #define SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_ADDRESS_SPACE_H_
 
+#include <lib/magma/platform/platform_buffer.h>
+#include <lib/magma/platform/platform_bus_mapper.h>
 #include <limits.h>
 
 #include <vector>
 
 #include "magma_util/short_macros.h"
-#include "platform_buffer.h"
-#include "platform_bus_mapper.h"
 #include "src/graphics/drivers/msd-arm-mali/src/types.h"
 
 // This is the standard page size for Mali when using LPAE page tables. The CPU page size must be a

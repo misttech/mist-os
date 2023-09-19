@@ -37,8 +37,8 @@ fuchsia_driver("msd_vsi-driver") {
   output_name = "libmsd_vsi"
   deps = [
     ":msd_vsi_entry",
-    "$magma_build_root/src/magma_util/platform:logger_for_system_drivers",
     "src",
+    "//src/graphics/magma/lib/magma/platform:logger_for_system_drivers",
   ]
   assert_no_deps = [ "//zircon/system/ulib/trace-engine:trace-engine-static" ]
 }
@@ -55,8 +55,8 @@ fuchsia_driver("msd_vsi_test-driver") {
   output_name = "libmsd_vsi_test"
   deps = [
     ":msd_vsi_test_entry",
-    "$magma_build_root/src/magma_util/platform:logger_for_system_drivers",
     "src",
+    "//src/graphics/magma/lib/magma/platform:logger_for_system_drivers",
   ]
   assert_no_deps = [ "//zircon/system/ulib/trace-engine:trace-engine-static" ]
 }
@@ -83,10 +83,10 @@ entry_deps = [
   "//src/devices/bus/lib/device-protocol-pdev",
   "//src/devices/lib/driver",
   "//src/graphics/lib/magma/src/magma_util:macros",
-  "//src/graphics/lib/magma/src/magma_util/platform:logger",
-  "//src/graphics/lib/magma/src/magma_util/platform:trace",
-  "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
-  "//src/graphics/lib/magma/src/magma_util/platform/zircon:thread_profile",
+  "//src/graphics/magma/lib/magma/platform:logger",
+  "//src/graphics/magma/lib/magma/platform:trace",
+  "//src/graphics/magma/lib/magma/platform/zircon:status",
+  "//src/graphics/magma/lib/magma/platform/zircon:thread_profile",
   "//src/graphics/magma/lib/magma_service/sys_driver",
   "//src/graphics/magma/lib/magma_service/sys_driver/dfv1:device_impl",
   "//src/lib/ddk",

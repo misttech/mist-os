@@ -4,12 +4,12 @@
 
 #include "mock_msd.h"
 
+#include <lib/magma/platform/platform_handle.h>
+#include <lib/magma/platform/platform_semaphore.h>
 #include <lib/magma_service/msd.h>
 
 #include <vector>
 
-#include "platform_handle.h"
-#include "platform_semaphore.h"
 #include "src/graphics/lib/magma/tests/helper/platform_msd_device_helper.h"
 
 std::unique_ptr<MsdMockBufferManager> g_bufmgr;

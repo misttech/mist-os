@@ -12,8 +12,8 @@ fuchsia_driver("msd_intel-driver") {
 
   deps = [
     ":msd_intel_entry",
-    "$magma_build_root/src/magma_util/platform:logger_for_system_drivers",
     "src",
+    "//src/graphics/magma/lib/magma/platform:logger_for_system_drivers",
   ]
 
   assert_no_deps = [ "//zircon/system/ulib/trace-engine:trace-engine-static" ]
@@ -34,8 +34,8 @@ fuchsia_driver("msd_intel_test-driver") {
 
   deps = [
     ":msd_intel_test_entry",
-    "$magma_build_root/src/magma_util/platform:logger_for_system_drivers",
     "src",
+    "//src/graphics/magma/lib/magma/platform:logger_for_system_drivers",
   ]
 
   assert_no_deps = [ "//zircon/system/ulib/trace-engine:trace-engine-static" ]
@@ -71,8 +71,8 @@ source_set("msd_intel_entry") {
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
     "//src/devices/lib/driver",
     "//src/graphics/lib/magma/src/magma_util:macros",
-    "//src/graphics/lib/magma/src/magma_util/platform:trace",
-    "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
+    "//src/graphics/magma/lib/magma/platform:trace",
+    "//src/graphics/magma/lib/magma/platform/zircon:status",
     "//src/graphics/magma/lib/magma_service/sys_driver",
     "//src/graphics/magma/lib/magma_service/sys_driver/dfv1:device_impl",
     "//src/lib/ddk",
@@ -96,8 +96,8 @@ source_set("msd_intel_test_entry") {
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
     "//src/devices/lib/driver",
     "//src/graphics/lib/magma/src/magma_util:macros",
-    "//src/graphics/lib/magma/src/magma_util/platform:trace",
-    "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
+    "//src/graphics/magma/lib/magma/platform:trace",
+    "//src/graphics/magma/lib/magma/platform/zircon:status",
     "//src/graphics/magma/lib/magma_service/sys_driver",
     "//src/graphics/magma/lib/magma_service/sys_driver/dfv1:device_impl",
     "//src/lib/ddk",
@@ -108,9 +108,9 @@ source_set("msd_intel_test_entry") {
   ]
   deps += [
     "tests/unit_tests:hardware_tests",
-    "//src/graphics/lib/magma/src/magma_util/platform/zircon:pci_driver_gtest",
     "//src/graphics/lib/magma/tests/msd_conformance_tests",
     "//src/graphics/lib/magma/tests/unit_tests:magma_platform_pci_device_tests",
+    "//src/graphics/magma/lib/magma/platform/zircon:pci_driver_gtest",
   ]
 }
 

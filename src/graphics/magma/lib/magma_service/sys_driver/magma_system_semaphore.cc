@@ -4,8 +4,9 @@
 
 #include "magma_system_semaphore.h"
 
+#include <lib/magma/platform/platform_object.h>
+
 #include "magma_util/macros.h"
-#include "platform_object.h"
 
 namespace msd {
 MagmaSystemSemaphore::MagmaSystemSemaphore(uint64_t global_id,

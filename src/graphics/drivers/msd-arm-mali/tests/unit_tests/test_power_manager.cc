@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma/platform/platform_buffer.h>
 #include <zircon/compiler.h>
 
 #include <iterator>
@@ -9,7 +10,6 @@
 #include <gtest/gtest.h>
 
 #include "mock/mock_mmio.h"
-#include "platform_buffer.h"
 #include "src/graphics/drivers/msd-arm-mali/src/power_manager.h"
 #include "src/graphics/drivers/msd-arm-mali/src/registers.h"
 

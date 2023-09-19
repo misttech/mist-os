@@ -4,8 +4,9 @@
 
 #include "src/graphics/drivers/msd-arm-mali/src/power_manager.h"
 
-#include "platform_buffer.h"
-#include "platform_trace.h"
+#include <lib/magma/platform/platform_buffer.h>
+#include <lib/magma/platform/platform_trace.h>
+
 #include "src/graphics/drivers/msd-arm-mali/src/registers.h"
 
 namespace {

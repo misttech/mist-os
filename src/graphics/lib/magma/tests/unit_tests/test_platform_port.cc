@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma/platform/platform_handle.h>
+#include <lib/magma/platform/platform_port.h>
+#include <lib/magma/platform/platform_semaphore.h>
+
 #include <chrono>
 #include <thread>
 
@@ -9,9 +13,6 @@
 
 #include "magma_util/dlog.h"
 #include "magma_util/short_macros.h"
-#include "platform_handle.h"
-#include "platform_port.h"
-#include "platform_semaphore.h"
 
 #ifdef __Fuchsia__
 #include <lib/zx/channel.h>

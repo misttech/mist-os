@@ -15,13 +15,13 @@ source_set("sys_driver") {
     "$magma_build_root/include:magma",
     "$magma_build_root/src/magma_util:macros",
     "$magma_build_root/src/magma_util:status",
-    "$magma_build_root/src/magma_util/platform:buffer",
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
     "//sdk/lib/fit",
     "//sdk/lib/stdcompat",
-    "//src/graphics/lib/magma/src/magma_util/platform:trace",
-    "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
     "//src/graphics/magma:msd",
+    "//src/graphics/magma/lib/magma/platform:buffer",
+    "//src/graphics/magma/lib/magma/platform:trace",
+    "//src/graphics/magma/lib/magma/platform/zircon:status",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 
@@ -41,8 +41,8 @@ source_set("sys_driver") {
   ]
 
   deps = [
-    "$magma_build_root/src/magma_util/platform:object",
-    "$magma_build_root/src/magma_util/platform:trace",
+    "//src/graphics/magma/lib/magma/platform:object",
+    "//src/graphics/magma/lib/magma/platform:trace",
   ]
 }
 
@@ -64,9 +64,9 @@ source_set("magma_driver_base") {
     "//sdk/lib/driver/devfs/cpp",
     "//sdk/lib/inspect/component/cpp:inspect_component_cpp",
     "//src/graphics/lib/magma/src/magma_util:macros",
-    "//src/graphics/lib/magma/src/magma_util/platform:logger",
-    "//src/graphics/lib/magma/src/magma_util/platform/zircon:logger_for_dfv2",
-    "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
+    "//src/graphics/magma/lib/magma/platform:logger",
+    "//src/graphics/magma/lib/magma/platform/zircon:logger_for_dfv2",
+    "//src/graphics/magma/lib/magma/platform/zircon:status",
     "//zircon/system/ulib/zx",
   ]
 }

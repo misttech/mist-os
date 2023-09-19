@@ -48,11 +48,11 @@ source_set("common_non_hardware_tests") {
     "//src/devices/testing/fake-resource",
     "//src/graphics/drivers/msd-arm-mali/src",
     "//src/graphics/lib/magma/src/magma_util:registers",
-    "//src/graphics/lib/magma/src/magma_util/platform:buffer",
-    "//src/graphics/lib/magma/src/magma_util/platform:port",
     "//src/graphics/lib/magma/tests/helper:msd_stubs",
     "//src/graphics/lib/magma/tests/mock:bus_mapper",
     "//src/graphics/lib/magma/tests/mock:mmio",
+    "//src/graphics/magma/lib/magma/platform:buffer",
+    "//src/graphics/magma/lib/magma/platform:port",
     "//third_party/googletest:gtest",
   ]
 }
@@ -90,7 +90,7 @@ executable("msd_arm_mali_dfv2_tests") {
     "//src/devices/testing/fake-resource",
     "//src/graphics/drivers/msd-arm-mali:msd_arm_entry_dfv2",
     "//src/graphics/drivers/msd-arm-mali/src",
-    "//src/graphics/lib/magma/src/magma_util/platform/zircon:logger_for_dfv2",
+    "//src/graphics/magma/lib/magma/platform/zircon:logger_for_dfv2",
     "//src/lib/fxl/test:gtest_main",
   ]
 }
@@ -116,11 +116,11 @@ group("test_deps") {
     "//src/graphics/drivers/msd-arm-mali/src",
     "//src/graphics/lib/magma/src/magma_util:macros",
     "//src/graphics/lib/magma/src/magma_util:registers",
-    "//src/graphics/lib/magma/src/magma_util/platform:port",
-    "//src/graphics/lib/magma/src/magma_util/platform:semaphore",
     "//src/graphics/lib/magma/tests/helper:platform_msd_device_helper",
     "//src/graphics/lib/magma/tests/mock:mmio",
     "//src/graphics/magma:msd",
+    "//src/graphics/magma/lib/magma/platform:port",
+    "//src/graphics/magma/lib/magma/platform:semaphore",
     "//src/graphics/magma/lib/magma_service/sys_driver",
     "//third_party/googletest:gtest",
   ]

@@ -9,7 +9,7 @@ source_set("platform_device_helper") {
 
   public_deps = [
     "$magma_build_root/src/magma_util:macros",
-    "$magma_build_root/src/magma_util/platform:device",
+    "//src/graphics/magma/lib/magma/platform:device",
   ]
 
   sources = [ "platform_device_helper.h" ]
@@ -20,7 +20,7 @@ source_set("platform_pci_device_helper") {
 
   public_deps = [
     "$magma_build_root/src/magma_util:macros",
-    "$magma_build_root/src/magma_util/platform:device",
+    "//src/graphics/magma/lib/magma/platform:device",
   ]
 
   sources = [ "platform_pci_device_helper.h" ]
@@ -39,8 +39,8 @@ source_set("command_buffer_helper_cpp") {
 
   public_deps = [
     ":platform_msd_device_helper",
-    "$magma_build_root/src/magma_util/platform:device",
-    "//src/graphics/lib/magma/src/magma_util/platform:semaphore",
+    "//src/graphics/magma/lib/magma/platform:device",
+    "//src/graphics/magma/lib/magma/platform:semaphore",
     "//src/graphics/magma/lib/magma_service/sys_driver",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
@@ -75,10 +75,10 @@ source_set("logger_init_helper") {
   testonly = true
   sources = [ "logger_init_helper.cc" ]
   deps = [
-    "$magma_build_root/src/magma_util/platform:handle",
-    "$magma_build_root/src/magma_util/platform:logger_impl",
-    "$magma_build_root/src/magma_util/platform:logger_provider_header",
     "//sdk/lib/fdio",
+    "//src/graphics/magma/lib/magma/platform:handle",
+    "//src/graphics/magma/lib/magma/platform:logger_impl",
+    "//src/graphics/magma/lib/magma/platform:logger_provider_header",
     "//zircon/system/ulib/zx",
   ]
 }

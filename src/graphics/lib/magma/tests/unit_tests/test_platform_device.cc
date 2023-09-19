@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma/platform/platform_device.h>
+#include <lib/magma/platform/platform_thread.h>
+
 #include <chrono>
 #include <thread>
 
@@ -9,8 +12,6 @@
 
 #include "helper/platform_device_helper.h"
 #include "magma_util/short_macros.h"
-#include "platform_device.h"
-#include "platform_thread.h"
 
 using std::chrono_literals::operator""ms;
 

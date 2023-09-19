@@ -5,10 +5,11 @@
 #ifndef REGISTER_IO_H
 #define REGISTER_IO_H
 
+#include <lib/magma/platform/platform_mmio.h>
+
 #include <memory>
 
 #include "magma_util/macros.h"
-#include "platform_mmio.h"
 
 namespace magma {
 

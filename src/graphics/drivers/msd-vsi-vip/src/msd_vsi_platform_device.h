@@ -5,7 +5,7 @@
 #ifndef MSD_VSI_PLATFORM_DEVICE_H
 #define MSD_VSI_PLATFORM_DEVICE_H
 
-#include <platform_device.h>
+#include <lib/magma/platform/platform_device.h>
 
 #include <optional>
 

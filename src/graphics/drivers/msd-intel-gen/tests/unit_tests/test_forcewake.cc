@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma/platform/platform_mmio.h>
+
 #include <gtest/gtest.h>
 
 #include "device_id.h"
 #include "forcewake.h"
 #include "mock/mock_mmio.h"
 #include "msd_intel_device.h"
-#include "platform_mmio.h"
 #include "registers.h"
 
 namespace {

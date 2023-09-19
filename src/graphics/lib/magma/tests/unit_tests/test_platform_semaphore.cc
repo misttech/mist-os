@@ -7,6 +7,8 @@
 #include <lib/zx/vmo.h>
 #endif
 
+#include <lib/magma/platform/platform_semaphore.h>
+
 #include <chrono>
 #include <thread>
 
@@ -14,7 +16,6 @@
 
 #include "magma_util/dlog.h"
 #include "magma_util/short_macros.h"
-#include "platform_semaphore.h"
 
 namespace {
 

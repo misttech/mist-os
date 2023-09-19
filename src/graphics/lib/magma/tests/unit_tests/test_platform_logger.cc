@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <platform_logger.h>
-#include <platform_logger_provider.h>
+#include <lib/magma/platform/platform_logger.h>
+#include <lib/magma/platform/platform_logger_provider.h>
 #include <string.h>
 
 #include <gtest/gtest.h>

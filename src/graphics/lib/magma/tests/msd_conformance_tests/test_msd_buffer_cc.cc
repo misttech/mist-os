@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma/platform/platform_buffer.h>
 #include <lib/magma_service/msd.h>
 
 #include <gtest/gtest.h>
@@ -9,7 +10,6 @@
 #include "helper/platform_msd_device_helper.h"
 #include "magma_util/dlog.h"
 #include "magma_util/short_macros.h"
-#include "platform_buffer.h"
 
 namespace {
 

@@ -5,6 +5,8 @@
 #ifndef MSD_VSI_DEVICE_H
 #define MSD_VSI_DEVICE_H
 
+#include <lib/magma/platform/platform_bus_mapper.h>
+#include <lib/magma/platform/platform_semaphore.h>
 #include <lib/magma_service/msd.h>
 
 #include <list>
@@ -25,8 +27,6 @@
 #include "msd_vsi_platform_device.h"
 #include "page_table_arrays.h"
 #include "page_table_slot_allocator.h"
-#include "platform_bus_mapper.h"
-#include "platform_semaphore.h"
 #include "ringbuffer.h"
 #include "sequencer.h"
 

@@ -4,12 +4,13 @@
 
 #include "forcewake.h"
 
+#include <lib/magma/platform/platform_trace.h>
+
 #include <thread>
 
 #include "magma_util/dlog.h"
 #include "magma_util/short_macros.h"
 #include "msd_intel_register_io.h"
-#include "platform_trace.h"
 
 ForceWake::ForceWake(MsdIntelRegisterIo* register_io, uint32_t device_id) {
   status_render_ = registers::ForceWakeStatus::GetRender(register_io);

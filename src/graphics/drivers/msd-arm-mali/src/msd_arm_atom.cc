@@ -4,8 +4,9 @@
 
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_atom.h"
 
+#include <lib/magma/platform/platform_trace.h>
+
 #include "magma_util/short_macros.h"
-#include "platform_trace.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_connection.h"
 #include "string_printf.h"
 

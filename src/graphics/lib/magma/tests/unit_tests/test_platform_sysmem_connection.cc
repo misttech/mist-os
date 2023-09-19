@@ -4,14 +4,13 @@
 
 #include <lib/fdio/directory.h>
 #include <lib/magma/magma_sysmem.h>
+#include <lib/magma/platform/platform_handle.h>
+#include <lib/magma/platform/platform_sysmem_connection.h>
 #include <lib/zx/channel.h>
 
 #include <array>
 
 #include <gtest/gtest.h>
-
-#include "platform_handle.h"
-#include "platform_sysmem_connection.h"
 
 class TestPlatformSysmemConnection {
  public:

@@ -5,11 +5,12 @@
 #ifndef SRC_GRAPHICS_DRIVERS_MSD_VSI_VIP_SRC_PAGE_TABLE_ARRAYS_H_
 #define SRC_GRAPHICS_DRIVERS_MSD_VSI_VIP_SRC_PAGE_TABLE_ARRAYS_H_
 
+#include <lib/magma/platform/platform_buffer.h>
+#include <lib/magma/platform/platform_bus_mapper.h>
+
 #include "address_space.h"
 #include "magma_util/register_io.h"
 #include "magma_util/short_macros.h"
-#include "platform_buffer.h"
-#include "platform_bus_mapper.h"
 #include "registers.h"
 
 class PageTableArrays {

@@ -52,9 +52,9 @@ executable("magma_conformance_tests") {
       "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
       "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_cpp_wire",
       "//sdk/lib/fdio",
-      "//src/graphics/lib/magma/src/magma_util/platform:logger",
-      "//src/graphics/lib/magma/src/magma_util/platform:logger_provider_header",
-      "//src/graphics/lib/magma/src/magma_util/platform:trace_provider",
+      "//src/graphics/magma/lib/magma/platform:logger",
+      "//src/graphics/magma/lib/magma/platform:logger_provider_header",
+      "//src/graphics/magma/lib/magma/platform:trace_provider",
       "//zircon/system/ulib/async-loop:async-loop-cpp",
     ]
   }
@@ -90,9 +90,9 @@ executable("magma_conformance_tests_hermetic") {
       "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
       "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_cpp_wire",
       "//sdk/lib/fdio",
-      "//src/graphics/lib/magma/src/magma_util/platform:logger",
-      "//src/graphics/lib/magma/src/magma_util/platform:logger_provider_header",
-      "//src/graphics/lib/magma/src/magma_util/platform:trace_provider",
+      "//src/graphics/magma/lib/magma/platform:logger",
+      "//src/graphics/magma/lib/magma/platform:logger_provider_header",
+      "//src/graphics/magma/lib/magma/platform:trace_provider",
       "//zircon/system/ulib/async-loop:async-loop-cpp",
     ]
   }

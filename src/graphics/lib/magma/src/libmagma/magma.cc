@@ -4,6 +4,17 @@
 
 #include <lib/magma/magma.h>
 #include <lib/magma/magma_common_defs.h>
+#include <lib/magma/platform/platform_connection_client.h>
+#include <lib/magma/platform/platform_device_client.h>
+#include <lib/magma/platform/platform_handle.h>
+#include <lib/magma/platform/platform_logger.h>
+#include <lib/magma/platform/platform_logger_provider.h>
+#include <lib/magma/platform/platform_object.h>
+#include <lib/magma/platform/platform_port.h>
+#include <lib/magma/platform/platform_semaphore.h>
+#include <lib/magma/platform/platform_thread.h>
+#include <lib/magma/platform/platform_trace.h>
+#include <lib/magma/platform/platform_trace_provider.h>
 
 #include <atomic>
 #include <chrono>
@@ -12,17 +23,6 @@
 #include "magma_util/macros.h"
 #include "magma_util/short_macros.h"
 #include "magma_util/utils.h"
-#include "platform_connection_client.h"
-#include "platform_device_client.h"
-#include "platform_handle.h"
-#include "platform_logger.h"
-#include "platform_logger_provider.h"
-#include "platform_object.h"
-#include "platform_port.h"
-#include "platform_semaphore.h"
-#include "platform_thread.h"
-#include "platform_trace.h"
-#include "platform_trace_provider.h"
 
 namespace {
 

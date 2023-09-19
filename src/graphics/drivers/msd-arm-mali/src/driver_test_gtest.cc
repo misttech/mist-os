@@ -4,12 +4,13 @@
 
 #define MAGMA_DLOG_ENABLE 1
 
+#include <lib/magma/platform/platform_logger.h>
+
 #include <gtest/gtest.h>
 
 #include "helper/platform_msd_device_helper.h"
 #include "magma_util/dlog.h"
 #include "parent_device.h"
-#include "platform_logger.h"
 
 namespace {
 ParentDevice* test_device_s;

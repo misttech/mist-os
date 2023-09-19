@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 #ifndef SRC_GRAPHICS_LIB_MAGMA_TESTS_UNIT_TESTS_TEST_PLATFORM_BUS_MAPPER_CASES_H_
 #define SRC_GRAPHICS_LIB_MAGMA_TESTS_UNIT_TESTS_TEST_PLATFORM_BUS_MAPPER_CASES_H_
+#include <lib/magma/platform/platform_bus_mapper.h>
+
 #include <vector>
 
 #include <gtest/gtest.h>
 
 #include "helper/platform_device_helper.h"
 #include "magma_util/utils.h"
-#include "platform_bus_mapper.h"
 
 class TestPlatformBusMapperCases {
  public:

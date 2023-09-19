@@ -5,6 +5,8 @@
 #ifndef MSD_INTEL_DEVICE_H
 #define MSD_INTEL_DEVICE_H
 
+#include <lib/magma/platform/platform_semaphore.h>
+#include <lib/magma/platform/platform_trace.h>
 #include <lib/magma_service/msd.h>
 
 #include <array>
@@ -23,8 +25,6 @@
 #include "msd_intel_context.h"
 #include "msd_intel_pci_device.h"
 #include "msd_intel_register_io.h"
-#include "platform_semaphore.h"
-#include "platform_trace.h"
 #include "render_command_streamer.h"
 #include "sequencer.h"
 #include "video_command_streamer.h"

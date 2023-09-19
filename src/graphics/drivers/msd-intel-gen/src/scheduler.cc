@@ -4,9 +4,10 @@
 
 #include "scheduler.h"
 
+#include <lib/magma/platform/platform_trace.h>
+
 #include "msd_intel_connection.h"
 #include "msd_intel_context.h"
-#include "platform_trace.h"
 
 class FifoScheduler : public Scheduler {
  public:

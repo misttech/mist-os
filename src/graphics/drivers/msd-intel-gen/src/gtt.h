@@ -5,11 +5,12 @@
 #ifndef GTT_H
 #define GTT_H
 
+#include <lib/magma/platform/platform_pci_device.h>
+
 #include <memory>
 #include <mutex>
 
 #include "address_space.h"
-#include "platform_pci_device.h"
 
 class Gtt : public AddressSpace {
  public:

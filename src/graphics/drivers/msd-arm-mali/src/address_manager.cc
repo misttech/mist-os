@@ -4,11 +4,12 @@
 
 #include "src/graphics/drivers/msd-arm-mali/src/address_manager.h"
 
+#include <lib/magma/platform/platform_barriers.h>
+#include <lib/magma/platform/platform_logger.h>
+
 #include <chrono>
 #include <thread>
 
-#include "platform_barriers.h"
-#include "platform_logger.h"
 #include "src/graphics/drivers/msd-arm-mali/src/address_space.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_connection.h"
 

@@ -6,12 +6,12 @@
 
 #include <lib/async/cpp/task.h>
 #include <lib/magma/magma_common_defs.h>
+#include <lib/magma/platform/platform_trace.h>
+#include <lib/magma/platform/zircon/zircon_platform_status.h>
 
 #include <optional>
 
 #include "fidl/fuchsia.gpu.magma/cpp/wire_types.h"
-#include "platform_trace.h"
-#include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
 
 namespace {
 std::optional<fuchsia_gpu_magma::ObjectType> ValidateObjectType(

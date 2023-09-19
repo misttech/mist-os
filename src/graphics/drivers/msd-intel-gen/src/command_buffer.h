@@ -5,6 +5,7 @@
 #ifndef COMMAND_BUFFER_H
 #define COMMAND_BUFFER_H
 
+#include <lib/magma/platform/platform_semaphore.h>
 #include <lib/magma_service/msd.h>
 
 #include <memory>
@@ -12,7 +13,6 @@
 
 #include "mapped_batch.h"
 #include "msd_intel_buffer.h"
-#include "platform_semaphore.h"
 
 class AddressSpace;
 class MsdIntelContext;

@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_THREAD_H_
 #define SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_THREAD_H_
 
-#include "platform_thread.h"
+#include <lib/magma/platform/platform_thread.h>
 
 namespace magma {
 

@@ -5,10 +5,9 @@
 #include "parent_device_dfv1.h"
 
 #include <lib/ddk/driver.h>
-
-#include "src/graphics/lib/magma/src/magma_util/platform/platform_thread.h"
-#include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_interrupt.h"
-#include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_mmio.h"
+#include <lib/magma/platform/platform_thread.h>
+#include <lib/magma/platform/zircon/zircon_platform_interrupt.h>
+#include <lib/magma/platform/zircon/zircon_platform_mmio.h>
 
 msd::DeviceHandle* ZxDeviceToDeviceHandle(zx_device_t* device) {
   return reinterpret_cast<msd::DeviceHandle*>(device);

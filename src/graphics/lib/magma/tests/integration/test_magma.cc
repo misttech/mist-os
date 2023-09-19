@@ -17,6 +17,9 @@
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/magma/magma_sysmem.h>
+#include <lib/magma/platform/platform_logger.h>
+#include <lib/magma/platform/platform_logger_provider.h>
+#include <lib/magma/platform/platform_trace_provider.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/vmar.h>
 
@@ -26,9 +29,6 @@
 #include "fidl/fuchsia.logger/cpp/wire.h"
 #include "fidl/fuchsia.tracing.provider/cpp/wire.h"
 #include "fuchsia/sysmem/cpp/fidl.h"
-#include "platform_logger.h"
-#include "platform_logger_provider.h"
-#include "platform_trace_provider.h"
 #endif
 
 #if defined(__linux__)

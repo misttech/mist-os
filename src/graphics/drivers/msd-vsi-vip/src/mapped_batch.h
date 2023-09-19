@@ -5,10 +5,11 @@
 #ifndef MAPPED_BATCH_H
 #define MAPPED_BATCH_H
 
+#include <lib/magma/platform/platform_buffer.h>
+#include <lib/magma/platform/platform_semaphore.h>
+
 #include "gpu_mapping.h"
 #include "magma_util/mapped_batch.h"
-#include "platform_buffer.h"
-#include "platform_semaphore.h"
 
 class MsdVsiContext;
 

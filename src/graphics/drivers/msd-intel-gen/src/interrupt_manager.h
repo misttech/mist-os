@@ -5,11 +5,12 @@
 #ifndef INTERRUPT_MANAGER_H
 #define INTERRUPT_MANAGER_H
 
+#include <lib/magma/platform/platform_interrupt.h>
+#include <lib/magma/platform/platform_pci_device.h>
+
 #include <type_traits>
 
 #include "msd_intel_register_io.h"
-#include "platform_interrupt.h"
-#include "platform_pci_device.h"
 
 class InterruptManager {
  public:

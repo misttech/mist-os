@@ -52,9 +52,9 @@ source_set("device_impl") {
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
     "//src/devices/lib/driver",
     "//src/graphics/lib/magma/src/magma_util:macros",
-    "//src/graphics/lib/magma/src/magma_util/platform:thread",
-    "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
-    "//src/graphics/lib/magma/src/magma_util/platform/zircon:thread_profile",
+    "//src/graphics/magma/lib/magma/platform:thread",
+    "//src/graphics/magma/lib/magma/platform/zircon:status",
+    "//src/graphics/magma/lib/magma/platform/zircon:thread_profile",
     "//src/lib/ddk",
     "//src/lib/ddktl",
   ]

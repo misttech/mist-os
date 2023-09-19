@@ -5,9 +5,9 @@
 #ifndef MOCK_MMIO_H
 #define MOCK_MMIO_H
 
-#include <memory>
+#include <lib/magma/platform/platform_mmio.h>
 
-#include "platform_mmio.h"
+#include <memory>
 
 class MockMmio : public magma::PlatformMmio {
  public:

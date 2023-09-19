@@ -12,6 +12,8 @@
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/fit/thread_safety.h>
 #include <lib/inspect/component/cpp/service.h>
+#include <lib/magma/platform/zircon/zircon_platform_logger_dfv2.h>
+#include <lib/magma/platform/zircon/zircon_platform_status.h>
 #include <threads.h>
 #include <zircon/threads.h>
 
@@ -19,8 +21,6 @@
 #include "magma_system_device.h"
 #include "magma_util/macros.h"
 #include "performance_counters_server.h"
-#include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_logger_dfv2.h"
-#include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
 
 namespace msd {
 

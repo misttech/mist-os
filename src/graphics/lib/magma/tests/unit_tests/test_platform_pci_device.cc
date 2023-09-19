@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma/platform/platform_pci_device.h>
+
 #include <thread>
 
 #include <gtest/gtest.h>
 
 #include "helper/platform_pci_device_helper.h"
 #include "magma_util/short_macros.h"
-#include "platform_pci_device.h"
 
 TEST(PlatformPciDevice, Basic) {
   magma::PlatformPciDevice* platform_device = TestPlatformPciDevice::GetInstance();

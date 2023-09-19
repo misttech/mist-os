@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma/platform/platform_semaphore.h>
 #include <lib/magma_service/sys_driver/magma_system_connection.h>
 #include <lib/magma_service/sys_driver/magma_system_context.h>
 #include <lib/magma_service/sys_driver/magma_system_device.h>
@@ -13,7 +14,6 @@
 #include "helper/platform_msd_device_helper.h"
 #include "magma_util/short_macros.h"
 #include "src/graphics/drivers/msd-arm-mali/include/magma_arm_mali_types.h"
-#include "src/graphics/lib/magma/src/magma_util/platform/platform_semaphore.h"
 
 namespace {
 

@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_GPU_MAPPING_H
 #define SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_GPU_MAPPING_H
 
-#include <platform_bus_mapper.h>
+#include <lib/magma/platform/platform_bus_mapper.h>
 
 #include <memory>
 #include <vector>

@@ -4,9 +4,9 @@
 #ifndef SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_PLATFORM_DEVICE_HELPER_H_
 #define SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_PLATFORM_DEVICE_HELPER_H_
 
-#include <memory>
+#include <lib/magma/platform/platform_device.h>
 
-#include "platform_device.h"
+#include <memory>
 
 class TestPlatformDevice {
  public:

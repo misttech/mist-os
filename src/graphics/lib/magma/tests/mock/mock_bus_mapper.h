@@ -5,9 +5,9 @@
 #ifndef MOCK_BUS_MAPPER_H
 #define MOCK_BUS_MAPPER_H
 
-#include <vector>
+#include <lib/magma/platform/platform_bus_mapper.h>
 
-#include "platform_bus_mapper.h"
+#include <vector>
 
 class MockBusMapper;
 class MockConsistentBusMapper;

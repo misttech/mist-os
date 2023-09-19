@@ -239,15 +239,15 @@ config("fidl-wire-deprecated-mutable-tables") {
 
     #------------------
     #------------------
-    "//src/graphics/lib/magma/src/magma_util/platform/zircon:entry",
+    "//src/graphics/magma/lib/magma/platform/zircon:entry",
 
     #------------------
     #------------------
-    "//src/graphics/lib/magma/src/magma_util/platform/zircon:entry_test",
+    "//src/graphics/magma/lib/magma/platform/zircon:entry_test",
 
     #------------------
     #------------------
-    "//src/graphics/lib/magma/src/magma_util/platform/zircon:sysmem_connection",
+    "//src/graphics/magma/lib/magma/platform/zircon:sysmem_connection",
 
     #------------------
     #------------------

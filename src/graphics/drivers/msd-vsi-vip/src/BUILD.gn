@@ -49,18 +49,18 @@ source_set("src") {
     "//src/graphics/lib/magma/src/magma_util:registers",
     "//src/graphics/lib/magma/src/magma_util:ringbuffer",
     "//src/graphics/lib/magma/src/magma_util:thread",
-    "//src/graphics/lib/magma/src/magma_util/platform:barriers",
-    "//src/graphics/lib/magma/src/magma_util/platform:buffer",
-    "//src/graphics/lib/magma/src/magma_util/platform:bus_mapper",
-    "//src/graphics/lib/magma/src/magma_util/platform:device",
-    "//src/graphics/lib/magma/src/magma_util/platform:event",
-    "//src/graphics/lib/magma/src/magma_util/platform:logger",
-    "//src/graphics/lib/magma/src/magma_util/platform:semaphore",
-    "//src/graphics/lib/magma/src/magma_util/platform:thread",
+    "//src/graphics/magma/lib/magma/platform:barriers",
+    "//src/graphics/magma/lib/magma/platform:buffer",
+    "//src/graphics/magma/lib/magma/platform:bus_mapper",
+    "//src/graphics/magma/lib/magma/platform:device",
+    "//src/graphics/magma/lib/magma/platform:event",
+    "//src/graphics/magma/lib/magma/platform:logger",
+    "//src/graphics/magma/lib/magma/platform:semaphore",
+    "//src/graphics/magma/lib/magma/platform:thread",
     "//zircon/system/ulib/fbl",
   ]
   if (is_fuchsia) {
-    deps += [ "//src/graphics/lib/magma/src/magma_util/platform/zircon:device" ]
+    deps += [ "//src/graphics/magma/lib/magma/platform/zircon:device" ]
   }
   friend = [
     "../tests/mock:*",

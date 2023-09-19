@@ -71,7 +71,6 @@ group("test_deps") {
     "$magma_build_root/src/magma_util:address_space",
     "$magma_build_root/src/magma_util:macros",
     "$magma_build_root/src/magma_util:registers",
-    "$magma_build_root/src/magma_util/platform:semaphore",
     "$magma_build_root/tests/helper:command_buffer_helper_cpp",
     "$magma_build_root/tests/helper:platform_pci_device_helper",
     "$magma_build_root/tests/mock:address_space",
@@ -82,6 +81,7 @@ group("test_deps") {
     "//src/graphics/drivers/msd-intel-gen/src",
     "//src/graphics/drivers/msd-intel-gen/tests/mock",
     "//src/graphics/magma:msd",
+    "//src/graphics/magma/lib/magma/platform:semaphore",
     "//third_party/googletest:gtest",
   ]
 }

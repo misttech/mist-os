@@ -5,8 +5,8 @@
 #ifndef SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_ACCESSOR_H_
 #define SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_ACCESSOR_H_
 
-#include <platform_buffer.h>
-#include <platform_bus_mapper.h>
+#include <lib/magma/platform/platform_buffer.h>
+#include <lib/magma/platform/platform_bus_mapper.h>
 
 namespace magma {
 

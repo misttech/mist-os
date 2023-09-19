@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma/platform/platform_port.h>
+
 #include <thread>
 #include <utility>
 #include <vector>
@@ -10,7 +12,6 @@
 
 #include "driver_logger_harness.h"
 #include "mock/mock_bus_mapper.h"
-#include "platform_port.h"
 #include "src/graphics/drivers/msd-arm-mali/src/job_scheduler.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_connection.h"
 #include "src/graphics/drivers/msd-arm-mali/tests/unit_tests/fake_connection_owner_base.h"

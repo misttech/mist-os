@@ -4,13 +4,14 @@
 
 #include "command_buffer.h"
 
+#include <lib/magma/platform/platform_trace.h>
+
 #include "address_space.h"
 #include "instructions.h"
 #include "magma_intel_gen_defs.h"
 #include "msd_intel_connection.h"
 #include "msd_intel_context.h"
 #include "msd_intel_semaphore.h"
-#include "platform_trace.h"
 
 std::unique_ptr<CommandBuffer> CommandBuffer::Create(std::weak_ptr<MsdIntelContext> context,
                                                      msd::magma_command_buffer* cmd_buf,

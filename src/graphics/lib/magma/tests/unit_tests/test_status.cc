@@ -7,7 +7,7 @@
 #include "magma_util/status.h"
 
 #if defined(__Fuchsia__)
-#include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
+#include <lib/magma/platform/zircon/zircon_platform_status.h>
 #endif
 
 class TestStatus {

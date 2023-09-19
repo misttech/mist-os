@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma/platform/platform_buffer.h>
+#include <lib/magma/platform/platform_handle.h>
 #include <unistd.h>
 
 #include <gtest/gtest.h>
-
-#include "platform_buffer.h"
-#include "platform_handle.h"
 
 class TestPlatformHandle {
  public:

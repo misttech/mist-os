@@ -17,7 +17,7 @@ fuchsia_driver("msd_arm-driver") {
   deps = [
     ":msd_arm_entry",
     "src",
-    "//src/graphics/lib/magma/src/magma_util/platform:logger_for_system_drivers",
+    "//src/graphics/magma/lib/magma/platform:logger_for_system_drivers",
   ]
 }
 
@@ -53,8 +53,8 @@ fuchsia_driver("msd_arm_test-driver") {
     ":msd_arm_test_entry",
     "src",
     "tests/unit_tests:tests_requiring_hardware",
-    "//src/graphics/lib/magma/src/magma_util/platform:logger_for_system_drivers",
     "//src/graphics/lib/magma/tests/msd_conformance_tests",
+    "//src/graphics/magma/lib/magma/platform:logger_for_system_drivers",
   ]
 }
 
@@ -96,11 +96,11 @@ dfv2_entry_deps = [
   "//sdk/fidl/fuchsia.hardware.gpu.mali:fuchsia.hardware.gpu.mali_cpp_wire",
   "//sdk/lib/driver/devfs/cpp",
   "//src/graphics/lib/magma/src/magma_util:macros",
-  "//src/graphics/lib/magma/src/magma_util/platform:bus_mapper",
-  "//src/graphics/lib/magma/src/magma_util/platform:logger",
-  "//src/graphics/lib/magma/src/magma_util/platform:trace",
-  "//src/graphics/lib/magma/src/magma_util/platform/zircon:logger_for_dfv2",
-  "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
+  "//src/graphics/magma/lib/magma/platform:bus_mapper",
+  "//src/graphics/magma/lib/magma/platform:logger",
+  "//src/graphics/magma/lib/magma/platform:trace",
+  "//src/graphics/magma/lib/magma/platform/zircon:logger_for_dfv2",
+  "//src/graphics/magma/lib/magma/platform/zircon:status",
   "//src/graphics/magma/lib/magma_service/sys_driver",
   "//zircon/system/ulib/trace",
   "//zircon/system/ulib/trace-vthread",
@@ -199,11 +199,11 @@ entry_deps = [
   "//src/devices/bin/driver_runtime",
   "//src/devices/lib/driver",
   "//src/graphics/lib/magma/src/magma_util:macros",
-  "//src/graphics/lib/magma/src/magma_util/platform:bus_mapper",
-  "//src/graphics/lib/magma/src/magma_util/platform:logger",
-  "//src/graphics/lib/magma/src/magma_util/platform:trace",
-  "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
-  "//src/graphics/lib/magma/src/magma_util/platform/zircon:thread_profile",
+  "//src/graphics/magma/lib/magma/platform:bus_mapper",
+  "//src/graphics/magma/lib/magma/platform:logger",
+  "//src/graphics/magma/lib/magma/platform:trace",
+  "//src/graphics/magma/lib/magma/platform/zircon:status",
+  "//src/graphics/magma/lib/magma/platform/zircon:thread_profile",
   "//src/graphics/magma/lib/magma_service/sys_driver",
   "//src/graphics/magma/lib/magma_service/sys_driver/dfv1:device_impl",
   "//src/lib/ddk",

@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma/platform/platform_semaphore.h>
 #include <lib/magma_service/msd.h>
 
 #include <gtest/gtest.h>
 
 #include "helper/platform_msd_device_helper.h"
-#include "platform_semaphore.h"
 
 TEST(MsdSemaphore, ImportAndDestroy) {
   auto msd_driver = msd::Driver::Create();

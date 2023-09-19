@@ -4,6 +4,10 @@
 
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_connection.h"
 
+#include <lib/magma/platform/platform_barriers.h>
+#include <lib/magma/platform/platform_logger.h>
+#include <lib/magma/platform/platform_semaphore.h>
+#include <lib/magma/platform/platform_trace.h>
 #include <lib/magma_service/msd_defs.h>
 #include <zircon/compiler.h>
 
@@ -14,10 +18,6 @@
 #include "magma_util/dlog.h"
 #include "magma_util/short_macros.h"
 #include "magma_util/simple_allocator.h"
-#include "platform_barriers.h"
-#include "platform_logger.h"
-#include "platform_semaphore.h"
-#include "platform_trace.h"
 #include "src/graphics/drivers/msd-arm-mali/include/magma_arm_mali_types.h"
 #include "src/graphics/drivers/msd-arm-mali/src/address_space.h"
 #include "src/graphics/drivers/msd-arm-mali/src/gpu_mapping.h"

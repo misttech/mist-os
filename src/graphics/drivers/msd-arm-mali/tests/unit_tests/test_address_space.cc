@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma/platform/platform_mmio.h>
+
 #include <gtest/gtest.h>
 
 #include "driver_logger_harness.h"
 #include "mock/mock_bus_mapper.h"
 #include "mock/mock_mmio.h"
-#include "platform_mmio.h"
 #include "src/graphics/drivers/msd-arm-mali/src/address_manager.h"
 #include "src/graphics/drivers/msd-arm-mali/src/address_space.h"
 #include "src/graphics/drivers/msd-arm-mali/src/registers.h"

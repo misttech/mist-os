@@ -4,6 +4,8 @@
 
 #include "msd_intel_device.h"
 
+#include <lib/magma/platform/platform_trace.h>
+
 #include <bitset>
 #include <cstdio>
 #include <iterator>
@@ -18,7 +20,6 @@
 #include "magma_util/dlog.h"
 #include "magma_util/short_macros.h"
 #include "msd_intel_semaphore.h"
-#include "platform_trace.h"
 #include "registers.h"
 
 inline uint64_t get_current_time_ns() {

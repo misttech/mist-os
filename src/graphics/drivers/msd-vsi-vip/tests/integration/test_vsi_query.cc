@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/magma/magma.h>
+#include <lib/magma/platform/platform_buffer.h>
 
 #include <gtest/gtest.h>
 
@@ -10,7 +11,6 @@
 #include "magma_vendor_queries.h"
 #include "magma_vsi_vip_devices.h"
 #include "magma_vsi_vip_types.h"
-#include "platform_buffer.h"
 
 constexpr uint32_t kPageSize = 4096;
 constexpr uint32_t kSystemPageCount = 4;

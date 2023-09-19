@@ -27,23 +27,23 @@ static_library("libmagma_static") {
 
   deps = [
     "$magma_build_root/src/magma_util:short_macros",
-    "$magma_build_root/src/magma_util/platform:buffer",
-    "$magma_build_root/src/magma_util/platform:connection_client",
-    "$magma_build_root/src/magma_util/platform:device_client",
-    "$magma_build_root/src/magma_util/platform:handle",
-    "$magma_build_root/src/magma_util/platform:logger_impl",
-    "$magma_build_root/src/magma_util/platform:port",
-    "$magma_build_root/src/magma_util/platform:semaphore",
-    "$magma_build_root/src/magma_util/platform:thread",
-    "$magma_build_root/src/magma_util/platform:trace",
-    "$magma_build_root/src/magma_util/platform:trace_provider",
+    "//src/graphics/magma/lib/magma/platform:buffer",
+    "//src/graphics/magma/lib/magma/platform:connection_client",
+    "//src/graphics/magma/lib/magma/platform:device_client",
+    "//src/graphics/magma/lib/magma/platform:handle",
+    "//src/graphics/magma/lib/magma/platform:logger_impl",
+    "//src/graphics/magma/lib/magma/platform:port",
+    "//src/graphics/magma/lib/magma/platform:semaphore",
+    "//src/graphics/magma/lib/magma/platform:thread",
+    "//src/graphics/magma/lib/magma/platform:trace",
+    "//src/graphics/magma/lib/magma/platform:trace_provider",
     "//zircon/system/ulib/trace:trace-with-static-engine",
     "//zircon/system/ulib/trace-vthread:trace-vthread-with-static-engine",
   ]
 
   if (is_fuchsia) {
     sources += [ "magma_sysmem.cc" ]
-    deps += [ "$magma_build_root/src/magma_util/platform:sysmem_connection" ]
+    deps += [ "//src/graphics/magma/lib/magma/platform:sysmem_connection" ]
   }
 
   # Magma ICDs are only allowed to depend on (parts of) libc and libzircon, and no other shared libraries.

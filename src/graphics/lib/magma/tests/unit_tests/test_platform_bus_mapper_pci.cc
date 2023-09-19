@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma/platform/platform_bus_mapper.h>
+
 #include <vector>
 
 #include <gtest/gtest.h>
 
 #include "helper/platform_pci_device_helper.h"
-#include "platform_bus_mapper.h"
 #include "test_platform_bus_mapper_cases.h"
 
 TEST(PlatformPciDevice, BusMapperBasic) {

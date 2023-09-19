@@ -5,6 +5,8 @@
 #ifndef SRC_GRAPHICS_LIB_MAGMA_TESTS_MOCK_MOCK_MSD_H_
 #define SRC_GRAPHICS_LIB_MAGMA_TESTS_MOCK_MOCK_MSD_H_
 
+#include <lib/magma/platform/platform_buffer.h>
+#include <lib/magma/platform/platform_semaphore.h>
 #include <lib/magma_service/msd.h>
 #include <lib/magma_service/msd_defs.h>
 #include <lib/sync/cpp/completion.h>
@@ -14,8 +16,6 @@
 #include <vector>
 
 #include "magma_util/macros.h"
-#include "platform_buffer.h"
-#include "platform_semaphore.h"
 
 // These classes contain default implementations of msd_device_t functionality.
 // To override a specific function to contain test logic, inherit from the

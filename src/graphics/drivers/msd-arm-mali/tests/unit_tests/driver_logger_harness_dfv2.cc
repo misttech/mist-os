@@ -8,11 +8,11 @@
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
+#include <lib/magma/platform/zircon/zircon_platform_logger_dfv2.h>
 
 #include <gtest/gtest.h>
 
 #include "driver_logger_harness.h"
-#include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_logger_dfv2.h"
 
 DriverLoggerHarness::~DriverLoggerHarness() {}
 

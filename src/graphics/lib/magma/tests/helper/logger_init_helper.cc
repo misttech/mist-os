@@ -4,10 +4,10 @@
 
 #include <assert.h>
 #include <lib/fdio/directory.h>
+#include <lib/magma/platform/platform_handle.h>
+#include <lib/magma/platform/platform_logger.h>
+#include <lib/magma/platform/platform_logger_provider.h>
 #include <lib/zx/channel.h>
-#include <platform_handle.h>
-#include <platform_logger.h>
-#include <platform_logger_provider.h>
 
 class LoggerInitHelper {
  public:

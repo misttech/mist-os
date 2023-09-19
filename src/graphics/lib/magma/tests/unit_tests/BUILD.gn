@@ -70,18 +70,18 @@ source_set("magma_util_tests") {
     "$magma_build_root/src/magma_util:registers",
     "$magma_build_root/src/magma_util:ringbuffer",
     "$magma_build_root/src/magma_util:short_macros",
-    "$magma_build_root/src/magma_util/platform:buffer",
-    "$magma_build_root/src/magma_util/platform:semaphore",
     "$magma_build_root/tests/mock:address_space",
     "$magma_build_root/tests/mock:bus_mapper",
     "$magma_build_root/tests/mock:mmio",
     "//sdk/lib/fdio",
+    "//src/graphics/magma/lib/magma/platform:buffer",
+    "//src/graphics/magma/lib/magma/platform:semaphore",
     "//third_party/googletest:gtest",
   ]
   if (is_fuchsia) {
     deps += [
-      "$magma_build_root/src/magma_util/platform/zircon:status",
       "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
+      "//src/graphics/magma/lib/magma/platform/zircon:status",
       "//zircon/system/ulib/zx",
     ]
   }
@@ -103,20 +103,20 @@ source_set("magma_platform_tests") {
   ]
   deps = [
     "$magma_build_root/src/magma_util:short_macros",
-    "$magma_build_root/src/magma_util/platform:connection_client",
-    "$magma_build_root/src/magma_util/platform:event",
-    "$magma_build_root/src/magma_util/platform:handle",
-    "$magma_build_root/src/magma_util/platform:logger",
-    "$magma_build_root/src/magma_util/platform:logger_provider_header",
-    "$magma_build_root/src/magma_util/platform:port",
-    "$magma_build_root/src/magma_util/platform:semaphore",
-    "$magma_build_root/src/magma_util/platform:sysmem_connection",
-    "$magma_build_root/src/magma_util/platform:thread",
-    "$magma_build_root/src/magma_util/platform:trace",
-    "$magma_build_root/src/magma_util/platform:trace_provider",
-    "$magma_build_root/src/magma_util/platform:trace_provider_with_fdio",
     "$magma_build_root/tests/mock:mmio",
     "//sdk/lib/fdio",
+    "//src/graphics/magma/lib/magma/platform:connection_client",
+    "//src/graphics/magma/lib/magma/platform:event",
+    "//src/graphics/magma/lib/magma/platform:handle",
+    "//src/graphics/magma/lib/magma/platform:logger",
+    "//src/graphics/magma/lib/magma/platform:logger_provider_header",
+    "//src/graphics/magma/lib/magma/platform:port",
+    "//src/graphics/magma/lib/magma/platform:semaphore",
+    "//src/graphics/magma/lib/magma/platform:sysmem_connection",
+    "//src/graphics/magma/lib/magma/platform:thread",
+    "//src/graphics/magma/lib/magma/platform:trace",
+    "//src/graphics/magma/lib/magma/platform:trace_provider",
+    "//src/graphics/magma/lib/magma/platform:trace_provider_with_fdio",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/zx",
   ]
@@ -139,9 +139,9 @@ source_set("magma_platform_device_tests") {
   deps = [
     ":platform_bus_mapper_cases",
     "$magma_build_root/src/magma_util:short_macros",
-    "$magma_build_root/src/magma_util/platform:bus_mapper",
-    "$magma_build_root/src/magma_util/platform:thread",
     "$magma_build_root/tests/helper:platform_device_helper",
+    "//src/graphics/magma/lib/magma/platform:bus_mapper",
+    "//src/graphics/magma/lib/magma/platform:thread",
     "//third_party/googletest:gtest",
   ]
 }
@@ -158,9 +158,9 @@ source_set("magma_platform_pci_device_tests") {
   deps = [
     ":platform_bus_mapper_cases",
     "$magma_build_root/src/magma_util:short_macros",
-    "$magma_build_root/src/magma_util/platform:bus_mapper",
-    "$magma_build_root/src/magma_util/platform:thread",
     "$magma_build_root/tests/helper:platform_pci_device_helper",
+    "//src/graphics/magma/lib/magma/platform:bus_mapper",
+    "//src/graphics/magma/lib/magma/platform:thread",
     "//third_party/googletest:gtest",
   ]
 }

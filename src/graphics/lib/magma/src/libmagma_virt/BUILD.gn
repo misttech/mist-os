@@ -22,8 +22,8 @@ static_library("libmagma_virt") {
   deps = [
     ":magma_generic($shlib_toolchain)",
     ":virtmagma_headers",
-    "$magma_build_root/src/magma_util/platform:logger_impl",
     "//src/graphics/lib/magma/include/virtio",
+    "//src/graphics/magma/lib/magma/platform:logger_impl",
   ]
 
   # Only generate a copy in the shlib toolchain, to avoid redundant work.

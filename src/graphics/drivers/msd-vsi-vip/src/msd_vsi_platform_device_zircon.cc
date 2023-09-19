@@ -3,10 +3,9 @@
 // found in the LICENSE file.
 
 #include <lib/ddk/device.h>
+#include <lib/magma/platform/zircon/zircon_platform_device.h>
 
 #include <optional>
-
-#include <magma_util/platform/zircon/zircon_platform_device.h>
 
 #include "msd_vsi_platform_device.h"
 

@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma/platform/platform_thread.h>
+
 #include <thread>
 
 #include <gtest/gtest.h>
-
-#include "platform_thread.h"
 
 class TestPlatformThread {
  public:

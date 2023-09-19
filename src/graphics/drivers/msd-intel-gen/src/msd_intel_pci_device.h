@@ -5,10 +5,11 @@
 #ifndef MSD_INTEL_PCI_DEVICE_H
 #define MSD_INTEL_PCI_DEVICE_H
 
+#include <lib/magma/platform/platform_pci_device.h>
+#include <lib/magma/platform/platform_semaphore.h>
+
 #include "gtt.h"
 #include "interrupt_manager.h"
-#include "platform_pci_device.h"
-#include "platform_semaphore.h"
 
 class MsdIntelPciDevice : public magma::PlatformPciDevice {
  public:

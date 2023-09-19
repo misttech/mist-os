@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_POWER_MANAGER_H_
 
 #include <lib/fit/thread_safety.h>
+#include <lib/magma/platform/platform_semaphore.h>
 
 #include <chrono>
 #include <deque>
@@ -15,7 +16,6 @@
 
 #include "magma_util/short_macros.h"
 #include "mali_register_io.h"
-#include "platform_semaphore.h"
 
 // This class generally lives on the device thread.
 class PowerManager {

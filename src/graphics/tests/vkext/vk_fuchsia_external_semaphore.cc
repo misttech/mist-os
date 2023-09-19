@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma/platform/platform_semaphore.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,7 +15,6 @@
 #include <gtest/gtest.h>
 #include <vulkan/vulkan.h>
 
-#include "platform_semaphore.h"
 #include "src/graphics/tests/common/utils.h"
 #include "vulkan/vulkan_core.h"
 

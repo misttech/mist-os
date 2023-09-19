@@ -5,10 +5,11 @@
 #ifndef PPGTT_H
 #define PPGTT_H
 
+#include <lib/magma/platform/platform_buffer.h>
+
 #include "address_space.h"
 #include "msd_intel_register_io.h"
 #include "pagetable.h"
-#include "platform_buffer.h"
 
 using gen_pde_t = uint64_t;
 using gen_pdpe_t = uint64_t;

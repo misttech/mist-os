@@ -4,8 +4,9 @@
 
 #include "src/graphics/drivers/msd-arm-mali/src/performance_counters.h"
 
-#include "platform_barriers.h"
-#include "platform_logger.h"
+#include <lib/magma/platform/platform_barriers.h>
+#include <lib/magma/platform/platform_logger.h>
+
 #include "src/graphics/drivers/msd-arm-mali/src/registers.h"
 
 namespace {

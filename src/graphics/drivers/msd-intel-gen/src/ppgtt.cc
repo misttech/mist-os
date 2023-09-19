@@ -4,9 +4,10 @@
 
 #include "ppgtt.h"
 
+#include <lib/magma/platform/platform_buffer.h>
+#include <lib/magma/platform/platform_logger.h>
+
 #include "magma_util/short_macros.h"
-#include "platform_buffer.h"
-#include "platform_logger.h"
 #include "registers.h"
 
 constexpr bool kLogEnable = false;

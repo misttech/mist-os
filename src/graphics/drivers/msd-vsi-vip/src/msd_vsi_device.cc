@@ -5,6 +5,11 @@
 #include "msd_vsi_device.h"
 
 #include <lib/fit/defer.h>
+#include <lib/magma/platform/platform_barriers.h>
+#include <lib/magma/platform/platform_logger.h>
+#include <lib/magma/platform/platform_mmio.h>
+#include <lib/magma/platform/platform_thread.h>
+#include <lib/magma/platform/platform_trace.h>
 #include <lib/magma_service/msd.h>
 
 #include <algorithm>
@@ -20,11 +25,6 @@
 #include "magma_util/short_macros.h"
 #include "magma_vendor_queries.h"
 #include "msd_vsi_context.h"
-#include "platform_barriers.h"
-#include "platform_logger.h"
-#include "platform_mmio.h"
-#include "platform_thread.h"
-#include "platform_trace.h"
 #include "registers.h"
 
 static constexpr uint32_t kInterruptIndex = 0;

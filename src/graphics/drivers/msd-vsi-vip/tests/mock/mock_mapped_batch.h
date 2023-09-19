@@ -5,9 +5,10 @@
 #ifndef MOCK_MAPPED_BATCH_H
 #define MOCK_MAPPED_BATCH_H
 
+#include <lib/magma/platform/platform_buffer.h>
+#include <lib/magma/platform/platform_semaphore.h>
+
 #include "magma_util/mapped_batch.h"
-#include "platform_buffer.h"
-#include "platform_semaphore.h"
 #include "src/graphics/drivers/msd-vsi-vip/src/msd_vsi_context.h"
 
 class MockMappedBatch : public magma::MappedBatch<MsdVsiContext, GpuMapping::BufferType> {

@@ -5,11 +5,10 @@
 #include "parent_device_dfv2.h"
 
 #include <fidl/fuchsia.hardware.gpu.mali/cpp/driver/wire.h>
+#include <lib/magma/platform/zircon/zircon_platform_interrupt.h>
+#include <lib/magma/platform/zircon/zircon_platform_mmio.h>
 #include <threads.h>
 #include <zircon/threads.h>
-
-#include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_interrupt.h"
-#include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_mmio.h"
 
 ParentDeviceDFv2::ParentDeviceDFv2(
     std::shared_ptr<fdf::Namespace> incoming,

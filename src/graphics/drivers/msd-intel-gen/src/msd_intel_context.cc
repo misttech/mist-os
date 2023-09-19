@@ -4,14 +4,14 @@
 
 #include "msd_intel_context.h"
 
+#include <lib/magma/platform/platform_logger.h>
+#include <lib/magma/platform/platform_thread.h>
+#include <lib/magma/platform/platform_trace.h>
 #include <zircon/types.h>
 
 #include "address_space.h"
 #include "command_buffer.h"
 #include "msd_intel_connection.h"
-#include "platform_logger.h"
-#include "platform_thread.h"
-#include "platform_trace.h"
 
 MsdIntelContext::HandleWaitContext::HandleWaitContext(
     MsdIntelContext* context, EngineCommandStreamerId id, zx::handle object,

@@ -5,13 +5,14 @@
 #ifndef SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_GPU_MAPPING_H_
 #define SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_GPU_MAPPING_H_
 
+#include <lib/magma/platform/platform_bus_mapper.h>
+
 #include <cstdint>
 #include <memory>
 #include <set>
 #include <vector>
 
 #include "magma_util/short_macros.h"
-#include "platform_bus_mapper.h"
 #include "src/graphics/drivers/msd-arm-mali/src/region.h"
 
 class MsdArmBuffer;

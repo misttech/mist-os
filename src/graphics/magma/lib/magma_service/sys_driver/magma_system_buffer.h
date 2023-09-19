@@ -5,12 +5,11 @@
 #ifndef SRC_GRAPHICS_MAGMA_LIB_MAGMA_SERVICE_SYS_DRIVER_MAGMA_SYSTEM_BUFFER_H_
 #define SRC_GRAPHICS_MAGMA_LIB_MAGMA_SERVICE_SYS_DRIVER_MAGMA_SYSTEM_BUFFER_H_
 
+#include <lib/magma/platform/platform_buffer.h>
 #include <lib/magma_service/msd.h>
 
 #include <functional>
 #include <memory>
-
-#include "platform_buffer.h"
 
 namespace msd {
 class MagmaSystemBuffer {

@@ -5,11 +5,12 @@
 #ifndef MAPPED_BATCH_H
 #define MAPPED_BATCH_H
 
+#include <lib/magma/platform/platform_bus_mapper.h>
+#include <lib/magma/platform/platform_semaphore.h>
+
 #include "device_id.h"
 #include "gpu_mapping.h"
 #include "msd_intel_buffer.h"
-#include "platform_bus_mapper.h"
-#include "platform_semaphore.h"
 #include "sequencer.h"
 
 class MsdIntelContext;

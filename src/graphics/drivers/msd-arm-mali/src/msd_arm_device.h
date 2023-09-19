@@ -9,6 +9,8 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/fit/thread_safety.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/magma/platform/platform_interrupt.h>
+#include <lib/magma/platform/platform_semaphore.h>
 #include <lib/magma_service/msd.h>
 #include <lib/magma_service/msd_defs.h>
 #include <zircon/compiler.h>
@@ -24,8 +26,6 @@
 #include "magma_util/thread.h"
 #include "mali_register_io.h"
 #include "parent_device.h"
-#include "platform_interrupt.h"
-#include "platform_semaphore.h"
 #include "src/graphics/drivers/msd-arm-mali/src/address_manager.h"
 #include "src/graphics/drivers/msd-arm-mali/src/device_request.h"
 #include "src/graphics/drivers/msd-arm-mali/src/gpu_features.h"
