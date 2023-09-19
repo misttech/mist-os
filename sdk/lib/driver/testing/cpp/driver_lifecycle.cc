@@ -179,7 +179,13 @@ DriverRuntime::AsyncTask<zx::result<>> DriverUnderTestBase::Start(fdf::DriverSta
 
 DriverRuntime::AsyncTask<zx::result<>> DriverUnderTestBase::PrepareStop() {
 #if __Fuchsia_API_level__ >= FUCHSIA_HEAD
-  return Stop();
+  std::lock_guard guard(checker_);
+  fpromise::bridge<zx::result<>> bridge;
+  stop_completer_.emplace(std::move(bridge.completer));
+  fdf::Arena arena('STOP');
+  fidl::OneWayStatus status = driver_client_.buffer(arena)->Stop();
+  ZX_ASSERT_MSG(status.ok(), "Failed to send Stop request.");
+  return DriverRuntime::AsyncTask<zx::result<>>(bridge.consumer.promise());
 #else
   std::lock_guard guard(checker_);
   ZX_ASSERT_MSG(driver_.has_value(), "Driver does not exist.");
@@ -204,20 +210,8 @@ DriverRuntime::AsyncTask<zx::result<>> DriverUnderTestBase::PrepareStop() {
 #endif
 }
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
-DriverRuntime::AsyncTask<zx::result<>> DriverUnderTestBase::Stop() {
-#else
 zx::result<> DriverUnderTestBase::Stop() {
-#endif
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
-  std::lock_guard guard(checker_);
-  fpromise::bridge<zx::result<>> bridge;
-  stop_completer_.emplace(std::move(bridge.completer));
-  fdf::Arena arena('STOP');
-  fidl::OneWayStatus status = driver_client_.buffer(arena)->Stop();
-  ZX_ASSERT_MSG(status.ok(), "Failed to send Stop request.");
-  return DriverRuntime::AsyncTask<zx::result<>>(bridge.consumer.promise());
-#else
+#if __Fuchsia_API_level__ < FUCHSIA_HEAD
   std::lock_guard guard(checker_);
   ZX_ASSERT_MSG(driver_.has_value(), "Driver does not exist.");
   ZX_ASSERT_MSG(driver_.value().is_ok(), "Driver start did not succeed: %s.",
@@ -227,6 +221,8 @@ zx::result<> DriverUnderTestBase::Stop() {
   zx_status_t status = driver_lifecycle_symbol_.v1.stop(driver_.value().value());
   driver_.reset();
   return zx::make_result(status);
+#else
+  return zx::ok();
 #endif
 }
 

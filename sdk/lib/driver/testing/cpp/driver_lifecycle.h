@@ -60,25 +60,14 @@ class DriverUnderTestBase {
   // The resulting zx::result is the result of the start operation.
   DriverRuntime::AsyncTask<zx::result<>> Start(fdf::DriverStartArgs start_args);
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
-// To not break existing tests, this will passthrough to |Stop|.
-#else
-// PrepareStop the driver. This is an asynchronous operation.
-// Use |DriverRuntime::RunToCompletion| to await the completion of the async task.
-// The resulting zx::result is the result of the prepare stop operation.
-#endif
-  DriverRuntime::AsyncTask<zx::result<>> PrepareStop();
-
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
-  // Stop the driver. This is an asynchronous operation.
+  // PrepareStop the driver. This is an asynchronous operation.
   // Use |DriverRuntime::RunToCompletion| to await the completion of the async task.
   // The resulting zx::result is the result of the prepare stop operation.
-  DriverRuntime::AsyncTask<zx::result<>> Stop();
-#else
+  DriverRuntime::AsyncTask<zx::result<>> PrepareStop();
+
   // Stop the driver. The PrepareStop operation must have been completed before Stop is called.
   // Returns the result of the stop operation.
   zx::result<> Stop();
-#endif
 
  protected:
   template <typename Driver>
