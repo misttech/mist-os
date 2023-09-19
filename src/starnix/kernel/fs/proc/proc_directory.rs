@@ -32,10 +32,6 @@ use std::{
 /// It also contains a special symlink, `self`, which targets the task directory for the task
 /// that reads the symlink.
 pub struct ProcDirectory {
-    /// The kernel that this directory is associated with. This is used to populate the
-    /// directory contents on-demand.
-    kernel: Weak<Kernel>,
-
     /// A map that stores all the nodes that aren't task directories.
     nodes: BTreeMap<&'static FsStr, FsNodeHandle>,
 }
@@ -73,7 +69,7 @@ impl ProcDirectory {
                 fs.create_node(LoadavgFile::new_node(kernel), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
         };
 
-        Arc::new(ProcDirectory { kernel: Arc::downgrade(kernel), nodes })
+        Arc::new(ProcDirectory { nodes })
     }
 }
 
@@ -92,7 +88,7 @@ impl FsNodeOps for Arc<ProcDirectory> {
     fn lookup(
         &self,
         node: &FsNode,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         match self.nodes.get(name) {
@@ -100,7 +96,7 @@ impl FsNodeOps for Arc<ProcDirectory> {
             None => {
                 let pid_string = std::str::from_utf8(name).map_err(|_| errno!(ENOENT))?;
                 let pid = pid_string.parse::<pid_t>().map_err(|_| errno!(ENOENT))?;
-                let weak_task = self.kernel.upgrade().unwrap().pids.read().get_task(pid);
+                let weak_task = current_task.get_task(pid);
                 let task = weak_task.upgrade().ok_or_else(|| errno!(ENOENT))?;
                 Ok(pid_directory(&node.fs(), &task))
             }
