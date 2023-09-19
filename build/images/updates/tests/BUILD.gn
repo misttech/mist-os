@@ -1,0 +1,265 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Always use the `$target_out_dir` associated with `$default_toolchain`.
+out_dir = get_label_info(":stub($default_toolchain)", "target_out_dir")
+
+gn_assembled_test_dir = "$out_dir/gn_assembled_fx_publish_working_dir"
+bazel_assembled_test_dir = "$out_dir/bazel_assembled_fx_publish_working_dir"
+
+gn_assembly_cache_packages_list =
+    "$gn_assembled_test_dir/assembly_cache_packages.list"
+bazel_assembly_cache_packages_list =
+    "$bazel_assembled_test_dir/assembly_cache_packages.list"
+
+if (is_fuchsia) {
+  import("//build/assembly/assembled_system.gni")
+  import("//build/assembly/board_configuration.gni")
+  import("//build/assembly/cache_packages_from_product_assembler.gni")
+  import("//build/assembly/product_assembly_configuration.gni")
+  import("//build/bazel/assembly/bazel_product_bundle.gni")
+  import("//build/images/paths.gni")
+  import("//build/product.gni")
+  import("//src/sys/core/build/core.gni")
+
+  core_realm_definition("core_realm") {
+    testonly = true
+  }
+
+  product_assembly_configuration("product_assembly_config") {
+    testonly = true
+    platform = {
+      build_type = "eng"
+      feature_set_level = "utility"
+    }
+  }
+
+  board_configuration("board_config") {
+    name = "test"
+    filesystems = {
+      fvm = {
+        sparse_output = {
+        }
+      }
+    }
+  }
+
+  assembled_system("fx_publish_test.gn_assembly") {
+    testonly = true
+    product_assembly_config_label = ":product_assembly_config"
+    allow_eng_platform_bundle_use = true
+
+    core_realm_definition = ":core_realm"
+    board_config_label = ":board_config"
+
+    base_packages = []
+    cache_packages = [ "//examples/hello_world/cpp:hello-world-cpp" ]
+
+    bootfs_labels = []
+    generate_fvm = true
+    use_assembly_fshost = true
+  }
+
+  bazel_product_bundle("bazel_pb") {
+    testonly = true
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target = "//:INVALID_UNUSED_TARGET"
+    bazel_product_image_target = "//build/images/updates/tests:fake"
+    bazel_inputs_from_gn = [ ":fx_publish_test.gn_assembly.bazel_legacy_aib" ]
+  }
+
+  # macos infra builders cannot build assembly without timing out, so use a stub package manifest
+  # list instead to avoid going through the assembly process for mac hosts.
+  if (host_os == "mac") {
+    copy("gn_assembly_cache_packages.list") {
+      sources = [ "stub_package_manifest_list.json" ]
+      outputs = [ gn_assembly_cache_packages_list ]
+    }
+    copy("bazel_assembly_cache_packages.list") {
+      sources = [ "stub_package_manifest_list.json" ]
+      outputs = [ bazel_assembly_cache_packages_list ]
+    }
+  } else {
+    cache_packages_from_product_assembler("gn_assembly_cache_packages.list") {
+      assembly_label = ":fx_publish_test.gn_assembly($default_toolchain)"
+      is_bazel_assembled = false
+      outputs = [ gn_assembly_cache_packages_list ]
+      testonly = true
+    }
+    cache_packages_from_product_assembler(
+        "bazel_assembly_cache_packages.list") {
+      assembly_label = ":bazel_pb($default_toolchain)"
+      is_bazel_assembled = true
+      outputs = [ bazel_assembly_cache_packages_list ]
+      testonly = true
+    }
+  }
+}
+
+if (is_host) {
+  import("//build/python/python_action.gni")
+  import("//build/python/python_binary.gni")
+  import("//build/python/python_host_test.gni")
+  import("//build/testing/host_test_data.gni")
+  import("//src/sys/pkg/repositories/devhost/devhost.gni")
+
+  python_binary("populate_fx_publish_working_dir") {
+    main_source = "populate_fx_publish_working_dir.py"
+  }
+
+  # Populates a fake build directory `$output` for running fx publish tests.
+  # This involves:
+  #  - Generating a new `amber-files` repository,
+  #  - Symlinking `host-tools/package-tool`, and
+  #  - Copying the transitive closure of `$package_manifest_list`.
+  # We also need to symlink `$output/$output` to `$output` but that cannot be done in the build step
+  # since infra will fail to upload/materialize cyclic symlinks.
+  #
+  # Arguments:
+  #
+  #   package_manifest_list (path)
+  #     Path to the package manifest list.
+  #
+  #   output (path)
+  #     The directory to place the replicated packages and empty repository.
+  #
+  #   deps
+  #   testonly
+  #   visibility
+  template("populate_fx_publish_working_dir") {
+    assert(defined(invoker.package_manifest_list),
+           "must define a `package_manifest_list` path argument")
+    assert(defined(invoker.output), "must define a `output` path argument")
+
+    _copied_package_dir = invoker.output
+
+    # Create a empty repository for `//tools/devshell:fx_publish_test`.
+    # This way, the test can inherit the publish options from the build system.
+    _amber_files_target = "${target_name}_amber_files"
+    devhost_repository_publish(_amber_files_target) {
+      testonly = true
+
+      output_repository_dir = "${_copied_package_dir}/amber-files"
+
+      deps = []
+      package_list_manifests = [ "stub_package_manifest_list.json" ]
+    }
+
+    _package_manifest_list = invoker.package_manifest_list
+    _deps = [
+      ":${_amber_files_target}($host_toolchain)",
+      "//src/sys/pkg/bin/package-tool:host",
+    ]
+    if (defined(invoker.deps)) {
+      _deps += invoker.deps
+    }
+
+    python_action(target_name) {
+      forward_variables_from(invoker,
+                             [
+                               "visibility",
+                               "testonly",
+                             ])
+      binary_label =
+          "//build/images/updates/tests:populate_fx_publish_working_dir"
+      depfile = "$target_gen_dir/$target_name.d"
+      inputs = [ _package_manifest_list ]
+
+      # Typically the timestamp of a directory doesn't accurately reflect the state of its contents,
+      # but since this script writes a depfile including all outputs it's okay to to specify a
+      # single directory here as the output.
+      outputs = [ _copied_package_dir ]
+      args = [
+        "--working-dir",
+        rebase_path(outputs[0], root_build_dir),
+        "--depfile",
+        rebase_path(depfile, root_build_dir),
+      ]
+      deps = _deps
+      testonly = true
+    }
+  }
+
+  # Create a predefined hermetic CWD for fx_publish integration tests on CQ/CV that can be known in
+  # GN time. This is needed because test data sources for host_test_data can only be provided in GN
+  # time but precise file references within the package manifest list can only be known during
+  # action/ninja time.
+  populate_fx_publish_working_dir("fx_publish_gn_assembly_working_dir") {
+    package_manifest_list = gn_assembly_cache_packages_list
+    deps = [ ":gn_assembly_cache_packages.list($default_toolchain)" ]
+    output = gn_assembled_test_dir
+    testonly = true
+  }
+
+  populate_fx_publish_working_dir("fx_publish_bazel_assembly_working_dir") {
+    package_manifest_list = bazel_assembly_cache_packages_list
+    deps = [ ":bazel_assembly_cache_packages.list($default_toolchain)" ]
+    output = bazel_assembled_test_dir
+    testonly = true
+  }
+
+  host_test_data("fx_publish_gn_test_data") {
+    sources = [ gn_assembled_test_dir ]
+    deps = [ ":fx_publish_gn_assembly_working_dir" ]
+  }
+
+  host_test_data("fx_publish_bazel_test_data") {
+    sources = [ bazel_assembled_test_dir ]
+    deps = [ ":fx_publish_bazel_assembly_working_dir" ]
+  }
+
+  python_host_test("fx_publish_gn_assembled_test") {
+    main_source = "//tools/devshell/tests/subcommands/fx_publish_test.py"
+    sources = [
+      "//tools/devshell/contrib/__init__.py",
+      "//tools/devshell/contrib/publish.py",
+      "//tools/devshell/contrib/terminal.py",
+    ]
+    deps = [ ":fx_publish_gn_test_data" ]
+    main_callable = "main"
+    extra_args = [
+      "--test-dir",
+      rebase_path(gn_assembled_test_dir, root_build_dir),
+    ]
+
+    # Macos hosts don't publish any packages. See above comment for explanation.
+    if (host_os != "mac") {
+      extra_args += [
+        "--expect-cache-packages",
+        "hello-world-cpp/0",
+      ]
+    }
+  }
+
+  python_host_test("fx_publish_bazel_assembled_test") {
+    main_source = "//tools/devshell/tests/subcommands/fx_publish_test.py"
+    sources = [
+      "//tools/devshell/contrib/__init__.py",
+      "//tools/devshell/contrib/publish.py",
+      "//tools/devshell/contrib/terminal.py",
+    ]
+    deps = [ ":fx_publish_bazel_test_data" ]
+    main_callable = "main"
+    extra_args = [
+      "--test-dir",
+      rebase_path(bazel_assembled_test_dir, root_build_dir),
+    ]
+
+    # Macos hosts don't publish any packages. See above comment for explanation.
+    if (host_os != "mac") {
+      extra_args += [
+        "--expect-cache-packages",
+        "hello-world-cpp/0",
+      ]
+    }
+  }
+
+  group("fx_publish_tests") {
+    testonly = true
+    public_deps = [
+      ":fx_publish_bazel_assembled_test",
+      ":fx_publish_gn_assembled_test",
+    ]
+  }
+}

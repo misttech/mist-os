@@ -48,6 +48,8 @@ fuchsia_package(
     components = [
         ":component",
     ],
+    package_repository_name = "fuchsia.com",
+    visibility = ["//visibility:public"],
 )
 
 fuchsia_cc_test(

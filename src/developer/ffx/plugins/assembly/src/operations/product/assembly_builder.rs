@@ -361,7 +361,10 @@ impl ImageAssemblyConfigBuilder {
         };
 
         let package_url = package_entry.manifest.package_url()?.ok_or_else(|| {
-            anyhow::anyhow!("Something happened when trying to get the package_url")
+            anyhow::anyhow!(
+                "Failed to retrieve package_url for package {}",
+                package_entry.manifest.name()
+            )
         })?;
         self.package_urls.try_insert_unique(package_url).map_err(|e| {
             anyhow::anyhow!("duplicate package {} found in {}", e, package_set.name)

@@ -99,6 +99,8 @@ files = {
     cache_package_manifests = "$root_build_dir/cache_package_manifests.list"
     universe_package_manifests =
         "$root_build_dir/universe_package_manifests.list"
+    assembly_cache_package_manifests =
+        "$root_build_dir/assembly_cache_packages.list"
 
     # TODO(https://fxbug.dev/123120): Audit and add the following paths when
     # only Bazel assembly is enabled.

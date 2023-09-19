@@ -6,19 +6,26 @@ import("//build/bazel/bazel_workspace.gni")
 import("//build/images/args.gni")
 import("//build/python/python_action.gni")
 
+assert(is_fuchsia,
+       "Assembly templates can only be used with `$default_toolchain`.")
+
 # Collect a newline-delimited text file of cache packages from the `ffx assembly product` call.
 #
 # Arguments:
 #
-#   assembly_label (GN label)
+#   assembly_label (GN label, required)
 #     Label for the assembled_system() invocation to use, e.g. //build/images/fuchsia.
 #
-#   namespace (string)
+#   is_bazel_assembled (bool, required)
+#     Whether the assembly label corresponds to a Bazel-assembled or GN-assembled product.
+#     Typically you'd want this value to be the same as `use_bazel_images_only`.
+#
+#   namespace (string, optional)
 #     The effective namespace used by the system label.
 #     Defaults to the 'name' of the label in 'assembly_label'.
 #     Only applicable for GN/non-Bazel assembly.
 #
-#   outputs (list of paths)
+#   outputs (list of paths, required)
 #     Usual GN meaning, expects a single file to write to.
 #
 #   testonly
@@ -28,17 +35,20 @@ template("cache_packages_from_product_assembler") {
       defined(invoker.assembly_label),
       "must define a `assembly_label` argument which points to an assembled_system() invocation")
   assert(defined(invoker.outputs), "must define `outputs`")
-  assert(!use_bazel_images_only || !defined(invoker.namespace),
-         "`namespace` is not allowed for `use_bazel_images_only`")
+  assert(defined(invoker.is_bazel_assembled),
+         "must define `is_bazel_assembled`")
+  assert(!invoker.is_bazel_assembled || !defined(invoker.namespace),
+         "`namespace` is not allowed for Bazel-assembled products!")
 
   _assembly_target_name = get_label_info(invoker.assembly_label, "name")
   _assembly_dir = get_label_info(invoker.assembly_label, "dir")
   _assembly_namespace = _assembly_target_name
+  _is_bazel_assembled = invoker.is_bazel_assembled
   if (defined(invoker.namespace)) {
     _assembly_namespace = invoker.namespace
   }
 
-  if (use_bazel_images_only) {
+  if (_is_bazel_assembled) {
     _assembly_gen_dir = get_label_info(invoker.assembly_label, "target_out_dir")
     _assembly_manifest = "${_assembly_gen_dir}/${_assembly_target_name}_product_assembly/image_assembly.json"
     _assembly_dep = "${_assembly_dir}:${_assembly_namespace}_product_assembly"
@@ -64,7 +74,7 @@ template("cache_packages_from_product_assembler") {
       "--output",
       rebase_path(outputs[0], root_build_dir),
     ]
-    if (use_bazel_images_only) {
+    if (_is_bazel_assembled) {
       args += [
         "--rebase",
         rebase_path(bazel_execroot, root_build_dir),

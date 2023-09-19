@@ -1,0 +1,47 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@fuchsia_sdk//fuchsia:assembly.bzl",
+    "BUILD_TYPES",
+    "assembly_bundle",
+    "fuchsia_board_configuration",
+    "fuchsia_product_assembly",
+    "fuchsia_product_configuration",
+)
+
+fuchsia_board_configuration(
+    name = "board_config",
+    board_name = "fake_board",
+)
+
+assembly_bundle(
+    name = "legacy_gn_aib",
+    dir = "@legacy_ninja_build_outputs//:obj/build/images/updates/tests/fx_publish_test.gn_assembly/fx_publish_test.gn_assembly.bazel_legacy_aib",
+    files = "@legacy_ninja_build_outputs//:fx_publish_test.gn_assembly.bazel_legacy_aib",
+)
+
+fuchsia_product_configuration(
+    name = "product_assembly_config",
+    cache_packages = [
+        # FIXME(https://issuetracker.google.com/288468542): Uncomment once
+        # bazel-generated package manifests use relative paths for blobs.
+        # "//build/bazel/examples/hello_cpp:pkg",
+    ],
+    json_config = {
+        "platform": {
+            "build_type": BUILD_TYPES.ENG,
+            "feature_set_level": "utility",
+        },
+    },
+)
+
+fuchsia_product_assembly(
+    name = "fake_product_assembly",
+    testonly = True,
+    board_config = ":board_config",
+    legacy_aib = ":legacy_gn_aib",
+    platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
+    product_config = ":product_assembly_config",
+)

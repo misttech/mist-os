@@ -217,7 +217,8 @@ if (use_bringup_assembly) {
   # tool.
   cache_packages_from_product_assembler("assembly_cache_packages.list") {
     assembly_label = labels.images
-    outputs = [ "$root_build_dir/assembly_cache_packages.list" ]
+    is_bazel_assembled = use_bazel_images_only
+    outputs = [ files.assembly_cache_package_manifests ]
     testonly = true
   }
 

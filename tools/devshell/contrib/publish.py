@@ -67,20 +67,9 @@ def main() -> int:
         default='amber-files',
     )
     parser.add_argument(
-        '--no-build',
-        dest='build',
-        default=True,
-        help='Publish only, skipping `fx build`.',
-        action='store_false',
-    )
-    parser.add_argument(
         '--quiet',
         help='Suppress messages.',
         action='store_true',
-    )
-    parser.add_argument(
-        '--stamp',
-        help='Specify a stamp file to write to after publishing.',
     )
     args = parser.parse_args()
 
@@ -105,11 +94,10 @@ def main() -> int:
             Terminal.fatal(f'Unrecognized packages "{packages}".')
 
     # Build step.
-    if args.build:
-        run(
-            *fx_command('build', *ninja_targets),
-            failure_message='Build failures!',
-        )
+    run(
+        *fx_command('build', *ninja_targets),
+        failure_message='Build failures!',
+    )
 
     # Publish the packages.
     run(
@@ -118,8 +106,10 @@ def main() -> int:
         'publish',
         repo,
         *publish_tool_opts,
-        '--package-list',
-        *packages_to_publish,
+        *[
+            arg for package_list in packages_to_publish
+            for arg in ['--package-list', package_list]
+        ],
         failure_message='An internal error occured while publishing.',
     )
 
@@ -130,19 +120,16 @@ def main() -> int:
             for file in packages_to_publish
         ])
     publish_count_msg = f'Published {publish_count} packages'
-    if not Terminal.suppress:
-        if subprocess.run(shlex.join(fx_command('is-package-server-running')),
-                          shell=True, capture_output=True).returncode:
-            Terminal.warn(
-                f'{publish_count_msg}, but it looks like the package server is not running.'
-            )
-            Terminal.warn('You probably need to run "fx serve".')
-        else:
-            Terminal.info(f'{publish_count_msg}!')
+    if subprocess.run(shlex.join(fx_command('is-package-server-running')),
+                      shell=True, capture_output=True).returncode:
+        Terminal.warn(
+            f'{publish_count_msg}, but it looks like the package server is not running.'
+        )
+        Terminal.warn('You probably need to run "fx serve".')
+    else:
+        Terminal.info(f'{publish_count_msg}!')
 
-    # Write stamp file.
-    if args.stamp:
-        Path(args.stamp).write_text(str(publish_count))
+    return 0
 
 
 if __name__ == '__main__':

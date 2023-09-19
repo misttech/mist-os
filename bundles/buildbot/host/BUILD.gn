@@ -18,6 +18,7 @@ group("host") {
 
     # These tests depend on the system assembly and can't be included in the same groups that get
     # added to the build graph through //src's groups because that would create dep cycles.
+    "//build/images/updates/tests:fx_publish_tests($host_toolchain)",
     "//src/developer/ffx:host_tests($host_toolchain)",
   ]
 

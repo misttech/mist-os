@@ -38,6 +38,9 @@ _excluded_bazel_inputs = [
 
   # Bringup is testonly too.
   "//build/images/bringup:bringup.bazel_legacy_aib",
+
+  # This is only used for `//tools/devshell:fx_publish_test`.
+  "//build/images/updates/tests:fx_publish_test.gn_assembly.bazel_legacy_aib",
 ]
 
 _excluded_bazel_inputs += eng_only_platform_aib_labels

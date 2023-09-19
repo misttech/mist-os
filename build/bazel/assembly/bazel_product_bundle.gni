@@ -36,7 +36,7 @@ import("//src/sys/pkg/bin/package-tool/package-tool.gni")
 #    NOTE: This template does NOT check this is the actual product image target
 #    used in `bazel_product_bundle_target`.
 #
-#    Type: label (from BUIDL.bazel)
+#    Type: label (from BUILD.bazel)
 #
 #  bazel_recovery_image_target (optional)
 #    The Bazel recovery image target for this product bundle.
@@ -49,7 +49,7 @@ import("//src/sys/pkg/bin/package-tool/package-tool.gni")
 #    NOTE: This template does NOT check this is the actual recovery image target
 #    used in `bazel_product_bundle_target`.
 #
-#    Type: label (from BUIDL.bazel)
+#    Type: label (from BUILD.bazel)
 #
 #  bazel_size_checker_target (optional)
 #    The Bazel fuchsia_size_checker target for this product bundle's product
