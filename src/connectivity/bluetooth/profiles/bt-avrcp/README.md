@@ -47,8 +47,9 @@ src/connectivity/bluetooth/profiles/bt-avrcp --with
     >
     ```
 
-1.  Start the `bt-a2dp-sink` service with `run -d
-    fuchsia-pkg://fuchsia.com/bt-a2dp-sink#meta/bt-a2dp-sink.cmx`
+1.  Start the `bt-a2dp-sink` service with `ffx component run
+    /core/ffx-laboratory:bt-a2dp
+    fuchsia-pkg://fuchsia.com/bt-a2dp-sink#meta/bt-a2dp-sink.cm`
 
 1.  (If you haven't paired previously) pair your fuchsia device with your test
     device -
