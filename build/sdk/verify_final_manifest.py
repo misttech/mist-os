@@ -88,6 +88,12 @@ def main() -> int:
             "--only_verify_host_tools_for_cpu is not specified"),
         required=True,
     )
+    parser.add_argument(
+        "--label",
+        help=(
+            "GN label that caused this script to be run. Makes errors easier "
+            "to reproduce."),
+    )
 
     args = parser.parse_args()
 
@@ -154,6 +160,16 @@ Please acknowledge this change by running:
 """,
                 file=sys.stderr,
             )
+
+        print(
+            f"""\
+Note: If you are seeing this on an automated build failure and are trying to
+reproduce, ensure that
+    {args.label}
+is in your GN graph.
+""",
+            file=sys.stderr,
+        )
         return 1
 
     return 0

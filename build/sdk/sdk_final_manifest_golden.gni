@@ -75,6 +75,11 @@ template("sdk_final_manifest_golden") {
         rebase_path(outputs[0], root_build_dir),
       ]
 
+      args += [
+        "--label",
+        get_label_info(":${target_name}", "label_with_toolchain"),
+      ]
+
       deps = [ invoker.idk_exported_label ]
     }
   }
