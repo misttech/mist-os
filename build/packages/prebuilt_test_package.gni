@@ -45,6 +45,10 @@ template("prebuilt_test_package") {
   test_spec(spec_target_name) {
     target = get_label_info(":${invoker.target_name}", "label_with_toolchain")
     build_rule = "prebuilt_test_package"
+    package_label = target
+    package_manifests = rebase_path(
+            [ "${target_out_dir}/${invoker.target_name}/package_manifest.json" ],
+            root_build_dir)
     package_url = "fuchsia-pkg://fuchsia.com/${package_name}#meta/${invoker.component_name}"
     assert(
         get_path_info(invoker.component_name, "extension") == "cm",
