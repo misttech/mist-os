@@ -34,10 +34,10 @@ use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_starnix_binder as fbinder;
 use fuchsia_zircon as zx;
 use std::{
-    collections::{btree_map::BTreeMap, VecDeque},
+    collections::{btree_map, BTreeMap, HashMap, HashSet, VecDeque},
     ops::DerefMut,
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicU64, Ordering},
         Arc, Weak,
     },
 };
@@ -1379,12 +1379,11 @@ enum RefCountAction {
     DecRefs(Arc<BinderObject>),
 }
 
-impl Releasable for RefCountAction {
-    type Context<'a> = ();
-
-    /// Execute the current action. This must be done without holding any lock to a
-    /// `BinderProcess`.
-    fn release(&self, _: ()) {
+impl RefCountAction {
+    /// Enqueue the action to the `BinderProcess`. If the actions is a reference decrease and the
+    /// object has no reference left, return a pair with the `BinderProcess` and the `BinderObject`
+    /// so that the object can be removed from the process table.
+    fn enqueue(&self) -> Option<(Arc<BinderProcess>, Arc<BinderObject>)> {
         match self {
             Self::Acquire(object) => {
                 if let Some(binder_process) = object.owner.upgrade() {
@@ -1393,11 +1392,9 @@ impl Releasable for RefCountAction {
             }
             Self::Release(object) => {
                 if let Some(binder_process) = object.owner.upgrade() {
-                    let mut process_state = binder_process.lock();
                     binder_process.enqueue_command(Command::ReleaseRef(object.local));
                     if !object.has_ref() {
-                        object.poisoned.store(true, Ordering::Relaxed);
-                        process_state.objects.remove(&object.local.weak_ref_addr);
+                        return Some((binder_process, Arc::clone(object)));
                     }
                 }
             }
@@ -1408,28 +1405,47 @@ impl Releasable for RefCountAction {
             }
             Self::DecRefs(object) => {
                 if let Some(binder_process) = object.owner.upgrade() {
-                    let mut process_state = binder_process.lock();
                     binder_process.enqueue_command(Command::DecRef(object.local));
                     if !object.has_ref() {
-                        object.poisoned.store(true, Ordering::Relaxed);
-                        process_state.objects.remove(&object.local.weak_ref_addr);
+                        return Some((binder_process, Arc::clone(object)));
                     }
                 }
             }
         }
+        None
     }
 }
 
-/// A list of `RefCountAction` that is itself releasable. Releasing the list will release each
-/// individual action.
+/// A list of `RefCountAction` that is releasable. Releasing the list will enqueue each actions and
+/// remove any freed object from the process.
 type RefCountActions = ReleaseGuard<Vec<RefCountAction>>;
 
 impl Releasable for Vec<RefCountAction> {
-    type Context<'a> = <RefCountAction as Releasable>::Context<'a>;
+    type Context<'a> = ();
 
-    fn release(&self, context: Self::Context<'_>) {
+    fn release(&self, _context: ()) {
+        let mut cleanables =
+            HashMap::<ArcKey<BinderProcess>, HashSet<ArcKey<BinderObject>>>::default();
         for action in self {
-            action.release(context);
+            if let Some((binder_process, object)) = action.enqueue() {
+                cleanables.entry(ArcKey(binder_process)).or_default().insert(ArcKey(object));
+            }
+        }
+        for (process, objects) in cleanables.into_iter() {
+            let mut process_state = process.lock();
+            for object in objects {
+                if !object.has_ref() {
+                    // The object might have been reused since it was last considered. It is then
+                    // possible that it has already been removed, and replaced with a new value.
+                    // Check that the current object in the map is the expected one.
+                    let entry = process_state.objects.entry(object.local.weak_ref_addr);
+                    if let btree_map::Entry::Occupied(v) = entry {
+                        if Arc::ptr_eq(v.get(), &object) {
+                            v.remove_entry();
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -2039,9 +2055,6 @@ struct BinderObject {
     flags: u32,
     /// Mutable state for the binder object, protected behind a mutex.
     state: Mutex<BinderObjectMutableState>,
-    /// Debug boolean to ensure a removed BinderObject cannot be resurrected.
-    // TODO(https://fxbug.dev/298935909): Remove when the bug has been solved.
-    poisoned: AtomicBool,
 }
 
 /// Assert that a dropped object from a live process has no reference.
@@ -2135,7 +2148,6 @@ impl BinderObject {
                 strong_count: ObjectReferenceCount::WaitingAck(0),
                 ..Default::default()
             }),
-            poisoned: Default::default(),
         })
     }
 
@@ -2145,7 +2157,6 @@ impl BinderObject {
             local: Default::default(),
             flags,
             state: Default::default(),
-            poisoned: Default::default(),
         })
     }
 
@@ -2171,7 +2182,6 @@ impl BinderObject {
     /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn inc_strong(self: &Arc<Self>, actions: &mut RefCountActions) -> StrongRefGuard {
-        assert!(!self.poisoned.load(Ordering::Relaxed));
         if self.lock().strong_count.inc() {
             actions.push(RefCountAction::Acquire(self.clone()));
         }
@@ -2182,7 +2192,6 @@ impl BinderObject {
     /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn inc_weak(self: &Arc<Self>, actions: &mut RefCountActions) -> WeakRefGuard {
-        assert!(!self.poisoned.load(Ordering::Relaxed));
         if self.lock().weak_count.inc() {
             actions.push(RefCountAction::IncRefs(self.clone()));
         }
@@ -4658,7 +4667,11 @@ pub mod tests {
             strong_ref_addr: UserAddress::const_from(0x0000000000000100),
         };
 
-        let object = BinderObject::new(&proc, LOCAL_BINDER_OBJECT, 0);
+        let object = register_binder_object(
+            &proc,
+            LOCAL_BINDER_OBJECT.weak_ref_addr,
+            LOCAL_BINDER_OBJECT.strong_ref_addr,
+        );
 
         let mut actions = RefCountActions::default();
         object.ack_acquire(&mut actions).expect("ack_acquire");
