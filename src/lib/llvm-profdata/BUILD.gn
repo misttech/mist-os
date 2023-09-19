@@ -36,7 +36,7 @@ zx_library("llvm-profdata") {
     # same translation unit.
     _profile_configs = [
       "//build/config/profile:coverage",
-      "//build/config/profile:profile",
+      "//build/config/profile",
     ]
     configs += _profile_configs
     configs -= _profile_configs
