@@ -13,7 +13,6 @@ triage_files = [
   "audio.triage",
   "bluetooth.triage",
   "cpu.triage",
-  "crashes.triage",
   "disk.triage",
   "fonts.triage",
   "httpsdate_time_source.triage",
