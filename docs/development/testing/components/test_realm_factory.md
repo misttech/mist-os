@@ -107,15 +107,16 @@ or responses to the component under test.
 
 Below are some examples of test suites and test realm factory components.
 
-| Test suite | Realm Factory Component |
-|-|-|
-| [WLAN hw-sim tests]          | [WLAN hw-sim test realm factory] |
-| [Diagnostics detect tests]   | [Diagnostics detect test realm factory] |
-| [Diagnostics sampler tests]  | [Diagnostics sampler test realm factory] |
-| [pkgdir tests]               | [pkgdir test realm factory]
-| [CTF example Rust test]      | [CTF example test realm factory]
-| [CTF example C++ test]       | [CTF example test realm factory]
-|                              | [Mock hwinfo test realm factory]
+Test suite                   | Realm Factory Component
+---------------------------- | ------------------------------------------------
+[WLAN hw-sim tests]          | [WLAN hw-sim test realm factory]
+[Diagnostics detect tests]   | [Diagnostics detect test realm factory]
+[Diagnostics sampler tests]  | [Diagnostics sampler test realm factory]
+[pkgdir tests]               | [pkgdir test realm factory]
+[CTF example Rust test]      | [CTF example test realm factory]
+[CTF example C++ test]       | [CTF example test realm factory]
+|                            | [Mock hwinfo test realm factory]
+
 
 ## Frequently asked questions
 
