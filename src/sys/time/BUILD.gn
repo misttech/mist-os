@@ -7,7 +7,8 @@ group("recovery") {
   deps = [
     "httpsdate_time_source:httpsdate-time-source",
     "httpsdate_time_source:httpsdate-time-source-pull",
-    "timekeeper",
+    "timekeeper:service",
+    "timekeeper:timekeeper-config-values",
   ]
 }
 

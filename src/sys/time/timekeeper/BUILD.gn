@@ -5,6 +5,20 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
+group("timekeeper") {
+  testonly = true
+  deps = [
+    ":service",
+    ":tests",
+    ":timekeeper-config-values",
+  ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":timekeeper-tests" ]
+}
+
 timekeeper_deps = [
   # The generated structured config data schema.
   ":timekeeper-config",
@@ -103,17 +117,6 @@ fuchsia_component("service") {
   deps = [ ":bin" ]
 }
 
-group("timekeeper_pkg_for_transition") {
-  public_deps = [ ":timekeeper" ]
-}
-
-fuchsia_package("timekeeper") {
-  deps = [
-    ":service",
-    ":timekeeper-config-values",
-  ]
-}
-
 # This package requires structured config from elsewhere.
 fuchsia_package("timekeeper-without-config") {
   package_name = "timekeeper"
@@ -142,9 +145,4 @@ fuchsia_unittest_package("timekeeper-tests") {
       max_severity = "ERROR"
     }
   }
-}
-
-group("tests") {
-  testonly = true
-  deps = [ ":timekeeper-tests" ]
 }
