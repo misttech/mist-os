@@ -142,9 +142,25 @@ extern "C" WEAK int getcpu(unsigned* cpu, void* cache, void* unused)
     __attribute__((alias("__vdso_getcpu")));
 
 extern "C" EXPORT int __vdso_gettimeofday(struct timeval* tv, struct timezone* tz) {
+  if (tz != nullptr) {
+    int ret = syscall(__NR_gettimeofday, reinterpret_cast<intptr_t>(tv),
+                      reinterpret_cast<intptr_t>(tz), 0);
+    return ret;
+  }
+  if (tv == nullptr) {
+    return 0;
+  }
+  int64_t utc_nsec = calculate_utc_time_nsec();
+  if (utc_nsec != UTC_INVALID) {
+    tv->tv_sec = utc_nsec / NSEC_PER_SEC;
+    tv->tv_usec = (utc_nsec % NSEC_PER_SEC) / 1'000;
+    return 0;
+  }
+  // The syscall is used instead of endlessly retrying to acquire the seqlock. This gives the
+  // writer thread of the seqlock a chance to run, even if it happens to have a lower priority
+  // than the current thread.
   int ret =
       syscall(__NR_gettimeofday, reinterpret_cast<intptr_t>(tv), reinterpret_cast<intptr_t>(tz), 0);
-
   return ret;
 }
 
