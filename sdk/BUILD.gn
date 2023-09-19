@@ -461,7 +461,10 @@ sdk_molecule("core_deps") {
 sdk_molecule("core_packages") {
   visibility = [ ":*" ]
 
-  deps = [ "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_sdk" ]
+  deps = [
+    "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_sdk",
+    "//src/performance/memory/heapdump/collector:collector_sdk",
+  ]
 }
 
 sdk_molecule("platform_fidls") {
