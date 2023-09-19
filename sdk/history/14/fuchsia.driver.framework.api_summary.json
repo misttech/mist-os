@@ -24,7 +24,7 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.driver.framework/CompositeNodeManager.AddSpec",
-        "strictness": "strict",
+        "strictness": "flexible",
         "ordinal": "5930736293275290740",
         "direction": "two_way",
         "request": "fuchsia.driver.framework/CompositeNodeSpec",
@@ -34,7 +34,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.driver.framework/CompositeNodeManager",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {
@@ -71,7 +71,7 @@
     {
         "kind": "enum",
         "name": "fuchsia.driver.framework/CompositeNodeSpecError",
-        "strictness": "strict",
+        "strictness": "flexible",
         "type": "uint32"
     },
     {
@@ -210,7 +210,7 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.driver.framework/Node.AddChild",
-        "strictness": "strict",
+        "strictness": "flexible",
         "ordinal": "8633697350522413353",
         "direction": "two_way",
         "request": "fuchsia.driver.framework/NodeAddChildRequest",
@@ -220,7 +220,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.driver.framework/Node",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {
@@ -284,21 +284,21 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.driver.framework/NodeController.OnBind",
-        "strictness": "strict",
+        "strictness": "flexible",
         "ordinal": "5905369594807853098",
         "direction": "event"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.driver.framework/NodeController.Remove",
-        "strictness": "strict",
+        "strictness": "flexible",
         "ordinal": "6123359741742396225",
         "direction": "one_way"
     },
     {
         "kind": "protocol/member",
         "name": "fuchsia.driver.framework/NodeController.RequestBind",
-        "strictness": "strict",
+        "strictness": "flexible",
         "ordinal": "4735909333556220047",
         "direction": "two_way",
         "request": "fuchsia.driver.framework/NodeControllerRequestBindRequest",
@@ -308,7 +308,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.driver.framework/NodeController",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {
@@ -380,7 +380,7 @@
     {
         "kind": "enum",
         "name": "fuchsia.driver.framework/NodeError",
-        "strictness": "strict",
+        "strictness": "flexible",
         "type": "uint32"
     },
     {

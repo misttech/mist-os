@@ -39,6 +39,8 @@ class TestDriver : public fdf::DriverBase,
 
   // fidl::WireAsyncEventHandler<fuchsia_driver_framework::NodeController>
   void on_fidl_error(fidl::UnbindInfo error) override;
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<fuchsia_driver_framework::NodeController> metadata) override;
 
  private:
   // fidl::WireServer<fuchsia_driver_component_test::ZirconProtocol>

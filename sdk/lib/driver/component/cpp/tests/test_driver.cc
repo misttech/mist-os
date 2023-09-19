@@ -179,4 +179,7 @@ void TestDriver::on_fidl_error(fidl::UnbindInfo error) {
   }
 }
 
+void TestDriver::handle_unknown_event(
+    fidl::UnknownEventMetadata<fuchsia_driver_framework::NodeController> metadata) {}
+
 FUCHSIA_DRIVER_EXPORT(TestDriver);

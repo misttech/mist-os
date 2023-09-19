@@ -114,6 +114,13 @@ class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeControlle
   void Remove(RemoveCompleter::Sync& completer) override { RemoveFromParent(); }
   void RequestBind(RequestBindRequestView request, RequestBindCompleter::Sync& completer) override;
 
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_driver_framework::NodeController> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_driver_framework::Node> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
+
   void SetParent(TestNode* parent,
                  fidl::ServerEnd<fuchsia_driver_framework::NodeController> controller);
   void SetProperties(std::vector<fuchsia_driver_framework::NodeProperty> properties);

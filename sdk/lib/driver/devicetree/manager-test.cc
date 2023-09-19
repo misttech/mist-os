@@ -140,6 +140,10 @@ class FakeCompositeNodeManager final
     completer.Reply(zx::ok());
   }
 
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_driver_framework::CompositeNodeManager> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {}
+
   std::vector<AddSpecRequest> requests() { return requests_; }
 
  private:

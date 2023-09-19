@@ -57,6 +57,10 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   // fidl::WireServer<fuchsia_driver_framework::CompositeNodeManager> interface
   void AddSpec(AddSpecRequestView request, AddSpecCompleter::Sync& completer) override;
 
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_driver_framework::CompositeNodeManager> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
+
   // CompositeManagerBridge interface
   void BindNodesForCompositeNodeSpec() override;
   void AddSpecToDriverIndex(fuchsia_driver_framework::wire::CompositeNodeSpec group,

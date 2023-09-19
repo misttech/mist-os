@@ -247,6 +247,23 @@ void DriverRunner::AddSpec(AddSpecRequestView request, AddSpecCompleter::Sync& c
   completer.Reply(composite_node_spec_manager_.AddSpec(*request, std::move(spec)));
 }
 
+void DriverRunner::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_driver_framework::CompositeNodeManager> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  std::string method_type;
+  switch (metadata.unknown_method_type) {
+    case fidl::UnknownMethodType::kOneWay:
+      method_type = "one-way";
+      break;
+    case fidl::UnknownMethodType::kTwoWay:
+      method_type = "two-way";
+      break;
+  };
+
+  LOGF(WARNING, "CompositeNodeManager received unknown %s method. Ordinal: %lu",
+       method_type.c_str(), metadata.method_ordinal);
+}
+
 void DriverRunner::AddSpecToDriverIndex(fuchsia_driver_framework::wire::CompositeNodeSpec group,
                                         AddToIndexCallback callback) {
   driver_index_->AddCompositeNodeSpec(group).Then(

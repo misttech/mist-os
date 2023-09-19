@@ -971,6 +971,23 @@ void Node::RequestBind(RequestBindRequestView request, RequestBindCompleter::Syn
   }
 }
 
+void Node::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_driver_framework::NodeController> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  std::string method_type;
+  switch (metadata.unknown_method_type) {
+    case fidl::UnknownMethodType::kOneWay:
+      method_type = "one-way";
+      break;
+    case fidl::UnknownMethodType::kTwoWay:
+      method_type = "two-way";
+      break;
+  };
+
+  LOGF(WARNING, "fdf::NodeController received unknown %s method. Ordinal: %lu", method_type.c_str(),
+       metadata.method_ordinal);
+}
+
 void Node::AddChild(AddChildRequestView request, AddChildCompleter::Sync& completer) {
   AddChild(fidl::ToNatural(request->args), std::move(request->controller), std::move(request->node),
            [completer = completer.ToAsync()](
@@ -982,6 +999,23 @@ void Node::AddChild(AddChildRequestView request, AddChildCompleter::Sync& comple
                completer.ReplySuccess();
              }
            });
+}
+
+void Node::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_driver_framework::Node> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  std::string method_type;
+  switch (metadata.unknown_method_type) {
+    case fidl::UnknownMethodType::kOneWay:
+      method_type = "one-way";
+      break;
+    case fidl::UnknownMethodType::kTwoWay:
+      method_type = "two-way";
+      break;
+  };
+
+  LOGF(WARNING, "fdf::Node received unknown %s method. Ordinal: %lu", method_type.c_str(),
+       metadata.method_ordinal);
 }
 
 void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_info,

@@ -163,6 +163,14 @@ void TestNode::RequestBind(RequestBindRequestView request, RequestBindCompleter:
   completer.ReplySuccess();
 }
 
+void TestNode::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_driver_framework::NodeController> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {}
+
+void TestNode::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_driver_framework::Node> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {}
+
 void TestNode::SetParent(TestNode* parent,
                          fidl::ServerEnd<fuchsia_driver_framework::NodeController> controller) {
   std::lock_guard guard(checker_);

@@ -47,7 +47,7 @@ type CompositeNodeSpec = table {
 };
 
 /// Error codes for the CompositeNodeManager protocol.
-type CompositeNodeSpecError = strict enum {
+type CompositeNodeSpecError = flexible enum {
     /// An argument of the composite node spec was not provided.
     MISSING_ARGS = 1;
     /// The given composite node spec's `nodes` is empty.
@@ -63,7 +63,7 @@ type CompositeNodeSpecError = strict enum {
 /// static bind rules of a composite driver with the dynamic bind properties
 /// of nodes in the system so that the driver bind rules are more generic and reusable.
 @discoverable
-closed protocol CompositeNodeManager {
+open protocol CompositeNodeManager {
     /// Adds the given composite node specification to the driver framework.
-    strict AddSpec(CompositeNodeSpec) -> () error CompositeNodeSpecError;
+    flexible AddSpec(CompositeNodeSpec) -> () error CompositeNodeSpecError;
 };

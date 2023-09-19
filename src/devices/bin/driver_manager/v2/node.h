@@ -330,8 +330,13 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // fidl::WireServer<fuchsia_driver_framework::NodeController>
   void Remove(RemoveCompleter::Sync& completer) override;
   void RequestBind(RequestBindRequestView request, RequestBindCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_driver_framework::NodeController> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
   // fidl::WireServer<fuchsia_driver_framework::Node>
   void AddChild(AddChildRequestView request, AddChildCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_driver_framework::Node> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // Add this Node to its parents. This should be called when the node is created.
   void AddToParents();
