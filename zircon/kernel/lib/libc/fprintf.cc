@@ -296,7 +296,7 @@ int vfprintf(FILE *out, const char *fmt, va_list ap) {
         goto _output_string;
         // clang-format on
       case 'p':
-        flags |= LONGFLAG | ALTFLAG;
+        flags |= SIZETFLAG | ALTFLAG;
         goto hex;
       case 'X':
         flags |= CAPSFLAG;

@@ -24,6 +24,9 @@ namespace {
 template <typename IntegralType>
 constexpr bool kIs64Bit = sizeof(IntegralType) == sizeof(uint64_t);
 
+template <typename IntegralType>
+constexpr bool kIs32Bit = sizeof(IntegralType) == sizeof(uint32_t);
+
 // Checks that vsnprintf() gives the expected string as output.
 bool test_printf(const char* expected, const char* format, ...) {
   char buf[100];
@@ -113,6 +116,13 @@ bool hex() {
   EXPECT_TRUE(test_printf("uint8: f4 0 fe", "uint8: %hhx %hhx %hhx", -12, 0, 254));
   EXPECT_TRUE(test_printf("uint16:fb2e 0 4d2", "uint16:%hx %hx %hx", -1234, 0, 1234));
   EXPECT_TRUE(test_printf("uint:  ff439eb2 0 bc614e", "uint:  %x %x %x", -12345678, 0, 12345678));
+  if constexpr (kIs64Bit<void*>) {
+    EXPECT_TRUE(test_printf("ptr: 0xdeadbeefcabba6e5", "ptr: %p", (void*)0xdeadbeefcabba6e5));
+  } else if constexpr (kIs32Bit<void*>) {
+    EXPECT_TRUE(test_printf("ptr: 0xdeadbeef", "ptr: %p", (void*)0xdeadbeef));
+  } else {
+    EXPECT_TRUE(false, "Unexpected pointer size");
+  }
 
   if constexpr (kIs64Bit<unsigned long>) {
     EXPECT_TRUE(test_printf("ulong: ffffffffff439eb2 0 bc614e", "ulong: %lx %lx %lx", -12345678UL,
