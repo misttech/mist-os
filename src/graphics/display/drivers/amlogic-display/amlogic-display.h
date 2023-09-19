@@ -307,7 +307,7 @@ class AmlogicDisplay
   inspect::Node root_node_;
   inspect::Node osd_node_;
 
-  display::DisplayId display_id_ = kPanelDisplayId;
+  display::DisplayId display_id_ TA_GUARDED(display_mutex_) = kPanelDisplayId;
   bool display_attached_ TA_GUARDED(display_mutex_) = false;
 
   // Hot Plug Detection
