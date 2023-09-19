@@ -272,8 +272,6 @@ template("board_configuration") {
     contents = {
       name = board_name
 
-      uses_file_relative_paths = true
-
       if (defined(_filesystems)) {
         filesystems = _filesystems
       }

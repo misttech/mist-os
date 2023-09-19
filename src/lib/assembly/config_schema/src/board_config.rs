@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use assembly_file_relative_path::SupportsFileRelativePaths;
+use crate::common::{PackageDetails, PackagedDriverDetails};
+use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use assembly_images_config::BoardFilesystemConfig;
-use camino::Utf8PathBuf;
 use serde::{Deserialize, Serialize};
-
-use crate::common::PackageSet;
 
 /// This struct provides information about the "board" that a product is being
 /// assembled to run on.
@@ -30,9 +28,9 @@ pub struct BoardInformation {
     #[file_relative_paths]
     pub filesystems: BoardFilesystemConfig,
 
-    /// This is the bundle of board-specific artifacts that the Fuchsia platform
-    /// needs added to the assembled system in order to be able to boot Fuchsia
-    /// on this board.
+    /// This is the path to the directory that contains the bundle of
+    /// board-specific artifacts that the Fuchsia platform needs added to the
+    /// assembled system in order to be able to boot Fuchsia on this board.
     ///
     /// Examples:
     ///  - the "board driver"
@@ -40,40 +38,29 @@ pub struct BoardInformation {
     ///
     /// If any of these artifacts are removed, even the 'bootstrap' feature set
     /// may be unable to boot.
-    pub main_support_bundle: Option<HardwareSupportBundle>,
-
-    /// Temporary flag to handle transition
-    #[serde(default)]
-    pub uses_file_relative_paths: bool,
+    #[file_relative_paths]
+    pub main_bundle: Option<FileRelativePathBuf>,
 }
 
 /// This struct defines a bundle of artifacts that can be included by the board
 /// in the assembled image.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
-pub struct HardwareSupportBundle {
+pub struct BoardInputBundle {
     /// These are the drivers that are included by this bundle.
+    #[file_relative_paths]
     pub drivers: Vec<PackagedDriverDetails>,
-}
 
-/// This defines one or more drivers in a package, and which package set they
-/// belong to.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-#[serde(deny_unknown_fields)]
-pub struct PackagedDriverDetails {
-    /// The package containing the driver.
-    pub package: Utf8PathBuf,
-
-    /// Which set this package belongs to.
-    pub set: PackageSet,
-
-    /// The driver components within the package, e.g. meta/foo.cm.
-    pub components: Vec<Utf8PathBuf>,
+    /// These are the packages to include with this bundle.
+    #[file_relative_paths]
+    pub packages: Vec<PackageDetails>,
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use assembly_file_relative_path::SupportsFileRelativePaths;
+    use camino::Utf8PathBuf;
 
     #[test]
     fn test_basic_board_deserialize() {
@@ -88,38 +75,29 @@ mod test {
     }
 
     #[test]
-    fn test_complete_board_deserialize() {
+    fn test_complete_board_deserialize_with_relative_paths() {
+        let board_dir = Utf8PathBuf::from("some/path/to/board");
+        let board_file = board_dir.join("board_configuration.json");
+
         let json = serde_json::json!({
             "name": "sample board",
             "provided_features": [
                 "feature_a",
                 "feature_b"
             ],
-            "main_support_bundle": {
-                "drivers": [
-                    {
-                        "package": "path/to/package_manifest.json",
-                        "set": "base",
-                        "components": [ "meta/foo.cm" ]
-                    }
-                ]
-            }
+            "main_bundle": "main_bundle",
         });
 
         let parsed: BoardInformation = serde_json::from_value(json).unwrap();
+        let resolved = parsed.resolve_paths_from_file(board_file).unwrap();
+
         let expected = BoardInformation {
             name: "sample board".to_owned(),
             provided_features: vec!["feature_a".into(), "feature_b".into()],
-            main_support_bundle: Some(HardwareSupportBundle {
-                drivers: vec![PackagedDriverDetails {
-                    package: "path/to/package_manifest.json".into(),
-                    set: PackageSet::Base,
-                    components: vec!["meta/foo.cm".into()],
-                }],
-            }),
+            main_bundle: Some("some/path/to/board/main_bundle".into()),
             ..Default::default()
         };
 
-        assert_eq!(parsed, expected);
+        assert_eq!(resolved, expected);
     }
 }

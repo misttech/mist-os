@@ -10,8 +10,10 @@ pub mod platform_config;
 pub mod product_config;
 
 pub use assembly_config::AssemblyConfig;
-pub use board_config::BoardInformation;
-pub use common::{DriverDetails, FeatureControl, FileEntry, PackageSet};
+pub use board_config::{BoardInformation, BoardInputBundle};
+pub use common::{
+    DriverDetails, FeatureControl, FileEntry, PackageDetails, PackageSet, PackagedDriverDetails,
+};
 pub use image_assembly_config::{ImageAssemblyConfig, PartialImageAssemblyConfig};
 pub use platform_config::{
     example_config::ExampleConfig,

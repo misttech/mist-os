@@ -7,10 +7,11 @@ use anyhow::{anyhow, ensure, Context, Result};
 use assembly_config_data::ConfigDataBuilder;
 use assembly_config_schema::{
     assembly_config::{AssemblyInputBundle, CompiledPackageDefinition, ShellCommands},
-    board_config::{HardwareSupportBundle, PackagedDriverDetails},
+    board_config::BoardInputBundle,
+    common::PackagedDriverDetails,
     image_assembly_config::{PartialImageAssemblyConfig, PartialKernelConfig},
     product_config::{ProductConfigData, ProductPackageDetails, ProductPackagesConfig},
-    DriverDetails, FileEntry,
+    DriverDetails, FileEntry, PackageDetails,
 };
 use assembly_named_file_map::NamedFileMap;
 
@@ -260,21 +261,13 @@ impl ImageAssemblyConfigBuilder {
         Ok(())
     }
 
-    /// Add a Hardware Support Bundle to the builder, using the path to the
+    /// Add a Board input Bundle to the builder, using the path to the
     /// folder that contains it.
     ///
     /// If any of the items it's trying to add are duplicates (either of itself
     /// or others, this will return an error).
-    pub fn add_hardware_support_bundle(
-        &mut self,
-        bundle_path: impl AsRef<Utf8Path>,
-        bundle: HardwareSupportBundle,
-    ) -> Result<()> {
-        let bundle_path = bundle_path.as_ref();
-
+    pub fn add_board_input_bundle(&mut self, bundle: BoardInputBundle) -> Result<()> {
         for PackagedDriverDetails { package, set, components } in bundle.drivers {
-            let driver_package_path = &bundle_path.join(&package);
-
             // These need to be consolidated into a single type so that they are
             // less cumbersome.
             let (package_set, driver_package_type) = match &set {
@@ -286,16 +279,27 @@ impl ImageAssemblyConfigBuilder {
                 }
             };
 
-            self.add_unique_package_from_path(driver_package_path, &package_set)?;
+            self.add_unique_package_from_path(&package, &package_set)?;
 
             let package_url =
-                DriverManifestBuilder::get_package_url(driver_package_type, driver_package_path)?;
+                DriverManifestBuilder::get_package_url(driver_package_type, &package)?;
 
             let driver_set = match &set {
                 assembly_config_schema::PackageSet::Base => &mut self.base_drivers,
                 assembly_config_schema::PackageSet::BootFS => &mut self.boot_drivers,
             };
-            driver_set.try_insert_unique(package_url, DriverDetails { package, components })?;
+            driver_set.try_insert_unique(
+                package_url,
+                DriverDetails { package: package.into(), components },
+            )?;
+        }
+
+        for PackageDetails { package, set } in bundle.packages {
+            let package_set = match &set {
+                assembly_config_schema::PackageSet::Base => PackageSets::BASE,
+                assembly_config_schema::PackageSet::BootFS => PackageSets::BOOTFS,
+            };
+            self.add_unique_package_from_path(package, &package_set)?;
         }
 
         Ok(())

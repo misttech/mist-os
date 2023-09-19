@@ -729,9 +729,8 @@ mod tests {
         pub(crate) static ref BOARD_INFORMATION_FOR_TESTS: BoardInformation = BoardInformation {
             name: "Test Board".into(),
             provided_features: vec![],
-            main_support_bundle: None,
+            main_bundle: None,
             filesystems: BoardFilesystemConfig::default(),
-            uses_file_relative_paths: false,
         };
     }
 

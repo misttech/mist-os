@@ -64,6 +64,8 @@ impl FfxMain for AssemblyTool {
                         .map(|_| ())
                 }
             },
+            OperationClass::BoardInputBundle(args) => operations::board::board_input_bundle(args)
+                .context("Create Hardware Support Bundle"),
         }
         .map_err(flatten_error_sources)
     }

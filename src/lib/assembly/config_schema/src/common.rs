@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use camino::Utf8PathBuf;
 use serde::{Deserialize, Serialize};
 
@@ -39,6 +40,32 @@ pub struct DriverDetails {
 
     /// The driver components within the package, e.g. meta/foo.cm.
     pub components: Vec<Utf8PathBuf>,
+}
+
+/// This defines one or more drivers in a package, and which package set they
+/// belong to.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
+#[serde(deny_unknown_fields)]
+pub struct PackagedDriverDetails {
+    /// The package containing the driver.
+    pub package: FileRelativePathBuf,
+
+    /// Which set this package belongs to.
+    pub set: PackageSet,
+
+    /// The driver components within the package, e.g. meta/foo.cm.
+    pub components: Vec<Utf8PathBuf>,
+}
+
+/// This defines a package, and which package set it belongs to.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
+#[serde(deny_unknown_fields)]
+pub struct PackageDetails {
+    /// A package to add.
+    pub package: FileRelativePathBuf,
+
+    /// Which set this package belongs to.
+    pub set: PackageSet,
 }
 
 /// A mapping between a file source and destination.

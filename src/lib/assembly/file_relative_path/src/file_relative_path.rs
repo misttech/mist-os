@@ -174,6 +174,14 @@ impl FileRelativePathBuf {
             passthrough @ Self::FileRelative { .. } => Ok(passthrough),
         }
     }
+
+    /// Convert this FileRelativePathBuf to a simple Utf8PathBuf
+    pub fn as_utf8_pathbuf(self) -> Utf8PathBuf {
+        match self {
+            FileRelativePathBuf::FileRelative(path_in_file) => path_in_file,
+            FileRelativePathBuf::Resolved(resolved_path) => resolved_path,
+        }
+    }
 }
 
 /// This trait can be implemented by structs to allow them to easily resolve or
@@ -338,6 +346,28 @@ fn get_file_parent_dir(file_path: impl AsRef<Utf8Path>) -> Result<Utf8PathBuf> {
     })
 }
 
+// Implement SupportsFileRelativePaths for FileRelativePathBuf so there is
+// has an implementation that satisfies Option<T: SupportsFileRelativePaths> for
+// Option<FileRelativePathBuf>
+impl SupportsFileRelativePaths for FileRelativePathBuf {
+    fn resolve_paths_from_dir(self, dir_path: impl AsRef<Utf8Path>) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        self.resolve_from_dir(dir_path)
+    }
+
+    fn make_paths_relative_to_dir(
+        self,
+        path_to_containing_dir: impl AsRef<Utf8Path>,
+    ) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        self.make_relative_to_dir(path_to_containing_dir)
+    }
+}
+
 //
 // Serialization / Deserialization implementations for FileRelativePathBuf
 //
@@ -367,10 +397,7 @@ impl Into<FileRelativePathBufSerializationHelper> for FileRelativePathBuf {
 // form.
 impl From<FileRelativePathBuf> for Utf8PathBuf {
     fn from(value: FileRelativePathBuf) -> Self {
-        match value {
-            FileRelativePathBuf::FileRelative(path_in_file) => path_in_file,
-            FileRelativePathBuf::Resolved(resolved_path) => resolved_path,
-        }
+        value.as_utf8_pathbuf()
     }
 }
 
@@ -431,16 +458,16 @@ impl std::fmt::Display for FileRelativePathBuf {
 // Trait implementations for various containers of FileRelativePathBuf
 //
 
-impl SupportsFileRelativePaths for Vec<FileRelativePathBuf> {
+impl<T: SupportsFileRelativePaths> SupportsFileRelativePaths for Vec<T> {
     fn resolve_paths_from_dir(self, dir_path: impl AsRef<Utf8Path>) -> Result<Self> {
-        self.into_iter().map(|p| p.resolve_from_dir(&dir_path)).collect()
+        self.into_iter().map(|p| p.resolve_paths_from_dir(&dir_path)).collect()
     }
 
     fn make_paths_relative_to_dir(
         self,
         path_to_containing_dir: impl AsRef<Utf8Path>,
     ) -> Result<Self> {
-        self.into_iter().map(|p| p.make_relative_to_dir(&path_to_containing_dir)).collect()
+        self.into_iter().map(|p| p.make_paths_relative_to_dir(&path_to_containing_dir)).collect()
     }
 }
 

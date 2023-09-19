@@ -29,6 +29,7 @@ pub enum OperationClass {
     CreateUpdate(CreateUpdateArgs),
     Product(ProductArgs),
     SizeCheck(SizeCheckArgs),
+    BoardInputBundle(BoardInputBundleArgs),
 }
 
 /// create the system images.
@@ -334,4 +335,38 @@ impl FromStr for PackageValidationHandling {
             _ => Err(format!("Unknown handling for package validation, valid values are 'warning' and 'error' (the default): {}", s))
         }
     }
+}
+
+/// Arguments for creating a Board Input Bundle for use by Assembly.
+#[derive(Debug, FromArgs, PartialEq)]
+#[argh(subcommand, name = "board-input-bundle")]
+pub struct BoardInputBundleArgs {
+    /// the directory to write the board input bundle to.
+    #[argh(option)]
+    pub outdir: Utf8PathBuf,
+
+    /// the path to write a depfile to, which contains all the files read in the
+    /// process of creating the bundle.  The output file listed in the depfile
+    /// is '$outdir/board_input_bundle.json'.
+    #[argh(option)]
+    pub depfile: Option<Utf8PathBuf>,
+
+    /// the path to the file that describes all the drivers to add to the bundle.
+    /// The format of this file is a json list of dictionaries that specify the
+    /// following fields:
+    /// 1) 'package': The path to the package manifest
+    /// 2) 'set': The package set that it belongs to ("bootfs" or "base")
+    /// 3) 'components': A list of the driver components in this pacakge.
+    #[argh(option)]
+    pub drivers: Option<Utf8PathBuf>,
+
+    /// the paths to package manifests for all packages to add to the base
+    /// package set.
+    #[argh(option)]
+    pub base_packages: Vec<Utf8PathBuf>,
+
+    /// the paths to package manifests for all packages to add to the bootfs
+    /// package set.
+    #[argh(option)]
+    pub bootfs_packages: Vec<Utf8PathBuf>,
 }

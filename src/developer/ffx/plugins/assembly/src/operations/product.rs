@@ -4,7 +4,7 @@
 
 use crate::operations::product::assembly_builder::ImageAssemblyConfigBuilder;
 use anyhow::{Context, Result};
-use assembly_config_schema::{AssemblyConfig, BoardInformation};
+use assembly_config_schema::{AssemblyConfig, BoardInformation, BoardInputBundle};
 use assembly_file_relative_path::SupportsFileRelativePaths;
 use assembly_images_config::ImagesConfig;
 use assembly_tool::SdkToolProvider;
@@ -36,18 +36,10 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
 
     let board_info_path = board_info;
     let board_info = util::read_config::<BoardInformation>(&board_info_path)
-        .context("Loading board information")?;
-
-    // To support the transition to using file-relative paths, only relativize
-    // them when the transitional marker flag is set.
-    let board_info = if board_info.uses_file_relative_paths {
-        let resolved = board_info
-            .resolve_paths_from_file(&board_info_path)
-            .context("Resolving paths in board configuration.")?;
-        resolved
-    } else {
-        board_info
-    };
+        .context("Loading board information")?
+        // and then resolve the file-relative paths to be relative to the cwd instead.
+        .resolve_paths_from_file(&board_info_path)
+        .context("Resolving paths in board configuration.")?;
 
     let mut builder = ImageAssemblyConfigBuilder::default();
 
@@ -72,12 +64,18 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         builder.add_domain_config(package, config)?;
     }
 
-    // Add the board's Hardware Support Bundle, if it has one.
-    if let Some(main_support_bundle) = board_info.main_support_bundle {
-        let hsb_dir = board_info_path.parent().unwrap_or_else(|| ".".into());
-        builder
-            .add_hardware_support_bundle(&hsb_dir, main_support_bundle)
-            .context("Adding the board's main hardware support bundle from: {board_info_path}")?;
+    // Add the board's Board input Bundle, if it has one.
+    if let Some(main_bundle) = board_info.main_bundle {
+        let main_bundle = main_bundle.as_utf8_pathbuf().join("board_input_bundle.json");
+        let bundle: BoardInputBundle =
+            util::read_config(&main_bundle).context("Loading board's main board input bundle")?;
+
+        let bundle = bundle.resolve_paths_from_file(&main_bundle).with_context(|| {
+            format!("resolving paths in main board input bundle: {main_bundle}")
+        })?;
+        builder.add_board_input_bundle(bundle).with_context(|| {
+            format!("Adding the board's main board input bundle from: {main_bundle}")
+        })?;
     }
 
     // Add the platform Assembly Input Bundles that were chosen by the configuration.
