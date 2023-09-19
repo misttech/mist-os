@@ -1114,10 +1114,6 @@ group("xml-rs") {
   public_deps = [ ":xml-rs-v0_8_0" ]
 }
 
-group("xts-mode") {
-  public_deps = [ ":xts-mode-v0_5_1" ]
-}
-
 group("zerocopy") {
   public_deps = [ ":zerocopy-v0_7_0-alpha_5" ]
 }
@@ -13236,30 +13232,6 @@ rust_library("xml-rs-v0_8_0") {
     "--edition=2015",
     "-Cmetadata=9187c9c232fb3a0e",
     "-Cextra-filename=-9187c9c232fb3a0e",
-  ]
-
-  visibility = [ ":*" ]
-}
-
-rust_library("xts-mode-v0_5_1") {
-  crate_name = "xts_mode"
-  crate_root = "//third_party/rust_crates/vendor/xts-mode-0.5.1/src/lib.rs"
-  output_name = "xts_mode-3809b9a3c1b0808d"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":byteorder-v1_4_3" ]
-  deps += [ ":cipher-v0_4_4" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2021",
-    "-Cmetadata=3809b9a3c1b0808d",
-    "-Cextra-filename=-3809b9a3c1b0808d",
-    "--cfg=feature=\"default\"",
-    "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]

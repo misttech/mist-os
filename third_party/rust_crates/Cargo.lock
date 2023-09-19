@@ -1498,7 +1498,6 @@ dependencies = [
  "webpki",
  "which",
  "xml-rs",
- "xts-mode",
  "zerocopy",
  "zip",
  "zstd",
@@ -5058,16 +5057,6 @@ name = "xml-rs"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "541b12c998c5b56aa2b4e6f18f03664eef9a4fd0a246a55594efae6cc2d964b5"
-
-[[package]]
-name = "xts-mode"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09cbddb7545ca0b9ffa7bdc653e8743303e1712687a6918ced25f2cdbed42520"
-dependencies = [
- "byteorder",
- "cipher",
-]
 
 [[package]]
 name = "zerocopy"
