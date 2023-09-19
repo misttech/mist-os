@@ -292,13 +292,15 @@ pub fn sys_bpf(
                 FdNumber::AT_FDCWD,
                 &pathname,
             )?;
-            parent.entry.node.downcast_ops::<BpfFsDir>().ok_or_else(|| errno!(EINVAL))?;
+            let bpf_dir =
+                parent.entry.node.downcast_ops::<BpfFsDir>().ok_or_else(|| errno!(EINVAL))?;
             let selinux_context = get_selinux_context(&pathname);
-            parent.entry.add_node_ops(
+            bpf_dir.register_pin(
                 current_task,
+                &parent.entry,
                 basename,
-                mode!(IFREG, 0o600),
-                BpfFsObject::new(object, &selinux_context),
+                object,
+                &selinux_context,
             )?;
             Ok(SUCCESS)
         }
@@ -427,6 +429,23 @@ impl BpfFsDir {
             .set_xattr(b"security.selinux", selinux_context, XattrOp::Create)
             .expect("Failed to set selinux context.");
         Self { xattrs }
+    }
+
+    fn register_pin(
+        &self,
+        current_task: &CurrentTask,
+        dir_entry: &DirEntryHandle,
+        name: &FsStr,
+        object: BpfHandle,
+        selinux_context: &FsStr,
+    ) -> Result<(), Errno> {
+        dir_entry.create_entry(current_task, name, |dir, _name| {
+            Ok(dir.fs().create_node(
+                BpfFsObject::new(object, &selinux_context),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o600), FsCred::root()),
+            ))
+        })?;
+        Ok(())
     }
 }
 

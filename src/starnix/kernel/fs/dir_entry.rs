@@ -278,36 +278,6 @@ impl DirEntry {
         Ok((entry, exists))
     }
 
-    /// Magically creates a node without asking the filesystem. All the other node creation
-    /// functions go through the filesystem, such as create_node or create_symlink.
-    pub fn add_node_ops(
-        self: &DirEntryHandle,
-        current_task: &CurrentTask,
-        name: &FsStr,
-        mode: FileMode,
-        ops: impl FsNodeOps,
-    ) -> Result<DirEntryHandle, Errno> {
-        self.add_node_ops_dev(current_task, name, mode, DeviceType::NONE, ops)
-    }
-
-    pub fn add_node_ops_dev(
-        self: &DirEntryHandle,
-        current_task: &CurrentTask,
-        name: &FsStr,
-        mode: FileMode,
-        dev: DeviceType,
-        ops: impl FsNodeOps,
-    ) -> Result<DirEntryHandle, Errno> {
-        self.create_entry(current_task, name, |dir, _name| {
-            let node = dir.fs().create_node(ops, |id| {
-                let mut info = FsNodeInfo::new(id, mode, FsCred::root());
-                info.rdev = dev;
-                info
-            });
-            Ok(node)
-        })
-    }
-
     // This is marked as test-only because it sets the owner/group to root instead of the current
     // user to save a bit of typing in tests, but this shouldn't happen silently in production.
     #[cfg(test)]
