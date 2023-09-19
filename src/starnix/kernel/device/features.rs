@@ -4,7 +4,7 @@
 
 use crate::{
     device::{
-        binder::create_binders, framebuffer::fb_device_init, input::init_input_devices,
+        framebuffer::fb_device_init, input::init_input_devices,
         perfetto_consumer::start_perfetto_consumer_thread, starnix::magma_device_init,
     },
     logging::log_warn,
@@ -25,10 +25,6 @@ pub fn run_features(entries: &Vec<String>, kernel: &Arc<Kernel>) -> Result<(), E
     for entry in entries {
         let entry_type = entry.split_once(':').map(|(ty, _)| ty).unwrap_or(entry);
         match entry_type {
-            "binder" => {
-                // Creates the various binder drivers (/dev/binder, /dev/hwbinder, /dev/vndbinder).
-                create_binders(kernel)?;
-            }
             "selinux_enabled" => {}
             "framebuffer" => {
                 fb_device_init(kernel);

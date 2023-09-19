@@ -5,15 +5,16 @@
 #![allow(non_upper_case_globals)]
 
 use crate::{
+    auth::FsCred,
     device::{mem::new_null_file, remote_binder::RemoteBinderDevice, DeviceOps},
     fs::{
         buffers::{InputBuffer, OutputBuffer, VecInputBuffer},
-        devtmpfs::dev_tmp_fs,
         fileops_impl_nonseekable, fs_node_impl_dir_readonly,
         fuchsia::new_remote_file,
-        CacheMode, DirEntryHandle, FdEvents, FdFlags, FdNumber, FileHandle, FileObject, FileOps,
-        FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FileWriteGuardRef, FsNode,
-        FsNodeOps, FsStr, FsString, MemoryDirectoryFile, NamespaceNode, SpecialNode,
+        CacheMode, DirectoryEntryType, FdEvents, FdFlags, FdNumber, FileHandle, FileObject,
+        FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FileWriteGuardRef,
+        FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, NamespaceNode, SpecialNode,
+        VecDirectory, VecDirectoryEntry,
     },
     lock::{Mutex, MutexGuard, RwLock},
     logging::*,
@@ -3930,7 +3931,28 @@ impl FileSystemOps for BinderFs {
     }
 }
 
-struct BinderFsDir;
+#[derive(Debug)]
+struct BinderFsDir {
+    devices: BTreeMap<FsString, DeviceType>,
+}
+
+impl BinderFsDir {
+    fn new(kernel: &Kernel) -> Result<Self, Errno> {
+        let remote_dev = kernel.device_registry.register_dyn_chrdev(RemoteBinderDevice {})?;
+        let mut devices = BTreeMap::default();
+        devices.insert(b"remote".to_vec(), remote_dev);
+        Ok(Self { devices })
+    }
+
+    fn add_binder_device(&mut self, kernel: &Kernel, name: FsString) -> Result<(), Errno> {
+        let driver = BinderDriver::new();
+        let dev = kernel.device_registry.register_dyn_chrdev(driver.clone())?;
+        self.devices.insert(name, dev);
+        kernel.binders.write().insert(dev, driver);
+        Ok(())
+    }
+}
+
 impl FsNodeOps for BinderFsDir {
     fs_node_impl_dir_readonly!();
 
@@ -3940,36 +3962,38 @@ impl FsNodeOps for BinderFsDir {
         _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(Box::new(MemoryDirectoryFile::new()))
+        let entries = self
+            .devices
+            .keys()
+            .map(|name| VecDirectoryEntry {
+                entry_type: DirectoryEntryType::CHR,
+                name: name.clone(),
+                inode: None,
+            })
+            .collect::<Vec<_>>();
+        Ok(VecDirectory::new_file(entries))
+    }
+
+    fn lookup(
+        &self,
+        node: &FsNode,
+        _current_task: &CurrentTask,
+        name: &FsStr,
+    ) -> Result<FsNodeHandle, Errno> {
+        if let Some(dev) = self.devices.get(name) {
+            let mode = if name == b"remote" { mode!(IFCHR, 0o444) } else { mode!(IFCHR, 0o600) };
+            Ok(node.fs().create_node(SpecialNode, |ino| {
+                let mut info = FsNodeInfo::new(ino, mode, FsCred::root());
+                info.rdev = *dev;
+                info
+            }))
+        } else {
+            error!(ENOENT, format!("looking for {:?}", String::from_utf8_lossy(name)))
+        }
     }
 }
 
-const BINDERS: &[&FsStr] = &[b"binder", b"hwbinder", b"vndbinder"];
-
-fn make_binder_nodes(kernel: &Kernel, dir: &DirEntryHandle) -> Result<(), Errno> {
-    let mut registered_binders = kernel.binders.write();
-    for name in BINDERS {
-        let driver = BinderDriver::new();
-        let dev = kernel.device_registry.register_dyn_chrdev(driver.clone())?;
-        dir.add_node_ops_dev(
-            kernel.kthreads.system_task(),
-            name,
-            mode!(IFCHR, 0o600),
-            dev,
-            SpecialNode,
-        )?;
-        registered_binders.insert(dev, driver);
-    }
-    let remote_dev = kernel.device_registry.register_dyn_chrdev(RemoteBinderDevice {})?;
-    dir.add_node_ops_dev(
-        kernel.kthreads.system_task(),
-        b"remote",
-        mode!(IFCHR, 0o444),
-        remote_dev,
-        SpecialNode,
-    )?;
-    Ok(())
-}
+const DEFAULT_BINDERS: &[&FsStr] = &[b"binder", b"hwbinder", b"vndbinder"];
 
 impl BinderFs {
     pub fn new_fs(
@@ -3977,15 +4001,13 @@ impl BinderFs {
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let fs = FileSystem::new(kernel, CacheMode::Permanent, BinderFs, options);
-        fs.set_root(BinderFsDir);
-        make_binder_nodes(kernel, fs.root())?;
+        let mut root = BinderFsDir::new(kernel)?;
+        for name in DEFAULT_BINDERS {
+            root.add_binder_device(kernel, name.to_vec())?;
+        }
+        fs.set_root(root);
         Ok(fs)
     }
-}
-
-pub fn create_binders(kernel: &Arc<Kernel>) -> Result<(), Errno> {
-    let fs = dev_tmp_fs(kernel);
-    make_binder_nodes(kernel, fs.root())
 }
 
 #[cfg(test)]
