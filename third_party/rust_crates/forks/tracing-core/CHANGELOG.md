@@ -1,9 +1,138 @@
+# 0.1.31 (May 11, 2023)
+
+This release of `tracing-core` fixes a bug that caused threads which call
+`dispatcher::get_default` _before_ a global default subscriber is set to never
+see the global default once it is set. In addition, it includes improvements for
+instrumentation performance in some cases, especially when using a global
+default dispatcher.
+
+### Fixed
+
+- Fixed incorrect thread-local caching of `Dispatch::none` if
+  `dispatcher::get_default` is called before `dispatcher::set_global_default`
+  ([#2593])
+
+### Changed
+
+- Cloning a `Dispatch` that points at a global default subscriber no longer
+  requires an `Arc` reference count increment, improving performance
+  substantially ([#2593])
+- `dispatcher::get_default` no longer attempts to access a thread local if the
+  scoped dispatcher is not in use, improving performance when the default
+  dispatcher is global ([#2593])
+- Added `#[inline]` annotations called by the `event!` and `span!` macros to
+  reduce the size of macro-generated code and improve recording performance
+  ([#2555])
+
+Thanks to new contributor @ldm0 for contributing to this release!
+
+[#2593]: https://github.com/tokio-rs/tracing/pull/2593
+[#2555]: https://github.com/tokio-rs/tracing/pull/2555
+
+# 0.1.30 (October 6, 2022)
+
+This release of `tracing-core` adds a new `on_register_dispatch` method to the
+`Subscriber` trait to allow the `Subscriber` to perform initialization after
+being registered as a `Dispatch`, and a `WeakDispatch` type to allow a
+`Subscriber` to store its own `Dispatch` without creating reference count
+cycles.
+
+### Added
+
+- `Subscriber::on_register_dispatch` method ([#2269])
+- `WeakDispatch` type and `Dispatch::downgrade()` function ([#2293])
+
+Thanks to @jswrenn for contributing to this release!
+
+[#2269]: https://github.com/tokio-rs/tracing/pull/2269
+[#2293]: https://github.com/tokio-rs/tracing/pull/2293
+
+# 0.1.29 (July 29, 2022)
+
+This release of `tracing-core` adds `PartialEq` and `Eq` implementations for
+metadata types, and improves error messages when setting the global default
+subscriber fails.
+
+### Added
+
+- `PartialEq` and `Eq` implementations for `Metadata` ([#2229])
+- `PartialEq` and `Eq` implementations for `FieldSet` ([#2229])
+
+### Fixed
+
+- Fixed unhelpful `fmt::Debug` output for `dispatcher::SetGlobalDefaultError`
+  ([#2250])
+- Fixed compilation with `-Z minimal-versions` ([#2246])
+
+Thanks to @jswrenn and @CAD97 for contributing to this release!
+
+[#2229]: https://github.com/tokio-rs/tracing/pull/2229
+[#2246]: https://github.com/tokio-rs/tracing/pull/2246
+[#2250]: https://github.com/tokio-rs/tracing/pull/2250
+
+# 0.1.28 (June 23, 2022)
+
+This release of `tracing-core` adds new `Value` implementations, including one
+for `String`, to allow recording `&String` as a value without having to call
+`as_str()` or similar, and for 128-bit integers (`i128` and `u128`). In
+addition, it adds new methods and trait implementations for `Subscriber`s.
+
+### Added
+
+- `Value` implementation for `String` ([#2164])
+- `Value` implementation for `u128` and `i28` ([#2166])
+- `downcast_ref` and `is` methods for `dyn Subscriber + Sync`,
+  `dyn Subscriber + Send`, and `dyn Subscriber + Send + Sync` ([#2160])
+- `Subscriber::event_enabled` method to enable filtering based on `Event` field
+  values ([#2008])
+- `Subscriber` implementation for `Box<S: Subscriber + ?Sized>` and
+  `Arc<S: Subscriber + ?Sized>` ([#2161])
+
+Thanks to @jswrenn and @CAD97 for contributing to this release!
+
+[#2164]: https://github.com/tokio-rs/tracing/pull/2164
+[#2166]: https://github.com/tokio-rs/tracing/pull/2166
+[#2160]: https://github.com/tokio-rs/tracing/pull/2160
+[#2008]: https://github.com/tokio-rs/tracing/pull/2008
+[#2161]: https://github.com/tokio-rs/tracing/pull/2161
+
+# 0.1.27 (June 7, 2022)
+
+This release of `tracing-core` introduces a new `DefaultCallsite` type, which
+can be used by instrumentation crates rather than implementing their own
+callsite types. Using `DefaultCallsite` may offer reduced overhead from callsite
+registration.
+
+### Added
+
+- `DefaultCallsite`, a pre-written `Callsite` implementation for use in
+  instrumentation crates ([#2083])
+- `ValueSet::len` and `Record::len` methods returning the number of fields in a
+  `ValueSet` or `Record` ([#2152])
+
+### Changed
+
+- Replaced `lazy_static` dependency with `once_cell` ([#2147])
+
+### Documented
+
+- Added documentation to the `callsite` module ([#2088], [#2149])
+
+Thanks to new contributors @jamesmunns and @james7132 for contributing to this
+release!
+
+[#2083]: https://github.com/tokio-rs/tracing/pull/2083
+[#2152]: https://github.com/tokio-rs/tracing/pull/2152
+[#2147]: https://github.com/tokio-rs/tracing/pull/2147
+[#2088]: https://github.com/tokio-rs/tracing/pull/2088
+[#2149]: https://github.com/tokio-rs/tracing/pull/2149
+
 # 0.1.26 (April 14, 2022)
 
 This release adds a `Value` implementation for `Box<T: Value>` to allow
 recording boxed values more conveniently. In particular, this should improve
 the ergonomics of the implementations for `dyn std::error::Error` trait objects,
-including those added in [v0.1.25]. 
+including those added in [v0.1.25].
 
 ### Added
 
