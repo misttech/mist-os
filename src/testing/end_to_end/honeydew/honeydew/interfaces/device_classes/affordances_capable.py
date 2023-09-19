@@ -12,6 +12,7 @@ from honeydew.interfaces.affordances import tracing
 from honeydew.interfaces.affordances.bluetooth.profiles import bluetooth_gap
 from honeydew.interfaces.affordances.ui import screenshot
 from honeydew.interfaces.affordances.ui import user_input
+from honeydew.interfaces.affordances.wlan import wlan_policy
 from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.utils import properties
 
@@ -118,4 +119,18 @@ class UserInputCapableDevice(abc.ABC):
 
         Returns:
             user_input.UserInput object
+        """
+
+
+class WlanPolicyCapableDevice(abc.ABC):
+    """Abstract base class to be implemented by a device which supports the
+    Wlan affordance."""
+
+    @properties.Affordance
+    @abc.abstractmethod
+    def wlan_policy(self) -> wlan_policy.WlanPolicy:
+        """Returns a WlanPolicy affordance object.
+
+        Returns:
+            wlan_policy.WlanPolicy object
         """

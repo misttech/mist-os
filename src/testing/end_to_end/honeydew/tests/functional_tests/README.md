@@ -199,7 +199,7 @@ $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/device_class_
 ## Affordance tests
 
 ### Bluetooth tests
-``` shell
+```shell
 $ fx set core.x64 \
     --with //build/images/recovery:recovery-installer \
     --with //src/testing/sl4f \
@@ -211,7 +211,7 @@ $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_te
 ```
 
 ### Tracing tests
-``` shell
+```shell
 $ fx set core.qemu-x64 \
     --with //src/testing/sl4f \
     --with //src/sys/bin/start_sl4f \
@@ -253,7 +253,7 @@ $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_te
 ```
 
 ### UserInput tests
-``` shell
+```shell
 $ fx set terminal.qemu-x64 \
     --with //src/testing/sl4f \
     --with //src/sys/bin/start_sl4f \
@@ -261,6 +261,17 @@ $ fx set terminal.qemu-x64 \
     --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
 $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_ui:user_input_test --e2e --output
+```
+
+###  Wlan policy tests
+```shell
+$ fx set core.x64 \
+    --with //src/testing/sl4f \
+    --with //src/sys/bin/start_sl4f \
+    --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
+    --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
+
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_wlan:wlan_policy_test --e2e --output
 ```
 
 ## Transport tests

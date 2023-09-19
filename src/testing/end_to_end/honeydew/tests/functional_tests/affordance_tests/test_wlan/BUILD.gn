@@ -1,0 +1,59 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be found
+# in the LICENSE file.
+
+import("//build/python/python_mobly_test.gni")
+import("//build/testing/environments.gni")
+
+if (is_host) {
+  python_mobly_test("wlan_policy_test") {
+    main_source = "test_wlan_policy.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+    ]
+    environments = [ nelson_env ]
+  }
+
+  python_mobly_test("wlan_policy_test_fc") {
+    main_source = "test_wlan_policy.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+    ]
+    transport = "fuchsia-controller"
+    environments = [ nelson_env ]
+  }
+
+  group("tests") {
+    testonly = true
+    public_deps = [
+      ":wlan_policy_test($host_toolchain)",
+      ":wlan_policy_test_fc($host_toolchain)",
+    ]
+  }
+
+  # WLAN affordance tests are not enabled in infra yet.
+
+  # Stable infra test groups.
+  group("stable_sl4f_emulator_tests") {
+    testonly = true
+    public_deps = []
+  }
+
+  group("stable_non_sl4f_emulator_tests") {
+    testonly = true
+    public_deps = []
+  }
+
+  # Unstable infra test groups.
+  group("unstable_sl4f_emulator_tests") {
+    testonly = true
+    public_deps = []
+  }
+
+  group("unstable_non_sl4f_emulator_tests") {
+    testonly = true
+    public_deps = []
+  }
+}

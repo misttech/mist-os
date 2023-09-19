@@ -122,6 +122,11 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         self.assertIsInstance(
             self.fd_obj, affordances_capable.UserInputCapableDevice)
 
+    def test_fuchsia_device_is_wlan_policy_capable(self) -> None:
+        """Test case to make sure fuchsia device is wlan_policy capable"""
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.WlanPolicyCapableDevice)
+
     # List all the tests related to transports in alphabetical order
     def test_fuchsia_device_is_sl4f_capable(self) -> None:
         """Test case to make sure fuchsia device is sl4f capable"""

@@ -38,6 +38,14 @@ if (is_host) {
   python_host_test("user_input_sl4f_test") {
     main_source = "user_input_test.py"
     libraries = [ "//src/testing/end_to_end/honeydew" ]
+  }
+
+  python_host_test("wlan_policy_sl4f_test") {
+    main_source = "wlan_policy_test.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//third_party/parameterized",
+    ]
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
   }
@@ -50,5 +58,6 @@ group("tests") {
     ":screenshot_sl4f_test($host_toolchain)",
     ":tracing_sl4f_test($host_toolchain)",
     ":user_input_sl4f_test($host_toolchain)",
+    ":wlan_policy_sl4f_test($host_toolchain)",
   ]
 }

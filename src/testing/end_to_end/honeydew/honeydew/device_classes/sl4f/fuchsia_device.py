@@ -15,6 +15,7 @@ from honeydew.affordances.sl4f.bluetooth.profiles import \
     bluetooth_gap as bluetooth_gap_sl4f
 from honeydew.affordances.sl4f.ui import screenshot as screenshot_sl4f
 from honeydew.affordances.sl4f.ui import user_input as user_input_sl4f
+from honeydew.affordances.sl4f.wlan import wlan_policy as wlan_policy_sl4f
 from honeydew.device_classes import base_fuchsia_device
 from honeydew.interfaces.affordances import tracing as tracing_interface
 from honeydew.interfaces.affordances.bluetooth.profiles import \
@@ -23,6 +24,8 @@ from honeydew.interfaces.affordances.ui import \
     screenshot as screenshot_interface
 from honeydew.interfaces.affordances.ui import \
     user_input as user_input_interface
+from honeydew.interfaces.affordances.wlan import \
+    wlan_policy as wlan_policy_interface
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.device_classes import transports_capable
 from honeydew.transports import sl4f as sl4f_transport
@@ -50,6 +53,7 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
                     affordances_capable.BluetoothGapCapableDevice,
                     affordances_capable.ScreenshotCapableDevice,
                     affordances_capable.TracingCapableDevice,
+                    affordances_capable.WlanPolicyCapableDevice,
                     affordances_capable.UserInputCapableDevice,
                     transports_capable.SL4FCapableDevice):
     """FuchsiaDevice abstract base class implementation using SL4F.
@@ -132,6 +136,16 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
             user_input.UserInput object
         """
         return user_input_sl4f.UserInput(sl4f=self.sl4f)
+
+    @properties.Affordance
+    def wlan_policy(self) -> wlan_policy_interface.WlanPolicy:
+        """Returns a wlan_policy affordance object.
+
+        Returns:
+            wlan_policy.WlanPolicy object
+        """
+        return wlan_policy_sl4f.WlanPolicy(
+            device_name=self.device_name, sl4f=self.sl4f)
 
     # List all the public methods in alphabetical order
     def close(self) -> None:

@@ -10,6 +10,7 @@ if (is_host) {
       "test_session:tests",
       "test_tracing:tests",
       "test_ui:tests",
+      "test_wlan:tests",
     ]
   }
 
@@ -25,6 +26,7 @@ if (is_host) {
       "test_session:stable_sl4f_emulator_tests",
       "test_tracing:stable_sl4f_emulator_tests",
       "test_ui:stable_sl4f_emulator_tests",
+      "test_wlan:stable_sl4f_emulator_tests",
     ]
   }
 
@@ -35,6 +37,7 @@ if (is_host) {
       "test_session:stable_non_sl4f_emulator_tests",
       "test_tracing:stable_non_sl4f_emulator_tests",
       "test_ui:stable_non_sl4f_emulator_tests",
+      "test_wlan:stable_non_sl4f_emulator_tests",
     ]
   }
 
@@ -46,6 +49,7 @@ if (is_host) {
       "test_session:unstable_sl4f_emulator_tests",
       "test_tracing:unstable_sl4f_emulator_tests",
       "test_ui:unstable_sl4f_emulator_tests",
+      "test_wlan:unstable_sl4f_emulator_tests",
     ]
   }
 
@@ -56,6 +60,7 @@ if (is_host) {
       "test_session:unstable_non_sl4f_emulator_tests",
       "test_tracing:unstable_non_sl4f_emulator_tests",
       "test_ui:unstable_non_sl4f_emulator_tests",
+      "test_wlan:unstable_non_sl4f_emulator_tests",
     ]
   }
 }
