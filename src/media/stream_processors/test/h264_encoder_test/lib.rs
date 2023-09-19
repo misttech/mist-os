@@ -15,10 +15,7 @@ use stream_processor_test::*;
 // Instructions for capturing output of encoder:
 // 1. Set the `output_file` field to write the encoded output into "/tmp/".
 // 2. Add exec.run_singlethreaded(future::pending()) at the end of the test so it doesn't exit.
-//    This is so the tmp file doesn't get cleaned up.
-// 3. File will be written to isolated tmp directory for the test environment. Look under:
-//    `/tmp/r/sys/r/test_env_XXXXXX`
-// 4. Scp from `<isolated tmp>/fuchsia.com:h264_encoder_test:0#meta:h264_encoder_test.cmx` to host.
+// 3. Use `ffx component copy` to copy the file to the host.
 
 #[fuchsia::test]
 fn h264_stream_output_generated() -> Result<()> {

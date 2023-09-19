@@ -40,10 +40,12 @@ bool HermeticPipelineTest::save_input_and_output_files_ = false;
 //
 //  PKG=<fuchsia_test_package to run>
 //  REALM=audio-pipeline-tests
-//  DEVICE_DIR=/data/cache/r/sys/r/$REALM/fuchsia.com:$PKG:0#meta:$PKG-component.cmx/
+//  DEVICE_DIR=/tmp
 //
 //  fx test "--realm=$REALM" $PKG -- --save-inputs-and-outputs
-//  fx cp --to-host $DEVICE_DIR/<file> <path-on-host>
+//
+//  Run `ffx component copy --help` for instructions to copy the file in /tmp to
+//  the host.
 //
 void set_save_pipeline_test_inputs_and_outputs(bool save_input_and_output_files) {
   HermeticPipelineTest::save_input_and_output_files_ = save_input_and_output_files;
