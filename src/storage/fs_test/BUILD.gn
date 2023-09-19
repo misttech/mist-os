@@ -39,7 +39,9 @@ static_library("fs_test") {
   ]
   public_deps = [
     # fs_test.h:
+    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_hlcpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire_testing",
+    "//sdk/lib/diagnostics/reader/cpp:archive_reader",
     "//sdk/lib/sys/inspect/cpp",
     "//src/storage/blobfs",
     "//src/storage/lib/fs_management",

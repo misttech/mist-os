@@ -45,7 +45,6 @@ rustc_library("platform") {
       "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
       "//sdk/fidl/fuchsia.memorypressure:fuchsia.memorypressure_rust",
       "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
-      "//src/lib/diagnostics/inspect/runtime/rust",
       "//src/lib/diagnostics/inspect/rust",
       "//src/lib/fidl/rust/fidl",
       "//src/lib/fuchsia-async",

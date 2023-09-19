@@ -122,6 +122,7 @@ class FilesystemInstance {
     return fidl::ClientEnd<fuchsia_io::Directory>();
   }
   virtual void Reset() {}
+  virtual std::string GetComponentSelector() const = 0;
 };
 
 // Base class for all supported file systems. It is a factory class that generates

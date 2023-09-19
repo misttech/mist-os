@@ -67,6 +67,11 @@ class MemfsInstance : public fs_test::FilesystemInstance {
 
   fs_management::SingleVolumeFilesystemInterface* fs() override { return nullptr; }
 
+  std::string GetComponentSelector() const override {
+    ZX_ASSERT_MSG(false, "GetComponentSelector unimplemented for MemfsInstance");
+    return "";
+  }
+
  private:
   void Shutdown() {
     loop_.Quit();

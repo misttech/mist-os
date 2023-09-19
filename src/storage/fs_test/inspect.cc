@@ -20,10 +20,11 @@ namespace {
 
 using namespace ::testing;
 using namespace inspect::testing;
+using diagnostics::reader::InspectData;
 
 using inspect::BoolPropertyValue;
+using inspect::IntPropertyValue;
 using inspect::StringPropertyValue;
-using inspect::UintPropertyValue;
 
 // All properties we require the fs.info node to contain, excluding optional fields.
 constexpr std::string_view kRequiredInfoProperties[] = {
@@ -98,16 +99,19 @@ fs_inspect::InfoData GetInfoProperties(const inspect::NodeValue& info_node) {
   }
 
   return InfoData{
-      .id = info_node.get_property<UintPropertyValue>(InfoData::kPropId)->value(),
-      .type = info_node.get_property<UintPropertyValue>(InfoData::kPropType)->value(),
+      .id = static_cast<uint64_t>(
+          info_node.get_property<IntPropertyValue>(InfoData::kPropId)->value()),
+      .type = static_cast<uint64_t>(
+          info_node.get_property<IntPropertyValue>(InfoData::kPropType)->value()),
       .name = info_node.get_property<StringPropertyValue>(InfoData::kPropName)->value(),
-      .version_major =
-          info_node.get_property<UintPropertyValue>(InfoData::kPropVersionMajor)->value(),
-      .version_minor =
-          info_node.get_property<UintPropertyValue>(InfoData::kPropVersionMinor)->value(),
-      .block_size = info_node.get_property<UintPropertyValue>(InfoData::kPropBlockSize)->value(),
-      .max_filename_length =
-          info_node.get_property<UintPropertyValue>(InfoData::kPropMaxFilenameLength)->value(),
+      .version_major = static_cast<uint64_t>(
+          info_node.get_property<IntPropertyValue>(InfoData::kPropVersionMajor)->value()),
+      .version_minor = static_cast<uint64_t>(
+          info_node.get_property<IntPropertyValue>(InfoData::kPropVersionMinor)->value()),
+      .block_size = static_cast<uint64_t>(
+          info_node.get_property<IntPropertyValue>(InfoData::kPropBlockSize)->value()),
+      .max_filename_length = static_cast<uint64_t>(
+          info_node.get_property<IntPropertyValue>(InfoData::kPropMaxFilenameLength)->value()),
       .oldest_version = std::move(oldest_version),
   };
 }
@@ -117,12 +121,14 @@ fs_inspect::InfoData GetInfoProperties(const inspect::NodeValue& info_node) {
 fs_inspect::UsageData GetUsageProperties(const inspect::NodeValue& usage_node) {
   using fs_inspect::UsageData;
   return UsageData{
-      .total_bytes =
-          usage_node.get_property<UintPropertyValue>(UsageData::kPropTotalBytes)->value(),
-      .used_bytes = usage_node.get_property<UintPropertyValue>(UsageData::kPropUsedBytes)->value(),
-      .total_nodes =
-          usage_node.get_property<UintPropertyValue>(UsageData::kPropTotalNodes)->value(),
-      .used_nodes = usage_node.get_property<UintPropertyValue>(UsageData::kPropUsedNodes)->value(),
+      .total_bytes = static_cast<uint64_t>(
+          usage_node.get_property<IntPropertyValue>(UsageData::kPropTotalBytes)->value()),
+      .used_bytes = static_cast<uint64_t>(
+          usage_node.get_property<IntPropertyValue>(UsageData::kPropUsedBytes)->value()),
+      .total_nodes = static_cast<uint64_t>(
+          usage_node.get_property<IntPropertyValue>(UsageData::kPropTotalNodes)->value()),
+      .used_nodes = static_cast<uint64_t>(
+          usage_node.get_property<IntPropertyValue>(UsageData::kPropUsedNodes)->value()),
   };
 }
 
@@ -133,16 +139,16 @@ fs_inspect::FvmData GetFvmProperties(const inspect::NodeValue& fvm_node) {
   return FvmData{
       .size_info =
           {
-              .size_bytes =
-                  fvm_node.get_property<UintPropertyValue>(FvmData::kPropSizeBytes)->value(),
-              .size_limit_bytes =
-                  fvm_node.get_property<UintPropertyValue>(FvmData::kPropSizeLimitBytes)->value(),
-              .available_space_bytes =
-                  fvm_node.get_property<UintPropertyValue>(FvmData::kPropAvailableSpaceBytes)
-                      ->value(),
+              .size_bytes = static_cast<uint64_t>(
+                  fvm_node.get_property<IntPropertyValue>(FvmData::kPropSizeBytes)->value()),
+              .size_limit_bytes = static_cast<uint64_t>(
+                  fvm_node.get_property<IntPropertyValue>(FvmData::kPropSizeLimitBytes)->value()),
+              .available_space_bytes = static_cast<uint64_t>(
+                  fvm_node.get_property<IntPropertyValue>(FvmData::kPropAvailableSpaceBytes)
+                      ->value()),
           },
-      .out_of_space_events =
-          fvm_node.get_property<UintPropertyValue>(FvmData::kPropOutOfSpaceEvents)->value(),
+      .out_of_space_events = static_cast<uint64_t>(
+          fvm_node.get_property<IntPropertyValue>(FvmData::kPropOutOfSpaceEvents)->value()),
   };
 }
 
@@ -151,10 +157,10 @@ fs_inspect::FvmData GetFvmProperties(const inspect::NodeValue& fvm_node) {
 fs_inspect::VolumeData GetVolumeProperties(const inspect::NodeValue& volume_node) {
   using fs_inspect::VolumeData;
   return VolumeData{
-      .used_bytes =
-          volume_node.get_property<UintPropertyValue>(VolumeData::kPropVolumeUsedBytes)->value(),
-      .used_nodes =
-          volume_node.get_property<UintPropertyValue>(VolumeData::kPropVolumeUsedNodes)->value(),
+      .used_bytes = static_cast<uint64_t>(
+          volume_node.get_property<IntPropertyValue>(VolumeData::kPropVolumeUsedBytes)->value()),
+      .used_nodes = static_cast<uint64_t>(
+          volume_node.get_property<IntPropertyValue>(VolumeData::kPropVolumeUsedNodes)->value()),
       .encrypted =
           volume_node.get_property<BoolPropertyValue>(VolumeData::kPropVolumeEncrypted)->value(),
   };
@@ -174,38 +180,49 @@ class InspectTest : public FilesystemTest {
   // All calls to this function *must* be wrapped with ASSERT_NO_FATAL_FAILURE. Failure to do so
   // can result in some test fixture methods segfaulting.
   void UpdateAndValidateSnapshot() {
-    std::optional<inspect::Hierarchy> snapshot;
-    fs().TakeSnapshot(&snapshot);
-    ASSERT_TRUE(snapshot.has_value());
-    snapshot_ = std::move(*snapshot);
-    // Validate the inspect hierarchy. Ensures all nodes/properties exist and are the correct types.
-    ASSERT_NO_FATAL_FAILURE(ValidateHierarchy(snapshot_, fs().options()));
+    std::optional<InspectData> data;
+    fs().TakeSnapshot(&data);
+    ASSERT_TRUE(data.has_value());
+    ASSERT_TRUE(data->payload().has_value());
+    ASSERT_NO_FATAL_FAILURE(ValidateHierarchy(**data->payload(), fs().options()));
+    snapshot_ = std::move(*data);
   }
 
   // Obtains InfoData containing values from the latest snapshot's fs.info node.
   fs_inspect::InfoData GetInfoData() const {
-    return GetInfoProperties(snapshot_.GetByPath({fs_inspect::kInfoNodeName})->node());
+    EXPECT_NE(nullptr, snapshot_->payload().value());
+    auto* n = snapshot_->payload().value()->GetByPath({fs_inspect::kInfoNodeName});
+    EXPECT_NE(nullptr, n);
+    return GetInfoProperties(n->node());
   }
 
   // Obtains UsageData containing values from the latest snapshot's fs.usage node.
   fs_inspect::UsageData GetUsageData() const {
-    return GetUsageProperties(snapshot_.GetByPath({fs_inspect::kUsageNodeName})->node());
+    EXPECT_NE(nullptr, snapshot_->payload().value());
+    auto* n = snapshot_->payload().value()->GetByPath({fs_inspect::kUsageNodeName});
+    EXPECT_NE(nullptr, n);
+    return GetUsageProperties(n->node());
   }
 
   // Obtains FvmData containing values from the latest snapshot's fs.fvm node.
   fs_inspect::FvmData GetFvmData() const {
-    return GetFvmProperties(snapshot_.GetByPath({fs_inspect::kFvmNodeName})->node());
+    EXPECT_NE(nullptr, snapshot_->payload().value());
+    auto* n = snapshot_->payload().value()->GetByPath({fs_inspect::kFvmNodeName});
+    EXPECT_NE(nullptr, n);
+    return GetFvmProperties(n->node());
   }
 
   // Obtains FvmData containing values from the latest snapshot's fs.volumes.`volume_name` node.
   fs_inspect::VolumeData GetVolumeData(const char* volume_name) const {
-    return GetVolumeProperties(
-        snapshot_.GetByPath({fs_inspect::kVolumesNodeName, volume_name})->node());
+    EXPECT_NE(nullptr, snapshot_->payload().value());
+    auto* n = snapshot_->payload().value()->GetByPath({fs_inspect::kVolumesNodeName, volume_name});
+    EXPECT_NE(nullptr, n);
+    return GetVolumeProperties(n->node());
   }
 
  private:
   // Last snapshot taken of the inspect tree.
-  inspect::Hierarchy snapshot_ = {};
+  std::optional<InspectData> snapshot_ = {};
 };
 
 // Validate values in the fs.info node.
@@ -289,6 +306,7 @@ TEST_P(InspectTest, ValidateVolumeNode) {
   if (!fs().GetTraits().is_multi_volume) {
     return;
   }
+
   fs_inspect::VolumeData volume_data = GetVolumeData("default");
   EXPECT_EQ(volume_data.bytes_limit, std::nullopt);
   EXPECT_TRUE(volume_data.encrypted);
@@ -307,6 +325,7 @@ TEST_P(InspectTest, ValidateVolumeNode) {
 
   // Take a new inspect snapshot, ensure used_bytes/used_nodes are updated correctly.
   ASSERT_NO_FATAL_FAILURE(UpdateAndValidateSnapshot());
+
   volume_data = GetVolumeData("default");
   // Used bytes should increase by at least the amount of written data, and we should now use
   // at least one more inode than before.

@@ -79,6 +79,8 @@ async fn main() -> Result<(), Error> {
     };
 
     let inspector = fuchsia_inspect::component::inspector();
+    let _inspect_server_task =
+        inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
     // matcher_lock is used to block matching temporarily and inject
     // paths to be ignored.
     let matcher_lock = Arc::new(Mutex::new(HashSet::new()));
@@ -102,9 +104,6 @@ async fn main() -> Result<(), Error> {
             "data" => remote_dir(data_exposed_dir),
         },
         "mnt" => vfs::pseudo_directory! {},
-        inspect_runtime::DIAGNOSTICS_DIR => inspect_runtime::create_diagnostics_dir(
-            inspector.clone(),
-        ),
     };
     let svc_dir = vfs::pseudo_directory! {
         fshost::AdminMarker::PROTOCOL_NAME =>

@@ -192,6 +192,8 @@ rustc_binary("fxfs") {
   edition = "2021"
   deps = [
     ":lib",
+    "//src/lib/diagnostics/inspect/runtime/rust",
+    "//src/lib/diagnostics/inspect/rust",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",

@@ -127,6 +127,7 @@ template("fs_test_suite") {
 
   storage_driver_test_realm_v2_component("${suite_name}-inspect-tests") {
     deps = [ "//src/storage/fs_test:inspect_tests" ] + extra_deps
+    manifest = "//src/storage/fs_test/meta/inspect-tests.cml"
   }
 
   storage_driver_test_realm_v2_component("${suite_name}-link-tests") {

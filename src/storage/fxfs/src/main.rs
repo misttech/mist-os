@@ -14,6 +14,14 @@ use {
 #[fasync::run(6)]
 async fn main() -> Result<(), Error> {
     diagnostics_log::initialize(diagnostics_log::PublishOptions::default())?;
+    let _inspect_server_task = inspect_runtime::publish(
+        fuchsia_inspect::component::inspector(),
+        inspect_runtime::PublishOptions::default().send_vmo_preference(
+            inspect_runtime::TreeServerSendPreference::frozen_or(
+                inspect_runtime::TreeServerSendPreference::DeepCopy,
+            ),
+        ),
+    );
 
     #[cfg(feature = "tracing")]
     fuchsia_trace_provider::trace_provider_create_with_fdio();

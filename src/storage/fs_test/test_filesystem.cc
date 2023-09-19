@@ -7,10 +7,12 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/executor.h>
+#include <lib/diagnostics/reader/cpp/archive_reader.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/inspect/service/cpp/reader.h>
+#include <lib/sys/cpp/component_context.h>
 
 #include <gtest/gtest.h>
 
@@ -18,6 +20,8 @@
 #include "src/storage/fs_test/crypt_service.h"
 
 namespace fs_test {
+
+using diagnostics::reader::InspectData;
 
 fs_management::MountOptions TestFilesystem::DefaultMountOptions() const {
   fs_management::MountOptions options;
@@ -112,37 +116,36 @@ zx::result<fuchsia_io::wire::FilesystemInfo> TestFilesystem::GetFsInfo() const {
   return zx::ok(*result.value().info);
 }
 
-void TestFilesystem::TakeSnapshot(std::optional<inspect::Hierarchy>* out) const {
+void TestFilesystem::TakeSnapshot(std::optional<InspectData>* out) const {
   ASSERT_NE(nullptr, out) << "out parameter must be non-null";
   ASSERT_EQ(std::nullopt, *out) << "out parameter will overwrite value already held";
+
   async::Loop loop = async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   loop.StartThread("inspect-snapshot-thread");
   async::Executor executor(loop.dispatcher());
 
-  fuchsia::inspect::TreePtr tree;
-  async_dispatcher_t* dispatcher = executor.dispatcher();
-  auto service_dir = ServiceDirectory();
-  ASSERT_TRUE(service_dir.is_valid());
-  zx_status_t status =
-      fdio_service_connect_at(service_dir.handle()->get(), "diagnostics/fuchsia.inspect.Tree",
-                              tree.NewRequest(dispatcher).TakeChannel().release());
-  ASSERT_EQ(status, ZX_OK) << "Failed to connect to inspect service: "
-                           << zx_status_get_string(status);
+  auto context = sys::ComponentContext::Create();
+  fuchsia::diagnostics::ArchiveAccessorPtr accessor;
+  ASSERT_TRUE(context->svc()->Connect(accessor.NewRequest(executor.dispatcher())) == ZX_OK)
+      << "Failed to connect to ArchiveAccessor";
 
   std::condition_variable cv;
   std::mutex m;
   bool done = false;
-  fpromise::result<inspect::Hierarchy> hierarchy_or_error;
 
-  auto promise = inspect::ReadFromTree(std::move(tree))
-                     .then([&](fpromise::result<inspect::Hierarchy>& result) {
-                       {
-                         std::unique_lock<std::mutex> lock(m);
-                         hierarchy_or_error = std::move(result);
-                         done = true;
-                       }
-                       cv.notify_all();
-                     });
+  fpromise::result<std::vector<InspectData>, std::string> data_or_err;
+  diagnostics::reader::ArchiveReader reader(std::move(accessor),
+                                            {filesystem_->GetComponentSelector() + ":root"});
+  auto promise =
+      reader.SnapshotInspectUntilPresent({filesystem_->GetComponentSelector()})
+          .then([&](fpromise::result<std::vector<InspectData>, std::string>& inspect_data) {
+            {
+              std::unique_lock<std::mutex> lock(m);
+              data_or_err = std::move(inspect_data);
+              done = true;
+            }
+            cv.notify_all();
+          });
 
   executor.schedule_task(std::move(promise));
 
@@ -152,8 +155,11 @@ void TestFilesystem::TakeSnapshot(std::optional<inspect::Hierarchy>* out) const 
   loop.Quit();
   loop.JoinThreads();
 
-  ASSERT_TRUE(hierarchy_or_error.is_ok()) << "Failed to obtain inspect tree snapshot!";
-  *out = {hierarchy_or_error.take_value()};
+  ASSERT_TRUE(data_or_err.is_ok())
+      << "Failed to obtain inspect tree snapshot: " << data_or_err.take_error();
+  auto all = data_or_err.take_value();
+  ASSERT_EQ(all.size(), 1ul) << "There should be exactly one matching Inspect hierarchy";
+  *out = {std::move(all[0])};
 }
 
 }  // namespace fs_test

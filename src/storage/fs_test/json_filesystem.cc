@@ -153,6 +153,12 @@ class JsonInstance : public FilesystemInstance {
     fs_.reset();
   }
 
+  std::string GetComponentSelector() const override {
+    return component_.collection_name().has_value()
+               ? *component_.collection_name() + "\\:" + component_.child_name()
+               : component_.child_name();
+  }
+
  private:
   const JsonFilesystem& filesystem_;
   fs_management::FsComponent component_;

@@ -186,6 +186,7 @@ storage_driver_test_realm_v2_component("minfs-integration-test") {
 }
 
 storage_driver_test_realm_v2_component("minfs-dirty-cache-integration-test") {
+  manifest = "meta/minfs-dirty-cache-integration-test.cml"
   deps = [ ":minfs_dirty_cache_integration" ]
 }
 

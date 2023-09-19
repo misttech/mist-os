@@ -32,16 +32,17 @@ const std::string kDirtyBytesPropertyName = "dirty_bytes";
 class DirtyCacheTest : public fs_test::FilesystemTest {
  public:
   uint64_t GetDirtyBytes() {
-    std::optional<inspect::Hierarchy> snapshot;
+    std::optional<diagnostics::reader::InspectData> snapshot;
     fs().TakeSnapshot(&snapshot);
     ZX_ASSERT_MSG(snapshot.has_value(), "Failed to take snapshot");
-    const inspect::Hierarchy* detail_node = snapshot->GetByPath({"fs.detail"});
+    ZX_ASSERT_MSG(snapshot->payload().has_value(), "Failed to capture payload in snapshot");
+    const inspect::Hierarchy* detail_node = snapshot->payload().value()->GetByPath({"fs.detail"});
     ZX_ASSERT_MSG(detail_node != nullptr, "Failed to find expected node in Inspect hierarchy!");
     const auto* dirty_bytes_property =
-        detail_node->node().get_property<inspect::UintPropertyValue>(kDirtyBytesPropertyName);
+        detail_node->node().get_property<inspect::IntPropertyValue>(kDirtyBytesPropertyName);
     ZX_ASSERT_MSG(dirty_bytes_property != nullptr,
                   "Failed to find dirty bytes property in specified node!");
-    return dirty_bytes_property->value();
+    return static_cast<uint64_t>(dirty_bytes_property->value());
   }
 };
 
