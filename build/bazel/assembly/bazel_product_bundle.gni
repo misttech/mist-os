@@ -112,7 +112,6 @@ template("bazel_product_bundle") {
 
   labels = {
     bazel_product_bundle = "${target_name}_bazel_action"
-    transpose_paving_script = "${target_name}_paving_script_transpose"
     package_manifest_list = "${target_name}_package_manifests_list"
     transfer_manifest = "${target_name}_transfer_manifest"
 
@@ -124,9 +123,6 @@ template("bazel_product_bundle") {
 
   files = {
     out_dir = target_name
-
-    transposed_paving_script = "${out_dir}/pave.sh"
-    original_paving_script = "${transposed_paving_script}.orig"
 
     product_bundle_out_dir = "${out_dir}/product_bundle"
     package_manifests_out_dir = "${out_dir}/manifests"
@@ -368,14 +364,6 @@ template("bazel_product_bundle") {
         bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out"
         ninja = files.product_bundle_out_dir
       },
-
-      # The pave.sh script contains sub-paths {{BAZEL_TARGET_NAME}}_out
-      # that need to be substituted with "product_bundle" to work correctly
-      # with the Ninja directory, so copy it for later processing.
-      {
-        bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_pave.sh"
-        ninja = files.original_paving_script
-      },
     ]
     directory_timestamp_outputs = [
       "${files.product_bundle_out_dir}/product_bundle.json",
@@ -570,28 +558,6 @@ template("bazel_product_bundle") {
     }
   }
 
-  action(labels.transpose_paving_script) {
-    forward_variables_from(invoker,
-                           [
-                             "testonly",
-                             "visibility",
-                           ])
-    script = "//build/bazel/assembly/transpose_paving_script.py"
-    inputs = [ "${target_out_dir}/${files.original_paving_script}" ]
-    outputs = [ "${target_out_dir}/${files.transposed_paving_script}" ]
-    args = [
-      "--input",
-      rebase_path(inputs[0], root_build_dir),
-      "--output",
-      rebase_path(outputs[0], root_build_dir),
-      "--src-dir",
-      get_label_info(invoker.bazel_product_bundle_target, "name") + "_out",
-      "--dst-dir",
-      "product_bundle",
-    ]
-    deps = [ ":${labels.bazel_product_bundle}" ]
-  }
-
   package_tool_package_manifest_list_create(labels.package_manifest_list) {
     forward_variables_from(invoker,
                            [
@@ -624,7 +590,6 @@ template("bazel_product_bundle") {
     deps = [
       ":${labels.package_manifest_list}",
       ":${labels.transfer_manifest}",
-      ":${labels.transpose_paving_script}",
     ]
 
     # Some dependents want to claim outputs from these targets as inputs.

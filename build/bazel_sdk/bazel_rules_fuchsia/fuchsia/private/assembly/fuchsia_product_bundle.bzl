@@ -427,7 +427,6 @@ def _fuchsia_product_bundle_impl(ctx):
         "--partitions $PARTITIONS_PATH",
         "--system-a $SYSTEM_A_MANIFEST",
         "--out-dir $OUTDIR",
-        "--with-deprecated-flash-manifest",
     ]
 
     # Gather the environment variables needed in the script.
@@ -504,38 +503,6 @@ def _fuchsia_product_bundle_impl(ctx):
     if ctx.attr.recovery_scrutiny_config:
         recovery_scrutiny_config = ctx.attr.recovery_scrutiny_config[FuchsiaScrutinyConfigInfo]
         deps += _scrutiny_validation(ctx, ffx_tool, pb_out_dir, recovery_scrutiny_config, True)
-
-    # TODO(fxb/121752): Remove the generation of pave.sh after infra is
-    # ready to use product bundle to flash device.
-    pave_script = ctx.actions.declare_file(ctx.label.name + "_pave.sh")
-    ctx.actions.run(
-        outputs = [pave_script],
-        inputs = [pb_out_dir],
-        executable = ctx.executable._create_pave_script,
-        arguments = [
-            "--product-bundle",
-            pb_out_dir.path + "/product_bundle.json",
-            "--pave-script-path",
-            pave_script.path,
-        ],
-    )
-
-    # TODO(fxb/121752): Remove the generation of flash.json after infra is
-    # ready to use product bundle to flash device.
-    flash_manifest = ctx.actions.declare_file(ctx.label.name + "_flash.json")
-    ctx.actions.run(
-        outputs = [flash_manifest],
-        inputs = [pb_out_dir],
-        executable = ctx.executable._rebase_flash_manifest,
-        arguments = [
-            "--product-bundle",
-            pb_out_dir.path,
-            "--flash-manifest-path",
-            flash_manifest.path,
-        ],
-    )
-    deps.append(flash_manifest)
-    deps.append(pave_script)
 
     return [DefaultInfo(files = depset(direct = deps)), FuchsiaProductBundleInfo(
         product_bundle = pb_out_dir,
