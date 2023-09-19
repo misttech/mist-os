@@ -91,8 +91,9 @@ DriverUnderTestBase::DriverUnderTestBase(DriverRegistration driver_registration_
 }
 
 DriverUnderTestBase::~DriverUnderTestBase() {
-  ZX_ASSERT(token_.has_value());
-  driver_registration_symbol_.v1.destroy(token_.value());
+  if (token_.has_value()) {
+    driver_registration_symbol_.v1.destroy(token_.value());
+  }
 }
 
 void DriverUnderTestBase::on_fidl_error(fidl::UnbindInfo error) {
@@ -222,6 +223,9 @@ zx::result<> DriverUnderTestBase::Stop() {
   driver_.reset();
   return zx::make_result(status);
 #else
+  ZX_ASSERT(token_.has_value());
+  driver_registration_symbol_.v1.destroy(token_.value());
+  token_.reset();
   return zx::ok();
 #endif
 }
