@@ -141,10 +141,7 @@ function format-file() {
     *.gidl) format-full-file "${GIDL_CMD}" "$1" ;;
     *.config) format-full-file "${JSON_FMT_CMD}" "$1" ;;
     *.json) format-full-file "${JSON_FMT_CMD}" "$1" ;;
-    *.json5) format-full-file "${JSON5_FMT_CMD}" "$1" ;;
     *.py) format-full-file "${PY_CMD}" "$1" ;;
-    *.triage) format-full-file "${JSON5_FMT_CMD}" "$1";;
-    *.persist) format-full-file "${JSON5_FMT_CMD}" "$1";;
     *.*)
       if $must_format; then
         fx-error "Unsupported extension for file $1"
@@ -339,6 +336,7 @@ for file in "${FILES[@]}"; do
     *.bazel | *.bzl | *.bzlmod | *.star | BUILD | WORKSPACE |\
     *.cml |\
     *.fidl |\
+    *.json5 | *.persist | *.triage |\
     *.gn | *.gni |\
     *.go |\
     *.rs)
