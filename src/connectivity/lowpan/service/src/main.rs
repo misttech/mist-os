@@ -68,7 +68,8 @@ async fn main() -> Result<(), Error> {
     // Creates a new inspector object. This will create the "root" node in the
     // inspect tree to which further children objects can be added.
     let inspector = fuchsia_inspect::Inspector::default();
-    inspect_runtime::serve(&inspector, &mut fs)?;
+    let _inspect_server_task =
+        inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
     let inspect_tree = Arc::new(inspect::LowpanServiceTree::new(inspector));
     let inspect_fut = inspect::start_inspect_process(inspect_tree).map(|ret| {
         error!("Inspect process terminated: {:?}", ret);
