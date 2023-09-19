@@ -4,5 +4,8 @@
 
 # Compiled tools that are depended on by shac checks under //scripts/shac.
 group("shac_tools") {
-  deps = [ "//tools/fidl/fidlc:fidl-format($host_toolchain)" ]
+  deps = [
+    "//tools/cmc:cmc.actual($host_toolchain)",
+    "//tools/fidl/fidlc:fidl-format($host_toolchain)",
+  ]
 }
