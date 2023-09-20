@@ -1163,7 +1163,8 @@ impl FsNode {
         name: &FsStr,
         child: &FsNodeHandle,
     ) -> Result<(), Errno> {
-        self.check_access(current_task, Access::WRITE)?;
+        // The user must be able to search and write to the directory.
+        self.check_access(current_task, Access::EXEC | Access::WRITE)?;
         self.check_sticky_bit(current_task, child)?;
         self.ops().unlink(self, current_task, name, child)?;
         self.update_ctime_mtime();

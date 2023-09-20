@@ -336,9 +336,6 @@ impl DirEntry {
     ) -> Result<(), Errno> {
         assert!(!DirEntry::is_reserved_name(name));
 
-        // The user must be able to search the directory (requires the EXEC permission)
-        self.node.check_access(current_task, Access::EXEC)?;
-
         // child *must* be dropped after self_children and child_children below (even in the error
         // paths).
         let child;
