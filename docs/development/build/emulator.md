@@ -64,10 +64,9 @@ With the Fuchsia SDK, FEMU supports pre-built images, including:
 
 ARM64 support (`qemu-arm64`) is very limited and not recommended.
 
-Use `ffx product-bundle list ` to see the full set of available products
-available from the SDK, and
-<code>ffx product-bundle get {{ '<var>' }}product-bundle</var></code>
-to download those products.
+Use `ffx --machine product list --version <SDK_VERSION>` to see the full list of
+products available from the SDK and the corresponding transfer manifests, and
+`ffx product download <TRANSFER_MANIFEST_URL>` to download those products.
 
 ## Networking
 
