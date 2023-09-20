@@ -29,7 +29,7 @@ class MouseDevice : public fidl::WireServer<fuchsia_input_report::InputDevice> {
  public:
   zx_status_t Start();
 
-  void SendReport(const MouseReport& report);
+  size_t SendReport(const MouseReport& report);
   // Function for testing that blocks until a new reader is connected.
   zx_status_t WaitForNextReader(zx::duration timeout) {
     zx_status_t status = sync_completion_wait(&next_reader_wait_, timeout.get());
@@ -53,7 +53,7 @@ class MouseDevice : public fidl::WireServer<fuchsia_input_report::InputDevice> {
 
  private:
   sync_completion_t next_reader_wait_;
-  input_report_reader::InputReportReaderManager<MouseReport> input_report_readers_;
+  input_report_reader::InputReportReaderManager<MouseReport, 10> input_report_readers_;
   async::Loop loop_ = async::Loop(&kAsyncLoopConfigNeverAttachToThread);
 };
 
@@ -65,8 +65,8 @@ zx_status_t MouseDevice::Start() {
   return ZX_OK;
 }
 
-void MouseDevice::SendReport(const MouseReport& report) {
-  input_report_readers_.SendReportToAllReaders(report);
+size_t MouseDevice::SendReport(const MouseReport& report) {
+  return input_report_readers_.SendReportToAllReaders(report);
 }
 
 void MouseDevice::GetInputReportsReader(GetInputReportsReaderRequestView request,
@@ -360,4 +360,42 @@ TEST_F(InputReportReaderTests, CloseReaderWithOutstandingRead) {
 
   // Unbind the reader now that the report is waiting.
   reader = {};
+}
+
+TEST_F(InputReportReaderTests, MaxUnreadReports) {
+  fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader;
+  {
+    auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
+    ASSERT_TRUE(endpoints.is_ok());
+    auto [client, server] = std::move(endpoints.value());
+    ASSERT_TRUE(input_device_->GetInputReportsReader(std::move(server)).ok());
+    reader = fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(std::move(client));
+    mouse_.WaitForNextReader(zx::duration::infinite());
+  }
+
+  // Send 15 reports, and store the counter value in movement_x. Our InputReportReaderManager has
+  // kMaxUnreadReports set to 10, so the first five reports should be dropped.
+  for (int64_t i = 1; i <= 10; i++) {
+    // The first 10 reports should be accepted without causing others to be dropped.
+    EXPECT_EQ(mouse_.SendReport({.movement_x = i}), 0);
+  }
+  for (int64_t i = 11; i <= 15; i++) {
+    // With the report queue full, SendReport should now result in one report getting dropped.
+    EXPECT_EQ(mouse_.SendReport({.movement_x = i}), 1);
+  }
+
+  auto result = reader->ReadInputReports();
+  ASSERT_OK(result.status());
+  ASSERT_FALSE(result->is_error());
+  auto& reports = result->value()->reports;
+
+  ASSERT_EQ(10, reports.count());
+
+  ASSERT_TRUE(reports[0].has_mouse());
+  ASSERT_TRUE(reports[0].mouse().has_movement_x());
+  EXPECT_EQ(reports[0].mouse().movement_x(), 6);
+
+  ASSERT_TRUE(reports[9].has_mouse());
+  ASSERT_TRUE(reports[9].mouse().has_movement_x());
+  EXPECT_EQ(reports[9].mouse().movement_x(), 15);
 }
