@@ -100,6 +100,10 @@ class FakeSysinfo : public fidl::WireServer<fuchsia_sysinfo::SysInfo> {
     completer.Reply(ZX_ERR_NOT_SUPPORTED, nullptr);
   }
 
+  void GetSerialNumber(GetSerialNumberCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
   fidl::ClientEnd<fuchsia_sysinfo::SysInfo>& svc_chan() { return svc_chan_; }
 
   void set_board_name(const char* board) { strlcpy(board_, board, sizeof(board_)); }

@@ -137,6 +137,9 @@ where
                                 r @ fidl_fuchsia_sysinfo::SysInfoRequest::GetInterruptControllerInfo {
                                     ..
                                 } => panic!("unsupported request {:?}", r),
+                                r @ fidl_fuchsia_sysinfo::SysInfoRequest::GetSerialNumber {
+                                    ..
+                                } => panic!("unsupported request {:?}", r),
                             }
                                 .expect("failed to send response"),
                         )

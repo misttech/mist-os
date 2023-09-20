@@ -90,6 +90,7 @@ class PlatformBus : public PlatformBusType,
   void GetBoardRevision(GetBoardRevisionCompleter::Sync& completer) override;
   void GetBootloaderVendor(GetBootloaderVendorCompleter::Sync& completer) override;
   void GetInterruptControllerInfo(GetInterruptControllerInfoCompleter::Sync& completer) override;
+  void GetSerialNumber(GetSerialNumberCompleter::Sync& completer) override;
 
   // IOMMU protocol implementation.
   zx_status_t IommuGetBti(uint32_t iommu_index, uint32_t bti_id, zx::bti* out_bti);

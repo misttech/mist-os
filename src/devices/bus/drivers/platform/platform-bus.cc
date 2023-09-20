@@ -407,6 +407,28 @@ void PlatformBus::GetInterruptControllerInfo(GetInterruptControllerInfoCompleter
       ZX_OK, fidl::ObjectView<fuchsia_sysinfo::wire::InterruptControllerInfo>::FromExternal(&info));
 }
 
+void PlatformBus::GetSerialNumber(GetSerialNumberCompleter::Sync& completer) {
+  auto result = GetBootItem(ZBI_TYPE_SERIAL_NUMBER, 0);
+  if (result.is_error()) {
+    zxlogf(INFO, "Boot Item ZBI_TYPE_SERIAL_NUMBER not found");
+    completer.ReplyError(result.error_value());
+    return;
+  }
+  auto& [vmo, length] = *result;
+  if (length > fuchsia_sysinfo::wire::kSerialNumberLen) {
+    completer.ReplyError(ZX_ERR_BUFFER_TOO_SMALL);
+    return;
+  }
+  char serial[fuchsia_sysinfo::wire::kSerialNumberLen];
+  zx_status_t status = vmo.read(serial, 0, length);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to read serial number VMO %d", status);
+    completer.ReplyError(status);
+    return;
+  }
+  completer.ReplySuccess(fidl::StringView::FromExternal(serial, length));
+}
+
 void PlatformBus::GetBoardInfo(fdf::Arena& arena, GetBoardInfoCompleter::Sync& completer) {
   fbl::AutoLock lock(&board_info_lock_);
   fidl::Arena<> fidl_arena;

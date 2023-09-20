@@ -8,6 +8,8 @@ using zx;
 
 const BOARD_NAME_LEN uint8 = 32;
 const BOOTLOADER_VENDOR_LEN uint8 = 32;
+@available(added=HEAD)
+const SERIAL_NUMBER_LEN uint8 = 32;
 
 @available(removed=12)
 type InterruptControllerType = strict enum {
@@ -58,4 +60,9 @@ closed protocol SysInfo {
         status zx.Status;
         info box<InterruptControllerInfo>;
     });
+
+    @available(added=HEAD)
+    strict GetSerialNumber() -> (struct {
+        serial string:<SERIAL_NUMBER_LEN>;
+    }) error zx.Status;
 };

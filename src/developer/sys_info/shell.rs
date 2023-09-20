@@ -17,6 +17,7 @@ enum SystemInfo {
     BoardRevision,
     BootLoaderVendor,
     InterruptController,
+    SerialNumber,
 }
 
 impl std::str::FromStr for SystemInfo {
@@ -28,6 +29,7 @@ impl std::str::FromStr for SystemInfo {
             "board_revision" => Ok(SystemInfo::BoardRevision),
             "bootloader_vendor" => Ok(SystemInfo::BootLoaderVendor),
             "interrupt_controller" => Ok(SystemInfo::InterruptController),
+            "serial_number" => Ok(SystemInfo::SerialNumber),
             _ => Err(format!("Invalid key: {:?}. ", value)),
         }
     }
@@ -120,10 +122,28 @@ async fn print_interrupt_controller_info(provider: SysInfoProxy) -> Result<(), E
     Ok(())
 }
 
+fn write_serial_number<W: Write>(
+    w: &mut W,
+    serial_number: Result<String, i32>,
+) -> Result<(), Error> {
+    match serial_number {
+        Ok(s) => writeln!(w, "serial_number: {}", s)?,
+        Err(e) => writeln!(w, "zx_status: {}", zx::Status::from_raw(e))?,
+    }
+    Ok(())
+}
+
+async fn print_serial_number(provider: SysInfoProxy) -> Result<(), Error> {
+    let serial_number = provider.get_serial_number().await?;
+    let mut w = std::io::stdout();
+    write_serial_number(&mut w, serial_number).expect("Function write_serial_number() failed");
+    Ok(())
+}
+
 /// System Information command.
 #[derive(Debug, PartialEq, FromArgs)]
 struct BuildInfoCmd {
-    /// valid keys: <board_name> <board_revision> <bootloader_vendor> <interrupt_controller>
+    /// valid keys: <board_name> <board_revision> <bootloader_vendor> <interrupt_controller> <serial_number>
     #[argh(positional)]
     info: SystemInfo,
 }
@@ -139,6 +159,7 @@ async fn main() -> Result<(), Error> {
         SystemInfo::BoardRevision => print_board_revision_info(provider).await?,
         SystemInfo::BootLoaderVendor => print_bootloader_vendor_info(provider).await?,
         SystemInfo::InterruptController => print_interrupt_controller_info(provider).await?,
+        SystemInfo::SerialNumber => print_serial_number(provider).await?,
     }
 
     Ok(())
