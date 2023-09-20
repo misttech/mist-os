@@ -3,18 +3,13 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{format_err, Error},
+    anyhow::Error,
     diagnostics_data::LogsData,
-    fidl::endpoints::ClientEnd,
-    fidl_fuchsia_developer_remotecontrol::{
-        ArchiveIteratorMarker, ArchiveIteratorProxy, DiagnosticsData,
-    },
-    fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync,
+    fidl_fuchsia_test_manager as ftest_manager,
     futures::Stream,
-    futures::{channel::mpsc, stream::BoxStream, AsyncReadExt, SinkExt, StreamExt},
+    futures::{stream::BoxStream, StreamExt},
     log_command::log_socket_stream::LogsDataStream,
     pin_project::pin_project,
-    serde_json,
     std::{
         pin::Pin,
         task::{Context, Poll},
@@ -54,9 +49,6 @@ impl Stream for LogStream {
 #[cfg(target_os = "fuchsia")]
 fn get_log_stream(syslog: ftest_manager::Syslog) -> Result<LogStream, fidl::Error> {
     match syslog {
-        ftest_manager::Syslog::Archive(client_end) => {
-            Ok(LogStream::new(ArchiveLogStream::from_client_end(client_end)?))
-        }
         ftest_manager::Syslog::Batch(client_end) => {
             Ok(LogStream::new(BatchLogStream::from_client_end(client_end)?))
         }
@@ -73,9 +65,6 @@ fn get_log_stream(syslog: ftest_manager::Syslog) -> Result<LogStream, fidl::Erro
 #[cfg(not(target_os = "fuchsia"))]
 fn get_log_stream(syslog: ftest_manager::Syslog) -> Result<LogStream, fidl::Error> {
     match syslog {
-        ftest_manager::Syslog::Archive(client_end) => {
-            Ok(LogStream::new(ArchiveLogStream::from_client_end(client_end)?))
-        }
         ftest_manager::Syslog::Stream(client_end) => Ok(LogStream::new(
             LogsDataStream::new(fuchsia_async::Socket::from_socket(client_end).unwrap())
                 .map(|result| Ok(result)),
@@ -90,7 +79,8 @@ fn get_log_stream(syslog: ftest_manager::Syslog) -> Result<LogStream, fidl::Erro
 #[cfg(target_os = "fuchsia")]
 mod fuchsia {
     use {
-        super::*, diagnostics_reader::Subscription, fidl_fuchsia_diagnostics::BatchIteratorMarker,
+        super::*, diagnostics_reader::Subscription, fidl::endpoints::ClientEnd,
+        fidl_fuchsia_diagnostics::BatchIteratorMarker,
     };
 
     #[pin_project]
@@ -129,125 +119,12 @@ mod fuchsia {
     }
 }
 
-#[pin_project]
-struct ArchiveLogStream {
-    #[pin]
-    receiver: mpsc::Receiver<Result<LogsData, Error>>,
-    _drain_task: fasync::Task<()>,
-}
-
-impl ArchiveLogStream {
-    #[cfg(test)]
-    #[cfg(not(target_os = "fuchsia"))]
-    fn new() -> Result<(Self, ftest_manager::LogsIterator), fidl::Error> {
-        fidl::endpoints::create_proxy::<ArchiveIteratorMarker>().map(|(proxy, server_end)| {
-            let (receiver, _drain_task) = Self::start_streaming_logs(proxy);
-            (Self { _drain_task, receiver }, ftest_manager::LogsIterator::Archive(server_end))
-        })
-    }
-
-    pub fn from_client_end(
-        client_end: ClientEnd<ArchiveIteratorMarker>,
-    ) -> Result<Self, fidl::Error> {
-        let (receiver, _drain_task) = Self::start_streaming_logs(client_end.into_proxy()?);
-        Ok(Self { _drain_task, receiver })
-    }
-}
-
-impl ArchiveLogStream {
-    /// Number of concurrently active GetNext requests. Chosen by testing powers of 2 when
-    /// running a set of tests using ffx test against an emulator, and taking the value at
-    /// which improvement stops.
-    const PIPELINED_REQUESTS: usize = 32;
-
-    fn start_streaming_logs(
-        proxy: ArchiveIteratorProxy,
-    ) -> (mpsc::Receiver<Result<LogsData, Error>>, fasync::Task<()>) {
-        let (mut sender, receiver) = mpsc::channel(32);
-        let mut log_stream = futures::stream::repeat_with(move || proxy.get_next())
-            .buffered(Self::PIPELINED_REQUESTS);
-        let task = fasync::Task::spawn(async move {
-            loop {
-                // unwrap okay as repeat_with produces an infinite stream.
-                let result = match log_stream.next().await.unwrap() {
-                    Err(e) => {
-                        let _ =
-                            sender.send(Err(format_err!("Error calling GetNext: {:?}", e))).await;
-                        break;
-                    }
-                    Ok(batch) => batch,
-                };
-
-                let entries = match result {
-                    Err(e) => {
-                        let _ =
-                            sender.send(Err(format_err!("GetNext returned error: {:?}", e))).await;
-                        break;
-                    }
-                    Ok(entries) => entries,
-                };
-
-                if entries.is_empty() {
-                    break;
-                }
-
-                for diagnostics_data in
-                    entries.into_iter().map(|e| e.diagnostics_data).filter_map(|data| data)
-                {
-                    match diagnostics_data {
-                        DiagnosticsData::Inline(inline) => {
-                            let _ = match serde_json::from_str(&inline.data) {
-                                Ok(data) => sender.send(Ok(data)).await,
-                                Err(e) => {
-                                    sender.send(Err(format_err!("Malformed json: {:?}", e))).await
-                                }
-                            };
-                        }
-                        DiagnosticsData::Socket(socket) => {
-                            // hack, probably get a good value from diagnostic bridge lib somewhere
-                            let mut buffer = Vec::with_capacity(32000);
-                            let read_sock_result: Result<_, Error> = async {
-                                let mut async_sock = fasync::Socket::from_socket(socket)?;
-                                async_sock.read_to_end(&mut buffer).await.map_err(Error::from)
-                            }
-                            .await;
-                            if let Err(e) = read_sock_result {
-                                let _ = sender
-                                    .send(Err(format_err!("Error reading socket: {:?}", e)))
-                                    .await;
-                                continue;
-                            }
-                            let _ = match serde_json::from_slice(&buffer) {
-                                Ok(data) => sender.send(Ok(data)).await,
-                                Err(e) => {
-                                    sender.send(Err(format_err!("Malformed json: {:?}", e))).await
-                                }
-                            };
-                        }
-                    }
-                }
-            }
-        });
-        (receiver, task)
-    }
-}
-
-impl Stream for ArchiveLogStream {
-    type Item = Result<LogsData, Error>;
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let this = self.project();
-        this.receiver.poll_next(cx)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use {
         super::*,
         diagnostics_data::{Severity, Timestamp},
-        fidl::endpoints::ServerEnd,
         fuchsia_async as fasync,
-        futures::TryStreamExt,
     };
 
     #[cfg(target_os = "fuchsia")]
@@ -255,11 +132,13 @@ mod tests {
         use {
             super::*,
             assert_matches::assert_matches,
+            fidl::endpoints::ServerEnd,
             fidl_fuchsia_diagnostics::{
                 BatchIteratorMarker, BatchIteratorRequest, FormattedContent, ReaderError,
             },
             fidl_fuchsia_mem as fmem, fuchsia_zircon as zx,
             futures::StreamExt,
+            futures::TryStreamExt,
         };
 
         fn create_log_stream() -> Result<(LogStream, ftest_manager::LogsIterator), fidl::Error> {
@@ -338,93 +217,49 @@ mod tests {
 
     #[cfg(not(target_os = "fuchsia"))]
     mod host {
-        use {
-            super::*,
-            assert_matches::assert_matches,
-            fidl_fuchsia_developer_remotecontrol::{
-                ArchiveIteratorEntry, ArchiveIteratorError, ArchiveIteratorMarker,
-                ArchiveIteratorRequest, DiagnosticsData, InlineData,
-            },
-            futures::AsyncWriteExt,
-            std::collections::VecDeque,
-        };
+        use {super::*, assert_matches::assert_matches, futures::AsyncWriteExt};
 
         fn create_log_stream() -> Result<(LogStream, ftest_manager::LogsIterator), fidl::Error> {
-            let (stream, iterator) = ArchiveLogStream::new()?;
+            let (client_end, server_end) = fidl::Socket::create_stream();
+            let (stream, iterator) = (
+                LogStream::new(
+                    LogsDataStream::new(fuchsia_async::Socket::from_socket(client_end).unwrap())
+                        .map(|result| Ok(result)),
+                ),
+                ftest_manager::LogsIterator::Stream(server_end),
+            );
             Ok((LogStream::new(stream), iterator))
         }
 
-        async fn spawn_archive_iterator_server(
-            server_end: ServerEnd<ArchiveIteratorMarker>,
-            with_error: bool,
-            with_socket: bool,
-        ) {
-            let mut request_stream = server_end.into_stream().expect("got stream");
+        async fn spawn_archive_iterator_server(socket: fidl::Socket, with_error: bool) {
+            let mut socket = fuchsia_async::Socket::from_socket(socket).unwrap();
             let mut values = vec![1, 2, 3].into_iter();
-            let mut empty_response_sent = false;
-            while let Some(ArchiveIteratorRequest::GetNext { responder }) =
-                request_stream.try_next().await.expect("get next request")
-            {
+            loop {
                 match values.next() {
                     None => {
-                        let result = responder.send(Ok(vec![]));
-                        // Because of pipelining, there are cases where it's okay for the
-                        // response to fail with a channel closed error
-                        match empty_response_sent || with_error {
-                            false => {
-                                assert!(result.is_ok(), "send response");
-                                empty_response_sent = true;
-                            }
-                            true => (),
-                        }
+                        // End of stream, close socket.
+                        break;
                     }
                     Some(value) => {
                         if with_error {
-                            // Because of pipelining, the channel may be open or closed
-                            // depending on timing, so ignore any errors.
-                            let _ = responder.send(Err(ArchiveIteratorError::DataReadFailed));
+                            // Send invalid JSON to trigger an error other than
+                            // ZX_ERR_PEER_CLOSED
+                            let _ = socket.write_all("5".as_bytes()).await;
                             continue;
                         }
-                        let json_data = get_json_data(value);
-                        match with_socket {
-                            false => {
-                                let result = ArchiveIteratorEntry {
-                                    diagnostics_data: Some(DiagnosticsData::Inline(InlineData {
-                                        data: json_data,
-                                        truncated_chars: 0,
-                                    })),
-                                    ..Default::default()
-                                };
-                                responder.send(Ok(vec![result])).expect("send response");
-                            }
-                            true => {
-                                let (socket, tx_socket) = fidl::Socket::create_stream();
-                                let mut tx_socket = fasync::Socket::from_socket(tx_socket)
-                                    .expect("create async socket");
-                                let response = ArchiveIteratorEntry {
-                                    diagnostics_data: Some(DiagnosticsData::Socket(socket)),
-                                    ..Default::default()
-                                };
-                                responder.send(Ok(vec![response])).expect("send response");
-                                tx_socket
-                                    .write_all(json_data.as_bytes())
-                                    .await
-                                    .expect("write to socket");
-                            }
-                        }
+                        socket.write_all(get_json_data(value).as_bytes()).await.unwrap();
                     }
                 }
             }
         }
 
-        async fn archive_stream_returns_logs(use_socket: bool) {
+        async fn archive_stream_returns_logs() {
             let (mut log_stream, iterator) = create_log_stream().expect("got log stream");
             let server_end = match iterator {
-                ftest_manager::LogsIterator::Archive(server_end) => server_end,
+                ftest_manager::LogsIterator::Stream(server_end) => server_end,
                 _ => panic!("unexpected logs iterator server end"),
             };
-            fasync::Task::spawn(spawn_archive_iterator_server(server_end, false, use_socket))
-                .detach();
+            fasync::Task::spawn(spawn_archive_iterator_server(server_end, false)).detach();
             assert_eq!(log_stream.next().await.unwrap().expect("got ok result").msg(), Some("1"));
             assert_eq!(log_stream.next().await.unwrap().expect("got ok result").msg(), Some("2"));
             assert_eq!(log_stream.next().await.unwrap().expect("got ok result").msg(), Some("3"));
@@ -433,67 +268,22 @@ mod tests {
 
         #[fasync::run_singlethreaded(test)]
         async fn archive_stream_returns_logs_inline() {
-            archive_stream_returns_logs(false).await;
+            archive_stream_returns_logs().await;
         }
 
-        #[fasync::run_singlethreaded(test)]
-        async fn archive_stream_returns_logs_socket() {
-            archive_stream_returns_logs(true).await;
-        }
-
-        async fn archive_stream_can_return_errors(use_socket: bool) {
+        async fn archive_stream_can_return_errors() {
             let (mut log_stream, iterator) = create_log_stream().expect("got log stream");
             let server_end = match iterator {
-                ftest_manager::LogsIterator::Archive(server_end) => server_end,
+                ftest_manager::LogsIterator::Stream(server_end) => server_end,
                 _ => panic!("unexpected logs iterator server end"),
             };
-            fasync::Task::spawn(spawn_archive_iterator_server(server_end, true, use_socket))
-                .detach();
-            assert_matches!(log_stream.next().await, Some(Err(_)));
+            fasync::Task::spawn(spawn_archive_iterator_server(server_end, true)).detach();
+            assert_matches!(log_stream.next().await, None);
         }
 
         #[fasync::run_singlethreaded(test)]
         async fn archive_stream_can_return_errors_inline() {
-            archive_stream_can_return_errors(false).await;
-        }
-
-        #[fasync::run_singlethreaded(test)]
-        async fn archive_stream_can_return_errors_socket() {
-            archive_stream_can_return_errors(true).await;
-        }
-
-        #[fasync::run_singlethreaded(test)]
-        async fn archive_stream_pipelines_requests() {
-            let (proxy, mut request_stream) =
-                fidl::endpoints::create_proxy_and_stream::<ArchiveIteratorMarker>().unwrap();
-            let (receiver, task) = ArchiveLogStream::start_streaming_logs(proxy);
-            // Multiple requests should be active at once. Note - StreamExt::buffered only
-            // guaranteed that up to ArchiveLogStream::PIPELINED_REQUESTS requests are buffered,
-            // so we can't assert equality.
-            let mut active_requests: VecDeque<_> = request_stream
-                .by_ref()
-                .take(ArchiveLogStream::PIPELINED_REQUESTS / 2)
-                .collect()
-                .await;
-            assert_eq!(active_requests.len(), ArchiveLogStream::PIPELINED_REQUESTS / 2);
-
-            // Verify that a log sent as a response to the first request is received.
-            let responder = active_requests.pop_front().unwrap().unwrap().into_get_next().unwrap();
-            responder
-                .send(Ok(vec![ArchiveIteratorEntry {
-                    diagnostics_data: Some(DiagnosticsData::Inline(InlineData {
-                        data: "data".to_string(),
-                        truncated_chars: 0,
-                    })),
-                    ..Default::default()
-                }]))
-                .unwrap();
-            // Send an empty response, which shuts down the pending task.
-            let responder = active_requests.pop_front().unwrap().unwrap().into_get_next().unwrap();
-            responder.send(Ok(vec![])).unwrap();
-            drop(request_stream);
-            task.await;
-            assert_eq!(receiver.collect::<Vec<_>>().await.len(), 1);
+            archive_stream_can_return_errors().await;
         }
     }
 

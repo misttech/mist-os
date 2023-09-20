@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    crate::utilities::LogOnDrop,
     anyhow::Error,
     async_trait::async_trait,
     diagnostics_bridge::ArchiveReaderManager,
@@ -36,13 +35,9 @@ pub(crate) fn serve_syslog(
     log_iterator: ftest_manager::LogsIterator,
 ) -> Result<ServeSyslogOutcome, StreamError> {
     let logs_iterator_task = match log_iterator {
-        ftest_manager::LogsIterator::Archive(iterator) => {
-            let iterator_fut =
-                IsolatedLogsProvider::new(&accessor).run_iterator_server(iterator)?;
-            Some(fasync::Task::spawn(async move {
-                let _on_drop = LogOnDrop("Log iterator task dropped");
-                iterator_fut.await
-            }))
+        ftest_manager::LogsIterator::Archive(_) => {
+            warn!("This is deprecated and in the process of removal. Please use SocketBatchIterator instead");
+            None
         }
         ftest_manager::LogsIterator::Stream(iterator) => {
             let iterator_fut = run_iterator_socket(&host_accessor, iterator);

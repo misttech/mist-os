@@ -176,11 +176,9 @@ impl RunningSuite {
 
         let (log_iterator, syslog) = match options.log_iterator {
             Some(ftest_manager::LogsIteratorOption::ArchiveIterator) => {
+                warn!("This is deprecated and in the process of removal. Please use SocketBatchIterator instead");
                 let (proxy, request) = fidl::endpoints::create_endpoints();
-                (
-                    ftest_manager::LogsIterator::Archive(request),
-                    ftest_manager::Syslog::Archive(proxy),
-                )
+                (ftest_manager::LogsIterator::Batch(request), ftest_manager::Syslog::Batch(proxy))
             }
             Some(ftest_manager::LogsIteratorOption::SocketBatchIterator) => {
                 let (local, remote) = fuchsia_zircon::Socket::create_stream();

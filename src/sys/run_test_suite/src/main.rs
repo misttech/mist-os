@@ -195,7 +195,7 @@ async fn main() {
         },
         experimental_parallel_execution: None,
         accumulate_debug_data: true, // must be true to support coverage via scp
-        log_protocol: Some(LogsIteratorOption::ArchiveIterator),
+        log_protocol: Some(LogsIteratorOption::SocketBatchIterator),
         min_severity_logs: min_severity_logs.clone(),
         // TODO(https://fxbug.dev/107998): make this configurable
         show_full_moniker: true,

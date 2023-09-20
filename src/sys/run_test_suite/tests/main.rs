@@ -821,7 +821,7 @@ async fn launch_and_test_huge_test(
 }
 
 #[test_case(LogsIteratorOption::BatchIterator ; "batch")]
-#[test_case(LogsIteratorOption::ArchiveIterator ; "archive")]
+#[test_case(LogsIteratorOption::SocketBatchIterator ; "archive")]
 #[fuchsia::test]
 async fn launch_and_test_logspam_test(iterator_option: LogsIteratorOption) {
     let (reporter, _output, output_dir) = create_shell_and_dir_reporter();
@@ -1420,9 +1420,9 @@ fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/echo_test_realm.
 }
 
 #[test_case("batch", LogsIteratorOption::BatchIterator, false ; "batch")]
-#[test_case("archive", LogsIteratorOption::ArchiveIterator, false ; "archive")]
+#[test_case("archive", LogsIteratorOption::SocketBatchIterator, false ; "archive")]
 #[test_case("batch_in_provided_realm", LogsIteratorOption::BatchIterator, true ; "batch_in_provided_realm")]
-#[test_case("archive_in_provided_realm", LogsIteratorOption::ArchiveIterator, true ; "archive_in_provided_realm")]
+#[test_case("archive_in_provided_realm", LogsIteratorOption::SocketBatchIterator, true ; "archive_in_provided_realm")]
 #[fuchsia::test]
 async fn test_logging_component(
     subcase: &'static str,
@@ -1501,7 +1501,7 @@ async fn test_logging_component(
 }
 
 #[test_case("batch", LogsIteratorOption::BatchIterator ; "batch")]
-#[test_case("archive", LogsIteratorOption::ArchiveIterator ; "archive")]
+#[test_case("archive", LogsIteratorOption::SocketBatchIterator ; "archive")]
 #[fuchsia::test]
 async fn test_logging_component_min_severity(
     subcase: &'static str,
@@ -1550,7 +1550,7 @@ fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/logging_test.cm 
 }
 
 #[test_case("batch", LogsIteratorOption::BatchIterator ; "batch")]
-#[test_case("archive", LogsIteratorOption::ArchiveIterator ; "archive")]
+#[test_case("archive", LogsIteratorOption::SocketBatchIterator ; "archive")]
 #[fuchsia::test]
 async fn test_per_component_min_severity(
     subcase: &'static str,
@@ -1670,21 +1670,21 @@ fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/stdout_ansi_test
 }
 
 #[test_case(LogsIteratorOption::BatchIterator ; "batch")]
-#[test_case(LogsIteratorOption::ArchiveIterator ; "archive")]
+#[test_case(LogsIteratorOption::SocketBatchIterator ; "archive")]
 #[fuchsia::test]
 async fn test_logging_component_max_severity_info(iterator_option: LogsIteratorOption) {
     test_max_severity(Severity::Info, iterator_option).await;
 }
 
 #[test_case(LogsIteratorOption::BatchIterator ; "batch")]
-#[test_case(LogsIteratorOption::ArchiveIterator ; "archive")]
+#[test_case(LogsIteratorOption::SocketBatchIterator ; "archive")]
 #[fuchsia::test]
 async fn test_logging_component_max_severity_warn(iterator_option: LogsIteratorOption) {
     test_max_severity(Severity::Warn, iterator_option).await;
 }
 
 #[test_case(LogsIteratorOption::BatchIterator ; "batch")]
-#[test_case(LogsIteratorOption::ArchiveIterator ; "archive")]
+#[test_case(LogsIteratorOption::SocketBatchIterator ; "archive")]
 #[fuchsia::test]
 async fn test_logging_component_max_severity_error(iterator_option: LogsIteratorOption) {
     test_max_severity(Severity::Error, iterator_option).await;

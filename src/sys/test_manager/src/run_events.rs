@@ -297,14 +297,14 @@ mod tests {
             }))
         );
 
-        let (client_end, _server_end) = fidl::endpoints::create_endpoints();
-        let event = SuiteEvents::suite_syslog(ftest_manager::Syslog::Archive(client_end))
+        let (client_end, _server_end) = fuchsia_zircon::Socket::create_stream();
+        let event = SuiteEvents::suite_syslog(ftest_manager::Syslog::Stream(client_end))
             .into_suite_run_event();
         assert_matches!(event.timestamp, Some(_));
         assert_matches!(
             event.payload,
             Some(FidlSuiteEventPayload::SuiteArtifact(ftest_manager::SuiteArtifact {
-                artifact: ftest_manager::Artifact::Log(ftest_manager::Syslog::Archive(_)),
+                artifact: ftest_manager::Artifact::Log(ftest_manager::Syslog::Stream(_)),
             }))
         );
 

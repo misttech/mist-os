@@ -11,7 +11,6 @@ lib_sources = [
 ]
 
 lib_deps = [
-  "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
   "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_rust",
   "//src/diagnostics/lib/log-command",
   "//src/lib/diagnostics/data/rust",
@@ -21,12 +20,12 @@ lib_deps = [
   "//third_party/rust_crates:futures",
   "//third_party/rust_crates:parking_lot",
   "//third_party/rust_crates:pin-project",
-  "//third_party/rust_crates:serde_json",
 ]
 
 shared_test_deps = [
   "//third_party/rust_crates:assert_matches",
   "//third_party/rust_crates:pretty_assertions",
+  "//third_party/rust_crates:serde_json",
 ]
 
 rustc_library("test_diagnostics") {

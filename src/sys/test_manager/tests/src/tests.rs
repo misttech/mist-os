@@ -539,7 +539,7 @@ async fn collect_isolated_logs_using_batch() {
 async fn collect_isolated_logs_using_archive_iterator() {
     let test_url = "fuchsia-pkg://fuchsia.com/test-manager-diagnostics-tests#meta/test-root.cm";
     let options = RunOptions {
-        log_iterator: Some(ftest_manager::LogsIteratorOption::ArchiveIterator),
+        log_iterator: Some(ftest_manager::LogsIteratorOption::SocketBatchIterator),
         ..default_run_option()
     };
     let (_events, logs) = run_single_test(test_url, options).await.unwrap();
@@ -569,7 +569,7 @@ async fn collect_isolated_logs_using_host_socket() {
 async fn update_log_severity_for_all_components() {
     let test_url = "fuchsia-pkg://fuchsia.com/test-manager-diagnostics-tests#meta/test-root.cm";
     let options = RunOptions {
-        log_iterator: Some(ftest_manager::LogsIteratorOption::ArchiveIterator),
+        log_iterator: Some(ftest_manager::LogsIteratorOption::SocketBatchIterator),
         log_interest: Some(vec![
             selectors::parse_log_interest_selector_or_severity("DEBUG").unwrap()
         ]),
@@ -591,7 +591,7 @@ async fn update_log_severity_for_all_components() {
 async fn update_log_severity_for_the_test() {
     let test_url = "fuchsia-pkg://fuchsia.com/test-manager-diagnostics-tests#meta/test-root.cm";
     let options = RunOptions {
-        log_iterator: Some(ftest_manager::LogsIteratorOption::ArchiveIterator),
+        log_iterator: Some(ftest_manager::LogsIteratorOption::SocketBatchIterator),
         log_interest: Some(vec![selectors::parse_log_interest_selector_or_severity(
             "<root>#DEBUG",
         )
