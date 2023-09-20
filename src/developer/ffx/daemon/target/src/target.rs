@@ -977,17 +977,48 @@ impl Target {
     }
 
     #[tracing::instrument]
-    pub async fn init_remote_proxy(self: &Rc<Self>) -> Result<RemoteControlProxy> {
-        // Ensure auto-connect has at least started.
+    pub async fn wait_for_rcs(
+        self: &Rc<Self>,
+    ) -> Result<Result<rcs::RcsConnection, ffx::TargetConnectionError>> {
         self.run_host_pipe();
-        match self.events.wait_for(None, |e| e == TargetEvent::RcsActivated).await {
-            Ok(()) => (),
+        // This setup here is due to the events not having a proper streaming implementation. The
+        // closure is intended to have a static lifetime, which forces this to happen to extract an
+        // event.
+        let seen_event = Rc::new(RefCell::new(None));
+
+        Ok(loop {
+            if let Some(rcs) = self.rcs() {
+                break Ok(rcs);
+            } else if let Some(err) = seen_event.borrow_mut().take() {
+                break Err(ffx::TargetConnectionError::from(err));
+            } else {
+                tracing::trace!("RCS dropped after event fired. Waiting again.");
+            }
+
+            let se_clone = seen_event.clone();
+
+            self.events
+                .wait_for(None, move |e| match e {
+                    TargetEvent::RcsActivated => true,
+                    TargetEvent::SshHostPipeErr(host_pipe_err) => {
+                        *se_clone.borrow_mut() = Some(host_pipe_err);
+                        true
+                    }
+                    _ => false,
+                })
+                .await
+                .context("waiting for RCS")?;
+        })
+    }
+
+    #[tracing::instrument]
+    pub async fn init_remote_proxy(self: &Rc<Self>) -> Result<RemoteControlProxy> {
+        match self.wait_for_rcs().await? {
+            Ok(rcs) => Ok(rcs.proxy),
             Err(e) => {
-                tracing::warn!("{}", e);
-                bail!("RCS connection issue")
+                bail!("RCS connection issue: {e:?}")
             }
         }
-        self.rcs().ok_or(anyhow!("rcs dropped after event fired")).map(|r| r.proxy)
     }
 
     pub async fn is_fastboot_tcp(&self) -> Result<bool> {

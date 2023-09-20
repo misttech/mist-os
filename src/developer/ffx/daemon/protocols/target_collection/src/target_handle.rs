@@ -4,14 +4,14 @@
 
 use crate::reboot;
 use anyhow::{anyhow, Context as _, Result};
-use ffx_daemon_events::{HostPipeErr, TargetEvent};
+use ffx_daemon_events::TargetEvent;
 use ffx_daemon_target::target::Target;
 use ffx_stream_util::TryStreamUtilExt;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_developer_ffx::{self as ffx};
 use futures::TryStreamExt;
 use protocols::Context;
-use std::{cell::RefCell, future::Future, pin::Pin, rc::Rc, time::Duration};
+use std::{future::Future, pin::Pin, rc::Rc, time::Duration};
 
 // TODO(awdavies): Abstract this to use similar utilities to an actual protocol.
 // This functionally behaves the same with the only caveat being that some
@@ -102,8 +102,8 @@ impl TargetHandleInner {
                 responder.send().map_err(Into::into)
             }
             ffx::TargetRequest::OpenRemoteControl { remote_control, responder } => {
-                self.target.run_host_pipe();
-                let rcs = wait_for_rcs(&self.target).await?;
+                tracing::debug!("In OpenRemoteControl, running host pipe");
+                let rcs = self.target.wait_for_rcs().await?;
                 match rcs {
                     Ok(mut c) => {
                         // TODO(awdavies): Return this as a specific error to
@@ -132,59 +132,6 @@ impl TargetHandleInner {
     }
 }
 
-#[tracing::instrument]
-pub(crate) async fn wait_for_rcs(
-    t: &Rc<Target>,
-) -> Result<Result<rcs::RcsConnection, ffx::TargetConnectionError>> {
-    // This setup here is due to the events not having a proper streaming implementation. The
-    // closure is intended to have a static lifetime, which forces this to happen to extract an
-    // event.
-    let seen_event = Rc::new(RefCell::new(None));
-
-    Ok(loop {
-        if let Some(rcs) = t.rcs() {
-            break Ok(rcs);
-        } else if let Some(err) = seen_event.borrow_mut().take() {
-            break Err(host_pipe_err_to_fidl(err));
-        } else {
-            tracing::trace!("RCS dropped after event fired. Waiting again.");
-        }
-
-        let se_clone = seen_event.clone();
-
-        t.events
-            .wait_for(None, move |e| match e {
-                TargetEvent::RcsActivated => true,
-                TargetEvent::SshHostPipeErr(host_pipe_err) => {
-                    *se_clone.borrow_mut() = Some(host_pipe_err);
-                    true
-                }
-                _ => false,
-            })
-            .await
-            .context("waiting for RCS")?;
-    })
-}
-
-#[tracing::instrument]
-fn host_pipe_err_to_fidl(h: HostPipeErr) -> ffx::TargetConnectionError {
-    match h {
-        HostPipeErr::Unknown(s) => {
-            tracing::warn!("Unknown host-pipe error received: '{}'", s);
-            ffx::TargetConnectionError::UnknownError
-        }
-        HostPipeErr::NetworkUnreachable => ffx::TargetConnectionError::NetworkUnreachable,
-        HostPipeErr::PermissionDenied => ffx::TargetConnectionError::PermissionDenied,
-        HostPipeErr::ConnectionRefused => ffx::TargetConnectionError::ConnectionRefused,
-        HostPipeErr::UnknownNameOrService => ffx::TargetConnectionError::UnknownNameOrService,
-        HostPipeErr::Timeout => ffx::TargetConnectionError::Timeout,
-        HostPipeErr::KeyVerificationFailure => ffx::TargetConnectionError::KeyVerificationFailure,
-        HostPipeErr::NoRouteToHost => ffx::TargetConnectionError::NoRouteToHost,
-        HostPipeErr::InvalidArgument => ffx::TargetConnectionError::InvalidArgument,
-        HostPipeErr::TargetIncompatible => ffx::TargetConnectionError::TargetIncompatible,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -202,50 +149,6 @@ mod tests {
         net::{IpAddr, SocketAddr},
         str::FromStr,
     };
-
-    #[test]
-    fn test_host_pipe_err_to_fidl_conversion() {
-        assert_eq!(
-            host_pipe_err_to_fidl(HostPipeErr::Unknown(String::from("foobar"))),
-            ffx::TargetConnectionError::UnknownError
-        );
-        assert_eq!(
-            host_pipe_err_to_fidl(HostPipeErr::InvalidArgument),
-            ffx::TargetConnectionError::InvalidArgument
-        );
-        assert_eq!(
-            host_pipe_err_to_fidl(HostPipeErr::NoRouteToHost),
-            ffx::TargetConnectionError::NoRouteToHost
-        );
-        assert_eq!(
-            host_pipe_err_to_fidl(HostPipeErr::KeyVerificationFailure),
-            ffx::TargetConnectionError::KeyVerificationFailure
-        );
-        assert_eq!(
-            host_pipe_err_to_fidl(HostPipeErr::Timeout),
-            ffx::TargetConnectionError::Timeout
-        );
-        assert_eq!(
-            host_pipe_err_to_fidl(HostPipeErr::UnknownNameOrService),
-            ffx::TargetConnectionError::UnknownNameOrService
-        );
-        assert_eq!(
-            host_pipe_err_to_fidl(HostPipeErr::ConnectionRefused),
-            ffx::TargetConnectionError::ConnectionRefused
-        );
-        assert_eq!(
-            host_pipe_err_to_fidl(HostPipeErr::PermissionDenied),
-            ffx::TargetConnectionError::PermissionDenied
-        );
-        assert_eq!(
-            host_pipe_err_to_fidl(HostPipeErr::NetworkUnreachable),
-            ffx::TargetConnectionError::NetworkUnreachable
-        );
-        assert_eq!(
-            host_pipe_err_to_fidl(HostPipeErr::TargetIncompatible),
-            ffx::TargetConnectionError::TargetIncompatible
-        );
-    }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_valid_target_state() {

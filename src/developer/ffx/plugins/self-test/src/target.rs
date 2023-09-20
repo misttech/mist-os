@@ -94,4 +94,10 @@ pub mod include_target {
 
         Ok(())
     }
+
+    // TODO(slgrady) Create a test for connecting only to discovered targets
+    // only on demand.  The challenge is that test environments do not support
+    // discovered targets, due to isolation requirements. It may be possible to
+    // create a hermetic environment (e.g. with a Docker container) in which to
+    // execute a test.
 }

@@ -121,7 +121,6 @@ async fn add_manual_target(
         }
         target.update_connection_state(|_| TargetConnectionState::Manual(last_seen));
     }
-
     let target = tc.merge_insert(target);
     if !is_fastboot_tcp {
         tracing::info!("Running host pipe");
@@ -337,7 +336,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                         );
                     }
                 };
-                let rcs = target_handle::wait_for_rcs(&target).await?;
+                let rcs = target.wait_for_rcs().await?;
                 match rcs {
                     Ok(mut rcs) => {
                         let (rcs_proxy, server) =
@@ -591,12 +590,6 @@ fn handle_discovered_target(tc: &Rc<TargetCollection>, t: ffx::TargetInfo) -> Op
         let new_target = Target::from_target_info(t);
         new_target.update_connection_state(|_| TargetConnectionState::Mdns(Instant::now()));
         let target = tc.merge_insert(new_target);
-        if !target.is_host_pipe_running() {
-            tracing::debug!("Starting host_pipe for {:?}", &target.addrs());
-            target.run_host_pipe();
-        } else {
-            tracing::debug!("host pipe already running for {:?}", &target.addrs());
-        }
         return Some(target);
     }
 }
@@ -626,7 +619,7 @@ mod tests {
             &tc,
             ffx::TargetInfo { nodename: Some(t.nodename().unwrap()), ..Default::default() },
         );
-        assert!(t.is_host_pipe_running());
+        assert!(!t.is_host_pipe_running());
         assert_matches!(t.get_connection_state(), TargetConnectionState::Mdns(t) if t > before_update);
     }
 
