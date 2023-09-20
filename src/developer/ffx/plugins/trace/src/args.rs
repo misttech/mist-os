@@ -40,7 +40,6 @@ pub enum TraceSubCommand {
     Start(Start),
     Stop(Stop),
     Status(Status),
-    Symbolize(Symbolize),
     // More commands including `record` and `convert` to follow.
 }
 
@@ -68,21 +67,6 @@ pub type TraceCategories = Vec<String>;
 /// Gets status of all running traces.
 #[argh(subcommand, name = "status")]
 pub struct Status {}
-
-#[derive(FromArgs, PartialEq, Debug)]
-/// Symbolizes the provided ordinal
-#[argh(subcommand, name = "symbolize")]
-pub struct Symbolize {
-    /// FIDL ordinal to be symbolized.
-    #[argh(option)]
-    pub ordinal: u64,
-
-    /// additional IR files to use for symbolization. Path provided must be
-    /// absolute or relative to $FUCHSIA_BUILD_DIR. If not provided, only the
-    /// files listed in $FUCHSIA_BUILD_DIR/all_fidl_json.txt will be checked.
-    #[argh(option)]
-    pub ir_path: Vec<String>,
-}
 
 #[derive(FromArgs, PartialEq, Debug)]
 /// Stops an active running trace.
