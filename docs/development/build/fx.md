@@ -54,6 +54,7 @@ with this:
 * `fx build` [execute a build](#execute-a-build)
 * `fx flash ; fx mkzedboot` [flash a target; or prepare a zedboot USB key](#flash-a-board-and-prepare-zedboot)
 * `fx serve` [serve a build](#serve-a-build)
+* `fx publish cache` [iterate on cache packages](#iterate-cache-packages)
 * `fx ota` [update a target](#update-a-target-device)
 * `fx test` [execute tests](#execute-tests)
 * `fx shell` [connect to a target shell](#connect-to-a-target-shell)
@@ -244,6 +245,38 @@ to your `~/.bashrc` or equivalent. This change results in the following:
   override.
 
 Note that the behavior of `fx build` remains unchanged.
+
+### Iterating on Cache packages {#iterate-cache-packages}
+
+Any time a cache package needs to be rebuilt `fx build` triggers through a full
+system assembly in addition to compiling + publishing cache packages. In most
+developer workflows iterating over cache packages this is excessive and causes
+slowdowns.
+
+If you are only iterating on cache packages, you can achieve up to 2-3X faster
+build speeds by simply replacing `fx build` with `fx publish cache`. Here's what
+this might look like in a typical development cycle workflow:
+
+```bash
+# Workspace Setup Phase:
+# 1. <flash a device or start an emulator>
+# 2. In a separate window, start the package server.
+> fx serve
+
+# Workflow Iteration Phase:
+# 1. <Make changes to cache package>
+# 2. Rebuild and publish cache packages.
+> fx publish cache
+# 3. <Restart your component>
+> ffx component stop /core/your_component
+> ffx session restart
+```
+
+You can run `fx list-packages --cache` to view a list of all cache packages.
+
+Known limitation: (Re)booting the emulator won't result in the updated component
+running until it is restarted. [(Bug)](https://issuetracker.google.com/300995299)
+
 
 ### Building a specific target {#building-a-specific-target}
 
