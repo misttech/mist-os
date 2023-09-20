@@ -368,12 +368,14 @@ impl Validate for [Elf64ProgramHeader] {
         let page_size = zx::system_get_page_size() as usize;
         let mut vaddr_high: usize = 0;
         for hdr in self {
-            if hdr.filesz > hdr.memsz {
-                return Err(ElfParseError::InvalidProgramHeader("filesz > memsz"));
-            }
-
             match hdr.segment_type() {
                 Ok(SegmentType::Load) => {
+                    if hdr.filesz > hdr.memsz {
+                        return Err(ElfParseError::InvalidProgramHeader(
+                            "filesz > memsz in a PT_LOAD segment",
+                        ));
+                    }
+
                     // Virtual addresses for PT_LOAD segments should not overlap.
                     if hdr.vaddr < vaddr_high {
                         return Err(ElfParseError::InvalidProgramHeader(
