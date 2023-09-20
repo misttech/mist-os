@@ -46,6 +46,8 @@ async fn main() -> Result<(), Error> {
 
 async fn main_inner() -> Result<(), Error> {
     let inspector = finspect::Inspector::default();
+    let _inspect_server_task =
+        inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
 
     let target_channel_manager =
         channel::TargetChannelManager::new(connect::ServiceConnector, "/config/data");
@@ -86,8 +88,6 @@ async fn main_inner() -> Result<(), Error> {
         .add_fidl_service(move |stream| {
             IncomingServices::ChannelControl(stream, Arc::clone(&channel_handler_clone))
         });
-
-    inspect_runtime::serve(&inspector, &mut fs)?;
 
     fs.take_and_serve_directory_handle().context("ServiceFs::take_and_serve_directory_handle")?;
     futures.push(

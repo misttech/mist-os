@@ -315,8 +315,6 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
         .add_fidl_service(rewrite_cb)
         .add_fidl_service(cup_cb);
 
-    inspect_runtime::serve(&inspector, &mut fs)?;
-
     fs.take_and_serve_directory_handle().context("while serving directory handle")?;
 
     futures.push(fs.collect().boxed_local());
@@ -327,6 +325,9 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
     );
 
     ftrace::instant!("app", "startup", ftrace::Scope::Process);
+
+    let _inspect_server_task =
+        inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
 
     futures.collect::<()>().await;
 

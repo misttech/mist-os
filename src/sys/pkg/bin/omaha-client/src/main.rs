@@ -68,7 +68,9 @@ async fn main_inner() -> Result<(), Error> {
 
     // Inspect
     let inspector = fuchsia_inspect::Inspector::default();
-    inspect_runtime::serve(&inspector, &mut fs)?;
+    let _inspect_server_task =
+        inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
+
     let root = inspector.root();
     let configuration_node = inspect::ConfigurationNode::new(root.create_child("configuration"));
     configuration_node.set(&platform_config);

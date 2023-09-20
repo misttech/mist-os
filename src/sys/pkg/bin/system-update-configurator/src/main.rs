@@ -33,10 +33,11 @@ pub async fn main() -> Result<(), Error> {
 
 async fn run() -> Result<(), Error> {
     let inspector = fuchsia_inspect::Inspector::default();
+    let _inspect_server_task =
+        inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
     let health_status = health::HealthStatus::new(inspector.root());
 
     let mut fs: service::Fs = ServiceFs::new_local();
-    let () = inspect_runtime::serve(&inspector, &mut fs).context("while configuring inspect")?;
     fs.take_and_serve_directory_handle().context("while taking outdir handle")?;
 
     let storage = bridge::OptOutStorage;

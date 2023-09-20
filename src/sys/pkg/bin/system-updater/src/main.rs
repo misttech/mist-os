@@ -16,7 +16,7 @@ use {
     fuchsia_component::server::ServiceFs,
     parking_lot::Mutex,
     std::sync::Arc,
-    tracing::{error, info, warn},
+    tracing::{error, info},
 };
 
 mod fidl;
@@ -29,6 +29,9 @@ async fn main() {
     let structured_config = system_updater_config::Config::take_from_startup_handle();
 
     let inspector = fuchsia_inspect::Inspector::default();
+    let _inspect_server_task =
+        inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
+
     let history_node = inspector.root().create_child("history");
 
     let history = Arc::new(Mutex::new(UpdateHistory::load(history_node).await));
@@ -37,11 +40,6 @@ async fn main() {
     if let Err(e) = fs.take_and_serve_directory_handle() {
         error!("error encountered serving directory handle: {:#}", anyhow!(e));
         std::process::exit(1);
-    }
-
-    if let Err(e) = inspect_runtime::serve(&inspector, &mut fs) {
-        // Almost nothing should be fatal to the system-updater if we can help it.
-        warn!("Couldn't serve inspect: {:#}", anyhow!(e));
     }
 
     // The install manager task will run the update attempt task,

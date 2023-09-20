@@ -55,6 +55,9 @@ pub fn main() -> Result<(), Error> {
 
 async fn main_inner_async() -> Result<(), Error> {
     let inspector = finspect::Inspector::default();
+    let _inspect_server_task =
+        inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
+
     let verification_node = inspector.root().create_child("verification");
     let mut health_node = finspect::health::Node::new(inspector.root());
 
@@ -122,7 +125,6 @@ async fn main_inner_async() -> Result<(), Error> {
     // Handle ServiceFs and inspect
     let mut fs = ServiceFs::new_local();
     fs.take_and_serve_directory_handle().context("while serving directory handle")?;
-    let () = inspect_runtime::serve(&inspector, &mut fs).context("while serving inspect")?;
 
     // Handle FIDL.
     let fidl = Arc::new(FidlServer::new(p_external, blocker));

@@ -116,6 +116,8 @@ pub fn main() -> Result<(), Error> {
 async fn main_inner() -> Result<(), Error> {
     info!("starting package cache service");
     let inspector = finspect::Inspector::default();
+    let _inspect_server_task =
+        inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
 
     let (use_fxblob, use_system_image) = {
         let config = pkg_cache_config::Config::take_from_startup_handle();
@@ -334,7 +336,6 @@ async fn main_inner() -> Result<(), Error> {
                 system_image,
             )
             .context("serve pkgfs compat directories")?,
-        inspect_runtime::DIAGNOSTICS_DIR => inspect_runtime::create_diagnostics_dir(inspector),
     };
 
     let () = out_dir.open(
