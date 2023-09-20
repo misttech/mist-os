@@ -917,15 +917,17 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
         };
 
         // The zombies whose exit signal matches the waiting options queried.
-        let zombie_matches_wait_options: fn(&OwnedRef<ZombieProcess>) -> bool =
-            if options.wait_for_all {
-                |_zombie| true
-            } else if options.wait_for_clone {
-                // A "clone" zombie is one which has delivered no signal, or a signal other than SIGCHLD to its parent upon termination.
-                |zombie| zombie.exit_info.exit_signal != Some(SIGCHLD)
-            } else {
-                |zombie| zombie.exit_info.exit_signal == Some(SIGCHLD)
-            };
+        let zombie_matches_wait_options: Box<dyn Fn(&OwnedRef<ZombieProcess>) -> bool> = if options
+            .wait_for_all
+        {
+            Box::new(|_zombie: &OwnedRef<ZombieProcess>| true)
+        } else {
+            // A "clone" zombie is one which has delivered no signal, or a
+            // signal other than SIGCHLD to its parent upon termination.
+            Box::new(|zombie: &OwnedRef<ZombieProcess>| {
+                Self::is_correct_exit_signal(options.wait_for_clone, zombie.exit_info.exit_signal)
+            })
+        };
 
         // We look for the last zombie in the vector that matches pid selector and waiting options
         let selected_zombie_position = self
@@ -952,6 +954,10 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
         })
     }
 
+    fn is_correct_exit_signal(for_clone: bool, exit_code: Option<Signal>) -> bool {
+        for_clone == (exit_code != Some(SIGCHLD))
+    }
+
     fn get_waitable_running_children(
         &self,
         selector: ProcessSelector,
@@ -972,13 +978,24 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
             if options.wait_for_all {
                 return true;
             }
-            child.read().tasks.values().any(|container| {
-                let info = container.info();
-                if options.wait_for_clone {
-                    *info.exit_signal() != Some(SIGCHLD)
-                } else {
-                    *info.exit_signal() == Some(SIGCHLD)
+            let child_state = child.read();
+            if child_state.terminating {
+                // Child is terminating.  In addition to its original location,
+                // the leader may have exited, and its exit signal may be in the
+                // leader_exit_info.
+                if let Some(info) = &child_state.leader_exit_info {
+                    if info.exit_signal.is_some() {
+                        return Self::is_correct_exit_signal(
+                            options.wait_for_clone,
+                            info.exit_signal,
+                        );
+                    }
                 }
+            };
+
+            child_state.tasks.values().any(|container| {
+                let info = container.info();
+                Self::is_correct_exit_signal(options.wait_for_clone, *info.exit_signal())
             })
         };
 
