@@ -301,30 +301,6 @@
         "request": "fuchsia.media/AudioCreateAudioRendererRequest"
     },
     {
-        "kind": "protocol/member",
-        "name": "fuchsia.media/Audio.SetSystemGain",
-        "strictness": "strict",
-        "ordinal": "8515047631012755542",
-        "direction": "one_way",
-        "request": "fuchsia.media/AudioSetSystemGainRequest"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.media/Audio.SetSystemMute",
-        "strictness": "strict",
-        "ordinal": "2666794838470419504",
-        "direction": "one_way",
-        "request": "fuchsia.media/AudioSetSystemMuteRequest"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.media/Audio.SystemGainMuteChanged",
-        "strictness": "strict",
-        "ordinal": "2202477666250892016",
-        "direction": "event",
-        "request": "fuchsia.media/AudioSystemGainMuteChangedRequest"
-    },
-    {
         "kind": "protocol",
         "name": "fuchsia.media/Audio",
         "openness": "closed",
@@ -1027,30 +1003,6 @@
         "request": "fuchsia.media/AudioCoreSetRenderUsageGainRequest"
     },
     {
-        "kind": "protocol/member",
-        "name": "fuchsia.media/AudioCore.SetSystemGain",
-        "strictness": "strict",
-        "ordinal": "6499835425468848505",
-        "direction": "one_way",
-        "request": "fuchsia.media/AudioCoreSetSystemGainRequest"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.media/AudioCore.SetSystemMute",
-        "strictness": "strict",
-        "ordinal": "6920516870512125551",
-        "direction": "one_way",
-        "request": "fuchsia.media/AudioCoreSetSystemMuteRequest"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.media/AudioCore.SystemGainMuteChanged",
-        "strictness": "strict",
-        "ordinal": "2524839922906587440",
-        "direction": "event",
-        "request": "fuchsia.media/AudioCoreSystemGainMuteChangedRequest"
-    },
-    {
         "kind": "protocol",
         "name": "fuchsia.media/AudioCore",
         "openness": "closed",
@@ -1239,42 +1191,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.media/AudioCoreSetRenderUsageGainRequest"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.media/AudioCoreSetSystemGainRequest.gain_db",
-        "ordinal": "1",
-        "type": "float32"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.media/AudioCoreSetSystemGainRequest"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.media/AudioCoreSetSystemMuteRequest.muted",
-        "ordinal": "1",
-        "type": "bool"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.media/AudioCoreSetSystemMuteRequest"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.media/AudioCoreSystemGainMuteChangedRequest.gain_db",
-        "ordinal": "1",
-        "type": "float32"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.media/AudioCoreSystemGainMuteChangedRequest.muted",
-        "ordinal": "2",
-        "type": "bool"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.media/AudioCoreSystemGainMuteChangedRequest"
     },
     {
         "kind": "struct/member",
@@ -2099,26 +2015,6 @@
     },
     {
         "kind": "struct/member",
-        "name": "fuchsia.media/AudioSetSystemGainRequest.gain_db",
-        "ordinal": "1",
-        "type": "float32"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.media/AudioSetSystemGainRequest"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.media/AudioSetSystemMuteRequest.muted",
-        "ordinal": "1",
-        "type": "bool"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.media/AudioSetSystemMuteRequest"
-    },
-    {
-        "kind": "struct/member",
         "name": "fuchsia.media/AudioStreamType.channels",
         "ordinal": "2",
         "type": "uint32"
@@ -2138,22 +2034,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.media/AudioStreamType"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.media/AudioSystemGainMuteChangedRequest.gain_db",
-        "ordinal": "1",
-        "type": "float32"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.media/AudioSystemGainMuteChangedRequest.muted",
-        "ordinal": "2",
-        "type": "bool"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.media/AudioSystemGainMuteChangedRequest"
     },
     {
         "kind": "union/member",

@@ -24,19 +24,15 @@ closed protocol Audio {
         loopback bool;
     });
 
-    // TODO(fxbug.dev/38104): Remove these methods.
-    @transitional
-    @deprecated
+    @available(removed=15)
     strict SetSystemMute(struct {
         muted bool;
     });
-    @transitional
-    @deprecated
+    @available(removed=15)
     strict SetSystemGain(struct {
         gain_db float32;
     });
-    @transitional
-    @deprecated
+    @available(removed=15)
     strict -> SystemGainMuteChanged(struct {
         gain_db float32;
         muted bool;

@@ -139,8 +139,7 @@ closed protocol AudioCore {
     /// the range -160 db to 0 db, inclusive. This setting is applied to all
     /// audio output devices. Audio input devices are unaffected.
     /// Does not affect System Mute.
-    @transitional
-    @deprecated
+    @available(removed=15)
     strict SetSystemGain(struct {
         gain_db float32;
     });
@@ -148,8 +147,7 @@ closed protocol AudioCore {
     /// Sets/clears the systemwide 'Mute' state for audio output devices.
     /// Audio input devices are unaffected. Changes to the System Mute state do
     /// not affect the value of System Gain.
-    @transitional
-    @deprecated
+    @available(removed=15)
     strict SetSystemMute(struct {
         muted bool;
     });
@@ -158,8 +156,7 @@ closed protocol AudioCore {
     /// connects to AudioCore, the system immediately sends that client a
     /// SystemGainMuteChanged event with the current system Gain|Mute settings.
     /// Subsequent events will be sent when these Gain|Mute values change.
-    @transitional
-    @deprecated
+    @available(removed=15)
     strict -> SystemGainMuteChanged(struct {
         gain_db float32;
         muted bool;
