@@ -62,9 +62,16 @@ default_args = {
   pw_log_BACKEND = "//third_party/pigweed/backends/pw_log"
   pw_chrono_SYSTEM_CLOCK_BACKEND =
       "//third_party/pigweed/src/pw_chrono_stl:system_clock"
-  pw_sync_MUTEX_BACKEND = "//third_party/pigweed/src/pw_sync_baremetal:mutex"
+  pw_sync_MUTEX_BACKEND = "//third_party/pigweed/src/pw_sync_stl:mutex_backend"
   pw_sys_io_BACKEND = "//third_party/pigweed/src/pw_sys_io_stdio"
   pw_thread_SLEEP_BACKEND = "//third_party/pigweed/src/pw_thread_stl:sleep"
+
+  pw_sync_THREAD_NOTIFICATION_BACKEND = "//third_party/pigweed/src/pw_sync:binary_semaphore_thread_notification_backend"
+  pw_sync_TIMED_THREAD_NOTIFICATION_BACKEND = "//third_party/pigweed/src/pw_sync:binary_semaphore_timed_thread_notification_backend"
+  pw_chrono_SYSTEM_TIMER_BACKEND =
+      "//third_party/pigweed/src/pw_chrono_stl:system_timer"
+  pw_sync_BINARY_SEMAPHORE_BACKEND =
+      "//third_party/pigweed/src/pw_sync_stl:binary_semaphore_backend"
 
   # Pigweed configs for Fuchsia.
   pw_function_CONFIG =
@@ -99,4 +106,9 @@ default_args = {
   # Use protoc from the Fuchsia build for Pigweed
   pw_protobuf_compiler_PROTOC_TARGET = "//third_party/protobuf:protoc"
   pw_protobuf_compiler_PROTOC_BINARY = "host_x64/protoc"
+
+  # Settings for pigweed's CHRE module.
+  dir_pw_third_party_chre = "//third_party/chre/src"
+  pw_chre_CONFIG = "//third_party/chre:chre_config"
+  pw_chre_PLATFORM_BACKEND = "//third_party/pigweed/src/pw_chre:chre_backend"
 }
