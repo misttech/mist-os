@@ -2944,3 +2944,16 @@
   reviewers: ['abarth@google.com', 'cpu@google.com', 'joshlf@google.com', 'galbanum@google.com', 'csuter@google.com']
   submitted: '2023-07-25'
   reviewed: '2023-09-05'
+
+- name: 'RFC-0226'
+  title: 'Zircon Pager Writeback'
+  short_description: 'Kernel support for tracking and writing back modifications to pager-backed VMOs'
+  authors: ['rashaeqbal@google.com']
+  file: '0226_zircon_pager_writeback.md'
+  area: ['Kernel']
+  issue: ['63989']
+  gerrit_change_id: ['827880']
+  status: 'Accepted'
+  reviewers: ['adanis@google.com', 'cpu@google.com', 'csuter@google.com']
+  submitted: '2023-04-13'
+  reviewed: '2023-09-19'

@@ -466,3 +466,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0224_userspace_pointer_masking.md
   - title: "RFC-0225: Fxblob: Storing blobs in Fxfs"
     path: /docs/contribute/governance/rfcs/0225_fxblob.md
+  - title: "RFC-0226: Zircon Pager Writeback"
+    path: /docs/contribute/governance/rfcs/0226_zircon_pager_writeback.md
