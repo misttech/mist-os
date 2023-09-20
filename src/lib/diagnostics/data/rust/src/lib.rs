@@ -9,8 +9,11 @@
 
 use anyhow::format_err;
 use chrono::{Local, TimeZone, Utc};
-use fidl_fuchsia_diagnostics::{DataType, Severity as FidlSeverity};
+use diagnostics_hierarchy::HierarchyMatcher;
+use fidl_fuchsia_diagnostics::{DataType, Selector, Severity as FidlSeverity};
 use flyweights::FlyStr;
+use moniker::{ExtendedMoniker, MonikerError};
+use selectors::SelectorMatchExt;
 use serde::{
     self,
     de::{DeserializeOwned, Deserializer},
@@ -27,6 +30,7 @@ use std::{
     time::Duration,
 };
 use termion::{color, style};
+use thiserror::Error;
 
 pub use diagnostics_hierarchy::{
     assert_data_tree, hierarchy, tree_assertion, DiagnosticsHierarchy, Property,
@@ -528,6 +532,49 @@ where
             payload: None,
         }
     }
+
+    /// Uses a set of Selectors to filter self's payload and returns the resulting
+    /// Data. If the resulting payload is empty, it returns Ok(None).
+    pub fn filter(mut self, selectors: &[Selector]) -> Result<Option<Self>, Error> {
+        let Some(hierarchy) = self.payload else {
+            return Ok(None);
+        };
+        let moniker = match ExtendedMoniker::parse_str(self.moniker.as_str()) {
+            Ok(moniker) => moniker,
+            Err(e) => return Err(Error::Moniker(e)),
+        };
+        let matching_selectors = match moniker.match_against_selectors(selectors) {
+            Ok(selectors) if selectors.is_empty() => return Ok(None),
+            Ok(selectors) => selectors,
+            Err(e) => {
+                return Err(Error::Internal(e));
+            }
+        };
+
+        // TODO(fxbug.dev/300319116): Cache the `HierarchyMatcher`s
+        let matcher: HierarchyMatcher = match matching_selectors.try_into() {
+            Ok(hierarchy_matcher) => hierarchy_matcher,
+            Err(e) => {
+                return Err(Error::Internal(e.into()));
+            }
+        };
+
+        self.payload = match diagnostics_hierarchy::filter_hierarchy(hierarchy, &matcher) {
+            Some(hierarchy) => Some(hierarchy),
+            None => return Ok(None),
+        };
+        Ok(Some(self))
+    }
+}
+
+/// Errors that can happen in this library.
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error(transparent)]
+    Internal(#[from] anyhow::Error),
+
+    #[error(transparent)]
+    Moniker(#[from] MonikerError),
 }
 
 /// A diagnostics data object containing inspect data.
@@ -1469,7 +1516,9 @@ impl Metadata {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use diagnostics_hierarchy::hierarchy;
+    use selectors::FastError;
     use serde_json::json;
 
     const TEST_URL: &'static str = "fuchsia-pkg://test";
@@ -1540,6 +1589,135 @@ mod tests {
             "timestamp": 123456,
           }
         });
+
+        pretty_assertions::assert_eq!(result_json, expected_json, "golden diff failed.");
+    }
+
+    fn parse_selectors(strings: Vec<&str>) -> Vec<Selector> {
+        strings
+            .iter()
+            .map(|s| match selectors::parse_selector::<FastError>(s) {
+                Ok(selector) => selector,
+                Err(e) => panic!("Couldn't parse selector {s}: {e}"),
+            })
+            .collect::<Vec<_>>()
+    }
+
+    #[fuchsia::test]
+    fn test_filter_returns_none_on_empty_hierarchy() {
+        let data = Data::for_inspect(
+            "a/b/c/d",
+            None,
+            123456i64,
+            TEST_URL,
+            Some(InspectHandleName::filename("test_file_plz_ignore.inspect")),
+            Vec::new(),
+        );
+        let selectors = parse_selectors(vec!["a/b/c/d:foo"]);
+
+        assert_eq!(data.filter(&selectors).expect("Filter OK"), None);
+    }
+
+    #[fuchsia::test]
+    fn test_filter_returns_err_on_bad_moniker() {
+        let mut hierarchy = hierarchy! {
+            root: {
+                x: "foo",
+            }
+        };
+        hierarchy.sort();
+        let data = Data::for_inspect(
+            "a b c d",
+            Some(hierarchy),
+            123456i64,
+            TEST_URL,
+            Some(InspectHandleName::filename("test_file_plz_ignore.inspect")),
+            Vec::new(),
+        );
+        let selectors = parse_selectors(vec!["a/b/c/d:foo"]);
+
+        assert_matches!(data.filter(&selectors), Err(Error::Moniker(_)));
+    }
+
+    #[fuchsia::test]
+    fn test_filter_returns_none_on_selector_mismatch() {
+        let mut hierarchy = hierarchy! {
+            root: {
+                x: "foo",
+            }
+        };
+        hierarchy.sort();
+        let data = Data::for_inspect(
+            "b/c/d/e",
+            Some(hierarchy),
+            123456i64,
+            TEST_URL,
+            Some(InspectHandleName::filename("test_file_plz_ignore.inspect")),
+            Vec::new(),
+        );
+        let selectors = parse_selectors(vec!["a/b/c/d:foo"]);
+
+        assert_eq!(data.filter(&selectors).expect("Filter OK"), None);
+    }
+
+    #[fuchsia::test]
+    fn test_filter_returns_none_on_data_mismatch() {
+        let mut hierarchy = hierarchy! {
+            root: {
+                x: "foo",
+            }
+        };
+        hierarchy.sort();
+        let data = Data::for_inspect(
+            "a/b/c/d",
+            Some(hierarchy),
+            123456i64,
+            TEST_URL,
+            Some(InspectHandleName::filename("test_file_plz_ignore.inspect")),
+            Vec::new(),
+        );
+        let selectors = parse_selectors(vec!["a/b/c/d:foo"]);
+
+        assert_eq!(data.filter(&selectors).expect("FIlter OK"), None);
+    }
+
+    #[fuchsia::test]
+    fn test_filter_returns_matching_data() {
+        let mut hierarchy = hierarchy! {
+            root: {
+                x: "foo",
+                y: "bar",
+            }
+        };
+        hierarchy.sort();
+        let data = Data::for_inspect(
+            "a/b/c/d",
+            Some(hierarchy),
+            123456i64,
+            TEST_URL,
+            Some(InspectHandleName::filename("test_file_plz_ignore.inspect")),
+            Vec::new(),
+        );
+        let selectors = parse_selectors(vec!["a/b/c/d:root:x"]);
+
+        let expected_json = json!({
+          "moniker": "a/b/c/d",
+          "version": 1,
+          "data_source": "Inspect",
+          "payload": {
+            "root": {
+              "x": "foo"
+            }
+          },
+          "metadata": {
+            "component_url": TEST_URL,
+            "filename": "test_file_plz_ignore.inspect",
+            "timestamp": 123456,
+          }
+        });
+
+        let result_json = serde_json::to_value(&data.filter(&selectors).expect("Filter Ok"))
+            .expect("serialization should succeed.");
 
         pretty_assertions::assert_eq!(result_json, expected_json, "golden diff failed.");
     }
