@@ -447,9 +447,11 @@ group("log") {
   visibility = third_party_rust_crate_log_visibility
 }
 
-group("loom") {
-  public_deps = [ ":loom-v0_5_6" ]
-  testonly = true
+if (!(current_os == "fuchsia")) {
+  group("loom") {
+    public_deps = [ ":loom-v0_5_6" ]
+    testonly = true
+  }
 }
 
 group("lru-cache") {
