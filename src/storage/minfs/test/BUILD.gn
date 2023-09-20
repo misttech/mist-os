@@ -249,10 +249,9 @@ fs_test_suite("minfs") {
     deps += [ ":minfs-power-test" ]
   }
 
-  # TODO(fxbug.dev/297201368): Remove when these tests pass on RISC-V.
+  # TODO(b/297201368): These tests timeout on RISC-V builders currently.
   if (current_cpu == "riscv64") {
     omit_components = [
-      ":minfs-attr-tests",
       ":minfs-full-tests",
       ":minfs-resize-tests",
     ]

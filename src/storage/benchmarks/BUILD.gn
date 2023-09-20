@@ -56,7 +56,7 @@ group("benchmarks") {
     "starnix:benchmarks",
   ]
 
-  # TODO(fxbug.dev/297201368): Remove when this can be built on RISCV64.
+  # TODO(b/297312145): Remove when Starnix can be built on RISC-V.
   if (current_cpu == "riscv64") {
     deps -= [ "starnix:benchmarks" ]
   }
