@@ -122,7 +122,6 @@ closed protocol SemanticListener {
     });
 
     /// Asks the semantics provider to perform hit testing and return the result.
-    @transitional
     strict HitTest(struct {
         local_point fuchsia.math.PointF;
     }) -> (struct {
