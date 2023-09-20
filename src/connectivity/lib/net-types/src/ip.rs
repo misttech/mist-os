@@ -366,8 +366,8 @@ pub trait Ip:
         Out: GenericOverIp<Self, Type = Out> + GenericOverIp<Ipv4> + GenericOverIp<Ipv6>,
     >(
         input: In,
-        v4: fn(<In as GenericOverIp<Ipv4>>::Type) -> <Out as GenericOverIp<Ipv4>>::Type,
-        v6: fn(<In as GenericOverIp<Ipv6>>::Type) -> <Out as GenericOverIp<Ipv6>>::Type,
+        v4: impl FnOnce(<In as GenericOverIp<Ipv4>>::Type) -> <Out as GenericOverIp<Ipv4>>::Type,
+        v6: impl FnOnce(<In as GenericOverIp<Ipv6>>::Type) -> <Out as GenericOverIp<Ipv6>>::Type,
     ) -> Out;
 }
 
@@ -435,8 +435,8 @@ impl Ip for Ipv4 {
         Out: GenericOverIp<Self, Type = Out> + GenericOverIp<Ipv4> + GenericOverIp<Ipv6>,
     >(
         input: In,
-        v4: fn(<In as GenericOverIp<Ipv4>>::Type) -> <Out as GenericOverIp<Ipv4>>::Type,
-        _v6: fn(<In as GenericOverIp<Ipv6>>::Type) -> <Out as GenericOverIp<Ipv6>>::Type,
+        v4: impl FnOnce(<In as GenericOverIp<Ipv4>>::Type) -> <Out as GenericOverIp<Ipv4>>::Type,
+        _v6: impl FnOnce(<In as GenericOverIp<Ipv6>>::Type) -> <Out as GenericOverIp<Ipv6>>::Type,
     ) -> Out {
         v4(input)
     }
@@ -626,8 +626,8 @@ impl Ip for Ipv6 {
         Out: GenericOverIp<Self, Type = Out> + GenericOverIp<Ipv4> + GenericOverIp<Ipv6>,
     >(
         input: In,
-        _v4: fn(<In as GenericOverIp<Ipv4>>::Type) -> <Out as GenericOverIp<Ipv4>>::Type,
-        v6: fn(<In as GenericOverIp<Ipv6>>::Type) -> <Out as GenericOverIp<Ipv6>>::Type,
+        _v4: impl FnOnce(<In as GenericOverIp<Ipv4>>::Type) -> <Out as GenericOverIp<Ipv4>>::Type,
+        v6: impl FnOnce(<In as GenericOverIp<Ipv6>>::Type) -> <Out as GenericOverIp<Ipv6>>::Type,
     ) -> Out {
         v6(input)
     }
