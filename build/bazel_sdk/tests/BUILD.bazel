@@ -16,6 +16,7 @@ test_suite(
     tests = [
         ":assembly_tests",
         ":licenses_tests",
+        "//fuchsia/drivers:tests",
         "//fuchsia/packaging:tests",
     ],
 )

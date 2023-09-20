@@ -28,20 +28,13 @@ fuchsia_driver_bind_bytecode(
     ],
 )
 
-cc_library(
-    name = "test_driver_lib",
+fuchsia_cc_driver(
+    name = "test_driver",
     srcs = [
         "cc_test_driver.cc",
-    ],
-    hdrs = [
         "cc_test_driver.h",
     ],
     deps = ["@fuchsia_sdk//pkg/driver_component_cpp"],
-)
-
-fuchsia_cc_driver(
-    name = "test_driver",
-    deps = [":test_driver_lib"],
 )
 
 fuchsia_component_manifest(

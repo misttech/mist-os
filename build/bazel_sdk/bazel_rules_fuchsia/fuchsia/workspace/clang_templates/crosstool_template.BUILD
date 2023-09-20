@@ -46,6 +46,7 @@ filegroup(
 exports_files([
     "bin/clang-format",
     "bin/clang-tidy",
+    "bin/llvm-readelf",
 ])
 
 filegroup(

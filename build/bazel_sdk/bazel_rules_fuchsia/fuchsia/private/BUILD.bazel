@@ -10,7 +10,9 @@ exports_files(
 )
 
 exports_files(
-    glob([
+    [
+        "driver.ld",
+    ] + glob([
         "templates/*",
     ]),
     visibility = ["//visibility:public"],

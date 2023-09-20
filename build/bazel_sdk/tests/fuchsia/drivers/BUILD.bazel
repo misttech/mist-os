@@ -1,0 +1,58 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("@rules_python//python:defs.bzl", "py_binary")
+load(":driver_binary_test.bzl", "driver_binary_test")
+load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_cc_driver")
+
+package(default_visibility = ["//visibility:public"])
+
+test_suite(
+    name = "tests",
+    tests = [
+        ":test-driver-with-direct-srcs",
+        ":test-fuchsia-cc-driver-without-srcs",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+driver_binary_test(
+    name = "test-fuchsia-cc-driver-without-srcs",
+    driver = ":driver-no-srcs",
+)
+
+driver_binary_test(
+    name = "test-driver-with-direct-srcs",
+    driver = ":driver-with-srcs",
+)
+
+# Test Resources
+py_binary(
+    name = "verify_driver_binary",
+    srcs = ["verify_driver_binary.py"],
+    python_version = "PY3",
+)
+
+cc_library(
+    name = "lib",
+    srcs = ["driver.cc"],
+    hdrs = ["driver.h"],
+    deps = ["@fuchsia_sdk//pkg/driver_component_cpp"],
+)
+
+fuchsia_cc_driver(
+    name = "driver-no-srcs",
+    # We must include driver.cc here to properly link our symbols
+    srcs = ["driver.cc"],
+    deps = [":lib"],
+)
+
+fuchsia_cc_driver(
+    name = "driver-with-srcs",
+    srcs = [
+        "driver.cc",
+        "driver.h",
+    ],
+    deps = ["@fuchsia_sdk//pkg/driver_component_cpp"],
+)
