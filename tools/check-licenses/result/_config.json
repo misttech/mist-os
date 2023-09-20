@@ -28,6 +28,7 @@
       {
         "name": "AllProjectsMustHaveALicense",
         "allowlist": {
+          "prebuilt/third_party/black/linux-x64": true,
           "prebuilt/drivers/wlan/intel/iwlwifi": true,
           "prebuilt/audio/config": true,
           "prebuilt/drivers/wlan/intel/iwlwifi": true,
