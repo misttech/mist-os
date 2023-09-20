@@ -15,6 +15,7 @@ sdk_source_set("cpp") {
     "function.h",
     "internal/dispatcher_bound_storage.cc",
     "internal/dispatcher_bound_storage.h",
+    "internal/promise_adaptor.h",
     "internal/receiver_base.cc",
     "internal/receiver_base.h",
     "internal/sendable.h",
@@ -28,6 +29,7 @@ sdk_source_set("cpp") {
 
   public_deps = [
     "//sdk/lib/fit",
+    "//sdk/lib/fit-promise",
     "//sdk/lib/stdcompat",
     "//zircon/system/ulib/async",
     "//zircon/system/ulib/async:async-cpp",

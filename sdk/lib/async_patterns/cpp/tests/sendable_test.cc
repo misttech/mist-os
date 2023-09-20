@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <memory>
-#include <tuple>
 #include <type_traits>
 
 void SendableCompileTimeTests() {

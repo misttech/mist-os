@@ -268,7 +268,7 @@ zx_status_t AmlogicSecureMemDevice::CreateAndServeSysmemTee() {
 
   sysmem_secure_mem_server_.AsyncCall(
       &SysmemSecureMemServer::Bind, std::move(sysmem_secure_mem_server),
-      receiver_.Once(&AmlogicSecureMemDevice::SysmemSecureMemServerOnUnbound));
+      receiver_.Once(&AmlogicSecureMemDevice::SysmemSecureMemServerOnUnbound).ignore_result());
 
   // Tell sysmem about the fidl::sysmem::Tee channel that sysmem will use (async) to configure
   // secure memory ranges.  Sysmem won't fidl call back during this banjo call.

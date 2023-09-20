@@ -247,7 +247,7 @@ class [[nodiscard]] DispatcherBound<T>::AsyncCallBuilder {
   // Arranges the |on_result| callback to be called with the result of the async
   // call. See |DispatcherBound<T>::AsyncCall| for documentation.
   template <typename R>
-  void Then(async_patterns::Callback<R> on_result) && {
+  void Then(async_patterns::Callback<void(R)> on_result) && {
     constexpr bool kReceiverMatchesReturnValue =
         std::is_invocable_v<decltype(on_result), TaskResult>;
     static_assert(kReceiverMatchesReturnValue,
