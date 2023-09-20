@@ -35,13 +35,4 @@ fuchsia_unittest_package("unittests") {
       max_severity = "FATAL"
     }
   }
-
-  if (current_cpu == "riscv64") {
-    # TODO(fxbug.dev/300314048): Make the test pass on RISC-V and remove these lines.
-    test_specs = {
-    }
-    test_specs = {
-      environments = []
-    }
-  }
 }
