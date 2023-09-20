@@ -638,14 +638,11 @@ pub const ZX_RSRC_FLAG_EXCLUSIVE: zx_rsrc_flags_t = 0x00010000;
 pub const ZX_CPU_PERF_SCALE: u32 = 1;
 pub const ZX_CPU_DEFAULT_PERF_SCALE: u32 = 2;
 
-#[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum zx_cache_policy_t {
-    ZX_CACHE_POLICY_CACHED = 0,
-    ZX_CACHE_POLICY_UNCACHED = 1,
-    ZX_CACHE_POLICY_UNCACHED_DEVICE = 2,
-    ZX_CACHE_POLICY_WRITE_COMBINING = 3,
-}
+// Cache policy flags.
+pub const ZX_CACHE_POLICY_CACHED: u32 = 0;
+pub const ZX_CACHE_POLICY_UNCACHED: u32 = 1;
+pub const ZX_CACHE_POLICY_UNCACHED_DEVICE: u32 = 2;
+pub const ZX_CACHE_POLICY_WRITE_COMBINING: u32 = 3;
 
 // Flag bits for zx_cache_flush.
 multiconst!(u32, [
