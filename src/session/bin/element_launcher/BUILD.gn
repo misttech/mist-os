@@ -1,0 +1,65 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bazel/bazel_inputs.gni")
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+
+rustc_binary("bin") {
+  output_name = "element_launcher"
+  with_unit_tests = true
+  edition = "2021"
+
+  deps = [
+    ":element_launcher_config",
+    "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
+    "//third_party/rust_crates:tracing",
+  ]
+
+  sources = [ "src/main.rs" ]
+}
+
+fuchsia_component_manifest("element_launcher_component_manifest") {
+  manifest = "meta/element_launcher.cml"
+  component_name = "element_launcher"
+}
+
+fuchsia_structured_config_rust_lib("element_launcher_config") {
+  cm_label = ":element_launcher_component_manifest"
+}
+
+fuchsia_component("element_launcher_component") {
+  cm_label = ":element_launcher_component_manifest"
+  deps = [ ":bin" ]
+}
+
+fuchsia_structured_config_values("element_launcher_empty_config") {
+  cm_label = ":element_launcher_component_manifest"
+  values_source = "//src/ui/bin/element_launcher/meta/empty_config.json5"
+}
+
+fuchsia_package("element_launcher") {
+  package_name = "element_launcher"
+
+  deps = [
+    ":element_launcher_component",
+    ":element_launcher_component_manifest",
+    ":element_launcher_empty_config",
+  ]
+}
+
+# Make `element_launcher` available to products assembled with Bazel.
+#
+# TODO(fxbug.dev/122492): Make this less verbose.
+fuchsia_package_archive("element_launcher_archive") {
+  package = ":element_launcher"
+}
+
+bazel_input_resource("element_launcher_bazel_inputs") {
+  deps = [ ":element_launcher_archive" ]
+  sources = get_target_outputs(":element_launcher_archive")
+  outputs = [ "{{source_file_part}}" ]
+}
