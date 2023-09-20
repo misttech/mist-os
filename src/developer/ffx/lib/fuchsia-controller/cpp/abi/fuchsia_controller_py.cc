@@ -183,6 +183,15 @@ PyObject *Context_connect_device_proxy(Context *self, PyObject *args) {
   return PyObject_CallFunction(reinterpret_cast<PyObject *>(&channel::ChannelType), "I", handle);
 }
 
+PyObject *Context_connect_remote_control_proxy(Context *self, PyObject *args) {
+  zx_handle_t handle;
+  if (ffx_connect_remote_control_proxy(self->env_context, &handle) != ZX_OK) {
+    mod::dump_python_err();
+    return nullptr;
+  }
+  return PyObject_CallFunction(reinterpret_cast<PyObject *>(&channel::ChannelType), "I", handle);
+}
+
 PyMethodDef Context_methods[] = {
     {"connect_daemon_protocol", reinterpret_cast<PyCFunction>(Context_connect_daemon_protocol),
      METH_O, nullptr},
@@ -190,6 +199,8 @@ PyMethodDef Context_methods[] = {
      METH_NOARGS, nullptr},
     {"connect_device_proxy", reinterpret_cast<PyCFunction>(Context_connect_device_proxy),
      METH_VARARGS, nullptr},
+    {"connect_remote_control_proxy",
+     reinterpret_cast<PyCFunction>(Context_connect_remote_control_proxy), METH_NOARGS, nullptr},
     SENTINEL};
 
 DES_MIX PyTypeObject ContextType = {

@@ -8,6 +8,7 @@ use errors::ffx_error;
 use ffx_config::environment::ExecutableKind;
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
+use ffx_daemon::DaemonConfig;
 use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
 use fidl::endpoints::Proxy;
 use fidl::AsHandleRef;
@@ -110,7 +111,12 @@ impl EnvContext {
     }
 
     pub async fn connect_remote_control_proxy(&self) -> Result<zx_types::zx_handle_t> {
-        let proxy = self.injector.remote_factory().await?;
+        let target = ffx_target::resolve_default_target(&self.context).await?;
+        let is_default_target = target.is_none();
+        let daemon = self.injector.daemon_factory().await?;
+        let timeout = self.context.get_proxy_timeout().await?;
+        let proxy =
+            ffx_target::get_remote_proxy(target, is_default_target, daemon, timeout).await?;
         let hdl = proxy.into_channel().map_err(fxe)?.into_zx_channel();
         let res = hdl.raw_handle();
         std::mem::forget(hdl);

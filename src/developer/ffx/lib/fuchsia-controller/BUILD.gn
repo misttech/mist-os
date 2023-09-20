@@ -18,6 +18,7 @@ rustc_staticlib("lib") {
     "//src/connectivity/overnet/lib/hoist",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/core:lib",
+    "//src/developer/ffx/daemon:lib",
     "//src/developer/ffx/daemon/proxy:lib",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/rcs:lib",
