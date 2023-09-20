@@ -280,10 +280,8 @@ if [[ -n "${VERBOSE}" ]]; then
   printf "Files to be formatted:\n%s\n" "${FILES[@]}"
 fi
 
-PY_TOOL="fuchsia-vendored-python"
-declare -r PY_TOOL
-VPYTHON_TOOL="${FUCHSIA_DIR}/prebuilt/third_party/vpython/vpython3"
-declare -r VPYTHON_TOOL
+readonly PY_TOOL="${FUCHSIA_DIR}/scripts/fuchsia-vendored-python"
+readonly VPYTHON_TOOL="${FUCHSIA_DIR}/prebuilt/third_party/vpython/vpython3"
 readonly CLANG_CMD="${PREBUILT_CLANG_DIR}/bin/clang-format -style=file -fallback-style=Google -sort-includes -i"
 readonly DART_CMD="${PREBUILT_DART_DIR}/bin/dart format"
 readonly GIDL_FORMAT_TOOL="$( fx-command-run list-build-artifacts --expect-one --name gidl-format tools )"

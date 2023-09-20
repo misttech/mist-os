@@ -26,17 +26,16 @@ BT_FILE_DEPS=(
 )
 
 MOCK_CLANG_DIR="prebuilt/third_party/clang/test"
-MOCK_GN="prebuilt/third_party/gn/test/gn"
+MOCK_SHAC="prebuilt/third_party/shac/shac"
 MOCK_PYTHON3_DIR="prebuilt/third_party/python3/test"
-MOCK_RUST_DIR="prebuilt/third_party/rust/test"
 BT_MOCKED_TOOLS=(
+  "scripts/fuchsia-vendored-python"
   "tools/devshell/list-build-artifacts"
   "tools/devshell/lib/platform.sh"
   "prebuilt/third_party/vpython/vpython3"
   "${MOCK_CLANG_DIR}/bin/clang-format"
-  "${MOCK_GN}"
   "${MOCK_PYTHON3_DIR}/bin/python3"
-  "${MOCK_RUST_DIR}/bin/rustfmt"
+  "${MOCK_SHAC}"
   "${FUCHSIA_BUILD_DIR}/host_x64/cmc"
   "${FUCHSIA_BUILD_DIR}/host_x64/fidl-format"
   "${FUCHSIA_BUILD_DIR}/host_x64/gidl-format"
@@ -55,9 +54,8 @@ BT_SET_UP() {
   export PATH="${BT_TEMP_DIR}/bin:${PATH}"
   cat > "${BT_TEMP_DIR}/tools/devshell/lib/platform.sh.mock_side_effects" <<EOF
     readonly PREBUILT_CLANG_DIR=${BT_TEMP_DIR}/${MOCK_CLANG_DIR}
-    readonly PREBUILT_GN=${BT_TEMP_DIR}/${MOCK_GN}
+    readonly PREBUILT_SHAC=${BT_TEMP_DIR}/${MOCK_SHAC}
     readonly PREBUILT_PYTHON3_DIR=${BT_TEMP_DIR}/${MOCK_PYTHON3_DIR}
-    readonly PREBUILT_RUST_DIR=${BT_TEMP_DIR}/${MOCK_RUST_DIR}
 EOF
 }
 
@@ -80,9 +78,7 @@ TEST_fx-format-code-commands() {
   printf -v csfiles ",%s" "${files[@]}"
   BT_EXPECT "${fx}" format-code --verbose --files="${csfiles:1}" > "${out}"
   BT_EXPECT grep -q -E '"clang-format.*cplusplus.cc"' "${out}"
-  BT_EXPECT grep -q -E '"gn format.*gn.gn"' "${out}"
-  BT_EXPECT grep -q -E '"gn format.*gn.gni"' "${out}"
-  BT_EXPECT grep -q -E '"rustfmt.*rust.rs"' "${out}"
+  BT_EXPECT grep -q -E '"shac fmt .*/rust.rs .*/gn.gn .*/gn.gni"' "${out}"
   BT_EXPECT grep -q -E '"yapf.*python3.py"' "${out}"
 }
 
@@ -117,7 +113,6 @@ TEST_fx-format-code-builds-required-commands() {
   local err="${BT_TEMP_DIR}/_fx_format_code_stderr"
   local files=(
     "${TESTDATA}/cplusplus.cc"
-    "${TESTDATA}/rust.rs"
     "${TESTDATA}/gidl.gidl"
     "${TESTDATA}/fidl.test.fidl"
     "${TESTDATA}/cml.cml"
@@ -131,7 +126,6 @@ TEST_fx-format-code-builds-required-commands() {
   # but this test verifies that they would be built.
   "${fx}" format-code --verbose --files="${csfiles:1}" > "${out}" 2> "${err}"
   BT_EXPECT grep -q -E '"clang-format.*cplusplus.cc"' "${out}"
-  BT_EXPECT grep -q -E '"rustfmt.*rust.rs"' "${out}"
   BT_EXPECT grep -q -E '"fidl-format not built; building now..."' "${err}"
   BT_EXPECT grep -q -E '"gidl-format not built; building now..."' "${err}"
   BT_EXPECT grep -q -E '"cmc not built; building now..."' "${err}"
