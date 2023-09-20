@@ -76,17 +76,11 @@ pattern).
 ## Tests
 
 *   Parsing and serialization tests:
-    [packet_formats_lib_test.cmx](../../../lib/network/packet-formats/meta/packet_formats_lib_test.cmx).
+    [packet_formats_test](../../../lib/packet-formats/BUILD.gn).
 
-*   Core unit tests: [dhcpv6-core-test.cmx](core/meta/dhcpv6-core-test.cmx).
+*   Core unit tests: [dhcpv6-core-test](core/BUILD.gn).
 
 *   Client bindings unit tests:
-    [dhcpv6-client-test.cmx](client/meta/dhcpv6-client-test.cmx).
-
-*   Integration test:
-    [dhcp-validity-test.cmx](../tests/dhcp_interop/meta/dhcp_validity_test.cmx).
-    This test uses netemul to launch a DHCPv6 client on Fuchsia, and a DHCPv6
-    server on Debian in the same network, to make sure the client can talk to a
-    DHCPv6 server in the same nework.
+    [dhcpv6-client-test](client/BUILD.gn).
 
 [1]: ../../../../sdk/fidl/fuchsia.net.dhcpv6/client.fidl
