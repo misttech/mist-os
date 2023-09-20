@@ -101,12 +101,15 @@ background, and their outputs buffered. The Fuchsia build uses this feature for
 all commands that invoke Bazel, since these tend to be long, and Bazel provides
 its own status updates to the terminal.
 
-### Fuchsia-specific improvements {#fuchsia-improvements}
+### Fuchsia-specific status display
 
-Setting `NINJA_STATUS_MAX_COMANDS` to a strictly positive integer also prints
-a small table of the longest running commands, and their elapsed times, under
-the status line. For example, with `export NINJA_STATUS_MAX_COMMANDS=4`, the
-status could look like:
+As a special Fuchsia-specific improvement, Ninja will display a table of
+the oldest long-running commands, with their run time, to better understand
+what's going on during a build. This is only enabled in smart terminals.
+
+Set `NINJA_STATUS_MAX_COMMANDS=<count>` in your environment to change the
+number of commands being displayed. `fx build `sets its default to 4, which
+looks like;
 
 ```none  {:.devsite-disable-click-to-copy}
 [0/28477](260) STAMP host_x64/obj/tools/configc/configc_sdk_meta_generated_file.stamp
@@ -116,29 +119,8 @@ status could look like:
   0.4s | CXX obj/BUILD_DIR/fidling/gen/sdk/fidl/fuchsia.me...dia/cpp/fuchsia.media_cpp_natural_types.natural_types.cc.o
 ```
 
-The following animated image shows how this looks in practice:
-
-![Ninja multi-line status example](/docs/images/build/ninja-multiline-status.gif)
-
-Note that:
-
-- This feature is automatically disabled in dry-run or verbose invocations
-  of Ninja (that is, using the `-n` or `--verbose` flags).
-
-- This feature is automatically disabled when Ninja is not running in an
-  interactive / smart terminal.
-
-- This feature is suspended when running console commands as well (visible
-  in the example above when running Bazel actions).
-
-- This feature makes it easy to visualize bottlenecks in the build, that is,
-  long-lasting commands that prevent other commands to run in parallel.
-
-The commands table updates 10 times per second by default, which is very useful
-to understand which long commands are hobbling the build. It is possible to
-change the refresh period by setting `NINJA_STATUS_REFRESH_MILLIS` to a decimal
-value in milliseconds (not that anything lower than 100 will be ignored since
-elapsed times are only printed up to a single decimal fractional digit).
+For more details, see
+[Fuchsia feature: status of pending commands][fuchsia-feature-pending-commands].
 
 ## Ninja build dependency graph {#build-graph}
 
@@ -392,3 +374,4 @@ problematic cases.
 [GN]: https://gn.googlesource.com/gn/
 [bazel-action-graph]: https://bazel.build/reference/glossary#action-graph
 [clean-build-fences]: https://cs.opensource.google/fuchsia/fuchsia/+/main:build/force_clean/README.md
+[fuchsia-feature-pending-commands]: /docs/development/build/ninja_fuchsia_improvements.md#feature-stastus-of-pending-commands
