@@ -7,7 +7,7 @@ use {
     anyhow::Error,
     async_trait::async_trait,
     futures::future::poll_fn,
-    fxfs::object_handle::ObjectProperties,
+    fxfs::{object_handle::ObjectProperties, object_store::ObjectDescriptor},
     std::{
         any::TypeId,
         collections::{btree_map::Entry, BTreeMap},
@@ -28,6 +28,7 @@ pub trait FxNode: IntoAny + Send + Sync + 'static {
     fn open_count_add_one(&self);
     fn open_count_sub_one(self: Arc<Self>);
     async fn get_properties(&self) -> Result<ObjectProperties, Error>;
+    fn object_descriptor(&self) -> ObjectDescriptor;
 }
 
 struct PlaceholderInner {
@@ -53,6 +54,10 @@ impl FxNode for Placeholder {
     fn open_count_sub_one(self: Arc<Self>) {}
     async fn get_properties(&self) -> Result<ObjectProperties, Error> {
         unreachable!();
+    }
+
+    fn object_descriptor(&self) -> ObjectDescriptor {
+        ObjectDescriptor::File
     }
 }
 
@@ -280,7 +285,7 @@ mod tests {
         async_trait::async_trait,
         fuchsia_async as fasync,
         futures::future::join_all,
-        fxfs::object_handle::ObjectProperties,
+        fxfs::{object_handle::ObjectProperties, object_store::ObjectDescriptor},
         std::{
             sync::{
                 atomic::{AtomicU64, Ordering},
@@ -306,6 +311,10 @@ mod tests {
         fn open_count_sub_one(self: Arc<Self>) {}
         async fn get_properties(&self) -> Result<ObjectProperties, Error> {
             unreachable!();
+        }
+
+        fn object_descriptor(&self) -> ObjectDescriptor {
+            ObjectDescriptor::Directory
         }
     }
     impl Drop for FakeNode {

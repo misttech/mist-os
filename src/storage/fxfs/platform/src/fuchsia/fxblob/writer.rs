@@ -277,7 +277,9 @@ impl FxDeliveryBlob {
         transaction
             .commit_with_callback(|_| {
                 self.is_completed.store(true, Ordering::Relaxed);
-                parent.did_add(&name);
+                // This can't actually add the node to the cache, because it hasn't been created
+                // ever at this point. Passes in None for now as a result.
+                parent.did_add(&name, None);
             })
             .await?;
         Ok(())
@@ -317,6 +319,10 @@ impl FxNode for FxDeliveryBlob {
                 .graveyard()
                 .queue_tombstone(store.store_object_id(), self.object_id());
         }
+    }
+
+    fn object_descriptor(&self) -> ObjectDescriptor {
+        ObjectDescriptor::File
     }
 }
 

@@ -6,6 +6,7 @@ use {
     crate::fuchsia::{
         component::map_to_raw_status,
         directory::FxDirectory,
+        dirent_cache::DirentCache,
         file::FxFile,
         fxblob::blob::FxBlob,
         memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
@@ -48,36 +49,55 @@ use {
     vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope},
 };
 
+const DIRENT_CACHE_LIMIT: usize = 1500;
+
 #[derive(Clone)]
-pub struct FlushTaskConfig {
-    /// The period to wait between flushes at [`MemoryPressureLevel::Normal`].
-    pub mem_normal_period: Duration,
-
-    /// The period to wait between flushes at [`MemoryPressureLevel::Warning`].
-    pub mem_warning_period: Duration,
-
-    /// The period to wait between flushes at [`MemoryPressureLevel::Critical`].
-    pub mem_critical_period: Duration,
+pub struct MemoryPressureLevelConfig {
+    /// The period to wait between flushes.
+    pub flush_period: Duration,
+    /// The limit of cached nodes.
+    pub cache_size_limit: usize,
 }
 
-impl FlushTaskConfig {
-    pub fn flush_period_from_level(&self, level: &MemoryPressureLevel) -> Duration {
+#[derive(Clone)]
+pub struct MemoryPressureConfig {
+    /// The configuration to use at [`MemoryPressureLevel::Normal`].
+    pub mem_normal: MemoryPressureLevelConfig,
+
+    /// The configuration to use at [`MemoryPressureLevel::Warning`].
+    pub mem_warning: MemoryPressureLevelConfig,
+
+    /// The configuration to use at [`MemoryPressureLevel::Critical`].
+    pub mem_critical: MemoryPressureLevelConfig,
+}
+
+impl MemoryPressureConfig {
+    pub fn for_level(&self, level: &MemoryPressureLevel) -> &MemoryPressureLevelConfig {
         match level {
-            MemoryPressureLevel::Normal => self.mem_normal_period,
-            MemoryPressureLevel::Warning => self.mem_warning_period,
-            MemoryPressureLevel::Critical => self.mem_critical_period,
+            MemoryPressureLevel::Normal => &self.mem_normal,
+            MemoryPressureLevel::Warning => &self.mem_warning,
+            MemoryPressureLevel::Critical => &self.mem_critical,
         }
     }
 }
 
-impl Default for FlushTaskConfig {
+impl Default for MemoryPressureConfig {
     fn default() -> Self {
         // TODO(https://fxbug.dev/110000): investigate a smarter strategy for determining flush
         // frequency.
         Self {
-            mem_normal_period: Duration::from_secs(20),
-            mem_warning_period: Duration::from_secs(5),
-            mem_critical_period: Duration::from_millis(1500),
+            mem_normal: MemoryPressureLevelConfig {
+                flush_period: Duration::from_secs(20),
+                cache_size_limit: DIRENT_CACHE_LIMIT,
+            },
+            mem_warning: MemoryPressureLevelConfig {
+                flush_period: Duration::from_secs(5),
+                cache_size_limit: 100,
+            },
+            mem_critical: MemoryPressureLevelConfig {
+                flush_period: Duration::from_millis(1500),
+                cache_size_limit: 20,
+            },
         }
     }
 }
@@ -99,6 +119,8 @@ pub struct FxVolume {
 
     // The execution scope for this volume.
     scope: ExecutionScope,
+
+    dirent_cache: DirentCache,
 }
 
 impl FxVolume {
@@ -117,6 +139,7 @@ impl FxVolume {
             flush_task: Mutex::new(None),
             fs_id,
             scope,
+            dirent_cache: DirentCache::new(DIRENT_CACHE_LIMIT),
         })
     }
 
@@ -126,6 +149,10 @@ impl FxVolume {
 
     pub fn cache(&self) -> &NodeCache {
         &self.cache
+    }
+
+    pub fn dirent_cache(&self) -> &DirentCache {
+        &self.dirent_cache
     }
 
     pub fn pager(&self) -> &Pager {
@@ -146,6 +173,7 @@ impl FxVolume {
 
     pub async fn terminate(&self) {
         self.cache.clear();
+        self.dirent_cache.clear();
         self.scope.shutdown();
         self.pager.terminate();
         self.scope.wait().await;
@@ -251,7 +279,7 @@ impl FxVolume {
     /// be closed later with Self::terminate, or the FxVolume will never be dropped.
     pub fn start_flush_task(
         self: &Arc<Self>,
-        config: FlushTaskConfig,
+        config: MemoryPressureConfig,
         mem_monitor: Option<&MemoryPressureMonitor>,
     ) {
         let mut flush_task = self.flush_task.lock().unwrap();
@@ -275,7 +303,7 @@ impl FxVolume {
 
     async fn flush_task(
         self: Arc<Self>,
-        config: FlushTaskConfig,
+        config: MemoryPressureConfig,
         mut level_stream: impl Stream<Item = MemoryPressureLevel> + FusedStream + Unpin,
         terminate: oneshot::Receiver<()>,
     ) {
@@ -283,11 +311,12 @@ impl FxVolume {
         let mut terminate = terminate.fuse();
         // Default to the normal flush period until updates come from the `level_stream`.
         let mut level = MemoryPressureLevel::Normal;
-        let mut timer = fasync::Timer::new(config.flush_period_from_level(&level)).fuse();
+        let mut timer = fasync::Timer::new(config.for_level(&level).flush_period).fuse();
 
         loop {
             let mut should_terminate = false;
             let mut should_flush = false;
+            let mut should_update_cache_limit = false;
 
             futures::select_biased! {
                 _ = terminate => should_terminate = true,
@@ -299,16 +328,17 @@ impl FxVolume {
                     should_flush = matches!(new_level, MemoryPressureLevel::Critical);
                     if new_level != level {
                         level = new_level;
-                        timer = fasync::Timer::new(config.flush_period_from_level(&level)).fuse();
+                        should_update_cache_limit = true;
+                        timer = fasync::Timer::new(config.for_level(&level).flush_period).fuse();
                         debug!(
                             "Background flush period changed to {:?} due to new memory pressure \
                             level ({:?}).",
-                            config.flush_period_from_level(&level), level
+                            config.for_level(&level).flush_period, level
                         );
                     }
                 }
                 _ = timer => {
-                    timer = fasync::Timer::new(config.flush_period_from_level(&level)).fuse();
+                    timer = fasync::Timer::new(config.for_level(&level).flush_period).fuse();
                     should_flush = true;
                 }
             };
@@ -318,6 +348,11 @@ impl FxVolume {
 
             if should_flush {
                 self.flush_all_files().await;
+                self.dirent_cache.recycle_stale_files();
+            }
+
+            if should_update_cache_limit {
+                self.dirent_cache.set_limit(config.for_level(&level).cache_size_limit);
             }
         }
         debug!(store_id = self.store.store_object_id(), "FxVolume::flush_task end");
@@ -583,6 +618,7 @@ pub fn info_to_filesystem_info(
 #[cfg(test)]
 mod tests {
     use {
+        super::DIRENT_CACHE_LIMIT,
         crate::fuchsia::{
             directory::FxDirectory,
             file::FxFile,
@@ -591,7 +627,7 @@ mod tests {
                 close_dir_checked, close_file_checked, open_dir, open_dir_checked, open_file,
                 open_file_checked, write_at, TestFixture,
             },
-            volume::{FlushTaskConfig, FxVolumeAndRoot},
+            volume::{FxVolumeAndRoot, MemoryPressureConfig, MemoryPressureLevelConfig},
             volumes_directory::VolumesDirectory,
         },
         fidl::endpoints::ServerEnd,
@@ -922,10 +958,19 @@ mod tests {
             assert!(!data_has_persisted().await);
 
             vol.volume().start_flush_task(
-                FlushTaskConfig {
-                    mem_normal_period: Duration::from_millis(100),
-                    mem_warning_period: Duration::from_millis(100),
-                    mem_critical_period: Duration::from_millis(100),
+                MemoryPressureConfig {
+                    mem_normal: MemoryPressureLevelConfig {
+                        flush_period: Duration::from_millis(100),
+                        cache_size_limit: 100,
+                    },
+                    mem_warning: MemoryPressureLevelConfig {
+                        flush_period: Duration::from_millis(100),
+                        cache_size_limit: 100,
+                    },
+                    mem_critical: MemoryPressureLevelConfig {
+                        flush_period: Duration::from_millis(100),
+                        cache_size_limit: 100,
+                    },
                 },
                 None,
             );
@@ -988,6 +1033,9 @@ mod tests {
             // Write some data to the file, which will only go to the cache for now.
             write_at(&file, 0, &[123u8]).await.expect("write_at failed");
 
+            // Initialized to the default size.
+            assert_eq!(vol.volume().dirent_cache().limit(), DIRENT_CACHE_LIMIT);
+
             let data_has_persisted = || async {
                 // We have to reopen the object each time since this is a distinct handle from the
                 // one managed by the FxFile.
@@ -1006,10 +1054,19 @@ mod tests {
                 .expect("Failed to create MemoryPressureMonitor");
 
             // Configure the flush task to only flush quickly on warning.
-            let flush_config = FlushTaskConfig {
-                mem_normal_period: Duration::from_secs(20),
-                mem_warning_period: Duration::from_millis(100),
-                mem_critical_period: Duration::from_secs(20),
+            let flush_config = MemoryPressureConfig {
+                mem_normal: MemoryPressureLevelConfig {
+                    flush_period: Duration::from_secs(20),
+                    cache_size_limit: DIRENT_CACHE_LIMIT,
+                },
+                mem_warning: MemoryPressureLevelConfig {
+                    flush_period: Duration::from_millis(100),
+                    cache_size_limit: 100,
+                },
+                mem_critical: MemoryPressureLevelConfig {
+                    flush_period: Duration::from_secs(20),
+                    cache_size_limit: 50,
+                },
             };
             vol.volume().start_flush_task(flush_config, Some(&mem_pressure));
 
@@ -1035,6 +1092,7 @@ mod tests {
             }
 
             assert!(data_has_persisted().await);
+            assert_eq!(vol.volume().dirent_cache().limit(), 100);
 
             vol.volume().terminate().await;
         }
@@ -1082,6 +1140,9 @@ mod tests {
                 .downcast::<FxFile>()
                 .expect("Not a file");
 
+            // Initialized to the default size.
+            assert_eq!(vol.volume().dirent_cache().limit(), DIRENT_CACHE_LIMIT);
+
             // Write some data to the file, which will only go to the cache for now.
             write_at(&file, 0, &[123u8]).await.expect("write_at failed");
 
@@ -1103,10 +1164,19 @@ mod tests {
                 .expect("Failed to create MemoryPressureMonitor");
 
             // Configure the flush task to only flush quickly on warning.
-            let flush_config = FlushTaskConfig {
-                mem_normal_period: Duration::from_secs(20),
-                mem_warning_period: Duration::from_secs(20),
-                mem_critical_period: Duration::from_secs(20),
+            let flush_config = MemoryPressureConfig {
+                mem_normal: MemoryPressureLevelConfig {
+                    flush_period: Duration::from_secs(20),
+                    cache_size_limit: DIRENT_CACHE_LIMIT,
+                },
+                mem_warning: MemoryPressureLevelConfig {
+                    flush_period: Duration::from_secs(20),
+                    cache_size_limit: 100,
+                },
+                mem_critical: MemoryPressureLevelConfig {
+                    flush_period: Duration::from_secs(20),
+                    cache_size_limit: 50,
+                },
             };
             vol.volume().start_flush_task(flush_config, Some(&mem_pressure));
 
@@ -1131,6 +1201,7 @@ mod tests {
             }
 
             assert!(data_has_persisted().await);
+            assert_eq!(vol.volume().dirent_cache().limit(), 50);
 
             vol.volume().terminate().await;
         }

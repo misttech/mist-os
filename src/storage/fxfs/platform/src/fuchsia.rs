@@ -5,6 +5,7 @@
 pub mod component;
 mod device;
 pub mod directory;
+mod dirent_cache;
 mod errors;
 pub mod file;
 pub mod fxblob;

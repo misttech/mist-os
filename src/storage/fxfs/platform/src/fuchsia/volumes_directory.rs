@@ -8,7 +8,7 @@ use {
         directory::FxDirectory,
         fxblob::BlobDirectory,
         memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
-        volume::{FlushTaskConfig, FxVolume, FxVolumeAndRoot, RootDir},
+        volume::{FxVolume, FxVolumeAndRoot, MemoryPressureConfig, RootDir},
         RemoteCrypt,
     },
     anyhow::{anyhow, bail, ensure, Context, Error},
@@ -113,9 +113,9 @@ impl MountedVolumesGuard<'_> {
             FxfsError::AlreadyBound
         );
         if as_blob {
-            self.mount_store::<BlobDirectory>(name, store, FlushTaskConfig::default()).await
+            self.mount_store::<BlobDirectory>(name, store, MemoryPressureConfig::default()).await
         } else {
-            self.mount_store::<FxDirectory>(name, store, FlushTaskConfig::default()).await
+            self.mount_store::<FxDirectory>(name, store, MemoryPressureConfig::default()).await
         }
     }
 
@@ -124,7 +124,7 @@ impl MountedVolumesGuard<'_> {
         &mut self,
         name: &str,
         store: Arc<ObjectStore>,
-        flush_task_config: FlushTaskConfig,
+        flush_task_config: MemoryPressureConfig,
     ) -> Result<FxVolumeAndRoot, Error> {
         metrics::object_stores_tracker().register_store(name, Arc::downgrade(&store));
         let store_id = store.store_object_id();

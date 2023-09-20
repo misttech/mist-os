@@ -234,6 +234,10 @@ impl FxNode for FxFile {
     async fn get_properties(&self) -> Result<ObjectProperties, Error> {
         self.handle.get_properties().await
     }
+
+    fn object_descriptor(&self) -> ObjectDescriptor {
+        ObjectDescriptor::File
+    }
 }
 
 impl DirectoryEntry for FxFile {

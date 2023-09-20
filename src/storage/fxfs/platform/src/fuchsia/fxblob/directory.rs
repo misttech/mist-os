@@ -153,21 +153,43 @@ impl BlobDirectory {
         // A lock needs to be held over searching the directory and incrementing the open count.
         let guard = fs.read_lock(&keys).await;
 
-        match self.directory.directory().lookup(name).await? {
-            Some((object_id, object_descriptor)) => {
+        let child_node = match self
+            .directory
+            .directory()
+            .owner()
+            .dirent_cache()
+            .lookup(&(self.directory.object_id(), name.to_owned()))
+        {
+            Some(node) => Some(node),
+            None => {
+                if let Some((object_id, _)) = self.directory.directory().lookup(name).await? {
+                    let node = self.get_or_load_node(object_id, name).await?;
+                    self.directory.directory().owner().dirent_cache().insert(
+                        self.directory.object_id(),
+                        name.to_string(),
+                        node.clone(),
+                    );
+                    Some(node)
+                } else {
+                    None
+                }
+            }
+        };
+        match child_node {
+            Some(node) => {
                 ensure!(
                     !flags.contains(fio::OpenFlags::CREATE | fio::OpenFlags::CREATE_IF_ABSENT),
                     FxfsError::AlreadyExists
                 );
                 ensure!(!flags.contains(fio::OpenFlags::RIGHT_WRITABLE), FxfsError::AccessDenied);
-                match object_descriptor {
+                match node.object_descriptor() {
                     ObjectDescriptor::File => {
                         ensure!(!flags.contains(fio::OpenFlags::DIRECTORY), FxfsError::NotDir)
                     }
                     _ => bail!(FxfsError::Inconsistent),
                 }
                 // TODO(fxbug.dev/122125): Test that we can't open a blob while still writing it.
-                Ok(OpenedNode::new(self.get_or_load_node(object_id, name).await?))
+                Ok(OpenedNode::new(node))
             }
             None => {
                 std::mem::drop(guard);
@@ -363,6 +385,10 @@ impl FxNode for BlobDirectory {
 
     fn open_count_add_one(&self) {}
     fn open_count_sub_one(self: Arc<Self>) {}
+
+    fn object_descriptor(&self) -> ObjectDescriptor {
+        ObjectDescriptor::Directory
+    }
 }
 
 #[async_trait]

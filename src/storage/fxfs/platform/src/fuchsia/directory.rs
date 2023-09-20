@@ -134,8 +134,43 @@ impl FxDirectory {
                     Right(fs.read_lock(&keys).await)
                 };
 
-            match current_dir.directory.lookup(name).await? {
-                Some((object_id, object_descriptor)) => {
+            let child_descriptor = match self
+                .directory
+                .owner()
+                .dirent_cache()
+                .lookup(&(current_dir.object_id(), name.to_owned()))
+            {
+                Some(node) => {
+                    let desc = node.object_descriptor();
+                    Some((node, desc))
+                }
+                None => {
+                    if let Some((object_id, object_descriptor)) =
+                        current_dir.directory.lookup(name).await?
+                    {
+                        let child_node = self
+                            .volume()
+                            .get_or_load_node(
+                                object_id,
+                                object_descriptor.clone(),
+                                Some(current_dir.clone()),
+                            )
+                            .await?;
+
+                        self.directory.owner().dirent_cache().insert(
+                            current_dir.object_id(),
+                            name.to_owned(),
+                            child_node.clone(),
+                        );
+                        Some((child_node, object_descriptor))
+                    } else {
+                        None
+                    }
+                }
+            };
+
+            match child_descriptor {
+                Some((child_node, object_descriptor)) => {
                     if transaction_or_guard.is_left()
                         && protocols.open_mode() == fio::OpenMode::AlwaysCreate
                     {
@@ -169,10 +204,7 @@ impl FxDirectory {
                             ObjectDescriptor::Volume => bail!(FxfsError::Inconsistent),
                         }
                     }
-                    current_node = self
-                        .volume()
-                        .get_or_load_node(object_id, object_descriptor, Some(current_dir))
-                        .await?;
+                    current_node = child_node;
                     if last_segment {
                         // We must make sure to take an open-count whilst we are holding a read
                         // lock.
@@ -181,23 +213,22 @@ impl FxDirectory {
                 }
                 None => {
                     if let Left(mut transaction) = transaction_or_guard {
-                        let node = OpenedNode::new(
-                            current_dir
-                                .create_child(
-                                    &mut transaction,
-                                    name,
-                                    protocols.create_directory(),
-                                    protocols.create_attributes(),
-                                )
-                                .await?,
-                        );
+                        let new_node = current_dir
+                            .create_child(
+                                &mut transaction,
+                                name,
+                                protocols.create_directory(),
+                                protocols.create_attributes(),
+                            )
+                            .await?;
+                        let node = OpenedNode::new(new_node.clone());
                         if let GetResult::Placeholder(p) =
                             self.volume().cache().get_or_reserve(node.object_id()).await
                         {
                             transaction
                                 .commit_with_callback(|_| {
                                     p.commit(&node);
-                                    current_dir.did_add(name);
+                                    current_dir.did_add(name, Some(new_node));
                                 })
                                 .await?;
                             return Ok(node);
@@ -236,11 +267,22 @@ impl FxDirectory {
 
     /// Called to indicate a file or directory was removed from this directory.
     pub(crate) fn did_remove(&self, name: &str) {
+        self.directory
+            .owner()
+            .dirent_cache()
+            .remove(&(self.directory.object_id(), name.to_owned()));
         self.watchers.lock().unwrap().send_event(&mut SingleNameEventProducer::removed(name));
     }
 
     /// Called to indicate a file or directory was added to this directory.
-    pub(crate) fn did_add(&self, name: &str) {
+    pub(crate) fn did_add(&self, name: &str, node: Option<Arc<dyn FxNode>>) {
+        if let Some(node) = node {
+            self.directory.owner().dirent_cache().insert(
+                self.directory.object_id(),
+                name.to_owned(),
+                node,
+            );
+        }
         self.watchers.lock().unwrap().send_event(&mut SingleNameEventProducer::added(name));
     }
 
@@ -259,11 +301,14 @@ impl FxDirectory {
             return Err(zx::Status::ALREADY_EXISTS);
         }
         self.directory
-            .insert_child(&mut transaction, &name, source_id, kind)
+            .insert_child(&mut transaction, &name, source_id, kind.clone())
             .await
             .map_err(map_to_status)?;
         store.adjust_refs(&mut transaction, source_id, 1).await.map_err(map_to_status)?;
-        transaction.commit_with_callback(|_| self.did_add(&name)).await.map_err(map_to_status)?;
+        transaction
+            .commit_with_callback(|_| self.did_add(&name, None))
+            .await
+            .map_err(map_to_status)?;
         Ok(())
     }
 }
@@ -297,6 +342,9 @@ impl FxNode for FxDirectory {
 
     async fn get_properties(&self) -> Result<ObjectProperties, Error> {
         self.directory.get_properties().await
+    }
+    fn object_descriptor(&self) -> ObjectDescriptor {
+        ObjectDescriptor::Directory
     }
 }
 
@@ -536,17 +584,16 @@ impl MutableDirectory for FxDirectory {
                 src_dir.did_remove(src);
 
                 match replace_result {
-                    ReplacedChild::None => self.did_add(dst),
+                    ReplacedChild::None => {}
                     ReplacedChild::ObjectWithRemainingLinks(..) | ReplacedChild::Object(_) => {
                         self.did_remove(dst);
-                        self.did_add(dst);
                     }
                     ReplacedChild::Directory(id) => {
                         self.did_remove(dst);
-                        self.did_add(dst);
                         self.volume().mark_directory_deleted(id);
                     }
                 }
+                self.did_add(dst, Some(moved_node));
             })
             .await
             .map_err(map_to_status)?;

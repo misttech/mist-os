@@ -173,4 +173,8 @@ impl FxNode for FxSymlink {
             _ => bail!(FxfsError::NotFile),
         }
     }
+
+    fn object_descriptor(&self) -> ObjectDescriptor {
+        ObjectDescriptor::Symlink
+    }
 }

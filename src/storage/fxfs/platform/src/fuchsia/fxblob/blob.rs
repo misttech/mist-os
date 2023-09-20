@@ -22,7 +22,7 @@ use {
         async_enter,
         errors::FxfsError,
         object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle},
-        object_store::DataObjectHandle,
+        object_store::{DataObjectHandle, ObjectDescriptor},
         round::{round_down, round_up},
     },
     std::{
@@ -151,6 +151,10 @@ impl FxNode for FxBlob {
                 .graveyard()
                 .queue_tombstone(store.store_object_id(), self.object_id());
         }
+    }
+
+    fn object_descriptor(&self) -> ObjectDescriptor {
+        ObjectDescriptor::File
     }
 }
 
