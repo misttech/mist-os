@@ -7,6 +7,7 @@ use crate::common::fastboot_interface::FastbootInterface;
 use crate::common::fastboot_interface::Variable;
 use crate::common::RebootEvent;
 use crate::common::UploadProgress;
+use crate::usb_discovery::open_interface_with_serial;
 use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use chrono::Duration;
@@ -21,6 +22,25 @@ use futures::io::{AsyncRead, AsyncWrite};
 use std::fmt::Debug;
 use std::fs::read;
 use tokio::sync::mpsc::Sender;
+use usb_bulk::AsyncInterface;
+
+///////////////////////////////////////////////////////////////////////////////
+// AsyncInterface
+//
+
+/// Creates a FastbootProxy over USB for a device with the given serial number
+pub async fn usb_proxy(serial_number: String) -> Result<FastbootProxy<AsyncInterface>> {
+    FastbootProxy::<AsyncInterface>::build(serial_number).await
+}
+
+impl FastbootProxy<AsyncInterface> {
+    async fn build(serial_number: String) -> Result<FastbootProxy<AsyncInterface>> {
+        let interface = open_interface_with_serial(&serial_number).await.with_context(|| {
+            format!("Failed to open target usb interface by serial {serial_number}")
+        })?;
+        Ok(FastbootProxy::<AsyncInterface> { target_id: serial_number,  interface })
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct FastbootProxy<T: AsyncRead + AsyncWrite + Unpin> {
