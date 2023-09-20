@@ -245,21 +245,28 @@ func (f *FFXInstance) Stop() error {
 }
 
 // BootloaderBoot RAM boots the target.
-func (f *FFXInstance) BootloaderBoot(ctx context.Context, serialNum, zbi, vbmeta, slot string) error {
-	var args []string
-	if zbi != "" {
-		args = append(args, "--zbi", zbi)
-	}
-	if vbmeta != "" {
-		args = append(args, "--vbmeta", vbmeta)
-	}
-	if slot != "" {
-		args = append(args, "--slot", slot)
-	}
-	return f.Run(ctx, append([]string{
+func (f *FFXInstance) BootloaderBoot(ctx context.Context, serialNum, zbi, vbmeta, slot, productBundle string) error {
+	args := []string{
 		"--target", serialNum,
 		"--config", "{\"ffx\": {\"fastboot\": {\"inline_target\": true}}}",
-		"target", "bootloader", "boot"}, args...)...)
+		"target", "bootloader",
+	}
+	if productBundle != "" {
+		args = append(args, "--product-bundle", productBundle)
+	}
+	args = append(args, "boot")
+	if productBundle == "" {
+		if zbi != "" {
+			args = append(args, "--zbi", zbi)
+		}
+		if vbmeta != "" {
+			args = append(args, "--vbmeta", vbmeta)
+		}
+		if slot != "" {
+			args = append(args, "--slot", slot)
+		}
+	}
+	return f.Run(ctx, args...)
 }
 
 // List lists all available targets.

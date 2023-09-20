@@ -296,7 +296,7 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 				return err
 			}
 		} else if t.opts.Netboot {
-			if err := t.ramBoot(ctx, imgs); err != nil {
+			if err := t.ramBoot(ctx, imgs, pbPath); err != nil {
 				return err
 			}
 		} else {
@@ -403,8 +403,11 @@ func (t *Device) bootZedboot(ctx context.Context, images []bootserver.Image) err
 	return err
 }
 
-func (t *Device) ramBoot(ctx context.Context, images []bootserver.Image) error {
+func (t *Device) ramBoot(ctx context.Context, images []bootserver.Image, productBundle string) error {
 	if t.UseFFX() {
+		if productBundle != "" && t.imageOverrides.IsEmpty() {
+			return t.ffx.BootloaderBoot(ctx, t.config.FastbootSernum, "", "", "", productBundle)
+		}
 		var zbi *bootserver.Image
 		if t.imageOverrides.ZBI == "" {
 			zbi = getImageByName(images, "zbi_zircon-a")
@@ -425,7 +428,7 @@ func (t *Device) ramBoot(ctx context.Context, images []bootserver.Image) error {
 			return fmt.Errorf("could not find \"vbmeta_zircon-a\" or VBMeta override")
 		}
 
-		return t.ffx.BootloaderBoot(ctx, t.config.FastbootSernum, zbi.Path, vbmeta.Path, "")
+		return t.ffx.BootloaderBoot(ctx, t.config.FastbootSernum, zbi.Path, vbmeta.Path, "", "")
 	}
 	bootScript := getImageByName(images, "script_fastboot-boot-script")
 	if bootScript == nil {
