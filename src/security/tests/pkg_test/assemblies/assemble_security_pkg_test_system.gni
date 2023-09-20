@@ -288,9 +288,6 @@ template("assemble_security_pkg_test_system") {
   board_configuration(labels.board_config) {
     name = invoker.board_name
     filesystems = {
-      zbi = {
-        compression = "zstd.max"
-      }
       fvm = {
         slice_size = 1048576
         sparse_output = {
