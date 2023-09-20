@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/bazel/bazel_inputs.gni")
+import("//build/board.gni")
 import("//build/compiled_action.gni")
 import("//build/images/args.gni")
 import("//build/images/filesystem_limits.gni")
@@ -120,6 +121,10 @@ if (blobfs_capacity != false && max_blob_contents_size != false &&
     deps = eng_platform_aib_labels
   }
 
+  _board_output_dir =
+      get_label_info(board_configuration_label, "target_out_dir") + "/" +
+      get_label_info(board_configuration_label, "name")
+
   action("convert_size_limits_to_size_budgets") {
     script = "//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/tools/convert_size_limits.py"
     inputs = [
@@ -137,6 +142,8 @@ if (blobfs_capacity != false && max_blob_contents_size != false &&
     args = [
       "--platform-aibs",
       rebase_path(_platform_aibs, root_build_dir),
+      "--board-output-dir",
+      rebase_path(_board_output_dir, root_build_dir),
       "--size-limits",
       rebase_path("$root_build_dir/size_checker.json", root_build_dir),
       "--image-assembly-config",

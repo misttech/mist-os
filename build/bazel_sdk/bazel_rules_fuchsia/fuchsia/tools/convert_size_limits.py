@@ -41,7 +41,8 @@ class InvalidInputError(Exception):
     pass
 
 
-def convert_budget_format(platform_aib_paths, component, all_manifests):
+def convert_budget_format(
+        platform_aib_paths, board_output_dir, component, all_manifests):
     """Converts a component budget to the new budget format.
 
   Args:
@@ -67,6 +68,10 @@ def convert_budget_format(platform_aib_paths, component, all_manifests):
     for bundle_path in platform_aib_paths:
         prefixes_for_prefixes.append(bundle_path)
 
+    if board_output_dir:
+        prefixes_for_prefixes.append(
+            os.path.join(board_output_dir, "main_bundle"))
+
     prefixes = tuple(
         os.path.join(prefix, src)
         for prefix in prefixes_for_prefixes
@@ -78,12 +83,13 @@ def convert_budget_format(platform_aib_paths, component, all_manifests):
             set(
                 m for m in all_manifests for prefix in prefixes
                 if m.startswith(prefixes) or re.match(prefix, m))))
-    return dict(
+    result = dict(
         name=component["component"],
         budget_bytes=component["limit"],
         creep_budget_bytes=component["creep_limit"],
         merge=False,
         packages=packages)
+    return result
 
 
 def count_packages(budgets, all_manifests):
@@ -97,14 +103,16 @@ def count_packages(budgets, all_manifests):
     return more_than_once, zero
 
 
-def make_package_set_budgets(platform_aib_paths, size_limits, product_config):
+def make_package_set_budgets(
+        platform_aib_paths, board_output_dir, size_limits, product_config):
     # Convert each budget to the new format and packages from base and cache.
     # Package from system belongs the system budget.
     all_manifests = product_config.get("base", []) + product_config.get(
         "cache", [])
     components = size_limits.get("components", [])
     packages_budgets = list(
-        convert_budget_format(platform_aib_paths, pkg, all_manifests)
+        convert_budget_format(
+            platform_aib_paths, board_output_dir, pkg, all_manifests)
         for pkg in components)
 
     # Verify packages are in exactly one budget.
@@ -170,6 +178,7 @@ def main():
     )
     parser.add_argument(
         '--platform-aibs', type=argparse.FileType('r'), required=True)
+    parser.add_argument('--board-output-dir')
     parser.add_argument(
         '--size-limits', type=argparse.FileType('r'), required=True)
     parser.add_argument(
@@ -198,7 +207,8 @@ def main():
         # Convert all the budget formats.
         resource_budgets = make_resources_budgets(size_limits)
         package_set_budgets = make_package_set_budgets(
-            platform_aib_paths, size_limits, image_assembly_config)
+            platform_aib_paths, args.board_output_dir, size_limits,
+            image_assembly_config)
 
         output_contents = dict(
             resource_budgets=resource_budgets,

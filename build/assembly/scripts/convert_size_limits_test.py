@@ -188,6 +188,8 @@ class ConvertTest(unittest.TestCase):
                 "",
                 "--platform-aibs",
                 platform_aibs_path,
+                "--board-output-dir",
+                os.path.join(tmpdir, "board"),
                 "--size-limits",
                 size_limits_path,
                 "--image-assembly-config",

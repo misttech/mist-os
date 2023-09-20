@@ -23,11 +23,12 @@ load(
 
 def fuchsia_size_checker(
         name,
-        product_image,
-        update_package,
-        size_checker_file,
-        blobfs_capacity,
-        max_blob_contents_size,
+        product_image = None,
+        board_config = None,
+        update_package = None,
+        size_checker_file = None,
+        blobfs_capacity = None,
+        max_blob_contents_size = None,
         update_package_size_creep_limit = 90112,
         blobfs_creep_limit = 102400):
     """An implementation of size checker that run product size checker, blobfs package size checker and non-blobfs size chekcer. It will also aggregate all the reports and create a merged report.
@@ -52,6 +53,7 @@ def fuchsia_size_checker(
         name = name + "_package_blobfs",
         size_checker_file = size_checker_file,
         product_image = product_image,
+        board_config = board_config,
         blobfs_capacity = blobfs_capacity,
         max_blob_contents_size = max_blob_contents_size,
     )
