@@ -178,6 +178,20 @@ void CacheLineFlusher::FlushPtEntry(const volatile pt_entry_t* entry) {
 // refer to it, and that changes to the page tables have appropriate visiblity
 // to the hardware interpreting them.  Finish MUST be called on this
 // class, even if the page table change failed.
+// The aspace lock *must* be held over the full operation of the ConsistencyManager, from
+// queue_free to Flush. The lock must be held continuously, due to strategy employed here of only
+// invalidating actual vaddrs with changing entries, and not all vaddrs an operation applies to.
+// Otherwise the following scenario is possible
+//  1. Thread 1 performs an Unmap and removes PTE entries, but drops the lock prior to invalidation.
+//  2. Thread 2 performs an Unmap, no PTE entries are removed, no invalidations occur
+//  3. Thread 2 now believes the resources (pages) for the region are no longer accessible, and
+//     returns them to the pmm.
+//  4. Thread 3 attempts to access this region and is now able to read/write to returned pages as
+//     invalidations have not occurred.
+// This scenario is possible as the mappings here are not the source of truth of resource
+// management, but a cache of information from other parts of the system. If thread 2 wanted to
+// guarantee that the pages were free it could issue it's own TLB invalidations for the vaddr range,
+// even though it found no entries. However this is not the strategy employed here at the moment.
 class X86PageTableBase::ConsistencyManager {
  public:
   explicit ConsistencyManager(X86PageTableBase* pt);

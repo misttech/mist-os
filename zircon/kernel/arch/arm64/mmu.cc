@@ -427,6 +427,21 @@ ktl::string_view ArmAspaceTypeName(ArmAspaceType type) {
 // A consistency manager that tracks TLB updates, walker syncs and free pages in an effort to
 // minimize DSBs (by delaying and coalescing TLB invalidations) and switching to full ASID
 // invalidations if too many TLB invalidations are requested.
+// The aspace lock *must* be held over the full operation of the ConsistencyManager, from
+// construction to deletion. The lock must be held continuously to deletion, and specifically till
+// the actual TLB invalidations occur, due to strategy employed here of only invalidating actual
+// vaddrs with changing entries, and not all vaddrs an operation applies to. Otherwise the following
+// scenario is possible
+//  1. Thread 1 performs an Unmap and removes PTE entries, but drops the lock prior to invalidation.
+//  2. Thread 2 performs an Unmap, no PTE entries are removed, no invalidations occur
+//  3. Thread 2 now believes the resources (pages) for the region are no longer accessible, and
+//     returns them to the pmm.
+//  4. Thread 3 attempts to access this region and is now able to read/write to returned pages as
+//     invalidations have not occurred.
+// This scenario is possible as the mappings here are not the source of truth of resource
+// management, but a cache of information from other parts of the system. If thread 2 wanted to
+// guarantee that the pages were free it could issue it's own TLB invalidations for the vaddr range,
+// even though it found no entries. However this is not the strategy employed here at the moment.
 class ArmArchVmAspace::ConsistencyManager {
  public:
   ConsistencyManager(ArmArchVmAspace& aspace) TA_REQ(aspace.lock_) : aspace_(aspace) {}
@@ -1580,7 +1595,6 @@ zx_status_t ArmArchVmAspace::HarvestAccessed(vaddr_t vaddr, size_t count,
   //
   const size_t kMaxEntriesPerIteration = 32;
 
-  ConsistencyManager cm(*this);
   size_t remaining_size = size;
   vaddr_t current_vaddr = vaddr;
   vaddr_t current_vaddr_rel = vaddr_rel;
@@ -1589,15 +1603,20 @@ zx_status_t ArmArchVmAspace::HarvestAccessed(vaddr_t vaddr, size_t count,
     ktrace::Scope trace = KTRACE_BEGIN_SCOPE_ENABLE(
         LOCAL_KTRACE_ENABLE, "kernel:vm", "harvest_loop", ("remaining_size", remaining_size));
     size_t entry_limit = kMaxEntriesPerIteration;
-    const size_t harvested_size = HarvestAccessedPageTable(
-        &entry_limit, current_vaddr, current_vaddr_rel, remaining_size, top_index_shift_,
-        non_terminal_action, terminal_action, tt_virt_, cm, nullptr);
-    DEBUG_ASSERT(harvested_size > 0);
-    DEBUG_ASSERT(harvested_size <= remaining_size);
+    // The consistency manager must be scoped narrowly here as it is incorrect keep it alive without
+    // the lock held, which we will drop later on.
+    {
+      ConsistencyManager cm(*this);
+      const size_t harvested_size = HarvestAccessedPageTable(
+          &entry_limit, current_vaddr, current_vaddr_rel, remaining_size, top_index_shift_,
+          non_terminal_action, terminal_action, tt_virt_, cm, nullptr);
+      DEBUG_ASSERT(harvested_size > 0);
+      DEBUG_ASSERT(harvested_size <= remaining_size);
 
-    remaining_size -= harvested_size;
-    current_vaddr += harvested_size;
-    current_vaddr_rel += harvested_size;
+      remaining_size -= harvested_size;
+      current_vaddr += harvested_size;
+      current_vaddr_rel += harvested_size;
+    }
 
     // Release and re-acquire the lock to let contending threads have a chance
     // to acquire the arch aspace lock between iterations. Use arch::Yield() to

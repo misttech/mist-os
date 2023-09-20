@@ -237,6 +237,21 @@ paddr_t kernel_virt_to_phys(const void* va) {
 // A consistency manager that tracks TLB updates, walker syncs and free pages in an effort to
 // minimize MBs (by delaying and coalescing TLB invalidations) and switching to full ASID
 // invalidations if too many TLB invalidations are requested.
+// The aspace lock *must* be held over the full operation of the ConsistencyManager, from
+// construction to deletion. The lock must be held continuously to deletion, and specifically till
+// the actual TLB invalidations occur, due to strategy employed here of only invalidating actual
+// vaddrs with changing entries, and not all vaddrs an operation applies to. Otherwise the following
+// scenario is possible
+//  1. Thread 1 performs an Unmap and removes PTE entries, but drops the lock prior to invalidation.
+//  2. Thread 2 performs an Unmap, no PTE entries are removed, no invalidations occur
+//  3. Thread 2 now believes the resources (pages) for the region are no longer accessible, and
+//     returns them to the pmm.
+//  4. Thread 3 attempts to access this region and is now able to read/write to returned pages as
+//     invalidations have not occurred.
+// This scenario is possible as the mappings here are not the source of truth of resource
+// management, but a cache of information from other parts of the system. If thread 2 wanted to
+// guarantee that the pages were free it could issue it's own TLB invalidations for the vaddr range,
+// even though it found no entries. However this is not the strategy employed here at the moment.
 class Riscv64ArchVmAspace::ConsistencyManager {
  public:
   ConsistencyManager(Riscv64ArchVmAspace& aspace) TA_REQ(aspace.lock_) : aspace_(aspace) {}
