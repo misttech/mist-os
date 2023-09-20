@@ -143,6 +143,7 @@ size_checker_input = {
         "packages/base/vulkan_loader",
         "packages/base/libvulkan_intel_gen",
         "packages/base/libvulkan_goldfish",
+        "packages/vulkan_loader",
       ]
       limit = 3708346  # 3.537 MiB
       creep_limit = 49152  # 48.0 KiB
@@ -248,7 +249,7 @@ size_checker_input = {
     },
     {
       component = "Connectivity/Wlan-Drivers"
-      src = [ "src/connectivity/wlan/drivers/third_party/intel/iwlwifi" ]
+      src = [ "packages/iwlwifi" ]
       limit = 5578880  # 5.32 MiB
       creep_limit = 524288  # 512.0 KiB
     },
