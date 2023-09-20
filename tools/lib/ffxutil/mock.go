@@ -30,6 +30,10 @@ func (f *MockFFXInstance) run(cmd string, args ...string) error {
 	return nil
 }
 
+func (f *MockFFXInstance) Run(_ context.Context, args ...string) error {
+	return nil
+}
+
 func (f *MockFFXInstance) RunWithTarget(_ context.Context, args ...string) error {
 	return nil
 }

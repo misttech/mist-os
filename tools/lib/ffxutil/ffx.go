@@ -327,6 +327,17 @@ func (f *FFXInstance) GetConfig(ctx context.Context) error {
 	return f.Run(ctx, "config", "get")
 }
 
+// GetPBArtifacts returns a list of the artifacts required for the specified artifactsGroup (flash or emu).
+// The returned list are relative paths to the pbPath.
+func (f *FFXInstance) GetPBArtifacts(ctx context.Context, pbPath string, artifactsGroup string) ([]string, error) {
+	output, err := f.RunAndGetOutput(ctx, "--config", "ffx_product_get_artifacts=true", "product", "get-artifacts", pbPath, "-r", "-g", artifactsGroup)
+	if err != nil {
+		return nil, err
+	}
+
+	return strings.Split(output, "\n"), nil
+}
+
 // GetImageFromPB returns an image from a product bundle.
 func (f *FFXInstance) GetImageFromPB(ctx context.Context, pbPath string, slot string, imageType string) (*bootserver.Image, error) {
 	relImagePath, err := f.RunAndGetOutput(ctx, "product", "get-image-path", pbPath, "-r", "--slot", slot, "--image-type", imageType)

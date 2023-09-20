@@ -23,6 +23,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder"
 	"go.fuchsia.dev/fuchsia/tools/lib/color"
 	"go.fuchsia.dev/fuchsia/tools/lib/flagmisc"
+	"go.fuchsia.dev/fuchsia/tools/lib/hostplatform"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
 
@@ -126,6 +127,7 @@ type buildModules interface {
 	TestSpecs() []build.TestSpec
 	TestListLocation() []string
 	TestDurations() []build.TestDuration
+	Tools() build.Tools
 	PackageRepositories() []build.PackageRepo
 	ProductBundles() []build.ProductBundle
 }
@@ -294,13 +296,25 @@ func execute(ctx context.Context, flags testsharderFlags, m buildModules) error 
 
 	if flags.imageDeps || flags.hermeticDeps || flags.ffxDeps {
 		for _, s := range shards {
+			var pbPath, ffxPath string
 			if flags.ffxDeps {
 				if err := testsharder.AddFFXDeps(s, flags.buildDir, m.Images(), flags.pave); err != nil {
 					return err
 				}
+				if flags.productBundleName != "" && s.ImageOverrides.IsEmpty() {
+					pbPath = build.GetPbPathByName(m.ProductBundles(), flags.productBundleName)
+					platform, err := hostplatform.Name()
+					if err != nil {
+						return err
+					}
+					ffxPath, err = m.Tools().LookupPath(platform, "ffx")
+					if err != nil {
+						return err
+					}
+					ffxPath = filepath.Join(flags.buildDir, ffxPath)
+				}
 			}
-			pbPath := build.GetPbPathByName(m.ProductBundles(), flags.productBundleName)
-			if err := testsharder.AddImageDeps(s, flags.buildDir, m.Images(), flags.pave, pbPath); err != nil {
+			if err := testsharder.AddImageDeps(ctx, s, flags.buildDir, m.Images(), flags.pave, pbPath, ffxPath); err != nil {
 				return err
 			}
 		}

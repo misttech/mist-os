@@ -5,6 +5,7 @@
 package testsharder
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"go.fuchsia.dev/fuchsia/tools/build"
+	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 )
 
 func mockImages(t *testing.T) ([]build.Image, string) {
@@ -85,6 +87,14 @@ func mockImages(t *testing.T) ([]build.Image, string) {
 	return imgs, imgDir
 }
 
+type mockFFX struct {
+	ffxutil.MockFFXInstance
+}
+
+func (m *mockFFX) GetPBArtifacts(ctx context.Context, pbPath, group string) ([]string, error) {
+	return []string{"zbi"}, nil
+}
+
 func TestAddImageDeps(t *testing.T) {
 	imgs, imgDir := mockImages(t)
 	testCases := []struct {
@@ -100,7 +110,7 @@ func TestAddImageDeps(t *testing.T) {
 			deviceType: "AEMU",
 			pave:       false,
 			pbPath:     "obj/build/images/fuchsia/product_bundle",
-			want:       []string{"fuchsia.zbi", "images.json", "multiboot.bin", "obj/build/images/fuchsia/fuchsia/fvm.blk", "obj/build/images/fuchsia/product_bundle", "product_bundles.json"},
+			want:       []string{"fuchsia.zbi", "images.json", "multiboot.bin", "obj/build/images/fuchsia/fuchsia/fvm.blk", "obj/build/images/fuchsia/product_bundle/zbi", "product_bundles.json"},
 		},
 		{
 			name:       "paving image deps",
@@ -156,7 +166,14 @@ func TestAddImageDeps(t *testing.T) {
 					},
 				},
 			}
-			AddImageDeps(s, imgDir, imgs, tc.pave, tc.pbPath)
+			origGetFFX := getFFX
+			defer func() {
+				getFFX = origGetFFX
+			}()
+			getFFX = func(ctx context.Context, ffxPath, outputsDir string) (ffxInterface, error) {
+				return &mockFFX{}, nil
+			}
+			AddImageDeps(context.Background(), s, imgDir, imgs, tc.pave, tc.pbPath, "path/to/ffx")
 			if diff := cmp.Diff(tc.want, s.Deps); diff != "" {
 				t.Errorf("AddImageDeps(%v, %v, %t) failed: (-want +got): \n%s", s, imgs, tc.pave, diff)
 			}

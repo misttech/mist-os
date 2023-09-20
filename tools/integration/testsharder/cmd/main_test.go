@@ -595,6 +595,15 @@ func (m *fakeModules) TestSpecs() []build.TestSpec              { return m.testS
 func (m *fakeModules) TestDurations() []build.TestDuration      { return m.testDurations }
 func (m *fakeModules) PackageRepositories() []build.PackageRepo { return m.packageRepositories }
 func (m *fakeModules) ProductBundles() []build.ProductBundle    { return m.productBundles }
+func (m *fakeModules) Tools() build.Tools {
+	return build.Tools{
+		{
+			Name: "ffx",
+			Path: "host_x64/ffx",
+			OS:   "linux",
+			CPU:  "x64",
+		}}
+}
 
 func packageURL(basename string) string {
 	return fmt.Sprintf("fuchsia-pkg://fuchsia.com/%s#meta/%s.cm", basename, basename)
