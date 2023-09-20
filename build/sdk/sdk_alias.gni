@@ -27,6 +27,8 @@ template("sdk_alias") {
 
   sdk_target_gen_dir = get_label_info(invoker.target, "target_gen_dir")
   sdk_target_name = get_label_info(invoker.target, "name")
+  meta_json_name = "$target_name.meta.json"
+  manifest_name = "$target_name.sdk"
 
   group_deps = []
 
@@ -38,7 +40,7 @@ template("sdk_alias") {
 
       sources = [ "$sdk_target_gen_dir/$sdk_target_name.meta.json" ]
 
-      outputs = [ "$target_gen_dir/$target_name.meta.json" ]
+      outputs = [ "$target_gen_dir/$meta_json_name" ]
 
       deps = [ invoker.target ]
     }
@@ -51,7 +53,7 @@ template("sdk_alias") {
 
     sources = [ "$sdk_target_gen_dir/$sdk_target_name.sdk" ]
 
-    outputs = [ "$target_gen_dir/$target_name.sdk" ]
+    outputs = [ "$target_gen_dir/$manifest_name" ]
 
     deps = [ invoker.target ]
   }

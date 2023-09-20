@@ -2110,6 +2110,25 @@ if (in_default_toolchain) {
   }
 }
 
+# Pass through wrapper of `copy`, in preparation of adding
+# applicable_licenses in followup CLs.
+# TODO(fxbug.dev//132723): Add applicable_licenses parameter.
+template("copy") {
+  copy(target_name) {
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+  }
+}
+
 # Internal template used to wrap a linked binary target (i.e. executable(),
 # shared_library() or loadable_module()) definition.
 #

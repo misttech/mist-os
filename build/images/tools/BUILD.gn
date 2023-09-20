@@ -5,32 +5,33 @@
 import("//build/board.gni")
 import("//build/images/tools/fastboot.gni")
 
+_board_tools_deps = []
+foreach(tool_path, board_tools) {
+  basename = get_path_info(tool_path, "file")
+  copy("board_tool_$basename") {
+    sources = [ tool_path ]
+    outputs = [ "$root_out_dir/board_tools/$basename" ]
+
+    metadata = {
+      images = [
+        {
+          label =
+              get_label_info(":board_tool_$basename", "label_with_toolchain")
+          archive = true
+          name = "$basename"
+          path = "board_tools/$basename"
+          type = "script"
+        },
+      ]
+    }
+  }
+
+  _board_tools_deps += [ ":board_tool_$basename" ]
+}
+
 # Copy any board-specific tools.
 group("board_tools") {
-  deps = []
-
-  foreach(tool_path, board_tools) {
-    basename = get_path_info(tool_path, "file")
-    copy("board_tool_$basename") {
-      sources = [ tool_path ]
-      outputs = [ "$root_out_dir/board_tools/$basename" ]
-
-      metadata = {
-        images = [
-          {
-            label =
-                get_label_info(":board_tool_$basename", "label_with_toolchain")
-            archive = true
-            name = "$basename"
-            path = "board_tools/$basename"
-            type = "script"
-          },
-        ]
-      }
-    }
-
-    deps += [ ":board_tool_$basename" ]
-  }
+  deps = _board_tools_deps
 }
 
 group("bootserver") {
