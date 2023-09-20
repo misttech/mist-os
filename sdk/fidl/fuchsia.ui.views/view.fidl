@@ -22,7 +22,6 @@ closed protocol View {
     /// with an error.
     ///
     /// TODO(fxbug.dev/24470): Allow re-parenting `View`s with a new `Present()` call.
-    @transitional
     strict Present(resource struct {
         view_token ViewToken;
     });

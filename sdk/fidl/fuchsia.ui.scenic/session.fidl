@@ -164,7 +164,6 @@ closed protocol Session {
     /// Note: `acquire_fences` and `release_fences` are only necessary to synchronize
     /// access to memory (and other external resources).  Any modification to
     /// resources made via the Session API are automatically synchronized.
-    @transitional
     strict Present(resource struct {
         presentation_time uint64;
         acquire_fences vector<zx.Handle:EVENT>;
