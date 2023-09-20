@@ -30,11 +30,14 @@ namespace {
 using fuchsia::boot::Items;
 
 // Mock fuchsia.boot.Items server
-class FakeItems : public Items {
+class FakeItems final : public Items {
  public:
   fidl::InterfaceRequestHandler<Items> GetHandler() { return bindings_.GetHandler(this); }
 
   void Get(uint32_t type, uint32_t extra, GetCallback callback) override { EXPECT_TRUE(false); }
+  void Get2(uint32_t type, std::unique_ptr<fuchsia::boot::Extra>, Get2Callback callback) override {
+    EXPECT_TRUE(false);
+  }
 
   void GetBootloaderFile(::std::string filename, GetBootloaderFileCallback callback) override {
     if (!bootloader_file_set_) {

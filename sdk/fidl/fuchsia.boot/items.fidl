@@ -29,7 +29,6 @@ closed protocol Items {
     /// length is returned for each item as VMOs are page-aligned.
     ///
     /// Returns ZX_ERR_NOT_SUPPORTED if this is an untracked item which will never be stored.
-    @transitional
     strict Get2(struct {
         type uint32;
         extra box<struct {

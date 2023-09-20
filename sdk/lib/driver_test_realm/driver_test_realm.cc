@@ -188,6 +188,10 @@ class FakeBootItems final : public fidl::WireServer<fuchsia_boot::Items> {
     }
     completer.Reply(std::move(vmo), length);
   }
+  void Get2(Get2RequestView request, Get2Completer::Sync& completer) override {
+    FX_SLOG(ERROR, "Unsupported Get2 called.");
+    completer.Close(ZX_OK);
+  }
 
   void GetBootloaderFile(GetBootloaderFileRequestView request,
                          GetBootloaderFileCompleter::Sync& completer) override {
