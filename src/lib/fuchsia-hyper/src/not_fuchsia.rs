@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{parse_ip_addr, HyperConnectorFuture, TcpOptions, TcpStream},
+    crate::{parse_ip_addr, HyperConnectorFuture, SocketOptions, TcpOptions, TcpStream},
     async_net as net,
     futures::io,
     http::uri::{Scheme, Uri},
@@ -29,9 +29,14 @@ pub(crate) fn configure_cert_store(tls: &mut ClientConfig) {
 /// creating a TcpStream to a particular destination.
 #[derive(Clone, Debug)]
 pub struct HyperConnector {
-    // TODO(fxbug.dev/84729)
-    #[allow(unused)]
     tcp_options: TcpOptions,
+    socket_options: SocketOptions,
+}
+
+impl From<(TcpOptions, SocketOptions)> for HyperConnector {
+    fn from((tcp_options, socket_options): (TcpOptions, SocketOptions)) -> Self {
+        Self { tcp_options, socket_options }
+    }
 }
 
 impl HyperConnector {
@@ -40,7 +45,7 @@ impl HyperConnector {
     }
 
     pub fn from_tcp_options(tcp_options: TcpOptions) -> Self {
-        Self { tcp_options }
+        Self { tcp_options, socket_options: SocketOptions::default() }
     }
 }
 
@@ -82,13 +87,17 @@ impl HyperConnector {
         })
         .await?;
 
+        if self.socket_options.bind_device.is_some() {
+            unimplemented!("TODO(fxbug.dev/133952) fuchsia-hyper does not support bind_device on non-fuchsia devices");
+        }
+
         let stream = if let Some(addr) = addr {
             net::TcpStream::connect(addr).await?
         } else {
             resolve_host_port(host, port).await?
         };
+        let () = self.tcp_options.apply(&stream)?;
 
-        // TODO: figure out how to apply tcp options
         Ok(TcpStream { stream })
     }
 }

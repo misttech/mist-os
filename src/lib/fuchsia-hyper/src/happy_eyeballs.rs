@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    crate::connect_and_bind_device,
     fuchsia_async::{net, Time, Timer},
     fuchsia_zircon as zx,
     futures::{
@@ -26,7 +27,7 @@ pub(crate) trait SocketConnector {
     type Connection;
     type Fut: Future<Output = io::Result<Self::Connection>>;
 
-    fn connect(&mut self, addr: SocketAddr) -> io::Result<Self::Fut>;
+    fn connect(&mut self, addr: SocketAddr, bind_device: Option<&str>) -> io::Result<Self::Fut>;
 }
 
 pub(crate) struct RealSocketConnector;
@@ -34,8 +35,8 @@ impl SocketConnector for RealSocketConnector {
     type Connection = net::TcpStream;
     type Fut = net::TcpConnector;
 
-    fn connect(&mut self, addr: SocketAddr) -> io::Result<Self::Fut> {
-        net::TcpStream::connect(addr)
+    fn connect(&mut self, addr: SocketAddr, bind_device: Option<&str>) -> io::Result<Self::Fut> {
+        connect_and_bind_device(addr, bind_device)
     }
 }
 
@@ -80,6 +81,7 @@ pub(crate) fn happy_eyeballs<A, C>(
     connector: C,
     min_conn_att_delay: zx::Duration,
     conn_att_delay: zx::Duration,
+    bind_device: Option<&str>,
 ) -> HappyEyeballs<C>
 where
     A: IntoIterator<Item = SocketAddr>,
@@ -107,7 +109,14 @@ where
     let min_conn_att_delay = min(max(ABS_MIN_CONN_ATT_DELAY, min_conn_att_delay), conn_att_delay);
 
     HappyEyeballs {
-        inner: Inner::new(addrs.peekable(), connector, min_conn_att_delay, conn_att_delay).fuse(),
+        inner: Inner::new(
+            addrs.peekable(),
+            connector,
+            min_conn_att_delay,
+            conn_att_delay,
+            bind_device,
+        )
+        .fuse(),
     }
 }
 
@@ -147,6 +156,7 @@ where
     last_wake: Time,
     next_wake: Time,
     err: Option<io::Error>,
+    bind_device: Option<String>,
 }
 
 impl<C: SocketConnector> Inner<C> {
@@ -155,6 +165,7 @@ impl<C: SocketConnector> Inner<C> {
         connector: C,
         min_conn_att_delay: zx::Duration,
         conn_att_delay: zx::Duration,
+        bind_device: Option<&str>,
     ) -> Self {
         let last_wake = Time::now();
         let first_deadline =
@@ -170,6 +181,7 @@ impl<C: SocketConnector> Inner<C> {
             next_wake: first_deadline,
             timer: Timer::new(first_deadline).fuse(),
             err: None,
+            bind_device: bind_device.map(str::to_string),
         };
 
         // Ensure that we've enqueued something to do when we're first polled.
@@ -184,7 +196,7 @@ impl<C: SocketConnector> Inner<C> {
     // entire address list.
     fn next_conn(&mut self) -> Option<C::Fut> {
         while let Some(addr) = self.addrs.next() {
-            match self.connector.connect(addr) {
+            match self.connector.connect(addr, self.bind_device.as_deref()) {
                 Ok(c) => {
                     return Some(c);
                 }
@@ -357,7 +369,7 @@ mod test {
 
     #[derive(Debug, PartialEq, Eq)]
     enum Event {
-        Connecting { addr: SocketAddr, class: Class },
+        Connecting { addr: SocketAddr, class: Class, bind_device: Option<String> },
         DelayFinished { addr: SocketAddr },
     }
 
@@ -404,15 +416,20 @@ mod test {
         type Connection = SocketAddr;
         type Fut = futures::future::LocalBoxFuture<'static, io::Result<Self::Connection>>;
 
-        fn connect(&mut self, addr: SocketAddr) -> io::Result<Self::Fut> {
+        fn connect(
+            &mut self,
+            addr: SocketAddr,
+            bind_device: Option<&str>,
+        ) -> io::Result<Self::Fut> {
             let inner = self.inner.clone();
+            let bind_device = bind_device.map(str::to_string);
             Ok(async move {
                 let class = {
                     let mut inner = inner.lock();
                     let class = *inner.addrclass.get(&addr).unwrap_or_else(|| {
                         panic!("expected to resolve class for address {:#}", addr)
                     });
-                    inner.events.push(Event::Connecting { addr, class });
+                    inner.events.push(Event::Connecting { addr, class, bind_device });
                     class
                 };
 
@@ -482,6 +499,7 @@ mod test {
             connector.clone(),
             RECOMMENDED_MIN_CONN_ATT_DELAY,
             RECOMMENDED_CONN_ATT_DELAY,
+            None,
         );
 
         // Connect to the service. This should fail on the first poll cycle.
@@ -519,6 +537,7 @@ mod test {
             connector.clone(),
             RECOMMENDED_MIN_CONN_ATT_DELAY,
             RECOMMENDED_CONN_ATT_DELAY,
+            Some("expected_device"),
         );
 
         let mut fail_addrs = fail_addrs.into_iter();
@@ -529,7 +548,14 @@ mod test {
         // Trigger all the failing polls.
         for (delay, expected_event) in fail_addrs.enumerate().map(|(i, addr)| {
             let delay = if i == 0 { 0.millis() } else { RECOMMENDED_MIN_CONN_ATT_DELAY };
-            (delay, Event::Connecting { addr, class: Class::NotListening })
+            (
+                delay,
+                Event::Connecting {
+                    addr,
+                    class: Class::NotListening,
+                    bind_device: Some("expected_device".into()),
+                },
+            )
         }) {
             assert_matches::assert_matches!(
                 next_event(&mut executor, &mut fut, delay),
@@ -546,7 +572,11 @@ mod test {
         );
         assert_eq!(
             connector.take_events(),
-            vec![Event::Connecting { addr: last_fail_addr, class: Class::NotListening }]
+            vec![Event::Connecting {
+                addr: last_fail_addr,
+                class: Class::NotListening,
+                bind_device: Some("expected_device".into())
+            }]
         );
     }
 
@@ -578,12 +608,20 @@ mod test {
             connector.clone(),
             RECOMMENDED_MIN_CONN_ATT_DELAY,
             RECOMMENDED_CONN_ATT_DELAY,
+            Some("bind_device"),
         );
 
         // Trigger all the failing polls.
         for (delay, expected_event) in fail_addrs.iter().enumerate().map(|(i, addr)| {
             let delay = if i == 0 { 0.millis() } else { RECOMMENDED_CONN_ATT_DELAY };
-            (delay, Event::Connecting { addr: *addr, class: Class::Blackholed })
+            (
+                delay,
+                Event::Connecting {
+                    addr: *addr,
+                    class: Class::Blackholed,
+                    bind_device: Some("bind_device".into()),
+                },
+            )
         }) {
             assert_matches::assert_matches!(
                 next_event(&mut executor, &mut fut, delay),
@@ -615,6 +653,7 @@ mod test {
             connector.clone(),
             RECOMMENDED_MIN_CONN_ATT_DELAY,
             RECOMMENDED_CONN_ATT_DELAY,
+            Some("single_valid"),
         );
 
         // Connect to the service. This succeeds because the address is good.
@@ -624,7 +663,11 @@ mod test {
         );
         assert_eq!(
             connector.take_events(),
-            vec![Event::Connecting { addr: server_addr, class: Class::Connectable }]
+            vec![Event::Connecting {
+                addr: server_addr,
+                class: Class::Connectable,
+                bind_device: Some("single_valid".into())
+            }]
         );
     }
 
@@ -649,6 +692,7 @@ mod test {
             connector.clone(),
             RECOMMENDED_MIN_CONN_ATT_DELAY,
             RECOMMENDED_CONN_ATT_DELAY,
+            Some("bad_network"),
         );
 
         // Connect to the service. This succeeds because the first address is good.
@@ -658,7 +702,11 @@ mod test {
         );
         assert_eq!(
             connector.take_events(),
-            vec![Event::Connecting { addr: server_addr, class: Class::Connectable }]
+            vec![Event::Connecting {
+                addr: server_addr,
+                class: Class::Connectable,
+                bind_device: Some("bad_network".into()),
+            }]
         );
     }
 
@@ -731,12 +779,20 @@ mod test {
             connector.clone(),
             RECOMMENDED_MIN_CONN_ATT_DELAY,
             RECOMMENDED_CONN_ATT_DELAY,
+            Some("test_fallback"),
         );
 
         // Trigger all the failing polls.
         for (delay, expected_event) in fail_addrs.iter().enumerate().map(|(i, addr)| {
             let delay = if i == 0 { 0.millis() } else { delay };
-            (delay, Event::Connecting { addr: *addr, class: fail_class })
+            (
+                delay,
+                Event::Connecting {
+                    addr: *addr,
+                    class: fail_class,
+                    bind_device: Some("test_fallback".into()),
+                },
+            )
         }) {
             assert_matches::assert_matches!(
                 next_event(&mut executor, &mut fut, delay),
@@ -753,7 +809,11 @@ mod test {
         );
         assert_eq!(
             connector.take_events(),
-            vec![Event::Connecting { addr: server_addr, class: Class::Connectable }]
+            vec![Event::Connecting {
+                addr: server_addr,
+                class: Class::Connectable,
+                bind_device: Some("test_fallback".into())
+            }]
         );
     }
 
@@ -789,12 +849,20 @@ mod test {
             connector.clone(),
             RECOMMENDED_MIN_CONN_ATT_DELAY,
             RECOMMENDED_CONN_ATT_DELAY,
+            Some("blackhole"),
         );
 
         // Trigger all the failing polls.
         for (delay, expected_event) in fail_addrs.iter().enumerate().map(|(i, addr)| {
             let delay = if i == 0 { 0.millis() } else { RECOMMENDED_CONN_ATT_DELAY };
-            (delay, Event::Connecting { addr: *addr, class: Class::Blackholed })
+            (
+                delay,
+                Event::Connecting {
+                    addr: *addr,
+                    class: Class::Blackholed,
+                    bind_device: Some("blackhole".into()),
+                },
+            )
         }) {
             assert_matches::assert_matches!(
                 next_event(&mut executor, &mut fut, delay),
@@ -810,7 +878,11 @@ mod test {
         );
         assert_eq!(
             connector.take_events(),
-            vec![Event::Connecting { addr: server_addr, class: Class::Connectable }]
+            vec![Event::Connecting {
+                addr: server_addr,
+                class: Class::Connectable,
+                bind_device: Some("blackhole".into())
+            }]
         );
     }
 
@@ -837,22 +909,42 @@ mod test {
             connector.clone(),
             RECOMMENDED_MIN_CONN_ATT_DELAY,
             RECOMMENDED_CONN_ATT_DELAY,
+            Some("crossproto"),
         );
 
         // Trigger all the failing polls.
         for (delay, expected_event) in vec![
-            (0.millis(), Event::Connecting { addr: nl_v4, class: Class::NotListening }),
+            (
+                0.millis(),
+                Event::Connecting {
+                    addr: nl_v4,
+                    class: Class::NotListening,
+                    bind_device: Some("crossproto".into()),
+                },
+            ),
             (
                 RECOMMENDED_MIN_CONN_ATT_DELAY,
-                Event::Connecting { addr: bh_v6, class: Class::Blackholed },
+                Event::Connecting {
+                    addr: bh_v6,
+                    class: Class::Blackholed,
+                    bind_device: Some("crossproto".into()),
+                },
             ),
             (
                 RECOMMENDED_CONN_ATT_DELAY,
-                Event::Connecting { addr: bh_v4, class: Class::Blackholed },
+                Event::Connecting {
+                    addr: bh_v4,
+                    class: Class::Blackholed,
+                    bind_device: Some("crossproto".into()),
+                },
             ),
             (
                 RECOMMENDED_CONN_ATT_DELAY,
-                Event::Connecting { addr: nl_v6, class: Class::NotListening },
+                Event::Connecting {
+                    addr: nl_v6,
+                    class: Class::NotListening,
+                    bind_device: Some("crossproto".into()),
+                },
             ),
         ] {
             assert_matches::assert_matches!(
@@ -870,7 +962,11 @@ mod test {
         );
         assert_eq!(
             connector.take_events(),
-            vec![Event::Connecting { addr: server_addr, class: Class::Connectable }]
+            vec![Event::Connecting {
+                addr: server_addr,
+                class: Class::Connectable,
+                bind_device: Some("crossproto".into())
+            }]
         );
     }
 
@@ -890,35 +986,73 @@ mod test {
         if ipv4_first {
             conn_addrs = vec![nl_v4, bh_v4, bh_v6, nl_v6];
             expected_events = vec![
-                (0.millis(), Event::Connecting { addr: nl_v4, class: Class::NotListening }),
+                (
+                    0.millis(),
+                    Event::Connecting {
+                        addr: nl_v4,
+                        class: Class::NotListening,
+                        bind_device: Some("rfc8305s4p4".into()),
+                    },
+                ),
                 (
                     RECOMMENDED_MIN_CONN_ATT_DELAY,
-                    Event::Connecting { addr: bh_v6, class: Class::Blackholed },
+                    Event::Connecting {
+                        addr: bh_v6,
+                        class: Class::Blackholed,
+                        bind_device: Some("rfc8305s4p4".into()),
+                    },
                 ),
                 (
                     RECOMMENDED_CONN_ATT_DELAY,
-                    Event::Connecting { addr: bh_v4, class: Class::Blackholed },
+                    Event::Connecting {
+                        addr: bh_v4,
+                        class: Class::Blackholed,
+                        bind_device: Some("rfc8305s4p4".into()),
+                    },
                 ),
                 (
                     RECOMMENDED_CONN_ATT_DELAY,
-                    Event::Connecting { addr: nl_v6, class: Class::NotListening },
+                    Event::Connecting {
+                        addr: nl_v6,
+                        class: Class::NotListening,
+                        bind_device: Some("rfc8305s4p4".into()),
+                    },
                 ),
             ];
         } else {
             conn_addrs = vec![nl_v6, bh_v6, bh_v4, nl_v4];
             expected_events = vec![
-                (0.millis(), Event::Connecting { addr: nl_v6, class: Class::NotListening }),
+                (
+                    0.millis(),
+                    Event::Connecting {
+                        addr: nl_v6,
+                        class: Class::NotListening,
+                        bind_device: Some("rfc8305s4p4".into()),
+                    },
+                ),
                 (
                     RECOMMENDED_MIN_CONN_ATT_DELAY,
-                    Event::Connecting { addr: bh_v4, class: Class::Blackholed },
+                    Event::Connecting {
+                        addr: bh_v4,
+                        class: Class::Blackholed,
+                        bind_device: Some("rfc8305s4p4".into()),
+                    },
                 ),
                 (
                     RECOMMENDED_CONN_ATT_DELAY,
-                    Event::Connecting { addr: bh_v6, class: Class::Blackholed },
+                    Event::Connecting {
+                        addr: bh_v6,
+                        class: Class::Blackholed,
+                        bind_device: Some("rfc8305s4p4".into()),
+                    },
                 ),
                 (
                     RECOMMENDED_CONN_ATT_DELAY,
-                    Event::Connecting { addr: nl_v4, class: Class::NotListening },
+                    Event::Connecting {
+                        addr: nl_v4,
+                        class: Class::NotListening,
+                        bind_device: Some("rfc8305s4p4".into()),
+                    },
                 ),
             ];
         };
@@ -937,6 +1071,7 @@ mod test {
             connector.clone(),
             RECOMMENDED_MIN_CONN_ATT_DELAY,
             RECOMMENDED_CONN_ATT_DELAY,
+            Some("rfc8305s4p4"),
         );
 
         // Trigger all the failing polls.
@@ -954,7 +1089,11 @@ mod test {
         );
         assert_eq!(
             connector.take_events(),
-            vec![Event::Connecting { addr: server_addr, class: Class::Connectable }]
+            vec![Event::Connecting {
+                addr: server_addr,
+                class: Class::Connectable,
+                bind_device: Some("rfc8305s4p4".into())
+            }]
         );
     }
 
@@ -979,17 +1118,26 @@ mod test {
             connector.clone(),
             RECOMMENDED_MIN_CONN_ATT_DELAY,
             RECOMMENDED_CONN_ATT_DELAY,
+            Some("latent_endpoint"),
         );
 
         // Trigger all the failing polls.
         for (delay, expected_event) in vec![
             (
                 0.millis(),
-                Event::Connecting { addr: server_addr, class: Class::DelayedConnectable { delay } },
+                Event::Connecting {
+                    addr: server_addr,
+                    class: Class::DelayedConnectable { delay },
+                    bind_device: Some("latent_endpoint".into()),
+                },
             ),
             (
                 RECOMMENDED_CONN_ATT_DELAY,
-                Event::Connecting { addr: bh_addr, class: Class::Blackholed },
+                Event::Connecting {
+                    addr: bh_addr,
+                    class: Class::Blackholed,
+                    bind_device: Some("latent_endpoint".into()),
+                },
             ),
         ] {
             assert_matches::assert_matches!(
@@ -1037,6 +1185,7 @@ mod test {
             connector.clone(),
             zx::Duration::from_millis(1),
             zx::Duration::from_seconds(5),
+            Some("timer_behavior"),
         );
 
         // Walk through all the events that should occur in this setup.
@@ -1045,13 +1194,21 @@ mod test {
                 0.millis(),
                 false,
                 false,
-                Some(Event::Connecting { addr: nl_addr, class: Class::NotListening }),
+                Some(Event::Connecting {
+                    addr: nl_addr,
+                    class: Class::NotListening,
+                    bind_device: Some("timer_behavior".into()),
+                }),
             ),
             (
                 10.millis(),
                 true,
                 false,
-                Some(Event::Connecting { addr: bh_addr, class: Class::Blackholed }),
+                Some(Event::Connecting {
+                    addr: bh_addr,
+                    class: Class::Blackholed,
+                    bind_device: Some("timer_behavior".into()),
+                }),
             ),
             (250.millis(), false, false, None),
             (
@@ -1060,7 +1217,11 @@ mod test {
                 2010.millis(),
                 true,
                 true,
-                Some(Event::Connecting { addr: server_addr, class: Class::Connectable }),
+                Some(Event::Connecting {
+                    addr: server_addr,
+                    class: Class::Connectable,
+                    bind_device: Some("timer_behavior".into()),
+                }),
             ),
         ] {
             let () = executor.set_fake_time(Time::from_nanos(abstime.into_nanos()));

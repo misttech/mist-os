@@ -4,8 +4,9 @@
 
 use {
     crate::{
+        connect_and_bind_device,
         happy_eyeballs::{self, RealSocketConnector},
-        parse_ip_addr, HyperConnectorFuture, TcpOptions, TcpStream,
+        parse_ip_addr, HyperConnectorFuture, SocketOptions, TcpOptions, TcpStream,
     },
     fidl_connector::{Connect, ServiceReconnector},
     fidl_fuchsia_net_name::{LookupIpOptions, LookupMarker, LookupProxy, LookupResult},
@@ -32,7 +33,14 @@ pub(crate) fn configure_cert_store(tls: &mut ClientConfig) {
 #[derive(Clone)]
 pub struct HyperConnector {
     tcp_options: TcpOptions,
+    socket_options: SocketOptions,
     provider: RealServiceConnector,
+}
+
+impl From<(TcpOptions, SocketOptions)> for HyperConnector {
+    fn from((tcp_options, socket_options): (TcpOptions, SocketOptions)) -> Self {
+        Self { tcp_options, socket_options, provider: RealServiceConnector::new() }
+    }
 }
 
 impl HyperConnector {
@@ -41,7 +49,11 @@ impl HyperConnector {
     }
 
     pub fn from_tcp_options(tcp_options: TcpOptions) -> Self {
-        Self { tcp_options, provider: RealServiceConnector::new() }
+        Self {
+            tcp_options,
+            socket_options: SocketOptions::default(),
+            provider: RealServiceConnector::new(),
+        }
     }
 }
 
@@ -77,33 +89,12 @@ impl HyperConnector {
             }
         };
 
-        let stream = connect_to_addr(&self.provider, host, port).await?;
-        let () = apply_tcp_options(stream.std(), &self.tcp_options)?;
+        let stream =
+            connect_to_addr(&self.provider, host, port, self.socket_options.bind_device.as_deref())
+                .await?;
+        let () = self.tcp_options.apply(stream.std())?;
 
         Ok(TcpStream { stream })
-    }
-}
-
-fn apply_tcp_options(stream: &std::net::TcpStream, options: &TcpOptions) -> Result<(), io::Error> {
-    let stream = socket2::SockRef::from(stream);
-    let mut any = false;
-    let mut keepalive = socket2::TcpKeepalive::new();
-    if let Some(idle) = options.keepalive_idle {
-        any = true;
-        keepalive = keepalive.with_time(idle);
-    };
-    if let Some(interval) = options.keepalive_interval {
-        any = true;
-        keepalive = keepalive.with_interval(interval);
-    }
-    if let Some(count) = options.keepalive_count {
-        any = true;
-        keepalive = keepalive.with_retries(count);
-    }
-    if any {
-        stream.set_tcp_keepalive(&keepalive)
-    } else {
-        Ok(())
     }
 }
 
@@ -174,9 +165,10 @@ async fn connect_to_addr<T: ProviderConnector + LookupConnector>(
     provider: &T,
     host: &str,
     port: u16,
+    bind_device: Option<&str>,
 ) -> Result<net::TcpStream, io::Error> {
     if let Some(addr) = parse_ip_addr_with_provider(provider, host, port).await? {
-        return net::TcpStream::connect(addr)?.await;
+        return connect_and_bind_device(addr, bind_device)?.await;
     }
 
     happy_eyeballs::happy_eyeballs(
@@ -184,6 +176,7 @@ async fn connect_to_addr<T: ProviderConnector + LookupConnector>(
         RealSocketConnector,
         happy_eyeballs::RECOMMENDED_MIN_CONN_ATT_DELAY,
         happy_eyeballs::RECOMMENDED_CONN_ATT_DELAY,
+        bind_device,
     )
     .await
 }

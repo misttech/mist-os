@@ -19,6 +19,7 @@ rustc_library("fuchsia-hyper") {
     "//third_party/rust_crates:lru-cache",
     "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:rustls",
+    "//third_party/rust_crates:socket2",
     "//third_party/rust_crates:tokio",
   ]
   test_deps = [
@@ -43,7 +44,6 @@ rustc_library("fuchsia-hyper") {
       "//src/sys/lib/fidl-connector",
       "//third_party/rust_crates:itertools",
       "//third_party/rust_crates:pin-project",
-      "//third_party/rust_crates:socket2",
     ]
     test_deps += [
       "//src/lib/fidl/rust/fidl",

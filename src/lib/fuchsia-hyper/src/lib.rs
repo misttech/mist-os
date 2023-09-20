@@ -16,6 +16,7 @@ use {
         Body,
     },
     std::{
+        marker::PhantomData,
         net::{
             AddrParseError, Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr, SocketAddrV4, SocketAddrV6,
         },
@@ -52,6 +53,17 @@ pub type HttpClient = Client<HyperConnector, Body>;
 
 /// A Fuchsia-compatible hyper client configured for making HTTP and HTTPS requests.
 pub type HttpsClient = Client<hyper_rustls::HttpsConnector<HyperConnector>, Body>;
+
+/// A trait to implement a builder for a Fuchsia compatible hyper client
+/// configured for either only HTTP or both HTTP and HTTPS requests.
+pub trait MakeClientBuilder: Sized {
+    fn builder() -> HttpClientBuilder<Self> {
+        HttpClientBuilder::default()
+    }
+}
+
+impl MakeClientBuilder for HttpClient {}
+impl MakeClientBuilder for HttpsClient {}
 
 /// A future that yields a hyper-compatible TCP stream.
 #[must_use = "futures do nothing unless polled"]
@@ -145,6 +157,37 @@ impl TcpOptions {
             keepalive_count: Some(3),
         }
     }
+
+    pub(crate) fn apply<T: std::os::fd::AsRawFd>(&self, stream: &T) -> io::Result<()> {
+        let stream = socket2::SockRef::from(stream);
+        let mut any = false;
+        let mut keepalive = socket2::TcpKeepalive::new();
+        if let Some(idle) = self.keepalive_idle {
+            any = true;
+            keepalive = keepalive.with_time(idle);
+        };
+        if let Some(interval) = self.keepalive_interval {
+            any = true;
+            keepalive = keepalive.with_interval(interval);
+        }
+        if let Some(count) = self.keepalive_count {
+            any = true;
+            keepalive = keepalive.with_retries(count);
+        }
+        if any {
+            stream.set_tcp_keepalive(&keepalive)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+/// Extra socket options to ensure that requests are made through a particular
+/// device or over a particular IP domain.
+#[derive(Clone, Debug, Default)]
+pub struct SocketOptions {
+    /// Specifies, as a string, the device that the created socket should bind to.
+    pub bind_device: Option<String>,
 }
 
 #[derive(Clone)]
@@ -159,6 +202,72 @@ impl<F: Future + Send + 'static> hyper::rt::Executor<F> for Executor {
 #[derive(Clone)]
 pub struct LocalExecutor;
 
+/// Implements the Builder pattern for constructing HTTP or HTTPS clients.
+#[derive(Clone)]
+pub struct HttpClientBuilder<T> {
+    tcp_options: Option<TcpOptions>,
+    socket_options: Option<SocketOptions>,
+    tls: Option<rustls::ClientConfig>,
+    phantom: PhantomData<T>,
+}
+
+impl<T> Default for HttpClientBuilder<T> {
+    fn default() -> Self {
+        Self {
+            tcp_options: Default::default(),
+            socket_options: Default::default(),
+            tls: Default::default(),
+            phantom: Default::default(),
+        }
+    }
+}
+
+impl HttpClientBuilder<HttpClient> {
+    /// Constructs an HttpClient
+    pub fn build(mut self) -> HttpClient {
+        Client::builder().executor(Executor).build(self.connector())
+    }
+}
+
+impl HttpClientBuilder<HttpsClient> {
+    /// Constructs an HttpsClient
+    pub fn build(mut self) -> HttpsClient {
+        let https = hyper_rustls::HttpsConnector::from((
+            self.connector(),
+            self.tls.unwrap_or_else(|| {
+                let mut tls = new_rustls_client_config();
+                configure_cert_store(&mut tls);
+                tls
+            }),
+        ));
+        Client::builder().executor(Executor).build(https)
+    }
+
+    /// Overrides the default tls `ClientConfig`
+    pub fn tls(self, tls: rustls::ClientConfig) -> Self {
+        Self { tls: Some(tls), ..self }
+    }
+}
+
+impl<T> HttpClientBuilder<T> {
+    fn connector(&mut self) -> HyperConnector {
+        HyperConnector::from((
+            self.tcp_options.take().unwrap_or_default(),
+            self.socket_options.take().unwrap_or_default(),
+        ))
+    }
+
+    /// Sets the TCP options for the underlying HyperConnector
+    pub fn tcp_options(self, tcp_options: TcpOptions) -> Self {
+        Self { tcp_options: Some(tcp_options), ..self }
+    }
+
+    /// Sets the SocketOptions for the underlying HyperConnector
+    pub fn socket_options(self, socket_options: SocketOptions) -> Self {
+        Self { socket_options: Some(socket_options), ..self }
+    }
+}
+
 impl<F: Future + 'static> hyper::rt::Executor<F> for LocalExecutor {
     fn execute(&self, fut: F) {
         fuchsia_async::Task::local(fut.map(drop)).detach()
@@ -167,28 +276,24 @@ impl<F: Future + 'static> hyper::rt::Executor<F> for LocalExecutor {
 
 /// Returns a new Fuchsia-compatible hyper client for making HTTP requests.
 pub fn new_client() -> HttpClient {
-    Client::builder().executor(Executor).build(HyperConnector::new())
+    HttpClient::builder().build()
 }
 
 pub fn new_https_client_dangerous(
     tls: rustls::ClientConfig,
     tcp_options: TcpOptions,
 ) -> HttpsClient {
-    let https =
-        hyper_rustls::HttpsConnector::from((HyperConnector::from_tcp_options(tcp_options), tls));
-    Client::builder().executor(Executor).build(https)
+    HttpsClient::builder().tls(tls).tcp_options(tcp_options).build()
 }
 
 /// Returns a new Fuchsia-compatible hyper client for making HTTP and HTTPS requests.
 pub fn new_https_client_from_tcp_options(tcp_options: TcpOptions) -> HttpsClient {
-    let mut tls = new_rustls_client_config();
-    configure_cert_store(&mut tls);
-    new_https_client_dangerous(tls, tcp_options)
+    HttpsClient::builder().tcp_options(tcp_options).build()
 }
 
 /// Returns a new Fuchsia-compatible hyper client for making HTTP and HTTPS requests.
 pub fn new_https_client() -> HttpsClient {
-    new_https_client_from_tcp_options(std::default::Default::default())
+    HttpsClient::builder().build()
 }
 
 /// Returns a rustls::ClientConfig for further construction with improved session cache and without
@@ -276,6 +381,25 @@ where
     };
 
     Ok(Some(SocketAddr::V6(SocketAddrV6::new(addr, port, 0, scope_id))))
+}
+
+#[cfg(target_os = "fuchsia")]
+pub(crate) fn connect_and_bind_device<D: AsRef<[u8]>>(
+    addr: SocketAddr,
+    bind_device: Option<D>,
+) -> io::Result<net::TcpConnector> {
+    let socket = socket2::Socket::new(
+        match addr {
+            SocketAddr::V4(_) => socket2::Domain::IPV4,
+            SocketAddr::V6(_) => socket2::Domain::IPV6,
+        },
+        socket2::Type::STREAM,
+        Some(socket2::Protocol::TCP),
+    )?;
+    if let Some(bind_device) = bind_device {
+        socket.bind_device(Some(bind_device.as_ref()))?;
+    }
+    net::TcpStream::connect_from_raw(socket, addr)
 }
 
 #[cfg(test)]
