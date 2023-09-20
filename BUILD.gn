@@ -683,9 +683,6 @@ build_api_module("sdk_archives") {
            # WARNING (fxbug.dev/116642): the driver SDK will soon be removed.
            "//sdk:driver_archive",
            "//sdk:final_fuchsia_idk",
-
-           # WARNING (fxbug.dev/126262): This will be removed soon.
-           "//sdk:merged",
          ] + sdk_archive_labels
 }
 
