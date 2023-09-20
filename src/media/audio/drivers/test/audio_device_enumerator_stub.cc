@@ -22,10 +22,6 @@ void AudioDeviceEnumeratorStub::GetDeviceGain(uint64_t dev_id,
 void AudioDeviceEnumeratorStub::SetDeviceGain(uint64_t dev_id,
                                               fuchsia::media::AudioGainInfo gain_info,
                                               fuchsia::media::AudioGainValidFlags flags) {}
-void AudioDeviceEnumeratorStub::GetDefaultInputDevice(
-    GetDefaultInputDeviceCallback get_default_input_callback) {}
-void AudioDeviceEnumeratorStub::GetDefaultOutputDevice(
-    GetDefaultOutputDeviceCallback get_default_output_callback) {}
 
 void AudioDeviceEnumeratorStub::AddDeviceByChannel(
     std::string device_name, bool is_input,

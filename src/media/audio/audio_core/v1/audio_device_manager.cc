@@ -372,14 +372,6 @@ void AudioDeviceManager::SetDeviceGain(uint64_t device_token,
   NotifyDeviceGainChanged(*dev);
 }
 
-void AudioDeviceManager::GetDefaultInputDevice(GetDefaultInputDeviceCallback cbk) {
-  cbk(default_input_token_);
-}
-
-void AudioDeviceManager::GetDefaultOutputDevice(GetDefaultOutputDeviceCallback cbk) {
-  cbk(default_output_token_);
-}
-
 std::shared_ptr<AudioDevice> AudioDeviceManager::FindLastPlugged(AudioObject::Type type,
                                                                  bool allow_unplugged) {
   TRACE_DURATION("audio", "AudioDeviceManager::FindLastPlugged");

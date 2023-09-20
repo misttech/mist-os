@@ -1230,22 +1230,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.media/AudioDeviceEnumerator.GetDefaultInputDevice",
-        "strictness": "strict",
-        "ordinal": "1557410486901999284",
-        "direction": "two_way",
-        "response": "fuchsia.media/AudioDeviceEnumeratorGetDefaultInputDeviceResponse"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.media/AudioDeviceEnumerator.GetDefaultOutputDevice",
-        "strictness": "strict",
-        "ordinal": "5909890929158198081",
-        "direction": "two_way",
-        "response": "fuchsia.media/AudioDeviceEnumeratorGetDefaultOutputDeviceResponse"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.media/AudioDeviceEnumerator.GetDeviceGain",
         "strictness": "strict",
         "ordinal": "2728415165983506763",
@@ -1329,26 +1313,6 @@
         "kind": "struct",
         "name": "fuchsia.media/AudioDeviceEnumeratorAddDeviceByChannelRequest",
         "resourceness": "resource"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.media/AudioDeviceEnumeratorGetDefaultInputDeviceResponse.device_token",
-        "ordinal": "1",
-        "type": "uint64"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.media/AudioDeviceEnumeratorGetDefaultInputDeviceResponse"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.media/AudioDeviceEnumeratorGetDefaultOutputDeviceResponse.device_token",
-        "ordinal": "1",
-        "type": "uint64"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.media/AudioDeviceEnumeratorGetDefaultOutputDeviceResponse"
     },
     {
         "kind": "struct/member",
