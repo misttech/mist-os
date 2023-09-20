@@ -11,7 +11,10 @@ driver_bind_rules("sdmmc-bind") {
   rules = "sdmmc.bind"
   bind_output = "sdmmc.bindbc"
   tests = "sdmmc-bind-test.json"
-  deps = [ "//src/devices/bind/fuchsia.sdmmc" ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_bindlib",
+    "//src/devices/bind/fuchsia.sdmmc",
+  ]
 }
 
 fuchsia_driver("sdmmc-driver") {
