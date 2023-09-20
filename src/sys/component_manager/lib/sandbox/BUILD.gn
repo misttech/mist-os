@@ -48,8 +48,10 @@ rustc_library("sandbox") {
     "src/dict.rs",
     "src/directory.rs",
     "src/handle.rs",
+    "src/lazy.rs",
     "src/lib.rs",
     "src/open.rs",
+    "src/optional.rs",
     "src/receiver.rs",
     "src/sender.rs",
   ]

@@ -15,7 +15,9 @@ mod data;
 mod dict;
 mod directory;
 mod handle;
+mod lazy;
 mod open;
+mod optional;
 mod receiver;
 mod sender;
 
@@ -25,6 +27,8 @@ pub use self::data::Data;
 pub use self::dict::{Dict, Key as DictKey};
 pub use self::directory::Directory;
 pub use self::handle::Handle;
+pub use self::lazy::Lazy;
 pub use self::open::Open;
+pub use self::optional::Optional;
 pub use receiver::{Message, Receiver};
 pub use sender::Sender;

@@ -326,6 +326,7 @@ group("tests") {
 
   deps = [
     ":component-manager-tests",
+    "bedrock:tests",
     "lib:tests",
     "stress_tests",
     "stress_tests_alt:component-manager-stress-tests-short",
