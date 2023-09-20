@@ -59,7 +59,6 @@ closed protocol Scenic {
     /// The `view_focuser`'s client is coupled to the requested `session`, and
     /// this coupling acts as a security boundary: the ViewRef used as the basis
     /// for authority by `view_focuser` must come from `session`.
-    @transitional
     strict CreateSession2(resource struct {
         session server_end:Session;
         listener client_end:<SessionListener, optional>;
