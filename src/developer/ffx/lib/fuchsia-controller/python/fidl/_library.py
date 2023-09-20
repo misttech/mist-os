@@ -36,6 +36,12 @@ class Method(dict):
         super().__init__(json_dict)
         self.parent_ir = parent_ir
 
+    def __getitem__(self, key) -> IR:
+        res = super().__getitem__(key)
+        if key == "identifier":
+            return normalize_identifier(res)
+        return res
+
     def has_response(self) -> bool:
         """Returns True if the method has a response."""
         return bool(self["has_response"])
@@ -44,14 +50,45 @@ class Method(dict):
         """Returns True if the method has a request."""
         return bool(self["has_request"])
 
-    def request_payload_identifier(self) -> str:
+    def has_result(self) -> bool:
+        """Returns True if the method has a result.
+
+        This is different from whether or not a method has a response, because a result is something
+        that can return an error (technically it's a union with two different values).
+        """
+        return bool(self["has_error"])
+
+    def request_payload_identifier(self) -> Optional[str]:
         """Attempts to lookup the payload identifier if it exists.
 
         Returns:
             None if there is no identifier, else an identifier string.
         """
         assert "maybe_request_payload" in self
-        return self["maybe_request_payload"]["identifier"]
+        payload = self.maybe_request_payload()
+        if not payload:
+            return None
+        return payload.identifier()
+
+    def response_payload_raw_identifier(self) -> Optional[str]:
+        """Attempts to lookup the response payload identifier  if it exists.
+
+        Returns:
+            None if there is no identifier, else an identifier string.
+        """
+        if not "maybe_response_payload" in self:
+            return None
+        return self.maybe_response_payload().raw_identifier()
+
+    def maybe_response_payload(self) -> Optional[IR]:
+        if not "maybe_response_payload" in self:
+            return None
+        return IR(self.parent_ir, self["maybe_response_payload"])
+
+    def maybe_request_payload(self) -> Optional[IR]:
+        if not "maybe_request_payload" in self:
+            return None
+        return IR(self.parent_ir, self["maybe_request_payload"])
 
     def ordinal(self) -> int:
         return self["ordinal"]
@@ -75,11 +112,27 @@ class IR(dict):
                          "alias", "protocol", "experimental_resource"]:
                 setattr(self, f"{decl}_decls", self._decl_dict(decl))
 
+    def __getitem__(self, key):
+        res = super().__getitem__(key)
+        if key == "identifier":
+            return normalize_identifier(res)
+        if type(res) == dict:
+            return IR(self.path, res)
+        if type(res) == list and res and type(res[0]) == dict:
+            return [IR(self.path, x) for x in res]
+        return res
+
     def _decl_dict(self, ty: str) -> Dict[str, IR]:
         return {x["name"]: IR(self.path, x) for x in self[f"{ty}_declarations"]}
 
     def name(self) -> str:
-        return self["name"]
+        return normalize_identifier(self["name"])
+
+    def identifier(self) -> str:
+        return normalize_identifier(self["identifier"])
+
+    def raw_identifier(self) -> str:
+        return super().__getitem__("identifier")
 
     def methods(self) -> List[Method]:
         return [Method(self, x) for x in self["methods"]]
@@ -273,7 +326,7 @@ def type_annotation(type_ir, root_ir, recurse_guard=None) -> type:
 
     kind = type_ir["kind"]
     if kind == "identifier":
-        ident = type_ir["identifier"]
+        ident = type_ir.identifier()
         ident_kind = get_kind_by_identifier(ident, root_ir)
         ty = get_type_by_identifier(ident, root_ir, recurse_guard)
         if ident_kind == "bits":
@@ -547,7 +600,7 @@ def const_declaration(ir, root_ir, recurse_guard=None) -> FIDLConstant:
         converter = primitive_converter(ir["type"]["subtype"])
         return FIDLConstant(name, converter(ir["value"]["value"]))
     elif kind == "identifier":
-        ident = ir["type"]["identifier"]
+        ident = ir["type"].identifier()
         ty = get_type_by_identifier(ident, root_ir, recurse_guard)
         if type(ty) == str:
             return FIDLConstant(name, ty(ir["value"]["value"]))
@@ -635,13 +688,17 @@ def protocol_server_type(ir: IR, root_ir) -> type:
         ident = ""
         if "maybe_request_payload" in method:
             ident = method.request_payload_identifier()
+        success_type = None
+        err_type = None
         properties["method_map"][method.ordinal()] = MethodInfo(
             name=method_snake_case,
             request_ident=ident,
             requires_response=method.has_response() and
             "maybe_response_payload" in method,
             empty_response=method.has_response() and
-            "maybe_response_payload" not in method)
+            "maybe_response_payload" not in method,
+            has_result=method.has_result(),
+            response_identifier=method.response_payload_raw_identifier())
     return type(name, (ServerBase,), properties)
 
 
@@ -665,9 +722,9 @@ def get_fidl_method_response_payload_ident(ir: Method, root_ir) -> str:
     assert ir.has_response()
     response_ident = ""
     if ir.get("maybe_response_payload"):
-        response_kind = ir["maybe_response_payload"]["kind"]
+        response_kind = ir.maybe_response_payload()["kind"]
         if response_kind == "identifier":
-            ident = ir["maybe_response_payload"]["identifier"]
+            ident = ir.maybe_response_payload().identifier()
             # Just ensures the module for this is going to be imported.
             get_kind_by_identifier(ident, root_ir)
             response_ident = ident
@@ -707,6 +764,19 @@ def get_fidl_request_server_lambda(ir: Method, root_ir, msg) -> Callable:
                 f"Method {snake_case_name} not implemented")
 
         return lambda self: server_lamdba(self)
+
+
+def normalize_identifier(identifier: str) -> str:
+    """Takes an identifier and attempts to normalize it.
+
+    For the average identifier this shouldn't do anything. This only applies to result types
+    that have underscores in their names.
+
+    Returns: The normalized identifier string (sans-underscores).
+    """
+    if identifier.endswith("_Result") or identifier.endswith("_Response"):
+        return identifier.replace("_", "")
+    return identifier
 
 
 def protocol_method(

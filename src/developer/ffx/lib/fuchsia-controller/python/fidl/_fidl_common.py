@@ -6,6 +6,7 @@ import sys
 import re
 import inspect
 import typing
+from dataclasses import dataclass
 from typing import List, Tuple, Dict
 
 # These can be updated to use TypeAlias when python is updated to 3.10+
@@ -16,6 +17,17 @@ FidlMessage = Tuple[bytearray, List[int]]
 FIDL_HEADER_SIZE = 8
 # The number of bytes in a FIDL ordinal.
 FIDL_ORDINAL_SIZE = 8
+
+
+@dataclass
+class GenericResult:
+    fidl_type: str
+    response: typing.Optional[object] = None
+    err: typing.Optional[object] = None
+
+    @property
+    def __fidl_type__(self):
+        return self.fidl_type
 
 
 def parse_txid(msg: FidlMessage):

@@ -5,6 +5,7 @@ import unittest
 import asyncio
 import fidl.fuchsia_developer_ffx as ffx
 import fidl.fuchsia_io as f_io
+import fidl.zx as zx
 import fidl.fuchsia_controller_test as fc_test
 import os
 import sys
@@ -59,9 +60,13 @@ class TargetCollectionImpl(ffx.TargetCollection.Server):
 class StubFileServer(f_io.File.Server):
 
     def read(self, request: f_io.ReadableReadRequest):
-        res = f_io.Readable_Read_Result()
-        res.response = f_io.Readable_Read_Response(data=[1, 2, 3, 4])
-        return res
+        return f_io.ReadableReadResponse(data=[1, 2, 3, 4])
+
+
+class FailingFileServer(f_io.File.Server):
+
+    def read(self, _: f_io.ReadableReadRequest):
+        return self.Error(ZxStatus.ZX_ERR_PEER_CLOSED)
 
 
 class TestingServer(fc_test.Testing.Server):
@@ -148,6 +153,16 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
             file_server.serve())
         res = await file_proxy.read(count=4)
         self.assertEqual(res.response.data, [1, 2, 3, 4])
+
+    async def test_failing_file_server(self):
+        client, server = Channel.create()
+        file_proxy = f_io.File.Client(client)
+        file_server = FailingFileServer(server)
+        server_task = asyncio.get_running_loop().create_task(
+            file_server.serve())
+        res = await file_proxy.read(count=4)
+        self.assertEqual(res.response, None)
+        self.assertEqual(res.err, ZxStatus.ZX_ERR_PEER_CLOSED)
 
     async def test_testing_server(self):
         client, server = Channel.create()

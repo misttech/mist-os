@@ -65,9 +65,9 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
     return f"{test_func_name}_with_{test_label}"
 
 
-def _file_read_result(data: f_io.Transfer) -> f_io.Readable_Read_Result:
-    ret = f_io.Readable_Read_Result()
-    ret.response = f_io.Readable_Read_Response(data=data)
+def _file_read_result(data: f_io.Transfer) -> f_io.ReadableReadResult:
+    ret = f_io.ReadableReadResult()
+    ret.response = f_io.ReadableReadResponse(data=data)
     return ret
 
 

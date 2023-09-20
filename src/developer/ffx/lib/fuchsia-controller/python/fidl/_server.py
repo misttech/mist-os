@@ -17,6 +17,8 @@ class MethodInfo:
     request_ident: str
     requires_response: bool
     empty_response: bool
+    has_result: bool
+    response_identifier: str
 
 
 Ordinal = int
@@ -31,6 +33,12 @@ class ServerBase(object):
     class StopService(Exception):
         """StopService is used to stop the serving loop, close the channel, and shutdown cleanly."""
         pass
+
+    class Error:
+        """Simple wrapper class around an error."""
+
+        def __init__(self, error):
+            self.error = error
 
     def __init__(self, channel: fc.Channel, channel_waker=None):
         self.channel = channel
@@ -94,6 +102,13 @@ class ServerBase(object):
             raise RuntimeError(
                 f"Method {info.name} returned None when a response was expected"
             )
+        if info.has_result:
+            if type(res) is type(self).Error:
+                res = GenericResult(
+                    fidl_type=info.response_identifier, err=res.error)
+            else:
+                res = GenericResult(
+                    fidl_type=info.response_identifier, response=res)
         if res is not None:
             fidl_msg = encode_fidl_message(
                 ordinal=ordinal,

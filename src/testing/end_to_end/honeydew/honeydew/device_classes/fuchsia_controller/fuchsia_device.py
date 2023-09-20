@@ -323,8 +323,11 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         ret: bytearray = bytearray()
         try:
             while True:
-                result: f_io.Readable_Read_Result = asyncio.run(
+                result: f_io.ReadableReadResult = asyncio.run(
                     file_proxy.read(count=f_io.MAX_BUF))
+                if result.err:
+                    raise errors.FuchsiaControllerError(
+                        "read() failed. Received zx.Status {result.err}")
                 if not result.response.data:
                     break
                 ret.extend(result.response.data)
