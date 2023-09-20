@@ -58,6 +58,8 @@ if (is_host) {
 
     test_deps = [
       "//third_party/rust_crates:maplit",
+      "//third_party/rust_crates:pretty_assertions",
+      "//third_party/rust_crates:rand",
       "//third_party/rust_crates:regex",
     ]
 
@@ -65,6 +67,7 @@ if (is_host) {
       "src/boot/mod.rs",
       "src/common/cmd.rs",
       "src/common/crypto.rs",
+      "src/common/fastboot.rs",
       "src/common/fastboot_interface.rs",
       "src/common/fidl_fastboot_compatibility.rs",
       "src/common/mod.rs",

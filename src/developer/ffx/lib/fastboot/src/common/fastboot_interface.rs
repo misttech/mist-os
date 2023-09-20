@@ -42,7 +42,7 @@ pub trait Fastboot {
     async fn oem(&mut self, command: &str) -> Result<()>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum RebootEvent {
     OnReboot,
 }
@@ -55,7 +55,7 @@ pub enum UploadProgress {
     OnError { error: Error },
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Variable {
     pub name: String,
     pub value: String,

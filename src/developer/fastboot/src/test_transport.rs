@@ -7,6 +7,7 @@ use futures::task::{Context, Poll};
 use futures::{AsyncRead, AsyncWrite};
 use std::pin::Pin;
 
+#[derive(Debug)]
 pub struct TestTransport {
     replies: Vec<Reply>,
 }
