@@ -246,37 +246,35 @@ to your `~/.bashrc` or equivalent. This change results in the following:
 
 Note that the behavior of `fx build` remains unchanged.
 
-### Iterating on Cache packages {#iterate-cache-packages}
+### Iterating on cache packages {#iterate-cache-packages}
 
-Any time a cache package needs to be rebuilt `fx build` triggers through a full
-system assembly in addition to compiling + publishing cache packages. In most
-developer workflows iterating over cache packages this is excessive and causes
-slowdowns.
+Running `fx build` triggers a full system assembly in addition to compiling and
+publishing [cache packages](#package_deployment_options). If your workflow requires
+only iterating over rebuilding cache packages, running `fx build` can be excessive
+and cause slowdowns.
 
-If you are only iterating on cache packages, you can achieve up to 2-3X faster
-build speeds by simply replacing `fx build` with `fx publish cache`. Here's what
-this might look like in a typical development cycle workflow:
+For rebuilding cache packages, you can achieve faster build speed by replacing
+`fx build` with `fx publish cache`. Below is what it might look like in a typical
+development workflow:
 
-```bash
-# Workspace Setup Phase:
-# 1. <flash a device or start an emulator>
-# 2. In a separate window, start the package server.
-> fx serve
+```none {:.devsite-disable-click-to-copy}
+# Set up your workspace here.
+$ fx serve
 
-# Workflow Iteration Phase:
-# 1. <Make changes to cache package>
-# 2. Rebuild and publish cache packages.
-> fx publish cache
-# 3. <Restart your component>
-> ffx component stop /core/your_component
-> ffx session restart
+# Make changes to cache packages here.
+
+# Rebuild and publish cache packages:
+$ fx publish cache
+
+# Restart your component, for example:
+$ ffx component stop /core/your_component
+$ ffx session restart
 ```
 
-You can run `fx list-packages --cache` to view a list of all cache packages.
+A known issue: Rebooting the Fuchsia emulator does not cause components to run
+from the updated packages. The components needs to be restarted manually.
 
-Known limitation: (Re)booting the emulator won't result in the updated component
-running until it is restarted. [(Bug)](https://issuetracker.google.com/300995299)
-
+To view a list of all cache packages, you can run `fx list-packages --cache`.
 
 ### Building a specific target {#building-a-specific-target}
 
@@ -318,6 +316,19 @@ Once the build is finished, this command creates the build archive file
 (`build-archive.zip` in the example above) in your Fuchsia build directory, which is
 `out/default` by default. (To view the exact location of your build directory,
 run `fx get-build-dir`.)
+
+### Creating a product bundle ZIP file {#creating-a-product-bundle-zip-file}
+
+If you've already built a Fuchsia product (by running `fx build`), you can
+run the following command to [create a ZIP file][fx-create-pb-zip] that
+contains the product bundle:
+
+```posix-terminal
+fx create-pb-zip
+```
+
+This command creates a `pb.zip` file containing the product bundle in the
+`$(fx get-build-dir)` directory.
 
 ## Flash a board and prepare Zedboot {#flash-a-board-and-prepare-zedboot}
 
@@ -673,3 +684,4 @@ To suppress the inclusion of `local/args.gn`, run `fx set ... --skip-local-args`
 [fxb94507]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=94507
 [fuchsia-gi-repo]: https://fuchsia.googlesource.com/integration/
 [fx-sync-to-ref]: https://fuchsia.dev/reference/tools/fx/cmd/sync-to
+[fx-create-pb-zip]: https://fuchsia.dev/reference/tools/fx/cmd/create-pb-zip
