@@ -1715,7 +1715,10 @@ async fn test_readded_address_present<N: Netstack>(name: &str) {
         .expect("delete address and subnet route"));
 
     interface.add_address_and_subnet_route(SRC_IP).await.expect("re-add address and subnet route");
-    let addresses = interface.get_addrs().await.expect("get addresses");
+    let addresses = interface
+        .get_addrs(fnet_interfaces_ext::IncludedAddresses::OnlyAssigned)
+        .await
+        .expect("get addresses");
     assert!(
         addresses.iter().any(
             |&fidl_fuchsia_net_interfaces_ext::Address {

@@ -9,6 +9,7 @@ use std::{collections::HashSet, mem::size_of};
 use assert_matches::assert_matches;
 use fidl_fuchsia_net as net;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
+use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_routes as fnet_routes;
 use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
@@ -493,7 +494,8 @@ async fn duplicate_address_detection<N: Netstack>(name: &str) {
                 .expect("Control.AddAddress FIDL error");
             // `Box::pin` rather than `pin_mut!` allows `get_addr_fut` to be
             // moved out of this scope.
-            let mut get_addrs_fut = Box::pin(iface.get_addrs());
+            let mut get_addrs_fut =
+                Box::pin(iface.get_addrs(fnet_interfaces_ext::IncludedAddresses::OnlyAssigned));
             let get_addrs_poll = futures::poll!(&mut get_addrs_fut);
             if interface_up {
                 expect_dad_neighbor_solicitation(fake_ep).await;
@@ -622,7 +624,8 @@ async fn duplicate_address_detection<N: Netstack>(name: &str) {
 
     assert_dad_success(&mut state_stream).await;
 
-    let addresses = iface.get_addrs().await.expect("addrs");
+    let addresses =
+        iface.get_addrs(fnet_interfaces_ext::IncludedAddresses::OnlyAssigned).await.expect("addrs");
     assert!(
         addresses.iter().any(
             |&fidl_fuchsia_net_interfaces_ext::Address {
