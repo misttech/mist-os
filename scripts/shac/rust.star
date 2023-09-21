@@ -34,9 +34,17 @@ def _rustfmt(ctx):
     unformatted = res.stdout.splitlines()
     if res.retcode and not unformatted:
         fail("rustfmt failed:\n%s" % res.stderr)
+
+    procs = []
     for f in unformatted:
         filepath = f[len(ctx.scm.root) + 1:]
-        output = ctx.os.exec(base_cmd + ["--emit", "stdout", filepath]).wait().stdout
+        procs.append((
+            filepath,
+            ctx.os.exec(base_cmd + ["--emit", "stdout", filepath]),
+        ))
+
+    for filepath, proc in procs:
+        output = proc.wait().stdout
 
         # First two lines are file name and a blank line.
         formatted = "\n".join(output.split("\n")[2:])

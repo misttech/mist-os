@@ -20,8 +20,12 @@ def _fidl_format(ctx):
       ctx: A ctx instance.
     """
     exe = compiled_tool_path(ctx, "fidl-format")
+
+    procs = []
     for f in _filter_fidl_files(ctx.scm.affected_files()):
-        formatted = ctx.os.exec([exe, f]).wait().stdout
+        procs.append((f, ctx.os.exec([exe, f])))
+    for f, proc in procs:
+        formatted = proc.wait().stdout
         original = str(ctx.io.read_file(f))
         if formatted != original:
             ctx.emit.finding(

@@ -17,14 +17,18 @@ def _json5_format(ctx):
       ctx: A ctx instance.
     """
     exe = compiled_tool_path(ctx, "formatjson5")
-    cml_files = [
+    json5_files = [
         f
         for f in ctx.scm.affected_files()
         if f.endswith((_JSON5_EXTS))
     ]
 
-    for f in cml_files:
-        formatted = ctx.os.exec([exe, f]).wait().stdout
+    procs = []
+    for f in json5_files:
+        procs.append((f, ctx.os.exec([exe, f])))
+
+    for f, proc in procs:
+        formatted = proc.wait().stdout
         original = str(ctx.io.read_file(f))
         if formatted != original:
             ctx.emit.finding(

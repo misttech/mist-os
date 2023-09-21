@@ -17,8 +17,12 @@ def _cml_format(ctx):
         if f.endswith(".cml")
     ]
 
+    procs = []
     for f in cml_files:
-        formatted = ctx.os.exec([exe, "format", f]).wait().stdout
+        procs.append((f, ctx.os.exec([exe, "format", f])))
+
+    for f, proc in procs:
+        formatted = proc.wait().stdout
         original = str(ctx.io.read_file(f))
         if formatted != original:
             ctx.emit.finding(
