@@ -20,6 +20,7 @@ BT_FILE_DEPS=(
   "tools/devshell/tests/subcommands/${TESTDATA}/gidl.gidl"
   "tools/devshell/tests/subcommands/${TESTDATA}/gn.gn"
   "tools/devshell/tests/subcommands/${TESTDATA}/gn.gni"
+  "tools/devshell/tests/subcommands/${TESTDATA}/json5.json5"
   "tools/devshell/tests/subcommands/${TESTDATA}/python3.py"
   "tools/devshell/tests/subcommands/${TESTDATA}/no-extension"
   "tools/devshell/tests/subcommands/${TESTDATA}/unknown-extension.blah"
@@ -116,6 +117,7 @@ TEST_fx-format-code-builds-required-commands() {
     "${TESTDATA}/gidl.gidl"
     "${TESTDATA}/fidl.test.fidl"
     "${TESTDATA}/cml.cml"
+    "${TESTDATA}/json5.json5"
   )
   local csfiles
   printf -v csfiles ",%s" "${files[@]}"
@@ -128,6 +130,7 @@ TEST_fx-format-code-builds-required-commands() {
   BT_EXPECT grep -q -E '"clang-format.*cplusplus.cc"' "${out}"
   BT_EXPECT grep -q -E '"fidl-format not built; building now..."' "${err}"
   BT_EXPECT grep -q -E '"gidl-format not built; building now..."' "${err}"
+  BT_EXPECT grep -q -E '"formatjson5 not built; building now..."' "${err}"
   BT_EXPECT grep -q -E '"cmc not built; building now..."' "${err}"
 }
 

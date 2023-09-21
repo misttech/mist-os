@@ -295,27 +295,47 @@ readonly PY_CMD="${VPYTHON_TOOL} ${FUCHSIA_DIR}/scripts/yapf --in-place"
 
 readonly FIX_HEADER_GUARDS_CMD="${PY_TOOL} ${FUCHSIA_DIR}/scripts/style/check-header-guards.py --fix"
 
+# Mapping from tool name to a list of extensions for files to which the tool
+# applies. Used to determine which tools to compile just-in-time based on the
+# files that are being formatted.
+#
+# Not all supported Bash versions support associative arrays (a.k.a. hash
+# tables), so instead use an array of specially-formatted strings, with keys and
+# values separated by an equals sign and repeated values separated by spaces.
+compiled_formatter_extensions=(
+  "cmc=.cml"
+  "doc-checker=.md"
+  "fidl-format=.fidl"
+  "formatjson5=.json5 .persist .triage"
+  "gidl-format=.gidl"
+)
+
 # If a required formatter does not exist, but can be built, build it.
-for file in "${FILES[@]}"; do
-  if [[ ${file} =~ .*\.fidl ]]; then
-    fidl_format_tool="$( fx-command-run list-build-artifacts --expect-one --name fidl-format tools )"
-    if [[ ! -x "${FUCHSIA_BUILD_DIR}/${fidl_format_tool}" ]]; then
-      fx-info "fidl-format not built; building now..."
-      fx-command-run build "${fidl_format_tool}"
-    fi
-  elif [[ ${file} =~ .*\.gidl ]]; then
-    if [[ ! -x "${GIDL_FORMAT_TOOL_ABS}" ]]; then
-      fx-info "gidl-format not built; building now..."
-      fx-command-run build "${GIDL_FORMAT_TOOL}"
-    fi
-  elif [[ ${file} =~ .*\.cml ]]; then
-    cmc_tool="$( fx-command-run list-build-artifacts --expect-one --name cmc tools )"
-    if [[ ! -x ""${FUCHSIA_BUILD_DIR}/${cmc_tool}"" ]]; then
-      fx-info "cmc not built; building now..."
-      fx-command-run build "${cmc_tool}"
+tool_targets=()
+for entry in "${compiled_formatter_extensions[@]}"; do
+  tool="${entry%%=*}"
+  extensions="${entry##*=}"
+  needed=false
+  for file in "${FILES[@]}"; do
+    for ext in ${extensions}; do
+      if [[ ${file} = *${ext} ]]; then
+        needed=true
+      fi
+    done
+  done
+
+  if $needed; then
+    tool_path="$( fx-command-run list-build-artifacts --expect-one --name "${tool}" tools )"
+    if [[ ! -x "${FUCHSIA_BUILD_DIR}/${tool_path}" ]]; then
+      fx-info "${tool} not built; building now..."
+      tool_targets+=("$tool_path")
     fi
   fi
 done
+
+if [[ ${#tool_targets[@]} -gt 0 ]]; then
+  fx-command-run build "${tool_targets[@]}"
+fi
 
 [[ -n "${DRY_RUN}" ]] && exit
 
