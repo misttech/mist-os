@@ -54,13 +54,9 @@ type Spec = resource table {
 
     @available(removed=12)
     3: additional_services fuchsia.sys.ServiceList;
-    @available(added=12)
-    3: reserved;
 
     @available(removed=12)
     4: arguments vector<string:MAX>:MAX;
-    @available(added=12)
-    4: reserved;
 };
 
 /// Errors that can be returned when attempting to add elements to a session.
