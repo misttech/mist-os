@@ -62,6 +62,7 @@ template("_hw_sim_integration_test") {
     test_components = [ ":test-root" ]
     subpackages = [
       "../testing/realm-factory",
+      "//src/lib/fuchsia-component-test/realm_builder_server:pkg",
       ":$test_suite_package_name",
     ]
   }
