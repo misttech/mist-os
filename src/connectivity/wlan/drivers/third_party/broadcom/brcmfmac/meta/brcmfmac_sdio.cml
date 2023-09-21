@@ -19,6 +19,7 @@
         { service: "fuchsia.wlan.fullmac.Service" },
     ],
     use: [
+        { protocol: "fuchsia.scheduler.ProfileProvider" },
         { service: "fuchsia.hardware.pci.Service" },
     ],
     expose: [

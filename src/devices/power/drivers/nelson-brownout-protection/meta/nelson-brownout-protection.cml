@@ -16,6 +16,7 @@
         fallback: "false",
     },
     use: [
+        { protocol: "fuchsia.scheduler.ProfileProvider" },
         { service: "fuchsia.hardware.power.sensor.Service" },
         { service: "fuchsia.hardware.audio.CodecService" },
         { service: "fuchsia.hardware.gpio.Service" },
