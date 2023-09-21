@@ -35,19 +35,21 @@ import sys
 import collections
 import re
 import os
+from typing import Any, Dict, List
 
 
 class InvalidInputError(Exception):
     pass
 
 
-def convert_budget_format(
+def convert_budget_format_from_srcs(
         platform_aib_paths, board_output_dir, component, all_manifests):
     """Converts a component budget to the new budget format.
 
   Args:
     platform_aib_paths: list of platform AIB paths.
-    component: dictionary, former size checker configuration entry.
+    component: dictionary, size checker configuration entry that specifies
+    source path prefixes for components.
     all_manifests: [string], list of path to packages manifests.
   Returns:
     dictionary, new configuration with a name, a maximum size and the list of
@@ -92,6 +94,34 @@ def convert_budget_format(
     return result
 
 
+def convert_budget_format_by_pkg_names(
+        component: Dict[str, Any], all_manifests: Dict[str, str]):
+    """Converts a component budget to the new budget format.
+
+  Args:
+    component: dictionary, size checker configuration entry that specifies
+    packages by name.
+    all_manifests: Dict[string, Path)], list of tuples of package name and manifest
+    path.
+  Returns:
+    dictionary, new configuration with a name, a maximum size and the list of
+    packages manifest to fit in the budget.
+  """
+    packages = sorted(
+        [
+            all_manifests[pkg_name]
+            for pkg_name in set(component["pkgs"])
+            if pkg_name in all_manifests
+        ])
+    result = dict(
+        name=component["component"],
+        budget_bytes=component["limit"],
+        creep_budget_bytes=component["creep_limit"],
+        merge=False,
+        packages=packages)
+    return result
+
+
 def count_packages(budgets, all_manifests):
     """Returns packages that are missing, or present in multiple budgets."""
     package_count = collections.Counter(
@@ -107,13 +137,40 @@ def make_package_set_budgets(
         platform_aib_paths, board_output_dir, size_limits, product_config):
     # Convert each budget to the new format and packages from base and cache.
     # Package from system belongs the system budget.
-    all_manifests = product_config.get("base", []) + product_config.get(
-        "cache", [])
+    all_manifests: List[str] = product_config.get(
+        "base", []) + product_config.get("cache", [])
+
+    # All package manifest paths are either in the format of:
+    #   some/path/to/<package_name>
+    # or
+    #   some/path/to/<package_name>/package_manifest.json
+    #
+    # So a map of <package_name> to path can be readily computed.
+    manifests_by_name: Dict[str, str] = {}
+    for manifest_path in all_manifests:
+        segments = manifest_path.split("/")
+        if segments[-1] == "package_manifest.json" or segments[
+                -1] == "rebased_package_manifest.json":
+            # packages that have gone through the archive and expansion, such as
+            # for use with bazel assembly may have an '_expanded' suffix that
+            # should be removed.
+            name = segments[-2].removesuffix("_expanded")
+        else:
+            name = segments[-1]
+        manifests_by_name[name] = manifest_path
+
     components = size_limits.get("components", [])
-    packages_budgets = list(
-        convert_budget_format(
-            platform_aib_paths, board_output_dir, pkg, all_manifests)
-        for pkg in components)
+    packages_budgets = []
+    for component in components:
+        if 'pkgs' in component:
+            packages_budgets.append(
+                convert_budget_format_by_pkg_names(
+                    component, manifests_by_name))
+        else:
+            packages_budgets.append(
+                convert_budget_format_from_srcs(
+                    platform_aib_paths, board_output_dir, component,
+                    all_manifests))
 
     # Verify packages are in exactly one budget.
     more_than_once, zero = count_packages(packages_budgets, all_manifests)
