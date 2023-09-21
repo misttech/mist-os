@@ -213,6 +213,7 @@ impl DaemonProtocolProvider for Daemon {
             .await
             .map_err(|e| anyhow!("{:#?}", e))
             .context("getting default target")?;
+        target.run_host_pipe();
         let events = target.events.clone();
         Ok((target, events))
     }
@@ -407,7 +408,6 @@ impl Daemon {
     }
 
     /// Awaits a target that has RCS active.
-    #[tracing::instrument(skip(self))]
     async fn get_rcs_ready_target(&self, target_query: Option<String>) -> Result<Rc<Target>> {
         let target = self
             .get_target(target_query)
@@ -422,16 +422,13 @@ impl Daemon {
             let nodename = target.nodename().unwrap_or("<No Nodename>".to_string());
             bail!("Attempting to connect to RCS on a zedboot target: {}", nodename);
         }
-        match target.wait_for_rcs().await.context("waiting for RCS")? {
-            Ok(_) => {} // Connection is established and ready
-            Err(e) => {
-                bail!(
-                    "Couldn't establish connection to {}@{}: {e:?}",
-                    target.nodename_str(),
-                    target.id()
-                );
-            }
-        }
+        // Ensure auto-connect has at least started.
+        target.run_host_pipe();
+        target
+            .events
+            .wait_for(None, |e| e == TargetEvent::RcsActivated)
+            .await
+            .context("waiting for RCS activation")?;
         tracing::debug!("RCS activated for {}@{}", target.nodename_str(), target.id());
         Ok(target)
     }
@@ -565,6 +562,12 @@ impl Daemon {
                 match target_collection.upgrade() {
                     Some(target_collection) => {
                         for target in target_collection.targets() {
+                            // Manually-added remote targets will not be discovered by mDNS,
+                            // and as a result will not have host-pipe triggered automatically
+                            // by the mDNS event handler.
+                            if target.is_manual() {
+                                target.run_host_pipe();
+                            }
                             target.expire_state();
                             if target.is_manual() && !target.is_connected() {
                                 // If a manual target has been allowed to transition to the

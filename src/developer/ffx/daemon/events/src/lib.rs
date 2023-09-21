@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use addr::TargetAddr;
-use fidl_fuchsia_developer_ffx as ffx;
 use rcs::RcsConnection;
 use std::{net::SocketAddr, time::Instant};
 
@@ -116,29 +115,6 @@ impl From<String> for HostPipeErr {
 impl From<&str> for HostPipeErr {
     fn from(s: &str) -> Self {
         Self::from(s.to_owned())
-    }
-}
-
-impl From<HostPipeErr> for ffx::TargetConnectionError {
-    #[tracing::instrument]
-    fn from(e: HostPipeErr) -> Self {
-        match e {
-            HostPipeErr::Unknown(s) => {
-                tracing::warn!("Unknown host-pipe error received: '{}'", s);
-                ffx::TargetConnectionError::UnknownError
-            }
-            HostPipeErr::NetworkUnreachable => ffx::TargetConnectionError::NetworkUnreachable,
-            HostPipeErr::PermissionDenied => ffx::TargetConnectionError::PermissionDenied,
-            HostPipeErr::ConnectionRefused => ffx::TargetConnectionError::ConnectionRefused,
-            HostPipeErr::UnknownNameOrService => ffx::TargetConnectionError::UnknownNameOrService,
-            HostPipeErr::Timeout => ffx::TargetConnectionError::Timeout,
-            HostPipeErr::KeyVerificationFailure => {
-                ffx::TargetConnectionError::KeyVerificationFailure
-            }
-            HostPipeErr::NoRouteToHost => ffx::TargetConnectionError::NoRouteToHost,
-            HostPipeErr::InvalidArgument => ffx::TargetConnectionError::InvalidArgument,
-            HostPipeErr::TargetIncompatible => ffx::TargetConnectionError::TargetIncompatible,
-        }
     }
 }
 
@@ -264,49 +240,5 @@ mod tests {
 
         let unknown_str = "OIHWOFIHOIWHFW";
         assert_eq!(HostPipeErr::from(unknown_str), HostPipeErr::Unknown(String::from(unknown_str)));
-    }
-
-    #[test]
-    fn test_host_pipe_err_to_fidl_conversion() {
-        assert_eq!(
-            ffx::TargetConnectionError::from(HostPipeErr::Unknown(String::from("foobar"))),
-            ffx::TargetConnectionError::UnknownError
-        );
-        assert_eq!(
-            ffx::TargetConnectionError::from(HostPipeErr::InvalidArgument),
-            ffx::TargetConnectionError::InvalidArgument
-        );
-        assert_eq!(
-            ffx::TargetConnectionError::from(HostPipeErr::NoRouteToHost),
-            ffx::TargetConnectionError::NoRouteToHost
-        );
-        assert_eq!(
-            ffx::TargetConnectionError::from(HostPipeErr::KeyVerificationFailure),
-            ffx::TargetConnectionError::KeyVerificationFailure
-        );
-        assert_eq!(
-            ffx::TargetConnectionError::from(HostPipeErr::Timeout),
-            ffx::TargetConnectionError::Timeout
-        );
-        assert_eq!(
-            ffx::TargetConnectionError::from(HostPipeErr::UnknownNameOrService),
-            ffx::TargetConnectionError::UnknownNameOrService
-        );
-        assert_eq!(
-            ffx::TargetConnectionError::from(HostPipeErr::ConnectionRefused),
-            ffx::TargetConnectionError::ConnectionRefused
-        );
-        assert_eq!(
-            ffx::TargetConnectionError::from(HostPipeErr::PermissionDenied),
-            ffx::TargetConnectionError::PermissionDenied
-        );
-        assert_eq!(
-            ffx::TargetConnectionError::from(HostPipeErr::NetworkUnreachable),
-            ffx::TargetConnectionError::NetworkUnreachable
-        );
-        assert_eq!(
-            ffx::TargetConnectionError::from(HostPipeErr::TargetIncompatible),
-            ffx::TargetConnectionError::TargetIncompatible
-        );
     }
 }
