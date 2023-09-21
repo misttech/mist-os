@@ -11,6 +11,7 @@ use futures::{
     prelude::*,
     task::{Context, Poll},
 };
+use std::fmt;
 use std::time::Duration;
 use std::{convert::TryInto, io::ErrorKind, net::SocketAddr, pin::Pin};
 use timeout::timeout;
@@ -24,6 +25,15 @@ pub struct TcpNetworkInterface {
     /// Returns a tuple of (avail_bytes, bytes_read, bytes)
     read_task: Option<Pin<Box<dyn Future<Output = std::io::Result<(u64, usize, Vec<u8>)>>>>>,
     write_task: Option<Pin<Box<dyn Future<Output = std::io::Result<usize>>>>>,
+}
+
+impl fmt::Debug for TcpNetworkInterface {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TcpNetworkInterface")
+            .field("stream", &self.stream)
+            .field("read_avail_bytes", &self.read_avail_bytes)
+            .finish()
+    }
 }
 
 impl AsyncRead for TcpNetworkInterface {

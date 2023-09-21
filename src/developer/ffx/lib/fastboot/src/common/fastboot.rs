@@ -7,6 +7,7 @@ use crate::common::fastboot_interface::FastbootInterface;
 use crate::common::fastboot_interface::Variable;
 use crate::common::RebootEvent;
 use crate::common::UploadProgress;
+use crate::transport::tcp::{open_once, TcpNetworkInterface};
 use crate::usb_discovery::open_interface_with_serial;
 use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
@@ -21,6 +22,7 @@ use ffx_config::get;
 use futures::io::{AsyncRead, AsyncWrite};
 use std::fmt::Debug;
 use std::fs::read;
+use std::net::SocketAddr;
 use tokio::sync::mpsc::Sender;
 use usb_bulk::AsyncInterface;
 
@@ -38,7 +40,23 @@ impl FastbootProxy<AsyncInterface> {
         let interface = open_interface_with_serial(&serial_number).await.with_context(|| {
             format!("Failed to open target usb interface by serial {serial_number}")
         })?;
-        Ok(FastbootProxy::<AsyncInterface> { target_id: serial_number,  interface })
+        Ok(FastbootProxy::<AsyncInterface> { target_id: serial_number, interface })
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// TcpInterface
+//
+
+/// Creates a FastbootProxy over TCP for a device at the given SocketAddr
+pub async fn tcp_proxy(addr: &SocketAddr) -> Result<FastbootProxy<TcpNetworkInterface>> {
+    FastbootProxy::<TcpNetworkInterface>::build(addr).await
+}
+
+impl FastbootProxy<TcpNetworkInterface> {
+    async fn build(addr: &SocketAddr) -> Result<FastbootProxy<TcpNetworkInterface>> {
+        let interface = open_once(addr, Duration::seconds(1).to_std()?).await?;
+        Ok(FastbootProxy::<TcpNetworkInterface> { target_id: addr.to_string(), interface })
     }
 }
 
