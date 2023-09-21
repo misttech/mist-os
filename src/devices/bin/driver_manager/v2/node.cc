@@ -1024,6 +1024,19 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
   auto url = start_info.resolved_url().get();
   bool colocate =
       fdf_internal::ProgramValue(start_info.program(), "colocate").value_or("") == "true";
+  bool host_restart_on_crash =
+      fdf_internal::ProgramValue(start_info.program(), "host_restart_on_crash").value_or("") ==
+      "true";
+
+  if (host_restart_on_crash && colocate) {
+    LOGF(ERROR,
+         "Failed to start driver '%.*s'. Both host_restart_on_crash and colocate cannot be true.",
+         static_cast<int>(url.size()), url.data());
+    cb(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+
+  host_restart_on_crash_ = host_restart_on_crash;
 
   if (colocate && !driver_host_) {
     LOGF(ERROR,
@@ -1055,15 +1068,31 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
     cb(zx::error(endpoints.error_value()));
     return;
   }
-  node_ref_.emplace(dispatcher_, std::move(endpoints->server), this,
-                    [](Node* node, fidl::UnbindInfo info) {
-                      node->node_ref_.reset();
-                      if (!info.is_user_initiated()) {
-                        LOGF(WARNING, "Removing node %s because of fdf::Node binding closed: %s",
-                             node->name().c_str(), info.FormatDescription().c_str());
-                        node->Remove(RemovalSet::kAll, nullptr);
-                      }
-                    });
+  node_ref_.emplace(
+      dispatcher_, std::move(endpoints->server), this, [](Node* node, fidl::UnbindInfo info) {
+        node->node_ref_.reset();
+        // If the unbind is initiated from us, we don't need to do anything to handle
+        // the closure.
+        if (info.is_user_initiated()) {
+          return;
+        }
+
+        if (node->node_state_ == NodeState::kRunning) {
+          // If the node is running but this node closure has happened, then we want to restart
+          // the node if it has the host_restart_on_crash_ enabled on it.
+          if (node->host_restart_on_crash_) {
+            LOGF(INFO, "Restarting node %s due to node closure while running.",
+                 node->name().c_str());
+            node->RestartNode();
+            return;
+          }
+
+          LOGF(WARNING, "fdf::Node binding for node %s closed while the node was running: %s",
+               node->name().c_str(), info.FormatDescription().c_str());
+        }
+
+        node->Remove(RemovalSet::kAll, nullptr);
+      });
 
   LOGF(INFO, "Binding %.*s to  %s", static_cast<int>(url.size()), url.data(), name().c_str());
   // Start the driver within the driver host.
@@ -1168,9 +1197,15 @@ void Node::on_fidl_error(fidl::UnbindInfo info) {
     LOGF(DEBUG, "Node: %s: driver channel had expected shutdown.", name().c_str());
     FinishRemoval();
   } else {
-    LOGF(WARNING, "Removing node %s because of unexpected driver channel shutdown.",
-         name().c_str());
-    Remove(RemovalSet::kAll, nullptr);
+    if (host_restart_on_crash_) {
+      LOGF(WARNING, "Restarting node %s because of unexpected driver channel shutdown.",
+           name().c_str());
+      RestartNode();
+    } else {
+      LOGF(WARNING, "Removing node %s because of unexpected driver channel shutdown.",
+           name().c_str());
+      Remove(RemovalSet::kAll, nullptr);
+    }
   }
 }
 

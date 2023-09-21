@@ -49,15 +49,20 @@ class FakeDriverHost : public dfv2::DriverHost {
              fuchsia_component_runner::wire::ComponentStartInfo start_info,
              fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) override {
     drivers_[node_name] = std::move(driver);
+    clients_[node_name] = std::move(client_end);
     cb(zx::ok());
   }
 
   zx::result<uint64_t> GetProcessKoid() const override { return zx::error(ZX_ERR_NOT_SUPPORTED); }
 
-  void CloseDriver(std::string node_name) { drivers_[node_name].Close(ZX_OK); }
+  void CloseDriver(std::string node_name) {
+    drivers_[node_name].Close(ZX_OK);
+    clients_[node_name].reset();
+  }
 
  private:
   std::unordered_map<std::string, fidl::ServerEnd<fuchsia_driver_host::Driver>> drivers_;
+  std::unordered_map<std::string, fidl::ClientEnd<fuchsia_driver_framework::Node>> clients_;
 };
 
 class FakeNodeManager : public TestNodeManagerBase {
@@ -76,18 +81,29 @@ class FakeNodeManager : public TestNodeManagerBase {
         .collection = "",
     };
     realm_->DestroyChild(child_ref).Then(std::move(callback));
+    clients_.erase(node.name());
   }
 
   void CloseDriverForNode(std::string node_name) { driver_host_.CloseDriver(node_name); }
 
+  void AddClient(const std::string& node_name,
+                 fidl::ClientEnd<fuchsia_component_runner::ComponentController> client) {
+    clients_[node_name] = std::move(client);
+  }
+
  private:
   fidl::WireClient<fuchsia_component::Realm> realm_;
-
+  std::unordered_map<std::string, fidl::ClientEnd<fuchsia_component_runner::ComponentController>>
+      clients_;
   FakeDriverHost driver_host_;
 };
 
 class Dfv2NodeTest : public DriverManagerTestBase {
  public:
+  struct StartDriverOptions {
+    bool host_restart_on_crash;
+  };
+
   void SetUp() override {
     DriverManagerTestBase::SetUp();
     realm_ = std::make_unique<TestRealm>(dispatcher());
@@ -98,7 +114,8 @@ class Dfv2NodeTest : public DriverManagerTestBase {
         fidl::WireClient<fuchsia_component::Realm>(std::move(client.value()), dispatcher()));
   }
 
-  void StartTestDriver(std::shared_ptr<dfv2::Node> node) {
+  void StartTestDriver(std::shared_ptr<dfv2::Node> node,
+                       StartDriverOptions options = {.host_restart_on_crash = false}) {
     std::vector<fuchsia_data::DictionaryEntry> program_entries = {
         {{
             .key = "binary",
@@ -112,6 +129,14 @@ class Dfv2NodeTest : public DriverManagerTestBase {
         }},
     };
 
+    if (options.host_restart_on_crash) {
+      program_entries.emplace_back(fuchsia_data::DictionaryEntry({
+          .key = "host_restart_on_crash",
+          .value = std::make_unique<fuchsia_data::DictionaryValue>(
+              fuchsia_data::DictionaryValue::WithStr("true")),
+      }));
+    }
+
     auto outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     EXPECT_EQ(ZX_OK, outgoing_endpoints.status_value());
 
@@ -123,6 +148,8 @@ class Dfv2NodeTest : public DriverManagerTestBase {
 
     auto controller_endpoints =
         fidl::CreateEndpoints<fuchsia_component_runner::ComponentController>();
+
+    node_manager->AddClient(node->name(), std::move(controller_endpoints->client));
 
     fidl::Arena arena;
     node->StartDriver(fidl::ToWire(arena, std::move(start_info)),
@@ -270,4 +297,33 @@ TEST_F(Dfv2NodeTest, RemoveCompositeNodeForRebind_Dealloc) {
   composite.reset();
   RunLoopUntilIdle();
   ASSERT_TRUE(remove_callback_succeeded);
+}
+
+TEST_F(Dfv2NodeTest, RestartOnCrashComposite) {
+  auto parent_node_1 = CreateNode("parent_1");
+  StartTestDriver(parent_node_1);
+  ASSERT_TRUE(parent_node_1->has_driver_component());
+  ASSERT_EQ(dfv2::NodeState::kRunning, parent_node_1->node_state());
+
+  auto parent_node_2 = CreateNode("parent_2");
+  StartTestDriver(parent_node_2);
+  ASSERT_TRUE(parent_node_2->has_driver_component());
+  ASSERT_EQ(dfv2::NodeState::kRunning, parent_node_2->node_state());
+
+  auto composite =
+      CreateCompositeNode("composite", {parent_node_1, parent_node_2}, /* is_legacy*/ false);
+  StartTestDriver(composite, {.host_restart_on_crash = true});
+
+  ASSERT_TRUE(composite->has_driver_component());
+  ASSERT_EQ(dfv2::NodeState::kRunning, composite->node_state());
+
+  ASSERT_EQ(1u, parent_node_1->children().size());
+  ASSERT_EQ(1u, parent_node_2->children().size());
+
+  // Simulate a crash by closing the driver side of channels.
+  node_manager->CloseDriverForNode("composite");
+  RunLoopUntilIdle();
+
+  // The node should come back to running state.
+  ASSERT_EQ(dfv2::NodeState::kRunning, composite->node_state());
 }

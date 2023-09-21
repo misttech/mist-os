@@ -321,7 +321,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   void SetPerformanceState(SetPerformanceStateRequestView request,
                            SetPerformanceStateCompleter::Sync& completer) override;
 
-  // This is called when fuchsia_driver_framework::Driver is closed.
+  // This is called when fuchsia_driver_host::Driver is closed.
   void on_fidl_error(fidl::UnbindInfo info) override;
   // fidl::WireServer<fuchsia_component_runner::ComponentController>
   // We ignore these signals.
@@ -390,6 +390,8 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
 
   // TODO(fxb/122531): Set this flag from NodeAddArgs.
   bool can_multibind_composites_ = true;
+
+  bool host_restart_on_crash_ = false;
 
   fidl::Arena<128> arena_;
   std::vector<fuchsia_component_decl::wire::Offer> offers_;

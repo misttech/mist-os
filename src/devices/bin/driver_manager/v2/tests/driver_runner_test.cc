@@ -220,6 +220,8 @@ class TestDriver : public fdh::testing::Driver_TestBase {
 
   void Stop() override { stop_handler_(); }
 
+  void DropNode() { node_.Unbind(); }
+
  private:
   fit::function<void()> close_binding_;
   StopHandler stop_handler_;
@@ -278,6 +280,7 @@ struct Driver {
   std::string binary;
   bool colocate = false;
   bool close = false;
+  bool host_restart_on_crash = false;
 };
 
 class DriverRunnerTest : public gtest::TestLoopFixture {
@@ -379,15 +382,20 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
                                                             Driver driver) {
     fidl::Arena arena;
 
-    fidl::VectorView<fdata::wire::DictionaryEntry> program_entries(arena, 2);
+    fidl::VectorView<fdata::wire::DictionaryEntry> program_entries(arena, 3);
     program_entries[0].key.Set(arena, "binary");
     program_entries[0].value = fdata::wire::DictionaryValue::WithStr(arena, driver.binary);
+
     program_entries[1].key.Set(arena, "colocate");
     program_entries[1].value =
         fdata::wire::DictionaryValue::WithStr(arena, driver.colocate ? "true" : "false");
 
+    program_entries[2].key.Set(arena, "host_restart_on_crash");
+    program_entries[2].value = fdata::wire::DictionaryValue::WithStr(
+        arena, driver.host_restart_on_crash ? "true" : "false");
+
     auto program_builder = fdata::wire::Dictionary::Builder(arena);
-    program_builder.entries(std::move(program_entries));
+    program_builder.entries(program_entries);
 
     auto outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     EXPECT_EQ(ZX_OK, outgoing_endpoints.status_value());
@@ -496,11 +504,13 @@ TEST_F(DriverRunnerTest, StartRootDriver) {
 
   driver_host().SetStartHandler([this](fdf::DriverStartArgs start_args, auto request) {
     auto& entries = start_args.program().entries();
-    EXPECT_EQ(2u, entries.size());
+    EXPECT_EQ(3u, entries.size());
     EXPECT_EQ("binary", entries[0].key);
     EXPECT_EQ("driver/root-driver.so", entries[0].value->str());
     EXPECT_EQ("colocate", entries[1].key);
     EXPECT_EQ("false", entries[1].value->str());
+    EXPECT_EQ("host_restart_on_crash", entries[2].key);
+    EXPECT_EQ("false", entries[2].value->str());
 
     fdf::NodePtr node;
     ASSERT_EQ(ZX_OK, node.Bind(start_args.mutable_node()->TakeChannel()));
@@ -531,11 +541,13 @@ TEST_F(DriverRunnerTest, StartRootDriver_DriverStopBeforeComponentExit) {
   driver_host().SetStartHandler(
       [this, &root_node, &event_order](fdf::DriverStartArgs start_args, auto request) {
         auto& entries = start_args.program().entries();
-        EXPECT_EQ(2u, entries.size());
+        EXPECT_EQ(3u, entries.size());
         EXPECT_EQ("binary", entries[0].key);
         EXPECT_EQ("driver/root-driver.so", entries[0].value->str());
         EXPECT_EQ("colocate", entries[1].key);
         EXPECT_EQ("false", entries[1].value->str());
+        EXPECT_EQ("host_restart_on_crash", entries[2].key);
+        EXPECT_EQ("false", entries[2].value->str());
 
         fdf::NodePtr node;
         EXPECT_EQ(ZX_OK, node.Bind(std::move(*start_args.mutable_node()), dispatcher()));
@@ -570,11 +582,13 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddOwnedChild) {
 
   driver_host().SetStartHandler([this](fdf::DriverStartArgs start_args, auto request) {
     auto& entries = start_args.program().entries();
-    EXPECT_EQ(2u, entries.size());
+    EXPECT_EQ(3u, entries.size());
     EXPECT_EQ("binary", entries[0].key);
     EXPECT_EQ("driver/root-driver.so", entries[0].value->str());
     EXPECT_EQ("colocate", entries[1].key);
     EXPECT_EQ("false", entries[1].value->str());
+    EXPECT_EQ("host_restart_on_crash", entries[2].key);
+    EXPECT_EQ("false", entries[2].value->str());
 
     fdf::NodePtr root_node;
     EXPECT_EQ(ZX_OK, root_node.Bind(std::move(*start_args.mutable_node()), dispatcher()));
@@ -611,11 +625,13 @@ TEST_F(DriverRunnerTest, StartRootDriver_RemoveOwnedChild) {
   driver_host().SetStartHandler([this, &root_test_driver, &node_controller, &second_node](
                                     fdf::DriverStartArgs start_args, auto request) {
     auto& entries = start_args.program().entries();
-    EXPECT_EQ(2u, entries.size());
+    EXPECT_EQ(3u, entries.size());
     EXPECT_EQ("binary", entries[0].key);
     EXPECT_EQ("driver/root-driver.so", entries[0].value->str());
     EXPECT_EQ("colocate", entries[1].key);
     EXPECT_EQ("false", entries[1].value->str());
+    EXPECT_EQ("host_restart_on_crash", entries[2].key);
+    EXPECT_EQ("false", entries[2].value->str());
 
     fdf::NodePtr root_node;
     EXPECT_EQ(ZX_OK, root_node.Bind(std::move(*start_args.mutable_node()), dispatcher()));
@@ -877,11 +893,13 @@ TEST_F(DriverRunnerTest, StartSecondDriver_NewDriverHost) {
   driver_host().SetStartHandler(
       [this, &node_controller](fdf::DriverStartArgs start_args, auto request) {
         auto& entries = start_args.program().entries();
-        EXPECT_EQ(2u, entries.size());
+        EXPECT_EQ(3u, entries.size());
         EXPECT_EQ("binary", entries[0].key);
         EXPECT_EQ("driver/root-driver.so", entries[0].value->str());
         EXPECT_EQ("colocate", entries[1].key);
         EXPECT_EQ("false", entries[1].value->str());
+        EXPECT_EQ("host_restart_on_crash", entries[2].key);
+        EXPECT_EQ("false", entries[2].value->str());
 
         realm().SetCreateChildHandler([](fdecl::CollectionRef collection, fdecl::Child decl,
                                          std::vector<fdecl::Offer> offers) {
@@ -935,11 +953,14 @@ TEST_F(DriverRunnerTest, StartSecondDriver_NewDriverHost) {
   driver_host().SetStartHandler([&](fdf::DriverStartArgs start_args, auto request) {
     EXPECT_FALSE(start_args.has_symbols());
     auto& entries = start_args.program().entries();
-    EXPECT_EQ(2u, entries.size());
+    EXPECT_EQ(3u, entries.size());
     EXPECT_EQ("binary", entries[0].key);
     EXPECT_EQ("driver/second-driver.so", entries[0].value->str());
     EXPECT_EQ("colocate", entries[1].key);
     EXPECT_EQ("false", entries[1].value->str());
+    EXPECT_EQ("host_restart_on_crash", entries[2].key);
+    EXPECT_EQ("false", entries[2].value->str());
+
     second_driver_request = std::move(request);
     second_node = std::move(*start_args.mutable_node());
   });
@@ -974,11 +995,13 @@ TEST_F(DriverRunnerTest, StartSecondDriver_SameDriverHost) {
   driver_host().SetStartHandler(
       [this, &node_controller](fdf::DriverStartArgs start_args, auto request) {
         auto& entries = start_args.program().entries();
-        EXPECT_EQ(2u, entries.size());
+        EXPECT_EQ(3u, entries.size());
         EXPECT_EQ("binary", entries[0].key);
         EXPECT_EQ("driver/root-driver.so", entries[0].value->str());
         EXPECT_EQ("colocate", entries[1].key);
         EXPECT_EQ("false", entries[1].value->str());
+        EXPECT_EQ("host_restart_on_crash", entries[2].key);
+        EXPECT_EQ("false", entries[2].value->str());
 
         realm().SetCreateChildHandler(
             [](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {
@@ -1018,11 +1041,13 @@ TEST_F(DriverRunnerTest, StartSecondDriver_SameDriverHost) {
     EXPECT_EQ("sym", symbols[0].name());
     EXPECT_EQ(0xfeedu, symbols[0].address());
     auto& entries = start_args.program().entries();
-    EXPECT_EQ(2u, entries.size());
+    EXPECT_EQ(3u, entries.size());
     EXPECT_EQ("binary", entries[0].key);
     EXPECT_EQ("driver/second-driver.so", entries[0].value->str());
     EXPECT_EQ("colocate", entries[1].key);
     EXPECT_EQ("true", entries[1].value->str());
+    EXPECT_EQ("host_restart_on_crash", entries[2].key);
+    EXPECT_EQ("false", entries[2].value->str());
     second_driver_request = std::move(request);
     second_node = std::move(*start_args.mutable_node());
   });
@@ -1073,11 +1098,13 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UseProperties) {
   driver_host().SetStartHandler(
       [this, &node_controller](fdf::DriverStartArgs start_args, auto request) {
         auto& entries = start_args.program().entries();
-        EXPECT_EQ(2u, entries.size());
+        EXPECT_EQ(3u, entries.size());
         EXPECT_EQ("binary", entries[0].key);
         EXPECT_EQ("driver/root-driver.so", entries[0].value->str());
         EXPECT_EQ("colocate", entries[1].key);
         EXPECT_EQ("false", entries[1].value->str());
+        EXPECT_EQ("host_restart_on_crash", entries[2].key);
+        EXPECT_EQ("false", entries[2].value->str());
 
         realm().SetCreateChildHandler(
             [](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {
@@ -1110,11 +1137,14 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UseProperties) {
   fidl::InterfaceHandle<fdf::Node> second_node;
   driver_host().SetStartHandler([&](fdf::DriverStartArgs start_args, auto request) {
     auto& entries = start_args.program().entries();
-    EXPECT_EQ(2u, entries.size());
+    EXPECT_EQ(3u, entries.size());
     EXPECT_EQ("binary", entries[0].key);
     EXPECT_EQ("driver/second-driver.so", entries[0].value->str());
     EXPECT_EQ("colocate", entries[1].key);
     EXPECT_EQ("true", entries[1].value->str());
+    EXPECT_EQ("host_restart_on_crash", entries[2].key);
+    EXPECT_EQ("false", entries[2].value->str());
+
     second_driver_request = std::move(request);
     second_node = std::move(*start_args.mutable_node());
   });
@@ -1218,6 +1248,101 @@ TEST_F(DriverRunnerTest, StartSecondDriver_DisableAndRematch_UndisableAndRestart
                                    CreateChildRef("dev.second", "boot-drivers")});
 }
 
+// Start the second driver with host_restart_on_crash enabled, and then kill the driver host, and
+// observe the node start the driver again in another host. Done by both a node client drop, and a
+// driver host server binding close.
+TEST_F(DriverRunnerTest, StartSecondDriverHostRestartOnCrash) {
+  auto driver_index = CreateDriverIndex();
+  auto driver_index_client = driver_index.Connect();
+  ASSERT_EQ(ZX_OK, driver_index_client.status_value());
+  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspect(),
+                             &LoaderFactory, dispatcher());
+  SetupDevfs(driver_runner);
+  auto defer = fit::defer([this] { Unbind(); });
+
+  fdf::NodeControllerPtr node_controller;
+  driver_host().SetStartHandler(
+      [this, &node_controller](fdf::DriverStartArgs start_args, auto request) {
+        realm().SetCreateChildHandler(
+            [](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {});
+        realm().SetOpenExposedDirHandler([this](fdecl::ChildRef child, auto exposed_dir) {
+          driver_dir().Bind(std::move(exposed_dir));
+        });
+
+        fdf::NodePtr root_node;
+        EXPECT_EQ(ZX_OK, root_node.Bind(std::move(*start_args.mutable_node()), dispatcher()));
+        fdf::NodeAddArgs args;
+        args.set_name("second");
+        root_node->AddChild(std::move(args), node_controller.NewRequest(dispatcher()), {},
+                            [](auto result) { EXPECT_FALSE(result.is_err()); });
+        BindDriver(std::move(request), std::move(root_node));
+      });
+  auto root_driver = StartRootDriver("fuchsia-boot:///#meta/root-driver.cm", driver_runner);
+  ASSERT_EQ(ZX_OK, root_driver.status_value());
+
+  TestDriver* second_test_driver;
+  driver_host().SetStartHandler(
+      [this, &second_test_driver](fdf::DriverStartArgs start_args, auto request) {
+        realm().SetCreateChildHandler(
+            [](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {});
+        auto& entries = start_args.program().entries();
+        EXPECT_EQ(3u, entries.size());
+        EXPECT_EQ("binary", entries[0].key);
+        EXPECT_EQ("driver/second-driver.so", entries[0].value->str());
+        EXPECT_EQ("colocate", entries[1].key);
+        EXPECT_EQ("false", entries[1].value->str());
+        EXPECT_EQ("host_restart_on_crash", entries[2].key);
+        EXPECT_EQ("true", entries[2].value->str());
+
+        fdf::NodePtr second_node;
+        EXPECT_EQ(ZX_OK, second_node.Bind(std::move(*start_args.mutable_node()), dispatcher()));
+        second_test_driver = BindDriver(std::move(request), std::move(second_node));
+      });
+
+  StartDriverHost("driver-hosts");
+  auto second_driver = StartDriver(driver_runner, {.url = "fuchsia-boot:///#meta/second-driver.cm",
+                                                   .binary = "driver/second-driver.so",
+                                                   .host_restart_on_crash = true});
+
+  EXPECT_EQ(0u, driver_runner.bind_manager().NumOrphanedNodes());
+
+  // Stop the driver host binding.
+  second_test_driver->close_binding();
+  EXPECT_TRUE(RunLoopUntilIdle());
+
+  zx_signals_t signals = 0;
+  ASSERT_EQ(ZX_OK, second_driver.channel().wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite(),
+                                                    &signals));
+  ASSERT_TRUE(signals & ZX_CHANNEL_PEER_CLOSED);
+
+  // The driver host and driver should be started again by the node.
+  StartDriverHost("driver-hosts");
+  second_driver = StartDriver(driver_runner, {.url = "fuchsia-boot:///#meta/second-driver.cm",
+                                              .binary = "driver/second-driver.so",
+                                              .host_restart_on_crash = true});
+
+  // Drop the node client binding.
+  second_test_driver->DropNode();
+  EXPECT_TRUE(RunLoopUntilIdle());
+
+  signals = 0;
+  ASSERT_EQ(ZX_OK, second_driver.channel().wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite(),
+                                                    &signals));
+  ASSERT_TRUE(signals & ZX_CHANNEL_PEER_CLOSED);
+
+  // The driver host and driver should be started again by the node.
+  StartDriverHost("driver-hosts");
+  second_driver = StartDriver(driver_runner, {.url = "fuchsia-boot:///#meta/second-driver.cm",
+                                              .binary = "driver/second-driver.so",
+                                              .host_restart_on_crash = true});
+
+  StopDriverComponent(std::move(root_driver.value()));
+
+  realm().AssertDestroyedChildren(
+      {CreateChildRef("dev", "boot-drivers"), CreateChildRef("dev.second", "boot-drivers"),
+       CreateChildRef("dev.second", "boot-drivers"), CreateChildRef("dev.second", "boot-drivers")});
+}
+
 // The root driver adds a node that only binds after a RequestBind() call.
 TEST_F(DriverRunnerTest, BindThroughRequest) {
   auto driver_index = CreateDriverIndex();
@@ -1232,11 +1357,13 @@ TEST_F(DriverRunnerTest, BindThroughRequest) {
   driver_host().SetStartHandler(
       [this, &node_controller](fdf::DriverStartArgs start_args, auto request) {
         auto& entries = start_args.program().entries();
-        EXPECT_EQ(2u, entries.size());
+        EXPECT_EQ(3u, entries.size());
         EXPECT_EQ("binary", entries[0].key);
         EXPECT_EQ("driver/root-driver.so", entries[0].value->str());
         EXPECT_EQ("colocate", entries[1].key);
         EXPECT_EQ("false", entries[1].value->str());
+        EXPECT_EQ("host_restart_on_crash", entries[2].key);
+        EXPECT_EQ("false", entries[2].value->str());
 
         realm().SetCreateChildHandler(
             [](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {
@@ -1278,11 +1405,14 @@ TEST_F(DriverRunnerTest, BindThroughRequest) {
   driver_host().SetStartHandler([&](fdf::DriverStartArgs start_args, auto request) {
     EXPECT_FALSE(start_args.has_symbols());
     auto& entries = start_args.program().entries();
-    EXPECT_EQ(2u, entries.size());
+    EXPECT_EQ(3u, entries.size());
     EXPECT_EQ("binary", entries[0].key);
     EXPECT_EQ("driver/second-driver.so", entries[0].value->str());
     EXPECT_EQ("colocate", entries[1].key);
     EXPECT_EQ("false", entries[1].value->str());
+    EXPECT_EQ("host_restart_on_crash", entries[2].key);
+    EXPECT_EQ("false", entries[2].value->str());
+
     second_driver_request = std::move(request);
     second_node = std::move(*start_args.mutable_node());
   });
@@ -1315,11 +1445,13 @@ TEST_F(DriverRunnerTest, BindAndRestartThroughRequest) {
   driver_host().SetStartHandler(
       [this, &node_controller](fdf::DriverStartArgs start_args, auto request) {
         auto& entries = start_args.program().entries();
-        EXPECT_EQ(2u, entries.size());
+        EXPECT_EQ(3u, entries.size());
         EXPECT_EQ("binary", entries[0].key);
         EXPECT_EQ("driver/root-driver.so", entries[0].value->str());
         EXPECT_EQ("colocate", entries[1].key);
         EXPECT_EQ("false", entries[1].value->str());
+        EXPECT_EQ("host_restart_on_crash", entries[2].key);
+        EXPECT_EQ("false", entries[2].value->str());
 
         fdf::NodePtr root_node;
         EXPECT_EQ(ZX_OK, root_node.Bind(std::move(*start_args.mutable_node()), dispatcher()));
@@ -1366,11 +1498,13 @@ TEST_F(DriverRunnerTest, BindAndRestartThroughRequest) {
   driver_host().SetStartHandler([&](fdf::DriverStartArgs start_args, auto request) {
     EXPECT_FALSE(start_args.has_symbols());
     auto& entries = start_args.program().entries();
-    EXPECT_EQ(2u, entries.size());
+    EXPECT_EQ(3u, entries.size());
     EXPECT_EQ("binary", entries[0].key);
     EXPECT_EQ("driver/second-driver.so", entries[0].value->str());
     EXPECT_EQ("colocate", entries[1].key);
     EXPECT_EQ("false", entries[1].value->str());
+    EXPECT_EQ("host_restart_on_crash", entries[2].key);
+    EXPECT_EQ("false", entries[2].value->str());
 
     fdf::NodePtr node;
     EXPECT_EQ(ZX_OK, node.Bind(std::move(*start_args.mutable_node()), dispatcher()));
@@ -1424,11 +1558,13 @@ TEST_F(DriverRunnerTest, BindAndRestartThroughRequest) {
   driver_host().SetStartHandler([&](fdf::DriverStartArgs start_args, auto request) {
     EXPECT_FALSE(start_args.has_symbols());
     auto& entries = start_args.program().entries();
-    EXPECT_EQ(2u, entries.size());
+    EXPECT_EQ(3u, entries.size());
     EXPECT_EQ("binary", entries[0].key);
     EXPECT_EQ("driver/third-driver.so", entries[0].value->str());
     EXPECT_EQ("colocate", entries[1].key);
     EXPECT_EQ("false", entries[1].value->str());
+    EXPECT_EQ("host_restart_on_crash", entries[2].key);
+    EXPECT_EQ("false", entries[2].value->str());
 
     fdf::NodePtr node;
     EXPECT_EQ(ZX_OK, node.Bind(std::move(*start_args.mutable_node()), dispatcher()));
@@ -1462,11 +1598,13 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UnknownNode) {
 
   driver_host().SetStartHandler([this](fdf::DriverStartArgs start_args, auto request) {
     auto& entries = start_args.program().entries();
-    EXPECT_EQ(2u, entries.size());
+    EXPECT_EQ(3u, entries.size());
     EXPECT_EQ("binary", entries[0].key);
     EXPECT_EQ("driver/root-driver.so", entries[0].value->str());
     EXPECT_EQ("colocate", entries[1].key);
     EXPECT_EQ("false", entries[1].value->str());
+    EXPECT_EQ("host_restart_on_crash", entries[2].key);
+    EXPECT_EQ("false", entries[2].value->str());
 
     fdf::NodePtr root_node;
     EXPECT_EQ(ZX_OK, root_node.Bind(std::move(*start_args.mutable_node()), dispatcher()));
@@ -1511,11 +1649,13 @@ TEST_F(DriverRunnerTest, StartSecondDriver_BindOrphanToBaseDriver) {
 
   driver_host().SetStartHandler([this](fdf::DriverStartArgs start_args, auto request) {
     auto& entries = start_args.program().entries();
-    EXPECT_EQ(2u, entries.size());
+    EXPECT_EQ(3u, entries.size());
     EXPECT_EQ("binary", entries[0].key);
     EXPECT_EQ("driver/root-driver.so", entries[0].value->str());
     EXPECT_EQ("colocate", entries[1].key);
     EXPECT_EQ("false", entries[1].value->str());
+    EXPECT_EQ("host_restart_on_crash", entries[2].key);
+    EXPECT_EQ("false", entries[2].value->str());
 
     fdf::NodePtr root_node;
     EXPECT_EQ(ZX_OK, root_node.Bind(std::move(*start_args.mutable_node()), dispatcher()));
@@ -2123,11 +2263,13 @@ TEST_F(DriverRunnerTest, CreateAndBindCompositeNodeSpec) {
 
   driver_host().SetStartHandler([this](fdf::DriverStartArgs start_args, auto request) {
     auto& entries = start_args.program().entries();
-    EXPECT_EQ(2u, entries.size());
+    EXPECT_EQ(3u, entries.size());
     EXPECT_EQ("binary", entries[0].key);
     EXPECT_EQ("driver/composite-driver.so", entries[0].value->str());
     EXPECT_EQ("colocate", entries[1].key);
     EXPECT_EQ("true", entries[1].value->str());
+    EXPECT_EQ("host_restart_on_crash", entries[2].key);
+    EXPECT_EQ("false", entries[2].value->str());
 
     fdf::NodePtr node;
     ASSERT_EQ(ZX_OK, node.Bind(start_args.mutable_node()->TakeChannel()));
@@ -2380,11 +2522,13 @@ TEST_F(DriverRunnerTest, ConnectToDeviceController) {
   driver_host().SetStartHandler([this, &root_test_driver, &node_controller, &second_node](
                                     fdf::DriverStartArgs start_args, auto request) {
     auto& entries = start_args.program().entries();
-    EXPECT_EQ(2u, entries.size());
+    EXPECT_EQ(3u, entries.size());
     EXPECT_EQ("binary", entries[0].key);
     EXPECT_EQ("driver/root-driver.so", entries[0].value->str());
     EXPECT_EQ("colocate", entries[1].key);
     EXPECT_EQ("false", entries[1].value->str());
+    EXPECT_EQ("host_restart_on_crash", entries[2].key);
+    EXPECT_EQ("false", entries[2].value->str());
 
     fdf::NodePtr root_node;
     EXPECT_EQ(ZX_OK, root_node.Bind(std::move(*start_args.mutable_node()), dispatcher()));
