@@ -24,7 +24,7 @@ pub(crate) mod isn;
 use alloc::{collections::VecDeque, vec::Vec};
 use core::{
     convert::Infallible as Never,
-    fmt::Debug,
+    fmt,
     marker::PhantomData,
     num::{NonZeroU16, NonZeroUsize},
     ops::{Deref as _, RangeInclusive},
@@ -134,12 +134,12 @@ pub trait NonSyncContext: TimerContext<TimerId> + TracingContext {
     /// The object that will be returned by the state machine when a passive
     /// open connection becomes established. The bindings can use this object
     /// to read/write bytes from/into the created buffers.
-    type ReturnedBuffers: Debug;
+    type ReturnedBuffers: fmt::Debug;
     /// The extra information provided by the Bindings that implements platform
     /// dependent behaviors. It serves as a [`ListenerNotifier`] if the socket
     /// was used as a listener and it will be used to provide buffers if used
     /// to establish connections.
-    type ListenerNotifierOrProvidedBuffers: Debug
+    type ListenerNotifierOrProvidedBuffers: fmt::Debug
         + Takeable
         + Clone
         + IntoBuffers<Self::ReceiveBuffer, Self::SendBuffer>
@@ -255,6 +255,21 @@ impl<A: IpAddress, D> From<SocketAddr<A, D>>
     }
 }
 
+impl<A: IpAddress, D: fmt::Display> fmt::Display for SocketAddr<A, D> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        let Self { ip, port } = self;
+        let IpInvariant(result) = A::Version::map_ip(
+            (ip, IpInvariant((f, port))),
+            |(ip, IpInvariant((f, port)))| IpInvariant(write!(f, "{}:{}", ip.addr(), port)),
+            |(ip, IpInvariant((f, port)))| match **ip {
+                ZonedAddr::Unzoned(a) => IpInvariant(write!(f, "[{}]:{}", a, port)),
+                ZonedAddr::Zoned(ref az) => IpInvariant(write!(f, "[{}]:{}", az, port)),
+            },
+        );
+        result
+    }
+}
+
 /// An implementation of [`IpTransportContext`] for TCP.
 pub(crate) enum TcpIpTransportContext {}
 
@@ -343,7 +358,7 @@ impl<'a, I: Ip> Inserter<SocketId<I>> for ListenerAddrInserter<'a, I> {
 }
 
 #[derive(Derivative)]
-#[derivative(Debug(bound = "D: Debug"))]
+#[derivative(Debug(bound = "D: fmt::Debug"))]
 pub(crate) enum BoundSocketState<I: IpExt, D: Id, C: NonSyncContext> {
     Listener(
         (
@@ -835,7 +850,7 @@ pub(crate) struct Sockets<I: IpExt, D: WeakId, C: NonSyncContext> {
 }
 
 #[derive(Derivative)]
-#[derivative(Debug(bound = "D: Debug"))]
+#[derivative(Debug(bound = "D: fmt::Debug"))]
 pub(crate) enum SocketState<I: IpExt, D: WeakId, C: NonSyncContext> {
     Unbound(Unbound<D, C::ListenerNotifierOrProvidedBuffers>),
     Bound(BoundSocketState<I, D, C>),
@@ -973,9 +988,9 @@ pub(crate) enum MaybeListener<I: Ip, PassiveOpen, Extra, Notifier> {
 
 impl<
         I: Ip,
-        PassiveOpen: core::fmt::Debug,
-        Extra: Debug,
-        Notifier: Debug + Into<Extra> + Takeable,
+        PassiveOpen: fmt::Debug,
+        Extra: fmt::Debug,
+        Notifier: fmt::Debug + Into<Extra> + Takeable,
     > MaybeListener<I, PassiveOpen, Extra, Notifier>
 {
     fn maybe_shutdown(&mut self) -> Option<Listener<I, PassiveOpen, Notifier>> {
@@ -2014,50 +2029,79 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
     }
 
     fn with_info<V: InfoVisitor>(&mut self, visitor: V) -> V::VisitResult {
+        const DEVICE_ID_PLACEHOLDER: &'static str =
+            "TODO(http://fxbug.dev/133946): Populate with bindings device id once available";
         self.with_tcp_sockets(|sockets| {
-            let stats = sockets.socket_state.iter().filter_map(|(index, socket_state)| {
-                match socket_state {
-                    SocketState::Unbound(_) => Some(SocketStats::<I> {
-                        id: SocketId(index, IpVersionMarker::default()),
-                        local: None,
-                        remote: None,
-                    }),
-                    SocketState::Bound(BoundSocketState::Listener((_state, _sharing, addr))) => {
-                        let ListenerAddr { ip: ListenerIpAddr { identifier, addr }, device: _ } =
-                            *addr;
-                        Some(SocketStats {
-                            id: SocketId(index, IpVersionMarker::default()),
-                            local: Some((addr.map(SocketIpAddr::into), identifier)),
+            let stats =
+                sockets.socket_state.iter().filter_map(
+                    |(index, socket_state)| match socket_state {
+                        SocketState::Unbound(_) => Some(SocketStats {
+                            id: SocketId::<I>(index, IpVersionMarker::default()),
+                            local: None,
                             remote: None,
-                        })
-                    }
-                    SocketState::Bound(BoundSocketState::Connected((state, _sharing, addr))) => {
-                        let Connection {
-                            acceptor: _,
-                            state: _,
-                            ip_sock: _,
-                            defunct,
-                            socket_options: _,
-                            soft_error: _,
-                            handshake_status: _,
-                        } = state;
-                        (!defunct).then(|| {
-                            let ConnAddr {
-                                ip:
-                                    ConnIpAddr {
-                                        local: (local_ip, local_port),
-                                        remote: (remote_ip, remote_port),
-                                    },
-                                device: _,
+                        }),
+                        SocketState::Bound(BoundSocketState::Listener((
+                            _state,
+                            _sharing,
+                            addr,
+                        ))) => {
+                            let ListenerAddr {
+                                ip: ListenerIpAddr { identifier, addr },
+                                device: ref _device,
                             } = *addr;
-                            let id = SocketId(index, IpVersionMarker::default());
-                            let local = Some((Some(local_ip.into()), local_port));
-                            let remote = Some((remote_ip.into(), remote_port));
-                            SocketStats { id, local, remote }
-                        })
-                    }
-                }
-            });
+                            let local = addr.map(|addr| SocketAddr {
+                                ip: maybe_zoned(*addr.as_ref(), &Some(DEVICE_ID_PLACEHOLDER)),
+                                port: identifier,
+                            });
+                            Some(SocketStats {
+                                id: SocketId(index, IpVersionMarker::default()),
+                                local,
+                                remote: None,
+                            })
+                        }
+                        SocketState::Bound(BoundSocketState::Connected((
+                            state,
+                            _sharing,
+                            addr,
+                        ))) => {
+                            let Connection {
+                                acceptor: _,
+                                state: _,
+                                ip_sock: _,
+                                defunct,
+                                socket_options: _,
+                                soft_error: _,
+                                handshake_status: _,
+                            } = state;
+                            (!defunct).then(|| {
+                                let ConnAddr {
+                                    ip:
+                                        ConnIpAddr {
+                                            local: (local_ip, local_port),
+                                            remote: (remote_ip, remote_port),
+                                        },
+                                    device: ref _device,
+                                } = *addr;
+                                let id = SocketId(index, IpVersionMarker::default());
+                                let local = Some(SocketAddr {
+                                    ip: maybe_zoned(
+                                        *local_ip.as_ref(),
+                                        &Some(DEVICE_ID_PLACEHOLDER),
+                                    ),
+                                    port: local_port,
+                                });
+                                let remote = Some(SocketAddr {
+                                    ip: maybe_zoned(
+                                        *remote_ip.as_ref(),
+                                        &Some(DEVICE_ID_PLACEHOLDER),
+                                    ),
+                                    port: remote_port,
+                                });
+                                SocketStats { id, local, remote }
+                            })
+                        }
+                    },
+                );
 
             visitor.visit(stats)
         })
@@ -2131,7 +2175,7 @@ trait AccessBufferSize {
         Instant: crate::Instant + 'static,
         S: SendBuffer,
         R: ReceiveBuffer,
-        P: Debug + Takeable,
+        P: fmt::Debug + Takeable,
     >(
         state: &mut State<Instant, R, S, P>,
         new_size: usize,
@@ -2149,7 +2193,7 @@ impl AccessBufferSize for SendBufferSize {
         Instant: crate::Instant + 'static,
         S: SendBuffer,
         R: ReceiveBuffer,
-        P: Debug + Takeable,
+        P: fmt::Debug + Takeable,
     >(
         state: &mut State<Instant, R, S, P>,
         new_size: usize,
@@ -2173,7 +2217,7 @@ impl AccessBufferSize for ReceiveBufferSize {
         Instant: crate::Instant + 'static,
         S: SendBuffer,
         R: ReceiveBuffer,
-        P: Debug + Takeable,
+        P: fmt::Debug + Takeable,
     >(
         state: &mut State<Instant, R, S, P>,
         new_size: usize,
@@ -2646,13 +2690,13 @@ where
 }
 
 /// Statistics about an individual socket.
-pub struct SocketStats<I: Ip> {
+pub struct SocketStats<I: Ip, D> {
     /// Identifier for the socket.
     pub id: SocketId<I>,
     /// The local address of the socket.
-    pub local: Option<(Option<SpecifiedAddr<I::Addr>>, NonZeroU16)>,
+    pub local: Option<SocketAddr<I::Addr, D>>,
     /// The remote address of the socket.
-    pub remote: Option<(SpecifiedAddr<I::Addr>, NonZeroU16)>,
+    pub remote: Option<SocketAddr<I::Addr, D>>,
 }
 
 /// Visitor for socket state.
@@ -2661,7 +2705,10 @@ pub trait InfoVisitor {
     type VisitResult;
 
     /// Consumes `self` and a socket state iterator to produce a `VisitResult`.
-    fn visit<I: Ip>(self, stats: impl Iterator<Item = SocketStats<I>>) -> Self::VisitResult;
+    fn visit<I: Ip, D: fmt::Display>(
+        self,
+        stats: impl Iterator<Item = SocketStats<I, D>>,
+    ) -> Self::VisitResult;
 }
 
 /// Provides access to shared and per-socket TCP stats via a visitor.
@@ -3033,8 +3080,13 @@ impl<I: Ip> EntryKey for ConnectionId<I> {
 
 #[cfg(test)]
 mod tests {
-    use core::{cell::RefCell, fmt::Debug, num::NonZeroU8, time::Duration};
-    use fakealloc::{rc::Rc, vec};
+    use core::{
+        cell::RefCell,
+        fmt::Debug,
+        num::{NonZeroU16, NonZeroU8},
+        time::Duration,
+    };
+    use fakealloc::{format, rc::Rc, string::String, vec};
 
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
@@ -3719,6 +3771,52 @@ mod tests {
         });
 
         (net, client, client_snd_end, accepted)
+    }
+
+    #[test]
+    fn test_socket_addr_display() {
+        assert_eq!(
+            format!(
+                "{}",
+                SocketAddr {
+                    ip: maybe_zoned(
+                        SpecifiedAddr::new(Ipv4Addr::new([192, 168, 0, 1]))
+                            .expect("failed to create specified addr"),
+                        &None::<usize>,
+                    ),
+                    port: NonZeroU16::new(1024).expect("failed to create NonZeroU16"),
+                }
+            ),
+            String::from("192.168.0.1:1024"),
+        );
+        assert_eq!(
+            format!(
+                "{}",
+                SocketAddr {
+                    ip: maybe_zoned(
+                        SpecifiedAddr::new(Ipv6Addr::new([0x2001, 0xDB8, 0, 0, 0, 0, 0, 1]))
+                            .expect("failed to create specified addr"),
+                        &None::<usize>,
+                    ),
+                    port: NonZeroU16::new(1024).expect("failed to create NonZeroU16"),
+                }
+            ),
+            String::from("[2001:db8::1]:1024")
+        );
+        assert_eq!(
+            format!(
+                "{}",
+                SocketAddr {
+                    ip: maybe_zoned(
+                        SpecifiedAddr::new(Ipv6Addr::new([0xFE80, 0, 0, 0, 0, 0, 0, 1]))
+                            .expect("failed to create specified addr"),
+                        &Some(42),
+                    ),
+                    port: NonZeroU16::new(1024).expect("failed to create NonZeroU16"),
+                }
+            ),
+            String::from("[fe80::1%42]:1024")
+        );
     }
 
     #[ip_test]

@@ -10,11 +10,11 @@
 use super::{devices::DeviceSpecificInfo, BindingsNonSyncCtxImpl, Ctx, DeviceIdExt, StackTime};
 use fuchsia_inspect::ArrayProperty as _;
 use net_types::{
-    ip::{Ip, IpAddress, IpVersion, Ipv4, Ipv6},
+    ip::{Ip, IpVersion, Ipv4, Ipv6},
     Witness as _,
 };
 use netstack3_core::{device::DeviceId, ip, transport::tcp};
-use std::{borrow::Cow, fmt::Debug, num::NonZeroU16, ops::Deref, string::ToString as _};
+use std::{fmt, string::ToString as _};
 
 /// Publishes netstack3 socket diagnostics data to Inspect.
 pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
@@ -34,9 +34,9 @@ pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
     struct Visitor(fuchsia_inspect::Inspector);
     impl tcp::socket::InfoVisitor for &'_ mut Visitor {
         type VisitResult = ();
-        fn visit<I: Ip>(
+        fn visit<I: Ip, D: fmt::Display>(
             self,
-            per_socket: impl Iterator<Item = tcp::socket::SocketStats<I>>,
+            per_socket: impl Iterator<Item = tcp::socket::SocketStats<I, D>>,
         ) -> Self::VisitResult {
             let Visitor(inspector) = self;
             for socket in per_socket {
@@ -50,20 +50,13 @@ pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
                             IpVersion::V6 => "IPv6",
                         },
                     );
-                    fn format_addr_port<'a, A: IpAddress, S: Deref<Target = A>>(
-                        (addr, port): (S, NonZeroU16),
-                    ) -> Cow<'a, str> {
-                        Cow::Owned(format!("{}:{}", *addr, port))
-                    }
                     node.record_string(
                         "LocalAddress",
-                        local.map_or("[NOT BOUND]".into(), |(addr, port)| {
-                            format_addr_port((&addr.map_or(I::UNSPECIFIED_ADDRESS, |a| *a), port))
-                        }),
+                        local.map_or("[NOT BOUND]".into(), |socket| format!("{}", socket)),
                     );
                     node.record_string(
                         "RemoteAddress",
-                        remote.map_or("[NOT CONNECTED]".into(), format_addr_port),
+                        remote.map_or("[NOT CONNECTED]".into(), |socket| format!("{}", socket)),
                     )
                 })
             }
@@ -172,7 +165,7 @@ pub(crate) fn devices(ctx: &Ctx) -> fuchsia_inspect::Inspector {
 pub(crate) fn neighbors(ctx: &Ctx) -> fuchsia_inspect::Inspector {
     struct Visitor(fuchsia_inspect::Inspector);
     impl netstack3_core::device::NeighborVisitor<BindingsNonSyncCtxImpl, StackTime> for Visitor {
-        fn visit_neighbors<LinkAddress: Debug>(
+        fn visit_neighbors<LinkAddress: fmt::Debug>(
             &self,
             device: DeviceId<BindingsNonSyncCtxImpl>,
             neighbors: impl Iterator<
