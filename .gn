@@ -111,4 +111,6 @@ default_args = {
   dir_pw_third_party_chre = "//third_party/chre/src"
   pw_chre_CONFIG = "//third_party/chre:chre_config"
   pw_chre_PLATFORM_BACKEND = "//third_party/pigweed/src/pw_chre:chre_backend"
+  pw_chre_PLATFORM_BACKEND_HEADERS =
+      "//third_party/pigweed/src/pw_chre:chre_backend_headers"
 }
