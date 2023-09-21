@@ -157,6 +157,9 @@ pub struct ThreadGroup {
 
     // Timer id of ITIMER_REAL.
     itimer_real_id: TimerId,
+
+    // Tasks ptraced by this process
+    pub ptracees: Mutex<BTreeMap<pid_t, TaskContainer>>,
 }
 
 impl fmt::Debug for ThreadGroup {
@@ -285,6 +288,7 @@ impl ThreadGroup {
                 parent.as_ref().map(|p| p.base.limits.lock().clone()).unwrap_or(Default::default()),
             ),
             next_seccomp_filter_id: Default::default(),
+            ptracees: Default::default(),
             mutable_state: RwLock::new(ThreadGroupMutableState {
                 parent: parent.as_ref().map(|p| Arc::clone(p.base)),
                 tasks: BTreeMap::new(),
@@ -334,6 +338,15 @@ impl ThreadGroup {
         // ThreadGroup can be dropped.
         let tasks = state.tasks().map(|x| unsafe { TempRef::into_static(x) }).collect::<Vec<_>>();
         drop(state);
+
+        // Detach from any ptraced tasks.
+        let tracees = self.ptracees.lock().keys().cloned().collect::<Vec<_>>();
+        for tracee in tracees {
+            if let Some(task_ref) = self.kernel.pids.read().get_task(tracee).clone().upgrade() {
+                let _ = ptrace_detach(self, task_ref.as_ref(), &UserAddress::NULL);
+            }
+        }
+
         for task in tasks {
             task.write().exit_status = Some(exit_status.clone());
             send_signal(&task, SignalInfo::default(SIGKILL));
@@ -603,11 +616,22 @@ impl ThreadGroup {
     }
 
     /// Set the stop status of the process.  If you pass |siginfo| of |None|,
-    /// does not update the signal.
-    pub fn set_stopped(self: &Arc<Self>, stopped: StopState, siginfo: Option<SignalInfo>) -> bool {
+    /// does not update the signal.  If |finalize_only| is set, will check that
+    /// the set will be a finalize (Stopping -> Stopped or Stopped -> Stopped)
+    /// before executing it.  Returns true iff the stop state was changed.
+    pub fn set_stopped(
+        self: &Arc<Self>,
+        stopped: StopState,
+        siginfo: Option<SignalInfo>,
+        finalize_only: bool,
+    ) -> bool {
         {
             let mut state = self.write();
-            if state.stopped == stopped || state.stopped.is_downgrade(&stopped) {
+            if finalize_only && !state.stopped.is_stopping_or_stopped() {
+                return false;
+            }
+
+            if state.stopped.is_illegal_transition(stopped) {
                 return false;
             }
 
@@ -622,7 +646,7 @@ impl ThreadGroup {
                     state.waitable = siginfo;
                 }
             }
-            if state.stopped == StopState::Waking {
+            if state.stopped == StopState::Waking || state.stopped == StopState::ForceWaking {
                 state.stopped_waiters.notify_all();
             };
         }
@@ -849,6 +873,131 @@ impl ThreadGroup {
             // TODO(fxbug.dev/127682): How can we calculate system time?
             system_time: zx::Duration::default(),
         }
+    }
+
+    /// For each task traced by this thread_group that matches the given
+    /// selector, acquire its TaskMutableState and ptracees lock and execute the
+    /// given function.
+    pub fn get_ptracees_and(
+        &self,
+        selector: ProcessSelector,
+        pids: &PidTable,
+        f: &mut dyn FnMut(WeakRef<Task>, &TaskMutableState),
+    ) {
+        for tracee in self
+            .ptracees
+            .lock()
+            .keys()
+            .filter(|tracee_pid| match selector {
+                ProcessSelector::Pid(pid) => pid == **tracee_pid,
+                ProcessSelector::Any => true,
+                _ => false,
+            })
+            .map(|tracee_pid| pids.get_task(*tracee_pid).clone())
+        {
+            if let Some(task_ref) = tracee.clone().upgrade() {
+                let task_state = task_ref.write();
+                if task_state.ptrace.is_some() {
+                    f(tracee, &task_state);
+                }
+            }
+        }
+    }
+
+    /// Returns a tracee whose state has changed, so that waitpid can report on it.
+    pub fn get_waitable_ptracee(
+        &self,
+        selector: ProcessSelector,
+        options: &WaitingOptions,
+        pids: &PidTable,
+    ) -> Option<WaitResult> {
+        let mut tasks = vec![];
+        self.get_ptracees_and(selector, pids, &mut |task: WeakRef<Task>, _| {
+            tasks.push(task);
+        });
+        for task in tasks {
+            let Some(task_ref) = task.upgrade() else { continue; };
+
+            let process_state = &mut task_ref.thread_group.write();
+            let mut task_state = task_ref.write();
+            if task_state.ptrace.as_ref().map_or(false, |ptrace| ptrace.waitable.is_some())
+                || process_state.waitable.is_some()
+            {
+                // We've identified a potential target.  Need to return either
+                // the process's information (if we are in group-stop) or the
+                // thread's information (if we are in a different stop).
+
+                // The shared information:
+                let mut pid: i32 = 0;
+                let info = process_state.tasks.values().next().unwrap().info().clone();
+                let uid = info.creds().uid;
+                let mut exit_status = None;
+                let exit_signal = info.exit_signal();
+                let time_stats =
+                    process_state.base.time_stats() + process_state.children_time_stats;
+                let task_stopped = task_state.stopped;
+
+                if process_state.waitable.is_some() {
+                    // The information for processes, if we were in group stop.
+                    let mut exit_status_fn: Option<&dyn Fn(SignalInfo) -> ExitStatus> = None;
+                    if process_state.stopped == StopState::Awake && options.wait_for_continued {
+                        exit_status_fn = Some(&ExitStatus::Continue);
+                    }
+                    if process_state.stopped == StopState::GroupStopped && options.wait_for_stopped
+                    {
+                        exit_status_fn = Some(&ExitStatus::Stop);
+                    }
+                    if let Some(mut exit_status_fn) = exit_status_fn {
+                        let siginfo = if options.keep_waitable_state {
+                            process_state.waitable.clone()
+                        } else {
+                            process_state.waitable.take()
+                        };
+                        if let Some(siginfo) = siginfo {
+                            if siginfo.signal == SIGKILL {
+                                exit_status_fn = &ExitStatus::Kill
+                            }
+
+                            exit_status = Some(exit_status_fn(siginfo));
+                        }
+                    }
+                    pid = process_state.base.leader;
+                } else if let Some(ptrace) = task_state.ptrace.as_mut() {
+                    // The information for the task, if we were in a non-group stop.
+                    let mut exit_status_fn: Option<&dyn Fn(SignalInfo) -> ExitStatus> = None;
+                    if task_stopped == StopState::Awake {
+                        exit_status_fn = Some(&ExitStatus::Continue);
+                    }
+                    if task_stopped.is_stopping_or_stopped() {
+                        exit_status_fn = Some(&ExitStatus::Stop);
+                    }
+                    if let Some(mut exit_status_fn) = exit_status_fn {
+                        let siginfo = if options.keep_waitable_state {
+                            ptrace.waitable.clone().unwrap()
+                        } else {
+                            ptrace.waitable.take().unwrap()
+                        };
+                        if siginfo.signal == SIGKILL {
+                            exit_status_fn = &ExitStatus::Kill
+                        }
+                        exit_status = Some(exit_status_fn(siginfo));
+                    }
+                    pid = task_ref.get_tid();
+                }
+                if let Some(exit_status) = exit_status {
+                    return Some(WaitResult {
+                        pid,
+                        uid,
+                        exit_info: ProcessExitInfo {
+                            status: exit_status,
+                            exit_signal: *exit_signal,
+                        },
+                        time_stats,
+                    });
+                }
+            }
+        }
+        None
     }
 }
 
@@ -1092,7 +1241,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
 /// moment where the task is not yet released, yet the weak pointer is not upgradeable anymore.
 /// During this time, it is still necessary to access the persistent info to compute the state of
 /// the thread for the different wait syscalls.
-struct TaskContainer(WeakRef<Task>, TaskPersistentInfo);
+pub struct TaskContainer(WeakRef<Task>, TaskPersistentInfo);
 
 impl From<&TempRef<'_, Task>> for TaskContainer {
     fn from(task: &TempRef<'_, Task>) -> Self {

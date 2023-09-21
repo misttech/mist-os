@@ -929,14 +929,17 @@ pub fn sys_prctl(
 }
 
 pub fn sys_ptrace(
-    _current_task: &mut CurrentTask,
-    request: u64,
+    current_task: &mut CurrentTask,
+    request: u32,
     pid: pid_t,
     addr: UserAddress,
     data: UserAddress,
 ) -> Result<(), Errno> {
-    not_implemented!("ptrace({request}, {pid}, {addr}, {data})");
-    error!(ENOSYS)
+    match request {
+        PTRACE_TRACEME => ptrace_traceme(current_task),
+        PTRACE_ATTACH => ptrace_attach(current_task, pid),
+        _ => ptrace_dispatch(current_task, request, pid, addr, data),
+    }
 }
 
 pub fn sys_set_tid_address(

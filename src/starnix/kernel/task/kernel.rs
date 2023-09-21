@@ -14,7 +14,7 @@ use std::{
     collections::{BTreeMap, HashSet},
     iter::FromIterator,
     sync::{
-        atomic::{AtomicI32, AtomicU16, AtomicU32, AtomicU64},
+        atomic::{AtomicI32, AtomicU16, AtomicU32, AtomicU64, AtomicU8},
         Arc, Weak,
     },
 };
@@ -184,6 +184,9 @@ pub struct Kernel {
     pub next_inotify_cookie: AtomicU32,
 
     pub inotify_limits: InotifyLimits,
+
+    // Controls which processes a process is allowed to ptrace.  See Documentation/security/Yama.txt
+    pub ptrace_scope: AtomicU8,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -286,6 +289,7 @@ impl Kernel {
                 max_user_instances: AtomicI32::new(128),
                 max_user_watches: AtomicI32::new(1048576),
             },
+            ptrace_scope: AtomicU8::new(0),
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle

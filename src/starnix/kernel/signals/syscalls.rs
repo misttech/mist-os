@@ -567,6 +567,9 @@ pub struct WaitingOptions {
     pub wait_for_all: bool,
     /// Wait for children who deliver no signal or a signal other than SIGCHLD, ignored if wait_for_all is true
     pub wait_for_clone: bool,
+    /// If present, and the target is ptraced by the waiter, wait for processes
+    /// to do anything.
+    pub waiter: Option<pid_t>,
 }
 
 impl WaitingOptions {
@@ -580,6 +583,7 @@ impl WaitingOptions {
             keep_waitable_state: options & WNOWAIT > 0,
             wait_for_all: options & __WALL > 0,
             wait_for_clone: options & __WCLONE > 0,
+            waiter: None,
         }
     }
 
@@ -597,12 +601,14 @@ impl WaitingOptions {
     }
 
     /// Build a `WaitingOptions` from the waiting flags of wait4.
-    pub fn new_for_wait4(options: u32) -> Result<Self, Errno> {
+    pub fn new_for_wait4(options: u32, waiter_pid: pid_t) -> Result<Self, Errno> {
         if options & !(__WCLONE | __WALL | WNOHANG | WUNTRACED | WCONTINUED) != 0 {
             not_implemented!("unsupported wait4 options: {:#x}", options);
             return error!(EINVAL);
         }
-        Ok(Self::new(options | WEXITED))
+        let mut result = Self::new(options | WEXITED);
+        result.waiter = Some(waiter_pid);
+        Ok(result)
     }
 }
 
@@ -620,11 +626,55 @@ fn wait_on_pid(
     loop {
         {
             let mut pids = current_task.kernel().pids.write();
-            let mut thread_group = current_task.thread_group.write();
-            if let Some(child) = thread_group.get_waitable_child(selector, options, &mut pids)? {
-                return Ok(Some(child));
+            // Waits and notifies on a given task need to be done atomically
+            // with respect to changes to the task's waitable state; otherwise,
+            // we see missing notifications. We do that by holding the task lock.
+            // This next line checks for waitable traces without holding the
+            // task lock, because constructing ZombieProcess objects requires
+            // holding all sorts of locks that are incompatible with holding the
+            // task lock.  We therefore have to check to see if a tracee has
+            // become waitable again, after we acquire the lock.
+            if let Some(tracee) =
+                current_task.thread_group.get_waitable_ptracee(selector, options, &pids)
+            {
+                return Ok(Some(tracee));
             }
-            thread_group.child_status_waiters.wait_async(&waiter);
+            {
+                let mut thread_group = current_task.thread_group.write();
+
+                // Per the above, see if traced tasks have become waitable. If they have, release
+                // the lock and retry getting waitable tracees.
+                let mut has_waitable_tracee = false;
+                let mut has_any_tracee = false;
+                current_task.thread_group.get_ptracees_and(
+                    selector,
+                    &pids,
+                    &mut |_, task_state: &TaskMutableState| {
+                        if let Some(ptrace) = &task_state.ptrace {
+                            has_any_tracee = true;
+                            ptrace.tracer_waiters.wait_async(&waiter);
+                            if ptrace.waitable.is_some() {
+                                has_waitable_tracee = true;
+                            }
+                        }
+                    },
+                );
+                if has_waitable_tracee {
+                    continue;
+                }
+                match thread_group.get_waitable_child(selector, options, &mut pids) {
+                    Ok(Some(child)) => {
+                        return Ok(Some(child));
+                    }
+                    Ok(None) => (),
+                    Err(errno) => {
+                        if !has_any_tracee {
+                            return Err(errno);
+                        }
+                    }
+                }
+                thread_group.child_status_waiters.wait_async(&waiter);
+            }
         }
 
         if !options.block {
@@ -703,7 +753,7 @@ pub fn sys_wait4(
     options: u32,
     user_rusage: UserRef<rusage>,
 ) -> Result<pid_t, Errno> {
-    let waiting_options = WaitingOptions::new_for_wait4(options)?;
+    let waiting_options = WaitingOptions::new_for_wait4(options, current_task.get_pid())?;
 
     let selector = if pid == 0 {
         ProcessSelector::Pgid(current_task.thread_group.read().process_group.leader)
@@ -1508,7 +1558,7 @@ mod tests {
             wait_on_pid(
                 &current_task,
                 ProcessSelector::Any,
-                &WaitingOptions::new_for_wait4(0).expect("WaitingOptions")
+                &WaitingOptions::new_for_wait4(0, 0).expect("WaitingOptions")
             ),
             error!(ECHILD)
         );
@@ -1531,7 +1581,7 @@ mod tests {
             wait_on_pid(
                 &current_task,
                 ProcessSelector::Any,
-                &WaitingOptions::new_for_wait4(0).expect("WaitingOptions")
+                &WaitingOptions::new_for_wait4(0, 0).expect("WaitingOptions")
             ),
             Ok(Some(expected_result))
         );
@@ -1547,7 +1597,7 @@ mod tests {
             wait_on_pid(
                 &task,
                 ProcessSelector::Any,
-                &WaitingOptions::new_for_wait4(WNOHANG).expect("WaitingOptions")
+                &WaitingOptions::new_for_wait4(WNOHANG, 0).expect("WaitingOptions")
             ),
             Ok(None)
         );
@@ -1559,7 +1609,7 @@ mod tests {
             let waited_child = wait_on_pid(
                 &task,
                 ProcessSelector::Any,
-                &WaitingOptions::new_for_wait4(0).expect("WaitingOptions"),
+                &WaitingOptions::new_for_wait4(0, 0).expect("WaitingOptions"),
             )
             .expect("wait_on_pid")
             .unwrap();
@@ -1601,7 +1651,7 @@ mod tests {
         let errno = wait_on_pid(
             &task,
             ProcessSelector::Any,
-            &WaitingOptions::new_for_wait4(0).expect("WaitingOptions"),
+            &WaitingOptions::new_for_wait4(0, 0).expect("WaitingOptions"),
         )
         .expect_err("wait_on_pid");
         assert_eq!(errno, ERESTARTSYS);

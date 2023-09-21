@@ -163,39 +163,86 @@ pub enum StopState {
     Waking,
     /// In this state, at least one thread is awake.
     Awake,
+    /// Same as the above, but you are not allowed to make further transitions.  Used
+    /// to kill the task / group.  These names are not in ptrace(2).
+    ForceWaking,
+    ForceAwake,
 
     /// In this state, the process has been told to stop via a signal, but has not yet stopped.
     GroupStopping,
     /// In this state, at least one thread of the process has stopped
     GroupStopped,
+    /// In this state, the task has received a signal, and it is being traced, so it will
+    /// stop at the next opportunity.
+    SignalDeliveryStopping,
+    /// Same as the last one, but has stopped.
+    SignalDeliveryStopped,
+    // TODO: Other states.
 }
 
 impl StopState {
     /// This means a stop is either in progress or we've stopped.
     pub fn is_stopping_or_stopped(&self) -> bool {
-        *self == StopState::GroupStopped || self.is_stopping()
+        self.is_stopped() || self.is_stopping()
     }
 
     /// This means a stop is in progress.  Refers to any stop state ending in "ing".
     pub fn is_stopping(&self) -> bool {
-        *self == StopState::GroupStopping
+        *self == StopState::GroupStopping || *self == StopState::SignalDeliveryStopping
+    }
+
+    /// This means task is stopped.
+    pub fn is_stopped(&self) -> bool {
+        *self == StopState::GroupStopped || *self == StopState::SignalDeliveryStopped
+    }
+
+    /// Returns the "ed" version of this StopState, if it is "ing".
+    pub fn finalize(&self) -> Result<StopState, ()> {
+        match *self {
+            StopState::GroupStopping => Ok(StopState::GroupStopped),
+            StopState::SignalDeliveryStopping => Ok(StopState::SignalDeliveryStopped),
+            StopState::Waking => Ok(StopState::Awake),
+            StopState::ForceWaking => Ok(StopState::ForceAwake),
+            _ => Err(()),
+        }
     }
 
     pub fn is_downgrade(&self, new_state: &StopState) -> bool {
         match *self {
             StopState::GroupStopped => *new_state == StopState::GroupStopping,
+            StopState::SignalDeliveryStopped => *new_state == StopState::SignalDeliveryStopping,
             StopState::Awake => *new_state == StopState::Waking,
             _ => false,
         }
     }
 
     pub fn is_waking_or_awake(&self) -> bool {
-        *self == StopState::Waking || *self == StopState::Awake
+        *self == StopState::Waking
+            || *self == StopState::Awake
+            || *self == StopState::ForceWaking
+            || *self == StopState::ForceAwake
     }
 
-    /// Indicate if the transition to the stopped / awake state is not finished.
+    /// Indicate if the transition to the stopped / awake state is not finished.  This
+    /// function is typically used to determine when it is time to notify waiters.
     pub fn is_in_progress(&self) -> bool {
-        *self == StopState::Waking || *self == StopState::GroupStopping
+        *self == StopState::Waking
+            || *self == StopState::ForceWaking
+            || *self == StopState::GroupStopping
+            || *self == StopState::SignalDeliveryStopping
+    }
+
+    pub fn ptrace_only(&self) -> bool {
+        !self.is_waking_or_awake()
+            && *self != StopState::GroupStopped
+            && *self != StopState::GroupStopping
+    }
+
+    pub fn is_illegal_transition(&self, new_state: StopState) -> bool {
+        *self == StopState::ForceAwake
+            || (*self == StopState::ForceWaking && new_state != StopState::ForceAwake)
+            || new_state == *self
+            || self.is_downgrade(&new_state)
     }
 }
 
@@ -260,6 +307,13 @@ pub struct TaskMutableState {
     /// This value is set to the `timerslack_ns` of the creating thread, and thus is not constant
     /// across tasks.
     default_timerslack_ns: u64,
+
+    /// The stop state of the task, distinct from the stop state of the thread group.
+    pub stopped: StopState,
+
+    /// Information that a tracer needs to communicate with this process, if it
+    /// is being traced.
+    pub ptrace: Option<PtraceState>,
 }
 
 impl TaskMutableState {
@@ -285,6 +339,69 @@ impl TaskMutableState {
             self.timerslack_ns = self.default_timerslack_ns;
         } else {
             self.timerslack_ns = ns;
+        }
+    }
+
+    pub fn set_stopped(&mut self, stopped: StopState, siginfo: Option<SignalInfo>) {
+        if stopped.ptrace_only() && self.ptrace.is_none() {
+            return;
+        }
+
+        if self.stopped.is_illegal_transition(stopped) {
+            return;
+        }
+
+        // TODO(qsr): When task can be stopped inside user code, task will need to be
+        // either restarted or stopped here.
+        self.stopped = stopped;
+        if let Some(signal) = &siginfo {
+            if let Some(ref mut ptrace) = &mut self.ptrace {
+                // We don't want waiters to think the process was unstopped because
+                // of a sigkill. They will get woken when the process dies.
+                if signal.signal != SIGKILL {
+                    ptrace.waitable = siginfo;
+                }
+            }
+        }
+        if stopped == StopState::Waking || stopped == StopState::ForceWaking {
+            self.notify_ptracees();
+        }
+        if !stopped.is_in_progress() {
+            self.notify_ptracers();
+        }
+    }
+
+    pub fn set_ptrace(&mut self, tracer: Option<pid_t>) -> Result<(), Errno> {
+        if let Some(tracer) = tracer {
+            if self.ptrace.is_some() {
+                return Err(errno!(EPERM));
+            }
+            self.ptrace = Some(PtraceState::new(tracer));
+        } else {
+            self.ptrace = None;
+        }
+        Ok(())
+    }
+
+    pub fn is_ptraced(&self) -> bool {
+        self.ptrace.is_some()
+    }
+
+    pub fn notify_ptracers(&mut self) {
+        if let Some(ptrace) = &self.ptrace {
+            ptrace.tracer_waiters.notify_all();
+        }
+    }
+
+    pub fn wait_on_ptracer(&self, waiter: &Waiter) {
+        if let Some(ptrace) = &self.ptrace {
+            ptrace.tracee_waiters.wait_async(&waiter);
+        }
+    }
+
+    pub fn notify_ptracees(&mut self) {
+        if let Some(ptrace) = &self.ptrace {
+            ptrace.tracee_waiters.notify_all();
         }
     }
 }
@@ -538,6 +655,8 @@ impl Task {
                 timerslack_ns,
                 // The default timerslack is set to the current timerslack of the creating thread.
                 default_timerslack_ns: timerslack_ns,
+                stopped: StopState::Awake,
+                ptrace: None,
             }),
             persistent_info: TaskPersistentInfoState::new(id, pid, command, creds, exit_signal),
             seccomp_filter_state,
@@ -1263,12 +1382,93 @@ impl Task {
             system_time: zx::Duration::default(),
         }
     }
+
+    /// Sets the stop state (per set_stopped), and also notifies all listeners,
+    /// including the parent process if appropriate.
+    pub fn set_stopped_and_notify(&self, stopped: StopState, siginfo: Option<SignalInfo>) {
+        self.write().set_stopped(stopped, siginfo);
+
+        if !stopped.is_in_progress() {
+            let parent = self.thread_group.read().parent.clone();
+            if let Some(parent) = parent {
+                parent.write().child_status_waiters.notify_all();
+            }
+        }
+    }
+
+    /// If the task is stopping, set it as stopped. return whether the caller
+    /// should stop.
+    pub fn finalize_stop_state(&self) -> bool {
+        // Stopping because the thread group is stopping.
+        // Try to flip to GroupStopped - will fail if we shouldn't.
+        let _ = self.thread_group.set_stopped(StopState::GroupStopped, None, true);
+        if self.thread_group.read().stopped == StopState::GroupStopped {
+            // stopping because the thread group has stopped
+            self.write().set_stopped(StopState::GroupStopped, None);
+            return true;
+        }
+
+        // Stopping because the task is stopping
+        let state = self.read();
+        if state.stopped.is_stopping_or_stopped() {
+            let stopped = state.stopped.finalize();
+            drop(state);
+            if let Ok(stopped) = stopped {
+                self.set_stopped_and_notify(stopped, None);
+            }
+            return true;
+        }
+        false
+    }
+
+    /// If waking, promotes from waking to awake.  If not waking, make waiter async
+    /// wait until woken.  Returns true if woken.
+    pub fn wake_or_wait_until_unstopped_async(&self, waiter: &Waiter) -> bool {
+        // If we've woken up, return.
+        let task_stop_state = self.read().stopped;
+        if (task_stop_state == StopState::GroupStopped
+            && self.thread_group.read().stopped.is_waking_or_awake())
+            || task_stop_state.is_waking_or_awake()
+        {
+            let new_state = if task_stop_state.is_waking_or_awake() {
+                task_stop_state.finalize()
+            } else {
+                self.thread_group.read().stopped.finalize()
+            };
+            if let Ok(new_state) = new_state {
+                self.thread_group.set_stopped(new_state, None, false);
+                self.write().set_stopped(new_state, None);
+                return true;
+            }
+        }
+
+        {
+            let group_state = self.thread_group.read();
+            if group_state.stopped.is_stopped() || self.write().stopped.is_stopped() {
+                group_state.stopped_waiters.wait_async(&waiter);
+                self.write().wait_on_ptracer(&waiter);
+            }
+        }
+        false
+    }
 }
 
 impl Releasable for Task {
     type Context<'a> = &'a CurrentTask;
 
     fn release(&self, current_task: &CurrentTask) {
+        // Disconnect from tracer, if one is present.
+        let ptracer_pid = self.read().ptrace.as_ref().map_or(None, |ptrace| Some(ptrace.pid));
+        if let Some(ptracer_pid) = ptracer_pid {
+            if let Some(ProcessEntryRef::Process(tg)) =
+                self.thread_group.kernel.pids.read().get_process(ptracer_pid)
+            {
+                let pid = self.get_pid();
+                tg.ptracees.lock().remove(&pid);
+            }
+            let _ = self.write().set_ptrace(None);
+        }
+
         self.thread_group.remove(self);
 
         // Release the fd table.

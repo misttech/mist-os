@@ -26,8 +26,9 @@ pub fn send_signal(task: &Task, siginfo: SignalInfo) {
     let action = action_for_signal(&siginfo, sigaction);
 
     // Enqueue a masked signal, since it can be unmasked later, but don't enqueue an ignored
-    // signal, since it cannot. See SigtimedwaitTest.IgnoredUnmaskedSignal gvisor test.
-    if action != DeliveryAction::Ignore || action_is_masked {
+    // signal, since it cannot. See SigtimedwaitTest.IgnoredUnmaskedSignal gvisor test.  In
+    // either case, if it is ptraced, enqueue it, so it can do the signal-delivery-stop.
+    if task_state.is_ptraced() || action != DeliveryAction::Ignore || action_is_masked {
         task_state.signals.enqueue(siginfo.clone());
     }
 
@@ -41,8 +42,14 @@ pub fn send_signal(task: &Task, siginfo: SignalInfo) {
 
     // Unstop the process for SIGCONT. Also unstop for SIGKILL, the only signal that can interrupt
     // a stopped process.
-    if siginfo.signal == SIGCONT || siginfo.signal == SIGKILL {
-        task.thread_group.set_stopped(StopState::Waking, Some(siginfo));
+    // Unstop the process for SIGCONT. Also unstop for SIGKILL, the only signal that can interrupt
+    // a stopped process.
+    if siginfo.signal == SIGCONT {
+        task.thread_group.set_stopped(StopState::Waking, Some(siginfo), false);
+        task.write().set_stopped(StopState::Waking, None);
+    } else if siginfo.signal == SIGKILL {
+        task.thread_group.set_stopped(StopState::ForceWaking, Some(siginfo), false);
+        task.write().set_stopped(StopState::ForceWaking, None);
     }
 }
 
@@ -103,8 +110,10 @@ pub fn dequeue_signal(current_task: &mut CurrentTask) {
     let mut task_state = task.write();
 
     let mask = task_state.signals.mask();
-    let siginfo =
-        task_state.signals.take_next_where(|sig| !mask.has_signal(sig.signal) || sig.force);
+    let is_ptraced = task_state.is_ptraced();
+    let siginfo = task_state
+        .signals
+        .take_next_where(|sig| !mask.has_signal(sig.signal) || sig.force || is_ptraced);
     prepare_to_restart_syscall(
         current_task,
         siginfo.as_ref().map(|siginfo| task.thread_group.signal_actions.get(siginfo.signal)),
@@ -113,6 +122,16 @@ pub fn dequeue_signal(current_task: &mut CurrentTask) {
     // A syscall may have been waiting with a temporary mask which should be used to dequeue the
     // signal, but after the signal has been dequeued the old mask should be restored.
     task_state.signals.restore_mask();
+
+    if let Some(ref siginfo) = siginfo {
+        if is_ptraced && siginfo.signal != SIGKILL {
+            // Indicate we will be stopping for ptrace at the next opportunity.
+            // Whether you actually deliver the signal is now up to ptrace, so
+            // we can return.
+            task_state.set_stopped(StopState::SignalDeliveryStopping, Some(siginfo.clone()));
+            return;
+        }
+    }
 
     // Drop the task state before actually setting up any signal handler.
     std::mem::drop(task_state);
@@ -183,7 +202,7 @@ pub fn deliver_signal(task: &Task, mut siginfo: SignalInfo, registers: &mut Regi
             }
             DeliveryAction::Stop => {
                 drop(task_state);
-                task.thread_group.set_stopped(StopState::GroupStopping, Some(siginfo));
+                task.thread_group.set_stopped(StopState::GroupStopping, Some(siginfo), false);
             }
             DeliveryAction::Continue => {
                 // Nothing to do. Effect already happened when the signal was raised.

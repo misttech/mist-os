@@ -222,7 +222,7 @@ pub fn create_filesystem_from_spec<'a>(
 }
 
 /// Block the execution of `current_task` as long as the task is stopped and not terminated.
-pub fn block_while_stopped(current_task: &CurrentTask) {
+pub fn block_while_stopped(current_task: &mut CurrentTask) {
     // Early exit test to avoid creating a port when we don't need to sleep. Testing in the loop
     // after adding the waiter to the wait queue is still important to deal with race conditions
     // where the condition becomes true between checking it and starting the wait.
@@ -234,32 +234,30 @@ pub fn block_while_stopped(current_task: &CurrentTask) {
 
     // Upgrade the state from stopping to stopped if needed. Return if the task
     // should not be stopped.
-    if current_task.thread_group.read().stopped.is_stopping_or_stopped() {
-        current_task.thread_group.set_stopped(StopState::GroupStopped, None);
-    } else {
+    if !current_task.finalize_stop_state() {
         return;
     }
 
     let waiter = Waiter::new_ignoring_signals();
     loop {
-        current_task.thread_group.read().stopped_waiters.wait_async(&waiter);
-
-        // If we've exited, unstop the threads and return without notifying waiters.
+        // If we've exited, unstop the threads and return without notifying
+        // waiters.
         if current_task.read().exit_status.is_some() {
-            current_task.thread_group.set_stopped(StopState::Awake, None);
+            current_task.thread_group.set_stopped(StopState::ForceAwake, None, false);
+            current_task.write().set_stopped(StopState::ForceAwake, None);
             return;
         }
-        if current_task.thread_group.read().stopped.is_waking_or_awake() {
-            current_task.thread_group.set_stopped(StopState::Awake, None);
+
+        if current_task.wake_or_wait_until_unstopped_async(&waiter) {
             return;
         }
 
         // Do the wait. Result is not needed, as this is not in a syscall.
         let _: Result<(), Errno> = waiter.wait(current_task);
 
-        if current_task.thread_group.read().stopped.is_stopping() {
-            current_task.thread_group.set_stopped(StopState::GroupStopped, None);
-        }
+        // Maybe go from stopping to stopped, if we are currently stopping
+        // again.
+        current_task.finalize_stop_state();
     }
 }
 
@@ -270,13 +268,17 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_block_while_stopped_stop_and_continue() {
-        let (_kernel, task) = create_kernel_and_task();
+        let (_kernel, mut task) = create_kernel_and_task();
 
         // block_while_stopped must immediately returned if the task is not stopped.
-        block_while_stopped(&task);
+        block_while_stopped(&mut task);
 
         // Stop the task.
-        task.thread_group.set_stopped(StopState::GroupStopping, Some(SignalInfo::default(SIGSTOP)));
+        task.thread_group.set_stopped(
+            StopState::GroupStopping,
+            Some(SignalInfo::default(SIGSTOP)),
+            false,
+        );
 
         let thread = std::thread::spawn({
             let task = task.weak_task();
@@ -288,30 +290,37 @@ mod tests {
                 }
 
                 // Continue the task.
-                task.thread_group
-                    .set_stopped(StopState::Waking, Some(SignalInfo::default(SIGCONT)));
+                task.thread_group.set_stopped(
+                    StopState::Waking,
+                    Some(SignalInfo::default(SIGCONT)),
+                    false,
+                );
             }
         });
 
         // Block until continued.
-        block_while_stopped(&task);
+        block_while_stopped(&mut task);
 
         // Join the thread, which will ensure set_stopped terminated.
         thread.join().expect("joined");
 
         // The task should not be blocked anymore.
-        block_while_stopped(&task);
+        block_while_stopped(&mut task);
     }
 
     #[::fuchsia::test]
     async fn test_block_while_stopped_stop_and_exit() {
-        let (_kernel, task) = create_kernel_and_task();
+        let (_kernel, mut task) = create_kernel_and_task();
 
         // block_while_stopped must immediately returned if the task is neither stopped nor exited.
-        block_while_stopped(&task);
+        block_while_stopped(&mut task);
 
         // Stop the task.
-        task.thread_group.set_stopped(StopState::GroupStopping, Some(SignalInfo::default(SIGSTOP)));
+        task.thread_group.set_stopped(
+            StopState::GroupStopping,
+            Some(SignalInfo::default(SIGSTOP)),
+            false,
+        );
 
         let thread = std::thread::spawn({
             let task = task.weak_task();
@@ -328,12 +337,12 @@ mod tests {
         });
 
         // Block until continued.
-        block_while_stopped(&task);
+        block_while_stopped(&mut task);
 
         // Join the task, which will ensure thread_group.exit terminated.
         thread.join().expect("joined");
 
         // The task should not be blocked because it is stopped.
-        block_while_stopped(&task);
+        block_while_stopped(&mut task);
     }
 }

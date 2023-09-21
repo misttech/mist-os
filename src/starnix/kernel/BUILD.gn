@@ -338,6 +338,7 @@ rustc_binary("starnix_kernel_bin") {
     "task/net.rs",
     "task/pid_table.rs",
     "task/process_group.rs",
+    "task/ptrace.rs",
     "task/scheduler.rs",
     "task/seccomp.rs",
     "task/session.rs",
