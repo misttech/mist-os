@@ -177,7 +177,10 @@ foreach(test, shard_test_list) {
   }
 }
 
-lacewing_test_list = [ "flatland_benchmark" ]
+lacewing_test_list = [
+  "flatland_benchmark",
+  "input_latency_benchmark",
+]
 
 if (is_host) {
   foreach(test_name, lacewing_test_list) {
@@ -319,7 +322,7 @@ group("package_deps") {
     # Used by network device benchmarks.
     "//src/connectivity/network/drivers/network-device/device:network-device-microbenchmarks",
 
-    # These are used by flatland_benchmarks.
+    # These are used by flatland_benchmarks and input_latency_benchmarks
     "//src/ui/examples:flatland-examples",
 
     # This is used by storage_benchmarks_test.

@@ -48,6 +48,10 @@ Lacewing:
     end-to-end present latency, measured by tracing flow events, for minimal
     Flatland client (`flatland-view-provider`).
 
+*   `py_input_latency_benchmark` - Tests the performance of
+    end-to-end input latency, measured by tracing flow events, for minimal
+    Scenic clients (`simplest-app-flatland-session`).
+
 You can view the test results from CI builds in [Chromeperf][chromeperf].
 
 <!-- Reference links -->
