@@ -114,6 +114,9 @@ size_checker_input = {
         "wlancfg",
         "wlandevicemonitor",
         "wlanstack",
+        "wlanif",
+        "wlanphy",
+        "wlan",
       ]
       limit = 2615148  # 2.494 MiB
       creep_limit = 81920  # 80.0 KiB
