@@ -15,6 +15,7 @@ rustc_library("diagnostics-assertions") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:difference",
     "//third_party/rust_crates:num-traits",
+    "//third_party/rust_crates:regex",
   ]
 
   test_deps = [ "//src/lib/fuchsia" ]

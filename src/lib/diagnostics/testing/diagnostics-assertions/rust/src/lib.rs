@@ -16,6 +16,7 @@ use {
     },
     difference::{Changeset, Difference},
     num_traits::One,
+    regex::Regex,
     std::{
         collections::BTreeSet,
         fmt::{Debug, Display, Formatter, Result as FmtResult},
@@ -544,6 +545,76 @@ impl<K> PropertyAssertion<K> for AnyProperty {
     }
 }
 
+/// A PropertyAssertion that passes for any String.
+pub struct AnyStringProperty;
+
+impl<K> PropertyAssertion<K> for AnyStringProperty {
+    fn run(&self, actual: &Property<K>) -> Result<(), Error> {
+        match actual {
+            Property::String(..) => Ok(()),
+            _ => Err(format_err!("expected String, found {}", actual.discriminant_name())),
+        }
+    }
+}
+
+/// A PropertyAssertion that passes for any String containing
+/// a matching for the given regular expression.
+pub struct StringPropertyRegex<'a> {
+    original: &'a str,
+    re: Regex,
+}
+
+impl<'a> StringPropertyRegex<'a> {
+    pub fn new(s: &'a str) -> StringPropertyRegex<'a> {
+        Self { original: s, re: Regex::new(s).expect("invalid regular expression") }
+    }
+}
+
+impl<K> PropertyAssertion<K> for StringPropertyRegex<'_> {
+    fn run(&self, actual: &Property<K>) -> Result<(), Error> {
+        if let Property::String(_, ref v) = actual {
+            if self.re.is_match(v) {
+                return Ok(());
+            } else {
+                return Err(format_err!(
+                    "expected String matching \"{}\", found \"{}\"",
+                    self.original,
+                    v
+                ));
+            }
+        }
+        Err(format_err!(
+            "expected String matching \"{}\", found {}",
+            self.original,
+            actual.discriminant_name()
+        ))
+    }
+}
+
+/// A PropertyAssertion that passes for any Bytes.
+pub struct AnyBytesProperty;
+
+impl<K> PropertyAssertion<K> for AnyBytesProperty {
+    fn run(&self, actual: &Property<K>) -> Result<(), Error> {
+        match actual {
+            Property::Bytes(..) => Ok(()),
+            _ => Err(format_err!("expected bytes, found {}", actual.discriminant_name())),
+        }
+    }
+}
+
+/// A PropertyAssertion that passes for any Uint.
+pub struct AnyUintProperty;
+
+impl<K> PropertyAssertion<K> for AnyUintProperty {
+    fn run(&self, actual: &Property<K>) -> Result<(), Error> {
+        match actual {
+            Property::Uint(..) => Ok(()),
+            _ => Err(format_err!("expected Uint, found {}", actual.discriminant_name())),
+        }
+    }
+}
+
 /// A PropertyAssertion that passes for non-zero, unsigned integers.
 ///
 /// TODO(fxbug.dev/62447): generalize this to use the >= operator.
@@ -559,6 +630,57 @@ impl<K> PropertyAssertion<K> for NonZeroUintProperty {
             _ => {
                 Err(format_err!("expected non-zero integer, found {}", actual.discriminant_name()))
             }
+        }
+    }
+}
+
+/// A PropertyAssertion that passes for any Int.
+pub struct AnyIntProperty;
+
+impl<K> PropertyAssertion<K> for AnyIntProperty {
+    fn run(&self, actual: &Property<K>) -> Result<(), Error> {
+        match actual {
+            Property::Int(..) => Ok(()),
+            _ => Err(format_err!("expected Int, found {}", actual.discriminant_name())),
+        }
+    }
+}
+
+/// A PropertyAssertion that passes for any Double.
+pub struct AnyDoubleProperty;
+
+impl<K> PropertyAssertion<K> for AnyDoubleProperty {
+    fn run(&self, actual: &Property<K>) -> Result<(), Error> {
+        match actual {
+            Property::Double(..) => Ok(()),
+            _ => Err(format_err!("expected Double, found {}", actual.discriminant_name())),
+        }
+    }
+}
+
+/// A PropertyAssertion that passes for any Int, Uint, or Double.
+pub struct AnyNumericProperty;
+
+impl<K> PropertyAssertion<K> for AnyNumericProperty {
+    fn run(&self, actual: &Property<K>) -> Result<(), Error> {
+        match actual {
+            Property::Int(..) | Property::Uint(..) | Property::Double(..) => Ok(()),
+            _ => Err(format_err!(
+                "expected an Int, Uint or Double. found {}",
+                actual.discriminant_name()
+            )),
+        }
+    }
+}
+
+/// A PropertyAssertion that passes for any Boolean.
+pub struct AnyBoolProperty;
+
+impl<K> PropertyAssertion<K> for AnyBoolProperty {
+    fn run(&self, actual: &Property<K>) -> Result<(), Error> {
+        match actual {
+            Property::Bool(..) => Ok(()),
+            _ => Err(format_err!("expected Bool, found {}", actual.discriminant_name())),
         }
     }
 }
@@ -1083,6 +1205,111 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn test_any_string_property_passes() {
+        let diagnostics_hierarchy = DiagnosticsHierarchy::new(
+            "key",
+            vec![
+                Property::String("value1".to_string(), "a".to_string()),
+                Property::String("value2".to_string(), "b".to_string()),
+            ],
+            vec![],
+        );
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            value1: AnyStringProperty,
+            value2: AnyStringProperty,
+        });
+    }
+
+    #[fuchsia::test]
+    #[should_panic]
+    fn test_any_string_property_fails() {
+        let diagnostics_hierarchy = DiagnosticsHierarchy::new(
+            "key",
+            vec![Property::Int("value1".to_string(), 10i64)],
+            vec![],
+        );
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            value1: AnyStringProperty,
+        });
+    }
+
+    #[fuchsia::test]
+    fn test_string_property_regex_passes() {
+        let diagnostics_hierarchy = DiagnosticsHierarchy::new(
+            "key",
+            vec![Property::String("value1".to_string(), "aaaabbbb".to_string())],
+            vec![],
+        );
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            value1: StringPropertyRegex::new("a{4}b{4}"),
+        });
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            value1: StringPropertyRegex::new("a{4}"),
+        });
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            value1: StringPropertyRegex::new("a{2}b{2}"),
+        });
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            value1: StringPropertyRegex::new("b{4}"),
+        });
+    }
+
+    #[fuchsia::test]
+    #[should_panic]
+    fn test_string_property_regex_no_match() {
+        let diagnostics_hierarchy = DiagnosticsHierarchy::new(
+            "key",
+            vec![Property::String("value1".to_string(), "bbbbcccc".to_string())],
+            vec![],
+        );
+        assert_data_tree!(diagnostics_hierarchy, key: {
+                value: StringPropertyRegex::new("b{2}d{2}"),
+        });
+    }
+
+    #[fuchsia::test]
+    #[should_panic]
+    fn test_string_property_regex_wrong_type() {
+        let diagnostics_hierarchy = DiagnosticsHierarchy::new(
+            "key",
+            vec![Property::Int("value1".to_string(), 10i64)],
+            vec![],
+        );
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            value1: StringPropertyRegex::new("a{4}"),
+        });
+    }
+
+    #[fuchsia::test]
+    fn test_any_bytes_property_passes() {
+        let diagnostics_hierarchy = DiagnosticsHierarchy::new(
+            "key",
+            vec![
+                Property::Bytes("value1".to_string(), vec![1, 2, 3]),
+                Property::Bytes("value2".to_string(), vec![4, 5, 6]),
+            ],
+            vec![],
+        );
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            value1: AnyBytesProperty,
+            value2: AnyBytesProperty,
+        });
+    }
+
+    #[fuchsia::test]
+    #[should_panic]
+    fn test_any_bytes_property_fails() {
+        let diagnostics_hierarchy = DiagnosticsHierarchy::new(
+            "key",
+            vec![Property::Int("value1".to_string(), 10i64)],
+            vec![],
+        );
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            value1: AnyBytesProperty,
+        });
+    }
+
+    #[fuchsia::test]
     fn test_nonzero_uint_property_passes() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
@@ -1121,6 +1348,153 @@ mod tests {
         );
         assert_data_tree!(diagnostics_hierarchy, key: {
             value1: NonZeroUintProperty,
+        });
+    }
+
+    #[fuchsia::test]
+    fn test_uint_property_passes() {
+        let diagnostics_hierarchy = DiagnosticsHierarchy::new(
+            "key",
+            vec![
+                Property::Uint("value1".to_string(), 10u64),
+                Property::Uint("value2".to_string(), 20u64),
+            ],
+            vec![],
+        );
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            value1: AnyUintProperty,
+            value2: AnyUintProperty,
+        });
+    }
+
+    #[fuchsia::test]
+    #[should_panic]
+    fn test_uint_property_fails() {
+        let diagnostics_hierarchy = DiagnosticsHierarchy::new(
+            "key",
+            vec![Property::Int("value1".to_string(), 10i64)],
+            vec![],
+        );
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            value1: AnyUintProperty,
+        });
+    }
+
+    #[fuchsia::test]
+    fn test_int_property_passes() {
+        let diagnostics_hierarchy = DiagnosticsHierarchy::new(
+            "key",
+            vec![
+                Property::Int("value1".to_string(), 10i64),
+                Property::Int("value2".to_string(), 20i64),
+            ],
+            vec![],
+        );
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            value1: AnyIntProperty,
+            value2: AnyIntProperty,
+        });
+    }
+
+    #[fuchsia::test]
+    #[should_panic]
+    fn test_int_property_fails() {
+        let diagnostics_hierarchy = DiagnosticsHierarchy::new(
+            "key",
+            vec![Property::Uint("value1".to_string(), 0u64)],
+            vec![],
+        );
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            value1: AnyIntProperty,
+        });
+    }
+
+    #[fuchsia::test]
+    fn test_double_property_passes() {
+        let diagnostics_hierarchy = DiagnosticsHierarchy::new(
+            "key",
+            vec![
+                Property::Double("value1".to_string(), std::f64::consts::PI),
+                Property::Double("value2".to_string(), std::f64::consts::E),
+            ],
+            vec![],
+        );
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            value1: AnyDoubleProperty,
+            value2: AnyDoubleProperty,
+        });
+    }
+
+    #[fuchsia::test]
+    #[should_panic]
+    fn test_double_property_fails() {
+        let diagnostics_hierarchy = DiagnosticsHierarchy::new(
+            "key",
+            vec![Property::Uint("value1".to_string(), 0u64)],
+            vec![],
+        );
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            value1: AnyDoubleProperty,
+        });
+    }
+
+    #[fuchsia::test]
+    fn test_numeric_property_passes() {
+        let diagnostics_hierarchy = DiagnosticsHierarchy::new(
+            "key",
+            vec![
+                Property::Int("value1".to_string(), 10i64),
+                Property::Uint("value2".to_string(), 20u64),
+                Property::Double("value3".to_string(), std::f64::consts::PI),
+            ],
+            vec![],
+        );
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            value1: AnyNumericProperty,
+            value2: AnyNumericProperty,
+            value3: AnyNumericProperty,
+        });
+    }
+
+    #[fuchsia::test]
+    #[should_panic]
+    fn test_numeric_property_fails() {
+        let diagnostics_hierarchy = DiagnosticsHierarchy::new(
+            "key",
+            vec![Property::String("value1".to_string(), "a".to_string())],
+            vec![],
+        );
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            value1: AnyNumericProperty,
+        });
+    }
+
+    #[fuchsia::test]
+    fn test_bool_property_passes() {
+        let diagnostics_hierarchy = DiagnosticsHierarchy::new(
+            "key",
+            vec![
+                Property::Bool("value1".to_string(), true),
+                Property::Bool("value2".to_string(), false),
+            ],
+            vec![],
+        );
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            value1: AnyBoolProperty,
+            value2: AnyBoolProperty,
+        });
+    }
+
+    #[fuchsia::test]
+    #[should_panic]
+    fn test_bool_property_fails() {
+        let diagnostics_hierarchy = DiagnosticsHierarchy::new(
+            "key",
+            vec![Property::Uint("value1".to_string(), 0u64)],
+            vec![],
+        );
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            value1: AnyBoolProperty,
         });
     }
 
