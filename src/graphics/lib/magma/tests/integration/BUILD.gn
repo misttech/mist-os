@@ -35,9 +35,9 @@ executable("magma_conformance_tests") {
   deps = [
     "$magma_build_root/include:magma",
     "$magma_build_root/src/libmagma",
-    "$magma_build_root/tests/helper:magma_map_cpu",
     "//src/graphics/drivers/msd-arm-mali/include",
     "//src/graphics/drivers/msd-intel-gen/include",
+    "//src/graphics/magma/lib/magma_client/test_util:magma_map_cpu",
     "//src/lib/fsl",
     "//src/lib/fxl",
     "//src/lib/testing/loop_fixture",
@@ -74,9 +74,9 @@ executable("magma_conformance_tests_hermetic") {
   deps = [
     "$magma_build_root/include:magma",
     "$magma_build_root/src/libmagma:magma_hermetic",
-    "$magma_build_root/tests/helper:magma_map_cpu",
     "//src/graphics/drivers/msd-arm-mali/include",
     "//src/graphics/drivers/msd-intel-gen/include",
+    "//src/graphics/magma/lib/magma_client/test_util:magma_map_cpu",
     "//src/lib/fsl",
     "//src/lib/fxl",
     "//src/lib/testing/loop_fixture",
@@ -112,9 +112,9 @@ executable("virtmagma_conformance_tests") {
   deps = [
     "$magma_build_root/include:magma",
     "$magma_build_root/src/libmagma_virt",
-    "$magma_build_root/tests/helper:magma_map_cpu",
     "//src/graphics/drivers/msd-arm-mali/include",
     "//src/graphics/drivers/msd-intel-gen/include",
+    "//src/graphics/magma/lib/magma_client/test_util:magma_map_cpu",
     "//src/lib/fxl",
     "//third_party/googletest:gtest",
   ]

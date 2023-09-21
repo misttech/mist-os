@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_MAGMA_MAP_CPU_H_
-#define SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_MAGMA_MAP_CPU_H_
+#ifndef SRC_GRAPHICS_MAGMA_LIB_MAGMA_CLIENT_TEST_UTIL_MAGMA_MAP_CPU_H_
+#define SRC_GRAPHICS_MAGMA_LIB_MAGMA_CLIENT_TEST_UTIL_MAGMA_MAP_CPU_H_
 
 #include <lib/magma/magma.h>
 #include <stddef.h>
@@ -18,4 +18,4 @@ bool UnmapCpuHelper(void* addr, size_t length);
 
 }  // namespace magma
 
-#endif  // SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_MAGMA_MAP_CPU_H_
+#endif  // SRC_GRAPHICS_MAGMA_LIB_MAGMA_CLIENT_TEST_UTIL_MAGMA_MAP_CPU_H_

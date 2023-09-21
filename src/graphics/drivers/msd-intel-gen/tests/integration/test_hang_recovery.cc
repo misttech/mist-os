@@ -9,15 +9,15 @@
 #include <lib/magma/util/dlog.h>
 #include <lib/magma/util/short_macros.h>
 #include <lib/magma/util/utils.h>
+#include <lib/magma_client/test_util/inflight_list.h>
+#include <lib/magma_client/test_util/magma_map_cpu.h>
+#include <lib/magma_client/test_util/test_device_helper.h>
 #include <lib/zx/channel.h>
 
 #include <thread>
 
 #include <gtest/gtest.h>
 
-#include "helper/inflight_list.h"
-#include "helper/magma_map_cpu.h"
-#include "helper/test_device_helper.h"
 #include "magma_intel_gen_defs.h"
 
 namespace {

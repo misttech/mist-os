@@ -8,12 +8,11 @@
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/magma/magma.h>
 #include <lib/magma/util/short_macros.h>
+#include <lib/magma_client/test_util/test_device_helper.h>
 #include <lib/zx/channel.h>
 #include <magma_intel_gen_defs.h>
 
 #include <gtest/gtest.h>
-
-#include "helper/test_device_helper.h"
 
 namespace {
 

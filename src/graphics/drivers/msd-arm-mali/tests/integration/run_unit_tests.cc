@@ -7,6 +7,7 @@
 #include <lib/fit/defer.h>
 #include <lib/magma/magma.h>
 #include <lib/magma/util/short_macros.h>
+#include <lib/magma_client/test_util/test_device_helper.h>
 #include <lib/zx/channel.h>
 
 #include <shared_mutex>
@@ -15,7 +16,6 @@
 #include <gtest/gtest.h>
 
 #include "driver_registry.h"
-#include "helper/test_device_helper.h"
 #include "magma_vendor_queries.h"
 
 // The test build of the MSD runs a bunch of unit tests automatically when it loads. We need to

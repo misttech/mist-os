@@ -6,12 +6,11 @@
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <lib/fdio/directory.h>
 #include <lib/fit/defer.h>
+#include <lib/magma_client/test_util/test_device_helper.h>
 #include <lib/zx/channel.h>
 #include <magma_intel_gen_defs.h>
 
 #include <gtest/gtest.h>
-
-#include "helper/test_device_helper.h"
 
 // The test build of the MSD runs a bunch of unit tests automatically when it loads. We need to
 // unload the normal MSD to replace it with the test MSD so we can run those tests and query the

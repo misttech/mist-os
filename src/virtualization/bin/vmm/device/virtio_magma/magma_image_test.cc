@@ -4,10 +4,11 @@
 
 #include "magma_image.h"
 
+#include <lib/magma_client/test_util/test_device_helper.h>
+
 #include <gtest/gtest.h>
 
 #include "drm_fourcc.h"
-#include "src/graphics/lib/magma/tests/helper/test_device_helper.h"
 
 class MagmaImageTesting : public ::testing::Test {};
 

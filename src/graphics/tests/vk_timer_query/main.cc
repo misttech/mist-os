@@ -4,6 +4,7 @@
 
 #include <lib/fdio/unsafe.h>
 #include <lib/magma/magma.h>
+#include <lib/magma_client/test_util/test_device_helper.h>
 #include <lib/zx/vmo.h>
 
 #include <thread>
@@ -11,7 +12,6 @@
 #include <gtest/gtest.h>
 
 #include "../vkreadback/vkreadback.h"
-#include "helper/test_device_helper.h"
 #include "magma_vendor_queries.h"
 #include "src/lib/fxl/test/test_settings.h"
 

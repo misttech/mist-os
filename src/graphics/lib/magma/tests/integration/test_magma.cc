@@ -17,9 +17,9 @@
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/magma/magma_sysmem.h>
-#include <lib/magma/platform/platform_logger.h>
-#include <lib/magma/platform/platform_logger_provider.h>
-#include <lib/magma/platform/platform_trace_provider.h>
+#include <lib/magma/platform/platform_logger.h>           // nogncheck
+#include <lib/magma/platform/platform_logger_provider.h>  // nogncheck
+#include <lib/magma/platform/platform_trace_provider.h>   // nogncheck
 #include <lib/zx/channel.h>
 #include <lib/zx/vmar.h>
 
@@ -40,10 +40,10 @@
 
 #include <lib/magma/magma.h>
 #include <lib/magma/magma_common_defs.h>
+#include <lib/magma_client/test_util/magma_map_cpu.h>
 
 #include <gtest/gtest.h>
 
-#include "helper/magma_map_cpu.h"
 #include "magma_intel_gen_defs.h"
 #include "src/graphics/drivers/msd-arm-mali/include/magma_arm_mali_types.h"
 #include "src/graphics/drivers/msd-arm-mali/include/magma_vendor_queries.h"

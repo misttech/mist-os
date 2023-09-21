@@ -4,15 +4,14 @@
 
 #include <lib/magma/magma.h>
 #include <lib/magma/util/utils.h>
+#include <lib/magma_client/test_util/inflight_list.h>
+#include <lib/magma_client/test_util/magma_map_cpu.h>
+#include <lib/magma_client/test_util/test_device_helper.h>
 #include <magma_intel_gen_defs.h>
 
 #include <vector>
 
 #include <gtest/gtest.h>
-
-#include "helper/inflight_list.h"
-#include "helper/magma_map_cpu.h"
-#include "helper/test_device_helper.h"
 
 namespace {
 

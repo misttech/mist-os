@@ -18,7 +18,7 @@ executable("vkloop_bin") {
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
     "//src/graphics/lib/magma/include:magma",
     "//src/graphics/lib/magma/src/libmagma",
-    "//src/graphics/lib/magma/tests/helper:test_device_helper",
+    "//src/graphics/magma/lib/magma_client/test_util:test_device_helper",
     "//src/graphics/tests/common",
   ]
   public_deps = [

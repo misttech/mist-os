@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/magma/magma.h>
+#include <lib/magma_client/test_util/magma_map_cpu.h>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -11,7 +12,6 @@
 #include <vector>
 
 #include <gtest/gtest.h>
-#include <helper/magma_map_cpu.h>
 
 #include "test_magma_vsi.h"
 

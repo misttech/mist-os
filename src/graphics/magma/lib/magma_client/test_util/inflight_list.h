@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_INFLIGHT_LIST_H_
-#define SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_INFLIGHT_LIST_H_
+#ifndef SRC_GRAPHICS_MAGMA_LIB_MAGMA_CLIENT_TEST_UTIL_INFLIGHT_LIST_H_
+#define SRC_GRAPHICS_MAGMA_LIB_MAGMA_CLIENT_TEST_UTIL_INFLIGHT_LIST_H_
 
 #include <lib/magma/magma.h>
 #include <lib/magma/util/dlog.h>
@@ -77,4 +77,4 @@ class InflightList {
 
 }  // namespace magma
 
-#endif  // SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_INFLIGHT_LIST_H_
+#endif  // SRC_GRAPHICS_MAGMA_LIB_MAGMA_CLIENT_TEST_UTIL_INFLIGHT_LIST_H_

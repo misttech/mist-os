@@ -55,22 +55,6 @@ source_set("msd_stubs") {
   public_deps = [ "//src/graphics/magma:msd" ]
 }
 
-source_set("test_device_helper") {
-  testonly = true
-  public_configs = [ "//src/graphics/lib/magma:magma_tests_include_config" ]
-
-  public_deps = [
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
-    "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
-    "//sdk/lib/component/incoming/cpp",
-    "//src/graphics/lib/magma/src/libmagma",
-    "//third_party/googletest:gtest",
-    "//zircon/system/ulib/zx",
-  ]
-
-  sources = [ "test_device_helper.h" ]
-}
-
 source_set("logger_init_helper") {
   testonly = true
   sources = [ "logger_init_helper.cc" ]
@@ -81,35 +65,4 @@ source_set("logger_init_helper") {
     "//src/graphics/magma/lib/magma/platform:logger_provider_header",
     "//zircon/system/ulib/zx",
   ]
-}
-
-source_set("inflight_list") {
-  testonly = true
-
-  public_configs = [ "//src/graphics/lib/magma:magma_tests_include_config" ]
-
-  sources = [ "inflight_list.h" ]
-
-  public_deps = [
-    "$magma_build_root/include:magma",
-    "//src/graphics/magma/lib/magma/util:macros",
-    "//src/graphics/magma/lib/magma/util:status",
-  ]
-}
-
-source_set("magma_map_cpu") {
-  testonly = true
-
-  public_configs = [ "//src/graphics/lib/magma:magma_tests_include_config" ]
-
-  sources = [
-    "magma_map_cpu.cc",
-    "magma_map_cpu.h",
-  ]
-
-  public_deps = [ "$magma_build_root/include:magma" ]
-
-  if (is_fuchsia) {
-    deps = [ "//zircon/system/ulib/zx" ]
-  }
 }
