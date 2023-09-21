@@ -4,9 +4,11 @@
 
 # Compiled tools that are depended on by shac checks under //scripts/shac.
 group("shac_tools") {
+  testonly = true
   deps = [
     "//build/tools/formatjson5:formatjson5.actual($host_toolchain)",
     "//tools/cmc:cmc.actual($host_toolchain)",
+    "//tools/doc_checker:doc_checker_bin.actual($host_toolchain)",
     "//tools/fidl/fidlc:fidl-format($host_toolchain)",
     "//tools/fidl/fidlc:fidl-lint($host_toolchain)",
   ]

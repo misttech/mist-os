@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 load("./cml.star", "register_cml_checks")
-load("./common.star", "FORMATTER_MSG", "cipd_platform_name")
+load("./common.star", "FORMATTER_MSG", "cipd_platform_name", "compiled_tool_path")
 load("./fidl.star", "register_fidl_checks")
 load("./go.star", "register_go_checks")
 load("./json.star", "register_json_checks")
@@ -44,6 +44,36 @@ def _gn_format(ctx):
             replacements = [formatted_contents],
         )
 
+def _doc_checker(ctx):
+    """Runs the doc-checker tool."""
+
+    # If a Markdown change is present (including a deletion of a markdown file),
+    # check the entire project.
+    if not any([f.endswith(".md") for f in ctx.scm.affected_files()]):
+        return
+
+    exe = compiled_tool_path(ctx, "doc-checker")
+    res = ctx.os.exec([exe, "--local-links-only"], ok_retcodes = [0, 1]).wait()
+    if res.retcode == 0:
+        return
+    lines = res.stdout.split("\n")
+    for i in range(0, len(lines), 4):
+        # The doc-checker output contains 4-line plain text entries of the
+        # form:
+        # """Error
+        # /path/to/file:<line_number>
+        # The error message
+        # """
+        if i + 4 > len(lines):
+            break
+        _, location, msg, _ = lines[i:i + 4]
+        abspath = location.split(":", 1)[0]
+        ctx.emit.finding(
+            level = "error",
+            filepath = abspath[len(ctx.scm.root) + 1:],
+            message = msg + "\n\n" + "Run `fx doc-checker --local-links-only` to reproduce.",
+        )
+
 def register_all_checks():
     """Register all checks that should run.
 
@@ -52,6 +82,14 @@ def register_all_checks():
     file.
     """
     shac.register_check(shac.check(_gn_format, formatter = True))
+    shac.register_check(shac.check(
+        _doc_checker,
+        # TODO(olivernewman): doc-checker has historically been run from `fx
+        # format-code` even though it's not a formatter and doesn't write
+        # results back to disk. Determine whether anyone depends on doc-checker
+        # running with `fx format-code`, and unset `formatter = True`.
+        formatter = True,
+    ))
     register_cml_checks()
     register_fidl_checks()
     register_go_checks()
