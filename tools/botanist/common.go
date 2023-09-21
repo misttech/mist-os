@@ -42,10 +42,6 @@ func NewLockedWriter(ctx context.Context, writer io.Writer) *LockedWriter {
 			<-lock.end
 		}
 	}()
-	go func() {
-		<-ctx.Done()
-		close(w.locks)
-	}()
 	return w
 }
 
@@ -59,6 +55,10 @@ func (w *LockedWriter) Write(data []byte) (int, error) {
 	// Defer sending struct on chan to signal end of write.
 	defer func() { end <- struct{}{} }()
 	return w.writer.Write(data)
+}
+
+func (w *LockedWriter) Close() {
+	close(w.locks)
 }
 
 // LineWriter is a wrapper around a writer that writes line by line so
