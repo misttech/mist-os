@@ -8,7 +8,7 @@
 // the #subpackaged-runner-env.
 //
 // The following subpackages need to be added to the test's
-// ctf_fuchsia_test_package definition:
+// ctf_fuchsia_package definition:
 //
 // subpackages = [
 //  "//src/sys/test_runners/lib_loader_cache:lib_loader_runner_cache",

@@ -4,7 +4,8 @@
 
 import("//sdk/ctf/build/ctf.gni")
 
-# TODO(109696): Add this to //sdk/ctf/tests.
+# TODO(109696): Add this test to CTF by following the guide at
+# https://fuchsia.dev/fuchsia-src/development/testing/ctf/contributing_tests.
 ctf_rustc_test("collections_integration_test_bin") {
   name = "collections_integration_test"
   edition = "2021"
@@ -80,7 +81,7 @@ ctf_fuchsia_component("collections_integration_test_component") {
   ]
 }
 
-ctf_fuchsia_test_package("collections_integration_test") {
+fuchsia_test_package("collections_integration_test") {
   package_name = "collections_integration_test"
   test_components = [ ":collections_integration_test_component" ]
 }
