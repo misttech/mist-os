@@ -9,7 +9,7 @@
 
 #if __Fuchsia_API_level__ >= 13
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 15
 #include <lib/fit/function.h>
 #else
 #include <lib/driver/symbols/symbols.h>
@@ -20,7 +20,7 @@
 
 namespace fdf {
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 15
 // This class is a wrapper for a callback type that must be called into exactly once
 // before destruction. It is a move only type.
 class Completer {

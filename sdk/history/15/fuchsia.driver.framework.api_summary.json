@@ -119,6 +119,29 @@
         "resourceness": "resource"
     },
     {
+        "kind": "protocol/member",
+        "name": "fuchsia.driver.framework/Driver.Start",
+        "strictness": "flexible",
+        "ordinal": "2863727161496985794",
+        "direction": "two_way",
+        "request": "fuchsia.driver.framework/DriverStartRequest",
+        "response": "fuchsia.driver.framework/Driver_Start_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.driver.framework/Driver.Stop",
+        "strictness": "flexible",
+        "ordinal": "5446759044519003197",
+        "direction": "one_way"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.driver.framework/Driver",
+        "openness": "open",
+        "transport": "driver"
+    },
+    {
         "kind": "table/member",
         "name": "fuchsia.driver.framework/DriverStartArgs.config",
         "ordinal": "7",
@@ -169,6 +192,17 @@
     {
         "kind": "table",
         "name": "fuchsia.driver.framework/DriverStartArgs",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.driver.framework/DriverStartRequest.start_args",
+        "ordinal": "1",
+        "type": "fuchsia.driver.framework/DriverStartArgs"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.driver.framework/DriverStartRequest",
         "resourceness": "resource"
     },
     {

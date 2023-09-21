@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #if __Fuchsia_API_level__ >= 13
-#if __Fuchsia_API_level__ < FUCHSIA_HEAD
+#if __Fuchsia_API_level__ < 15
 
 #include <lib/driver/component/cpp/internal/lifecycle.h>
 #include <lib/driver/component/cpp/internal/start_args.h>

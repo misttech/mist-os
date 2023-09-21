@@ -9,7 +9,7 @@
 
 #if __Fuchsia_API_level__ >= 13
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 15
 #include <lib/driver/component/cpp/start_completer.h>
 #else
 #include <lib/driver/symbols/symbols.h>
@@ -18,7 +18,7 @@
 
 namespace fdf {
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 15
 // This is the completer for the PrepareStop operation in |DriverBase|.
 class PrepareStopCompleter : public Completer {
  public:

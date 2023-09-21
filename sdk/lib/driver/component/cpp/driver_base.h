@@ -78,7 +78,7 @@ extern bool logger_wait_for_initial_interest;
 // https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#synchronized-dispatcher
 class DriverBase {
  public:
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 15
   // Gets the DriverBase instance from the given token. This is only intended for testing.
   template <typename DriverBaseImpl>
   static DriverBaseImpl* GetInstanceFromTokenForTesting(void* token) {

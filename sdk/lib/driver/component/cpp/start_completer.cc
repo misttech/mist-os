@@ -7,13 +7,13 @@
 #include <lib/driver/component/cpp/start_completer.h>
 #include <zircon/assert.h>
 
-#if __Fuchsia_API_level__ < FUCHSIA_HEAD
+#if __Fuchsia_API_level__ < 15
 #include <lib/driver/component/cpp/driver_base.h>
 #endif
 
 namespace fdf {
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 15
 Completer::~Completer() {
   ZX_ASSERT_MSG(callback_ == std::nullopt, "Completer was not called before going out of scope.");
 }

@@ -6,7 +6,7 @@
 
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
 
-#if __Fuchsia_API_level__ < FUCHSIA_HEAD
+#if __Fuchsia_API_level__ < 15
 #include <chrono>
 
 #include "lib/fdf/testing.h"
@@ -14,7 +14,7 @@
 
 namespace fdf_testing {
 
-#if __Fuchsia_API_level__ < FUCHSIA_HEAD
+#if __Fuchsia_API_level__ < 15
 namespace internal {
 
 void StartDriverV3(const DriverLifecycle& lifecycle, EncodedDriverStartArgs encoded_start_args,
@@ -110,7 +110,7 @@ void DriverUnderTestBase::handle_unknown_event(
 
 DriverRuntime::AsyncTask<zx::result<>> DriverUnderTestBase::Start(fdf::DriverStartArgs start_args) {
   std::lock_guard guard(checker_);
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 15
   fdf::Arena arena('STRT');
   fpromise::bridge<zx::result<>> bridge;
   driver_client_.buffer(arena)
@@ -179,7 +179,7 @@ DriverRuntime::AsyncTask<zx::result<>> DriverUnderTestBase::Start(fdf::DriverSta
 }
 
 DriverRuntime::AsyncTask<zx::result<>> DriverUnderTestBase::PrepareStop() {
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 15
   std::lock_guard guard(checker_);
   fpromise::bridge<zx::result<>> bridge;
   stop_completer_.emplace(std::move(bridge.completer));
@@ -212,7 +212,7 @@ DriverRuntime::AsyncTask<zx::result<>> DriverUnderTestBase::PrepareStop() {
 }
 
 zx::result<> DriverUnderTestBase::Stop() {
-#if __Fuchsia_API_level__ < FUCHSIA_HEAD
+#if __Fuchsia_API_level__ < 15
   std::lock_guard guard(checker_);
   ZX_ASSERT_MSG(driver_.has_value(), "Driver does not exist.");
   ZX_ASSERT_MSG(driver_.value().is_ok(), "Driver start did not succeed: %s.",

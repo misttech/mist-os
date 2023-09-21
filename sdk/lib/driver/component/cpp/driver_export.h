@@ -9,7 +9,7 @@
 
 #if __Fuchsia_API_level__ >= 13
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 15
 #include <lib/driver/component/cpp/internal/driver_server.h>
 #else
 #include <lib/driver/component/cpp/internal/lifecycle.h>
@@ -20,7 +20,7 @@
 // `T(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher);`
 // This MUST only be called once inside of a shared object, and it must be called from the root
 // namespace and not nested inside any other namespace.
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 15
 #define FUCHSIA_DRIVER_EXPORT(driver)                                                   \
   EXPORT_FUCHSIA_DRIVER_REGISTRATION_V1(fdf_internal::DriverServer<driver>::initialize, \
                                         fdf_internal::DriverServer<driver>::destroy)

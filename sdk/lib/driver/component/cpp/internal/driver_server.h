@@ -7,7 +7,7 @@
 
 #include <zircon/availability.h>
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 15
 
 #include <fidl/fuchsia.driver.framework/cpp/driver/wire.h>
 #include <fidl/fuchsia.driver.framework/cpp/type_conversions.h>
