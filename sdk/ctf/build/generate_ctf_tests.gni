@@ -35,6 +35,31 @@ import("//sdk/ctf/build/internal/fuchsia_package_with_test.gni")
 import("//sdk/ctf/build/internal/generate_ctf_packages.gni")
 import("//src/lib/vulkan/vulkan.gni")
 
+template("generate_fidl-hlcpp-unit-tests") {
+  forward_variables_from(invoker, [ "test_info" ])
+  fuchsia_package_with_test(target_name) {
+    test_component_name = "fidl-hlcpp-unit-tests-root.cm"
+    subpackages = [
+      test_info.target_label,
+      # These tests do not currently use a test realm factory.
+    ]
+    test_component = "//sdk/ctf/tests/pkg/fidl/cpp:fidl-hlcpp-unit-tests-root"
+  }
+}
+
+template("generate_fidl-hlcpp-conformance-tests") {
+  forward_variables_from(invoker, [ "test_info" ])
+  fuchsia_package_with_test(target_name) {
+    test_component_name = "fidl-hlcpp-conformance-tests-root.cm"
+    subpackages = [
+      test_info.target_label,
+      # These tests do not currently use a test realm factory.
+    ]
+    test_component =
+        "//sdk/ctf/tests/pkg/fidl/cpp:fidl-hlcpp-conformance-tests-root"
+  }
+}
+
 template("generate_svc-tests") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {

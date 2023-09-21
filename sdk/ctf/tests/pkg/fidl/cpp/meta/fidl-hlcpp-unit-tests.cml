@@ -7,6 +7,6 @@
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "bin/fidl_hlcpp_conformance_tests",
+        binary: "bin/fidl-hlcpp-unit-tests",
     },
 }

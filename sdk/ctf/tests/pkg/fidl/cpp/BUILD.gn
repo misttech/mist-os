@@ -103,11 +103,11 @@ ctf_source_set("test_sources") {
   public_configs = [ "//sdk/config" ]
 }
 
-ctf_executable("fidl_hlcpp_conformance_tests_bin") {
+ctf_executable("fidl-hlcpp-conformance-tests_bin") {
   visibility = [ ":*" ]
   testonly = true
 
-  output_name = "fidl_hlcpp_conformance_tests"
+  output_name = "fidl-hlcpp-conformance-tests"
 
   deps = [
     "//sdk/testing/fidl:test",
@@ -121,18 +121,19 @@ ctf_executable("fidl_hlcpp_conformance_tests_bin") {
   non_cts_deps = gidl_deps
 }
 
-ctf_fuchsia_component("fidl_hlcpp_conformance_tests") {
-  manifest = "meta/fidl_hlcpp_conformance_tests.cml"
+ctf_fuchsia_component("fidl-hlcpp-conformance-tests-component") {
   testonly = true
+  component_name = "fidl-hlcpp-conformance-tests"
+  manifest = "meta/fidl-hlcpp-conformance-tests.cml"
   visibility = [ ":*" ]
-  deps = [ ":fidl_hlcpp_conformance_tests_bin" ]
+  deps = [ ":fidl-hlcpp-conformance-tests_bin" ]
 }
 
-ctf_executable("fidl_hlcpp_unit_tests_bin") {
+ctf_executable("fidl-hlcpp-unit-tests_bin") {
   visibility = [ ":*" ]
   testonly = true
 
-  output_name = "fidl_hlcpp_unit_tests"
+  output_name = "fidl-hlcpp-unit-tests"
 
   deps = [
     ":host_test_sources",
@@ -145,35 +146,59 @@ ctf_executable("fidl_hlcpp_unit_tests_bin") {
   ]
 }
 
-ctf_fuchsia_component("fidl_hlcpp_unit_tests") {
-  manifest = "meta/fidl_hlcpp_unit_tests.cml"
+ctf_fuchsia_component("fidl-hlcpp-unit-tests-component") {
+  testonly = true
+  component_name = "fidl-hlcpp-unit-tests"
+  manifest = "meta/fidl-hlcpp-unit-tests.cml"
   testonly = true
   visibility = [ ":*" ]
-  deps = [ ":fidl_hlcpp_unit_tests_bin" ]
+  deps = [ ":fidl-hlcpp-unit-tests_bin" ]
 }
 
-ctf_fuchsia_test_package("fidl_hlcpp_unit_test_package") {
-  package_name = "fidl_hlcpp_unit_test_package"
-  test_components = [ ":fidl_hlcpp_unit_tests" ]
+ctf_fuchsia_package("fidl-hlcpp-unit-tests") {
+  testonly = true
+  package_name = "fidl-hlcpp-unit-tests"
+  deps = [ ":fidl-hlcpp-unit-tests-component" ]
 }
 
-ctf_fuchsia_test_package("fidl_hlcpp_conformance_test_package") {
-  package_name = "fidl_hlcpp_conformance_test_package"
-  test_components = [ ":fidl_hlcpp_conformance_tests" ]
+ctf_fuchsia_package("fidl-hlcpp-conformance-tests") {
+  testonly = true
+  package_name = "fidl-hlcpp-conformance-tests"
+  deps = [ ":fidl-hlcpp-conformance-tests-component" ]
+}
+
+fuchsia_test_component("fidl-hlcpp-conformance-tests-root") {
+  manifest = "meta/fidl-hlcpp-conformance-tests-root.cml"
+  test_type = "ctf"
+}
+
+fuchsia_test_component("fidl-hlcpp-unit-tests-root") {
+  manifest = "meta/fidl-hlcpp-unit-tests-root.cml"
+  test_type = "ctf"
+}
+
+fuchsia_test_package("fidl-hlcpp-unit-tests-latest") {
+  test_components = [ ":fidl-hlcpp-unit-tests-root" ]
+  subpackages = [ ":fidl-hlcpp-unit-tests" ]
+}
+
+fuchsia_test_package("fidl-hlcpp-conformance-tests-latest") {
+  test_components = [ ":fidl-hlcpp-conformance-tests-root" ]
+  subpackages = [ ":fidl-hlcpp-conformance-tests" ]
 }
 
 if (is_host) {
   # TODO(johnshamoon): Add cts_test() and do this in the template.
-  test("fidl_hlcpp_unit_tests_host") {
-    output_name = "fidl_hlcpp_unit_tests"
+  test("fidl-hlcpp-unit-tests-host") {
+    output_name = "fidl-hlcpp-unit-tests"
     deps = [
       ":host_test_sources",
       "//zircon/system/ulib/zxtest",
     ]
   }
 
-  test("fidl_hlcpp_conformance_tests_host") {
-    output_name = "fidl_hlcpp_conformance_tests"
+  test("fidl-hlcpp-conformance-tests-host") {
+    output_name = "fidl-hlcpp-conformance-tests"
     deps = [ "//zircon/system/ulib/zxtest" ] + gidl_deps
   }
 }
@@ -214,9 +239,13 @@ ctf_source_set("handle_util") {
 group("tests") {
   testonly = true
   deps = [
-    ":fidl_hlcpp_conformance_test_package",
-    ":fidl_hlcpp_conformance_tests_host($host_toolchain)",
-    ":fidl_hlcpp_unit_test_package",
-    ":fidl_hlcpp_unit_tests_host($host_toolchain)",
+    ":fidl-hlcpp-conformance-tests-host($host_toolchain)",
+    ":fidl-hlcpp-conformance-tests-latest",
+    ":fidl-hlcpp-unit-tests-host($host_toolchain)",
+    ":fidl-hlcpp-unit-tests-latest",
+
+    # CTF release archives
+    ":fidl-hlcpp-conformance-tests_archive",
+    ":fidl-hlcpp-unit-tests_archive",
   ]
 }

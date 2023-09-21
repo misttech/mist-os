@@ -25,6 +25,16 @@
     "package_name": "fdio-spawn-tests"
   },
   {
+    "archive_gn_label": "//sdk/ctf/tests/pkg/fidl/cpp:fidl-hlcpp-conformance-tests_archive_copy",
+    "archive_name": "fidl-hlcpp-conformance-tests",
+    "package_name": "fidl-hlcpp-conformance-tests"
+  },
+  {
+    "archive_gn_label": "//sdk/ctf/tests/pkg/fidl/cpp:fidl-hlcpp-unit-tests_archive_copy",
+    "archive_name": "fidl-hlcpp-unit-tests",
+    "package_name": "fidl-hlcpp-unit-tests"
+  },
+  {
     "archive_gn_label": "//sdk/ctf/tests/pkg/svc:svc-tests_archive_copy",
     "archive_name": "svc-tests",
     "package_name": "svc-tests"
