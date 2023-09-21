@@ -42,7 +42,7 @@ done
 
 FASTBOOT_ARGS="$@"
 PRODUCT="%PRODUCT_NAME_STRING%"
-actual=$("$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} getvar product 2>&1 | head -n1 | cut -d' ' -f2-)
+actual=$("$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} getvar product 2>&1 | grep -i product | head -n1 | cut -d' ' -f2-)
 if [[ "${actual}" != "${PRODUCT}" ]]; then
   echo >&2 "Expected device ${PRODUCT} but found ${actual}"
   exit 1
@@ -64,9 +64,15 @@ sleep 5
 if [[ -z "${RECOVERY}" ]]; then
   "$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} flash fvm "${DIR}/fvm.fastboot.blk"
 fi
+
 if [[ ! -z "${SSH_KEY}" ]]; then
-  "$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} stage "${SSH_KEY}"
-  "$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} oem add-staged-bootloader-file ssh.authorized_keys
+  is_userspace=$("$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} getvar is-userspace 2>&1 | head -n1 | cut -d' ' -f2-)
+  if [[ "${is_userspace}" == "yes" ]]; then
+    echo "running in userspace fastboot. rebooting to userspace fastboot"
+    "$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} reboot bootloader
+    sleep 5
+  fi
+  "$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} stage "${SSH_KEY}" oem add-staged-bootloader-file ssh.authorized_keys
 fi
 
 "$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} continue
@@ -418,7 +424,7 @@ done
 
 FASTBOOT_ARGS="$@"
 PRODUCT="%PRODUCT_NAME_STRING%"
-actual=$("$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} getvar product 2>&1 | head -n1 | cut -d' ' -f2-)
+actual=$("$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} getvar product 2>&1 | grep -i product | head -n1 | cut -d' ' -f2-)
 if [[ "${actual}" != "${PRODUCT}" ]]; then
   echo >&2 "Expected device ${PRODUCT} but found ${actual}"
   exit 1
@@ -440,9 +446,15 @@ sleep 5
 if [[ -z "${RECOVERY}" ]]; then
   "$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} flash fvm "${DIR}/fvm.fastboot.blk"
 fi
+
 if [[ ! -z "${SSH_KEY}" ]]; then
-  "$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} stage "${SSH_KEY}"
-  "$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} oem add-staged-bootloader-file ssh.authorized_keys
+  is_userspace=$("$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} getvar is-userspace 2>&1 | head -n1 | cut -d' ' -f2-)
+  if [[ "${is_userspace}" == "yes" ]]; then
+    echo "running in userspace fastboot. rebooting to userspace fastboot"
+    "$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} reboot bootloader
+    sleep 5
+  fi
+  "$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} stage "${SSH_KEY}" oem add-staged-bootloader-file ssh.authorized_keys
 fi
 
 "$DIR/fastboot.exe.linux-x64" ${FASTBOOT_ARGS} continue
