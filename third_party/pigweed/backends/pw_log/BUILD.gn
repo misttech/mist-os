@@ -36,6 +36,14 @@ source_set("pw_log") {
 source_set("pw_log.impl") {
 }
 
+source_set("syslog") {
+  sources = [ "log_syslog.cc" ]
+  deps = [
+    ":pw_log",
+    "//sdk/lib/syslog/cpp",
+  ]
+}
+
 source_set("printf") {
   sources = [ "log_printf.cc" ]
   deps = [ ":pw_log" ]
