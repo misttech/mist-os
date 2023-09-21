@@ -13,12 +13,11 @@
 #include <sys/time.h>
 #include <time.h>
 
-#include "src/starnix/kernel/vdso/vvar-data.h"
+#include "vdso-aux.h"
+#include "vdso-calculate-monotonic.h"
+#include "vdso-calculate-utc.h"
 
-extern "C" vvar_data vvar;
-
-const int64_t NSEC_PER_SEC = 1'000'000'000;
-const int64_t UTC_INVALID = 0;
+uint64_t get_raw_ticks() { return __rdtsc(); }
 
 extern "C" int syscall(intptr_t syscall_number, intptr_t arg1, intptr_t arg2, intptr_t arg3) {
   int ret;
@@ -27,46 +26,6 @@ extern "C" int syscall(intptr_t syscall_number, intptr_t arg1, intptr_t arg2, in
                    : "a"(syscall_number), "D"(arg1), "S"(arg2), "d"(arg3)
                    : "rcx", "r11", "memory");
   return ret;
-}
-
-inline int64_t calculate_monotonic_time_nsec() {
-  uint64_t raw_ticks = __rdtsc();
-  uint64_t ticks = raw_ticks + vvar.raw_ticks_to_ticks_offset.load(std::memory_order_acquire);
-  // TODO(mariagl): This could potentially overflow; Find a way to avoid this.
-  uint64_t monot_nsec = ticks * vvar.ticks_to_mono_numerator.load(std::memory_order_acquire) /
-                        vvar.ticks_to_mono_denominator.load(std::memory_order_acquire);
-  return monot_nsec;
-}
-
-inline int64_t calculate_utc_time_nsec() {
-  int64_t monotonic_time = calculate_monotonic_time_nsec();
-
-  // Mono to utc transform is read from vvar_data. The data is protected by a seqlock, and so
-  // a seqlock reader is implemented
-  // Check that the state of the seqlock shows that the transform is not being updated
-  uint64_t seq_num1 = vvar.seq_num.load(std::memory_order_acquire);
-  if (seq_num1 & 1) {
-    // Cannot read, because a write is in progress
-    return UTC_INVALID;
-  }
-  int64_t mono_to_utc_reference_offset =
-      vvar.mono_to_utc_reference_offset.load(std::memory_order_acquire);
-  int64_t mono_to_utc_synthetic_offset =
-      vvar.mono_to_utc_synthetic_offset.load(std::memory_order_acquire);
-  uint32_t mono_to_utc_reference_ticks =
-      vvar.mono_to_utc_reference_ticks.load(std::memory_order_acquire);
-  uint32_t mono_to_utc_synthetic_ticks =
-      vvar.mono_to_utc_synthetic_ticks.load(std::memory_order_acquire);
-  // Check that the state of the seqlock has not changed while reading the transform
-  uint64_t seq_num2 = vvar.seq_num.load(std::memory_order_acquire);
-  if (seq_num1 != seq_num2) {
-    // Data has been updated during the reading of it, so is invalid
-    return UTC_INVALID;
-  }
-  int64_t utc_nsec = (monotonic_time - mono_to_utc_reference_offset) * mono_to_utc_synthetic_ticks /
-                         mono_to_utc_reference_ticks +
-                     mono_to_utc_synthetic_offset;
-  return utc_nsec;
 }
 
 extern "C" EXPORT int __vdso_clock_gettime(int clock_id, struct timespec* tp) {

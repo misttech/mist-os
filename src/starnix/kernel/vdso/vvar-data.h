@@ -5,8 +5,6 @@
 #ifndef SRC_STARNIX_KERNEL_VDSO_VVAR_DATA_H_
 #define SRC_STARNIX_KERNEL_VDSO_VVAR_DATA_H_
 
-#include <stdint.h>
-
 #include "src/starnix/lib/linux_uapi/bindgen_atomics.h"
 
 #ifdef __cplusplus

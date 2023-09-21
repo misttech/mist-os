@@ -18,6 +18,7 @@ group("tests") {
     "gvisor:tests",
     "reboot:tests",
     "syscalls:tests",
+    "vdso:tests",
   ]
 
   # TODO(https://fxbug.dev/116773): Remove !is_asan check when Starnix can run binaries built for
