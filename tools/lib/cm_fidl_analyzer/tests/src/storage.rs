@@ -158,7 +158,7 @@ mod tests {
         let component_id_index_path = make_index_file(component_id_index::Index {
             instances: vec![component_id_index::InstanceIdEntry {
                 instance_id: parent_consumer_instance_id.clone(),
-                moniker: Some(Moniker::parse_str("/parent_consumer").unwrap()),
+                moniker: Some(Moniker::parse_str("parent_consumer").unwrap()),
             }],
             ..component_id_index::Index::default()
         })
@@ -209,7 +209,7 @@ mod tests {
 
         model
             .check_use(
-                Moniker::parse_str("/consumer").unwrap(),
+                Moniker::parse_str("consumer").unwrap(),
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
                     storage_relation: Some(InstancedMoniker::try_from(vec!["consumer:0"]).unwrap()),

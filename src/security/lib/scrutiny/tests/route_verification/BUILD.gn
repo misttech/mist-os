@@ -13,6 +13,7 @@ import("//build/product.gni")
 import("//build/python/python_binary.gni")
 import("//build/sdk/product_bundle.gni")
 import("//build/testing/host_test.gni")
+import("//build/testing/host_test_data.gni")
 import("//src/developer/ffx/config.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
 import("//src/sys/core/build/core.gni")
@@ -28,10 +29,21 @@ if (is_fuchsia) {
     check_references = false
   }
 
+  fuchsia_component("component_with_collection") {
+    testonly = true
+    manifest = "meta/component_with_collection.cml"
+
+    # We don't intend to run this component, just make its manifest visible to scrutiny.
+    check_references = false
+  }
+
   fuchsia_package("package") {
     testonly = true
     package_name = "package_for_scrutiny_testing"
-    deps = [ ":component_with_broken_use" ]
+    deps = [
+      ":component_with_broken_use",
+      ":component_with_collection",
+    ]
   }
 
   core_shard("core_shard") {
@@ -178,6 +190,8 @@ if (is_host) {
   files = {
     ffx = "$ffx_test_host_tools_out_dir/ffx-scrutiny"
 
+    component_tree_config = "//src/security/lib/scrutiny/tests/route_verification/component_tree_config.json5"
+
     product_bundle_target_out_dir =
         get_label_info(labels.product_bundle, "target_out_dir")
     product_bundle_target_name = get_label_info(labels.product_bundle, "name")
@@ -192,7 +206,10 @@ if (is_host) {
 
   host_test_data("failed_route_verify_test_data") {
     sources = get_target_outputs(":test_route_verification_bin")
-    sources += [ files.product_bundle_dir ]
+    sources += [
+      files.product_bundle_dir,
+      files.component_tree_config,
+    ]
     deps = [
       ":test_route_verification_bin",
       labels.product_bundle,
@@ -214,13 +231,17 @@ if (is_host) {
       "--fail-protocol",
       "fuchsia.foo.bar",
       "--fail-moniker",
-      "/core/component_with_broken_use",
+      "core/component_with_broken_use",
+      "--fail-dynamic-moniker",
+      "core/component_with_collection/coll:component_with_broken_use",
       "--success-protocol",
       "fuchsia.logger.LogSink",
       "--depfile",
       rebase_path(depfile, root_build_dir),
       "--product-bundle",
       rebase_path(files.product_bundle_dir, root_build_dir),
+      "--component-tree-config",
+      rebase_path(files.component_tree_config, root_build_dir),
     ]
     depfile = [ depfile ]
 

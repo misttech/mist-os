@@ -18,15 +18,14 @@ use {
             structured_config::VerifyStructuredConfigController,
         },
     },
-    cm_fidl_analyzer::{
-        node_path::NodePath, route::CapabilityRouteError, serde_ext::ErrorWithMessage,
-    },
+    cm_fidl_analyzer::route::CapabilityRouteError,
     cm_rust::CapabilityTypeName,
     cm_types::Name,
+    moniker::Moniker,
     routing::mapper::RouteSegment,
     scrutiny::prelude::*,
     serde::{Deserialize, Serialize},
-    std::{collections::HashSet, path::PathBuf, sync::Arc},
+    std::{collections::HashSet, error::Error, path::PathBuf, sync::Arc},
 };
 
 pub use controller::{
@@ -59,6 +58,44 @@ plugin!(
     vec![PluginDescriptor::new("CorePlugin")]
 );
 
+/// Error for use with serialization: Stores both structured error and message,
+/// and assesses equality using structured error.
+#[derive(Clone, Default, Deserialize, Serialize)]
+pub struct ErrorWithMessage<E: Clone + Error + Serialize> {
+    pub error: E,
+    #[serde(default)]
+    pub message: String,
+}
+
+impl<E: Clone + Error + PartialEq + Serialize> PartialEq<ErrorWithMessage<E>>
+    for ErrorWithMessage<E>
+{
+    fn eq(&self, other: &Self) -> bool {
+        // Ignore `message` when comparing.
+        self.error == other.error
+    }
+}
+
+impl<'de, E> From<E> for ErrorWithMessage<E>
+where
+    E: Clone + Deserialize<'de> + Error + Serialize,
+{
+    fn from(error: E) -> Self {
+        Self::from(&error)
+    }
+}
+
+impl<'de, E> From<&E> for ErrorWithMessage<E>
+where
+    E: Clone + Deserialize<'de> + Error + Serialize,
+{
+    fn from(error: &E) -> Self {
+        let message = error.to_string();
+        let error = error.clone();
+        Self { error, message }
+    }
+}
+
 /// Top-level result type for `CapabilityRouteController` query result.
 #[derive(Deserialize, Serialize)]
 pub struct CapabilityRouteResults {
@@ -88,7 +125,7 @@ pub struct ResultsBySeverity {
 /// Error-severity results from `CapabilityRouteController`.
 #[derive(Clone, Deserialize, Serialize)]
 pub struct ErrorResult {
-    pub using_node: NodePath,
+    pub using_node: Moniker,
     pub capability: Option<Name>,
     pub error: ErrorWithMessage<CapabilityRouteError>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
@@ -109,7 +146,7 @@ impl PartialEq for ErrorResult {
 /// Warning-severity results from `CapabilityRouteController`.
 #[derive(Clone, Deserialize, Serialize)]
 pub struct WarningResult {
-    pub using_node: NodePath,
+    pub using_node: Moniker,
     pub capability: Option<Name>,
     pub warning: ErrorWithMessage<CapabilityRouteError>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
@@ -130,7 +167,7 @@ impl PartialEq for WarningResult {
 /// Ok-severity results from `CapabilityRouteController`.
 #[derive(Clone, Deserialize, Serialize)]
 pub struct OkResult {
-    pub using_node: NodePath,
+    pub using_node: Moniker,
     pub capability: Name,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub route: Vec<RouteSegment>,
@@ -562,7 +599,7 @@ mod tests {
             component_id_index::Index {
                 instances: vec![component_id_index::InstanceIdEntry {
                     instance_id: Some(iid.clone()),
-                    moniker: Some(Moniker::parse_str("/a/b/c").unwrap()),
+                    moniker: Some(Moniker::parse_str("a/b/c").unwrap()),
                 }],
                 ..component_id_index::Index::default()
             },
@@ -579,7 +616,7 @@ mod tests {
             Some(&ComponentInstanceId::from_str(&iid).unwrap()),
             root_instance
                 .component_id_index()
-                .look_up_moniker(&Moniker::parse_str("/a/b/c").unwrap())
+                .look_up_moniker(&Moniker::parse_str("a/b/c").unwrap())
         );
         Ok(())
     }
@@ -1052,7 +1089,7 @@ mod tests {
         let response = controller.query(model.clone(), json!("{}"))?;
         assert_json_eq(
             response,
-            json!({"instances":  [{ "instance": "/", "url": DEFAULT_ROOT_URL.to_string() }]}),
+            json!({"instances":  [{ "instance": ".", "url": DEFAULT_ROOT_URL.to_string() }]}),
         );
         Ok(())
     }
@@ -1069,7 +1106,7 @@ mod tests {
 
         let controller = V2ComponentModelMappingController::default();
         let response = controller.query(model.clone(), json!("{}"))?;
-        assert_json_eq(response, json!({"instances": [ {"instance": "/", "url": root_url }]}));
+        assert_json_eq(response, json!({"instances": [ {"instance": ".", "url": root_url }]}));
 
         Ok(())
     }
@@ -1083,15 +1120,15 @@ mod tests {
         let response = controller.query(model.clone(), json!("{}"))?;
         assert!(
             (response
-                == json!({"instances": [{"instance": "/", "url": DEFAULT_ROOT_URL.to_string()},
-                                 {"instance": "/foo","url": "fuchsia-boot:///#meta/foo.cm"},
-                                 {"instance": "/bar", "url": "fuchsia-boot:///#meta/bar.cm"},
-                                 {"instance": "/foo/baz", "url": "fuchsia-boot:///#meta/baz.cm"}]}))
+                == json!({"instances": [{"instance": ".", "url": DEFAULT_ROOT_URL.to_string()},
+                                 {"instance": "foo","url": "fuchsia-boot:///#meta/foo.cm"},
+                                 {"instance": "bar", "url": "fuchsia-boot:///#meta/bar.cm"},
+                                 {"instance": "foo/baz", "url": "fuchsia-boot:///#meta/baz.cm"}]}))
                 | (response
-                    == json!({"instances": [{"instance": "/", "url": DEFAULT_ROOT_URL.to_string()},
-                                 {"instance": "/bar","url": "fuchsia-boot:///#meta/bar.cm"},
-                                 {"instance": "/foo", "url": "fuchsia-boot:///#meta/foo.cm"},
-                                 {"instance": "/foo/baz", "url": "fuchsia-boot:///#meta/baz.cm"}]}))
+                    == json!({"instances": [{"instance": ".", "url": DEFAULT_ROOT_URL.to_string()},
+                                 {"instance": "bar","url": "fuchsia-boot:///#meta/bar.cm"},
+                                 {"instance": "foo", "url": "fuchsia-boot:///#meta/foo.cm"},
+                                 {"instance": "foo/baz", "url": "fuchsia-boot:///#meta/baz.cm"}]}))
         );
 
         Ok(())
@@ -1130,7 +1167,7 @@ mod tests {
                                     },
                                     "message": "`bad_dir` was not offered to `child` by parent.",
                                 },
-                                "using_node": "/child",
+                                "using_node": "child",
                                 "route": [
                                     {
                                         "action": "use_by",
@@ -1152,7 +1189,7 @@ mod tests {
                         "ok": [
                             {
                                 "capability": "good_dir",
-                                "using_node": "/child",
+                                "using_node": "child",
                             },
                         ],
                     }
@@ -1177,7 +1214,7 @@ mod tests {
                                     },
                                     "message": "`.` does not have child `#missing_child`.",
                                 },
-                                "using_node": "/child",
+                                "using_node": "child",
                                 "route": [
                                     {
                                         "action": "use_by",
@@ -1260,7 +1297,7 @@ mod tests {
                               },
                               "message": "`bad_dir` was not offered to `child` by parent.",
                           },
-                          "using_node": "/child",
+                          "using_node": "child",
                           "route": [
                               {
                                   "action": "use_by",
@@ -1328,7 +1365,7 @@ mod tests {
                                   "moniker": "."
                               }
                           ],
-                          "using_node": "/child"
+                          "using_node": "child"
                       }
                   ]
               }
@@ -1353,7 +1390,7 @@ mod tests {
                             },
                             "message": "`.` does not have child `#missing_child`.",
                         },
-                        "using_node": "/child",
+                        "using_node": "child",
                         "route": [
                             {
                                 "action": "use_by",
@@ -1438,7 +1475,7 @@ mod tests {
                                     },
                                     "message": "`bad_dir` was not offered to `child` by parent.",
                                 },
-                                "using_node": "/child",
+                                "using_node": "child",
                                 "route": [
                                     {
                                         "action": "use_by",
@@ -1465,7 +1502,7 @@ mod tests {
                         "warnings": [
                             {
                                 "capability": "protocol",
-                                "using_node": "/child",
+                                "using_node": "child",
                                 "warning": {
                                     "error": {
                                         "analyzer_model_error": {
@@ -1562,7 +1599,7 @@ mod tests {
                               },
                               "message": "`bad_dir` was not offered to `child` by parent.",
                           },
-                          "using_node": "/child",
+                          "using_node": "child",
                           "route": [
                               {
                                   "action": "use_by",

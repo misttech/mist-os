@@ -6,7 +6,6 @@ use {
     crate::{
         component_model::{BuildAnalyzerModelError, Child},
         environment::EnvironmentForAnalyzer,
-        node_path::NodePath,
     },
     async_trait::async_trait,
     cm_moniker::{InstancedChildName, InstancedMoniker},
@@ -52,11 +51,6 @@ impl ComponentInstanceForAnalyzer {
     /// Exposes the component's ComponentDecl. This is referenced directly in tests.
     pub fn decl_for_testing(&self) -> &ComponentDecl {
         &self.decl
-    }
-
-    /// Returns a representation of the instance's position in the component instance tree.
-    pub fn node_path(&self) -> NodePath {
-        NodePath::new(self.moniker.path().clone())
     }
 
     // Creates a new root component instance.

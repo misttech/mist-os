@@ -43,9 +43,7 @@ rustc_library("cm_fidl_analyzer") {
     "src/component_model.rs",
     "src/environment.rs",
     "src/lib.rs",
-    "src/node_path.rs",
     "src/route.rs",
-    "src/serde_ext.rs",
   ]
 }
 

@@ -30,6 +30,13 @@ def main():
         required=True,
         help="Moniker whose route failed and must exist in output.")
     parser.add_argument(
+        "--fail-dynamic-moniker",
+        type=str,
+        required=True,
+        help=
+        "Moniker of component in dynamic collection whose route failed and must exist in output."
+    )
+    parser.add_argument(
         "--success-protocol",
         type=str,
         required=True,
@@ -44,6 +51,11 @@ def main():
         type=pathlib.Path,
         required=True,
         help="Path to the product bundle.")
+    parser.add_argument(
+        "--component-tree-config",
+        type=pathlib.Path,
+        required=True,
+        help="Path to the component tree configuration.")
     args = parser.parse_args()
 
     # Assume we're in the root build dir right now and that is where we'll find ffx env.
@@ -69,6 +81,8 @@ def main():
         "routes",
         "--product-bundle",
         args.product_bundle,
+        "--component-tree-config",
+        args.component_tree_config,
     ]
 
     test = unittest.TestCase()
@@ -86,6 +100,11 @@ def main():
     test.assertIn(
         args.fail_moniker, stderr,
         "error message must contain moniker whose route failed")
+
+    test.assertIn(
+        args.fail_dynamic_moniker, stderr,
+        "error message must contain dynamic collection moniker whose route failed"
+    )
 
     test.assertNotIn(
         args.success_protocol, stderr,

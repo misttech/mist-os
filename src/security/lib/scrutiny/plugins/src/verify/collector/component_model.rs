@@ -11,12 +11,13 @@ use {
         verify::collection::V2ComponentModel,
     },
     anyhow::{anyhow, Context, Result},
-    cm_fidl_analyzer::{component_model::ModelBuilderForAnalyzer, node_path::NodePath},
+    cm_fidl_analyzer::component_model::ModelBuilderForAnalyzer,
     cm_rust::{ComponentDecl, FidlIntoNative, RegistrationSource, RunnerRegistration},
     config_encoder::ConfigFields,
     fidl::unpersist,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as component_internal,
     fuchsia_url::{boot_url::BootUrl, AbsoluteComponentUrl},
+    moniker::Moniker,
     once_cell::sync::Lazy,
     routing::{
         component_id_index::ComponentIdIndex, config::RuntimeConfig, environment::RunnerRegistry,
@@ -54,7 +55,7 @@ pub struct DynamicComponent {
 
 #[derive(Deserialize, Serialize)]
 pub struct ComponentTreeConfig {
-    pub dynamic_components: HashMap<NodePath, DynamicComponent>,
+    pub dynamic_components: HashMap<Moniker, DynamicComponent>,
 }
 
 pub struct V2ComponentModelDataCollector {}
@@ -200,7 +201,7 @@ impl V2ComponentModelDataCollector {
 
     fn load_dynamic_components(
         component_tree_config_path: &Option<PathBuf>,
-    ) -> Result<HashMap<NodePath, (AbsoluteComponentUrl, Option<String>)>> {
+    ) -> Result<HashMap<Moniker, (AbsoluteComponentUrl, Option<String>)>> {
         if component_tree_config_path.is_none() {
             return Ok(HashMap::new());
         }
@@ -213,9 +214,9 @@ impl V2ComponentModelDataCollector {
                 .context("Failed to parse component tree configuration file")?;
 
         let mut dynamic_components = HashMap::new();
-        for (node_path, dynamic_component) in component_tree_config.dynamic_components.into_iter() {
+        for (moniker, dynamic_component) in component_tree_config.dynamic_components.into_iter() {
             dynamic_components
-                .insert(node_path, (dynamic_component.url, dynamic_component.environment));
+                .insert(moniker, (dynamic_component.url, dynamic_component.environment));
         }
         Ok(dynamic_components)
     }
