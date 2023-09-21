@@ -26,7 +26,10 @@ use {
     fuchsia_zircon::{self as zx, HandleBased},
     sandbox::{Message, Open},
     serve_processargs::NamespaceBuilder,
-    std::{collections::HashMap, sync::Arc},
+    std::{
+        collections::{HashMap, HashSet},
+        sync::Arc,
+    },
     tracing::{error, warn},
     vfs::{
         directory::entry::DirectoryEntry, directory::helper::DirectlyMutable,
@@ -54,13 +57,36 @@ pub async fn create_namespace(
             .map_err(CreateNamespaceError::ClonePkgDirFailed)?;
         add_pkg_directory(&mut namespace, pkg_dir)?;
     }
-    add_use_decls(&mut namespace, component, decl).await?;
+    let uses = deduplicate_event_stream(decl.uses.iter());
+    add_use_decls(&mut namespace, component, uses).await?;
     for entry in additional_entries {
         let directory: sandbox::Directory = entry.directory.into();
         let path = entry.path;
         namespace.add_entry(Box::new(directory), &path)?;
     }
     Ok(namespace)
+}
+
+/// Different from all other use declarations, multiple event stream capabilities may be used
+/// at the same path, the semantics being a single FIDL protocol capability is made available
+/// at that path, subscribing to all the specified events:
+/// see [`crate::model::events::registry::EventRegistry`].
+///
+/// This function transforms a sequence of [`UseDecl`] such that the duplicates are removed.
+fn deduplicate_event_stream<'a>(
+    iter: std::slice::Iter<'a, UseDecl>,
+) -> impl Iterator<Item = &'a UseDecl> {
+    let mut paths = HashSet::new();
+    iter.filter_map(move |use_decl| match use_decl {
+        UseDecl::EventStream(ref event_stream) => {
+            if !paths.insert(event_stream.target_path.clone()) {
+                None
+            } else {
+                Some(use_decl)
+            }
+        }
+        _ => Some(use_decl),
+    })
 }
 
 /// Adds the package directory to the namespace under the path "/pkg".
@@ -82,14 +108,14 @@ fn add_pkg_directory(
 async fn add_use_decls(
     namespace: &mut NamespaceBuilder,
     component: &Arc<ComponentInstance>,
-    decl: &ComponentDecl,
+    uses: impl Iterator<Item = &UseDecl>,
 ) -> Result<(), CreateNamespaceError> {
     // Populate the namespace from uses, using the component manager's namespace.
     // svc_dirs will hold (path,directory) pairs. Each pair holds a path in the
     // component's namespace and a directory that ComponentMgr will host for the component.
     let mut svc_dirs = HashMap::new();
 
-    for use_ in &decl.uses {
+    for use_ in uses {
         match use_ {
             cm_rust::UseDecl::Directory(_) => {
                 add_directory_helper(namespace, &use_, component.as_weak())?;
@@ -270,7 +296,6 @@ fn add_service_or_protocol_use(
     component: WeakComponentInstance,
 ) {
     let not_found_component_copy = component.clone();
-    let use_clone = use_.clone();
     let route_open_fn = move |_scope: ExecutionScope,
                               flags: fio::OpenFlags,
                               relative_path: Path,
@@ -365,17 +390,10 @@ fn add_service_or_protocol_use(
                 not_found_component_copy,
             )
         });
-    // NOTE: UseEventStream is special, in that we can route a single stream from multiple
-    // sources (merging them).
-    if matches!(use_clone, UseDecl::EventStream(_)) {
-        // Ignore duplication error if already exists
-        service_dir.clone().add_entry(capability_path.basename(), remote(route_open_fn)).ok();
-    } else {
-        service_dir
-            .clone()
-            .add_entry(capability_path.basename(), remote(route_open_fn))
-            .expect("could not add service to directory");
-    }
+    service_dir
+        .clone()
+        .add_entry(capability_path.basename(), remote(route_open_fn))
+        .expect("could not add service to directory");
 }
 
 /// Serves the pseudo-directories in `svc_dirs` and adds their client ends to the namespace.
