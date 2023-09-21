@@ -25,6 +25,11 @@
     "package_name": "fdio-spawn-tests"
   },
   {
+    "archive_gn_label": "//sdk/ctf/tests/pkg/svc:svc-tests_archive_copy",
+    "archive_name": "svc-tests",
+    "package_name": "svc-tests"
+  },
+  {
     "archive_gn_label": "//sdk/ctf/tests/pkg/vulkan:vulkan-loader-tests_archive_copy",
     "archive_name": "vulkan-loader-tests",
     "package_name": "vulkan-loader-tests"
