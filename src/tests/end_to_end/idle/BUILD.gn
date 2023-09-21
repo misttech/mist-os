@@ -3,14 +3,15 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/test.gni")
+import("//build/go/go_library.gni")
+import("//build/go/go_test.gni")
 
-test("idle_test") {
-  testonly = true
+go_library("idle_test_lib") {
+  sources = [ "idle_test.go" ]
+}
 
-  sources = [ "idle_test.cc" ]
-
-  deps = [ "//third_party/googletest:gtest" ]
+go_test("idle_test") {
+  library = ":idle_test_lib"
 
   environments = [
     {
