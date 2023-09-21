@@ -7,6 +7,7 @@
 
 #include <lib/async/cpp/wait.h>
 #include <lib/magma/platform/platform_logger.h>
+#include <lib/magma/util/status.h>
 #include <lib/magma_service/msd.h>
 
 #include <map>
@@ -15,7 +16,6 @@
 #include <set>
 
 #include "command_buffer.h"
-#include "magma_util/status.h"
 #include "msd_intel_buffer.h"
 #include "ppgtt.h"
 #include "ringbuffer.h"

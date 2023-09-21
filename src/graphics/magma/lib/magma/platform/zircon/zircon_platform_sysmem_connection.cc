@@ -7,14 +7,13 @@
 #include <lib/magma/magma_common_defs.h>
 #include <lib/magma/platform/platform_sysmem_connection.h>
 #include <lib/magma/platform/platform_thread.h>
+#include <lib/magma/util/short_macros.h>
+#include <lib/magma/util/utils.h>
 #include <lib/zx/channel.h>
 
 #include <limits>
 #include <unordered_set>
 #include <vector>
-
-#include "magma_util/short_macros.h"
-#include "magma_util/utils.h"
 
 using magma::Status;
 

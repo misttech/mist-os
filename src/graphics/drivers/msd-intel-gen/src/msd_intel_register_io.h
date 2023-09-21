@@ -5,12 +5,13 @@
 #ifndef MSD_INTEL_REGISTER_IO_H
 #define MSD_INTEL_REGISTER_IO_H
 
+#include <lib/magma/util/short_macros.h>
+#include <lib/magma_service/util/register_io.h>
+
 #include <chrono>
 #include <map>
 
 #include "device_id.h"
-#include "magma_util/register_io.h"
-#include "magma_util/short_macros.h"
 #include "types.h"
 
 // Wraps the common magma::RegisterIo so we can intercept reads and writes and perform forcewake

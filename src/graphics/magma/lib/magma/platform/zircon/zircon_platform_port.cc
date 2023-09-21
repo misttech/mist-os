@@ -4,11 +4,11 @@
 
 #include "zircon_platform_port.h"
 
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/short_macros.h>
+#include <lib/magma/util/utils.h>
 #include <lib/zx/time.h>
 
-#include "magma_util/dlog.h"
-#include "magma_util/short_macros.h"
-#include "magma_util/utils.h"
 #include "zircon/syscalls/port.h"
 
 namespace magma {

@@ -6,12 +6,12 @@
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/magma/magma.h>
+#include <lib/magma/util/short_macros.h>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include "helper/test_device_helper.h"
-#include "magma_util/short_macros.h"
 #include "magma_vendor_queries.h"
 
 TEST(TestIcd, IcdList) {

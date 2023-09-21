@@ -8,8 +8,8 @@ source_set("platform_device_helper") {
   public_configs = [ "$magma_build_root:magma_tests_include_config" ]
 
   public_deps = [
-    "$magma_build_root/src/magma_util:macros",
     "//src/graphics/magma/lib/magma/platform:device",
+    "//src/graphics/magma/lib/magma/util:macros",
   ]
 
   sources = [ "platform_device_helper.h" ]
@@ -19,8 +19,8 @@ source_set("platform_pci_device_helper") {
   public_configs = [ "$magma_build_root:magma_tests_include_config" ]
 
   public_deps = [
-    "$magma_build_root/src/magma_util:macros",
     "//src/graphics/magma/lib/magma/platform:device",
+    "//src/graphics/magma/lib/magma/util:macros",
   ]
 
   sources = [ "platform_pci_device_helper.h" ]
@@ -29,7 +29,7 @@ source_set("platform_pci_device_helper") {
 source_set("platform_msd_device_helper") {
   public_configs = [ "$magma_build_root:magma_tests_include_config" ]
 
-  public_deps = [ "$magma_build_root/src/magma_util:macros" ]
+  public_deps = [ "//src/graphics/magma/lib/magma/util:macros" ]
 
   sources = [ "platform_msd_device_helper.h" ]
 }
@@ -92,8 +92,8 @@ source_set("inflight_list") {
 
   public_deps = [
     "$magma_build_root/include:magma",
-    "$magma_build_root/src/magma_util:macros",
-    "$magma_build_root/src/magma_util:status",
+    "//src/graphics/magma/lib/magma/util:macros",
+    "//src/graphics/magma/lib/magma/util:status",
   ]
 }
 

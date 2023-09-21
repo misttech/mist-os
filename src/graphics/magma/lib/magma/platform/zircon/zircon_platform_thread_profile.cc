@@ -5,10 +5,9 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/magma/platform/platform_thread.h>
+#include <lib/magma/util/short_macros.h>
 #include <zircon/syscalls.h>
 #include <zircon/threads.h>
-
-#include <magma_util/short_macros.h>
 
 namespace magma {
 

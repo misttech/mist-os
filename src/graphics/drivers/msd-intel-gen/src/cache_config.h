@@ -5,11 +5,10 @@
 #ifndef CACHE_CONFIG_H
 #define CACHE_CONFIG_H
 
+#include <lib/magma_service/util/instruction_writer.h>
 #include <stdint.h>
 
 #include <memory>
-
-#include <magma_util/instruction_writer.h>
 
 #include "msd_intel_register_io.h"
 #include "types.h"

@@ -5,9 +5,10 @@
 #ifndef SRC_GRAPHICS_DRIVERS_MSD_INTEL_GEN_SRC_REGISTER_STATE_HELPER_H
 #define SRC_GRAPHICS_DRIVERS_MSD_INTEL_GEN_SRC_REGISTER_STATE_HELPER_H
 
+#include <lib/magma/util/short_macros.h>
+
 #include "device_id.h"
 #include "instructions.h"
-#include "magma_util/short_macros.h"
 #include "types.h"
 
 // Helper classes for initializing the register state in a context state buffer.

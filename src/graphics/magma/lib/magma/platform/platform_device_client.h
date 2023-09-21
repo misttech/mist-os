@@ -6,8 +6,7 @@
 #define SRC_GRAPHICS_MAGMA_LIB_MAGMA_PLATFORM_PLATFORM_DEVICE_CLIENT_H_
 
 #include <lib/magma/platform/platform_connection_client.h>
-
-#include "magma_util/status.h"
+#include <lib/magma/util/status.h>
 
 namespace magma {
 class PlatformDeviceClient {

@@ -5,14 +5,13 @@
 #include <lib/magma/platform/platform_handle.h>
 #include <lib/magma/platform/platform_port.h>
 #include <lib/magma/platform/platform_semaphore.h>
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/short_macros.h>
 
 #include <chrono>
 #include <thread>
 
 #include <gtest/gtest.h>
-
-#include "magma_util/dlog.h"
-#include "magma_util/short_macros.h"
 
 #ifdef __Fuchsia__
 #include <lib/zx/channel.h>

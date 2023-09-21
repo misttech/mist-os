@@ -4,11 +4,11 @@
 
 #include <lib/magma/platform/platform_buffer.h>
 #include <lib/magma/platform/platform_semaphore.h>
+#include <lib/magma_service/util/address_space.h>
+#include <lib/magma_service/util/command_buffer.h>
+#include <lib/magma_service/util/mapped_batch.h>
 
 #include <gtest/gtest.h>
-#include <magma_util/address_space.h>
-#include <magma_util/command_buffer.h>
-#include <magma_util/mapped_batch.h>
 #include <mock/fake_address_space.h>
 #include <mock/mock_bus_mapper.h>
 

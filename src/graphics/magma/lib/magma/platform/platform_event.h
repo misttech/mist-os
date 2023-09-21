@@ -5,9 +5,9 @@
 #ifndef SRC_GRAPHICS_MAGMA_LIB_MAGMA_PLATFORM_PLATFORM_EVENT_H_
 #define SRC_GRAPHICS_MAGMA_LIB_MAGMA_PLATFORM_PLATFORM_EVENT_H_
 
-#include <memory>
+#include <lib/magma/util/status.h>
 
-#include "magma_util/status.h"
+#include <memory>
 
 namespace magma {
 

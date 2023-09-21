@@ -5,12 +5,13 @@
 #ifndef SRC_GRAPHICS_MAGMA_LIB_MAGMA_SERVICE_SYS_DRIVER_MAGMA_SYSTEM_CONTEXT_H_
 #define SRC_GRAPHICS_MAGMA_LIB_MAGMA_SERVICE_SYS_DRIVER_MAGMA_SYSTEM_CONTEXT_H_
 
+#include <lib/magma/util/status.h>
+
 #include <functional>
 #include <memory>
 
 #include "magma_system_buffer.h"
 #include "magma_system_semaphore.h"
-#include "magma_util/status.h"
 
 class CommandBufferHelper;
 

@@ -6,6 +6,7 @@
 #define ZIRCON_PLATFORM_INTERRUPT_H
 
 #include <lib/magma/platform/platform_interrupt.h>
+#include <lib/magma/util/short_macros.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/handle.h>
 #include <lib/zx/interrupt.h>
@@ -14,7 +15,6 @@
 
 #include <utility>
 
-#include "magma_util/short_macros.h"
 #include "zircon_platform_port.h"
 
 namespace magma {

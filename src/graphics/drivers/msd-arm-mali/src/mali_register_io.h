@@ -5,9 +5,9 @@
 #ifndef SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_MALI_REGISTER_IO_H_
 #define SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_MALI_REGISTER_IO_H_
 
-#include <utility>
+#include <lib/magma_service/util/register_io.h>
 
-#include "magma_util/register_io.h"
+#include <utility>
 
 namespace mali {
 

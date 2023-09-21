@@ -5,6 +5,8 @@
 #include "msd_intel_device.h"
 
 #include <lib/magma/platform/platform_trace.h>
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/short_macros.h>
 
 #include <bitset>
 #include <cstdio>
@@ -17,8 +19,6 @@
 #include "device_id.h"
 #include "forcewake.h"
 #include "magma_intel_gen_defs.h"
-#include "magma_util/dlog.h"
-#include "magma_util/short_macros.h"
 #include "msd_intel_semaphore.h"
 #include "registers.h"
 

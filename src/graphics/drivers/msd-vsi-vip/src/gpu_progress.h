@@ -5,10 +5,11 @@
 #ifndef SRC_GRAPHICS_DRIVERS_MSD_VSI_VIP_SRC_GPU_PROGRESS_H_
 #define SRC_GRAPHICS_DRIVERS_MSD_VSI_VIP_SRC_GPU_PROGRESS_H_
 
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/short_macros.h>
+
 #include <chrono>
 
-#include "magma_util/dlog.h"
-#include "magma_util/short_macros.h"
 #include "sequencer.h"
 
 class GpuProgress {

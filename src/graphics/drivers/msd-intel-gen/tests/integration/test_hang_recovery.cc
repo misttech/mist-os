@@ -6,6 +6,9 @@
 
 #include <lib/fdio/directory.h>
 #include <lib/magma/magma.h>
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/short_macros.h>
+#include <lib/magma/util/utils.h>
 #include <lib/zx/channel.h>
 
 #include <thread>
@@ -16,9 +19,6 @@
 #include "helper/magma_map_cpu.h"
 #include "helper/test_device_helper.h"
 #include "magma_intel_gen_defs.h"
-#include "magma_util/dlog.h"
-#include "magma_util/short_macros.h"
-#include "magma_util/utils.h"
 
 namespace {
 

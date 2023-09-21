@@ -7,13 +7,13 @@
 #include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/magma/magma.h>
+#include <lib/magma/util/short_macros.h>
 #include <lib/zx/channel.h>
 #include <magma_intel_gen_defs.h>
 
 #include <gtest/gtest.h>
 
 #include "helper/test_device_helper.h"
-#include "magma_util/short_macros.h"
 
 namespace {
 

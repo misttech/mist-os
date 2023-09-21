@@ -6,11 +6,10 @@
 #include <lib/magma/magma_sysmem.h>
 #include <lib/magma/platform/platform_buffer.h>
 #include <lib/magma/platform/platform_semaphore.h>
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/short_macros.h>
 
 #include <unordered_map>
-
-#include "magma_util/dlog.h"
-#include "magma_util/short_macros.h"
 
 std::unordered_map<uint32_t, magma::PlatformBuffer*> exported_buffers;
 std::unordered_map<uint32_t, magma::PlatformSemaphore*> exported_semaphores;

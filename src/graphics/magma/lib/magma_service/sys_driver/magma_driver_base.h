@@ -14,12 +14,12 @@
 #include <lib/inspect/component/cpp/service.h>
 #include <lib/magma/platform/zircon/zircon_platform_logger_dfv2.h>
 #include <lib/magma/platform/zircon/zircon_platform_status.h>
+#include <lib/magma/util/macros.h>
 #include <threads.h>
 #include <zircon/threads.h>
 
 #include "dependency_injection_server.h"
 #include "magma_system_device.h"
-#include "magma_util/macros.h"
 #include "performance_counters_server.h"
 
 namespace msd {

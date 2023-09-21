@@ -5,7 +5,7 @@
 #ifndef PLATFORM_INTERRUPT_H
 #define PLATFORM_INTERRUPT_H
 
-#include "magma_util/macros.h"
+#include <lib/magma/util/macros.h>
 
 namespace magma {
 

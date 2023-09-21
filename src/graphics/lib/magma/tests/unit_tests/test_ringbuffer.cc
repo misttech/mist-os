@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma_service/util/address_space.h>
+#include <lib/magma_service/util/gpu_mapping.h>
+#include <lib/magma_service/util/ringbuffer.h>
+
 #include <gtest/gtest.h>
-#include <magma_util/address_space.h>
-#include <magma_util/gpu_mapping.h>
-#include <magma_util/ringbuffer.h>
 #include <mock/fake_address_space.h>
 #include <mock/mock_bus_mapper.h>
 

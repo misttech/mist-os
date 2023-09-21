@@ -8,10 +8,9 @@
 #include <lib/magma/magma.h>
 #include <lib/magma/magma_sysmem.h>
 #include <lib/magma/platform/platform_buffer.h>
+#include <lib/magma/util/status.h>
 
 #include <memory>
-
-#include "magma_util/status.h"
 
 namespace magma_sysmem {
 class PlatformBufferConstraints;

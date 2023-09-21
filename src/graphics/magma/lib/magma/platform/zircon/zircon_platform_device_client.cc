@@ -5,11 +5,10 @@
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <lib/magma/platform/platform_connection_client.h>
 #include <lib/magma/platform/platform_device_client.h>
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/short_macros.h>
+#include <lib/magma/util/utils.h>
 #include <lib/zx/channel.h>
-
-#include "magma_util/dlog.h"
-#include "magma_util/short_macros.h"
-#include "magma_util/utils.h"
 
 namespace magma {
 class ZirconPlatformDeviceClient : public PlatformDeviceClient {

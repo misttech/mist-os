@@ -5,7 +5,7 @@
 #ifndef GPU_MAPPING_H
 #define GPU_MAPPING_H
 
-#include <magma_util/gpu_mapping.h>
+#include <lib/magma_service/util/gpu_mapping.h>
 
 #include "msd_intel_buffer.h"
 

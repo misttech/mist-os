@@ -4,13 +4,13 @@
 
 #define MAGMA_DLOG_ENABLE 1
 
+#include <lib/magma/util/dlog.h>
 #include <zircon/types.h>
 
 #include <gtest/gtest.h>
 
 #include "helper/platform_msd_device_helper.h"
 #include "helper/platform_pci_device_helper.h"
-#include "magma_util/dlog.h"
 
 namespace {
 magma::PlatformPciDevice* platform_pci_device_s = nullptr;

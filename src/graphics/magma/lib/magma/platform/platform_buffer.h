@@ -12,12 +12,11 @@
 #include <lib/magma/magma_common_defs.h>
 #include <lib/magma/platform/platform_handle.h>
 #include <lib/magma/platform/platform_object.h>
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/macros.h>
+#include <lib/magma/util/status.h>
 
 #include <memory>
-
-#include "magma_util/dlog.h"
-#include "magma_util/macros.h"
-#include "magma_util/status.h"
 
 namespace magma {
 

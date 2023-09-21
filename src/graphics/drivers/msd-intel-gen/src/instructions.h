@@ -5,12 +5,11 @@
 #ifndef INSTRUCTIONS_H
 #define INSTRUCTIONS_H
 
+#include <lib/magma/util/short_macros.h>
+#include <lib/magma/util/utils.h>
+#include <lib/magma_service/util/instruction_writer.h>
 #include <stdint.h>
 
-#include <magma_util/instruction_writer.h>
-#include <magma_util/short_macros.h>
-
-#include "magma_util/utils.h"
 #include "types.h"
 
 // from intel-gfx-prm-osrc-bdw-vol02a-commandreference-instructions_2.pdf pp.870

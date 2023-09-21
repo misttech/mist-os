@@ -4,7 +4,7 @@
 
 #include "gpu_progress.h"
 
-#include "magma_util/dlog.h"
+#include <lib/magma/util/dlog.h>
 
 void GpuProgress::Submitted(uint32_t sequence_number, std::chrono::steady_clock::time_point time) {
   DASSERT(sequence_number != Sequencer::kInvalidSequenceNumber);

@@ -6,11 +6,10 @@
 #define DEVICE_REQUEST_H
 
 #include <lib/magma/platform/platform_event.h>
+#include <lib/magma/util/short_macros.h>
+#include <lib/magma/util/status.h>
 
 #include <memory>
-
-#include "magma_util/short_macros.h"
-#include "magma_util/status.h"
 
 template <class Processor>
 class DeviceRequest {

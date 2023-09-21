@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/magma/magma.h>
+#include <lib/magma/util/utils.h>
 #include <magma_intel_gen_defs.h>
 
 #include <vector>
@@ -12,7 +13,6 @@
 #include "helper/inflight_list.h"
 #include "helper/magma_map_cpu.h"
 #include "helper/test_device_helper.h"
-#include "magma_util/utils.h"
 
 namespace {
 

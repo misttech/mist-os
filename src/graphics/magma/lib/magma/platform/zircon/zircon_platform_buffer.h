@@ -7,13 +7,12 @@
 
 #include <lib/magma/platform/platform_buffer.h>
 #include <lib/magma/platform/platform_object.h>
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/short_macros.h>
+#include <lib/magma/util/utils.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
 #include <limits.h>  // PAGE_SIZE
-
-#include "magma_util/dlog.h"
-#include "magma_util/short_macros.h"
-#include "magma_util/utils.h"
 
 namespace magma {
 

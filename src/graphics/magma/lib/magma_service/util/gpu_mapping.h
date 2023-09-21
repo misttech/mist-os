@@ -6,14 +6,13 @@
 #define SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_GPU_MAPPING_H
 
 #include <lib/magma/platform/platform_bus_mapper.h>
+#include <lib/magma/util/macros.h>
+#include <lib/magma/util/utils.h>
 
 #include <memory>
 #include <vector>
 
-#include <magma_util/macros.h>
-
 #include "accessor.h"
-#include "magma_util/utils.h"
 
 namespace magma {
 

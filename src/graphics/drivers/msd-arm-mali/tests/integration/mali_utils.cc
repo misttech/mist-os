@@ -4,7 +4,7 @@
 
 #include "mali_utils.h"
 
-#include "magma_util/utils.h"
+#include <lib/magma/util/utils.h>
 
 namespace mali_utils {
 

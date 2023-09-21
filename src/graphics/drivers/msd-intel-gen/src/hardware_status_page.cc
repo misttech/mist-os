@@ -5,8 +5,7 @@
 #include "hardware_status_page.h"
 
 #include <lib/magma/platform/platform_barriers.h>
-
-#include "magma_util/dlog.h"
+#include <lib/magma/util/dlog.h>
 
 void GlobalHardwareStatusPage::ReadContextStatus(uint64_t& read_index,
                                                  std::optional<bool>* idle_out) {

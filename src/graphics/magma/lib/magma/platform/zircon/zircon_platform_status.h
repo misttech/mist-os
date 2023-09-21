@@ -5,10 +5,9 @@
 #ifndef ZIRCON_PLATFORM_STATUS_H
 #define ZIRCON_PLATFORM_STATUS_H
 
+#include <lib/magma/util/macros.h>
+#include <lib/magma/util/status.h>
 #include <zircon/types.h>
-
-#include "magma_util/macros.h"
-#include "magma_util/status.h"
 
 namespace magma {
 

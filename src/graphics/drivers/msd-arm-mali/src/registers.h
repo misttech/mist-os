@@ -5,10 +5,11 @@
 #ifndef REGISTERS_H
 #define REGISTERS_H
 
+#include <lib/magma/util/short_macros.h>
+#include <lib/magma_service/util/register_io.h>
+
 #include "hwreg/bitfields.h"
-#include "magma_util/short_macros.h"
 #include "mali_register_io.h"
-#include "src/graphics/lib/magma/src/magma_util/register_io.h"
 
 namespace registers {
 

@@ -8,16 +8,16 @@
 #include <lib/magma/platform/platform_logger.h>
 #include <lib/magma/platform/platform_semaphore.h>
 #include <lib/magma/platform/platform_trace.h>
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/short_macros.h>
 #include <lib/magma_service/msd_defs.h>
+#include <lib/magma_service/util/simple_allocator.h>
 #include <zircon/compiler.h>
 
 #include <atomic>
 #include <limits>
 #include <vector>
 
-#include "magma_util/dlog.h"
-#include "magma_util/short_macros.h"
-#include "magma_util/simple_allocator.h"
 #include "src/graphics/drivers/msd-arm-mali/include/magma_arm_mali_types.h"
 #include "src/graphics/drivers/msd-arm-mali/src/address_space.h"
 #include "src/graphics/drivers/msd-arm-mali/src/gpu_mapping.h"

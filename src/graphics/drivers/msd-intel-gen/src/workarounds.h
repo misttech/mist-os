@@ -5,9 +5,8 @@
 #ifndef WORKAROUNDS_H
 #define WORKAROUNDS_H
 
+#include <lib/magma_service/util/instruction_writer.h>
 #include <stdint.h>
-
-#include <magma_util/instruction_writer.h>
 
 #include "types.h"
 

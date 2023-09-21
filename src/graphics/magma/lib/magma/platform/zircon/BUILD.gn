@@ -18,10 +18,10 @@ source_set("buffer") {
   ]
 
   deps = [
-    "$magma_build_root/src/magma_util:macros",
-    "$magma_build_root/src/magma_util:short_macros",
     "..:object",
     "//src/graphics/magma/lib/magma/platform:trace",
+    "//src/graphics/magma/lib/magma/util:macros",
+    "//src/graphics/magma/lib/magma/util:short_macros",
   ]
 }
 
@@ -40,11 +40,11 @@ source_set("bus_mapper") {
   ]
 
   deps = [
-    "$magma_build_root/src/magma_util:macros",
-    "$magma_build_root/src/magma_util:short_macros",
     "..:logger",
     "..:object",
     "//src/graphics/magma/lib/magma/platform:trace",
+    "//src/graphics/magma/lib/magma/util:macros",
+    "//src/graphics/magma/lib/magma/util:short_macros",
   ]
 }
 
@@ -53,8 +53,8 @@ source_set("interrupt") {
 
   public_deps = [
     ":port",
-    "$magma_build_root/src/magma_util:short_macros",
     "..:interrupt_header",
+    "//src/graphics/magma/lib/magma/util:short_macros",
     "//zircon/system/ulib/zx",
   ]
 }
@@ -66,9 +66,9 @@ source_set("mmio") {
     "zircon_platform_mmio.h",
   ]
   deps = [
-    "$magma_build_root/src/magma_util:macros",
-    "$magma_build_root/src/magma_util:short_macros",
     "..:mmio_header",
+    "//src/graphics/magma/lib/magma/util:macros",
+    "//src/graphics/magma/lib/magma/util:short_macros",
   ]
   public_deps = [ "//src/devices/lib/mmio" ]
 }
@@ -92,10 +92,10 @@ source_set("device") {
     ":bus_mapper",
     ":handle",
     ":mmio",
-    "$magma_build_root/src/magma_util:macros",
-    "$magma_build_root/src/magma_util:short_macros",
     "..:device_header",
     "//src/devices/lib/driver",
+    "//src/graphics/magma/lib/magma/util:macros",
+    "//src/graphics/magma/lib/magma/util:short_macros",
     "//zircon/system/ulib/zx",
   ]
 }
@@ -111,15 +111,15 @@ source_set("connection_client") {
   public_deps = [
     ":handle",
     ":status",
-    "$magma_build_root/src/magma_util:macros",
     "..:connection_client_header",
     "..:trace",
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
+    "//src/graphics/magma/lib/magma/util:macros",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/zx",
   ]
 
-  deps = [ "$magma_build_root/src/magma_util:short_macros" ]
+  deps = [ "//src/graphics/magma/lib/magma/util:short_macros" ]
 
   # Fidl bindings should not introduce a dep on libasync-default.so
   assert_no_deps = [ "//zircon/system/ulib/async-default" ]
@@ -133,9 +133,9 @@ source_set("device_client") {
   deps = [
     "..:device_client_header",
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
-    "//src/graphics/lib/magma/src/magma_util:macros",
-    "//src/graphics/lib/magma/src/magma_util:short_macros",
-    "//src/graphics/lib/magma/src/magma_util:status",
+    "//src/graphics/magma/lib/magma/util:macros",
+    "//src/graphics/magma/lib/magma/util:short_macros",
+    "//src/graphics/magma/lib/magma/util:status",
     "//zircon/system/ulib/zx",
   ]
 }
@@ -151,7 +151,7 @@ source_set("sysmem_connection") {
     "..:thread",
     "..:trace",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
-    "//src/graphics/lib/magma/src/magma_util:short_macros",
+    "//src/graphics/magma/lib/magma/util:short_macros",
     "//zircon/system/ulib/image-format",
     "//zircon/system/ulib/zx",
   ]
@@ -181,9 +181,9 @@ source_set("thread_profile") {
   sources = [ "zircon_platform_thread_profile.cc" ]
 
   deps = [
-    "$magma_build_root/src/magma_util:macros",
-    "$magma_build_root/src/magma_util:short_macros",
     "..:thread_header",
+    "//src/graphics/magma/lib/magma/util:macros",
+    "//src/graphics/magma/lib/magma/util:short_macros",
     "//src/lib/ddk",
   ]
 }
@@ -197,11 +197,11 @@ source_set("event") {
   ]
 
   deps = [
-    "$magma_build_root/src/magma_util:macros",
     "..:event_header",
+    "//src/graphics/magma/lib/magma/util:macros",
     "//zircon/system/ulib/zx",
   ]
-  public_deps = [ "//src/graphics/lib/magma/src/magma_util:short_macros" ]
+  public_deps = [ "//src/graphics/magma/lib/magma/util:short_macros" ]
 }
 
 source_set("handle") {
@@ -214,14 +214,14 @@ source_set("handle") {
 
   public_deps = [
     ":port",
-    "$magma_build_root/src/magma_util:macros",
     "..:handle_header",
+    "//src/graphics/magma/lib/magma/util:macros",
     "//zircon/system/ulib/zx",
   ]
 
   deps = [
-    "$magma_build_root/src/magma_util:macros",
     "..:object",
+    "//src/graphics/magma/lib/magma/util:macros",
   ]
 }
 
@@ -267,8 +267,8 @@ source_set("logger_for_dfv2") {
     "zircon_platform_logger_dfv2.h",
   ]
   deps = [
-    "$magma_build_root/src/magma_util:macros",
     "//sdk/lib/driver/logging/cpp",
+    "//src/graphics/magma/lib/magma/util:macros",
   ]
 }
 
@@ -278,9 +278,9 @@ source_set("object") {
   sources = [ "zircon_platform_object.cc" ]
 
   deps = [
-    "$magma_build_root/src/magma_util:macros",
-    "$magma_build_root/src/magma_util:short_macros",
     "..:object_header",
+    "//src/graphics/magma/lib/magma/util:macros",
+    "//src/graphics/magma/lib/magma/util:short_macros",
     "//zircon/system/ulib/zx",
   ]
 }
@@ -296,10 +296,10 @@ source_set("semaphore") {
   ]
 
   public_deps = [
-    "$magma_build_root/src/magma_util:macros",
-    "$magma_build_root/src/magma_util:short_macros",
     "..:semaphore_header",
     "..:trace",
+    "//src/graphics/magma/lib/magma/util:macros",
+    "//src/graphics/magma/lib/magma/util:short_macros",
     "//zircon/system/ulib/zx",
   ]
 
@@ -318,9 +318,9 @@ source_set("port") {
   ]
 
   public_deps = [
-    "$magma_build_root/src/magma_util:macros",
-    "$magma_build_root/src/magma_util:short_macros",
     "..:port_header",
+    "//src/graphics/magma/lib/magma/util:macros",
+    "//src/graphics/magma/lib/magma/util:short_macros",
   ]
 
   deps = [ "//zircon/system/ulib/zx" ]
@@ -349,9 +349,9 @@ source_set("trace_provider") {
   ]
 
   deps = [
-    "$magma_build_root/src/magma_util:macros",
-    "$magma_build_root/src/magma_util:short_macros",
     "..:trace_provider_header",
+    "//src/graphics/magma/lib/magma/util:macros",
+    "//src/graphics/magma/lib/magma/util:short_macros",
     "//zircon/system/ulib/async:async-cpp",
   ]
 
@@ -377,10 +377,10 @@ source_set("trace_provider_with_fdio") {
 
   deps = [
     ":trace_provider",
-    "$magma_build_root/src/magma_util:macros",
-    "$magma_build_root/src/magma_util:short_macros",
     "..:trace_provider_with_fdio_header",
     "//sdk/lib/fdio",
+    "//src/graphics/magma/lib/magma/util:macros",
+    "//src/graphics/magma/lib/magma/util:short_macros",
   ]
 
   public_deps = [ "//sdk/lib/fit" ]
@@ -403,7 +403,7 @@ source_set("status") {
   sources = [ "zircon_platform_status.h" ]
 
   public_deps = [
-    "$magma_build_root/src/magma_util:macros",
-    "$magma_build_root/src/magma_util:status",
+    "//src/graphics/magma/lib/magma/util:macros",
+    "//src/graphics/magma/lib/magma/util:status",
   ]
 }

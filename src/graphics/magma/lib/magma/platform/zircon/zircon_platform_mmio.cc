@@ -4,8 +4,8 @@
 
 #include "zircon_platform_mmio.h"
 
-#include "magma_util/dlog.h"
-#include "magma_util/short_macros.h"
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/short_macros.h>
 
 namespace magma {
 

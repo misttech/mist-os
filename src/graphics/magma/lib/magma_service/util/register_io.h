@@ -6,10 +6,9 @@
 #define REGISTER_IO_H
 
 #include <lib/magma/platform/platform_mmio.h>
+#include <lib/magma/util/macros.h>
 
 #include <memory>
-
-#include "magma_util/macros.h"
 
 namespace magma {
 

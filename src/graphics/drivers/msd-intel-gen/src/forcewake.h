@@ -5,9 +5,10 @@
 #ifndef FORCEWAKE_H
 #define FORCEWAKE_H
 
+#include <lib/magma/util/short_macros.h>
+
 #include <optional>
 
-#include "magma_util/short_macros.h"
 #include "msd_intel_register_io.h"
 #include "registers.h"
 

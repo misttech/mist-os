@@ -4,10 +4,10 @@
 
 #include <assert.h>
 #include <lib/magma/magma.h>
+#include <lib/magma/util/short_macros.h>
 #include <pthread.h>
 #include <sys/mman.h>
 
-#include "magma_util/short_macros.h"
 #include "src/graphics/lib/magma/include/virtio/virtio_magma.h"
 #include "src/graphics/lib/magma/src/libmagma_virt/virtmagma_util.h"
 

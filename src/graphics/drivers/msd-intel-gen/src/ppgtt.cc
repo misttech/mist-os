@@ -6,8 +6,8 @@
 
 #include <lib/magma/platform/platform_buffer.h>
 #include <lib/magma/platform/platform_logger.h>
+#include <lib/magma/util/short_macros.h>
 
-#include "magma_util/short_macros.h"
 #include "registers.h"
 
 constexpr bool kLogEnable = false;

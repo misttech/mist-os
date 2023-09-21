@@ -8,8 +8,7 @@
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/fdf/cpp/dispatcher.h>
-
-#include "magma_util/macros.h"
+#include <lib/magma/util/macros.h>
 
 namespace msd::internal {
 class PerformanceCountersServer

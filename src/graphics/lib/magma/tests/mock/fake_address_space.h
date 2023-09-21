@@ -5,10 +5,10 @@
 #ifndef FAKE_ADDRESS_SPACE_H
 #define FAKE_ADDRESS_SPACE_H
 
-#include <map>
+#include <lib/magma/util/macros.h>
+#include <lib/magma_service/util/address_space.h>
 
-#include <magma_util/address_space.h>
-#include <magma_util/macros.h>
+#include <map>
 
 // AddressSpaceBase is the base class of the FakeAllocatingAddresSpace, could be
 // magma::AddressSpace or some derivative.

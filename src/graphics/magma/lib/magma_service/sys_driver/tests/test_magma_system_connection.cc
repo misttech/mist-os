@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/magma/magma.h>
+#include <lib/magma/util/short_macros.h>
 #include <lib/magma_service/sys_driver/magma_system_connection.h>
 #include <lib/magma_service/sys_driver/magma_system_device.h>
 
@@ -10,7 +11,6 @@
 
 #include <gtest/gtest.h>
 
-#include "magma_util/short_macros.h"
 #include "mock/mock_msd.h"
 #ifdef __Fuchsia__
 #include <lib/magma/platform/zircon/zircon_platform_buffer.h>

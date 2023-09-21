@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <gtest/gtest.h>
+#include <lib/magma/util/status.h>
 
-#include "magma_util/status.h"
+#include <gtest/gtest.h>
 
 #if defined(__Fuchsia__)
 #include <lib/magma/platform/zircon/zircon_platform_status.h>

@@ -6,13 +6,13 @@
 #define SRC_GRAPHICS_LIB_MAGMA_SRC_LIBMAGMA_VIRT_VIRTMAGMA_UTIL_H_
 
 #include <errno.h>
+#include <lib/magma/util/short_macros.h>
 #include <sys/fcntl.h>
 #include <sys/ioctl.h>
 #include <sys/unistd.h>
 
 #include <utility>
 
-#include "src/graphics/lib/magma/src/magma_util/short_macros.h"
 #include "virtmagma.h"
 
 inline bool virtmagma_handshake(int32_t file_descriptor) {

@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_RINGBUFFER_H_
-#define SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_RINGBUFFER_H_
+#ifndef SRC_GRAPHICS_MAGMA_LIB_MAGMA_SERVICE_UTIL_RINGBUFFER_H_
+#define SRC_GRAPHICS_MAGMA_LIB_MAGMA_SERVICE_UTIL_RINGBUFFER_H_
+
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/macros.h>
 
 #include "accessor.h"
 #include "address_space.h"
-#include "dlog.h"
 #include "instruction_writer.h"
-#include "macros.h"
 
 class TestRingbuffer;
 
@@ -188,4 +189,4 @@ bool Ringbuffer<GpuMapping>::Unmap() {
 
 }  // namespace magma
 
-#endif  // SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_RINGBUFFER_H_
+#endif  // SRC_GRAPHICS_MAGMA_LIB_MAGMA_SERVICE_UTIL_RINGBUFFER_H_

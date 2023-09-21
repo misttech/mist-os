@@ -5,12 +5,12 @@
 #ifndef ADDRESS_SPACE_H
 #define ADDRESS_SPACE_H
 
+#include <lib/magma/util/status.h>
+#include <lib/magma_service/util/address_space.h>
+
 #include <map>
 #include <mutex>
 #include <unordered_map>
-
-#include <magma_util/address_space.h>
-#include <magma_util/status.h>
 
 #include "gpu_mapping.h"
 

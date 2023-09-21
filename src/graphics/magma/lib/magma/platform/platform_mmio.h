@@ -5,13 +5,12 @@
 #ifndef PLATFORM_MMIO_H
 #define PLATFORM_MMIO_H
 
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/macros.h>
 #include <lib/mmio-ptr/mmio-ptr.h>
 #include <stdint.h>
 
 #include <memory>
-
-#include "magma_util/dlog.h"
-#include "magma_util/macros.h"
 
 namespace magma {
 

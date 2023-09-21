@@ -8,15 +8,15 @@ source_set("msd_cpp") {
   public_configs = [ "$magma_build_root:magma_tests_include_config" ]
 
   public_deps = [
-    "$magma_build_root/src/magma_util:macros",
     "$magma_build_root/tests/helper:platform_msd_device_helper",
     "//src/graphics/magma:msd",
     "//src/graphics/magma/lib/magma/platform:buffer",
     "//src/graphics/magma/lib/magma/platform:semaphore",
+    "//src/graphics/magma/lib/magma/util:macros",
     "//zircon/system/ulib/sync:sync-cpp",
   ]
 
-  deps = [ "$magma_build_root/src/magma_util:short_macros" ]
+  deps = [ "//src/graphics/magma/lib/magma/util:short_macros" ]
 
   sources = [
     "mock_msd.cc",
@@ -28,8 +28,8 @@ source_set("mmio") {
   public_configs = [ "$magma_build_root:magma_tests_include_config" ]
 
   public_deps = [
-    "$magma_build_root/src/magma_util:macros",
     "//src/graphics/magma/lib/magma/platform:mmio_header",
+    "//src/graphics/magma/lib/magma/util:macros",
   ]
 
   sources = [
@@ -50,11 +50,11 @@ source_set("magma_system") {
   sources = [ "mock_magma_system.cc" ]
   deps = [
     "$magma_build_root/include:magma",
-    "$magma_build_root/src/magma_util:macros",
-    "$magma_build_root/src/magma_util:short_macros",
     "//src/graphics/magma/lib/magma/platform:buffer",
     "//src/graphics/magma/lib/magma/platform:logger_impl",
     "//src/graphics/magma/lib/magma/platform:semaphore",
+    "//src/graphics/magma/lib/magma/util:macros",
+    "//src/graphics/magma/lib/magma/util:short_macros",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/trace-vthread",
   ]
@@ -63,8 +63,8 @@ source_set("magma_system") {
 source_set("address_space") {
   sources = [ "fake_address_space.h" ]
   deps = [
-    "$magma_build_root/src/magma_util:address_space",
-    "$magma_build_root/src/magma_util:macros",
     "//src/graphics/magma/lib/magma/platform:buffer",
+    "//src/graphics/magma/lib/magma/util:macros",
+    "//src/graphics/magma/lib/magma_service/util:address_space",
   ]
 }

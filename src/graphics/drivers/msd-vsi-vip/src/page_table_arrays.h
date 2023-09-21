@@ -7,10 +7,10 @@
 
 #include <lib/magma/platform/platform_buffer.h>
 #include <lib/magma/platform/platform_bus_mapper.h>
+#include <lib/magma/util/short_macros.h>
+#include <lib/magma_service/util/register_io.h>
 
 #include "address_space.h"
-#include "magma_util/register_io.h"
-#include "magma_util/short_macros.h"
 #include "registers.h"
 
 class PageTableArrays {

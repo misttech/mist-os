@@ -10,6 +10,7 @@
 #include <lib/magma/platform/platform_mmio.h>
 #include <lib/magma/platform/platform_thread.h>
 #include <lib/magma/platform/platform_trace.h>
+#include <lib/magma/util/short_macros.h>
 #include <lib/magma_service/msd.h>
 
 #include <algorithm>
@@ -22,7 +23,6 @@
 #include "address_space_layout.h"
 #include "command_buffer.h"
 #include "instructions.h"
-#include "magma_util/short_macros.h"
 #include "magma_vendor_queries.h"
 #include "msd_vsi_context.h"
 #include "registers.h"

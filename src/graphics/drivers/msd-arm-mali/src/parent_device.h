@@ -8,14 +8,13 @@
 #include <fidl/fuchsia.hardware.gpu.mali/cpp/driver/wire.h>
 #include <lib/magma/platform/platform_interrupt.h>
 #include <lib/magma/platform/platform_mmio.h>
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/short_macros.h>
+#include <lib/magma/util/status.h>
 #include <lib/magma_service/msd.h>
 
 #include <chrono>
 #include <memory>
-
-#include "magma_util/dlog.h"
-#include "magma_util/short_macros.h"
-#include "magma_util/status.h"
 
 class ParentDevice {
  public:

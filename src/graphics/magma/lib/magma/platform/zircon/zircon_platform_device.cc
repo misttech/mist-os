@@ -8,12 +8,12 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/magma/platform/platform_mmio.h>
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/short_macros.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/vmo.h>
 #include <zircon/process.h>
 
-#include "magma_util/dlog.h"
-#include "magma_util/short_macros.h"
 #include "zircon_platform_handle.h"
 #include "zircon_platform_interrupt.h"
 #include "zircon_platform_mmio.h"

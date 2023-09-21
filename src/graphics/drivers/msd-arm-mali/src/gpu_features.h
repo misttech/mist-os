@@ -6,8 +6,8 @@
 #define SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_GPU_FEATURES_H_
 
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/magma_service/util/register_io.h>
 
-#include "magma_util/register_io.h"
 #include "src/graphics/drivers/msd-arm-mali/src/mali_register_io.h"
 #include "src/graphics/drivers/msd-arm-mali/src/registers.h"
 #include "string_printf.h"

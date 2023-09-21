@@ -5,10 +5,10 @@
 #include "zircon_vmo_semaphore.h"
 
 #include <lib/magma/platform/platform_object.h>
+#include <lib/magma/util/short_macros.h>
+#include <lib/magma/util/utils.h>
 #include <lib/zx/time.h>
 
-#include "magma_util/short_macros.h"
-#include "magma_util/utils.h"
 #include "zircon_platform_port.h"
 
 namespace magma {

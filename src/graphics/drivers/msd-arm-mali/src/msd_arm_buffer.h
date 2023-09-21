@@ -7,11 +7,11 @@
 
 #include <lib/magma/platform/platform_buffer.h>
 #include <lib/magma/platform/platform_event.h>
+#include <lib/magma/util/short_macros.h>
 #include <lib/magma_service/msd.h>
 
 #include <unordered_set>
 
-#include "magma_util/short_macros.h"
 #include "src/graphics/drivers/msd-arm-mali/src/region.h"
 
 class GpuMapping;

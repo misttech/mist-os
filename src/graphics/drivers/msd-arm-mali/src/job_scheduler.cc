@@ -6,9 +6,9 @@
 
 #include <lib/magma/platform/platform_logger.h>
 #include <lib/magma/platform/platform_trace.h>
+#include <lib/magma/util/dlog.h>
 #include <lib/magma_service/msd_defs.h>
 
-#include "magma_util/dlog.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_connection.h"
 #include "string_printf.h"
 

@@ -5,7 +5,7 @@
 #ifndef RINGBUFFER_H
 #define RINGBUFFER_H
 
-#include <magma_util/ringbuffer.h>
+#include <lib/magma_service/util/ringbuffer.h>
 
 #include "gpu_mapping.h"
 

@@ -4,7 +4,7 @@
 
 #include "magma_system_buffer.h"
 
-#include "magma_util/macros.h"
+#include <lib/magma/util/macros.h>
 
 namespace msd {
 

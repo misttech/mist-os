@@ -6,9 +6,8 @@
 #define MSD_VSI_SEMAPHORE_H
 
 #include <lib/magma/platform/platform_semaphore.h>
+#include <lib/magma/util/short_macros.h>
 #include <lib/magma_service/msd.h>
-
-#include "magma_util/short_macros.h"
 
 class MsdVsiAbiSemaphore : public msd::Semaphore {
  public:

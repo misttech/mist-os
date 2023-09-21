@@ -7,12 +7,12 @@
 
 #include <lib/fit/thread_checker.h>
 #include <lib/fit/thread_safety.h>
+#include <lib/magma/util/short_macros.h>
 
 #include <mutex>
 #include <thread>
 #include <unordered_set>
 
-#include "magma_util/short_macros.h"
 #include "msd_arm_buffer.h"
 #include "src/graphics/drivers/msd-arm-mali/src/address_manager.h"
 #include "src/graphics/drivers/msd-arm-mali/src/gpu_features.h"

@@ -9,9 +9,8 @@
 #include <fidl/fuchsia.memorypressure/cpp/wire.h>
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/fdf/cpp/dispatcher.h>
+#include <lib/magma/util/macros.h>
 #include <lib/magma_service/msd.h>
-
-#include "magma_util/macros.h"
 
 namespace msd::internal {
 class DependencyInjectionServer : public fidl::WireServer<fuchsia_gpu_magma::DependencyInjection>,

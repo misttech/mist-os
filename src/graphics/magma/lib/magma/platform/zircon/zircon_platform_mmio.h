@@ -3,11 +3,10 @@
 // found in the LICENSE file.
 
 #include <lib/magma/platform/platform_mmio.h>
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/short_macros.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/mmio/mmio-pinned-buffer.h>
-
-#include "magma_util/dlog.h"
-#include "magma_util/short_macros.h"
 
 namespace magma {
 

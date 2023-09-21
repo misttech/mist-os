@@ -6,9 +6,8 @@
 #define ZIRCON_PLATFORM_HANDLE_H
 
 #include <lib/magma/platform/platform_handle.h>
+#include <lib/magma/util/short_macros.h>
 #include <lib/zx/handle.h>
-
-#include "magma_util/short_macros.h"
 
 namespace magma {
 

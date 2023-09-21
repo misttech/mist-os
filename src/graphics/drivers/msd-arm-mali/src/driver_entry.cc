@@ -14,6 +14,7 @@
 #include <lib/magma/platform/platform_bus_mapper.h>
 #include <lib/magma/platform/platform_logger.h>
 #include <lib/magma/platform/zircon/zircon_platform_status.h>
+#include <lib/magma/util/short_macros.h>
 #include <lib/magma_service/sys_driver/dfv1/magma_device_impl.h>
 #include <lib/magma_service/sys_driver/magma_system_device.h>
 #include <zircon/errors.h>
@@ -27,7 +28,6 @@
 #include <ddktl/fidl.h>
 #include <ddktl/protocol/empty-protocol.h>
 
-#include "magma_util/short_macros.h"
 #include "parent_device_dfv1.h"
 #include "src/graphics/drivers/msd-arm-mali/src/parent_device.h"
 

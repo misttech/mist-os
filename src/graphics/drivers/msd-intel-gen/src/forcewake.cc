@@ -5,11 +5,11 @@
 #include "forcewake.h"
 
 #include <lib/magma/platform/platform_trace.h>
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/short_macros.h>
 
 #include <thread>
 
-#include "magma_util/dlog.h"
-#include "magma_util/short_macros.h"
 #include "msd_intel_register_io.h"
 
 ForceWake::ForceWake(MsdIntelRegisterIo* register_io, uint32_t device_id) {

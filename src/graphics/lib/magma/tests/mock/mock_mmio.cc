@@ -4,9 +4,8 @@
 
 #include "mock/mock_mmio.h"
 
+#include <lib/magma/util/dlog.h>
 #include <stdlib.h>
-
-#include "magma_util/dlog.h"
 
 std::unique_ptr<MockMmio> MockMmio::Create(uint64_t size) {
   void* addr = calloc(size, 1);

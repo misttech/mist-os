@@ -8,11 +8,11 @@
 
 #include "simple_allocator.h"
 
-#include <memory>
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/macros.h>
+#include <lib/magma/util/utils.h>
 
-#include "magma_util/dlog.h"
-#include "magma_util/macros.h"
-#include "magma_util/utils.h"
+#include <memory>
 
 namespace magma {
 

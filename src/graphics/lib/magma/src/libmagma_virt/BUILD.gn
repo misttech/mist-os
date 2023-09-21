@@ -11,8 +11,8 @@ source_set("virtmagma_headers") {
     "virtmagma_util.h",
   ]
   public_deps = [
-    "$magma_build_root/src/magma_util:macros",
-    "$magma_build_root/src/magma_util:short_macros",
+    "//src/graphics/magma/lib/magma/util:macros",
+    "//src/graphics/magma/lib/magma/util:short_macros",
   ]
 }
 

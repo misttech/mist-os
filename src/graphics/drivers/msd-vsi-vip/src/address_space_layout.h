@@ -5,10 +5,9 @@
 #ifndef SRC_GRAPHICS_DRIVERS_MSD_VSI_VIP_SRC_ADDRESS_SPACE_LAYOUT_H_
 #define SRC_GRAPHICS_DRIVERS_MSD_VSI_VIP_SRC_ADDRESS_SPACE_LAYOUT_H_
 
+#include <lib/magma/util/short_macros.h>
+#include <lib/magma/util/utils.h>
 #include <stdint.h>
-
-#include "magma_util/short_macros.h"
-#include "magma_util/utils.h"
 
 class AddressSpaceLayout {
  public:

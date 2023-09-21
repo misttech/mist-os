@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <gtest/gtest.h>
+#include <lib/magma/util/short_macros.h>
+#include <lib/magma/util/utils.h>
 
-#include "magma_util/short_macros.h"
-#include "magma_util/utils.h"
+#include <gtest/gtest.h>
 
 TEST(MagmaUtil, GetPow2) {
   uint64_t pow2;

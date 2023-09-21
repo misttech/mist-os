@@ -3,9 +3,8 @@
 // found in the LICENSE file.
 
 #include <lib/magma/platform/platform_object.h>
+#include <lib/magma/util/short_macros.h>
 #include <zircon/syscalls.h>
-
-#include "magma_util/short_macros.h"
 
 namespace magma {
 

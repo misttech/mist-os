@@ -15,14 +15,13 @@
 #include <lib/magma/platform/platform_thread.h>
 #include <lib/magma/platform/platform_trace.h>
 #include <lib/magma/platform/platform_trace_provider.h>
+#include <lib/magma/util/macros.h>
+#include <lib/magma/util/short_macros.h>
+#include <lib/magma/util/utils.h>
 
 #include <atomic>
 #include <chrono>
 #include <map>
-
-#include "magma_util/macros.h"
-#include "magma_util/short_macros.h"
-#include "magma_util/utils.h"
 
 namespace {
 

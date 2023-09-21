@@ -7,6 +7,7 @@
 
 #include <lib/magma/platform/platform_buffer.h>
 #include <lib/magma/platform/platform_event.h>
+#include <lib/magma/util/short_macros.h>
 #include <lib/magma_service/msd.h>
 
 #include <atomic>
@@ -15,7 +16,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include "magma_util/short_macros.h"
 #include "types.h"
 
 class AddressSpace;

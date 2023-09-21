@@ -6,11 +6,11 @@
 
 #include <lib/magma/magma_common_defs.h>
 #include <lib/magma/platform/platform_connection_client.h>
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/utils.h>
 
 #include <vector>
 
-#include "magma_util/dlog.h"
-#include "magma_util/utils.h"
 #include "zircon_platform_handle.h"
 #include "zircon_platform_status.h"
 

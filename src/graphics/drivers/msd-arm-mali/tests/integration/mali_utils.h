@@ -5,12 +5,12 @@
 #define SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_TESTS_INTEGRATION_MALI_UTILS_H_
 
 #include <lib/magma/magma.h>
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/short_macros.h>
 
 #include "helper/magma_map_cpu.h"
 #include "helper/test_device_helper.h"
 #include "magma_arm_mali_types.h"
-#include "magma_util/dlog.h"
-#include "magma_util/short_macros.h"
 #include "src/graphics/drivers/msd-arm-mali/include/magma_vendor_queries.h"
 
 namespace mali_utils {

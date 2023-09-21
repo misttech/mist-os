@@ -6,11 +6,10 @@
 
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/magma/platform/platform_logger.h>
+#include <lib/magma/util/macros.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <zircon/assert.h>
-
-#include "magma_util/macros.h"
 
 namespace magma {
 

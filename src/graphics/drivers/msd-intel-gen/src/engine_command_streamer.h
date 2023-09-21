@@ -5,13 +5,14 @@
 #ifndef ENGINE_COMMAND_STREAMER_H
 #define ENGINE_COMMAND_STREAMER_H
 
+#include <lib/magma/util/status.h>
+
 #include <memory>
 #include <queue>
 
 #include "address_space.h"
 #include "gpu_progress.h"
 #include "hardware_status_page.h"
-#include "magma_util/status.h"
 #include "mapped_batch.h"
 #include "msd_intel_context.h"
 #include "msd_intel_register_io.h"

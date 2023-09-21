@@ -12,9 +12,9 @@
 #include <lib/magma/platform/platform_bus_mapper.h>
 #include <lib/magma/platform/zircon/zircon_platform_logger_dfv2.h>
 #include <lib/magma/platform/zircon/zircon_platform_status.h>
+#include <lib/magma/util/short_macros.h>
 #include <lib/magma_service/sys_driver/magma_driver_base.h>
 
-#include "magma_util/short_macros.h"
 #include "parent_device_dfv2.h"
 
 #if MAGMA_TEST_DRIVER

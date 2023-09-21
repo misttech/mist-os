@@ -5,11 +5,11 @@
 #ifndef SRC_GRAPHICS_DRIVERS_MSD_VSI_VIP_SRC_PAGE_TABLE_SLOT_ALLOCATOR_H_
 #define SRC_GRAPHICS_DRIVERS_MSD_VSI_VIP_SRC_PAGE_TABLE_SLOT_ALLOCATOR_H_
 
+#include <lib/magma/util/short_macros.h>
+
 #include <atomic>
 #include <mutex>
 #include <vector>
-
-#include "magma_util/short_macros.h"
 
 // Thread-safe.
 class PageTableSlotAllocator {

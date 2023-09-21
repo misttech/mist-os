@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <lib/magma/magma.h>
+#include <lib/magma/util/short_macros.h>
 #include <lib/zx/channel.h>
 
 #include <shared_mutex>
@@ -13,7 +14,6 @@
 
 #include "driver_registry.h"
 #include "helper/test_device_helper.h"
-#include "magma_util/short_macros.h"
 #include "src/graphics/drivers/msd-arm-mali/include/magma_vendor_queries.h"
 
 namespace {

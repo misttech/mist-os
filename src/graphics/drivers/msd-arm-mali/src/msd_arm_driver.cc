@@ -4,8 +4,9 @@
 
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_driver.h"
 
-#include "magma_util/dlog.h"
-#include "magma_util/short_macros.h"
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/short_macros.h>
+
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_device.h"
 
 MsdArmDriver::MsdArmDriver() {

@@ -5,9 +5,9 @@
 #include "msd_intel_connection.h"
 
 #include <lib/magma/platform/platform_trace.h>
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/short_macros.h>
 
-#include "magma_util/dlog.h"
-#include "magma_util/short_macros.h"
 #include "msd_intel_context.h"
 #include "ppgtt.h"
 

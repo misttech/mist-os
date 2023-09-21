@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_MACROS_H_
-#define SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_MACROS_H_
+#ifndef SRC_GRAPHICS_MAGMA_LIB_MAGMA_UTIL_MACROS_H_
+#define SRC_GRAPHICS_MAGMA_LIB_MAGMA_UTIL_MACROS_H_
 
 #include <assert.h>
 #include <stdarg.h>
@@ -77,4 +77,4 @@ static constexpr bool kMagmaDretEnable = kDebug;
 
 }  // namespace magma
 
-#endif  // SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_MACROS_H_
+#endif  // SRC_GRAPHICS_MAGMA_LIB_MAGMA_UTIL_MACROS_H_

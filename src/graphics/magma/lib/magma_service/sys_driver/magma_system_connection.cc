@@ -4,10 +4,11 @@
 
 #include "magma_system_connection.h"
 
+#include <lib/magma/util/macros.h>
+
 #include <vector>
 
 #include "magma_system_device.h"
-#include "magma_util/macros.h"
 
 namespace msd {
 MagmaSystemConnection::MagmaSystemConnection(Owner* owner,

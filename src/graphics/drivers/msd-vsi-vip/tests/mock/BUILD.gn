@@ -9,9 +9,9 @@ source_set("mock") {
 
   public_deps = [
     "//src/graphics/drivers/msd-vsi-vip/src",
-    "//src/graphics/lib/magma/src/magma_util:mapped_batch",
     "//src/graphics/magma/lib/magma/platform:buffer",
     "//src/graphics/magma/lib/magma/platform:semaphore",
+    "//src/graphics/magma/lib/magma_service/util:mapped_batch",
   ]
 
   sources = [ "mock_mapped_batch.h" ]

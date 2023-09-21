@@ -5,9 +5,9 @@
 #ifndef PLATFORM_PORT_H
 #define PLATFORM_PORT_H
 
-#include <memory>
+#include <lib/magma/util/status.h>
 
-#include "magma_util/status.h"
+#include <memory>
 
 namespace magma {
 

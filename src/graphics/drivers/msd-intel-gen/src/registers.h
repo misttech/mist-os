@@ -5,13 +5,14 @@
 #ifndef REGISTERS_H
 #define REGISTERS_H
 
+#include <lib/magma/util/short_macros.h>
+#include <lib/magma/util/utils.h>
+
 #include <bitset>
 #include <vector>
 
 #include "device_id.h"
 #include "hwreg/bitfields.h"
-#include "magma_util/short_macros.h"
-#include "magma_util/utils.h"
 #include "msd_intel_register_io.h"
 #include "types.h"
 

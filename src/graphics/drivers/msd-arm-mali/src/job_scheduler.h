@@ -5,6 +5,7 @@
 #ifndef SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_JOB_SCHEDULER_H_
 #define SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_JOB_SCHEDULER_H_
 
+#include <lib/magma/util/short_macros.h>
 #include <lib/magma_service/msd_defs.h>
 
 #include <chrono>
@@ -12,7 +13,6 @@
 #include <list>
 #include <vector>
 
-#include "magma_util/short_macros.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_atom.h"
 
 class JobScheduler {

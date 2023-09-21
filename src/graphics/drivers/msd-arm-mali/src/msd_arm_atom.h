@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_MSD_ARM_ATOM_H_
 
 #include <lib/magma/platform/platform_semaphore.h>
+#include <lib/magma/util/utils.h>
 
 #include <chrono>
 #include <cstdint>
@@ -13,7 +14,6 @@
 #include <string>
 #include <vector>
 
-#include "magma_util/utils.h"
 #include "src/graphics/drivers/msd-arm-mali/include/magma_arm_mali_types.h"
 #include "src/graphics/drivers/msd-arm-mali/src/address_space.h"
 

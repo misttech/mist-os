@@ -7,6 +7,7 @@
 
 #include <lib/magma/platform/platform_buffer.h>
 #include <lib/magma/platform/platform_semaphore.h>
+#include <lib/magma/util/macros.h>
 #include <lib/magma_service/msd.h>
 #include <lib/magma_service/msd_defs.h>
 #include <lib/sync/cpp/completion.h>
@@ -14,8 +15,6 @@
 #include <iterator>
 #include <memory>
 #include <vector>
-
-#include "magma_util/macros.h"
 
 // These classes contain default implementations of msd_device_t functionality.
 // To override a specific function to contain test logic, inherit from the

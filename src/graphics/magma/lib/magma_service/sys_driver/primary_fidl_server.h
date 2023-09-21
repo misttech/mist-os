@@ -12,6 +12,9 @@
 #include <lib/async/time.h>
 #include <lib/async/wait.h>
 #include <lib/fit/function.h>
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/macros.h>
+#include <lib/magma/util/status.h>
 #include <lib/magma_service/msd.h>
 #include <lib/magma_service/msd_defs.h>
 #include <lib/stdcompat/optional.h>
@@ -24,10 +27,6 @@
 #include <mutex>
 #include <thread>
 #include <utility>
-
-#include "magma_util/dlog.h"
-#include "magma_util/macros.h"
-#include "magma_util/status.h"
 
 namespace msd {
 class FlowControlChecker;

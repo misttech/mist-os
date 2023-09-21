@@ -5,6 +5,7 @@
 #include "magma_system_context.h"
 
 #include <lib/magma/platform/platform_trace.h>
+#include <lib/magma/util/macros.h>
 
 #include <memory>
 #include <unordered_set>
@@ -12,7 +13,6 @@
 
 #include "magma_system_connection.h"
 #include "magma_system_device.h"
-#include "magma_util/macros.h"
 
 namespace msd {
 magma::Status MagmaSystemContext::ExecuteCommandBufferWithResources(

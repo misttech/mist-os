@@ -7,6 +7,8 @@
 
 #include <lib/magma/platform/platform_semaphore.h>
 #include <lib/magma/platform/platform_trace.h>
+#include <lib/magma/util/short_macros.h>
+#include <lib/magma/util/thread.h>
 #include <lib/magma_service/msd.h>
 
 #include <array>
@@ -19,8 +21,6 @@
 #include "forcewake.h"
 #include "gtt.h"
 #include "interrupt_manager.h"
-#include "magma_util/short_macros.h"
-#include "magma_util/thread.h"
 #include "msd_intel_connection.h"
 #include "msd_intel_context.h"
 #include "msd_intel_pci_device.h"

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_THREAD_H_
-#define SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_THREAD_H_
+#ifndef SRC_GRAPHICS_MAGMA_LIB_MAGMA_UTIL_THREAD_H_
+#define SRC_GRAPHICS_MAGMA_LIB_MAGMA_UTIL_THREAD_H_
 
 #include <lib/magma/platform/platform_thread.h>
 
@@ -16,4 +16,4 @@ class ThreadIdCheck {
 
 }  // namespace magma
 
-#endif  // SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_THREAD_H_
+#endif  // SRC_GRAPHICS_MAGMA_LIB_MAGMA_UTIL_THREAD_H_

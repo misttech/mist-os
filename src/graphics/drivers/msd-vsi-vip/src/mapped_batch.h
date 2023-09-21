@@ -7,9 +7,9 @@
 
 #include <lib/magma/platform/platform_buffer.h>
 #include <lib/magma/platform/platform_semaphore.h>
+#include <lib/magma_service/util/mapped_batch.h>
 
 #include "gpu_mapping.h"
-#include "magma_util/mapped_batch.h"
 
 class MsdVsiContext;
 

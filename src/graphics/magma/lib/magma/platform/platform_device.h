@@ -9,12 +9,11 @@
 #include <lib/magma/platform/platform_handle.h>
 #include <lib/magma/platform/platform_interrupt.h>
 #include <lib/magma/platform/platform_mmio.h>
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/status.h>
 
 #include <chrono>
 #include <memory>
-
-#include "magma_util/dlog.h"
-#include "magma_util/status.h"
 
 namespace magma {
 

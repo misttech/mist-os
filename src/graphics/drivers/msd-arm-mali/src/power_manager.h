@@ -7,14 +7,13 @@
 
 #include <lib/fit/thread_safety.h>
 #include <lib/magma/platform/platform_semaphore.h>
+#include <lib/magma/util/short_macros.h>
+#include <lib/magma_service/util/register_io.h>
 
 #include <chrono>
 #include <deque>
 #include <mutex>
 
-#include <magma_util/register_io.h>
-
-#include "magma_util/short_macros.h"
 #include "mali_register_io.h"
 
 // This class generally lives on the device thread.

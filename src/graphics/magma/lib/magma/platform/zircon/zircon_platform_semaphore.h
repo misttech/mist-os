@@ -7,9 +7,8 @@
 
 #include <lib/magma/platform/platform_semaphore.h>
 #include <lib/magma/platform/platform_trace.h>
+#include <lib/magma/util/short_macros.h>
 #include <lib/zx/event.h>
-
-#include "magma_util/short_macros.h"
 
 namespace magma {
 

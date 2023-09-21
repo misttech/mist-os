@@ -6,11 +6,10 @@
 #define SRC_GRAPHICS_MAGMA_LIB_MAGMA_PLATFORM_ZIRCON_ZIRCON_PLATFORM_EVENT_H_
 
 #include <lib/magma/platform/platform_event.h>
+#include <lib/magma/util/short_macros.h>
+#include <lib/magma/util/utils.h>
 #include <lib/zx/event.h>
 #include <lib/zx/time.h>
-
-#include "magma_util/short_macros.h"
-#include "magma_util/utils.h"
 
 namespace magma {
 

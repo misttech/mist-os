@@ -7,14 +7,14 @@
 
 #include <lib/magma/platform/platform_buffer.h>
 #include <lib/magma/platform/platform_bus_mapper.h>
+#include <lib/magma/util/short_macros.h>
+#include <lib/magma_service/util/address_space.h>
 #include <limits.h>
 
 #include <vector>
 
 #include "gpu_mapping.h"
 #include "macros.h"
-#include "magma_util/address_space.h"
-#include "magma_util/short_macros.h"
 
 #ifndef PAGE_SHIFT
 #define PAGE_SHIFT 12

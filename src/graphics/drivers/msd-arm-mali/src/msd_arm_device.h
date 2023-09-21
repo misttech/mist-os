@@ -11,8 +11,11 @@
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/magma/platform/platform_interrupt.h>
 #include <lib/magma/platform/platform_semaphore.h>
+#include <lib/magma/util/short_macros.h>
+#include <lib/magma/util/thread.h>
 #include <lib/magma_service/msd.h>
 #include <lib/magma_service/msd_defs.h>
+#include <lib/magma_service/util/register_io.h>
 #include <zircon/compiler.h>
 
 #include <deque>
@@ -21,9 +24,6 @@
 #include <thread>
 #include <vector>
 
-#include "magma_util/register_io.h"
-#include "magma_util/short_macros.h"
-#include "magma_util/thread.h"
 #include "mali_register_io.h"
 #include "parent_device.h"
 #include "src/graphics/drivers/msd-arm-mali/src/address_manager.h"

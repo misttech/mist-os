@@ -5,12 +5,11 @@
 #include "zircon_platform_trace_provider.h"
 
 #include <lib/async/cpp/task.h>
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/short_macros.h>
 #include <zircon/syscalls.h>
 
 #include <memory>
-
-#include "magma_util/dlog.h"
-#include "magma_util/short_macros.h"
 
 namespace magma {
 

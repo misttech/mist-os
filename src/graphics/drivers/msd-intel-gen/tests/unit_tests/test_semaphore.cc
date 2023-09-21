@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma/util/dlog.h>
+
 #include <thread>
 
 #include <gtest/gtest.h>
 
-#include "magma_util/dlog.h"
 #include "msd_intel_semaphore.h"
 
 namespace {

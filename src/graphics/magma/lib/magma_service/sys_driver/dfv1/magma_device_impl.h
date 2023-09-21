@@ -10,6 +10,7 @@
 #include <lib/fit/thread_safety.h>
 #include <lib/magma/platform/platform_thread.h>
 #include <lib/magma/platform/zircon/zircon_platform_status.h>
+#include <lib/magma/util/short_macros.h>
 #include <lib/magma_service/sys_driver/magma_system_device.h>
 
 #include <memory>
@@ -18,7 +19,6 @@
 
 #include "magma_dependency_injection_device.h"
 #include "magma_performance_counter_device.h"
-#include "magma_util/short_macros.h"
 
 namespace msd {
 #if MAGMA_TEST_DRIVER

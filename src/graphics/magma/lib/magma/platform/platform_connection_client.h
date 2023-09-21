@@ -9,11 +9,10 @@
 #include <lib/magma/platform/platform_buffer.h>
 #include <lib/magma/platform/platform_object.h>
 #include <lib/magma/platform/platform_thread.h>
+#include <lib/magma/util/macros.h>
+#include <lib/magma/util/status.h>
 
 #include <memory>
-
-#include "magma_util/macros.h"
-#include "magma_util/status.h"
 
 namespace magma {
 

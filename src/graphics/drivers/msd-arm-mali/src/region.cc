@@ -4,9 +4,9 @@
 
 #include "src/graphics/drivers/msd-arm-mali/src/region.h"
 
-#include <algorithm>
+#include <lib/magma/util/short_macros.h>
 
-#include "magma_util/short_macros.h"
+#include <algorithm>
 
 void Region::Union(const Region& other) {
   if (other.empty()) {

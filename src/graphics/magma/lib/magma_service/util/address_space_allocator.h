@@ -5,7 +5,7 @@
 #ifndef ADDRESS_SPACE_ALLOCATOR_H
 #define ADDRESS_SPACE_ALLOCATOR_H
 
-#include "magma_util/macros.h"
+#include <lib/magma/util/macros.h>
 
 namespace magma {
 

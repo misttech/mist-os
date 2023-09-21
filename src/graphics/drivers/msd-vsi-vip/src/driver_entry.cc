@@ -12,6 +12,7 @@
 #include <lib/magma/platform/platform_handle.h>
 #include <lib/magma/platform/platform_logger.h>
 #include <lib/magma/platform/zircon/zircon_platform_status.h>
+#include <lib/magma/util/short_macros.h>
 #include <lib/magma_service/sys_driver/dfv1/magma_device_impl.h>
 #include <lib/magma_service/sys_driver/magma_system_device.h>
 #include <zircon/process.h>
@@ -25,7 +26,6 @@
 #include <ddktl/protocol/empty-protocol.h>
 
 #include "lib/ddk/binding_driver.h"
-#include "magma_util/short_macros.h"
 
 #if MAGMA_TEST_DRIVER
 zx_status_t magma_indriver_test(zx_device_t* device);

@@ -5,9 +5,9 @@
 #include "msd_intel_register_io.h"
 
 #include <lib/magma/platform/platform_trace.h>
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/short_macros.h>
 
-#include "magma_util/dlog.h"
-#include "magma_util/short_macros.h"
 #include "registers.h"
 
 MsdIntelRegisterIo::MsdIntelRegisterIo(Owner* owner, std::unique_ptr<magma::PlatformMmio> mmio,

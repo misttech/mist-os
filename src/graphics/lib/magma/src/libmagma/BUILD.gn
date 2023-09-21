@@ -26,7 +26,6 @@ static_library("libmagma_static") {
   sources = [ "magma.cc" ]
 
   deps = [
-    "$magma_build_root/src/magma_util:short_macros",
     "//src/graphics/magma/lib/magma/platform:buffer",
     "//src/graphics/magma/lib/magma/platform:connection_client",
     "//src/graphics/magma/lib/magma/platform:device_client",
@@ -37,6 +36,7 @@ static_library("libmagma_static") {
     "//src/graphics/magma/lib/magma/platform:thread",
     "//src/graphics/magma/lib/magma/platform:trace",
     "//src/graphics/magma/lib/magma/platform:trace_provider",
+    "//src/graphics/magma/lib/magma/util:short_macros",
     "//zircon/system/ulib/trace:trace-with-static-engine",
     "//zircon/system/ulib/trace-vthread:trace-vthread-with-static-engine",
   ]

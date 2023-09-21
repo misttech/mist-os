@@ -5,6 +5,7 @@
 #ifndef SRC_GRAPHICS_MAGMA_LIB_MAGMA_SERVICE_SYS_DRIVER_MAGMA_SYSTEM_CONNECTION_H_
 #define SRC_GRAPHICS_MAGMA_LIB_MAGMA_SERVICE_SYS_DRIVER_MAGMA_SYSTEM_CONNECTION_H_
 
+#include <lib/magma/util/macros.h>
 #include <lib/magma_service/msd.h>
 
 #include <memory>
@@ -15,7 +16,6 @@
 #include "fidl/fuchsia.gpu.magma/cpp/wire_types.h"
 #include "magma_system_buffer.h"
 #include "magma_system_context.h"
-#include "magma_util/macros.h"
 #include "primary_fidl_server.h"
 
 namespace msd {

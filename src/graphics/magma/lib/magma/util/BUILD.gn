@@ -21,26 +21,7 @@ config("magma_util_config") {
   } else {
     defines = [ "MAGMA_DEBUG_INTERNAL_USE_ONLY=0" ]
   }
-}
-
-# Deprecated
-group("magma_util") {
-  public_deps = [ ":macros" ]
-}
-
-source_set("address_space") {
-  visibility = visibility_list
-
-  sources = [
-    "accessor.h",
-    "address_space.h",
-    "gpu_mapping.h",
-  ]
-  public_deps = [
-    ":macros",
-    "//src/graphics/magma/lib/magma/platform:buffer",
-    "//src/graphics/magma/lib/magma/platform:bus_mapper",
-  ]
+  configs = [ "../../..:src_config" ]
 }
 
 source_set("macros") {
@@ -69,27 +50,6 @@ source_set("status") {
   public_deps = [ "$magma_build_root/include:magma_common" ]
 }
 
-source_set("mapped_batch") {
-  visibility = visibility_list
-
-  public_configs = [
-    ":magma_util_config",
-    "$magma_build_root:magma_src_include_config",
-  ]
-
-  sources = [
-    "command_buffer.h",
-    "mapped_batch.h",
-  ]
-
-  public_deps = [
-    ":address_space",
-    "//src/graphics/magma:msd",
-    "//src/graphics/magma/lib/magma/platform:semaphore",
-    "//src/graphics/magma/lib/magma/platform:trace",
-  ]
-}
-
 source_set("thread") {
   visibility = visibility_list
 
@@ -98,58 +58,6 @@ source_set("thread") {
   sources = [ "thread.h" ]
 
   deps = [ "//src/graphics/magma/lib/magma/platform:thread" ]
-}
-
-source_set("allocator") {
-  visibility = visibility_list
-
-  public_configs = [ "$magma_build_root:magma_src_include_config" ]
-
-  sources = [
-    "address_space_allocator.h",
-    "simple_allocator.cc",
-    "simple_allocator.h",
-  ]
-
-  public_deps = [
-    ":macros",
-    "//sdk/lib/fit",
-  ]
-}
-
-source_set("registers") {
-  visibility = visibility_list
-
-  public_configs = [
-    ":magma_util_config",
-    "$magma_build_root:magma_src_include_config",
-  ]
-
-  sources = [
-    "register_io.cc",
-    "register_io.h",
-  ]
-
-  public_deps = [
-    ":macros",
-    "//src/graphics/magma/lib/magma/platform:mmio_header",
-  ]
-}
-
-source_set("ringbuffer") {
-  visibility = visibility_list
-
-  public_configs = [ "$magma_build_root:magma_src_include_config" ]
-
-  sources = [
-    "instruction_writer.h",
-    "ringbuffer.h",
-  ]
-
-  public_deps = [
-    ":address_space",
-    ":macros",
-  ]
 }
 
 source_set("short_macros") {

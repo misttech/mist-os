@@ -7,7 +7,10 @@
 
 #include <lib/magma/platform/platform_bus_mapper.h>
 #include <lib/magma/platform/platform_semaphore.h>
+#include <lib/magma/util/short_macros.h>
+#include <lib/magma/util/thread.h>
 #include <lib/magma_service/msd.h>
+#include <lib/magma_service/util/register_io.h>
 
 #include <list>
 #include <memory>
@@ -17,9 +20,6 @@
 #include "device_request.h"
 #include "gpu_features.h"
 #include "gpu_progress.h"
-#include "magma_util/register_io.h"
-#include "magma_util/short_macros.h"
-#include "magma_util/thread.h"
 #include "magma_vsi_vip_devices.h"
 #include "magma_vsi_vip_types.h"
 #include "mapped_batch.h"

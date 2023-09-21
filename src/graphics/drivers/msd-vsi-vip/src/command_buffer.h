@@ -5,8 +5,8 @@
 #ifndef COMMAND_BUFFER_H
 #define COMMAND_BUFFER_H
 
-#include <magma_util/accessor.h>
-#include <magma_util/command_buffer.h>
+#include <lib/magma_service/util/accessor.h>
+#include <lib/magma_service/util/command_buffer.h>
 
 #include "gpu_mapping.h"
 #include "instructions.h"

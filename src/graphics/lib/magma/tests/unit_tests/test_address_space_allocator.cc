@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/short_macros.h>
+#include <lib/magma_service/util/simple_allocator.h>
+
 #include <list>
 
 #include <gtest/gtest.h>
-
-#include "magma_util/dlog.h"
-#include "magma_util/short_macros.h"
-#include "magma_util/simple_allocator.h"
 
 #define ROUNDUP(a, b) (((a) + ((b)-1)) & ~((b)-1))
 #define ALIGN(a, b) ROUNDUP(a, b)

@@ -4,9 +4,9 @@
 
 #include "magma_performance_counter_device.h"
 
-#include <ddktl/fidl.h>
+#include <lib/magma/util/short_macros.h>
 
-#include "magma_util/short_macros.h"
+#include <ddktl/fidl.h>
 
 namespace magma {
 

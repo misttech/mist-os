@@ -5,6 +5,8 @@
 #define MAGMA_DLOG_ENABLE 1
 
 #include <lib/magma/magma.h>
+#include <lib/magma/util/dlog.h>
+#include <lib/magma/util/short_macros.h>
 #include <lib/zx/channel.h>
 #include <poll.h>
 
@@ -15,8 +17,6 @@
 #include "helper/magma_map_cpu.h"
 #include "helper/test_device_helper.h"
 #include "magma_arm_mali_types.h"
-#include "magma_util/dlog.h"
-#include "magma_util/short_macros.h"
 #include "mali_utils.h"
 #include "src/graphics/drivers/msd-arm-mali/include/magma_vendor_queries.h"
 
