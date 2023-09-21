@@ -141,8 +141,10 @@ impl Emu {
     pub fn start(ctx: &crate::TestContext) -> Emu {
         let emu_dir = TempDir::new_in(&*crate::TEMP_DIR).expect("could not create emu temp dir");
 
-        let esp_blk = std::fs::read(crate::ROOT_BUILD_DIR.join(env!("BOOTLOADER")))
-            .expect("failed to read bootloader");
+        let esp_blk_path = crate::ROOT_BUILD_DIR.join(env!("BOOTLOADER"));
+        let esp_blk = std::fs::read(esp_blk_path.clone()).unwrap_or_else(|_| {
+            panic!("failed to read bootloader from: {}", esp_blk_path.display())
+        });
         let disk_path = emu_dir.path().join("disk.img");
         Emu::make_empty_disk(&disk_path, &esp_blk).expect("failed to make empty disk");
 
