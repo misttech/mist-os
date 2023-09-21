@@ -137,7 +137,7 @@ async fn enumerate_echo_test() {
 
     proxy
         .enumerate_in_realm(
-            "fuchsia-pkg://fuchsia.com/test_manager_test#meta/echo_test_realm.cm",
+            "fuchsia-pkg://fuchsia.com/test_manager_specified_realm_test#meta/echo_test_realm.cm",
             realm,
             &offers,
             ECHO_TEST_COL,
@@ -384,7 +384,7 @@ async fn debug_data_isolated_test() {
 
 #[fuchsia::test]
 async fn custom_artifact_realm_test() {
-    let test_url = "fuchsia-pkg://fuchsia.com/test_manager_test#meta/custom_artifact_realm_test.cm";
+    let test_url = "fuchsia-pkg://fuchsia.com/test_manager_specified_realm_test#meta/custom_artifact_realm_test.cm";
 
     let (events, _) =
         run_test_in_hermetic_test_realm(test_url, default_run_option()).await.unwrap();

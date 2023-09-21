@@ -6,7 +6,7 @@
     children: [
         {
             name: "test_driver",
-            url: "fuchsia-pkg://fuchsia.com/test_manager_test#meta/custom_artifact_user.cm",
+            url: "#meta/custom_artifact_user.cm",
         },
     ],
     use: [

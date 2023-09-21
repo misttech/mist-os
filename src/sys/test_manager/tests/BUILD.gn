@@ -82,7 +82,17 @@ fuchsia_test_package("test_manager_test") {
   test_components = [ ":test_manager_test_component" ]
   deps = [ "test_data" ]
 
-  subpackages = [ "//src/sys/test_manager:pkg" ]
+  subpackages = [
+    "//src/sys/test_manager:pkg",
+
+    # even though we don't use this as a sub-package (in the code), this will
+    # make sure that required blobs are in build graph and cached.
+    # TODO(b/301507292) : Remove these
+    "//examples/components/routing/integration_tests/cpp:subpackaged_echo_integration_test_cpp",
+    "//examples/components/routing/integration_tests/rust:subpackaged_echo_integration_test_rust",
+    "//src/sys/test_runners/gtest/test_data:gtest-runner-example-tests",
+    "diagnostics_tests:test-manager-diagnostics-tests",
+  ]
 
   # There's expected error logs that happen during the test such as not resolving an instance when
   # testing that we fail to execute a test with an unknown URL.
@@ -110,14 +120,23 @@ fuchsia_test_package("test_manager_specified_realm_test") {
   test_components = [ ":test_manager_specified_realm_test_component" ]
   deps = [
     ":test_realm",
+    "test_data:custom_artifact_realm_test",
     "test_data:debug_data_write_test",
     "test_data:echo_test_client",
     "test_data:echo_test_realm",
     "//examples/components/routing/rust/echo_server:echo_server_cmp",
+    "//examples/tests/rust:custom_artifact_user_cmp",
     "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_component",
   ]
 
-  subpackages = [ "//src/sys/test_manager:pkg" ]
+  subpackages = [
+    "//src/sys/test_manager:pkg",
+
+    # even though we don't use this as a sub-package (in the code), this will
+    # make sure that required blobs are in build graph and cached.
+    # TODO(b/301507292) : Remove this
+    "diagnostics_tests:test-manager-diagnostics-tests",
+  ]
 }
 
 fuchsia_test_component("test_manager_stress_test_component") {
@@ -150,7 +169,7 @@ group("tests") {
     "test_data:debug-data-test",
 
     # test_manager_test launches these tests.
-    # TODO(fxbug.dev/104764): consider reorganizing these tests so that these dependencies
+    # TODO(b/301507292): consider reorganizing these tests so that these dependencies
     # are not necessary.
     "//examples/components/routing/integration_tests/cpp:subpackaged_echo_integration_test_cpp",
     "//examples/components/routing/integration_tests/rust:subpackaged_echo_integration_test_rust",
