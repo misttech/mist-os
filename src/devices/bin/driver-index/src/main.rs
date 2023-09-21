@@ -206,6 +206,13 @@ async fn run_driver_registrar_server(
                         }
                     }
                 }
+                fdr::DriverRegistrarRequest::_UnknownMethod { ordinal, method_type, .. } => {
+                    tracing::warn!(
+                        "DriverRegistrarRequest::UnknownMethod {:?} with ordinal {}",
+                        method_type,
+                        ordinal
+                    );
+                }
             }
             Ok(())
         })
