@@ -1,0 +1,9 @@
+{
+    "short_description": "Driver Framework example for demo-libc",
+    "manufacturer": "",
+    "families": [],
+    "models": [],
+    "areas": [
+        "DriverFramework"
+    ]
+}
