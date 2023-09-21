@@ -90,10 +90,10 @@ pub fn parse_many_documents(
 /// This enum allows such names to be specified disambiguating what
 /// namespace they are in.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub enum CapabilityId {
-    Service(Name),
-    Protocol(Name),
-    Directory(Name),
+pub enum CapabilityId<'a> {
+    Service(&'a Name),
+    Protocol(&'a Name),
+    Directory(&'a Name),
     // A service in a `use` declaration has a target path in the component's namespace.
     UsedService(Path),
     // A protocol in a `use` declaration has a target path in the component's namespace.
@@ -104,16 +104,16 @@ pub enum CapabilityId {
     UsedStorage(Path),
     // An event stream in a `use` declaration has a target path in the component's namespace.
     UsedEventStream(Path),
-    Storage(Name),
-    Runner(Name),
-    Resolver(Name),
-    EventStream(Name),
+    Storage(&'a Name),
+    Runner(&'a Name),
+    Resolver(&'a Name),
+    EventStream(&'a Name),
 }
 
 /// Generates a `Vec<Name>` -> `Vec<CapabilityId>` conversion function.
 macro_rules! capability_ids_from_names {
     ($name:ident, $variant:expr) => {
-        fn $name(names: Vec<Name>) -> Vec<Self> {
+        fn $name(names: Vec<&'a Name>) -> Vec<Self> {
             names.into_iter().map(|n| $variant(n)).collect()
         }
     };
@@ -128,7 +128,7 @@ macro_rules! capability_ids_from_paths {
     };
 }
 
-impl CapabilityId {
+impl<'a> CapabilityId<'a> {
     /// Human readable description of this capability type.
     pub fn type_str(&self) -> &'static str {
         match self {
@@ -167,7 +167,7 @@ impl CapabilityId {
     ///
     /// When multiple capability identifiers are specified, the target names are the same as the
     /// source names.
-    pub fn from_use(use_: &Use) -> Result<Vec<CapabilityId>, Error> {
+    pub fn from_use(use_: &'a Use) -> Result<Vec<Self>, Error> {
         // TODO: Validate that exactly one of these is set.
         let alias = use_.path.as_ref();
         if let Some(n) = use_.service() {
@@ -214,7 +214,7 @@ impl CapabilityId {
         )))
     }
 
-    pub fn from_capability(capability: &Capability) -> Result<Vec<CapabilityId>, Error> {
+    pub fn from_capability(capability: &'a Capability) -> Result<Vec<Self>, Error> {
         // TODO: Validate that exactly one of these is set.
         if let Some(n) = capability.service() {
             if n.is_many() && capability.path.is_some() {
@@ -297,7 +297,7 @@ impl CapabilityId {
     ///
     /// When multiple capability identifiers are specified, the target names are the same as the
     /// source names.
-    pub fn from_offer_expose<T>(clause: &T) -> Result<Vec<CapabilityId>, Error>
+    pub fn from_offer_expose<T>(clause: &'a T) -> Result<Vec<Self>, Error>
     where
         T: CapabilityClause + AsClause + fmt::Debug,
     {
@@ -362,12 +362,12 @@ impl CapabilityId {
     }
 
     /// Returns the target names as a `Vec`  from a declaration with `names` and `alias` as a `Vec`.
-    fn get_one_or_many_names(
-        names: OneOrMany<Name>,
-        alias: Option<&Name>,
+    fn get_one_or_many_names<'b>(
+        names: OneOrMany<&'b Name>,
+        alias: Option<&'b Name>,
         capability_type: &str,
-    ) -> Result<Vec<Name>, Error> {
-        let names: Vec<Name> = names.into_iter().collect();
+    ) -> Result<Vec<&'b Name>, Error> {
+        let names: Vec<&Name> = names.into_iter().collect();
         if names.len() == 1 {
             Ok(vec![alias_or_name(alias, &names[0])])
         } else {
@@ -383,11 +383,11 @@ impl CapabilityId {
 
     /// Returns the target paths as a `Vec` from a `use` declaration with `names` and `alias`.
     fn get_one_or_many_svc_paths(
-        names: OneOrMany<Name>,
+        names: OneOrMany<&Name>,
         alias: Option<&Path>,
         capability_type: &str,
     ) -> Result<Vec<Path>, Error> {
-        let names: Vec<Name> = names.into_iter().collect();
+        let names: Vec<_> = names.into_iter().collect();
         match (names.len(), alias) {
             (_, None) => {
                 Ok(names.into_iter().map(|n| format!("/svc/{}", n).parse().unwrap()).collect())
@@ -413,7 +413,7 @@ impl CapabilityId {
     capability_ids_from_paths!(used_protocols_from, CapabilityId::UsedProtocol);
 }
 
-impl fmt::Display for CapabilityId {
+impl fmt::Display for CapabilityId<'_> {
     /// Return the string ID of this clause.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
@@ -1200,7 +1200,7 @@ where
                 to_keep.push(c.clone());
                 return;
             }
-            let mut names = c.names();
+            let mut names = c.names().into_iter().cloned().collect();
             let mut copy = c.clone();
             copy.set_names(vec![Name::from_str("a").unwrap()]); // The name here is arbitrary.
             let r = to_merge.iter().position(|(t, _)| t == &copy);
@@ -1307,8 +1307,10 @@ macro_rules! merge_from_other_field {
 /// This is a macro to let us easily specialize on the $type_name.
 macro_rules! compute_capability_diff {
     ($ours:ident, $theirs:ident, $type_name:ident) => {
-        let our_field = $ours.$type_name();
-        let their_field = $theirs.$type_name();
+        let our_field: Option<OneOrMany<Name>> =
+            $ours.$type_name().map(|o| o.into_iter().cloned().collect());
+        let their_field: Option<OneOrMany<Name>> =
+            $theirs.$type_name().map(|o| o.into_iter().cloned().collect());
         match (our_field, their_field) {
             (_, None) | (None, _) => {} // One of the declarations is not for `type_name`.
             (Some(our_field), Some(their_field)) => {
@@ -1674,11 +1676,7 @@ impl Document {
         self.capabilities
             .as_ref()
             .map(|c| {
-                c.iter()
-                    .filter_map(|c| c.service.as_ref())
-                    .map(|p| p.to_vec().into_iter())
-                    .flatten()
-                    .collect()
+                c.iter().filter_map(|c| c.service.as_ref()).map(|p| p.iter()).flatten().collect()
             })
             .unwrap_or_else(|| vec![])
     }
@@ -1687,11 +1685,7 @@ impl Document {
         self.capabilities
             .as_ref()
             .map(|c| {
-                c.iter()
-                    .filter_map(|c| c.protocol.as_ref())
-                    .map(|p| p.to_vec().into_iter())
-                    .flatten()
-                    .collect()
+                c.iter().filter_map(|c| c.protocol.as_ref()).map(|p| p.iter()).flatten().collect()
             })
             .unwrap_or_else(|| vec![])
     }
@@ -1724,7 +1718,7 @@ impl Document {
             .unwrap_or_else(|| vec![])
     }
 
-    pub fn all_capability_names(&self) -> HashSet<Name> {
+    pub fn all_capability_names(&self) -> HashSet<&Name> {
         self.capabilities
             .as_ref()
             .map(|c| {
@@ -2804,13 +2798,13 @@ pub trait FromClause {
 }
 
 pub trait CapabilityClause: Clone + PartialEq {
-    fn service(&self) -> Option<OneOrMany<Name>>;
-    fn protocol(&self) -> Option<OneOrMany<Name>>;
-    fn directory(&self) -> Option<OneOrMany<Name>>;
-    fn storage(&self) -> Option<OneOrMany<Name>>;
-    fn runner(&self) -> Option<OneOrMany<Name>>;
-    fn resolver(&self) -> Option<OneOrMany<Name>>;
-    fn event_stream(&self) -> Option<OneOrMany<Name>>;
+    fn service(&self) -> Option<OneOrMany<&Name>>;
+    fn protocol(&self) -> Option<OneOrMany<&Name>>;
+    fn directory(&self) -> Option<OneOrMany<&Name>>;
+    fn storage(&self) -> Option<OneOrMany<&Name>>;
+    fn runner(&self) -> Option<OneOrMany<&Name>>;
+    fn resolver(&self) -> Option<OneOrMany<&Name>>;
+    fn event_stream(&self) -> Option<OneOrMany<&Name>>;
     fn set_service(&mut self, o: Option<OneOrMany<Name>>);
     fn set_protocol(&mut self, o: Option<OneOrMany<Name>>);
     fn set_directory(&mut self, o: Option<OneOrMany<Name>>);
@@ -2836,7 +2830,7 @@ pub trait CapabilityClause: Clone + PartialEq {
 
     /// Returns the names of the capabilities in this clause.
     /// If `protocol()` returns `Some(OneOrMany::Many(vec!["a", "b"]))`, this returns!["a", "b"].
-    fn names(&self) -> Vec<Name> {
+    fn names(&self) -> Vec<&Name> {
         let res = vec![
             self.service(),
             self.protocol(),
@@ -2847,7 +2841,7 @@ pub trait CapabilityClause: Clone + PartialEq {
             self.event_stream(),
         ];
         res.into_iter()
-            .map(|o| o.map(|o| o.into_iter().collect::<Vec<Name>>()).unwrap_or(vec![]))
+            .map(|o| o.map(|o| o.into_iter().collect::<Vec<&Name>>()).unwrap_or(vec![]))
             .flatten()
             .collect()
     }
@@ -2920,27 +2914,31 @@ impl Canonicalize for Capability {
     }
 }
 
+fn option_one_or_many_as_ref<T>(o: &Option<OneOrMany<T>>) -> Option<OneOrMany<&T>> {
+    o.as_ref().map(|o| o.as_ref())
+}
+
 impl CapabilityClause for Capability {
-    fn service(&self) -> Option<OneOrMany<Name>> {
-        self.service.clone()
+    fn service(&self) -> Option<OneOrMany<&Name>> {
+        option_one_or_many_as_ref(&self.service)
     }
-    fn protocol(&self) -> Option<OneOrMany<Name>> {
-        self.protocol.clone()
+    fn protocol(&self) -> Option<OneOrMany<&Name>> {
+        option_one_or_many_as_ref(&self.protocol)
     }
-    fn directory(&self) -> Option<OneOrMany<Name>> {
-        self.directory.as_ref().map(|n| OneOrMany::One(n.clone()))
+    fn directory(&self) -> Option<OneOrMany<&Name>> {
+        self.directory.as_ref().map(|n| OneOrMany::One(n))
     }
-    fn storage(&self) -> Option<OneOrMany<Name>> {
-        self.storage.as_ref().map(|n| OneOrMany::One(n.clone()))
+    fn storage(&self) -> Option<OneOrMany<&Name>> {
+        self.storage.as_ref().map(|n| OneOrMany::One(n))
     }
-    fn runner(&self) -> Option<OneOrMany<Name>> {
-        self.runner.as_ref().map(|n| OneOrMany::One(n.clone()))
+    fn runner(&self) -> Option<OneOrMany<&Name>> {
+        self.runner.as_ref().map(|n| OneOrMany::One(n))
     }
-    fn resolver(&self) -> Option<OneOrMany<Name>> {
-        self.resolver.as_ref().map(|n| OneOrMany::One(n.clone()))
+    fn resolver(&self) -> Option<OneOrMany<&Name>> {
+        self.resolver.as_ref().map(|n| OneOrMany::One(n))
     }
-    fn event_stream(&self) -> Option<OneOrMany<Name>> {
-        self.event_stream.clone()
+    fn event_stream(&self) -> Option<OneOrMany<&Name>> {
+        option_one_or_many_as_ref(&self.event_stream)
     }
 
     fn set_service(&mut self, o: Option<OneOrMany<Name>>) {
@@ -3025,25 +3023,25 @@ impl RightsClause for Capability {
 }
 
 impl CapabilityClause for DebugRegistration {
-    fn service(&self) -> Option<OneOrMany<Name>> {
+    fn service(&self) -> Option<OneOrMany<&Name>> {
         None
     }
-    fn protocol(&self) -> Option<OneOrMany<Name>> {
-        self.protocol.clone()
+    fn protocol(&self) -> Option<OneOrMany<&Name>> {
+        option_one_or_many_as_ref(&self.protocol)
     }
-    fn directory(&self) -> Option<OneOrMany<Name>> {
+    fn directory(&self) -> Option<OneOrMany<&Name>> {
         None
     }
-    fn storage(&self) -> Option<OneOrMany<Name>> {
+    fn storage(&self) -> Option<OneOrMany<&Name>> {
         None
     }
-    fn runner(&self) -> Option<OneOrMany<Name>> {
+    fn runner(&self) -> Option<OneOrMany<&Name>> {
         None
     }
-    fn resolver(&self) -> Option<OneOrMany<Name>> {
+    fn resolver(&self) -> Option<OneOrMany<&Name>> {
         None
     }
-    fn event_stream(&self) -> Option<OneOrMany<Name>> {
+    fn event_stream(&self) -> Option<OneOrMany<&Name>> {
         None
     }
 
@@ -3115,26 +3113,26 @@ impl Canonicalize for Use {
 }
 
 impl CapabilityClause for Use {
-    fn service(&self) -> Option<OneOrMany<Name>> {
-        self.service.clone()
+    fn service(&self) -> Option<OneOrMany<&Name>> {
+        option_one_or_many_as_ref(&self.service)
     }
-    fn protocol(&self) -> Option<OneOrMany<Name>> {
-        self.protocol.clone()
+    fn protocol(&self) -> Option<OneOrMany<&Name>> {
+        option_one_or_many_as_ref(&self.protocol)
     }
-    fn directory(&self) -> Option<OneOrMany<Name>> {
-        self.directory.as_ref().map(|n| OneOrMany::One(n.clone()))
+    fn directory(&self) -> Option<OneOrMany<&Name>> {
+        self.directory.as_ref().map(|n| OneOrMany::One(n))
     }
-    fn storage(&self) -> Option<OneOrMany<Name>> {
-        self.storage.as_ref().map(|n| OneOrMany::One(n.clone()))
+    fn storage(&self) -> Option<OneOrMany<&Name>> {
+        self.storage.as_ref().map(|n| OneOrMany::One(n))
     }
-    fn runner(&self) -> Option<OneOrMany<Name>> {
+    fn runner(&self) -> Option<OneOrMany<&Name>> {
         None
     }
-    fn resolver(&self) -> Option<OneOrMany<Name>> {
+    fn resolver(&self) -> Option<OneOrMany<&Name>> {
         None
     }
-    fn event_stream(&self) -> Option<OneOrMany<Name>> {
-        self.event_stream.clone()
+    fn event_stream(&self) -> Option<OneOrMany<&Name>> {
+        option_one_or_many_as_ref(&self.event_stream)
     }
 
     fn set_service(&mut self, o: Option<OneOrMany<Name>>) {
@@ -3235,26 +3233,26 @@ impl Canonicalize for Expose {
 }
 
 impl CapabilityClause for Expose {
-    fn service(&self) -> Option<OneOrMany<Name>> {
-        self.service.as_ref().map(|n| n.clone())
+    fn service(&self) -> Option<OneOrMany<&Name>> {
+        option_one_or_many_as_ref(&self.service)
     }
-    fn protocol(&self) -> Option<OneOrMany<Name>> {
-        self.protocol.clone()
+    fn protocol(&self) -> Option<OneOrMany<&Name>> {
+        option_one_or_many_as_ref(&self.protocol)
     }
-    fn directory(&self) -> Option<OneOrMany<Name>> {
-        self.directory.clone()
+    fn directory(&self) -> Option<OneOrMany<&Name>> {
+        option_one_or_many_as_ref(&self.directory)
     }
-    fn storage(&self) -> Option<OneOrMany<Name>> {
+    fn storage(&self) -> Option<OneOrMany<&Name>> {
         None
     }
-    fn runner(&self) -> Option<OneOrMany<Name>> {
-        self.runner.clone()
+    fn runner(&self) -> Option<OneOrMany<&Name>> {
+        option_one_or_many_as_ref(&self.runner)
     }
-    fn resolver(&self) -> Option<OneOrMany<Name>> {
-        self.resolver.clone()
+    fn resolver(&self) -> Option<OneOrMany<&Name>> {
+        option_one_or_many_as_ref(&self.resolver)
     }
-    fn event_stream(&self) -> Option<OneOrMany<Name>> {
-        self.event_stream.clone()
+    fn event_stream(&self) -> Option<OneOrMany<&Name>> {
+        option_one_or_many_as_ref(&self.event_stream)
     }
 
     fn set_service(&mut self, o: Option<OneOrMany<Name>>) {
@@ -3366,26 +3364,26 @@ impl Canonicalize for Offer {
 }
 
 impl CapabilityClause for Offer {
-    fn service(&self) -> Option<OneOrMany<Name>> {
-        self.service.as_ref().map(|n| n.clone())
+    fn service(&self) -> Option<OneOrMany<&Name>> {
+        option_one_or_many_as_ref(&self.service)
     }
-    fn protocol(&self) -> Option<OneOrMany<Name>> {
-        self.protocol.clone()
+    fn protocol(&self) -> Option<OneOrMany<&Name>> {
+        option_one_or_many_as_ref(&self.protocol)
     }
-    fn directory(&self) -> Option<OneOrMany<Name>> {
-        self.directory.clone()
+    fn directory(&self) -> Option<OneOrMany<&Name>> {
+        option_one_or_many_as_ref(&self.directory)
     }
-    fn storage(&self) -> Option<OneOrMany<Name>> {
-        self.storage.clone()
+    fn storage(&self) -> Option<OneOrMany<&Name>> {
+        option_one_or_many_as_ref(&self.storage)
     }
-    fn runner(&self) -> Option<OneOrMany<Name>> {
-        self.runner.clone()
+    fn runner(&self) -> Option<OneOrMany<&Name>> {
+        option_one_or_many_as_ref(&self.runner)
     }
-    fn resolver(&self) -> Option<OneOrMany<Name>> {
-        self.resolver.clone()
+    fn resolver(&self) -> Option<OneOrMany<&Name>> {
+        option_one_or_many_as_ref(&self.resolver)
     }
-    fn event_stream(&self) -> Option<OneOrMany<Name>> {
-        self.event_stream.clone()
+    fn event_stream(&self) -> Option<OneOrMany<&Name>> {
+        option_one_or_many_as_ref(&self.event_stream)
     }
 
     fn set_service(&mut self, o: Option<OneOrMany<Name>>) {
@@ -3490,12 +3488,12 @@ where
     r.into()
 }
 
-pub fn alias_or_name(alias: Option<&Name>, name: &Name) -> Name {
-    alias.unwrap_or(name).clone()
+pub fn alias_or_name<'a>(alias: Option<&'a Name>, name: &'a Name) -> &'a Name {
+    alias.unwrap_or(name)
 }
 
-pub fn alias_or_path(alias: Option<&Path>, path: &Path) -> Path {
-    alias.unwrap_or(path).clone()
+pub fn alias_or_path<'a>(alias: Option<&'a Path>, path: &'a Path) -> &'a Path {
+    alias.unwrap_or(path)
 }
 
 pub fn format_cml(buffer: &str, file: &std::path::Path) -> Result<Vec<u8>, Error> {
@@ -3946,33 +3944,32 @@ mod tests {
     #[test]
     fn test_capability_id() -> Result<(), Error> {
         // service
+        let a: Name = "a".parse().unwrap();
+        let b: Name = "b".parse().unwrap();
         assert_eq!(
             CapabilityId::from_offer_expose(&Offer {
-                service: Some(OneOrMany::One("a".parse().unwrap())),
+                service: Some(OneOrMany::One(a.clone())),
                 ..empty_offer()
             },)?,
-            vec![CapabilityId::Service("a".parse().unwrap())]
+            vec![CapabilityId::Service(&a)]
         );
         assert_eq!(
             CapabilityId::from_offer_expose(&Offer {
-                service: Some(OneOrMany::Many(vec!["a".parse().unwrap(), "b".parse().unwrap()],)),
+                service: Some(OneOrMany::Many(vec![a.clone(), b.clone()],)),
                 ..empty_offer()
             },)?,
-            vec![
-                CapabilityId::Service("a".parse().unwrap()),
-                CapabilityId::Service("b".parse().unwrap())
-            ]
+            vec![CapabilityId::Service(&a), CapabilityId::Service(&b)]
         );
         assert_eq!(
             CapabilityId::from_use(&Use {
-                service: Some(OneOrMany::One("a".parse().unwrap())),
+                service: Some(OneOrMany::One(a.clone())),
                 ..empty_use()
             },)?,
             vec![CapabilityId::UsedService("/svc/a".parse().unwrap())]
         );
         assert_eq!(
             CapabilityId::from_use(&Use {
-                service: Some(OneOrMany::Many(vec!["a".parse().unwrap(), "b".parse().unwrap(),],)),
+                service: Some(OneOrMany::Many(vec![a.clone(), b.clone(),],)),
                 ..empty_use()
             },)?,
             vec![
@@ -3999,7 +3996,7 @@ mod tests {
         );
         assert_eq!(
             CapabilityId::from_use(&Use {
-                service: Some(OneOrMany::One("a".parse().unwrap())),
+                service: Some(OneOrMany::One(a.clone())),
                 path: Some("/b".parse().unwrap()),
                 ..empty_use()
             },)?,
@@ -4009,31 +4006,28 @@ mod tests {
         // protocol
         assert_eq!(
             CapabilityId::from_offer_expose(&Offer {
-                protocol: Some(OneOrMany::One("a".parse().unwrap())),
+                protocol: Some(OneOrMany::One(a.clone())),
                 ..empty_offer()
             },)?,
-            vec![CapabilityId::Protocol("a".parse().unwrap())]
+            vec![CapabilityId::Protocol(&a)]
         );
         assert_eq!(
             CapabilityId::from_offer_expose(&Offer {
-                protocol: Some(OneOrMany::Many(vec!["a".parse().unwrap(), "b".parse().unwrap()],)),
+                protocol: Some(OneOrMany::Many(vec![a.clone(), b.clone()],)),
                 ..empty_offer()
             },)?,
-            vec![
-                CapabilityId::Protocol("a".parse().unwrap()),
-                CapabilityId::Protocol("b".parse().unwrap())
-            ]
+            vec![CapabilityId::Protocol(&a), CapabilityId::Protocol(&b)]
         );
         assert_eq!(
             CapabilityId::from_use(&Use {
-                protocol: Some(OneOrMany::One("a".parse().unwrap())),
+                protocol: Some(OneOrMany::One(a.clone())),
                 ..empty_use()
             },)?,
             vec![CapabilityId::UsedProtocol("/svc/a".parse().unwrap())]
         );
         assert_eq!(
             CapabilityId::from_use(&Use {
-                protocol: Some(OneOrMany::Many(vec!["a".parse().unwrap(), "b".parse().unwrap(),],)),
+                protocol: Some(OneOrMany::Many(vec![a.clone(), b.clone(),],)),
                 ..empty_use()
             },)?,
             vec![
@@ -4043,7 +4037,7 @@ mod tests {
         );
         assert_eq!(
             CapabilityId::from_use(&Use {
-                protocol: Some(OneOrMany::One("a".parse().unwrap())),
+                protocol: Some(OneOrMany::One(a.clone())),
                 path: Some("/b".parse().unwrap()),
                 ..empty_use()
             },)?,
@@ -4053,24 +4047,21 @@ mod tests {
         // directory
         assert_eq!(
             CapabilityId::from_offer_expose(&Offer {
-                directory: Some(OneOrMany::One("a".parse().unwrap())),
+                directory: Some(OneOrMany::One(a.clone())),
                 ..empty_offer()
             },)?,
-            vec![CapabilityId::Directory("a".parse().unwrap())]
+            vec![CapabilityId::Directory(&a)]
         );
         assert_eq!(
             CapabilityId::from_offer_expose(&Offer {
-                directory: Some(OneOrMany::Many(vec!["a".parse().unwrap(), "b".parse().unwrap()])),
+                directory: Some(OneOrMany::Many(vec![a.clone(), b.clone()])),
                 ..empty_offer()
             },)?,
-            vec![
-                CapabilityId::Directory("a".parse().unwrap()),
-                CapabilityId::Directory("b".parse().unwrap()),
-            ]
+            vec![CapabilityId::Directory(&a), CapabilityId::Directory(&b),]
         );
         assert_eq!(
             CapabilityId::from_use(&Use {
-                directory: Some("a".parse().unwrap()),
+                directory: Some(a.clone()),
                 path: Some("/b".parse().unwrap()),
                 ..empty_use()
             },)?,
@@ -4080,24 +4071,21 @@ mod tests {
         // storage
         assert_eq!(
             CapabilityId::from_offer_expose(&Offer {
-                storage: Some(OneOrMany::One("cache".parse().unwrap())),
+                storage: Some(OneOrMany::One(a.clone())),
                 ..empty_offer()
             },)?,
-            vec![CapabilityId::Storage("cache".parse().unwrap())],
+            vec![CapabilityId::Storage(&a)]
         );
         assert_eq!(
             CapabilityId::from_offer_expose(&Offer {
-                storage: Some(OneOrMany::Many(vec!["a".parse().unwrap(), "b".parse().unwrap()])),
+                storage: Some(OneOrMany::Many(vec![a.clone(), b.clone()])),
                 ..empty_offer()
             },)?,
-            vec![
-                CapabilityId::Storage("a".parse().unwrap()),
-                CapabilityId::Storage("b".parse().unwrap()),
-            ]
+            vec![CapabilityId::Storage(&a), CapabilityId::Storage(&b),]
         );
         assert_eq!(
             CapabilityId::from_use(&Use {
-                storage: Some("a".parse().unwrap()),
+                storage: Some(a.clone()),
                 path: Some("/b".parse().unwrap()),
                 ..empty_use()
             },)?,
@@ -4107,11 +4095,11 @@ mod tests {
         // "as" aliasing.
         assert_eq!(
             CapabilityId::from_offer_expose(&Offer {
-                service: Some(OneOrMany::One("a".parse().unwrap())),
-                r#as: Some("b".parse().unwrap()),
+                service: Some(OneOrMany::One(a.clone())),
+                r#as: Some(b.clone()),
                 ..empty_offer()
             },)?,
-            vec![CapabilityId::Service("b".parse().unwrap())]
+            vec![CapabilityId::Service(&b)]
         );
 
         // Error case.

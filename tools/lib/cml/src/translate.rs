@@ -83,7 +83,7 @@ pub fn compile(
         &options.protocol_requirements,
     )?;
 
-    let all_capability_names: BTreeSet<Name> =
+    let all_capability_names: BTreeSet<&Name> =
         document.all_capability_names().into_iter().collect();
     let all_children = document.all_children_names().into_iter().collect();
     let all_collections = document.all_collection_names().into_iter().collect();
@@ -256,17 +256,17 @@ fn translate_program(program: &Program) -> Result<fdecl::Program, Error> {
 /// `use` rules consume a single capability from one source (parent|framework).
 fn translate_use(
     use_in: &Vec<Use>,
-    all_capability_names: &BTreeSet<Name>,
+    all_capability_names: &BTreeSet<&Name>,
     all_children: &BTreeSet<&Name>,
     all_collections: &BTreeSet<&Name>,
 ) -> Result<Vec<fdecl::Use>, Error> {
     let mut out_uses = vec![];
     for use_ in use_in {
-        if let Some(n) = &use_.service {
+        if let Some(n) = use_.service() {
             let source = extract_use_source(use_, all_capability_names, all_children)?;
             let target_paths =
                 all_target_use_paths(use_, use_).ok_or_else(|| Error::internal("no capability"))?;
-            let source_names = n.to_vec();
+            let source_names = n.into_iter();
             let availability = extract_use_availability(use_)?;
             for (source_name, target_path) in source_names.into_iter().zip(target_paths.into_iter())
             {
@@ -281,11 +281,11 @@ fn translate_use(
                     ..Default::default()
                 }));
             }
-        } else if let Some(n) = &use_.protocol {
+        } else if let Some(n) = use_.protocol() {
             let source = extract_use_source(use_, all_capability_names, all_children)?;
             let target_paths =
                 all_target_use_paths(use_, use_).ok_or_else(|| Error::internal("no capability"))?;
-            let source_names = n.to_vec();
+            let source_names = n.into_iter();
             let availability = extract_use_availability(use_)?;
             for (source_name, target_path) in source_names.into_iter().zip(target_paths.into_iter())
             {
@@ -388,7 +388,7 @@ fn translate_use(
 /// one or more targets (parent|framework).
 fn translate_expose(
     expose_in: &Vec<Expose>,
-    all_capability_names: &BTreeSet<Name>,
+    all_capability_names: &BTreeSet<&Name>,
     all_collections: &BTreeSet<&Name>,
     all_children: &BTreeSet<&Name>,
 ) -> Result<Vec<fdecl::Expose>, Error> {
@@ -424,7 +424,7 @@ fn translate_expose(
             }
         } else if let Some(n) = expose.protocol() {
             let source = extract_single_expose_source(expose, Some(all_capability_names))?;
-            let source_names = n.to_vec();
+            let source_names = n.into_iter();
             let target_names = all_target_capability_names(expose, expose)
                 .ok_or_else(|| Error::internal("no capability"))?;
             for (source_name, target_name) in source_names.into_iter().zip(target_names.into_iter())
@@ -440,7 +440,7 @@ fn translate_expose(
                 out_exposes.push(fdecl::Expose::Protocol(fdecl::ExposeProtocol {
                     source: Some(source),
                     source_name: Some(source_name.clone().into()),
-                    target_name: Some(target_name.into()),
+                    target_name: Some(target_name.clone().into()),
                     target: Some(clone_ref(&target)?),
                     availability: Some(availability),
                     ..Default::default()
@@ -448,7 +448,7 @@ fn translate_expose(
             }
         } else if let Some(n) = expose.directory() {
             let source = extract_single_expose_source(expose, None)?;
-            let source_names = n.to_vec();
+            let source_names = n.into_iter();
             let target_names = all_target_capability_names(expose, expose)
                 .ok_or_else(|| Error::internal("no capability"))?;
             let rights = extract_expose_rights(expose)?;
@@ -466,7 +466,7 @@ fn translate_expose(
                 out_exposes.push(fdecl::Expose::Directory(fdecl::ExposeDirectory {
                     source: Some(source),
                     source_name: Some(source_name.clone().into()),
-                    target_name: Some(target_name.into()),
+                    target_name: Some(target_name.clone().into()),
                     target: Some(clone_ref(&target)?),
                     rights,
                     subdir: subdir.as_ref().map(|s| s.clone().into()),
@@ -476,7 +476,7 @@ fn translate_expose(
             }
         } else if let Some(n) = expose.runner() {
             let source = extract_single_expose_source(expose, None)?;
-            let source_names = n.to_vec();
+            let source_names = n.into_iter();
             let target_names = all_target_capability_names(expose, expose)
                 .ok_or_else(|| Error::internal("no capability"))?;
             for (source_name, target_name) in source_names.into_iter().zip(target_names.into_iter())
@@ -485,13 +485,13 @@ fn translate_expose(
                     source: Some(clone_ref(&source)?),
                     source_name: Some(source_name.clone().into()),
                     target: Some(clone_ref(&target)?),
-                    target_name: Some(target_name.into()),
+                    target_name: Some(target_name.clone().into()),
                     ..Default::default()
                 }))
             }
         } else if let Some(n) = expose.resolver() {
             let source = extract_single_expose_source(expose, None)?;
-            let source_names = n.to_vec();
+            let source_names = n.into_iter();
             let target_names = all_target_capability_names(expose, expose)
                 .ok_or_else(|| Error::internal("no capability"))?;
             for (source_name, target_name) in source_names.into_iter().zip(target_names.into_iter())
@@ -500,7 +500,7 @@ fn translate_expose(
                     source: Some(clone_ref(&source)?),
                     source_name: Some(source_name.clone().into()),
                     target: Some(clone_ref(&target)?),
-                    target_name: Some(target_name.into()),
+                    target_name: Some(target_name.clone().into()),
                     ..Default::default()
                 }))
             }
@@ -531,7 +531,7 @@ fn derive_source_and_availability(
     availability: Option<&Availability>,
     source: fdecl::Ref,
     source_availability: Option<&SourceAvailability>,
-    all_capability_names: &BTreeSet<Name>,
+    all_capability_names: &BTreeSet<&Name>,
     all_children: &BTreeSet<&Name>,
     all_collections: &BTreeSet<&Name>,
 ) -> (fdecl::Ref, fdecl::Availability) {
@@ -630,7 +630,7 @@ fn expand_offer_to_all(
 /// `offer` rules route multiple capabilities from multiple sources to multiple targets.
 fn translate_offer(
     offer_in: &Vec<Offer>,
-    all_capability_names: &BTreeSet<Name>,
+    all_capability_names: &BTreeSet<&Name>,
     all_children: &BTreeSet<&Name>,
     all_collections: &BTreeSet<&Name>,
 ) -> Result<Vec<fdecl::Offer>, Error> {
@@ -987,7 +987,7 @@ fn translate_config(
 
 fn translate_environments(
     envs_in: &Vec<Environment>,
-    all_capability_names: &BTreeSet<Name>,
+    all_capability_names: &BTreeSet<&Name>,
 ) -> Result<Vec<fdecl::Environment>, Error> {
     envs_in
         .iter()
@@ -1063,7 +1063,7 @@ fn translate_resolver_registration(
 
 fn translate_debug_capabilities(
     capabilities: &Vec<DebugRegistration>,
-    all_capability_names: &BTreeSet<Name>,
+    all_capability_names: &BTreeSet<&Name>,
 ) -> Result<Vec<fdecl::DebugRegistration>, Error> {
     let mut out_capabilities = vec![];
     for capability in capabilities {
@@ -1071,7 +1071,7 @@ fn translate_debug_capabilities(
             let source = extract_single_offer_source(capability, Some(all_capability_names))?;
             let targets = all_target_capability_names(capability, capability)
                 .ok_or_else(|| Error::internal("no capability"))?;
-            let source_names = n.to_vec();
+            let source_names = n;
             for target_name in targets {
                 // When multiple source names are provided, there is no way to alias each one, so
                 // source_name == target_name.
@@ -1082,7 +1082,7 @@ fn translate_debug_capabilities(
                 // extract_all_targets_for_each_child returned separate vectors for targets and
                 // target_names instead of the cross product of them.
                 let source_name = if source_names.len() == 1 {
-                    source_names[0].clone()
+                    (*source_names.iter().next().unwrap()).clone()
                 } else {
                     target_name.clone()
                 };
@@ -1090,7 +1090,7 @@ fn translate_debug_capabilities(
                     fdecl::DebugProtocolRegistration {
                         source: Some(clone_ref(&source)?),
                         source_name: Some(source_name.into()),
-                        target_name: Some(target_name.into()),
+                        target_name: Some(target_name.clone().into()),
                         ..Default::default()
                     },
                 ));
@@ -1102,7 +1102,7 @@ fn translate_debug_capabilities(
 
 fn extract_use_source(
     in_obj: &Use,
-    all_capability_names: &BTreeSet<Name>,
+    all_capability_names: &BTreeSet<&Name>,
     all_children_names: &BTreeSet<&Name>,
 ) -> Result<fdecl::Ref, Error> {
     match in_obj.from.as_ref() {
@@ -1203,7 +1203,7 @@ fn extract_expose_rights(in_obj: &Expose) -> Result<Option<fio::Operations>, Err
 
 fn expose_source_from_ref(
     reference: &ExposeFromRef,
-    all_capability_names: Option<&BTreeSet<Name>>,
+    all_capability_names: Option<&BTreeSet<&Name>>,
     all_collections: Option<&BTreeSet<&Name>>,
 ) -> Result<fdecl::Ref, Error> {
     match reference {
@@ -1227,7 +1227,7 @@ fn expose_source_from_ref(
 
 fn extract_single_expose_source(
     in_obj: &Expose,
-    all_capability_names: Option<&BTreeSet<Name>>,
+    all_capability_names: Option<&BTreeSet<&Name>>,
 ) -> Result<fdecl::Ref, Error> {
     match &in_obj.from {
         OneOrMany::One(reference) => expose_source_from_ref(&reference, all_capability_names, None),
@@ -1244,12 +1244,7 @@ fn extract_all_expose_sources(
     in_obj: &Expose,
     all_collections: Option<&BTreeSet<&Name>>,
 ) -> Result<Vec<fdecl::Ref>, Error> {
-    in_obj
-        .from
-        .to_vec()
-        .into_iter()
-        .map(|e| expose_source_from_ref(e, None, all_collections))
-        .collect()
+    in_obj.from.iter().map(|e| expose_source_from_ref(e, None, all_collections)).collect()
 }
 
 fn extract_offer_rights(in_obj: &Offer) -> Result<Option<fio::Operations>, Error> {
@@ -1283,7 +1278,7 @@ fn extract_offer_rights(in_obj: &Offer) -> Result<Option<fio::Operations>, Error
 
 fn extract_single_offer_source<T>(
     in_obj: &T,
-    all_capability_names: Option<&BTreeSet<Name>>,
+    all_capability_names: Option<&BTreeSet<&Name>>,
 ) -> Result<fdecl::Ref, Error>
 where
     T: FromClause,
@@ -1301,12 +1296,11 @@ where
 
 fn extract_all_offer_sources<T: FromClause>(
     in_obj: &T,
-    all_capability_names: &BTreeSet<Name>,
+    all_capability_names: &BTreeSet<&Name>,
     all_collections: &BTreeSet<&Name>,
 ) -> Result<Vec<fdecl::Ref>, Error> {
     in_obj
         .from_()
-        .to_vec()
         .into_iter()
         .map(|r| {
             offer_source_from_ref(r.clone(), Some(all_capability_names), Some(all_collections))
@@ -1335,19 +1329,18 @@ fn translate_child_or_collection_ref(
 // `offer`.
 fn extract_offer_sources_and_targets(
     offer: &Offer,
-    source_names: OneOrMany<Name>,
-    all_capability_names: &BTreeSet<Name>,
+    source_names: OneOrMany<&Name>,
+    all_capability_names: &BTreeSet<&Name>,
     all_children: &BTreeSet<&Name>,
     all_collections: &BTreeSet<&Name>,
 ) -> Result<Vec<(fdecl::Ref, Name, fdecl::Ref, Name)>, Error> {
     let mut out = vec![];
 
-    let source_names = source_names.to_vec();
     let sources = extract_all_offer_sources(offer, all_capability_names, all_collections)?;
     let target_names = all_target_capability_names(offer, offer)
         .ok_or_else(|| Error::internal("no capability".to_string()))?;
 
-    for source in &sources {
+    for source in sources {
         for to in &offer.to {
             for target_name in &target_names {
                 // When multiple source names are provided, there is no way to alias each one,
@@ -1355,13 +1348,13 @@ fn extract_offer_sources_and_targets(
                 // source_name may be aliased to a different target_name, so we use
                 // source_names[0] to obtain the source_name.
                 let source_name = if source_names.len() == 1 {
-                    source_names[0].clone()
+                    (*source_names.iter().next().unwrap()).clone()
                 } else {
-                    target_name.clone()
+                    (*target_name).clone()
                 };
                 let target =
                     translate_child_or_collection_ref(to.into(), all_children, all_collections)?;
-                out.push((source.clone(), source_name, target, target_name.clone()))
+                out.push((source.clone(), source_name, target, (*target_name).clone()))
             }
         }
     }
@@ -1395,7 +1388,7 @@ where
 
 /// Returns the list of paths derived from a `use` declaration with `names` and `to_obj`. `to_obj`
 /// must be a declaration that has a `path` clause.
-fn svc_paths_from_names<T>(names: OneOrMany<Name>, to_obj: &T) -> OneOrMany<Path>
+fn svc_paths_from_names<T>(names: OneOrMany<&Name>, to_obj: &T) -> OneOrMany<Path>
 where
     T: PathClause,
 {
@@ -1430,29 +1423,32 @@ where
 }
 
 /// Return the target names or paths specified in the given capability.
-fn all_target_capability_names<T, U>(in_obj: &T, to_obj: &U) -> Option<OneOrMany<Name>>
+fn all_target_capability_names<'a, T, U>(
+    in_obj: &'a T,
+    to_obj: &'a U,
+) -> Option<OneOrMany<&'a Name>>
 where
     T: CapabilityClause,
     U: AsClause + PathClause,
 {
     if let Some(as_) = to_obj.r#as() {
         // We've already validated that when `as` is specified, only 1 source id exists.
-        Some(OneOrMany::One(as_.clone()))
+        Some(OneOrMany::One(as_))
     } else {
         if let Some(n) = in_obj.service() {
-            Some(n.clone())
+            Some(n)
         } else if let Some(n) = in_obj.protocol() {
-            Some(n.clone())
+            Some(n)
         } else if let Some(n) = in_obj.directory() {
-            Some(n.clone())
+            Some(n)
         } else if let Some(n) = in_obj.storage() {
-            Some(n.clone())
+            Some(n)
         } else if let Some(n) = in_obj.runner() {
-            Some(n.clone())
+            Some(n)
         } else if let Some(n) = in_obj.resolver() {
-            Some(n.clone())
+            Some(n)
         } else if let Some(n) = in_obj.event_stream() {
-            Some(n.clone())
+            Some(n)
         } else {
             None
         }
@@ -1481,7 +1477,7 @@ pub fn translate_capabilities(
     let mut out_capabilities = vec![];
     for capability in capabilities_in {
         if let Some(service) = &capability.service {
-            for n in service.to_vec() {
+            for n in service.iter() {
                 let source_path = match as_builtin {
                     true => None,
                     false => Some(
@@ -1499,7 +1495,7 @@ pub fn translate_capabilities(
                 }));
             }
         } else if let Some(protocol) = &capability.protocol {
-            for n in protocol.to_vec() {
+            for n in protocol.iter() {
                 let source_path = match as_builtin {
                     true => None,
                     false => Some(
@@ -1639,7 +1635,7 @@ where
 
 pub fn offer_source_from_ref(
     reference: AnyRef<'_>,
-    all_capability_names: Option<&BTreeSet<Name>>,
+    all_capability_names: Option<&BTreeSet<&Name>>,
     all_collection_names: Option<&BTreeSet<&Name>>,
 ) -> Result<fdecl::Ref, Error> {
     match reference {

@@ -41,6 +41,14 @@ impl<T> OneOrMany<T> {
             Self::Many(v) => v.len(),
         }
     }
+
+    /// Returns a `OneOrMany<&T>` that references this `OneOrMany<T>`.
+    pub fn as_ref(&self) -> OneOrMany<&T> {
+        match self {
+            Self::One(o) => OneOrMany::<&T>::One(o),
+            Self::Many(v) => OneOrMany::<&T>::Many(v.iter().collect()),
+        }
+    }
 }
 
 impl<T> OneOrMany<T>
@@ -113,11 +121,23 @@ impl<T> IntoIterator for OneOrMany<T> {
     }
 }
 
-impl<T> OneOrMany<T> {
-    pub fn to_vec(&self) -> Vec<&T> {
-        match self {
-            OneOrMany::One(x) => vec![&x],
-            OneOrMany::Many(v) => v.iter().collect(),
+impl<T> FromIterator<T> for OneOrMany<T> {
+    fn from_iter<I>(iter: I) -> Self
+    where
+        I: IntoIterator<Item = T> + Sized,
+    {
+        let mut iter = iter.into_iter();
+        if let Some(first) = iter.next() {
+            let rest: Vec<_> = iter.collect();
+            if rest.is_empty() {
+                Self::One(first)
+            } else {
+                let mut out = vec![first];
+                out.extend(rest);
+                Self::Many(out)
+            }
+        } else {
+            Self::Many(vec![])
         }
     }
 }
@@ -244,12 +264,15 @@ mod tests {
     }
 
     #[test]
-    fn test_to_vec() {
-        let v = OneOrMany::One(34);
-        assert_eq!(&[&34], &v.to_vec()[..]);
+    fn test_from_iter() {
+        let o: OneOrMany<i64> = [34].into_iter().collect();
+        assert_eq!(o, OneOrMany::One(34));
 
-        let v = OneOrMany::Many(vec![1, 2, 3]);
-        assert_eq!(&[&1, &2, &3], &v.to_vec()[..]);
+        let o: OneOrMany<i64> = [1, 2, 3].into_iter().collect();
+        assert_eq!(o, OneOrMany::Many(vec![1, 2, 3]));
+
+        let o: OneOrMany<i64> = [].into_iter().collect();
+        assert_eq!(o, OneOrMany::Many(vec![]));
     }
 
     #[test]

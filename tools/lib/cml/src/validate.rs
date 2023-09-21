@@ -58,7 +58,7 @@ struct ValidationContext<'a> {
     all_runners: HashSet<&'a Name>,
     all_resolvers: HashSet<&'a Name>,
     all_environment_names: HashSet<&'a Name>,
-    all_capability_names: HashSet<Name>,
+    all_capability_names: HashSet<&'a Name>,
 }
 
 // Facet key for fuchsia.test
@@ -181,14 +181,13 @@ impl<'a> ValidationContext<'a> {
                 .iter()
                 .filter(|o| matches!(o.to, OneOrMany::One(OfferToRef::All)))
                 .filter(|o| o.protocol.is_some())
-                .map(Offer::clone)
-                .collect::<Vec<Offer>>();
+                .collect::<Vec<&Offer>>();
 
-            let mut duplicate_check: HashSet<CapabilityId> = HashSet::new();
+            let mut duplicate_check: HashSet<CapabilityId<'a>> = HashSet::new();
             let problem_protocols = offered_to_all
                 .iter()
-                .map(CapabilityId::from_offer_expose)
-                .collect::<Result<Vec<Vec<CapabilityId>>, _>>()?
+                .map(|o| CapabilityId::from_offer_expose(*o))
+                .collect::<Result<Vec<Vec<CapabilityId<'a>>>, _>>()?
                 .into_iter()
                 .flatten()
                 .filter(|cap_id| !duplicate_check.insert((*cap_id).clone()))
@@ -374,7 +373,7 @@ to run your test in the correct test realm.",
     fn validate_capability(
         &self,
         capability: &'a Capability,
-        used_ids: &mut HashMap<String, CapabilityId>,
+        used_ids: &mut HashMap<String, CapabilityId<'a>>,
     ) -> Result<(), Error> {
         if capability.directory.is_some() && capability.path.is_none() {
             return Err(Error::validate("\"path\" should be present with \"directory\""));
@@ -431,7 +430,7 @@ to run your test in the correct test realm.",
     fn validate_use(
         &self,
         use_: &'a Use,
-        used_ids: &mut HashMap<String, CapabilityId>,
+        used_ids: &mut HashMap<String, CapabilityId<'a>>,
         strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
     ) -> Result<(), Error> {
         if use_.from == Some(UseFromRef::Debug) && use_.protocol.is_none() {
@@ -569,7 +568,7 @@ to run your test in the correct test realm.",
     fn validate_expose(
         &self,
         expose: &'a Expose,
-        used_ids: &mut HashMap<String, CapabilityId>,
+        used_ids: &mut HashMap<String, CapabilityId<'a>>,
     ) -> Result<(), Error> {
         // TODO: Many of these checks are similar, see if we can unify them
 
@@ -735,9 +734,9 @@ to run your test in the correct test realm.",
     fn validate_offer(
         &self,
         offer: &'a Offer,
-        used_ids: &mut HashMap<&'a Name, HashMap<String, CapabilityId>>,
+        used_ids: &mut HashMap<&'a Name, HashMap<String, CapabilityId<'a>>>,
         strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
-        protocols_offered_to_all: &[Offer],
+        protocols_offered_to_all: &[&'a Offer],
     ) -> Result<(), Error> {
         // TODO: Many of these checks are repititious, see if we can unify them
 
@@ -933,7 +932,7 @@ to run your test in the correct test realm.",
                     }
                 }
             } else {
-                for reference in offer.from.to_vec() {
+                for reference in offer.from.iter() {
                     if (offer.directory.is_some() || offer.protocol.is_some())
                         && (offer.dependency.as_ref().unwrap_or(&DependencyType::Strong)
                             != &DependencyType::Strong)
@@ -955,7 +954,7 @@ to run your test in the correct test realm.",
 
             // Collect strong dependencies. We'll check for dependency cycles after all offer
             // declarations are validated.
-            for from in offer.from.to_vec().iter() {
+            for from in offer.from.iter() {
                 let is_strong = if offer.directory.is_some() || offer.protocol.is_some() {
                     offer.dependency.as_ref().unwrap_or(&DependencyType::Strong)
                         == &DependencyType::Strong
