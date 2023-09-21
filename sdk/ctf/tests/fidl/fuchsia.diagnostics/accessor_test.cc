@@ -37,7 +37,7 @@ const char EXPECTED_DATA_BUCKETS_HISTOGRAMS[] = R"JSON({
         "filename": "fuchsia.inspect.Tree",
         "timestamp": TIMESTAMP
     },
-    "moniker": "realm_builder\\:CHILD_NAME/inspect-publisher",
+    "moniker": "test_suite/realm_builder\\:CHILD_NAME/inspect-publisher",
     "payload": {
         "root": {
             "arrays": {
@@ -152,7 +152,7 @@ const char EXPECTED_DATA_PARAMS_HISTOGRAMS[] = R"JSON({
         "filename": "fuchsia.inspect.Tree",
         "timestamp": TIMESTAMP
     },
-    "moniker": "realm_builder\\:CHILD_NAME/inspect-publisher",
+    "moniker": "test_suite/realm_builder\\:CHILD_NAME/inspect-publisher",
     "payload": {
         "root": {
             "arrays": {
@@ -316,7 +316,8 @@ TEST_F(AccessorTest, StreamDiagnosticsInspect) {
 
   auto _binder = realm.component().ConnectSync<fuchsia::component::Binder>();
 
-  auto moniker = "realm_builder\\:" + realm.component().GetChildName() + "/inspect-publisher";
+  auto moniker =
+      "test_suite/realm_builder\\:" + realm.component().GetChildName() + "/inspect-publisher";
   auto selector = moniker + ":root";
   diagnostics::reader::ArchiveReader reader(std::move(accessor), {selector});
 

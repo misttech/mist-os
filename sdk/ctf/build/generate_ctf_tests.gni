@@ -35,6 +35,30 @@ import("//sdk/ctf/build/internal/fuchsia_package_with_test.gni")
 import("//sdk/ctf/build/internal/generate_ctf_packages.gni")
 import("//src/lib/vulkan/vulkan.gni")
 
+template("generate_fuchsia-diagnostics-tests") {
+  forward_variables_from(invoker, [ "test_info" ])
+  fuchsia_package_with_test(target_name) {
+    test_component_name = "fuchsia-diagnostics-tests-root.cm"
+    subpackages = [
+      test_info.target_label,
+      # These tests do not currently use a test realm factory.
+    ]
+    test_component = "//sdk/ctf/tests/fidl/fuchsia.diagnostics:fuchsia-diagnostics-tests-root"
+  }
+}
+
+template("generate_fuchsia-diagnostics-log-tests") {
+  forward_variables_from(invoker, [ "test_info" ])
+  fuchsia_package_with_test(target_name) {
+    test_component_name = "fuchsia-diagnostics-log-tests-root.cm"
+    subpackages = [
+      test_info.target_label,
+      # These tests do not currently use a test realm factory.
+    ]
+    test_component = "//sdk/ctf/tests/fidl/fuchsia.diagnostics:fuchsia-diagnostics-log-tests-root"
+  }
+}
+
 template("generate_fidl-hlcpp-unit-tests") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {

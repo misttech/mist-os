@@ -1,5 +1,15 @@
 [
   {
+    "archive_gn_label": "//sdk/ctf/tests/fidl/fuchsia.diagnostics:fuchsia-diagnostics-log-tests_archive_copy",
+    "archive_name": "fuchsia-diagnostics-log-tests",
+    "package_name": "fuchsia-diagnostics-log-tests"
+  },
+  {
+    "archive_gn_label": "//sdk/ctf/tests/fidl/fuchsia.diagnostics:fuchsia-diagnostics-tests_archive_copy",
+    "archive_name": "fuchsia-diagnostics-tests",
+    "package_name": "fuchsia-diagnostics-tests"
+  },
+  {
     "archive_gn_label": "//sdk/ctf/tests/fidl/fuchsia.element:fuchsia-element-tests_archive_copy",
     "archive_name": "fuchsia-element-tests",
     "package_name": "fuchsia-element-tests"
