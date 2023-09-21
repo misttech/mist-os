@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
+#include <lib/async/default.h>
 #include <lib/zx/interrupt.h>
 
 #ifndef SRC_DEVICES_I2C_TESTING_FAKE_I2C_INCLUDE_LIB_FAKE_I2C_FAKE_I2C_H_
@@ -90,6 +91,16 @@ class FakeI2c : public fidl::WireServer<fuchsia_hardware_i2c::Device> {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
+  fuchsia_hardware_i2c::Service::InstanceHandler CreateInstanceHandler() {
+    auto* dispatcher = async_get_default_dispatcher();
+    Handler device_handler = [impl = this, dispatcher = dispatcher](
+                                 ::fidl::ServerEnd<::fuchsia_hardware_i2c::Device> request) {
+      impl->bindings_.AddBinding(dispatcher, std::move(request), impl, fidl::kIgnoreBindingClosure);
+    };
+
+    return fuchsia_hardware_i2c::Service::InstanceHandler({.device = std::move(device_handler)});
+  }
+
  protected:
   // The main function to be overriden for a specific fake. This is called on each
   // I2cTransact, but with serialized write and read information so it is easier to
@@ -114,6 +125,8 @@ class FakeI2c : public fidl::WireServer<fuchsia_hardware_i2c::Device> {
   }
 
   zx::interrupt irq_;
+
+  fidl::ServerBindingGroup<fuchsia_hardware_i2c::Device> bindings_;
 };
 
 }  // namespace fake_i2c
