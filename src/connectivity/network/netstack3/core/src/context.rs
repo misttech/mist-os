@@ -1421,24 +1421,6 @@ pub mod testutil {
     }
 
     #[cfg(test)]
-    impl<S, Id, Meta, Event: Debug, DeviceId, NonSyncCtxState: Default>
-        FakeCtx<S, Id, Meta, Event, DeviceId, NonSyncCtxState>
-    {
-        /// Constructs a `FakeCtx` with the given state and default
-        /// `FakeTimerCtx`, and `FakeFrameCtx`.
-        pub(crate) fn with_state(state: S) -> Self {
-            FakeCtx {
-                sync_ctx: FakeSyncCtx {
-                    state,
-                    frames: FakeFrameCtx::default(),
-                    _devices_marker: PhantomData,
-                },
-                non_sync_ctx: FakeNonSyncCtx::default(),
-            }
-        }
-    }
-
-    #[cfg(test)]
     impl<SC, Id, Event: Debug, NonSyncCtxState: Default>
         FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState>
     {

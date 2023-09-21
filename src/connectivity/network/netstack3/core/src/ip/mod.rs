@@ -69,9 +69,9 @@ use crate::{
         },
         forwarding::{ForwardingTable, IpForwardingDeviceContext},
         icmp::{
-            BufferIcmpHandler, IcmpHandlerIpExt, IcmpIpExt, IcmpIpTransportContext, IcmpSockets,
-            Icmpv4Error, Icmpv4ErrorCode, Icmpv4ErrorKind, Icmpv4State, Icmpv4StateBuilder,
-            Icmpv6ErrorCode, Icmpv6ErrorKind, Icmpv6State, Icmpv6StateBuilder, InnerIcmpContext,
+            BufferIcmpHandler, IcmpHandlerIpExt, IcmpIpExt, IcmpIpTransportContext, Icmpv4Error,
+            Icmpv4ErrorCode, Icmpv4ErrorKind, Icmpv4State, Icmpv4StateBuilder, Icmpv6ErrorCode,
+            Icmpv6ErrorKind, Icmpv6State, Icmpv6StateBuilder, InnerIcmpContext,
         },
         ipv6::Ipv6PacketAction,
         path_mtu::{PmtuCache, PmtuTimerId},
@@ -81,6 +81,7 @@ use crate::{
         socket::{BufferIpSocketHandler, IpSocketContext, IpSocketHandler},
         types::{Destination, NextHop, ResolvedRoute},
     },
+    socket::datagram,
     sync::{LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
     transport::{tcp::socket::TcpIpTransportContext, udp::UdpIpTransportContext},
     BufferNonSyncContext, Instant, NonSyncContext, SyncCtx,
@@ -1015,7 +1016,7 @@ impl<
 impl<
         C: BufferNonSyncContext<B>,
         B: BufferMut,
-        L: LockBefore<crate::lock_ordering::IcmpSockets<Ipv4>>,
+        L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv4>>,
     > BufferTransportContext<Ipv4, C, B> for Locked<&SyncCtx<C>, L>
 {
     fn dispatch_receive_ip_packet(
@@ -1074,7 +1075,7 @@ impl<
 impl<
         C: BufferNonSyncContext<B>,
         B: BufferMut,
-        L: LockBefore<crate::lock_ordering::IcmpSockets<Ipv6>>,
+        L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv6>>,
     > BufferTransportContext<Ipv6, C, B> for Locked<&SyncCtx<C>, L>
 {
     fn dispatch_receive_ip_packet(
@@ -1264,19 +1265,55 @@ impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::IpStateRoutingTable<Ipv4
     }
 }
 
-impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::IcmpSockets<Ipv4>> for SyncCtx<C> {
-    type Data = IcmpSockets<Ipv4, WeakDeviceId<C>>;
-    type ReadGuard<'l> = RwLockReadGuard<'l, IcmpSockets<Ipv4, WeakDeviceId<C>>>
-        where Self: 'l;
-    type WriteGuard<'l> = RwLockWriteGuard<'l, IcmpSockets<Ipv4, WeakDeviceId<C>>>
-        where Self: 'l;
+impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::IcmpBoundMap<Ipv4>> for SyncCtx<C> {
+    type Data = icmp::BoundSockets<Ipv4, WeakDeviceId<C>>;
+    type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
+    type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
 
     fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.state.ipv4.icmp.as_ref().sockets.read()
+        self.state.ipv4.icmp.inner.sockets.bound_and_id_allocator.read()
     }
-
     fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.state.ipv4.icmp.as_ref().sockets.write()
+        self.state.ipv4.icmp.inner.sockets.bound_and_id_allocator.write()
+    }
+}
+
+impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::IcmpBoundMap<Ipv6>> for SyncCtx<C> {
+    type Data = icmp::BoundSockets<Ipv6, WeakDeviceId<C>>;
+    type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
+    type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
+
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
+        self.state.ipv6.icmp.inner.sockets.bound_and_id_allocator.read()
+    }
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
+        self.state.ipv6.icmp.inner.sockets.bound_and_id_allocator.write()
+    }
+}
+
+impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::IcmpSocketsTable<Ipv4>> for SyncCtx<C> {
+    type Data = icmp::SocketsState<Ipv4, WeakDeviceId<C>>;
+    type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
+    type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
+
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
+        self.state.ipv4.icmp.inner.sockets.state.read()
+    }
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
+        self.state.ipv4.icmp.inner.sockets.state.write()
+    }
+}
+
+impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::IcmpSocketsTable<Ipv6>> for SyncCtx<C> {
+    type Data = icmp::SocketsState<Ipv6, WeakDeviceId<C>>;
+    type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
+    type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
+
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
+        self.state.ipv6.icmp.inner.sockets.state.read()
+    }
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
+        self.state.ipv6.icmp.inner.sockets.state.write()
     }
 }
 
@@ -1287,22 +1324,6 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::IcmpTokenBucket<Ipv4>> for
 
     fn lock(&self) -> Self::Guard<'_> {
         self.state.ipv4.icmp.as_ref().error_send_bucket.lock()
-    }
-}
-
-impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::IcmpSockets<Ipv6>> for SyncCtx<C> {
-    type Data = IcmpSockets<Ipv6, WeakDeviceId<C>>;
-    type ReadGuard<'l> = RwLockReadGuard<'l, IcmpSockets<Ipv6, WeakDeviceId<C>>>
-        where Self: 'l;
-    type WriteGuard<'l> = RwLockWriteGuard<'l, IcmpSockets<Ipv6, WeakDeviceId<C>>>
-        where Self: 'l;
-
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.state.ipv6.icmp.as_ref().sockets.read()
-    }
-
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.state.ipv6.icmp.as_ref().sockets.write()
     }
 }
 
@@ -2692,12 +2713,13 @@ pub(crate) fn send_ipv6_packet_from_device<
 
 impl<
         C: NonSyncContext,
-        L: LockBefore<crate::lock_ordering::IcmpSockets<Ipv4>>
+        L: LockBefore<crate::lock_ordering::IcmpBoundMap<Ipv4>>
             + LockBefore<crate::lock_ordering::TcpSockets<Ipv4>>
             + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4>>,
     > InnerIcmpContext<Ipv4, C> for Locked<&SyncCtx<C>, L>
 {
-    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::IcmpSockets<Ipv4>>;
+    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::IcmpBoundMap<Ipv4>>;
+    type DualStackContext = datagram::UninstantiableContext<Ipv4, icmp::Icmp, Self>;
     fn receive_icmp_error(
         &mut self,
         ctx: &mut C,
@@ -2759,22 +2781,22 @@ impl<
         }
     }
 
-    fn with_icmp_sockets<O, F: FnOnce(&IcmpSockets<Ipv4, Self::WeakDeviceId>) -> O>(
+    fn with_icmp_sockets<O, F: FnOnce(&icmp::BoundSockets<Ipv4, Self::WeakDeviceId>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
-        cb(&self.read_lock::<crate::lock_ordering::IcmpSockets<Ipv4>>())
+        cb(&self.read_lock::<crate::lock_ordering::IcmpBoundMap<Ipv4>>())
     }
 
     fn with_icmp_ctx_and_sockets_mut<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &mut IcmpSockets<Ipv4, Self::WeakDeviceId>) -> O,
+        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &mut icmp::BoundSockets<Ipv4, Self::WeakDeviceId>) -> O,
     >(
         &mut self,
         cb: F,
     ) -> O {
         let (mut sockets, mut sync_ctx) =
-            self.write_lock_and::<crate::lock_ordering::IcmpSockets<Ipv4>>();
+            self.write_lock_and::<crate::lock_ordering::IcmpBoundMap<Ipv4>>();
         cb(&mut sync_ctx, &mut sockets)
     }
 
@@ -2788,12 +2810,13 @@ impl<
 
 impl<
         C: NonSyncContext,
-        L: LockBefore<crate::lock_ordering::IcmpSockets<Ipv6>>
+        L: LockBefore<crate::lock_ordering::IcmpBoundMap<Ipv6>>
             + LockBefore<crate::lock_ordering::TcpSockets<Ipv6>>
             + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv6>>,
     > InnerIcmpContext<Ipv6, C> for Locked<&SyncCtx<C>, L>
 {
-    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::IcmpSockets<Ipv6>>;
+    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::IcmpBoundMap<Ipv6>>;
+    type DualStackContext = datagram::UninstantiableContext<Ipv6, icmp::Icmp, Self>;
     fn receive_icmp_error(
         &mut self,
         ctx: &mut C,
@@ -2855,22 +2878,22 @@ impl<
         }
     }
 
-    fn with_icmp_sockets<O, F: FnOnce(&IcmpSockets<Ipv6, Self::WeakDeviceId>) -> O>(
+    fn with_icmp_sockets<O, F: FnOnce(&icmp::BoundSockets<Ipv6, Self::WeakDeviceId>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
-        cb(&self.read_lock::<crate::lock_ordering::IcmpSockets<Ipv6>>())
+        cb(&self.read_lock::<crate::lock_ordering::IcmpBoundMap<Ipv6>>())
     }
 
     fn with_icmp_ctx_and_sockets_mut<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &mut IcmpSockets<Ipv6, Self::WeakDeviceId>) -> O,
+        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &mut icmp::BoundSockets<Ipv6, Self::WeakDeviceId>) -> O,
     >(
         &mut self,
         cb: F,
     ) -> O {
         let (mut sockets, mut sync_ctx) =
-            self.write_lock_and::<crate::lock_ordering::IcmpSockets<Ipv6>>();
+            self.write_lock_and::<crate::lock_ordering::IcmpBoundMap<Ipv6>>();
         cb(&mut sync_ctx, &mut sockets)
     }
 
@@ -2880,6 +2903,126 @@ impl<
     ) -> O {
         cb(&mut self.lock::<crate::lock_ordering::IcmpTokenBucket<Ipv6>>())
     }
+}
+
+impl<L, C: NonSyncContext> icmp::IcmpStateContext for Locked<&SyncCtx<C>, L> {}
+
+impl<
+        C: NonSyncContext,
+        L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv6>>
+            + LockBefore<crate::lock_ordering::TcpSockets<Ipv6>>
+            + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv6>>,
+    > icmp::StateContext<Ipv6, C> for Locked<&SyncCtx<C>, L>
+{
+    type SocketStateCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::IcmpSocketsTable<Ipv6>>;
+
+    fn with_sockets_state<
+        O,
+        F: FnOnce(&mut Self::SocketStateCtx<'_>, &icmp::SocketsState<Ipv6, Self::WeakDeviceId>) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let (sockets, mut sync_ctx) =
+            self.read_lock_and::<crate::lock_ordering::IcmpSocketsTable<Ipv6>>();
+        cb(&mut sync_ctx, &sockets)
+    }
+
+    fn with_sockets_state_mut<
+        O,
+        F: FnOnce(
+            &mut Self::SocketStateCtx<'_>,
+            &mut icmp::SocketsState<Ipv6, Self::WeakDeviceId>,
+        ) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let (mut sockets, mut sync_ctx) =
+            self.write_lock_and::<crate::lock_ordering::IcmpSocketsTable<Ipv6>>();
+        cb(&mut sync_ctx, &mut sockets)
+    }
+
+    fn with_bound_state_context<O, F: FnOnce(&mut Self::SocketStateCtx<'_>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O {
+        cb(&mut self.cast_locked())
+    }
+}
+
+impl<
+        C: NonSyncContext,
+        L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv4>>
+            + LockBefore<crate::lock_ordering::TcpSockets<Ipv4>>
+            + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4>>,
+    > icmp::StateContext<Ipv4, C> for Locked<&SyncCtx<C>, L>
+{
+    type SocketStateCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::IcmpSocketsTable<Ipv4>>;
+
+    fn with_sockets_state<
+        O,
+        F: FnOnce(&mut Self::SocketStateCtx<'_>, &icmp::SocketsState<Ipv4, Self::WeakDeviceId>) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let (sockets, mut sync_ctx) =
+            self.read_lock_and::<crate::lock_ordering::IcmpSocketsTable<Ipv4>>();
+        cb(&mut sync_ctx, &sockets)
+    }
+
+    fn with_sockets_state_mut<
+        O,
+        F: FnOnce(
+            &mut Self::SocketStateCtx<'_>,
+            &mut icmp::SocketsState<Ipv4, Self::WeakDeviceId>,
+        ) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let (mut sockets, mut sync_ctx) =
+            self.write_lock_and::<crate::lock_ordering::IcmpSocketsTable<Ipv4>>();
+        cb(&mut sync_ctx, &mut sockets)
+    }
+
+    fn with_bound_state_context<O, F: FnOnce(&mut Self::SocketStateCtx<'_>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O {
+        cb(&mut self.cast_locked())
+    }
+}
+
+impl<
+        I: datagram::IpExt,
+        B: BufferMut,
+        C: icmp::BufferIcmpNonSyncCtx<I, B>
+            + icmp::BufferIcmpNonSyncCtx<I::OtherVersion, B>
+            + crate::NonSyncContext,
+        L,
+    > icmp::BufferStateContext<I, C, B> for Locked<&SyncCtx<C>, L>
+where
+    Self: icmp::StateContext<I, C> + icmp::IcmpStateContext,
+    for<'a> Self::SocketStateCtx<'a>: icmp::BufferBoundStateContext<I, C, B>,
+{
+    type BufferSocketStateCtx<'a> = Self::SocketStateCtx<'a>;
+}
+
+impl<
+        I: datagram::IpExt,
+        B: BufferMut,
+        C: icmp::BufferIcmpNonSyncCtx<I, B>
+            + icmp::BufferIcmpNonSyncCtx<I::OtherVersion, B>
+            + crate::NonSyncContext,
+        L,
+    > icmp::BufferBoundStateContext<I, C, B> for Locked<&SyncCtx<C>, L>
+where
+    Self: icmp::InnerIcmpContext<I, C>,
+    for<'a> Self::IpSocketsCtx<'a>: BufferTransportIpContext<I, C, B>,
+{
+    type BufferIpSocketsCtx<'a> = Self::IpSocketsCtx<'a>;
 }
 
 /// Resolve the route to a given destination.

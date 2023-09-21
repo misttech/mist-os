@@ -606,19 +606,6 @@ impl IntoErrno for IpSockSendError {
     }
 }
 
-impl IntoErrno for netstack3_core::ip::icmp::IcmpSockCreationError {
-    fn into_errno(self) -> Errno {
-        match self {
-            netstack3_core::ip::icmp::IcmpSockCreationError::Ip(e) => e.into_errno(),
-            netstack3_core::ip::icmp::IcmpSockCreationError::SockAddrConflict => Errno::Eaddrinuse,
-            netstack3_core::ip::icmp::IcmpSockCreationError::RemoteAddrIsMapped => {
-                Errno::Enetunreach
-            }
-            netstack3_core::ip::icmp::IcmpSockCreationError::LocalAddrIsMapped => Errno::Einval,
-        }
-    }
-}
-
 impl IntoErrno for udp::SendToError {
     fn into_errno(self) -> Errno {
         match self {

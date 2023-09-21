@@ -1114,6 +1114,11 @@ impl<I: IpExt, B: BufferMut, C: StateNonSyncContext<I> + BufferNonSyncContext<I,
 {
 }
 
+// TODO(https://fxbug.dev/133966): This trait is used to express the requirement
+// for the blanket impl [1] so that we don't need to mention the datagram traits
+// in our BufferSocketHandler trait. We should simplify this by adding datagram
+// trait bounds.
+// [1]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/network/netstack3/core/src/socket/datagram.rs;l=1073;drc=9c47dd3a602a603b1a803cf3abc7e708e8e17455
 /// An execution context for the UDP protocol when a buffer is provided which
 /// also provides access to state.
 pub(crate) trait BufferStateContext<I: IpExt, C: BufferStateNonSyncContext<I, B>, B: BufferMut>:
@@ -1130,6 +1135,11 @@ where
     >;
 }
 
+// TODO(https://fxbug.dev/133966): This trait is used to express the requirement
+// for the blanket impl [1] so that we don't need to mention the datagram traits
+// in our BufferSocketHandler trait. We should simplify this by adding datagram
+// trait bounds.
+// [1]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/network/netstack3/core/src/socket/datagram.rs;l=1042;drc=9c47dd3a602a603b1a803cf3abc7e708e8e17455
 /// An execution context for the UDP protocol when a buffer is provided which
 /// also provides access to state.
 pub(crate) trait BufferBoundStateContext<I: IpExt, C: BufferStateNonSyncContext<I, B>, B: BufferMut>
@@ -2005,6 +2015,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: BoundStateContext<I, C> + UdpState
     DatagramBoundStateContext<I, C, Udp> for SC
 {
     type IpSocketsCtx<'a> = SC::IpSocketsCtx<'a>;
+    // TODO(https://fxbug.dev/133884): Remove the laziness by dropping `Option`.
     type LocalIdAllocator = Option<PortAlloc<UdpBoundSocketMap<I, SC::WeakDeviceId>>>;
 
     fn with_bound_sockets<

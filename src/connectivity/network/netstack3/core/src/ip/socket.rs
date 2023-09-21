@@ -930,7 +930,7 @@ pub(crate) mod testutil {
             testutil::{FakeInstant, FakeNonSyncCtx, FakeSyncCtx},
             RngContext, SendFrameContext, TracingContext,
         },
-        device::testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId},
+        device::testutil::{FakeStrongDeviceId, FakeWeakDeviceId},
         ip::{
             device::state::{AssignedAddress as _, DualStackIpDeviceState, IpDeviceState},
             forwarding::{
@@ -1555,16 +1555,6 @@ pub(crate) mod testutil {
                     (device, device_state, remote_ips)
                 },
             ))
-        }
-    }
-
-    impl<I: IpDeviceStateIpExt> FakeIpSocketCtx<I, FakeDeviceId> {
-        /// Creates a new `FakeIpSocketCtx<Ipv4>`.
-        pub(crate) fn new_fake(
-            local_ips: Vec<SpecifiedAddr<I::Addr>>,
-            remote_ips: Vec<SpecifiedAddr<I::Addr>>,
-        ) -> Self {
-            Self::new([FakeDeviceConfig { device: FakeDeviceId, local_ips, remote_ips }])
         }
     }
 }

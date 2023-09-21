@@ -2763,6 +2763,7 @@ pub(crate) fn get_shutdown_connected<
 }
 
 /// Error encountered when sending a datagram on a socket.
+#[derive(Debug, GenericOverIp)]
 pub enum SendError<B, S> {
     /// The socket is not connected,
     NotConnected(B),
