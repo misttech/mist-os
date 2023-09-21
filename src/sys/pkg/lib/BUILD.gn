@@ -68,4 +68,11 @@ group("tests") {
     "version:tests",
     "work-queue:tests",
   ]
+
+  if (current_cpu == "riscv64") {
+    deps -= [
+      # TODO(fxbug.dev/300170314): Remove after removing Go dependencies on RISC-V.
+      "merkle:tests",
+    ]
+  }
 }

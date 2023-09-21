@@ -34,4 +34,11 @@ group("tests") {
     "system-updater:tests",
     "update:tests",
   ]
+
+  if (current_cpu == "riscv64") {
+    public_deps -= [
+      # TODO(fxbug.dev/300170314): Remove after removing Go dependencies on RISC-V.
+      "pm:tests",
+    ]
+  }
 }
