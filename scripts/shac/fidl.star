@@ -4,6 +4,15 @@
 
 load("./common.star", "FORMATTER_MSG", "compiled_tool_path")
 
+def _filter_fidl_files(files):
+    return [
+        f
+        for f in files
+        if f.endswith(".fidl") and
+           # FIDL test files are often purposefully invalid.
+           not f.endswith(".test.fidl")
+    ]
+
 def _fidl_format(ctx):
     """Runs fidl-format.
 
@@ -11,15 +20,7 @@ def _fidl_format(ctx):
       ctx: A ctx instance.
     """
     exe = compiled_tool_path(ctx, "fidl-format")
-    fidl_files = [
-        f
-        for f in ctx.scm.affected_files()
-        if f.endswith(".fidl") and
-           # FIDL test files are often purposefully invalid.
-           not f.endswith(".test.fidl")
-    ]
-
-    for f in fidl_files:
+    for f in _filter_fidl_files(ctx.scm.affected_files()):
         formatted = ctx.os.exec([exe, f]).wait().stdout
         original = str(ctx.io.read_file(f))
         if formatted != original:
@@ -30,5 +31,52 @@ def _fidl_format(ctx):
                 replacements = [formatted],
             )
 
+def _fidl_lint(ctx):
+    """Runs fidl-lint.
+
+    Args:
+        ctx: A ctx instance.
+    """
+    fidl_files = _filter_fidl_files(ctx.scm.affected_files())
+    if not fidl_files:
+        return
+
+    results = json.decode(ctx.os.exec(
+        [
+            compiled_tool_path(ctx, "fidl-lint"),
+            "--format=json",
+        ] + fidl_files,
+        ok_retcodes = [0, 1],
+    ).wait().stdout)
+
+    for result in results:
+        replacements = []
+        for s in result["suggestions"]:
+            for repl in s["replacements"]:
+                # Only consider replacements that cover the same span as the
+                # finding.
+                if all([
+                    repl[field] == result[field]
+                    for field in [
+                        "path",
+                        "start_line",
+                        "start_char",
+                        "end_line",
+                        "end_char",
+                    ]
+                ]):
+                    replacements.append(repl["replacement"])
+        ctx.emit.finding(
+            level = "warning",
+            message = result["message"],
+            filepath = result["path"],
+            line = result["start_line"],
+            col = result["start_char"] + 1,
+            end_line = result["end_line"],
+            end_col = result["end_char"] + 1,
+            replacements = replacements,
+        )
+
 def register_fidl_checks():
     shac.register_check(shac.check(_fidl_format, formatter = True))
+    shac.register_check(shac.check(_fidl_lint))

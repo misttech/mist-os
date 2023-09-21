@@ -8,5 +8,6 @@ group("shac_tools") {
     "//build/tools/formatjson5:formatjson5.actual($host_toolchain)",
     "//tools/cmc:cmc.actual($host_toolchain)",
     "//tools/fidl/fidlc:fidl-format($host_toolchain)",
+    "//tools/fidl/fidlc:fidl-lint($host_toolchain)",
   ]
 }
