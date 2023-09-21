@@ -298,8 +298,8 @@ mod tests {
     use super::*;
     use crate::utils::run_all_tasks_until_stalled::run_all_tasks_until_stalled;
     use assert_matches::assert_matches;
+    use diagnostics_assertions::assert_data_tree;
     use fidl::endpoints::{ControlHandle, RequestStream};
-    use inspect::assert_data_tree;
 
     /// Tests that well-formed configuration JSON does not panic the `new_from_json` function.
     #[fasync::run_singlethreaded(test)]

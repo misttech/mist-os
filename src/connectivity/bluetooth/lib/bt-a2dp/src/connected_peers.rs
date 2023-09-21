@@ -457,11 +457,11 @@ mod tests {
 
     use async_utils::PollExt;
     use bt_avdtp::{Request, ServiceCapability};
+    use diagnostics_assertions::assert_data_tree;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_bluetooth_bredr::{
         ProfileMarker, ProfileRequestStream, ServiceClassProfileIdentifier,
     };
-    use fuchsia_inspect::assert_data_tree;
     use futures::{self, pin_mut, task::Poll, StreamExt};
     use std::{
         convert::{TryFrom, TryInto},

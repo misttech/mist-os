@@ -62,10 +62,8 @@ pub(super) fn write_to_inspect(
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
-        fidl_fuchsia_update_verify as verify,
-        fuchsia_inspect::{assert_data_tree, Inspector},
-        proptest::prelude::*,
+        super::*, diagnostics_assertions::assert_data_tree, fidl_fuchsia_update_verify as verify,
+        fuchsia_inspect::Inspector, proptest::prelude::*,
     };
 
     #[test]

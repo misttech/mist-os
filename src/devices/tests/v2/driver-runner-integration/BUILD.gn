@@ -21,6 +21,7 @@ rustc_test("driver_runner_integration_test") {
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/lib/driver_test_realm/realm_builder/rust",
     "//src/lib/diagnostics/reader/rust",
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component-test",
     "//src/sys/lib/component-events",

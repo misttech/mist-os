@@ -27,6 +27,7 @@ rustc_library("system-image") {
   ]
 
   test_deps = [
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/sys/pkg/lib/fuchsia-pkg-testing",

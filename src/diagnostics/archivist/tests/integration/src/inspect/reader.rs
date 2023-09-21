@@ -5,9 +5,8 @@
 use crate::{constants::*, test_topology};
 use anyhow::Error;
 use archivist_lib::constants;
-use diagnostics_reader::{
-    assert_data_tree, assert_json_diff, AnyProperty, ArchiveReader, DiagnosticsHierarchy, Inspect,
-};
+use diagnostics_assertions::{assert_data_tree, assert_json_diff, AnyProperty};
+use diagnostics_reader::{ArchiveReader, Inspect};
 use difference::assert_diff;
 use fidl_fuchsia_archivist_test as ftest;
 use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, ArchiveAccessorProxy};

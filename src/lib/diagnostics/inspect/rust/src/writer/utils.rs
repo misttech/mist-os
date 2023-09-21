@@ -21,7 +21,7 @@ pub fn unique_name(prefix: &str) -> String {
 mod tests {
     use super::*;
     use crate::writer::Inspector;
-    use diagnostics_hierarchy::assert_data_tree;
+    use diagnostics_assertions::assert_data_tree;
 
     #[fuchsia::test]
     fn test_unique_name() {

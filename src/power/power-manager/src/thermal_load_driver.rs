@@ -384,7 +384,7 @@ mod tests {
     use super::*;
     use crate::test::mock_node::{create_dummy_node, MessageMatcher, MockNode, MockNodeMaker};
     use crate::{msg_eq, msg_ok_return};
-    use fuchsia_inspect::assert_data_tree;
+    use diagnostics_assertions::assert_data_tree;
 
     /// Tests that each node config file has proper configuration for ThermalLoadDriver entries. The
     /// test ensures that any TemperatureHandler nodes that are named inside the

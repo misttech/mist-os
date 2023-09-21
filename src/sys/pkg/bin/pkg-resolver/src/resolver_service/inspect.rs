@@ -72,7 +72,8 @@ pub struct PackageWithRewrittenUrl {
 mod tests {
     use {
         super::*,
-        fuchsia_inspect::{assert_data_tree, testing::AnyProperty, Inspector},
+        diagnostics_assertions::{assert_data_tree, AnyProperty},
+        fuchsia_inspect::Inspector,
     };
 
     #[test]

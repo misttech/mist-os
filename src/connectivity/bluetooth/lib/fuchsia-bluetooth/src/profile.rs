@@ -728,7 +728,7 @@ impl Inspect for &mut ValidScoConnectionParameters {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_inspect::assert_data_tree;
+    use diagnostics_assertions::assert_data_tree;
 
     #[test]
     fn test_find_descriptors_fails_with_no_descriptors() {

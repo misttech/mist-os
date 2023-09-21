@@ -30,7 +30,6 @@ use {
 
 pub mod macros;
 pub mod serialization;
-pub mod testing;
 
 /// Extra slots for a linear histogram: 2 parameter slots (floor, step size) and
 /// 2 overflow slots.
@@ -650,6 +649,59 @@ where
     }
 }
 
+pub mod testing {
+    use crate::ArrayContent;
+    use num_traits::bounds::Bounded;
+    use std::ops::{Add, AddAssign, MulAssign};
+
+    // Require test code to import CondensableOnDemand to access the
+    // condense_histogram() associated function.
+    pub trait CondensableOnDemand {
+        fn condense_histogram(&mut self);
+    }
+
+    fn condense_counts<T: num_traits::Zero + Copy + PartialEq>(
+        counts: &[T],
+    ) -> (Vec<T>, Vec<usize>) {
+        let mut condensed_counts = vec![];
+        let mut indexes = vec![];
+        for (index, count) in counts.iter().enumerate() {
+            if *count != T::zero() {
+                condensed_counts.push(*count);
+                indexes.push(index);
+            }
+        }
+        (condensed_counts, indexes)
+    }
+
+    impl<T> CondensableOnDemand for ArrayContent<T>
+    where
+        T: Add<Output = T> + num_traits::Zero + AddAssign + Copy + MulAssign + PartialEq + Bounded,
+    {
+        fn condense_histogram(&mut self) {
+            match self {
+                Self::Values(_) => return,
+                Self::LinearHistogram(histogram) => {
+                    if histogram.indexes.is_some() {
+                        return;
+                    }
+                    let (counts, indexes) = condense_counts(&histogram.counts);
+                    histogram.counts = counts;
+                    histogram.indexes = Some(indexes);
+                }
+                Self::ExponentialHistogram(histogram) => {
+                    if histogram.indexes.is_some() {
+                        return;
+                    }
+                    let (counts, indexes) = condense_counts(&histogram.counts);
+                    histogram.counts = counts;
+                    histogram.indexes = Some(indexes);
+                }
+            }
+        }
+    }
+}
+
 impl<Key> Property<Key>
 where
     Key: AsRef<str>,
@@ -962,51 +1014,42 @@ pub struct LinearHistogramParams<T: Clone> {
     pub buckets: usize,
 }
 
+/// A type which can function as a "view" into a diagnostics hierarchy, optionally allocating a new
+/// instance to service a request.
+pub trait DiagnosticsHierarchyGetter<K: Clone> {
+    fn get_diagnostics_hierarchy(&self) -> Cow<'_, DiagnosticsHierarchy<K>>;
+}
+
+pub trait JsonGetter<K: Clone + AsRef<str>>: DiagnosticsHierarchyGetter<K> {
+    fn get_pretty_json(&self) -> String {
+        let mut tree = self.get_diagnostics_hierarchy();
+        tree.to_mut().sort();
+        serde_json::to_string_pretty(&tree).expect("pretty json string")
+    }
+
+    fn get_json(&self) -> String {
+        let mut tree = self.get_diagnostics_hierarchy();
+        tree.to_mut().sort();
+        serde_json::to_string(&tree).expect("pretty json string")
+    }
+}
+
+impl<K: Clone> DiagnosticsHierarchyGetter<K> for DiagnosticsHierarchy<K> {
+    fn get_diagnostics_hierarchy(&self) -> Cow<'_, DiagnosticsHierarchy<K>> {
+        Cow::Borrowed(self)
+    }
+}
+
+impl<K: Clone + AsRef<str>, T: DiagnosticsHierarchyGetter<K>> JsonGetter<K> for T {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testing::CondensableOnDemand;
+
     use assert_matches::assert_matches;
     use selectors::VerboseError;
     use std::sync::Arc;
-
-    impl<T> ArrayContent<T>
-    where
-        T: Add<Output = T> + num_traits::Zero + AddAssign + Copy + MulAssign + PartialEq + Bounded,
-    {
-        fn condense_counts(counts: &[T]) -> (Vec<T>, Vec<usize>) {
-            let mut condensed_counts = vec![];
-            let mut indexes = vec![];
-            for (index, count) in counts.iter().enumerate() {
-                if *count != T::zero() {
-                    condensed_counts.push(*count);
-                    indexes.push(index);
-                }
-            }
-            (condensed_counts, indexes)
-        }
-
-        pub(crate) fn condense_histogram(&mut self) {
-            match self {
-                Self::Values(_) => return,
-                Self::LinearHistogram(histogram) => {
-                    if histogram.indexes.is_some() {
-                        return;
-                    }
-                    let (counts, indexes) = Self::condense_counts(&histogram.counts);
-                    histogram.counts = counts;
-                    histogram.indexes = Some(indexes);
-                }
-                Self::ExponentialHistogram(histogram) => {
-                    if histogram.indexes.is_some() {
-                        return;
-                    }
-                    let (counts, indexes) = Self::condense_counts(&histogram.counts);
-                    histogram.counts = counts;
-                    histogram.indexes = Some(indexes);
-                }
-            }
-        }
-    }
 
     fn validate_hierarchy_iteration(
         mut results_vec: Vec<(Vec<String>, Option<Property>)>,
@@ -1363,6 +1406,7 @@ mod tests {
             }
         }"#;
         let parsed: DiagnosticsHierarchy = serde_json::from_str(json)?;
+
         let mut histogram =
             ArrayContent::new(vec![2, 3, 0, 4, 5, 0, 6, 0, 0, 0], ArrayFormat::LinearHistogram)
                 .unwrap();
@@ -1393,7 +1437,8 @@ mod tests {
             }
         }"#;
         let parsed: DiagnosticsHierarchy = serde_json::from_str(json)?;
-        assert_data_tree!(parsed, root: {histogram: contains {} });
+        assert_eq!(parsed.children.len(), 1);
+        assert_eq!(&parsed.children[0].name, "histogram");
         Ok(())
     }
 
@@ -1411,7 +1456,8 @@ mod tests {
             }
         }"#;
         let parsed: DiagnosticsHierarchy = serde_json::from_str(json)?;
-        assert_data_tree!(parsed, root: {histogram: contains {} });
+        assert_eq!(parsed.children.len(), 1);
+        assert_eq!(&parsed.children[0].name, "histogram");
         Ok(())
     }
 
@@ -1429,7 +1475,8 @@ mod tests {
             }
         }"#;
         let parsed: DiagnosticsHierarchy = serde_json::from_str(json)?;
-        assert_data_tree!(parsed, root: {histogram: contains {} });
+        assert_eq!(parsed.children.len(), 1);
+        assert_eq!(&parsed.children[0].name, "histogram");
         Ok(())
     }
 
@@ -1447,7 +1494,8 @@ mod tests {
             }
         }"#;
         let parsed: DiagnosticsHierarchy = serde_json::from_str(json)?;
-        assert_data_tree!(parsed, root: {histogram: contains {} });
+        assert_eq!(parsed.children.len(), 1);
+        assert_eq!(&parsed.children[0].name, "histogram");
         Ok(())
     }
 

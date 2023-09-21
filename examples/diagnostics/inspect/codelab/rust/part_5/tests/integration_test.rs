@@ -10,9 +10,8 @@ use {
 // [START include_test_stuff]
 use {
     anyhow::format_err,
-    diagnostics_reader::{
-        assert_data_tree, AnyProperty, ArchiveReader, DiagnosticsHierarchy, Inspect,
-    },
+    diagnostics_assertions::{assert_data_tree, AnyProperty},
+    diagnostics_reader::{ArchiveReader, DiagnosticsHierarchy, Inspect},
 };
 // [END include_test_stuff]
 

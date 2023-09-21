@@ -20,6 +20,8 @@ use {
     std::collections::HashSet,
 };
 
+pub use diagnostics_assertions;
+
 /// Returns the current time as an i64 for InputReports and zx::Time for InputEvents.
 pub fn event_times() -> (i64, zx::Time) {
     let event_time = zx::Time::get_monotonic();
@@ -779,10 +781,10 @@ macro_rules! assert_input_report_sequence_generates_events {
             };
         }
 
-        fuchsia_inspect::assert_data_tree!(inspector, root: {
+        $crate::testing_utilities::diagnostics_assertions::assert_data_tree!(inspector, root: {
             "TestDevice": contains {
                 reports_received_count: num_reports as u64,
-                reports_filtered_count: AnyProperty,
+                reports_filtered_count: $crate::testing_utilities::diagnostics_assertions::AnyProperty,
                 events_generated: num_events as u64,
                 last_received_timestamp_ns: expected_last_received_timestamp,
                 last_generated_timestamp_ns: expected_last_generated_timestamp,

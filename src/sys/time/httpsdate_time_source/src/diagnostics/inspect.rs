@@ -189,7 +189,8 @@ mod test {
     use super::*;
     use crate::datatypes::Poll;
     use crate::diagnostics::Event;
-    use fuchsia_inspect::{assert_data_tree, testing::AnyProperty, Inspector};
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
+    use fuchsia_inspect::Inspector;
     use fuchsia_zircon as zx;
     use lazy_static::lazy_static;
 

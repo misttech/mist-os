@@ -607,8 +607,8 @@ impl KeyboardBinding {
 #[cfg(test)]
 mod tests {
     use {
-        super::*, crate::testing_utilities, fuchsia_async as fasync, fuchsia_inspect::AnyProperty,
-        fuchsia_zircon as zx, futures::StreamExt,
+        super::*, crate::testing_utilities, fuchsia_async as fasync, fuchsia_zircon as zx,
+        futures::StreamExt,
     };
 
     /// Tests that a key that is present in the new report, but was not present in the previous report

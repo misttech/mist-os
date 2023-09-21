@@ -39,7 +39,8 @@ impl Unit for JoinableInspectVecDeque {
 #[cfg(test)]
 mod tests {
     use crate::joinable_inspect_vecdeque::JoinableInspectVecDeque;
-    use fuchsia_inspect::{assert_data_tree, Inspector, Node};
+    use diagnostics_assertions::assert_data_tree;
+    use fuchsia_inspect::{Inspector, Node};
     use fuchsia_inspect_derive::{IValue, Inspect, WithInspect};
 
     #[derive(Default, Inspect)]

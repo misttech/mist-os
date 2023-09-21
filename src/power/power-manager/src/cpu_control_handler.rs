@@ -631,10 +631,10 @@ pub mod tests {
     use crate::test::mock_node::{MessageMatcher, MockNodeMaker};
     use crate::{msg_eq, msg_ok_return};
     use assert_matches::assert_matches;
+    use diagnostics_assertions::assert_data_tree;
     use fuchsia_async as fasync;
     use fuchsia_zircon as zx;
     use futures::TryStreamExt;
-    use inspect::assert_data_tree;
     use std::collections::HashSet;
 
     // Returns a proxy to a fake CpuCtrl driver pre-baked to return a single (fake) CPU P-state.

@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use diagnostics_assertions::assert_data_tree;
 use diagnostics_reader::{ArchiveReader, Inspect};
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
-use fuchsia_inspect::assert_data_tree;
 
 const CHILD_URL: &str = "#meta/config_example.cm";
 

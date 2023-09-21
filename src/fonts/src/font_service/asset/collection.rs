@@ -424,8 +424,8 @@ impl AssetCollectionInspectData {
 #[cfg(test)]
 mod tests {
     use {
-        super::*, async_trait::async_trait, finspect::assert_data_tree, fuchsia_async as fasync,
-        fuchsia_zircon as zx, std::path::Path,
+        super::*, async_trait::async_trait, diagnostics_assertions::assert_data_tree,
+        fuchsia_async as fasync, fuchsia_zircon as zx, std::path::Path,
     };
 
     fn mock_vmo(vmo_size: u64, buffer_size: u64) -> mem::Buffer {

@@ -98,8 +98,8 @@ mod tests {
     use {
         super::*,
         anyhow::Error,
+        diagnostics_assertions::assert_data_tree,
         fidl_fuchsia_examples_inspect::{ReverserMarker, ReverserProxy},
-        fuchsia_inspect::{self, assert_data_tree},
         futures::channel::oneshot,
     };
 

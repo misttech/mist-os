@@ -23,12 +23,12 @@ pub use debuglog::{convert_debuglog_to_log_message, KernelDebugLog};
 #[cfg(test)]
 mod tests {
     use crate::{identity::ComponentIdentity, logs::testing::*};
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use diagnostics_data::{
         LegacySeverity, DROPPED_LABEL, MESSAGE_LABEL, PID_LABEL, TAG_LABEL, TID_LABEL,
     };
     use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
     use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMessage};
-    use fuchsia_inspect::{assert_data_tree, testing::AnyProperty};
     use fuchsia_zircon as zx;
     use moniker::ExtendedMoniker;
     use std::sync::Arc;

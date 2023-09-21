@@ -37,7 +37,10 @@ rustc_binary("bin") {
     "//third_party/rust_crates:tracing",
   ]
 
-  test_deps = [ "//src/lib/async-utils" ]
+  test_deps = [
+    "//src/lib/async-utils",
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
+  ]
 
   sources = [
     "src/bounded_queue.rs",

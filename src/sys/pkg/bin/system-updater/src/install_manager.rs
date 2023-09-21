@@ -522,6 +522,7 @@ mod tests {
             NamespaceSystemInfo,
         },
         async_trait::async_trait,
+        diagnostics_assertions::{assert_data_tree, AnyProperty},
         event_queue::ClosedClient,
         fidl_fuchsia_hardware_power_statecontrol::AdminMarker as PowerStateControlMarker,
         fidl_fuchsia_paver::{BootManagerMarker, DataSinkMarker},
@@ -530,7 +531,7 @@ mod tests {
         fidl_fuchsia_update_installer_ext::{
             PrepareFailureReason, Progress, UpdateInfo, UpdateInfoAndProgress,
         },
-        fuchsia_inspect::{assert_data_tree, testing::AnyProperty, Inspector},
+        fuchsia_inspect::Inspector,
         mpsc::{Receiver, Sender},
         parking_lot::Mutex,
         std::{pin::Pin, sync::Arc, task::Poll},

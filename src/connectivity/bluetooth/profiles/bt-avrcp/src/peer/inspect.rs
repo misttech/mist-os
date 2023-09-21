@@ -116,8 +116,8 @@ mod tests {
     use crate::profile::{AvrcpControllerFeatures, AvrcpProtocolVersion, AvrcpTargetFeatures};
 
     use {
+        diagnostics_assertions::{assert_data_tree, AnyProperty},
         fuchsia_bluetooth::profile::Psm,
-        fuchsia_inspect::{assert_data_tree, testing::AnyProperty},
         fuchsia_inspect_derive::WithInspect,
     };
 

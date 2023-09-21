@@ -350,7 +350,7 @@ impl InspectData {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, fuchsia_inspect::assert_data_tree};
+    use {super::*, assert_matches::assert_matches, diagnostics_assertions::assert_data_tree};
 
     /// Tests for the presence and correctness of dynamically-added inspect data
     #[test]

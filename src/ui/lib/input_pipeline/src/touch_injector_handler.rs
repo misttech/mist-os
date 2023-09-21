@@ -956,7 +956,7 @@ mod tests {
             handle_configuration_request_stream(&mut configuration_request_stream);
         let (touch_handler_res, _) = futures::join!(touch_handler_fut, config_request_stream_fut,);
         let _handler = touch_handler_res.expect("Failed to create touch handler.");
-        fuchsia_inspect::assert_data_tree!(inspector, root: {
+        diagnostics_assertions::assert_data_tree!(inspector, root: {
             input_handlers_node: {
                 touch_injector_handler: {
                     events_received_count: 0u64,
@@ -966,7 +966,7 @@ mod tests {
                         status: "STARTING_UP",
                         // Timestamp value is unpredictable and not relevant in this context,
                         // so we only assert that the property is present.
-                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                        start_timestamp_nanos: diagnostics_assertions::AnyProperty
                     },
                 }
             }
@@ -1050,7 +1050,7 @@ mod tests {
 
         let last_received_event_time: u64 = event_time3.into_nanos().try_into().unwrap();
 
-        fuchsia_inspect::assert_data_tree!(inspector, root: {
+        diagnostics_assertions::assert_data_tree!(inspector, root: {
             input_handlers_node: {
                 touch_injector_handler: {
                     events_received_count: 3u64,
@@ -1060,7 +1060,7 @@ mod tests {
                         status: "STARTING_UP",
                         // Timestamp value is unpredictable and not relevant in this context,
                         // so we only assert that the property is present.
-                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                        start_timestamp_nanos: diagnostics_assertions::AnyProperty
                     },
                 }
             }

@@ -860,10 +860,10 @@ pub(crate) mod tests {
 
     use assert_matches::assert_matches;
     use async_utils::PollExt;
+    use diagnostics_assertions::assert_data_tree;
     use fidl::client::QueryResponseFut;
     use fidl_fuchsia_bluetooth_sys::{PairingKeypress, PairingMarker, PairingRequestStream};
     use fuchsia_bluetooth::types::Address;
-    use fuchsia_inspect::assert_data_tree;
     use fuchsia_inspect_derive::WithInspect;
     use futures::{future::Either, pin_mut};
 

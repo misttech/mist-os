@@ -476,6 +476,7 @@ impl FusedStream for Player {
 mod test {
     use super::*;
     use assert_matches::assert_matches;
+    use diagnostics_assertions::assert_data_tree;
     use fidl::{
         endpoints::{create_endpoints, create_proxy_and_stream},
         prelude::*,
@@ -485,7 +486,7 @@ mod test {
         stream::{StreamExt, TryStreamExt},
     };
     use futures_test::task::noop_waker;
-    use inspect::{assert_data_tree, Inspector};
+    use inspect::Inspector;
 
     static TEST_DOMAIN: &str = "test_domain";
 

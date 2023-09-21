@@ -34,7 +34,7 @@ async fn inspect_sockets(name: &str) {
 
     // Debug print the tree to make debugging easier in case of failures.
     println!("Got inspect data: {:#?}", data);
-    fuchsia_inspect::assert_data_tree!(data, "root": contains {
+    diagnostics_assertions::assert_data_tree!(data, "root": contains {
         "Sockets": {
             "0": {
                 LocalAddress: "[NOT BOUND]",
@@ -89,7 +89,7 @@ async fn inspect_routes(name: &str) {
 
     // Debug print the tree to make debugging easier in case of failures.
     println!("Got inspect data: {:#?}", data);
-    fuchsia_inspect::assert_data_tree!(data, "root": contains {
+    diagnostics_assertions::assert_data_tree!(data, "root": contains {
         "Routes": {
             "0": {
                 Destination: "255.255.255.255/32",
@@ -149,7 +149,7 @@ async fn inspect_devices(name: &str) {
 
     // Debug print the tree to make debugging easier in case of failures.
     println!("Got inspect data: {:#?}", data);
-    fuchsia_inspect::assert_data_tree!(data, "root": contains {
+    diagnostics_assertions::assert_data_tree!(data, "root": contains {
         "Devices": {
             "1": {
                 Name: "lo",

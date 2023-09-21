@@ -349,9 +349,9 @@ mod test {
 #[cfg(test)]
 mod test_inspect {
     use super::*;
+    use diagnostics_assertions::assert_data_tree;
     use event_queue::{ClosedClient, Notify};
     use fuchsia_async as fasync;
-    use fuchsia_inspect::assert_data_tree;
 
     #[derive(Clone, Debug)]
     struct FakeStateNotifier;

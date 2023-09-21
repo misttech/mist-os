@@ -8,8 +8,7 @@ mod list;
 
 pub use list::BoundedListNode;
 
-use fuchsia_inspect::{InspectType, Node};
-use fuchsia_inspect::{IntProperty, Property, StringReference};
+use fuchsia_inspect::{InspectType, IntProperty, Node, Property, StringReference};
 use fuchsia_zircon as zx;
 
 /// Extension trait that allows to manage timestamp properties.
@@ -87,9 +86,9 @@ impl InspectType for TimeProperty {}
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use diagnostics_assertions::assert_data_tree;
     use fuchsia_async as fasync;
-    use fuchsia_inspect::{assert_data_tree, Inspector};
+    use fuchsia_inspect::Inspector;
 
     #[fuchsia::test]
     fn test_time_metadata_format() {

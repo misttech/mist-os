@@ -455,8 +455,8 @@ mod tests {
     use crate::display::types::SetDisplayInfo;
     use crate::intl::types::{IntlInfo, LocaleId, TemperatureUnit};
     use crate::service;
-    use fuchsia_inspect::assert_data_tree;
-    use fuchsia_inspect::testing::TreeAssertion;
+    use diagnostics_assertions::assert_data_tree;
+    use diagnostics_assertions::TreeAssertion;
     use fuchsia_zircon::Time;
     use std::collections::HashSet;
 

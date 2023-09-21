@@ -106,7 +106,7 @@ impl Default for InspectConfigLoggerHandle {
 mod tests {
     use super::*;
     use crate::config::base::ConfigLoadStatus;
-    use fuchsia_inspect::assert_data_tree;
+    use diagnostics_assertions::assert_data_tree;
     use fuchsia_zircon::Time;
 
     #[fuchsia::test]

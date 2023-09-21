@@ -779,9 +779,9 @@ mod tests {
         },
         crate::utils::Position,
         assert_matches::assert_matches,
+        diagnostics_assertions::AnyProperty,
         fidl::endpoints::spawn_stream_handler,
         fuchsia_async as fasync,
-        fuchsia_inspect::AnyProperty,
         futures::StreamExt,
         pretty_assertions::assert_eq,
         test_case::test_case,
@@ -826,7 +826,7 @@ mod tests {
         let event = event_receiver.try_next();
         assert!(event.is_err());
 
-        fuchsia_inspect::assert_data_tree!(inspector, root: {
+        diagnostics_assertions::assert_data_tree!(inspector, root: {
             "TestDevice_Touch": contains {
                 reports_received_count: 1u64,
                 reports_filtered_count: 1u64,

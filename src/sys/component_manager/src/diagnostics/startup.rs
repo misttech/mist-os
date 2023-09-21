@@ -85,7 +85,8 @@ mod tests {
         testing::test_helpers::{component_decl_with_test_runner, ActionsTest},
     };
     use cm_rust_testing::ComponentDeclBuilder;
-    use fuchsia_inspect::{assert_data_tree, DiagnosticsHierarchyGetter};
+    use diagnostics_assertions::assert_data_tree;
+    use fuchsia_inspect::DiagnosticsHierarchyGetter;
     use moniker::{ChildName, ChildNameBase, MonikerBase};
 
     #[fuchsia::test]

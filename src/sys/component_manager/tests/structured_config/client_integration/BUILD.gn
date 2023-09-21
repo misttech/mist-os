@@ -13,8 +13,8 @@ rustc_library("sc_client_integration_support") {
   source_root = "support/lib.rs"
   sources = [ "support/lib.rs" ]
   deps = [
-    "//src/lib/diagnostics/inspect/rust",
     "//src/lib/diagnostics/reader/rust",
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia-component",
     "//src/sys/component_manager/tests/structured_config/fidl:test.structuredconfig.receiver_rust",
   ]

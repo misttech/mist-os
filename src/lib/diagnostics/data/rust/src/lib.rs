@@ -32,9 +32,7 @@ use std::{
 use termion::{color, style};
 use thiserror::Error;
 
-pub use diagnostics_hierarchy::{
-    assert_data_tree, hierarchy, tree_assertion, DiagnosticsHierarchy, Property,
-};
+pub use diagnostics_hierarchy::{hierarchy, DiagnosticsHierarchy, Property};
 
 #[cfg(target_os = "fuchsia")]
 mod logs_legacy;

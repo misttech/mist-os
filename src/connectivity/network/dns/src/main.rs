@@ -1216,9 +1216,9 @@ mod tests {
     };
 
     use assert_matches::assert_matches;
+    use diagnostics_assertions::{assert_data_tree, tree_assertion, NonZeroUintProperty};
     use dns::test_util::*;
     use dns::DEFAULT_PORT;
-    use fuchsia_inspect::{assert_data_tree, testing::NonZeroUintProperty, tree_assertion};
     use futures::future::TryFutureExt as _;
     use itertools::Itertools as _;
     use net_declare::{fidl_ip, std_ip, std_ip_v4, std_ip_v6};

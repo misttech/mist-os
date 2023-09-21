@@ -131,8 +131,8 @@ pub type InspectableScoState = IValue<ScoState>;
 mod tests {
     use super::*;
 
+    use diagnostics_assertions::assert_data_tree;
     use fidl_fuchsia_bluetooth_bredr as bredr;
-    use fuchsia_inspect::assert_data_tree;
     use fuchsia_inspect_derive::WithInspect;
 
     #[fuchsia::test]

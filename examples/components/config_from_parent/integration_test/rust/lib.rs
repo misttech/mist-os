@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Context as _;
+use diagnostics_assertions::assert_data_tree;
 use diagnostics_reader::{ArchiveReader, Inspect};
 use fidl_fuchsia_component::{BinderMarker, CreateChildArgs, RealmMarker};
 use fidl_fuchsia_component_decl::{
@@ -12,7 +13,6 @@ use fuchsia_component::client::{
     connect_to_protocol, connect_to_protocol_at_dir_root, open_childs_exposed_directory,
 };
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
-use fuchsia_inspect::assert_data_tree;
 
 const CHILD_URL: &str = "#meta/config_example.cm";
 const COLLECTION_NAME: &str = "realm_api_collection";

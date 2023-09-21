@@ -7,7 +7,7 @@ use component_events::{
     events::{EventStream, Started},
     matcher::EventMatcher,
 };
-use diagnostics_hierarchy::assert_data_tree;
+use diagnostics_assertions::assert_data_tree;
 use diagnostics_message::fx_log_packet_t;
 use diagnostics_reader::{ArchiveReader, Logs, Severity};
 use fidl::Socket;

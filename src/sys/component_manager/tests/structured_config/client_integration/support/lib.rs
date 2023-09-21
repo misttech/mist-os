@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use diagnostics_assertions::assert_data_tree;
 use diagnostics_reader::{ArchiveReader, Inspect};
 use fidl_test_structuredconfig_receiver::{ConfigReceiverPuppetMarker, ReceiverConfig};
-use fuchsia_inspect::assert_data_tree;
 
 pub async fn run_test_case(inspect_selector: &str) {
     let puppet =

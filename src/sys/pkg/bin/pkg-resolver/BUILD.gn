@@ -70,6 +70,7 @@ rustc_library("lib") {
   ]
 
   test_deps = [
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/sys/pkg/lib/fuchsia-pkg-testing",
     "//third_party/cobalt/src/lib/client/rust:cobalt-client",
     "//third_party/rust_crates:assert_matches",

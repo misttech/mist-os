@@ -437,12 +437,12 @@ mod tests {
     use super::*;
     use crate::stash_logger::StashInspectLoggerHandle;
     use assert_matches::assert_matches;
+    use diagnostics_assertions::assert_data_tree;
     use fidl_fuchsia_stash::{
         FlushError, StoreAccessorMarker, StoreAccessorRequest, StoreAccessorRequestStream,
     };
     use fuchsia_async as fasync;
     use fuchsia_async::TestExecutor;
-    use fuchsia_inspect::assert_data_tree;
     use futures::prelude::*;
     use serde::{Deserialize, Serialize};
     use std::marker::Unpin;

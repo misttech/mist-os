@@ -1025,10 +1025,10 @@ async fn test_neighbor_table_inspect() {
         .expect("failed to insert static neighbor entry");
     });
     let inspector = test_stack.inspector();
-    use diagnostics_hierarchy::testing::DiagnosticsHierarchyGetter;
+    use diagnostics_hierarchy::DiagnosticsHierarchyGetter;
     let data = inspector.get_diagnostics_hierarchy();
     println!("{:#?}", data);
-    fuchsia_inspect::assert_data_tree!(data, "root": contains {
+    diagnostics_assertions::assert_data_tree!(data, "root": contains {
         "Neighbors": {
             "eth2": {
                 "0": {

@@ -381,10 +381,11 @@ mod tests {
         super::*,
         crate::update::environment::{FakeSystemInfo, NamespaceBuildInfo},
         anyhow::anyhow,
+        diagnostics_assertions::assert_data_tree,
         fidl_fuchsia_update_installer_ext::{
             Initiator, PrepareFailureReason, UpdateInfo, UpdateInfoAndProgress,
         },
-        fuchsia_inspect::{assert_data_tree, Inspector},
+        fuchsia_inspect::Inspector,
         fuchsia_pkg_testing::SOURCE_EPOCH,
         mock_paver::MockPaverServiceBuilder,
         pretty_assertions::assert_eq,

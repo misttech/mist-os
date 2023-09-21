@@ -977,8 +977,8 @@ mod tests {
     use crate::types::{Hertz, Volts};
     use crate::{msg_eq, msg_ok_return};
     use assert_matches::assert_matches;
+    use diagnostics_assertions::assert_data_tree;
     use fuchsia_async as fasync;
-    use inspect::assert_data_tree;
     use test_util::assert_lt;
 
     // Common test configurations for big and little clusters.

@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    diagnostics_reader::{assert_data_tree, AnyProperty, ArchiveReader, Inspect, Logs, Severity},
+    diagnostics_assertions::{assert_data_tree, AnyProperty},
+    diagnostics_reader::{ArchiveReader, Inspect, Logs, Severity},
     fidl_fuchsia_component as fcomponent, fuchsia_async as fasync,
     fuchsia_component_test::ScopedInstance,
     futures::{future, StreamExt},

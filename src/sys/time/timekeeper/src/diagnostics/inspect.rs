@@ -525,7 +525,7 @@ mod tests {
             },
             time_source::FakePushTimeSource,
         },
-        fuchsia_inspect::{assert_data_tree, testing::AnyProperty},
+        diagnostics_assertions::{assert_data_tree, AnyProperty},
         lazy_static::lazy_static,
     };
 

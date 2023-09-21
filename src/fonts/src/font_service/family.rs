@@ -305,8 +305,8 @@ mod tests {
         super::*,
         anyhow::Error,
         char_collection::char_collect,
+        diagnostics_assertions::assert_data_tree,
         fidl_fuchsia_fonts::{Slant, Width},
-        finspect::assert_data_tree,
         maplit::{btreemap, btreeset},
         pretty_assertions::assert_eq,
     };

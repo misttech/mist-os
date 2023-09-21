@@ -100,7 +100,7 @@ fn write_file(path: &Path, value: u64) -> Result<(), Error> {
 mod tests {
     use {
         super::*,
-        fuchsia_inspect::{assert_data_tree, AnyProperty},
+        diagnostics_assertions::{assert_data_tree, AnyProperty},
         tempfile::TempDir,
         test_case::test_case,
     };

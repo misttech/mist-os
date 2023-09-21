@@ -901,9 +901,9 @@ impl ToResolveStatus for GetPackageHashError {
 mod tests {
     use {
         super::*,
+        diagnostics_assertions::assert_data_tree,
         fidl_fuchsia_pkg_ext::{MirrorConfigBuilder, RepositoryConfigBuilder, RepositoryKey},
         fuchsia_async as fasync,
-        fuchsia_inspect::assert_data_tree,
         http::Uri,
         maplit::hashmap,
         std::{borrow::Borrow, fs::File, io::Write, path::Path},

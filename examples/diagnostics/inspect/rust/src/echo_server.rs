@@ -113,7 +113,7 @@ mod tests {
         // [END_EXCLUDE]
 
         // Validate the contents of the tree match
-        fuchsia_inspect::assert_data_tree!(inspector, root: {
+        diagnostics_assertions::assert_data_tree!(inspector, root: {
             total_requests: 2u64,
             bytes_processed: 24u64,
         });

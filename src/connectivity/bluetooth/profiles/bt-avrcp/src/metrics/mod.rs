@@ -282,9 +282,9 @@ mod tests {
     use super::*;
     use async_utils::PollExt;
     use bt_metrics::respond_to_metrics_req_for_test;
+    use diagnostics_assertions::assert_data_tree;
     use fidl_fuchsia_metrics::{MetricEventLoggerMarker, MetricEventPayload};
     use fuchsia_async as fasync;
-    use fuchsia_inspect::assert_data_tree;
     use fuchsia_inspect_derive::WithInspect;
     use futures::stream::StreamExt;
 

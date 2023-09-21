@@ -60,7 +60,7 @@ macro_rules! hierarchy {
     // Handle adding a nodes to the hierarchy.
     (@build $hierarchy:expr, var $key:ident: { $($sub:tt)* }) => {{
         #[allow(unused_mut)]
-        let mut child = DiagnosticsHierarchy::new($key, vec![], vec![]);
+        let mut child = $crate::DiagnosticsHierarchy::new($key, vec![], vec![]);
         $crate::hierarchy!(@build child, $($sub)*);
         $hierarchy.add_child(child);
     }};
@@ -103,9 +103,8 @@ macro_rules! hierarchy {
 
     // Entry points
     (var $key:ident: { $($rest:tt)* }) => {{
-        use $crate::DiagnosticsHierarchy;
         #[allow(unused_mut)]
-        let mut hierarchy = DiagnosticsHierarchy::new($key, vec![], vec![]);
+        let mut hierarchy = $crate::DiagnosticsHierarchy::new($key, vec![], vec![]);
         $crate::hierarchy!(@build hierarchy, $($rest)*);
         hierarchy
     }};
@@ -164,17 +163,70 @@ impl_into_property_with_key!(StringList, [Vec<String>]);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{assert_data_tree, DiagnosticsHierarchy};
+    use crate::{ArrayFormat, DiagnosticsHierarchy};
 
     #[fuchsia::test]
     fn test_empty_hierarchy() {
+        let expected = DiagnosticsHierarchy::new_root();
         let h: DiagnosticsHierarchy = hierarchy! { root: {} };
-        assert_data_tree!(h, root: {});
+        assert_eq!(expected, h);
     }
 
     #[fuchsia::test]
     fn test_all_types() {
         let string_list = vec!["foo".to_string(), "bar".to_string()];
+
+        let mut expected = DiagnosticsHierarchy::new_root();
+        expected.add_property(Property::String("string".to_string(), "some string".to_string()));
+        expected.add_property(Property::String("strref".to_string(), "some str ref".to_string()));
+        expected.add_property(Property::Int("int8".to_string(), 1i64));
+        expected.add_property(Property::Int("int16".to_string(), 2i64));
+        expected.add_property(Property::Int("int32".to_string(), 3i64));
+        expected.add_property(Property::Int("int64".to_string(), 4i64));
+        expected.add_property(Property::Uint("uint16".to_string(), 5u64));
+        expected.add_property(Property::Uint("uint32".to_string(), 6u64));
+        expected.add_property(Property::Uint("uint64".to_string(), 7u64));
+        expected.add_property(Property::Double("float32".to_string(), 8.25f64));
+        expected.add_property(Property::Double("float64".to_string(), 9f64));
+        expected.add_property(Property::Bool("boolean".to_string(), true));
+        expected.add_property(Property::DoubleArray(
+            "array_float32".to_string(),
+            ArrayContent::new(vec![1f64, 2.5], ArrayFormat::Default).unwrap(),
+        ));
+        expected.add_property(Property::DoubleArray(
+            "array_float64".to_string(),
+            ArrayContent::new(vec![3f64, 4.25], ArrayFormat::Default).unwrap(),
+        ));
+        expected.add_property(Property::IntArray(
+            "array_int8".to_string(),
+            ArrayContent::new(vec![1i64, 2, 3, 4], ArrayFormat::Default).unwrap(),
+        ));
+        expected.add_property(Property::IntArray(
+            "array_int16".to_string(),
+            ArrayContent::new(vec![5i64, 6, 7, 8], ArrayFormat::Default).unwrap(),
+        ));
+        expected.add_property(Property::IntArray(
+            "array_int32".to_string(),
+            ArrayContent::new(vec![2i64, 4], ArrayFormat::Default).unwrap(),
+        ));
+        expected.add_property(Property::IntArray(
+            "array_int64".to_string(),
+            ArrayContent::new(vec![6i64, 8], ArrayFormat::Default).unwrap(),
+        ));
+        expected.add_property(Property::UintArray(
+            "array_uint16".to_string(),
+            ArrayContent::new(vec![0u64, 9], ArrayFormat::Default).unwrap(),
+        ));
+        expected.add_property(Property::UintArray(
+            "array_uint32".to_string(),
+            ArrayContent::new(vec![1u64, 3, 5], ArrayFormat::Default).unwrap(),
+        ));
+        expected.add_property(Property::UintArray(
+            "array_uint64".to_string(),
+            ArrayContent::new(vec![7u64, 9], ArrayFormat::Default).unwrap(),
+        ));
+        expected.add_property(Property::StringList("string_list".to_string(), string_list.clone()));
+
         let result = hierarchy! {
             root: {
                 string: "some string".to_string(),
@@ -183,9 +235,9 @@ mod tests {
                 int16: 2i16,
                 int32: 3i32,
                 int64: 4i64,
-                uint16: 5i16,
-                uint32: 6i32,
-                uint64: 7i64,
+                uint16: 5u16,
+                uint32: 6u32,
+                uint64: 7u64,
                 float32: 8.25f32,
                 float64: 9f64,
                 boolean: true,
@@ -201,40 +253,32 @@ mod tests {
                 string_list: string_list.clone(),
             }
         };
-        assert_data_tree!(result, root: {
-                string: "some string",
-                strref: "some str ref",
-                int8:  1i64,
-                int16: 2i64,
-                int32: 3i64,
-                int64: 4i64,
-                uint16: 5i64,
-                uint32: 6i64,
-                uint64: 7i64,
-                float32: 8.25f64,
-                float64: 9f64,
-                boolean: true,
-                array_float32: vec![1f64, 2.5],
-                array_float64: vec![3f64, 4.25],
-                array_int8: vec![1i64,2,3,4],
-                array_int16: vec![5i64,6,7,8],
-                array_int32: vec![2i64,4],
-                array_int64: vec![6i64,8],
-                array_uint16: vec![0u64,9],
-                array_uint32: vec![1u64,3, 5],
-                array_uint64: vec![7u64, 9],
-                string_list: string_list,
-        });
+
+        assert_eq!(expected, result);
     }
 
     #[fuchsia::test]
     fn test_nested_hierarchy() {
+        let mut expected = DiagnosticsHierarchy::new_root();
+        expected.add_property_at_path(
+            &["root", "sub1", "sub11", "sub111"],
+            Property::Int("value".to_string(), 1i64),
+        );
+        expected.add_property_at_path(
+            &["root", "sub1", "sub11", "sub111"],
+            Property::String("other_value".to_string(), "foo".to_string()),
+        );
+        expected.add_property_at_path(
+            &["root", "sub2", "sub21"],
+            Property::Uint("value".to_string(), 2u64),
+        );
+        let _ = expected.get_or_add_node(&["root", "sub2", "sub22"]);
         let result = hierarchy! {
             root: {
                 sub1: {
                     sub11: {
                         sub111: {
-                            value: 1u64,
+                            value: 1i64,
                             other_value: "foo",
                         }
                     }
@@ -247,26 +291,14 @@ mod tests {
                 }
             }
         };
-        assert_data_tree!(result, root: {
-            sub1: {
-                sub11: {
-                    sub111: {
-                        value: 1u64,
-                        other_value: "foo",
-                    }
-                }
-            },
-            sub2: {
-                sub21: {
-                    value: 2u64,
-                },
-                sub22: {}
-            }
-        });
+        assert_eq!(expected, result);
     }
 
     #[fuchsia::test]
     fn test_var_key_syntax() {
+        let mut expected = DiagnosticsHierarchy::new("foo", vec![], vec![]);
+        expected
+            .add_property_at_path(&["foo"], Property::String("bar".to_string(), "baz".to_string()));
         let some_key = "foo".to_string();
         let another_key = "bar".to_string();
         let result = hierarchy! {
@@ -274,9 +306,7 @@ mod tests {
                 var another_key: "baz",
             }
         };
-        assert_data_tree!(result, foo: {
-            bar: "baz",
-        });
+        assert_eq!(expected, result);
     }
 
     #[derive(Debug, PartialEq)]

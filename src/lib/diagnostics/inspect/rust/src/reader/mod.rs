@@ -33,7 +33,7 @@
 
 use {
     crate::reader::snapshot::{ScannedBlock, Snapshot},
-    diagnostics_hierarchy::{testing::DiagnosticsHierarchyGetter, *},
+    diagnostics_hierarchy::{DiagnosticsHierarchyGetter, *},
     inspect_format::{utils, BlockIndex, BlockType, PropertyFormat},
     maplit::btreemap,
     std::{borrow::Cow, cmp::min, collections::BTreeMap, convert::TryFrom},
@@ -575,11 +575,12 @@ mod tests {
     use {
         super::*,
         crate::{
-            assert_data_tree, assert_json_diff, types::private::InspectTypeInternal,
-            writer::testing_utils::GetBlockExt, ArrayProperty, ExponentialHistogramParams,
-            HistogramProperty, Inspector, LinearHistogramParams, StringReference,
+            types::private::InspectTypeInternal, writer::testing_utils::GetBlockExt, ArrayProperty,
+            ExponentialHistogramParams, HistogramProperty, Inspector, LinearHistogramParams,
+            StringReference,
         },
         anyhow::Error,
+        diagnostics_assertions::{assert_data_tree, assert_json_diff},
         futures::prelude::*,
         inspect_format::{constants, BlockContainer, CopyBytes, PayloadFields},
     };

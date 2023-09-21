@@ -208,9 +208,10 @@ mod tests {
     use {
         super::*,
         bytes::{BufMut, BytesMut},
+        diagnostics_assertions::assert_data_tree,
         fidl::endpoints::create_proxy,
         fidl_fuchsia_fido_report::SecurityKeyDeviceRequest,
-        fuchsia_inspect::{self as inspect, assert_data_tree},
+        fuchsia_inspect::{self as inspect},
         futures::FutureExt,
         std::collections::VecDeque,
         vfs::{

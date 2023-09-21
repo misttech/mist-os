@@ -560,11 +560,11 @@ mod tests {
         crate::gpu_usage_logger::tests::create_gpu_drivers,
         crate::sensor_logger::tests::{create_power_drivers, create_temperature_drivers},
         assert_matches::assert_matches,
+        diagnostics_assertions::assert_data_tree,
         fmetrics::{
             CpuLoad, GpuUsage, Metric, NetworkActivity, Power, StatisticsArgs, Temperature,
         },
         futures::{task::Poll, FutureExt},
-        inspect::assert_data_tree,
     };
 
     // A helper struct to create Fuchsia Executor and optionally add drivers for different logging

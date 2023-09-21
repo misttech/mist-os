@@ -35,6 +35,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:typed-builder",
   ]
   test_deps = [
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/sys/pkg/testing/mock-paver",
     "//src/sys/pkg/testing/mock-reboot",
     "//src/sys/pkg/testing/mock-verifier:lib",

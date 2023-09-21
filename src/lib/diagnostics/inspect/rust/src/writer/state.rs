@@ -1189,7 +1189,6 @@ impl InnerState {
 mod tests {
     use super::*;
     use crate::{
-        assert_data_tree,
         reader::{
             snapshot::{ScannedBlock, Snapshot},
             PartialNodeHierarchy,
@@ -1197,6 +1196,7 @@ mod tests {
         writer::testing_utils::get_state,
         Inspector,
     };
+    use diagnostics_assertions::assert_data_tree;
     use futures::prelude::*;
 
     #[fuchsia::test]

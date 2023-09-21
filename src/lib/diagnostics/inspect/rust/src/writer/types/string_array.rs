@@ -73,11 +73,10 @@ impl Drop for StringArrayProperty {
 mod tests {
     use super::*;
     use crate::{
-        assert_json_diff,
-        hierarchy::DiagnosticsHierarchy,
         writer::{testing_utils::GetBlockExt, Length},
         Inspector,
     };
+    use diagnostics_assertions::assert_json_diff;
 
     impl StringArrayProperty {
         pub fn load_string_slot(&self, slot: usize) -> Option<String> {

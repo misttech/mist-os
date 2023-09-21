@@ -374,7 +374,7 @@ mod tests {
         let input_handlers_node = input_pipeline_node.create_child("input_handlers");
         let _input_handler_status =
             InputHandlerStatus::new(&input_handlers_node, "test_handler", false);
-        fuchsia_inspect::assert_data_tree!(inspector, root: {
+        diagnostics_assertions::assert_data_tree!(inspector, root: {
             input_pipeline: {
                 input_handlers: {
                     test_handler: {
@@ -385,7 +385,7 @@ mod tests {
                             status: "STARTING_UP",
                             // Timestamp value is unpredictable and not relevant in this context,
                             // so we only assert that the property is present.
-                            start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                            start_timestamp_nanos: diagnostics_assertions::AnyProperty
                         },
                     }
                 }

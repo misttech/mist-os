@@ -83,7 +83,7 @@ mod tests {
         testing_utils::{get_state, GetBlockExt},
         Inspector, Node,
     };
-    use diagnostics_hierarchy::assert_data_tree;
+    use diagnostics_assertions::assert_data_tree;
 
     #[fuchsia::test]
     fn string_references_as_names() {

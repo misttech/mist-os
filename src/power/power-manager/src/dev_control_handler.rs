@@ -304,9 +304,9 @@ impl InspectData {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use diagnostics_assertions::assert_data_tree;
     use fuchsia_async as fasync;
     use futures::TryStreamExt;
-    use inspect::assert_data_tree;
     use std::cell::Cell;
 
     pub fn fake_dev_ctrl_driver(

@@ -937,10 +937,8 @@ fn arb_info_and_progress() -> impl Strategy<Value = (UpdateInfo, Progress)> {
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
-        assert_matches::assert_matches,
-        fuchsia_inspect::{assert_data_tree, Inspector},
-        serde_json::json,
+        super::*, assert_matches::assert_matches, diagnostics_assertions::assert_data_tree,
+        fuchsia_inspect::Inspector, serde_json::json,
     };
 
     prop_compose! {

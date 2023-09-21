@@ -42,6 +42,7 @@ rustc_binary("server_bin") {
   ]
 
   test_deps = [
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
   ]

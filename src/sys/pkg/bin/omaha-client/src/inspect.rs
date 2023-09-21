@@ -223,8 +223,9 @@ mod tests {
         app_set::{AppIdSource, AppMetadata},
         configuration::get_config,
     };
+    use diagnostics_assertions::assert_data_tree;
     use fuchsia_async as fasync;
-    use fuchsia_inspect::{assert_data_tree, Inspector};
+    use fuchsia_inspect::Inspector;
     use omaha_client::{
         common::{App, UserCounting},
         protocol::{request::InstallSource, Cohort},

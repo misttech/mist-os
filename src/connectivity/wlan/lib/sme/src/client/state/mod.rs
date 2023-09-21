@@ -1333,8 +1333,9 @@ mod tests {
     use {
         super::*,
         anyhow::format_err,
+        diagnostics_assertions::{assert_data_tree, AnyProperty},
         fuchsia_async::DurationExt,
-        fuchsia_inspect::{assert_data_tree, testing::AnyProperty, Inspector},
+        fuchsia_inspect::Inspector,
         futures::{channel::mpsc, Stream, StreamExt},
         ieee80211::Ssid,
         link_state::{EstablishingRsna, LinkUp},

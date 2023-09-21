@@ -59,7 +59,8 @@ pub fn serve_persisted_data(persist_root: &fuchsia_inspect::Node) -> Result<(), 
 mod test {
     use super::*;
     use anyhow::Error;
-    use fuchsia_inspect::{assert_data_tree, Inspector};
+    use diagnostics_assertions::assert_data_tree;
+    use fuchsia_inspect::Inspector;
 
     // This tests all the types, and also the stack-safety mechanism by including data that should
     // be clipped.

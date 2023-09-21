@@ -105,7 +105,8 @@ where
 #[cfg(test)]
 mod tests {
     use crate::managed_inspect_queue::ManagedInspectQueue;
-    use fuchsia_inspect::{self as inspect, assert_data_tree, Node};
+    use diagnostics_assertions::assert_data_tree;
+    use fuchsia_inspect::{self as inspect, Node};
     use fuchsia_inspect_derive::{IValue, Inspect, WithInspect};
 
     #[derive(Default, Inspect)]

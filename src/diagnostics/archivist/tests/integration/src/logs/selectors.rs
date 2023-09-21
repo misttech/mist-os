@@ -4,7 +4,8 @@
 
 use crate::{constants, test_topology, utils};
 use component_events::{events::*, matcher::*};
-use diagnostics_reader::{assert_data_tree, ArchiveReader, Logs};
+use diagnostics_assertions::assert_data_tree;
+use diagnostics_reader::{ArchiveReader, Logs};
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_diagnostics::ArchiveAccessorMarker;
 use fuchsia_async as fasync;

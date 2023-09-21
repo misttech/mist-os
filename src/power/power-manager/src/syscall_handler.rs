@@ -162,8 +162,8 @@ impl InspectData {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use diagnostics_assertions::assert_data_tree;
     use fuchsia_async as fasync;
-    use inspect::assert_data_tree;
 
     // Tests that errors are logged to Inspect as expected.
     #[fasync::run_singlethreaded(test)]

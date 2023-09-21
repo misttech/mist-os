@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use component_events::{events::*, matcher::*, sequence::*};
-use diagnostics_reader::{assert_data_tree, ArchiveReader, Inspect};
+use diagnostics_assertions::assert_data_tree;
+use diagnostics_reader::{ArchiveReader, Inspect};
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_decl as fdecl;
 use fuchsia_component::client;

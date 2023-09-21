@@ -80,6 +80,7 @@ rustc_binary("bin") {
   sources = timekeeper_sources
 
   test_deps = [
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
     "//src/lib/test_util",
   ]

@@ -6,9 +6,9 @@
 use {
     assert_matches::assert_matches,
     blobfs_ramdisk::Ramdisk,
+    diagnostics_assertions::assert_data_tree,
     fidl_fuchsia_pkg_rewrite_ext::Rule,
     fuchsia_hash::Hash,
-    fuchsia_inspect::assert_data_tree,
     fuchsia_pkg_testing::{
         serve::responder, Package, PackageBuilder, RepositoryBuilder, SystemImageBuilder,
     },

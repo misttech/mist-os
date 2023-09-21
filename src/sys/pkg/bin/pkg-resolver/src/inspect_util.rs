@@ -101,8 +101,8 @@ impl MirrorConfigInspectState {
 mod test_inspectable_repository_config {
     use {
         super::*,
+        diagnostics_assertions::assert_data_tree,
         fidl_fuchsia_pkg_ext::{MirrorConfigBuilder, RepositoryConfigBuilder, RepositoryKey},
-        fuchsia_inspect::assert_data_tree,
         http::Uri,
     };
 

@@ -180,10 +180,9 @@ impl CombinedWindowedStats<SumAndCount> {
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
-        crate::aggregations::create_saturating_add_fn,
-        fuchsia_async as fasync,
-        fuchsia_inspect::{assert_data_tree, Inspector},
+        super::*, crate::aggregations::create_saturating_add_fn,
+        diagnostics_assertions::assert_data_tree, fuchsia_async as fasync,
+        fuchsia_inspect::Inspector,
     };
 
     #[test]

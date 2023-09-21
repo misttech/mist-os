@@ -275,8 +275,8 @@ pub mod tests {
     use {
         super::*,
         assert_matches::assert_matches,
+        diagnostics_assertions::assert_data_tree,
         futures::{task::Poll, FutureExt, TryStreamExt},
-        inspect::assert_data_tree,
         std::{cell::Cell, pin::Pin},
     };
 

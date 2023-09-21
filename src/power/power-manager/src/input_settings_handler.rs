@@ -235,8 +235,8 @@ mod tests {
         super::*,
         crate::test::mock_node::{create_dummy_node, MessageMatcher, MockNodeMaker},
         crate::{msg_eq, msg_ok_return},
+        diagnostics_assertions::assert_data_tree,
         fuchsia_async as fasync,
-        fuchsia_inspect::assert_data_tree,
     };
 
     // A fake Settings service implementation for testing

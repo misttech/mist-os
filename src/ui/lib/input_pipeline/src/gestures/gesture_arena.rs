@@ -3581,7 +3581,7 @@ mod tests {
                 2,
                 &fake_handlers_node,
             );
-            fuchsia_inspect::assert_data_tree!(inspector, root: {
+            diagnostics_assertions::assert_data_tree!(inspector, root: {
                 gestures_event_log: {},
                 input_handlers_node: {
                     gesture_arena: {
@@ -3592,7 +3592,7 @@ mod tests {
                             status: "STARTING_UP",
                             // Timestamp value is unpredictable and not relevant in this context,
                             // so we only assert that the property is present.
-                            start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                            start_timestamp_nanos: diagnostics_assertions::AnyProperty
                         },
                     }
                 }
@@ -3615,7 +3615,7 @@ mod tests {
             arena.clone().handle_input_event(make_unhandled_keyboard_event()).await;
             arena.clone().handle_input_event(make_unhandled_touchpad_event()).await;
 
-            fuchsia_inspect::assert_data_tree!(inspector, root: contains {
+            diagnostics_assertions::assert_data_tree!(inspector, root: contains {
                 input_handlers_node: {
                     gesture_arena: {
                         events_received_count: 2u64,
@@ -3625,7 +3625,7 @@ mod tests {
                             status: "STARTING_UP",
                             // Timestamp value is unpredictable and not relevant in this context,
                             // so we only assert that the property is present.
-                            start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                            start_timestamp_nanos: diagnostics_assertions::AnyProperty
                         },
                     }
                 }
@@ -3826,7 +3826,7 @@ mod tests {
             }
             */
 
-            fuchsia_inspect::assert_data_tree!(inspector, root: {
+            diagnostics_assertions::assert_data_tree!(inspector, root: {
                 gestures_event_log: {
                     "0": {
                         touchpad_event: {
@@ -3965,13 +3965,13 @@ mod tests {
                 })
                 .await;
 
-            fuchsia_inspect::assert_data_tree!(inspector, root: {
+            diagnostics_assertions::assert_data_tree!(inspector, root: {
                 gestures_event_log: {
                     "0": contains {},
                     "1": contains {},
                     "2": {
                         gesture_start: {
-                          gesture_name: fuchsia_inspect::AnyProperty,
+                          gesture_name: diagnostics_assertions::AnyProperty,
                           latency_event_count: 1u64,
                           latency_micros: -9i64,
                         }
@@ -4096,7 +4096,7 @@ mod tests {
                 })
                 .await;
 
-            fuchsia_inspect::assert_data_tree!(inspector, root: {
+            diagnostics_assertions::assert_data_tree!(inspector, root: {
                 gestures_event_log: {
                     "0": { touchpad_event: contains {} },
                     "1": { touchpad_event: contains {} },
@@ -4132,7 +4132,7 @@ mod tests {
             arena.clone().handle_input_event(make_unhandled_touchpad_event()).await; // 2
             arena.clone().handle_input_event(make_unhandled_touchpad_event()).await; // 3
             arena.clone().handle_input_event(make_unhandled_touchpad_event()).await; // 4
-            fuchsia_inspect::assert_data_tree!(inspector, root: {
+            diagnostics_assertions::assert_data_tree!(inspector, root: {
                 gestures_event_log: {
                     "3": contains {},
                     "4": contains {},
@@ -4174,7 +4174,7 @@ mod tests {
                 executor.run_until_stalled(&mut handle_event_fut),
                 std::task::Poll::Ready(_)
             );
-            fuchsia_inspect::assert_data_tree!(inspector, root: {
+            diagnostics_assertions::assert_data_tree!(inspector, root: {
                 gestures_event_log: {
                     "0": {
                         touchpad_event: {

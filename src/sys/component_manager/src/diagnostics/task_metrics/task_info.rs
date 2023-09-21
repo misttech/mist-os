@@ -298,10 +298,9 @@ mod tests {
     use super::*;
     use crate::diagnostics::task_metrics::testing::FakeTask;
     use assert_matches::assert_matches;
-    use diagnostics_hierarchy::{ArrayContent, LinearHistogram};
-    use fuchsia_inspect::testing::assert_data_tree;
+    use diagnostics_assertions::assert_data_tree;
+    use diagnostics_hierarchy::{ArrayContent, DiagnosticsHierarchyGetter, LinearHistogram};
     use injectable_time::FakeTime;
-    use inspect::testing::DiagnosticsHierarchyGetter;
     use std::sync::Arc;
 
     async fn take_measurement_then_tick_clock<

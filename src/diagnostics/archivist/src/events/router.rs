@@ -378,12 +378,12 @@ pub trait EventProducer {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fidl::endpoints::RequestStream;
     use fidl_fuchsia_inspect::InspectSinkMarker;
     use fidl_fuchsia_io as fio;
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequestStream};
     use fuchsia_async as fasync;
-    use fuchsia_inspect::assert_data_tree;
     use fuchsia_zircon as zx;
     use fuchsia_zircon::AsHandleRef;
     use futures::{lock::Mutex, FutureExt, SinkExt};
@@ -686,17 +686,17 @@ mod tests {
                 },
                 recent_events: {
                     "0": {
-                        "@time": inspect::testing::AnyProperty,
+                        "@time": AnyProperty,
                         event: "diagnostics_ready",
                         moniker: "a/b"
                     },
                     "1": {
-                        "@time": inspect::testing::AnyProperty,
+                        "@time": AnyProperty,
                         event: "log_sink_requested",
                         moniker: "a/b"
                     },
                     "2": {
-                        "@time": inspect::testing::AnyProperty,
+                        "@time": AnyProperty,
                         event: "inspect_sink_requested",
                         moniker: "a/b"
                     },

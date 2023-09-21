@@ -3481,10 +3481,11 @@ mod tests {
             create_inspect_persistence_channel, create_wlan_hasher, generate_random_bss,
             generate_random_channel, generate_random_scanned_candidate,
         },
+        diagnostics_assertions::NonZeroUintProperty,
         fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_metrics::{MetricEvent, MetricEventLoggerRequest, MetricEventPayload},
         fidl_fuchsia_wlan_stats,
-        fuchsia_inspect::{testing::NonZeroUintProperty, Inspector},
+        fuchsia_inspect::Inspector,
         futures::{pin_mut, task::Poll, TryStreamExt},
         std::{cmp::min, collections::VecDeque, pin::Pin},
         test_case::test_case,
@@ -3506,7 +3507,7 @@ mod tests {
     macro_rules! assert_data_tree_with_respond_blocking_req {
         ($test_helper:expr, $test_fut:expr, $($rest:tt)+) => {{
             use {
-                fuchsia_inspect::{assert_data_tree, reader},
+                fuchsia_inspect::reader, diagnostics_assertions::assert_data_tree,
             };
 
             let inspector = $test_helper.inspector.clone();

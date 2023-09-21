@@ -383,7 +383,8 @@ mod tests {
     use crate::message::base::Audience;
     use crate::service;
 
-    use fuchsia_inspect::{assert_data_tree, Inspector};
+    use diagnostics_assertions::assert_data_tree;
+    use fuchsia_inspect::Inspector;
     use std::collections::HashSet;
 
     const MOCK_PROTOCOL_NAME: &str = "fuchsia.external.FakeAPI";

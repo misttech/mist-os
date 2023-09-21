@@ -28,7 +28,10 @@ rustc_library("fuchsia-inspect") {
     "//third_party/rust_crates:tracing",
   ]
 
-  test_deps = [ "//src/lib/fuchsia" ]
+  test_deps = [
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
+    "//src/lib/fuchsia",
+  ]
 
   sources = [
     "src/health.rs",

@@ -286,9 +286,10 @@ impl<B: MemBackend> MemDevice<B> {
 mod tests {
     use {
         super::*,
+        diagnostics_assertions::assert_data_tree,
         fidl::endpoints::{create_proxy_and_stream, RequestStream},
         fidl_fuchsia_virtualization_hardware::{VirtioMemMarker, VirtioMemProxy},
-        fuchsia_inspect::{assert_data_tree, Inspector},
+        fuchsia_inspect::Inspector,
         futures::StreamExt,
         std::cell::RefCell,
         std::ops::Range,

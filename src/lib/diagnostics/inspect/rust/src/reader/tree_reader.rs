@@ -167,7 +167,8 @@ where
 mod tests {
     use {
         super::*,
-        crate::{assert_data_tree, assert_json_diff, reader, Inspector, InspectorConfig},
+        crate::{reader, Inspector, InspectorConfig},
+        diagnostics_assertions::{assert_data_tree, assert_json_diff},
         inspect_format::constants,
     };
 

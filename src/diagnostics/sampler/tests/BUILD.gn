@@ -40,6 +40,7 @@ rustc_test("integration-bin") {
     "//src/diagnostics/sampler/tests/fidl:fuchsia.mockrebootcontroller_rust",
     "//src/diagnostics/sampler/tests/fidl:fuchsia.samplertestcontroller_rust",
     "//src/lib/diagnostics/reader/rust",
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",

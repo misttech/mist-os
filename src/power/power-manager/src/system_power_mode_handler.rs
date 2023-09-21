@@ -697,7 +697,7 @@ impl Node for SystemPowerModeHandler {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use fuchsia_inspect::assert_data_tree;
+    use diagnostics_assertions::assert_data_tree;
     use std::task::Poll;
     use system_power_mode_config::{ClientConfigTestExt, SystemPowerModeConfigTestExt};
 

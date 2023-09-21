@@ -273,8 +273,8 @@ impl HfFeaturesInspect {
 mod tests {
     use super::*;
 
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fidl_fuchsia_bluetooth_hfp::SignalStrength;
-    use fuchsia_inspect::{assert_data_tree, testing::AnyProperty};
     use fuchsia_inspect_derive::WithInspect;
 
     #[test]

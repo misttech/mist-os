@@ -39,10 +39,7 @@ impl InspectInfo {
 }
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fuchsia_inspect::{assert_data_tree, Inspector},
-    };
+    use {super::*, diagnostics_assertions::assert_data_tree, fuchsia_inspect::Inspector};
 
     #[test]
     fn test_log_state() {

@@ -9,10 +9,9 @@ use futures::lock;
 use serde::Serialize;
 use std::{cell, rc, sync};
 
+use diagnostics_assertions::assert_data_tree;
 use fuchsia_async as fasync;
-use fuchsia_inspect::{
-    assert_data_tree, Inspector, Node, NumericProperty, Property, StringProperty, UintProperty,
-};
+use fuchsia_inspect::{Inspector, Node, NumericProperty, Property, StringProperty, UintProperty};
 use fuchsia_inspect_derive::{AttachError, IDebug, IValue, Inspect, Unit, WithInspect};
 
 // TODO(fxbug.dev/49049): Add negative tests when compile failure tests are possible.

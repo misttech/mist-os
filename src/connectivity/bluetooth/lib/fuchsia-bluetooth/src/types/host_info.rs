@@ -150,9 +150,10 @@ impl InspectData<HostInfo> for HostInfoInspect {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use {
-        fidl_fuchsia_bluetooth as fbt,
-        fuchsia_inspect::{self as inspect, assert_data_tree},
+        diagnostics_assertions::assert_data_tree, fidl_fuchsia_bluetooth as fbt,
+        fuchsia_inspect as inspect,
     };
 
     #[test]

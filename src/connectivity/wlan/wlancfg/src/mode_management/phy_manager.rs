@@ -850,10 +850,11 @@ async fn set_power_save_mode(
 mod tests {
     use {
         super::*,
+        diagnostics_assertions::assert_data_tree,
         fidl::endpoints,
         fidl_fuchsia_wlan_device_service as fidl_service, fidl_fuchsia_wlan_sme as fidl_sme,
         fuchsia_async::{run_singlethreaded, TestExecutor},
-        fuchsia_inspect::{self as inspect, assert_data_tree},
+        fuchsia_inspect as inspect,
         fuchsia_zircon::sys::{ZX_ERR_NOT_FOUND, ZX_OK},
         futures::{channel::mpsc, stream::StreamExt, task::Poll},
         pin_utils::pin_mut,

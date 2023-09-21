@@ -797,6 +797,7 @@ mod test {
     };
     use anyhow::anyhow;
     use assert_matches::assert_matches;
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fuchsia_zircon as zx;
     use fuipointer::{
         EventPhase, TouchEvent, TouchPointerSample, TouchResponse, TouchSourceMarker,
@@ -1431,7 +1432,7 @@ mod test {
         let _touch_file =
             InputFile::new_touch(720, 1200, inspector.root().create_child("touch_input_file"));
 
-        fuchsia_inspect::assert_data_tree!(inspector, root: {
+        assert_data_tree!(inspector, root: {
             touch_input_file: {
                 fidl_events_received_count: 0u64,
                 fidl_events_converted_count: 0u64,
@@ -1441,7 +1442,7 @@ mod test {
                     status: "STARTING_UP",
                     // Timestamp value is unpredictable and not relevant in this context,
                     // so we only assert that the property is present.
-                    start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    start_timestamp_nanos: AnyProperty
                 },
             }
         });
@@ -1495,7 +1496,7 @@ mod test {
 
         let _events = read_uapi_events(input_file, &file_object, &current_task);
 
-        fuchsia_inspect::assert_data_tree!(inspector, root: {
+        assert_data_tree!(inspector, root: {
             touch_input_file: {
                 fidl_events_received_count: 7u64,
                 fidl_events_converted_count: 5u64,
@@ -1505,7 +1506,7 @@ mod test {
                     status: "OK",
                     // Timestamp value is unpredictable and not relevant in this context,
                     // so we only assert that the property is present.
-                    start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    start_timestamp_nanos: AnyProperty
                 },
             }
         });
@@ -1516,7 +1517,7 @@ mod test {
 
         // Inspect should reflect InputFile is in UNHEALTHY state after touch stream connection is
         // closed and touch relay terminates.
-        fuchsia_inspect::assert_data_tree!(inspector, root: {
+        assert_data_tree!(inspector, root: {
             touch_input_file: {
                 fidl_events_received_count: 7u64,
                 fidl_events_converted_count: 5u64,
@@ -1527,7 +1528,7 @@ mod test {
                     message: "Touch relay terminated unexpectedly",
                     // Timestamp value is unpredictable and not relevant in this context,
                     // so we only assert that the property is present.
-                    start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    start_timestamp_nanos: AnyProperty
                 },
             }
         });

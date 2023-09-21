@@ -125,7 +125,7 @@ fn parse_json(contents: &[u8]) -> Result<Vec<PinnedAbsolutePackageUrl>, CachePac
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches};
+    use {super::*, assert_matches::assert_matches, diagnostics_assertions::assert_data_tree};
 
     #[test]
     fn populate_from_valid_json() {
@@ -264,7 +264,7 @@ mod tests {
             .root()
             .record_lazy_values("unused", packages.record_lazy_inspect("cache-packages"));
 
-        finspect::assert_data_tree!(inspector, root: {
+        assert_data_tree!(inspector, root: {
             "cache-packages": vec![
                 "fuchsia-pkg://foo.bar/qwe/0?hash=\
                 0000000000000000000000000000000000000000000000000000000000000000",

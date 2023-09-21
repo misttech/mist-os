@@ -153,7 +153,8 @@ impl AssetCacheInspectData {
 #[cfg(test)]
 mod tests {
     use {
-        super::*, fidl_fuchsia_mem as mem, fuchsia_inspect::assert_data_tree, fuchsia_zircon as zx,
+        super::*, diagnostics_assertions::assert_data_tree, fidl_fuchsia_mem as mem,
+        fuchsia_zircon as zx,
     };
 
     /// Creates a `Cache` with some mocked assets.

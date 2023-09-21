@@ -24,7 +24,10 @@ network_unified_binary("bin") {
     "//third_party/rust_crates:tracing",
   ]
 
-  test_deps = [ "//third_party/rust_crates:test-case" ]
+  test_deps = [
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
+    "//third_party/rust_crates:test-case",
+  ]
 
   sources = [ "src/main.rs" ]
 }

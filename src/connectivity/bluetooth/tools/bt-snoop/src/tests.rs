@@ -4,10 +4,11 @@
 
 use argh::FromArgs;
 use async_utils::PollExt;
+use diagnostics_assertions::assert_data_tree;
 use fidl::{endpoints::RequestStream, Error as FidlError};
 use fidl_fuchsia_bluetooth_snoop::{PacketType, SnoopMarker, SnoopProxy, SnoopRequestStream};
 use fuchsia_async::{self as fasync, Channel, TestExecutor};
-use fuchsia_inspect::{assert_data_tree, Inspector};
+use fuchsia_inspect::Inspector;
 use fuchsia_zircon as zx;
 use futures::{pin_mut, StreamExt};
 use std::{task::Poll, time::Duration};

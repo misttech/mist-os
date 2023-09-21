@@ -87,10 +87,10 @@ async fn read_node(proxy: InspectProxy) -> Result<PartialNodeHierarchy, Error> {
 mod tests {
     use {
         super::*,
+        diagnostics_assertions::assert_data_tree,
         fidl_fuchsia_inspect_deprecated::{
             InspectMarker, InspectRequest, InspectRequestStream, Metric, Object, Property,
         },
-        fuchsia_inspect::assert_data_tree,
         futures::{TryFutureExt, TryStreamExt},
         lazy_static::lazy_static,
         maplit::{hashmap, hashset},

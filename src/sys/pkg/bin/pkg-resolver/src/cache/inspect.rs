@@ -160,8 +160,9 @@ impl<S: State> Attempt<S> {
 mod tests {
     use {
         super::*,
+        diagnostics_assertions::{assert_data_tree, AnyProperty},
         fidl_fuchsia_pkg as fpkg,
-        fuchsia_inspect::{assert_data_tree, testing::AnyProperty, Inspector},
+        fuchsia_inspect::Inspector,
         std::time::Duration,
     };
 

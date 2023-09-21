@@ -264,7 +264,8 @@ pub type InspectableBool = Inspectable<bool, InspectableBoolWatcher>;
 mod test {
     use {
         super::*,
-        fuchsia_inspect::{assert_data_tree, Inspector, IntProperty},
+        diagnostics_assertions::assert_data_tree,
+        fuchsia_inspect::{Inspector, IntProperty},
         std::collections::HashSet,
     };
 
@@ -365,7 +366,7 @@ mod test {
 #[cfg(test)]
 mod test_inspectable_len {
     use super::*;
-    use fuchsia_inspect::assert_data_tree;
+    use diagnostics_assertions::assert_data_tree;
 
     #[fuchsia::test]
     fn test_initialization() {
@@ -399,7 +400,7 @@ mod test_inspectable_len {
 #[cfg(test)]
 mod test_inspectable_debug_string {
     use super::*;
-    use fuchsia_inspect::assert_data_tree;
+    use diagnostics_assertions::assert_data_tree;
 
     #[fuchsia::test]
     fn test_initialization() {
@@ -434,7 +435,7 @@ mod test_inspectable_debug_string {
 #[cfg(test)]
 mod test_inspectable_u64 {
     use super::*;
-    use fuchsia_inspect::assert_data_tree;
+    use diagnostics_assertions::assert_data_tree;
 
     #[fuchsia::test]
     fn test_initialization() {
@@ -468,7 +469,7 @@ mod test_inspectable_u64 {
 #[cfg(test)]
 mod test_inspectable_bool {
     use super::*;
-    use fuchsia_inspect::assert_data_tree;
+    use diagnostics_assertions::assert_data_tree;
 
     #[fuchsia::test]
     fn test_initialization() {

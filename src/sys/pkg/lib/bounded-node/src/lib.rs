@@ -12,8 +12,9 @@ use {
 ///
 /// Child `Node`s at indices `[begin, end)` are guaranteed to be fully constructed.
 /// ```
-/// # use fuchsia_inspect::{assert_data_tree, Inspector},
-/// # use bounded_node::BoundedNode,
+/// # use fuchsia_inspect::Inspector;
+/// # use diagnostics_assertions::assert_data_tree;
+/// # use bounded_node::BoundedNode;
 ///
 /// let inspector = Inspector::default();
 /// let mut bounded_node =
@@ -94,10 +95,7 @@ impl<V> BoundedNode<V> {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        fuchsia_inspect::{assert_data_tree, Inspector},
-    };
+    use {super::*, diagnostics_assertions::assert_data_tree, fuchsia_inspect::Inspector};
 
     struct Item {
         _node: Node,

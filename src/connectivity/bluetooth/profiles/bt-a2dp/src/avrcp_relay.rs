@@ -453,10 +453,10 @@ mod tests {
     use assert_matches::assert_matches;
     use async_test_helpers::run_while;
     use async_utils::PollExt;
+    use diagnostics_assertions::assert_data_tree;
     use fidl::endpoints::{self, RequestStream};
     use fidl_fuchsia_power_battery as fpower;
     use fuchsia_async::pin_mut;
-    use fuchsia_inspect::assert_data_tree;
     use fuchsia_inspect_derive::WithInspect;
     use futures::{task::Poll, Future};
     use std::{convert::TryInto, pin::Pin};

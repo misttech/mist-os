@@ -37,7 +37,10 @@ rustc_library("fuchsia-bluetooth") {
     "//third_party/rust_crates:uuid",
   ]
 
-  test_deps = [ "//third_party/rust_crates:assert_matches" ]
+  test_deps = [
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
+    "//third_party/rust_crates:assert_matches",
+  ]
 
   sources = [
     "src/assigned_numbers.rs",

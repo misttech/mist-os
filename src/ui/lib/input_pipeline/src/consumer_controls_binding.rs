@@ -276,10 +276,7 @@ fn send_consumer_controls_event(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::testing_utilities, fuchsia_async as fasync, fuchsia_inspect::AnyProperty,
-        futures::StreamExt,
-    };
+    use {super::*, crate::testing_utilities, fuchsia_async as fasync, futures::StreamExt};
 
     // Tests that an InputReport containing one consumer control button generates an InputEvent
     // containing the same consumer control button.

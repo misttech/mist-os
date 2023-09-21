@@ -174,8 +174,7 @@ impl Node {
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
-        crate::{assert_data_tree, Inspector},
+        super::*, crate::Inspector, diagnostics_assertions::assert_data_tree,
         injectable_time::FakeTime,
     };
 

@@ -912,6 +912,7 @@ async fn main() -> Result {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use diagnostics_assertions::assert_data_tree;
     use fidl::endpoints::Proxy as _;
     use fidl_fuchsia_device as fdevice;
     use fidl_fuchsia_netemul as fnetemul;
@@ -1266,7 +1267,7 @@ mod tests {
                 );
             }
             let () = expect_single_inspect_node(&realm, COUNTER_COMPONENT_NAME, |data| {
-                diagnostics_reader::assert_data_tree!(data, root: {
+                assert_data_tree!(data, root: {
                     counter: {
                         count: u64::from(i),
                     }
@@ -1304,7 +1305,7 @@ mod tests {
             // Without binding to the child by connecting to its exposed protocol, we should be able to
             // see its inspect data since it has been started eagerly.
             expect_single_inspect_node(&realm, COUNTER_COMPONENT_NAME, |data| {
-                diagnostics_reader::assert_data_tree!(data, root: {
+                assert_data_tree!(data, root: {
                     counter: {
                         count: 0u64,
                     }
@@ -2179,7 +2180,7 @@ mod tests {
         // enabling eager startup, we should be able to see its inspect data
         // since it has been started explicitly.
         expect_single_inspect_node(&TestRealm { realm }, COUNTER_COMPONENT_NAME, |data| {
-            diagnostics_reader::assert_data_tree!(data, root: {
+            assert_data_tree!(data, root: {
                 counter: {
                     count: 0u64,
                 }

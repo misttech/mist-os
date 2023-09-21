@@ -383,13 +383,13 @@ mod tests {
     use crate::test::mock_node::create_dummy_node;
     use crate::utils::run_all_tasks_until_stalled::run_all_tasks_until_stalled;
     use assert_matches::assert_matches;
+    use diagnostics_assertions::assert_data_tree;
+    use diagnostics_assertions::TreeAssertion;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_hardware_input as finput;
     use fuchsia_async as fasync;
-    use fuchsia_inspect::testing::TreeAssertion;
     use fuchsia_zircon::{AsHandleRef, HandleBased};
     use futures::channel::mpsc;
-    use inspect::assert_data_tree;
     use std::cell::Cell;
 
     const LID_OPEN: u8 = 0x1;
@@ -625,7 +625,8 @@ mod tests {
             let mut sample_child = TreeAssertion::new(&i.to_string(), true);
             sample_child
                 .add_property_assertion("lid_report", Box::new(format!("{:?}", [LID_OPEN])));
-            sample_child.add_property_assertion("@time", Box::new(inspect::testing::AnyProperty));
+            sample_child
+                .add_property_assertion("@time", Box::new(diagnostics_assertions::AnyProperty));
             lid_reports.add_child_assertion(sample_child);
         }
 

@@ -77,7 +77,7 @@ impl Default for StashInspectLoggerHandle {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_inspect::assert_data_tree;
+    use diagnostics_assertions::assert_data_tree;
 
     // Verify that the StashInspectLogger accumulates failure counts to inspect.
     #[fuchsia::test]

@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    fuchsia_inspect::{assert_data_tree, Inspector, Node},
+    diagnostics_assertions::assert_data_tree,
+    fuchsia_inspect::{Inspector, Node},
     inspect_writable::{InspectWritable, InspectWritableNode},
 };
 

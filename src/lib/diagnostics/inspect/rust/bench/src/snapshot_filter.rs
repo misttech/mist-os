@@ -6,8 +6,7 @@ use fidl_fuchsia_diagnostics::Selector;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
 use fuchsia_inspect::{
     hierarchy::filter_hierarchy,
-    hierarchy::{DiagnosticsHierarchy, HierarchyMatcher},
-    testing::DiagnosticsHierarchyGetter,
+    hierarchy::{DiagnosticsHierarchy, DiagnosticsHierarchyGetter, HierarchyMatcher},
     Inspector,
 };
 use lazy_static::lazy_static;
@@ -187,7 +186,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_inspect::assert_json_diff;
+    use diagnostics_assertions::assert_json_diff;
     use pretty_assertions::assert_eq;
 
     #[fuchsia::test]
@@ -196,9 +195,8 @@ mod tests {
         let mut hierarchy_generator =
             InspectHierarchyGenerator::new(StdRng::seed_from_u64(0), inspector);
         hierarchy_generator.generate_hierarchy(10);
-        let result = hierarchy_generator.get_diagnostics_hierarchy();
         assert_json_diff!(
-        result,
+        hierarchy_generator,
         root:{
             child_4:{
                 value:4

@@ -1,26 +1,30 @@
-// Copyright 2019 The Fuchsia Authors. All rights reserved.
+// Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Testing utilities for a `DiagnosticsHierarchy`.
+//! Utilities to assert the structure of a DiagnosticsHierarchy.
 //!
-//! Pretty much the useful [`assert_data_tree`][assert_data_tree] macro plus some utilities for it.
+//! Pretty much the useful [`assert_data_tree`][assert_data_tree] macro
+//! plus some utilities for it.
 
 use {
-    crate::{
-        ArrayContent, ArrayFormat, DiagnosticsHierarchy, ExponentialHistogram,
-        ExponentialHistogramParams, LinearHistogram, LinearHistogramParams, Property,
-        EXPONENTIAL_HISTOGRAM_EXTRA_SLOTS, LINEAR_HISTOGRAM_EXTRA_SLOTS,
-    },
     anyhow::{bail, format_err, Error},
+    diagnostics_hierarchy::{
+        ArrayContent, ArrayFormat, ExponentialHistogram, ExponentialHistogramParams,
+        LinearHistogram, LinearHistogramParams, Property, EXPONENTIAL_HISTOGRAM_EXTRA_SLOTS,
+        LINEAR_HISTOGRAM_EXTRA_SLOTS,
+    },
     difference::{Changeset, Difference},
     num_traits::One,
     std::{
-        borrow::Cow,
         collections::BTreeSet,
         fmt::{Debug, Display, Formatter, Result as FmtResult},
         ops::{Add, AddAssign, MulAssign},
     },
+};
+
+pub use diagnostics_hierarchy::{
+    hierarchy, DiagnosticsHierarchy, DiagnosticsHierarchyGetter, JsonGetter,
 };
 
 /// Macro to simplify creating `TreeAssertion`s. Commonly used indirectly through the second
@@ -112,14 +116,14 @@ macro_rules! tree_assertion {
 
     // Entry points
     (var $key:ident: { $($sub:tt)* }) => {{
-        use $crate::testing::TreeAssertion;
+        use $crate::TreeAssertion;
         #[allow(unused_mut)]
         let mut tree_assertion = TreeAssertion::new($key, true);
         $crate::tree_assertion!(@build tree_assertion, $($sub)*);
         tree_assertion
     }};
     (var $key:ident: contains { $($sub:tt)* }) => {{
-        use $crate::testing::TreeAssertion;
+        use $crate::TreeAssertion;
         #[allow(unused_mut)]
         let mut tree_assertion = TreeAssertion::new($key, false);
         $crate::tree_assertion!(@build tree_assertion, $($sub)*);
@@ -224,9 +228,9 @@ macro_rules! tree_assertion {
 #[macro_export]
 macro_rules! assert_data_tree {
     ($diagnostics_hierarchy:expr, $($rest:tt)+) => {{
+        use $crate::DiagnosticsHierarchyGetter as _;
         let tree_assertion = $crate::tree_assertion!($($rest)+);
 
-        use $crate::testing::DiagnosticsHierarchyGetter as _;
         if let Err(e) = tree_assertion.run($diagnostics_hierarchy.get_diagnostics_hierarchy().as_ref()) {
             panic!("tree assertion fails: {}", e);
         }
@@ -240,49 +244,20 @@ macro_rules! assert_data_tree {
 #[macro_export]
 macro_rules! assert_json_diff {
     ($diagnostics_hierarchy:expr, $($rest:tt)+) => {{
-        use $crate::testing::JsonGetter as _;
-
+        use $crate::JsonGetter as _;
         let expected = $diagnostics_hierarchy.get_pretty_json();
-        let actual_hierarchy: DiagnosticsHierarchy = $crate::hierarchy!{$($rest)+};
+        let actual_hierarchy: $crate::DiagnosticsHierarchy = $crate::hierarchy!{$($rest)+};
         let actual = actual_hierarchy.get_pretty_json();
 
         if actual != expected {
-            panic!("{}", $crate::testing::diff_json(&expected, &actual));
+            panic!("{}", $crate::diff_json(&expected, &actual));
         }
     }}
-}
-
-/// A type which can function as a "view" into a diagnostics hierarchy, optionally allocating a new
-/// instance to service a request.
-pub trait DiagnosticsHierarchyGetter<K: Clone> {
-    fn get_diagnostics_hierarchy(&self) -> Cow<'_, DiagnosticsHierarchy<K>>;
 }
 
 pub fn diff_json(expected: &str, actual: &str) -> Changeset {
     Changeset::new(expected, actual, "")
 }
-
-pub trait JsonGetter<K: Clone + AsRef<str>>: DiagnosticsHierarchyGetter<K> {
-    fn get_pretty_json(&self) -> String {
-        let mut tree = self.get_diagnostics_hierarchy();
-        tree.to_mut().sort();
-        serde_json::to_string_pretty(&tree).expect("pretty json string")
-    }
-
-    fn get_json(&self) -> String {
-        let mut tree = self.get_diagnostics_hierarchy();
-        tree.to_mut().sort();
-        serde_json::to_string(&tree).expect("pretty json string")
-    }
-}
-
-impl<K: Clone> DiagnosticsHierarchyGetter<K> for DiagnosticsHierarchy<K> {
-    fn get_diagnostics_hierarchy(&self) -> Cow<'_, DiagnosticsHierarchy<K>> {
-        Cow::Borrowed(self)
-    }
-}
-
-impl<K: Clone + AsRef<str>, T: DiagnosticsHierarchyGetter<K>> JsonGetter<K> for T {}
 
 /// A difference between expected and actual output.
 struct Diff(Changeset);
@@ -689,6 +664,8 @@ impl<T: MulAssign + AddAssign + PartialOrd + Add<Output = T> + Copy + Default + 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use diagnostics_hierarchy::testing::CondensableOnDemand;
 
     #[fuchsia::test]
     fn test_assert_json_diff() {
@@ -1123,20 +1100,27 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_nonzero_uint_property_fails() {
+    fn test_nonzero_uint_property_fails_on_zero() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
-            vec![
-                Property::Int("value1".to_string(), 10i64),
-                Property::Uint("value2".to_string(), 0u64),
-                Property::String("value3".to_string(), "string_value".to_string()),
-            ],
+            vec![Property::Uint("value1".to_string(), 0u64)],
             vec![],
         );
         assert_data_tree!(diagnostics_hierarchy, key: {
             value1: NonZeroUintProperty,
-            value2: NonZeroUintProperty,
-            value3: NonZeroUintProperty,
+        });
+    }
+
+    #[fuchsia::test]
+    #[should_panic]
+    fn test_nonzero_uint_property_fails() {
+        let diagnostics_hierarchy = DiagnosticsHierarchy::new(
+            "key",
+            vec![Property::Int("value1".to_string(), 10i64)],
+            vec![],
+        );
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            value1: NonZeroUintProperty,
         });
     }
 

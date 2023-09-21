@@ -7,6 +7,7 @@
 use {
     anyhow::anyhow,
     assert_matches::assert_matches,
+    diagnostics_assertions::{assert_data_tree, AnyProperty},
     diagnostics_hierarchy::DiagnosticsHierarchy,
     diagnostics_reader::{ArchiveReader, Inspect},
     fidl_fuchsia_io as fio,
@@ -16,7 +17,6 @@ use {
     fuchsia_async::{self as fasync, OnSignals, TimeoutExt},
     fuchsia_component::server::ServiceFs,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
-    fuchsia_inspect::{assert_data_tree, testing::AnyProperty},
     fuchsia_zircon::{self as zx, AsHandleRef},
     futures::{channel::oneshot, prelude::*},
     mock_paver::{hooks as mphooks, MockPaverService, MockPaverServiceBuilder, PaverEvent},

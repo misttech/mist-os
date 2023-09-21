@@ -4,7 +4,7 @@
 
 use {
     anyhow::Error,
-    diagnostics_hierarchy::assert_data_tree,
+    diagnostics_assertions::assert_data_tree,
     diagnostics_reader::{ArchiveReader, Inspect},
 };
 

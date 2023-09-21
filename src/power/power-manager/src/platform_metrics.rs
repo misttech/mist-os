@@ -646,7 +646,7 @@ impl InspectThrottleHistoryEntry {
 #[cfg(test)]
 mod historical_max_cpu_temperature_tests {
     use super::*;
-    use inspect::assert_data_tree;
+    use diagnostics_assertions::assert_data_tree;
 
     /// Tests that after each max temperature recording, the max temperature is reset for the next
     /// round. The test would fail if HistoricalMaxCpuTemperature was not resetting the previous max
@@ -788,7 +788,7 @@ mod historical_max_cpu_temperature_tests {
 #[cfg(test)]
 mod inspect_throttle_history_tests {
     use super::*;
-    use fuchsia_inspect::assert_data_tree;
+    use diagnostics_assertions::assert_data_tree;
 
     /// Verifies that `InspectThrottleHistory` correctly rolls old entries out of its buffer.
     #[test]
@@ -860,9 +860,9 @@ mod tests {
     use crate::{msg_eq, msg_ok_return};
     use assert_matches::assert_matches;
     use async_utils::PollExt as _;
+    use diagnostics_assertions::{assert_data_tree, HistogramAssertion};
     use fidl_contrib::protocol_connector::ProtocolSender;
     use fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload};
-    use fuchsia_inspect::{assert_data_tree, HistogramAssertion};
 
     /// Tests that well-formed configuration JSON does not panic the `new_from_json` function.
     #[fasync::run_singlethreaded(test)]

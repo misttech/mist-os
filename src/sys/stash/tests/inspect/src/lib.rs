@@ -4,7 +4,8 @@
 
 use {
     anyhow::Error,
-    diagnostics_reader::{assert_data_tree, ArchiveReader, Inspect},
+    diagnostics_assertions::assert_data_tree,
+    diagnostics_reader::{ArchiveReader, Inspect},
 };
 
 #[fuchsia::test]

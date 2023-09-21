@@ -87,7 +87,7 @@ fn write_stats(state: &State, node: &super::Node) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{assert_data_tree, assert_json_diff, hierarchy::DiagnosticsHierarchy};
+    use diagnostics_assertions::{assert_data_tree, assert_json_diff};
     use inspect_format::constants;
 
     #[fuchsia::test]

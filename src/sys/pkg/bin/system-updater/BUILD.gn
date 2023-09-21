@@ -70,6 +70,7 @@ rustc_binary("bin") {
   ]
   non_rust_deps = [ ":epoch.json" ]
   test_deps = [
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/sys/pkg/lib/fuchsia-pkg-testing",
     "//src/sys/pkg/lib/version",
     "//src/sys/pkg/testing/mock-paver",

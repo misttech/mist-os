@@ -859,7 +859,7 @@ mod tests {
             ImeHandler::new_handler(proxy, &fake_handlers_node, metrics::MetricsLogger::default())
                 .await
                 .expect("Failed to create ImeHandler.");
-        fuchsia_inspect::assert_data_tree!(inspector, root: {
+        diagnostics_assertions::assert_data_tree!(inspector, root: {
             input_handlers_node: {
                 ime_handler: {
                     events_received_count: 0u64,
@@ -869,7 +869,7 @@ mod tests {
                         status: "STARTING_UP",
                         // Timestamp value is unpredictable and not relevant in this context,
                         // so we only assert that the property is present.
-                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                        start_timestamp_nanos: diagnostics_assertions::AnyProperty
                     },
                 }
             }
@@ -938,7 +938,7 @@ mod tests {
 
         let last_event_timestamp: u64 = event_time_u64.into_nanos().try_into().unwrap();
 
-        fuchsia_inspect::assert_data_tree!(inspector, root: {
+        diagnostics_assertions::assert_data_tree!(inspector, root: {
             input_handlers_node: {
                 ime_handler: {
                     events_received_count: 3u64,
@@ -948,7 +948,7 @@ mod tests {
                         status: "STARTING_UP",
                         // Timestamp value is unpredictable and not relevant in this context,
                         // so we only assert that the property is present.
-                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                        start_timestamp_nanos: diagnostics_assertions::AnyProperty
                     },
                 }
             }

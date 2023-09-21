@@ -101,6 +101,7 @@ rustc_binary("font_provider") {
   deps += [ "//build/config/sanitizers:suppress-lsan.DO-NOT-USE-THIS" ]
 
   test_deps = [
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/intl/unicode_utils/char_collection",
     "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:pretty_assertions",

@@ -581,8 +581,8 @@ impl InputEvent {
 #[cfg(test)]
 mod tests {
     use {
-        super::*, assert_matches::assert_matches, fidl::endpoints::spawn_stream_handler,
-        fuchsia_inspect::AnyProperty, fuchsia_zircon as zx, pretty_assertions::assert_eq,
+        super::*, assert_matches::assert_matches, diagnostics_assertions::AnyProperty,
+        fidl::endpoints::spawn_stream_handler, fuchsia_zircon as zx, pretty_assertions::assert_eq,
         std::convert::TryFrom as _, test_case::test_case,
     };
 
@@ -605,7 +605,7 @@ mod tests {
         let input_devices_node = input_pipeline_node.create_child("input_devices");
         let device_node = input_devices_node.create_child("001_keyboard");
         let _input_device_status = InputDeviceStatus::new(device_node);
-        fuchsia_inspect::assert_data_tree!(inspector, root: {
+        diagnostics_assertions::assert_data_tree!(inspector, root: {
             input_pipeline: {
                 input_devices: {
                     "001_keyboard": {
@@ -620,7 +620,7 @@ mod tests {
                             // so we only assert that the property is present.
                             start_timestamp_nanos: AnyProperty
                         },
-                        driver_to_binding_latency_ms: fuchsia_inspect::HistogramAssertion::exponential(super::LATENCY_HISTOGRAM_PROPERTIES),
+                        driver_to_binding_latency_ms: diagnostics_assertions::HistogramAssertion::exponential(super::LATENCY_HISTOGRAM_PROPERTIES),
                     }
                 }
             }
@@ -636,8 +636,9 @@ mod tests {
     async fn input_device_status_updates_latency_histogram_on_count_received_report(
         latency_nsec: i64,
     ) {
-        let mut expected_histogram =
-            fuchsia_inspect::HistogramAssertion::exponential(super::LATENCY_HISTOGRAM_PROPERTIES);
+        let mut expected_histogram = diagnostics_assertions::HistogramAssertion::exponential(
+            super::LATENCY_HISTOGRAM_PROPERTIES,
+        );
         let inspector = fuchsia_inspect::Inspector::default();
         let input_device_status = InputDeviceStatus::new_internal(
             inspector.root().clone_weak(),
@@ -646,7 +647,7 @@ mod tests {
         input_device_status
             .count_received_report(&InputReport { event_time: Some(0), ..InputReport::default() });
         expected_histogram.insert_values([latency_nsec / 1000 / 1000]);
-        fuchsia_inspect::assert_data_tree!(inspector, root: contains {
+        diagnostics_assertions::assert_data_tree!(inspector, root: contains {
             driver_to_binding_latency_ms: expected_histogram,
         });
     }

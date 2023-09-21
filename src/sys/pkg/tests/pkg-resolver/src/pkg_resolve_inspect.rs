@@ -5,14 +5,10 @@
 use {
     anyhow::format_err,
     assert_matches::assert_matches,
+    diagnostics_assertions::{assert_data_tree, tree_assertion, AnyProperty, PropertyAssertion},
     fidl_fuchsia_pkg_ext::RepositoryConfigBuilder,
     fidl_fuchsia_pkg_rewrite_ext::{Rule, RuleConfig},
-    fuchsia_inspect::{
-        assert_data_tree,
-        reader::Property,
-        testing::{AnyProperty, PropertyAssertion},
-        tree_assertion,
-    },
+    fuchsia_inspect::reader::Property,
     fuchsia_pkg_testing::{serve::responder, PackageBuilder, RepositoryBuilder},
     futures::FutureExt as _,
     lib::MountsBuilder,

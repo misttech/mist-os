@@ -36,6 +36,8 @@ rustc_binary("virtio_mem_bin") {
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:zerocopy",
   ]
+
+  test_deps = [ "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions" ]
 }
 
 fuchsia_unittest_package("virtio_mem_unittests") {

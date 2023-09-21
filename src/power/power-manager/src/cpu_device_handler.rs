@@ -326,10 +326,10 @@ impl InspectData {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use diagnostics_assertions::assert_data_tree;
     use fuchsia_async as fasync;
     use fuchsia_zircon as zx;
     use futures::TryStreamExt;
-    use inspect::assert_data_tree;
     use std::cell::Cell;
 
     // Creates a fake fuchsia.device.Controller proxy

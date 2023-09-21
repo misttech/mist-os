@@ -410,8 +410,8 @@ pub(crate) mod tests {
         super::*,
         anyhow::Error,
         assert_matches::assert_matches,
+        diagnostics_assertions::assert_data_tree,
         fuchsia_async as fasync,
-        fuchsia_inspect::assert_data_tree,
         serde_json::json,
         std::{io, path::Path},
     };

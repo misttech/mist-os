@@ -5,13 +5,14 @@
 use anyhow::{format_err, Error};
 use assert_matches::assert_matches;
 use async_helpers::hanging_get::asynchronous as hanging_get;
+use diagnostics_assertions::assert_data_tree;
 use fidl_fuchsia_bluetooth::Appearance;
 use fidl_fuchsia_bluetooth_host::HostRequest;
 use fidl_fuchsia_bluetooth_sys::{self as sys, TechnologyType};
 use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_bluetooth::types::bonding_data::example;
 use fuchsia_bluetooth::types::{Address, HostData, HostId, Identity, Peer, PeerId};
-use fuchsia_inspect::{self as inspect, assert_data_tree};
+use fuchsia_inspect as inspect;
 use futures::channel::mpsc;
 use futures::future::join;
 use futures::stream::TryStreamExt;

@@ -331,6 +331,7 @@ mod tests {
     use async_test_helpers::run_while;
     use async_utils::PollExt;
     use bt_rfcomm::{profile::build_rfcomm_protocol, ServerChannel};
+    use diagnostics_assertions::assert_data_tree;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream, ControlHandle};
     use fidl_fuchsia_bluetooth as bt;
     use fidl_fuchsia_bluetooth_bredr as bredr;
@@ -340,7 +341,6 @@ mod tests {
     use fidl_fuchsia_power_battery as fpower;
     use fuchsia_async as fasync;
     use fuchsia_bluetooth::types::Uuid;
-    use fuchsia_inspect::assert_data_tree;
     use fuchsia_zircon as zx;
     use futures::{pin_mut, SinkExt, TryStreamExt};
     use std::collections::HashSet;

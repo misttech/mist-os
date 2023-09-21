@@ -160,7 +160,7 @@ mod tests {
     use crate::intl::types::{IntlInfo, LocaleId, TemperatureUnit};
     use crate::service;
 
-    use fuchsia_inspect::assert_data_tree;
+    use diagnostics_assertions::assert_data_tree;
     use std::collections::HashSet;
 
     /// The `RequestProcessor` handles sending a request through a MessageHub

@@ -501,7 +501,7 @@ impl Inspect for &mut IProcedure {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use fuchsia_inspect::assert_data_tree;
+    use diagnostics_assertions::assert_data_tree;
 
     /// A vec of responses converts to the expected request
     #[fuchsia::test]

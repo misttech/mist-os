@@ -7,6 +7,8 @@
 use {
     anyhow::anyhow,
     assert_matches::assert_matches,
+    diagnostics_assertions::{assert_data_tree, tree_assertion, AnyProperty, TreeAssertion},
+    diagnostics_hierarchy::DiagnosticsHierarchy,
     diagnostics_reader::{ArchiveReader, Inspect},
     fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics,
     fidl_fuchsia_paver as fpaver,
@@ -24,12 +26,6 @@ use {
     fidl_fuchsia_update_verify as fupdate_verify, fuchsia_async as fasync,
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
-    fuchsia_inspect::{
-        assert_data_tree,
-        reader::DiagnosticsHierarchy,
-        testing::{AnyProperty, TreeAssertion},
-        tree_assertion,
-    },
     fuchsia_pkg_testing::{make_current_epoch_json, make_packages_json},
     fuchsia_url::{PinnedAbsolutePackageUrl, UnpinnedAbsolutePackageUrl},
     fuchsia_zircon as zx,

@@ -21,7 +21,7 @@ use tracing::{error, info, warn};
 #[cfg(test)]
 use {
     fuchsia_bluetooth::types::{LeBondData, OneOrBoth},
-    fuchsia_inspect::testing::DiagnosticsHierarchyGetter,
+    fuchsia_inspect::DiagnosticsHierarchyGetter,
     std::collections::HashSet,
 };
 

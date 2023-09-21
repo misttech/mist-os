@@ -978,12 +978,12 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
 #[cfg(test)]
 mod tests {
     use super::*;
+    use diagnostics_assertions::assert_data_tree;
+    use diagnostics_assertions::AnyProperty;
     use fuchsia_async as fasync;
     use fuchsia_async::Time;
     use fuchsia_async::TimeoutExt;
     use fuchsia_component_test::ScopedInstanceFactory;
-    use fuchsia_inspect::assert_data_tree;
-    use fuchsia_inspect::testing::AnyProperty;
 
     #[fasync::run(4, test)]
     async fn test_watch_device_changes() {

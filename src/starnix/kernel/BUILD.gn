@@ -165,6 +165,7 @@ rustc_binary("starnix_kernel_bin") {
   }
 
   test_deps = [
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia-fs",
     "//src/lib/test_util",
     "//src/storage/ext4/tests:test_img",

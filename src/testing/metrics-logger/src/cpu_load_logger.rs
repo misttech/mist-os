@@ -345,13 +345,13 @@ pub mod tests {
         super::*,
         anyhow::{format_err, Error},
         assert_matches::assert_matches,
+        diagnostics_assertions::assert_data_tree,
         fidl_fuchsia_kernel::{CpuStats, PerCpuStats},
         fuchsia_zbi_abi::{
             ArchitectureInfo, Entity, ZbiTopologyArchitecture, ZbiTopologyArm64Info,
             ZbiTopologyCluster, ZbiTopologyEntityType, ZbiTopologyNode, ZbiTopologyProcessor,
         },
         futures::{task::Poll, FutureExt, TryStreamExt},
-        inspect::assert_data_tree,
         std::{cell::Cell, pin::Pin},
     };
 

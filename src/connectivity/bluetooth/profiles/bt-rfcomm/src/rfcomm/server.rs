@@ -290,11 +290,11 @@ mod tests {
     use assert_matches::assert_matches;
     use async_utils::PollExt;
     use bt_rfcomm::{frame::mux_commands::*, frame::*, Role, DLCI};
+    use diagnostics_assertions::assert_data_tree;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream};
     use fidl_fuchsia_bluetooth_bredr::ConnectionReceiverMarker;
     use fuchsia_async as fasync;
     use fuchsia_bluetooth::types::Channel;
-    use fuchsia_inspect::assert_data_tree;
     use fuchsia_inspect_derive::WithInspect;
     use futures::{pin_mut, task::Poll, AsyncWriteExt, StreamExt};
 

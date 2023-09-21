@@ -286,7 +286,8 @@ mod tests {
     use {
         super::*,
         crate::wire::{LE16, LE64},
-        fuchsia_inspect::{assert_data_tree, Inspector},
+        diagnostics_assertions::assert_data_tree,
+        fuchsia_inspect::Inspector,
         std::ops::Range,
         virtio_device::chain::{ReadableChain, WritableChain},
         virtio_device::fake_queue::{Chain, ChainBuilder, IdentityDriverMem, TestQueue},

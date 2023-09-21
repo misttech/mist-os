@@ -842,6 +842,7 @@ mod tests {
     use crate::profile::{AvrcpControllerFeatures, AvrcpProtocolVersion, AvrcpTargetFeatures};
 
     use {
+        diagnostics_assertions::assert_data_tree,
         fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_bluetooth::ErrorCode,
         fidl_fuchsia_bluetooth_bredr::{
@@ -849,7 +850,6 @@ mod tests {
         },
         fuchsia_async::{self as fasync, DurationExt},
         fuchsia_bluetooth::types::Channel,
-        fuchsia_inspect::assert_data_tree,
         fuchsia_inspect_derive::WithInspect,
         fuchsia_zircon::DurationNum,
         futures::{pin_mut, task::Poll},

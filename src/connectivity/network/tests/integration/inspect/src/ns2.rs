@@ -8,11 +8,14 @@
 
 use std::{collections::HashMap, convert::TryFrom as _, num::NonZeroU16};
 
+use diagnostics_assertions::{
+    assert_data_tree, tree_assertion, AnyProperty, NonZeroUintProperty, PropertyAssertion,
+    TreeAssertion,
+};
 use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_packet as fposix_socket_packet;
 use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
 use fuchsia_async as fasync;
-use fuchsia_inspect::testing::{tree_assertion, AnyProperty, NonZeroUintProperty, TreeAssertion};
 use fuchsia_zircon as zx;
 
 use const_unwrap::const_unwrap_option;
@@ -99,7 +102,7 @@ impl std::ops::Drop for AddressMatcher {
     }
 }
 
-impl fuchsia_inspect::testing::PropertyAssertion for AddressMatcher {
+impl PropertyAssertion for AddressMatcher {
     fn run(&self, actual: &Property<String>) -> Result<()> {
         let actual = actual.string().ok_or_else(|| {
             anyhow::anyhow!("invalid property {:#?} for AddressMatcher, want String", actual)
@@ -225,7 +228,7 @@ async fn inspect_nic(name: &str) {
         .expect("get_inspect_data failed");
     // Debug print the tree to make debugging easier in case of failures.
     println!("Got inspect data: {:#?}", data);
-    fuchsia_inspect::assert_data_tree!(data, NICs: {
+    assert_data_tree!(data, NICs: {
         loopback_props.id.to_string() => {
             Name: loopback_props.name,
             Loopback: "true",
@@ -659,7 +662,7 @@ async fn inspect_stat_counters(name: &str) {
         .await
         .expect("get_inspect_data failed");
     // TODO(https://fxbug.dev/62447): change AnyProperty to AnyUintProperty when available.
-    fuchsia_inspect::assert_data_tree!(data, "Networking Stat Counters": {
+    assert_data_tree!(data, "Networking Stat Counters": {
         DroppedPackets: AnyProperty,
         SocketCount: AnyProperty,
         SocketsCreated: AnyProperty,
@@ -1031,7 +1034,7 @@ async fn inspect_socket_stats(name: &str) {
         .expect("Socket Info inspect data should be present");
     // Debug print the tree to make debugging easier in case of failures.
     println!("Got inspect data: {:#?}", data);
-    fuchsia_inspect::assert_data_tree!(data, "Socket Info": contains {
+    assert_data_tree!(data, "Socket Info": contains {
         "1": {
             BindAddress: "",
             BindNICID: "0",

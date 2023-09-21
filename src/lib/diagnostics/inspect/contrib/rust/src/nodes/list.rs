@@ -62,8 +62,8 @@ impl BoundedListNode {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use diagnostics_assertions::assert_data_tree;
     use fuchsia_inspect::{
-        assert_data_tree,
         reader::{self, ReaderError},
         Inspector,
     };

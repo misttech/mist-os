@@ -297,6 +297,7 @@ impl SessionMultiplexer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use diagnostics_assertions::assert_data_tree;
     use std::convert::TryFrom;
 
     use crate::rfcomm::inspect::CREDIT_FLOW_CONTROL;
@@ -310,7 +311,7 @@ mod tests {
         let mut multiplexer = SessionMultiplexer::create();
         multiplexer.iattach(inspect.root(), "multiplexer").expect("should attach to inspect tree");
         // Default inspect tree.
-        fuchsia_inspect::assert_data_tree!(inspect, root: {
+        assert_data_tree!(inspect, root: {
             multiplexer: {
                 role: "Unassigned",
             },
@@ -319,7 +320,7 @@ mod tests {
         // Reserving a channel should add to the inspect tree.
         let dlci = DLCI::try_from(9).unwrap();
         let _ = multiplexer.find_or_create_session_channel(dlci);
-        fuchsia_inspect::assert_data_tree!(inspect, root: {
+        assert_data_tree!(inspect, root: {
             multiplexer: {
                 role: "Unassigned",
                 channel_0: contains {
@@ -333,7 +334,7 @@ mod tests {
         let dlci2 = DLCI::try_from(20).unwrap();
         let (sender2, _receiver2) = mpsc::channel(0);
         let _channel2 = multiplexer.establish_session_channel(dlci2, sender2);
-        fuchsia_inspect::assert_data_tree!(inspect, root: {
+        assert_data_tree!(inspect, root: {
             multiplexer: {
                 role: "Unassigned",
                 flow_control: CREDIT_FLOW_CONTROL,
@@ -356,7 +357,7 @@ mod tests {
         // This line of code runs the executor to complete the drop of the future. Only then
         // will the `channel_1` inspect node be removed from the tree.
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
-        fuchsia_inspect::assert_data_tree!(inspect, root: {
+        assert_data_tree!(inspect, root: {
             multiplexer: {
                 role: "Unassigned",
                 flow_control: CREDIT_FLOW_CONTROL,

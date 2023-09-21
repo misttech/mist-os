@@ -372,10 +372,10 @@ pub mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use async_utils::PollExt as _;
-    use fuchsia_inspect::testing::TreeAssertion;
+    use diagnostics_assertions::assert_data_tree;
+    use diagnostics_assertions::TreeAssertion;
     use futures::poll;
     use futures::TryStreamExt;
-    use inspect::assert_data_tree;
     use std::task::Poll;
 
     /// Spawns a new task that acts as a fake temperature driver for testing purposes. Each
@@ -522,7 +522,8 @@ pub mod tests {
         for i in 10..InspectData::NUM_INSPECT_TEMPERATURE_SAMPLES + 10 {
             let mut sample_child = TreeAssertion::new(&i.to_string(), true);
             sample_child.add_property_assertion("temperature", Box::new(30.0));
-            sample_child.add_property_assertion("@time", Box::new(inspect::testing::AnyProperty));
+            sample_child
+                .add_property_assertion("@time", Box::new(diagnostics_assertions::AnyProperty));
             temperature_readings.add_child_assertion(sample_child);
         }
 

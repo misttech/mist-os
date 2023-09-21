@@ -103,7 +103,7 @@ mod tests {
     };
 
     // [START include_testing]
-    use fuchsia_inspect::assert_data_tree;
+    use diagnostics_assertions::assert_data_tree;
     // [END include_testing]
 
     #[fuchsia::test]

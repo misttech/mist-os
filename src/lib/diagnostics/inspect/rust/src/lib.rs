@@ -87,20 +87,10 @@ pub mod hierarchy {
 
 pub use {
     crate::{state::Stats, writer::*},
-    diagnostics_hierarchy::{ExponentialHistogramParams, LinearHistogramParams},
-    testing::*,
+    diagnostics_hierarchy::{
+        DiagnosticsHierarchyGetter, ExponentialHistogramParams, LinearHistogramParams,
+    },
 };
-
-pub mod testing {
-    pub use diagnostics_hierarchy::{
-        assert_data_tree, assert_json_diff,
-        testing::{
-            AnyProperty, DiagnosticsHierarchyGetter, HistogramAssertion, NonZeroUintProperty,
-            PropertyAssertion, TreeAssertion,
-        },
-        tree_assertion,
-    };
-}
 
 /// Directiory within the outgoing directory of a component where the diagnostics service should be
 /// added.

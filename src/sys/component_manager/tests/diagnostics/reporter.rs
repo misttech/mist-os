@@ -3,9 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    diagnostics_reader::{
-        assert_data_tree, AnyProperty, ArchiveReader, DiagnosticsHierarchy, Inspect,
-    },
+    diagnostics_assertions::{assert_data_tree, AnyProperty},
+    diagnostics_reader::{ArchiveReader, DiagnosticsHierarchy, Inspect},
     fidl::endpoints::create_proxy,
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_fs,
 };

@@ -35,7 +35,8 @@ mod quick_start_before {
 }
 
 mod quick_start_after {
-    use fuchsia_inspect::{assert_data_tree, NumericProperty};
+    use diagnostics_assertions::assert_data_tree;
+    use fuchsia_inspect::NumericProperty;
 
     // [START quick_start_after_decl]
     use fuchsia_inspect_derive::{
@@ -110,7 +111,8 @@ mod quick_start_after {
 }
 
 mod derive_inspect {
-    use fuchsia_inspect::{assert_data_tree, Node};
+    use diagnostics_assertions::assert_data_tree;
+    use fuchsia_inspect::Node;
     use fuchsia_inspect_derive::{AttachError, IValue, Inspect, WithInspect};
     use std::cell::RefCell;
 
@@ -225,7 +227,7 @@ mod derive_inspect {
 }
 
 mod smart_pointers {
-    use fuchsia_inspect::assert_data_tree;
+    use diagnostics_assertions::assert_data_tree;
     use fuchsia_inspect_derive::{AttachError, IValue, WithInspect};
 
     #[test]
@@ -264,7 +266,7 @@ mod smart_pointers {
 }
 
 mod unit {
-    use fuchsia_inspect::assert_data_tree;
+    use diagnostics_assertions::assert_data_tree;
     use fuchsia_inspect_derive::{AttachError, IValue, WithInspect};
 
     use fuchsia_inspect_derive::Unit;

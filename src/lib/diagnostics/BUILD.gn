@@ -9,7 +9,6 @@ group("diagnostics") {
     "//src/lib/diagnostics/log",
     "//src/lib/diagnostics/reader",
     "//src/lib/diagnostics/selectors",
-    "//src/lib/diagnostics/testing",
   ]
 }
 

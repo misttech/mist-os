@@ -4,12 +4,12 @@
 
 use {
     anyhow::{format_err, Error},
+    diagnostics_assertions::{assert_data_tree, AnyProperty},
     diagnostics_hierarchy::{self, DiagnosticsHierarchy},
     diagnostics_reader::{ArchiveReader, ComponentSelector, Inspect},
     fidl_fuchsia_diagnostics::ArchiveAccessorMarker,
     fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_test_wlan_realm::WlanConfig,
-    fuchsia_inspect::testing::{assert_data_tree, AnyProperty},
     fuchsia_zircon::DurationNum,
     ieee80211::Bssid,
     pin_utils::pin_mut,

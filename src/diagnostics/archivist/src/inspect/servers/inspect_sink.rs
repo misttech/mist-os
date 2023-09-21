@@ -135,13 +135,12 @@ mod tests {
         inspect::container::InspectArtifactsContainer,
     };
     use assert_matches::assert_matches;
+    use diagnostics_assertions::assert_json_diff;
     use fidl::endpoints::{create_proxy_and_stream, create_request_stream, ClientEnd};
     use fidl_fuchsia_inspect::TreeMarker;
     use fidl_fuchsia_inspect::{InspectSinkMarker, InspectSinkProxy, InspectSinkPublishRequest};
     use fuchsia_async::Task;
-    use fuchsia_inspect::{
-        assert_json_diff, hierarchy::DiagnosticsHierarchy, reader::read, Inspector,
-    };
+    use fuchsia_inspect::{reader::read, Inspector};
     use fuchsia_zircon::{self as zx, AsHandleRef};
     use futures::Future;
     use inspect_runtime::{service::spawn_tree_server_with_stream, PublishOptions};

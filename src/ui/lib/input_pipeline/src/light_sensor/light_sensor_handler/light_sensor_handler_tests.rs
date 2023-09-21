@@ -864,7 +864,7 @@ fn light_sensor_handler_initialized_with_inspect_node() {
     );
     let _handler =
         LightSensorHandler::new(DoublingCalibrator, sensor_configuration, inspect_status);
-    fuchsia_inspect::assert_data_tree!(inspector, root: {
+    diagnostics_assertions::assert_data_tree!(inspector, root: {
         input_handlers_node: {
             light_sensor_handler: {
                 clients_connected_count: 0u64,
@@ -876,7 +876,7 @@ fn light_sensor_handler_initialized_with_inspect_node() {
                     status: "STARTING_UP",
                     // Timestamp value is unpredictable and not relevant in this context,
                     // so we only assert that the property is present.
-                    start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    start_timestamp_nanos: diagnostics_assertions::AnyProperty
                 },
             }
         }
@@ -1002,7 +1002,7 @@ async fn light_sensor_handler_inspect_counts_events() {
     // Event should be discarded and counted to `events_saturated_count`.
     let _ = Rc::clone(&handler).handle_input_event(saturated_input_event.clone()).await;
 
-    fuchsia_inspect::assert_data_tree!(inspector, root: {
+    diagnostics_assertions::assert_data_tree!(inspector, root: {
         input_handlers_node: {
             light_sensor_handler: {
                 clients_connected_count: 1u64,
@@ -1014,7 +1014,7 @@ async fn light_sensor_handler_inspect_counts_events() {
                     status: "STARTING_UP",
                     // Timestamp value is unpredictable and not relevant in this context,
                     // so we only assert that the property is present.
-                    start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    start_timestamp_nanos: diagnostics_assertions::AnyProperty
                 },
             }
         }
@@ -1024,7 +1024,7 @@ async fn light_sensor_handler_inspect_counts_events() {
     request_task.await;
 
     // Update clients_connected_count once stream is terminated & client stops sending requests.
-    fuchsia_inspect::assert_data_tree!(inspector, root: {
+    diagnostics_assertions::assert_data_tree!(inspector, root: {
         input_handlers_node: {
             light_sensor_handler: contains {
                 clients_connected_count: 0u64,

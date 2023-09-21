@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use diagnostics_reader::{assert_data_tree, ArchiveReader, Data, Logs, Severity};
+use diagnostics_assertions::assert_data_tree;
+use diagnostics_reader::{ArchiveReader, Data, Logs, Severity};
 use fidl_fuchsia_component::{BinderMarker, BinderProxy};
 use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMarker, LogMessage};
 use fuchsia_async::Task;

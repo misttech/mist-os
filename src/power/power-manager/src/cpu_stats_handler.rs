@@ -319,10 +319,10 @@ pub mod tests {
     use super::*;
     use crate::types::Seconds;
     use async_utils::PollExt;
+    use diagnostics_assertions::assert_data_tree;
     use fuchsia_async as fasync;
     use fuchsia_zircon::DurationNum;
     use futures::TryStreamExt;
-    use inspect::assert_data_tree;
     use std::collections::VecDeque;
     use std::ops::Add;
 
@@ -550,7 +550,7 @@ pub mod tests {
                     cpu_loads: {
                         "0": {
                             load: TEST_NUM_CORES as f64,
-                            "@time": inspect::testing::AnyProperty
+                            "@time": diagnostics_assertions::AnyProperty
                         }
                     }
                 }

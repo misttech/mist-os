@@ -443,10 +443,11 @@ mod tests {
     use {
         super::SessionManager,
         anyhow::{anyhow, Error},
+        diagnostics_assertions::assert_data_tree,
+        diagnostics_assertions::AnyProperty,
         fidl::endpoints::{create_proxy_and_stream, spawn_stream_handler, ServerEnd},
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
-        fidl_fuchsia_session as fsession,
-        fuchsia_inspect::{self, assert_data_tree, testing::AnyProperty},
+        fidl_fuchsia_session as fsession, fuchsia_inspect,
         futures::channel::mpsc,
         futures::prelude::*,
         lazy_static::lazy_static,

@@ -649,7 +649,7 @@ mod tests {
     use crate::test::mock_node::{create_dummy_node, MessageMatcher, MockNodeMaker};
     use crate::{msg_eq, msg_ok_return};
     use assert_matches::assert_matches;
-    use fuchsia_inspect::assert_data_tree;
+    use diagnostics_assertions::assert_data_tree;
     use std::task::Poll;
     use thermal_config::TripPoint;
 

@@ -74,6 +74,7 @@ rustc_binary("snapshot-filter-bin") {
   ]
 
   test_deps = [
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:pretty_assertions",
   ]

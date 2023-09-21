@@ -668,7 +668,7 @@ pub mod tests {
     use super::*;
     use crate::test::mock_node::{create_dummy_node, MessageMatcher, MockNodeMaker};
     use crate::{msg_eq, msg_ok_return};
-    use inspect::testing::assert_data_tree;
+    use diagnostics_assertions::assert_data_tree;
 
     pub fn get_sample_interval(thermal_policy: &ThermalPolicy) -> Seconds {
         thermal_policy.config.policy_params.controller_params.sample_interval

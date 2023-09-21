@@ -7,8 +7,9 @@
 /// different types of packages when blobfs is in various intermediate states.
 use {
     assert_matches::assert_matches,
-    cobalt_sw_delivery_registry as metrics, fidl_fuchsia_pkg_ext as pkg, fuchsia_async as fasync,
-    fuchsia_inspect::assert_data_tree,
+    cobalt_sw_delivery_registry as metrics,
+    diagnostics_assertions::assert_data_tree,
+    fidl_fuchsia_pkg_ext as pkg, fuchsia_async as fasync,
     fuchsia_pkg_testing::{
         serve::{responder, Domain},
         Package, PackageBuilder, RepositoryBuilder,

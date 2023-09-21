@@ -214,16 +214,13 @@ mod tests {
         events::{EventStream, Started},
         matcher::EventMatcher,
     };
+    use diagnostics_assertions::assert_json_diff;
     use diagnostics_reader::{ArchiveReader, Inspect};
     use fidl_fuchsia_sys2 as fsys;
     use fuchsia_async as fasync;
     use fuchsia_component::{client, server::ServiceObj};
     use fuchsia_component_test::ScopedInstance;
-    use fuchsia_inspect::{
-        reader::{read, DiagnosticsHierarchy},
-        testing::assert_json_diff,
-        InspectorConfig,
-    };
+    use fuchsia_inspect::{reader::read, InspectorConfig};
     use fuchsia_zircon::DurationNum;
     use futures::FutureExt;
 

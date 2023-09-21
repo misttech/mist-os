@@ -283,6 +283,7 @@ pub async fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use diagnostics_assertions::assert_data_tree;
     use std::cell::RefCell;
     use std::rc::Rc;
     use test_case::test_case;
@@ -554,7 +555,7 @@ mod tests {
         }));
         let inspector = fuchsia_inspect::component::inspector();
         let nodes = InspectNodes::new(inspector, &m);
-        fuchsia_inspect::assert_data_tree!(inspector,
+        assert_data_tree!(inspector,
             root: {
                 current_boot: 2u64,
                 user_setting: 2u64,
@@ -564,7 +565,7 @@ mod tests {
 
         m.persisted = Persisted { user: None, automated: Some(NetstackVersion::Netstack2) };
         nodes.update(&m);
-        fuchsia_inspect::assert_data_tree!(inspector,
+        assert_data_tree!(inspector,
             root: {
                 current_boot: 2u64,
                 user_setting: 0u64,

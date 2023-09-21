@@ -26,6 +26,7 @@ rustc_test("test_bin") {
   deps = [
     ":inspect-writable",
     "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
   ]
 

@@ -142,9 +142,9 @@ mod test {
                 generate_random_scanned_candidate,
             },
         },
+        diagnostics_assertions::{assert_data_tree, AnyProperty},
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
-        fuchsia_async as fasync,
-        fuchsia_inspect::{self as inspect, assert_data_tree},
+        fuchsia_async as fasync, fuchsia_inspect as inspect,
         futures::channel::mpsc,
         rand::Rng,
         wlan_common::{assert_variant, channel, random_fidl_bss_description},
@@ -393,16 +393,16 @@ mod test {
         assert_data_tree!(test_values.inspector, root: {
             bss_select_test: {
                 "0": {
-                    "@time": inspect::testing::AnyProperty,
+                    "@time": AnyProperty,
                     "candidates": {
                         "0": contains {
-                            score: inspect::testing::AnyProperty,
+                            score: AnyProperty,
                         },
                         "1": contains {
-                            score: inspect::testing::AnyProperty,
+                            score: AnyProperty,
                         },
                         "2": contains {
-                            score: inspect::testing::AnyProperty,
+                            score: AnyProperty,
                         },
                     },
                     "selected": {
@@ -413,7 +413,7 @@ mod test {
                         security_type_saved: candidates[2].saved_security_type_to_string(),
                         security_type_scanned: format!("{}", wlan_common::bss::Protection::from(candidates[2].security_type_detailed)),
                         channel: {
-                            cbw: inspect::testing::AnyProperty,
+                            cbw: AnyProperty,
                             primary: u64::from(fidl_channel.primary),
                             secondary80: u64::from(fidl_channel.secondary80),
                         },
@@ -444,7 +444,7 @@ mod test {
         assert_data_tree!(test_values.inspector, root: {
             bss_select_test: {
                 "0": {
-                    "@time": inspect::testing::AnyProperty,
+                    "@time": AnyProperty,
                     "candidates": {},
                 }
             },

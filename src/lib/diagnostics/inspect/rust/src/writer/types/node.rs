@@ -548,14 +548,14 @@ impl InnerType for InnerNodeType {
 mod tests {
     use super::*;
     use crate::{
-        assert_json_diff, reader,
+        reader,
         writer::{
             private::InspectTypeInternal,
             testing_utils::{get_state, GetBlockExt},
             ArrayProperty,
         },
     };
-    use diagnostics_hierarchy::{assert_data_tree, DiagnosticsHierarchy};
+    use diagnostics_assertions::{assert_data_tree, assert_json_diff};
     use futures::FutureExt;
     use inspect_format::BlockType;
 
@@ -912,7 +912,8 @@ mod tests {
 #[cfg(all(test, target_os = "fuchsia"))]
 mod fuchsia_tests {
     use super::*;
-    use crate::{assert_json_diff, hierarchy::DiagnosticsHierarchy, reader, NumericProperty};
+    use crate::{hierarchy::DiagnosticsHierarchy, reader, NumericProperty};
+    use diagnostics_assertions::assert_json_diff;
     use fuchsia_zircon::{self as zx, AsHandleRef, Peered};
     use std::{convert::TryFrom, sync::Arc};
 

@@ -170,7 +170,7 @@ impl BasePackages {
 #[cfg(test)]
 mod tests {
     use {
-        super::*, fuchsia_inspect::assert_data_tree, fuchsia_pkg_testing::PackageBuilder,
+        super::*, diagnostics_assertions::assert_data_tree, fuchsia_pkg_testing::PackageBuilder,
         std::iter::FromIterator as _,
     };
 

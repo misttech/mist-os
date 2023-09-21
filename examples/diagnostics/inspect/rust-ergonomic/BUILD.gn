@@ -16,6 +16,7 @@ rustc_test("ergonomic_inspect_tests") {
   deps = [
     "//src/lib/diagnostics/inspect/derive",
     "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
   ]
 
   sources = [ "src/main.rs" ]

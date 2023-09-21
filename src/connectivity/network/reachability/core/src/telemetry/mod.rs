@@ -494,8 +494,9 @@ impl Telemetry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fidl::endpoints::create_proxy_and_stream;
-    use fuchsia_inspect::{assert_data_tree, AnyProperty, Inspector};
+    use fuchsia_inspect::Inspector;
     use fuchsia_zircon::DurationNum;
     use futures::task::Poll;
     use std::pin::Pin;

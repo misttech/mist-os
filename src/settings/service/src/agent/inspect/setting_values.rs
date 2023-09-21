@@ -220,7 +220,7 @@ impl SettingValuesInspectAgent {
 
 #[cfg(test)]
 mod tests {
-    use fuchsia_inspect::assert_data_tree;
+    use diagnostics_assertions::assert_data_tree;
     use fuchsia_zircon::Time;
 
     use crate::agent::Invocation;

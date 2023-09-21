@@ -212,7 +212,7 @@ impl InnerType for InnerValueType {
 mod tests {
     use super::*;
     use crate::Inspector;
-    use diagnostics_hierarchy::assert_data_tree;
+    use diagnostics_assertions::assert_data_tree;
 
     #[fuchsia::test]
     fn test_reparent_from_state() {

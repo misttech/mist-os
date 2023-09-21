@@ -595,9 +595,9 @@ mod tests {
                 generate_random_scan_result, generate_random_scanned_candidate,
             },
         },
+        diagnostics_assertions::{assert_data_tree, AnyProperty},
         fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
-        fuchsia_async as fasync,
-        fuchsia_inspect::{self as inspect, assert_data_tree},
+        fuchsia_async as fasync, fuchsia_inspect as inspect,
         futures::{channel::mpsc, task::Poll},
         lazy_static::lazy_static,
         pin_utils::pin_mut,
@@ -1209,7 +1209,7 @@ mod tests {
             connection_selection_test: {
                 connection_selection: {
                     "0": {
-                        "@time": inspect::testing::AnyProperty,
+                        "@time": AnyProperty,
                         "candidates": {},
                     },
                 }
@@ -1386,20 +1386,20 @@ mod tests {
             connection_selection_test: {
                 connection_selection: {
                     "0": {
-                        "@time": inspect::testing::AnyProperty,
+                        "@time": AnyProperty,
                         "candidates": {
                             "0": contains {
-                                bssid_hash: inspect::testing::AnyProperty,
-                                score: inspect::testing::AnyProperty,
+                                bssid_hash: AnyProperty,
+                                score: AnyProperty,
                             },
                             "1": contains {
-                                bssid_hash: inspect::testing::AnyProperty,
-                                score: inspect::testing::AnyProperty,
+                                bssid_hash: AnyProperty,
+                                score: AnyProperty,
                             },
                         },
                         "selected": contains {
-                            bssid_hash: inspect::testing::AnyProperty,
-                            score: inspect::testing::AnyProperty,
+                            bssid_hash: AnyProperty,
+                            score: AnyProperty,
                         },
                     },
                 }

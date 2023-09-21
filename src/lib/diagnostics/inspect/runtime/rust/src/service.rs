@@ -137,10 +137,10 @@ fn spawn_tree_name_iterator_server(values: Vec<String>, mut stream: TreeNameIter
 #[cfg(test)]
 mod tests {
     use super::*;
+    use diagnostics_assertions::{assert_data_tree, assert_json_diff};
     use fidl_fuchsia_inspect::{TreeNameIteratorMarker, TreeNameIteratorProxy, TreeProxy};
     use fuchsia_async::DurationExt;
     use fuchsia_inspect::{
-        assert_data_tree, assert_json_diff,
         reader::{read_with_timeout, DiagnosticsHierarchy, PartialNodeHierarchy},
         Inspector,
     };

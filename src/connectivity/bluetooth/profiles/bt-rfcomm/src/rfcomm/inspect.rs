@@ -158,8 +158,8 @@ impl SessionInspect {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fuchsia_async::DurationExt;
-    use fuchsia_inspect::{assert_data_tree, testing::AnyProperty};
     use fuchsia_inspect_derive::WithInspect;
     use fuchsia_zircon::DurationNum;
     use std::convert::TryFrom;

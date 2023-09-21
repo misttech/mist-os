@@ -17,7 +17,10 @@ rustc_library("windowed-stats") {
     "//third_party/rust_crates:num-traits",
   ]
 
-  test_deps = [ "//src/lib/fuchsia-async" ]
+  test_deps = [
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
+    "//src/lib/fuchsia-async",
+  ]
 
   sources = [
     "src/aggregations.rs",

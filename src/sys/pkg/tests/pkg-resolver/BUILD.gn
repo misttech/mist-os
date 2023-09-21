@@ -25,6 +25,7 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_rust",
     "//src/lib/diagnostics/hierarchy/rust",
     "//src/lib/diagnostics/reader/rust",
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component-test",
@@ -97,6 +98,7 @@ rustc_test("pkg_resolve_inspect") {
   deps = [
     ":lib",
     "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
     "//src/sys/lib/fidl-fuchsia-pkg-ext",
     "//src/sys/lib/fidl-fuchsia-pkg-rewrite-ext",
@@ -199,7 +201,7 @@ rustc_test("resolve_succeeds") {
   deps = [
     ":lib",
     "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
-    "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/http-uri-ext",
@@ -248,7 +250,7 @@ rustc_test("system_cache_fallback") {
   deps = [
     ":lib",
     "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
-    "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/zircon/rust:fuchsia-zircon",

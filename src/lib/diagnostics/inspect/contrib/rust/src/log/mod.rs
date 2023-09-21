@@ -212,8 +212,9 @@ mod tests {
     use super::*;
     use crate::nodes::BoundedListNode;
 
+    use diagnostics_assertions::assert_data_tree;
     use fuchsia_async as fasync;
-    use fuchsia_inspect::{assert_data_tree, Inspector};
+    use fuchsia_inspect::Inspector;
     use parking_lot::Mutex;
 
     #[fuchsia::test]

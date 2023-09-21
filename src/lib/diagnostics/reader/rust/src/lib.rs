@@ -25,10 +25,7 @@ use thiserror::Error;
 use parking_lot::Mutex;
 
 pub use diagnostics_data::{Data, Inspect, Logs, Severity};
-pub use diagnostics_hierarchy::{
-    assert_data_tree, assert_json_diff, hierarchy, testing::*, tree_assertion,
-    DiagnosticsHierarchy, Property,
-};
+pub use diagnostics_hierarchy::{hierarchy, DiagnosticsHierarchy, Property};
 
 const RETRY_DELAY_MS: i64 = 300;
 
@@ -511,7 +508,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diagnostics_hierarchy::assert_data_tree;
+    use diagnostics_assertions::assert_data_tree;
     use diagnostics_log::{Publisher, PublisherOptions};
     use fidl_fuchsia_diagnostics as fdiagnostics;
     use fidl_fuchsia_logger as flogger;

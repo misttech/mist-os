@@ -720,10 +720,9 @@ mod tests {
         crate::mouse_model_database,
         crate::observe_fake_events_input_handler,
         crate::utils::Position,
+        diagnostics_assertions::AnyProperty,
         fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream},
-        fuchsia_async as fasync,
-        fuchsia_inspect::AnyProperty,
-        fuchsia_zircon as zx,
+        fuchsia_async as fasync, fuchsia_zircon as zx,
         futures::channel::mpsc::UnboundedSender,
         futures::FutureExt,
         pretty_assertions::assert_eq,
@@ -989,7 +988,7 @@ mod tests {
         );
         let input_devices = test_node.create_child("input_devices");
         // Assert that inspect tree is initialized with no devices.
-        fuchsia_inspect::assert_data_tree!(inspector, root: {
+        diagnostics_assertions::assert_data_tree!(inspector, root: {
             input_pipeline: {
                 supported_input_devices: "Mouse",
                 input_devices: {}
@@ -1030,7 +1029,7 @@ mod tests {
         );
 
         // Assert that inspect tree reflects new device discovered and connected.
-        fuchsia_inspect::assert_data_tree!(inspector, root: {
+        diagnostics_assertions::assert_data_tree!(inspector, root: {
             input_pipeline: {
                 supported_input_devices: "Mouse",
                 input_devices: {
@@ -1112,7 +1111,7 @@ mod tests {
         );
         let input_devices = test_node.create_child("input_devices");
         // Assert that inspect tree is initialized with no devices.
-        fuchsia_inspect::assert_data_tree!(inspector, root: {
+        diagnostics_assertions::assert_data_tree!(inspector, root: {
             input_pipeline: {
                 supported_input_devices: "Keyboard",
                 input_devices: {}
@@ -1136,7 +1135,7 @@ mod tests {
         assert_eq!(bindings.len(), 0);
 
         // Assert that inspect tree reflects new device discovered, but not connected.
-        fuchsia_inspect::assert_data_tree!(inspector, root: {
+        diagnostics_assertions::assert_data_tree!(inspector, root: {
             input_pipeline: {
                 supported_input_devices: "Keyboard",
                 input_devices: {
@@ -1235,7 +1234,7 @@ mod tests {
             test_node,
             metrics::MetricsLogger::default(),
         );
-        fuchsia_inspect::assert_data_tree!(inspector, root: {
+        diagnostics_assertions::assert_data_tree!(inspector, root: {
             input_pipeline: {
                 supported_input_devices: "Touch, ConsumerControls",
                 handlers_registered: 1u64,

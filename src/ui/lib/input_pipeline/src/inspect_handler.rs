@@ -351,10 +351,10 @@ mod tests {
         touch_binding::{TouchScreenDeviceDescriptor, TouchpadDeviceDescriptor},
         utils::Position,
     };
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_input_report::InputDeviceMarker;
     use fuchsia_async as fasync;
-    use fuchsia_inspect::{assert_data_tree, AnyProperty};
     use maplit::{hashmap, hashset};
     use std::collections::HashSet;
     use test_case::test_case;
@@ -1118,8 +1118,9 @@ mod tests {
             handler.clone().handle_input_event(create_fake_input_event(zx::Time::ZERO)).await;
         }
 
-        let mut histogram_assertion =
-            fuchsia_inspect::HistogramAssertion::exponential(super::LATENCY_HISTOGRAM_PROPERTIES);
+        let mut histogram_assertion = diagnostics_assertions::HistogramAssertion::exponential(
+            super::LATENCY_HISTOGRAM_PROPERTIES,
+        );
         histogram_assertion
             .insert_values(latencies_nsec.into_iter().map(|nsec| nsec / 1000 / 1000));
         assert_data_tree!(inspector, root: {

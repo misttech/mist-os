@@ -706,8 +706,8 @@ mod tests {
 mod inspect_tests {
     use {
         super::*,
+        diagnostics_assertions::assert_data_tree,
         fuchsia_async as fasync,
-        fuchsia_inspect::assert_data_tree,
         fuchsia_pkg_testing::{serve::responder, PackageBuilder, RepositoryBuilder},
         fuchsia_url::RepositoryUrl,
         futures::stream::StreamExt,

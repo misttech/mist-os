@@ -6,8 +6,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::task::Poll;
 
+use diagnostics_assertions::assert_data_tree;
 use fuchsia_async as fasync;
-use fuchsia_inspect::{assert_data_tree, Inspector};
+use fuchsia_inspect::Inspector;
 use fuchsia_zircon::{Duration, DurationNum, Time};
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::channel::oneshot;

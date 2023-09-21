@@ -233,7 +233,7 @@ pub(crate) fn append_pcap<W: Write>(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fuchsia_async as fasync, fuchsia_inspect::assert_data_tree};
+    use {super::*, diagnostics_assertions::assert_data_tree, fuchsia_async as fasync};
 
     /// An empty log tests that the most basic inspect data is plumbed through the lazy generation
     /// function. See top level tests module for more integrated tests.

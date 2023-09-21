@@ -151,7 +151,7 @@ fn validate_static_selector(static_selector: &Selector) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_inspect::testing::{assert_data_tree, AnyProperty};
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use std::fs;
 
     #[fuchsia::test]

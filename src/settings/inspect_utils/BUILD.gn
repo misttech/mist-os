@@ -28,7 +28,10 @@ rustc_library("settings_inspect_utils") {
     "//src/lib/diagnostics/inspect/rust",
   ]
 
-  test_deps = [ "//src/lib/fuchsia" ]
+  test_deps = [
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
+    "//src/lib/fuchsia",
+  ]
 
   sources = [
     "src/joinable_inspect_vecdeque.rs",

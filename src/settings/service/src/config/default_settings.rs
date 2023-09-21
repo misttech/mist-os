@@ -136,9 +136,9 @@ pub(crate) mod testing {
     use crate::tests::helpers::move_executor_forward_and_get;
 
     use assert_matches::assert_matches;
+    use diagnostics_assertions::assert_data_tree;
+    use diagnostics_assertions::AnyProperty;
     use fuchsia_async::TestExecutor;
-    use fuchsia_inspect::assert_data_tree;
-    use fuchsia_inspect::testing::AnyProperty;
     use fuchsia_zircon::Time;
     use serde::Deserialize;
 

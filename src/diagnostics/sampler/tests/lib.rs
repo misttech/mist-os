@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use diagnostics_reader::{assert_data_tree, AnyProperty, ArchiveReader, Inspect};
+use diagnostics_assertions::{assert_data_tree, AnyProperty};
+use diagnostics_reader::{ArchiveReader, Inspect};
 use fidl_fuchsia_component::BinderMarker;
 use fidl_fuchsia_diagnostics as fdiagnostics;
 use fidl_fuchsia_metrics_test::MetricEventLoggerQuerierMarker;

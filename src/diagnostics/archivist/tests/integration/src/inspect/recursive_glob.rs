@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{constants::*, test_topology};
-use diagnostics_hierarchy::{assert_data_tree, testing::AnyProperty};
+use diagnostics_assertions::{assert_data_tree, AnyProperty};
 use diagnostics_reader::{ArchiveReader, Inspect};
 use fidl_fuchsia_diagnostics::ArchiveAccessorMarker;
 use std::{collections::HashSet, iter::FromIterator};

@@ -3,10 +3,7 @@
 // found in the LICENSE file.
 
 use crate::writer::{private::InspectTypeInternal, Error, Heap, Node, State};
-use diagnostics_hierarchy::{
-    testing::{DiagnosticsHierarchyGetter, JsonGetter},
-    DiagnosticsHierarchy,
-};
+use diagnostics_hierarchy::{DiagnosticsHierarchy, DiagnosticsHierarchyGetter, JsonGetter};
 use inspect_format::{constants, BlockContainer, Container};
 use std::{borrow::Cow, cmp::max, default::Default, fmt, sync::Arc};
 use tracing::error;

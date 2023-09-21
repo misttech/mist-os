@@ -287,8 +287,8 @@ mod tests {
     use {
         super::*,
         char_collection::char_collect,
+        diagnostics_assertions::assert_data_tree,
         fidl_fuchsia_fonts::{Slant, Width, WEIGHT_NORMAL},
-        finspect::assert_data_tree,
         maplit::btreeset,
     };
 

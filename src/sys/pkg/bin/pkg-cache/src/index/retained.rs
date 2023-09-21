@@ -245,7 +245,7 @@ mod tests {
     use {
         super::*,
         crate::test_utils::add_meta_far_to_blobfs,
-        fuchsia_inspect::{assert_data_tree, testing::AnyProperty},
+        diagnostics_assertions::{assert_data_tree, AnyProperty},
         maplit::{hashmap, hashset},
     };
 

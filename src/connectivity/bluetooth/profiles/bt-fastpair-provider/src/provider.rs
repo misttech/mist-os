@@ -624,6 +624,7 @@ mod tests {
     use assert_matches::assert_matches;
     use async_test_helpers::run_while;
     use async_utils::PollExt;
+    use diagnostics_assertions::assert_data_tree;
     use fidl::endpoints::{create_proxy_and_stream, ControlHandle, Proxy, RequestStream};
     use fidl_fuchsia_bluetooth_gatt2::{
         Handle, LocalServiceProxy, LocalServiceWriteValueRequest as WriteValueRequest,
@@ -635,7 +636,7 @@ mod tests {
     };
     use fuchsia_async as fasync;
     use fuchsia_bluetooth::types::{Address, HostId};
-    use fuchsia_inspect::{assert_data_tree, NumericProperty};
+    use fuchsia_inspect::NumericProperty;
     use fuchsia_inspect_derive::WithInspect;
     use futures::{pin_mut, FutureExt, SinkExt};
     use std::convert::{TryFrom, TryInto};
