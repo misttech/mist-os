@@ -255,9 +255,9 @@ void Tcs3400Device::Configure() {
     }
   }
 
-  // per spec 0 is device's default. we define the default as no polling.
-  polling_handler_.Cancel();
-  if (feature_report.report_interval_us != 0) {
+  if (feature_report.report_interval_us == 0) {  // per spec 0 is device's default
+    polling_handler_.Cancel();                   // we define the default as no polling
+  } else if (!polling_handler_.is_pending()) {
     polling_handler_.PostDelayed(dispatcher_, zx::usec(feature_report.report_interval_us));
   }
 }
@@ -274,12 +274,14 @@ void Tcs3400Device::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* ir
 
   const zx::result<Tcs3400InputReport> report = ReadInputRpt();
   if (report.is_error()) {
-    rearm_irq_handler_.PostDelayed(dispatcher_, zx::duration(INTERRUPTS_HYSTERESIS));
+    async::PostDelayedTask(dispatcher_, fit::bind_member(this, &Tcs3400Device::RearmIrq),
+                           zx::duration(INTERRUPTS_HYSTERESIS));
     return;
   }
   if (feature_report.reporting_state ==
       fuchsia_input_report::wire::SensorReportingState::kReportNoEvents) {
-    rearm_irq_handler_.PostDelayed(dispatcher_, zx::duration(INTERRUPTS_HYSTERESIS));
+    async::PostDelayedTask(dispatcher_, fit::bind_member(this, &Tcs3400Device::RearmIrq),
+                           zx::duration(INTERRUPTS_HYSTERESIS));
     return;
   }
 
@@ -291,7 +293,8 @@ void Tcs3400Device::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* ir
   fbl::AutoLock lock(&input_lock_);
   input_rpt_ = *report;
 
-  rearm_irq_handler_.PostDelayed(dispatcher_, zx::duration(INTERRUPTS_HYSTERESIS));
+  async::PostDelayedTask(dispatcher_, fit::bind_member(this, &Tcs3400Device::RearmIrq),
+                         zx::duration(INTERRUPTS_HYSTERESIS));
 }
 
 void Tcs3400Device::RearmIrq() {
@@ -303,7 +306,8 @@ void Tcs3400Device::RearmIrq() {
   }
 }
 
-void Tcs3400Device::HandlePoll() {
+void Tcs3400Device::HandlePoll(async_dispatcher_t* dispatcher, async::TaskBase* task,
+                               zx_status_t status) {
   Tcs3400FeatureReport feature_report;
   {
     fbl::AutoLock lock(&feature_lock_);
@@ -674,7 +678,6 @@ zx_status_t Tcs3400Device::Bind() {
 
 void Tcs3400Device::DdkUnbind(ddk::UnbindTxn txn) {
   irq_handler_.Cancel();
-  rearm_irq_handler_.Cancel();
   polling_handler_.Cancel();
   irq_.destroy();
   txn.Reply();
