@@ -80,6 +80,12 @@ impl IsolatedEmulator {
             .await
             .context("setting ffx log level")?;
 
+        // TODO(slgrady) remove one we have debugged the flake in which the ssh
+        // connection is never made
+        this.ffx(&["config", "set", "daemon.host_pipe_ssh_timeout", "110"])
+            .await
+            .context("setting ffx daemon ssh timeout")?;
+
         this.ffx_isolate.start_daemon().await?;
 
         info!("starting emulator {}", this.emu_name);
@@ -94,6 +100,10 @@ impl IsolatedEmulator {
             &this.emu_name,
             "--log",
             &*emulator_log,
+            // TODO(slgrady) remove one  we have debugged the flake in which the
+            // ssh connection is never made
+            "--startup-timeout",
+            "120",
             PRODUCT_BUNDLE_PATH,
         ])
         .await

@@ -179,7 +179,10 @@ async fn write_ssh_log(line: &String) {
             return;
         }
     };
-    writeln!(&mut f, "{line}").unwrap_or_else(|e| tracing::warn!("Couldn't write ssh log: {e:?}"));
+    const TIME_FORMAT: &str = "%b %d %H:%M:%S%.3f";
+    let timestamp = chrono::Local::now().format(TIME_FORMAT);
+    writeln!(&mut f, "{timestamp}: {line}")
+        .unwrap_or_else(|e| tracing::warn!("Couldn't write ssh log: {e:?}"));
 }
 
 impl HostPipeChild {
@@ -252,7 +255,7 @@ impl HostPipeChild {
             Ok(addr) => Some(HostAddr(addr)),
             Err(e) => {
                 tracing::error!("Failed to read ssh client address: {:?}", e);
-                None
+                return Err(e);
             }
         };
         tracing::debug!("Got ssh host address {ssh_host_address:?}");
