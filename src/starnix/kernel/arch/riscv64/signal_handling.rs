@@ -31,7 +31,7 @@ pub struct SignalStackFrame {
 
 impl SignalStackFrame {
     pub fn new(
-        _task: &Task,
+        task: &Task,
         registers: &mut RegisterState,
         signal_state: &SignalState,
         siginfo: &SignalInfo,
@@ -58,6 +58,15 @@ impl SignalStackFrame {
             },
             ..Default::default()
         };
+
+        let vdso_sigreturn_offset = task
+            .thread_group
+            .kernel
+            .vdso
+            .sigreturn_offset
+            .expect("Failed to get __vdso_rt_sigreturn offset");
+        let sigreturn_addr = task.mm.state.read().vdso_base.ptr() as u64 + vdso_sigreturn_offset;
+        registers.ra = sigreturn_addr;
 
         SignalStackFrame { context, siginfo_bytes: siginfo.as_siginfo_bytes() }
     }
