@@ -173,25 +173,36 @@ class ElementMeta(object):
     def get_files(self) -> Tuple[Set[Path], Dict[str, Set[Path]]]:
         '''Extracts the files associated with the given element.
         Returns a 2-tuple containing:
-         - the set of arch-independent files;
-         - the sets of arch-dependent files, indexed by architecture.
+         - the set of variant-independent files;
+         - the sets of variant-dependent files, indexed by architecture.
         '''
         type = self.type
         common_files = set()
-        arch_files = {}
+        variant_files = {}
         if type == 'cc_prebuilt_library':
             common_files.update(self._meta['headers'])
             if 'ifs' in self._meta:
                 common_files.add(
                     os.path.join(self._meta['root'], self._meta['ifs']))
-            for arch, binaries in self._meta['binaries'].items():
+            for arch, binaries in self._meta.get('binaries', {}).items():
                 contents = set()
                 contents.add(binaries['link'])
                 if 'dist' in binaries:
                     contents.add(binaries['dist'])
                 if 'debug' in binaries:
                     contents.add(binaries['debug'])
-                arch_files[arch] = contents
+                variant_files[arch] = contents
+            for variant in self._meta.get('variants', []):
+                contents = set()
+                constraint = variant['constraints']['arch'] + '-' + str(
+                    variant['constraints']['api_level'])
+                value = variant['values']
+                contents.add(value['link_lib'])
+                if 'dist_lib' in value:
+                    contents.add(value['dist_lib'])
+                if 'debug' in value:
+                    contents.add(value['debug'])
+                variant_files[constraint] = contents
         elif type == 'cc_source_library':
             common_files.update(self._meta['headers'])
             common_files.update(self._meta['sources'])
@@ -206,32 +217,43 @@ class ElementMeta(object):
                         common_files.update(collection)
             if 'target_files' in self._meta:
                 for (arch, binaries) in self._meta["target_files"].items():
-                    arch_files[arch] = set()
+                    variant_files[arch] = set()
                     for (name, collection) in binaries.items():
                         if name == "executable" or name == "executable_metadata":
-                            arch_files[arch].add(collection)
+                            variant_files[arch].add(collection)
                         else:
-                            arch_files[arch].update(collection)
+                            variant_files[arch].update(collection)
         elif type == 'fidl_library':
             common_files.update(self._meta['sources'])
         elif type in ['host_tool', 'companion_host_tool', 'package']:
             if 'files' in self._meta:
                 common_files.update(self._meta['files'])
             if 'target_files' in self._meta:
-                arch_files.update(self._meta['target_files'])
+                variant_files.update(self._meta['target_files'])
         elif type == 'loadable_module':
             common_files.update(self._meta['resources'])
-            arch_files.update(self._meta['binaries'])
+            variant_files.update(self._meta['binaries'])
         elif type == 'sysroot':
             for ifs_file in self._meta['ifs_files']:
                 common_files.add(os.path.join("pkg", "sysroot", ifs_file))
-            for arch, version in self._meta['versions'].items():
+            for arch, version in self._meta.get('versions', {}).items():
                 contents = set()
                 contents.update(version['headers'])
                 contents.update(version['link_libs'])
                 contents.update(version['dist_libs'])
                 contents.update(version['debug_libs'])
-                arch_files[arch] = contents
+                variant_files[arch] = contents
+
+            for variant in self._meta.get('variants', []):
+                contents = set()
+                constraint = variant['constraints']['arch'] + '-' + str(
+                    variant['constraints']['api_level'])
+                value = variant['values']
+                contents.update(value['headers'])
+                contents.update(value['link_libs'])
+                contents.update(value['dist_libs'])
+                contents.update(value['debug_libs'])
+                variant_files[constraint] = contents
         elif type == 'documentation':
             common_files.update(self._meta['docs'])
         elif type in ('config', 'license', 'component_manifest'):
@@ -244,7 +266,7 @@ class ElementMeta(object):
         else:
             raise Exception('Unknown element type: ' + type)
 
-        return (common_files, arch_files)
+        return (common_files, variant_files)
 
     def merge_with(self, other: ElementMeta) -> ElementMeta:
         '''Merge current instance with another one and return new value.'''
@@ -259,9 +281,14 @@ class ElementMeta(object):
                 'Incompatible element types (%s vs %s)' % (type, other.type))
 
         meta = {}
-        if type in ('cc_prebuilt_library', 'loadable_module'):
+        if type == 'cc_prebuilt_library':
             meta = meta_one
-            meta['binaries'].update(meta_two['binaries'])
+            meta['binaries'].update(meta_two.get('binaries', {}))
+            meta['variants'] = meta_one.get('variants', []) + meta_two.get(
+                'variants', [])
+        elif type == 'loadable_module':
+            meta = meta_one
+            meta['binaries'].update(meta_two.get('binaries', {}))
         elif type == 'package':
             meta = meta_one
             meta['package_manifests'] += meta_two['package_manifests']
@@ -276,7 +303,9 @@ class ElementMeta(object):
             meta['target_files'].update(meta_two['target_files'])
         elif type == 'sysroot':
             meta = meta_one
-            meta['versions'].update(meta_two['versions'])
+            meta['versions'].update(meta_two.get('versions', {}))
+            meta['variants'] = meta_one.get('variants', []) + meta_two.get(
+                'variants', [])
         elif type in ['ffx_tool', 'host_tool', 'companion_host_tool']:
             meta = meta_one
             if not 'target_files' in meta:
@@ -647,9 +676,9 @@ class OutputSdk(object):
         meta = source_sdk.get_element_meta(element)
         assert meta is not None, 'Could not find metadata for element: %s, %s, %s' % (
             element, meta, source_sdk)
-        common_files, arch_files = meta.get_files()
+        common_files, variant_files = meta.get_files()
         files = common_files
-        for more_files in arch_files.values():
+        for more_files in variant_files.values():
             files.update(more_files)
         self.copy_files(files, source_sdk.directory)
         # Copy the metadata file as well.
@@ -841,7 +870,7 @@ def main(main_args=None):
         )
 
     if len(args.inputs
-           ) == 1 and args.inputs[0].archive and args.output_directory:
+          ) == 1 and args.inputs[0].archive and args.output_directory:
         parser.error(
             'Using a single input archive as input and an output directory is not supported!\n'
             +

@@ -127,16 +127,37 @@ generated_file("sysroot-meta-json") {
       "libc.ifs",
       "zircon.ifs",
     ]
-    versions = {
-      if (target_cpu == "arm64") {
-        arm64 = version_content
-      } else if (target_cpu == "x64") {
-        x64 = version_content
-      } else if (target_cpu == "riscv64") {
-        riscv64 = version_content
-      } else {
-        assert(false, "Unknown CPU type: $target_cpu")
+    if (override_target_api_level == -1) {
+      versions = {
+        if (target_cpu == "arm64") {
+          arm64 = version_content
+        } else if (target_cpu == "x64") {
+          x64 = version_content
+        } else if (target_cpu == "riscv64") {
+          riscv64 = version_content
+        } else {
+          assert(false, "Unknown CPU type: $target_cpu")
+        }
       }
+    } else {
+      variants = [
+        {
+          constraints = {
+            api_level = override_target_api_level
+            arch = target_cpu
+          }
+          values = {
+            root = file_base
+
+            include_dir = "$file_base/include"
+            sysroot_dir = version_content.dist_dir
+            headers = version_content.headers
+            link_libs = version_content.link_libs
+            dist_libs = version_content.dist_libs
+            debug_libs = version_content.debug_libs
+          }
+        },
+      ]
     }
   }
   output_conversion = "json"
@@ -160,8 +181,10 @@ action("sysroot-meta") {
     "--output=" + rebase_path(outputs[0], root_build_dir),
     "--manifest=" + rebase_path(outputs[1], root_build_dir),
     "--depfile=" + rebase_path(depfile, root_build_dir),
-    "--location=/versions/$target_cpu/debug_libs",
   ]
+  if (override_target_api_level == -1) {
+    args += [ "--location=/versions/$target_cpu/debug_libs" ]
+  }
   deps = [ ":sysroot-meta-json" ] + sysroot_sdk_deps
 }
 meta_outputs = get_target_outputs(":sysroot-meta")

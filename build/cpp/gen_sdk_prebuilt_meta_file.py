@@ -56,9 +56,8 @@ def main():
         'Path to the file where to write the file mapping for the debug library',
         required=False)
     parser.add_argument(
-        '--ifs',
-        help='Path to an llvm .ifs file',
-        required=False)
+        '--ifs', help='Path to an llvm .ifs file', required=False)
+    parser.add_argument('--api-level', help='The API level', required=False)
     args = parser.parse_args()
 
     metadata = {
@@ -101,6 +100,26 @@ def main():
         else:
             raise Exception('Unsupported dependency type: %s' % type)
     metadata['deps'] = sorted(set(deps))
+
+    if args.api_level:
+        binary = metadata['binaries'][args.arch]
+        variant = {
+            'constraints': {
+                'arch': args.arch,
+                'api_level': int(args.api_level)
+            },
+            'values': {}
+        }
+        if 'dist' in binary:
+            variant['values']['dist_lib'] = binary['dist']
+        if 'dist_path' in binary:
+            variant['values']['dist_lib_dest'] = binary['dist_path']
+        if 'link' in binary:
+            variant['values']['link_lib'] = binary['link']
+        if 'debug' in binary:
+            variant['values']['debug'] = binary['debug']
+        metadata['variants'] = [variant]
+        del metadata['binaries']
 
     with open(args.out, 'w') as out_file:
         json.dump(

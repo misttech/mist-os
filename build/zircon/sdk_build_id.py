@@ -51,26 +51,32 @@ def main():
         type=argparse.FileType('w'),
         required=True,
     )
-    parser.add_argument('--location', help='JSON pointer', required=True)
+    parser.add_argument('--location', help='JSON pointer', required=False)
     args = parser.parse_args()
 
     # Read in the original JSON tree.
     data = json.load(args.input)
 
     # Poor man's JSON pointer: /foo/bar/baz looks up in dicts.
-    ptr = args.location.split('/')
-    assert ptr[0] == '', '%s should be absolute JSON pointer' % args.location
-
-    # Follow the pointer steps until the last one, so walk[ptr[0]] points
-    # at the requested location in the JSON tree.
-    walk = {'': data}
-    while len(ptr) > 1:
-        walk = walk[ptr[0]]
-        ptr = ptr[1:]
-
-    # Apply the rewrites to the string or list at that spot in the tree.
     manifest = {}
-    walk[ptr[0]] = rewrite(walk[ptr[0]], manifest)
+    if args.location:
+        ptr = args.location.split('/')
+        assert ptr[
+            0] == '', '%s should be absolute JSON pointer' % args.location
+
+        # Follow the pointer steps until the last one, so walk[ptr[0]] points
+        # at the requested location in the JSON tree.
+        walk = {'': data}
+        while len(ptr) > 1:
+            walk = walk[ptr[0]]
+            ptr = ptr[1:]
+
+        # Apply the rewrites to the string or list at that spot in the tree.
+        walk[ptr[0]] = rewrite(walk[ptr[0]], manifest)
+    else:
+        # If no location argument is passed in, we will find the value from the variants section
+        debug = data['variants'][0]['values']['debug_libs']
+        data['variants'][0]['values']['debug_libs'] = rewrite(debug, manifest)
 
     # Write out the manifest collected while rewriting original debug files
     # names to .build-id/... names for publication.

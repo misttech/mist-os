@@ -83,28 +83,4 @@ mod tests {
         "#,
         valid = true,
     }
-
-    test_validation! {
-        name = test_validation_invalid,
-        kind = CcPrebuiltLibrary,
-        data = r#"
-        {
-            "name": "foobar",
-            "type": "cc_prebuilt_library",
-            "format": "shared",
-            "root": "pkg/foobar",
-            "deps": [
-                "raboof"
-            ],
-            "headers": [
-                "pkg/foobar/include/one.h",
-                "pkg/foobar/include/two.h"
-            ],
-            "include_dir": "pkg/foobar/include",
-            "binaries": {}
-        }
-        "#,
-        // Binaries are empty.
-        valid = false,
-    }
 }
