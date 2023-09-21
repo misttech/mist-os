@@ -4,7 +4,6 @@
 
 use anyhow::{anyhow, Context, Result};
 use errors::FfxError;
-use ffx_triage_args::TriageCommand;
 use fho::{deferred, moniker, AvailabilityFlag, Deferred, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_feedback::DataProviderProxy;
 use fuchsia_triage::{
@@ -14,9 +13,12 @@ use std::{env, io::Write, path::PathBuf};
 use tempfile::tempdir;
 use triage_app_lib::file_io::{config_from_files, diagnostics_from_directory};
 
+mod args;
 mod config;
 mod snapshot;
 pub use snapshot::create_snapshot;
+
+use args::TriageCommand;
 
 pub(crate) type Writer = MachineWriter<TriageOutput>;
 
@@ -28,8 +30,6 @@ pub struct TriageTool {
     #[command]
     cmd: TriageCommand,
 }
-
-fho::embedded_plugin!(TriageTool);
 
 #[async_trait::async_trait(?Send)]
 impl FfxMain for TriageTool {

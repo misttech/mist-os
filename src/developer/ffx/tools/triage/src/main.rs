@@ -5,5 +5,5 @@ use fho::FfxTool;
 
 #[fuchsia_async::run_singlethreaded]
 async fn main() {
-    ffx_triage::TriageTool::execute_tool().await
+    ffx_triage_lib::TriageTool::execute_tool().await
 }

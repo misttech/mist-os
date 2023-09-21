@@ -11,6 +11,7 @@ _tools = [
   "profiler",
   "starnix",
   "target-package",
+  "triage",
 ]
 
 group("tools") {
