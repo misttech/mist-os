@@ -125,7 +125,8 @@ zx_status_t Nelson::PowerInit() {
   }
 
   const ddk::BindRule kGpioRules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
       ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_10),
   };
@@ -142,7 +143,7 @@ zx_status_t Nelson::PowerInit() {
                               bind_fuchsia_hardware_power_sensor::BIND_FIDL_PROTOCOL_DEVICE),
   };
   const device_bind_prop_t kGpioProperties[] = {
-      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
       ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_GPIO_ALERT_PWR_L),
   };
 

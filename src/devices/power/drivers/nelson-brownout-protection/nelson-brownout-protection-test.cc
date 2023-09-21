@@ -4,7 +4,6 @@
 
 #include "nelson-brownout-protection.h"
 
-#include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
@@ -15,7 +14,9 @@
 #include <zxtest/zxtest.h>
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
+#include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
+
 namespace brownout_protection {
 
 namespace audio_fidl = ::fuchsia::hardware::audio;
@@ -119,90 +120,143 @@ class FakePowerSensor : public fidl::WireServer<fuchsia_hardware_power_sensor::D
 
   void GetSensorName(GetSensorNameCompleter::Sync& completer) override {}
 
+  fuchsia_hardware_power_sensor::Service::InstanceHandler CreateInstanceHandler() {
+    auto* dispatcher = async_get_default_dispatcher();
+    Handler device_handler =
+        [impl = this, dispatcher = dispatcher](
+            ::fidl::ServerEnd<::fuchsia_hardware_power_sensor::Device> request) {
+          impl->bindings_.AddBinding(dispatcher, std::move(request), impl,
+                                     fidl::kIgnoreBindingClosure);
+        };
+
+    return fuchsia_hardware_power_sensor::Service::InstanceHandler(
+        {.device = std::move(device_handler)});
+  }
+
  private:
   std::atomic<float> voltage_ = 0.0f;
+  fidl::ServerBindingGroup<fuchsia_hardware_power_sensor::Device> bindings_;
 };
 
-namespace {
-struct IncomingNamespace {
-  FakePowerSensor power_sensor;
-  component::OutgoingDirectory power_outgoing{async_get_default_dispatcher()};
-  fidl::ServerBindingGroup<fuchsia_hardware_power_sensor::Device> bindings;
-  component::OutgoingDirectory codec_outgoing{async_get_default_dispatcher()};
-};
-}  // namespace
+class NelsonBrownoutProtectionTest : public zxtest::Test {
+ public:
+  void SetUp() override {
+    ASSERT_OK(incoming_namespace_loop_.StartThread("incoming_namespace"));
 
-TEST(NelsonBrownoutProtectionTest, Test) {
-  auto fake_parent = MockDevice::FakeRootParent();
-  async::Loop loop{&kAsyncLoopConfigNoAttachToCurrentThread};
-  async_patterns::TestDispatcherBound<IncomingNamespace> incoming{loop.dispatcher(), std::in_place};
-  ASSERT_OK(audio::SimpleCodecServer::CreateAndAddToDdk<FakeCodec>(fake_parent.get()));
-  auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
-  auto codec = child_dev->GetDeviceContext<FakeCodec>();
-  ddk::MockGpio alert_gpio;
-
-  zx::interrupt alert_gpio_interrupt;
-  ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &alert_gpio_interrupt));
-
-  {
-    zx::interrupt interrupt_dup;
-    ASSERT_OK(alert_gpio_interrupt.duplicate(ZX_RIGHT_SAME_RIGHTS, &interrupt_dup));
-    alert_gpio.ExpectConfigIn(ZX_OK, GPIO_NO_PULL)
-        .ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_EDGE_LOW, std::move(interrupt_dup));
+    SetupPowerSensorFragment();
+    SetupCodecFragment();
+    SetupAlertGpioFragment();
   }
 
-  zx::result power_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(power_endpoints);
-  zx::result codec_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(codec_endpoints);
+ protected:
+  std::shared_ptr<MockDevice> fake_parent() { return fake_parent_; }
+  FakeCodec* codec() { return codec_; }
+  async_patterns::TestDispatcherBound<FakePowerSensor>& power_sensor() { return power_sensor_; }
+  zx::interrupt& alert_gpio_interrupt() { return alert_gpio_interrupt_; }
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio>& alert_gpio() { return alert_gpio_; }
 
-  ASSERT_OK(loop.StartThread("incoming-ns-thread"));
+ private:
+  void SetupPowerSensorFragment() {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(endpoints);
+    auto power_handler = power_sensor_.SyncCall(&FakePowerSensor::CreateInstanceHandler);
+    zx::result service_result = power_outgoing_.SyncCall(
+        [handler = std::move(power_handler)](component::OutgoingDirectory* outgoing) mutable {
+          return outgoing->AddService<fuchsia_hardware_power_sensor::Service>(std::move(handler));
+        });
+    ZX_ASSERT(service_result.is_ok());
+    ZX_ASSERT(
+        power_outgoing_.SyncCall(&component::OutgoingDirectory::Serve, std::move(endpoints->server))
+            .is_ok());
+    fake_parent_->AddFidlService(fuchsia_hardware_power_sensor::Service::Name,
+                                 std::move(endpoints->client), "power-sensor");
+  }
 
-  incoming.SyncCall([power_server = std::move(power_endpoints->server),
-                     codec_server = std::move(codec_endpoints->server),
-                     &codec](IncomingNamespace* ns) mutable {
-    fuchsia_hardware_power_sensor::Service::InstanceHandler handler({
-        .device = ns->bindings.CreateHandler(&ns->power_sensor, async_get_default_dispatcher(),
-                                             fidl::kIgnoreBindingClosure),
-    });
+  void SetupCodecFragment() {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(endpoints);
+    ASSERT_OK(audio::SimpleCodecServer::CreateAndAddToDdk<FakeCodec>(fake_parent_.get()));
+    auto* child_dev = fake_parent_->GetLatestChild();
+    ASSERT_NOT_NULL(child_dev);
+    codec_ = child_dev->GetDeviceContext<FakeCodec>();
+    auto codec_handler = codec_->GetInstanceHandler();
+    zx::result service_result = codec_outgoing_.SyncCall(
+        [handler = std::move(codec_handler)](component::OutgoingDirectory* outgoing) mutable {
+          return outgoing->AddService<fuchsia_hardware_audio::CodecService>(std::move(handler));
+        });
+    ZX_ASSERT(service_result.is_ok());
+    ZX_ASSERT(
+        codec_outgoing_.SyncCall(&component::OutgoingDirectory::Serve, std::move(endpoints->server))
+            .is_ok());
+    fake_parent_->AddFidlService(fuchsia_hardware_audio::CodecService::Name,
+                                 std::move(endpoints->client), "codec");
+  }
+
+  void SetupAlertGpioFragment() {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(endpoints);
     ASSERT_OK(
-        ns->power_outgoing.AddService<fuchsia_hardware_power_sensor::Service>(std::move(handler)));
-    ASSERT_OK(ns->power_outgoing.Serve(std::move(power_server)));
-    ASSERT_OK(ns->codec_outgoing.AddService<fuchsia_hardware_audio::CodecService>(
-        std::move(codec->GetInstanceHandler())));
-    ASSERT_OK(ns->codec_outgoing.Serve(std::move(codec_server)));
-  });
-  fake_parent->AddFidlService(fuchsia_hardware_power_sensor::Service::Name,
-                              std::move(power_endpoints->client), "power-sensor");
-  fake_parent->AddFidlService(fuchsia_hardware_audio::CodecService::Name,
-                              std::move(codec_endpoints->client), "codec");
+        zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &alert_gpio_interrupt_));
+    zx::interrupt interrupt;
+    ASSERT_OK(alert_gpio_interrupt_.duplicate(ZX_RIGHT_SAME_RIGHTS, &interrupt));
+    alert_gpio_.SyncCall(&fake_gpio::FakeGpio::SetInterrupt, zx::ok(std::move(interrupt)));
+    auto alert_gpio_handler = alert_gpio_.SyncCall(&fake_gpio::FakeGpio::CreateInstanceHandler);
+    zx::result service_result = alert_gpio_outgoing_.SyncCall(
+        [handler = std::move(alert_gpio_handler)](component::OutgoingDirectory* outgoing) mutable {
+          return outgoing->AddService<fuchsia_hardware_gpio::Service>(std::move(handler));
+        });
+    ZX_ASSERT(service_result.is_ok());
+    ZX_ASSERT(alert_gpio_outgoing_
+                  .SyncCall(&component::OutgoingDirectory::Serve, std::move(endpoints->server))
+                  .is_ok());
+    fake_parent_->AddFidlService(fuchsia_hardware_gpio::Service::Name, std::move(endpoints->client),
+                                 "alert-gpio");
+  }
 
-  fake_parent->AddProtocol(ZX_PROTOCOL_GPIO, alert_gpio.GetProto()->ops, alert_gpio.GetProto()->ctx,
-                           "alert-gpio");
-  ASSERT_OK(NelsonBrownoutProtection::Create(nullptr, fake_parent.get(), zx::duration{0}));
-  auto* child_dev2 = fake_parent->GetLatestChild();
+  std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
+  async::Loop incoming_namespace_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+
+  zx::interrupt alert_gpio_interrupt_;
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> alert_gpio_{
+      incoming_namespace_loop_.dispatcher(), std::in_place};
+  async_patterns::TestDispatcherBound<component::OutgoingDirectory> alert_gpio_outgoing_{
+      incoming_namespace_loop_.dispatcher(), std::in_place, async_patterns::PassDispatcher};
+
+  async_patterns::TestDispatcherBound<FakePowerSensor> power_sensor_{
+      incoming_namespace_loop_.dispatcher(), std::in_place};
+  async_patterns::TestDispatcherBound<component::OutgoingDirectory> power_outgoing_{
+      incoming_namespace_loop_.dispatcher(), std::in_place, async_patterns::PassDispatcher};
+
+  FakeCodec* codec_;
+  async_patterns::TestDispatcherBound<component::OutgoingDirectory> codec_outgoing_{
+      incoming_namespace_loop_.dispatcher(), std::in_place, async_patterns::PassDispatcher};
+};
+
+TEST_F(NelsonBrownoutProtectionTest, Test) {
+  ASSERT_OK(NelsonBrownoutProtection::Create(nullptr, fake_parent().get(), zx::duration{0}));
+  auto* child_dev2 = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev2);
   child_dev2->InitOp();
-  EXPECT_FALSE(codec->agl_enabled());
+  EXPECT_FALSE(codec()->agl_enabled());
 
-  incoming.SyncCall([](IncomingNamespace* ns) {
-    ns->power_sensor.set_voltage(10.0f);  // Must be less than 11.5 to stay in the brownout state.
-  });
+  // Must be less than 11.5 to stay in the brownout state.
+  power_sensor().SyncCall(&FakePowerSensor::set_voltage, 10.0f);
 
-  alert_gpio_interrupt.trigger(0, zx::clock::get_monotonic());
+  alert_gpio_interrupt().trigger(0, zx::clock::get_monotonic());
 
-  while (!codec->agl_enabled()) {
+  while (!codec()->agl_enabled()) {
   }
 
-  incoming.SyncCall([](IncomingNamespace* ns) {
-    ns->power_sensor.set_voltage(12.0f);  // End the brownout state and make sure AGL gets disabled.
-  });
+  // End the brownout state and make sure AGL gets disabled.
+  power_sensor().SyncCall(&FakePowerSensor::set_voltage, 12.0f);
 
-  while (codec->agl_enabled()) {
+  while (codec()->agl_enabled()) {
   }
 
-  ASSERT_NO_FATAL_FAILURE(alert_gpio.VerifyAndClear());
+  std::vector alert_gpio_states = alert_gpio().SyncCall(&fake_gpio::FakeGpio::GetStateLog);
+  ASSERT_GE(alert_gpio_states.size(), 1);
+  ASSERT_EQ(fake_gpio::ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull},
+            alert_gpio_states[0].sub_state);
 }
 
 }  // namespace brownout_protection

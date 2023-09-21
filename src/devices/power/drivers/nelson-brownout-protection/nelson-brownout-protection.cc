@@ -4,9 +4,9 @@
 
 #include "nelson-brownout-protection.h"
 
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.power.sensor/cpp/wire.h>
 #include <fuchsia/hardware/audio/cpp/banjo.h>
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/trace/event.h>
@@ -97,26 +97,47 @@ zx_status_t NelsonBrownoutProtection::Create(void* ctx, zx_device_t* parent,
 
   fidl::WireSyncClient power_sensor_client(std::move(client.value()));
 
-  ddk::GpioProtocolClient alert_gpio(parent, "alert-gpio");
-  if (!alert_gpio.is_valid()) {
-    zxlogf(ERROR, "No GPIO fragment");
-    return ZX_ERR_NO_RESOURCES;
+  const char* kAlertGpioFragmentname = "alert-gpio";
+  zx::result alert_gpio_result =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+          parent, kAlertGpioFragmentname);
+  if (alert_gpio_result.is_error()) {
+    zxlogf(ERROR, "Failed to get gpio protocol from fragment %s: %s", kAlertGpioFragmentname,
+           alert_gpio_result.status_string());
+    return alert_gpio_result.status_value();
   }
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> alert_gpio(
+      std::move(alert_gpio_result.value()));
+
+  {
+    // Pulled up externally.
+    fidl::WireResult result = alert_gpio->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kNoPull);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send ConfigIn request: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to configure gpio to input: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+  }
+
+  fidl::WireResult alert_interrupt = alert_gpio->GetInterrupt(ZX_INTERRUPT_MODE_EDGE_LOW);
+  if (!alert_interrupt.ok()) {
+    zxlogf(ERROR, "Failed to send GetInterrupt request: %s", alert_interrupt.status_string());
+    return alert_interrupt.status();
+  }
+  if (alert_interrupt->is_error()) {
+    zxlogf(ERROR, "Failed to get interrupt from gpio: %s",
+           zx_status_get_string(alert_interrupt->error_value()));
+    return alert_interrupt->error_value();
+  }
+
   zx_status_t status;
-  // Pulled up externally.
-  if ((status = alert_gpio.ConfigIn(GPIO_NO_PULL)) != ZX_OK) {
-    zxlogf(ERROR, "Failed to configure alert GPIO: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  zx::interrupt alert_interrupt;
-  if ((status = alert_gpio.GetInterrupt(ZX_INTERRUPT_MODE_EDGE_LOW, &alert_interrupt)) != ZX_OK) {
-    zxlogf(ERROR, "Failed to get alert interrupt: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  auto dev = std::make_unique<NelsonBrownoutProtection>(
-      parent, std::move(power_sensor_client), std::move(alert_interrupt), voltage_poll_interval);
+  auto dev = std::make_unique<NelsonBrownoutProtection>(parent, std::move(power_sensor_client),
+                                                        std::move(alert_interrupt.value()->irq),
+                                                        voltage_poll_interval);
   if ((status = dev->Init(std::move(*codec_client_end))) != ZX_OK) {
     return status;
   }
