@@ -21,7 +21,7 @@
 #if defined(__Fuchsia__)
 #include <lib/trace/event.h>
 
-#include "tracing.h"
+#include "src/performance/lib/test_utils/trace_controller.h"
 #endif
 
 namespace {
@@ -46,6 +46,7 @@ constexpr char kNetstack3EnvVar[] = "NETSTACK3";
 constexpr char kNetstack2EnvVar[] = "NETSTACK2";
 constexpr char kStarnixEnvVar[] = "STARNIX";
 #if defined(__Fuchsia__)
+constexpr char kSocketBenchmarksTracingCategory[] = "socket_benchmarks";
 constexpr char kTracingEnvVar[] = "TRACING";
 #endif
 
@@ -470,7 +471,13 @@ int main(int argc, char** argv) {
 #if defined(__Fuchsia__)
   std::optional<Tracer> tracer;
   if (std::getenv(kTracingEnvVar)) {
-    fit::result<fit::failed, Tracer> result = StartTracing();
+    const fuchsia_tracing_controller::TraceConfig trace_config{{
+        .categories = std::vector<std::string>{"kernel:sched", "kernel:meta", "net", "perftest",
+                                               kSocketBenchmarksTracingCategory},
+        .buffer_size_megabytes_hint = 64,
+    }};
+    fit::result<fit::failed, Tracer> result =
+        StartTracing(trace_config, "/custom_artifacts/trace.fxt");
     if (result.is_error()) {
       FX_LOGS(ERROR) << "failed to start tracing";
       return 1;

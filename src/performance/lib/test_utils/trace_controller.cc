@@ -2,14 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "tracing.h"
+#include "trace_controller.h"
 
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-provider/start.h>
+#include <zircon/errors.h>
 
 #include <fstream>
 
-fit::result<fit::failed, Tracer> StartTracing() {
+#include "src/lib/fsl/socket/blocking_drain.h"
+
+fit::result<fit::failed, Tracer> StartTracing(fuchsia_tracing_controller::TraceConfig trace_config,
+                                              const char* output_file) {
   trace_provider_start();
 
   zx::socket trace_socket, outgoing_socket;
@@ -30,13 +34,8 @@ fit::result<fit::failed, Tracer> StartTracing() {
     controller.Bind(std::move(*client_end));
   }
 
-  const fuchsia_tracing_controller::TraceConfig trace_config{{
-      .categories = std::vector<std::string>{"kernel:sched", "kernel:meta", "net", "perftest",
-                                             kSocketBenchmarksTracingCategory},
-      .buffer_size_megabytes_hint = 64,
-  }};
   if (fit::result<fidl::OneWayError> response =
-          controller->InitializeTracing({trace_config, std::move(outgoing_socket)});
+          controller->InitializeTracing({std::move(trace_config), std::move(outgoing_socket)});
       response.is_error()) {
     FX_LOGS(ERROR) << "failed to initialize tracing: " << response.error_value();
     return fit::failed();
@@ -51,36 +50,21 @@ fit::result<fit::failed, Tracer> StartTracing() {
 
   std::future<zx_status_t> fut = std::async(
       std::launch::async,
-      [](zx::socket trace_socket) {
-        std::ofstream ofs("/custom_artifacts/trace.fxt");
-        std::array<char, 4096> buffer;
-        for (;;) {
-          zx_signals_t signals = 0;
-          zx_status_t status = trace_socket.wait_one(ZX_SOCKET_READABLE | ZX_SOCKET_PEER_CLOSED,
-                                                     zx::time::infinite(), &signals);
-          if (status != ZX_OK) {
-            return status;
-          }
-          if (signals & ZX_SOCKET_READABLE) {
-            size_t actual;
-            zx_status_t status =
-                trace_socket.read(0u /* options */, buffer.data(), buffer.size(), &actual);
-            switch (status) {
-              case ZX_ERR_PEER_CLOSED:
-                return ZX_OK;
-              case ZX_OK:
-                ofs.write(buffer.data(), static_cast<std::streamsize>(actual));
-                break;
-              default:
-                return status;
-            }
-          }
-          if (signals & ZX_SOCKET_PEER_CLOSED) {
-            return ZX_OK;
-          }
-        }
+      [](zx::socket trace_socket, std::string output_file) {
+        std::ofstream ofs(output_file);
+        if (!fsl::BlockingDrainFrom(std::move(trace_socket), [&](const void* data, uint32_t len) {
+              const char* begin = static_cast<const char*>(data);
+              ofs.write(begin, len);
+              return len;
+            })) {
+          FX_LOGS(ERROR) << "failed to write trace bytes to output file";
+          return ZX_ERR_PEER_CLOSED;
+        };
+
+        return ZX_OK;
       },
-      std::move(trace_socket));
+      std::move(trace_socket), output_file);
+
   return fit::ok(Tracer{.controller = std::move(controller), .future = std::move(fut)});
 }
 

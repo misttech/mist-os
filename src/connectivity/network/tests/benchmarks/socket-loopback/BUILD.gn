@@ -15,12 +15,6 @@ test("loopback_socket_benchmarks") {
     "../../os.h",
     "loopback_socket_benchmarks.cc",
   ]
-  if (is_fuchsia) {
-    sources += [
-      "tracing.cc",
-      "tracing.h",
-    ]
-  }
 
   deps = [
     "//sdk/lib/syslog/cpp",
@@ -31,10 +25,8 @@ test("loopback_socket_benchmarks") {
   ]
   if (is_fuchsia) {
     deps += [
-      "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller_cpp",
-      "//sdk/lib/component/incoming/cpp",
+      "//src/performance/lib/test_utils:trace_controller",
       "//zircon/system/ulib/trace",
-      "//zircon/system/ulib/trace-provider",
     ]
   }
 }
