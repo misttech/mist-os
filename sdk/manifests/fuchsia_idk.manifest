@@ -262,6 +262,7 @@ host_tool://tools/arm64/bootserver
 host_tool://tools/arm64/cmc
 host_tool://tools/arm64/configc
 host_tool://tools/arm64/device-finder
+host_tool://tools/arm64/fake-omaha-client
 host_tool://tools/arm64/far
 host_tool://tools/arm64/ffx
 host_tool://tools/arm64/fidl-format
@@ -278,6 +279,7 @@ host_tool://tools/arm64/merkleroot
 host_tool://tools/arm64/minfs
 host_tool://tools/arm64/pm
 host_tool://tools/arm64/symbolizer
+host_tool://tools/arm64/trace2json
 host_tool://tools/arm64/zbi
 host_tool://tools/arm64/zxdb
 host_tool://tools/x64/bindc

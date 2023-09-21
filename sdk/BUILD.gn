@@ -16,14 +16,6 @@ import("//build/sdk/sdk_molecule.gni")
 import("//tools/check-licenses/build/license_data.gni")
 import("config.gni")
 
-# A list of sdk_collection() targets that determine the content
-# if the Fuchsia Core IDK, which provides stable and officially
-# supported Fuchsia APIs and ABIs.
-_fuchsia_core_idk_deps = [
-  ":core",
-  ":e2e_testing",
-]
-
 # A list of non-sdk_collection() targets that will be built with the
 # Fuchsia Core IDK archive, for validation purpose. Note that these
 # will also be built in the sub-builds launched by generate_final_idk().
@@ -54,7 +46,10 @@ if (host_os == "linux") {
 # this target here only ensures that `fx build sdk` will
 # also create $OUTPUT_DIR/sdk/exported/zircon_sysroot/ by
 # default, and should not affect other uses of _sdk_public_deps.
-_sdk_public_deps = _fuchsia_core_idk_deps + [ ":zircon_sysroot" ]
+_sdk_public_deps = [
+  ":core",
+  ":zircon_sysroot",
+]
 
 # This default target should depend on all public or partner IDKs.
 group("sdk") {
@@ -108,26 +103,15 @@ generated_file("plasa_manifest") {
   deps = _sdk_public_deps
 }
 
-# This target is used by infra builders to build all SDK archives that
-# make up the "core" SDK. This is deprecated and will be removed once
-# https://fxbug.dev/126262 is fixed.
-group("archives") {
-  testonly = true
-  public_deps = [
-    ":core_archive",
-    ":e2e_testing_archive",
-  ]
-}
-
-# This targets generates a "final" IDK archive
-
-# Note that this is part of the Fuchsia Core IDK.# that contains prebuilt binaries for several
-# target_cpu architecture. This is done by
-# performing several sub-builds and merging
-# the results explicitly.
+# This targets generates a "final" IDK archive, including prebuilt binaries for
+# several target_cpu architectures.
 generate_final_idk("final_fuchsia_idk") {
   output_name = "fuchsia_idk"
-  sdk_target_labels = _fuchsia_core_idk_deps
+  sdk_target_labels = [
+    # NOTE: Do not create any other sdk_collections and add them here. Instead,
+    # add atoms to the ":fuchsia_idk_atoms" sdk_molecule.
+    ":core",
+  ]
   validation_target_labels = _fuchsia_core_idk_validation_deps
   final_validation_target_labels = _fuchsia_core_idk_final_validation_deps
   testonly = true
@@ -138,6 +122,38 @@ sdk_final_manifest_golden("final_fuchsia_idk_manifest_golden") {
   idk_name = "fuchsia_idk"
   idk_exported_label = ":final_fuchsia_idk.exported"
   testonly = true
+}
+
+# NOTHING TO SEE HERE FOLKS.
+#
+# This build rule is an implementation detail. It should probably get
+# consolidated with ":final_fuchsia_idk".
+sdk_collection("core") {
+  id = sdk_id
+  category = "partner"
+
+  deps = [
+    # NOTE: Don't add any other sdk_molecules here.  Instead, add atoms to the
+    # ":fuchsia_idk_atoms" sdk_molecule.
+    ":fuchsia_idk_atoms",
+  ]
+}
+
+# A "molecule" of SDK atoms exposing the stable and officially supported APIs
+# and ABI of the Fuchsia platform.
+#
+# Due to limitations of the build system at the GN/Bazel boundary, this cannot
+# contain testonly atoms. Libraries and packages for use in tests absolutely
+# belong in the IDK, but unfortunately, before they can be added, the `testonly`
+# attribute must be removed.
+sdk_molecule("fuchsia_idk_atoms") {
+  deps = [
+    ":core_deps",
+    ":core_packages",
+  ]
+  if (!sdk_no_host_tools) {
+    deps += [ ":host_tools" ]
+  }
 }
 
 group("tests_no_e2e") {
@@ -260,29 +276,14 @@ sdk_collection("zircon_sysroot") {
   deps = [ "//zircon/public/sysroot/sdk:sysroot_sdk" ]
 }
 
-# A set of SDK atoms related to developing end-to-end tests.
-# Note that this is part of the Fuchsia Core IDK.
+# TODO: Delete once petals have been updated to remove this.
 sdk_collection("e2e_testing") {
   # TODO(fxbug.dev/6128): this id should not be necessary.
   id = sdk_id
 
   category = "partner"
 
-  deps = [
-    ":e2e_testing_tools",
-    "//sdk/testing/sl4f/client:client_sdk($dart_toolchain)",
-  ]
-}
-
-sdk_molecule("e2e_testing_tools") {
-  visibility = [ ":*" ]
-
-  if (!sdk_no_host_tools) {
-    deps = [
-      "//src/performance/trace2json:bin_sdk($host_toolchain)",
-      "//src/sys/pkg/testing/fake-omaha-client:bin_sdk($host_toolchain)",
-    ]
-  }
+  deps = []
 }
 
 # Tools and data used on a 'host' development machine; where host is often
@@ -324,6 +325,8 @@ sdk_molecule("host_tools") {
     "//zircon/tools/merkleroot:merkleroot_sdk",
     "//src/storage/minfs/tools:minfs_sdk",
     "//zircon/tools/zbi:zbi_sdk",
+    "//src/performance/trace2json:bin_sdk",
+    "//src/sys/pkg/testing/fake-omaha-client:bin_sdk",
 
     "//src/developer/ffx/plugins/emulator:uefi_internal",
 
@@ -381,6 +384,7 @@ sdk_molecule("core_lib") {
     "//sdk/lib/trace",
     "//sdk/lib/ui/scenic/cpp:cpp_sdk",
     "//sdk/lib/vfs/cpp:cpp_sdk",
+    "//sdk/testing/sl4f/client:client_sdk($dart_toolchain)",
     "//src/devices/bin/driver_runtime:driver_runtime_sdk",
     "//src/lib/fidl/cpp:cpp_sdk",
     "//src/lib/fidl/cpp:hlcpp_conversion_sdk",
@@ -491,30 +495,6 @@ sdk_collection("platform") {
     ":platform_fidls",
     ":platform_libs",
   ]
-}
-
-# A collection of SDK atoms exposing the stable and officially supported APIs
-# and ABI of the "core" Fuchsia platform.
-
-# Due to limitations of the build system at the GN/Bazel boundary, this
-# collection cannot contain testonly atoms. Libraries and packages for use in
-# tests absolutely belong in the IDK, but unfortunately, before they can be
-# added, the `testonly` attribute must be removed.
-#
-# This collection is part of the Fuchsia Core IDK, as well as used to populate
-# the @fuchsia_sdk Bazel repository used internally by the build.
-sdk_collection("core") {
-  id = sdk_id
-
-  category = "partner"
-
-  deps = [
-    ":core_deps",
-    ":core_packages",
-  ]
-  if (!sdk_no_host_tools) {
-    deps += [ ":host_tools" ]
-  }
 }
 
 if (is_host) {
