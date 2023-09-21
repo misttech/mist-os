@@ -478,12 +478,19 @@ rustflags = [ "--cfg=fn_like_proc_macro" ]
 # generator has not gone through a thorough safety review yet, and needs to be
 # re-reviewed before it can be used outside of tests.
 [gn.package.generator."0.7.5"]
-deps = [
-  "//build/validate:non_production_tag",
-  "//third_party/rust_crates/compat/generator:asm",
-]
 visibility = [ ":loom-v0_5_6" ]
 testonly = true
+deps = [
+  "//build/validate:non_production_tag",
+]
+
+# generator's asm deps are only supported on x64 and arm64 so far, and we need
+# to not include the asm target when there's no suitable implementation to be
+# selected.
+[gn.package.generator."0.7.5".platform."cfg(not(target_os = \"fuchsia\"))"]
+deps = [
+  "//third_party/rust_crates/compat/generator:asm",
+]
 
 [gn.package.generic-array."0.14.5"]
 rustflags = [ "--cfg=relaxed_coherence" ]

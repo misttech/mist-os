@@ -4565,7 +4565,10 @@ rust_library("generator-v0_7_5") {
     deps += [ ":windows-v0_48_0" ]
   }
   deps += [ "//build/validate:non_production_tag" ]
-  deps += [ "//third_party/rust_crates/compat/generator:asm" ]
+  if (!(current_os == "fuchsia")) {
+    deps += [ "//third_party/rust_crates/compat/generator:asm" ]
+  }
+
   rustenv = []
 
   rustflags = [
