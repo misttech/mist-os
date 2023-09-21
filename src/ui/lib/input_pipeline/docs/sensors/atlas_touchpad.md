@@ -30,7 +30,7 @@ MouseInputReport {
     position_x: None,
     position_y: None,
     unknown_data: None,
-    __non_exhaustive: ()
+    __source_breaking: SourceBreaking
 })
 ```
 
@@ -78,10 +78,10 @@ TouchInputReport {
         contact_width: Some(2953),
         contact_height: Some(3230),
         unknown_data: None,
-        __non_exhaustive: () }]),
+        __source_breaking: SourceBreaking }]),
     pressed_buttons: Some([]),
     unknown_data: None,
-    __non_exhaustive: ()
+    __source_breaking: SourceBreaking
 }
 ```
 

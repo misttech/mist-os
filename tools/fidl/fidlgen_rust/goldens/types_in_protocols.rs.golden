@@ -46,12 +46,12 @@ impl Bits {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[non_exhaustive]
 pub enum Enum {
     Val,
-    #[deprecated = "Use `Enum::unknown()` to construct and `EnumUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    __Unknown(u32),
+    __SourceBreaking {
+        unknown_ordinal: u32,
+    },
 }
 
 /// Pattern that matches an unknown `Enum` member.
@@ -75,31 +75,27 @@ impl Enum {
     pub fn from_primitive_allow_unknown(prim: u32) -> Self {
         match prim {
             1 => Self::Val,
-            #[allow(deprecated)]
-            x => Self::__Unknown(x),
+            unknown_ordinal => Self::__SourceBreaking { unknown_ordinal },
         }
     }
 
     #[inline]
     pub fn unknown() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown(0xffffffff)
+        Self::__SourceBreaking { unknown_ordinal: 0xffffffff }
     }
 
     #[inline]
     pub const fn into_primitive(self) -> u32 {
         match self {
             Self::Val => 1,
-            #[allow(deprecated)]
-            Self::__Unknown(x) => x,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown(_) => true,
+            Self::__SourceBreaking { unknown_ordinal: _ } => true,
             _ => false,
         }
     }
@@ -263,18 +259,16 @@ impl fidl::Persistable for VectorOptional {}
 
 #[derive(Debug, Default, PartialEq)]
 pub struct ResourceTable {
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Standalone for ResourceTable {}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Table {
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for Table {}
@@ -282,11 +276,9 @@ impl fidl::Persistable for Table {}
 #[derive(Debug)]
 pub enum ResourceUnion {
     B(bool),
-    #[deprecated = "Use `ResourceUnion::unknown()` to construct and `ResourceUnionUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -313,22 +305,19 @@ impl ResourceUnion {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::B(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -339,11 +328,9 @@ impl fidl::Standalone for ResourceUnion {}
 #[derive(Clone, Debug)]
 pub enum Union {
     B(bool),
-    #[deprecated = "Use `Union::unknown()` to construct and `UnionUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -370,22 +357,19 @@ impl Union {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::B(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -12423,8 +12407,7 @@ mod internal {
                     offset + 8,
                     _depth,
                 ),
-                #[allow(deprecated)]
-                ResourceUnion::__Unknown { .. } => Err(fidl::Error::UnknownUnionTag),
+                ResourceUnion::__SourceBreaking { .. } => Err(fidl::Error::UnknownUnionTag),
             }
         }
     }
@@ -12432,8 +12415,7 @@ mod internal {
     impl fidl::encoding::Decode<Self> for ResourceUnion {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -12490,7 +12472,7 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self = ResourceUnion::__Unknown { ordinal };
+                    *self = ResourceUnion::__SourceBreaking { unknown_ordinal: ordinal };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
@@ -12545,8 +12527,7 @@ mod internal {
                     offset + 8,
                     _depth,
                 ),
-                #[allow(deprecated)]
-                Union::__Unknown { .. } => Err(fidl::Error::UnknownUnionTag),
+                Union::__SourceBreaking { .. } => Err(fidl::Error::UnknownUnionTag),
             }
         }
     }
@@ -12554,8 +12535,7 @@ mod internal {
     impl fidl::encoding::Decode<Self> for Union {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -12612,7 +12592,7 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self = Union::__Unknown { ordinal };
+                    *self = Union::__SourceBreaking { unknown_ordinal: ordinal };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {

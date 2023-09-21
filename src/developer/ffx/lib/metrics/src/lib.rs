@@ -132,7 +132,7 @@ mod tests {
         //     commit_timestamp: None, build_version: None,
         //     abi_revision: None, api_level: None,
         //     exec_path: None, build_id: None,
-        //     __non_exhaustive: ()};
+        //     __source_breaking: fidl::marker::SourceBreaking};
         let version_info = VersionInfo::default();
         init_metrics_svc(version_info, None, String::from("test_version")).await;
         let mut custom_dimensions = BTreeMap::new();

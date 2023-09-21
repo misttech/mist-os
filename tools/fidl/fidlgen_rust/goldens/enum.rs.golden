@@ -22,11 +22,9 @@ use {
 use fuchsia_zircon as zx;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[non_exhaustive]
 pub enum MyEmptyFlexibleEnum {
-    #[deprecated = "Use `MyEmptyFlexibleEnum::unknown()` to construct and `MyEmptyFlexibleEnumUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    __Unknown(u32),
+    __SourceBreaking { unknown_ordinal: u32 },
 }
 
 /// Pattern that matches an unknown `MyEmptyFlexibleEnum` member.
@@ -48,42 +46,38 @@ impl MyEmptyFlexibleEnum {
     #[inline]
     pub fn from_primitive_allow_unknown(prim: u32) -> Self {
         match prim {
-            #[allow(deprecated)]
-            x => Self::__Unknown(x),
+            unknown_ordinal => Self::__SourceBreaking { unknown_ordinal },
         }
     }
 
     #[inline]
     pub fn unknown() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown(0xffffffff)
+        Self::__SourceBreaking { unknown_ordinal: 0xffffffff }
     }
 
     #[inline]
     pub const fn into_primitive(self) -> u32 {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown(x) => x,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown(_) => true,
+            Self::__SourceBreaking { unknown_ordinal: _ } => true,
         }
     }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[non_exhaustive]
 pub enum MyFlexibleEnum {
     Foo,
     Bar,
-    #[deprecated = "Use `MyFlexibleEnum::unknown()` to construct and `MyFlexibleEnumUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    __Unknown(u32),
+    __SourceBreaking {
+        unknown_ordinal: u32,
+    },
 }
 
 /// Pattern that matches an unknown `MyFlexibleEnum` member.
@@ -109,15 +103,13 @@ impl MyFlexibleEnum {
         match prim {
             1 => Self::Foo,
             2 => Self::Bar,
-            #[allow(deprecated)]
-            x => Self::__Unknown(x),
+            unknown_ordinal => Self::__SourceBreaking { unknown_ordinal },
         }
     }
 
     #[inline]
     pub fn unknown() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown(0xffffffff)
+        Self::__SourceBreaking { unknown_ordinal: 0xffffffff }
     }
 
     #[inline]
@@ -125,30 +117,28 @@ impl MyFlexibleEnum {
         match self {
             Self::Foo => 1,
             Self::Bar => 2,
-            #[allow(deprecated)]
-            Self::__Unknown(x) => x,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown(_) => true,
+            Self::__SourceBreaking { unknown_ordinal: _ } => true,
             _ => false,
         }
     }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[non_exhaustive]
 pub enum MyFlexibleEnumWithCustomUnknown {
     Foo,
     Bar,
     CustomUnknown,
-    #[deprecated = "Use `MyFlexibleEnumWithCustomUnknown::unknown()` to construct and `MyFlexibleEnumWithCustomUnknownUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    __Unknown(u32),
+    __SourceBreaking {
+        unknown_ordinal: u32,
+    },
 }
 
 /// Pattern that matches an unknown `MyFlexibleEnumWithCustomUnknown` member.
@@ -176,15 +166,13 @@ impl MyFlexibleEnumWithCustomUnknown {
             1 => Self::Foo,
             2 => Self::Bar,
             3 => Self::CustomUnknown,
-            #[allow(deprecated)]
-            x => Self::__Unknown(x),
+            unknown_ordinal => Self::__SourceBreaking { unknown_ordinal },
         }
     }
 
     #[inline]
     pub fn unknown() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown(0x3)
+        Self::__SourceBreaking { unknown_ordinal: 0x3 }
     }
 
     #[inline]
@@ -193,16 +181,14 @@ impl MyFlexibleEnumWithCustomUnknown {
             Self::Foo => 1,
             Self::Bar => 2,
             Self::CustomUnknown => 3,
-            #[allow(deprecated)]
-            Self::__Unknown(x) => x,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown(_) => true,
+            Self::__SourceBreaking { unknown_ordinal: _ } => true,
             _ => false,
         }
     }

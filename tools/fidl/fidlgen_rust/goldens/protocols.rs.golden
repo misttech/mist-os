@@ -315,11 +315,9 @@ impl fidl::Standalone for WithProtocolEndsStructContainingEndsResponse {}
 #[derive(Clone, Debug)]
 pub enum TheUnion {
     V(u32),
-    #[deprecated = "Use `TheUnion::unknown()` to construct and `TheUnionUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -346,22 +344,19 @@ impl TheUnion {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::V(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -10068,8 +10063,7 @@ mod internal {
                     offset + 8,
                     _depth,
                 ),
-                #[allow(deprecated)]
-                TheUnion::__Unknown { .. } => Err(fidl::Error::UnknownUnionTag),
+                TheUnion::__SourceBreaking { .. } => Err(fidl::Error::UnknownUnionTag),
             }
         }
     }
@@ -10077,8 +10071,7 @@ mod internal {
     impl fidl::encoding::Decode<Self> for TheUnion {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -10135,7 +10128,7 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self = TheUnion::__Unknown { ordinal };
+                    *self = TheUnion::__SourceBreaking { unknown_ordinal: ordinal };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {

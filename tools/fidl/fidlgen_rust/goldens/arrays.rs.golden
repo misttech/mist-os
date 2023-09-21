@@ -40,9 +40,8 @@ impl fidl::Persistable for StructSmallArray {}
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TableLargeArray {
     pub a: Option<[u32; 100]>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for TableLargeArray {}
@@ -50,9 +49,8 @@ impl fidl::Persistable for TableLargeArray {}
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TableSmallArray {
     pub a: Option<[u32; 2]>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for TableSmallArray {}
