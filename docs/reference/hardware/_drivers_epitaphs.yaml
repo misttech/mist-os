@@ -380,3 +380,15 @@
   available_in_git: '466281247ca8f90b5c8a694572fd3cff8664070e'
   areas: ['Board']
   path: '/src/devices/board/drivers/pinecrest'
+- short_description: 'Synaptics AS370 audio subsystem TDM output driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '919352'
+  available_in_git: '104162dd5cbfc2ee60e42a34c6922de8eb9e8b21'
+  areas: ['Media', 'Audio']
+  path: '/src/media/audio/drivers/as370-tdm-output'
+- short_description: 'Synaptics AS370 audio subsystem PDM input driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '919352'
+  available_in_git: '104162dd5cbfc2ee60e42a34c6922de8eb9e8b21'
+  areas: ['Media', 'Audio']
+  path: '/src/media/audio/drivers/as370-pdm-input'

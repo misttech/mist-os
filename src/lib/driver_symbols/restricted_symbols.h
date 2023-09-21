@@ -53,8 +53,6 @@ const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
     "#meta/ams-light.cm",
     "#meta/arm_mali_iv009_isp.cm",
     "#meta/as370-gpio.cm",
-    "#meta/as370-pdm-input.cm",
-    "#meta/as370-tdm-output.cm",
     "#meta/asix-88179.cm",
     "#meta/asix-88772b.cm",
     "#meta/astro.cm",

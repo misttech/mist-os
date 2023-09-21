@@ -11,8 +11,6 @@ group("drivers") {
     "aml-g12-tdm",
     "aml-g12-tdm:aml-g12-composite",
     "aml-g12-tdm:aml-g12-tdm-dai",
-    "as370-pdm-input",
-    "as370-tdm-output",
     "codecs/alc5514",
     "codecs/alc5663",
     "codecs/da7219",
@@ -38,8 +36,6 @@ group("tests") {
   deps = [
     "aml-g12-pdm:tests",
     "aml-g12-tdm:tests",
-    "as370-pdm-input:tests",
-    "as370-tdm-output:tests",
     "codecs:tests",
     "configurator:tests",
     "intel-hda:tests",
