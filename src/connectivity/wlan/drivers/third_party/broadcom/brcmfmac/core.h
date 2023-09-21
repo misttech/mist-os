@@ -26,7 +26,6 @@
 #include <fuchsia/hardware/network/driver/c/banjo.h>
 #include <fuchsia/hardware/wlanphyimpl/c/banjo.h>
 #include <fuchsia/wlan/common/c/banjo.h>
-#include <fuchsia/wlan/fullmac/c/banjo.h>
 #include <lib/stdcompat/span.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/channel.h>
@@ -45,12 +44,10 @@
 
 #include "bus.h"
 #include "fuchsia/wlan/ieee80211/cpp/fidl.h"
-#include "fuchsia/wlan/internal/c/banjo.h"
 #include "fweh.h"
 #include "fwil_types.h"
 #include "linuxisms.h"
 #include "recovery/recovery_trigger.h"
-#include "src/connectivity/wlan/drivers/lib/fullmac_ifc/wlan_fullmac_ifc.h"
 #include "workqueue.h"
 
 #define TOE_TX_CSUM_OL 0x00000001
@@ -280,7 +277,7 @@ struct net_device {
   uint32_t scan_num_results;
   std::mutex scan_sync_id_mutex;  // Used to ensure that sync_id is stored before processing results
   std::shared_mutex if_proto_lock;  // Used as RW-lock for if_proto.
-  std::unique_ptr<wlan::WlanFullmacIfc> if_proto;
+  fdf::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImplIfc> if_proto;
   uint8_t dev_addr[ETH_ALEN];
   char name[NET_DEVICE_NAME_MAX_LEN];
   void* priv;

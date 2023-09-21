@@ -124,12 +124,12 @@ TEST_F(ScanAndApStartTest, ScanApStartInterference) {
   // Scan should have been cancelled by AP start operation
   auto result = client_ifc_.ScanResultCode(kFirstScanId);
   EXPECT_NE(result, std::nullopt);
-  EXPECT_EQ(*result, wlan_fullmac::WlanScanResult::kCanceledByDriverOrFirmware);
+  EXPECT_EQ(*result, wlan_fullmac_wire::WlanScanResult::kCanceledByDriverOrFirmware);
 
   // Make sure the AP iface started successfully.
   EXPECT_EQ(softap_ifc_.stats_.start_confirmations.size(), 1U);
   EXPECT_EQ(softap_ifc_.stats_.start_confirmations.back().result_code,
-            wlan_fullmac::WlanStartResult::kSuccess);
+            wlan_fullmac_wire::WlanStartResult::kSuccess);
 }
 
 TEST_F(ScanAndApStartTest, ScanAbortFailure) {
@@ -151,12 +151,12 @@ TEST_F(ScanAndApStartTest, ScanAbortFailure) {
   // The first scan should be done because the abort is failed
   auto first_result = client_ifc_.ScanResultCode(kFirstScanId);
   EXPECT_NE(first_result, std::nullopt);
-  EXPECT_EQ(*first_result, wlan_fullmac::WlanScanResult::kSuccess);
+  EXPECT_EQ(*first_result, wlan_fullmac_wire::WlanScanResult::kSuccess);
 
   // Make sure the AP iface started successfully.
   EXPECT_EQ(softap_ifc_.stats_.start_confirmations.size(), 1U);
   EXPECT_EQ(softap_ifc_.stats_.start_confirmations.back().result_code,
-            wlan_fullmac::WlanStartResult::kSuccess);
+            wlan_fullmac_wire::WlanStartResult::kSuccess);
 
   env_->ScheduleNotification(std::bind(&SimInterface::StartScan, &client_ifc_, kSecondScanId, false,
                                        std::optional<const std::vector<uint8_t>>{}),
@@ -170,7 +170,7 @@ TEST_F(ScanAndApStartTest, ScanAbortFailure) {
   // brcmf_scan_status_bit_t::ABORT bit.
   auto second_result = client_ifc_.ScanResultCode(kSecondScanId);
   EXPECT_NE(second_result, std::nullopt);
-  EXPECT_EQ(*second_result, wlan_fullmac::WlanScanResult::kSuccess);
+  EXPECT_EQ(*second_result, wlan_fullmac_wire::WlanScanResult::kSuccess);
 }
 
 // This test verifies that when a scan request from SME is canceled by the driver because of an AP
@@ -195,12 +195,12 @@ TEST_F(ScanAndApStartTest, ScanWhileApStart) {
   // The first scan should be done because the abort is failed
   auto first_result = client_ifc_.ScanResultCode(kFirstScanId);
   EXPECT_NE(first_result, std::nullopt);
-  EXPECT_EQ(*first_result, wlan_fullmac::WlanScanResult::kShouldWait);
+  EXPECT_EQ(*first_result, wlan_fullmac_wire::WlanScanResult::kShouldWait);
 
   // The result of AP iface start should be NOT_SUPPORT when timeout happened.
   EXPECT_EQ(softap_ifc_.stats_.start_confirmations.size(), 1U);
   EXPECT_EQ(softap_ifc_.stats_.start_confirmations.back().result_code,
-            wlan_fullmac::WlanStartResult::kNotSupported);
+            wlan_fullmac_wire::WlanStartResult::kNotSupported);
 }
 
 }  // namespace wlan::brcmfmac

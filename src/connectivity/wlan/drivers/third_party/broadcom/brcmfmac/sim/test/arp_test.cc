@@ -84,9 +84,9 @@ class ArpTest : public SimTest {
   void Init();
   void CleanupApInterface();
 
-  void OnAssocInd(const wlan_fullmac::WlanFullmacAssocInd* ind);
-  void OnStartConf(const wlan_fullmac::WlanFullmacStartConfirm* resp);
-  void OnStopConf(const wlan_fullmac::WlanFullmacStopConfirm* resp);
+  void OnAssocInd(const wlan_fullmac_wire::WlanFullmacAssocInd* ind);
+  void OnStartConf(const wlan_fullmac_wire::WlanFullmacStartConfirm* resp);
+  void OnStopConf(const wlan_fullmac_wire::WlanFullmacStopConfirm* resp);
 
   // Send a frame directly into the environment
   void Tx(const std::vector<uint8_t>& ethFrame);
@@ -128,17 +128,17 @@ void GenericIfc::StopConf(StopConfRequestView request, fdf::Arena& arena,
   completer.buffer(arena).Reply();
 }
 
-void ArpTest::OnAssocInd(const wlan_fullmac::WlanFullmacAssocInd* ind) {
+void ArpTest::OnAssocInd(const wlan_fullmac_wire::WlanFullmacAssocInd* ind) {
   ASSERT_EQ(std::memcmp(ind->peer_sta_address.data(), kTheirMac.byte, ETH_ALEN), 0);
   assoc_ind_recv_ = true;
 }
 
-void ArpTest::OnStartConf(const wlan_fullmac::WlanFullmacStartConfirm* resp) {
-  ASSERT_EQ(resp->result_code, wlan_fullmac::WlanStartResult::kSuccess);
+void ArpTest::OnStartConf(const wlan_fullmac_wire::WlanFullmacStartConfirm* resp) {
+  ASSERT_EQ(resp->result_code, wlan_fullmac_wire::WlanStartResult::kSuccess);
 }
 
-void ArpTest::OnStopConf(const wlan_fullmac::WlanFullmacStopConfirm* resp) {
-  ASSERT_EQ(resp->result_code, wlan_fullmac::WlanStopResult::kSuccess);
+void ArpTest::OnStopConf(const wlan_fullmac_wire::WlanFullmacStopConfirm* resp) {
+  ASSERT_EQ(resp->result_code, wlan_fullmac_wire::WlanStopResult::kSuccess);
 }
 
 void ArpTest::Init() {

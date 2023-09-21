@@ -6,7 +6,6 @@
 
 #include <fuchsia/wlan/common/c/banjo.h>
 #include <fuchsia/wlan/ieee80211/cpp/fidl.h>
-#include <fuchsia/wlan/internal/c/banjo.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdio/directory.h>
 
@@ -273,7 +272,7 @@ void SimInterface::StopInterface() {
   }
 }
 
-void SimInterface::Query(wlan_fullmac::WlanFullmacQueryInfo* out_info) {
+void SimInterface::Query(wlan_fullmac_wire::WlanFullmacQueryInfo* out_info) {
   auto result = client_.buffer(test_arena_)->Query();
   ZX_ASSERT(result.ok());
   ZX_ASSERT(!result->is_error());
@@ -307,7 +306,7 @@ void SimInterface::QuerySpectrumManagementSupport(
 }
 
 void SimInterface::GetMacAddr(common::MacAddr* out_macaddr) {
-  wlan_fullmac::WlanFullmacQueryInfo info;
+  wlan_fullmac_wire::WlanFullmacQueryInfo info;
   Query(&info);
   memcpy(out_macaddr->byte, info.sta_addr.data(), ETH_ALEN);
 }
@@ -330,7 +329,7 @@ void SimInterface::StartConnect(const common::MacAddr& bssid, const wlan_ieee802
   assoc_ctx_.channel = channel;
 
   // Send connect request
-  auto builder = wlan_fullmac::WlanFullmacImplConnectRequest::Builder(test_arena_);
+  auto builder = wlan_fullmac_wire::WlanFullmacImplConnectRequest::Builder(test_arena_);
   fuchsia_wlan_internal::wire::BssDescription bss;
   memcpy(bss.bssid.data(), bssid.byte, ETH_ALEN);
   auto ies =
@@ -339,7 +338,7 @@ void SimInterface::StartConnect(const common::MacAddr& bssid, const wlan_ieee802
   bss.channel = channel;
   bss.bss_type = fuchsia_wlan_common::wire::BssType::kInfrastructure;
   builder.selected_bss(bss);
-  builder.auth_type(wlan_fullmac::WlanAuthType::kOpenSystem);
+  builder.auth_type(wlan_fullmac_wire::WlanAuthType::kOpenSystem);
   builder.connect_failure_timeout(1000);  // ~1s (although value is ignored for now)
 
   auto result = client_.buffer(test_arena_)->Connect(builder.Build());
@@ -367,7 +366,7 @@ void SimInterface::DeauthenticateFrom(const common::MacAddr& bssid,
   // This should only be performed on a Client interface
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kClient);
 
-  wlan_fullmac::WlanFullmacDeauthReq deauth_req = {.reason_code = reason};
+  wlan_fullmac_wire::WlanFullmacDeauthReq deauth_req = {.reason_code = reason};
   memcpy(deauth_req.peer_sta_address.data(), bssid.byte, ETH_ALEN);
 
   auto result = client_.buffer(test_arena_)->DeauthReq(deauth_req);
@@ -376,13 +375,13 @@ void SimInterface::DeauthenticateFrom(const common::MacAddr& bssid,
 
 void SimInterface::StartScan(uint64_t txn_id, bool active,
                              std::optional<const std::vector<uint8_t>> channels_arg) {
-  wlan_fullmac::WlanScanType scan_type =
-      active ? wlan_fullmac::WlanScanType::kActive : wlan_fullmac::WlanScanType::kPassive;
+  wlan_fullmac_wire::WlanScanType scan_type =
+      active ? wlan_fullmac_wire::WlanScanType::kActive : wlan_fullmac_wire::WlanScanType::kPassive;
   uint32_t dwell_time = active ? kDefaultActiveScanDwellTimeMs : kDefaultPassiveScanDwellTimeMs;
   const std::vector<uint8_t> channels =
       channels_arg.has_value() ? channels_arg.value() : kDefaultScanChannels;
 
-  auto builder = wlan_fullmac::WlanFullmacImplStartScanRequest::Builder(test_arena_);
+  auto builder = wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(test_arena_);
 
   builder.txn_id(txn_id);
   builder.scan_type(scan_type);
@@ -399,7 +398,7 @@ void SimInterface::StartScan(uint64_t txn_id, bool active,
   ZX_ASSERT(result.ok());
 }
 
-std::optional<wlan_fullmac::WlanScanResult> SimInterface::ScanResultCode(uint64_t txn_id) {
+std::optional<wlan_fullmac_wire::WlanScanResult> SimInterface::ScanResultCode(uint64_t txn_id) {
   auto results = scan_results_.find(txn_id);
 
   // Verify that we started a scan on this interface
@@ -408,7 +407,7 @@ std::optional<wlan_fullmac::WlanScanResult> SimInterface::ScanResultCode(uint64_
   return results->second.result_code;
 }
 
-const std::list<wlan_fullmac::WlanFullmacScanResult>* SimInterface::ScanResultList(
+const std::list<wlan_fullmac_wire::WlanFullmacScanResult>* SimInterface::ScanResultList(
     uint64_t txn_id) {
   auto results = scan_results_.find(txn_id);
 
@@ -424,7 +423,7 @@ void SimInterface::StartSoftAp(const wlan_ieee80211::CSsid& ssid,
   // This should only be performed on an AP interface
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kAp);
 
-  wlan_fullmac::WlanFullmacStartReq start_req = {
+  wlan_fullmac_wire::WlanFullmacStartReq start_req = {
       .bss_type = fuchsia_wlan_common::wire::BssType::kInfrastructure,
       .beacon_period = beacon_period,
       .dtim_period = dtim_period,
@@ -449,7 +448,7 @@ void SimInterface::StopSoftAp() {
   // This should only be performed on an AP interface
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kAp);
 
-  wlan_fullmac::WlanFullmacStopReq stop_req;
+  wlan_fullmac_wire::WlanFullmacStopReq stop_req;
 
   ZX_ASSERT(stop_req.ssid.data.size() == wlan_ieee80211::kMaxSsidByteLen);
   // Use the ssid from the last call to StartSoftAp

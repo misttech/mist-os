@@ -148,9 +148,9 @@ void DynamicIfTest::VerifyAssocWithSoftAP() {
 void DynamicIfTest::VerifyStartApTimer() {
   EXPECT_EQ(softap_ifc_.stats_.start_confirmations.size(), 2U);
   EXPECT_EQ(softap_ifc_.stats_.start_confirmations.front().result_code,
-            wlan_fullmac::WlanStartResult::kBssAlreadyStartedOrJoined);
+            wlan_fullmac_wire::WlanStartResult::kBssAlreadyStartedOrJoined);
   EXPECT_EQ(softap_ifc_.stats_.start_confirmations.back().result_code,
-            wlan_fullmac::WlanStartResult::kNotSupported);
+            wlan_fullmac_wire::WlanStartResult::kNotSupported);
 }
 
 void DynamicIfTest::SetChanspec(bool is_ap_iface, uint16_t* chanspec, zx_status_t expect_result) {
@@ -953,7 +953,7 @@ TEST_F(DynamicIfTest, StartApIfaceTimeoutWithReqSpamAndFwIgnore) {
   // Make sure the AP iface finally stated successfully.
   EXPECT_EQ(softap_ifc_.stats_.start_confirmations.size(), 3U);
   EXPECT_EQ(softap_ifc_.stats_.start_confirmations.back().result_code,
-            wlan_fullmac::WlanStartResult::kSuccess);
+            wlan_fullmac_wire::WlanStartResult::kSuccess);
 }
 
 // This test case verifies that a scan request comes while a AP start req is in progress will be
@@ -979,11 +979,12 @@ TEST_F(DynamicIfTest, RejectScanWhenApStartReqIsPending) {
   // is 149, The scan has been stopped before reaching that channel.
   EXPECT_EQ(client_ifc_.ScanResultList(kScanId)->size(), 0U);
   ASSERT_NE(client_ifc_.ScanResultCode(kScanId), std::nullopt);
-  EXPECT_EQ(client_ifc_.ScanResultCode(kScanId).value(), wlan_fullmac::WlanScanResult::kShouldWait);
+  EXPECT_EQ(client_ifc_.ScanResultCode(kScanId).value(),
+            wlan_fullmac_wire::WlanScanResult::kShouldWait);
 
   // AP start will also fail because the request is ignored in firmware.
   EXPECT_EQ(softap_ifc_.stats_.start_confirmations.size(), 1U);
   EXPECT_EQ(softap_ifc_.stats_.start_confirmations.back().result_code,
-            wlan_fullmac::WlanStartResult::kNotSupported);
+            wlan_fullmac_wire::WlanStartResult::kNotSupported);
 }
 }  // namespace wlan::brcmfmac

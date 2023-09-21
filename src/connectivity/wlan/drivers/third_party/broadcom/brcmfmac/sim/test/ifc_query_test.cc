@@ -26,7 +26,7 @@ TEST_F(SimTest, ClientIfcQuery) {
   SimInterface client_ifc;
   ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc, kDefaultMac), ZX_OK);
 
-  wlan_fullmac::WlanFullmacQueryInfo ifc_query_result;
+  wlan_fullmac_wire::WlanFullmacQueryInfo ifc_query_result;
   // TODO(fxbug.dev/94163): This query silently logs errors and fails because the
   // the "chanspecs", "ldpc_cap", and other iovars are not supported by the simulated firmware.
   env_->ScheduleNotification(std::bind(&SimInterface::Query, &client_ifc, &ifc_query_result),
@@ -44,7 +44,7 @@ TEST_F(SimTest, ClientIfcQuery) {
   ASSERT_LE(ifc_query_result.band_cap_count, (size_t)wlan_common::kMaxBands);
 
   for (size_t band = 0; band < ifc_query_result.band_cap_count; band++) {
-    wlan_fullmac::WlanFullmacBandCapability* band_cap = &ifc_query_result.band_cap_list[band];
+    wlan_fullmac_wire::WlanFullmacBandCapability* band_cap = &ifc_query_result.band_cap_list[band];
 
     // Band id should be in valid range
     EXPECT_TRUE(band_cap->band == wlan_common::WlanBand::kTwoGhz ||
@@ -66,7 +66,7 @@ TEST_F(SimTest, BadNchainIovar) {
   sim->sim_fw->err_inj_.AddErrInjIovar("rxstreams_cap", ZX_OK, BCME_OK, client_ifc.iface_id_,
                                        &alt_rxchain_data);
 
-  wlan_fullmac::WlanFullmacQueryInfo ifc_query_result;
+  wlan_fullmac_wire::WlanFullmacQueryInfo ifc_query_result;
   env_->ScheduleNotification(std::bind(&SimInterface::Query, &client_ifc, &ifc_query_result),
                              zx::sec(1));
   env_->Run(kSimulatedClockDuration);

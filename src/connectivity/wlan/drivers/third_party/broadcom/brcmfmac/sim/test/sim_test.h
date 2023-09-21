@@ -6,7 +6,6 @@
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_SIM_TEST_SIM_TEST_H_
 
 #include <fuchsia/wlan/common/c/banjo.h>
-#include <fuchsia/wlan/fullmac/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <zircon/types.h>
 
@@ -20,7 +19,7 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_device.h"
 #include "zircon/system/ulib/sync/include/lib/sync/cpp/completion.h"
 
-namespace wlan_fullmac = fuchsia_wlan_fullmac::wire;
+namespace wlan_fullmac_wire = fuchsia_wlan_fullmac::wire;
 
 namespace wlan::brcmfmac {
 
@@ -49,15 +48,15 @@ class SimInterface : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacImp
   struct Stats {
     size_t connect_attempts = 0;
     size_t connect_successes = 0;
-    std::list<wlan_fullmac::WlanFullmacConnectConfirm> connect_results;
-    std::list<wlan_fullmac::WlanFullmacAssocInd> assoc_indications;
-    std::list<wlan_fullmac::WlanFullmacAuthInd> auth_indications;
-    std::list<wlan_fullmac::WlanFullmacDeauthConfirm> deauth_results;
-    std::list<wlan_fullmac::WlanFullmacDeauthIndication> deauth_indications;
-    std::list<wlan_fullmac::WlanFullmacDisassocIndication> disassoc_indications;
-    std::list<wlan_fullmac::WlanFullmacChannelSwitchInfo> csa_indications;
-    std::list<wlan_fullmac::WlanFullmacStartConfirm> start_confirmations;
-    std::list<wlan_fullmac::WlanFullmacStopConfirm> stop_confirmations;
+    std::list<wlan_fullmac_wire::WlanFullmacConnectConfirm> connect_results;
+    std::list<wlan_fullmac_wire::WlanFullmacAssocInd> assoc_indications;
+    std::list<wlan_fullmac_wire::WlanFullmacAuthInd> auth_indications;
+    std::list<wlan_fullmac_wire::WlanFullmacDeauthConfirm> deauth_results;
+    std::list<wlan_fullmac_wire::WlanFullmacDeauthIndication> deauth_indications;
+    std::list<wlan_fullmac_wire::WlanFullmacDisassocIndication> disassoc_indications;
+    std::list<wlan_fullmac_wire::WlanFullmacChannelSwitchInfo> csa_indications;
+    std::list<wlan_fullmac_wire::WlanFullmacStartConfirm> start_confirmations;
+    std::list<wlan_fullmac_wire::WlanFullmacStopConfirm> stop_confirmations;
   };
 
   // Default scan options
@@ -90,7 +89,7 @@ class SimInterface : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacImp
   void DestroyDispatcher();
 
   // Default SME Callbacks
-  // Implementation of fuchsia_wlan_fullmac::WlanFullmacImplIfc.
+  // Implementation of wlan_fullmac_wire::WlanFullmacImplIfc.
   void OnScanResult(OnScanResultRequestView request, fdf::Arena& arena,
                     OnScanResultCompleter::Sync& completer) override;
   void OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
@@ -135,7 +134,7 @@ class SimInterface : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacImp
                        OnWmmStatusRespCompleter::Sync& completer) override;
 
   // Query an interface
-  void Query(wlan_fullmac::WlanFullmacQueryInfo* out_info);
+  void Query(wlan_fullmac_wire::WlanFullmacQueryInfo* out_info);
 
   // Query for MAC sublayer feature support on an interface
   void QueryMacSublayerSupport(wlan_common::MacSublayerSupport* out_resp);
@@ -166,8 +165,8 @@ class SimInterface : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacImp
   void StartScan(uint64_t txn_id = 0, bool active = false,
                  std::optional<const std::vector<uint8_t>> channels =
                      std::optional<const std::vector<uint8_t>>{});
-  std::optional<wlan_fullmac::WlanScanResult> ScanResultCode(uint64_t txn_id);
-  const std::list<wlan_fullmac::WlanFullmacScanResult>* ScanResultList(uint64_t txn_id);
+  std::optional<wlan_fullmac_wire::WlanScanResult> ScanResultCode(uint64_t txn_id);
+  const std::list<wlan_fullmac_wire::WlanFullmacScanResult>* ScanResultList(uint64_t txn_id);
 
   // SoftAP operation
   void StartSoftAp(const wlan_ieee80211::CSsid& ssid = kDefaultSoftApSsid,
@@ -202,7 +201,7 @@ class SimInterface : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacImp
   fdf::Arena test_arena_;
 
  private:
-  // Dispatch the FIDL request from fuchsia_wlan_fullmac::WlanFullmacImplIfc.
+  // Dispatch the FIDL request from wlan_fullmac_wire::WlanFullmacImplIfc.
   fdf::Dispatcher server_dispatcher_;
   // The completion waits for the completion of the AsyncShutdown() of server_dispatcher_.
   libsync::Completion server_completion_;
@@ -212,8 +211,8 @@ class SimInterface : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacImp
   // Track scan results
   struct ScanStatus {
     // If not present, indicates that the scan has not completed yet
-    std::optional<wlan_fullmac::WlanScanResult> result_code = std::nullopt;
-    std::list<wlan_fullmac::WlanFullmacScanResult> result_list;
+    std::optional<wlan_fullmac_wire::WlanScanResult> result_code = std::nullopt;
+    std::list<wlan_fullmac_wire::WlanFullmacScanResult> result_list;
   };
   // One entry per scan started
   std::map<uint64_t, ScanStatus> scan_results_;

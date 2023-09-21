@@ -15,7 +15,7 @@
 
 #include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
 #include <fidl/fuchsia.wlan.ieee80211/cpp/common_types.h>
-#include <fuchsia/wlan/fullmac/cpp/banjo.h>
+#include <fidl/fuchsia.wlan.ieee80211/cpp/driver/wire.h>
 #include <lib/stdcompat/span.h>
 #include <netinet/if_ether.h>
 #include <zircon/compiler.h>
@@ -30,6 +30,7 @@
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/ioctl_request.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/waitable_state.h"
 
+using fuchsia_wlan_ieee80211::wire::ReasonCode;
 namespace wlan::nxpfmac {
 
 class ConnectRequestParams;

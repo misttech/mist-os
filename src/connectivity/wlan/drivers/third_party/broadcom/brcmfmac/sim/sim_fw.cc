@@ -18,9 +18,7 @@
 
 #include <arpa/inet.h>
 #include <fuchsia/wlan/common/c/banjo.h>
-#include <fuchsia/wlan/fullmac/c/banjo.h>
 #include <fuchsia/wlan/ieee80211/cpp/fidl.h>
-#include <fuchsia/wlan/internal/c/banjo.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 
@@ -1418,7 +1416,7 @@ zx_status_t SimFirmware::RemoteUpdateExternalSaeStatus(uint16_t seq_num,
   auto pframe_hdr = reinterpret_cast<wlan::Authentication*>(buf->data());
 
   pframe_hdr->auth_txn_seq_number = seq_num;
-  pframe_hdr->status_code = WLAN_AUTH_RESULT_SUCCESS;
+  pframe_hdr->status_code = static_cast<uint16_t>(wlan_fullmac_wire::WlanAuthResult::kSuccess);
   pframe_hdr->auth_algorithm_number = BRCMF_AUTH_MODE_SAE;
   memcpy(buf->data() + sizeof(wlan::Authentication), sae_payload, text_len);
 

@@ -152,12 +152,12 @@ class DataFrameTest : public SimTest {
   void ClientTx(common::MacAddr dstAddr, common::MacAddr srcAddr, std::vector<uint8_t>& ethFrame);
 
   // Fullmac event handlers
-  void OnDeauthInd(const wlan_fullmac::WlanFullmacDeauthIndication* ind);
-  void OnConnectConf(const wlan_fullmac::WlanFullmacConnectConfirm* resp);
-  void OnDisassocInd(const wlan_fullmac::WlanFullmacDisassocIndication* ind);
-  void OnEapolConf(const wlan_fullmac::WlanFullmacEapolConfirm* resp);
-  void OnSignalReport(const wlan_fullmac::WlanFullmacSignalReportIndication* ind);
-  void OnEapolInd(const wlan_fullmac::WlanFullmacEapolIndication* ind);
+  void OnDeauthInd(const wlan_fullmac_wire::WlanFullmacDeauthIndication* ind);
+  void OnConnectConf(const wlan_fullmac_wire::WlanFullmacConnectConfirm* resp);
+  void OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIndication* ind);
+  void OnEapolConf(const wlan_fullmac_wire::WlanFullmacEapolConfirm* resp);
+  void OnSignalReport(const wlan_fullmac_wire::WlanFullmacSignalReportIndication* ind);
+  void OnEapolInd(const wlan_fullmac_wire::WlanFullmacEapolIndication* ind);
 
  protected:
   void GetHighWmeRxErrorRateInspectCount(uint64_t* out_count) {
@@ -199,7 +199,7 @@ class DataFrameTest : public SimTest {
   struct EapolContext {
     std::list<std::vector<uint8_t>> sent_data;
     std::list<std::vector<uint8_t>> received_data;
-    std::list<wlan_fullmac::WlanEapolResult> tx_eapol_conf_codes;
+    std::list<wlan_fullmac_wire::WlanEapolResult> tx_eapol_conf_codes;
   };
 
   // data frames sent by our driver detected by the environment
@@ -298,7 +298,7 @@ void DataFrameTest::Finish() {
   aps_.clear();
 }
 
-void DataFrameTest::OnDeauthInd(const wlan_fullmac::WlanFullmacDeauthIndication* ind) {
+void DataFrameTest::OnDeauthInd(const wlan_fullmac_wire::WlanFullmacDeauthIndication* ind) {
   if (!testing_driver_triggered_deauth_) {
     // This function is only used driver initiated deauth testing.
     return;
@@ -311,17 +311,17 @@ void DataFrameTest::OnDeauthInd(const wlan_fullmac::WlanFullmacDeauthIndication*
   env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), zx::msec(200));
 }
 
-void DataFrameTest::OnConnectConf(const wlan_fullmac::WlanFullmacConnectConfirm* resp) {
+void DataFrameTest::OnConnectConf(const wlan_fullmac_wire::WlanFullmacConnectConfirm* resp) {
   assoc_context_.connect_resp_count++;
   EXPECT_EQ(resp->result_code, assoc_context_.expected_results.front());
   assoc_context_.expected_results.pop_front();
 }
 
-void DataFrameTest::OnEapolConf(const wlan_fullmac::WlanFullmacEapolConfirm* resp) {
+void DataFrameTest::OnEapolConf(const wlan_fullmac_wire::WlanFullmacEapolConfirm* resp) {
   eapol_context_.tx_eapol_conf_codes.push_back(resp->result_code);
 }
 
-void DataFrameTest::OnEapolInd(const wlan_fullmac::WlanFullmacEapolIndication* ind) {
+void DataFrameTest::OnEapolInd(const wlan_fullmac_wire::WlanFullmacEapolIndication* ind) {
   std::vector<uint8_t> resp;
   resp.resize(ind->data.count());
   std::memcpy(resp.data(), ind->data.data(), ind->data.count());
@@ -334,7 +334,8 @@ void DataFrameTest::OnEapolInd(const wlan_fullmac::WlanFullmacEapolIndication* i
   eapol_ind_count++;
 }
 
-void DataFrameTest::OnSignalReport(const wlan_fullmac::WlanFullmacSignalReportIndication* ind) {
+void DataFrameTest::OnSignalReport(
+    const wlan_fullmac_wire::WlanFullmacSignalReportIndication* ind) {
   if (!testing_driver_triggered_deauth_) {
     // This function is only used for driver initiated deauth testing now.
     return;
@@ -351,18 +352,18 @@ void DataFrameTest::OnSignalReport(const wlan_fullmac::WlanFullmacSignalReportIn
   }
 }
 
-void DataFrameTest::OnDisassocInd(const wlan_fullmac::WlanFullmacDisassocIndication* ind) {}
+void DataFrameTest::OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIndication* ind) {}
 
 void DataFrameTest::StartConnect() {
   // Send connect request
-  auto builder = wlan_fullmac::WlanFullmacImplConnectRequest::Builder(client_ifc_.test_arena_);
+  auto builder = wlan_fullmac_wire::WlanFullmacImplConnectRequest::Builder(client_ifc_.test_arena_);
   fuchsia_wlan_internal::wire::BssDescription bss;
   std::memcpy(bss.bssid.data(), assoc_context_.bssid.byte, ETH_ALEN);
   bss.ies =
       fidl::VectorView<uint8_t>::FromExternal(assoc_context_.ies.data(), assoc_context_.ies.size());
   bss.channel = assoc_context_.channel;
   builder.selected_bss(bss);
-  builder.auth_type(wlan_fullmac::WlanAuthType::kOpenSystem);
+  builder.auth_type(wlan_fullmac_wire::WlanAuthType::kOpenSystem);
   builder.connect_failure_timeout(1000);  // ~1s (although value is ignored for now)
   auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->Connect(builder.Build());
   EXPECT_TRUE(result.ok());
@@ -370,7 +371,7 @@ void DataFrameTest::StartConnect() {
 
 void DataFrameTest::TxEapolRequest(common::MacAddr dstAddr, common::MacAddr srcAddr,
                                    const std::vector<uint8_t>& eapol) {
-  wlan_fullmac::WlanFullmacEapolReq eapol_req;
+  wlan_fullmac_wire::WlanFullmacEapolReq eapol_req;
   memcpy(eapol_req.dst_addr.data(), dstAddr.byte, ETH_ALEN);
   memcpy(eapol_req.src_addr.data(), srcAddr.byte, ETH_ALEN);
   eapol_req.data =
@@ -504,7 +505,8 @@ TEST_F(DataFrameTest, TxEapolFrame) {
 
   // Verify response
   EXPECT_EQ(assoc_context_.connect_resp_count, 1U);
-  EXPECT_EQ(eapol_context_.tx_eapol_conf_codes.front(), wlan_fullmac::WlanEapolResult::kSuccess);
+  EXPECT_EQ(eapol_context_.tx_eapol_conf_codes.front(),
+            wlan_fullmac_wire::WlanEapolResult::kSuccess);
 
   auto& tx_results = device_->DataPath().TxResults();
   ASSERT_EQ(tx_results.size(), 0);

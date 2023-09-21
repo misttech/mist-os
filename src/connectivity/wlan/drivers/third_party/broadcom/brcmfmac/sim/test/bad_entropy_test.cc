@@ -40,7 +40,7 @@ TEST_F(SimTest, ActiveScan) {
   // Verify that scan completed successfully
   auto scan_result = client_ifc.ScanResultCode(kScanId);
   ASSERT_TRUE(scan_result);
-  EXPECT_EQ(*scan_result, wlan_fullmac::WlanScanResult::kSuccess);
+  EXPECT_EQ(*scan_result, wlan_fullmac_wire::WlanScanResult::kSuccess);
 }
 
 }  // namespace wlan::brcmfmac

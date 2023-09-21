@@ -24,9 +24,9 @@ class SetKeysTest : public SimTest {
   SimInterface client_ifc_;
 };
 
-wlan_fullmac::WlanFullmacSetKeysReq FakeSetKeysRequest(
+wlan_fullmac_wire::WlanFullmacSetKeysReq FakeSetKeysRequest(
     const uint8_t keys[][wlan_ieee80211::kMaxKeyLen], size_t n) {
-  wlan_fullmac::WlanFullmacSetKeysReq set_keys_req{.num_keys = n};
+  wlan_fullmac_wire::WlanFullmacSetKeysReq set_keys_req{.num_keys = n};
 
   for (size_t i = 0; i < n; i++) {
     set_keys_req.keylist[i] = {
@@ -41,10 +41,10 @@ wlan_fullmac::WlanFullmacSetKeysReq FakeSetKeysRequest(
 }
 
 TEST_F(SetKeysTest, MultipleKeys) {
-  const uint8_t keys[wlan_fullmac::kWlanMaxKeylistSize][wlan_ieee80211::kMaxKeyLen] = {
+  const uint8_t keys[wlan_fullmac_wire::kWlanMaxKeylistSize][wlan_ieee80211::kMaxKeyLen] = {
       "One", "Two", "Three", "Four"};
-  wlan_fullmac::WlanFullmacSetKeysReq set_keys_req =
-      FakeSetKeysRequest(keys, wlan_fullmac::kWlanMaxKeylistSize);
+  wlan_fullmac_wire::WlanFullmacSetKeysReq set_keys_req =
+      FakeSetKeysRequest(keys, wlan_fullmac_wire::kWlanMaxKeylistSize);
   auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->SetKeysReq(set_keys_req);
   EXPECT_TRUE(result.ok());
 
@@ -52,12 +52,12 @@ TEST_F(SetKeysTest, MultipleKeys) {
 
   std::vector<brcmf_wsec_key_le> firmware_keys =
       device_->GetSim()->sim_fw->GetKeyList(client_ifc_.iface_id_);
-  ASSERT_EQ(firmware_keys.size(), wlan_fullmac::kWlanMaxKeylistSize);
+  ASSERT_EQ(firmware_keys.size(), wlan_fullmac_wire::kWlanMaxKeylistSize);
   EXPECT_STREQ(reinterpret_cast<const char*>(firmware_keys[0].data), "One");
   EXPECT_STREQ(reinterpret_cast<const char*>(firmware_keys[1].data), "Two");
   EXPECT_STREQ(reinterpret_cast<const char*>(firmware_keys[2].data), "Three");
   EXPECT_STREQ(reinterpret_cast<const char*>(firmware_keys[3].data), "Four");
-  ASSERT_EQ(set_keys_resp.num_keys, wlan_fullmac::kWlanMaxKeylistSize);
+  ASSERT_EQ(set_keys_resp.num_keys, wlan_fullmac_wire::kWlanMaxKeylistSize);
   for (auto status : set_keys_resp.statuslist.data_) {
     ASSERT_EQ(status, ZX_OK);
   }
@@ -69,31 +69,32 @@ TEST_F(SetKeysTest, SetGroupKey) {
   const uint8_t ucast_key[wlan_ieee80211::kMaxKeyLen] = "My Key";
   const size_t kKeyNum = 2;
 
-  fidl::Array<wlan_fullmac::SetKeyDescriptor, wlan_fullmac::kWlanMaxKeylistSize> key_list = {
-      .data_ =
-          {
+  fidl::Array<wlan_fullmac_wire::SetKeyDescriptor, wlan_fullmac_wire::kWlanMaxKeylistSize>
+      key_list = {
+          .data_ =
               {
-                  .key = fidl::VectorView<uint8_t>::FromExternal(
-                      const_cast<uint8_t*>(group_key),
-                      strlen(reinterpret_cast<const char*>(group_key))),
-                  .key_id = 0,
-                  .key_type = fuchsia_wlan_common::wire::WlanKeyType::kGroup,
-                  .address = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
-                  .cipher_suite_type = wlan_ieee80211::CipherSuiteType::kCcmp128,
+                  {
+                      .key = fidl::VectorView<uint8_t>::FromExternal(
+                          const_cast<uint8_t*>(group_key),
+                          strlen(reinterpret_cast<const char*>(group_key))),
+                      .key_id = 0,
+                      .key_type = fuchsia_wlan_common::wire::WlanKeyType::kGroup,
+                      .address = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+                      .cipher_suite_type = wlan_ieee80211::CipherSuiteType::kCcmp128,
+                  },
+                  {
+                      .key = fidl::VectorView<uint8_t>::FromExternal(
+                          const_cast<uint8_t*>(ucast_key),
+                          strlen(reinterpret_cast<const char*>(ucast_key))),
+                      .key_id = 1,
+                      .key_type = fuchsia_wlan_common::wire::WlanKeyType::kPairwise,
+                      .address = {0xde, 0xad, 0xbe, 0xef, 0xab, 0xcd},
+                      .cipher_suite_type = wlan_ieee80211::CipherSuiteType::kCcmp128,
+                  },
               },
-              {
-                  .key = fidl::VectorView<uint8_t>::FromExternal(
-                      const_cast<uint8_t*>(ucast_key),
-                      strlen(reinterpret_cast<const char*>(ucast_key))),
-                  .key_id = 1,
-                  .key_type = fuchsia_wlan_common::wire::WlanKeyType::kPairwise,
-                  .address = {0xde, 0xad, 0xbe, 0xef, 0xab, 0xcd},
-                  .cipher_suite_type = wlan_ieee80211::CipherSuiteType::kCcmp128,
-              },
-          },
-  };
+      };
 
-  wlan_fullmac::WlanFullmacSetKeysReq key_req = {
+  wlan_fullmac_wire::WlanFullmacSetKeysReq key_req = {
       .num_keys = kKeyNum,
       .keylist = {key_list},
   };
@@ -101,7 +102,7 @@ TEST_F(SetKeysTest, SetGroupKey) {
   // Set all the remaining enums in the request to valid values to pass FIDL enum value check during
   // the FIDL call.
   // TODO(b/288173116): Remove this after changing keylist to vector.
-  for (size_t i = 2; i < wlan_fullmac::kWlanMaxKeylistSize; i++) {
+  for (size_t i = 2; i < wlan_fullmac_wire::kWlanMaxKeylistSize; i++) {
     key_req.keylist.data()[i].key_type = fuchsia_wlan_common::wire::WlanKeyType::kPairwise;
     key_req.keylist.data()[i].cipher_suite_type = wlan_ieee80211::CipherSuiteType::kCcmp128;
   }

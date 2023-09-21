@@ -20,7 +20,6 @@
 #include <cstdio>
 #include <cstring>
 
-#include "fuchsia/wlan/fullmac/c/banjo.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/cfg80211.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/common.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/debug.h"
@@ -239,7 +238,8 @@ void WlanInterface::Start(StartRequestView request, fdf::Arena& arena,
 
   {
     std::lock_guard<std::shared_mutex> guard(wdev_->netdev->if_proto_lock);
-    wdev_->netdev->if_proto = std::make_unique<WlanFullmacIfc>(std::move(request->ifc));
+    wdev_->netdev->if_proto =
+        fdf::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImplIfc>(std::move(request->ifc));
   }
 
   zx::channel out_mlme_channel;

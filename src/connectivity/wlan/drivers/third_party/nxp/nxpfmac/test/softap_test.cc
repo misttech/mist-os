@@ -110,11 +110,11 @@ TEST_F(SoftApTest, Start) {
 
   memcpy(request.ssid.data.data(), kTestSoftApSsid, sizeof(kTestSoftApSsid));
   request.ssid.len = sizeof(kTestSoftApSsid);
-  ASSERT_EQ(softap.Start(&request), WLAN_START_RESULT_SUCCESS);
+  ASSERT_EQ(softap.Start(&request), wlan_fullmac_wire::WlanStartResult::kSuccess);
 
   ASSERT_OK(sync_completion_wait(&ioctl_completion, ZX_TIME_INFINITE));
   // Starting it again should fail
-  ASSERT_EQ(softap.Start(&request), WLAN_START_RESULT_BSS_ALREADY_STARTED_OR_JOINED);
+  ASSERT_EQ(softap.Start(&request), wlan_fullmac_wire::WlanStartResult::kBssAlreadyStartedOrJoined);
 }
 
 // Ensure appropriate data rates are set based on the requested band when starting the Soft AP.
@@ -179,18 +179,18 @@ TEST_F(SoftApTest, CheckRates) {
   fuchsia_wlan_fullmac::wire::WlanFullmacStartReq start_req = {.channel = kTest24GChannel};
   memcpy(start_req.ssid.data.data(), kTestSoftApSsid, sizeof(kTestSoftApSsid));
   start_req.ssid.len = sizeof(kTestSoftApSsid);
-  ASSERT_EQ(softap.Start(&start_req), WLAN_START_RESULT_SUCCESS);
+  ASSERT_EQ(softap.Start(&start_req), wlan_fullmac_wire::WlanStartResult::kSuccess);
   ASSERT_OK(sync_completion_wait(&ioctl_completion, ZX_TIME_INFINITE));
 
   // Stop the Soft AP.
   fuchsia_wlan_fullmac::wire::WlanFullmacStopReq stop_req;
   memcpy(stop_req.ssid.data.data(), kTestSoftApSsid, sizeof(kTestSoftApSsid));
   stop_req.ssid.len = sizeof(kTestSoftApSsid);
-  ASSERT_EQ(softap.Stop(&stop_req), WLAN_STOP_RESULT_SUCCESS);
+  ASSERT_EQ(softap.Stop(&stop_req), wlan_fullmac_wire::WlanStopResult::kSuccess);
 
   // Start the Soft AP on a 5Ghz channel
   start_req.channel = kTest5GChannel;
-  ASSERT_EQ(softap.Start(&start_req), WLAN_START_RESULT_SUCCESS);
+  ASSERT_EQ(softap.Start(&start_req), wlan_fullmac_wire::WlanStartResult::kSuccess);
 }
 
 TEST_F(SoftApTest, Stop) {
@@ -227,31 +227,31 @@ TEST_F(SoftApTest, Stop) {
   stop_req.ssid.len = sizeof(kTestSoftApSsid);
 
   // Attempt to stop the Soft AP before it is started should fail
-  ASSERT_EQ(WLAN_STOP_RESULT_BSS_ALREADY_STOPPED, softap.Stop(&stop_req));
+  ASSERT_EQ(wlan_fullmac_wire::WlanStopResult::kBssAlreadyStopped, softap.Stop(&stop_req));
 
   // Start the Soft AP.
   memcpy(start_req.ssid.data.data(), kTestSoftApSsid, sizeof(kTestSoftApSsid));
   start_req.ssid.len = sizeof(kTestSoftApSsid);
 
-  ASSERT_EQ(softap.Start(&start_req), WLAN_START_RESULT_SUCCESS);
+  ASSERT_EQ(softap.Start(&start_req), wlan_fullmac_wire::WlanStartResult::kSuccess);
 
   uint8_t wrong_ssid[] = "Wrong_SoftAP";
   // Attempt to stop a different Soft AP (wrong ssid)
   memcpy(stop_req.ssid.data.data(), wrong_ssid, sizeof(wrong_ssid));
   stop_req.ssid.len = sizeof(wrong_ssid);
-  ASSERT_EQ(softap.Stop(&stop_req), WLAN_STOP_RESULT_INTERNAL_ERROR);
+  ASSERT_EQ(softap.Stop(&stop_req), wlan_fullmac_wire::WlanStopResult::kInternalError);
 
   // Stopping the correct Soft AP should succeed.
   memcpy(stop_req.ssid.data.data(), kTestSoftApSsid, sizeof(kTestSoftApSsid));
   stop_req.ssid.len = sizeof(kTestSoftApSsid);
-  ASSERT_EQ(softap.Stop(&stop_req), WLAN_STOP_RESULT_SUCCESS);
+  ASSERT_EQ(softap.Stop(&stop_req), wlan_fullmac_wire::WlanStopResult::kSuccess);
 
   sync_completion_wait(&ioctl_completion, ZX_TIME_INFINITE);
 
   // Now that we're successfully stopped make sure calling stop again fails.
-  ASSERT_EQ(WLAN_STOP_RESULT_BSS_ALREADY_STOPPED, softap.Stop(&stop_req));
+  ASSERT_EQ(wlan_fullmac_wire::WlanStopResult::kBssAlreadyStopped, softap.Stop(&stop_req));
   // And Start can be called again
-  ASSERT_EQ(softap.Start(&start_req), WLAN_START_RESULT_SUCCESS);
+  ASSERT_EQ(softap.Start(&start_req), wlan_fullmac_wire::WlanStartResult::kSuccess);
 }
 
 TEST_F(SoftApTest, StaConnectDisconnectSoftAp) {
@@ -311,7 +311,7 @@ TEST_F(SoftApTest, StaConnectDisconnectSoftAp) {
 
   memcpy(request.ssid.data.data(), kTestSoftApSsid, sizeof(kTestSoftApSsid));
   request.ssid.len = sizeof(kTestSoftApSsid);
-  ASSERT_EQ(softap.Start(&request), WLAN_START_RESULT_SUCCESS);
+  ASSERT_EQ(softap.Start(&request), wlan_fullmac_wire::WlanStartResult::kSuccess);
 
   ASSERT_OK(sync_completion_wait(&ioctl_completion, ZX_TIME_INFINITE));
 
@@ -417,8 +417,9 @@ TEST_F(SoftApTest, StaLocalDisconnect) {
 
   memcpy(request.ssid.data.data(), kTestSoftApSsid, sizeof(kTestSoftApSsid));
   request.ssid.len = sizeof(kTestSoftApSsid);
-  env_.ScheduleNotification([&]() { ASSERT_EQ(softap.Start(&request), WLAN_START_RESULT_SUCCESS); },
-                            zx::msec(10));
+  env_.ScheduleNotification(
+      [&]() { ASSERT_EQ(softap.Start(&request), wlan_fullmac_wire::WlanStartResult::kSuccess); },
+      zx::msec(10));
 
   // STA connect event handling.
   auto sta_connect_send = [&]() {
@@ -458,7 +459,7 @@ TEST_F(SoftApTest, StaLocalDisconnect) {
   fuchsia_wlan_fullmac::wire::WlanFullmacStopReq stop_req;
   memcpy(stop_req.ssid.data.data(), kTestSoftApSsid, sizeof(kTestSoftApSsid));
   stop_req.ssid.len = sizeof(kTestSoftApSsid);
-  ASSERT_EQ(softap.Stop(&stop_req), WLAN_STOP_RESULT_SUCCESS);
+  ASSERT_EQ(softap.Stop(&stop_req), wlan_fullmac_wire::WlanStopResult::kSuccess);
 }
 
 }  // namespace

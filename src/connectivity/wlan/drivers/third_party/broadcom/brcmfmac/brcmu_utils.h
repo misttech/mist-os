@@ -17,7 +17,7 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_BRCMU_UTILS_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_BRCMU_UTILS_H_
 
-#include <fuchsia/wlan/fullmac/c/banjo.h>
+#include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
 #include <stdlib.h>
 #include <string.h>
 #include <zircon/compiler.h>
@@ -137,7 +137,7 @@ void brcmu_set_rx_rate_index_hist_rx11g(const uint32_t (&rx11g)[WSTATS_RATE_RANG
  */
 void brcmu_set_rx_rate_index_hist_rx11n(
     const uint32_t (&rx11n)[WSTATS_SGI_RANGE][WSTATS_BW_RANGE_11N][WSTATS_MCS_RANGE_11N],
-    uint32_t out_rx_rate[WLAN_FULLMAC_MAX_RX_RATE_INDEX_SAMPLES]);
+    uint32_t out_rx_rate[fuchsia_wlan_fullmac::wire::kWlanFullmacMaxRxRateIndexSamples]);
 /*
  * Convert the buckets of a wstats_counter
  * `rx11ac[WSTATS_NSS_RANGE][WSTATS_SGI_RANGE][WSTATS_BW_RANGE_11AC][WSTATS_MCS_RANGE_11AC]`

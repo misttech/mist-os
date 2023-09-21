@@ -24,11 +24,11 @@ class EscanArgsIfc : public SimInterface {
   void OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
                  OnScanEndCompleter::Sync& completer) override;
   bool ScanCompleted() { return scan_completed_; }
-  wlan_fullmac::WlanScanResult ScanResult() { return scan_result_; }
+  wlan_fullmac_wire::WlanScanResult ScanResult() { return scan_result_; }
 
  private:
   bool scan_completed_ = false;
-  wlan_fullmac::WlanScanResult scan_result_;
+  wlan_fullmac_wire::WlanScanResult scan_result_;
 };
 
 void EscanArgsIfc::OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
@@ -42,7 +42,7 @@ void EscanArgsIfc::OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
 class EscanArgsTest : public SimTest {
  public:
   void Init();
-  void RunScanTest(const wlan_fullmac::WlanFullmacImplStartScanRequest& req);
+  void RunScanTest(const wlan_fullmac_wire::WlanFullmacImplStartScanRequest& req);
 
  protected:
   EscanArgsIfc client_ifc_;
@@ -53,7 +53,7 @@ void EscanArgsTest::Init() {
   ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_), ZX_OK);
 }
 
-void EscanArgsTest::RunScanTest(const wlan_fullmac::WlanFullmacImplStartScanRequest& req) {
+void EscanArgsTest::RunScanTest(const wlan_fullmac_wire::WlanFullmacImplStartScanRequest& req) {
   auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->StartScan(req);
   ASSERT_TRUE(result.ok());
   env_->Run(kSimulatedClockDuration);
@@ -64,10 +64,11 @@ void EscanArgsTest::RunScanTest(const wlan_fullmac::WlanFullmacImplStartScanRequ
 TEST_F(EscanArgsTest, BadScanArgs) {
   Init();
   {
-    auto builder = wlan_fullmac::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
+    auto builder =
+        wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
 
     builder.txn_id(kScanTxnId);
-    builder.scan_type(wlan_fullmac::WlanScanType::kActive);
+    builder.scan_type(wlan_fullmac_wire::WlanScanType::kActive);
     builder.channels(
         fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(kDefaultChannelsList), 11));
     builder.min_channel_time(0);
@@ -76,14 +77,15 @@ TEST_F(EscanArgsTest, BadScanArgs) {
     // Dwell time of zero
     RunScanTest(builder.Build());
   }
-  EXPECT_NE(client_ifc_.ScanResult(), wlan_fullmac::WlanScanResult::kSuccess);
+  EXPECT_NE(client_ifc_.ScanResult(), wlan_fullmac_wire::WlanScanResult::kSuccess);
 
   // min dwell time > max dwell time
   {
-    auto builder = wlan_fullmac::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
+    auto builder =
+        wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
 
     builder.txn_id(kScanTxnId);
-    builder.scan_type(wlan_fullmac::WlanScanType::kActive);
+    builder.scan_type(wlan_fullmac_wire::WlanScanType::kActive);
     builder.channels(
         fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(kDefaultChannelsList), 11));
     builder.min_channel_time(SimInterface::kDefaultActiveScanDwellTimeMs + 1);
@@ -92,19 +94,20 @@ TEST_F(EscanArgsTest, BadScanArgs) {
     // Dwell time of zero
     RunScanTest(builder.Build());
   }
-  EXPECT_NE(client_ifc_.ScanResult(), wlan_fullmac::WlanScanResult::kSuccess);
+  EXPECT_NE(client_ifc_.ScanResult(), wlan_fullmac_wire::WlanScanResult::kSuccess);
 }
 
 TEST_F(EscanArgsTest, EmptyChannelList) {
   Init();
-  auto builder = wlan_fullmac::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
+  auto builder =
+      wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
 
-  builder.txn_id(kScanTxnId), builder.scan_type(wlan_fullmac::WlanScanType::kActive),
+  builder.txn_id(kScanTxnId), builder.scan_type(wlan_fullmac_wire::WlanScanType::kActive),
       builder.min_channel_time(SimInterface::kDefaultActiveScanDwellTimeMs + 1);
   builder.max_channel_time(SimInterface::kDefaultActiveScanDwellTimeMs);
 
   RunScanTest(builder.Build());
-  EXPECT_EQ(client_ifc_.ScanResult(), wlan_fullmac::WlanScanResult::kInvalidArgs);
+  EXPECT_EQ(client_ifc_.ScanResult(), wlan_fullmac_wire::WlanScanResult::kInvalidArgs);
 }
 
 }  // namespace wlan::brcmfmac

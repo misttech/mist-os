@@ -35,12 +35,12 @@ TEST_F(SimTest, ScanWhileScanning) {
   // Verify that first scan completed successfully
   auto first_result = client_ifc.ScanResultCode(kFirstScanId);
   EXPECT_NE(first_result, std::nullopt);
-  EXPECT_EQ(*first_result, fuchsia_wlan_fullmac::WlanScanResult::kSuccess);
+  EXPECT_EQ(*first_result, wlan_fullmac_wire::WlanScanResult::kSuccess);
 
   // Verify that second scan completed, but was not successful
   auto second_result = client_ifc.ScanResultCode(kSecondScanId);
   EXPECT_NE(second_result, std::nullopt);
-  EXPECT_NE(*second_result, fuchsia_wlan_fullmac::WlanScanResult::kSuccess);
+  EXPECT_NE(*second_result, wlan_fullmac_wire::WlanScanResult::kSuccess);
 }
 
 }  // namespace wlan::brcmfmac

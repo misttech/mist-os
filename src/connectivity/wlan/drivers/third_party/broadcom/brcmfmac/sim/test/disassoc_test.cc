@@ -45,7 +45,7 @@ TEST_F(SimTest, Disassoc) {
 
   // Verify that we get appropriate notification
   ASSERT_EQ(client_ifc.stats_.disassoc_indications.size(), 1U);
-  const wlan_fullmac::WlanFullmacDisassocIndication& disassoc_ind =
+  const wlan_fullmac_wire::WlanFullmacDisassocIndication& disassoc_ind =
       client_ifc.stats_.disassoc_indications.front();
   // Verify reason code is propagated
   EXPECT_EQ(disassoc_ind.reason_code, static_cast<wlan_ieee80211::ReasonCode>(kDisassocReason));
@@ -94,13 +94,13 @@ TEST_F(SimTest, SmeDeauthFollowedByFwDisassoc) {
 
   // Verify that we got the deauth confirmation
   ASSERT_EQ(client_ifc.stats_.deauth_results.size(), 1U);
-  const wlan_fullmac::WlanFullmacDeauthConfirm& deauth_confirm =
+  const wlan_fullmac_wire::WlanFullmacDeauthConfirm& deauth_confirm =
       client_ifc.stats_.deauth_results.front();
   EXPECT_EQ(0, memcmp(deauth_confirm.peer_sta_address.data(), kApBssid.byte, ETH_ALEN));
 
   // Verify that we got the disassociation indication, not a confirmation or anything else
   ASSERT_EQ(client_ifc.stats_.disassoc_indications.size(), 1U);
-  const wlan_fullmac::WlanFullmacDisassocIndication& disassoc_ind =
+  const wlan_fullmac_wire::WlanFullmacDisassocIndication& disassoc_ind =
       client_ifc.stats_.disassoc_indications.front();
   EXPECT_EQ(disassoc_ind.reason_code, static_cast<wlan_ieee80211::ReasonCode>(disassoc_reason));
   EXPECT_EQ(disassoc_ind.locally_initiated, true);

@@ -139,15 +139,16 @@ TEST_F(ScannerTest, Scan) {
   sync_completion_t scan_end_completion;
 
   std::atomic<int> scan_results_seen = 0;
-  auto on_scan_result = [&](const wlan_fullmac_scan_result_t& result) {
+  auto on_scan_result = [&](const wlan_fullmac_wire::WlanFullmacScanResult& result) {
     ++scan_results_seen;
-    EXPECT_BYTES_EQ(result.bss.bssid, scan_table[0].mac_address, sizeof(result.bss.bssid));
+    EXPECT_BYTES_EQ(result.bss.bssid.data(), scan_table[0].mac_address,
+                    sizeof(scan_table[0].mac_address));
     sync_completion_signal(&scan_result_completion);
   };
 
-  auto on_scan_end = [&](uint64_t txn_id, wlan_scan_result_t result) {
+  auto on_scan_end = [&](uint64_t txn_id, wlan_fullmac_wire::WlanScanResult result) {
     EXPECT_EQ(kTxnId, txn_id);
-    EXPECT_EQ(WLAN_SCAN_RESULT_SUCCESS, result);
+    EXPECT_EQ(wlan_fullmac_wire::WlanScanResult::kSuccess, result);
     sync_completion_signal(&scan_end_completion);
   };
 
@@ -225,9 +226,9 @@ TEST_F(ScannerTest, StopScan) {
   mocks_.SetOnMlanIoctl(std::move(on_ioctl));
 
   sync_completion_t scan_ended;
-  auto on_scan_end = [&](uint64_t txn_id, wlan_scan_result_t result) {
+  auto on_scan_end = [&](uint64_t txn_id, wlan_fullmac_wire::WlanScanResult result) {
     EXPECT_EQ(kTxnId, txn_id);
-    EXPECT_EQ(WLAN_SCAN_RESULT_CANCELED_BY_DRIVER_OR_FIRMWARE, result);
+    EXPECT_EQ(wlan_fullmac_wire::WlanScanResult::kCanceledByDriverOrFirmware, result);
     sync_completion_signal(&scan_ended);
   };
 
@@ -258,9 +259,9 @@ TEST_F(ScannerTest, StopScan) {
 
     sync_completion_reset(&scan_ended);
     // The second scan should be canceled when the scanner is destroyed
-    auto on_second_scan_end = [&](uint64_t txn_id, wlan_scan_result_t result) {
+    auto on_second_scan_end = [&](uint64_t txn_id, wlan_fullmac_wire::WlanScanResult result) {
       EXPECT_EQ(kTxnId, txn_id);
-      EXPECT_EQ(WLAN_SCAN_RESULT_CANCELED_BY_DRIVER_OR_FIRMWARE, result);
+      EXPECT_EQ(wlan_fullmac_wire::WlanScanResult::kCanceledByDriverOrFirmware, result);
       sync_completion_signal(&scan_ended);
     };
 
@@ -323,8 +324,8 @@ TEST_F(ScannerTest, ScanSpecificSsids) {
   mocks_.SetOnMlanIoctl(std::move(on_ioctl));
 
   sync_completion_t completion;
-  auto on_scan_end = [&](uint64_t txn_id, wlan_scan_result_t result) {
-    EXPECT_EQ(WLAN_SCAN_RESULT_SUCCESS, result);
+  auto on_scan_end = [&](uint64_t txn_id, wlan_fullmac_wire::WlanScanResult result) {
+    EXPECT_EQ(wlan_fullmac_wire::WlanScanResult::kSuccess, result);
     EXPECT_EQ(kTxnId, txn_id);
     sync_completion_signal(&completion);
   };
@@ -409,8 +410,8 @@ TEST_F(ScannerTest, ScanTimeout) {
   mocks_.SetOnMlanIoctl(std::move(on_ioctl));
 
   sync_completion_t completion;
-  auto on_scan_end = [&](uint64_t txn_id, wlan_scan_result_t result) {
-    EXPECT_EQ(WLAN_SCAN_RESULT_CANCELED_BY_DRIVER_OR_FIRMWARE, result);
+  auto on_scan_end = [&](uint64_t txn_id, wlan_fullmac_wire::WlanScanResult result) {
+    EXPECT_EQ(wlan_fullmac_wire::WlanScanResult::kCanceledByDriverOrFirmware, result);
     EXPECT_EQ(kTxnId, txn_id);
     sync_completion_signal(&completion);
   };

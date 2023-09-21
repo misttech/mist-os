@@ -30,7 +30,7 @@ class CrashRecoveryTest : public SimTest {
   void ScheduleCrash(zx::duration delay);
   void RecreateClientIface();
   void VerifyScanResult(const uint64_t scan_id, size_t min_result_num,
-                        wlan_fullmac::WlanScanResult expect_code);
+                        wlan_fullmac_wire::WlanScanResult expect_code);
 
   // Get the value of inspect counter of firmware recovery. It is used to verify the number of
   // counted firmware recovery in driver's metrics.
@@ -73,10 +73,10 @@ void CrashRecoveryTest::ScheduleCrash(zx::duration delay) {
 }
 
 void CrashRecoveryTest::VerifyScanResult(const uint64_t scan_id, size_t min_result_num,
-                                         wlan_fullmac::WlanScanResult expect_code) {
+                                         wlan_fullmac_wire::WlanScanResult expect_code) {
   EXPECT_GE(client_ifc_.ScanResultList(scan_id)->size(), min_result_num);
 
-  wlan_fullmac::WlanFullmacScanResult back_scan_result =
+  wlan_fullmac_wire::WlanFullmacScanResult back_scan_result =
       client_ifc_.ScanResultList(scan_id)->back();
   auto ssid =
       brcmf_find_ssid_in_ies(back_scan_result.bss.ies.data(), back_scan_result.bss.ies.count());
@@ -188,7 +188,8 @@ TEST_F(CrashRecoveryTest, ScanAfterCrashAfterConnect) {
 
   env_->Run(kTestDuration);
 
-  VerifyScanResult(kScanId, kExpectMinScanResultNumber, wlan_fullmac::WlanScanResult::kSuccess);
+  VerifyScanResult(kScanId, kExpectMinScanResultNumber,
+                   wlan_fullmac_wire::WlanScanResult::kSuccess);
 
   // Verify inspect is updated.
   uint64_t count;

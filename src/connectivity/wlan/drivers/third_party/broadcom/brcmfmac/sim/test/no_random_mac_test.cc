@@ -39,7 +39,7 @@ TEST_F(SimTest, RandomMacNotSupported) {
   EXPECT_TRUE(scan_result);
 
   // Verify that scan was successful
-  EXPECT_EQ(*scan_result, wlan_fullmac::WlanScanResult::kSuccess);
+  EXPECT_EQ(*scan_result, wlan_fullmac_wire::WlanScanResult::kSuccess);
 }
 
 }  // namespace wlan::brcmfmac

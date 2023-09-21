@@ -15,10 +15,18 @@
 
 #include <arpa/inet.h>
 #include <lib/async/cpp/task.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
+#include <lib/fdf/cpp/arena.h>
+#include <lib/fdf/cpp/channel.h>
+#include <lib/fdf/cpp/channel_read.h>
+#include <lib/fdf/cpp/dispatcher.h>
+#include <lib/fidl/cpp/wire/connect_service.h>
+#include <lib/fit/function.h>
 #include <lib/stdcompat/span.h>
 #include <stdint.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
+#include <zircon/types.h>
 
 #include <wlan/common/element.h>
 #include <wlan/common/ieee80211.h>
@@ -36,6 +44,9 @@
 
 namespace wlan::nxpfmac {
 
+namespace fuchsia_wlan_common_wire = fuchsia_wlan_common::wire;
+namespace fuchsia_wlan_ieee80211_wire = fuchsia_wlan_ieee80211::wire;
+namespace fuchsia_wlan_fullmac_wire = fuchsia_wlan_fullmac::wire;
 // This usually completes in about 120 milliseconds, give it plenty of time to complete but not too
 // long since connect scanning is synchronous.
 constexpr zx_duration_t kConnectScanTimeout = ZX_MSEC(600);
@@ -148,7 +159,10 @@ void WlanInterface::Start(StartRequestView request, fdf::Arena& arena,
   }
 
   NXPF_INFO("Starting wlan_fullmac interface");
-  { fullmac_ifc_ = std::make_unique<WlanFullmacIfc>(std::move(request->ifc)); }
+  {
+    fullmac_ifc_ =
+        fdf::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImplIfc>(std::move(request->ifc));
+  }
   is_up_ = true;
 
   completer.buffer(arena).ReplySuccess(std::move(mlme_channel_));
@@ -164,16 +178,24 @@ void WlanInterface::OnEapolResponse(wlan::drivers::components::Frame&& frame) {
   std::vector<uint8_t> eapol(frame.Data(), frame.Data() + frame.Size());
   zx_status_t status = async::PostTask(context_->device_->GetDispatcher(), [this, eapol] {
     constexpr size_t kEapolDataOffset = sizeof(ethhdr);
-    wlan_fullmac_eapol_indication_t eapol_ind{
-        .data_list = eapol.data() + kEapolDataOffset,
-        .data_count = eapol.size() - kEapolDataOffset,
-    };
+    fuchsia_wlan_fullmac_wire::WlanFullmacEapolIndication eapol_ind;
+    uint8_t* data_bytes = const_cast<uint8_t*>(eapol.data());
+    eapol_ind.data = ::fidl::VectorView<uint8_t>::FromExternal(data_bytes + kEapolDataOffset,
+                                                               eapol.size() - kEapolDataOffset);
 
     auto eth = reinterpret_cast<const ethhdr*>(eapol.data());
-    memcpy(eapol_ind.dst_addr, eth->h_dest, sizeof(eapol_ind.dst_addr));
-    memcpy(eapol_ind.src_addr, eth->h_source, sizeof(eapol_ind.src_addr));
+    memcpy(eapol_ind.dst_addr.data(), eth->h_dest, sizeof(eapol_ind.dst_addr));
+    memcpy(eapol_ind.src_addr.data(), eth->h_source, sizeof(eapol_ind.src_addr));
 
-    fullmac_ifc_->EapolInd(&eapol_ind);
+    auto arena = fdf::Arena::Create(0, 0);
+    if (arena.is_error()) {
+      NXPF_ERR("Failed to create Arena status=%s", arena.status_string());
+      return;
+    }
+    auto result = fullmac_ifc_.buffer(*arena)->EapolInd(eapol_ind);
+    if (!result.ok()) {
+      NXPF_ERR("Failed to send eapol ind result.status: %s", result.status_string());
+    }
   });
   if (status != ZX_OK) {
     NXPF_ERR("Failed to schedule EAPOL response: %s", zx_status_get_string(status));
@@ -181,16 +203,26 @@ void WlanInterface::OnEapolResponse(wlan::drivers::components::Frame&& frame) {
 }
 
 void WlanInterface::OnEapolTransmitted(zx_status_t status, const uint8_t* dst_addr) {
-  const wlan_eapol_result_t result =
-      status == ZX_OK ? WLAN_EAPOL_RESULT_SUCCESS : WLAN_EAPOL_RESULT_TRANSMISSION_FAILURE;
-  wlan_fullmac_eapol_confirm_t response{.result_code = result};
-  memcpy(response.dst_addr, dst_addr, sizeof(response.dst_addr));
+  const fuchsia_wlan_fullmac_wire::WlanEapolResult result =
+      status == ZX_OK ? fuchsia_wlan_fullmac_wire::WlanEapolResult::kSuccess
+                      : fuchsia_wlan_fullmac_wire::WlanEapolResult::kTransmissionFailure;
+  fuchsia_wlan_fullmac_wire::WlanFullmacEapolConfirm response{.result_code = result};
+  memcpy(response.dst_addr.data(), dst_addr, sizeof(response.dst_addr));
 
   // This work cannot be run on this thread since it's triggered from the mlan main process. There
   // are locks in fullmac that could block this call if fullmac is calling into this driver and
   // causes something to wait for the mlan main process to run.
-  status = async::PostTask(context_->device_->GetDispatcher(),
-                           [this, res = &response] { fullmac_ifc_->EapolConf(res); });
+  status = async::PostTask(context_->device_->GetDispatcher(), [this, res = &response] {
+    auto arena = fdf::Arena::Create(0, 0);
+    if (arena.is_error()) {
+      NXPF_ERR("Failed to create Arena status=%s", arena.status_string());
+      return;
+    }
+    auto sts = fullmac_ifc_.buffer(*arena)->EapolConf(*res);
+    if (!sts.ok()) {
+      NXPF_ERR("Failed to send eapol conf result.status: %s", sts.status_string());
+    }
+  });
   if (status != ZX_OK) {
     NXPF_ERR("Failed to schedule EAPOL transmit confirmation: %s", zx_status_get_string(status));
   }
@@ -341,13 +373,31 @@ void WlanInterface::StartScan(StartScanRequestView request, fdf::Arena& arena,
                               StartScanCompleter::Sync& completer) {
   std::lock_guard lock(mutex_);
 
-  auto on_scan_result = [this](const wlan_fullmac_scan_result_t& result) {
-    fullmac_ifc_->OnScanResult(&result);
+  auto on_scan_result = [this](const fuchsia_wlan_fullmac_wire::WlanFullmacScanResult& result) {
+    auto arena = fdf::Arena::Create(0, 0);
+    if (arena.is_error()) {
+      NXPF_ERR("Failed to create Arena status=%s", arena.status_string());
+      return;
+    }
+    auto status = fullmac_ifc_.buffer(*arena)->OnScanResult(result);
+    if (!status.ok()) {
+      NXPF_ERR("Failed to send scan result.status: %s", status.status_string());
+      return;
+    }
   };
 
-  auto on_scan_end = [this](uint64_t txn_id, wlan_scan_result_t result) {
-    wlan_fullmac_scan_end_t end{.txn_id = txn_id, .code = result};
-    fullmac_ifc_->OnScanEnd(&end);
+  auto on_scan_end = [this](uint64_t txn_id, fuchsia_wlan_fullmac_wire::WlanScanResult result) {
+    fuchsia_wlan_fullmac_wire::WlanFullmacScanEnd end{.txn_id = txn_id, .code = result};
+    auto arena = fdf::Arena::Create(0, 0);
+    if (arena.is_error()) {
+      NXPF_ERR("Failed to create Arena status=%s", arena.status_string());
+      return;
+    }
+    auto status = fullmac_ifc_.buffer(*arena)->OnScanEnd(end);
+    if (!status.ok()) {
+      NXPF_ERR("Failed to send scan end result.status: %s", status.status_string());
+      return;
+    }
   };
 
   // TODO(fxbug.dev/108408): Consider calculating a more accurate scan timeout based on the max
@@ -357,11 +407,19 @@ void WlanInterface::StartScan(StartScanRequestView request, fdf::Arena& arena,
       scanner_.Scan(request, kScanTimeout, std::move(on_scan_result), std::move(on_scan_end));
   if (status != ZX_OK) {
     NXPF_ERR("Scan failed: %s", zx_status_get_string(status));
-    wlan_fullmac_scan_end_t end{.txn_id = request->txn_id(),
-                                .code = WLAN_SCAN_RESULT_INTERNAL_ERROR};
-    fullmac_ifc_->OnScanEnd(&end);
-    completer.buffer(arena).Reply();
-    return;
+    fuchsia_wlan_fullmac_wire::WlanFullmacScanEnd end{
+        .txn_id = request->txn_id(),
+        .code = fuchsia_wlan_fullmac_wire::WlanScanResult::kInternalError};
+    auto fdf_arena = fdf::Arena::Create(0, 0);
+    if (fdf_arena.is_error()) {
+      NXPF_ERR("Failed to create Arena status=%s", fdf_arena.status_string());
+      return;
+    }
+    auto result = fullmac_ifc_.buffer(*fdf_arena)->OnScanEnd(end);
+    if (!result.ok()) {
+      NXPF_ERR("Failed to send scan end result.status: %s", result.status_string());
+      return;
+    }
   }
   completer.buffer(arena).Reply();
 }
@@ -437,9 +495,18 @@ void WlanInterface::DeauthReq(DeauthReqRequestView request, fdf::Arena& arena,
                                             fidl::ToUnderlying(request->req.reason_code));
     if (status != ZX_OK) {
       // Deauth request failed, respond to SME anyway since there is no way to indicate status.
-      wlan_fullmac_deauth_confirm_t resp{};
-      memcpy(resp.peer_sta_address, request->req.peer_sta_address.data(), ETH_ALEN);
-      fullmac_ifc_->DeauthConf(&resp);
+      fuchsia_wlan_fullmac_wire::WlanFullmacDeauthConfirm resp{};
+      memcpy(resp.peer_sta_address.data(), request->req.peer_sta_address.data(), ETH_ALEN);
+      auto arena = fdf::Arena::Create(0, 0);
+      if (arena.is_error()) {
+        NXPF_ERR("Failed to create Arena status=%s", arena.status_string());
+        return;
+      }
+      auto result = fullmac_ifc_.buffer(*arena)->DeauthConf(resp);
+      if (!result.ok()) {
+        NXPF_ERR("Failed to send deauth conf result.status: %s", result.status_string());
+        return;
+      }
     }
     // If the request is successful, the notification should occur via the event handler.
     completer.buffer(arena).Reply();
@@ -515,39 +582,59 @@ void WlanInterface::ResetReq(ResetReqRequestView request, fdf::Arena& arena,
 
 void WlanInterface::StartReq(StartReqRequestView request, fdf::Arena& arena,
                              StartReqCompleter::Sync& completer) {
-  const wlan_start_result_t result = [&]() -> wlan_start_result_t {
+  const fuchsia_wlan_fullmac_wire::WlanStartResult result =
+      [&]() -> fuchsia_wlan_fullmac_wire::WlanStartResult {
     std::lock_guard lock(mutex_);
     if (role_ != fuchsia_wlan_common::wire::WlanMacRole::kAp) {
       NXPF_ERR("Start is supported only in AP mode, current mode: %d", role_);
-      return WLAN_START_RESULT_NOT_SUPPORTED;
+      return fuchsia_wlan_fullmac_wire::WlanStartResult::kNotSupported;
     }
-    if (request->req.bss_type != fuchsia_wlan_common::wire::BssType::kInfrastructure) {
+    if (request->req.bss_type != fuchsia_wlan_common_wire::BssType::kInfrastructure) {
       NXPF_ERR("Attempt to start AP in unsupported mode (%d)", request->req.bss_type);
-      return WLAN_START_RESULT_NOT_SUPPORTED;
+      return fuchsia_wlan_fullmac_wire::WlanStartResult::kNotSupported;
     }
     return soft_ap_.Start(&request->req);
   }();
 
-  wlan_fullmac_start_confirm_t start_conf = {.result_code = result};
-  fullmac_ifc_->StartConf(&start_conf);
+  fuchsia_wlan_fullmac_wire::WlanFullmacStartConfirm start_conf = {.result_code = result};
+  auto ifc_arena = fdf::Arena::Create(0, 0);
+  if (ifc_arena.is_error()) {
+    NXPF_ERR("Failed to create Arena status=%s", ifc_arena.status_string());
+    return;
+  }
+  auto status = fullmac_ifc_.buffer(*ifc_arena)->StartConf(start_conf);
+  if (!status.ok()) {
+    NXPF_ERR("Failed to send start conf result.status: %s", status.status_string());
+    return;
+  }
   completer.buffer(arena).Reply();
 }
 
 void WlanInterface::StopReq(StopReqRequestView request, fdf::Arena& arena,
                             StopReqCompleter::Sync& completer) {
-  const wlan_stop_result_t result = [&]() -> wlan_stop_result_t {
+  const fuchsia_wlan_fullmac_wire::WlanStopResult result =
+      [&]() -> fuchsia_wlan_fullmac_wire::WlanStopResult {
     std::lock_guard lock(mutex_);
 
     if (role_ != fuchsia_wlan_common::wire::WlanMacRole::kAp) {
       NXPF_ERR("Stop is supported only in AP mode, current mode: %d", role_);
-      return WLAN_STOP_RESULT_INTERNAL_ERROR;
+      return fuchsia_wlan_fullmac_wire::WlanStopResult::kInternalError;
     }
 
     return soft_ap_.Stop(&request->req);
   }();
 
-  wlan_fullmac_stop_confirm_t stop_conf = {.result_code = result};
-  fullmac_ifc_->StopConf(&stop_conf);
+  fuchsia_wlan_fullmac_wire::WlanFullmacStopConfirm stop_conf = {.result_code = result};
+  auto ifc_arena = fdf::Arena::Create(0, 0);
+  if (ifc_arena.is_error()) {
+    NXPF_ERR("Failed to create Arena status=%s", ifc_arena.status_string());
+    return;
+  }
+  auto status = fullmac_ifc_.buffer(*ifc_arena)->StopConf(stop_conf);
+  if (!status.ok()) {
+    NXPF_ERR("Failed to send stop conf result.status: %s", status.status_string());
+    return;
+  }
   completer.buffer(arena).Reply();
 }
 
@@ -582,10 +669,19 @@ void WlanInterface::EapolReq(EapolReqRequestView request, fdf::Arena& arena,
   std::optional<wlan::drivers::components::Frame> frame = context_->data_plane_->AcquireFrame();
   if (!frame.has_value()) {
     NXPF_ERR("Failed to acquire frame container for EAPOL frame");
-    wlan_fullmac_eapol_confirm_t response{
-        .result_code = WLAN_EAPOL_RESULT_TRANSMISSION_FAILURE,
+    fuchsia_wlan_fullmac_wire::WlanFullmacEapolConfirm response{
+        .result_code = fuchsia_wlan_fullmac_wire::WlanEapolResult::kTransmissionFailure,
     };
-    fullmac_ifc_->EapolConf(&response);
+    auto ifc_arena = fdf::Arena::Create(0, 0);
+    if (ifc_arena.is_error()) {
+      NXPF_ERR("Failed to create Arena status=%s", ifc_arena.status_string());
+      return;
+    }
+    auto result = fullmac_ifc_.buffer(*ifc_arena)->EapolConf(response);
+    if (!result.ok()) {
+      NXPF_ERR("Failed to send eapol conf result.status: %s", result.status_string());
+      return;
+    }
     completer.buffer(arena).Reply();
     return;
   }
@@ -641,7 +737,7 @@ void WlanInterface::SaeHandshakeResp(SaeHandshakeRespRequestView request, fdf::A
       request->resp.peer_sta_address.data(), static_cast<uint16_t>(request->resp.status_code));
   if (status != ZX_OK) {
     NXPF_ERR("Failed to handle SAE handshake response: %s", zx_status_get_string(status));
-    if (request->resp.status_code != fuchsia_wlan_ieee80211::wire::StatusCode::kSuccess) {
+    if (request->resp.status_code != fuchsia_wlan_ieee80211_wire::StatusCode::kSuccess) {
       ConfirmConnectReq(static_cast<ClientConnection::StatusCode>(request->resp.status_code));
     } else {
       ConfirmConnectReq(ClientConnection::StatusCode::kJoinFailure);
@@ -670,8 +766,17 @@ void WlanInterface::SaeFrameTx(SaeFrameTxRequestView request, fdf::Arena& arena,
 void WlanInterface::WmmStatusReq(fdf::Arena& arena, WmmStatusReqCompleter::Sync& completer) {
   // TODO(https://fxbug.dev/110091): Implement support for this.
 
-  wlan_wmm_parameters_t wmm{};
-  fullmac_ifc_->OnWmmStatusResp(ZX_OK, &wmm);
+  fuchsia_wlan_common_wire::WlanWmmParameters wmm{};
+  auto ifc_arena = fdf::Arena::Create(0, 0);
+  if (ifc_arena.is_error()) {
+    NXPF_ERR("Failed to create Arena status=%s", ifc_arena.status_string());
+    return;
+  }
+  auto result = fullmac_ifc_.buffer(*ifc_arena)->OnWmmStatusResp(ZX_OK, wmm);
+  if (!result.ok()) {
+    NXPF_ERR("Failed to send wmm status resp result.status: %s", result.status_string());
+    return;
+  }
   completer.buffer(arena).Reply();
 }
 
@@ -682,74 +787,169 @@ void WlanInterface::OnLinkStateChanged(OnLinkStateChangedRequestView request, fd
 }
 
 void WlanInterface::OnDisconnectEvent(uint16_t reason_code) {
-  wlan_fullmac_deauth_indication_t ind{.reason_code = reason_code};
-  memcpy(ind.peer_sta_address, mac_address_, sizeof(mac_address_));
-  fullmac_ifc_->DeauthInd(&ind);
+  fuchsia_wlan_fullmac_wire::WlanFullmacDeauthIndication ind;
+
+  memcpy(ind.peer_sta_address.data(), mac_address_, sizeof(mac_address_));
+  ind.reason_code = static_cast<fuchsia_wlan_ieee80211_wire::ReasonCode>(reason_code);
+
+  auto arena = fdf::Arena::Create(0, 0);
+  if (arena.is_error()) {
+    NXPF_ERR("Failed to create Arena status=%s", arena.status_string());
+    return;
+  }
+  auto result = fullmac_ifc_.buffer(*arena)->DeauthInd(ind);
+  if (!result.ok()) {
+    NXPF_ERR("Failed to send scan end result.status: %s", result.status_string());
+    return;
+  }
 }
 
 void WlanInterface::SignalQualityIndication(int8_t rssi, int8_t snr) {
-  wlan_fullmac_signal_report_indication signal_ind = {.rssi_dbm = rssi, .snr_db = snr};
-  fullmac_ifc_->SignalReport(&signal_ind);
+  fuchsia_wlan_fullmac_wire::WlanFullmacSignalReportIndication signal_ind = {.rssi_dbm = rssi,
+                                                                             .snr_db = snr};
+  auto arena = fdf::Arena::Create(0, 0);
+  if (arena.is_error()) {
+    NXPF_ERR("Failed to create Arena status=%s", arena.status_string());
+    return;
+  }
+  auto result = fullmac_ifc_.buffer(*arena)->SignalReport(signal_ind);
+  if (!result.ok()) {
+    NXPF_ERR("Failed to send signal report result.status: %s", result.status_string());
+    return;
+  }
 }
 
 void WlanInterface::InitiateSaeHandshake(const uint8_t* peer_mac) {
-  wlan_fullmac_sae_handshake_ind_t ind{};
-  memcpy(ind.peer_sta_address, peer_mac, ETH_ALEN);
-  fullmac_ifc_->SaeHandshakeInd(&ind);
+  fuchsia_wlan_fullmac_wire::WlanFullmacSaeHandshakeInd ind{};
+  memcpy(ind.peer_sta_address.data(), peer_mac, ETH_ALEN);
+  auto arena = fdf::Arena::Create(0, 0);
+  if (arena.is_error()) {
+    NXPF_ERR("Failed to create Arena status=%s", arena.status_string());
+    return;
+  }
+  auto result = fullmac_ifc_.buffer(*arena)->SaeHandshakeInd(ind);
+  if (!result.ok()) {
+    NXPF_ERR("Failed to send sae handshake ind result.status: %s", result.status_string());
+    return;
+  }
 }
 
 void WlanInterface::OnAuthFrame(const uint8_t* peer_mac, const wlan::Authentication* frame,
                                 cpp20::span<const uint8_t> trailing_data) {
-  wlan_fullmac_sae_frame_t sae_frame{.status_code = frame->status_code,
-                                     .seq_num = frame->auth_txn_seq_number};
-  memcpy(sae_frame.peer_sta_address, peer_mac, ETH_ALEN);
-  sae_frame.sae_fields_list = trailing_data.data();
-  sae_frame.sae_fields_count = trailing_data.size();
+  fuchsia_wlan_fullmac_wire::WlanFullmacSaeFrame sae_frame{
+      .status_code = static_cast<fuchsia_wlan_ieee80211_wire::StatusCode>(frame->status_code),
+      .seq_num = frame->auth_txn_seq_number};
+  uint8_t* data_bytes = const_cast<uint8_t*>(trailing_data.data());
+  memcpy(sae_frame.peer_sta_address.data(), peer_mac, ETH_ALEN);
+  sae_frame.sae_fields =
+      ::fidl::VectorView<uint8_t>::FromExternal(data_bytes, trailing_data.size());
 
-  fullmac_ifc_->SaeFrameRx(&sae_frame);
+  auto arena = fdf::Arena::Create(0, 0);
+  if (arena.is_error()) {
+    NXPF_ERR("Failed to create Arena status=%s", arena.status_string());
+    return;
+  }
+  auto result = fullmac_ifc_.buffer(*arena)->SaeFrameRx(sae_frame);
+  if (!result.ok()) {
+    NXPF_ERR("Failed to send sae frame Rx result.status: %s", result.status_string());
+    return;
+  }
 }
 
 // Handle STA connect event for SoftAP.
 void WlanInterface::OnStaConnectEvent(uint8_t* sta_mac_addr, uint8_t* ies, uint32_t ie_length) {
   // This is the only event from FW for STA connect. Indicate both auth and assoc to SME.
-  wlan_fullmac_auth_ind_t auth_ind_params = {};
-  memcpy(auth_ind_params.peer_sta_address, sta_mac_addr, ETH_ALEN);
+  fuchsia_wlan_fullmac_wire::WlanFullmacAuthInd auth_ind_params = {};
+  memcpy(auth_ind_params.peer_sta_address.data(), sta_mac_addr, ETH_ALEN);
   // We always authenticate as an open system for WPA
-  auth_ind_params.auth_type = WLAN_AUTH_TYPE_OPEN_SYSTEM;
-  fullmac_ifc_->AuthInd(&auth_ind_params);
+  auth_ind_params.auth_type = fuchsia_wlan_fullmac_wire::WlanAuthType::kOpenSystem;
+  auto arena = fdf::Arena::Create(0, 0);
+  if (arena.is_error()) {
+    NXPF_ERR("Failed to create Arena status=%s", arena.status_string());
+    return;
+  }
+  auto result = fullmac_ifc_.buffer(*arena)->AuthInd(auth_ind_params);
+  if (!result.ok()) {
+    NXPF_ERR("Failed to send scan end result.status: %s", result.status_string());
+    return;
+  }
 
   // Indicate assoc.
-  wlan_fullmac_assoc_ind_t assoc_ind_params = {};
-  memcpy(assoc_ind_params.peer_sta_address, sta_mac_addr, ETH_ALEN);
+  fuchsia_wlan_fullmac_wire::WlanFullmacAssocInd assoc_ind_params = {};
+  memcpy(assoc_ind_params.peer_sta_address.data(), sta_mac_addr, ETH_ALEN);
   if (ie_length && ies && (ie_length <= sizeof(assoc_ind_params.vendor_ie))) {
-    memcpy(assoc_ind_params.vendor_ie, ies, ie_length);
+    memcpy(assoc_ind_params.vendor_ie.data(), ies, ie_length);
     assoc_ind_params.vendor_ie_len = ie_length;
   }
-  fullmac_ifc_->AssocInd(&assoc_ind_params);
+  auto assoc_arena = fdf::Arena::Create(0, 0);
+  if (assoc_arena.is_error()) {
+    NXPF_ERR("Failed to create Arena status=%s", assoc_arena.status_string());
+    return;
+  }
+  auto assoc_result = fullmac_ifc_.buffer(*assoc_arena)->AssocInd(assoc_ind_params);
+  if (!assoc_result.ok()) {
+    NXPF_ERR("Failed to send assoc ind result.status: %s", assoc_result.status_string());
+    return;
+  }
 }
 
 // Handle STA disconnect event for SoftAP.
 void WlanInterface::OnStaDisconnectEvent(uint8_t* sta_mac_addr, uint16_t reason_code,
                                          bool locally_initiated) {
   // This is the only event from FW for STA disconnect. Indicate both deauth and disassoc to SME.
+  if (!fullmac_ifc_.is_valid()) {
+    NXPF_ERR("IFC is not valid...probably deleted?");
+    return;
+  }
   if (!locally_initiated) {
     NXPF_INFO("Disconnect Event, not locally initiated, send deauth and disassoc ind");
-    wlan_fullmac_deauth_indication_t deauth_ind_params = {};
+    fuchsia_wlan_fullmac_wire::WlanFullmacDeauthIndication deauth_ind_params{};
     // Disconnect event contains the STA's mac address at offset 2.
-    memcpy(deauth_ind_params.peer_sta_address, sta_mac_addr, ETH_ALEN);
-    deauth_ind_params.reason_code = reason_code;
+    memcpy(deauth_ind_params.peer_sta_address.data(), sta_mac_addr, ETH_ALEN);
+    deauth_ind_params.reason_code =
+        static_cast<fuchsia_wlan_ieee80211_wire::ReasonCode>(reason_code);
+    deauth_ind_params.locally_initiated = locally_initiated;
 
-    // Indicate disassoc.
-    fullmac_ifc_->DeauthInd(&deauth_ind_params);
-    wlan_fullmac_disassoc_indication_t disassoc_ind_params = {};
-    memcpy(disassoc_ind_params.peer_sta_address, sta_mac_addr, ETH_ALEN);
-    disassoc_ind_params.reason_code = reason_code;
-    fullmac_ifc_->DisassocInd(&disassoc_ind_params);
+    auto arena = fdf::Arena::Create(0, 0);
+    if (arena.is_error()) {
+      NXPF_ERR("Failed to create Arena status=%s", arena.status_string());
+      return;
+    }
+    // Indicate deauth.
+    auto result = fullmac_ifc_.buffer(*arena)->DeauthInd(deauth_ind_params);
+    if (!result.ok()) {
+      NXPF_ERR("Failed to send deauth ind result.status: %s", result.status_string());
+      return;
+    }
+    fuchsia_wlan_fullmac_wire::WlanFullmacDisassocIndication disassoc_ind_params{};
+    memcpy(disassoc_ind_params.peer_sta_address.data(), sta_mac_addr, ETH_ALEN);
+    disassoc_ind_params.reason_code =
+        static_cast<fuchsia_wlan_ieee80211_wire::ReasonCode>(reason_code);
+    disassoc_ind_params.locally_initiated = locally_initiated;
+    auto disassoc_arena = fdf::Arena::Create(0, 0);
+    if (disassoc_arena.is_error()) {
+      NXPF_ERR("Failed to create Arena status=%s", disassoc_arena.status_string());
+      return;
+    }
+    auto disassoc_result = fullmac_ifc_.buffer(*disassoc_arena)->DisassocInd(disassoc_ind_params);
+    if (!disassoc_result.ok()) {
+      NXPF_ERR("Failed to send disassoc ind result.status: %s", disassoc_result.status_string());
+      return;
+    }
   } else {
     NXPF_INFO("Disconnect Event, locally initiated, send deauth conf");
-    wlan_fullmac_deauth_confirm_t conf{};
-    memcpy(conf.peer_sta_address, sta_mac_addr, ETH_ALEN);
-    fullmac_ifc_->DeauthConf(&conf);
+    fuchsia_wlan_fullmac_wire::WlanFullmacDeauthConfirm conf{};
+    memcpy(conf.peer_sta_address.data(), sta_mac_addr, ETH_ALEN);
+    auto deauth_arena = fdf::Arena::Create(0, 0);
+    if (deauth_arena.is_error()) {
+      NXPF_ERR("Failed to create Arena status=%s", deauth_arena.status_string());
+      return;
+    }
+    auto deauth_result = fullmac_ifc_.buffer(*deauth_arena)->DeauthConf(conf);
+    if (!deauth_result.ok()) {
+      NXPF_ERR("Failed to send deauth conf result.status: %s", deauth_result.status_string());
+      return;
+    }
   }
 }
 uint32_t WlanInterface::PortGetMtu() { return 1500u; }
@@ -819,23 +1019,49 @@ zx_status_t WlanInterface::SetMacAddressInFw() {
 }
 
 void WlanInterface::ConfirmDeauth() {
-  wlan_fullmac_deauth_confirm_t resp{};
-  memcpy(resp.peer_sta_address, mac_address_, sizeof(mac_address_));
-  fullmac_ifc_->DeauthConf(&resp);
+  fuchsia_wlan_fullmac_wire::WlanFullmacDeauthConfirm resp{};
+  memcpy(resp.peer_sta_address.data(), mac_address_, sizeof(mac_address_));
+  auto arena = fdf::Arena::Create(0, 0);
+  if (arena.is_error()) {
+    NXPF_ERR("Failed to create Arena status=%s", arena.status_string());
+    return;
+  }
+  auto result = fullmac_ifc_.buffer(*arena)->DeauthConf(resp);
+  if (!result.ok()) {
+    NXPF_ERR("Failed to send deauth conf result.status: %s", result.status_string());
+    return;
+  }
 }
 
 void WlanInterface::ConfirmDisassoc(zx_status_t status) {
-  NXPF_ERR("%s called", __func__);
-  wlan_fullmac_disassoc_confirm_t resp{.status = status};
-  fullmac_ifc_->DisassocConf(&resp);
+  fuchsia_wlan_fullmac_wire::WlanFullmacDisassocConfirm resp{.status = status};
+  auto arena = fdf::Arena::Create(0, 0);
+  if (arena.is_error()) {
+    NXPF_ERR("Failed to create Arena status=%s", arena.status_string());
+    return;
+  }
+  auto result = fullmac_ifc_.buffer(*arena)->DisassocConf(resp);
+  if (!result.ok()) {
+    NXPF_ERR("Failed to send disassoc conf result.status: %s", result.status_string());
+    return;
+  }
 }
 
 void WlanInterface::ConfirmConnectReq(ClientConnection::StatusCode status, const uint8_t* ies,
                                       size_t ies_len) {
-  wlan_fullmac_connect_confirm_t result = {.result_code = static_cast<uint16_t>(status),
-                                           .association_ies_list = ies,
-                                           .association_ies_count = ies_len};
-  fullmac_ifc_->ConnectConf(&result);
+  fuchsia_wlan_fullmac_wire::WlanFullmacConnectConfirm result = {.result_code = status};
+  uint8_t* ie_data = const_cast<uint8_t*>(ies);
+  result.association_ies = ::fidl::VectorView<uint8_t>::FromExternal(ie_data, ies_len);
+  auto arena = fdf::Arena::Create(0, 0);
+  if (arena.is_error()) {
+    NXPF_ERR("Failed to create Arena status=%s", arena.status_string());
+    return;
+  }
+  auto sts = fullmac_ifc_.buffer(*arena)->ConnectConf(result);
+  if (!sts.ok()) {
+    NXPF_ERR("Failed to send connect conf result.status: %s", sts.status_string());
+    return;
+  }
 }
 
 }  // namespace wlan::nxpfmac

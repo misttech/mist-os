@@ -14,7 +14,6 @@
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_NXP_NXPFMAC_WLAN_INTERFACE_H_
 
 #include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
-#include <fuchsia/wlan/fullmac/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/fit/function.h>
@@ -26,7 +25,6 @@
 #include <wlan/drivers/components/frame.h>
 #include <wlan/drivers/components/network_port.h>
 
-#include "src/connectivity/wlan/drivers/lib/fullmac_ifc/wlan_fullmac_ifc.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/client_connection.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/key_ring.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/scanner.h"
@@ -161,7 +159,7 @@ class WlanInterface : public WlanInterfaceDeviceType,
   SoftAp soft_ap_ __TA_GUARDED(mutex_);
   DeviceContext* context_ = nullptr;
 
-  std::unique_ptr<wlan::WlanFullmacIfc> fullmac_ifc_;
+  fdf::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImplIfc> fullmac_ifc_;
 
   // Serves fuchsia_wlan_fullmac::Service.
   fdf::OutgoingDirectory outgoing_dir_;

@@ -43,7 +43,7 @@ Scanner::Scanner(DeviceContext* context, uint32_t bss_index)
 
 Scanner::~Scanner() { StopScan(); }
 
-zx_status_t Scanner::Scan(const fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest* req,
+zx_status_t Scanner::Scan(const wlan_fullmac_wire::WlanFullmacImplStartScanRequest* req,
                           zx_duration_t timeout, OnScanResult&& on_scan_result,
                           OnScanEnd&& on_scan_end) {
   const std::lock_guard lock(mutex_);
@@ -71,7 +71,7 @@ zx_status_t Scanner::Scan(const fuchsia_wlan_fullmac::wire::WlanFullmacImplStart
     // The ioctl_in_progress_ flag must be cleared whenever this callback exits.
     fit::deferred_callback clear_awaiting_scan_ioctl([this]() { ioctl_in_progress_ = false; });
 
-    wlan_scan_result_t result;
+    wlan_fullmac_wire::WlanScanResult result;
     switch (io_status) {
       case IoctlStatus::Success:
         // We don't need to do anything here, we'll get results in the scan report event handler.
@@ -79,14 +79,14 @@ zx_status_t Scanner::Scan(const fuchsia_wlan_fullmac::wire::WlanFullmacImplStart
       case IoctlStatus::Timeout:
         NXPF_WARN("Scan timed out");
         // If the scan times out fetch and process whatever partial results we have so far.
-        FetchAndProcessScanResults(WLAN_SCAN_RESULT_CANCELED_BY_DRIVER_OR_FIRMWARE);
+        FetchAndProcessScanResults(wlan_fullmac_wire::WlanScanResult::kCanceledByDriverOrFirmware);
         return;
       case IoctlStatus::Canceled:
-        result = WLAN_SCAN_RESULT_CANCELED_BY_DRIVER_OR_FIRMWARE;
+        result = wlan_fullmac_wire::WlanScanResult::kCanceledByDriverOrFirmware;
         break;
       default:
         NXPF_ERR("Scan failed: %u", io_status);
-        result = WLAN_SCAN_RESULT_INTERNAL_ERROR;
+        result = wlan_fullmac_wire::WlanScanResult::kInternalError;
         break;
     }
 
@@ -137,7 +137,7 @@ zx_status_t Scanner::ConnectScan(const uint8_t* ssid, size_t ssid_len, uint8_t c
   std::vector<uint8_t> channel_vec;
   channel_vec.push_back(channel);
 
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest::Builder(arena);
+  auto builder = wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(arena);
 
   builder.txn_id(0);
   builder.scan_type(fuchsia_wlan_fullmac::wire::WlanScanType::kActive);
@@ -148,8 +148,8 @@ zx_status_t Scanner::ConnectScan(const uint8_t* ssid, size_t ssid_len, uint8_t c
   auto request = builder.Build();
 
   sync_completion_t scan_complete;
-  wlan_scan_result_t scan_result = WLAN_SCAN_RESULT_INTERNAL_ERROR;
-  auto on_scan_end = [&](uint64_t, wlan_scan_result_t result) {
+  wlan_fullmac_wire::WlanScanResult scan_result = wlan_fullmac_wire::WlanScanResult::kInternalError;
+  auto on_scan_end = [&](uint64_t, wlan_fullmac_wire::WlanScanResult result) {
     scan_result = result;
     sync_completion_signal(&scan_complete);
   };
@@ -166,9 +166,9 @@ zx_status_t Scanner::ConnectScan(const uint8_t* ssid, size_t ssid_len, uint8_t c
     return status;
   }
 
-  if (scan_result != WLAN_SCAN_RESULT_SUCCESS) {
+  if (scan_result != wlan_fullmac_wire::WlanScanResult::kSuccess) {
     NXPF_ERR("Connect scan failed: %u", scan_result);
-    if (scan_result == WLAN_SCAN_RESULT_CANCELED_BY_DRIVER_OR_FIRMWARE) {
+    if (scan_result == wlan_fullmac_wire::WlanScanResult::kCanceledByDriverOrFirmware) {
       return ZX_ERR_CANCELED;
     }
     return ZX_ERR_INTERNAL;
@@ -210,7 +210,7 @@ zx_status_t Scanner::StopScan() __TA_NO_THREAD_SAFETY_ANALYSIS {
 }
 
 zx_status_t Scanner::PrepareScanRequest(
-    const fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest* req) {
+    const wlan_fullmac_wire::WlanFullmacImplStartScanRequest* req) {
   scan_request_ = ScanRequestType(MLAN_IOCTL_SCAN, MLAN_ACT_SET, bss_index_,
                                   {.sub_command = MLAN_OID_SCAN_USER_CONFIG});
   auto scan_cfg =
@@ -307,10 +307,10 @@ void Scanner::OnScanReport(pmlan_event event) {
     NXPF_ERR("Received scan report event but no scan in progress");
     return;
   }
-  FetchAndProcessScanResults(WLAN_SCAN_RESULT_SUCCESS);
+  FetchAndProcessScanResults(wlan_fullmac_wire::WlanScanResult::kSuccess);
 }
 
-void Scanner::FetchAndProcessScanResults(wlan_scan_result_t result) {
+void Scanner::FetchAndProcessScanResults(wlan_fullmac_wire::WlanScanResult result) {
   // Initiate the scan results requests, this will also hold the results when the ioctl completes.
   scan_results_ = IoctlRequest<mlan_ds_scan>(MLAN_IOCTL_SCAN, MLAN_ACT_GET, bss_index_,
                                              mlan_ds_scan{.sub_command = MLAN_OID_SCAN_NORMAL});
@@ -318,43 +318,63 @@ void Scanner::FetchAndProcessScanResults(wlan_scan_result_t result) {
   IoctlStatus io_status = context_->ioctl_adapter_->IssueIoctlSync(&scan_results_);
   if (io_status != IoctlStatus::Success) {
     NXPF_ERR("Failed to get scan results: %d", io_status);
-    EndScan(txn_id_, WLAN_SCAN_RESULT_INTERNAL_ERROR);
+    EndScan(txn_id_, wlan_fullmac_wire::WlanScanResult::kInternalError);
     return;
   }
 
   ProcessScanResults(result);
 }
 
-void Scanner::ProcessScanResults(wlan_scan_result_t result) {
+void Scanner::ProcessScanResults(wlan_fullmac_wire::WlanScanResult result) {
   mlan_scan_resp& response = scan_results_.UserReq().param.scan_resp;
 
   auto results = reinterpret_cast<pBSSDescriptor_t>(response.pscan_table);
 
   for (uint32_t i = 0; i < response.num_in_scan_table; i++) {
     int8_t rssi = static_cast<int8_t>(std::clamp(-results[i].rssi, INT8_MIN, 0));
-    uint8_t* ies = nullptr;
-    size_t ies_count = 0;
+    fidl::VectorView<uint8_t> ies = {};
     if (results[i].pbeacon_buf && results[i].beacon_buf_size > kBeaconFixedSize) {
-      ies = results[i].pbeacon_buf + kBeaconFixedSize;
-      ies_count = results[i].beacon_buf_size - kBeaconFixedSize;
+      ies = ::fidl::VectorView<uint8_t>::FromExternal(
+          results[i].pbeacon_buf + kBeaconFixedSize, results[i].beacon_buf_size - kBeaconFixedSize);
     }
     uint16_t cap_info;
     memcpy(&cap_info, &results[i].cap_info, sizeof(cap_info));
 
-    wlan_fullmac_scan_result_t scan_result{
+    fuchsia_wlan_common::wire::ChannelBandwidth cbw;
+    switch (results[i].curr_bandwidth) {
+      case CHANNEL_BW_20MHZ:
+        cbw = fuchsia_wlan_common::wire::ChannelBandwidth::kCbw20;
+        break;
+      case CHANNEL_BW_40MHZ_ABOVE:
+        cbw = fuchsia_wlan_common::wire::ChannelBandwidth::kCbw40;
+        break;
+      case CHANNEL_BW_40MHZ_BELOW:
+        cbw = fuchsia_wlan_common::wire::ChannelBandwidth::kCbw40Below;
+        break;
+      case CHANNEL_BW_80MHZ:
+        cbw = fuchsia_wlan_common::wire::ChannelBandwidth::kCbw80;
+        break;
+      case CHANNEL_BW_160MHZ:
+        cbw = fuchsia_wlan_common::wire::ChannelBandwidth::kCbw160;
+        break;
+      default:
+        cbw = fuchsia_wlan_common::wire::ChannelBandwidth::kCbw20;
+        break;
+    }
+    wlan_fullmac_wire::WlanFullmacScanResult scan_result{
         .txn_id = txn_id_,
         .timestamp_nanos = zx::clock::get_monotonic().get(),
         .bss{
-            .bss_type = BSS_TYPE_INFRASTRUCTURE,  // TODO(fxbug.dev/80230): Remove hardcoding?
+            .bss_type =
+                fuchsia_wlan_common::wire::BssType::kInfrastructure,  // TODO(fxbug.dev/80230):
+                                                                      // Remove hardcoding?
             .beacon_period = results[i].beacon_period,
             .capability_info = cap_info,
-            .ies_list = ies,
-            .ies_count = ies_count,
-            .channel{.primary = static_cast<uint8_t>(results[i].channel),
-                     .cbw = results[i].curr_bandwidth},
+            .ies = ies,
+            .channel{.primary = static_cast<uint8_t>(results[i].channel), .cbw = cbw},
             .rssi_dbm = rssi,
         }};
-    memcpy(scan_result.bss.bssid, results[i].mac_address, ETH_ALEN);
+    memcpy(scan_result.bss.bssid.data(), results[i].mac_address, ETH_ALEN);
 
     if (on_scan_result_) {
       on_scan_result_(scan_result);
@@ -372,7 +392,7 @@ zx_status_t Scanner::CancelScanIoctl() {
   return ZX_OK;
 }
 
-void Scanner::EndScan(uint64_t txn_id, wlan_scan_result_t result) {
+void Scanner::EndScan(uint64_t txn_id, wlan_fullmac_wire::WlanScanResult result) {
   if (on_scan_end_) {
     on_scan_end_(txn_id, result);
     // Reset these callbacks here, they will not be used anymore for the scan that's ending. This

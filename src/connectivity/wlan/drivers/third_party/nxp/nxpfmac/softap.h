@@ -15,7 +15,6 @@
 
 #include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
 #include <fidl/fuchsia.wlan.ieee80211/cpp/wire_types.h>
-#include <fuchsia/wlan/fullmac/cpp/banjo.h>
 #include <lib/sync/completion.h>
 #include <netinet/if_ether.h>
 #include <zircon/compiler.h>
@@ -32,6 +31,8 @@
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/mlan/mlan_ieee.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/waitable_state.h"
 
+namespace wlan_fullmac_wire = fuchsia_wlan_fullmac::wire;
+namespace wlan_ieee80211_wire = fuchsia_wlan_ieee80211::wire;
 namespace wlan::nxpfmac {
 
 struct DeviceContext;
@@ -52,12 +53,12 @@ class SoftAp {
   SoftAp(SoftApIfc* ifc, DeviceContext* context, uint32_t bss_index);
   ~SoftAp();
   // Attempt to start the SoftAP on the given bss and channel. Returns appropriate
-  // WLAN_START_RESULT_XX.
-  wlan_start_result_t Start(const fuchsia_wlan_fullmac::wire::WlanFullmacStartReq* req)
-      __TA_EXCLUDES(mutex_);
+  // WlanStartResult.
+  wlan_fullmac_wire::WlanStartResult Start(
+      const fuchsia_wlan_fullmac::wire::WlanFullmacStartReq* req) __TA_EXCLUDES(mutex_);
 
-  // Returns appropriate WLAN_STOP_RESULT_XX.
-  wlan_stop_result_t Stop(const fuchsia_wlan_fullmac::wire::WlanFullmacStopReq* req)
+  // Returns appropriate WlanStopResult.
+  wlan_fullmac_wire::WlanStopResult Stop(const fuchsia_wlan_fullmac::wire::WlanFullmacStopReq* req)
       __TA_EXCLUDES(mutex_);
   zx_status_t DeauthSta(const uint8_t sta_mac_addr[ETH_ALEN], uint16_t reason_code)
       __TA_EXCLUDES(mutex_);

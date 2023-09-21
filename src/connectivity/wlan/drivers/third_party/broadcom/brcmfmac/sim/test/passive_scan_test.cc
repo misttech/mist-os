@@ -45,13 +45,13 @@ class PassiveScanTestInterface : public SimInterface {
   // Add a functor that can be run on each scan result by the VerifyScanResult method.
   // This allows scan results to be inspected (e.g. with EXPECT_EQ) as they come in, rather than
   // storing scan results for analysis after the sim env run has completed.
-  void AddVerifierFunction(std::function<void(const wlan_fullmac::WlanFullmacScanResult&)>);
+  void AddVerifierFunction(std::function<void(const wlan_fullmac_wire::WlanFullmacScanResult&)>);
 
   // Remove any verifier functions from the object.
   void ClearVerifierFunction();
 
   // Run the verifier method (if one was added) on the given scan result.
-  void VerifyScanResult(wlan_fullmac::WlanFullmacScanResult result);
+  void VerifyScanResult(wlan_fullmac_wire::WlanFullmacScanResult result);
 
   void OnScanResult(OnScanResultRequestView request, fdf::Arena& arena,
                     OnScanResultCompleter::Sync& completer) override;
@@ -59,7 +59,7 @@ class PassiveScanTestInterface : public SimInterface {
   PassiveScanTest* test_ = nullptr;
 
  private:
-  std::function<void(const wlan_fullmac::WlanFullmacScanResult&)> verifier_fn_;
+  std::function<void(const wlan_fullmac_wire::WlanFullmacScanResult&)> verifier_fn_;
 };
 
 class PassiveScanTest : public SimTest {
@@ -118,13 +118,13 @@ void PassiveScanTest::StartFakeApWithErrInjBeacon(
 }
 
 void PassiveScanTestInterface::AddVerifierFunction(
-    std::function<void(const wlan_fullmac::WlanFullmacScanResult&)> verifier_fn) {
+    std::function<void(const wlan_fullmac_wire::WlanFullmacScanResult&)> verifier_fn) {
   verifier_fn_ = std::move(verifier_fn);
 }
 
 void PassiveScanTestInterface::ClearVerifierFunction() { verifier_fn_ = nullptr; }
 
-void PassiveScanTestInterface::VerifyScanResult(wlan_fullmac::WlanFullmacScanResult result) {
+void PassiveScanTestInterface::VerifyScanResult(wlan_fullmac_wire::WlanFullmacScanResult result) {
   if (verifier_fn_ != nullptr) {
     verifier_fn_(result);
   }
@@ -161,7 +161,7 @@ TEST_F(PassiveScanTest, BasicFunctionality) {
 
   // The lambda arg will be run on each result, inside PassiveScanTestInterface::VerifyScanResults.
   client_ifc_.AddVerifierFunction(
-      [&test_start_timestamp_nanos](const wlan_fullmac::WlanFullmacScanResult& result) {
+      [&test_start_timestamp_nanos](const wlan_fullmac_wire::WlanFullmacScanResult& result) {
         // Verify timestamp is after test start
         ASSERT_GT(result.timestamp_nanos, test_start_timestamp_nanos);
 
@@ -209,13 +209,13 @@ TEST_F(PassiveScanTest, EmptyChannelList) {
 
   // The driver should exit early and return no scan results.
   client_ifc_.AddVerifierFunction(
-      [](const wlan_fullmac::WlanFullmacScanResult& result) { FAIL(); });
+      [](const wlan_fullmac_wire::WlanFullmacScanResult& result) { FAIL(); });
 
   env_->Run(kDefaultTestDuration);
 
   auto result_code = client_ifc_.ScanResultCode(kScanId);
   ASSERT_TRUE(result_code.has_value());
-  ASSERT_EQ(result_code.value(), wlan_fullmac::WlanScanResult::kInvalidArgs);
+  ASSERT_EQ(result_code.value(), wlan_fullmac_wire::WlanScanResult::kInvalidArgs);
 }
 
 TEST_F(PassiveScanTest, ScanWithMalformedBeaconMissingSsidInformationElement) {
@@ -243,7 +243,7 @@ TEST_F(PassiveScanTest, ScanWithMalformedBeaconMissingSsidInformationElement) {
                              kScanStartTime);
 
   client_ifc_.AddVerifierFunction(
-      [&test_start_timestamp_nanos](const wlan_fullmac::WlanFullmacScanResult& result) {
+      [&test_start_timestamp_nanos](const wlan_fullmac_wire::WlanFullmacScanResult& result) {
         // Verify timestamp is after test start
         ASSERT_GT(result.timestamp_nanos, test_start_timestamp_nanos);
 
@@ -295,7 +295,8 @@ TEST_F(PassiveScanTest, ScanWhenFirmwareBusy) {
 
   EXPECT_EQ(client_ifc_.ScanResultList(kScanId)->size(), 0U);
   ASSERT_NE(client_ifc_.ScanResultCode(kScanId), std::nullopt);
-  EXPECT_EQ(client_ifc_.ScanResultCode(kScanId).value(), wlan_fullmac::WlanScanResult::kShouldWait);
+  EXPECT_EQ(client_ifc_.ScanResultCode(kScanId).value(),
+            wlan_fullmac_wire::WlanScanResult::kShouldWait);
 }
 
 TEST_F(PassiveScanTest, ScanWhileAssocInProgress) {
@@ -321,7 +322,8 @@ TEST_F(PassiveScanTest, ScanWhileAssocInProgress) {
 
   EXPECT_EQ(client_ifc_.ScanResultList(kScanId)->size(), 0U);
   ASSERT_NE(client_ifc_.ScanResultCode(kScanId), std::nullopt);
-  EXPECT_EQ(client_ifc_.ScanResultCode(kScanId).value(), wlan_fullmac::WlanScanResult::kShouldWait);
+  EXPECT_EQ(client_ifc_.ScanResultCode(kScanId).value(),
+            wlan_fullmac_wire::WlanScanResult::kShouldWait);
 }
 
 TEST_F(PassiveScanTest, ScanAbortedInFirmware) {
@@ -350,6 +352,6 @@ TEST_F(PassiveScanTest, ScanAbortedInFirmware) {
   EXPECT_EQ(client_ifc_.ScanResultList(kScanId)->size(), 0U);
   ASSERT_NE(client_ifc_.ScanResultCode(kScanId), std::nullopt);
   EXPECT_EQ(client_ifc_.ScanResultCode(kScanId).value(),
-            wlan_fullmac::WlanScanResult::kCanceledByDriverOrFirmware);
+            wlan_fullmac_wire::WlanScanResult::kCanceledByDriverOrFirmware);
 }
 }  // namespace wlan::brcmfmac

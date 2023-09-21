@@ -15,7 +15,6 @@
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_NXP_NXPFMAC_SCANNER_H_
 
 #include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
-#include <fuchsia/wlan/fullmac/cpp/banjo.h>
 #include <lib/fit/function.h>
 #include <zircon/compiler.h>
 
@@ -25,14 +24,17 @@
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/ioctl_request.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/waitable_state.h"
 
+namespace wlan_fullmac_wire = fuchsia_wlan_fullmac::wire;
 namespace wlan::nxpfmac {
 
 struct DeviceContext;
 
 class Scanner {
  public:
-  using OnScanResult = fit::function<void(const wlan_fullmac_scan_result_t& /*result*/)>;
-  using OnScanEnd = fit::callback<void(uint64_t /*txn_id*/, wlan_scan_result_t /*result*/)>;
+  using OnScanResult =
+      fit::function<void(const wlan_fullmac_wire::WlanFullmacScanResult& /*result*/)>;
+  using OnScanEnd =
+      fit::callback<void(uint64_t /*txn_id*/, wlan_fullmac_wire::WlanScanResult /*result*/)>;
   Scanner(DeviceContext* context, uint32_t bss_index);
   // Destroying the scanner will stop any ongoing scans and wait for all all calls to the fullmac
   // ifc client to complete.
@@ -41,7 +43,7 @@ class Scanner {
   // Start a scan. Returns ZX_ERR_ALREADY_EXISTS if a scan is already in progress. The scan will
   // time out after the given timeout has elapsed. Scan results are reported one at a time through
   // the `on_scan_result` callback and `on_scan_end` will be called when the scan ends.
-  zx_status_t Scan(const fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest* req,
+  zx_status_t Scan(const wlan_fullmac_wire::WlanFullmacImplStartScanRequest* req,
                    zx_duration_t timeout, OnScanResult&& on_scan_result, OnScanEnd&& on_scan_end)
       __TA_EXCLUDES(mutex_);
 
@@ -66,10 +68,10 @@ class Scanner {
   void PopulateScanChannel(wlan_user_scan_chan& user_scan_chan, uint8_t channel, uint8_t scan_type,
                            uint32_t channel_time);
   void OnScanReport(pmlan_event event) __TA_EXCLUDES(mutex_);
-  void FetchAndProcessScanResults(wlan_scan_result_t result) __TA_REQUIRES(mutex_);
-  void ProcessScanResults(wlan_scan_result_t result) __TA_REQUIRES(mutex_);
+  void FetchAndProcessScanResults(wlan_fullmac_wire::WlanScanResult result) __TA_REQUIRES(mutex_);
+  void ProcessScanResults(wlan_fullmac_wire::WlanScanResult result) __TA_REQUIRES(mutex_);
   zx_status_t CancelScanIoctl() __TA_REQUIRES(mutex_);
-  void EndScan(uint64_t txn_id, wlan_scan_result_t result) __TA_REQUIRES(mutex_);
+  void EndScan(uint64_t txn_id, wlan_fullmac_wire::WlanScanResult result) __TA_REQUIRES(mutex_);
 
   DeviceContext* context_ = nullptr;
   using ScanRequestType = IoctlRequest<mlan_ds_scan, sizeof(wlan_user_scan_cfg)>;

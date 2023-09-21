@@ -19,7 +19,6 @@
 
 #include <fuchsia/wlan/common/c/banjo.h>
 #include <fuchsia/wlan/ieee80211/cpp/fidl.h>
-#include <fuchsia/wlan/internal/c/banjo.h>
 #include <stdint.h>
 #include <sys/types.h>
 #include <zircon/types.h>
