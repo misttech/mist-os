@@ -98,6 +98,9 @@ template("clippy") {
         # TODO(fxbug.dev/130287): upgrade bitflags to a version that doesn't trigger this and remove
         "-Aclippy::bad_bit_mask",
         "-Dclippy::missing_safety_doc",
+
+        # TODO(b/301642294) remove this allowance
+        "-Aclippy::never-loop",
       ]
       if (rustc_version_string !=
           "dblnU3tEhEv7oy3yIm63PMqD3dsqu8htntNrnj3hkd0C" &&
