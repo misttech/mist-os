@@ -209,7 +209,6 @@ List<String> chunkOnSlashes(
   /// String we will scan for instances of [sep] to determine how to split
   /// [haystack].
   String? needle, {
-
   /// Separator string that defaults to the current OS's filesystem separator.
   String? sep,
 

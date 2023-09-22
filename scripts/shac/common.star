@@ -17,9 +17,13 @@ def cipd_platform_name(ctx):
     }.get(ctx.platform.arch, ctx.platform.arch)
     return "%s-%s" % (os, arch)
 
+def get_build_dir(ctx):
+    """Returns the path to the build output directory."""
+    return ctx.vars.get("fuchsia_build_dir")
+
 def compiled_tool_path(ctx, tool_name):
     """Returns the path to a compiled tool in the build directory."""
-    build_dir = ctx.vars.get("fuchsia_build_dir")
+    build_dir = get_build_dir(ctx)
     tools = json.decode(str(ctx.io.read_file(build_dir + "/tool_paths.json")))
     for tool in tools:
         if (

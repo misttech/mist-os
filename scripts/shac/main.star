@@ -4,6 +4,7 @@
 
 load("./cml.star", "register_cml_checks")
 load("./common.star", "FORMATTER_MSG", "cipd_platform_name", "compiled_tool_path")
+load("./dart.star", "register_dart_checks")
 load("./fidl.star", "register_fidl_checks")
 load("./go.star", "register_go_checks")
 load("./json.star", "register_json_checks")
@@ -125,6 +126,7 @@ def register_all_checks():
     ))
     shac.register_check(shac.check(_mdlint))
     register_cml_checks()
+    register_dart_checks()
     register_fidl_checks()
     register_go_checks()
     register_json_checks()

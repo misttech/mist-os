@@ -72,7 +72,6 @@ class Fx {
   Future<String?> getSubCommandOutput(
     /// fx subcommand to execute. For example, "device-name", "status", etc.
     String cmd, {
-
     /// Optional list of arguments to pass to the subcommand.
     List<String>? args,
 
@@ -109,7 +108,6 @@ class Fx {
   Future<ProcessResult> runFxSubCommand(
     /// Specific `fx` subcommand to execute.
     String cmd, {
-
     /// Argument and flags for the subcommand. Optional.
     List<String>? args,
 

@@ -137,7 +137,6 @@ function format-file() {
   case "${filename}" in
     *.c | *.cc | *.cpp | *.h | *.hh | *.hpp | *.proto | *.ts)
       format-cc-file "$1" ;;
-    *.dart) format-full-file "${DART_CMD}"  "$1";;
     *.gidl) format-full-file "${GIDL_CMD}" "$1" ;;
     *.config) format-full-file "${JSON_FMT_CMD}" "$1" ;;
     *.json) format-full-file "${JSON_FMT_CMD}" "$1" ;;
@@ -283,7 +282,6 @@ fi
 readonly PY_TOOL="${FUCHSIA_DIR}/scripts/fuchsia-vendored-python"
 readonly VPYTHON_TOOL="${FUCHSIA_DIR}/prebuilt/third_party/vpython/vpython3"
 readonly CLANG_CMD="${PREBUILT_CLANG_DIR}/bin/clang-format -style=file -fallback-style=Google -sort-includes -i"
-readonly DART_CMD="${PREBUILT_DART_DIR}/bin/dart format"
 readonly GIDL_FORMAT_TOOL="$( fx-command-run list-build-artifacts --expect-one --name gidl-format tools )"
 readonly GIDL_FORMAT_TOOL_ABS="${FUCHSIA_BUILD_DIR}/${GIDL_FORMAT_TOOL}"
 readonly GIDL_CMD="${GIDL_FORMAT_TOOL_ABS} -i"
@@ -351,6 +349,7 @@ for file in "${FILES[@]}"; do
     # locally.
     *.bazel | *.bzl | *.bzlmod | *.star | BUILD | WORKSPACE |\
     *.cml |\
+    *.dart |\
     *.fidl |\
     *.json5 | *.persist | *.triage |\
     *.gn | *.gni |\
