@@ -221,6 +221,7 @@ gvisor_tests_run_as_root = [
   "proc_pid_oomscore_test",
   "proc_test",
   "processes_test",
+  "ptrace_test",
   "raw_socket_icmp_test",
   "raw_socket_test",
   "rlimits_test",

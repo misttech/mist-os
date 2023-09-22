@@ -555,6 +555,24 @@
                 "All/ProcPidUidGidMapTest.MapAnyIDsPrivileged/UID",
                 "All/ProcSelfUidGidMapTest.IdentityMapOwnID/GID",
 
+                // ptrace tests
+                "PtraceTest.85",
+                "PtraceTest.AttachParent_PeekData_PokeData_SignalSuppression",
+                "PtraceTest.ChangeRegSetInOptSyscall",
+                "PtraceTest.ExitWhenParentIsNotTracer_Syscall_TraceVfork_TraceVforkDone",
+                "PtraceTest.GetRegSet",
+                "PtraceTest.GetSigMask",
+                "PtraceTest.GetSiginfo_SetSiginfo_SignalInjection",
+                "PtraceTest.Int3",
+                "PtraceTest.Interrupt_Listen_RequireSeize",
+                "PtraceTest.PrctlSetPtracerInvalidPID",
+                "PtraceTest.SeizeSetOptions",
+                "PtraceTest.Seize_Interrupt_Listen",
+                "PtraceTest.SetYAMAPtraceScope",
+                "PtraceTest.Sysemu_PokeUser",
+                "TraceExec/PtraceExecveTest.Execve_GetRegs_PeekUser_SIGKILL_TraceClone_TraceExit/0",
+                "TraceExec/PtraceExecveTest.Execve_GetRegs_PeekUser_SIGKILL_TraceClone_TraceExit/1",
+
                 // raw_socket_icmp
                 "RawSocketICMPTest.IPv6ChecksumNotSupported",
                 "RawSocketICMPTest.ICMPv6FilterNotSupported",
@@ -1052,6 +1070,10 @@
                 // Passes sometimes, so it has to be skipped.
                 // TODO(b/297438987): Re-enable once timers are implemented.
                 "PpollTest.SignalMaskBlocksSignal",
+
+                // These tests hang / hard crash
+                "PtraceTest.AttachingConvertsGroupStopToPtraceStop",
+                "PtraceTest.TraceDescendantsAllowed",
             ],
         },
     ],
