@@ -104,6 +104,15 @@ def init():
     _init = True
 
 
+def is_init() -> bool:
+    """Return if termout is initialized.
+
+    Returns:
+        bool: True if output is initialized, false otherwise.
+    """
+    return _init
+
+
 @dataclass
 class Size:
     """Represents the width and height of a terminal window."""

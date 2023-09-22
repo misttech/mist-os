@@ -130,6 +130,13 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(patch.stop)
         return m
 
+    def _mock_subprocess_call(self, value: int) -> mock.MagicMock:
+        m = mock.MagicMock(return_value=value)
+        patch = mock.patch("main.subprocess.call", m)
+        patch.start()
+        self.addCleanup(patch.stop)
+        return m
+
     def _mock_has_device_connected(self, value: bool):
         m = mock.AsyncMock(return_value=value)
         patch = mock.patch("main.has_device_connected", m)
@@ -166,6 +173,9 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         for call in call_list:
             args, _ = call
             cur = []
+            if args and isinstance(args[0], list):
+                # Correct for subprocess.call using lists and not *args.
+                args = args[0]
             for a in args:
                 cur.append(a)
                 ret.add(tuple(cur))
@@ -319,6 +329,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         """Test that we can run all tests and report success"""
 
         command_mock = self._mock_run_command(0)
+        subprocess_mock = self._mock_subprocess_call(0)
         self._mock_has_device_connected(True)
         self._mock_has_tests_in_base(False)
 
@@ -326,6 +337,9 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ret, 0)
 
         call_prefixes = self._make_call_args_prefix_set(command_mock.call_args_list)
+        call_prefixes.update(
+            self._make_call_args_prefix_set(subprocess_mock.call_args_list)
+        )
 
         # Make sure we built, published, and ran the device test.
         self.assertIsSubset(

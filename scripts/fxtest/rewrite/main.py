@@ -13,6 +13,7 @@ import gzip
 import json
 import os
 import re
+import subprocess
 import sys
 import typing
 
@@ -430,20 +431,23 @@ async def do_build(
     build_id = recorder.emit_build_start(targets=build_command_line)
     recorder.emit_instruction_message("Use --no-build to skip building")
 
-    output = await execution.run_command(
-        "fx",
-        *(["build"] + build_command_line),
-        env={"CLICOLOR_FORCE": "1"},  # Pass color output for errors verbatim.
-        recorder=recorder,
-        parent=build_id,
-        print_verbatim=True,
+    status_suffix = " Status output suspended." if termout.is_init() else ""
+    recorder.emit_info_message(f"\nExecuting build.{status_suffix}")
+
+    # Allow display to update.
+    await asyncio.sleep(0.1)
+
+    if termout.is_init():
+        # Clear the status output while we are doing the build.
+        termout.write_lines([])
+
+    return_code = subprocess.call(
+        ["fx", "build"] + build_command_line,
     )
 
     error = None
-    if not output:
-        error = "Failure running build"
-    elif output.return_code != 0:
-        error = f"Build returned non-zero exit code {output.return_code}"
+    if return_code != 0:
+        error = f"Build returned non-zero exit code {return_code}"
 
     if error is not None:
         recorder.emit_end(error, id=build_id)
