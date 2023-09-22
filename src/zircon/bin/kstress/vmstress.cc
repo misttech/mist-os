@@ -1764,7 +1764,13 @@ class MultiVmoTestInstance : public TestInstance {
 
 // Test thread which initializes/tears down TestInstances
 int VmStressTest::test_thread() {
+#if defined(__x86_64__)
   constexpr uint64_t kMaxInstances = 8;
+#else
+  // Scale down the number of instances on less powerful hardware.
+  constexpr uint64_t kMaxInstances = 4;
+#endif
+
   constexpr uint64_t kVariableInstances = kMaxInstances - 1;
   std::unique_ptr<TestInstance> test_instances[kMaxInstances] = {};
 
