@@ -114,8 +114,8 @@ source_set("msd_vsi_test_entry") {
            ":msd_vsi_test_bind",
            "src",
            "tests/unit_tests:hardware_tests",
-           "//src/graphics/lib/magma/tests/helper:platform_device_helper",
-           "//src/graphics/lib/magma/tests/helper:platform_msd_device_helper",
+           "//src/graphics/magma/lib/magma_service/test_util:platform_device_helper",
+           "//src/graphics/magma/lib/magma_service/test_util:platform_msd_device_helper",
            "//third_party/googletest:gtest",
          ]
 }

@@ -121,14 +121,13 @@ source_set("msd_arm_test_entry_dfv2") {
     "src/driver_test_gtest.cc",
   ]
   defines = [ "MAGMA_TEST_DRIVER=1" ]
-  deps =
-      dfv2_entry_deps + [
-        "tests/unit_tests:tests_requiring_hardware",
-        "//src/graphics/lib/magma/tests/helper:platform_msd_device_helper",
-        "//src/graphics/lib/magma/tests/msd_conformance_tests",
-        "//src/graphics/magma/lib/magma_service/sys_driver:magma_driver_base",
-        "//third_party/googletest:gtest",
-      ]
+  deps = dfv2_entry_deps + [
+           "tests/unit_tests:tests_requiring_hardware",
+           "//src/graphics/lib/magma/tests/msd_conformance_tests",
+           "//src/graphics/magma/lib/magma_service/sys_driver:magma_driver_base",
+           "//src/graphics/magma/lib/magma_service/test_util:platform_msd_device_helper",
+           "//third_party/googletest:gtest",
+         ]
 }
 
 fuchsia_driver("msd_arm-dfv2-driver") {
@@ -227,7 +226,7 @@ source_set("msd_arm_test_entry") {
   defines = [ "MAGMA_TEST_DRIVER=1" ]
   deps = entry_deps + [
            "src",
-           "//src/graphics/lib/magma/tests/helper:platform_msd_device_helper",
+           "//src/graphics/magma/lib/magma_service/test_util:platform_msd_device_helper",
            "//third_party/googletest:gtest",
          ]
 }

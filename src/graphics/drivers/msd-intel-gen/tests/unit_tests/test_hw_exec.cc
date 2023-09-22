@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma_service/test_util/platform_pci_device_helper.h>
+
 #include <gtest/gtest.h>
 
-#include "helper/platform_pci_device_helper.h"
 #include "msd_intel_device.h"
 #include "src/graphics/drivers/msd-intel-gen/include/magma_intel_gen_defs.h"
 #include "test_command_buffer.h"

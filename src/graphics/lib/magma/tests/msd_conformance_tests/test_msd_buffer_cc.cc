@@ -6,10 +6,9 @@
 #include <lib/magma/util/dlog.h>
 #include <lib/magma/util/short_macros.h>
 #include <lib/magma_service/msd.h>
+#include <lib/magma_service/test_util/platform_msd_device_helper.h>
 
 #include <gtest/gtest.h>
-
-#include "helper/platform_msd_device_helper.h"
 
 namespace {
 

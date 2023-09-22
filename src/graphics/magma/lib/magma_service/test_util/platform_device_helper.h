@@ -1,8 +1,8 @@
 // Copyright 2016 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-#ifndef SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_PLATFORM_DEVICE_HELPER_H_
-#define SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_PLATFORM_DEVICE_HELPER_H_
+#ifndef SRC_GRAPHICS_MAGMA_LIB_MAGMA_SERVICE_TEST_UTIL_PLATFORM_DEVICE_HELPER_H_
+#define SRC_GRAPHICS_MAGMA_LIB_MAGMA_SERVICE_TEST_UTIL_PLATFORM_DEVICE_HELPER_H_
 
 #include <lib/magma/platform/platform_device.h>
 
@@ -15,4 +15,4 @@ class TestPlatformDevice {
   static magma::PlatformDevice* GetInstance();
 };
 
-#endif  // SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_PLATFORM_DEVICE_HELPER_H_
+#endif  // SRC_GRAPHICS_MAGMA_LIB_MAGMA_SERVICE_TEST_UTIL_PLATFORM_DEVICE_HELPER_H_

@@ -4,6 +4,7 @@
 
 #include <lib/magma_service/msd.h>
 #include <lib/magma_service/msd_defs.h>
+#include <lib/magma_service/test_util/msd_stubs.h>
 
 #include <limits>
 
@@ -18,7 +19,6 @@
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_connection.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_context.h"
 #include "src/graphics/drivers/msd-arm-mali/tests/unit_tests/fake_connection_owner_base.h"
-#include "src/graphics/lib/magma/tests/helper/msd_stubs.h"
 
 namespace {
 

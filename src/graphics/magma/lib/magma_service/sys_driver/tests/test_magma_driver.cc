@@ -3,10 +3,9 @@
 // found in the LICENSE file.
 
 #include <lib/magma_service/msd.h>
+#include <lib/magma_service/test_util/platform_device_helper.h>
 
 #include <gtest/gtest.h>
-
-#include "helper/platform_device_helper.h"
 
 namespace msd {
 class TestMagmaDriver {

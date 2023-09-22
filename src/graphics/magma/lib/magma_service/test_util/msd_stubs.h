@@ -1,8 +1,8 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-#ifndef SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_MSD_STUBS_H_
-#define SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_MSD_STUBS_H_
+#ifndef SRC_GRAPHICS_MAGMA_LIB_MAGMA_SERVICE_TEST_UTIL_MSD_STUBS_H_
+#define SRC_GRAPHICS_MAGMA_LIB_MAGMA_SERVICE_TEST_UTIL_MSD_STUBS_H_
 
 #include <lib/magma_service/msd.h>
 
@@ -25,4 +25,4 @@ class StubNotificationHandler : public NotificationHandler {
 
 }  // namespace msd::testing
 
-#endif  // SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_MSD_STUBS_H_
+#endif  // SRC_GRAPHICS_MAGMA_LIB_MAGMA_SERVICE_TEST_UTIL_MSD_STUBS_H_

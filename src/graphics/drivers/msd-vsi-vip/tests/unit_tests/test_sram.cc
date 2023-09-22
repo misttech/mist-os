@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <gtest/gtest.h>
+#include <lib/magma_service/test_util/platform_device_helper.h>
 
-#include "helper/platform_device_helper.h"
+#include <gtest/gtest.h>
 
 TEST(Sram, AxiSramSize) {
   magma::PlatformDevice* platform_device = TestPlatformDevice::GetInstance();

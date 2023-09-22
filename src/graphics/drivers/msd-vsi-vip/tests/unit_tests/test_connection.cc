@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma_service/test_util/msd_stubs.h>
+
 #include <gtest/gtest.h>
 
 #include "mock/mock_bus_mapper.h"
 #include "src/graphics/drivers/msd-vsi-vip/src/address_space_layout.h"
 #include "src/graphics/drivers/msd-vsi-vip/src/mapped_batch.h"
 #include "src/graphics/drivers/msd-vsi-vip/src/msd_vsi_connection.h"
-#include "src/graphics/lib/magma/tests/helper/msd_stubs.h"
 
 class TestMsdVsiConnection : public ::testing::Test, public MsdVsiConnection::Owner {
  public:

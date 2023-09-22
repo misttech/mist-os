@@ -4,12 +4,11 @@
 
 #include <lib/magma/platform/platform_pci_device.h>
 #include <lib/magma/util/short_macros.h>
+#include <lib/magma_service/test_util/platform_pci_device_helper.h>
 
 #include <thread>
 
 #include <gtest/gtest.h>
-
-#include "helper/platform_pci_device_helper.h"
 
 TEST(PlatformPciDevice, Basic) {
   magma::PlatformPciDevice* platform_device = TestPlatformPciDevice::GetInstance();

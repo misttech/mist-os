@@ -392,9 +392,9 @@ source_set("pci_driver_gtest") {
   sources = [ "pci_driver_test_gtest.cc" ]
 
   deps = [
-    "$magma_build_root/tests/helper:platform_msd_device_helper",
-    "$magma_build_root/tests/helper:platform_pci_device_helper",
     "//src/graphics/magma/lib/magma/platform:device",
+    "//src/graphics/magma/lib/magma_service/test_util:platform_msd_device_helper",
+    "//src/graphics/magma/lib/magma_service/test_util:platform_pci_device_helper",
     "//third_party/googletest:gtest",
   ]
 }

@@ -6,11 +6,10 @@
 
 #include <lib/ddk/device.h>
 #include <lib/magma/util/dlog.h>
+#include <lib/magma_service/test_util/platform_device_helper.h>
+#include <lib/magma_service/test_util/platform_msd_device_helper.h>
 
 #include <gtest/gtest.h>
-
-#include "helper/platform_device_helper.h"
-#include "helper/platform_msd_device_helper.h"
 
 namespace {
 std::unique_ptr<magma::PlatformDevice> platform_device_s;

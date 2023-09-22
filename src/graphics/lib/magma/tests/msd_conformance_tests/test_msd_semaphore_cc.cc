@@ -4,10 +4,9 @@
 
 #include <lib/magma/platform/platform_semaphore.h>
 #include <lib/magma_service/msd.h>
+#include <lib/magma_service/test_util/platform_msd_device_helper.h>
 
 #include <gtest/gtest.h>
-
-#include "helper/platform_msd_device_helper.h"
 
 TEST(MsdSemaphore, ImportAndDestroy) {
   auto msd_driver = msd::Driver::Create();

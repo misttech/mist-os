@@ -7,12 +7,12 @@
 #include <lib/magma_service/sys_driver/magma_system_connection.h>
 #include <lib/magma_service/sys_driver/magma_system_context.h>
 #include <lib/magma_service/sys_driver/magma_system_device.h>
+#include <lib/magma_service/test_util/platform_msd_device_helper.h>
 
 #include <memory>
 
 #include <gtest/gtest.h>
 
-#include "helper/platform_msd_device_helper.h"
 #include "src/graphics/drivers/msd-arm-mali/include/magma_arm_mali_types.h"
 
 namespace {

@@ -5,12 +5,11 @@
 #define SRC_GRAPHICS_LIB_MAGMA_TESTS_UNIT_TESTS_TEST_PLATFORM_BUS_MAPPER_CASES_H_
 #include <lib/magma/platform/platform_bus_mapper.h>
 #include <lib/magma/util/utils.h>
+#include <lib/magma_service/test_util/platform_device_helper.h>
 
 #include <vector>
 
 #include <gtest/gtest.h>
-
-#include "helper/platform_device_helper.h"
 
 class TestPlatformBusMapperCases {
  public:

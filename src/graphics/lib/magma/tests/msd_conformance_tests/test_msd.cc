@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <lib/magma_service/msd.h>
-
-#include "src/graphics/lib/magma/tests/helper/msd_stubs.h"
+#include <lib/magma_service/test_util/msd_stubs.h>
 
 // This test just checks that the header files compile.

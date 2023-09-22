@@ -7,10 +7,9 @@
 #include <lib/magma/platform/platform_handle.h>
 #include <lib/magma/platform/platform_semaphore.h>
 #include <lib/magma_service/msd.h>
+#include <lib/magma_service/test_util/platform_msd_device_helper.h>
 
 #include <vector>
-
-#include "src/graphics/lib/magma/tests/helper/platform_msd_device_helper.h"
 
 std::unique_ptr<MsdMockBufferManager> g_bufmgr;
 

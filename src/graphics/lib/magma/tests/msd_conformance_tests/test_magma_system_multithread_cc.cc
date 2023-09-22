@@ -5,14 +5,13 @@
 #include <lib/magma_service/sys_driver/magma_system_connection.h>
 #include <lib/magma_service/sys_driver/magma_system_context.h>
 #include <lib/magma_service/sys_driver/magma_system_device.h>
+#include <lib/magma_service/test_util/platform_msd_device_helper.h>
 #include <magma_intel_gen_defs.h>
 
 #include <thread>
 #include <vector>
 
 #include <gtest/gtest.h>
-
-#include "helper/platform_msd_device_helper.h"
 
 namespace msd {
 namespace {

@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma_service/test_util/platform_msd_device_helper.h>
+
 #include <gtest/gtest.h>
 
-#include "helper/platform_msd_device_helper.h"
 #include "src/graphics/drivers/msd-vsi-vip/src/command_buffer.h"
 #include "src/graphics/drivers/msd-vsi-vip/src/msd_vsi_device.h"
 

@@ -20,7 +20,7 @@ executable("unit_tests") {
   deps = [
     ":magma_platform_tests",
     ":magma_util_tests",
-    "$magma_build_root/tests/helper:logger_init_helper",
+    "//src/graphics/magma/lib/magma/test_util:logger_init_helper",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/trace",
@@ -138,10 +138,10 @@ source_set("magma_platform_device_tests") {
 
   deps = [
     ":platform_bus_mapper_cases",
-    "$magma_build_root/tests/helper:platform_device_helper",
     "//src/graphics/magma/lib/magma/platform:bus_mapper",
     "//src/graphics/magma/lib/magma/platform:thread",
     "//src/graphics/magma/lib/magma/util:short_macros",
+    "//src/graphics/magma/lib/magma_service/test_util:platform_device_helper",
     "//third_party/googletest:gtest",
   ]
 }
@@ -157,10 +157,10 @@ source_set("magma_platform_pci_device_tests") {
 
   deps = [
     ":platform_bus_mapper_cases",
-    "$magma_build_root/tests/helper:platform_pci_device_helper",
     "//src/graphics/magma/lib/magma/platform:bus_mapper",
     "//src/graphics/magma/lib/magma/platform:thread",
     "//src/graphics/magma/lib/magma/util:short_macros",
+    "//src/graphics/magma/lib/magma_service/test_util:platform_pci_device_helper",
     "//third_party/googletest:gtest",
   ]
 }

@@ -5,13 +5,12 @@
 #include <lib/magma/platform/platform_device.h>
 #include <lib/magma/platform/platform_thread.h>
 #include <lib/magma/util/short_macros.h>
+#include <lib/magma_service/test_util/platform_device_helper.h>
 
 #include <chrono>
 #include <thread>
 
 #include <gtest/gtest.h>
-
-#include "helper/platform_device_helper.h"
 
 using std::chrono_literals::operator""ms;
 

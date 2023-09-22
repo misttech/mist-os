@@ -14,7 +14,7 @@ executable("msd_arm_mali_nonhardware_tests") {
   public_deps = [
     ":tests_not_requiring_hardware",
     "//src/devices/testing/no_ddk",
-    "//src/graphics/lib/magma/tests/helper:logger_init_helper",
+    "//src/graphics/magma/lib/magma/test_util:logger_init_helper",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/trace",
@@ -47,11 +47,11 @@ source_set("common_non_hardware_tests") {
     "//src/devices/bus/testing/fake-pdev",
     "//src/devices/testing/fake-resource",
     "//src/graphics/drivers/msd-arm-mali/src",
-    "//src/graphics/lib/magma/tests/helper:msd_stubs",
     "//src/graphics/lib/magma/tests/mock:bus_mapper",
     "//src/graphics/lib/magma/tests/mock:mmio",
     "//src/graphics/magma/lib/magma/platform:buffer",
     "//src/graphics/magma/lib/magma/platform:port",
+    "//src/graphics/magma/lib/magma_service/test_util:msd_stubs",
     "//src/graphics/magma/lib/magma_service/util:registers",
     "//third_party/googletest:gtest",
   ]
@@ -67,8 +67,8 @@ source_set("tests_not_requiring_hardware") {
     ":test_deps",
     "//sdk/lib/driver/testing/cpp",
     "//sdk/lib/fdio",
-    "//src/graphics/lib/magma/tests/helper:msd_stubs",
     "//src/graphics/lib/magma/tests/mock:bus_mapper",
+    "//src/graphics/magma/lib/magma_service/test_util:msd_stubs",
     "//zircon/system/ulib/sync:sync-cpp",
   ]
 }
@@ -114,13 +114,13 @@ group("test_deps") {
   public_deps = [
     "../../include",
     "//src/graphics/drivers/msd-arm-mali/src",
-    "//src/graphics/lib/magma/tests/helper:platform_msd_device_helper",
     "//src/graphics/lib/magma/tests/mock:mmio",
     "//src/graphics/magma:msd",
     "//src/graphics/magma/lib/magma/platform:port",
     "//src/graphics/magma/lib/magma/platform:semaphore",
     "//src/graphics/magma/lib/magma/util:macros",
     "//src/graphics/magma/lib/magma_service/sys_driver",
+    "//src/graphics/magma/lib/magma_service/test_util:platform_msd_device_helper",
     "//src/graphics/magma/lib/magma_service/util:registers",
     "//third_party/googletest:gtest",
   ]
