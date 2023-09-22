@@ -49,8 +49,9 @@ typedef uint32_t zx_packet_type_t;
 #define ZX_PKT_GUEST_VCPU_EXIT        ((uint32_t)2)
 
 // zx_packet_page_request_t::command
-#define ZX_PAGER_VMO_READ ((uint16_t) 0)
-#define ZX_PAGER_VMO_COMPLETE ((uint16_t) 1)
+#define ZX_PAGER_VMO_READ             ((uint16_t) 0)
+#define ZX_PAGER_VMO_COMPLETE         ((uint16_t) 1)
+#define ZX_PAGER_VMO_DIRTY            ((uint16_t) 2)
 // clang-format on
 
 // port_packet_t::type ZX_PKT_TYPE_USER.
