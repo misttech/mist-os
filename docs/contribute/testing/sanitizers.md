@@ -90,7 +90,7 @@ applied to Rust code for detecting [Rust memory leaks][rust-leaks]{:.external}.
 
 #### Fuchsia platform build (in-tree)
 
-To reproduce a sanitizer build, specify the sanitizer variants:
+To reproduce a sanitizer build, you can use [build variants][variants] to enable the sanitizer:
 
 ```posix-terminal
 fx set {{ '<var label="product">product</var>' }} --variant asan-ubsan --variant host_asan-ubsan
@@ -320,3 +320,4 @@ See also: [sanitizers in the 2021 roadmap][sanitizers-2021-roadmap].
 [syzkaller]: https://github.com/google/syzkaller
 [test-coverage]: /docs/contribute/testing/coverage.md
 [testing-flakiness]: /docs/development/testing/testing_for_flakiness_in_cq.md
+[variants]: /docs/development/build/build_system/variants.md
