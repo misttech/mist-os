@@ -25,7 +25,7 @@ foreach test : ['virtmagma_unit_tests', 'virtmagma_image_tests']
   test_exe = executable(
     test,
     sources: files_unit_test,
-    include_directories : [inc_configuration, inc_top, inc_magma, inc_platform],
+    include_directories : [inc_magma_non_sdk, inc_top, inc_magma, ],
     cpp_args: cpp_args + ['-std=c++17'],
     link_with : [libmagma_virt],
     dependencies : [gtest_main_dep, dl_dep, drm_dep],
@@ -41,14 +41,13 @@ test = 'virtmagma_conformance_tests'
 files_test = files(
   'integration/test_magma.cc',
   'integration/test_magma_c.c',
-  'helper/magma_map_cpu.cc',
+  '../../../magma/lib/magma_client/test_util/magma_map_cpu.cc',
 )
 
 test_magma = executable(
   test,
   sources: files_test,
-  include_directories : [inc_configuration, inc_top, inc_magma, inc_msd_intel_gen,
-    inc_platform],
+  include_directories : [inc_magma_non_sdk, inc_top, inc_magma, inc_msd_intel_gen,],
   cpp_args: cpp_args + ['-DVIRTMAGMA=1'],
   link_with : [libmagma_virt],
   dependencies : [gtest_main_dep],

@@ -15,9 +15,7 @@ prog_objcopy = find_program('objcopy')
 magma_json = files('include/magma/magma.json')
 prog_cc = meson.get_compiler('c')
 
-inc_configuration = include_directories(['.', 'src'])
-inc_platform = include_directories('src/magma_util/platform')
-inc_magma_util = include_directories('src/magma_util')
+inc_magma_non_sdk = include_directories('../../magma')
 inc_msd_intel_gen = include_directories('../../drivers/msd-intel-gen/include')
 
 # Generate virtio_magma.h in the proper location
@@ -34,7 +32,7 @@ magma_generic_cc = custom_target(
 
 files_libmagma_linux = files(
   magma_manual,
-  'src/magma_util/platform/linux/linux_platform_logger.cc',
+  '../../magma/lib/magma/platform/linux/linux_platform_logger.cc',
 )
 
 thread_dep = dependency('threads')
@@ -44,8 +42,7 @@ libmagma_virt = static_library(
   sources: [files_libmagma_linux, magma_generic_cc, virtio_magma_h],
   cpp_args: cpp_args,
   c_args: c_args,
-  include_directories : [inc_top, inc_configuration, inc_magma,
-                         inc_platform, inc_magma_util],
+  include_directories : [inc_top, inc_magma_non_sdk, inc_magma, ],
   dependencies: thread_dep,
   install : true
 )
