@@ -3,13 +3,12 @@
 // found in the LICENSE file.
 
 #include <lib/magma/util/short_macros.h>
+#include <lib/magma_service/mock/mock_mmio.h>
 #include <lib/magma_service/util/register_io.h>
 
 #include <memory>
 
 #include <gtest/gtest.h>
-
-#include "src/graphics/lib/magma/tests/mock/mock_mmio.h"
 
 namespace {
 class RegisterTracer : public magma::RegisterIo::Hook {

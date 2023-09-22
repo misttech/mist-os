@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma_service/mock/mock_mmio.h>
+
 #include <gtest/gtest.h>
 
-#include "mock/mock_mmio.h"
 #include "src/graphics/drivers/msd-vsi-vip/src/registers.h"
 
 class TestRegisters : public ::testing::Test {

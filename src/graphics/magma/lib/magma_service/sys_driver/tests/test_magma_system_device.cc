@@ -3,11 +3,10 @@
 // found in the LICENSE file.
 
 #include <lib/magma/magma.h>
+#include <lib/magma_service/mock/mock_msd.h>
 #include <lib/magma_service/sys_driver/magma_system_device.h>
 
 #include <gtest/gtest.h>
-
-#include "mock/mock_msd.h"
 
 namespace msd {
 class MsdMockDevice_GetDeviceId : public MsdMockDevice {

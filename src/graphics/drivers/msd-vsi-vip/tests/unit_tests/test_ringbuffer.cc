@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma_service/mock/mock_bus_mapper.h>
+
 #include <gtest/gtest.h>
 
-#include "mock/mock_bus_mapper.h"
 #include "src/graphics/drivers/msd-vsi-vip/src/address_space.h"
 #include "src/graphics/drivers/msd-vsi-vip/src/msd_vsi_context.h"
 #include "src/graphics/drivers/msd-vsi-vip/src/ringbuffer.h"

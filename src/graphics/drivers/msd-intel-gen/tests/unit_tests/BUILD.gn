@@ -68,9 +68,6 @@ group("test_deps") {
   testonly = true
 
   public_deps = [
-    "$magma_build_root/tests/mock:address_space",
-    "$magma_build_root/tests/mock:bus_mapper",
-    "$magma_build_root/tests/mock:mmio",
     "//sdk/lib/fit",
     "//src/graphics/drivers/msd-intel-gen/include",
     "//src/graphics/drivers/msd-intel-gen/src",
@@ -78,6 +75,9 @@ group("test_deps") {
     "//src/graphics/magma:msd",
     "//src/graphics/magma/lib/magma/platform:semaphore",
     "//src/graphics/magma/lib/magma/util:macros",
+    "//src/graphics/magma/lib/magma_service/mock:address_space",
+    "//src/graphics/magma/lib/magma_service/mock:bus_mapper",
+    "//src/graphics/magma/lib/magma_service/mock:mmio",
     "//src/graphics/magma/lib/magma_service/test_util:command_buffer_helper_cpp",
     "//src/graphics/magma/lib/magma_service/test_util:platform_pci_device_helper",
     "//src/graphics/magma/lib/magma_service/util:address_space",

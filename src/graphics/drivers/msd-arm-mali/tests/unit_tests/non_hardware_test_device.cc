@@ -7,6 +7,8 @@
 #include <lib/fdf/testing.h>
 #include <lib/fdio/directory.h>
 #include <lib/inspect/cpp/reader.h>
+#include <lib/magma_service/mock/mock_bus_mapper.h>
+#include <lib/magma_service/mock/mock_mmio.h>
 
 #include <condition_variable>
 #include <mutex>
@@ -15,8 +17,6 @@
 
 #include "driver_logger_harness.h"
 #include "magma_vendor_queries.h"
-#include "mock/mock_bus_mapper.h"
-#include "mock/mock_mmio.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_device.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_driver.h"
 #include "src/graphics/drivers/msd-arm-mali/src/parent_device.h"

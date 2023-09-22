@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <gtest/gtest.h>
+#include <lib/magma_service/mock/mock_mmio.h>
 
-#include "mock/mock_mmio.h"
+#include <gtest/gtest.h>
 
 static void test_mock_mmio(magma::PlatformMmio* mmio) {
   ASSERT_NE(mmio, nullptr);

@@ -64,13 +64,13 @@ source_set("magma_util_tests") {
   ]
 
   deps = [
-    "$magma_build_root/tests/mock:address_space",
-    "$magma_build_root/tests/mock:bus_mapper",
-    "$magma_build_root/tests/mock:mmio",
     "//sdk/lib/fdio",
     "//src/graphics/magma/lib/magma/platform:buffer",
     "//src/graphics/magma/lib/magma/platform:semaphore",
     "//src/graphics/magma/lib/magma/util:short_macros",
+    "//src/graphics/magma/lib/magma_service/mock:address_space",
+    "//src/graphics/magma/lib/magma_service/mock:bus_mapper",
+    "//src/graphics/magma/lib/magma_service/mock:mmio",
     "//src/graphics/magma/lib/magma_service/util:address_space",
     "//src/graphics/magma/lib/magma_service/util:allocator",
     "//src/graphics/magma/lib/magma_service/util:mapped_batch",
@@ -102,7 +102,6 @@ source_set("magma_platform_tests") {
     "test_platform_trace.cc",
   ]
   deps = [
-    "$magma_build_root/tests/mock:mmio",
     "//sdk/lib/fdio",
     "//src/graphics/magma/lib/magma/platform:connection_client",
     "//src/graphics/magma/lib/magma/platform:event",
@@ -117,6 +116,7 @@ source_set("magma_platform_tests") {
     "//src/graphics/magma/lib/magma/platform:trace_provider",
     "//src/graphics/magma/lib/magma/platform:trace_provider_with_fdio",
     "//src/graphics/magma/lib/magma/util:short_macros",
+    "//src/graphics/magma/lib/magma_service/mock:mmio",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/zx",
   ]

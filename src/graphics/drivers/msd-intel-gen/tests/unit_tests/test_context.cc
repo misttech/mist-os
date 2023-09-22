@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/magma_service/mock/fake_address_space.h>
+#include <lib/magma_service/mock/mock_bus_mapper.h>
 
 #include <gtest/gtest.h>
-#include <mock/fake_address_space.h>
-#include <mock/mock_bus_mapper.h>
 
 #include "address_space.h"
 #include "magma_intel_gen_defs.h"

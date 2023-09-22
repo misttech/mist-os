@@ -1,70 +1,8 @@
-# Copyright 2016 The Fuchsia Authors. All rights reserved.
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//src/graphics/lib/magma/gnbuild/magma.gni")
-
-source_set("msd_cpp") {
-  public_configs = [ "$magma_build_root:magma_tests_include_config" ]
-
-  public_deps = [
-    "//src/graphics/magma:msd",
-    "//src/graphics/magma/lib/magma/platform:buffer",
-    "//src/graphics/magma/lib/magma/platform:semaphore",
-    "//src/graphics/magma/lib/magma/util:macros",
-    "//src/graphics/magma/lib/magma_service/test_util:platform_msd_device_helper",
-    "//zircon/system/ulib/sync:sync-cpp",
-  ]
-
-  deps = [ "//src/graphics/magma/lib/magma/util:short_macros" ]
-
-  sources = [
-    "mock_msd.cc",
-    "mock_msd.h",
-  ]
-}
-
-source_set("mmio") {
-  public_configs = [ "$magma_build_root:magma_tests_include_config" ]
-
-  public_deps = [
-    "//src/graphics/magma/lib/magma/platform:mmio_header",
-    "//src/graphics/magma/lib/magma/util:macros",
-  ]
-
-  sources = [
-    "mock_mmio.cc",
-    "mock_mmio.h",
-  ]
-}
-
-source_set("bus_mapper") {
-  public_configs = [ "$magma_build_root:magma_tests_include_config" ]
-
-  sources = [ "mock_bus_mapper.h" ]
-}
-
-source_set("magma_system") {
-  # All functions should be declared in magma.h or magma_sysmem.h, so warn about unnecessary functions.
-  cflags = [ "-Wmissing-prototypes" ]
-  sources = [ "mock_magma_system.cc" ]
-  deps = [
-    "//sdk/lib/magma_client:magma_headers",
-    "//src/graphics/magma/lib/magma/platform:buffer",
-    "//src/graphics/magma/lib/magma/platform:logger_impl",
-    "//src/graphics/magma/lib/magma/platform:semaphore",
-    "//src/graphics/magma/lib/magma/util:macros",
-    "//src/graphics/magma/lib/magma/util:short_macros",
-    "//zircon/system/ulib/trace",
-    "//zircon/system/ulib/trace-vthread",
-  ]
-}
-
-source_set("address_space") {
-  sources = [ "fake_address_space.h" ]
-  deps = [
-    "//src/graphics/magma/lib/magma/platform:buffer",
-    "//src/graphics/magma/lib/magma/util:macros",
-    "//src/graphics/magma/lib/magma_service/util:address_space",
-  ]
+# TODO(fxbug.dev/133551): Remove when mesa has been converted.
+group("magma_system") {
+  deps = [ "//src/graphics/magma/lib/magma_client/mock:magma_system" ]
 }

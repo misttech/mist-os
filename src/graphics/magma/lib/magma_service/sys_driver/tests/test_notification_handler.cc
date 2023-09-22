@@ -4,14 +4,13 @@
 
 #include <lib/async/cpp/task.h>
 #include <lib/fit/defer.h>
+#include <lib/magma_service/mock/mock_msd.h>
 #include <lib/magma_service/sys_driver/magma_system_connection.h>
 #include <lib/magma_service/sys_driver/magma_system_device.h>
 #include <lib/sync/cpp/completion.h>
 #include <lib/zx/channel.h>
 
 #include <gtest/gtest.h>
-
-#include "mock/mock_msd.h"
 
 namespace msd {
 namespace {

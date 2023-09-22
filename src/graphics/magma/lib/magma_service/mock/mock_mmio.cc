@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "mock/mock_mmio.h"
-
 #include <lib/magma/util/dlog.h>
+#include <lib/magma_service/mock/mock_mmio.h>
 #include <stdlib.h>
 
 std::unique_ptr<MockMmio> MockMmio::Create(uint64_t size) {

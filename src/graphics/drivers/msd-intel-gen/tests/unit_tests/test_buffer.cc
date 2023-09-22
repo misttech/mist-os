@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma_service/mock/fake_address_space.h>
+#include <lib/magma_service/mock/mock_bus_mapper.h>
+
 #include <thread>
 
 #include <gtest/gtest.h>
-#include <mock/fake_address_space.h>
-#include <mock/mock_bus_mapper.h>
 
 #include "address_space.h"
 #include "msd_intel_buffer.h"

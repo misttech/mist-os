@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 #include <lib/magma/platform/platform_mmio.h>
+#include <lib/magma_service/mock/mock_bus_mapper.h>
+#include <lib/magma_service/mock/mock_mmio.h>
 
 #include <gtest/gtest.h>
 
-#include "mock/mock_bus_mapper.h"
-#include "mock/mock_mmio.h"
 #include "ppgtt.h"
 #include "registers.h"
 

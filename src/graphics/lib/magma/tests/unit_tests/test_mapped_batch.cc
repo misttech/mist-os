@@ -4,13 +4,13 @@
 
 #include <lib/magma/platform/platform_buffer.h>
 #include <lib/magma/platform/platform_semaphore.h>
+#include <lib/magma_service/mock/fake_address_space.h>
+#include <lib/magma_service/mock/mock_bus_mapper.h>
 #include <lib/magma_service/util/address_space.h>
 #include <lib/magma_service/util/command_buffer.h>
 #include <lib/magma_service/util/mapped_batch.h>
 
 #include <gtest/gtest.h>
-#include <mock/fake_address_space.h>
-#include <mock/mock_bus_mapper.h>
 
 using Buffer = magma::PlatformBuffer;
 

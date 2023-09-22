@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 #include <lib/magma/platform/platform_buffer.h>
+#include <lib/magma_service/mock/mock_mmio.h>
 #include <zircon/compiler.h>
 
 #include <iterator>
 
 #include <gtest/gtest.h>
 
-#include "mock/mock_mmio.h"
 #include "src/graphics/drivers/msd-arm-mali/src/power_manager.h"
 #include "src/graphics/drivers/msd-arm-mali/src/registers.h"
 

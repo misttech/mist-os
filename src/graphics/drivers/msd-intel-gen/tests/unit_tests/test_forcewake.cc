@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 #include <lib/magma/platform/platform_mmio.h>
+#include <lib/magma_service/mock/mock_mmio.h>
 
 #include <gtest/gtest.h>
 
 #include "device_id.h"
 #include "forcewake.h"
-#include "mock/mock_mmio.h"
 #include "msd_intel_device.h"
 #include "registers.h"
 

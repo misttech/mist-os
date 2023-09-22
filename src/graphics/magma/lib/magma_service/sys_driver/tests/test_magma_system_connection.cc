@@ -4,14 +4,13 @@
 
 #include <lib/magma/magma.h>
 #include <lib/magma/util/short_macros.h>
+#include <lib/magma_service/mock/mock_msd.h>
 #include <lib/magma_service/sys_driver/magma_system_connection.h>
 #include <lib/magma_service/sys_driver/magma_system_device.h>
 
 #include <utility>
 
 #include <gtest/gtest.h>
-
-#include "mock/mock_msd.h"
 #ifdef __Fuchsia__
 #include <lib/magma/platform/zircon/zircon_platform_buffer.h>
 #endif

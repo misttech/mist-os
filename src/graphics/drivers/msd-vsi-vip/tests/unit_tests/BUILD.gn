@@ -20,10 +20,10 @@ executable("nonhardware_tests") {
   deps = [
     "//src/devices/testing/no_ddk",
     "//src/graphics/drivers/msd-vsi-vip/src",
-    "//src/graphics/lib/magma/tests/mock:bus_mapper",
-    "//src/graphics/lib/magma/tests/mock:mmio",
     "//src/graphics/magma/lib/magma/platform/zircon:thread_profile",
     "//src/graphics/magma/lib/magma/test_util:logger_init_helper",
+    "//src/graphics/magma/lib/magma_service/mock:bus_mapper",
+    "//src/graphics/magma/lib/magma_service/mock:mmio",
     "//src/graphics/magma/lib/magma_service/sys_driver",
     "//src/graphics/magma/lib/magma_service/test_util:msd_stubs",
     "//src/graphics/magma/lib/magma_service/util:mapped_batch",

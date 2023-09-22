@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_LIB_MAGMA_TESTS_MOCK_MOCK_MSD_H_
-#define SRC_GRAPHICS_LIB_MAGMA_TESTS_MOCK_MOCK_MSD_H_
+#ifndef SRC_GRAPHICS_MAGMA_LIB_MAGMA_SERVICE_MOCK_MOCK_MSD_H_
+#define SRC_GRAPHICS_MAGMA_LIB_MAGMA_SERVICE_MOCK_MOCK_MSD_H_
 
 #include <lib/magma/platform/platform_buffer.h>
 #include <lib/magma/platform/platform_semaphore.h>

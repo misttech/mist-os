@@ -125,7 +125,7 @@ executable("virtio_magma_bin_mock_system") {
   output_name = "virtio_magma"
   deps = [
     ":lib",
-    "//src/graphics/lib/magma/tests/mock:magma_system",
+    "//src/graphics/magma/lib/magma_client/mock:magma_system",
   ]
 }
 

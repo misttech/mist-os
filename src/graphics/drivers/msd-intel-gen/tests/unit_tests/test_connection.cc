@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/magma_service/mock/mock_bus_mapper.h>
 
 #include <type_traits>
 
 #include <gtest/gtest.h>
 
-#include "mock/mock_bus_mapper.h"
 #include "msd_intel_connection.h"
 #include "msd_intel_context.h"
 

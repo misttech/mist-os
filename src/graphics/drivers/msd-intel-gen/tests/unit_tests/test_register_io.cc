@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma_service/mock/mock_mmio.h>
+
 #include <map>
 
 #include <gtest/gtest.h>
 
 #include "hwreg/bitfields.h"
-#include "mock/mock_mmio.h"
 #include "msd_intel_register_io.h"
 #include "registers.h"
 

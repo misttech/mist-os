@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma_service/mock/mock_mmio.h>
 #include <lib/magma_service/util/register_io.h>
 
 #include <gtest/gtest.h>
-#include <mock/mock_mmio.h>
 
 #include "src/graphics/drivers/msd-arm-mali/src/registers.h"
 

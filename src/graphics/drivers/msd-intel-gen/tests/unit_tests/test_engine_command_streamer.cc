@@ -2,16 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma_service/mock/fake_address_space.h>
+#include <lib/magma_service/mock/mock_bus_mapper.h>
+#include <lib/magma_service/mock/mock_mmio.h>
+
 #include <gtest/gtest.h>
-#include <mock/fake_address_space.h>
-#include <mock/mock_bus_mapper.h>
-#include <mock/mock_mapped_batch.h>
-#include <mock/mock_mmio.h>
 
 #include "address_space.h"
 #include "device_id.h"
 #include "gtt.h"
 #include "instructions.h"
+#include "mock/mock_mapped_batch.h"
 #include "register_tracer.h"
 #include "registers.h"
 #include "render_command_streamer.h"

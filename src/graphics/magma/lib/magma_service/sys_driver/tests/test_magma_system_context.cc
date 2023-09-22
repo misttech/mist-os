@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma_service/mock/mock_msd.h>
 #include <lib/magma_service/test_util/command_buffer_helper_cpp.h>
 
 #include <gtest/gtest.h>
-
-#include "mock/mock_msd.h"
 
 namespace msd {
 TEST(MagmaSystemContext, ExecuteCommandBuffer_Normal) {
