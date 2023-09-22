@@ -22,7 +22,6 @@ rustc_library("fuchsia-sync") {
     "src/lib.rs",
     "src/mutex.rs",
     "src/rwlock.rs",
-    "src/zx.rs",
   ]
 }
 

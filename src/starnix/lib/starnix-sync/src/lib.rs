@@ -5,6 +5,5 @@
 //! Synchronization objects used by Starnix
 
 mod interruptible_event;
-mod zx;
 
 pub use interruptible_event::*;

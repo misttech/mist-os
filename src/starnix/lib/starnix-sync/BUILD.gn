@@ -16,7 +16,6 @@ rustc_library("starnix-sync") {
   sources = [
     "src/interruptible_event.rs",
     "src/lib.rs",
-    "src/zx.rs",
   ]
 }
 

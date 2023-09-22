@@ -6,8 +6,6 @@ use fuchsia_zircon::{self as zx, sys};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-use crate::zx::{zx_futex_wait, zx_futex_wake};
-
 /// A blocking object that can either be notified normally or interrupted
 ///
 /// To block using an `InterruptibleEvent`, first call `begin_wait`. At this point, the event is
@@ -106,7 +104,7 @@ impl InterruptibleEvent {
         // wakeups.
         loop {
             let status = unsafe {
-                zx_futex_wait(
+                sys::zx_futex_wait(
                     self.futex_ptr(),
                     WAITING,
                     sys::ZX_HANDLE_INVALID,
@@ -186,7 +184,7 @@ impl InterruptibleEvent {
                 .is_ok()
         {
             unsafe {
-                zx_futex_wake(self.futex_ptr(), u32::MAX);
+                sys::zx_futex_wake(self.futex_ptr(), u32::MAX);
             }
         }
     }

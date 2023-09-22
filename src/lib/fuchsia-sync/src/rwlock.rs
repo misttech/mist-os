@@ -5,8 +5,6 @@
 use fuchsia_zircon::sys;
 use std::sync::atomic::Ordering;
 
-use crate::zx::{zx_futex_wait, zx_futex_wake};
-
 pub struct RawSyncRwLock {
     /// Holds the primary state of the RwLock.
     ///
@@ -291,7 +289,7 @@ impl RawSyncRwLock {
             }
 
             unsafe {
-                zx_futex_wait(
+                sys::zx_futex_wait(
                     self.state_ptr(),
                     desired_sleep_state,
                     sys::ZX_HANDLE_INVALID, // We don't integrate with priority inheritance yet.
@@ -359,7 +357,7 @@ impl RawSyncRwLock {
             }
 
             unsafe {
-                zx_futex_wait(
+                sys::zx_futex_wait(
                     self.writer_queue_ptr(),
                     generation_number,
                     sys::ZX_HANDLE_INVALID, // We don't integrate with priority inheritance yet.
@@ -458,13 +456,13 @@ impl RawSyncRwLock {
         self.writer_queue.fetch_add(1, Ordering::Release);
         // TODO: Track which thread owns this futex for priority inheritance.
         unsafe {
-            zx_futex_wake(self.writer_queue_ptr(), 1);
+            sys::zx_futex_wake(self.writer_queue_ptr(), 1);
         }
     }
 
     fn wake_readers(&self) {
         unsafe {
-            zx_futex_wake(self.state_ptr(), u32::MAX);
+            sys::zx_futex_wake(self.state_ptr(), u32::MAX);
         }
     }
 }
@@ -616,7 +614,7 @@ mod test {
         fn wait_for_gate(&self) {
             while self.gate.load(Ordering::Acquire) == 0 {
                 unsafe {
-                    zx_futex_wait(
+                    sys::zx_futex_wait(
                         self.gate_ptr(),
                         0,
                         sys::ZX_HANDLE_INVALID,
@@ -629,7 +627,7 @@ mod test {
         fn open_gate(&self) {
             self.gate.fetch_add(1, Ordering::Release);
             unsafe {
-                zx_futex_wake(self.gate_ptr(), u32::MAX);
+                sys::zx_futex_wake(self.gate_ptr(), u32::MAX);
             }
         }
 
