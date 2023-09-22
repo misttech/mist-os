@@ -267,19 +267,19 @@ void Device::Connect(const wlan_fullmac_impl_connect_request_t* req) {
   }
 }
 
-void Device::ReconnectReq(const wlan_fullmac_reconnect_req_t* req) {
-  fuchsia_wlan_fullmac::wire::WlanFullmacReconnectReq reconnect_req;
-
-  // peer_sta_address
-  std::memcpy(reconnect_req.peer_sta_address.data(), req->peer_sta_address, ETH_ALEN);
-
+void Device::Reconnect(const wlan_fullmac_impl_reconnect_request_t* req) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     lerror("Arena creation failed: %s", arena.status_string());
     return;
   }
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplReconnectRequest::Builder(*arena);
+  // peer_sta_address
+  ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
+  std::memcpy(peer_sta_address.data(), req->peer_sta_address, ETH_ALEN);
+  builder.peer_sta_address(peer_sta_address);
 
-  auto result = client_.buffer(*arena)->ReconnectReq(reconnect_req);
+  auto result = client_.buffer(*arena)->Reconnect(builder.Build());
 
   if (!result.ok()) {
     lerror("ReconnectReq failed FIDL error: %s", result.status_string());

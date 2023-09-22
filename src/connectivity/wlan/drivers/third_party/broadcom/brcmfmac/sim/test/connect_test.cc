@@ -437,9 +437,12 @@ void ConnectTest::StartConnect() {
 void ConnectTest::StartReconnect() {
   // Send reconnect request
   // This is what SME does on a disassoc ind.
-  wlan_fullmac_wire::WlanFullmacReconnectReq reconnect_req;
-  std::memcpy(reconnect_req.peer_sta_address.data(), context_.bssid.byte, ETH_ALEN);
-  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->ReconnectReq(reconnect_req);
+  auto builder =
+      wlan_fullmac_wire::WlanFullmacImplReconnectRequest::Builder(client_ifc_.test_arena_);
+  ::fidl::Array<uint8_t, 6> peer_sta_address;
+  std::memcpy(peer_sta_address.data(), context_.bssid.byte, ETH_ALEN);
+  builder.peer_sta_address(peer_sta_address);
+  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->Reconnect(builder.Build());
   EXPECT_TRUE(result.ok());
 }
 

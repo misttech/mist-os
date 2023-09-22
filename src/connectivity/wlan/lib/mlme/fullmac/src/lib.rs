@@ -374,7 +374,7 @@ impl FullmacMlme {
                 self.is_bss_protected = !req.security_ie.is_empty();
                 self.device.connect(&mut convert_connect_request(&req))
             }
-            Reconnect(req) => self.device.reconnect_req(convert_reconnect_request(&req)),
+            Reconnect(req) => self.device.reconnect(convert_reconnect_request(&req)),
             AuthResponse(resp) => self.device.auth_resp(convert_authenticate_response(&resp)),
             Deauthenticate(req) => {
                 self.device.set_link_state(fidl_mlme::ControlledPortState::Closed);
@@ -931,7 +931,7 @@ mod handle_mlme_request_tests {
             assert_variant!(driver_calls.next(), Some(DriverCall::ReconnectReq { req }) => req);
         assert_eq!(
             *driver_req,
-            banjo_wlan_fullmac::WlanFullmacReconnectReq { peer_sta_address: [1u8; 6] }
+            banjo_wlan_fullmac::WlanFullmacImplReconnectRequest { peer_sta_address: [1u8; 6] }
         );
     }
 

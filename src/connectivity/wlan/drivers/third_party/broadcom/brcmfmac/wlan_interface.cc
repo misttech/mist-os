@@ -317,12 +317,11 @@ void WlanInterface::Connect(ConnectRequestView request, fdf::Arena& arena,
   completer.buffer(arena).Reply();
 }
 
-void WlanInterface::ReconnectReq(ReconnectReqRequestView request, fdf::Arena& arena,
-                                 ReconnectReqCompleter::Sync& completer) {
+void WlanInterface::Reconnect(ReconnectRequestView request, fdf::Arena& arena,
+                              ReconnectCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);
-  const fuchsia_wlan_fullmac::wire::WlanFullmacReconnectReq req = request->req;
   if (wdev_ != nullptr) {
-    brcmf_if_reconnect_req(wdev_->netdev, &req);
+    brcmf_if_reconnect_req(wdev_->netdev, request);
   }
   completer.buffer(arena).Reply();
 }

@@ -187,10 +187,6 @@ type WlanFullmacScanEnd = struct {
     code WlanScanResult;
 };
 
-type WlanFullmacReconnectReq = struct {
-    peer_sta_address ieee80211.MacAddr;
-};
-
 type WlanFullmacConnectConfirm = struct {
     peer_sta_address ieee80211.MacAddr;
     result_code ieee80211.StatusCode;
@@ -692,8 +688,8 @@ closed protocol WlanFullmacImpl {
         /// Additional parameters specific to the association exchange.
         6: security_ie vector<uint8>:ieee80211.WLAN_IE_MAX_LEN;
     }) -> ();
-    strict ReconnectReq(struct {
-        req WlanFullmacReconnectReq;
+    strict Reconnect(table {
+        1: peer_sta_address ieee80211.MacAddr;
     }) -> ();
     strict AuthResp(struct {
         resp WlanFullmacAuthResp;

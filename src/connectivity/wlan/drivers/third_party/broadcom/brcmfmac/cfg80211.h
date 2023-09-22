@@ -612,7 +612,7 @@ void brcmf_if_start_scan(net_device* ndev,
 void brcmf_if_connect_req(net_device* ndev,
                           const wlan_fullmac_wire::WlanFullmacImplConnectRequest* req);
 void brcmf_if_reconnect_req(net_device* ndev,
-                            const wlan_fullmac_wire::WlanFullmacReconnectReq* req);
+                            const wlan_fullmac_wire::WlanFullmacImplReconnectRequest* req);
 void brcmf_if_auth_resp(net_device* ndev, const wlan_fullmac_wire::WlanFullmacAuthResp* ind);
 void brcmf_if_deauth_req(net_device* ndev, const wlan_fullmac_wire::WlanFullmacDeauthReq* req);
 void brcmf_if_assoc_resp(net_device* ndev, const wlan_fullmac_wire::WlanFullmacAssocResp* ind);

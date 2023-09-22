@@ -336,8 +336,10 @@ pub struct FullmacDeviceInterface {
         device: *mut c_void,
         req: *mut banjo_wlan_fullmac::WlanFullmacImplConnectRequest,
     ),
-    reconnect_req:
-        extern "C" fn(device: *mut c_void, req: *mut banjo_wlan_fullmac::WlanFullmacReconnectReq),
+    reconnect: extern "C" fn(
+        device: *mut c_void,
+        req: *mut banjo_wlan_fullmac::WlanFullmacImplReconnectRequest,
+    ),
     auth_resp:
         extern "C" fn(device: *mut c_void, resp: *mut banjo_wlan_fullmac::WlanFullmacAuthResp),
     deauth_req:
@@ -422,10 +424,10 @@ impl FullmacDeviceInterface {
     pub fn connect(&self, req: &mut banjo_wlan_fullmac::WlanFullmacImplConnectRequest) {
         (self.connect)(self.device, req as *mut banjo_wlan_fullmac::WlanFullmacImplConnectRequest)
     }
-    pub fn reconnect_req(&self, mut req: banjo_wlan_fullmac::WlanFullmacReconnectReq) {
-        (self.reconnect_req)(
+    pub fn reconnect(&self, mut req: banjo_wlan_fullmac::WlanFullmacImplReconnectRequest) {
+        (self.reconnect)(
             self.device,
-            &mut req as *mut banjo_wlan_fullmac::WlanFullmacReconnectReq,
+            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplReconnectRequest,
         )
     }
     pub fn auth_resp(&self, mut resp: banjo_wlan_fullmac::WlanFullmacAuthResp) {
@@ -531,7 +533,7 @@ pub mod test_utils {
             security_ie: Vec<u8>,
         },
         ReconnectReq {
-            req: banjo_wlan_fullmac::WlanFullmacReconnectReq,
+            req: banjo_wlan_fullmac::WlanFullmacImplReconnectRequest,
         },
         AuthResp {
             resp: banjo_wlan_fullmac::WlanFullmacAuthResp,
@@ -656,7 +658,7 @@ pub mod test_utils {
                 query_spectrum_management_support: Self::query_spectrum_management_support,
                 start_scan: Self::start_scan,
                 connect: Self::connect,
-                reconnect_req: Self::reconnect_req,
+                reconnect: Self::reconnect,
                 auth_resp: Self::auth_resp,
                 deauth_req: Self::deauth_req,
                 assoc_resp: Self::assoc_resp,
@@ -775,9 +777,9 @@ pub mod test_utils {
         }
         // Cannot mark fn unsafe because it has to match fn signature in FullDeviceInterface
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
-        pub extern "C" fn reconnect_req(
+        pub extern "C" fn reconnect(
             device: *mut c_void,
-            req: *mut banjo_wlan_fullmac::WlanFullmacReconnectReq,
+            req: *mut banjo_wlan_fullmac::WlanFullmacImplReconnectRequest,
         ) {
             let device = unsafe { &mut *(device as *mut Self) };
             let req = unsafe { *req };

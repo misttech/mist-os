@@ -473,8 +473,8 @@ void WlanInterface::Connect(ConnectRequestView request, fdf::Arena& arena,
   completer.buffer(arena).Reply();
 }
 
-void WlanInterface::ReconnectReq(ReconnectReqRequestView request, fdf::Arena& arena,
-                                 ReconnectReqCompleter::Sync& completer) {
+void WlanInterface::Reconnect(ReconnectRequestView request, fdf::Arena& arena,
+                              ReconnectCompleter::Sync& completer) {
   NXPF_ERR("%s called", __func__);
   completer.buffer(arena).Reply();
 }

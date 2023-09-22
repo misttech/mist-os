@@ -78,8 +78,8 @@ class WlanInterface : public WlanInterfaceDeviceType,
                  StartScanCompleter::Sync& completer) override;
   void Connect(ConnectRequestView request, fdf::Arena& arena,
                ConnectCompleter::Sync& completer) override;
-  void ReconnectReq(ReconnectReqRequestView request, fdf::Arena& arena,
-                    ReconnectReqCompleter::Sync& completer) override;
+  void Reconnect(ReconnectRequestView request, fdf::Arena& arena,
+                 ReconnectCompleter::Sync& completer) override;
   void AuthResp(AuthRespRequestView request, fdf::Arena& arena,
                 AuthRespCompleter::Sync& completer) override;
   void DeauthReq(DeauthReqRequestView request, fdf::Arena& arena,

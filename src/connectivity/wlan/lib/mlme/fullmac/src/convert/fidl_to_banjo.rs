@@ -205,8 +205,8 @@ pub fn convert_connect_request(
 
 pub fn convert_reconnect_request(
     req: &fidl_mlme::ReconnectRequest,
-) -> banjo_wlan_fullmac::WlanFullmacReconnectReq {
-    banjo_wlan_fullmac::WlanFullmacReconnectReq { peer_sta_address: req.peer_sta_address }
+) -> banjo_wlan_fullmac::WlanFullmacImplReconnectRequest {
+    banjo_wlan_fullmac::WlanFullmacImplReconnectRequest { peer_sta_address: req.peer_sta_address }
 }
 
 pub fn convert_authenticate_response(

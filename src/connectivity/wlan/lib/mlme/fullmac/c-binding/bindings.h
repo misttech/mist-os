@@ -69,7 +69,7 @@ typedef struct {
   spectrum_management_support_t (*query_spectrum_management_support)(void *device);
   void (*start_scan)(void *device, wlan_fullmac_impl_start_scan_request_t *req);
   void (*connect)(void *device, wlan_fullmac_impl_connect_request_t *req);
-  void (*reconnect_req)(void *device, wlan_fullmac_reconnect_req_t *req);
+  void (*reconnect)(void *device, wlan_fullmac_impl_reconnect_request_t *req);
   void (*auth_resp)(void *device, wlan_fullmac_auth_resp_t *resp);
   void (*deauth_req)(void *device, wlan_fullmac_deauth_req_t *req);
   void (*assoc_resp)(void *device, wlan_fullmac_assoc_resp_t *resp);

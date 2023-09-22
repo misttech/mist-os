@@ -3758,15 +3758,20 @@ fail:
 }
 
 void brcmf_if_reconnect_req(net_device* ndev,
-                            const wlan_fullmac_wire::WlanFullmacReconnectReq* req) {
+                            const wlan_fullmac_wire::WlanFullmacImplReconnectRequest* req) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
 
-  if (memcmp(req->peer_sta_address.data(), ifp->connect_req.selected_bss()->bssid().data(),
+  if (!req->has_peer_sta_address()) {
+    BRCMF_ERR("Reconnect req does not contain peer addr");
+    return;
+  }
+
+  if (memcmp(req->peer_sta_address().data(), ifp->connect_req.selected_bss()->bssid().data(),
              ETH_ALEN)) {
     BRCMF_ERR("Requested MAC != Connected MAC");
 #if !defined(NDEBUG)
     const uint8_t* old_mac = ifp->connect_req.selected_bss()->bssid().data();
-    const uint8_t* new_mac = req->peer_sta_address.data();
+    const uint8_t* new_mac = req->peer_sta_address().data();
     BRCMF_IFDBG(WLANIF, ndev, " requested mac: " FMT_MAC ", connected mac: " FMT_MAC,
                 FMT_MAC_ARGS(new_mac), FMT_MAC_ARGS(old_mac));
 #endif /* !defined(NDEBUG) */
