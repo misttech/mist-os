@@ -181,7 +181,7 @@ where
     for<'a> &'a T: Into<u8>,
 {
     /// The minimum packet consists of an opcode (1 byte) and packet length (2 bytes).
-    const MIN_PACKET_SIZE: usize = 3;
+    pub const MIN_PACKET_SIZE: usize = 3;
 
     pub fn new(code: T, data: Vec<u8>, headers: HeaderSet) -> Self {
         Self { code, data, headers }
@@ -193,6 +193,11 @@ where
 
     pub fn data(&self) -> &Vec<u8> {
         &self.data
+    }
+
+    #[cfg(test)]
+    pub fn headers(&self) -> &HeaderSet {
+        &self.headers
     }
 
     /// Attempts to decode the body of `buf` into a `Packet`.
@@ -411,6 +416,10 @@ impl ResponsePacket {
     }
 
     pub fn new_setpath(code: ResponseCode, headers: HeaderSet) -> Self {
+        Self::new(code, vec![], headers)
+    }
+
+    pub fn new_get(code: ResponseCode, headers: HeaderSet) -> Self {
         Self::new(code, vec![], headers)
     }
 

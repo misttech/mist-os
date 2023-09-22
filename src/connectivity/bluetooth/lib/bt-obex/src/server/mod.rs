@@ -5,8 +5,7 @@
 use fuchsia_bluetooth::types::Channel;
 use futures::future::Future;
 use futures::stream::StreamExt;
-use packet_encoding::Decodable;
-use packet_encoding::Encodable;
+use packet_encoding::{Decodable, Encodable};
 use tracing::{info, trace, warn};
 
 use crate::error::{Error, PacketError};
@@ -19,6 +18,10 @@ pub use crate::transport::TransportType;
 /// interface.
 mod handler;
 pub use handler::ObexServerHandler;
+
+/// Implements the OBEX GET operation.
+mod get;
+use get::{Action, GetOperation};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum ConnectionStatus {
@@ -39,6 +42,14 @@ pub struct ObexServer {
     connected: ConnectionStatus,
     /// The maximum OBEX packet length for this OBEX session.
     max_packet_size: u16,
+    /// The active OBEX operation. Currently, the only two potential multi-step operations are
+    /// GET and PUT. This is Some<T> when an operation is in progress, and None otherwise. There
+    /// can only be one active multi-step operation. An operation is considered complete when
+    /// Operation::is_complete returns true. The active operation is cleaned up lazily -- when a
+    /// request to start a new operation is received, the previously finished operation is
+    /// removed.
+    // TODO(fxbug.dev/125307): Refactor into common operation trait when PUT is also supported.
+    active_operation: Option<GetOperation>,
     /// The data channel that is used to read & write OBEX packets.
     channel: Channel,
     /// The handler provided by the application profile. This handler should implement the
@@ -50,10 +61,16 @@ pub struct ObexServer {
 impl ObexServer {
     pub fn new(channel: Channel, handler: Box<dyn ObexServerHandler>) -> Self {
         let max_packet_size = max_packet_size_from_transport(channel.max_tx_size());
-        Self { connected: ConnectionStatus::Initialized, max_packet_size, channel, handler }
+        Self {
+            connected: ConnectionStatus::Initialized,
+            max_packet_size,
+            active_operation: None,
+            channel,
+            handler,
+        }
     }
 
-    /// Returns `true` if the OBEX connection is current connected (e.g. CONNECT operation done).
+    /// Returns `true` if the OBEX connection is currently active (e.g. CONNECT operation done).
     fn is_connected(&self) -> bool {
         matches!(self.connected, ConnectionStatus::Connected)
     }
@@ -147,6 +164,42 @@ impl ObexServer {
         Ok(response_packet)
     }
 
+    /// Potentially initializes a new operation.
+    /// Returns true if a new operation was initialized, false otherwise.
+    fn maybe_start_new_operation(&mut self) -> bool {
+        // TODO(fxbug.dev/125307): Generalize for PUT & GET when both are supported.
+        if self.active_operation.as_ref().map_or(false, |o| !o.is_complete()) {
+            return false;
+        }
+
+        trace!("Started new operation ({:?})", OpCode::Get);
+        self.active_operation = Some(GetOperation::new(self.max_packet_size));
+        return true;
+    }
+
+    /// Handles a GET request made by the remote OBEX client.
+    /// Returns a response packet to be sent to the peer on success, Error if the request can't
+    /// be handled or is invalid.
+    async fn get_request(&mut self, request: RequestPacket) -> Result<ResponsePacket, Error> {
+        let _ = self.maybe_start_new_operation();
+        let operation = self.active_operation.as_mut().expect("just initialized");
+
+        let request_headers = match operation.handle_request(request)? {
+            Action::SendPacket(response) => return Ok(response),
+            Action::GetApplicationData(request_headers) => request_headers,
+        };
+
+        // Otherwise, get the response payload from the profile application and begin the
+        // potentially multi-packet response phase.
+        match self.handler.get(request_headers).await {
+            Ok((data, response_headers)) => operation.start_response_phase(data, response_headers),
+            Err((code, response_headers)) => {
+                info!("Application rejected GET request: {code:?}");
+                Ok(ResponsePacket::new_get(code, response_headers))
+            }
+        }
+    }
+
     /// Processes a raw data `packet` received from the remote peer acting as an OBEX client.
     /// Returns a `ResponsePacket` on success, Error if the request couldn't be handled.
     async fn receive_packet(&mut self, packet: Vec<u8>) -> Result<ResponsePacket, Error> {
@@ -156,6 +209,7 @@ impl ObexServer {
             OpCode::Connect => self.connect_request(decoded).await,
             OpCode::Disconnect => self.disconnect_request(decoded).await,
             OpCode::SetPath => self.setpath_request(decoded).await,
+            OpCode::Get | OpCode::GetFinal => self.get_request(decoded).await,
             _code => todo!("Support other OBEX requests"),
         }
     }
@@ -388,5 +442,62 @@ mod tests {
             .run_until_stalled(&mut server_fut)
             .expect("server terminated from invalid setpath");
         assert_matches!(result, Err(Error::OperationError { operation: OpCode::SetPath, .. }));
+    }
+
+    #[fuchsia::test]
+    fn get_request_accepted_by_app_success() {
+        let mut exec = fasync::TestExecutor::new();
+        let (mut obex_server, test_app, mut remote) = new_obex_server();
+        // Set to the Connected state to bypass CONNECT operation.
+        obex_server.set_connected(ConnectionStatus::Connected);
+        let server_fut = obex_server.run();
+        pin_mut!(server_fut);
+        let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
+
+        // Send an example GET_FINAL request with a header describing the name of the object.
+        let headers = HeaderSet::from_header(Header::name("random object")).unwrap();
+        let get_request = RequestPacket::new_get_final(headers);
+        send_packet(&mut remote, get_request);
+
+        // The ObexServer should receive the request and hand it to the profile. Set the profile
+        // handler to return a static buffer.
+        let application_response_buf = vec![1, 2, 3, 4, 5, 6];
+        let response_headers = HeaderSet::from_header(Header::Description("foo".into())).unwrap();
+        test_app.set_get_response((application_response_buf.clone(), response_headers));
+        let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
+
+        let expectation = |response: ResponsePacket| {
+            assert_eq!(*response.code(), ResponseCode::Ok);
+            let mut headers = HeaderSet::from(response);
+            assert!(headers.contains_header(&HeaderIdentifier::Description));
+            let received_body = headers.remove_body(/*final_=*/ true).expect("contains body");
+            assert_eq!(received_body, application_response_buf);
+        };
+        expect_response(&mut exec, &mut remote, expectation, OpCode::GetFinal);
+    }
+
+    #[fuchsia::test]
+    fn get_request_rejected_by_app_success() {
+        let mut exec = fasync::TestExecutor::new();
+        let (mut obex_server, _test_app, mut remote) = new_obex_server();
+        obex_server.set_connected(ConnectionStatus::Connected);
+        let server_fut = obex_server.run();
+        pin_mut!(server_fut);
+        let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
+
+        // Send an example GET_FINAL request with a header describing the name of the object.
+        let headers = HeaderSet::from_header(Header::name("random object123")).unwrap();
+        let get_request = RequestPacket::new_get_final(headers);
+        send_packet(&mut remote, get_request);
+
+        // The ObexServer receives request and hands to application. By default, it rejects the
+        // request.
+        let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
+        // Expect the peer to received the rejection code.
+        let expectation = |response: ResponsePacket| {
+            assert_eq!(*response.code(), ResponseCode::NotImplemented);
+            assert!(response.headers().is_empty());
+        };
+        expect_response(&mut exec, &mut remote, expectation, OpCode::GetFinal);
     }
 }

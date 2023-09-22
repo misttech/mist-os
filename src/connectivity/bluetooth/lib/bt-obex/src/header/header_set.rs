@@ -21,7 +21,6 @@ impl HeaderSet {
         Self { ids: BTreeMap::new() }
     }
 
-    #[cfg(test)]
     pub fn from_headers(headers: Vec<Header>) -> Result<Self, Error> {
         let mut set = Self::new();
         for header in headers {
@@ -30,7 +29,6 @@ impl HeaderSet {
         Ok(set)
     }
 
-    #[cfg(test)]
     pub fn from_header(header: Header) -> Result<Self, Error> {
         Self::from_headers(vec![header])
     }

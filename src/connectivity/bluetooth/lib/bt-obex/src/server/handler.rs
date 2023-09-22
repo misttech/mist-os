@@ -11,7 +11,7 @@ use crate::operation::ResponseCode;
 /// reason for rejection.
 pub type ObexOperationError = (ResponseCode, HeaderSet);
 
-pub type ObexResult = Result<HeaderSet, ObexOperationError>;
+pub type ObexResult<T> = Result<T, ObexOperationError>;
 
 /// An interface that implements the OBEX Server role.
 /// This interface roughly corresponds to the operations defined in OBEX v1.5.
@@ -21,7 +21,7 @@ pub trait ObexServerHandler {
     /// `headers` are the informational headers provided by the remote OBEX client.
     /// Returns `Ok` with any response headers if the CONNECT request is accepted.
     /// Returns `Err` with a rejection code and headers if the CONNECT request is rejected.
-    async fn connect(&mut self, headers: HeaderSet) -> ObexResult;
+    async fn connect(&mut self, headers: HeaderSet) -> ObexResult<HeaderSet>;
 
     /// A request to disconnect the OBEX connection.
     /// `headers` are the informational headers provided by the remote OBEX client.
@@ -36,7 +36,19 @@ pub trait ObexServerHandler {
     /// If `create` is `false` and the path doesn't exist, `Err` should be returned.
     /// Returns `Ok` with any response headers if the SET_PATH request is accepted.
     /// Returns `Err` with a rejection code and headers if the SET_PATH request is rejected.
-    async fn set_path(&mut self, headers: HeaderSet, backup: bool, create: bool) -> ObexResult;
+    async fn set_path(
+        &mut self,
+        headers: HeaderSet,
+        backup: bool,
+        create: bool,
+    ) -> ObexResult<HeaderSet>;
+
+    /// A request to get data from the local OBEX server.
+    /// `headers` are the informational headers provided by the remote OBEX client that identify
+    /// the payload to be retrieved.
+    /// Returns `Ok` with the payload and optional informational headers if accepted.
+    /// Returns `Err` with a rejection code and optional headers if rejected.
+    async fn get(&mut self, headers: HeaderSet) -> ObexResult<(Vec<u8>, HeaderSet)>;
 
     // TODO(fxbug.dev/125307): Add other operation types.
 }
@@ -48,26 +60,38 @@ pub(crate) mod test_utils {
     use parking_lot::Mutex;
     use std::sync::Arc;
 
+    #[derive(Default)]
+    struct TestApplicationProfileInner {
+        generic_response: Option<ObexResult<HeaderSet>>,
+        get_response: Option<Result<(Vec<u8>, HeaderSet), ObexOperationError>>,
+    }
+
     #[derive(Clone)]
     pub(crate) struct TestApplicationProfile {
-        response: Arc<Mutex<Option<ObexResult>>>,
+        inner: Arc<Mutex<TestApplicationProfileInner>>,
     }
 
     impl TestApplicationProfile {
         pub fn new() -> Self {
-            Self { response: Arc::new(Mutex::new(None)) }
+            Self { inner: Arc::new(Mutex::new(Default::default())) }
         }
-        pub fn set_response(&self, response: ObexResult) {
-            *self.response.lock() = Some(response);
+
+        pub fn set_response(&self, response: ObexResult<HeaderSet>) {
+            (*self.inner.lock()).generic_response = Some(response);
+        }
+
+        pub fn set_get_response(&self, response: (Vec<u8>, HeaderSet)) {
+            (*self.inner.lock()).get_response = Some(Ok(response));
         }
     }
 
     #[async_trait]
     impl ObexServerHandler for TestApplicationProfile {
-        async fn connect(&mut self, _headers: HeaderSet) -> ObexResult {
+        async fn connect(&mut self, _headers: HeaderSet) -> ObexResult<HeaderSet> {
             // Defaults to rejecting with `MethodNotAllowed`.
-            self.response
+            self.inner
                 .lock()
+                .generic_response
                 .take()
                 .unwrap_or(Err((ResponseCode::MethodNotAllowed, HeaderSet::new())))
         }
@@ -75,7 +99,7 @@ pub(crate) mod test_utils {
         async fn disconnect(&mut self, _headers: HeaderSet) -> HeaderSet {
             // Disconnect cannot be rejected so just take the response headers if they exist or
             // default to returning an empty HeaderSet.
-            match self.response.lock().take() {
+            match self.inner.lock().generic_response.take() {
                 Some(Ok(headers)) => headers,
                 _ => HeaderSet::new(),
             }
@@ -86,9 +110,21 @@ pub(crate) mod test_utils {
             _headers: HeaderSet,
             _backup: bool,
             _create: bool,
-        ) -> ObexResult {
+        ) -> ObexResult<HeaderSet> {
             // Defaults to rejecting with `Forbidden`.
-            self.response.lock().take().unwrap_or(Err((ResponseCode::Forbidden, HeaderSet::new())))
+            self.inner
+                .lock()
+                .generic_response
+                .take()
+                .unwrap_or(Err((ResponseCode::Forbidden, HeaderSet::new())))
+        }
+
+        async fn get(&mut self, _headers: HeaderSet) -> ObexResult<(Vec<u8>, HeaderSet)> {
+            self.inner
+                .lock()
+                .get_response
+                .take()
+                .unwrap_or(Err((ResponseCode::NotImplemented, HeaderSet::new())))
         }
     }
 }
