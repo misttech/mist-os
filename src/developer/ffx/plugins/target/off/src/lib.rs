@@ -27,12 +27,17 @@ impl FfxMain for OffTool {
 }
 
 async fn off(admin_proxy: AdminProxy, _cmd: OffCommand) -> fho::Result<()> {
-    admin_proxy
-        .poweroff()
-        .await
-        .bug()?
-        .map_err(zx::Status::from_raw)
-        .user_message("Unexpected error from poweroff")
+    let res = admin_proxy.poweroff().await;
+    match res {
+        Ok(_) => Ok(()),
+        Err(ref e) => match e {
+            fidl::Error::ClientChannelClosed { status: zx::Status::PEER_CLOSED, .. } => Ok(()),
+            _ => res
+                .bug()?
+                .map_err(zx::Status::from_raw)
+                .user_message("Unexpected error from poweroff"),
+        },
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
