@@ -31,7 +31,8 @@ constexpr int bucket_for_ticks(zx_ticks_t start, zx_ticks_t end) {
   // rounding behavior of integer division here.
   const uint64_t seconds = end > start ? (end - start) / ticks_per_second() : 0;
   // Calculate the bucket and return it, clamping to the maximum number of buckets.
-  return ktl::min(seconds == 0 ? 0 : __builtin_ctzl(seconds) + 1, VmCompression::kNumLogBuckets);
+  return ktl::min(seconds == 0 ? 0 : __builtin_ctzl(seconds) + 1,
+                  VmCompression::kNumLogBuckets - 1);
 }
 
 }  // namespace
