@@ -628,6 +628,22 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
         });
   }
 
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_driver_test::Realm> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {
+    std::string method_type;
+    switch (metadata.unknown_method_type) {
+      case fidl::UnknownMethodType::kOneWay:
+        method_type = "one-way";
+        break;
+      case fidl::UnknownMethodType::kTwoWay:
+        method_type = "two-way";
+        break;
+    };
+
+    FX_SLOG(WARNING, "DriverDevelopmentService received unknown method.",
+            KV("Direction", method_type.c_str()), KV("Ordinal", metadata.method_ordinal));
+  }
+
  private:
   bool is_started_ = false;
   component::OutgoingDirectory* outgoing_;
