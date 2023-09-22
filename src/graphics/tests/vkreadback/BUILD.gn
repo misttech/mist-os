@@ -66,8 +66,9 @@ fuchsia_test_package("vkreadback_test_package") {
 
 group("vkreadback") {
   testonly = true
-  deps = [
-    ":vkreadback_test($host_toolchain)",
-    ":vkreadback_test_package",
-  ]
+  deps = [ ":vkreadback_test_package" ]
+  if (!is_mac) {
+    # TODO(fxbug.dev/102268): Add macOS support to VulkanContext and run this everywhere
+    deps += [ ":vkreadback_test($host_toolchain)" ]
+  }
 }
