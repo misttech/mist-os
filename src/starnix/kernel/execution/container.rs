@@ -252,7 +252,7 @@ pub async fn create_component_from_stream(
                     })?;
                 let service_config = ContainerServiceConfig { config, request_stream, receiver };
                 let kernel = &container.kernel;
-                let vvar = kernel.vdso.vvar_writeable.clone().expect("No vvar_writeable exists");
+                let vvar = kernel.vdso.vvar_writeable.clone();
                 kernel.kthreads.pool.dispatch(move || loop {
                     // TODO(fxb/129367): Replace polling for the clock transformation with having
                     // some sort of a wait for a clock transform update notification.

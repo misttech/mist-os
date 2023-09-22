@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    arch::vdso::{calculate_ticks_offset, get_sigreturn_offset, HAS_VDSO},
+    arch::vdso::{calculate_ticks_offset, VDSO_SIGRETURN_NAME},
     mm::PAGE_SIZE,
     time::utc::utc_write_vvar_data_transform_to,
     types::{errno, from_status_like_fdio, uapi, Errno},
@@ -11,10 +11,12 @@ use crate::{
 use fidl::AsHandleRef;
 use fuchsia_zircon::{self as zx, ClockTransformation, HandleBased};
 use once_cell::sync::Lazy;
+use process_builder::elf_parse;
 use std::{
     mem::size_of,
     sync::{atomic::Ordering, Arc},
 };
+use zerocopy::AsBytes;
 
 static VVAR_SIZE: Lazy<usize> = Lazy::new(|| *PAGE_SIZE as usize);
 
@@ -116,36 +118,24 @@ impl Drop for MemoryMappedVvar {
     }
 }
 
-#[derive(Default)]
 pub struct Vdso {
-    pub vmo: Option<Arc<zx::Vmo>>,
-    pub sigreturn_offset: Option<u64>,
-    pub vvar_writeable: Option<Arc<MemoryMappedVvar>>,
-    pub vvar_readonly: Option<Arc<zx::Vmo>>,
+    pub vmo: Arc<zx::Vmo>,
+    pub sigreturn_offset: u64,
+    pub vvar_writeable: Arc<MemoryMappedVvar>,
+    pub vvar_readonly: Arc<zx::Vmo>,
 }
 
 impl Vdso {
     pub fn new() -> Self {
-        let vdso_vmo = load_vdso_from_file().expect("Couldn't read vDSO from disk");
-        let sigreturn = match vdso_vmo.as_ref() {
-            Some(vdso) => get_sigreturn_offset(vdso),
-            None => Ok(None),
-        }
-        .expect("Couldn't find signal trampoline code in vDSO");
-
-        let (vvar_vmo_writeable, vvar_vmo_readonly) = if HAS_VDSO {
-            let (writeable_vvar, readonly_vvar) = create_vvar_and_handles();
-            (Some(writeable_vvar), Some(readonly_vvar))
-        } else {
-            (None, None)
+        let vmo = load_vdso_from_file().expect("Couldn't read vDSO from disk");
+        let sigreturn_offset = match VDSO_SIGRETURN_NAME {
+            Some(name) => get_sigreturn_offset(&vmo, name)
+                .expect("Couldn't find sigreturn trampoline code in vDSO"),
+            None => 0,
         };
 
-        Self {
-            vmo: vdso_vmo,
-            sigreturn_offset: sigreturn,
-            vvar_writeable: vvar_vmo_writeable,
-            vvar_readonly: vvar_vmo_readonly,
-        }
+        let (vvar_writeable, vvar_readonly) = create_vvar_and_handles();
+        Self { vmo, sigreturn_offset, vvar_writeable, vvar_readonly }
     }
 }
 
@@ -190,10 +180,7 @@ fn sync_open_in_namespace(
 }
 
 /// Reads the vDSO file and returns the backing VMO.
-pub fn load_vdso_from_file() -> Result<Option<Arc<zx::Vmo>>, Errno> {
-    if !HAS_VDSO {
-        return Ok(None);
-    }
+pub fn load_vdso_from_file() -> Result<Arc<zx::Vmo>, Errno> {
     const VDSO_FILENAME: &str = "libvdso.so";
     const VDSO_LOCATION: &str = "/pkg/data";
 
@@ -206,7 +193,42 @@ pub fn load_vdso_from_file() -> Result<Option<Arc<zx::Vmo>>, Errno> {
     )
     .map_err(|status| from_status_like_fdio!(status))?;
 
-    Ok(Some(Arc::new(vdso_vmo)))
+    Ok(Arc::new(vdso_vmo))
+}
+
+pub fn get_sigreturn_offset(vdso_vmo: &zx::Vmo, sigreturn_name: &str) -> Result<u64, Errno> {
+    let dyn_section = elf_parse::Elf64DynSection::from_vmo(vdso_vmo).map_err(|_| errno!(EINVAL))?;
+    let symtab =
+        dyn_section.dynamic_entry_with_tag(elf_parse::Elf64DynTag::Symtab).ok_or(errno!(EINVAL))?;
+    let strtab =
+        dyn_section.dynamic_entry_with_tag(elf_parse::Elf64DynTag::Strtab).ok_or(errno!(EINVAL))?;
+    let strsz =
+        dyn_section.dynamic_entry_with_tag(elf_parse::Elf64DynTag::Strsz).ok_or(errno!(EINVAL))?;
+
+    // Find the name of the signal trampoline in the string table and store the index.
+    let mut strtab_bytes = vec![0u8; strsz.value as usize];
+    vdso_vmo
+        .read(&mut strtab_bytes, strtab.value)
+        .map_err(|status| from_status_like_fdio!(status))?;
+    let mut strtab_items = strtab_bytes.split(|c: &u8| *c == 0u8);
+    let strtab_idx = strtab_items
+        .position(|entry: &[u8]| std::str::from_utf8(entry) == Ok(sigreturn_name))
+        .ok_or(errno!(ENOENT))?;
+
+    const SYM_ENTRY_SIZE: usize = std::mem::size_of::<elf_parse::Elf64Sym>();
+
+    // In the symbolic table, find a symbol with a name index pointing to the name we're looking for.
+    let mut symtab_offset = symtab.value;
+    loop {
+        let mut sym_entry = elf_parse::Elf64Sym::default();
+        vdso_vmo
+            .read(sym_entry.as_bytes_mut(), symtab_offset)
+            .map_err(|status| from_status_like_fdio!(status))?;
+        if sym_entry.st_name as usize == strtab_idx {
+            return Ok(sym_entry.st_value);
+        }
+        symtab_offset += SYM_ENTRY_SIZE as u64;
+    }
 }
 
 pub fn get_vvar_values() -> VvarInitialValues {

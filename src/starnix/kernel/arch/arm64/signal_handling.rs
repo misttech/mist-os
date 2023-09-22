@@ -62,14 +62,8 @@ impl SignalStackFrame {
             ..Default::default()
         };
 
-        let vdso_sigreturn_offset = task.thread_group.kernel.vdso.sigreturn_offset.expect(
-            "The offset for vDSO sigreturn implementation must be known on this architecture.",
-        );
-        let sigreturn_addr = {
-            let mm_state = task.mm.state.read();
-            mm_state.vdso_base.ptr() as u64 + vdso_sigreturn_offset
-        };
-
+        let vdso_sigreturn_offset = task.thread_group.kernel.vdso.sigreturn_offset;
+        let sigreturn_addr = task.mm.state.read().vdso_base.ptr() as u64 + vdso_sigreturn_offset;
         registers.lr = sigreturn_addr;
 
         SignalStackFrame { context, siginfo_bytes: siginfo.as_siginfo_bytes() }

@@ -5,9 +5,8 @@
 use core::arch::x86_64::_rdtsc;
 use fuchsia_zircon as zx;
 
-use crate::types::Errno;
-
-pub const HAS_VDSO: bool = true;
+// x86_64 doesn't depend on vDSO for sigreturn.
+pub const VDSO_SIGRETURN_NAME: Option<&'static str> = None;
 
 pub fn calculate_ticks_offset() -> i64 {
     let mut ticks_offset: i64 = i64::MIN;
@@ -32,8 +31,4 @@ pub fn calculate_ticks_offset() -> i64 {
         }
     }
     ticks_offset
-}
-
-pub fn get_sigreturn_offset(_vdso_vmo: &zx::Vmo) -> Result<Option<u64>, Errno> {
-    Ok(None)
 }
