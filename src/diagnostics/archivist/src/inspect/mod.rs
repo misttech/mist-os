@@ -396,17 +396,20 @@ mod tests {
             diagnostics::AccessorStats,
             events::{
                 router::EventConsumer,
-                types::{DiagnosticsReadyPayload, Event, EventPayload},
+                types::{
+                    DiagnosticsReadyPayload, Event, EventPayload, InspectSinkRequestedPayload,
+                },
             },
             identity::ComponentIdentity,
-            inspect::repository::InspectRepository,
+            inspect::{repository::InspectRepository, servers::InspectSinkServer},
             pipeline::Pipeline,
         },
         diagnostics_assertions::{assert_data_tree, AnyProperty},
         diagnostics_data::InspectHandleName,
-        fidl::endpoints::{create_proxy_and_stream, DiscoverableProtocolMarker},
+        fidl::endpoints::{create_proxy_and_stream, ClientEnd, DiscoverableProtocolMarker},
         fidl_fuchsia_diagnostics::{BatchIteratorMarker, BatchIteratorProxy, Format, StreamMode},
-        fidl_fuchsia_inspect::TreeMarker,
+        fidl_fuchsia_inspect::{InspectSinkMarker, InspectSinkPublishRequest, TreeMarker},
+        fidl_fuchsia_io as fio,
         fuchsia_async::{self as fasync, Task},
         fuchsia_component::server::ServiceFs,
         fuchsia_inspect::{reader, Inspector},
@@ -414,6 +417,7 @@ mod tests {
         fuchsia_zircon::Peered,
         futures::future::join_all,
         futures::{FutureExt, StreamExt},
+        inspect_runtime::{service, PublishOptions},
         moniker::ExtendedMoniker,
         selectors::{self, VerboseError},
         serde_json::json,
@@ -493,6 +497,7 @@ mod tests {
         ns.unbind(path).unwrap();
     }
 
+    // TODO(fxbug.dev/299973540): remove this test when the out/diagnostics dir is removed
     #[fuchsia::test]
     async fn inspect_data_collector_tree() {
         let path = "/test-bindings2/out";
@@ -593,7 +598,8 @@ mod tests {
             let done = done1;
             let mut executor = fasync::LocalExecutor::new();
             executor.run_singlethreaded(async {
-                verify_reader(path).await;
+                let directory = collector::find_directory_proxy(path).await.unwrap();
+                verify_reader(InspectServiceMethod::DiagnosticsDir(directory)).await;
                 done.signal_peer(zx::Signals::NONE, zx::Signals::USER_0).expect("signalling peer");
             });
         });
@@ -628,12 +634,21 @@ mod tests {
             let done = done1;
             let mut executor = fasync::LocalExecutor::new();
             executor.run_singlethreaded(async {
-                verify_reader(path).await;
+                let directory = collector::find_directory_proxy(path).await.unwrap();
+                verify_reader(InspectServiceMethod::DiagnosticsDir(directory)).await;
                 done.signal_peer(zx::Signals::NONE, zx::Signals::USER_0).expect("signalling peer");
             });
         });
         fasync::OnSignals::new(&done0, zx::Signals::USER_0).await.unwrap();
         ns.unbind(path).unwrap();
+    }
+
+    #[fuchsia::test]
+    async fn read_server_formatting_tree_inspect_sink() {
+        let inspector = inspector_for_reader_test();
+        let (_inspect_server, tree_client) =
+            service::spawn_tree_server(inspector, PublishOptions::default()).unwrap();
+        verify_reader(InspectServiceMethod::InspectSink(tree_client)).await;
     }
 
     #[fuchsia::test]
@@ -661,7 +676,12 @@ mod tests {
             let done = done1;
             let mut executor = fasync::LocalExecutor::new();
             executor.run_singlethreaded(async {
-                verify_reader_with_mode(path, VerifyMode::ExpectComponentFailure).await;
+                let directory = collector::find_directory_proxy(path).await.unwrap();
+                verify_reader_with_mode(
+                    InspectServiceMethod::DiagnosticsDir(directory),
+                    VerifyMode::ExpectComponentFailure,
+                )
+                .await;
                 done.signal_peer(zx::Signals::NONE, zx::Signals::USER_0).expect("signalling peer");
             });
         });
@@ -817,11 +837,21 @@ mod tests {
         ExpectComponentFailure,
     }
 
-    async fn verify_reader(path: &str) {
-        verify_reader_with_mode(path, VerifyMode::ExpectSuccess).await;
+    enum InspectServiceMethod {
+        InspectSink(ClientEnd<TreeMarker>),
+        DiagnosticsDir(fio::DirectoryProxy),
     }
 
-    async fn verify_reader_with_mode(path: &str, mode: VerifyMode) {
+    /// Verify that data can be read via InspectRepository, and that `AccessorStats` are updated
+    /// accordingly.
+    async fn verify_reader(inspect_service_method: InspectServiceMethod) {
+        verify_reader_with_mode(inspect_service_method, VerifyMode::ExpectSuccess).await;
+    }
+
+    async fn verify_reader_with_mode(
+        inspect_service_method: InspectServiceMethod,
+        mode: VerifyMode,
+    ) {
         let child_1_1_selector =
             selectors::parse_selector::<VerboseError>(r#"*:root/child_1/*:some-int"#).unwrap();
         let child_2_selector =
@@ -831,8 +861,6 @@ mod tests {
 
         let pipeline = Arc::new(Pipeline::for_test(static_selectors_opt));
         let inspect_repo = Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
-
-        let out_dir_proxy = collector::find_directory_proxy(path).await.unwrap();
 
         // The moniker here is made up since the selector is a glob
         // selector, so any path would match.
@@ -906,15 +934,47 @@ mod tests {
         let inspector_arc = Arc::new(inspector);
 
         let identity = Arc::new(ComponentIdentity::new(component_id, TEST_URL));
-        Arc::clone(&inspect_repo)
-            .handle(Event {
-                timestamp: zx::Time::get_monotonic(),
-                payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                    component: Arc::clone(&identity),
-                    directory: out_dir_proxy,
-                }),
-            })
-            .await;
+
+        match inspect_service_method {
+            InspectServiceMethod::DiagnosticsDir(directory) => {
+                Arc::clone(&inspect_repo)
+                    .handle(Event {
+                        timestamp: zx::Time::get_monotonic(),
+                        payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
+                            component: Arc::clone(&identity),
+                            directory,
+                        }),
+                    })
+                    .await;
+            }
+            InspectServiceMethod::InspectSink(tree_client) => {
+                let (proxy, request_stream) =
+                    create_proxy_and_stream::<InspectSinkMarker>().unwrap();
+                proxy
+                    .publish(InspectSinkPublishRequest {
+                        tree: Some(tree_client),
+                        ..Default::default()
+                    })
+                    .unwrap();
+
+                let inspect_sink_server =
+                    Arc::new(InspectSinkServer::new(Arc::clone(&inspect_repo)));
+                Arc::clone(&inspect_sink_server)
+                    .handle(Event {
+                        timestamp: zx::Time::get_monotonic(),
+                        payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
+                            component: Arc::clone(&identity),
+                            request_stream,
+                        }),
+                    })
+                    .await;
+
+                drop(proxy);
+
+                inspect_sink_server.stop().await;
+                inspect_sink_server.wait_for_servers_to_complete().await;
+            }
+        }
 
         let expected_get_next_result_errors = match mode {
             VerifyMode::ExpectComponentFailure => 1u64,
