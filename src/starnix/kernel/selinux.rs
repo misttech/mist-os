@@ -112,7 +112,7 @@ struct SeEnforce {
 }
 impl BytesFileOps for SeEnforce {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        let enforce_data = parse_u32_file(&data)?;
+        let enforce_data = parse_unsigned_file::<u32>(&data)?;
         let enforce_opt = match enforce_data {
             0 => Some(false),
             1 => Some(true),
@@ -152,7 +152,7 @@ impl BytesFileOps for SeCreate {
 struct SeCheckReqProt;
 impl BytesFileOps for SeCheckReqProt {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        let checkreqprot = parse_u32_file(&data)?;
+        let checkreqprot = parse_unsigned_file::<u32>(&data)?;
         not_implemented!("selinux checkreqprot: {}", checkreqprot);
         Ok(())
     }

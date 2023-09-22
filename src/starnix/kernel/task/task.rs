@@ -747,7 +747,7 @@ impl Task {
         //         namespace of the target.
         let target_creds = target.creds();
         if !creds.has_capability(CAP_SYS_PTRACE)
-            || !(target_creds.uid == uid
+            && !(target_creds.uid == uid
                 && target_creds.euid == uid
                 && target_creds.saved_uid == uid
                 && target_creds.gid == gid

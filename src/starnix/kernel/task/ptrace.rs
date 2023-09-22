@@ -3,13 +3,17 @@
 // found in the LICENSE file.
 
 use crate::{
+    fs::parse_unsigned_file,
+    mm::DumpPolicy,
     not_implemented,
     signals::{send_signal, SignalInfo},
     task::waiter::WaitQueue,
     task::StopState,
-    task::{CurrentTask, Task, ThreadGroup},
+    task::{CurrentTask, Kernel, Task, ThreadGroup},
     types::*,
 };
+
+use std::sync::{atomic::Ordering, Arc};
 
 /// Per-task ptrace-related state
 pub struct PtraceState {
@@ -39,6 +43,15 @@ impl PtraceState {
         }
     }
 }
+
+/// Scope definitions for Yama.  For full details, see ptrace(2).
+/// 1 means tracer needs to have CAP_SYS_PTRACE or be a parent / child
+/// proces. This is the default.
+const RESTRICTED_SCOPE: u8 = 1;
+/// 2 means tracer needs to have CAP_SYS_PTRACE
+const ADMIN_ONLY_SCOPE: u8 = 2;
+/// 3 means no process can attach.
+const NO_ATTACH_SCOPE: u8 = 3;
 
 /// Continues the target thread, optionally detaching from it.
 fn ptrace_cont(tracee: &Task, data: &UserAddress, detach: bool) -> Result<(), Errno> {
@@ -129,7 +142,22 @@ fn do_attach(thread_group: &ThreadGroup, task: WeakRef<Task>) -> Result<(), Errn
     unreachable!("Tracee thread not found");
 }
 
+fn check_caps_for_attach(ptrace_scope: u8, current_task: &CurrentTask) -> Result<(), Errno> {
+    if ptrace_scope == ADMIN_ONLY_SCOPE && !current_task.creds().has_capability(CAP_SYS_PTRACE) {
+        // Admin only use of ptrace
+        return error!(EPERM);
+    }
+    if ptrace_scope == NO_ATTACH_SCOPE {
+        // No use of ptrace
+        return error!(EPERM);
+    }
+    Ok(())
+}
+
 pub fn ptrace_traceme(current_task: &mut CurrentTask) -> Result<(), Errno> {
+    let ptrace_scope = current_task.kernel().ptrace_scope.load(Ordering::Relaxed);
+    check_caps_for_attach(ptrace_scope, current_task)?;
+
     let parent = current_task.thread_group.read().parent.clone();
     if let Some(parent) = parent {
         let task_ref = OwnedRef::temp(&current_task.task);
@@ -140,6 +168,9 @@ pub fn ptrace_traceme(current_task: &mut CurrentTask) -> Result<(), Errno> {
 }
 
 pub fn ptrace_attach(current_task: &mut CurrentTask, pid: pid_t) -> Result<(), Errno> {
+    let ptrace_scope = current_task.kernel().ptrace_scope.load(Ordering::Relaxed);
+    check_caps_for_attach(ptrace_scope, current_task)?;
+
     let weak_task = current_task.kernel().pids.read().get_task(pid);
     let tracee = weak_task.upgrade().ok_or_else(|| errno!(ESRCH))?;
 
@@ -147,8 +178,62 @@ pub fn ptrace_attach(current_task: &mut CurrentTask, pid: pid_t) -> Result<(), E
         return error!(EPERM);
     }
 
+    if *tracee.mm.dumpable.lock() == DumpPolicy::Disable {
+        return error!(EPERM);
+    }
+
+    if ptrace_scope == RESTRICTED_SCOPE {
+        // By default, this only allows us to attach to descendants.  It also
+        // allows the tracee to call PR_SET_PTRACER, but we defer that for
+        // the moment.
+        let mut ttg = tracee.thread_group.read().parent.clone();
+        let mut found = false;
+        let my_pid = current_task.thread_group.leader;
+        while let Some(target) = ttg {
+            if target.as_ref().leader == my_pid {
+                found = true;
+                break;
+            }
+            ttg = target.read().parent.clone();
+        }
+        if !found {
+            return error!(EPERM);
+        }
+    }
+
     current_task.check_ptrace_access_mode(PTRACE_MODE_ATTACH_REALCREDS, &tracee)?;
     do_attach(&current_task.thread_group, weak_task.clone())?;
     send_signal(&tracee, SignalInfo::default(SIGSTOP));
     Ok(())
+}
+
+pub fn ptrace_set_scope(kernel: &Arc<Kernel>, data: &[u8]) -> Result<(), Errno> {
+    loop {
+        let ptrace_scope = kernel.ptrace_scope.load(Ordering::Relaxed);
+        if let Ok(val) = parse_unsigned_file::<u8>(data) {
+            // Legal values are 0<=val<=3, unless scope is NO_ATTACH - see Yama
+            // documentation.
+            if ptrace_scope == NO_ATTACH_SCOPE && val != NO_ATTACH_SCOPE {
+                return error!(EINVAL);
+            }
+            if val <= NO_ATTACH_SCOPE {
+                match kernel.ptrace_scope.compare_exchange(
+                    ptrace_scope,
+                    val,
+                    Ordering::Relaxed,
+                    Ordering::Relaxed,
+                ) {
+                    Ok(_) => return Ok(()),
+                    Err(_) => continue,
+                }
+            }
+        }
+        return error!(EINVAL);
+    }
+}
+
+pub fn ptrace_get_scope(kernel: &Arc<Kernel>) -> Vec<u8> {
+    let mut scope = kernel.ptrace_scope.load(Ordering::Relaxed).to_string();
+    scope.push('\n');
+    scope.into_bytes()
 }

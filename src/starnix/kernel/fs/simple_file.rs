@@ -59,9 +59,9 @@ where
     }
 }
 
-pub fn parse_u32_file(buf: &[u8]) -> Result<u32, Errno> {
+pub fn parse_unsigned_file<T: Into<u64> + std::str::FromStr>(buf: &[u8]) -> Result<T, Errno> {
     let i = buf.iter().position(|c| !char::from(*c).is_ascii_digit()).unwrap_or(buf.len());
-    std::str::from_utf8(&buf[..i]).unwrap().parse::<u32>().map_err(|_| errno!(EINVAL))
+    std::str::from_utf8(&buf[..i]).unwrap().parse::<T>().map_err(|_| errno!(EINVAL))
 }
 
 pub fn serialize_u32_file(value: u32) -> Vec<u8> {

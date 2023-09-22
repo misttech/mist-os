@@ -41,6 +41,9 @@ pub fn sysctl_directory(fs: &FileSystemHandle, kernel: &Arc<Kernel>) -> FsNodeHa
             );
             dir.entry(b"actions_logged", SeccompActionsLogged::new_node(), mode);
         });
+        dir.subdir(b"yama", 0o555, |dir| {
+            dir.entry(b"ptrace_scope", PtraceYamaScope::new_node(), mode);
+        });
     });
     dir.node(b"net", sysctl_net_diretory(fs, kernel));
     dir.subdir(b"vm", 0o555, |dir| {
@@ -221,5 +224,26 @@ impl BytesFileOps for SeccompActionsLogged {
     }
     fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         Ok(SeccompAction::get_actions_logged(current_task.kernel()).into())
+    }
+}
+
+struct PtraceYamaScope {}
+
+impl PtraceYamaScope {
+    fn new_node() -> impl FsNodeOps {
+        BytesFile::new_node(Self {})
+    }
+}
+
+impl BytesFileOps for PtraceYamaScope {
+    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
+            return error!(EPERM);
+        }
+        ptrace_set_scope(current_task.kernel(), &data)?;
+        Ok(())
+    }
+    fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        Ok(ptrace_get_scope(current_task.kernel()).into())
     }
 }

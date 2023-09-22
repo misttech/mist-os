@@ -568,7 +568,6 @@
                 "PtraceTest.PrctlSetPtracerInvalidPID",
                 "PtraceTest.SeizeSetOptions",
                 "PtraceTest.Seize_Interrupt_Listen",
-                "PtraceTest.SetYAMAPtraceScope",
                 "PtraceTest.Sysemu_PokeUser",
                 "TraceExec/PtraceExecveTest.Execve_GetRegs_PeekUser_SIGKILL_TraceClone_TraceExit/0",
                 "TraceExec/PtraceExecveTest.Execve_GetRegs_PeekUser_SIGKILL_TraceClone_TraceExit/1",
@@ -1073,7 +1072,6 @@
 
                 // These tests hang / hard crash
                 "PtraceTest.AttachingConvertsGroupStopToPtraceStop",
-                "PtraceTest.TraceDescendantsAllowed",
             ],
         },
     ],
