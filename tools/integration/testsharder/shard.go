@@ -64,6 +64,19 @@ type Shard struct {
 	ImageOverrides build.ImageOverrides `json:"image_overrides,omitempty"`
 }
 
+// TargetCPU returns the CPU architecture of the target this shard will run against.
+func (s *Shard) TargetCPU() string {
+	return s.Tests[0].CPU
+}
+
+// HostCPU returns the host CPU architecture this shard will run on.
+func (s *Shard) HostCPU() string {
+	if s.Env.TargetsEmulator() && s.TargetCPU() == "arm64" {
+		return "arm64"
+	}
+	return "x64"
+}
+
 // CreatePackageRepo creates a package repository for the given shard.
 func (s *Shard) CreatePackageRepo(buildDir string, globalRepoMetadata string, cacheTestPackages bool) error {
 	globalRepoMetadata = filepath.Join(buildDir, globalRepoMetadata)

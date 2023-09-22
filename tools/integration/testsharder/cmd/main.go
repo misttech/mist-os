@@ -298,7 +298,7 @@ func execute(ctx context.Context, flags testsharderFlags, m buildModules) error 
 		for _, s := range shards {
 			var pbPath, ffxPath string
 			if flags.ffxDeps {
-				if err := testsharder.AddFFXDeps(s, flags.buildDir, m.Images(), flags.pave); err != nil {
+				if err := testsharder.AddFFXDeps(s, flags.buildDir, m.Images(), m.Tools(), flags.pave); err != nil {
 					return err
 				}
 				if flags.productBundleName != "" && s.ImageOverrides.IsEmpty() {
