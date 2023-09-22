@@ -1,3 +1,6 @@
 {
-    "sdk": {}
+    "sdk": {
+        "root": "$FUCHSIA_SDK_PATH",
+        "module": "$FUCHSIA_SDK_MODULE"
+    }
 }

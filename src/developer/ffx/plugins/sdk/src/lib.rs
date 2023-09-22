@@ -4,8 +4,8 @@
 
 use anyhow::{Context, Result};
 use ffx_config::{ConfigLevel, EnvironmentContext};
-use ffx_sdk_args::{SdkCommand, SetCommand, SetRootCommand, SetSubCommand, SubCommand};
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_sdk_args::{RunCommand, SdkCommand, SetCommand, SetRootCommand, SetSubCommand, SubCommand};
+use fho::{exit_with_code, user_error, FfxContext, FfxMain, FfxTool, SimpleWriter};
 use sdk::{in_tree_sdk_version, Sdk, SdkVersion};
 use std::io::Write;
 
@@ -27,7 +27,30 @@ impl FfxMain for SdkTool {
         match &self.cmd.sub {
             SubCommand::Version(_) => exec_version(self.sdk?, writer).await.map_err(Into::into),
             SubCommand::Set(cmd) => exec_set(self.context, cmd).await.map_err(Into::into),
+            SubCommand::Run(cmd) => exec_run(self.sdk?, cmd).await,
         }
+    }
+}
+
+async fn exec_run(sdk: Sdk, cmd: &RunCommand) -> fho::Result<()> {
+    let status = sdk
+        .get_host_tool_command(&cmd.name)
+        .with_user_message(|| {
+            format!("Could not find the host tool `{}` in the currently active sdk", cmd.name)
+        })?
+        .args(&cmd.args)
+        .status()
+        .map_err(|e| {
+            user_error!(
+                "Failed to spawn host tool `{}` from the sdk with system error: {e}",
+                cmd.name
+            )
+        })?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        exit_with_code!(status.code().unwrap_or(1))
     }
 }
 

@@ -11,6 +11,7 @@ use std::{
     fs,
     io::BufReader,
     path::{Path, PathBuf},
+    process::Command,
 };
 use tracing::warn;
 
@@ -30,6 +31,7 @@ pub enum SdkVersion {
 #[derive(Debug)]
 pub struct Sdk {
     path_prefix: PathBuf,
+    module: Option<String>,
     parts: Vec<Part>,
     real_paths: Option<HashMap<String, String>>,
     version: SdkVersion,
@@ -169,7 +171,7 @@ impl Sdk {
         let atoms = Self::parse_manifest(&manifest_path, file)?;
 
         // If we are able to parse the json file into atoms, creates a Sdk object from the atoms.
-        Self::from_sdk_atoms(&path, atoms, SdkVersion::InTree)
+        Self::from_sdk_atoms(&path, module_manifest, atoms, SdkVersion::InTree)
             .with_context(|| anyhow!("Parsing atoms from SDK manifest at `{}`", path.display()))
     }
 
@@ -188,6 +190,7 @@ impl Sdk {
 
         Ok(Sdk {
             path_prefix,
+            module: None,
             parts: manifest.parts,
             real_paths: None,
             version: SdkVersion::Version(manifest.id.clone()),
@@ -294,6 +297,18 @@ impl Sdk {
         }
     }
 
+    /// Returns a command invocation builder for the given host tool, if it
+    /// exists in the sdk.
+    pub fn get_host_tool_command(&self, name: &str) -> Result<Command> {
+        let host_tool = self.get_host_tool(name)?;
+        let mut command = Command::new(host_tool);
+        command.env("FUCHSIA_SDK_PATH", &self.path_prefix);
+        if let Some(module) = self.module.as_deref() {
+            command.env("FUCHSIA_SDK_ENV", module);
+        }
+        Ok(command)
+    }
+
     pub fn get_path_prefix(&self) -> &Path {
         &self.path_prefix
     }
@@ -313,14 +328,25 @@ impl Sdk {
     /// For tests only
     #[doc(hidden)]
     pub fn get_empty_sdk_with_version(version: SdkVersion) -> Sdk {
-        Sdk { path_prefix: PathBuf::new(), parts: Vec::new(), real_paths: None, version }
+        Sdk {
+            path_prefix: PathBuf::new(),
+            module: None,
+            parts: Vec::new(),
+            real_paths: None,
+            version,
+        }
     }
 
     /// Allocates a new Sdk using the given atoms.
     ///
     /// All the meta files specified in the atoms are loaded.
     /// The creation succeed only if all the meta files have been loaded successfully.
-    fn from_sdk_atoms(path_prefix: &Path, atoms: SdkAtoms, version: SdkVersion) -> Result<Self> {
+    fn from_sdk_atoms(
+        path_prefix: &Path,
+        module: Option<&str>,
+        atoms: SdkAtoms,
+        version: SdkVersion,
+    ) -> Result<Self> {
         let mut metas = Vec::new();
         let mut real_paths = HashMap::new();
 
@@ -342,6 +368,7 @@ impl Sdk {
 
         Ok(Sdk {
             path_prefix: path_prefix.to_owned(),
+            module: module.map(str::to_owned),
             parts: metas,
             real_paths: Some(real_paths),
             version,
@@ -492,7 +519,7 @@ mod test {
         ))
         .unwrap();
 
-        let sdk = Sdk::from_sdk_atoms(manifest_path, atoms, SdkVersion::Unknown).unwrap();
+        let sdk = Sdk::from_sdk_atoms(manifest_path, None, atoms, SdkVersion::Unknown).unwrap();
 
         let mut parts = sdk.parts.iter();
         assert!(matches!(parts.next().unwrap(), Part { kind: ElementType::HostTool, .. }));
@@ -511,10 +538,13 @@ mod test {
         ))
         .unwrap();
 
-        let sdk = Sdk::from_sdk_atoms(manifest_path, atoms, SdkVersion::Unknown).unwrap();
+        let sdk = Sdk::from_sdk_atoms(manifest_path, None, atoms, SdkVersion::Unknown).unwrap();
         let zxdb = sdk.get_host_tool("zxdb").unwrap();
 
         assert_eq!(manifest_path.join("host_x64/zxdb"), zxdb);
+
+        let zxdb_cmd = sdk.get_host_tool_command("zxdb").unwrap();
+        assert_eq!(zxdb_cmd.get_program(), manifest_path.join("host_x64/zxdb"));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -526,10 +556,13 @@ mod test {
         ))
         .unwrap();
 
-        let sdk = Sdk::from_sdk_atoms(manifest_path, atoms, SdkVersion::InTree).unwrap();
+        let sdk = Sdk::from_sdk_atoms(manifest_path, None, atoms, SdkVersion::InTree).unwrap();
         let symbol_index = sdk.get_host_tool("symbol-index").unwrap();
 
         assert_eq!(manifest_path.join("host_x64/symbol-index"), symbol_index);
+
+        let symbol_index_cmd = sdk.get_host_tool_command("symbol-index").unwrap();
+        assert_eq!(symbol_index_cmd.get_program(), manifest_path.join("host_x64/symbol-index"));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -541,7 +574,7 @@ mod test {
         ))
         .unwrap();
 
-        let sdk = Sdk::from_sdk_atoms(manifest_path, atoms, SdkVersion::Unknown).unwrap();
+        let sdk = Sdk::from_sdk_atoms(manifest_path, None, atoms, SdkVersion::Unknown).unwrap();
         let ffx_assembly = sdk.get_ffx_tool("ffx-assembly").unwrap();
 
         assert_eq!(manifest_path.join("host_x64/ffx-assembly"), ffx_assembly.executable);
@@ -577,6 +610,7 @@ mod test {
 
         let sdk = Sdk {
             path_prefix: sdk_root.to_owned(),
+            module: None,
             parts: manifest.parts,
             real_paths: None,
             version: SdkVersion::Version(manifest.id.to_owned()),
@@ -584,6 +618,9 @@ mod test {
         let zxdb = sdk.get_host_tool("zxdb").unwrap();
 
         assert_eq!(sdk_root.join("tools/zxdb"), zxdb);
+
+        let zxdb_cmd = sdk.get_host_tool_command("zxdb").unwrap();
+        assert_eq!(zxdb_cmd.get_program(), sdk_root.join("tools/zxdb"));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -597,6 +634,7 @@ mod test {
 
         let sdk = Sdk {
             path_prefix: sdk_root.to_owned(),
+            module: None,
             parts: manifest.parts,
             real_paths: None,
             version: SdkVersion::Version(manifest.id.to_owned()),

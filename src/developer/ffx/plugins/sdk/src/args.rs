@@ -19,11 +19,23 @@ pub struct SdkCommand {
 pub enum SubCommand {
     Version(VersionCommand),
     Set(SetCommand),
+    Run(RunCommand),
 }
 
 #[derive(FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "version", description = "Retrieve the version of the current SDK")]
 pub struct VersionCommand {}
+
+#[derive(FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "run", description = "Run a host tool from the active sdk")]
+pub struct RunCommand {
+    #[argh(positional)]
+    /// the name of the host-tool to run from the active sdk
+    pub name: String,
+    #[argh(positional, greedy)]
+    /// the host tool command to run, starting with the
+    pub args: Vec<String>,
+}
 
 #[derive(FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "set", description = "Set sdk-related configuration options")]
