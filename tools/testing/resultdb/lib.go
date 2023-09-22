@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-package main
+package resultdb
 
 import (
 	"encoding/json"
@@ -63,8 +63,8 @@ func SummaryToResultSink(s *runtests.TestSummary, tags []*resultpb.StringPair, o
 	return r, ts
 }
 
-// invocationLevelArtifacts creates resultdb artifacts for invocation-level files to be sent to ResultDB.
-func invocationLevelArtifacts(outputRoot string, invocationArtifacts []string) map[string]*sinkpb.Artifact {
+// InvocationLevelArtifacts creates resultdb artifacts for invocation-level files to be sent to ResultDB.
+func InvocationLevelArtifacts(outputRoot string, invocationArtifacts []string) map[string]*sinkpb.Artifact {
 	if len(outputRoot) == 0 {
 		outputRoot, _ = os.Getwd()
 	}

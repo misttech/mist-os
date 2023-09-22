@@ -18,6 +18,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"go.fuchsia.dev/fuchsia/tools/lib/flagmisc"
+	"go.fuchsia.dev/fuchsia/tools/testing/resultdb"
 )
 
 var (
@@ -53,11 +54,11 @@ func mainImpl() error {
 		return err
 	}
 	for _, summaryFile := range summaries {
-		summary, err := ParseSummary(summaryFile)
+		summary, err := resultdb.ParseSummary(summaryFile)
 		if err != nil {
 			return err
 		}
-		testResults, testsSkipped := SummaryToResultSink(summary, tagPairs, outputRoot)
+		testResults, testsSkipped := resultdb.SummaryToResultSink(summary, tagPairs, outputRoot)
 		// Group 500 testResults per ReportTestResultsRequest. This reduces the number of HTTP calls
 		// we make to result_sink. 500 is the maximum number of testResults allowed.
 		requests = append(requests, createTestResultsRequests(testResults, 500)...)
@@ -65,7 +66,7 @@ func mainImpl() error {
 	}
 
 	invocationRequest := &sinkpb.ReportInvocationLevelArtifactsRequest{
-		Artifacts: invocationLevelArtifacts(outputRoot, invocationArtifacts),
+		Artifacts: resultdb.InvocationLevelArtifacts(outputRoot, invocationArtifacts),
 	}
 
 	client := &http.Client{}
@@ -101,7 +102,7 @@ func mainImpl() error {
 		return err
 	}
 	if len(allTestsSkipped) > 0 {
-		return fmt.Errorf("Some tests could not be uploaded due to testname exceeding byte limit %d.", MAX_TEST_ID_SIZE_BYTES)
+		return fmt.Errorf("Some tests could not be uploaded due to testname exceeding byte limit %d.", resultdb.MAX_TEST_ID_SIZE_BYTES)
 	}
 	return nil
 }

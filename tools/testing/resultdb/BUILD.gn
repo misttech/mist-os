@@ -7,14 +7,29 @@ import("//build/go/go_library.gni")
 import("//build/go/go_test.gni")
 import("//build/testing/host_test_data.gni")
 
+go_library("lib") {
+  sources = [
+    "lib.go",
+    "lib_test.go",
+  ]
+  deps = [
+    "//third_party/golibs:golang.org/x/sync",
+    "//third_party/golibs:google.golang.org/protobuf",
+    "//third_party/luci-go/resultdb/proto/v1:resultdb_proto_go",
+    "//third_party/luci-go/resultdb/sink/proto/v1:resultsink_proto_go",
+    "//tools/lib/flagmisc",
+  ]
+}
+
 go_library("main") {
+  source_dir = "cmd"
+
   sources = [
     "main.go",
     "main_test.go",
-    "summary.go",
-    "summary_test.go",
   ]
   deps = [
+    ":lib",
     "//third_party/golibs:github.com/google/go-cmp",
     "//third_party/golibs:golang.org/x/sync",
     "//third_party/golibs:google.golang.org/protobuf",
