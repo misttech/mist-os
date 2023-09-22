@@ -1356,7 +1356,8 @@ class RemoteAction(object):
 
         self.vmsg("Creating download stubs for remote outputs.")
         # Create stubs, even for artifacts that are always_download-ed.
-        build_id = _reproxy_log_dir()  # unique per build
+        unique_log_dir = _reproxy_log_dir()  # unique per build
+        build_id = Path(unique_log_dir).name if unique_log_dir else 'unknown'
         stub_infos = log_record.make_download_stubs(
             files=self.output_files_relative_to_working_dir,
             dirs=self.output_dirs_relative_to_working_dir,

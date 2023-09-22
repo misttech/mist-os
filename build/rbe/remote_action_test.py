@@ -2190,7 +2190,7 @@ remote_metadata: {{
         mock_stub.assert_called_with(
             files=[Path(output)],
             dirs=[],
-            build_id=logdir,
+            build_id=Path(logdir).name,
         )
 
     def test_made_download_stubs_for_racing_remote_win(self):
@@ -2214,7 +2214,7 @@ remote_metadata: {{
         self.assertFalse(action.download_outputs)
         options = action.options
         self.assertIn(download_option, options)
-        logdir = '/fake/tmp/rpl/logz.932874'
+        logdir = '/fake/tmp/rpl/logz.932875'
         fake_log_record = FakeReproxyLogEntry(
             completion_status='STATUS_CACHE_HIT')
         with mock.patch.object(remote_action, '_reproxy_log_dir',
@@ -2236,7 +2236,7 @@ remote_metadata: {{
         mock_stub.assert_called_with(
             files=[Path(output)],
             dirs=[],
-            build_id=logdir,
+            build_id=Path(logdir).name,
         )
 
     def test_no_download_stubs_for_local_execution(self):
