@@ -276,26 +276,12 @@ impl<'a> ValidationContext<'a> {
             self.features.has(&Feature::EnableAllowNonHermeticPackagesFeature);
 
         if restrict_test_type {
-            let allowed_values = ["chromium"];
             let test_type = test_facet_map.map(|m| m.get(TEST_TYPE_FACET_KEY)).flatten();
-            if let Some(test_type) = test_type {
-                match test_type {
-                    serde_json::Value::String(s) => {
-                        if !allowed_values.contains(&s.as_str()) {
-                            return Err(Error::validate(format!(
-                                "'{}' is not a allowed test type. Allowed test types in the the facet: '{}'.
-Refer https://fuchsia.dev/fuchsia-src/development/testing/components/test_runner_framework?hl=en#non-hermetic_tests \
-to run your test in the correct test realm.",
-                                s, allowed_values.join(", ")
-                            )));
-                        }
-                    }
-                    facet => {
-                        return Err(Error::validate(format!(
-                            "'{TEST_TYPE_FACET_KEY}' is no a string: {facet:?}"
-                        )))
-                    }
-                }
+            if test_type.is_some() {
+                return Err(Error::validate(format!(
+                    "'{}' is not a allowed in facets. Refer \
+https://fuchsia.dev/fuchsia-src/development/testing/components/test_runner_framework?hl=en#non-hermetic_tests \
+to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             }
         }
 
@@ -6452,18 +6438,7 @@ mod tests {
                     }
                 }
             }),
-            Err(err) if err.to_string().contains("some_realm")
-        ),
-
-        test_valid_test_type_with_feature_enabled(
-            json!({
-                "facets": {
-                    TEST_FACET_KEY: {
-                        TEST_TYPE_FACET_KEY: "chromium",
-                    }
-                }
-            }),
-            Ok(())
+            Err(err) if err.to_string().contains(TEST_TYPE_FACET_KEY)
         ),
     }}
 
