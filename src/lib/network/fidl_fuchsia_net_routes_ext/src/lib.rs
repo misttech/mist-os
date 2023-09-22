@@ -249,6 +249,11 @@ impl TryFrom<fnet_routes::RouteTargetV4> for RouteTarget<Ipv4> {
                     .ok_or(FidlConversionError::UnspecifiedNextHop)
             })
             .transpose()?;
+        if let Some(next_hop) = next_hop {
+            if next_hop.is_limited_broadcast() {
+                return Err(FidlConversionError::NextHopNotUnicast);
+            }
+        }
         Ok(RouteTarget { outbound_interface, next_hop })
     }
 }
@@ -1175,6 +1180,17 @@ mod tests {
             }),
             Err(FidlConversionError::UnspecifiedNextHop)
         );
+    }
+
+    #[test]
+    fn route_target_try_from_limited_broadcast_next_hop_v4() {
+        assert_eq!(
+            RouteTarget::try_from(fnet_routes::RouteTargetV4 {
+                outbound_interface: 1,
+                next_hop: Some(Box::new(fidl_ip_v4!("255.255.255.255"))),
+            }),
+            Err(FidlConversionError::NextHopNotUnicast)
+        )
     }
 
     #[test]
