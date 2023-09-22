@@ -153,11 +153,14 @@ class AsyncCommand:
         Args:
             program (str): Name of the program to run.
             args (List[str]): Arguments to pass to the program.
-            symbolizer_args (Optional[List[str]]): If set, pipe output from the program through this program.
-            env (Optional[Dict[str,str]]): If set, use this dict
-                to populate the command's environment. Note that the
-                CWD environment variable is handled specially to ensure
-                that the command runs in the given working directory.
+            symbolizer_args (List[str], optional): If set, pipe
+                output from the program through this program.
+            env (Dict[str,str], optional): If set, use this dict
+                to populate the command's environment.
+                Note: the CWD environment variable is handled specially to ensure
+                    that the command runs in the given working directory.
+                Note: fx test's own environment is inherited and overridden by
+                    the values in this dict, if set.
             timeout (float, optional): Terminate the command after the given number of seconds.
 
         Returns:
@@ -171,6 +174,15 @@ class AsyncCommand:
             env.pop("CWD")
             if not env:
                 env = None
+        if env:
+            # Ensure that we inherit the incoming environment and
+            # extend it with the arguments to env, only if set.
+            new_env = dict(os.environ.items())
+            new_env.update(env)
+            env = new_env
+            if cwd is not None:
+                # CWD is already handled above, do not inherit.
+                env.pop("CWD")
 
         try:
 

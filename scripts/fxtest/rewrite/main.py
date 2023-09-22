@@ -433,6 +433,7 @@ async def do_build(
     output = await execution.run_command(
         "fx",
         *(["build"] + build_command_line),
+        env={"CLICOLOR_FORCE": "1"},  # Pass color output for errors verbatim.
         recorder=recorder,
         parent=build_id,
         print_verbatim=True,
