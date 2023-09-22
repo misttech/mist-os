@@ -47,7 +47,6 @@ action("bump_api_level") {
 
   script = "//scripts/versioning/update_platform_version.py"
 
-  _version_file = "//build/config/fuchsia/platform_version.json"
   _version_history_file = "//sdk/version_history.json"
   _fidl_compatiblity_doc_path =
       "//docs/development/testing/ctf/fidl_api_compatibility_testing.md"
@@ -66,8 +65,6 @@ action("bump_api_level") {
     rebase_path(_version_history_file, root_build_dir),
     "--fidl-compatibility-doc-path",
     rebase_path(_fidl_compatiblity_doc_path, root_build_dir),
-    "--platform-version-json",
-    rebase_path(_version_file, root_build_dir),
     "--goldens-manifest",
     rebase_path(_goldens_manifest, root_build_dir),
     "--fuchsia-api-level",
@@ -75,7 +72,6 @@ action("bump_api_level") {
   ]
 
   inputs = [
-    _version_file,
     _version_history_file,
     _goldens_manifest,
   ]
