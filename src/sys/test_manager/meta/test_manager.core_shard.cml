@@ -154,17 +154,7 @@
             source_availability: "unknown",
         },
         {
-            protocol: "fuchsia.process.Resolver",
-            from: "#process_resolver",
-            to: "#test_manager",
-            source_availability: "unknown",
-        },
-        {
-            protocol: [
-                "fuchsia.settings.Display",
-                "fuchsia.settings.Intl",
-                "fuchsia.settings.Privacy",
-            ],
+            protocol: [ "fuchsia.settings.Display" ],
             from: "#setui_service",
             to: "#test_manager",
             source_availability: "unknown",
@@ -231,7 +221,6 @@
         // Needed by some non-hermetic tests
         {
             protocol: [
-                "fuchsia.boot.FactoryItems",
                 "fuchsia.boot.RootResource",
                 "fuchsia.device.NameProvider",
                 "fuchsia.kernel.Counter",
@@ -255,13 +244,6 @@
         },
         {
             directory: "boot",
-            from: "parent",
-            to: "#test_manager",
-        },
-        {
-            // TODO(fxbug.dev/91934) - this is routed to test manager to support chromium tests.
-            // Once we're able, this part of the manifest should be maintained by chromium.
-            directory: "build-info",
             from: "parent",
             to: "#test_manager",
         },

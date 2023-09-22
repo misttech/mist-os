@@ -134,8 +134,7 @@ fn parse_suite_collection(entry: &fdata::DictionaryEntry) -> Result<&'static str
 mod test {
     use super::*;
     use crate::constants::{
-        CHROMIUM_TESTS_COLLECTION, CTS_TESTS_COLLECTION, SYSTEM_TESTS_COLLECTION,
-        VULKAN_TESTS_COLLECTION,
+        CHROMIUM_TESTS_COLLECTION, SYSTEM_TESTS_COLLECTION, VULKAN_TESTS_COLLECTION,
     };
 
     #[test]
@@ -208,23 +207,6 @@ mod test {
             ..Default::default()
         });
         assert_eq!(parse_facet(&decl).unwrap().collection, SYSTEM_TESTS_COLLECTION);
-
-        decl.facets = Some(fdata::Dictionary {
-            entries: vec![
-                fdata::DictionaryEntry { key: "somekey".into(), value: None },
-                fdata::DictionaryEntry {
-                    key: format!("{}.somekey", TEST_FACET),
-                    value: Some(fdata::DictionaryValue::Str("some_string".into()).into()),
-                },
-                fdata::DictionaryEntry {
-                    key: TEST_TYPE_FACET_KEY.into(),
-                    value: Some(fdata::DictionaryValue::Str("cts".into()).into()),
-                },
-            ]
-            .into(),
-            ..Default::default()
-        });
-        assert_eq!(parse_facet(&decl).unwrap().collection, CTS_TESTS_COLLECTION);
 
         decl.facets = Some(fdata::Dictionary {
             entries: vec![

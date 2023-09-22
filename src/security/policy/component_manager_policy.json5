@@ -473,9 +473,6 @@
                     // This protocol is available in the serial console
                     "/bootstrap/console-launcher",
 
-                    // This collection is used by CTS tests
-                    "/core/test_manager/cts-tests:**",
-
                     // This collection is used by CTF tests
                     "/core/testing/ctf-tests:**",
 

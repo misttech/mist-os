@@ -20,7 +20,6 @@ pub const CUSTOM_ARTIFACTS_CAPABILITY_NAME: &'static str = "custom_artifacts";
 pub const TEST_ENVIRONMENT_NAME: &'static str = "test-env";
 pub const HERMETIC_TESTS_COLLECTION: &'static str = "tests";
 pub const SYSTEM_TESTS_COLLECTION: &'static str = "system-tests";
-pub const CTS_TESTS_COLLECTION: &'static str = "cts-tests";
 pub const VULKAN_TESTS_COLLECTION: &'static str = "vulkan-tests";
 pub const CHROMIUM_TESTS_COLLECTION: &'static str = "chromium-tests";
 pub const CHROMIUM_SYSTEM_TESTS_COLLECTION: &'static str = "chromium-system-tests";
@@ -31,7 +30,6 @@ lazy_static! {
         ("hermetic", HERMETIC_TESTS_COLLECTION),
         ("chromium", CHROMIUM_TESTS_COLLECTION),
         ("chromium-system", CHROMIUM_SYSTEM_TESTS_COLLECTION),
-        ("cts", CTS_TESTS_COLLECTION),
         ("google", GOOGLE_TESTS_COLLECTION),
         ("system", SYSTEM_TESTS_COLLECTION),
         ("vulkan", VULKAN_TESTS_COLLECTION),
