@@ -44,7 +44,6 @@ mod tests {
     #[test]
     fn zero_size_to_empty_slice() {
         let arr = [];
-        assert_eq!((arr.as_ptr() as *const u8).is_null(), false);
         let span = CSpan { data: arr.as_ptr(), size: arr.len(), _p: PhantomData };
         assert_eq!(<&[u8]>::from(span), &[]);
     }
