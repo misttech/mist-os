@@ -191,6 +191,7 @@ build_api_module("api") {
     ":checkout_artifacts",
     ":cipd_assembly_artifacts",
     ":clippy_target_mapping",
+    ":detailed_size_checker_data",
     ":fuzzers",
     ":generated_sources",
     ":gerrit_size_report",
@@ -1333,6 +1334,20 @@ build_api_module("assembly_manifests") {
 build_api_module("product_size_checker_output") {
   testonly = true
   data_keys = [ "product_size_checker_output" ]
+  deps = [ "//build/images:default-images" ]
+}
+
+# Contains details about the size checker output
+#
+# This is informational only, as a debugging aid.
+#
+# Type: list(scope) (0 or more)
+#  size_budgets
+#    Optional:  Path to the breakdown of packages to size budgets.
+#
+build_api_module("detailed_size_checker_data") {
+  testonly = true
+  data_keys = [ "detailed_size_checker_data" ]
   deps = [ "//build/images:default-images" ]
 }
 

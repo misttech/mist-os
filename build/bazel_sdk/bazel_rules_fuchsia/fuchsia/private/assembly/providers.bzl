@@ -66,6 +66,7 @@ FuchsiaAssemblyConfigInfo = provider(
 FuchsiaSizeCheckerInfo = provider(
     doc = """Size reports created by size checker tool.""",
     fields = {
+        "size_budgets": "size_budgets.json file",
         "size_report": "size_report.json file",
         "verbose_output": "verbose version of size report file",
     },

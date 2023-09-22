@@ -7,6 +7,8 @@
 load(":providers.bzl", "FuchsiaSizeCheckerInfo")
 
 def _fuchsia_size_report_aggregator_impl(ctx):
+    size_budgets_input = [report[FuchsiaSizeCheckerInfo].size_budgets for report in ctx.attr.size_reports if hasattr(report[FuchsiaSizeCheckerInfo], "size_budgets")]
+    size_budgets_input = size_budgets_input[0] if len(size_budgets_input) > 0 else None
     size_reports = ",".join([
         report[FuchsiaSizeCheckerInfo].size_report.path
         for report in ctx.attr.size_reports
@@ -18,6 +20,7 @@ def _fuchsia_size_report_aggregator_impl(ctx):
         if hasattr(report[FuchsiaSizeCheckerInfo], "verbose_output")
     ])
 
+    size_budgets_file = ctx.actions.declare_file(ctx.label.name + "_size_budgets.json") if size_budgets_input else None
     size_report_file = ctx.actions.declare_file(ctx.label.name + "_size_report.json")
     verbose_output_file = ctx.actions.declare_file(ctx.label.name + "_verbose_output.json")
 
@@ -40,12 +43,27 @@ def _fuchsia_size_report_aggregator_impl(ctx):
 
     deps = [size_report_file, verbose_output_file]
 
+    if size_budgets_input:
+        # Copy the size budgets file
+        ctx.actions.run_shell(
+            outputs = [size_budgets_file],
+            inputs = [size_budgets_input],
+            command = "cp -L {} {}".format(size_budgets_input.path, size_budgets_file.path),
+        )
+        deps.append(size_budgets_file)
+
+    fuchsia_size_checker_info = FuchsiaSizeCheckerInfo(
+        size_budgets = size_budgets_file,
+        size_report = size_report_file,
+        verbose_output = verbose_output_file,
+    ) if size_budgets_file else FuchsiaSizeCheckerInfo(
+        size_report = size_report_file,
+        verbose_output = verbose_output_file,
+    )
+
     return [
         DefaultInfo(files = depset(direct = deps)),
-        FuchsiaSizeCheckerInfo(
-            size_report = size_report_file,
-            verbose_output = verbose_output_file,
-        ),
+        fuchsia_size_checker_info,
     ]
 
 fuchsia_size_report_aggregator = rule(

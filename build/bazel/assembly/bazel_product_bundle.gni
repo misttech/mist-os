@@ -284,8 +284,13 @@ template("bazel_product_bundle") {
       # INFO level, so it is necessary to include Bazel INFO logs here.
       filter_bazel_info_logs = false
 
+      _size_budgets_path = "${_size_report_target}/size_budgets.json"
       _size_report_path = "${_size_report_target}/size_report.json"
       copy_outputs = [
+        {
+          bazel = "{{BAZEL_TARGET_OUT_PATH}}_size_budgets.json"
+          ninja = _size_budgets_path
+        },
         {
           bazel = "{{BAZEL_TARGET_OUT_PATH}}_size_report.json"
           ninja = _size_report_path
@@ -300,6 +305,13 @@ template("bazel_product_bundle") {
         gerrit_size_reports =
             [ rebase_path("${target_out_dir}/${_size_report_path}",
                           root_build_dir) ]
+        detailed_size_checker_data = [
+          {
+            name = "size_budgets"
+            path = rebase_path("${target_out_dir}/${_size_budgets_path}",
+                               root_build_dir)
+          },
+        ]
       }
     }
   }
