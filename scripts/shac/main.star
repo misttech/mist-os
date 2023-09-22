@@ -74,6 +74,39 @@ def _doc_checker(ctx):
             message = msg + "\n\n" + "Run `fx doc-checker --local-links-only` to reproduce.",
         )
 
+def _mdlint(ctx):
+    """Runs mdlint."""
+    rfc_dir = "docs/contribute/governance/rfcs/"
+    affected_files = set(ctx.scm.affected_files())
+    if not any([f.startswith(rfc_dir) for f in affected_files]):
+        return
+    mdlint = compiled_tool_path(ctx, "mdlint")
+    res = ctx.os.exec(
+        [
+            mdlint,
+            "--json",
+            "--root-dir",
+            rfc_dir,
+            "--enable",
+            "all",
+            "--filter-filenames",
+            rfc_dir,
+        ],
+        ok_retcodes = [0, 1],
+    ).wait()
+    for finding in json.decode(res.stderr):
+        if finding["path"] not in ctx.scm.affected_files():
+            continue
+        ctx.emit.finding(
+            level = "warning",
+            message = finding["message"],
+            filepath = finding["path"],
+            line = finding["start_line"],
+            end_line = finding["end_line"],
+            col = finding["start_char"] + 1,
+            end_col = finding["end_char"] + 1,
+        )
+
 def register_all_checks():
     """Register all checks that should run.
 
@@ -90,6 +123,7 @@ def register_all_checks():
         # running with `fx format-code`, and unset `formatter = True`.
         formatter = True,
     ))
+    shac.register_check(shac.check(_mdlint))
     register_cml_checks()
     register_fidl_checks()
     register_go_checks()
