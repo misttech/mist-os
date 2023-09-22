@@ -9,6 +9,7 @@ from typing import Callable
 
 from honeydew.interfaces.affordances import session
 from honeydew.interfaces.affordances import tracing
+from honeydew.interfaces.affordances.bluetooth.profiles import bluetooth_avrcp
 from honeydew.interfaces.affordances.bluetooth.profiles import bluetooth_gap
 from honeydew.interfaces.affordances.ui import screenshot
 from honeydew.interfaces.affordances.ui import user_input
@@ -19,7 +20,7 @@ from honeydew.utils import properties
 
 class BluetoothGapCapableDevice(abc.ABC):
     """Abstract base class to be implemented by a device which supports the
-    Bluetooth affordance."""
+    Bluetooth Gap affordance."""
 
     @properties.Affordance
     @abc.abstractmethod
@@ -28,6 +29,20 @@ class BluetoothGapCapableDevice(abc.ABC):
 
         Returns:
             bluetooth_gap.BluetoothGap object
+        """
+
+
+class BluetoothAvrcpCapableDevice(abc.ABC):
+    """Abstract base class to be implemented by a device which supports the
+    Bluetooth Avrcp affordance."""
+
+    @properties.Affordance
+    @abc.abstractmethod
+    def bluetooth_avrcp(self) -> bluetooth_avrcp.BluetoothAvrcp:
+        """Returns a BluetoothAvrcp affordance object.
+
+        Returns:
+            bluetooth_avrcp.BluetoothAvrcp
         """
 
 

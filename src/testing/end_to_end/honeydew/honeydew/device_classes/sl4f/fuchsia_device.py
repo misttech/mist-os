@@ -12,12 +12,16 @@ from typing import Any, Dict, Optional
 from honeydew import custom_types
 from honeydew.affordances.sl4f import tracing as tracing_sl4f
 from honeydew.affordances.sl4f.bluetooth.profiles import \
+    bluetooth_avrcp as bluetooth_avrcp_sl4f
+from honeydew.affordances.sl4f.bluetooth.profiles import \
     bluetooth_gap as bluetooth_gap_sl4f
 from honeydew.affordances.sl4f.ui import screenshot as screenshot_sl4f
 from honeydew.affordances.sl4f.ui import user_input as user_input_sl4f
 from honeydew.affordances.sl4f.wlan import wlan_policy as wlan_policy_sl4f
 from honeydew.device_classes import base_fuchsia_device
 from honeydew.interfaces.affordances import tracing as tracing_interface
+from honeydew.interfaces.affordances.bluetooth.profiles import \
+    bluetooth_avrcp as bluetooth_avrcp_interface
 from honeydew.interfaces.affordances.bluetooth.profiles import \
     bluetooth_gap as bluetooth_gap_interface
 from honeydew.interfaces.affordances.ui import \
@@ -50,6 +54,7 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
+                    affordances_capable.BluetoothAvrcpCapableDevice,
                     affordances_capable.BluetoothGapCapableDevice,
                     affordances_capable.ScreenshotCapableDevice,
                     affordances_capable.TracingCapableDevice,
@@ -95,6 +100,18 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         return sl4f_obj
 
     # List all the affordances in alphabetical order
+    @properties.Affordance
+    def bluetooth_avrcp(self) -> bluetooth_avrcp_interface.BluetoothAvrcp:
+        """Returns a BluetoothAvrcp affordance object.
+
+        Returns:
+            bluetooth_avrcp.BluetoothAvrcp object
+        """
+        return bluetooth_avrcp_sl4f.BluetoothAvrcp(
+            device_name=self.device_name,
+            sl4f=self.sl4f,
+            reboot_affordance=self)
+
     @properties.Affordance
     def bluetooth_gap(self) -> bluetooth_gap_interface.BluetoothGap:
         """Returns a BluetoothGap affordance object.

@@ -207,7 +207,11 @@ $ fx set core.x64 \
     --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
     --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
+# GAP functional test
 $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_bluetooth:bluetooth_gap_test --e2e --output
+
+# AVRCP functional test
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_bluetooth:bluetooth_avrcp_test --e2e --output
 ```
 
 ### Tracing tests

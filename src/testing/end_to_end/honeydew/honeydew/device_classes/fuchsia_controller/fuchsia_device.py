@@ -20,6 +20,8 @@ from honeydew import custom_types
 from honeydew import errors
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
 from honeydew.affordances.fuchsia_controller.bluetooth.profiles import \
+    bluetooth_avrcp as bluetooth_avrcp_fc
+from honeydew.affordances.fuchsia_controller.bluetooth.profiles import \
     bluetooth_gap as bluetooth_gap_fc
 from honeydew.affordances.fuchsia_controller.ui import \
     screenshot as screenshot_fc
@@ -29,6 +31,8 @@ from honeydew.affordances.fuchsia_controller.wlan import \
     wlan_policy as wlan_policy_fc
 from honeydew.device_classes import base_fuchsia_device
 from honeydew.interfaces.affordances import tracing
+from honeydew.interfaces.affordances.bluetooth.profiles import \
+    bluetooth_avrcp as bluetooth_avrcp_interface
 from honeydew.interfaces.affordances.bluetooth.profiles import \
     bluetooth_gap as bluetooth_gap_interface
 from honeydew.interfaces.affordances.ui import screenshot
@@ -70,6 +74,7 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
+                    affordances_capable.BluetoothAvrcpCapableDevice,
                     affordances_capable.BluetoothGapCapableDevice,
                     affordances_capable.ScreenshotCapableDevice,
                     affordances_capable.TracingCapableDevice,
@@ -119,6 +124,15 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         return fuchsia_controller_obj
 
     # List all the affordances in alphabetical order
+    @properties.Affordance
+    def bluetooth_avrcp(self) -> bluetooth_avrcp_interface.BluetoothAvrcp:
+        """Returns a BluetoothAvrcp affordance object.
+
+        Returns:
+            bluetooth_avrcp.BluetoothAvrcp object
+        """
+        return bluetooth_avrcp_fc.BluetoothAvrcp()
+
     @properties.Affordance
     def bluetooth_gap(self) -> bluetooth_gap_interface.BluetoothGap:
         """Returns a BluetoothGap affordance object.

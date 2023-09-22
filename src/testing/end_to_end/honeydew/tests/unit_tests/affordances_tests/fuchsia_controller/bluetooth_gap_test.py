@@ -51,6 +51,11 @@ class BluetoothFCTests(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             self.bluetooth_obj.get_active_adapter_address()
 
+    def test_get_connected_devices(self) -> None:
+        """Test for Bluetooth.get_connected_devices() method."""
+        with self.assertRaises(NotImplementedError):
+            self.bluetooth_obj.get_connected_devices()
+
     def test_get_known_remote_devices(self) -> None:
         """Test for Bluetooth.get_known_remote_devices() method."""
         with self.assertRaises(NotImplementedError):

@@ -5,6 +5,13 @@
 import("//build/python/python_host_test.gni")
 
 if (is_host) {
+  python_host_test("bluetooth_avrcp_fc_test") {
+    main_source = "bluetooth_avrcp_test.py"
+    libraries = [ "//src/testing/end_to_end/honeydew" ]
+    main_callable = "unittest.main"
+    extra_args = [ "-v" ]
+  }
+
   python_host_test("bluetooth_gap_fc_test") {
     main_source = "bluetooth_gap_test.py"
     libraries = [ "//src/testing/end_to_end/honeydew" ]
@@ -33,6 +40,7 @@ if (is_host) {
 group("tests") {
   testonly = true
   public_deps = [
+    ":bluetooth_avrcp_fc_test($host_toolchain)",
     ":bluetooth_gap_fc_test($host_toolchain)",
     ":tracing_fc_test($host_toolchain)",
     ":wlan_policy_fc_test($host_toolchain)",

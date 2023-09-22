@@ -31,8 +31,8 @@ _SAMPLE_KNOWN_DEVICES_OUTPUT: Dict[str, Any] = {
                 {
                     "address": [88, 111, 107, 249, 15, 248],
                     "appearance": None,
-                    "bonded": False,
-                    "connected": False,
+                    "bonded": True,
+                    "connected": True,
                     "device_class": 2097408,
                     "id": "16085008211800713200",
                     "name": "fuchsia-f80f-f96b-6f59",
@@ -128,6 +128,13 @@ class BluetoothGapSL4FTests(unittest.TestCase):
         res = self.bluetooth_obj.get_active_adapter_address()
         self.sl4f_obj.run.assert_called()
         assert res == "20:1F:3B:62:E9:D2"
+
+    def test_get_connected_devices(self) -> None:
+        """Test for Bluetooth.get_connected_devices() method."""
+        self.sl4f_obj.run.return_value = _SAMPLE_KNOWN_DEVICES_OUTPUT
+        res = self.bluetooth_obj.get_connected_devices()
+        self.sl4f_obj.run.assert_called()
+        assert "16085008211800713200" in res
 
     def test_get_known_remote_devices(self) -> None:
         """Test for Bluetooth.get_known_remote_devices() method."""

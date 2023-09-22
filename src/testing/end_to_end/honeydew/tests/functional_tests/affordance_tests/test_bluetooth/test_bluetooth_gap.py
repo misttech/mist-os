@@ -77,6 +77,17 @@ class BluetoothGapAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
 
         self.device.bluetooth_gap.get_active_adapter_address()
 
+    def test_get_connected_devices(self) -> None:
+        """Test case for bluetooth.get_connected_devices()"""
+
+        if self._is_fuchsia_controller_based_device(self.device):
+            with asserts.assert_raises(NotImplementedError):
+                self.device.bluetooth_gap.get_connected_devices()
+            return
+
+        res = self.device.bluetooth_gap.get_connected_devices()
+        asserts.assert_equal(res, [])
+
     def test_get_known_remote_devices(self) -> None:
         """Test case for bluetooth.get_known_remote_devices()"""
 

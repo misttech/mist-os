@@ -14,11 +14,7 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
 
     # List all the public methods in alphabetical order
     def sys_init(self) -> None:
-        """Initializes bluetooth stack.
-
-        Raises:
-            errors.FuchsiaDeviceError: On failure.
-        """
+        """Initializes bluetooth stack."""
         raise NotImplementedError
 
     def accept_pairing(
@@ -29,9 +25,6 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         Args:
             input_mode: input mode of device
             output_mode: output mode of device
-
-        Raises:
-            errors.FuchsiaDeviceError: On failure.
         """
         raise NotImplementedError
 
@@ -44,9 +37,6 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
             transport:
                 1 -> Bluetooth classic transport.
                 2 -> Bluetooth LE (low energy) transport.
-
-        Raises:
-            errors.FuchsiaDeviceError: On failure.
         """
         raise NotImplementedError
 
@@ -58,9 +48,6 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
             transport:
                 1 -> Bluetooth classic transport.
                 2 -> Bluetooth LE (low energy) transport.
-
-        Raises:
-            errors.FuchsiaDeviceError: On failure.
         """
         raise NotImplementedError
 
@@ -69,9 +56,14 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
 
         Returns:
             The mac address of the active adapter
+        """
+        raise NotImplementedError
 
-        Raises:
-            errors.FuchsiaDeviceError: On failure.
+    def get_connected_devices(self) -> list:
+        """ Retrieves all connected remote devices.
+
+        Returns:
+            A list of all connected devices by identifier.
         """
         raise NotImplementedError
 
@@ -80,9 +72,6 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
 
         Returns:
             A dict of all known remote devices.
-
-        Raises:
-            errors.FuchsiaDeviceError: On failure.
         """
         raise NotImplementedError
 
@@ -95,9 +84,6 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
             transport:
                 1 -> Bluetooth classic transport.
                 2 -> Bluetooth LE (low energy) transport.
-
-        Raises:
-            errors.FuchsiaDeviceError: On failure.
         """
         raise NotImplementedError
 
@@ -106,9 +92,6 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
 
         Args:
             discovery: True to start discovery, False to stop discovery.
-
-        Raises:
-            errors.FuchsiaDeviceError: On failure.
         """
         raise NotImplementedError
 
@@ -118,8 +101,5 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         Args:
             discoverable: True to be discoverable by others, False to be not
                           discoverable by others.
-
-        Raises:
-            errors.FuchsiaDeviceError: On failure.
         """
         raise NotImplementedError

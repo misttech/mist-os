@@ -61,6 +61,14 @@ class BluetoothCommon(abc.ABC):
         """
 
     @abc.abstractmethod
+    def get_connected_devices(self) -> list:
+        """Retrieves all connected remote devices.
+
+        Returns:
+            A list of all connected devices by identifier.
+        """
+
+    @abc.abstractmethod
     def get_known_remote_devices(self) -> dict:
         """Retrieves all known remote devices received by device.
 

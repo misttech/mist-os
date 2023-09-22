@@ -133,6 +133,11 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             self.fd_obj, fuchsia_device_interface.FuchsiaDevice)
 
     # List all the tests related to affordances in alphabetical order
+    def test_fuchsia_device_is_bluetooth_avrcp_capable(self) -> None:
+        """Test case to make sure fuchsia device is BluetoothAvrcp capable"""
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.BluetoothAvrcpCapableDevice)
+
     def test_fuchsia_device_is_bluetooth_gap_capable(self) -> None:
         """Test case to make sure fuchsia device is BluetoothGap capable"""
         self.assertIsInstance(

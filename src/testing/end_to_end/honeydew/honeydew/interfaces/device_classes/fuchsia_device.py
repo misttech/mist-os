@@ -10,6 +10,7 @@ from typing import Callable, Dict, Optional
 from honeydew import custom_types
 from honeydew.interfaces.affordances import session
 from honeydew.interfaces.affordances import tracing
+from honeydew.interfaces.affordances.bluetooth.profiles import bluetooth_avrcp
 from honeydew.interfaces.affordances.bluetooth.profiles import bluetooth_gap
 from honeydew.interfaces.affordances.ui import screenshot
 from honeydew.interfaces.affordances.ui import user_input
@@ -97,6 +98,15 @@ class FuchsiaDevice(abc.ABC):
         """
 
     # List all the affordances in alphabetical order
+    @properties.Affordance
+    @abc.abstractmethod
+    def bluetooth_avrcp(self) -> bluetooth_avrcp.BluetoothAvrcp:
+        """Returns a BluetoothAvrcp affordance object.
+
+        Returns:
+            bluetooth_avrcp.BluetoothAvrcp object
+        """
+
     @properties.Affordance
     @abc.abstractmethod
     def bluetooth_gap(self) -> bluetooth_gap.BluetoothGap:

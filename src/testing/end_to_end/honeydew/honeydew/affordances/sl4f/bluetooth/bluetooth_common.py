@@ -131,6 +131,23 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         mac_address = address["result"].strip("[]").split(" ")
         return mac_address[2]
 
+    def get_connected_devices(self) -> list[str]:
+        """ Retrieves all connected remote devices.
+
+        Returns:
+            A list of all connected devices by identifier. If none,
+            then returns empty list.
+
+        Raises:
+            errors.Sl4fError: On failure.
+        """
+        data = self._sl4f.run(method=Sl4fMethods.GET_KNOWN_REMOTE_DEVICES)
+        connected_devices = []
+        for value in data.get("result", {}).values():
+            if value["bonded"]:
+                connected_devices.append(value["id"])
+        return connected_devices
+
     def get_known_remote_devices(self) -> dict:
         """Retrieves all known remote devices received by device.
 
@@ -145,6 +162,7 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
             method=Sl4fMethods.GET_KNOWN_REMOTE_DEVICES)
         return known_devices["result"]
 
+    # TODO(b/301499667): Update transport to bluetooth_transport
     def pair_device(
             self, identifier: str, transport: BluetoothTransport) -> None:
         """Pair device to target remote device via Bluetooth.

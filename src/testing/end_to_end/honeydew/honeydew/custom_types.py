@@ -21,6 +21,7 @@ class LEVEL(enum.Enum):
     ERROR = enum.auto()
 
 
+#TODO(b/301500367): Create bluetooth typing similar to typing/wlan.py
 class BluetoothTransport(enum.Enum):
     """Transport type of Bluetooth pair and/or connections."""
     CLASSIC = 1
@@ -31,6 +32,12 @@ class BluetoothAcceptPairing(enum.StrEnum):
     """Pairing modes for Bluetooth Accept Pairing."""
     DEFAULT_INPUT_MODE = "NONE"
     DEFAULT_OUTPUT_MODE = "NONE"
+
+
+class BluetoothAvrcpCommand(enum.StrEnum):
+    """Commands that the AVRCP service can send."""
+    PLAY = "Play"
+    PAUSE = "Pause"
 
 
 class IpPort(NamedTuple):
