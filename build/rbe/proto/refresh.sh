@@ -115,6 +115,8 @@ echo "Installing protos from $RECLIENT_SRCDIR to $DESTDIR"
 mkdir -p "$DESTDIR"/api/log
 grep -v "bq_table.proto" "$RECLIENT_SRCDIR"/api/log/log.proto | \
   grep -v "option.*gen_bq_schema" > "$DESTDIR"/api/log/log.proto
+mkdir -p "$DESTDIR"/api/stat
+cp "$RECLIENT_SRCDIR"/api/stat/stat.proto "$DESTDIR"/api/stat/
 mkdir -p "$DESTDIR"/api/stats
 cp "$RECLIENT_SRCDIR"/api/stats/stats.proto "$DESTDIR"/api/stats/
 
