@@ -84,7 +84,10 @@ if (is_host) {
       test_dir = "$root_out_dir/test_data/fxtest-rewrite-tests"
       sources = binary_sources + [ "main.py" ]
       libraries = binary_deps + [ "//third_party/parameterized" ]
-      deps = [ ":test_data" ]
+      deps = [
+        ":test_data",
+        ":test_deps",
+      ]
     }
   }
 
@@ -97,6 +100,16 @@ if (is_host) {
     ]
 
     outputs = [ "$root_out_dir/test_data/fxtest-rewrite-tests/test_data/build_output/{{source_file_part}}" ]
+  }
+
+  host_test_data("test_deps") {
+    sources = [ "$root_build_dir/host-tools/dldist" ]
+
+    outputs = [
+      "$root_out_dir/test_data/fxtest-rewrite-tests/bin/{{source_file_part}}",
+    ]
+
+    deps = [ "//scripts/fxtest/scripts:install" ]
   }
 
   # Rename the resulting .pyz for the host tool

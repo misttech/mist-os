@@ -18,15 +18,32 @@ struct Args {
     /// path of file containing strings to match, one per line
     #[argh(option)]
     input: PathBuf,
+
+    /// if set, return a perfect match if needle is a prefix of any input
+    #[argh(switch)]
+    match_prefixes: bool,
+
+    /// if set, print verbose debugging to stderr
+    #[argh(switch, short = 'v')]
+    verbose: bool,
 }
+
+const PERFECT_MATCH: usize = 0;
 
 fn main() -> Result<()> {
     let args: Args = argh::from_env();
 
     let contents = read_to_string(args.input)?;
     for line in contents.lines() {
-        let val = strsim::damerau_levenshtein(&args.needle, line);
-        println!("{}", val)
+        let val = if args.match_prefixes && line.starts_with(&args.needle) {
+            PERFECT_MATCH
+        } else {
+            strsim::damerau_levenshtein(&args.needle, line)
+        };
+        println!("{val}");
+        if args.verbose {
+            eprintln!("'{line}' = {val}");
+        }
     }
     Ok(())
 }

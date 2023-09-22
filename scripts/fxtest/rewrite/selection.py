@@ -11,13 +11,17 @@ wrappers for the outcomes of the selection process.
 
 import asyncio
 from collections import defaultdict
+from dataclasses import dataclass
 from enum import Enum
+import itertools
+import os
 import re
+import shutil
+import tempfile
 import typing
 
-import jellyfish
-
 import event
+import execution
 import selection_types
 from test_list_file import Test
 
@@ -108,208 +112,101 @@ async def select_tests(
     group_matches: typing.List[
         typing.Tuple[selection_types.MatchGroup, typing.List[str]]
     ] = []
-    best_matches: typing.Dict[str, int] = defaultdict(int)
+    best_matches: typing.Dict[str, int] = defaultdict(lambda: NO_MATCH_DISTANCE)
     TRAILING_PATH = re.compile(r"/([\w\-_\.]+)$")
     COMPONENT_REGEX = re.compile(r"#meta/([\w\-_]+)\.cm")
     PACKAGE_REGEX = re.compile(r"/([\w\-_]+)#meta")
 
-    def fast_match(s1: str, s2: str) -> int:
-        """Perform a fast Damerau-Levenshtein Distance match on the given strings.
+    def extract_label(entry: Test) -> str:
+        return entry.build.test.label
 
-        Strings with significantly different lengths cannot possible be below
-        the threshold, so to avoid expensive calculations this function
-        returns NO_MATCH_DISTANCE for strings whose lengths differ by more than
-        the current fuzzy distance threshold.
+    def extract_name(entry: Test) -> str:
+        return entry.info.name
 
-        Args:
-            s1 (str): First string to match.
-            s2 (str): Second string to match.
-
-        Returns:
-            int: Damerau-Levenshtein distance if strings are close
-                in length, NO_MATCH_DISTANCE otherwise.
-        """
-        if abs(len(s1) - len(s2)) > fuzzy_distance_threshold:
-            return NO_MATCH_DISTANCE
-        return jellyfish.damerau_levenshtein_distance(s1, s2)
-
-    def match_label(entry: Test, value: str) -> int:
-        """Match build labels against a value.
-
-        A build label starts with // and is followed by a path through the file system.
-
-        For example "//src/sys" would match all tests defined under src/sys.
-
-        Matchers return a perfect match (0) if value is a prefix, otherwise they return
-        the result of fast_match (see definition.)
-
-        Args:
-            entry (Test): Test to evaluate.
-            value (str): Search string to match.
-
-        Returns:
-            int: # of edits (including transposition) to match the
-                strings. See fast_match.
-        """
-        if entry.build.test.label.strip("/").startswith(value.strip("/")):
-            return PERFECT_MATCH_DISTANCE
-        return fast_match(entry.build.test.label, value)
-
-    def match_name(entry: Test, value: str) -> int:
-        """Match test names against a value.
-
-        A test name is a unique name for the test. It is typically a script path or component URL.
-
-        For example "fuchsia-pkg://fuchsia.com/my-tests#meta/my-tests.cm" would match
-        that exact test by name.
-
-        Matchers return a perfect match (0) if value is a prefix, otherwise they return
-        the result of fast_match (see definition.)
-
-        Args:
-            entry (Test): Test to evaluate.
-            value (str): Search string to match.
-
-        Returns:
-            int: # of edits (including transposition) to match the
-                strings. See fast_match.
-        """
-        if entry.info.name.startswith(value):
-            return PERFECT_MATCH_DISTANCE
-        return fast_match(entry.info.name, value)
-
-    def match_component(entry: Test, value: str) -> int:
-        """Match component names against a value.
-
-        A component name is the part of the URL preceding ".cm".
-
-        For example "my-component" is the component name for
-        fuchsia-pkg://fuchsia.com/my-package#meta/my-component.cm
-
-        Matchers return a perfect match (0) if value is a prefix, otherwise they return
-        the result of fast_match (see definition.)
-
-        Args:
-            entry (Test): Test to evaluate.
-            value (str): Search string to match.
-
-        Returns:
-            int: # of edits (including transposition) to match the
-                strings. See fast_match.
-        """
+    def extract_component(entry: Test) -> str | None:
         if entry.build.test.package_url is None:
-            return NO_MATCH_DISTANCE
+            return None
         m = COMPONENT_REGEX.findall(entry.build.test.package_url)
-        if m:
-            if m[0].startswith(value):
-                return PERFECT_MATCH_DISTANCE
-            return fast_match(m[0], value)
-        return NO_MATCH_DISTANCE
+        return m[0] if m else None
 
-    def match_trailing_path(entry: Test, value: str) -> int:
-        """Match the last element of the test path against a value.
-
-        Host tests consist of a path to the binary to execute, and
-        the last element of that path typically identifies the test.
-
-        For example, "my_test_script" is the last element of the
-        path for test "host_x64/tests/my_test_script".
-
-        Matchers return a perfect match (0) if value is a prefix, otherwise they return
-        the result of fast_match (see definition.)
-
-        Args:
-            entry (Test): Test to evaluate.
-            value (str): Search string to match.
-
-        Returns:
-            int: # of edits (including transposition) to match the
-                strings. See fast_match.
-        """
+    def extract_trailing_path(entry: Test) -> str | None:
         if entry.build.test.path is None:
-            return NO_MATCH_DISTANCE
+            return None
         m = TRAILING_PATH.findall(entry.build.test.path)
-        if m:
-            if m[0].startswith(value):
-                return PERFECT_MATCH_DISTANCE
-            return fast_match(m[0], value)
-        return NO_MATCH_DISTANCE
+        return m[0] if m else None
 
-    def match_package(entry: Test, value: str) -> int:
-        """Match package names against a value.
-
-        A package name is the last part of a URL path.
-
-        For example "my-package" is the package name for
-        fuchsia-pkg://fuchsia.com/my-package#meta/my-component.cm
-
-        Matchers return a perfect match (0) if value is a prefix, otherwise they return
-        the result of fast_match (see definition.)
-
-        Args:
-            entry (Test): Test to evaluate.
-            value (str): Search string to match.
-
-        Returns:
-            int: # of edits (including transposition) to match the
-                strings. See fast_match.
-        """
+    def extract_package(entry: Test) -> str | None:
         if entry.build.test.package_url is None:
-            return NO_MATCH_DISTANCE
+            return None
         m = PACKAGE_REGEX.findall(entry.build.test.package_url)
-        if m:
-            if m[0].startswith(value):
-                return PERFECT_MATCH_DISTANCE
-            return fast_match(m[0], value)
-        return NO_MATCH_DISTANCE
+        return m[0] if m else None
 
-    matchers = [
-        match_label,
-        match_name,
-        match_component,
-        match_package,
-        match_trailing_path,
-    ]
+    matched: typing.List[str] = []
+    match_tasks = []
 
     for group in match_groups:
-        id: event.Id | None = None
-        if recorder is not None:
-            id = recorder.emit_event_group(f"Matching {group}")
-        matched: typing.List[str] = []
 
-        def do_match():
+        async def task_handler(group: selection_types.MatchGroup):
+            id: event.Id | None = None
+            if recorder is not None:
+                # Hide the children of this event group. The runtime
+                # and output of the programs run under the group are
+                # useful in the log output, but too verbose to include
+                # in the status output.
+                id = recorder.emit_event_group(f"Matching {group}", hide_children=True)
+
+            label = _TestDistanceMeasurer(entries, extract_label)
+            name = _TestDistanceMeasurer(entries, extract_name)
+            component = _TestDistanceMeasurer(entries, extract_component)
+            package = _TestDistanceMeasurer(entries, extract_package)
+            trailing_path = _TestDistanceMeasurer(entries, extract_trailing_path)
+
+            async def closest_name_match() -> typing.List[_TestDistance]:
+                lowest_score_dict: defaultdict[Test, int] = defaultdict(
+                    lambda: NO_MATCH_DISTANCE
+                )
+                tests = []
+                tasks = (
+                    [label.distances(n, recorder, id) for n in group.names]
+                    + [name.distances(n, recorder, id) for n in group.names]
+                    + [component.distances(n, recorder, id) for n in group.names]
+                    + [package.distances(n, recorder, id) for n in group.names]
+                    + [trailing_path.distances(n, recorder, id) for n in group.names]
+                )
+                results: typing.List[typing.List[_TestDistance]] = await asyncio.gather(
+                    *tasks
+                )
+                for result in itertools.chain(*results):
+                    if result.test not in lowest_score_dict:
+                        tests.append(result.test)
+                    lowest_score_dict[result.test] = min(
+                        lowest_score_dict[result.test], result.distance
+                    )
+
+                return [_TestDistance(test, lowest_score_dict[test]) for test in tests]
+
+            match_tries = (
+                [closest_name_match()]
+                + [component.distances(c, recorder, id) for c in group.components]
+                + [package.distances(p, recorder, id) for p in group.packages]
+            )
+
+            distances: typing.List[typing.List[_TestDistance]] = await asyncio.gather(
+                *match_tries
+            )
+            match_distances: defaultdict[Test, int] = defaultdict(
+                lambda: NO_MATCH_DISTANCE
+            )
+            for td in itertools.chain(*distances):
+                match_distances[td.test] = min(match_distances[td.test], td.distance)
+
             for entry in entries:
-                # Calculate the worst matching {name, package name, component name}
-                # for each value in the match group. Each matching
-                # element has a score >= this value.
-                name_worst = max(
-                    [
-                        min([matcher(entry, name) for matcher in matchers])
-                        for name in group.names
-                    ],
-                    default=None,
-                )
-                package_worst = max(
-                    [match_package(entry, name) for name in group.packages],
-                    default=None,
-                )
-                component_worst = max(
-                    [match_component(entry, name) for name in group.components],
-                    default=None,
-                )
-
                 # The final score for a match group is the worst match
                 # out of the above sets of scores.
-                final_score = min(
-                    [
-                        x
-                        for x in [name_worst, package_worst, component_worst]
-                        if x is not None
-                    ]
-                )
+                final_score = match_distances[entry]
 
                 # Perform bookkeeping for debug output.
-                best_matches[entry.info.name] = max(
+                best_matches[entry.info.name] = min(
                     best_matches[entry.info.name], final_score
                 )
 
@@ -319,9 +216,12 @@ async def select_tests(
                     tests_to_run.add(entry)
             group_matches.append((group, matched))
 
-        await asyncio.to_thread(do_match)
-        if recorder is not None and id is not None:
-            recorder.emit_end(id=id)
+            if recorder is not None and id is not None:
+                recorder.emit_end(id=id)
+
+        match_tasks.append(asyncio.create_task(task_handler(group)))
+
+    await asyncio.wait(match_tasks, return_when=asyncio.FIRST_EXCEPTION)
 
     # Ensure tests match the input ordering for consistency.
     selected_tests = [e for e in entries if e in tests_to_run]
@@ -333,6 +233,76 @@ async def select_tests(
         group_matches,
         fuzzy_distance_threshold,
     )
+
+
+@dataclass
+class _TestDistance:
+    test: Test
+    distance: int
+
+
+class _TestDistanceMeasurer:
+    def __init__(
+        self,
+        tests: typing.List[Test],
+        extractor: typing.Callable[[Test], str | None],
+    ):
+        self._test_and_key = [
+            (test, y) for test in tests if (y := extractor(test)) is not None
+        ]
+
+    async def distances(
+        self,
+        value: str,
+        recorder: event.EventRecorder | None,
+        parent_id: event.Id | None,
+    ) -> typing.List[_TestDistance]:
+        with tempfile.TemporaryDirectory() as td:
+            file_name = os.path.join(td, "temp-input.txt")
+            with open(file_name, "w") as f:
+                f.write("\n".join([v[1] for v in self._test_and_key]))
+                f.flush()
+
+            program_prefix = ["fx", "dldist"]
+            if shutil.which("fx") is None:
+                # Try to use dldist from the FUCHSIA_DIR, for test scenarios.
+                expected_path = os.path.join(
+                    os.getenv("FUCHSIA_DIR") or "", "bin", "dldist"
+                )
+                if os.path.exists(expected_path):
+                    program_prefix = [expected_path]
+                else:
+                    # Find the directory containing this script, correcting for cases
+                    # where it is run as a .pyz archive. Try to find dldist in the
+                    # bin directory under that directory.
+                    cur_path = os.path.dirname(__file__)
+                    while not os.path.isdir(cur_path):
+                        cur_path = os.path.split(cur_path)[0]
+                    expected_path = os.path.join(cur_path, "bin", "dldist")
+                    if os.path.exists(expected_path):
+                        program_prefix = [expected_path]
+                    else:
+                        raise RuntimeError("Could not find matcher script dldist")
+
+            output = await execution.run_command(
+                *program_prefix,
+                "-v",
+                "--needle",
+                value,
+                "--input",
+                file_name,
+                "--match-prefixes",
+                recorder=recorder,
+                parent=parent_id,
+            )
+
+            if output is not None and output.return_code == 0:
+                vals = [int(line) for line in output.stdout.strip().splitlines()]
+                return [
+                    _TestDistance(t[0], v) for t, v in zip(self._test_and_key, vals)
+                ]
+
+            return []
 
 
 def _parse_selection_command_line(

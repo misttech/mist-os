@@ -39,6 +39,9 @@ class DurationInfo:
     # The number of expected children. If set, we can show a progress bar.
     expected_child_tasks: int = 0
 
+    # If True, hide children of this duration from the display.
+    hide_children: bool = False
+
 
 class ConsoleState:
     """Holder for all console output state.
@@ -292,6 +295,7 @@ def _produce_task_status_from_state(state: ConsoleState) -> TaskStatus:
     work_stack: typing.List[typing.Tuple[event.Id, int]] = [(event.GLOBAL_RUN_ID, 0)]
     while work_stack:
         id, indent = work_stack.pop()
+        info: DurationInfo | None = None
 
         if id == event.GLOBAL_RUN_ID:
             pass
@@ -312,6 +316,11 @@ def _produce_task_status_from_state(state: ConsoleState) -> TaskStatus:
                     / info.expected_child_tasks,
                 )
             duration_print_infos.append(DurationPrintInfo(info, indent, progress))
+
+        if info is not None and info.hide_children:
+            # Skip processing children of this duration for display.
+            continue
+
         for child_id in duration_children.get(id, []):
             children = []
             if child_id in state.active_durations:
@@ -448,13 +457,14 @@ async def _console_event_loop(
                     next_event.payload.event_group is not None
                     or next_event.payload.test_group is not None
                 ):
-                    group: eventGroupPayload = next_event.payload.event_group or next_event.payload.test_group  # type: ignore
+                    group: event.EventGroupPayload = next_event.payload.event_group or next_event.payload.test_group  # type: ignore
                     styled_name = statusinfo.highlight(group.name, style=flags.style)
                     state.active_durations[next_event.id] = DurationInfo(
                         styled_name,
                         next_event.timestamp,
                         parent=next_event.parent,
                         expected_child_tasks=group.queued_events or 0,
+                        hide_children=group.hide_children,
                     )
                 elif next_event.payload.build_targets:
                     styled_name = statusinfo.highlight(

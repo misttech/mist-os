@@ -182,6 +182,9 @@ class EventGroupPayload:
     # If set, this value can be used to create a progress bar for this event group.
     queued_events: int | None
 
+    # If true, instructs console displays to hide children.
+    hide_children: bool = False
+
 
 class TestGroupPayload(EventGroupPayload):
     """Test groups are specializations of event groups.
@@ -896,6 +899,7 @@ class EventRecorder:
         name: str,
         parent: Id | None = None,
         queued_events: int | None = None,
+        hide_children: bool = False,
     ) -> Id:
         """Create a new event group.
 
@@ -919,7 +923,9 @@ class EventRecorder:
                 parent=parent,
                 starting=True,
                 payload=EventPayloadUnion(
-                    event_group=EventGroupPayload(name, queued_events)
+                    event_group=EventGroupPayload(
+                        name, queued_events, hide_children=hide_children
+                    )
                 ),
             )
         )

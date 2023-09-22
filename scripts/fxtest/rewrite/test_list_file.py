@@ -144,6 +144,14 @@ class Test:
     def is_host_test(self) -> bool:
         return self.build.test.path is not None
 
+    def name(self) -> str:
+        """Return the unique name of this test.
+
+        Returns:
+            str: This tests name, which is unique among Tests.
+        """
+        return self.info.name
+
     @classmethod
     def join_test_descriptions(
         cls: typing.Type[typing.Self],

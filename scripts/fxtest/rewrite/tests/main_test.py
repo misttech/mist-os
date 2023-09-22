@@ -35,8 +35,16 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
 
         # Set up mocks
         self.mocks = []  # type:ignore
+
+        # Retain the real build dir, if one exists.
+        real_fuchsia_dir = os.getenv("FUCHSIA_DIR")
+
+        # Intercept environment and instantiate a new mock FUCHSIA_DIR.
         self.mocks.append(
-            mock.patch("os.environ", {"FUCHSIA_DIR": self.fuchsia_dir.name})
+            mock.patch(
+                "os.environ",
+                {"FUCHSIA_DIR": self.fuchsia_dir.name},
+            )
         )
         for m in self.mocks:
             m.start()
@@ -47,6 +55,26 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         cur_path = os.path.dirname(__file__)
         while not os.path.isdir(cur_path):
             cur_path = os.path.split(cur_path)[0]
+
+        # We use an external program to handle fuzzy matching called "dldist".
+        # Put the program in the correct location so that the main script can
+        # find it.
+        os.makedirs(os.path.join(self.fuchsia_dir.name, "bin"))
+        dldist_path = os.path.join(self.fuchsia_dir.name, "bin", "dldist")
+        if os.path.exists(os.path.join(cur_path, "bin", "dldist")):
+            # This path is used when executing the python_host_test target.
+            print("Using the local dldist for matching")
+            shutil.copy(os.path.join(cur_path, "bin", "dldist"), dldist_path)
+        else:
+            # This path is used when running coverage.py.
+            print("Trying to use FUCHSIA_DIR dldist for the test")
+            assert real_fuchsia_dir is not None
+            build_dir: str
+            with open(os.path.join(real_fuchsia_dir, ".fx-build-dir")) as f:
+                build_dir = os.path.join(real_fuchsia_dir, f.read().strip())
+            print(build_dir)
+            assert os.path.isdir(build_dir)
+            shutil.copy(os.path.join(build_dir, "host-tools", "dldist"), dldist_path)
 
         self.test_data_path = os.path.join(cur_path, "test_data/build_output")
 
