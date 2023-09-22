@@ -40,10 +40,25 @@ llvm_libc_source_set("converter") {
 llvm_libc_source_set("parser") {
   visibility = [ ":*" ]
 
-  functions = [ "parser" ]
+  # TODO(mcgrathr): soft transition for llvm-libc roll that removed parser.cc
+  # The old parser.h was 148 lines long. The new one is much longer.
+  # Use that to detect pre-roll vs post-roll builds.
+  # This hack can be removed once the roll lands.
+  _parser_lines =
+      read_file("$llvm_libc/src/stdio/printf_core/parser.h", "list lines")
+  _count = 0
+  foreach(line, _parser_lines) {
+    _count = _count + 1
+  }
+  if (_count == 148) {
+    functions = [ "parser" ]
 
-  # TODO(fxbug.dev/62780): tests need full libc framework
-  no_test_functions = [ "parser" ]
+    # TODO(fxbug.dev/62780): tests need full libc framework
+    no_test_functions = [ "parser" ]
+  } else {
+    public = [ "parser.h" ]
+    functions = []
+  }
 }
 
 llvm_libc_source_set("writer") {
