@@ -50,6 +50,15 @@ macro_rules! return_user_error {
     };
 }
 
+/// Utility macro for an early exit from a function returning an [`Error`] that
+/// represents an exit with a specific error code but no output.
+#[macro_export]
+macro_rules! exit_with_code {
+    ($code: expr) => {{
+        return Err($crate::Error::ExitWithCode($code));
+    }};
+}
+
 #[cfg(test)]
 mod tests {
     use crate::Error;

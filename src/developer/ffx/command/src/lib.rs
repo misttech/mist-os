@@ -111,7 +111,7 @@ pub async fn exit(res: Result<ExitStatus>) -> ! {
             report_bug(&err).await;
             ffx_config::print_log_hint(&mut out).await;
         }
-        Ok(_) => (),
+        Ok(_) | Err(Error::ExitWithCode(_)) => (),
     }
     std::process::exit(exit_code);
 }

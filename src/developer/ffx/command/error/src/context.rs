@@ -81,7 +81,7 @@ impl IntoExitCode for Error {
     fn exit_code(&self) -> i32 {
         use Error::*;
         match self {
-            Help { code, .. } => *code,
+            Help { code, .. } | ExitWithCode(code) => *code,
             Unexpected(err) | User(err) | Config(err) => {
                 err.ffx_error().map(FfxError::exit_code).unwrap_or(1)
             }

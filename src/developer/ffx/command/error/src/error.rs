@@ -28,6 +28,8 @@ pub enum Error {
     /// to recover from the issue, because it will not advise the user to look
     /// in the log files or anything like that.
     Config(#[source] anyhow::Error),
+    /// Exit with a specific error code but no output
+    ExitWithCode(i32),
 }
 
 /// Writes a detailed description of an anyhow error to the formatter
@@ -49,6 +51,7 @@ impl std::fmt::Display for Error {
             }
             Self::User(error) | Self::Config(error) => write!(f, "{error}"),
             Self::Help { output, .. } => write!(f, "{output}"),
+            Self::ExitWithCode(code) => write!(f, "Exiting with code {code}"),
         }
     }
 }
@@ -96,6 +99,7 @@ impl Error {
                 }
             }
             Error::Help { code, .. } => *code,
+            Error::ExitWithCode(code) => *code,
             _ => 1,
         }
     }
