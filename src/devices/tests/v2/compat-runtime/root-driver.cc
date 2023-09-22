@@ -22,6 +22,8 @@ namespace ft = fuchsia_compat_runtime_test;
 
 namespace {
 
+const std::string_view kChildName = "v1";
+
 class RootDriver : public fdf::DriverBase, public fdf::Server<ft::Root> {
  public:
   RootDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
@@ -31,12 +33,17 @@ class RootDriver : public fdf::DriverBase, public fdf::Server<ft::Root> {
   static constexpr const char* Name() { return "root"; }
 
   zx::result<> Start() override {
-    // Since our child is a V1 driver, we need to serve a VFS to pass to the |compat::DeviceServer|.
-    zx_status_t status = ServeRuntimeProtocolForV1();
-    if (status != ZX_OK) {
-      return zx::error(status);
+    // Setup the outgoing directory.
+    zx::result outgoing_result = outgoing()->AddService<ft::Service>(
+        ft::Service::InstanceHandler({
+            .root = bindings_.CreateHandler(this, driver_dispatcher()->get(),
+                                            fidl::kIgnoreBindingClosure),
+        }),
+        kChildName);
+    if (outgoing_result.is_error()) {
+      FDF_LOG(ERROR, "Failed to add service %s", outgoing_result.status_string());
+      return outgoing_result.take_error();
     }
-
     // Start the driver.
     auto result = AddChild();
     if (result.is_error()) {
@@ -53,63 +60,18 @@ class RootDriver : public fdf::DriverBase, public fdf::Server<ft::Root> {
   }
 
  private:
-  zx_status_t ServeRuntimeProtocolForV1() {
-    auto root = [this](fdf::ServerEnd<ft::Root> server_end) {
-      fdf::BindServer(driver_dispatcher()->get(), std::move(server_end), this);
-    };
-    ft::Service::InstanceHandler handler({.root = std::move(root)});
-
-    auto status = outgoing()->AddService<ft::Service>(std::move(handler));
-    if (status.is_error()) {
-      return status.status_value();
-    }
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    if (endpoints.is_error()) {
-      return endpoints.status_value();
-    }
-    auto serve =
-        outgoing()->Serve(fidl::ServerEnd<fuchsia_io::Directory>(endpoints->server.TakeChannel()));
-    if (serve.is_error()) {
-      return serve.status_value();
-    }
-
-    vfs_client_ = fidl::ClientEnd<fuchsia_io::Directory>(endpoints->client.TakeChannel());
-
-    return ZX_OK;
-  }
-
   fit::result<fdf::NodeError> AddChild() {
-    std::vector<std::string> service_offers;
-    service_offers.push_back(std::string(ft::Service::Name));
-
-    child_ = compat::DeviceServer(
-        "v1", 0, "root/v1",
-        compat::ServiceOffersV1("v1", std::move(vfs_client_), std::move(service_offers)));
-    zx_status_t status = child_->Serve(dispatcher(), outgoing().get());
-    if (status != ZX_OK) {
-      return fit::error(fdf::NodeError::kInternal);
-    }
-
     fidl::Arena arena;
 
-    // Set the symbols of the node that a driver will have access to.
-    compat_device_.name = "v1";
-    auto symbol = fdf::NodeSymbol{
-        {.name = compat::kDeviceSymbol, .address = reinterpret_cast<uint64_t>(&compat_device_)}};
+    auto offer = fdf::MakeOffer<ft::Service>(kChildName);
 
     // Set the properties of the node that a driver will bind to.
     auto property =
         fdf::MakeProperty(1 /*BIND_PROTOCOL */, bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD);
 
-    auto offers = child_->CreateOffers(arena);
-    std::vector<fuchsia_component_decl::Offer> natural_offers;
-    for (auto offer : offers) {
-      natural_offers.push_back(fidl::ToNatural(offer));
-    }
     auto args = fdf::NodeAddArgs{{
-        .name = std::string("v1"),
-        .offers = std::move(natural_offers),
-        .symbols = std::vector{std::move(symbol)},
+        .name = std::string(kChildName),
+        .offers = std::vector{std::move(offer)},
         .properties = std::vector{std::move(property)},
     }};
 
@@ -134,9 +96,7 @@ class RootDriver : public fdf::DriverBase, public fdf::Server<ft::Root> {
   fidl::WireClient<fdf::Node> node_;
   fidl::WireSharedClient<fdf::NodeController> controller_;
 
-  compat::device_t compat_device_ = compat::kDefaultDevice;
-  std::optional<compat::DeviceServer> child_;
-  fidl::ClientEnd<fuchsia_io::Directory> vfs_client_;
+  fdf::ServerBindingGroup<ft::Root> bindings_;
 };
 
 }  // namespace
