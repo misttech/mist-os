@@ -336,6 +336,9 @@ def main():
             args_gn_content += "sdk_no_host_tools = true\n"
             args_gn_content += "sdk_inside_idk_sub_build = true\n"
 
+            if api_level != 0:
+                args_gn_content += "sdk_inside_supported_api_sub_build = true\n"
+
             # Reuse host tools from the top-level build. This assumes that
             # sub-builds cannot use host tools that were not already built by
             # the top-level build, as there is no way to inject dependencies
@@ -367,7 +370,8 @@ def main():
                 return 1
 
             for sdk_target in args.sdk_targets:
-                base_exported_dir = sdk_label_to_exported_dir(sdk_target, build_dir)
+                base_exported_dir = sdk_label_to_exported_dir(
+                    sdk_target, build_dir)
                 all_input_dirs.append(base_exported_dir)
                 api_level_path = base_exported_dir / 'api_level'
                 api_level_path.write_text(str(api_level))

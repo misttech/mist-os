@@ -15,6 +15,12 @@ declare_args() {
   # issues. Should only be set in the args.gn files created by generate_final_idl()
   # actions.
   sdk_inside_idk_sub_build = false
+
+  # True when building an IDK cpu-specific and supported API sub-build. See
+  # //build/sdk/build_final_idk.py.
+  # This is expect to avoid building same build target and only do variant
+  # related artifacts.
+  sdk_inside_supported_api_sub_build = false
 }
 
 # The list of all cpu architectures for the prebuild fuchsia binaries that go

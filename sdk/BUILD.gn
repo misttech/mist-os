@@ -147,12 +147,38 @@ sdk_collection("core") {
 # belong in the IDK, but unfortunately, before they can be added, the `testonly`
 # attribute must be removed.
 sdk_molecule("fuchsia_idk_atoms") {
+  # If targeting older API levels, only these cc_prebuilt_library and sysroot
+  # molecules will be built.
   deps = [
-    ":core_deps",
-    ":core_packages",
+    ":core_cc_prebuilt_library",
+    ":core_sysroot",
   ]
+
+  if (!sdk_inside_supported_api_sub_build) {
+    deps += [
+      ":core_cc_source_library",
+      ":core_dart_library",
+      ":core_data",
+      ":core_documentation",
+      ":core_license",
+      ":core_loadable_module",
+      ":core_packages",
+      ":version_history",
+      "devices",
+      "docs",
+      "//sdk/fidl",
+
+      # TODO(https://fxbug.dev/132284): Fix compilation of the following atoms
+      # when targeting older API levels, or remove them from the IDK entirely.
+      "//sdk/lib/magma_common:magma_common_sdk",
+    ]
+  }
+
   if (!sdk_no_host_tools) {
-    deps += [ ":host_tools" ]
+    deps += [
+      ":host_tools",
+      "//tools/docsgen:ref_docs_sdk",
+    ]
   }
 }
 
@@ -246,16 +272,6 @@ sdk_documentation("sdk_notice") {
       source = "//tools/check-licenses/assets/sdk/NOTICE.fuchsia"
       dest = "NOTICE.fuchsia"
     },
-  ]
-}
-
-# License/copyright files for the SDK.
-sdk_molecule("license") {
-  visibility = [ ":*" ]
-  deps = [
-    ":musl_license",
-    ":open_source",
-    ":sdk_notice",
   ]
 }
 
@@ -353,7 +369,64 @@ sdk_molecule("host_tools") {
   }
 }
 
-sdk_molecule("core_lib") {
+sdk_molecule("core_packages") {
+  visibility = [ ":*" ]
+
+  deps = [
+    "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_sdk",
+    "//src/performance/memory/heapdump/collector:collector_sdk",
+  ]
+}
+
+sdk_molecule("core_data") {
+  visibility = [ ":*" ]
+
+  deps = [
+    "//sdk/lib/inspect",
+    "//sdk/lib/sys/component:realm_builder_shard_sdk",
+    "//sdk/lib/syslog",
+    "//sdk/lib/vulkan",
+    "//src/developer/ffx/lib/symbol-index:symbol-index-sdk",
+  ]
+}
+
+sdk_molecule("core_documentation") {
+  visibility = [ ":*" ]
+
+  deps = [ "//third_party/Vulkan-Loader:vulkan_license" ]
+}
+
+sdk_molecule("core_loadable_module") {
+  visibility = [ ":*" ]
+
+  deps = [ "//src/lib/vulkan:vulkan_layers" ]
+}
+
+sdk_molecule("core_dart_library") {
+  visibility = [ ":*" ]
+
+  deps = [ "//sdk/testing/sl4f/client:client_sdk($dart_toolchain)" ]
+}
+
+sdk_molecule("core_cc_prebuilt_library") {
+  visibility = [ ":*" ]
+
+  deps = [
+    "//sdk/lib/fdio:fdio_sdk",
+    "//sdk/lib/svc:svc_sdk",
+    "//src/devices/bin/driver_runtime:driver_runtime_sdk",
+    "//src/performance/memory/heapdump/instrumentation:instrumentation_sdk",
+    "//third_party/Vulkan-Loader:libvulkan_sdk",
+    "//zircon/system/ulib/async-default:async-default_sdk",
+    "//zircon/system/ulib/async-loop:async-loop-default_sdk",
+    "//zircon/system/ulib/sync:sync_sdk",
+    "//zircon/system/ulib/syslog:syslog_sdk",
+    "//zircon/system/ulib/trace-engine:trace-engine_sdk",
+    "//zircon/system/ulib/trace-provider:trace-provider-so_sdk",
+  ]
+}
+
+sdk_molecule("core_cc_source_library") {
   visibility = [ ":*" ]
 
   deps = [
@@ -363,92 +436,52 @@ sdk_molecule("core_lib") {
     "//sdk/lib/driver/component/cpp:cpp_sdk",
     "//sdk/lib/driver/devfs/cpp:cpp_sdk",
     "//sdk/lib/driver/testing/cpp:cpp_sdk",
-    "//sdk/lib/fdio:fdio_sdk",
     "//sdk/lib/fidl/cpp:cpp_sdk",
     "//sdk/lib/fidl/cpp/wire:wire_sdk",
     "//sdk/lib/fidl_driver:fidl_driver_natural_sdk",
     "//sdk/lib/fidl_driver:fidl_driver_sdk",
     "//sdk/lib/fit-promise:fit-promise_sdk",
     "//sdk/lib/input_report_reader:input_report_reader_sdk",
-    "//sdk/lib/inspect",
     "//sdk/lib/inspect/service/cpp:cpp_sdk",
+    "//sdk/lib/magma_client:magma_client_sdk",
     "//sdk/lib/media/cpp:cpp_sdk",
     "//sdk/lib/stdcompat:stdcompat_sdk",
-    "//sdk/lib/svc:svc_sdk",
-    "//sdk/lib/sys/component:realm_builder_shard_sdk",
+    "//sdk/lib/sys/component/cpp/testing:cpp_library_sdk",
     "//sdk/lib/sys/cpp:cpp_sdk",
+    "//sdk/lib/sys/cpp/testing:cpp_sdk",
     "//sdk/lib/sys/inspect/cpp:cpp_sdk",
     "//sdk/lib/sys/testing:testing_sdk",
-    "//sdk/lib/syslog",
     "//sdk/lib/syslog/structured_backend:structured_backend_sdk",
     "//sdk/lib/trace",
     "//sdk/lib/ui/scenic/cpp:cpp_sdk",
+    "//sdk/lib/ui/scenic/cpp/testing:testing_sdk",
     "//sdk/lib/vfs/cpp:cpp_sdk",
-    "//sdk/testing/sl4f/client:client_sdk($dart_toolchain)",
-    "//src/devices/bin/driver_runtime:driver_runtime_sdk",
     "//src/lib/fidl/cpp:cpp_sdk",
     "//src/lib/fidl/cpp:hlcpp_conversion_sdk",
     "//src/lib/fidl/cpp:natural_ostream_sdk",
-    "//src/performance/memory/heapdump/instrumentation:instrumentation_sdk",
     "//zircon/system/ulib/async:async-cpp_sdk",
     "//zircon/system/ulib/async:async_sdk",
-    "//zircon/system/ulib/async-default:async-default_sdk",
     "//zircon/system/ulib/async-loop:async-loop-cpp_sdk",
-    "//zircon/system/ulib/async-loop:async-loop-default_sdk",
     "//zircon/system/ulib/async-loop:async-loop_sdk",
-    "//zircon/system/ulib/inspect:inspect_sdk",
-    "//zircon/system/ulib/sync:sync_sdk",
-    "//zircon/system/ulib/syslog:syslog_sdk",
-    "//zircon/system/ulib/trace:trace_sdk",
-    "//zircon/system/ulib/trace-engine:trace-engine_sdk",
-    "//zircon/system/ulib/trace-provider:trace-provider-so_sdk",
-  ]
-
-  # TODO(https://fxbug.dev/132284): Fix compilation of the following atoms
-  # when targeting older API levels, or remove them from the IDK entirely.
-  if (override_target_api_level == -1) {
-    deps += [
-      "//sdk/lib/magma_client:magma_client_sdk",
-      "//sdk/lib/magma_common:magma_common_sdk",
-      "//sdk/lib/vulkan",
-    ]
-  }
-}
-
-# Pieces of the IDK sans host tools (which are in ":host_tools").
-sdk_molecule("core_deps") {
-  visibility = [ ":*" ]
-
-  deps = [
-    ":core_lib",
-    ":license",
-    ":version_history",
-    "devices",
-    "docs",
-    "//sdk/fidl",
-    "//sdk/lib/async-loop-testing/cpp:cpp_sdk",
-    "//sdk/lib/sys/component/cpp/testing:cpp_library_sdk",
-    "//sdk/lib/sys/cpp/testing:cpp_sdk",
-    "//sdk/lib/ui/scenic/cpp/testing:testing_sdk",
-    "//src/developer/ffx/lib/symbol-index:symbol-index-sdk",
-    "//src/lib/vulkan:vulkan_layers",
-    "//third_party/Vulkan-Loader:libvulkan_sdk",
-    "//third_party/Vulkan-Loader:vulkan_license",
-    "//zircon/public/sysroot/sdk:sysroot_sdk",
     "//zircon/system/ulib/async-testing:async-testing_sdk",
+    "//zircon/system/ulib/inspect:inspect_sdk",
+    "//zircon/system/ulib/trace:trace_sdk",
   ]
-  if (!sdk_no_host_tools) {
-    # This target depends on //sdk:host_tools.all($host_toolchain) indirectly.
-    deps += [ "//tools/docsgen:ref_docs_sdk" ]
-  }
 }
 
-sdk_molecule("core_packages") {
+sdk_molecule("core_sysroot") {
   visibility = [ ":*" ]
 
+  deps = [ "//zircon/public/sysroot/sdk:sysroot_sdk" ]
+}
+
+# License/copyright files for the SDK.
+sdk_molecule("core_license") {
+  visibility = [ ":*" ]
   deps = [
-    "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_sdk",
-    "//src/performance/memory/heapdump/collector:collector_sdk",
+    ":musl_license",
+    ":open_source",
+    ":sdk_notice",
   ]
 }
 
