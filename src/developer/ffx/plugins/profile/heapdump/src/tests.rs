@@ -155,4 +155,5 @@ async fn test_ffx_profile_heapdump() {
         });
         assert!(known_block_found);
     }
+    emu.stop().await;
 }

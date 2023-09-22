@@ -51,4 +51,5 @@ async fn cat_file_from_package_and_subpackages() {
         .await
         .unwrap();
     assert_eq!(output, include_str!("../testdata/subsubpackage_file.txt"));
+    emu.stop().await;
 }

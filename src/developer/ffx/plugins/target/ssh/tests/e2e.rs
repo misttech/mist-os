@@ -17,5 +17,6 @@ async fn ssh_works_and_reports_failures() -> Result<()> {
     emu.ssh(&["false"])
         .await
         .expect_err("the false command should fail and the failure should be reported to caller");
+    emu.stop().await;
     Ok(())
 }

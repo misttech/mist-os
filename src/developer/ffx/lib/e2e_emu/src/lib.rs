@@ -292,6 +292,11 @@ impl IsolatedEmulator {
         }
         Ok(parsed)
     }
+
+    // TODO(slgrady): remove when some variation of fxr/907483 gets added
+    pub async fn stop(&self) {
+        self.ffx(&["emu", "stop", &self.emu_name]).await.expect("emu stop failed");
+    }
 }
 
 impl Drop for IsolatedEmulator {
@@ -343,6 +348,7 @@ mod tests {
         info!("Checking that we can read RCS' logs.");
         let remote_control_logs = emu.logs_for_moniker("/core/remote-control").await.unwrap();
         assert_eq!(remote_control_logs.is_empty(), false);
+        emu.stop().await;
     }
 
     const TEST_PACKAGE_URL: &str = concat!("fuchsia-pkg://fuchsia.com/", env!("TEST_PACKAGE_NAME"));
@@ -356,6 +362,7 @@ mod tests {
         .await
         .unwrap();
         emu.ssh(&["pkgctl", "resolve", TEST_PACKAGE_URL]).await.unwrap();
+        emu.stop().await;
     }
 
     /// This ensures the above test is actually resolving the package from the package server by
@@ -364,5 +371,6 @@ mod tests {
     async fn fail_to_resolve_package_when_no_package_server_running() {
         let emu = IsolatedEmulator::start_internal("pkg_resolve_fail", None).await.unwrap();
         emu.ssh(&["pkgctl", "resolve", TEST_PACKAGE_URL]).await.unwrap_err();
+        emu.stop().await;
     }
 }
