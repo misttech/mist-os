@@ -204,8 +204,9 @@ def expand_response_files(command: Iterable[str],
             rspfile = Path(tok[1:])
             rspfiles.append(rspfile)
             rsp_lines = rspfile.read_text().splitlines()
+            rsp_lines_stripped = (line.strip() for line in rsp_lines)
             filtered_lines = remove_hash_comments(
-                line for line in rsp_lines if line)
+                line for line in rsp_lines_stripped if line)
             yield from expand_response_files(filtered_lines, rspfiles)
         else:
             yield tok

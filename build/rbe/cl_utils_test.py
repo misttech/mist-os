@@ -272,6 +272,30 @@ class ExpandResponseFilesTests(unittest.TestCase):
             list(cl_utils.expand_response_files(command, rspfiles)), command)
         self.assertEqual(rspfiles, [])
 
+    def test_space_only_rspfile(self):
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            rsp = tdp / 'args.rsp'
+            rsp.write_text(' \n')
+            command = ['tool.sh', f'@{rsp}', '-o', 'space.out']
+            rspfiles = []
+            self.assertEqual(
+                list(cl_utils.expand_response_files(command, rspfiles)),
+                ['tool.sh', '-o', 'space.out'])
+            self.assertEqual(rspfiles, [rsp])
+
+    def test_blank_line_rspfile(self):
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            rsp = tdp / 'args.rsp'
+            rsp.write_text('\n')
+            command = ['tool.sh', f'@{rsp}', '-o', 'blank.out']
+            rspfiles = []
+            self.assertEqual(
+                list(cl_utils.expand_response_files(command, rspfiles)),
+                ['tool.sh', '-o', 'blank.out'])
+            self.assertEqual(rspfiles, [rsp])
+
     def test_one_rspfile(self):
         with tempfile.TemporaryDirectory() as td:
             tdp = Path(td)

@@ -426,9 +426,11 @@ class RustAction(object):
             f'--emit=dep-info={depfile_name}', '-Z', 'binary-dep-depinfo'
         ]
         replaced_emit = False
-        # Use the response-file-expanded form, in case --emit is inside
-        # a response file.
-        for tok in self.rsp_expanded_command:
+        # Use the original command (without response files expanded)
+        # to avoid command length limits.
+        # Because of this, this transformation on --emit only works
+        # when the --emit argument is not buried inside a response file.
+        for tok in self.original_command:
             if tok.startswith('--emit'):  # replace the original emit
                 if replaced_emit:
                     pass

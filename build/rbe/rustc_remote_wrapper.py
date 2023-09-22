@@ -469,6 +469,7 @@ class RustRemoteAction(object):
 
         dep_only_command = cl_utils.auto_env_prefix_command(
             list(self._rust_action.dep_only_command(local_depfile)))
+        self.vmsg(f'scan-deps-only command: {dep_only_command}')
         dep_status = _make_local_depfile(dep_only_command)
         if dep_status != 0:
             cmd_str = cl_utils.command_quoted_str(dep_only_command)
