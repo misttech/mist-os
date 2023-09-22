@@ -2937,7 +2937,7 @@ From //third_party/perfetto/gn/perfetto.gni:303
 
 **Current value (from the default):** `false`
 
-From //src/power/power-manager/BUILD.gn:145
+From //src/power/power-manager/BUILD.gn:146
 
 ### enable_recovery_ui_v2
 
@@ -6014,7 +6014,19 @@ From //third_party/pigweed/src/third_party/chre/chre.gni:28
 
 CHRE's platform backend headers. The default is the Pigweed backend.
 
-**Current value (from the default):** `"//pw_chre:chre_backend_headers"`
+**Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_chre:chre_backend_headers"`
+
+From //.gn:115
+
+**Overridden from the default:** `"//pw_chre:chre_backend_headers"`
+
+From //third_party/pigweed/src/third_party/chre/chre.gni:25
+
+**Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_chre:chre_backend_headers"`
+
+From //.gn:115
+
+**Overridden from the default:** `"//pw_chre:chre_backend_headers"`
 
 From //third_party/pigweed/src/third_party/chre/chre.gni:25
 
@@ -9058,13 +9070,19 @@ TODO(fxbug.dev/67565) - remove once external sync FD extensions fully supported
 
 From //third_party/mesa/src/intel/vulkan/BUILD.gn:27
 
+### anv_enable_raytracing
+
+**Current value (from the default):** `false`
+
+From //third_party/mesa/src/intel/vulkan/BUILD.gn:28
+
 ### anv_use_max_ram
 
 Give maximum possible memory to Vulkan heap
 
 **Current value (from the default):** `false`
 
-From //third_party/mesa/src/intel/vulkan/BUILD.gn:30
+From //third_party/mesa/src/intel/vulkan/BUILD.gn:31
 
 ### build_libvulkan_goldfish
 
