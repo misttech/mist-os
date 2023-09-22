@@ -66,7 +66,15 @@ _PRODUCT_CONFIG_BASE_JSON = {
 }
 
 fuchsia_product_configuration(
-    name = "product_config",
+    name = "product_config.default",
+    json_config = _PRODUCT_CONFIG_BASE_JSON,
+)
+
+fuchsia_product_configuration(
+    name = "product_config.x64",
+    base_driver_packages = [
+        "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi",
+    ],
     json_config = _PRODUCT_CONFIG_BASE_JSON,
 )
 # LINT.ThenChange(//products/minimal/BUILD.gn)
@@ -76,7 +84,7 @@ fuchsia_product_image(
     board_config = "//boards:x64",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
-    product_config = ":product_config",
+    product_config = ":product_config.x64",
 )
 
 fuchsia_elf_sizes(
@@ -100,7 +108,7 @@ fuchsia_product_image(
     board_config = "//boards:qemu-x64",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
-    product_config = ":product_config",
+    product_config = ":product_config.default",
 )
 
 fuchsia_elf_sizes(
@@ -124,7 +132,7 @@ fuchsia_product_image(
     board_config = "//boards:riscv64",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng_riscv64",
-    product_config = ":product_config",
+    product_config = ":product_config.default",
 )
 
 fuchsia_elf_sizes(

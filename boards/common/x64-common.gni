@@ -81,13 +81,12 @@ board_driver_package_labels += [
 ]
 
 board_package_labels += [
+  "//src/graphics/bin/vulkan_loader",
   "//src/hwinfo:default_board_config",
   "//src/graphics/drivers/intel-gen/icd:libvulkan_intel_gen",
   "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-vulkan",
   "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-vulkan-config",
   "//src/media/codec/codecs/vaapi:codec_runner_intel_gen_prebuilt",
-
-  # This is a set of config_data entries
   "//src/factory/factory_store_providers/config/qemu",
 ]
 
