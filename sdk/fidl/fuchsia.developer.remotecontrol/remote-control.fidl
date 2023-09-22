@@ -66,6 +66,7 @@ closed protocol RemoteControl {
     }) -> () error zx.Status;
 
     // Connects to the [`fuchsia.boot/Arguments`] protocol
+    @deprecated
     strict BootArguments(resource struct {
         server server_end:boot.Arguments;
     }) -> () error zx.Status;

@@ -6,18 +6,14 @@ use crate::show::{ShowEntry, ShowValue};
 use addr::TargetAddr;
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
-use errors::ffx_bail;
 use ffx_target_show_args as args;
 use fho::{deferred, moniker, Deferred, FfxMain, FfxTool, SimpleWriter};
-use fidl_fuchsia_boot::ArgumentsProxy;
 use fidl_fuchsia_buildinfo::ProviderProxy;
 use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetProxy};
-use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_feedback::{DeviceIdProviderProxy, LastRebootInfoProviderProxy};
 use fidl_fuchsia_hwinfo::{Architecture, BoardProxy, DeviceProxy, ProductProxy};
 use fidl_fuchsia_intl::RegulatoryDomain;
 use fidl_fuchsia_update_channelcontrol::ChannelControlProxy;
-use fuchsia_zircon_status::Status;
 use std::{io::Write, time::Duration};
 use timeout::timeout;
 
@@ -27,7 +23,6 @@ mod show;
 pub struct ShowTool {
     #[command]
     cmd: args::TargetShow,
-    rcs_proxy: RemoteControlProxy,
     target_proxy: TargetProxy,
     #[with(moniker("/core/system-update"))]
     channel_control_proxy: ChannelControlProxy,
@@ -54,7 +49,6 @@ impl FfxMain for ShowTool {
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
         let ShowTool {
             cmd,
-            rcs_proxy,
             target_proxy,
             channel_control_proxy,
             board_proxy,
@@ -65,7 +59,6 @@ impl FfxMain for ShowTool {
             last_reboot_info_proxy,
         } = self;
         show_cmd(
-            rcs_proxy,
             channel_control_proxy,
             board_proxy,
             device_proxy,
@@ -83,7 +76,6 @@ impl FfxMain for ShowTool {
 }
 
 async fn show_cmd<W: Write>(
-    rcs_proxy: RemoteControlProxy,
     channel_control_proxy: ChannelControlProxy,
     board_proxy: BoardProxy,
     device_proxy: DeviceProxy,
@@ -95,14 +87,8 @@ async fn show_cmd<W: Write>(
     target_show_args: args::TargetShow,
     writer: &mut W,
 ) -> Result<()> {
-    let (arguments_proxy, arguments_server_end) = fidl::endpoints::create_proxy().unwrap();
-    if let Err(i) = rcs_proxy.boot_arguments(arguments_server_end).await? {
-        ffx_bail!("Could not open fuchsia.boot.Arguments: {}", Status::from_raw(i));
-    }
-
     show_cmd_impl(
         channel_control_proxy,
-        arguments_proxy,
         board_proxy,
         device_proxy,
         product_proxy,
@@ -119,7 +105,6 @@ async fn show_cmd<W: Write>(
 // Implementation of the target show command.
 async fn show_cmd_impl<W: Write>(
     channel_control_proxy: ChannelControlProxy,
-    arguments_proxy: ArgumentsProxy,
     board_proxy: BoardProxy,
     device_proxy: DeviceProxy,
     product_proxy: ProductProxy,
@@ -145,23 +130,12 @@ async fn show_cmd_impl<W: Write>(
         gather_build_info_show(build_info_proxy),
         gather_device_id_show(device_id_proxy),
         gather_last_reboot_info_show(last_reboot_info_proxy),
-        gather_boot_params_show(arguments_proxy),
     ) {
-        Ok((
-            target,
-            board,
-            device,
-            product,
-            update,
-            build,
-            Some(device_id),
-            reboot_info,
-            boot_params,
-        )) => {
-            vec![target, board, device, product, update, build, device_id, reboot_info, boot_params]
+        Ok((target, board, device, product, update, build, Some(device_id), reboot_info)) => {
+            vec![target, board, device, product, update, build, device_id, reboot_info]
         }
-        Ok((target, board, device, product, update, build, None, reboot_info, boot_params)) => {
-            vec![target, board, device, product, update, build, reboot_info, boot_params]
+        Ok((target, board, device, product, update, build, None, reboot_info)) => {
+            vec![target, board, device, product, update, build, reboot_info]
         }
         Err(e) => bail!(e),
     };
@@ -246,22 +220,6 @@ async fn gather_build_info_show(build: ProviderProxy) -> Result<ShowEntry> {
             ),
         ],
     ))
-}
-
-/// Determine the boot params for the target.
-async fn gather_boot_params_show(arguments: ArgumentsProxy) -> Result<ShowEntry> {
-    let args = arguments.collect("").await?;
-    let show_entries = args
-        .iter()
-        .map(|arg| {
-            let arg_component: Vec<&str> = arg.splitn(2, '=').collect();
-            let arg_value: Option<String> =
-                if arg_component.len() > 1 { Some(arg_component[1].to_string()) } else { None };
-
-            ShowEntry::str_value(arg_component[0], "", "", &arg_value)
-        })
-        .collect::<Vec<ShowEntry>>();
-    Ok(ShowEntry::group("Boot Params", "boot", "", show_entries))
 }
 
 fn arch_to_string(arch: Option<Architecture>) -> Option<String> {
@@ -460,7 +418,6 @@ async fn gather_last_reboot_info_show(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fidl_fuchsia_boot::ArgumentsRequest;
     use fidl_fuchsia_buildinfo::{BuildInfo, ProviderRequest};
     use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetInfo, TargetIp, TargetRequest};
     use fidl_fuchsia_feedback::{
@@ -519,9 +476,6 @@ mod tests {
         \n    Graceful: \"true\"\
         \n    Reason: \"ZbiSwap\"\
         \n    Uptime (ns): \"65000\"\
-        \nBoot Params: \
-        \n    fake_boot_key: \"fake_boot_value\"\
-        \n    fake_valueless_boot_key: \
         \n";
 
     fn setup_fake_target_server() -> TargetProxy {
@@ -602,29 +556,11 @@ mod tests {
         })
     }
 
-    fn setup_fake_arguments_server() -> ArgumentsProxy {
-        fidl::endpoints::spawn_stream_handler(move |req| async move {
-            match req {
-                ArgumentsRequest::Collect { responder, .. } => {
-                    responder
-                        .send(&[
-                            "fake_boot_key=fake_boot_value".to_owned(),
-                            "fake_valueless_boot_key".to_owned(),
-                        ])
-                        .unwrap();
-                }
-                _ => {}
-            }
-        })
-        .unwrap()
-    }
-
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_show_cmd_impl() {
         let mut output = Vec::new();
         show_cmd_impl(
             setup_fake_channel_control_server(),
-            setup_fake_arguments_server(),
             setup_fake_board_server(),
             setup_fake_device_server(),
             setup_fake_product_server(),
@@ -648,7 +584,6 @@ mod tests {
         let mut output = Vec::new();
         show_cmd_impl(
             setup_fake_channel_control_server(),
-            setup_fake_arguments_server(),
             setup_fake_board_server(),
             setup_fake_device_server(),
             setup_fake_product_server(),
@@ -664,7 +599,7 @@ mod tests {
         let v: Value =
             serde_json::from_str(std::str::from_utf8(&output).unwrap()).expect("Valid JSON");
         assert!(v.is_array());
-        assert_eq!(v.as_array().unwrap().len(), 9);
+        assert_eq!(v.as_array().unwrap().len(), 8);
 
         assert_eq!(v[0]["label"], Value::String("target".to_string()));
         assert_eq!(v[1]["label"], Value::String("board".to_string()));
@@ -674,7 +609,6 @@ mod tests {
         assert_eq!(v[5]["label"], Value::String("build".to_string()));
         assert_eq!(v[6]["label"], Value::String("feedback".to_string()));
         assert_eq!(v[7]["label"], Value::String("last_reboot".to_string()));
-        assert_eq!(v[8]["label"], Value::String("boot".to_string()));
 
         assert_eq!(v[0]["child"].as_array().unwrap().len(), 2);
         assert_eq!(v[1]["child"].as_array().unwrap().len(), 3);
@@ -684,7 +618,6 @@ mod tests {
         assert_eq!(v[5]["child"].as_array().unwrap().len(), 4);
         assert_eq!(v[6]["child"].as_array().unwrap().len(), 1);
         assert_eq!(v[7]["child"].as_array().unwrap().len(), 3);
-        assert_eq!(v[8]["child"].as_array().unwrap().len(), 2);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
