@@ -142,7 +142,8 @@ class IR(dict):
 
         Args:
             identifier: The FIDL identifier, e.g. foo.bar/Baz to denote the Baz struct from library
-            foo.bar.
+            foo.bar. This expects a raw_identifier (which may contain underscores like _Result at
+            the end of the name).
 
         Returns:
             The identifier's declaration type, or None if not found. The declaration type is a FIDL
@@ -326,7 +327,7 @@ def type_annotation(type_ir, root_ir, recurse_guard=None) -> type:
 
     kind = type_ir["kind"]
     if kind == "identifier":
-        ident = type_ir.identifier()
+        ident = type_ir.raw_identifier()
         ident_kind = get_kind_by_identifier(ident, root_ir)
         ty = get_type_by_identifier(ident, root_ir, recurse_guard)
         if ident_kind == "bits":
@@ -374,11 +375,13 @@ def fidl_ident_to_marker(name: str) -> str:
 
     Returns: foo.bar.baz/Foo returns foo.bar.baz.Foo
     """
+    name = normalize_identifier(name)
     return name.replace("/", ".")
 
 
 def fidl_ident_to_py_library_member(name: str) -> str:
     """Returns fidl library member name from identifier: foo.bar.baz/Foo would return Foo"""
+    name = normalize_identifier(name)
     return name.split("/")[1]
 
 
@@ -724,10 +727,10 @@ def get_fidl_method_response_payload_ident(ir: Method, root_ir) -> str:
     if ir.get("maybe_response_payload"):
         response_kind = ir.maybe_response_payload()["kind"]
         if response_kind == "identifier":
-            ident = ir.maybe_response_payload().identifier()
+            ident = ir.maybe_response_payload().raw_identifier()
             # Just ensures the module for this is going to be imported.
             get_kind_by_identifier(ident, root_ir)
-            response_ident = ident
+            response_ident = normalize_identifier(ident)
         else:
             response_ident = response_kind
     return response_ident
@@ -849,6 +852,8 @@ def load_ir_from_import(import_name: str) -> IR:
 
 def get_kind_by_identifier(ident: str, loader_ir) -> str:
     """Takes a fidl identifier, e.g. foo.bar.baz/Foo and returns its 'kind'.
+
+    This expects a raw identifier (e.g. not one that has been normalized).
 
     e.g. "struct," "table," etc."""
     res = loader_ir.declaration(ident)

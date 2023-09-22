@@ -95,3 +95,10 @@ class Importing(unittest.TestCase):
         mod = importlib.import_module("fidl.test_fidlcodec_examples")
         alias = mod.HandleAlias
         self.assertTrue(issubclass(alias, int))
+
+    def test_possible_error_method(self):
+        mod = importlib.import_module("fidl.fuchsia_controller_test")
+        # Simply setting this should be enough of a test, as it informs that the type was
+        # constructed properly.
+        res = mod.ComposerThingReturnPossibleErrorResult()
+        res.err = 5

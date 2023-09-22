@@ -51,8 +51,20 @@ closed protocol Noop {
     strict DoNoop() -> ();
 };
 
+closed protocol ComposerThing {
+    strict ReturnPossibleError() -> (struct {
+        some_bool_value bool;
+    }) error zx.Status;
+};
+
+closed protocol OtherComposedProtocol {
+    compose ComposerThing;
+};
+
 @discoverable
 closed protocol Testing {
+    compose ComposerThing;
+
     strict ReturnUnion() -> (flexible union {
         1: x uint8;
         2: y string:255;
@@ -61,5 +73,9 @@ closed protocol Testing {
     strict ReturnUnionWithTable() -> (flexible union {
         1: x NoopUnion;
         2: y NoopTable;
+    });
+
+    strict ReturnOtherComposedProtocol() -> (resource struct {
+        client_thing client_end:OtherComposedProtocol;
     });
 };

@@ -12,4 +12,8 @@ type CrossLibraryStruct = struct {
 @discoverable
 closed protocol CrossLibraryNoop {
     strict UnionNoop(fuchsia.controller.test.NoopUnion);
+
+    strict SendingProtocol(resource struct {
+        some_handle server_end:fuchsia.controller.test.Testing;
+    });
 };
