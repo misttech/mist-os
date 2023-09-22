@@ -316,6 +316,7 @@
                     "/core/test_manager/system-tests:**",
                     "/core/test_manager/chromium-system-tests:**",
                     "/core/test_manager/chromium-tests:**",
+                    "/core/testing/chromium-tests:**",
 
                     // debug-dash-launcher is used in engineering builds to launch dash shells.
                     // It uses PackageResolver to add tool package directories into the dash
@@ -607,6 +608,7 @@
                     // we should remove this.
                     "/core/test_manager/chromium-system-tests:**",
                     "/core/test_manager/chromium-tests:**",
+                    "/core/testing/chromium-tests:**",
 
                     // TODO(fxbug.dev/130576): Remove once the shell tools that use this capability
                     // no longer run in the sshd realm.

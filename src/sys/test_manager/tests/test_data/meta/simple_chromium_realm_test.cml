@@ -10,7 +10,4 @@
     program: {
         binary: "bin/noop_test",
     },
-    facets: {
-        "fuchsia.test": { type: "chromium" },
-    },
 }

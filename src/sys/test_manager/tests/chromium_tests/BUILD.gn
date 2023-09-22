@@ -14,11 +14,11 @@ rustc_test("chromium-routing-test-bin") {
   sources = [ "test.rs" ]
 }
 
-fuchsia_component("chromium-routing-test-cmp") {
+fuchsia_test_component("chromium-routing-test-cmp") {
   component_name = "chromium_routing_test"
-  testonly = true
   manifest = "meta/chromium_routing_test.cml"
   deps = [ ":chromium-routing-test-bin" ]
+  test_type = "chromium"
 }
 
 fuchsia_test_package("chromium-routing-test") {

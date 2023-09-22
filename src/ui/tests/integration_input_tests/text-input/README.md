@@ -19,6 +19,10 @@ From here, you can compile and run the test as usual.
 
 ## Debugging Chromium tests using remote devtools
 
+**Note**: This section might already be stale. If you try this and it works
+(with some modifications), consider fixing the instructions and removing the
+disclaimer.
+
 TODO(fxbug.dev/109739): Automate the Chromium remote devtools setup.
 
 A big drawback of Fuchsia's hermetic integration tests, at the time of this
@@ -72,21 +76,17 @@ web_context_->CreateFrameWithParams(std::move(frame_params), web_frame_.NewReque
 (you don't need to do any of the above, `text-input-chromium.cc` is already
 configured correctly; above text is given for completeness.)
 
-Next, you must add the following into [meta/text-input-test.cml]:
+Next, you must replace the following in [BUILD.gn]:
 
 ```
-{
-    include: {
-       //"sys/testing/system-test.shard.cml",
-    },
-    facets: {
-        "fuchsia.test": { type: "chromium" },
-    },
+fuchsia_test_component("text-input-test-component") {
+  ...
+  test_type = "system" # replace this
 }
 ```
 
-Note that you need to uncomment `system-text.shard.cml`, because the `facets`
-stanza is in conflict with it.
+Note that you need to replace `test_type = "chromium"` with `test_type =
+"system"`.
 
 Uncomment the section below in [text-input-test.cc]:
 

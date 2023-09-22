@@ -59,11 +59,11 @@ executable("web_runner_integration_tests_bin") {
   data_deps = [ "//src/fonts:downstream_test_deps($default_toolchain)" ]
 }
 
-fuchsia_component("web_runner_integration_tests") {
+fuchsia_test_component("web_runner_integration_tests") {
   restricted_features = [ "allow_non_hermetic_packages" ]
-  testonly = true
   deps = [ ":web_runner_integration_tests_bin" ]
   manifest = "meta/web_runner_integration_tests.cml"
+  test_type = "chromium"
 }
 
 fuchsia_test_package("web_runner_tests") {

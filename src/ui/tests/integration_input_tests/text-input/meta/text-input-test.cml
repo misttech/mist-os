@@ -41,13 +41,8 @@
             subdir: "text-input-test",
         },
     ],
-
-    // Used to be able to connect Chromium remote tools. Conflicts with
-    // system-test.shard.cml.
-    // See ../README.md for instructions.
     facets: {
         "fuchsia.test": {
-            type: "chromium",
             "deprecated-allowed-packages": [ "web_engine" ],
         },
     },

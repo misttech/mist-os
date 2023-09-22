@@ -578,6 +578,7 @@ Possible values of `test_type`:
 
 | Value | Description |
 | ----- | ----------- |
+| `chromium` | [Chromium test realm] |
 | `ctf` | [CTF test realm] |
 | `device` | [Device tests] |
 | `drm` | [DRM tests] |
@@ -632,7 +633,6 @@ Possible values of `fuchsia.test.type`:
 | Value | Description |
 | ----- | ----------- |
 | `hermetic` | Hermetic realm |
-| `chromium` | Chromium test realm |
 | `chromium-system` | Chromium system test realm |
 | `google` | Google test realm |
 
@@ -781,6 +781,7 @@ offer: [
 
 [caching-loader-service]: /src/sys/test_runners/src/elf/elf_component.rs
 [cf]: /docs/concepts/components/v2/
+[Chromium test realm]: /src/sys/testing/meta/chromium_test_realm.shard.cml
 [component-manifest]: /docs/concepts/components/v2/component_manifests.md
 [component-unit-tests]: /docs/development/components/build.md#unit-tests
 [create-test-realm]: /docs/development/testing/components/create_test_realm.md
