@@ -40,6 +40,7 @@
                 "cpp_natural_ostream",
                 "cpp_type_conversions",
                 "cpp",
+                "cpp_testing",
                 "cpp_driver_wire",
                 "cpp_driver",
                 "cpp_hlcpp_conversion",

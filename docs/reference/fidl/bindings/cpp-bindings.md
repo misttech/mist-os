@@ -1196,16 +1196,18 @@ use these headers, depend on the generated test scaffolding library with a
 The test base header contains a class for each protocol that provides stub
 implementations for each of the class’ methods, making it possible to implement
 only the methods that are used during testing. These classes are template
-specializations of `fidl::testing::WireTestBase<Protocol>` where `Protocol` is
-the FIDL protocol that is stubbed (e.g. for protocol
-`games.tictactoe/TicTacToe`, the test base is
-`fidl::testing::WireTestBase<games_tictactoe::TicTacToe>`).
+specializations of `fidl::testing::WireTestBase<Protocol>` or
+`fidl::testing::TestBase<Protocol>` where `Protocol` is the FIDL protocol that
+is stubbed (e.g. for protocol `games.tictactoe/TicTacToe`, the test bases are
+`fidl::testing::WireTestBase<games_tictactoe::TicTacToe>` or
+`fidl::testing::TestBase<games_tictactoe::TicTacToe>`).
 
 For the same `TicTacToe` protocol listed above, generated test base subclasses
-`fidl::WireServer<TicTacToe>` (see [Protocols](#protocols)), offering the
-following methods:
+`fidl::WireServer<TicTacToe>` and `fidl::Server<TicTacToe>` (see
+[Protocols](#protocols)), offering the following methods:
 
-* `virtual ~WireTestBase() = default`: Destructor.
+* `virtual ~WireTestBase() = default` or `virtual ~TestBase() = default` :
+  Destructor.
 * `virtual void NotImplemented_(const std::string& name, ::fidl::CompleterBase&
   completer) = 0`: Pure virtual method that is overridden to define behavior for
   unimplemented methods.

@@ -58,6 +58,7 @@ to this as the root directory. It is structured as follows:
        │           ├── natural_messaging.h
        │           ├── natural_types.cc
        │           ├── natural_types.h
+       |           ├── test_base.h
        │           ├── type_conversions.cc
        │           ├── type_conversions.h
        │           ├── wire.h
@@ -110,7 +111,8 @@ directory follow the pattern: `${target_name}/${binding_flavor}/fuchsia.io/cpp`.
 From there C++ outputs `wire_types.h`, `wire_types.cc`, `wire_messaging.h`,
 `wire_messaging.cc`, `wire.h` and `wire_test_base.h` for using wire types, and
 `natural_types.h`, `natural_types.cc`, `natural_messaging.h`,
-`natural_messaging.cc`, `fidl.h` for using natural types alongside wire types.
+`natural_messaging.cc`, `test_base.h`, `fidl.h` for using natural types
+alongside wire types.
 
 `common_types.h` and `markers.h` are shared between wire and natural types.
 
@@ -130,6 +132,7 @@ files:
     out/default/fidling/gen/sdk/fidl/fuchsia.io/fuchsia.io/cpp/fidl/fuchsia.io/cpp/natural_types.cc
     out/default/fidling/gen/sdk/fidl/fuchsia.io/fuchsia.io/cpp/fidl/fuchsia.io/cpp/natural_messaging.h
     out/default/fidling/gen/sdk/fidl/fuchsia.io/fuchsia.io/cpp/fidl/fuchsia.io/cpp/natural_messaging.cc
+    out/default/fidling/gen/sdk/fidl/fuchsia.io/fuchsia.io/cpp/fidl/fuchsia.io/cpp/test_base.h
     out/default/fidling/gen/sdk/fidl/fuchsia.io/fuchsia.io/cpp/fidl/fuchsia.io/cpp/type_conversions.h
     out/default/fidling/gen/sdk/fidl/fuchsia.io/fuchsia.io/cpp/fidl/fuchsia.io/cpp/type_conversions.cc
     out/default/fidling/gen/sdk/fidl/fuchsia.io/fuchsia.io/cpp/fidl/fuchsia.io/cpp/hlcpp_conversion.h

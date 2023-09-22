@@ -14,7 +14,7 @@ func main() {
 	fidl := flags.ParseAndLoadIR()
 	generator := codegen.NewGenerator(flags)
 	generator.GenerateFiles(fidl, []string{
-		"WireHeader", "UnifiedHeader", "WireTestBase", "Markers",
+		"WireHeader", "UnifiedHeader", "WireTestBase", "TestBase", "Markers",
 		"CommonTypesHeader", "CommonTypesSource",
 		"WireTypesHeader", "WireTypesSource",
 		"WireMessagingHeader", "WireMessagingSource",

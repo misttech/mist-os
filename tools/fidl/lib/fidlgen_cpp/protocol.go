@@ -193,6 +193,7 @@ var (
 	WireEventDispatcher            = internalNs.member("WireEventDispatcher")
 	WireServerDispatcher           = internalNs.member("WireServerDispatcher")
 	WireTestBase                   = testingNs.member("WireTestBase")
+	TestBase                       = testingNs.member("TestBase")
 	WireSyncEventHandlerTestBase   = testingNs.member("WireSyncEventHandlerTestBase")
 	IncomingEventsStorage          = internalNs.member("IncomingEventsStorage")
 	IncomingEventsHandleStorage    = internalNs.member("IncomingEventsHandleStorage")
@@ -1251,6 +1252,7 @@ func (c *compiler) compileProtocol(p fidlgen.Protocol) *Protocol {
 	fuzzingName := strings.ReplaceAll(strings.ReplaceAll(string(p.Name), ".", "_"), "/", "_")
 	testBaseNames := protocolName.appendName("_TestBase").appendNamespace("testing")
 	testBaseNames.Wire = WireTestBase.template(protocolName.Wire)
+	testBaseNames.Unified = TestBase.template(protocolName.Unified)
 	r := newProtocol(protocolInner{
 		Attributes:                  Attributes{p.Attributes},
 		nameVariants:                protocolName,

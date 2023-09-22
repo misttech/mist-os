@@ -137,6 +137,14 @@ class AsyncEventHandler;
 template <typename Protocol>
 class Server;
 
+namespace testing {
+
+// |TestBase<P>| is a in subclass of |fidl::Server<P>| with default implementations of all of the
+// methods.
+template <typename Protocol>
+class TestBase;
+}  // namespace testing
+
 }  // namespace fidl
 
 #endif  // SRC_LIB_FIDL_CPP_INCLUDE_LIB_FIDL_CPP_UNIFIED_MESSAGING_DECLARATIONS_H_

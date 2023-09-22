@@ -237,6 +237,12 @@ def _get_binding_info(sdk_for_default_deps, binding_type):
             "layer_deps": ["cpp_natural_types", "cpp_type_conversions", "cpp_wire", "cpp_common", "cpp_wire_types"],
             "deps": [wire_dep, natural_dep],
         },
+        "cpp_testing": {
+            "headers": ["test_base.h"],
+            "sources": [""],
+            "layer_deps": ["cpp"],
+            "deps": [],
+        },
         "cpp_driver_wire": {
             "headers": ["driver/wire.h", "driver/wire_messaging.h"],
             "sources": ["driver/wire_messaging.cc"],

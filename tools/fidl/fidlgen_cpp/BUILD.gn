@@ -40,6 +40,7 @@ if (is_host) {
       "file_natural_ostream_source.tmpl",
       "file_natural_types_header.tmpl",
       "file_natural_types_source.tmpl",
+      "file_test_base.tmpl",
       "file_type_conversions_header.tmpl",
       "file_type_conversions_source.tmpl",
       "file_unified_header.tmpl",
@@ -181,6 +182,10 @@ if (is_host) {
           {
             golden = "goldens/${info.name}_natural_messaging.cc.golden"
             candidate = "$_gen_dir/$_include_path/natural_messaging.cc"
+          },
+          {
+            golden = "goldens/${info.name}_test_base.h.golden"
+            candidate = "$_gen_dir/$_include_path/test_base.h"
           },
           {
             golden = "goldens/${info.name}_type_conversions.h.golden"
