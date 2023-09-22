@@ -41,7 +41,7 @@ source_set("magma_image") {
     "//zircon/system/ulib/syslog",
   ]
   public_deps = [
-    "//src/graphics/lib/magma/include:magma",
+    "//sdk/lib/magma_client:magma_headers",
     "//zircon/system/ulib/zx",
   ]
 
@@ -60,7 +60,7 @@ source_set("lib") {
   ]
   deps = [
     ":magma_image",
-    "//src/graphics/lib/magma/include:magma",
+    "//sdk/lib/magma_client:magma_headers",
     "//src/graphics/lib/magma/include/virtio",
     "//src/virtualization/bin/vmm/device:virtio",
     "//zircon/system/ulib/syslog",

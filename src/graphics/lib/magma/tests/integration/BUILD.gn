@@ -33,8 +33,8 @@ executable("magma_conformance_tests") {
   ]
 
   deps = [
-    "$magma_build_root/include:magma",
     "$magma_build_root/src/libmagma",
+    "//sdk/lib/magma_client:magma_headers",
     "//src/graphics/drivers/msd-arm-mali/include",
     "//src/graphics/drivers/msd-intel-gen/include",
     "//src/graphics/magma/lib/magma_client/test_util:magma_map_cpu",
@@ -72,8 +72,8 @@ executable("magma_conformance_tests_hermetic") {
   ]
 
   deps = [
-    "$magma_build_root/include:magma",
     "$magma_build_root/src/libmagma:magma_hermetic",
+    "//sdk/lib/magma_client:magma_headers",
     "//src/graphics/drivers/msd-arm-mali/include",
     "//src/graphics/drivers/msd-intel-gen/include",
     "//src/graphics/magma/lib/magma_client/test_util:magma_map_cpu",
@@ -110,8 +110,8 @@ executable("virtmagma_conformance_tests") {
   ]
 
   deps = [
-    "$magma_build_root/include:magma",
     "$magma_build_root/src/libmagma_virt",
+    "//sdk/lib/magma_client:magma_headers",
     "//src/graphics/drivers/msd-arm-mali/include",
     "//src/graphics/drivers/msd-intel-gen/include",
     "//src/graphics/magma/lib/magma_client/test_util:magma_map_cpu",
@@ -136,8 +136,8 @@ executable("virtmagma_no_cpp_test") {
   ]
 
   deps = [
-    "$magma_build_root/include:magma",
     "$magma_build_root/src/libmagma_virt",
+    "//sdk/lib/magma_client:magma_headers",
   ]
 
   disable_syslog_backend = true

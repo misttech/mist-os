@@ -49,7 +49,7 @@ source_set("magma_system") {
   cflags = [ "-Wmissing-prototypes" ]
   sources = [ "mock_magma_system.cc" ]
   deps = [
-    "$magma_build_root/include:magma",
+    "//sdk/lib/magma_client:magma_headers",
     "//src/graphics/magma/lib/magma/platform:buffer",
     "//src/graphics/magma/lib/magma/platform:logger_impl",
     "//src/graphics/magma/lib/magma/platform:semaphore",

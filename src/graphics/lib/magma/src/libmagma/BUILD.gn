@@ -13,7 +13,7 @@ group("libmagma") {
 }
 
 static_library("libmagma_static") {
-  public_deps = [ "$magma_build_root/include:magma" ]
+  public_deps = [ "//sdk/lib/magma_client:magma_headers" ]
 
   # All functions should be declared in magma.h or magma_sysmem.h, so warn about unnecessary functions.
   cflags = [ "-Wmissing-prototypes" ]

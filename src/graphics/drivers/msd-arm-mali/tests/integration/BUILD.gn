@@ -30,7 +30,7 @@ executable("msd_arm_mali_integration_tests") {
     "//sdk/fidl/fuchsia.driver.registrar:fuchsia.driver.registrar_cpp_wire",
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
     "//sdk/lib/component/incoming/cpp",
-    "//src/graphics/lib/magma/include:magma",
+    "//sdk/lib/magma_client:magma_headers",
     "//src/graphics/lib/magma/src/libmagma",
     "//src/graphics/magma/lib/magma/test_util:logger_init_helper",
     "//src/graphics/magma/lib/magma/util:macros",

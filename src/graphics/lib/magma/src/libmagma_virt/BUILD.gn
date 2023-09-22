@@ -17,7 +17,7 @@ source_set("virtmagma_headers") {
 }
 
 static_library("libmagma_virt") {
-  public_deps = [ "$magma_build_root/include:magma" ]
+  public_deps = [ "//sdk/lib/magma_client:magma_headers" ]
 
   deps = [
     ":magma_generic($shlib_toolchain)",

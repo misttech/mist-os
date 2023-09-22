@@ -48,9 +48,9 @@ executable("magma-info-bin") {
   output_name = "magma-info"
 
   deps = [
-    "$magma_build_root/include:magma",
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
     "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/magma_client:magma_headers",
     "//src/lib/fxl",
     "//src/zircon/lib/zircon",
   ]

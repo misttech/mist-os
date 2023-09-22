@@ -20,7 +20,7 @@ source_set("vaapi_stubs") {
     "vaapi_stubs.h",
   ]
   public_deps = [
-    "//src/graphics/lib/magma/include:magma",
+    "//sdk/lib/magma_client:magma_headers",
     "//third_party/intel/libva/fuchsia:headers",
   ]
   deps = [ "//third_party/googletest:gtest" ]

@@ -32,7 +32,7 @@ source_set("buffer_header") {
   public_deps = [
     ":handle",
     ":object",
-    "//src/graphics/lib/magma/include:magma",
+    "//sdk/lib/magma_client:magma_headers",
     "//src/graphics/magma/lib/magma/util:macros",
     "//src/graphics/magma/lib/magma/util:status",
   ]
@@ -191,7 +191,7 @@ source_set("connection_client_header") {
     ":buffer",
     ":object",
     ":thread",
-    "//src/graphics/lib/magma/include:magma",
+    "//sdk/lib/magma_client:magma_headers",
     "//src/graphics/magma/lib/magma/util:macros",
     "//src/graphics/magma/lib/magma/util:status",
   ]
@@ -439,7 +439,7 @@ source_set("sysmem_connection_header") {
 
   public_deps = [
     ":buffer",
-    "//src/graphics/lib/magma/include:magma",
+    "//sdk/lib/magma_client:magma_headers",
     "//src/graphics/magma/lib/magma/util:macros",
     "//src/graphics/magma/lib/magma/util:status",
   ]

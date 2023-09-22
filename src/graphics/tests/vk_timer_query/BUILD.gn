@@ -12,9 +12,9 @@ executable("vk_timer_query_bin") {
   sources = [ "main.cc" ]
 
   deps = [
-    "$magma_build_root/include:magma",
     "../vkreadback:helper",
     "//sdk/lib/fdio",
+    "//sdk/lib/magma_client:magma_headers",
     "//src/graphics/drivers/msd-arm-mali/include",
     "//src/graphics/lib/magma/src/libmagma",
     "//src/graphics/magma/lib/magma/platform:semaphore",
