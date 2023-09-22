@@ -23,9 +23,5 @@
             from: "framework",
         },
         { protocol: "fuchsia.diagnostics.ArchiveAccessor" },
-        {
-            event_stream: [ "started" ],
-            from: "parent",
-        },
     ],
 }
