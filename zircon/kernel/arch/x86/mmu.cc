@@ -668,19 +668,10 @@ zx_status_t X86ArchVmAspace::Init() {
     pt_ = mmu;
 
     if (g_x86_feature_pcid_enabled) {
-      // assign a PCID
-      zx::result<uint16_t> result = pcid_allocator->TryAlloc();
-      if (result.is_error()) {
-        // TODO(fxbug.dev/124428): Implement some kind of PCID recycling.
-        LTRACEF("X86: ran out of PCIDs when assigning new aspace\n");
-        return ZX_ERR_NO_RESOURCES;
+      zx_status_t status = AllocatePCID();
+      if (status != ZX_OK) {
+        return status;
       }
-      pcid_ = result.value();
-      DEBUG_ASSERT(pcid_ != MMU_X86_UNUSED_PCID && pcid_ < 4096);
-
-      // Start off with all cpus marked as dirty so the first context switch on any cpu
-      // invalidates the entire PCID when it's loaded.
-      MarkPcidDirtyCpus(CPU_MASK_ALL);
     }
 
     zx_status_t status = mmu->Init(this, test_page_alloc_func_);
@@ -697,6 +688,53 @@ zx_status_t X86ArchVmAspace::Init() {
             pcid_);
   }
 
+  return ZX_OK;
+}
+
+zx_status_t X86ArchVmAspace::InitPrepopulated() {
+  canary_.Assert();
+  // Prepopulated ArchVmAspaces are only allowed with user address spaces.
+  DEBUG_ASSERT(flags_ == 0);
+
+  X86PageTableMmu* mmu = new (&page_table_storage_.mmu) X86PageTableMmu();
+  pt_ = mmu;
+
+  if (g_x86_feature_pcid_enabled) {
+    zx_status_t status = AllocatePCID();
+    if (status != ZX_OK) {
+      return status;
+    }
+  }
+
+  zx_status_t status = mmu->InitPrepopulated(this, base_, size_, test_page_alloc_func_);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  status = mmu->AliasKernelMappings();
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  LTRACEF("user aspace: pt phys %#" PRIxPTR ", virt %p, pcid %#hx\n", pt_->phys(), pt_->virt(),
+          pcid_);
+  return ZX_OK;
+}
+
+zx_status_t X86ArchVmAspace::AllocatePCID() {
+  DEBUG_ASSERT(g_x86_feature_pcid_enabled);
+  zx::result<uint16_t> result = pcid_allocator->TryAlloc();
+  if (result.is_error()) {
+    // TODO(fxbug.dev/124428): Implement some kind of PCID recycling.
+    LTRACEF("X86: ran out of PCIDs when assigning new aspace\n");
+    return ZX_ERR_NO_RESOURCES;
+  }
+  pcid_ = result.value();
+  DEBUG_ASSERT(pcid_ != MMU_X86_UNUSED_PCID && pcid_ < 4096);
+
+  // Start off with all cpus marked as dirty so the first context switch on any cpu
+  // invalidates the entire PCID when it's loaded.
+  MarkPcidDirtyCpus(CPU_MASK_ALL);
   return ZX_OK;
 }
 

@@ -31,6 +31,7 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
   virtual ~ArmArchVmAspace();
 
   zx_status_t Init() override;
+  zx_status_t InitPrepopulated() override;
 
   void DisableUpdates() override;
 

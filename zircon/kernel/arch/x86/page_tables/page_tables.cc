@@ -386,6 +386,37 @@ zx_status_t X86PageTableBase::Init(void* ctx,
   return ZX_OK;
 }
 
+// We disable analysis due to the write to |pages_| tripping it up.  It is safe
+// to write to |pages_| since this is part of object construction.
+zx_status_t X86PageTableBase::InitPrepopulated(
+    void* ctx, vaddr_t base, size_t size, page_alloc_fn_t test_paf) TA_NO_THREAD_SAFETY_ANALYSIS {
+  zx_status_t status = Init(ctx, test_paf);
+  if (status != ZX_OK) {
+    return status;
+  }
+  has_prepopulated_pml4_ = true;
+
+  PageTableLevel top = top_level();
+  const uint start = vaddr_to_index(top, base);
+  uint end = vaddr_to_index(top, base + size - 1);
+  // Check the end if it fills out the table entry.
+  if (page_aligned(top, base + size)) {
+    end += 1;
+  }
+  IntermediatePtFlags flags = intermediate_flags();
+
+  for (uint i = start; i < end; i++) {
+    pt_entry_t* pdp = AllocatePageTable();
+    if (pdp == nullptr) {
+      TRACEF("error allocating pdp for shared process\n");
+      return ZX_ERR_NO_MEMORY;
+    }
+    pages_ += 1;
+    virt_[i] = X86_VIRT_TO_PHYS(pdp) | flags | X86_MMU_PG_P;
+  }
+  return ZX_OK;
+}
+
 void X86PageTableBase::UpdateEntry(ConsistencyManager* cm, PageTableLevel level, vaddr_t vaddr,
                                    volatile pt_entry_t* pte, paddr_t paddr, PtFlags flags,
                                    bool was_terminal, bool exact_flags) {
@@ -401,6 +432,11 @@ void X86PageTableBase::UpdateEntry(ConsistencyManager* cm, PageTableLevel level,
     return;
   }
 
+  if (level == PageTableLevel::PML4_L && has_prepopulated_pml4_) {
+    // If this is a prepopulated page table, the only possible modification should be removal of
+    // the accessed flag.
+    DEBUG_ASSERT(olde == (newe | X86_MMU_PG_A));
+  }
   /* set the new entry */
   *pte = newe;
   cm->cache_line_flusher()->FlushPtEntry(pte);
@@ -414,6 +450,9 @@ void X86PageTableBase::UpdateEntry(ConsistencyManager* cm, PageTableLevel level,
 void X86PageTableBase::UnmapEntry(ConsistencyManager* cm, PageTableLevel level, vaddr_t vaddr,
                                   volatile pt_entry_t* pte, bool was_terminal) {
   DEBUG_ASSERT(pte);
+  if (level == PageTableLevel::PML4_L) {
+    DEBUG_ASSERT(!has_prepopulated_pml4_);
+  }
 
   pt_entry_t olde = *pte;
 
@@ -644,7 +683,11 @@ zx::result<bool> X86PageTableBase::RemoveMapping(volatile pt_entry_t* table, Pag
     // we unmapped anything in the lower level, check to see if that
     // level is now empty.
     bool unmap_page_table = page_aligned(level, unmap_vaddr) && unmap_size >= ps;
-    if (!unmap_page_table && lower_unmapped) {
+    // If the PML4 was prepopulated, we cannot unmap it here as other page tables may be
+    // referencing its entries.
+    if (has_prepopulated_pml4_ && level == PageTableLevel::PML4_L) {
+      unmap_page_table = false;
+    } else if (!unmap_page_table && lower_unmapped) {
       unmap_page_table = page_table_is_clear(next_table);
     }
     if (unmap_page_table) {
@@ -764,8 +807,12 @@ zx_status_t X86PageTableBase::AddMapping(volatile pt_entry_t* table, uint mmu_fl
                   term_flags | X86_MMU_PG_PS, /*was_terminal=*/false);
       cursor.ConsumePAddr(ps);
     } else {
-      // See if we need to create a new table
+      // See if we need to create a new table.
       if (!IS_PAGE_PRESENT(pt_val)) {
+        // We should never need to do this in a prepopulated PML4.
+        if (level == PageTableLevel::PML4_L) {
+          DEBUG_ASSERT(!has_prepopulated_pml4_);
+        }
         volatile pt_entry_t* m = AllocatePageTable();
         if (m == nullptr) {
           // The mapping wasn't fully updated, but there is work here
@@ -1007,6 +1054,11 @@ bool X86PageTableBase::HarvestMapping(volatile pt_entry_t* table,
     // empty, then we have to just scan it and see.
     if (!unmap_page_table && lower_unmapped) {
       unmap_page_table = page_table_is_clear(next_table);
+    }
+    // If the PML4 was prepopulated, we cannot unmap it here as other page tables may be
+    // referencing its entries.
+    if (has_prepopulated_pml4_ && level == PageTableLevel::PML4_L) {
+      unmap_page_table = false;
     }
     if (unmap_page_table) {
       LTRACEF("L: %d free pt v %#" PRIxPTR " phys %#" PRIxPTR "\n", static_cast<int>(level),
@@ -1294,12 +1346,38 @@ void X86PageTableBase::Destroy(vaddr_t base, size_t size) {
   // This lock should be uncontended since Destroy is not supposed to be called in parallel with
   // any other operation, but hold it anyway so we can clear virt_ and attempt to surface any bugs.
   Guard<Mutex> a{&lock_};
+  DEBUG_ASSERT(num_references_ == 0);
+
+  // If this page table has a prepopulated PML4, we need to manually clean up the entries we
+  // created in InitPrepopulated. We know for sure that these entries are no longer referenced by
+  // other page tables because we expect those page tables to have been destroyed before this one.
+  if (has_prepopulated_pml4_) {
+    DEBUG_ASSERT(virt_ != nullptr);
+
+    PageTableLevel top = top_level();
+    pt_entry_t* table = static_cast<pt_entry_t*>(virt_);
+    const uint start = vaddr_to_index(top, base);
+    uint end = vaddr_to_index(top, base + size - 1);
+    // Check the end if it fills out the table entry.
+    if (page_aligned(top, base + size)) {
+      end += 1;
+    }
+    for (uint i = start; i < end; i++) {
+      if (IS_PAGE_PRESENT(table[i])) {
+        volatile pt_entry_t* next_table = get_next_table_from_entry(table[i]);
+        paddr_t ptable_phys = X86_VIRT_TO_PHYS(next_table);
+        vm_page_t* page = paddr_to_vm_page(ptable_phys);
+        pmm_free_page(page);
+        table[i] = 0;
+      }
+    }
+  }
 
   if constexpr (DEBUG_ASSERT_IMPLEMENTED) {
     PageTableLevel top = top_level();
     if (virt_) {
       pt_entry_t* table = static_cast<pt_entry_t*>(virt_);
-      uint start = vaddr_to_index(top, base);
+      const uint start = vaddr_to_index(top, base);
       uint end = vaddr_to_index(top, base + size - 1);
 
       // Check the end if it fills out the table entry.

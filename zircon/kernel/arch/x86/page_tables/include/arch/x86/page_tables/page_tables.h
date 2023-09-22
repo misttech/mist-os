@@ -110,6 +110,10 @@ class X86PageTableBase {
 
   // Initialize an empty page table, assigning this given context to it.
   zx_status_t Init(void* ctx, page_alloc_fn_t test_paf = nullptr);
+  // Initialize a page table, assign the given context, and prepopulate the top level page table
+  // entries.
+  zx_status_t InitPrepopulated(void* ctx, vaddr_t base, size_t size,
+                               page_alloc_fn_t test_paf = nullptr);
 
   // Release the resources associated with this page table.  |base| and |size|
   // are only used for debug checks that the page tables have no more mappings.
@@ -201,6 +205,15 @@ class X86PageTableBase {
   pt_entry_t* AllocatePageTable();
 
   fbl::Canary<fbl::magic("X86P")> canary_;
+
+  // The number of times entries in the pml4 are referenced by other page tables.
+  // Unified page tables increment and decrement this value on their associated shared and
+  // restricted page tables, so we must hold the lock_ when doing so.
+  uint32_t num_references_ TA_GUARDED(lock_) = 0;
+
+  // This is true if this page table has a prepopulated top level page table.
+  // It should set be once by InitPrepopulated and then never modified.
+  bool has_prepopulated_pml4_ = false;
 
   // low lock to protect the mmu code
   DECLARE_MUTEX(X86PageTableBase) lock_;

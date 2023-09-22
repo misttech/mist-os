@@ -49,7 +49,13 @@ class ArchVmAspaceInterface {
   // page tables.
   using page_alloc_fn_t = zx_status_t (*)(uint alloc_flags, vm_page** p, paddr_t* pa);
 
+  // This method initializes an empty ArchVmAspace.
   virtual zx_status_t Init() = 0;
+
+  // This method initializes an ArchVmAspace just like Init, but also prepopulates the top level
+  // page table. Either Init or InitPrepopulated can be called to set up an ArchVmAspace, but not
+  // both.
+  virtual zx_status_t InitPrepopulated() = 0;
 
   // This method puts the instance into read-only mode and asserts that it contains no mappings.
   //
@@ -71,7 +77,6 @@ class ArchVmAspaceInterface {
   virtual zx_status_t Destroy() = 0;
 
   // main methods
-
   // Map a physically contiguous region into the virtual address space
   virtual zx_status_t MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t count, uint mmu_flags,
                                     size_t* mapped) = 0;

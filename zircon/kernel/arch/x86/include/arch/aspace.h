@@ -28,6 +28,7 @@ class X86PageTableMmu final : public X86PageTableBase {
  public:
   using X86PageTableBase::Destroy;
   using X86PageTableBase::Init;
+  using X86PageTableBase::InitPrepopulated;
 
   // Initialize the kernel page table, assigning the given context to it.
   // This X86PageTable will be special in that its mappings will all have
@@ -88,6 +89,7 @@ class X86ArchVmAspace final : public ArchVmAspaceInterface {
   using ArchVmAspaceInterface::page_alloc_fn_t;
 
   zx_status_t Init() override;
+  zx_status_t InitPrepopulated() override;
 
   void DisableUpdates() final {
     // This method is no-op on x86 as the feature is only needed on arm64.  See fxbug.dev/79118.
@@ -144,6 +146,9 @@ class X86ArchVmAspace final : public ArchVmAspaceInterface {
  private:
   // Test the vaddr against the address space's range.
   bool IsValidVaddr(vaddr_t vaddr) const { return (vaddr >= base_ && vaddr <= base_ + size_ - 1); }
+
+  // Helper method to allocate a PCID for this ArchVmAspace.
+  zx_status_t AllocatePCID();
 
   // Helper method to mark this aspace active.
   // This exists for clarity of call sites so that the comment explaining why this is done can be in
