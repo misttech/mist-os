@@ -217,7 +217,7 @@ From //build/images/vbmeta.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/atx_metadata.bin"`
 
-From //boards/common/x64-common.gni:107
+From //boards/common/x64-common.gni:106
 
 **Overridden from the default:** `""`
 
@@ -237,7 +237,7 @@ From //build/images/vbmeta.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"`
 
-From //boards/common/x64-common.gni:105
+From //boards/common/x64-common.gni:104
 
 **Overridden from the default:** `""`
 
@@ -386,7 +386,7 @@ From //build/images/filesystem_limits.gni:17
 
 **Current value for `target_cpu = "x64"`:** `10485760000`
 
-From //boards/common/x64-common.gni:109
+From //boards/common/x64-common.gni:108
 
 **Overridden from the default:** `false`
 
@@ -579,7 +579,7 @@ From //build/board.gni:106
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:33
+From //boards/x64.gni:41
 
 **Overridden from the default:** `false`
 
@@ -632,7 +632,7 @@ From //boards/common/arm64-common.gni:29
 
 From //build/board.gni:47
 
-**Current value for `target_cpu = "x64"`:** `["//src/hwinfo:default_board_config", "//src/graphics/drivers/intel-gen/icd:libvulkan_intel_gen", "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-vulkan", "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-vulkan-config", "//src/media/codec/codecs/vaapi:codec_runner_intel_gen_prebuilt", "//src/factory/factory_store_providers/config/qemu"]`
+**Current value for `target_cpu = "x64"`:** `["//src/graphics/bin/vulkan_loader", "//src/hwinfo:default_board_config", "//src/graphics/drivers/intel-gen/icd:libvulkan_intel_gen", "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-vulkan", "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-vulkan-config", "//src/media/codec/codecs/vaapi:codec_runner_intel_gen_prebuilt", "//src/factory/factory_store_providers/config/qemu"]`
 
 From //boards/common/x64-common.gni:83
 
@@ -944,7 +944,7 @@ From //build/images/args.gni:29
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:113
+From //boards/common/x64-common.gni:112
 
 **Overridden from the default:** `false`
 
@@ -1342,7 +1342,7 @@ From //build/images/custom_signing.gni:26
 
 **Current value (from the default):** `""`
 
-From //third_party/Vulkan-Loader/BUILD.gn:22
+From //third_party/Vulkan-Loader/BUILD.gn:20
 
 ### cxx_rbe_check
 
@@ -3095,7 +3095,7 @@ vendor/acme/proprietary:build_installer with Ninja:
 
 **Current value (from the default):** `[]`
 
-From //build/bazel/legacy_ninja_build_outputs.gni:121
+From //build/bazel/legacy_ninja_build_outputs.gni:122
 
 ### extra_package_labels
 
@@ -3748,7 +3748,7 @@ their own `__hwasan_default_options` C function.  Instead, they can use a
 sanitizer_extra_options() target in their `deps` and then any options
 injected that way can override that option's setting in this list.
 
-**Current value (from the default):** `["allocator_may_return_null=1", "detect_leaks=1"]`
+**Current value (from the default):** `["allocator_may_return_null=1"]`
 
 From //build/config/sanitizers/sanitizer_default_options.gni:94
 
@@ -4542,7 +4542,7 @@ From //build/images/filesystem_limits.gni:12
 
 **Current value for `target_cpu = "x64"`:** `5216665600`
 
-From //boards/common/x64-common.gni:111
+From //boards/common/x64-common.gni:110
 
 **Overridden from the default:** `false`
 
@@ -5334,7 +5334,7 @@ From //build/board.gni:112
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/common/x64-common.gni:101
+From //boards/common/x64-common.gni:100
 
 **Overridden from the default:** `[]`
 
@@ -5355,7 +5355,7 @@ From //build/board.gni:111
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/common/x64-common.gni:100
+From //boards/common/x64-common.gni:99
 
 **Overridden from the default:** `false`
 
@@ -7662,6 +7662,17 @@ actions.
 
 From //build/sdk/config.gni:17
 
+### sdk_inside_supported_api_sub_build
+
+True when building an IDK cpu-specific and supported API sub-build. See
+//build/sdk/build_final_idk.py.
+This is expect to avoid building same build target and only do variant
+related artifacts.
+
+**Current value (from the default):** `false`
+
+From //build/sdk/config.gni:23
+
 ### sdk_no_host_tools
 
 Whether to omit host tools from the generated IDKs.
@@ -8473,7 +8484,7 @@ From //build/images/args.gni:26
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:114
+From //boards/common/x64-common.gni:113
 
 **Overridden from the default:** `false`
 
@@ -8652,7 +8663,7 @@ From //build/images/vbmeta.gni:14
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:103
+From //boards/common/x64-common.gni:102
 
 **Overridden from the default:** `false`
 
