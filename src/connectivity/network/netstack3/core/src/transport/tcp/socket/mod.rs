@@ -3887,7 +3887,6 @@ mod tests {
         available_port: NonZeroU16,
         expected_result: Result<NonZeroU16, LocalAddressError>,
     ) {
-        set_logger_for_test();
         let TcpCtx { mut sync_ctx, mut non_sync_ctx } =
             TcpCtx::<I, _>::with_sync_ctx(TcpSyncCtx::new(
                 I::FAKE_CONFIG.local_ip,
