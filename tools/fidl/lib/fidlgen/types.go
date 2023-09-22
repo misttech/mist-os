@@ -2028,13 +2028,21 @@ func (r *Root) ForBindings(language string) Root {
 	})
 }
 
-// ForTransport filters out protocols (and nested anonymous layouts) that do
-// not support the given transport. It returns a new Root and does not modify r.
+// ForTransport filters out protocols and services (and any nested anonymous
+// layouts) that do not support the given transport. It returns a new Root and
+// does not modify r.
 func (r *Root) ForTransport(transport string) Root {
 	return r.filter(func(e Element) bool {
-		if protocol, ok := e.(*Protocol); ok {
-			if _, ok := protocol.Transports()[transport]; !ok {
+		switch e := e.(type) {
+		case *Protocol:
+			if _, ok := e.Transports()[transport]; !ok {
 				return false
+			}
+		case *Service:
+			for _, member := range e.Members {
+				if member.Type.ProtocolTransport != transport {
+					return false
+				}
 			}
 		}
 		return true

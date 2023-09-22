@@ -150,7 +150,6 @@ fidl_testdata_info = [
       "fidlgen_go",
       "fidlgen_hlcpp",
       "fidlgen_libfuzzer",
-      "fidlgen_rust",
       "fidlgen_syzkaller",
     ]
   },

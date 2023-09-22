@@ -48,7 +48,7 @@ use fuchsia_zircon as zx;
 {{- range .Protocols }}
 {{ template "ProtocolDeclaration" . }}
 {{- end }}
-{{- range (call .ServicesForTransport "Channel") }}
+{{- range .Services }}
 {{ template "ServiceDeclaration" . }}
 {{- end }}
 
