@@ -10,10 +10,11 @@
     program: {
         runner: "driver",
         bind: "meta/bind/test-bti-bind.bindbc",
-        colocate: "true",
+        colocate: "false",
         compat: "driver/test-bti.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
+        host_restart_on_crash: "true",
     },
     use: [
         { service: "fuchsia.hardware.platform.device.Service" },

@@ -451,6 +451,11 @@ test("platform-bus-bti") {
 
 fuchsia_unittest_package("platform-bus-bti-test") {
   manifest = "meta/platform-bus-bti-test.cml"
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
   deps = [
     ":platform-bus-bti",
     ":test-bti",

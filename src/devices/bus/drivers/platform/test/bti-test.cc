@@ -50,6 +50,7 @@ TEST(PbusBtiTest, BtiIsSameAfterCrash) {
   fuchsia::driver::test::Realm_Start_Result realm_result;
   fuchsia::driver::test::RealmArgs args;
   args.set_root_driver("fuchsia-boot:///platform-bus#meta/platform-bus.cm");
+  args.set_use_driver_framework_v2(true);
   ASSERT_EQ(ZX_OK, driver_test_realm->Start(std::move(args), &realm_result));
   ASSERT_FALSE(realm_result.is_err());
 

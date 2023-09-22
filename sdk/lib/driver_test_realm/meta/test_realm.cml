@@ -102,6 +102,11 @@
             to: [ "#driver_manager" ],
         },
         {
+            protocol: [ "fuchsia.boot.RootResource" ],
+            from: "parent",
+            to: [ "#boot-drivers" ],
+        },
+        {
             protocol: "fuchsia.process.Launcher",
             from: "parent",
             to: "#driver_manager",
