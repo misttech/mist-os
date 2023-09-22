@@ -733,6 +733,53 @@ zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t size,
   return ZX_OK;
 }
 
+zx_status_t VmCowPages::CloneUnidirectionalLocked(uint64_t offset, uint64_t size,
+                                                  fbl::RefPtr<AttributionObject> attribution_object,
+                                                  fbl::RefPtr<VmCowPages>* cow_child,
+                                                  uint64_t new_root_parent_offset,
+                                                  uint64_t child_parent_limit) {
+  fbl::AllocChecker ac;
+  auto cow_pages =
+      NewVmCowPages(&ac, hierarchy_state_ptr_, VmCowPagesOptions::kNone, pmm_alloc_flags_, size,
+                    nullptr, nullptr, ktl::move(attribution_object));
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  // Walk up the parent chain until we find a good place to hang this new cow clone. A good
+  // place here means the first place that has committed pages that we actually need to
+  // snapshot. In doing so we need to ensure that the limits of the child we create do not end
+  // up seeing more of the final parent than it would have been able to see from here.
+  VmCowPages* cur = this;
+  AssertHeld(cur->lock_ref());
+  while (cur->parent_) {
+    // There's a parent, check if there are any pages in the current range. Unless we've moved
+    // outside the range of our parent, in which case we can just walk up.
+    if (child_parent_limit > 0 &&
+        cur->page_list_.AnyPagesOrIntervalsInRange(offset, offset + child_parent_limit)) {
+      break;
+    }
+    // To move to the parent we need to translate our window into |cur|.
+    if (offset >= cur->parent_limit_) {
+      child_parent_limit = 0;
+    } else {
+      child_parent_limit = ktl::min(child_parent_limit, cur->parent_limit_ - offset);
+    }
+    offset += cur->parent_offset_;
+    cur = cur->parent_.get();
+  }
+  new_root_parent_offset = CheckedAdd(offset, cur->root_parent_offset_);
+  cur->AddChildLocked(cow_pages.get(), offset, new_root_parent_offset, child_parent_limit);
+
+  *cow_child = ktl::move(cow_pages);
+
+  VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
+  AssertHeld((*cow_child)->lock_ref());
+  VMO_FRUGAL_VALIDATION_ASSERT((*cow_child)->DebugValidateVmoPageBorrowingLocked());
+
+  return ZX_OK;
+}
+
 zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint64_t size,
                                           fbl::RefPtr<AttributionObject> attribution_object,
                                           fbl::RefPtr<VmCowPages>* cow_child) {
@@ -813,64 +860,17 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
                                       new_root_parent_offset, child_parent_limit);
     }
     case CloneType::SnapshotAtLeastOnWrite: {
-      fbl::AllocChecker ac;
-      auto cow_pages =
-          NewVmCowPages(&ac, hierarchy_state_ptr_, VmCowPagesOptions::kNone, pmm_alloc_flags_, size,
-                        nullptr, nullptr, ktl::move(attribution_object));
-      if (!ac.check()) {
-        return ZX_ERR_NO_MEMORY;
-      }
-
-      // Walk up the parent chain until we find a good place to hang this new cow clone. A good
-      // place here means the first place that has committed pages that we actually need to
-      // snapshot. In doing so we need to ensure that the limits of the child we create do not end
-      // up seeing more of the final parent than it would have been able to see from here.
-      VmCowPages* cur = this;
-      AssertHeld(cur->lock_ref());
-      while (cur->parent_) {
-        // There's a parent, check if there are any pages in the current range. Unless we've moved
-        // outside the range of our parent, in which case we can just walk up.
-        if (child_parent_limit > 0 &&
-            cur->page_list_.AnyPagesOrIntervalsInRange(offset, offset + child_parent_limit)) {
-          break;
-        }
-        // To move to the parent we need to translate our window into |cur|.
-        if (offset >= cur->parent_limit_) {
-          child_parent_limit = 0;
-        } else {
-          child_parent_limit = ktl::min(child_parent_limit, cur->parent_limit_ - offset);
-        }
-        offset += cur->parent_offset_;
-        cur = cur->parent_.get();
-      }
-      new_root_parent_offset = CheckedAdd(offset, cur->root_parent_offset_);
-      cur->AddChildLocked(cow_pages.get(), offset, new_root_parent_offset, child_parent_limit);
-
-      *cow_child = ktl::move(cow_pages);
-
-      VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-      AssertHeld((*cow_child)->lock_ref());
-      VMO_FRUGAL_VALIDATION_ASSERT((*cow_child)->DebugValidateVmoPageBorrowingLocked());
-
-      return ZX_OK;
+      return CloneUnidirectionalLocked(offset, size, attribution_object, cow_child,
+                                       new_root_parent_offset, child_parent_limit);
     }
     case CloneType::SnapshotModified: {
       // If at the root of vmo hierarchy, create a unidirectional clone
+      // TODO(fxb/123742): consider extinding this to take unidirectional clones of
+      // snapshot-modified leaves if possible.
       if (!parent_) {
-        fbl::AllocChecker ac;
-        auto cow_pages =
-            NewVmCowPages(&ac, hierarchy_state_ptr_, VmCowPagesOptions::kNone, pmm_alloc_flags_,
-                          size, nullptr, nullptr, ktl::move(attribution_object));
-        if (!ac.check()) {
-          return ZX_ERR_NO_MEMORY;
-        }
-
-        new_root_parent_offset = CheckedAdd(offset, root_parent_offset_);
-        AddChildLocked(cow_pages.get(), offset, new_root_parent_offset, child_parent_limit);
-
-        *cow_child = ktl::move(cow_pages);
+        return CloneUnidirectionalLocked(offset, size, attribution_object, cow_child,
+                                         new_root_parent_offset, child_parent_limit);
         // Else, take a snapshot.
-        return ZX_OK;
       } else {
         return CloneBidirectionalLocked(offset, size, attribution_object, cow_child,
                                         new_root_parent_offset, child_parent_limit);
