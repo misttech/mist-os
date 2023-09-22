@@ -2762,6 +2762,1090 @@ impl MainProtocolTwoWayAnonWithErrorResponder {
     }
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct OpenProtocolMarker;
+
+impl fidl::endpoints::ProtocolMarker for OpenProtocolMarker {
+    type Proxy = OpenProtocolProxy;
+    type RequestStream = OpenProtocolRequestStream;
+    const DEBUG_NAME: &'static str = "(anonymous) OpenProtocol";
+}
+
+pub trait OpenProtocolProxyInterface: Send + Sync {
+    fn r#flexible_one_way(&self, value: i32) -> Result<(), fidl::Error>;
+    type FlexibleTwoWayNoErrorResponseFut: std::future::Future<Output = Result<i32, fidl::Error>>
+        + Send;
+    fn r#flexible_two_way_no_error(&self, value: i32) -> Self::FlexibleTwoWayNoErrorResponseFut;
+    type FlexibleTwoWayWithErrorResponseFut: std::future::Future<Output = Result<fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorResult, fidl::Error>> + Send;
+    fn r#flexible_two_way_with_error(&self, value: i32)
+        -> Self::FlexibleTwoWayWithErrorResponseFut;
+    fn r#strict_one_way(&self, value: i32) -> Result<(), fidl::Error>;
+    type StrictTwoWayNoErrorResponseFut: std::future::Future<Output = Result<i32, fidl::Error>>
+        + Send;
+    fn r#strict_two_way_no_error(&self, value: i32) -> Self::StrictTwoWayNoErrorResponseFut;
+    type StrictTwoWayWithErrorResponseFut: std::future::Future<
+            Output = Result<
+                fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorResult,
+                fidl::Error,
+            >,
+        > + Send;
+    fn r#strict_two_way_with_error(&self, value: i32) -> Self::StrictTwoWayWithErrorResponseFut;
+    fn r#flexible_one_way_named_payload(&self, value: i32) -> Result<(), fidl::Error>;
+}
+
+#[derive(Debug)]
+#[cfg(target_os = "fuchsia")]
+pub struct OpenProtocolSynchronousProxy {
+    client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl OpenProtocolSynchronousProxy {
+    pub fn new(channel: fidl::Channel) -> Self {
+        let protocol_name = <OpenProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
+        Self { client: fidl::client::sync::Client::new(channel, protocol_name) }
+    }
+
+    pub fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    /// Waits until an event arrives and returns it. It is safe for other
+    /// threads to make concurrent requests while waiting for an event.
+    pub fn wait_for_event(&self, deadline: zx::Time) -> Result<OpenProtocolEvent, fidl::Error> {
+        OpenProtocolEvent::decode(self.client.wait_for_event(deadline)?)
+    }
+
+    pub fn r#flexible_one_way(&self, mut value: i32) -> Result<(), fidl::Error> {
+        self.client
+            .send::<fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleOneWayRequest>(
+                (value,),
+                0x30ce1cc0e7e88521,
+                fidl::encoding::DynamicFlags::FLEXIBLE,
+            )
+    }
+
+    pub fn r#flexible_two_way_no_error(
+        &self,
+        mut value: i32,
+        ___deadline: zx::Time,
+    ) -> Result<i32, fidl::Error> {
+        let _response = self.client.send_query::<
+            fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayNoErrorRequest,
+            fidl::encoding::FlexibleType<fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayNoErrorResponse>,
+        >(
+            (value,),
+            0x4d5655754da320d8,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+            ___deadline,
+        )?
+        .into_result::<OpenProtocolMarker>("flexible_two_way_no_error")?;
+        Ok(_response.value)
+    }
+
+    pub fn r#flexible_two_way_with_error(
+        &self,
+        mut value: i32,
+        ___deadline: zx::Time,
+    ) -> Result<
+        fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorResult,
+        fidl::Error,
+    > {
+        let _response = self.client.send_query::<
+            fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorRequest,
+            fidl::encoding::FlexibleResultType<fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorResponse, i32>,
+        >(
+            (value,),
+            0x30a12dd4f7823782,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+            ___deadline,
+        )?
+        .into_result::<OpenProtocolMarker>("flexible_two_way_with_error")?;
+        Ok(_response.map(|x| x.value))
+    }
+
+    pub fn r#strict_one_way(&self, mut value: i32) -> Result<(), fidl::Error> {
+        self.client
+            .send::<fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictOneWayRequest>(
+                (value,),
+                0x79fce2c7f5b1bfa7,
+                fidl::encoding::DynamicFlags::empty(),
+            )
+    }
+
+    pub fn r#strict_two_way_no_error(
+        &self,
+        mut value: i32,
+        ___deadline: zx::Time,
+    ) -> Result<i32, fidl::Error> {
+        let _response = self.client.send_query::<
+            fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayNoErrorRequest,
+            fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayNoErrorResponse,
+        >(
+            (value,),
+            0x3338d68165132184,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
+        Ok(_response.value)
+    }
+
+    pub fn r#strict_two_way_with_error(
+        &self,
+        mut value: i32,
+        ___deadline: zx::Time,
+    ) -> Result<
+        fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorResult,
+        fidl::Error,
+    > {
+        let _response = self.client.send_query::<
+            fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorRequest,
+            fidl::encoding::ResultType<fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorResponse, i32>,
+        >(
+            (value,),
+            0x4a72f997c7db5037,
+            fidl::encoding::DynamicFlags::empty(),
+            ___deadline,
+        )?;
+        Ok(_response.map(|x| x.value))
+    }
+
+    pub fn r#flexible_one_way_named_payload(&self, mut value: i32) -> Result<(), fidl::Error> {
+        self.client.send::<fidl_test_protocollayouts_imported::ImportStructPayload>(
+            (value,),
+            0x152c0b4acb5c0570,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct OpenProtocolProxy {
+    client: fidl::client::Client,
+}
+
+impl fidl::endpoints::Proxy for OpenProtocolProxy {
+    type Protocol = OpenProtocolMarker;
+
+    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> Result<::fidl::AsyncChannel, Self> {
+        self.client.into_channel().map_err(|client| Self { client })
+    }
+
+    fn as_channel(&self) -> &::fidl::AsyncChannel {
+        self.client.as_channel()
+    }
+}
+
+impl OpenProtocolProxy {
+    /// Create a new Proxy for test.protocollayouts/OpenProtocol.
+    pub fn new(channel: fidl::AsyncChannel) -> Self {
+        let protocol_name = <OpenProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
+        Self { client: fidl::client::Client::new(channel, protocol_name) }
+    }
+
+    /// Get a Stream of events from the remote end of the protocol.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the event stream was already taken.
+    pub fn take_event_stream(&self) -> OpenProtocolEventStream {
+        OpenProtocolEventStream { event_receiver: self.client.take_event_receiver() }
+    }
+
+    pub fn r#flexible_one_way(&self, mut value: i32) -> Result<(), fidl::Error> {
+        OpenProtocolProxyInterface::r#flexible_one_way(self, value)
+    }
+
+    pub fn r#flexible_two_way_no_error(
+        &self,
+        mut value: i32,
+    ) -> fidl::client::QueryResponseFut<i32> {
+        OpenProtocolProxyInterface::r#flexible_two_way_no_error(self, value)
+    }
+
+    pub fn r#flexible_two_way_with_error(
+        &self,
+        mut value: i32,
+    ) -> fidl::client::QueryResponseFut<
+        fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorResult,
+    > {
+        OpenProtocolProxyInterface::r#flexible_two_way_with_error(self, value)
+    }
+
+    pub fn r#strict_one_way(&self, mut value: i32) -> Result<(), fidl::Error> {
+        OpenProtocolProxyInterface::r#strict_one_way(self, value)
+    }
+
+    pub fn r#strict_two_way_no_error(&self, mut value: i32) -> fidl::client::QueryResponseFut<i32> {
+        OpenProtocolProxyInterface::r#strict_two_way_no_error(self, value)
+    }
+
+    pub fn r#strict_two_way_with_error(
+        &self,
+        mut value: i32,
+    ) -> fidl::client::QueryResponseFut<
+        fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorResult,
+    > {
+        OpenProtocolProxyInterface::r#strict_two_way_with_error(self, value)
+    }
+
+    pub fn r#flexible_one_way_named_payload(&self, mut value: i32) -> Result<(), fidl::Error> {
+        OpenProtocolProxyInterface::r#flexible_one_way_named_payload(self, value)
+    }
+}
+
+impl OpenProtocolProxyInterface for OpenProtocolProxy {
+    fn r#flexible_one_way(&self, mut value: i32) -> Result<(), fidl::Error> {
+        self.client
+            .send::<fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleOneWayRequest>(
+                (value,),
+                0x30ce1cc0e7e88521,
+                fidl::encoding::DynamicFlags::FLEXIBLE,
+            )
+    }
+
+    type FlexibleTwoWayNoErrorResponseFut = fidl::client::QueryResponseFut<i32>;
+    fn r#flexible_two_way_no_error(
+        &self,
+        mut value: i32,
+    ) -> Self::FlexibleTwoWayNoErrorResponseFut {
+        fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i32, fidl::Error> {
+            let _response = fidl::client::decode_transaction_body::<fidl::encoding::FlexibleType<fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayNoErrorResponse>, 0x4d5655754da320d8>(_buf?)?
+            .into_result::<OpenProtocolMarker>("flexible_two_way_no_error")?;
+            Ok(_response.value)
+        }
+        self.client.send_query_and_decode::<
+            fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayNoErrorRequest,
+            i32,
+        >(
+            (value,),
+            0x4d5655754da320d8,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+            _decode,
+        )
+    }
+
+    type FlexibleTwoWayWithErrorResponseFut = fidl::client::QueryResponseFut<
+        fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorResult,
+    >;
+    fn r#flexible_two_way_with_error(
+        &self,
+        mut value: i32,
+    ) -> Self::FlexibleTwoWayWithErrorResponseFut {
+        fn _decode(
+            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+        ) -> Result<
+            fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorResult,
+            fidl::Error,
+        > {
+            let _response = fidl::client::decode_transaction_body::<fidl::encoding::FlexibleResultType<fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorResponse, i32>, 0x30a12dd4f7823782>(_buf?)?
+            .into_result::<OpenProtocolMarker>("flexible_two_way_with_error")?;
+            Ok(_response.map(|x| x.value))
+        }
+        self.client.send_query_and_decode::<
+            fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorRequest,
+            fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorResult,
+        >(
+            (value,),
+            0x30a12dd4f7823782,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+            _decode,
+        )
+    }
+
+    fn r#strict_one_way(&self, mut value: i32) -> Result<(), fidl::Error> {
+        self.client
+            .send::<fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictOneWayRequest>(
+                (value,),
+                0x79fce2c7f5b1bfa7,
+                fidl::encoding::DynamicFlags::empty(),
+            )
+    }
+
+    type StrictTwoWayNoErrorResponseFut = fidl::client::QueryResponseFut<i32>;
+    fn r#strict_two_way_no_error(&self, mut value: i32) -> Self::StrictTwoWayNoErrorResponseFut {
+        fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i32, fidl::Error> {
+            let _response = fidl::client::decode_transaction_body::<
+                fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayNoErrorResponse,
+                0x3338d68165132184,
+            >(_buf?)?;
+            Ok(_response.value)
+        }
+        self.client.send_query_and_decode::<
+            fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayNoErrorRequest,
+            i32,
+        >(
+            (value,),
+            0x3338d68165132184,
+            fidl::encoding::DynamicFlags::empty(),
+            _decode,
+        )
+    }
+
+    type StrictTwoWayWithErrorResponseFut = fidl::client::QueryResponseFut<
+        fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorResult,
+    >;
+    fn r#strict_two_way_with_error(
+        &self,
+        mut value: i32,
+    ) -> Self::StrictTwoWayWithErrorResponseFut {
+        fn _decode(
+            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+        ) -> Result<
+            fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorResult,
+            fidl::Error,
+        > {
+            let _response = fidl::client::decode_transaction_body::<fidl::encoding::ResultType<fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorResponse, i32>, 0x4a72f997c7db5037>(_buf?)?;
+            Ok(_response.map(|x| x.value))
+        }
+        self.client.send_query_and_decode::<
+            fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorRequest,
+            fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorResult,
+        >(
+            (value,),
+            0x4a72f997c7db5037,
+            fidl::encoding::DynamicFlags::empty(),
+            _decode,
+        )
+    }
+
+    fn r#flexible_one_way_named_payload(&self, mut value: i32) -> Result<(), fidl::Error> {
+        self.client.send::<fidl_test_protocollayouts_imported::ImportStructPayload>(
+            (value,),
+            0x152c0b4acb5c0570,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
+    }
+}
+
+pub struct OpenProtocolEventStream {
+    event_receiver: fidl::client::EventReceiver,
+}
+
+impl std::marker::Unpin for OpenProtocolEventStream {}
+
+impl futures::stream::FusedStream for OpenProtocolEventStream {
+    fn is_terminated(&self) -> bool {
+        self.event_receiver.is_terminated()
+    }
+}
+
+impl futures::Stream for OpenProtocolEventStream {
+    type Item = Result<OpenProtocolEvent, fidl::Error>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        match futures::ready!(futures::stream::StreamExt::poll_next_unpin(
+            &mut self.event_receiver,
+            cx
+        )?) {
+            Some(buf) => std::task::Poll::Ready(Some(OpenProtocolEvent::decode(buf))),
+            None => std::task::Poll::Ready(None),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum OpenProtocolEvent {
+    FlexibleEvent {
+        value: i32,
+    },
+    StrictEvent {
+        value: i32,
+    },
+    #[non_exhaustive]
+    _UnknownEvent {
+        /// Ordinal of the event that was sent.
+        ordinal: u64,
+    },
+}
+
+impl OpenProtocolEvent {
+    #[allow(irrefutable_let_patterns)]
+    pub fn into_flexible_event(self) -> Option<i32> {
+        if let OpenProtocolEvent::FlexibleEvent { value } = self {
+            Some((value))
+        } else {
+            None
+        }
+    }
+    #[allow(irrefutable_let_patterns)]
+    pub fn into_strict_event(self) -> Option<i32> {
+        if let OpenProtocolEvent::StrictEvent { value } = self {
+            Some((value))
+        } else {
+            None
+        }
+    }
+
+    /// Decodes a message buffer as a [`OpenProtocolEvent`].
+    fn decode(mut buf: fidl::MessageBufEtc) -> Result<OpenProtocolEvent, fidl::Error> {
+        let (bytes, _handles) = buf.split_mut();
+        let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
+        debug_assert_eq!(tx_header.tx_id, 0);
+        match tx_header.ordinal {
+            0x7f038af71aad17d4 => {
+                let mut out = fidl::new_empty!(
+                    fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleEventRequest
+                );
+                fidl::encoding::Decoder::decode_into::<
+                    fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleEventRequest,
+                >(&tx_header, _body_bytes, _handles, &mut out)?;
+                Ok((OpenProtocolEvent::FlexibleEvent { value: out.value }))
+            }
+            0x366a73eb0b37159d => {
+                let mut out = fidl::new_empty!(
+                    fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictEventRequest
+                );
+                fidl::encoding::Decoder::decode_into::<
+                    fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictEventRequest,
+                >(&tx_header, _body_bytes, _handles, &mut out)?;
+                Ok((OpenProtocolEvent::StrictEvent { value: out.value }))
+            }
+            _ if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::FLEXIBLE) => {
+                Ok(OpenProtocolEvent::_UnknownEvent { ordinal: tx_header.ordinal })
+            }
+            _ => Err(fidl::Error::UnknownOrdinal {
+                ordinal: tx_header.ordinal,
+                protocol_name: <OpenProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
+            }),
+        }
+    }
+}
+
+/// A Stream of incoming requests for test.protocollayouts/OpenProtocol.
+pub struct OpenProtocolRequestStream {
+    inner: std::sync::Arc<fidl::ServeInner>,
+    is_terminated: bool,
+}
+
+impl std::marker::Unpin for OpenProtocolRequestStream {}
+
+impl futures::stream::FusedStream for OpenProtocolRequestStream {
+    fn is_terminated(&self) -> bool {
+        self.is_terminated
+    }
+}
+
+impl fidl::endpoints::RequestStream for OpenProtocolRequestStream {
+    type Protocol = OpenProtocolMarker;
+    type ControlHandle = OpenProtocolControlHandle;
+
+    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+        Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
+    }
+
+    fn control_handle(&self) -> Self::ControlHandle {
+        OpenProtocolControlHandle { inner: self.inner.clone() }
+    }
+
+    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+        (self.inner, self.is_terminated)
+    }
+
+    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+        Self { inner, is_terminated }
+    }
+}
+
+impl futures::Stream for OpenProtocolRequestStream {
+    type Item = Result<OpenProtocolRequest, fidl::Error>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        let this = &mut *self;
+        if this.inner.check_shutdown(cx) {
+            this.is_terminated = true;
+            return std::task::Poll::Ready(None);
+        }
+        if this.is_terminated {
+            panic!("polled OpenProtocolRequestStream after completion");
+        }
+        fidl::encoding::with_tls_decode_buf(|bytes, handles| {
+            match this.inner.channel().read_etc(cx, bytes, handles) {
+                std::task::Poll::Ready(Ok(())) => {}
+                std::task::Poll::Pending => return std::task::Poll::Pending,
+                std::task::Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
+                    this.is_terminated = true;
+                    return std::task::Poll::Ready(None);
+                }
+                std::task::Poll::Ready(Err(e)) => {
+                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e))))
+                }
+            }
+
+            // A message has been received from the channel
+            let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
+
+            std::task::Poll::Ready(Some(match header.ordinal {
+                0x30ce1cc0e7e88521 => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
+                    let mut req = fidl::new_empty!(fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleOneWayRequest);
+                    fidl::encoding::Decoder::decode_into::<fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleOneWayRequest>(&header, _body_bytes, handles, &mut req)?;
+                    let control_handle = OpenProtocolControlHandle { inner: this.inner.clone() };
+                    Ok(OpenProtocolRequest::FlexibleOneWay { value: req.value, control_handle })
+                }
+                0x4d5655754da320d8 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                    let mut req = fidl::new_empty!(fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayNoErrorRequest);
+                    fidl::encoding::Decoder::decode_into::<fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayNoErrorRequest>(&header, _body_bytes, handles, &mut req)?;
+                    let control_handle = OpenProtocolControlHandle { inner: this.inner.clone() };
+                    Ok(OpenProtocolRequest::FlexibleTwoWayNoError {
+                        value: req.value,
+
+                        responder: OpenProtocolFlexibleTwoWayNoErrorResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id,
+                        },
+                    })
+                }
+                0x30a12dd4f7823782 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                    let mut req = fidl::new_empty!(fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorRequest);
+                    fidl::encoding::Decoder::decode_into::<fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorRequest>(&header, _body_bytes, handles, &mut req)?;
+                    let control_handle = OpenProtocolControlHandle { inner: this.inner.clone() };
+                    Ok(OpenProtocolRequest::FlexibleTwoWayWithError {
+                        value: req.value,
+
+                        responder: OpenProtocolFlexibleTwoWayWithErrorResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id,
+                        },
+                    })
+                }
+                0x79fce2c7f5b1bfa7 => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
+                    let mut req = fidl::new_empty!(
+                        fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictOneWayRequest
+                    );
+                    fidl::encoding::Decoder::decode_into::<
+                        fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictOneWayRequest,
+                    >(&header, _body_bytes, handles, &mut req)?;
+                    let control_handle = OpenProtocolControlHandle { inner: this.inner.clone() };
+                    Ok(OpenProtocolRequest::StrictOneWay { value: req.value, control_handle })
+                }
+                0x3338d68165132184 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                    let mut req = fidl::new_empty!(fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayNoErrorRequest);
+                    fidl::encoding::Decoder::decode_into::<fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayNoErrorRequest>(&header, _body_bytes, handles, &mut req)?;
+                    let control_handle = OpenProtocolControlHandle { inner: this.inner.clone() };
+                    Ok(OpenProtocolRequest::StrictTwoWayNoError {
+                        value: req.value,
+
+                        responder: OpenProtocolStrictTwoWayNoErrorResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id,
+                        },
+                    })
+                }
+                0x4a72f997c7db5037 => {
+                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                    let mut req = fidl::new_empty!(fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorRequest);
+                    fidl::encoding::Decoder::decode_into::<fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorRequest>(&header, _body_bytes, handles, &mut req)?;
+                    let control_handle = OpenProtocolControlHandle { inner: this.inner.clone() };
+                    Ok(OpenProtocolRequest::StrictTwoWayWithError {
+                        value: req.value,
+
+                        responder: OpenProtocolStrictTwoWayWithErrorResponder {
+                            control_handle: std::mem::ManuallyDrop::new(control_handle),
+                            tx_id: header.tx_id,
+                        },
+                    })
+                }
+                0x152c0b4acb5c0570 => {
+                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
+                    let mut req =
+                        fidl::new_empty!(fidl_test_protocollayouts_imported::ImportStructPayload);
+                    fidl::encoding::Decoder::decode_into::<
+                        fidl_test_protocollayouts_imported::ImportStructPayload,
+                    >(&header, _body_bytes, handles, &mut req)?;
+                    let control_handle = OpenProtocolControlHandle { inner: this.inner.clone() };
+                    Ok(OpenProtocolRequest::FlexibleOneWayNamedPayload {
+                        value: req.value,
+
+                        control_handle,
+                    })
+                }
+                _ if header.tx_id == 0
+                    && header.dynamic_flags().contains(fidl::encoding::DynamicFlags::FLEXIBLE) =>
+                {
+                    Ok(OpenProtocolRequest::_UnknownMethod {
+                        ordinal: header.ordinal,
+                        control_handle: OpenProtocolControlHandle { inner: this.inner.clone() },
+                        method_type: fidl::MethodType::OneWay,
+                    })
+                }
+                _ if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::FLEXIBLE) => {
+                    this.inner.send_framework_err(
+                        fidl::encoding::FrameworkErr::UnknownMethod,
+                        header.tx_id,
+                        header.ordinal,
+                        header.dynamic_flags(),
+                        (bytes, handles),
+                    )?;
+                    Ok(OpenProtocolRequest::_UnknownMethod {
+                        ordinal: header.ordinal,
+                        control_handle: OpenProtocolControlHandle { inner: this.inner.clone() },
+                        method_type: fidl::MethodType::TwoWay,
+                    })
+                }
+                _ => Err(fidl::Error::UnknownOrdinal {
+                    ordinal: header.ordinal,
+                    protocol_name:
+                        <OpenProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
+                }),
+            }))
+        })
+    }
+}
+
+#[derive(Debug)]
+pub enum OpenProtocolRequest {
+    FlexibleOneWay {
+        value: i32,
+        control_handle: OpenProtocolControlHandle,
+    },
+    FlexibleTwoWayNoError {
+        value: i32,
+        responder: OpenProtocolFlexibleTwoWayNoErrorResponder,
+    },
+    FlexibleTwoWayWithError {
+        value: i32,
+        responder: OpenProtocolFlexibleTwoWayWithErrorResponder,
+    },
+    StrictOneWay {
+        value: i32,
+        control_handle: OpenProtocolControlHandle,
+    },
+    StrictTwoWayNoError {
+        value: i32,
+        responder: OpenProtocolStrictTwoWayNoErrorResponder,
+    },
+    StrictTwoWayWithError {
+        value: i32,
+        responder: OpenProtocolStrictTwoWayWithErrorResponder,
+    },
+    FlexibleOneWayNamedPayload {
+        value: i32,
+        control_handle: OpenProtocolControlHandle,
+    },
+    /// An interaction was received which does not match any known method.
+    #[non_exhaustive]
+    _UnknownMethod {
+        /// Ordinal of the method that was called.
+        ordinal: u64,
+        control_handle: OpenProtocolControlHandle,
+        method_type: fidl::MethodType,
+    },
+}
+
+impl OpenProtocolRequest {
+    #[allow(irrefutable_let_patterns)]
+    pub fn into_flexible_one_way(self) -> Option<(i32, OpenProtocolControlHandle)> {
+        if let OpenProtocolRequest::FlexibleOneWay { value, control_handle } = self {
+            Some((value, control_handle))
+        } else {
+            None
+        }
+    }
+
+    #[allow(irrefutable_let_patterns)]
+    pub fn into_flexible_two_way_no_error(
+        self,
+    ) -> Option<(i32, OpenProtocolFlexibleTwoWayNoErrorResponder)> {
+        if let OpenProtocolRequest::FlexibleTwoWayNoError { value, responder } = self {
+            Some((value, responder))
+        } else {
+            None
+        }
+    }
+
+    #[allow(irrefutable_let_patterns)]
+    pub fn into_flexible_two_way_with_error(
+        self,
+    ) -> Option<(i32, OpenProtocolFlexibleTwoWayWithErrorResponder)> {
+        if let OpenProtocolRequest::FlexibleTwoWayWithError { value, responder } = self {
+            Some((value, responder))
+        } else {
+            None
+        }
+    }
+
+    #[allow(irrefutable_let_patterns)]
+    pub fn into_strict_one_way(self) -> Option<(i32, OpenProtocolControlHandle)> {
+        if let OpenProtocolRequest::StrictOneWay { value, control_handle } = self {
+            Some((value, control_handle))
+        } else {
+            None
+        }
+    }
+
+    #[allow(irrefutable_let_patterns)]
+    pub fn into_strict_two_way_no_error(
+        self,
+    ) -> Option<(i32, OpenProtocolStrictTwoWayNoErrorResponder)> {
+        if let OpenProtocolRequest::StrictTwoWayNoError { value, responder } = self {
+            Some((value, responder))
+        } else {
+            None
+        }
+    }
+
+    #[allow(irrefutable_let_patterns)]
+    pub fn into_strict_two_way_with_error(
+        self,
+    ) -> Option<(i32, OpenProtocolStrictTwoWayWithErrorResponder)> {
+        if let OpenProtocolRequest::StrictTwoWayWithError { value, responder } = self {
+            Some((value, responder))
+        } else {
+            None
+        }
+    }
+
+    #[allow(irrefutable_let_patterns)]
+    pub fn into_flexible_one_way_named_payload(self) -> Option<(i32, OpenProtocolControlHandle)> {
+        if let OpenProtocolRequest::FlexibleOneWayNamedPayload { value, control_handle } = self {
+            Some((value, control_handle))
+        } else {
+            None
+        }
+    }
+
+    /// Name of the method defined in FIDL
+    pub fn method_name(&self) -> &'static str {
+        match *self {
+            OpenProtocolRequest::FlexibleOneWay { .. } => "flexible_one_way",
+            OpenProtocolRequest::FlexibleTwoWayNoError { .. } => "flexible_two_way_no_error",
+            OpenProtocolRequest::FlexibleTwoWayWithError { .. } => "flexible_two_way_with_error",
+            OpenProtocolRequest::StrictOneWay { .. } => "strict_one_way",
+            OpenProtocolRequest::StrictTwoWayNoError { .. } => "strict_two_way_no_error",
+            OpenProtocolRequest::StrictTwoWayWithError { .. } => "strict_two_way_with_error",
+            OpenProtocolRequest::FlexibleOneWayNamedPayload { .. } => {
+                "flexible_one_way_named_payload"
+            }
+            OpenProtocolRequest::_UnknownMethod {
+                method_type: fidl::MethodType::OneWay, ..
+            } => "unknown one-way method",
+            OpenProtocolRequest::_UnknownMethod {
+                method_type: fidl::MethodType::TwoWay, ..
+            } => "unknown two-way method",
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct OpenProtocolControlHandle {
+    inner: std::sync::Arc<fidl::ServeInner>,
+}
+
+impl fidl::endpoints::ControlHandle for OpenProtocolControlHandle {
+    fn shutdown(&self) {
+        self.inner.shutdown()
+    }
+
+    fn shutdown_with_epitaph(&self, status: zx_status::Status) {
+        self.inner.shutdown_with_epitaph(status)
+    }
+
+    fn is_closed(&self) -> bool {
+        self.inner.channel().is_closed()
+    }
+
+    fn on_closed<'a>(&'a self) -> fidl::OnSignals<'a> {
+        self.inner.channel().on_closed()
+    }
+}
+
+impl OpenProtocolControlHandle {
+    pub fn send_flexible_event(&self, mut value: i32) -> Result<(), fidl::Error> {
+        self.inner
+            .send::<fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleEventRequest>(
+                (value,),
+                0,
+                0x7f038af71aad17d4,
+                fidl::encoding::DynamicFlags::FLEXIBLE,
+            )
+    }
+
+    pub fn send_strict_event(&self, mut value: i32) -> Result<(), fidl::Error> {
+        self.inner
+            .send::<fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictEventRequest>(
+                (value,),
+                0,
+                0x366a73eb0b37159d,
+                fidl::encoding::DynamicFlags::empty(),
+            )
+    }
+}
+
+#[must_use = "FIDL methods require a response to be sent"]
+#[derive(Debug)]
+pub struct OpenProtocolFlexibleTwoWayNoErrorResponder {
+    control_handle: std::mem::ManuallyDrop<OpenProtocolControlHandle>,
+    tx_id: u32,
+}
+
+/// Set the the channel to be shutdown (see [`OpenProtocolControlHandle::shutdown`])
+/// if the responder is dropped without sending a response, so that the client
+/// doesn't hang. To prevent this behavior, call `drop_without_shutdown`.
+impl std::ops::Drop for OpenProtocolFlexibleTwoWayNoErrorResponder {
+    fn drop(&mut self) {
+        self.control_handle.shutdown();
+        // Safety: drops once, never accessed again
+        unsafe { std::mem::ManuallyDrop::drop(&mut self.control_handle) };
+    }
+}
+
+impl fidl::endpoints::Responder for OpenProtocolFlexibleTwoWayNoErrorResponder {
+    type ControlHandle = OpenProtocolControlHandle;
+
+    fn control_handle(&self) -> &OpenProtocolControlHandle {
+        &self.control_handle
+    }
+
+    fn drop_without_shutdown(mut self) {
+        // Safety: drops once, never accessed again due to mem::forget
+        unsafe { std::mem::ManuallyDrop::drop(&mut self.control_handle) };
+        // Prevent Drop from running (which would shut down the channel)
+        std::mem::forget(self);
+    }
+}
+
+impl OpenProtocolFlexibleTwoWayNoErrorResponder {
+    /// Sends a response to the FIDL transaction.
+    ///
+    /// Sets the channel to shutdown if an error occurs.
+    pub fn send(self, mut value: i32) -> Result<(), fidl::Error> {
+        let _result = self.send_raw(value);
+        if _result.is_err() {
+            self.control_handle.shutdown();
+        }
+        self.drop_without_shutdown();
+        _result
+    }
+
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
+    pub fn send_no_shutdown_on_err(self, mut value: i32) -> Result<(), fidl::Error> {
+        let _result = self.send_raw(value);
+        self.drop_without_shutdown();
+        _result
+    }
+
+    fn send_raw(&self, mut value: i32) -> Result<(), fidl::Error> {
+        self.control_handle.inner.send::<fidl::encoding::FlexibleType<
+            fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayNoErrorResponse,
+        >>(
+            fidl::encoding::Flexible::new((value,)),
+            self.tx_id,
+            0x4d5655754da320d8,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
+    }
+}
+
+#[must_use = "FIDL methods require a response to be sent"]
+#[derive(Debug)]
+pub struct OpenProtocolFlexibleTwoWayWithErrorResponder {
+    control_handle: std::mem::ManuallyDrop<OpenProtocolControlHandle>,
+    tx_id: u32,
+}
+
+/// Set the the channel to be shutdown (see [`OpenProtocolControlHandle::shutdown`])
+/// if the responder is dropped without sending a response, so that the client
+/// doesn't hang. To prevent this behavior, call `drop_without_shutdown`.
+impl std::ops::Drop for OpenProtocolFlexibleTwoWayWithErrorResponder {
+    fn drop(&mut self) {
+        self.control_handle.shutdown();
+        // Safety: drops once, never accessed again
+        unsafe { std::mem::ManuallyDrop::drop(&mut self.control_handle) };
+    }
+}
+
+impl fidl::endpoints::Responder for OpenProtocolFlexibleTwoWayWithErrorResponder {
+    type ControlHandle = OpenProtocolControlHandle;
+
+    fn control_handle(&self) -> &OpenProtocolControlHandle {
+        &self.control_handle
+    }
+
+    fn drop_without_shutdown(mut self) {
+        // Safety: drops once, never accessed again due to mem::forget
+        unsafe { std::mem::ManuallyDrop::drop(&mut self.control_handle) };
+        // Prevent Drop from running (which would shut down the channel)
+        std::mem::forget(self);
+    }
+}
+
+impl OpenProtocolFlexibleTwoWayWithErrorResponder {
+    /// Sends a response to the FIDL transaction.
+    ///
+    /// Sets the channel to shutdown if an error occurs.
+    pub fn send(self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
+            self.control_handle.shutdown();
+        }
+        self.drop_without_shutdown();
+        _result
+    }
+
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
+    pub fn send_no_shutdown_on_err(self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
+        let _result = self.send_raw(result);
+        self.drop_without_shutdown();
+        _result
+    }
+
+    fn send_raw(&self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
+        self.control_handle.inner.send::<fidl::encoding::FlexibleResultType<
+            fidl_test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorResponse,
+            i32,
+        >>(
+            fidl::encoding::FlexibleResult::new(result.map(|value| (value,))),
+            self.tx_id,
+            0x30a12dd4f7823782,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        )
+    }
+}
+
+#[must_use = "FIDL methods require a response to be sent"]
+#[derive(Debug)]
+pub struct OpenProtocolStrictTwoWayNoErrorResponder {
+    control_handle: std::mem::ManuallyDrop<OpenProtocolControlHandle>,
+    tx_id: u32,
+}
+
+/// Set the the channel to be shutdown (see [`OpenProtocolControlHandle::shutdown`])
+/// if the responder is dropped without sending a response, so that the client
+/// doesn't hang. To prevent this behavior, call `drop_without_shutdown`.
+impl std::ops::Drop for OpenProtocolStrictTwoWayNoErrorResponder {
+    fn drop(&mut self) {
+        self.control_handle.shutdown();
+        // Safety: drops once, never accessed again
+        unsafe { std::mem::ManuallyDrop::drop(&mut self.control_handle) };
+    }
+}
+
+impl fidl::endpoints::Responder for OpenProtocolStrictTwoWayNoErrorResponder {
+    type ControlHandle = OpenProtocolControlHandle;
+
+    fn control_handle(&self) -> &OpenProtocolControlHandle {
+        &self.control_handle
+    }
+
+    fn drop_without_shutdown(mut self) {
+        // Safety: drops once, never accessed again due to mem::forget
+        unsafe { std::mem::ManuallyDrop::drop(&mut self.control_handle) };
+        // Prevent Drop from running (which would shut down the channel)
+        std::mem::forget(self);
+    }
+}
+
+impl OpenProtocolStrictTwoWayNoErrorResponder {
+    /// Sends a response to the FIDL transaction.
+    ///
+    /// Sets the channel to shutdown if an error occurs.
+    pub fn send(self, mut value: i32) -> Result<(), fidl::Error> {
+        let _result = self.send_raw(value);
+        if _result.is_err() {
+            self.control_handle.shutdown();
+        }
+        self.drop_without_shutdown();
+        _result
+    }
+
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
+    pub fn send_no_shutdown_on_err(self, mut value: i32) -> Result<(), fidl::Error> {
+        let _result = self.send_raw(value);
+        self.drop_without_shutdown();
+        _result
+    }
+
+    fn send_raw(&self, mut value: i32) -> Result<(), fidl::Error> {
+        self.control_handle.inner.send::<fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayNoErrorResponse>(
+            (value,),
+            self.tx_id,
+            0x3338d68165132184,
+            fidl::encoding::DynamicFlags::empty()
+        )
+    }
+}
+
+#[must_use = "FIDL methods require a response to be sent"]
+#[derive(Debug)]
+pub struct OpenProtocolStrictTwoWayWithErrorResponder {
+    control_handle: std::mem::ManuallyDrop<OpenProtocolControlHandle>,
+    tx_id: u32,
+}
+
+/// Set the the channel to be shutdown (see [`OpenProtocolControlHandle::shutdown`])
+/// if the responder is dropped without sending a response, so that the client
+/// doesn't hang. To prevent this behavior, call `drop_without_shutdown`.
+impl std::ops::Drop for OpenProtocolStrictTwoWayWithErrorResponder {
+    fn drop(&mut self) {
+        self.control_handle.shutdown();
+        // Safety: drops once, never accessed again
+        unsafe { std::mem::ManuallyDrop::drop(&mut self.control_handle) };
+    }
+}
+
+impl fidl::endpoints::Responder for OpenProtocolStrictTwoWayWithErrorResponder {
+    type ControlHandle = OpenProtocolControlHandle;
+
+    fn control_handle(&self) -> &OpenProtocolControlHandle {
+        &self.control_handle
+    }
+
+    fn drop_without_shutdown(mut self) {
+        // Safety: drops once, never accessed again due to mem::forget
+        unsafe { std::mem::ManuallyDrop::drop(&mut self.control_handle) };
+        // Prevent Drop from running (which would shut down the channel)
+        std::mem::forget(self);
+    }
+}
+
+impl OpenProtocolStrictTwoWayWithErrorResponder {
+    /// Sends a response to the FIDL transaction.
+    ///
+    /// Sets the channel to shutdown if an error occurs.
+    pub fn send(self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
+        let _result = self.send_raw(result);
+        if _result.is_err() {
+            self.control_handle.shutdown();
+        }
+        self.drop_without_shutdown();
+        _result
+    }
+
+    /// Similar to "send" but does not shutdown the channel if an error occurs.
+    pub fn send_no_shutdown_on_err(self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
+        let _result = self.send_raw(result);
+        self.drop_without_shutdown();
+        _result
+    }
+
+    fn send_raw(&self, mut result: Result<i32, i32>) -> Result<(), fidl::Error> {
+        self.control_handle.inner.send::<fidl::encoding::ResultType<
+            fidl_test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorResponse,
+            i32,
+        >>(
+            result.map(|value| (value,)),
+            self.tx_id,
+            0x4a72f997c7db5037,
+            fidl::encoding::DynamicFlags::empty(),
+        )
+    }
+}
+
 mod internal {
     use super::*;
 

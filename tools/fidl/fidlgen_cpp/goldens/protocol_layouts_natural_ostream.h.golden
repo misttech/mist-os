@@ -128,6 +128,23 @@ struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocollayouts::MainPr
               << ">(" << value.channel().get() << ")";
   }
 };
+template <>
+struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocollayouts::OpenProtocol>> {
+  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocollayouts::OpenProtocol>& value) {
+    return os << "ClientEnd<"
+              << "test_protocollayouts::OpenProtocol"
+              << ">(" << value.channel().get() << ")";
+  }
+};
+
+template <>
+struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocollayouts::OpenProtocol>> {
+  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_protocollayouts::OpenProtocol>& value) {
+    return os << "ServerEnd<"
+              << "test_protocollayouts::OpenProtocol"
+              << ">(" << value.channel().get() << ")";
+  }
+};
 
 namespace fidl {
 
@@ -137,6 +154,14 @@ inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test
 
 inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocollayouts::MainProtocol>& value) {
   return fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocollayouts::MainProtocol>>::Format(os, value);
+}
+
+inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocollayouts::OpenProtocol>& value) {
+  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocollayouts::OpenProtocol>>::Format(os, value);
+}
+
+inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocollayouts::OpenProtocol>& value) {
+  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocollayouts::OpenProtocol>>::Format(os, value);
 }
 
 #pragma clang diagnostic pop

@@ -460,6 +460,36 @@ struct WireTypeForNaturalType<::fidl::Response<::test_protocollayouts::MainProto
   using type = ::fidl::WireResponse<::test_protocollayouts::MainProtocol::TwoWayAnonWithError>;
 };
 
+template <>
+struct WireNaturalConversionTraits<::fidl::WireResponse<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError>, ::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError>> {
+  static ::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError> ToNatural(::fidl::WireResponse<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError> src);
+  static ::fidl::WireResponse<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError> ToWire(fidl::AnyArena& arena, ::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError> src);
+};
+
+template <>
+struct NaturalTypeForWireType<::fidl::WireResponse<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError>> {
+  using type = ::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError>;
+};
+template <>
+struct WireTypeForNaturalType<::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError>> {
+  using type = ::fidl::WireResponse<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError>;
+};
+
+template <>
+struct WireNaturalConversionTraits<::fidl::WireResponse<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>, ::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>> {
+  static ::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError> ToNatural(::fidl::WireResponse<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError> src);
+  static ::fidl::WireResponse<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError> ToWire(fidl::AnyArena& arena, ::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError> src);
+};
+
+template <>
+struct NaturalTypeForWireType<::fidl::WireResponse<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>> {
+  using type = ::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>;
+};
+template <>
+struct WireTypeForNaturalType<::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>> {
+  using type = ::fidl::WireResponse<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>;
+};
+
 #endif  // __Fuchsia__
 #pragma clang diagnostic pop
 

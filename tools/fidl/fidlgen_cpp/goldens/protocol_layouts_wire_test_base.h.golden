@@ -133,6 +133,67 @@ class ::fidl::testing::WireSyncEventHandlerTestBase<::test_protocollayouts::Main
     NotImplemented_("OnAnonWithError");
   }
 };
+
+template <>
+class WireTestBase<::test_protocollayouts::OpenProtocol> : public ::fidl::WireServer<::test_protocollayouts::OpenProtocol> {
+ public:
+  virtual ~WireTestBase<::test_protocollayouts::OpenProtocol>() = default;
+  virtual void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) = 0;
+  virtual void FlexibleOneWay(
+      ::test_protocollayouts_imported::wire::ComposedOpenProtocolFlexibleOneWayRequest* request,
+      FlexibleOneWayCompleter::Sync& completer) override {
+    NotImplemented_("FlexibleOneWay", completer);
+  }
+  virtual void FlexibleTwoWayNoError(
+      ::test_protocollayouts_imported::wire::ComposedOpenProtocolFlexibleTwoWayNoErrorRequest* request,
+      FlexibleTwoWayNoErrorCompleter::Sync& completer) override {
+    NotImplemented_("FlexibleTwoWayNoError", completer);
+  }
+  virtual void FlexibleTwoWayWithError(
+      ::test_protocollayouts_imported::wire::ComposedOpenProtocolFlexibleTwoWayWithErrorRequest* request,
+      FlexibleTwoWayWithErrorCompleter::Sync& completer) override {
+    NotImplemented_("FlexibleTwoWayWithError", completer);
+  }
+  virtual void StrictOneWay(
+      ::test_protocollayouts_imported::wire::ComposedOpenProtocolStrictOneWayRequest* request,
+      StrictOneWayCompleter::Sync& completer) override {
+    NotImplemented_("StrictOneWay", completer);
+  }
+  virtual void StrictTwoWayNoError(
+      ::test_protocollayouts_imported::wire::ComposedOpenProtocolStrictTwoWayNoErrorRequest* request,
+      StrictTwoWayNoErrorCompleter::Sync& completer) override {
+    NotImplemented_("StrictTwoWayNoError", completer);
+  }
+  virtual void StrictTwoWayWithError(
+      ::test_protocollayouts_imported::wire::ComposedOpenProtocolStrictTwoWayWithErrorRequest* request,
+      StrictTwoWayWithErrorCompleter::Sync& completer) override {
+    NotImplemented_("StrictTwoWayWithError", completer);
+  }
+  virtual void FlexibleOneWayNamedPayload(
+      ::test_protocollayouts_imported::wire::ImportStructPayload* request,
+      FlexibleOneWayNamedPayloadCompleter::Sync& completer) override {
+    NotImplemented_("FlexibleOneWayNamedPayload", completer);
+  }
+  virtual void handle_unknown_method(::fidl::UnknownMethodMetadata<::test_protocollayouts::OpenProtocol> metadata, UnknownMethodCompleter::Sync& completer) override {
+    NotImplemented_("handle_unknown_method", completer);
+  }
+};
+
+template <>
+class ::fidl::testing::WireSyncEventHandlerTestBase<::test_protocollayouts::OpenProtocol> : public ::fidl::WireSyncEventHandler<::test_protocollayouts::OpenProtocol> {
+ public:
+  virtual ~WireSyncEventHandlerTestBase<::test_protocollayouts::OpenProtocol>() = default;
+  virtual void NotImplemented_(const std::string& name) = 0;
+  void FlexibleEvent(::fidl::WireEvent<::test_protocollayouts::OpenProtocol::FlexibleEvent>* event) override {
+    NotImplemented_("FlexibleEvent");
+  }
+  void StrictEvent(::fidl::WireEvent<::test_protocollayouts::OpenProtocol::StrictEvent>* event) override {
+    NotImplemented_("StrictEvent");
+  }
+  virtual void handle_unknown_event(::fidl::UnknownEventMetadata<::test_protocollayouts::OpenProtocol> metadata) override {
+    NotImplemented_("handle_unknown_event");
+  }
+};
 #pragma clang diagnostic pop
 
 }  // namespace testing

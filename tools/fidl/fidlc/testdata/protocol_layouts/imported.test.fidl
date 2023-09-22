@@ -35,3 +35,45 @@ closed protocol ComposedProtocol {
     strict -> OnNamedComposed(ImportUnionPayload);
     strict -> OnNamedComposedWithError(ImportTablePayload) error uint32;
 };
+
+type ImportStructPayload = struct {
+    value int32;
+};
+
+open protocol ComposedOpenProtocol {
+    flexible FlexibleOneWay(struct {
+        value int32;
+    });
+    flexible FlexibleTwoWayNoError(struct {
+        value int32;
+    }) -> (struct {
+        value int32;
+    });
+    flexible FlexibleTwoWayWithError(struct {
+        value int32;
+    }) -> (struct {
+        value int32;
+    }) error int32;
+    flexible -> FlexibleEvent(struct {
+        value int32;
+    });
+
+    strict StrictOneWay(struct {
+        value int32;
+    });
+    strict StrictTwoWayNoError(struct {
+        value int32;
+    }) -> (struct {
+        value int32;
+    });
+    strict StrictTwoWayWithError(struct {
+        value int32;
+    }) -> (struct {
+        value int32;
+    }) error int32;
+    strict -> StrictEvent(struct {
+        value int32;
+    });
+
+    flexible FlexibleOneWayNamedPayload(ImportStructPayload);
+};

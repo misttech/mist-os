@@ -210,7 +210,7 @@ static std::vector<const flat::Struct*> ExternalStructs(
         }
 
         // Include the success variant of a result union, if it's an external struct.
-        if (method->has_error) {
+        if (method->HasResultUnion()) {
           ZX_ASSERT(id->type_decl->kind == Decl::Kind::kUnion);
           const auto* result_union = static_cast<const flat::Union*>(id->type_decl);
           const auto* success_variant_type = static_cast<const flat::IdentifierType*>(

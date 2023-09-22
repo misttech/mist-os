@@ -581,6 +581,220 @@
         </tr>
 </table>
 
+## OpenProtocol {#OpenProtocol}
+*Defined in [test.protocollayouts/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/protocol_layouts/example.test.fidl;l=53)*
+
+
+### FlexibleEvent {#OpenProtocol.FlexibleEvent}
+
+
+
+
+
+#### Response {#OpenProtocol.FlexibleEvent_Response}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>value</code></td>
+            <td>
+                <code>int32</code>
+            </td>
+        </tr>
+</table>
+
+### FlexibleOneWay {#OpenProtocol.FlexibleOneWay}
+
+
+
+
+#### Request {#OpenProtocol.FlexibleOneWay_Request}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>value</code></td>
+            <td>
+                <code>int32</code>
+            </td>
+        </tr>
+</table>
+
+
+### FlexibleOneWayNamedPayload {#OpenProtocol.FlexibleOneWayNamedPayload}
+
+
+
+
+#### Request {#OpenProtocol.FlexibleOneWayNamedPayload_Request}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>value</code></td>
+            <td>
+                <code>int32</code>
+            </td>
+        </tr>
+</table>
+
+
+### FlexibleTwoWayNoError {#OpenProtocol.FlexibleTwoWayNoError}
+
+
+
+
+#### Request {#OpenProtocol.FlexibleTwoWayNoError_Request}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>value</code></td>
+            <td>
+                <code>int32</code>
+            </td>
+        </tr>
+</table>
+
+
+#### Response {#OpenProtocol.FlexibleTwoWayNoError_Response}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>payload</code></td>
+            <td>
+                <code><a class='link' href='../test.protocollayouts.imported/'>test.protocollayouts.imported</a>/<a class='link' href='../test.protocollayouts.imported/#ComposedOpenProtocol_FlexibleTwoWayNoError_Result'>ComposedOpenProtocol_FlexibleTwoWayNoError_Result</a></code>
+            </td>
+        </tr>
+</table>
+
+### FlexibleTwoWayWithError {#OpenProtocol.FlexibleTwoWayWithError}
+
+
+
+
+#### Request {#OpenProtocol.FlexibleTwoWayWithError_Request}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>value</code></td>
+            <td>
+                <code>int32</code>
+            </td>
+        </tr>
+</table>
+
+
+#### Response {#OpenProtocol.FlexibleTwoWayWithError_Response}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>payload</code></td>
+            <td>
+                <code><a class='link' href='../test.protocollayouts.imported/'>test.protocollayouts.imported</a>/<a class='link' href='../test.protocollayouts.imported/#ComposedOpenProtocol_FlexibleTwoWayWithError_Result'>ComposedOpenProtocol_FlexibleTwoWayWithError_Result</a></code>
+            </td>
+        </tr>
+</table>
+
+### StrictEvent {#OpenProtocol.StrictEvent}
+
+
+
+
+
+#### Response {#OpenProtocol.StrictEvent_Response}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>value</code></td>
+            <td>
+                <code>int32</code>
+            </td>
+        </tr>
+</table>
+
+### StrictOneWay {#OpenProtocol.StrictOneWay}
+
+
+
+
+#### Request {#OpenProtocol.StrictOneWay_Request}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>value</code></td>
+            <td>
+                <code>int32</code>
+            </td>
+        </tr>
+</table>
+
+
+### StrictTwoWayNoError {#OpenProtocol.StrictTwoWayNoError}
+
+
+
+
+#### Request {#OpenProtocol.StrictTwoWayNoError_Request}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>value</code></td>
+            <td>
+                <code>int32</code>
+            </td>
+        </tr>
+</table>
+
+
+#### Response {#OpenProtocol.StrictTwoWayNoError_Response}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>value</code></td>
+            <td>
+                <code>int32</code>
+            </td>
+        </tr>
+</table>
+
+### StrictTwoWayWithError {#OpenProtocol.StrictTwoWayWithError}
+
+
+
+
+#### Request {#OpenProtocol.StrictTwoWayWithError_Request}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>value</code></td>
+            <td>
+                <code>int32</code>
+            </td>
+        </tr>
+</table>
+
+
+#### Response {#OpenProtocol.StrictTwoWayWithError_Response}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>payload</code></td>
+            <td>
+                <code><a class='link' href='../test.protocollayouts.imported/'>test.protocollayouts.imported</a>/<a class='link' href='../test.protocollayouts.imported/#ComposedOpenProtocol_StrictTwoWayWithError_Result'>ComposedOpenProtocol_StrictTwoWayWithError_Result</a></code>
+            </td>
+        </tr>
+</table>
+
 
 
 

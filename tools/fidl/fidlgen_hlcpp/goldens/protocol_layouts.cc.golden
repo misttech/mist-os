@@ -3712,6 +3712,531 @@ zx_status_t MainProtocol_SyncProxy::TwoWayAnonWithError(::test::protocollayouts:
 
 #endif  // __Fuchsia__
 
+#ifdef __Fuchsia__
+
+  namespace _internal {
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocolFlexibleOneWayRequestTable;
+  
+  
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocolFlexibleTwoWayNoErrorRequestTable;
+  
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocol_FlexibleTwoWayNoError_ResultTable;
+  
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocolFlexibleTwoWayWithErrorRequestTable;
+  
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocol_FlexibleTwoWayWithError_ResultTable;
+  
+  
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocolFlexibleEventRequestTable;
+  
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocolStrictOneWayRequestTable;
+  
+  
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocolStrictTwoWayNoErrorRequestTable;
+  
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocolStrictTwoWayNoErrorResponseTable;
+  
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocolStrictTwoWayWithErrorRequestTable;
+  
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocol_StrictTwoWayWithError_ResultTable;
+  
+  
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ComposedOpenProtocolStrictEventRequestTable;
+  
+__LOCAL extern "C" const fidl_type_t test_protocollayouts_imported_ImportStructPayloadTable;
+  
+
+}  // namespace _internal
+
+OpenProtocol::~OpenProtocol() = default;
+
+const fidl_type_t* ::test::protocollayouts::OpenProtocol_RequestDecoder::GetType(uint64_t ordinal, bool* out_needs_response, bool* out_is_known) {
+  *out_needs_response = false;
+  *out_is_known = false;
+  switch (ordinal) {
+    case ::test::protocollayouts::internal::kOpenProtocol_FlexibleOneWay_Ordinal:
+      *out_is_known = true;
+      return &::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolFlexibleOneWayRequestTable;
+        ;
+    case ::test::protocollayouts::internal::kOpenProtocol_FlexibleTwoWayNoError_Ordinal:
+      *out_is_known = true;
+      *out_needs_response = true;
+      return &::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolFlexibleTwoWayNoErrorRequestTable;
+        ;
+    case ::test::protocollayouts::internal::kOpenProtocol_FlexibleTwoWayWithError_Ordinal:
+      *out_is_known = true;
+      *out_needs_response = true;
+      return &::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolFlexibleTwoWayWithErrorRequestTable;
+        ;
+    case ::test::protocollayouts::internal::kOpenProtocol_StrictOneWay_Ordinal:
+      *out_is_known = true;
+      return &::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolStrictOneWayRequestTable;
+        ;
+    case ::test::protocollayouts::internal::kOpenProtocol_StrictTwoWayNoError_Ordinal:
+      *out_is_known = true;
+      *out_needs_response = true;
+      return &::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolStrictTwoWayNoErrorRequestTable;
+        ;
+    case ::test::protocollayouts::internal::kOpenProtocol_StrictTwoWayWithError_Ordinal:
+      *out_is_known = true;
+      *out_needs_response = true;
+      return &::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolStrictTwoWayWithErrorRequestTable;
+        ;
+    case ::test::protocollayouts::internal::kOpenProtocol_FlexibleOneWayNamedPayload_Ordinal:
+      *out_is_known = true;
+      return &::test::protocollayouts::_internal::test_protocollayouts_imported_ImportStructPayloadTable;
+        ;
+    default:
+      return nullptr;
+  }
+}
+
+const fidl_type_t* OpenProtocol_ResponseDecoder::GetType(uint64_t ordinal) {
+  switch (ordinal) {
+    case ::test::protocollayouts::internal::kOpenProtocol_FlexibleTwoWayNoError_Ordinal:
+      return &::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocol_FlexibleTwoWayNoError_ResultTable;
+        ;
+    case ::test::protocollayouts::internal::kOpenProtocol_FlexibleTwoWayWithError_Ordinal:
+      return &::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocol_FlexibleTwoWayWithError_ResultTable;
+        ;
+    case ::test::protocollayouts::internal::kOpenProtocol_FlexibleEvent_Ordinal:
+      return &::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolFlexibleEventRequestTable;
+        ;
+    case ::test::protocollayouts::internal::kOpenProtocol_StrictTwoWayNoError_Ordinal:
+      return &::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolStrictTwoWayNoErrorResponseTable;
+        ;
+    case ::test::protocollayouts::internal::kOpenProtocol_StrictTwoWayWithError_Ordinal:
+      return &::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocol_StrictTwoWayWithError_ResultTable;
+        ;
+    case ::test::protocollayouts::internal::kOpenProtocol_StrictEvent_Ordinal:
+      return &::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolStrictEventRequestTable;
+        ;
+    default:
+      return nullptr;
+  }
+}
+
+OpenProtocol_EventSender::~OpenProtocol_EventSender() = default;
+
+OpenProtocol_Sync::~OpenProtocol_Sync() = default;
+
+OpenProtocol_Proxy::OpenProtocol_Proxy(::fidl::internal::ProxyController* controller)
+    : controller_(controller) {
+  (void)controller_;
+}
+
+OpenProtocol_Proxy::~OpenProtocol_Proxy() = default;
+
+zx_status_t OpenProtocol_Proxy::Dispatch_(::fidl::HLCPPIncomingMessage message) {
+  zx_status_t status = ZX_OK;
+  switch (message.ordinal()) {
+    case ::test::protocollayouts::internal::kOpenProtocol_FlexibleEvent_Ordinal: {
+      if (!FlexibleEvent) {
+        status = ZX_OK;
+        break;
+      }
+      const char* error_msg = nullptr;
+      status = message.Decode(&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolFlexibleEventRequestTable, &error_msg);
+      if (status != ZX_OK) {
+        FIDL_REPORT_DECODING_ERROR(message, &::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolFlexibleEventRequestTable, error_msg);
+        break;
+      }
+      ::fidl::Decoder decoder(std::move(message));
+      FlexibleEvent(::fidl::DecodeAs<int32_t>(&decoder, 0 + sizeof(fidl_message_header_t)));
+      break;
+    }
+    case ::test::protocollayouts::internal::kOpenProtocol_StrictEvent_Ordinal: {
+      if (!StrictEvent) {
+        status = ZX_OK;
+        break;
+      }
+      const char* error_msg = nullptr;
+      status = message.Decode(&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolStrictEventRequestTable, &error_msg);
+      if (status != ZX_OK) {
+        FIDL_REPORT_DECODING_ERROR(message, &::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolStrictEventRequestTable, error_msg);
+        break;
+      }
+      ::fidl::Decoder decoder(std::move(message));
+      StrictEvent(::fidl::DecodeAs<int32_t>(&decoder, 0 + sizeof(fidl_message_header_t)));
+      break;
+    }
+    default: {
+      auto txid = message.txid();
+      auto is_flexible = message.is_flexible();
+      auto ordinal = message.ordinal();
+      // To satisfy RFC-0138, move the message so it is destructed before
+      // calling the unknown event handler.
+      { auto message_ = std::move(message); }
+      if (txid == 0 && is_flexible) {
+        handle_unknown_event(ordinal);
+        break;
+      }
+      status = ZX_ERR_NOT_SUPPORTED;
+      break;
+    }
+  }
+  return status;
+}
+
+
+void OpenProtocol_Proxy::FlexibleOneWay(int32_t value) {
+  ::fidl::MessageEncoder _encoder(::test::protocollayouts::internal::kOpenProtocol_FlexibleOneWay_Ordinal, ::test::protocollayouts::internal::kOpenProtocol_FlexibleOneWay_DynamicFlags);
+  const fidl_type_t* req_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolFlexibleOneWayRequestTable;
+  controller_->Send(req_type, ::test::protocollayouts::OpenProtocol_RequestEncoder::FlexibleOneWay(&_encoder, &value), nullptr);
+}
+namespace {
+
+::std::unique_ptr<::fidl::internal::SingleUseMessageHandler>
+OpenProtocol_FlexibleTwoWayNoError_ResponseHandler(OpenProtocol::FlexibleTwoWayNoErrorCallback&& callback) {
+  ZX_DEBUG_ASSERT_MSG(callback,
+                      "Callback must not be empty for OpenProtocol::FlexibleTwoWayNoError\n");
+  return ::std::make_unique<::fidl::internal::SingleUseMessageHandler>(
+      [callback_ = std::move(callback)](::fidl::HLCPPIncomingMessage&& message) {
+        ::fidl::Decoder decoder(std::move(message));
+        callback_(::fidl::DecodeAs<::test::protocollayouts::imported::ComposedOpenProtocol_FlexibleTwoWayNoError_Result>(&decoder, 0 + sizeof(fidl_message_header_t)));
+        return ZX_OK;
+      }, &::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocol_FlexibleTwoWayNoError_ResultTable);
+}
+
+}  // namespace
+void OpenProtocol_Proxy::FlexibleTwoWayNoError(int32_t value, FlexibleTwoWayNoErrorCallback callback) {
+  ::fidl::MessageEncoder _encoder(::test::protocollayouts::internal::kOpenProtocol_FlexibleTwoWayNoError_Ordinal, ::test::protocollayouts::internal::kOpenProtocol_FlexibleTwoWayNoError_DynamicFlags);
+  const fidl_type_t* req_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolFlexibleTwoWayNoErrorRequestTable;
+  controller_->Send(req_type, ::test::protocollayouts::OpenProtocol_RequestEncoder::FlexibleTwoWayNoError(&_encoder, &value), OpenProtocol_FlexibleTwoWayNoError_ResponseHandler(std::move(callback)));
+}
+namespace {
+
+::std::unique_ptr<::fidl::internal::SingleUseMessageHandler>
+OpenProtocol_FlexibleTwoWayWithError_ResponseHandler(OpenProtocol::FlexibleTwoWayWithErrorCallback&& callback) {
+  ZX_DEBUG_ASSERT_MSG(callback,
+                      "Callback must not be empty for OpenProtocol::FlexibleTwoWayWithError\n");
+  return ::std::make_unique<::fidl::internal::SingleUseMessageHandler>(
+      [callback_ = std::move(callback)](::fidl::HLCPPIncomingMessage&& message) {
+        ::fidl::Decoder decoder(std::move(message));
+        callback_(::fidl::DecodeAs<::test::protocollayouts::imported::ComposedOpenProtocol_FlexibleTwoWayWithError_Result>(&decoder, 0 + sizeof(fidl_message_header_t)));
+        return ZX_OK;
+      }, &::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocol_FlexibleTwoWayWithError_ResultTable);
+}
+
+}  // namespace
+void OpenProtocol_Proxy::FlexibleTwoWayWithError(int32_t value, FlexibleTwoWayWithErrorCallback callback) {
+  ::fidl::MessageEncoder _encoder(::test::protocollayouts::internal::kOpenProtocol_FlexibleTwoWayWithError_Ordinal, ::test::protocollayouts::internal::kOpenProtocol_FlexibleTwoWayWithError_DynamicFlags);
+  const fidl_type_t* req_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolFlexibleTwoWayWithErrorRequestTable;
+  controller_->Send(req_type, ::test::protocollayouts::OpenProtocol_RequestEncoder::FlexibleTwoWayWithError(&_encoder, &value), OpenProtocol_FlexibleTwoWayWithError_ResponseHandler(std::move(callback)));
+}
+void OpenProtocol_Proxy::StrictOneWay(int32_t value) {
+  ::fidl::MessageEncoder _encoder(::test::protocollayouts::internal::kOpenProtocol_StrictOneWay_Ordinal, ::test::protocollayouts::internal::kOpenProtocol_StrictOneWay_DynamicFlags);
+  const fidl_type_t* req_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolStrictOneWayRequestTable;
+  controller_->Send(req_type, ::test::protocollayouts::OpenProtocol_RequestEncoder::StrictOneWay(&_encoder, &value), nullptr);
+}
+namespace {
+
+::std::unique_ptr<::fidl::internal::SingleUseMessageHandler>
+OpenProtocol_StrictTwoWayNoError_ResponseHandler(OpenProtocol::StrictTwoWayNoErrorCallback&& callback) {
+  ZX_DEBUG_ASSERT_MSG(callback,
+                      "Callback must not be empty for OpenProtocol::StrictTwoWayNoError\n");
+  return ::std::make_unique<::fidl::internal::SingleUseMessageHandler>(
+      [callback_ = std::move(callback)](::fidl::HLCPPIncomingMessage&& message) {
+        ::fidl::Decoder decoder(std::move(message));
+        callback_(::fidl::DecodeAs<int32_t>(&decoder, 0 + sizeof(fidl_message_header_t)));
+        return ZX_OK;
+      }, &::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolStrictTwoWayNoErrorResponseTable);
+}
+
+}  // namespace
+void OpenProtocol_Proxy::StrictTwoWayNoError(int32_t value, StrictTwoWayNoErrorCallback callback) {
+  ::fidl::MessageEncoder _encoder(::test::protocollayouts::internal::kOpenProtocol_StrictTwoWayNoError_Ordinal, ::test::protocollayouts::internal::kOpenProtocol_StrictTwoWayNoError_DynamicFlags);
+  const fidl_type_t* req_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolStrictTwoWayNoErrorRequestTable;
+  controller_->Send(req_type, ::test::protocollayouts::OpenProtocol_RequestEncoder::StrictTwoWayNoError(&_encoder, &value), OpenProtocol_StrictTwoWayNoError_ResponseHandler(std::move(callback)));
+}
+namespace {
+
+::std::unique_ptr<::fidl::internal::SingleUseMessageHandler>
+OpenProtocol_StrictTwoWayWithError_ResponseHandler(OpenProtocol::StrictTwoWayWithErrorCallback&& callback) {
+  ZX_DEBUG_ASSERT_MSG(callback,
+                      "Callback must not be empty for OpenProtocol::StrictTwoWayWithError\n");
+  return ::std::make_unique<::fidl::internal::SingleUseMessageHandler>(
+      [callback_ = std::move(callback)](::fidl::HLCPPIncomingMessage&& message) {
+        ::fidl::Decoder decoder(std::move(message));
+        callback_(::fidl::DecodeAs<::test::protocollayouts::imported::ComposedOpenProtocol_StrictTwoWayWithError_Result>(&decoder, 0 + sizeof(fidl_message_header_t)));
+        return ZX_OK;
+      }, &::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocol_StrictTwoWayWithError_ResultTable);
+}
+
+}  // namespace
+void OpenProtocol_Proxy::StrictTwoWayWithError(int32_t value, StrictTwoWayWithErrorCallback callback) {
+  ::fidl::MessageEncoder _encoder(::test::protocollayouts::internal::kOpenProtocol_StrictTwoWayWithError_Ordinal, ::test::protocollayouts::internal::kOpenProtocol_StrictTwoWayWithError_DynamicFlags);
+  const fidl_type_t* req_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolStrictTwoWayWithErrorRequestTable;
+  controller_->Send(req_type, ::test::protocollayouts::OpenProtocol_RequestEncoder::StrictTwoWayWithError(&_encoder, &value), OpenProtocol_StrictTwoWayWithError_ResponseHandler(std::move(callback)));
+}
+void OpenProtocol_Proxy::FlexibleOneWayNamedPayload(int32_t value) {
+  ::fidl::MessageEncoder _encoder(::test::protocollayouts::internal::kOpenProtocol_FlexibleOneWayNamedPayload_Ordinal, ::test::protocollayouts::internal::kOpenProtocol_FlexibleOneWayNamedPayload_DynamicFlags);
+  const fidl_type_t* req_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ImportStructPayloadTable;
+  controller_->Send(req_type, ::test::protocollayouts::OpenProtocol_RequestEncoder::FlexibleOneWayNamedPayload(&_encoder, &value), nullptr);
+}
+
+OpenProtocol_Stub::OpenProtocol_Stub(::test::protocollayouts::OpenProtocol_Stub::OpenProtocol_clazz* impl) : impl_(impl) {
+  (void)impl_;
+}
+
+OpenProtocol_Stub::~OpenProtocol_Stub() = default;
+
+namespace {
+
+class OpenProtocol_FlexibleTwoWayNoError_Responder final {
+ public:
+  OpenProtocol_FlexibleTwoWayNoError_Responder(::fidl::internal::PendingResponse response)
+      : response_(std::move(response)) {}
+
+  void operator()(::test::protocollayouts::imported::ComposedOpenProtocol_FlexibleTwoWayNoError_Result ComposedOpenProtocol_FlexibleTwoWayNoError_Result) {
+    ::fidl::MessageEncoder _encoder(::test::protocollayouts::internal::kOpenProtocol_FlexibleTwoWayNoError_Ordinal, ::test::protocollayouts::internal::kOpenProtocol_FlexibleTwoWayNoError_DynamicFlags);
+    const fidl_type_t* resp_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocol_FlexibleTwoWayNoError_ResultTable;
+    ZX_ASSERT_MSG(!ComposedOpenProtocol_FlexibleTwoWayNoError_Result.is_transport_err(), "Applications must not explicitly send transport_err for flexible methods.");
+    response_.Send(resp_type, ::test::protocollayouts::OpenProtocol_ResponseEncoder::FlexibleTwoWayNoError(&_encoder, &ComposedOpenProtocol_FlexibleTwoWayNoError_Result));
+  }
+
+ private:
+  ::fidl::internal::PendingResponse response_;
+};
+
+class OpenProtocol_FlexibleTwoWayWithError_Responder final {
+ public:
+  OpenProtocol_FlexibleTwoWayWithError_Responder(::fidl::internal::PendingResponse response)
+      : response_(std::move(response)) {}
+
+  void operator()(::test::protocollayouts::imported::ComposedOpenProtocol_FlexibleTwoWayWithError_Result ComposedOpenProtocol_FlexibleTwoWayWithError_Result) {
+    ::fidl::MessageEncoder _encoder(::test::protocollayouts::internal::kOpenProtocol_FlexibleTwoWayWithError_Ordinal, ::test::protocollayouts::internal::kOpenProtocol_FlexibleTwoWayWithError_DynamicFlags);
+    const fidl_type_t* resp_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocol_FlexibleTwoWayWithError_ResultTable;
+    ZX_ASSERT_MSG(!ComposedOpenProtocol_FlexibleTwoWayWithError_Result.is_transport_err(), "Applications must not explicitly send transport_err for flexible methods.");
+    response_.Send(resp_type, ::test::protocollayouts::OpenProtocol_ResponseEncoder::FlexibleTwoWayWithError(&_encoder, &ComposedOpenProtocol_FlexibleTwoWayWithError_Result));
+  }
+
+ private:
+  ::fidl::internal::PendingResponse response_;
+};
+
+class OpenProtocol_StrictTwoWayNoError_Responder final {
+ public:
+  OpenProtocol_StrictTwoWayNoError_Responder(::fidl::internal::PendingResponse response)
+      : response_(std::move(response)) {}
+
+  void operator()(int32_t value) {
+    ::fidl::MessageEncoder _encoder(::test::protocollayouts::internal::kOpenProtocol_StrictTwoWayNoError_Ordinal, ::test::protocollayouts::internal::kOpenProtocol_StrictTwoWayNoError_DynamicFlags);
+    const fidl_type_t* resp_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolStrictTwoWayNoErrorResponseTable;
+    response_.Send(resp_type, ::test::protocollayouts::OpenProtocol_ResponseEncoder::StrictTwoWayNoError(&_encoder, &value));
+  }
+
+ private:
+  ::fidl::internal::PendingResponse response_;
+};
+
+class OpenProtocol_StrictTwoWayWithError_Responder final {
+ public:
+  OpenProtocol_StrictTwoWayWithError_Responder(::fidl::internal::PendingResponse response)
+      : response_(std::move(response)) {}
+
+  void operator()(::test::protocollayouts::imported::ComposedOpenProtocol_StrictTwoWayWithError_Result ComposedOpenProtocol_StrictTwoWayWithError_Result) {
+    ::fidl::MessageEncoder _encoder(::test::protocollayouts::internal::kOpenProtocol_StrictTwoWayWithError_Ordinal, ::test::protocollayouts::internal::kOpenProtocol_StrictTwoWayWithError_DynamicFlags);
+    const fidl_type_t* resp_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocol_StrictTwoWayWithError_ResultTable;
+    response_.Send(resp_type, ::test::protocollayouts::OpenProtocol_ResponseEncoder::StrictTwoWayWithError(&_encoder, &ComposedOpenProtocol_StrictTwoWayWithError_Result));
+  }
+
+ private:
+  ::fidl::internal::PendingResponse response_;
+};
+
+}  // namespace
+
+zx_status_t OpenProtocol_Stub::Dispatch_(
+    ::fidl::HLCPPIncomingMessage message,
+    ::fidl::internal::PendingResponse response) {
+  bool needs_response;
+  bool is_known;
+  const fidl_type_t* request_type = ::test::protocollayouts::OpenProtocol_RequestDecoder::GetType(message.ordinal(), &needs_response, &is_known);
+
+  if (!is_known) {
+    auto is_flexible = message.is_flexible();
+    auto ordinal = message.ordinal();
+    // To satisfy RFC-0138, move the message so it is destructed before sending
+    // a reply or calling the unknown method handler.
+    { auto message_ = std::move(message); }
+    if (is_flexible) {
+      if (response.needs_response()) {
+        ::fidl::MessageEncoder encoder(ordinal, ::fidl::MessageDynamicFlags::kFlexibleMethod);
+        const fidl_type_t* resp_type = &kFidlInternalUnknownMethodResponseTable;
+        response.Send(resp_type, ::fidl::internal::EncodeUnknownMethodResponse(&encoder));
+        impl_->handle_unknown_method(ordinal, true);
+      } else {
+        impl_->handle_unknown_method(ordinal, false);
+      }
+      return ZX_OK;
+    }
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  if (!message.has_only_header()) {
+    if (request_type == nullptr) {
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+    const char* error_msg = nullptr;
+    zx_status_t status = message.Decode(request_type, &error_msg);
+    if (status != ZX_OK) {
+      FIDL_REPORT_DECODING_ERROR(message, request_type, error_msg);
+      return status;
+    }
+  }
+
+  if (response.needs_response() != needs_response) {
+    if (needs_response) {
+      FIDL_REPORT_DECODING_ERROR(message, request_type, "Message needing a response with no txid");
+    } else {
+      FIDL_REPORT_DECODING_ERROR(message, request_type, "Message not needing a response with a txid");
+    }
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  uint64_t ordinal = message.ordinal();
+  switch (ordinal) {
+    case ::test::protocollayouts::internal::kOpenProtocol_FlexibleOneWay_Ordinal:
+    {
+      ::fidl::Decoder decoder(std::move(message));
+      impl_->FlexibleOneWay(::fidl::DecodeAs<int32_t>(&decoder, 0 + sizeof(fidl_message_header_t)));
+      break;
+    }
+    case ::test::protocollayouts::internal::kOpenProtocol_FlexibleTwoWayNoError_Ordinal:
+    {
+      ::fidl::Decoder decoder(std::move(message));
+      impl_->FlexibleTwoWayNoError(::fidl::DecodeAs<int32_t>(&decoder, 0 + sizeof(fidl_message_header_t)), OpenProtocol_FlexibleTwoWayNoError_Responder(std::move(response)));
+      break;
+    }
+    case ::test::protocollayouts::internal::kOpenProtocol_FlexibleTwoWayWithError_Ordinal:
+    {
+      ::fidl::Decoder decoder(std::move(message));
+      impl_->FlexibleTwoWayWithError(::fidl::DecodeAs<int32_t>(&decoder, 0 + sizeof(fidl_message_header_t)), OpenProtocol_FlexibleTwoWayWithError_Responder(std::move(response)));
+      break;
+    }
+    case ::test::protocollayouts::internal::kOpenProtocol_StrictOneWay_Ordinal:
+    {
+      ::fidl::Decoder decoder(std::move(message));
+      impl_->StrictOneWay(::fidl::DecodeAs<int32_t>(&decoder, 0 + sizeof(fidl_message_header_t)));
+      break;
+    }
+    case ::test::protocollayouts::internal::kOpenProtocol_StrictTwoWayNoError_Ordinal:
+    {
+      ::fidl::Decoder decoder(std::move(message));
+      impl_->StrictTwoWayNoError(::fidl::DecodeAs<int32_t>(&decoder, 0 + sizeof(fidl_message_header_t)), OpenProtocol_StrictTwoWayNoError_Responder(std::move(response)));
+      break;
+    }
+    case ::test::protocollayouts::internal::kOpenProtocol_StrictTwoWayWithError_Ordinal:
+    {
+      ::fidl::Decoder decoder(std::move(message));
+      impl_->StrictTwoWayWithError(::fidl::DecodeAs<int32_t>(&decoder, 0 + sizeof(fidl_message_header_t)), OpenProtocol_StrictTwoWayWithError_Responder(std::move(response)));
+      break;
+    }
+    case ::test::protocollayouts::internal::kOpenProtocol_FlexibleOneWayNamedPayload_Ordinal:
+    {
+      ::fidl::Decoder decoder(std::move(message));
+      impl_->FlexibleOneWayNamedPayload(::fidl::DecodeAs<int32_t>(&decoder, 0 + sizeof(fidl_message_header_t)));
+      break;
+    }
+    default: {
+      // Unknown ordinals are handled at the beginning of dispatching, so this
+      // should be unreachable.
+      ZX_PANIC("Unreachable: unknown ordinals handled earlier.");
+    }
+  }
+  return ZX_OK;
+}
+void OpenProtocol_Stub::FlexibleEvent(int32_t value) {
+  ::fidl::MessageEncoder _encoder(::test::protocollayouts::internal::kOpenProtocol_FlexibleEvent_Ordinal, ::test::protocollayouts::internal::kOpenProtocol_FlexibleEvent_DynamicFlags);
+  const fidl_type_t* resp_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolFlexibleEventRequestTable;sender_()->Send(resp_type, ::test::protocollayouts::OpenProtocol_ResponseEncoder::FlexibleEvent(&_encoder, &value));
+}
+void OpenProtocol_Stub::StrictEvent(int32_t value) {
+  ::fidl::MessageEncoder _encoder(::test::protocollayouts::internal::kOpenProtocol_StrictEvent_Ordinal, ::test::protocollayouts::internal::kOpenProtocol_StrictEvent_DynamicFlags);
+  const fidl_type_t* resp_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolStrictEventRequestTable;sender_()->Send(resp_type, ::test::protocollayouts::OpenProtocol_ResponseEncoder::StrictEvent(&_encoder, &value));
+}
+
+OpenProtocol_SyncProxy::OpenProtocol_SyncProxy(::zx::channel channel)
+    : proxy_(::std::move(channel)) {}
+
+OpenProtocol_SyncProxy::~OpenProtocol_SyncProxy() = default;
+
+zx_status_t OpenProtocol_SyncProxy::FlexibleOneWay(int32_t value) {
+  ::fidl::MessageEncoder _encoder(::test::protocollayouts::internal::kOpenProtocol_FlexibleOneWay_Ordinal, ::test::protocollayouts::internal::kOpenProtocol_FlexibleOneWay_DynamicFlags);
+    const fidl_type_t* req_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolFlexibleOneWayRequestTable;
+  return proxy_.Send(req_type, ::test::protocollayouts::OpenProtocol_RequestEncoder::FlexibleOneWay(&_encoder, &value));
+}
+
+zx_status_t OpenProtocol_SyncProxy::FlexibleTwoWayNoError(int32_t value, ::test::protocollayouts::imported::ComposedOpenProtocol_FlexibleTwoWayNoError_Result* out_ComposedOpenProtocol_FlexibleTwoWayNoError_Result) {
+  ::fidl::MessageEncoder _encoder(::test::protocollayouts::internal::kOpenProtocol_FlexibleTwoWayNoError_Ordinal, ::test::protocollayouts::internal::kOpenProtocol_FlexibleTwoWayNoError_DynamicFlags);
+  ::fidl::IncomingMessageBuffer buffer_;
+  ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
+  const fidl_type_t* req_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolFlexibleTwoWayNoErrorRequestTable;
+  const fidl_type_t* resp_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocol_FlexibleTwoWayNoError_ResultTable;
+  zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::protocollayouts::OpenProtocol_RequestEncoder::FlexibleTwoWayNoError(&_encoder, &value), &response_);
+  if (status_ != ZX_OK)
+    return status_;
+  ::fidl::Decoder decoder_(std::move(response_));
+  *out_ComposedOpenProtocol_FlexibleTwoWayNoError_Result = ::fidl::DecodeAs<::test::protocollayouts::imported::ComposedOpenProtocol_FlexibleTwoWayNoError_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
+  return ZX_OK;
+}
+
+zx_status_t OpenProtocol_SyncProxy::FlexibleTwoWayWithError(int32_t value, ::test::protocollayouts::imported::ComposedOpenProtocol_FlexibleTwoWayWithError_Result* out_ComposedOpenProtocol_FlexibleTwoWayWithError_Result) {
+  ::fidl::MessageEncoder _encoder(::test::protocollayouts::internal::kOpenProtocol_FlexibleTwoWayWithError_Ordinal, ::test::protocollayouts::internal::kOpenProtocol_FlexibleTwoWayWithError_DynamicFlags);
+  ::fidl::IncomingMessageBuffer buffer_;
+  ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
+  const fidl_type_t* req_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolFlexibleTwoWayWithErrorRequestTable;
+  const fidl_type_t* resp_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocol_FlexibleTwoWayWithError_ResultTable;
+  zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::protocollayouts::OpenProtocol_RequestEncoder::FlexibleTwoWayWithError(&_encoder, &value), &response_);
+  if (status_ != ZX_OK)
+    return status_;
+  ::fidl::Decoder decoder_(std::move(response_));
+  *out_ComposedOpenProtocol_FlexibleTwoWayWithError_Result = ::fidl::DecodeAs<::test::protocollayouts::imported::ComposedOpenProtocol_FlexibleTwoWayWithError_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
+  return ZX_OK;
+}
+
+zx_status_t OpenProtocol_SyncProxy::StrictOneWay(int32_t value) {
+  ::fidl::MessageEncoder _encoder(::test::protocollayouts::internal::kOpenProtocol_StrictOneWay_Ordinal, ::test::protocollayouts::internal::kOpenProtocol_StrictOneWay_DynamicFlags);
+    const fidl_type_t* req_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolStrictOneWayRequestTable;
+  return proxy_.Send(req_type, ::test::protocollayouts::OpenProtocol_RequestEncoder::StrictOneWay(&_encoder, &value));
+}
+
+zx_status_t OpenProtocol_SyncProxy::StrictTwoWayNoError(int32_t value, int32_t* out_value) {
+  ::fidl::MessageEncoder _encoder(::test::protocollayouts::internal::kOpenProtocol_StrictTwoWayNoError_Ordinal, ::test::protocollayouts::internal::kOpenProtocol_StrictTwoWayNoError_DynamicFlags);
+  ::fidl::IncomingMessageBuffer buffer_;
+  ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
+  const fidl_type_t* req_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolStrictTwoWayNoErrorRequestTable;
+  const fidl_type_t* resp_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolStrictTwoWayNoErrorResponseTable;
+  zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::protocollayouts::OpenProtocol_RequestEncoder::StrictTwoWayNoError(&_encoder, &value), &response_);
+  if (status_ != ZX_OK)
+    return status_;
+  ::fidl::Decoder decoder_(std::move(response_));
+  *out_value = ::fidl::DecodeAs<int32_t>(&decoder_, 0 + sizeof(fidl_message_header_t));
+  return ZX_OK;
+}
+
+zx_status_t OpenProtocol_SyncProxy::StrictTwoWayWithError(int32_t value, ::test::protocollayouts::imported::ComposedOpenProtocol_StrictTwoWayWithError_Result* out_ComposedOpenProtocol_StrictTwoWayWithError_Result) {
+  ::fidl::MessageEncoder _encoder(::test::protocollayouts::internal::kOpenProtocol_StrictTwoWayWithError_Ordinal, ::test::protocollayouts::internal::kOpenProtocol_StrictTwoWayWithError_DynamicFlags);
+  ::fidl::IncomingMessageBuffer buffer_;
+  ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
+  const fidl_type_t* req_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocolStrictTwoWayWithErrorRequestTable;
+  const fidl_type_t* resp_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocol_StrictTwoWayWithError_ResultTable;
+  zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::protocollayouts::OpenProtocol_RequestEncoder::StrictTwoWayWithError(&_encoder, &value), &response_);
+  if (status_ != ZX_OK)
+    return status_;
+  ::fidl::Decoder decoder_(std::move(response_));
+  *out_ComposedOpenProtocol_StrictTwoWayWithError_Result = ::fidl::DecodeAs<::test::protocollayouts::imported::ComposedOpenProtocol_StrictTwoWayWithError_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
+  return ZX_OK;
+}
+
+zx_status_t OpenProtocol_SyncProxy::FlexibleOneWayNamedPayload(int32_t value) {
+  ::fidl::MessageEncoder _encoder(::test::protocollayouts::internal::kOpenProtocol_FlexibleOneWayNamedPayload_Ordinal, ::test::protocollayouts::internal::kOpenProtocol_FlexibleOneWayNamedPayload_DynamicFlags);
+    const fidl_type_t* req_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ImportStructPayloadTable;
+  return proxy_.Send(req_type, ::test::protocollayouts::OpenProtocol_RequestEncoder::FlexibleOneWayNamedPayload(&_encoder, &value));
+}
+
+#endif  // __Fuchsia__
+
 
 }  // namespace protocollayouts
 }  // namespace test

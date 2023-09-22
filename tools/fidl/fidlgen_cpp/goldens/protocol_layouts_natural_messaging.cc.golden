@@ -1166,4 +1166,510 @@ void fidl::Server<::test_protocollayouts::MainProtocol>::dispatch_message(
 
 #endif  // __Fuchsia__
 
+namespace test_protocollayouts {
+
+[[maybe_unused]] constexpr inline uint64_t kOpenProtocol_FlexibleOneWay_Ordinal = 3516779973873009953lu;
+
+[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_FlexibleOneWay_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
+
+[[maybe_unused]] constexpr inline uint64_t kOpenProtocol_FlexibleTwoWayNoError_Ordinal = 5572735551219638488lu;
+
+[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_FlexibleTwoWayNoError_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
+
+[[maybe_unused]] constexpr inline uint64_t kOpenProtocol_FlexibleTwoWayWithError_Ordinal = 3504132377779779458lu;
+
+[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_FlexibleTwoWayWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
+
+[[maybe_unused]] constexpr inline uint64_t kOpenProtocol_FlexibleEvent_Ordinal = 9152311661656086484lu;
+
+[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_FlexibleEvent_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
+
+[[maybe_unused]] constexpr inline uint64_t kOpenProtocol_StrictOneWay_Ordinal = 8790149921168801703lu;
+
+[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_StrictOneWay_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+
+[[maybe_unused]] constexpr inline uint64_t kOpenProtocol_StrictTwoWayNoError_Ordinal = 3690935745864999300lu;
+
+[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_StrictTwoWayNoError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+
+[[maybe_unused]] constexpr inline uint64_t kOpenProtocol_StrictTwoWayWithError_Ordinal = 5364624536440098871lu;
+
+[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_StrictTwoWayWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+
+[[maybe_unused]] constexpr inline uint64_t kOpenProtocol_StrictEvent_Ordinal = 3921073878922106269lu;
+
+[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_StrictEvent_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+
+[[maybe_unused]] constexpr inline uint64_t kOpenProtocol_FlexibleOneWayNamedPayload_Ordinal = 1525606789639046512lu;
+
+[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_FlexibleOneWayNamedPayload_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
+
+#ifdef __Fuchsia__
+}  // namespace test_protocollayouts
+
+::fidl::internal::NaturalThenable<::test_protocollayouts::OpenProtocol::FlexibleTwoWayNoError>
+fidl::internal::NaturalClientImpl<::test_protocollayouts::OpenProtocol>::FlexibleTwoWayNoError(const ::fidl::Request<::test_protocollayouts::OpenProtocol::FlexibleTwoWayNoError>& request) const {
+  return ::fidl::internal::NaturalThenable<::test_protocollayouts::OpenProtocol::FlexibleTwoWayNoError>(
+      &client_base(), {}, &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kOpenProtocol_FlexibleTwoWayNoError_Ordinal, ::test_protocollayouts::kOpenProtocol_FlexibleTwoWayNoError_DynamicFlags,
+      [request = request](NaturalMessageEncoder& encoder) mutable {
+        encoder.EncodeBody(request);
+        return ZX_OK;
+      },
+      [](
+          ::fidl::internal::ThenableBase* base,
+          ::fidl::internal::NaturalMessageEncoder& encoder,
+          ::fidl::internal::ResponseContext* response_context) {
+        ::fidl::OutgoingMessage msg = encoder.GetMessage();
+        return base->SendTwoWay(msg, response_context);
+      });
+}
+
+::fidl::internal::NaturalThenable<::test_protocollayouts::OpenProtocol::FlexibleTwoWayWithError>
+fidl::internal::NaturalClientImpl<::test_protocollayouts::OpenProtocol>::FlexibleTwoWayWithError(const ::fidl::Request<::test_protocollayouts::OpenProtocol::FlexibleTwoWayWithError>& request) const {
+  return ::fidl::internal::NaturalThenable<::test_protocollayouts::OpenProtocol::FlexibleTwoWayWithError>(
+      &client_base(), {}, &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kOpenProtocol_FlexibleTwoWayWithError_Ordinal, ::test_protocollayouts::kOpenProtocol_FlexibleTwoWayWithError_DynamicFlags,
+      [request = request](NaturalMessageEncoder& encoder) mutable {
+        encoder.EncodeBody(request);
+        return ZX_OK;
+      },
+      [](
+          ::fidl::internal::ThenableBase* base,
+          ::fidl::internal::NaturalMessageEncoder& encoder,
+          ::fidl::internal::ResponseContext* response_context) {
+        ::fidl::OutgoingMessage msg = encoder.GetMessage();
+        return base->SendTwoWay(msg, response_context);
+      });
+}
+
+::fidl::internal::NaturalThenable<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError>
+fidl::internal::NaturalClientImpl<::test_protocollayouts::OpenProtocol>::StrictTwoWayNoError(const ::fidl::Request<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError>& request) const {
+  return ::fidl::internal::NaturalThenable<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError>(
+      &client_base(), {}, &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kOpenProtocol_StrictTwoWayNoError_Ordinal, ::test_protocollayouts::kOpenProtocol_StrictTwoWayNoError_DynamicFlags,
+      [request = request](NaturalMessageEncoder& encoder) mutable {
+        encoder.EncodeBody(request);
+        return ZX_OK;
+      },
+      [](
+          ::fidl::internal::ThenableBase* base,
+          ::fidl::internal::NaturalMessageEncoder& encoder,
+          ::fidl::internal::ResponseContext* response_context) {
+        ::fidl::OutgoingMessage msg = encoder.GetMessage();
+        return base->SendTwoWay(msg, response_context);
+      });
+}
+
+::fidl::internal::NaturalThenable<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>
+fidl::internal::NaturalClientImpl<::test_protocollayouts::OpenProtocol>::StrictTwoWayWithError(const ::fidl::Request<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>& request) const {
+  return ::fidl::internal::NaturalThenable<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>(
+      &client_base(), {}, &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kOpenProtocol_StrictTwoWayWithError_Ordinal, ::test_protocollayouts::kOpenProtocol_StrictTwoWayWithError_DynamicFlags,
+      [request = request](NaturalMessageEncoder& encoder) mutable {
+        encoder.EncodeBody(request);
+        return ZX_OK;
+      },
+      [](
+          ::fidl::internal::ThenableBase* base,
+          ::fidl::internal::NaturalMessageEncoder& encoder,
+          ::fidl::internal::ResponseContext* response_context) {
+        ::fidl::OutgoingMessage msg = encoder.GetMessage();
+        return base->SendTwoWay(msg, response_context);
+      });
+}
+
+::fit::result<::fidl::OneWayError>
+fidl::internal::NaturalClientImpl<::test_protocollayouts::OpenProtocol>::FlexibleOneWay(const ::fidl::Request<::test_protocollayouts::OpenProtocol::FlexibleOneWay>& request) const {
+  ::fidl::internal::NaturalMessageEncoder _encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kOpenProtocol_FlexibleOneWay_Ordinal, ::test_protocollayouts::kOpenProtocol_FlexibleOneWay_DynamicFlags};
+  _encoder.EncodeBody(request);
+
+  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
+  ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
+  return ::fidl::internal::ToFitxResult(status);
+}
+
+::fit::result<::fidl::OneWayError>
+fidl::internal::NaturalClientImpl<::test_protocollayouts::OpenProtocol>::StrictOneWay(const ::fidl::Request<::test_protocollayouts::OpenProtocol::StrictOneWay>& request) const {
+  ::fidl::internal::NaturalMessageEncoder _encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kOpenProtocol_StrictOneWay_Ordinal, ::test_protocollayouts::kOpenProtocol_StrictOneWay_DynamicFlags};
+  _encoder.EncodeBody(request);
+
+  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
+  ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
+  return ::fidl::internal::ToFitxResult(status);
+}
+
+::fit::result<::fidl::OneWayError>
+fidl::internal::NaturalClientImpl<::test_protocollayouts::OpenProtocol>::FlexibleOneWayNamedPayload(const ::fidl::Request<::test_protocollayouts::OpenProtocol::FlexibleOneWayNamedPayload>& request) const {
+  ::fidl::internal::NaturalMessageEncoder _encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kOpenProtocol_FlexibleOneWayNamedPayload_Ordinal, ::test_protocollayouts::kOpenProtocol_FlexibleOneWayNamedPayload_DynamicFlags};
+  _encoder.EncodeBody(request);
+
+  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
+  ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
+  return ::fidl::internal::ToFitxResult(status);
+}
+namespace test_protocollayouts {
+
+#endif  // __Fuchsia__
+
+}  // namespace test_protocollayouts
+
+#ifdef __Fuchsia__
+
+::fidl::Result<::test_protocollayouts::OpenProtocol::FlexibleTwoWayNoError>
+fidl::internal::NaturalSyncClientImpl<::test_protocollayouts::OpenProtocol>::FlexibleTwoWayNoError(const ::fidl::Request<::test_protocollayouts::OpenProtocol::FlexibleTwoWayNoError>& request) {
+  ::fidl::internal::NaturalMessageEncoder encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kOpenProtocol_FlexibleTwoWayNoError_Ordinal, ::test_protocollayouts::kOpenProtocol_FlexibleTwoWayNoError_DynamicFlags};
+  encoder.EncodeBody(request);
+  ::fidl::OutgoingMessage msg = encoder.GetMessage();
+  ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_protocollayouts::OpenProtocol::FlexibleTwoWayNoError>> response_storage;
+  return ::fidl::internal::DecodeResponseAndFoldError<::test_protocollayouts::OpenProtocol::FlexibleTwoWayNoError>(
+      msg.Call(_client_end().handle(), response_storage.view()), nullptr);
+}
+
+::fidl::Result<::test_protocollayouts::OpenProtocol::FlexibleTwoWayWithError>
+fidl::internal::NaturalSyncClientImpl<::test_protocollayouts::OpenProtocol>::FlexibleTwoWayWithError(const ::fidl::Request<::test_protocollayouts::OpenProtocol::FlexibleTwoWayWithError>& request) {
+  ::fidl::internal::NaturalMessageEncoder encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kOpenProtocol_FlexibleTwoWayWithError_Ordinal, ::test_protocollayouts::kOpenProtocol_FlexibleTwoWayWithError_DynamicFlags};
+  encoder.EncodeBody(request);
+  ::fidl::OutgoingMessage msg = encoder.GetMessage();
+  ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_protocollayouts::OpenProtocol::FlexibleTwoWayWithError>> response_storage;
+  return ::fidl::internal::DecodeResponseAndFoldError<::test_protocollayouts::OpenProtocol::FlexibleTwoWayWithError>(
+      msg.Call(_client_end().handle(), response_storage.view()), nullptr);
+}
+
+::fidl::Result<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError>
+fidl::internal::NaturalSyncClientImpl<::test_protocollayouts::OpenProtocol>::StrictTwoWayNoError(const ::fidl::Request<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError>& request) {
+  ::fidl::internal::NaturalMessageEncoder encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kOpenProtocol_StrictTwoWayNoError_Ordinal, ::test_protocollayouts::kOpenProtocol_StrictTwoWayNoError_DynamicFlags};
+  encoder.EncodeBody(request);
+  ::fidl::OutgoingMessage msg = encoder.GetMessage();
+  ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError>> response_storage;
+  return ::fidl::internal::DecodeResponseAndFoldError<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError>(
+      msg.Call(_client_end().handle(), response_storage.view()), nullptr);
+}
+
+::fidl::Result<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>
+fidl::internal::NaturalSyncClientImpl<::test_protocollayouts::OpenProtocol>::StrictTwoWayWithError(const ::fidl::Request<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>& request) {
+  ::fidl::internal::NaturalMessageEncoder encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kOpenProtocol_StrictTwoWayWithError_Ordinal, ::test_protocollayouts::kOpenProtocol_StrictTwoWayWithError_DynamicFlags};
+  encoder.EncodeBody(request);
+  ::fidl::OutgoingMessage msg = encoder.GetMessage();
+  ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>> response_storage;
+  return ::fidl::internal::DecodeResponseAndFoldError<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>(
+      msg.Call(_client_end().handle(), response_storage.view()), nullptr);
+}
+
+::fit::result<::fidl::OneWayError>
+fidl::internal::NaturalSyncClientImpl<::test_protocollayouts::OpenProtocol>::FlexibleOneWay(const ::fidl::Request<::test_protocollayouts::OpenProtocol::FlexibleOneWay>& request) {
+  ::fidl::internal::NaturalMessageEncoder encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kOpenProtocol_FlexibleOneWay_Ordinal, ::test_protocollayouts::kOpenProtocol_FlexibleOneWay_DynamicFlags};
+  encoder.EncodeBody(request);
+  ::fidl::OutgoingMessage msg = encoder.GetMessage();
+  msg.Write(_client_end().handle());
+  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
+}
+
+::fit::result<::fidl::OneWayError>
+fidl::internal::NaturalSyncClientImpl<::test_protocollayouts::OpenProtocol>::StrictOneWay(const ::fidl::Request<::test_protocollayouts::OpenProtocol::StrictOneWay>& request) {
+  ::fidl::internal::NaturalMessageEncoder encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kOpenProtocol_StrictOneWay_Ordinal, ::test_protocollayouts::kOpenProtocol_StrictOneWay_DynamicFlags};
+  encoder.EncodeBody(request);
+  ::fidl::OutgoingMessage msg = encoder.GetMessage();
+  msg.Write(_client_end().handle());
+  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
+}
+
+::fit::result<::fidl::OneWayError>
+fidl::internal::NaturalSyncClientImpl<::test_protocollayouts::OpenProtocol>::FlexibleOneWayNamedPayload(const ::fidl::Request<::test_protocollayouts::OpenProtocol::FlexibleOneWayNamedPayload>& request) {
+  ::fidl::internal::NaturalMessageEncoder encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kOpenProtocol_FlexibleOneWayNamedPayload_Ordinal, ::test_protocollayouts::kOpenProtocol_FlexibleOneWayNamedPayload_DynamicFlags};
+  encoder.EncodeBody(request);
+  ::fidl::OutgoingMessage msg = encoder.GetMessage();
+  msg.Write(_client_end().handle());
+  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
+}
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+::fidl::Status fidl::SyncEventHandler<::test_protocollayouts::OpenProtocol>::HandleOneEvent(
+    ::fidl::UnownedClientEnd<::test_protocollayouts::OpenProtocol> client_end) {
+  ::fidl::internal::IncomingEventsStorage<::test_protocollayouts::OpenProtocol> event_storage;
+  fidl::internal::NaturalEventDispatcher<::test_protocollayouts::OpenProtocol> dispatcher{this};
+  return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
+}
+::fidl::Status
+fidl::internal::NaturalEventDispatcher<::test_protocollayouts::OpenProtocol>::DispatchEvent(
+    ::fidl::IncomingHeaderAndMessage& msg,
+    ::fidl::internal::MessageStorageViewBase* storage_view) {
+  switch (msg.header()->ordinal) {
+    case ::test_protocollayouts::kOpenProtocol_FlexibleEvent_Ordinal: {
+      ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_protocollayouts_imported::ComposedOpenProtocolFlexibleEventRequest>(std::move(msg));
+      if (decoded.is_error()) {
+        return decoded.error_value();
+      }
+      if (event_handler()) {
+        ::fidl::Event<::test_protocollayouts::OpenProtocol::FlexibleEvent> event = std::move(decoded.value());
+        event_handler()->FlexibleEvent(event);
+      }
+      return ::fidl::Status::Ok();
+    }
+    case ::test_protocollayouts::kOpenProtocol_StrictEvent_Ordinal: {
+      ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_protocollayouts_imported::ComposedOpenProtocolStrictEventRequest>(std::move(msg));
+      if (decoded.is_error()) {
+        return decoded.error_value();
+      }
+      if (event_handler()) {
+        ::fidl::Event<::test_protocollayouts::OpenProtocol::StrictEvent> event = std::move(decoded.value());
+        event_handler()->StrictEvent(event);
+      }
+      return ::fidl::Status::Ok();
+    }
+    default:
+      auto* hdr = msg.header();
+      ::fidl::UnknownMethodType unknown_method_type =
+          ::fidl::internal::UnknownMethodTypeFromHeader(hdr);
+      bool is_flexible_interaction = ::fidl::IsFlexibleInteraction(hdr);
+      auto ordinal = hdr->ordinal;
+      std::move(msg).CloseHandles();
+      if (is_flexible_interaction &&
+          ::fidl::internal::CanHandleEvent(::test_protocollayouts::OpenProtocol::kOpenness, unknown_method_type)) {
+        if (event_handler()) {
+          ::fidl::UnknownEventMetadata<::test_protocollayouts::OpenProtocol> metadata{
+              .event_ordinal = ordinal,
+          };
+          event_handler()->handle_unknown_event(metadata);
+        }
+        return ::fidl::Status::Ok();
+      }
+      return ::fidl::Status::UnknownOrdinal();
+  }
+}
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_protocollayouts::OpenProtocol>::FlexibleEvent(const ::test_protocollayouts_imported::ComposedOpenProtocolFlexibleEventRequest& payload) {
+  ::fidl::internal::NaturalMessageEncoder _encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kOpenProtocol_FlexibleEvent_Ordinal, ::test_protocollayouts::kOpenProtocol_FlexibleEvent_DynamicFlags};
+  _encoder.EncodeBody(payload);
+  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
+  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
+}
+
+::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_protocollayouts::OpenProtocol>::FlexibleEvent(const ::test_protocollayouts_imported::ComposedOpenProtocolFlexibleEventRequest& payload) {
+  ::fidl::internal::NaturalMessageEncoder _encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kOpenProtocol_FlexibleEvent_Ordinal, ::test_protocollayouts::kOpenProtocol_FlexibleEvent_DynamicFlags};
+  _encoder.EncodeBody(payload);
+  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
+  _encoded_message.Write(_transport());
+  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
+}
+
+::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_protocollayouts::OpenProtocol>::StrictEvent(const ::test_protocollayouts_imported::ComposedOpenProtocolStrictEventRequest& payload) {
+  ::fidl::internal::NaturalMessageEncoder _encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kOpenProtocol_StrictEvent_Ordinal, ::test_protocollayouts::kOpenProtocol_StrictEvent_DynamicFlags};
+  _encoder.EncodeBody(payload);
+  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
+  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
+}
+
+::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_protocollayouts::OpenProtocol>::StrictEvent(const ::test_protocollayouts_imported::ComposedOpenProtocolStrictEventRequest& payload) {
+  ::fidl::internal::NaturalMessageEncoder _encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kOpenProtocol_StrictEvent_Ordinal, ::test_protocollayouts::kOpenProtocol_StrictEvent_DynamicFlags};
+  _encoder.EncodeBody(payload);
+  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
+  _encoded_message.Write(_transport());
+  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
+}
+
+#endif  // __Fuchsia__
+
+void fidl::internal::NaturalCompleterBase<::test_protocollayouts::OpenProtocol::FlexibleTwoWayNoError>::Reply(const ::fidl::Response<::test_protocollayouts::OpenProtocol::FlexibleTwoWayNoError>& response) {
+  ::fidl::internal::NaturalMessageEncoder _encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kOpenProtocol_FlexibleTwoWayNoError_Ordinal, ::test_protocollayouts::kOpenProtocol_FlexibleTwoWayNoError_DynamicFlags};
+  _encoder.EncodeBody(
+      ::fidl::internal::ResponseMessageConverter<::test_protocollayouts::OpenProtocol::FlexibleTwoWayNoError>::IntoDomainObject(response));
+  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
+  SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
+}
+
+void fidl::internal::NaturalCompleterBase<::test_protocollayouts::OpenProtocol::FlexibleTwoWayWithError>::Reply(const ::fidl::Response<::test_protocollayouts::OpenProtocol::FlexibleTwoWayWithError>& response) {
+  ::fidl::internal::NaturalMessageEncoder _encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kOpenProtocol_FlexibleTwoWayWithError_Ordinal, ::test_protocollayouts::kOpenProtocol_FlexibleTwoWayWithError_DynamicFlags};
+  _encoder.EncodeBody(
+      ::fidl::internal::ResponseMessageConverter<::test_protocollayouts::OpenProtocol::FlexibleTwoWayWithError>::IntoDomainObject(response));
+  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
+  SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
+}
+
+void fidl::internal::NaturalCompleterBase<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError>::Reply(const ::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError>& response) {
+  ::fidl::internal::NaturalMessageEncoder _encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kOpenProtocol_StrictTwoWayNoError_Ordinal, ::test_protocollayouts::kOpenProtocol_StrictTwoWayNoError_DynamicFlags};
+  _encoder.EncodeBody(
+      ::fidl::internal::ResponseMessageConverter<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError>::IntoDomainObject(response));
+  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
+  SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
+}
+
+void fidl::internal::NaturalCompleterBase<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>::Reply(const ::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>& response) {
+  ::fidl::internal::NaturalMessageEncoder _encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_protocollayouts::kOpenProtocol_StrictTwoWayWithError_Ordinal, ::test_protocollayouts::kOpenProtocol_StrictTwoWayWithError_DynamicFlags};
+  _encoder.EncodeBody(
+      ::fidl::internal::ResponseMessageConverter<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>::IntoDomainObject(response));
+  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
+  SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
+}
+
+#ifdef __Fuchsia__
+
+constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_protocollayouts::OpenProtocol>::entries_[] = {
+    {
+        ::test_protocollayouts::kOpenProtocol_FlexibleOneWay_Ordinal,
+        [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
+           internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
+          ::fit::result decoded = ::fidl::StandaloneDecode<::test_protocollayouts_imported::ComposedOpenProtocolFlexibleOneWayRequest>(
+              std::move(msg), metadata);
+          if (decoded.is_error()) {
+            return decoded.error_value();
+          }
+          ::fidl::internal::NaturalCompleter<::test_protocollayouts::OpenProtocol::FlexibleOneWay>::Sync completer(txn);
+          static_cast<::fidl::Server<::test_protocollayouts::OpenProtocol>*>(interface)->FlexibleOneWay(
+              decoded.value(),
+              completer);
+          return ::fidl::Status::Ok();
+        },
+    },
+    {
+        ::test_protocollayouts::kOpenProtocol_FlexibleTwoWayNoError_Ordinal,
+        [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
+           internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
+          ::fit::result decoded = ::fidl::StandaloneDecode<::test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayNoErrorRequest>(
+              std::move(msg), metadata);
+          if (decoded.is_error()) {
+            return decoded.error_value();
+          }
+          ::fidl::internal::NaturalCompleter<::test_protocollayouts::OpenProtocol::FlexibleTwoWayNoError>::Sync completer(txn);
+          static_cast<::fidl::Server<::test_protocollayouts::OpenProtocol>*>(interface)->FlexibleTwoWayNoError(
+              decoded.value(),
+              completer);
+          return ::fidl::Status::Ok();
+        },
+    },
+    {
+        ::test_protocollayouts::kOpenProtocol_FlexibleTwoWayWithError_Ordinal,
+        [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
+           internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
+          ::fit::result decoded = ::fidl::StandaloneDecode<::test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorRequest>(
+              std::move(msg), metadata);
+          if (decoded.is_error()) {
+            return decoded.error_value();
+          }
+          ::fidl::internal::NaturalCompleter<::test_protocollayouts::OpenProtocol::FlexibleTwoWayWithError>::Sync completer(txn);
+          static_cast<::fidl::Server<::test_protocollayouts::OpenProtocol>*>(interface)->FlexibleTwoWayWithError(
+              decoded.value(),
+              completer);
+          return ::fidl::Status::Ok();
+        },
+    },
+    {
+        ::test_protocollayouts::kOpenProtocol_StrictOneWay_Ordinal,
+        [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
+           internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
+          ::fit::result decoded = ::fidl::StandaloneDecode<::test_protocollayouts_imported::ComposedOpenProtocolStrictOneWayRequest>(
+              std::move(msg), metadata);
+          if (decoded.is_error()) {
+            return decoded.error_value();
+          }
+          ::fidl::internal::NaturalCompleter<::test_protocollayouts::OpenProtocol::StrictOneWay>::Sync completer(txn);
+          static_cast<::fidl::Server<::test_protocollayouts::OpenProtocol>*>(interface)->StrictOneWay(
+              decoded.value(),
+              completer);
+          return ::fidl::Status::Ok();
+        },
+    },
+    {
+        ::test_protocollayouts::kOpenProtocol_StrictTwoWayNoError_Ordinal,
+        [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
+           internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
+          ::fit::result decoded = ::fidl::StandaloneDecode<::test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayNoErrorRequest>(
+              std::move(msg), metadata);
+          if (decoded.is_error()) {
+            return decoded.error_value();
+          }
+          ::fidl::internal::NaturalCompleter<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError>::Sync completer(txn);
+          static_cast<::fidl::Server<::test_protocollayouts::OpenProtocol>*>(interface)->StrictTwoWayNoError(
+              decoded.value(),
+              completer);
+          return ::fidl::Status::Ok();
+        },
+    },
+    {
+        ::test_protocollayouts::kOpenProtocol_StrictTwoWayWithError_Ordinal,
+        [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
+           internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
+          ::fit::result decoded = ::fidl::StandaloneDecode<::test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorRequest>(
+              std::move(msg), metadata);
+          if (decoded.is_error()) {
+            return decoded.error_value();
+          }
+          ::fidl::internal::NaturalCompleter<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>::Sync completer(txn);
+          static_cast<::fidl::Server<::test_protocollayouts::OpenProtocol>*>(interface)->StrictTwoWayWithError(
+              decoded.value(),
+              completer);
+          return ::fidl::Status::Ok();
+        },
+    },
+    {
+        ::test_protocollayouts::kOpenProtocol_FlexibleOneWayNamedPayload_Ordinal,
+        [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
+           internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
+          ::fit::result decoded = ::fidl::StandaloneDecode<::test_protocollayouts_imported::ImportStructPayload>(
+              std::move(msg), metadata);
+          if (decoded.is_error()) {
+            return decoded.error_value();
+          }
+          ::fidl::internal::NaturalCompleter<::test_protocollayouts::OpenProtocol::FlexibleOneWayNamedPayload>::Sync completer(txn);
+          static_cast<::fidl::Server<::test_protocollayouts::OpenProtocol>*>(interface)->FlexibleOneWayNamedPayload(
+              decoded.value(),
+              completer);
+          return ::fidl::Status::Ok();
+        },
+    },
+};
+
+const ::fidl::internal::MethodEntry* fidl::internal::NaturalServerDispatcher<::test_protocollayouts::OpenProtocol>::entries_end_ =
+    &entries_[7];
+const ::fidl::internal::UnknownMethodHandlerEntry fidl::internal::NaturalServerDispatcher<::test_protocollayouts::OpenProtocol>::unknown_method_handler_entry_ = {
+    .openness = ::fidl::internal::Openness::kOpen,
+    .dispatch = [](void* interface, uint64_t method_ordinal,
+                   ::fidl::UnknownMethodType unknown_method_type, ::fidl::Transaction* txn) {
+      ::fidl::UnknownMethodCompleter::Sync completer(txn);
+      static_cast<::fidl::Server<::test_protocollayouts::OpenProtocol>*>(interface)->handle_unknown_method(
+          ::fidl::UnknownMethodMetadata<::test_protocollayouts::OpenProtocol>{
+              .method_ordinal = method_ordinal,
+
+              .unknown_method_type = unknown_method_type,
+
+          },
+          completer);
+    },
+    .send_reply = ::fidl::internal::SendChannelUnknownMethodReply,
+};
+
+void fidl::internal::NaturalServerDispatcher<::test_protocollayouts::OpenProtocol>::Dispatch(::fidl::Server<::test_protocollayouts::OpenProtocol>* impl, ::fidl::IncomingHeaderAndMessage&& msg,
+                                                                                             internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
+  ::fidl::internal::Dispatch(impl, msg, storage_view, txn, entries_, entries_end_, &unknown_method_handler_entry_);
+}
+
+void fidl::Server<::test_protocollayouts::OpenProtocol>::dispatch_message(
+    ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
+    ::fidl::internal::MessageStorageViewBase* storage_view) {
+  ::fidl::internal::NaturalServerDispatcher<::test_protocollayouts::OpenProtocol>::Dispatch(this, std::move(msg), storage_view, txn);
+}
+
+#endif  // __Fuchsia__
+
 #pragma clang diagnostic pop

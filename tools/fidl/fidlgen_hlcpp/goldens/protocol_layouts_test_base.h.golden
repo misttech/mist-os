@@ -63,6 +63,36 @@ class MainProtocol_TestBase : public ::test::protocollayouts::MainProtocol {
     NotImplemented_("TwoWayAnonWithError");
   }
 };
+
+class OpenProtocol_TestBase : public ::test::protocollayouts::OpenProtocol {
+ public:
+  virtual ~OpenProtocol_TestBase() {}
+  virtual void NotImplemented_(const std::string& name) = 0;
+  void FlexibleOneWay(int32_t value) override {
+    NotImplemented_("FlexibleOneWay");
+  }
+  void FlexibleTwoWayNoError(int32_t value, FlexibleTwoWayNoErrorCallback callback) override {
+    NotImplemented_("FlexibleTwoWayNoError");
+  }
+  void FlexibleTwoWayWithError(int32_t value, FlexibleTwoWayWithErrorCallback callback) override {
+    NotImplemented_("FlexibleTwoWayWithError");
+  }
+  void StrictOneWay(int32_t value) override {
+    NotImplemented_("StrictOneWay");
+  }
+  void StrictTwoWayNoError(int32_t value, StrictTwoWayNoErrorCallback callback) override {
+    NotImplemented_("StrictTwoWayNoError");
+  }
+  void StrictTwoWayWithError(int32_t value, StrictTwoWayWithErrorCallback callback) override {
+    NotImplemented_("StrictTwoWayWithError");
+  }
+  void FlexibleOneWayNamedPayload(int32_t value) override {
+    NotImplemented_("FlexibleOneWayNamedPayload");
+  }
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {
+    NotImplemented_("handle_unknown_method");
+  }
+};
 }  // namespace testing
 }  // namespace protocollayouts
 }  // namespace test

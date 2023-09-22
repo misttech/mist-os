@@ -70,6 +70,57 @@ struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::protocollayout
     };
   }
 };
+template <>
+struct NaturalToHLCPPTraits<fidl::ClientEnd<::test_protocollayouts::OpenProtocol>> {
+  using HLCPPType = fidl::InterfaceHandle<::test::protocollayouts::OpenProtocol>;
+  static inline fidl::InterfaceHandle<::test::protocollayouts::OpenProtocol> Convert(fidl::ClientEnd<::test_protocollayouts::OpenProtocol>&& c) {
+    return fidl::InterfaceHandle<::test::protocollayouts::OpenProtocol>(c.TakeChannel());
+  }
+};
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ServerEnd<::test_protocollayouts::OpenProtocol>> {
+  using HLCPPType = fidl::InterfaceRequest<::test::protocollayouts::OpenProtocol>;
+  static inline fidl::InterfaceRequest<::test::protocollayouts::OpenProtocol> Convert(fidl::ServerEnd<::test_protocollayouts::OpenProtocol>&& c) {
+    return fidl::InterfaceRequest<::test::protocollayouts::OpenProtocol>(c.TakeChannel());
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceHandle<::test::protocollayouts::OpenProtocol>> {
+  using NaturalType = fidl::ClientEnd<::test_protocollayouts::OpenProtocol>;
+  static inline fidl::ClientEnd<::test_protocollayouts::OpenProtocol> Convert(fidl::InterfaceHandle<::test::protocollayouts::OpenProtocol>&& c) {
+    return fidl::ClientEnd<::test_protocollayouts::OpenProtocol>(c.TakeChannel());
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::protocollayouts::OpenProtocol>> {
+  using NaturalType = fidl::ServerEnd<::test_protocollayouts::OpenProtocol>;
+  static inline fidl::ServerEnd<::test_protocollayouts::OpenProtocol> Convert(fidl::InterfaceRequest<::test::protocollayouts::OpenProtocol>&& c) {
+    return fidl::ServerEnd<::test_protocollayouts::OpenProtocol>(c.TakeChannel());
+  }
+};
+
+template <>
+struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_protocollayouts::OpenProtocol>> {
+  using HLCPPType = fidl::InterfaceRequestHandler<::test::protocollayouts::OpenProtocol>;
+  static inline fidl::InterfaceRequestHandler<::test::protocollayouts::OpenProtocol> Convert(fidl::ProtocolHandler<::test_protocollayouts::OpenProtocol>&& c) {
+    return [c = std::move(c)](fidl::InterfaceRequest<::test::protocollayouts::OpenProtocol> r) {
+      c(::fidl::HLCPPToNatural(r));
+    };
+  }
+};
+
+template <>
+struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::protocollayouts::OpenProtocol>> {
+  using NaturalType = fidl::ProtocolHandler<::test_protocollayouts::OpenProtocol>;
+  static inline fidl::ProtocolHandler<::test_protocollayouts::OpenProtocol> Convert(fidl::InterfaceRequestHandler<::test::protocollayouts::OpenProtocol>&& c) {
+    return [c = std::move(c)](fidl::ServerEnd<::test_protocollayouts::OpenProtocol> r) {
+      c(::fidl::NaturalToHLCPP(r));
+    };
+  }
+};
 
 template <>
 struct NaturalToHLCPPTraits<::test_protocollayouts::LocalTablePayload> {

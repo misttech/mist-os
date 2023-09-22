@@ -409,6 +409,24 @@ namespace internal {
       WireNaturalConversionTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult, ::fit::result<uint32_t, ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResponse>>::ToWire(arena, std::move(src)));
 }
 
+::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError> WireNaturalConversionTraits<::fidl::WireResponse<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError>, ::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError>>::ToNatural(::fidl::WireResponse<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError> src) {
+  return ::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError>(
+      WireNaturalConversionTraits<::test_protocollayouts_imported::wire::ComposedOpenProtocolStrictTwoWayNoErrorResponse, ::test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayNoErrorResponse>::ToNatural(std::move(src)));
+}
+::fidl::WireResponse<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError> WireNaturalConversionTraits<::fidl::WireResponse<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError>, ::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError>>::ToWire(fidl::AnyArena& arena, ::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError> src) {
+  return ::fidl::WireResponse<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError>(
+      WireNaturalConversionTraits<::test_protocollayouts_imported::wire::ComposedOpenProtocolStrictTwoWayNoErrorResponse, ::test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayNoErrorResponse>::ToWire(arena, std::move(src)));
+}
+
+::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError> WireNaturalConversionTraits<::fidl::WireResponse<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>, ::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>>::ToNatural(::fidl::WireResponse<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError> src) {
+  return ::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>(
+      WireNaturalConversionTraits<::test_protocollayouts_imported::wire::ComposedOpenProtocolStrictTwoWayWithErrorResult, ::fit::result<int32_t, ::test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorResponse>>::ToNatural(std::move(src)));
+}
+::fidl::WireResponse<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError> WireNaturalConversionTraits<::fidl::WireResponse<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>, ::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>>::ToWire(fidl::AnyArena& arena, ::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError> src) {
+  return ::fidl::WireResponse<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>(
+      WireNaturalConversionTraits<::test_protocollayouts_imported::wire::ComposedOpenProtocolStrictTwoWayWithErrorResult, ::fit::result<int32_t, ::test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorResponse>>::ToWire(arena, std::move(src)));
+}
+
 #endif  // __Fuchsia__
 #pragma clang diagnostic pop
 

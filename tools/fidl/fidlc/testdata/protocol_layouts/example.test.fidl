@@ -49,3 +49,7 @@ closed protocol MainProtocol {
         1: a uint16;
     }) error uint32;
 };
+
+open protocol OpenProtocol {
+    compose imp.ComposedOpenProtocol;
+};
