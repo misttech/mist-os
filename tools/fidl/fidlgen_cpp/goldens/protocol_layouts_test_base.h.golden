@@ -81,6 +81,41 @@ class TestBase<::test_protocollayouts::MainProtocol> : public ::fidl::Server<::t
     NotImplemented_("TwoWayAnonWithError", completer);
   }
 };
+
+template <>
+class TestBase<::test_protocollayouts::OpenProtocol> : public ::fidl::Server<::test_protocollayouts::OpenProtocol> {
+ public:
+  virtual ~TestBase<::test_protocollayouts::OpenProtocol>() = default;
+  virtual void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) = 0;
+  virtual void FlexibleOneWay(FlexibleOneWayRequest& request,
+                              FlexibleOneWayCompleter::Sync& completer) {
+    NotImplemented_("FlexibleOneWay", completer);
+  }
+  virtual void FlexibleTwoWayNoError(FlexibleTwoWayNoErrorRequest& request,
+                                     FlexibleTwoWayNoErrorCompleter::Sync& completer) {
+    NotImplemented_("FlexibleTwoWayNoError", completer);
+  }
+  virtual void FlexibleTwoWayWithError(FlexibleTwoWayWithErrorRequest& request,
+                                       FlexibleTwoWayWithErrorCompleter::Sync& completer) {
+    NotImplemented_("FlexibleTwoWayWithError", completer);
+  }
+  virtual void StrictOneWay(StrictOneWayRequest& request,
+                            StrictOneWayCompleter::Sync& completer) {
+    NotImplemented_("StrictOneWay", completer);
+  }
+  virtual void StrictTwoWayNoError(StrictTwoWayNoErrorRequest& request,
+                                   StrictTwoWayNoErrorCompleter::Sync& completer) {
+    NotImplemented_("StrictTwoWayNoError", completer);
+  }
+  virtual void StrictTwoWayWithError(StrictTwoWayWithErrorRequest& request,
+                                     StrictTwoWayWithErrorCompleter::Sync& completer) {
+    NotImplemented_("StrictTwoWayWithError", completer);
+  }
+  virtual void FlexibleOneWayNamedPayload(FlexibleOneWayNamedPayloadRequest& request,
+                                          FlexibleOneWayNamedPayloadCompleter::Sync& completer) {
+    NotImplemented_("FlexibleOneWayNamedPayload", completer);
+  }
+};
 #pragma clang diagnostic pop
 
 }  // namespace testing
