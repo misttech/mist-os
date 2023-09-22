@@ -45,11 +45,11 @@ pub const UINT64: u64 = 4;
 
 pub const UINT8: u8 = 4;
 
-pub const BITS_PRIMITIVE_VAL: u32 = BitsType::VALUE.bits();
+pub const BITS_PRIMITIVE_VAL: u32 = BitsType::VALUE.bits() as u32;
 
 pub const BITS_VAL: BitsType = BitsType::VALUE;
 
-pub const ENUM_PRIMITIVE_VAL: i32 = EnumType::Value.into_primitive();
+pub const ENUM_PRIMITIVE_VAL: i32 = EnumType::Value.into_primitive() as i32;
 
 pub const ENUM_VAL: EnumType = EnumType::Value;
 
@@ -82,7 +82,7 @@ bitflags! {
     #[derive(Default)]
     pub struct BitsType: u32 {
         const VALUE = 1;
-        const SECOND_VALUE = UINT32;
+        const SECOND_VALUE = UINT32 as u32;
         const THIRD_VALUE = 2;
     }
 }

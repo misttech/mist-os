@@ -5,6 +5,7 @@ using zx;
 const ENABLED_FLAG bool = true;
 const OFFSET int8 = -33;
 const ANSWER uint16 = 42;
+const ANSWER_NARROWED uint8 = ANSWER;
 const ANSWER_IN_BINARY uint16 = 0b101010;
 const POPULATION_USA_2018 uint32 = 330000000;
 const DIAMOND uint64 = 0x183c7effff7e3c18;
@@ -23,6 +24,7 @@ type EnumType = strict enum : int32 {
 };
 const enumVal EnumType = EnumType.VALUE;
 const enumPrimitiveVal int32 = EnumType.VALUE;
+const enumPrimitiveValNarrowed int8 = EnumType.VALUE;
 const enumTrue EnumType = EnumType.true;
 const enumPrimitiveTrue int32 = EnumType.true;
 
@@ -32,5 +34,6 @@ type BitsType = strict bits : uint32 {
 };
 const bitsVal BitsType = BitsType.VALUE;
 const bitsPrimitiveVal uint32 = BitsType.VALUE;
+const bitsPrimitiveValNarrowed uint8 = BitsType.VALUE;
 const bitsTrue BitsType = BitsType.true;
 const bitsPrimitiveTrue uint32 = BitsType.true;

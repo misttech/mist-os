@@ -42,6 +42,8 @@ constexpr int8_t kOffset = -33;
 
 constexpr uint16_t kAnswer = 42u;
 
+constexpr uint8_t kAnswerNarrowed = ::test_consts::wire::kAnswer;
+
 constexpr uint16_t kAnswerInBinary = 42u;
 
 constexpr uint32_t kPopulationUsa2018 = 330000000u;
@@ -66,6 +68,8 @@ constexpr ::test_consts::wire::EnumType kEnumVal = ::test_consts::wire::EnumType
 
 constexpr int32_t kEnumPrimitiveVal = ::test_consts::wire::EnumType::kValue;
 
+constexpr int8_t kEnumPrimitiveValNarrowed = ::test_consts::wire::EnumType::kValue;
+
 constexpr ::test_consts::wire::EnumType kEnumTrue = ::test_consts::wire::EnumType::kTrue;
 
 constexpr int32_t kEnumPrimitiveTrue = ::test_consts::wire::EnumType::kTrue;
@@ -73,6 +77,8 @@ constexpr int32_t kEnumPrimitiveTrue = ::test_consts::wire::EnumType::kTrue;
 constexpr ::test_consts::wire::BitsType kBitsVal = ::test_consts::wire::BitsType::kValue;
 
 constexpr uint32_t kBitsPrimitiveVal = ::test_consts::wire::BitsType::kValue;
+
+constexpr uint8_t kBitsPrimitiveValNarrowed = ::test_consts::wire::BitsType::kValue;
 
 constexpr ::test_consts::wire::BitsType kBitsTrue = ::test_consts::wire::BitsType::kTrue;
 

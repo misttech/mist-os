@@ -528,25 +528,15 @@ type compiler struct {
 	structs map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct
 }
 
-// inExternalLibrary returns true if the library that the given
-// CompoundIdentifier is in is different from the one the compiler is generating
-// code for.
-func (c *compiler) inExternalLibrary(ci fidlgen.CompoundIdentifier) bool {
-	if len(ci.Library) != len(c.library) {
-		return true
-	}
-	for i, part := range c.library {
-		if ci.Library[i] != part {
-			return true
-		}
-	}
-	return false
+func (c *compiler) inExternalLibrary(eci fidlgen.EncodedCompoundIdentifier) bool {
+	return eci.LibraryName() != c.library.Encode()
 }
 
-// TODO(fxbug.dev/66767): Escaping reserved words should happen *after*
-// converting to CamelCase.
-func compileCamelIdentifier(val fidlgen.Identifier) string {
-	return fidlgen.ToUpperCamelCase(changeIfReserved(val))
+func (c *compiler) lookupDeclInfo(val fidlgen.EncodedCompoundIdentifier) fidlgen.DeclInfo {
+	if info, ok := c.decls[val]; ok {
+		return info
+	}
+	panic(fmt.Sprintf("identifier not in decl map: %s", val))
 }
 
 func compileLibraryName(library fidlgen.LibraryIdentifier) string {
@@ -557,8 +547,12 @@ func compileLibraryName(library fidlgen.LibraryIdentifier) string {
 	return changeIfReserved(fidlgen.Identifier(strings.Join(parts, "_")))
 }
 
-// compileSnakeIdentifier converts the identifier to snake_case and escapes it
-// (by adding an underscore suffix) if it collides with a reserved word.
+// TODO(fxbug.dev/66767): Escaping reserved words should happen *after*
+// converting to CamelCase.
+func compileCamelIdentifier(val fidlgen.Identifier) string {
+	return fidlgen.ToUpperCamelCase(changeIfReserved(val))
+}
+
 // TODO(fxbug.dev/66767): Escaping reserved words should happen *after*
 // converting to snake_case.
 func compileSnakeIdentifier(val fidlgen.Identifier) string {
@@ -571,62 +565,50 @@ func compileScreamingSnakeIdentifier(val fidlgen.Identifier) string {
 	return fidlgen.ConstNameToAllCapsSnake(changeIfReserved(val))
 }
 
-// compileCompoundIdentifier produces a string Rust identifier which can be used
-// from the generated code to refer to the specified FIDL declaration or member.
-//
-// The case used in the Declaration and Member names will be unchanged.
-//
-// If the CompoundIdentifier is from the current library, the name will be
-// unqualified, meaning that it is suitable for use in Rust type declarations.
-// If it is from a different library, it will be fully qualified, and the source
-// library will be added as a required extern-crate.
-func (c *compiler) compileCompoundIdentifier(val fidlgen.CompoundIdentifier) string {
-	strs := []string{}
+// compileDeclIdentifier returns a Rust path expression referring to the given
+// declaration. It qualifies the crate name if it is external.
+func (c *compiler) compileDeclIdentifier(val fidlgen.EncodedCompoundIdentifier) string {
+	ci := val.Parse()
+	if ci.Member != "" {
+		panic(fmt.Sprintf("unexpected member: %s", val))
+	}
+	var name string
+	if c.lookupDeclInfo(val).Type == fidlgen.ConstDeclType {
+		name = compileScreamingSnakeIdentifier(ci.Name)
+	} else {
+		name = compileCamelIdentifier(ci.Name)
+	}
+	// TODO(fxbug.dev/66767): This is incorrect. We're calling changeIfReserved
+	// a second time, after compileScreamingSnakeIdentifier or
+	// compileCamelIdentifier already did. We should only call it once.
+	name = changeIfReserved(fidlgen.Identifier(name))
 	if c.inExternalLibrary(val) {
-		externName := compileLibraryName(val.Library)
-		c.externCrates[externName] = struct{}{}
-		strs = append(strs, externName)
+		crate := compileLibraryName(ci.Library)
+		c.externCrates[crate] = struct{}{}
+		return fmt.Sprintf("%s::%s", crate, name)
 	}
-	str := changeIfReserved(val.Name)
-	strs = append(strs, str)
-	if val.Member != "" {
-		strs = append(strs, string(val.Member))
+	return name
+}
+
+// compileMemberIdentifier returns a Rust path expression referring to the given
+// declaration member. It qualifies the crate name if it is external.
+func (c *compiler) compileMemberIdentifier(val fidlgen.EncodedCompoundIdentifier) string {
+	ci := val.Parse()
+	if ci.Member == "" {
+		panic(fmt.Sprintf("expected a member: %s", val))
 	}
-	return strings.Join(strs, "::")
-}
-
-// compileCamelCompoundIdentifier produces a string Rust identifier which can be
-// used from the generated code to refer to the specified FIDL declaration or
-// member.
-//
-// The resulting string will have the Declaration changed to CamelCase, but
-// Member (if any) will be unaffected by case conversion.
-//
-// If the CompoundIdentifier is from the current library, the name will be
-// unqualified. If the CompoundIdentifier refers to a Declaration, that means
-// that the name is just the declaration name converted to CamelCase, so it is
-// suitable for use in Rust type declarations. If the CompoundIdentifier is for
-// a member within a declaration, the member name will be qualified by the
-// declaration name, so it is not suitable for declaring e.g. a method name.
-//
-// If it is from a different library, it will be fully qualified, and the source
-// library will be added as a required extern-crate.
-func (c *compiler) compileCamelCompoundIdentifier(eci fidlgen.EncodedCompoundIdentifier) string {
-	val := eci.Parse()
-	val.Name = fidlgen.Identifier(compileCamelIdentifier(val.Name))
-	return c.compileCompoundIdentifier(val)
-}
-
-func (c *compiler) compileSnakeCompoundIdentifier(eci fidlgen.EncodedCompoundIdentifier) string {
-	val := eci.Parse()
-	val.Name = fidlgen.Identifier(compileSnakeIdentifier(val.Name))
-	return c.compileCompoundIdentifier(val)
-}
-
-func (c *compiler) compileScreamingSnakeCompoundIdentifier(eci fidlgen.EncodedCompoundIdentifier) string {
-	val := eci.Parse()
-	val.Name = fidlgen.Identifier(compileScreamingSnakeIdentifier(val.Name))
-	return c.compileCompoundIdentifier(val)
+	decl := val.DeclName()
+	declType := c.lookupDeclInfo(decl).Type
+	var member string
+	switch declType {
+	case fidlgen.BitsDeclType:
+		member = compileScreamingSnakeIdentifier(ci.Member)
+	case fidlgen.EnumDeclType:
+		member = compileCamelIdentifier(ci.Member)
+	default:
+		panic(fmt.Sprintf("unexpected decl type: %s", declType))
+	}
+	return fmt.Sprintf("%s::%s", c.compileDeclIdentifier(decl), member)
 }
 
 func compileLiteral(val fidlgen.Literal, typ fidlgen.Type) string {
@@ -674,56 +656,43 @@ func compileLiteral(val fidlgen.Literal, typ fidlgen.Type) string {
 	}
 }
 
-func (c *compiler) identifierConstantDeclType(eci EncodedCompoundIdentifier) fidlgen.DeclType {
-	memberless := eci.Parse()
-	memberless.Member = ""
-	declInfo, ok := c.decls[memberless.Encode()]
-	if !ok {
-		panic(fmt.Sprintf("identifier not in decl map: %s", memberless.Encode()))
-	}
-	return declInfo.Type
-}
-
 func (c *compiler) compileConstant(val fidlgen.Constant, typ fidlgen.Type) string {
 	switch val.Kind {
 	case fidlgen.IdentifierConstant:
-		declType := c.identifierConstantDeclType(val.Identifier)
-		parts := val.Identifier.Parse()
+		declType := c.lookupDeclInfo(val.Identifier.DeclName()).Type
+		var expr string
 		switch declType {
 		case fidlgen.ConstDeclType:
-			parts.Name = fidlgen.Identifier(compileScreamingSnakeIdentifier(parts.Name))
-			return c.compileCompoundIdentifier(parts)
+			expr = c.compileDeclIdentifier(val.Identifier)
 		case fidlgen.BitsDeclType:
-			parts.Name = fidlgen.Identifier(compileCamelIdentifier(parts.Name))
-			parts.Member = fidlgen.Identifier(compileScreamingSnakeIdentifier(parts.Member))
-			// TODO(fxbug.dev/93195): For now we assume the primitive type
-			// matches the bits underlying type. If it doesn't the generated
-			// Rust code will not compile.
+			expr = c.compileMemberIdentifier(val.Identifier)
 			if typ.Kind == fidlgen.PrimitiveType {
-				return fmt.Sprintf("%s.bits()", c.compileCompoundIdentifier(parts))
+				expr += ".bits()"
 			}
-			return c.compileCompoundIdentifier(parts)
 		case fidlgen.EnumDeclType:
-			parts.Name = fidlgen.Identifier(compileCamelIdentifier(parts.Name))
-			parts.Member = fidlgen.Identifier(compileCamelIdentifier(parts.Member))
-			// TODO(fxbug.dev/93195): For now we assume the primitive type
-			// matches the enum underlying type. If it doesn't the generated
-			// Rust code will not compile.
+			expr = c.compileMemberIdentifier(val.Identifier)
 			if typ.Kind == fidlgen.PrimitiveType {
-				return fmt.Sprintf("%s.into_primitive()", c.compileCompoundIdentifier(parts))
+				expr += ".into_primitive()"
 			}
-			return c.compileCompoundIdentifier(parts)
 		default:
-			panic(fmt.Sprintf("unexpected decl type %s", declType))
+			panic(fmt.Sprintf("unexpected decl type: %s", declType))
 		}
+		// TODO(fxbug.dev/62520): fidlc allows conversions between primitive
+		// types. Ideally the JSON IR would model these conversions explicitly.
+		// In the meantime, just assume that a cast is always necessary.
+		if typ.Kind == fidlgen.PrimitiveType {
+			expr = fmt.Sprintf("%s as %s", expr, compilePrimitiveSubtype(typ.PrimitiveSubtype))
+		}
+		return expr
 	case fidlgen.LiteralConstant:
 		return compileLiteral(*val.Literal, typ)
 	case fidlgen.BinaryOperator:
 		if typ.Kind == fidlgen.PrimitiveType {
 			return val.Value
 		}
-		decl := c.compileCamelCompoundIdentifier(typ.Identifier)
-		// from_bits isn't a const function, so from_bits_truncate must be used.
+		decl := c.compileDeclIdentifier(typ.Identifier)
+		// TODO(https://github.com/rust-lang/rust/issues/67441):
+		// Use from_bits(%s).unwrap() once the const_option feature is stable.
 		return fmt.Sprintf("%s::from_bits_truncate(%s)", decl, val.Value)
 	default:
 		panic(fmt.Sprintf("unknown constant kind: %s", val.Kind))
@@ -731,22 +700,15 @@ func (c *compiler) compileConstant(val fidlgen.Constant, typ fidlgen.Type) strin
 }
 
 func (c *compiler) compileConst(val fidlgen.Const) Const {
-	name := c.compileScreamingSnakeCompoundIdentifier(val.Name)
-	var r Const
+	r := Const{
+		Const: val,
+		Name:  c.compileDeclIdentifier(val.Name),
+		Value: c.compileConstant(val.Value, val.Type),
+	}
 	if val.Type.Kind == fidlgen.StringType {
-		r = Const{
-			Const: val,
-			Type:  "&str",
-			Name:  name,
-			Value: c.compileConstant(val.Value, val.Type),
-		}
+		r.Type = "&str"
 	} else {
-		r = Const{
-			Const: val,
-			Type:  c.compileType(val.Type).Owned,
-			Name:  name,
-			Value: c.compileConstant(val.Value, val.Type),
-		}
+		r.Type = c.compileType(val.Type).Owned
 	}
 	return r
 }
@@ -841,7 +803,7 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 			t.Param = fmt.Sprintf("Option<%s>", t.Param)
 		}
 	case fidlgen.RequestType:
-		s := fmt.Sprintf("fidl::endpoints::ServerEnd<%sMarker>", c.compileCamelCompoundIdentifier(val.RequestSubtype))
+		s := fmt.Sprintf("fidl::endpoints::ServerEnd<%sMarker>", c.compileDeclIdentifier(val.RequestSubtype))
 		t.Fidl = fmt.Sprintf("fidl::encoding::Endpoint<%s>", s)
 		t.Owned = s
 		t.Param = s
@@ -851,11 +813,8 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 			t.Param = fmt.Sprintf("Option<%s>", t.Param)
 		}
 	case fidlgen.IdentifierType:
-		name := c.compileCamelCompoundIdentifier(val.Identifier)
-		declInfo, ok := c.decls[val.Identifier]
-		if !ok {
-			panic(fmt.Sprintf("unknown identifier: %v", val.Identifier))
-		}
+		name := c.compileDeclIdentifier(val.Identifier)
+		declInfo := c.lookupDeclInfo(val.Identifier)
 		t.DeclType = declInfo.Type
 		switch declInfo.Type {
 		case fidlgen.BitsDeclType, fidlgen.EnumDeclType:
@@ -992,7 +951,7 @@ func convertResultToEncodeExpr(v string, t Type, p Payload) string {
 		}
 		return v
 	default:
-		panic(fmt.Sprintf("unexpected decl type %s", t.DeclType))
+		panic(fmt.Sprintf("unexpected decl type: %s", t.DeclType))
 	}
 }
 
@@ -1083,7 +1042,7 @@ func convertMutRefOwnedToEncodeExpr(v string, t Type) string {
 func (c *compiler) compileBits(val fidlgen.Bits) Bits {
 	e := Bits{
 		Bits:           val,
-		Name:           c.compileCamelCompoundIdentifier(val.Name),
+		Name:           c.compileDeclIdentifier(val.Name),
 		UnderlyingType: c.compileType(val.Type).Owned,
 		Members:        []BitsMember{},
 	}
@@ -1100,7 +1059,7 @@ func (c *compiler) compileBits(val fidlgen.Bits) Bits {
 func (c *compiler) compileEnum(val fidlgen.Enum) Enum {
 	e := Enum{
 		Enum:           val,
-		Name:           c.compileCamelCompoundIdentifier(val.Name),
+		Name:           c.compileDeclIdentifier(val.Name),
 		UnderlyingType: compilePrimitiveSubtype(val.Type),
 		Members:        []EnumMember{},
 	}
@@ -1177,7 +1136,7 @@ func emptyPayload(fidlType string) Payload {
 }
 
 func (c *compiler) payloadForType(payloadType Type) Payload {
-	typeName := c.compileCamelCompoundIdentifier(payloadType.Identifier)
+	typeName := c.compileDeclIdentifier(payloadType.Identifier)
 	st, ok := c.structs[payloadType.Identifier]
 
 	// Not a struct: table or union payload.
@@ -1300,7 +1259,7 @@ func (c *compiler) compileResponse(m fidlgen.Method) Payload {
 		p.ConvertToFields = inner.ConvertToFields
 	} else {
 		paramName := "result"
-		p.TupleType = c.compileCamelCompoundIdentifier(m.ResponsePayload.Identifier)
+		p.TupleType = c.compileDeclIdentifier(m.ResponsePayload.Identifier)
 		p.TupleTypeAliasRhs = fmt.Sprintf("Result<%s, %s>", inner.TupleType, errType.Owned)
 		okParamType := "()"
 		if len(inner.Parameters) > 0 {
@@ -1334,7 +1293,7 @@ func (c *compiler) compileResponse(m fidlgen.Method) Payload {
 }
 
 func (c *compiler) compileProtocol(val fidlgen.Protocol) Protocol {
-	name := c.compileCamelCompoundIdentifier(val.Name)
+	name := c.compileDeclIdentifier(val.Name)
 	r := Protocol{
 		Protocol:         val,
 		ECI:              val.Name,
@@ -1382,7 +1341,7 @@ func (c *compiler) compileProtocol(val fidlgen.Protocol) Protocol {
 func (c *compiler) compileService(val fidlgen.Service) Service {
 	r := Service{
 		Service:     val,
-		Name:        c.compileCamelCompoundIdentifier(val.Name),
+		Name:        c.compileDeclIdentifier(val.Name),
 		Members:     []ServiceMember{},
 		ServiceName: val.GetServiceName(),
 	}
@@ -1393,7 +1352,7 @@ func (c *compiler) compileService(val fidlgen.Service) Service {
 			Name:          string(v.Name),
 			CamelName:     compileCamelIdentifier(v.Name),
 			SnakeName:     compileSnakeIdentifier(v.Name),
-			ProtocolType:  c.compileCamelCompoundIdentifier(v.Type.Identifier),
+			ProtocolType:  c.compileDeclIdentifier(v.Type.Identifier),
 		}
 		r.Members = append(r.Members, m)
 	}
@@ -1441,10 +1400,10 @@ func (c *compiler) computeUseFidlStructCopy(typ fidlgen.Type) bool {
 		}
 		return true
 	case fidlgen.IdentifierType:
-		if c.inExternalLibrary(typ.Identifier.Parse()) {
+		if c.inExternalLibrary(typ.Identifier) {
 			return false
 		}
-		declType := c.decls[typ.Identifier].Type
+		declType := c.lookupDeclInfo(typ.Identifier).Type
 		switch declType {
 		case fidlgen.BitsDeclType, fidlgen.EnumDeclType, fidlgen.TableDeclType, fidlgen.UnionDeclType, fidlgen.ProtocolDeclType:
 			return false
@@ -1463,12 +1422,11 @@ func (c *compiler) computeUseFidlStructCopy(typ fidlgen.Type) bool {
 }
 
 func (c *compiler) resolveStruct(identifier fidlgen.EncodedCompoundIdentifier) *fidlgen.Struct {
-	if c.inExternalLibrary(identifier.Parse()) {
+	if c.inExternalLibrary(identifier) {
 		// This behavior is matched by computeUseFullStructCopy.
 		return nil
 	}
-	declType := c.decls[identifier].Type
-	if declType == fidlgen.StructDeclType {
+	if c.lookupDeclInfo(identifier).Type == fidlgen.StructDeclType {
 		st, ok := c.structs[identifier]
 		if !ok {
 			panic(fmt.Sprintf("struct not found: %v", identifier))
@@ -1519,7 +1477,7 @@ func toRustPaddingMarkers(in []fidlgen.PaddingMarker) []rustPaddingMarker {
 }
 
 func (c *compiler) compileStruct(val fidlgen.Struct) Struct {
-	name := c.compileCamelCompoundIdentifier(val.Name)
+	name := c.compileDeclIdentifier(val.Name)
 	r := Struct{
 		Struct:                    val,
 		ECI:                       val.Name,
@@ -1550,7 +1508,7 @@ func (c *compiler) compileUnion(val fidlgen.Union) Union {
 	r := Union{
 		Union: val,
 		ECI:   val.Name,
-		Name:  c.compileCamelCompoundIdentifier(val.Name),
+		Name:  c.compileDeclIdentifier(val.Name),
 	}
 	for _, v := range val.Members {
 		if v.Reserved {
@@ -1570,7 +1528,7 @@ func (c *compiler) compileTable(table fidlgen.Table) Table {
 	r := Table{
 		Table: table,
 		ECI:   table.Name,
-		Name:  c.compileCamelCompoundIdentifier(table.Name),
+		Name:  c.compileDeclIdentifier(table.Name),
 	}
 	for _, member := range table.SortedMembersNoReserved() {
 		r.Members = append(r.Members, TableMember{
@@ -1713,17 +1671,14 @@ func (c *compiler) fillDerives(ir *Root) {
 // Computes derives for a struct, table, or union.
 // Also fills in the .Derives field if the type is local to this library.
 func (dc *derivesCompiler) fillDerivesForECI(eci EncodedCompoundIdentifier) derives {
-	declInfo, ok := dc.decls[eci]
-	if !ok {
-		panic(fmt.Sprintf("declaration not found: %v", eci))
-	}
+	declInfo := dc.lookupDeclInfo(eci)
 
 	// TODO(fxbug.dev/61760): Make external type information available here.
 	// Currently, we conservatively assume external structs, tables, and unions
 	// only derive a minimal set of traits, which includes Clone for value types
 	// (not having Clone is especially annoying, so we put resourceness of
 	// external types into the IR as a stopgap solution).
-	if dc.inExternalLibrary(eci.Parse()) {
+	if dc.inExternalLibrary(eci) {
 		return minimalDerives(*declInfo.Resourceness)
 	}
 

@@ -465,11 +465,32 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
         "data": "ANSWER_IN_BINARY",
-        "start_offset": 122,
-        "end_offset": 138
+        "start_offset": 160,
+        "end_offset": 176
       },
       "value": {
         "type": "literal"
+      }
+    },
+    {
+      "identifier": "test.consts/ANSWER_NARROWED",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
+        "data": "ANSWER_NARROWED",
+        "start_offset": 122,
+        "end_offset": 137
+      },
+      "value": {
+        "type": "identifier",
+        "identifier": "test.consts/ANSWER",
+        "referenced_at": {
+          "is_virtual": false,
+          "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
+          "data": "ANSWER",
+          "start_offset": 146,
+          "end_offset": 152
+        }
       }
     },
     {
@@ -478,8 +499,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
         "data": "CONVERSION_FACTOR",
-        "start_offset": 371,
-        "end_offset": 388
+        "start_offset": 409,
+        "end_offset": 426
       },
       "value": {
         "type": "literal"
@@ -491,8 +512,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
         "data": "DIAMOND",
-        "start_offset": 210,
-        "end_offset": 217
+        "start_offset": 248,
+        "end_offset": 255
       },
       "value": {
         "type": "literal"
@@ -517,8 +538,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
         "data": "FUCHSIA",
-        "start_offset": 253,
-        "end_offset": 260
+        "start_offset": 291,
+        "end_offset": 298
       },
       "value": {
         "type": "literal"
@@ -530,8 +551,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
         "data": "MIN_TEMP",
-        "start_offset": 337,
-        "end_offset": 345
+        "start_offset": 375,
+        "end_offset": 383
       },
       "value": {
         "type": "literal"
@@ -556,8 +577,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
         "data": "POPULATION_USA_2018",
-        "start_offset": 164,
-        "end_offset": 183
+        "start_offset": 202,
+        "end_offset": 221
       },
       "value": {
         "type": "literal"
@@ -569,8 +590,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
         "data": "USERNAME",
-        "start_offset": 297,
-        "end_offset": 305
+        "start_offset": 335,
+        "end_offset": 343
       },
       "value": {
         "type": "literal"
@@ -582,8 +603,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
         "data": "ZX_CONST",
-        "start_offset": 516,
-        "end_offset": 524
+        "start_offset": 554,
+        "end_offset": 562
       },
       "value": {
         "type": "identifier",
@@ -592,8 +613,8 @@
           "is_virtual": false,
           "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
           "data": "zx.CHANNEL_MAX_MSG_BYTES",
-          "start_offset": 534,
-          "end_offset": 558
+          "start_offset": 572,
+          "end_offset": 596
         }
       }
     },
@@ -603,8 +624,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
         "data": "ZX_OBJ_VAL",
-        "start_offset": 418,
-        "end_offset": 428
+        "start_offset": 456,
+        "end_offset": 466
       },
       "value": {
         "type": "identifier",
@@ -613,8 +634,8 @@
           "is_virtual": false,
           "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
           "data": "zx.ObjType.CHANNEL",
-          "start_offset": 442,
-          "end_offset": 460
+          "start_offset": 480,
+          "end_offset": 498
         }
       }
     },
@@ -624,8 +645,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
         "data": "ZX_RIGHTS_VAL",
-        "start_offset": 468,
-        "end_offset": 481
+        "start_offset": 506,
+        "end_offset": 519
       },
       "value": {
         "type": "identifier",
@@ -634,8 +655,8 @@
           "is_virtual": false,
           "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
           "data": "zx.Rights.READ",
-          "start_offset": 494,
-          "end_offset": 508
+          "start_offset": 532,
+          "end_offset": 546
         }
       }
     },
@@ -645,8 +666,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
         "data": "bitsPrimitiveTrue",
-        "start_offset": 1024,
-        "end_offset": 1041
+        "start_offset": 1171,
+        "end_offset": 1188
       },
       "value": {
         "type": "identifier",
@@ -655,8 +676,8 @@
           "is_virtual": false,
           "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
           "data": "BitsType.true",
-          "start_offset": 1051,
-          "end_offset": 1064
+          "start_offset": 1198,
+          "end_offset": 1211
         }
       }
     },
@@ -666,8 +687,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
         "data": "bitsPrimitiveVal",
-        "start_offset": 935,
-        "end_offset": 951
+        "start_offset": 1027,
+        "end_offset": 1043
       },
       "value": {
         "type": "identifier",
@@ -676,8 +697,29 @@
           "is_virtual": false,
           "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
           "data": "BitsType.VALUE",
-          "start_offset": 961,
-          "end_offset": 975
+          "start_offset": 1053,
+          "end_offset": 1067
+        }
+      }
+    },
+    {
+      "identifier": "test.consts/bitsPrimitiveValNarrowed",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
+        "data": "bitsPrimitiveValNarrowed",
+        "start_offset": 1075,
+        "end_offset": 1099
+      },
+      "value": {
+        "type": "identifier",
+        "identifier": "test.consts/BitsType.VALUE",
+        "referenced_at": {
+          "is_virtual": false,
+          "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
+          "data": "BitsType.VALUE",
+          "start_offset": 1108,
+          "end_offset": 1122
         }
       }
     },
@@ -687,8 +729,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
         "data": "bitsTrue",
-        "start_offset": 983,
-        "end_offset": 991
+        "start_offset": 1130,
+        "end_offset": 1138
       },
       "value": {
         "type": "identifier",
@@ -697,8 +739,8 @@
           "is_virtual": false,
           "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
           "data": "BitsType.true",
-          "start_offset": 1003,
-          "end_offset": 1016
+          "start_offset": 1150,
+          "end_offset": 1163
         }
       }
     },
@@ -708,8 +750,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
         "data": "bitsVal",
-        "start_offset": 894,
-        "end_offset": 901
+        "start_offset": 986,
+        "end_offset": 993
       },
       "value": {
         "type": "identifier",
@@ -718,8 +760,8 @@
           "is_virtual": false,
           "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
           "data": "BitsType.VALUE",
-          "start_offset": 913,
-          "end_offset": 927
+          "start_offset": 1005,
+          "end_offset": 1019
         }
       }
     },
@@ -729,8 +771,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
         "data": "enumPrimitiveTrue",
-        "start_offset": 766,
-        "end_offset": 783
+        "start_offset": 858,
+        "end_offset": 875
       },
       "value": {
         "type": "identifier",
@@ -739,8 +781,8 @@
           "is_virtual": false,
           "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
           "data": "EnumType.true",
-          "start_offset": 792,
-          "end_offset": 805
+          "start_offset": 884,
+          "end_offset": 897
         }
       }
     },
@@ -750,8 +792,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
         "data": "enumPrimitiveVal",
-        "start_offset": 678,
-        "end_offset": 694
+        "start_offset": 716,
+        "end_offset": 732
       },
       "value": {
         "type": "identifier",
@@ -760,8 +802,29 @@
           "is_virtual": false,
           "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
           "data": "EnumType.VALUE",
-          "start_offset": 703,
-          "end_offset": 717
+          "start_offset": 741,
+          "end_offset": 755
+        }
+      }
+    },
+    {
+      "identifier": "test.consts/enumPrimitiveValNarrowed",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
+        "data": "enumPrimitiveValNarrowed",
+        "start_offset": 763,
+        "end_offset": 787
+      },
+      "value": {
+        "type": "identifier",
+        "identifier": "test.consts/EnumType.VALUE",
+        "referenced_at": {
+          "is_virtual": false,
+          "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
+          "data": "EnumType.VALUE",
+          "start_offset": 795,
+          "end_offset": 809
         }
       }
     },
@@ -771,8 +834,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
         "data": "enumTrue",
-        "start_offset": 725,
-        "end_offset": 733
+        "start_offset": 817,
+        "end_offset": 825
       },
       "value": {
         "type": "identifier",
@@ -781,8 +844,8 @@
           "is_virtual": false,
           "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
           "data": "EnumType.true",
-          "start_offset": 745,
-          "end_offset": 758
+          "start_offset": 837,
+          "end_offset": 850
         }
       }
     },
@@ -792,8 +855,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
         "data": "enumVal",
-        "start_offset": 637,
-        "end_offset": 644
+        "start_offset": 675,
+        "end_offset": 682
       },
       "value": {
         "type": "identifier",
@@ -802,8 +865,8 @@
           "is_virtual": false,
           "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
           "data": "EnumType.VALUE",
-          "start_offset": 656,
-          "end_offset": 670
+          "start_offset": 694,
+          "end_offset": 708
         }
       }
     }
@@ -816,8 +879,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
         "data": "EnumType",
-        "start_offset": 566,
-        "end_offset": 574
+        "start_offset": 604,
+        "end_offset": 612
       },
       "members": [
         {
@@ -826,8 +889,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
             "data": "VALUE",
-            "start_offset": 603,
-            "end_offset": 608
+            "start_offset": 641,
+            "end_offset": 646
           },
           "value": {
             "type": "literal"
@@ -839,8 +902,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/consts.test.fidl",
             "data": "true",
-            "start_offset": 618,
-            "end_offset": 622
+            "start_offset": 656,
+            "end_offset": 660
           },
           "value": {
             "type": "literal"
