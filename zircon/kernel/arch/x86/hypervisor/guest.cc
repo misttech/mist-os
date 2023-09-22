@@ -132,38 +132,3 @@ zx::result<> NormalGuest::SetTrap(uint32_t kind, zx_vaddr_t addr, size_t len,
   }
   return traps_.InsertTrap(kind, addr, len, ktl::move(port), key);
 }
-
-// static
-zx::result<ktl::unique_ptr<Guest>> DirectGuest::Create() {
-  auto dpa = hypervisor::DirectPhysicalAspace::Create();
-  if (dpa.is_error()) {
-    return dpa.take_error();
-  }
-  // Invalidate the EPT across all CPUs.
-  uint64_t eptp = ept_pointer_from_pml4(dpa->arch_aspace().arch_table_phys());
-  broadcast_invept(eptp);
-
-  auto shared_aspace =
-      VmAspace::Create(USER_ASPACE_BASE, USER_ASPACE_SIZE, VmAspace::Type::User, "guest_shared");
-  if (!shared_aspace) {
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-  shared_aspace->arch_aspace().arch_set_vpid(kSharedVpid);
-
-  auto guest = Guest::Create<DirectGuest>();
-  if (guest.is_error()) {
-    return guest.take_error();
-  }
-  guest->dpas_ = ktl::move(*dpa);
-  guest->shared_aspace_ = ktl::move(shared_aspace);
-  return zx::ok(*ktl::move(guest));
-}
-
-DirectGuest::~DirectGuest() {
-  // Reset the VPID associated with the address space, so that if VMX is turned
-  // off, we do not issue an `invvpid`.
-  //
-  // This is safe, as we always `invept` all CPUs when creating a guest, and
-  // then `invvpid` on the current CPU when creating a VCPU.
-  shared_aspace_->arch_aspace().arch_set_vpid(MMU_X86_UNUSED_VPID);
-}

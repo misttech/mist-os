@@ -1850,7 +1850,6 @@ zx_info_process_handle_stats_t!(zx_info_process_handle_stats_t);
 // from //zircon/system/public/zircon/syscalls/hypervisor.h
 multiconst!(zx_guest_option_t, [
     ZX_GUEST_OPT_NORMAL = 0;
-    ZX_GUEST_OPT_DIRECT = 1;
 ]);
 
 multiconst!(zx_guest_trap_t, [

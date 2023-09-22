@@ -13,7 +13,6 @@ __BEGIN_CDECLS
 typedef uint32_t zx_guest_option_t;
 
 #define ZX_GUEST_OPT_NORMAL ((zx_guest_option_t) 0u)
-#define ZX_GUEST_OPT_DIRECT ((zx_guest_option_t) 1u)
 
 typedef uint32_t zx_guest_trap_t;
 

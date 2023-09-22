@@ -26,11 +26,6 @@ impl Guest {
         Self::create(hypervisor, sys::ZX_GUEST_OPT_NORMAL)
     }
 
-    /// Create a direct guest, that is able to access Zircon syscalls.
-    pub fn direct(hypervisor: &Resource) -> Result<(Guest, Vmar), Status> {
-        Self::create(hypervisor, sys::ZX_GUEST_OPT_DIRECT)
-    }
-
     fn create(
         hypervisor: &Resource,
         options: sys::zx_guest_option_t,
@@ -172,18 +167,6 @@ mod tests {
     async fn guest_normal_create() {
         let hypervisor = get_hypervisor().await;
         match Guest::normal(&hypervisor) {
-            Err(Status::NOT_SUPPORTED) => {
-                println!("Hypervisor not supported");
-                return;
-            }
-            result => result.unwrap(),
-        };
-    }
-
-    #[fuchsia::test]
-    async fn guest_direct_create() {
-        let hypervisor = get_hypervisor().await;
-        match Guest::direct(&hypervisor) {
             Err(Status::NOT_SUPPORTED) => {
                 println!("Hypervisor not supported");
                 return;

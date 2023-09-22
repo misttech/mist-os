@@ -26,12 +26,6 @@ zx::result<ktl::unique_ptr<Vcpu>> CreateVcpu(Guest& guest, uint32_t guest_option
   switch (guest_options) {
     case ZX_GUEST_OPT_NORMAL:
       return NormalVcpu::Create(static_cast<NormalGuest&>(guest), entry);
-    case ZX_GUEST_OPT_DIRECT:
-#if ARCH_X86
-      return DirectVcpu::Create(static_cast<DirectGuest&>(guest), entry);
-#else
-      return zx::error(ZX_ERR_NOT_SUPPORTED);
-#endif  // ARCH_X86
     default:
       return zx::error(ZX_ERR_INVALID_ARGS);
   }

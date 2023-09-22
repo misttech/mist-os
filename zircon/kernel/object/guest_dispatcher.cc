@@ -22,12 +22,6 @@ zx::result<ktl::unique_ptr<Guest>> CreateGuest(uint32_t options) {
   switch (options) {
     case ZX_GUEST_OPT_NORMAL:
       return NormalGuest::Create();
-    case ZX_GUEST_OPT_DIRECT:
-#if ARCH_X86
-      return DirectGuest::Create();
-#else
-      return zx::error(ZX_ERR_NOT_SUPPORTED);
-#endif  // ARCH_X86
     default:
       return zx::error(ZX_ERR_INVALID_ARGS);
   }
@@ -53,9 +47,8 @@ zx_status_t GuestDispatcher::Create(uint32_t options, KernelHandle<GuestDispatch
     return ZX_ERR_NO_MEMORY;
   }
 
-  uint mmu_flags = options == ZX_GUEST_OPT_DIRECT ? ARCH_MMU_FLAG_PERM_USER : 0;
   zx_status_t status =
-      VmAddressRegionDispatcher::Create(std::move(vmar), mmu_flags, vmar_handle, vmar_rights);
+      VmAddressRegionDispatcher::Create(std::move(vmar), 0, vmar_handle, vmar_rights);
   if (status != ZX_OK) {
     return status;
   }

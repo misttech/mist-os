@@ -238,8 +238,6 @@ zx::result<> vmcs_init(AutoVmcs& vmcs, const VcpuConfig& config, uint16_t vpid, 
   // be bootstrapped by the operating system.
   //
   // If there is no base processor for this VCPU type, then default to true.
-  // This is important for direct mode, as all VCPUs will be treated as base
-  // processors.
   const bool is_base_processor = config.has_base_processor ? vpid == kBaseProcessorVpid : true;
 
   // Setup VM-entry VMCS controls.
@@ -1145,58 +1143,4 @@ zx::result<> NormalVcpu::WriteState(const zx_vcpu_io_t& io_state) {
   static_assert(sizeof(vmx_state_.guest_state.rax) >= 4);
   memcpy(&vmx_state_.guest_state.rax, io_state.data, io_state.access_size);
   return zx::ok();
-}
-
-// static
-zx::result<ktl::unique_ptr<Vcpu>> DirectVcpu::Create(DirectGuest& guest, zx_vaddr_t entry) {
-  auto vcpu = Vcpu::Create<DirectVcpu>(guest, DirectGuest::kSharedVpid, entry);
-  if (vcpu.is_error()) {
-    return vcpu.take_error();
-  }
-  AutoVmcs vmcs(vcpu->vmcs_page_.PhysicalAddress());
-  // Mask access to CR0.
-  vmcs.Write(VmcsFieldXX::CR0_GUEST_HOST_MASK, X86_CR0_PE | X86_CR0_ET | X86_CR0_NE | X86_CR0_WP |
-                                                   X86_CR0_NW | X86_CR0_CD | X86_CR0_PG);
-  vmcs.Write(VmcsFieldXX::CR0_READ_SHADOW,
-             X86_CR0_PE | X86_CR0_ET | X86_CR0_NE | X86_CR0_WP | X86_CR0_PG);
-  // Mask access to CR4.
-  vmcs.Write(VmcsFieldXX::CR4_GUEST_HOST_MASK, X86_CR4_PAE | X86_CR4_PGE | X86_CR4_OSFXSR |
-                                                   X86_CR4_VMXE | X86_CR4_FSGSBASE |
-                                                   X86_CR4_OSXSAVE);
-  vmcs.Write(VmcsFieldXX::CR4_READ_SHADOW, X86_CR4_PAE | X86_CR4_PGE | X86_CR4_OSFXSR |
-                                               X86_CR4_VMXE | X86_CR4_FSGSBASE | X86_CR4_OSXSAVE);
-  // Set CR3 to `SharedAspace()`.
-  const paddr_t table_phys = guest.SharedAspace().arch_aspace().arch_table_phys();
-  vmcs.Write(VmcsFieldXX::HOST_CR3, table_phys);
-  vmcs.Write(VmcsFieldXX::GUEST_CR3, table_phys);
-  // VM exit on all exception.
-  vmcs.Write(VmcsField32::EXCEPTION_BITMAP, UINT32_MAX);
-  return zx::ok(ktl::move(*vcpu));
-}
-
-DirectVcpu::DirectVcpu(DirectGuest& guest, uint16_t vpid, Thread* thread)
-    : Vcpu(guest, vpid, thread) {}
-
-zx::result<> DirectVcpu::Enter(zx_port_packet_t& packet) {
-  auto pre_enter = [this](AutoVmcs& vmcs) mutable -> zx::result<> {
-    if (fs_base_ != 0) {
-      vmcs.Write(VmcsFieldXX::GUEST_FS_BASE, fs_base_);
-      fs_base_ = 0;
-    }
-    return zx::ok();
-  };
-  auto post_exit = [this](AutoVmcs& vmcs, zx_port_packet_t& packet) -> zx::result<> {
-    return vmexit_handler_direct(vmcs, vmx_state_.guest_state, fs_base_, packet);
-  };
-  auto& shared_aspace = static_cast<DirectGuest&>(guest_).SharedAspace();
-  VmAspace& host_aspace = hypervisor::switch_aspace(shared_aspace);
-  auto result = EnterInternal(ktl::move(pre_enter), ktl::move(post_exit), packet);
-  hypervisor::switch_aspace(host_aspace);
-  return result;
-}
-
-void DirectVcpu::Kick() {
-  kicked_.store(true);
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-  interrupt_cpu(thread_.load(), last_cpu_);
 }

@@ -234,12 +234,6 @@ static void x86_tlb_global_invalidate() {
   }
 }
 
-static void maybe_invvpid(InvVpid invalidation, uint16_t vpid, zx_vaddr_t address) {
-  if (vpid != MMU_X86_UNUSED_VPID) {
-    invvpid(invalidation, vpid, address);
-  }
-}
-
 // X86PageTableMmu
 
 bool X86PageTableMmu::check_paddr(paddr_t paddr) { return x86_mmu_check_paddr(paddr); }
@@ -340,27 +334,18 @@ void X86PageTableMmu::TlbInvalidate(PendingTlbInvalidation* pending) {
 
   const auto aspace = static_cast<X86ArchVmAspace*>(ctx());
   const ulong root_ptable_phys = phys();
-  const uint16_t vpid = aspace->arch_vpid();
   const uint16_t pcid = aspace->pcid();
 
   struct TlbInvalidatePage_context {
     paddr_t target_root_ptable;
     const PendingTlbInvalidation* pending;
-    uint16_t vpid;
     uint16_t pcid;
   };
   TlbInvalidatePage_context task_context = {
       .target_root_ptable = root_ptable_phys,
       .pending = pending,
-      .vpid = vpid,
       .pcid = pcid,
   };
-
-  // TODO(fxbug.dev/95763): Consider whether it is better to invalidate a VPID
-  // on context switch, or whether it is better to target all CPUs here.
-  if (vpid != MMU_X86_UNUSED_VPID) {
-    pending->contains_global = true;
-  }
 
   mp_ipi_target_t target;
   cpu_mask_t target_mask = 0;
@@ -427,11 +412,9 @@ void X86PageTableMmu::TlbInvalidate(PendingTlbInvalidation* pending) {
       if (context->pending->contains_global) {
         kcounter_add(tlb_invalidations_full_global_received, 1);
         x86_tlb_global_invalidate();
-        maybe_invvpid(InvVpid::SINGLE_CONTEXT, context->vpid, 0);
       } else {
         kcounter_add(tlb_invalidations_full_nonglobal_received, 1);
         x86_tlb_nonglobal_invalidate(context->pcid);
-        maybe_invvpid(InvVpid::SINGLE_CONTEXT_RETAIN_GLOBALS, context->vpid, 0);
       }
       return;
     }
@@ -458,8 +441,6 @@ void X86PageTableMmu::TlbInvalidate(PendingTlbInvalidation* pending) {
              */
             invpcid_va_pcid(item.addr(), context->pcid);
           }
-
-          maybe_invvpid(InvVpid::INDIVIDUAL_ADDRESS, context->vpid, item.addr());
           break;
       }
     }

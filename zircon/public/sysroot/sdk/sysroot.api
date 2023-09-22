@@ -180,7 +180,7 @@
   "include/zircon/syscalls/clock.h": "95f7dbe3bc0abd2c604c94c5ae4d3252",
   "include/zircon/syscalls/debug.h": "93adcbe92fe89f4cb6ef77254ce02811",
   "include/zircon/syscalls/exception.h": "cbf75845ccdd3a24d213716967f12a79",
-  "include/zircon/syscalls/hypervisor.h": "c919cd59b4b5be28319fb1c06ebcd907",
+  "include/zircon/syscalls/hypervisor.h": "2fde38fb441710b0e02c04dad4cbd42c",
   "include/zircon/syscalls/internal/cdecls.inc": "6c71d1355789cfcca9e7d14ff8c3fe8f",
   "include/zircon/syscalls/iommu.h": "a6cc36174b0b1d5c34877f05d047bbc3",
   "include/zircon/syscalls/log.h": "3286e6d90aee6dca1a46c914910d4ab3",

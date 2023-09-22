@@ -21,7 +21,6 @@
 #include <vm/arch_vm_aspace.h>
 #include <vm/pmm.h>
 
-constexpr uint16_t MMU_X86_UNUSED_VPID = 0;
 constexpr uint16_t MMU_X86_UNUSED_PCID = 0;
 
 // Implementation of page tables used by x86-64 CPUs.
@@ -118,8 +117,6 @@ class X86ArchVmAspace final : public ArchVmAspaceInterface {
   bool ActiveSinceLastCheck(bool clear) override;
 
   paddr_t arch_table_phys() const override { return pt_->phys(); }
-  uint16_t arch_vpid() const { return vpid_; }
-  void arch_set_vpid(uint16_t vpid) { vpid_ = vpid; }
   paddr_t pt_phys() const { return pt_->phys(); }
   size_t pt_pages() const { return pt_->pages(); }
   uint16_t pcid() const { return pcid_; }
@@ -172,9 +169,6 @@ class X86ArchVmAspace final : public ArchVmAspaceInterface {
   // This will be either a normal page table or an EPT, depending on whether
   // flags_ includes ARCH_ASPACE_FLAG_GUEST.
   X86PageTableBase* pt_;
-
-  // If this address space has an associated VPID.
-  uint16_t vpid_ = MMU_X86_UNUSED_VPID;
 
   // PCID assigned to the aspace. Defaults to unused if PCIDs are not being used.
   uint16_t pcid_ = MMU_X86_UNUSED_PCID;

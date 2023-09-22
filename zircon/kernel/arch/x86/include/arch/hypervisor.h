@@ -81,23 +81,6 @@ class NormalGuest : public Guest {
   id_allocator::IdAllocator<uint16_t, kMaxGuestVcpus> vpid_allocator_;
 };
 
-class DirectGuest : public Guest {
- public:
-  // VPID shared by all direct VCPUs.
-  static constexpr uint16_t kSharedVpid = 1;
-
-  static zx::result<ktl::unique_ptr<Guest>> Create();
-  ~DirectGuest() override;
-
-  hypervisor::DirectPhysicalAspace& PhysicalAspace() { return dpas_; }
-  fbl::RefPtr<VmAddressRegion> RootVmar() const override { return shared_aspace_->RootVmar(); }
-  VmAspace& SharedAspace() { return *shared_aspace_; }
-
- private:
-  hypervisor::DirectPhysicalAspace dpas_;
-  fbl::RefPtr<VmAspace> shared_aspace_;
-};
-
 // Stores part of the MSR state for a virtual CPU.
 struct MsrState {
   uint64_t star;
@@ -214,25 +197,6 @@ class NormalVcpu : public Vcpu {
  private:
   LocalApicState local_apic_state_;
   PvClockState pv_clock_state_;
-};
-
-class DirectVcpu : public Vcpu {
- public:
-  static constexpr VcpuConfig kConfig = {
-      .has_base_processor = false,
-      .cr_exiting = true,
-      .unrestricted = false,
-  };
-
-  static zx::result<ktl::unique_ptr<Vcpu>> Create(DirectGuest& guest, zx_vaddr_t entry);
-
-  DirectVcpu(DirectGuest& guest, uint16_t vpid, Thread* thread);
-
-  zx::result<> Enter(zx_port_packet_t& packet) override;
-  void Kick() override;
-
- private:
-  uintptr_t fs_base_ = 0;
 };
 
 #endif  // ZIRCON_KERNEL_ARCH_X86_INCLUDE_ARCH_HYPERVISOR_H_
