@@ -315,9 +315,7 @@ fi
 # Fall back to disk type defaults if left unspecified with a provided emulated
 # disk file.
 if [[ -n "$DISKFILE" ]] && [[ -z "$DISKTYPE" ]]; then
-  if (( $UEFI_DISK_BOOT )); then
-    DISKTYPE="usb"
-  elif (( $VIRTIO )); then
+  if (( $VIRTIO )); then
     DISKTYPE="virtio"
   else
     DISKTYPE="ahci"
