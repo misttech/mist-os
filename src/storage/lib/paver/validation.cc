@@ -46,15 +46,12 @@ bool ExtractZbiPayload(cpp20::span<const uint8_t> data, const zbi_header_t** hea
                        cpp20::span<const uint8_t>* payload) {
   // Validate data header.
   if (data.size() < sizeof(zbi_header_t)) {
-    ERROR("Data too short: expected at least %ld byte(s), got %ld byte(s).\n", sizeof(zbi_header_t),
-          data.size());
     return false;
   }
 
   // Validate the header.
   const auto zbi_header = reinterpret_cast<const zbi_header_t*>(data.data());
   if (zbi_header->magic != ZBI_ITEM_MAGIC) {
-    ERROR("ZBI header has incorrect magic value.\n");
     return false;
   }
   if ((zbi_header->flags & ZBI_FLAGS_VERSION) != ZBI_FLAGS_VERSION) {
@@ -87,6 +84,7 @@ bool IsValidKernelZbi(Arch arch, cpp20::span<const uint8_t> data) {
   const zbi_header_t* container_header;
   cpp20::span<const uint8_t> container_data;
   if (!ExtractZbiPayload(data, &container_header, &container_data)) {
+    ERROR("Kernel payload does not look like a ZBI container");
     return false;
   }
 
