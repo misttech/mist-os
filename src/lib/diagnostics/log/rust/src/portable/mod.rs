@@ -80,6 +80,7 @@ where
         Some(Severity::Error) | Some(Severity::Fatal) => Level::ERROR,
     };
     let builder = tracing_subscriber::fmt()
+        .with_ansi(false)
         .event_format(HostFormatter {
             tags: opts.publisher.tags.iter().map(|s| s.to_string()).collect(),
             display_module_path: opts.publisher.metatags.contains(&Metatag::Target),

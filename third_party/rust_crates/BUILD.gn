@@ -1003,7 +1003,7 @@ group("tracing-mutex") {
 }
 
 group("tracing-subscriber") {
-  public_deps = [ ":tracing-subscriber-v0_3_1" ]
+  public_deps = [ ":tracing-subscriber-v0_3_15" ]
 }
 
 if (current_os == "fuchsia") {
@@ -5852,7 +5852,7 @@ rust_library("loom-v0_5_6") {
   deps += [ ":generator-v0_7_5" ]
   deps += [ ":scoped-tls-v1_0_1" ]
   deps += [ ":tracing-v0_1_34" ]
-  deps += [ ":tracing-subscriber-v0_3_1" ]
+  deps += [ ":tracing-subscriber-v0_3_15" ]
   deps += [ "//build/validate:non_production_tag" ]
   rustenv = []
 
@@ -11713,17 +11713,17 @@ rust_library("tracing-mutex-v0_2_1") {
   visibility = [ ":*" ]
 }
 
-rust_library("tracing-subscriber-v0_3_1") {
+rust_library("tracing-subscriber-v0_3_15") {
   crate_name = "tracing_subscriber"
   crate_root =
-      "//third_party/rust_crates/vendor/tracing-subscriber-0.3.1/src/lib.rs"
-  output_name = "tracing_subscriber-3c92bd8481194a1d"
+      "//third_party/rust_crates/vendor/tracing-subscriber-0.3.15/src/lib.rs"
+  output_name = "tracing_subscriber-dfc2ec637e1dcf07"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":ansi_term-v0_12_1" ]
-  deps += [ ":lazy_static-v1_4_0" ]
   deps += [ ":matchers-v0_1_0" ]
+  deps += [ ":once_cell-v1_17_1" ]
   deps += [ ":regex-v1_5_6" ]
   deps += [ ":sharded-slab-v0_1_4" ]
   deps += [ ":smallvec-v1_8_0" ]
@@ -11737,16 +11737,16 @@ rust_library("tracing-subscriber-v0_3_1") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=3c92bd8481194a1d",
-    "-Cextra-filename=-3c92bd8481194a1d",
+    "-Cmetadata=dfc2ec637e1dcf07",
+    "-Cextra-filename=-dfc2ec637e1dcf07",
     "--cfg=feature=\"alloc\"",
     "--cfg=feature=\"ansi\"",
     "--cfg=feature=\"ansi_term\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"env-filter\"",
     "--cfg=feature=\"fmt\"",
-    "--cfg=feature=\"lazy_static\"",
     "--cfg=feature=\"matchers\"",
+    "--cfg=feature=\"once_cell\"",
     "--cfg=feature=\"regex\"",
     "--cfg=feature=\"registry\"",
     "--cfg=feature=\"sharded-slab\"",
