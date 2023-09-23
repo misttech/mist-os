@@ -22,6 +22,7 @@ pipes using non-blocking async readers, we do not hang.
 """
 
 import asyncio
+import atexit
 from dataclasses import dataclass
 from dataclasses import field
 from io import StringIO
@@ -290,6 +291,14 @@ class AsyncCommand:
         raise AsyncCommandError("Event stream unexpectedly stopped")
 
     async def _task(self):
+        # Make sure that the child process group is killed when this process
+        # exits. Otherwise the child process group keeps running if a user
+        # does Ctrl+C on this script.
+        def kill_async_process():
+            self.kill()
+
+        atexit.register(kill_async_process)
+
         tasks = []
 
         async def read_stream(
@@ -350,6 +359,10 @@ class AsyncCommand:
             # Also ensure we wait for the wrapped process, and use it's return code as the canonical code.
             wrapper_return_code = return_code
             return_code = await self._wrapped_process.wait()
+
+        # There is no longer a need to cleanup this process, since it already
+        # terminated.
+        atexit.unregister(kill_async_process)
 
         runtime = time.time() - self._start
 
