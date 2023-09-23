@@ -15,6 +15,7 @@ use {
     },
     clonable_error::ClonableError,
     cm_moniker::{InstancedExtendedMoniker, InstancedMoniker},
+    cm_rust::UseDecl,
     cm_types::Name,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     moniker::{ChildName, Moniker, MonikerError},
@@ -841,6 +842,9 @@ pub enum CreateNamespaceError {
     #[error("failed to clone pkg dir: {0}")]
     ClonePkgDirFailed(#[source] fuchsia_fs::node::CloneError),
 
+    #[error("use decl without path cannot be installed into the namespace: {0:?}")]
+    UseDeclWithoutPath(UseDecl),
+
     #[error("{0}")]
     InstanceNotInInstanceIdIndex(#[source] RoutingError),
 
@@ -852,6 +856,7 @@ impl CreateNamespaceError {
     fn as_zx_status(&self) -> zx::Status {
         match self {
             Self::ClonePkgDirFailed(_) => zx::Status::IO,
+            Self::UseDeclWithoutPath(_) => zx::Status::INVALID_ARGS,
             Self::InstanceNotInInstanceIdIndex(e) => e.as_zx_status(),
             Self::NamespaceError(_) => zx::Status::INVALID_ARGS,
         }

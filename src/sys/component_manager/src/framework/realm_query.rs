@@ -1198,7 +1198,7 @@ mod tests {
             entries,
             vec![fuchsia_fs::directory::DirEntry {
                 name: "foo".to_string(),
-                kind: fuchsia_fs::directory::DirentKind::Unknown
+                kind: fuchsia_fs::directory::DirentKind::Service
             }]
         );
     }
