@@ -36,7 +36,9 @@ group("system") {
 group("fdr") {
   testonly = true
   deps = [
+    ":fdr_lib_unittests",
     ":system_recovery_fdr",
+
     # TODO (fxbug.dev/103089): Handle FDR via integration tests.
     # ":system_recovery_fdr_test",
   ]
@@ -63,12 +65,10 @@ group("ota") {
 group("tests") {
   testonly = true
   deps = [
+    ":fdr",
     ":installer",
     ":ota",
     ":system",
-
-    # TODO (fxbug.dev/103089): Handle FDR via integration tests.
-    # ":fdr",
   ]
 }
 
@@ -121,6 +121,10 @@ rustc_library("fdr_lib") {
   ]
   source_root = "src/fdr.rs"
   sources = [ "src/fdr.rs" ]
+}
+
+fuchsia_unittest_package("fdr_lib_unittests") {
+  deps = [ ":fdr_lib_test" ]
 }
 
 rustc_library("ota_lib") {

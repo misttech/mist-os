@@ -829,6 +829,7 @@ impl RecoveryViewAssistant {
                         };
                         fasync::Task::local(f).detach();
                     }
+                    FactoryResetState::AwaitingReset => {} // no-op
                 };
             }
             RecoveryMessages::CountdownTick(count) => {
