@@ -38,7 +38,7 @@ class LayerTest : public TestBase {
         .type = fhd::wire::kTypeSimple,
         .handle = 0,
     };
-    EXPECT_OK(display()->ImportVmoImage(&dc_image, zx::vmo(0), 0));
+    EXPECT_OK(display()->ImportVmoImageForTesting(&dc_image, zx::vmo(0), 0));
     EXPECT_NE(dc_image.handle, 0u);
     fbl::RefPtr<Image> image =
         fbl::AdoptRef(new Image(controller(), dc_image, zx::vmo(0), nullptr, ClientId(1)));

@@ -31,7 +31,7 @@ class ImageTest : public TestBase, public FenceCallback {
     zx::vmo dup_vmo;
     EXPECT_OK(vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup_vmo));
     // TODO: Factor this out of display::Client or make images easier to test without a client.
-    if (display()->ImportVmoImage(&dc_image, std::move(vmo), /*offset=*/0) != ZX_OK) {
+    if (display()->ImportVmoImageForTesting(&dc_image, std::move(vmo), /*offset=*/0) != ZX_OK) {
       return nullptr;
     }
     fbl::RefPtr<Image> image =

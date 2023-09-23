@@ -23,18 +23,17 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
-#include <memory>
 #include <unordered_map>
 
 #include <ddktl/device.h>
 #include <fbl/auto_lock.h>
-#include <fbl/intrusive_double_list.h>
 #include <fbl/mutex.h>
 
 #include "src/graphics/display/drivers/fake/image-info.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
 
 namespace fake_display {
 
@@ -132,11 +131,11 @@ class FakeDisplay : public DeviceType,
   void SendVsync();
 
   // Just for display core unittests.
-  zx_status_t ImportVmoImage(image_t* image, zx::vmo vmo, size_t offset);
+  zx_status_t ImportVmoImageForTesting(image_t* image, zx::vmo vmo, size_t offset);
 
   size_t TEST_imported_images_count() const {
     fbl::AutoLock lock(&image_mutex_);
-    return imported_images_.size_slow();
+    return imported_images_.size();
   }
 
   uint8_t GetClampRgbValue() const {
@@ -218,12 +217,21 @@ class FakeDisplay : public DeviceType,
                      fidl::SyncClient<fuchsia_sysmem::BufferCollection>>
       buffer_collections_;
 
-  // Imported Images
-  fbl::DoublyLinkedList<std::unique_ptr<ImageInfo>> imported_images_ TA_GUARDED(image_mutex_);
+  // Imported display images, keyed by image ID.
+  DisplayImageInfo::HashTable imported_images_ TA_GUARDED(image_mutex_);
 
-  // Points to the current image to be displayed and captured.
-  // Stores nullptr if there is no image displaying on the fake display.
-  ImageInfo* current_image_to_capture_ TA_GUARDED(image_mutex_);
+  // ID of the current image to be displayed and captured.
+  // Stores `kInvalidDriverImageId` if there is no image displaying on the fake
+  // display.
+  display::DriverImageId current_image_to_capture_id_ TA_GUARDED(image_mutex_) =
+      display::kInvalidDriverImageId;
+
+  // The driver image ID for the next display image to be imported to the
+  // device.
+  // Note: we cannot use std::atomic here, since std::atomic only allows
+  // built-in integral and floating types to do atomic arithmetics.
+  display::DriverImageId next_imported_display_driver_image_id_ TA_GUARDED(image_mutex_) =
+      display::DriverImageId(1);
 
   // Imported capture images, keyed by image ID.
   CaptureImageInfo::HashTable imported_captures_ TA_GUARDED(capture_mutex_);
