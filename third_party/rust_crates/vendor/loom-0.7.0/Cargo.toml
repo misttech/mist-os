@@ -11,8 +11,9 @@
 
 [package]
 edition = "2018"
+rust-version = "1.60.0"
 name = "loom"
-version = "0.5.6"
+version = "0.7.0"
 authors = ["Carl Lerche <me@carllerche.com>"]
 description = "Permutation testing for concurrent code"
 homepage = "https://github.com/tokio-rs/loom"
@@ -61,7 +62,7 @@ optional = true
 version = "0.1.27"
 
 [dependencies.tracing-subscriber]
-version = "0.3"
+version = "0.3.8"
 features = ["env-filter"]
 
 [dev-dependencies.futures-util]
