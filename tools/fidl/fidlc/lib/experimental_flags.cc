@@ -39,6 +39,7 @@ std::map<const std::string_view, const ExperimentalFlags::Flag> ExperimentalFlag
     {"output_index_json", Flag::kOutputIndexJson},
     {"zx_c_types", Flag::kZxCTypes},
     {"allow_arbitrary_error_types", Flag::kAllowArbitraryErrorTypes},
+    {"transitional_allow_list", Flag::kTransitionalAllowList},
 };
 
 }  // namespace fidl

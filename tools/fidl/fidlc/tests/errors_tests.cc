@@ -213,4 +213,12 @@ protocol Example {
   ASSERT_EQ(error_id->type_decl->kind, fidl::flat::Decl::Kind::kTable);
 }
 
+TEST(ErrorsTest, TransitionalAllowList) {
+  TestLibrary library;
+  library.AddFile("bad/fi-0202.test.fidl");
+  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
+  library.EnableFlag(fidl::ExperimentalFlags::Flag::kTransitionalAllowList);
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrTransitionalNotAllowed);
+}
+
 }  // namespace

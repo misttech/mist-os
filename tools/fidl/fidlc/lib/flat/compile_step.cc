@@ -1194,6 +1194,111 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
       CheckNoEventErrorSyntax(method);
     }
   }
+
+  // Ensure that only methods from a small allow-list use the @transitional attribute.
+  static const auto transitional_allowlist = std::set<std::string_view>{
+      "fidl.test.protocoleventadd.Example.OnNewEvent",
+      "fidl.test.protocoleventremove.Example.OnOldEvent",
+      "fidl.test.protocolmethodadd.Example.NewMethod",
+      "fidl.test.protocolmethodremove.Example.OldMethod",
+      "fuchsia.accessibility.semantics.SemanticTree.SendSemanticEvent",
+      "fuchsia.bluetooth.gatt2.LocalService.OnSuppressDiscovery",
+      "fuchsia.bluetooth.gatt2.LocalService.PeerUpdate",
+      "fuchsia.bluetooth.gatt2.Server.PublishService",
+      "fuchsia.bluetooth.le.Connection.RequestGattClient",
+      "fuchsia.camera.Manager.CreateStreamV2",
+      "fuchsia.camera3.Device.GetConfigurations",
+      "fuchsia.camera3.Device.GetConfigurations2",
+      "fuchsia.camera3.Stream.GetNextFrame",
+      "fuchsia.camera3.Stream.GetNextFrame2",
+      "fuchsia.camera3.Stream.GetProperties",
+      "fuchsia.camera3.Stream.GetProperties2",
+      "fuchsia.element.AnnotationController.WatchAnnotations",
+      "fuchsia.feedback.CrashReportingProductRegister.UpsertWithAck",
+      "fuchsia.hardware.display.Coordinator.ApplyConfig2",
+      "fuchsia.io.Directory2.AddInotifyFilter",
+      "fuchsia.io.Directory2.CreateSymlink",
+      "fuchsia.io.Node2.GetExtendedAttribute",
+      "fuchsia.io.Node2.ListExtendedAttributes",
+      "fuchsia.io.Node2.RemoveExtendedAttribute",
+      "fuchsia.io.Node2.SetExtendedAttribute",
+      "fuchsia.media.AudioCore.CreateAudioCapturerWithConfiguration",
+      "fuchsia.media.AudioCore.EnableDeviceSettings",
+      "fuchsia.media.AudioCore.GetDbFromVolume",
+      "fuchsia.media.AudioCore.GetVolumeFromDb",
+      "fuchsia.media.sounds.Player.StopPlayingSound",
+      "fuchsia.modular.ComponentContext.DeprecatedConnectToAgent",
+      "fuchsia.modular.ComponentContext.DeprecatedConnectToAgentService",
+      "fuchsia.modular.SessionShell.AttachView",
+      "fuchsia.modular.SessionShell.AttachView2",
+      "fuchsia.modular.SessionShell.AttachView3",
+      "fuchsia.modular.SessionShellContext.Logout",
+      "fuchsia.modular.StoryController.GetInfo",
+      "fuchsia.modular.StoryController.GetInfo2",
+      "fuchsia.modular.StoryProvider.GetStories",
+      "fuchsia.modular.StoryProvider.GetStories2",
+      "fuchsia.modular.StoryProvider.GetStoryInfo",
+      "fuchsia.modular.StoryProvider.GetStoryInfo2",
+      "fuchsia.modular.StoryProviderWatcher.OnChange",
+      "fuchsia.modular.StoryProviderWatcher.OnChange2",
+      "fuchsia.modular.StoryShell.AddSurface",
+      "fuchsia.modular.StoryShell.AddSurface2",
+      "fuchsia.modular.StoryShell.AddSurface3",
+      "fuchsia.modular.StoryShell.UpdateSurface",
+      "fuchsia.modular.StoryShell.UpdateSurface2",
+      "fuchsia.modular.StoryShell.UpdateSurface3",
+      "fuchsia.settings.Setup.Set",
+      "fuchsia.starnix.binder.ProcessAccessor.FileRequest",
+      "fuchsia.sysinfo.SysInfo.GetBoardRevision",
+      "fuchsia.ui.accessibility.view.Registry.CreateAccessibilityViewport",
+      "fuchsia.ui.app.ViewProvider.CreateView2",
+      "fuchsia.ui.app.ViewProvider.CreateViewWithViewRef",
+      "fuchsia.ui.composition.Flatland.CreateView2",
+      "fuchsia.ui.composition.Flatland.SetInfiniteHitRegion",
+      "fuchsia.ui.input.InputMethodEditor.DispatchKey3",
+      "fuchsia.ui.policy.DeviceListenerRegistry.RegisterListener",
+      "fuchsia.ui.policy.DeviceListenerRegistry.RegisterMediaButtonsListener",
+      "fuchsia.ui.policy.MediaButtonsListener.OnEvent",
+      "fuchsia.ui.policy.MediaButtonsListener.OnMediaButtonsEvent",
+      "fuchsia.ui.scenic.Scenic.CreateSessionT",
+      "fuchsia.ui.scenic.Scenic.UsesFlatland",
+      "fuchsia.ui.views.View.Present",
+      "fuchsia.weave.Signer.SignHashWithPrivateKey",
+      "fuchsia.web.Frame.Close",
+      "fuchsia.web.Frame.CreateView",
+      "fuchsia.web.Frame.CreateView2",
+      "fuchsia.web.Frame.CreateViewWithViewRef",
+      "fuchsia.web.Frame.SetMediaSessionId",
+      "fuchsia.web.Frame.SetMediaSettings",
+      "fuchsia.web.Frame.SetNavigationEventListener",
+      "fuchsia.web.Frame.SetNavigationEventListener2",
+      "fuchsia.web.Frame.SetPageScale",
+      "fuchsia.web.Frame.SetPreferredTheme",
+      "fuchsia.web.NavigationController.GetVisibleEntry",
+      "test.protocols.Transitional.Event",
+      "test.protocols.Transitional.OneWay",
+      "test.protocols.Transitional.Request",
+      "test.transitional.TransitionalEvent.Event",
+      "test.transitional.TransitionMethods.UnimplementedMethod",
+  };
+  if (experimental_flags().IsFlagEnabled(ExperimentalFlags::Flag::kTransitionalAllowList)) {
+    for (auto& method : protocol_declaration->methods) {
+      auto attribute = method.attributes->Get("transitional");
+      if (attribute == nullptr) {
+        continue;
+      }
+      std::ostringstream method_name;
+      for (const auto part : library()->name) {
+        method_name << part << '.';
+      }
+      method_name << protocol_declaration->GetName() << "." << method.name.data();
+      bool allowed = transitional_allowlist.find(method_name.str()) != transitional_allowlist.end();
+
+      if (!allowed) {
+        Fail(ErrTransitionalNotAllowed, attribute->span, method.name.data());
+      }
+    }
+  }
 }
 
 void CompileStep::ValidateDomainErrorType(const Union* result_union) {

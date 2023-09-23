@@ -33,6 +33,7 @@ template("fidlc") {
     "no_optional_structs",
     "unknown_interactions",
     "unknown_interactions_mandate",
+    "transitional_allow_list",
   ]
 
   if (defined(invoker.experimental_flags)) {

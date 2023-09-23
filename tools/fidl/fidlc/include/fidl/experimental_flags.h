@@ -53,6 +53,9 @@ class ExperimentalFlags {
 
     // Allow any types in error syntax, not just (u)int32 or enums thereof.
     kAllowArbitraryErrorTypes = 1 << 10,
+
+    // Enable an allow-list for the @transitional attribute.
+    kTransitionalAllowList = 1 << 11,
   };
 
   ExperimentalFlags() = default;

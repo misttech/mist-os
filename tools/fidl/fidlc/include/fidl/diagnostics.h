@@ -420,6 +420,9 @@ constexpr ErrorDef<201, std::vector<std::string_view>, Platform, Platform>
     ErrPlatformVersionNotSelected(
         "library '{}' belongs to platform '{}', but no version was selected for it; "
         "please choose a version N by passing `--available {}:N`");
+constexpr ErrorDef<202, std::string_view> ErrTransitionalNotAllowed(
+    "The @transitional attribute is not allowed on {}. "
+    "Try using @available instead.");
 
 // To add a new error:
 //
@@ -629,6 +632,7 @@ static constexpr const DiagnosticDef *kAllDiagnosticDefs[] = {
     /* fi-0199 */ &ErrOverlayMemberMustBeValue,
     /* fi-0200 */ &ErrOverlayMustNotContainReserved,
     /* fi-0201 */ &ErrPlatformVersionNotSelected,
+    /* fi-0202*/ &ErrTransitionalNotAllowed,
 };
 
 // In reporter.h we assert that reported error IDs are <= kNumDiagnosticDefs.

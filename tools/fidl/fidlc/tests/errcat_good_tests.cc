@@ -1385,4 +1385,13 @@ TEST(ErrcatTests, Good0201) {
   ASSERT_COMPILED(library);
 }
 
+TEST(ErrcatTests, Good0202) {
+  TestLibrary library;
+  library.AddFile("good/fi-0202.test.fidl");
+  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
+  library.EnableFlag(fidl::ExperimentalFlags::Flag::kTransitionalAllowList);
+  library.SelectVersion("test", "10");
+  ASSERT_COMPILED(library);
+}
+
 }  // namespace
