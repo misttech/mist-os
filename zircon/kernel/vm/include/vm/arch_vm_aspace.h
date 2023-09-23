@@ -53,9 +53,11 @@ class ArchVmAspaceInterface {
   virtual zx_status_t Init() = 0;
 
   // This method initializes an ArchVmAspace just like Init, but also prepopulates the top level
-  // page table. Either Init or InitPrepopulated can be called to set up an ArchVmAspace, but not
-  // both.
+  // page table. Either Init, InitPrepopulated, or InitUnified can be called to set up an
+  // ArchVmAspace, but not both.
   virtual zx_status_t InitPrepopulated() = 0;
+  virtual zx_status_t InitUnified(ArchVmAspaceInterface& shared,
+                                  ArchVmAspaceInterface& restricted) = 0;
 
   // This method puts the instance into read-only mode and asserts that it contains no mappings.
   //
@@ -68,10 +70,11 @@ class ArchVmAspaceInterface {
   // ArchVmAspaceInterface.
   virtual void DisableUpdates() = 0;
 
-  // Destroy expects the aspace to be fully unmapped, as any mapped regions
-  // indicate incomplete cleanup at the higher layers.
+  // Destroy expects the aspace to be fully unmapped, as any mapped regions indicate incomplete
+  // cleanup at the higher layers. Note that this does not apply to unified aspaces, which may
+  // still contain some mappings when Destroy() is called.
   //
-  // It is safe to call Destroy even if Init failed.
+  // It is safe to call Destroy even if Init, InitPrepopulated, or InitUnified failed.
   // Once destroy has been called it is a user error to call any of the other methods on the aspace,
   // unless specifically stated otherwise, and doing so may cause a panic.
   virtual zx_status_t Destroy() = 0;

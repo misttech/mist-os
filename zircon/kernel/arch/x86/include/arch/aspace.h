@@ -29,6 +29,7 @@ class X86PageTableMmu final : public X86PageTableBase {
   using X86PageTableBase::Destroy;
   using X86PageTableBase::Init;
   using X86PageTableBase::InitPrepopulated;
+  using X86PageTableBase::InitUnified;
 
   // Initialize the kernel page table, assigning the given context to it.
   // This X86PageTable will be special in that its mappings will all have
@@ -90,6 +91,8 @@ class X86ArchVmAspace final : public ArchVmAspaceInterface {
 
   zx_status_t Init() override;
   zx_status_t InitPrepopulated() override;
+  zx_status_t InitUnified(ArchVmAspaceInterface& shared,
+                          ArchVmAspaceInterface& restricted) override;
 
   void DisableUpdates() final {
     // This method is no-op on x86 as the feature is only needed on arm64.  See fxbug.dev/79118.

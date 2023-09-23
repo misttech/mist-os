@@ -245,7 +245,7 @@ X86PageTableBase::ConsistencyManager::~ConsistencyManager() {
 }
 
 void X86PageTableBase::ConsistencyManager::Finish() {
-  DEBUG_ASSERT(pt_->lock_.lock().IsHeld());
+  AssertHeld(pt_->lock_);
 
   clf_.ForceFlush();
   if (pt_->needs_cache_flushes()) {
@@ -255,6 +255,15 @@ void X86PageTableBase::ConsistencyManager::Finish() {
     arch::DeviceMemoryBarrier();
   }
   pt_->TlbInvalidate(&tlb_);
+  if (pt_->IsRestricted()) {
+    // TODO(https://fxbug.dev/132980): This TLB invalidation could be wrapped into the preceding
+    // one so long as we built the target mask correctly.
+    Guard<Mutex> a{AssertOrderedLock, &pt_->referenced_pt_->lock_,
+                   pt_->referenced_pt_->LockOrder()};
+    pt_->referenced_pt_->TlbInvalidate(&tlb_);
+  }
+  // Clear out the pending TLB invalidations.
+  tlb_.clear();
   pt_ = nullptr;
 }
 
@@ -413,6 +422,80 @@ zx_status_t X86PageTableBase::InitPrepopulated(
     }
     pages_ += 1;
     virt_[i] = X86_VIRT_TO_PHYS(pdp) | flags | X86_MMU_PG_P;
+  }
+  return ZX_OK;
+}
+
+zx_status_t X86PageTableBase::InitUnified(void* ctx, X86PageTableBase* shared, vaddr_t shared_base,
+                                          size_t shared_size, X86PageTableBase* restricted,
+                                          vaddr_t restricted_base, size_t restricted_size,
+                                          page_alloc_fn_t test_paf) {
+  // Validate that the shared and restricted page tables do not overlap and do not share a PML4
+  // entry.
+  PageTableLevel top = top_level();
+  const uint restricted_start = vaddr_to_index(top, restricted_base);
+  uint restricted_end = vaddr_to_index(top, restricted_base + restricted_size - 1);
+  if (page_aligned(top, restricted_base + restricted_size)) {
+    restricted_end += 1;
+  }
+  const uint shared_start = vaddr_to_index(top, shared_base);
+  uint shared_end = vaddr_to_index(top, shared_base + shared_size - 1);
+  if (page_aligned(top, shared_base + shared_size)) {
+    shared_end += 1;
+  }
+  DEBUG_ASSERT(restricted_end <= shared_start);
+
+  zx_status_t status = Init(ctx, test_paf);
+  if (status != ZX_OK) {
+    return status;
+  }
+  is_unified_ = true;
+
+  // Validate the restricted page table and set its metadata.
+  {
+    Guard<Mutex> a{AssertOrderedLock, &restricted->lock_, restricted->LockOrder()};
+    DEBUG_ASSERT(restricted->virt_);
+    DEBUG_ASSERT(restricted->referenced_pt_ == nullptr);
+    DEBUG_ASSERT(!restricted->is_shared_);
+    DEBUG_ASSERT(!restricted->is_restricted_);
+
+    // Assert that there are no entries in the restricted page table.
+    for (uint i = restricted_start; i < restricted_end; i++) {
+      DEBUG_ASSERT(!IS_PAGE_PRESENT(restricted->virt_[i]));
+    }
+
+    restricted->is_restricted_ = true;
+    restricted->referenced_pt_ = this;
+    restricted->num_references_++;
+  }
+
+  // Copy all mappings from the shared page table and set its metadata.
+  {
+    Guard<Mutex> a{AssertOrderedLock, &shared->lock_, shared->LockOrder()};
+    DEBUG_ASSERT(shared->virt_);
+    DEBUG_ASSERT(shared->has_prepopulated_pml4_);
+    DEBUG_ASSERT(shared->referenced_pt_ == nullptr);
+    DEBUG_ASSERT(!shared->is_restricted_);
+
+    // Set up the PML4 so we capture any mappings created prior to creation of this unified page
+    // table.
+    pt_entry_t curr_entry = 0;
+    for (uint i = shared_start; i < shared_end; i++) {
+      curr_entry = shared->virt_[i];
+      if (IS_PAGE_PRESENT(curr_entry)) {
+        virt_[i] = curr_entry;
+      }
+    }
+
+    shared->is_shared_ = true;
+    shared->num_references_++;
+  }
+
+  // Update this page table's bookkeeping.
+  {
+    Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
+    referenced_pt_ = restricted;
+    shared_pt_ = shared;
   }
   return ZX_OK;
 }
@@ -617,6 +700,9 @@ zx::result<bool> X86PageTableBase::RemoveMapping(volatile pt_entry_t* table, Pag
   LTRACEF("L: %d, %016" PRIxPTR " %016zx\n", static_cast<int>(level), cursor.vaddr(),
           cursor.size());
   DEBUG_ASSERT(check_vaddr(cursor.vaddr()));
+  // Unified page tables should never be unmapping entries directly; rather, their constituent page
+  // tables should be unmapping entries on their behalf.
+  DEBUG_ASSERT(!IsUnified());
 
   if (level == PageTableLevel::PT_L) {
     return zx::ok(RemoveMappingL0(table, cursor, cm));
@@ -696,6 +782,15 @@ zx::result<bool> X86PageTableBase::RemoveMapping(volatile pt_entry_t* table, Pag
               (uintptr_t)next_table, ptable_phys);
 
       vm_page_t* page = paddr_to_vm_page(ptable_phys);
+      if (level == PageTableLevel::PML4_L && IsRestricted()) {
+        Guard<Mutex> a{AssertOrderedLock, &referenced_pt_->lock_, referenced_pt_->LockOrder()};
+        pt_entry_t* referenced_entry = (pt_entry_t*)referenced_pt_->virt() + index;
+        DEBUG_ASSERT(check_equal_ignore_flags(*referenced_entry, *e));
+
+        ConsistencyManager cm_referenced(referenced_pt_);
+        referenced_pt_->UnmapEntry(&cm_referenced, level, unmap_vaddr, referenced_entry, false);
+        cm_referenced.Finish();
+      }
       UnmapEntry(cm, level, unmap_vaddr, e, /*was_terminal=*/false);
 
       DEBUG_ASSERT(page);
@@ -734,6 +829,11 @@ bool X86PageTableBase::RemoveMappingL0(volatile pt_entry_t* table, MappingCursor
   return unmapped;
 }
 
+bool X86PageTableBase::check_equal_ignore_flags(pt_entry_t left, pt_entry_t right) {
+  pt_entry_t no_accessed_dirty_mask = ~X86_MMU_PG_A & ~X86_MMU_PG_D;
+  return (left & no_accessed_dirty_mask) == (right & no_accessed_dirty_mask);
+}
+
 /**
  * @brief Creates mappings for the range specified by start_cursor
  *
@@ -757,6 +857,9 @@ zx_status_t X86PageTableBase::AddMapping(volatile pt_entry_t* table, uint mmu_fl
   DEBUG_ASSERT(check_vaddr(cursor.vaddr()));
   DEBUG_ASSERT(check_paddr(cursor.paddr()));
   const vaddr_t start_vaddr = cursor.vaddr();
+  // Unified page tables should never be mapping entries directly; rather, their constituent page
+  // tables should be mapping entries on their behalf.
+  DEBUG_ASSERT(!IsUnified());
 
   zx_status_t ret = ZX_OK;
 
@@ -827,8 +930,21 @@ zx_status_t X86PageTableBase::AddMapping(volatile pt_entry_t* table, uint mmu_fl
 
         LTRACEF_LEVEL(2, "new table %p at level %d\n", m, static_cast<int>(level));
 
+        if (level == PageTableLevel::PML4_L && IsRestricted()) {
+          Guard<Mutex> a{AssertOrderedLock, &referenced_pt_->lock_, referenced_pt_->LockOrder()};
+          pt_entry_t* referenced_entry = (pt_entry_t*)referenced_pt_->virt() + index;
+          DEBUG_ASSERT(check_equal_ignore_flags(*referenced_entry, *e));
+
+          ConsistencyManager cm_referenced(referenced_pt_);
+          referenced_pt_->UpdateEntry(&cm_referenced, level, cursor.vaddr(), referenced_entry,
+                                      X86_VIRT_TO_PHYS(m), interm_flags,
+                                      /*was_terminal=*/false);
+          cm_referenced.Finish();
+        }
+
         UpdateEntry(cm, level, cursor.vaddr(), e, X86_VIRT_TO_PHYS(m), interm_flags,
                     /*was_terminal=*/false);
+
         pt_val = *e;
         pages_++;
       }
@@ -1065,6 +1181,15 @@ bool X86PageTableBase::HarvestMapping(volatile pt_entry_t* table,
               (uintptr_t)next_table, ptable_phys);
 
       vm_page_t* page = paddr_to_vm_page(ptable_phys);
+      if (level == PageTableLevel::PML4_L && IsRestricted()) {
+        Guard<Mutex> a{AssertOrderedLock, &referenced_pt_->lock_, referenced_pt_->LockOrder()};
+        pt_entry_t* referenced_entry = (pt_entry_t*)referenced_pt_->virt() + index;
+        DEBUG_ASSERT(check_equal_ignore_flags(*referenced_entry, *e));
+
+        ConsistencyManager cm_referenced(referenced_pt_);
+        referenced_pt_->UnmapEntry(&cm_referenced, level, unmap_vaddr, referenced_entry, false);
+        cm_referenced.Finish();
+      }
       UnmapEntry(cm, level, unmap_vaddr, e, /*was_terminal=*/false);
 
       DEBUG_ASSERT(page);
@@ -1144,7 +1269,7 @@ zx_status_t X86PageTableBase::UnmapPages(vaddr_t vaddr, const size_t count,
   // constructor.
   zx::result<bool> status = zx::ok(true);
   {
-    Guard<Mutex> a{&lock_};
+    Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
     DEBUG_ASSERT(virt_);
     status = RemoveMapping(virt_, top_level(), enlarge, cursor, &cm);
     cm.Finish();
@@ -1179,7 +1304,7 @@ zx_status_t X86PageTableBase::MapPages(vaddr_t vaddr, paddr_t* phys, size_t coun
   PageTableLevel top = top_level();
   __UNINITIALIZED ConsistencyManager cm(this);
   {
-    Guard<Mutex> a{&lock_};
+    Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
     DEBUG_ASSERT(virt_);
 
     MappingCursor cursor(/*paddrs=*/phys, /*paddr_count=*/count, /*page_size=*/PAGE_SIZE,
@@ -1220,7 +1345,7 @@ zx_status_t X86PageTableBase::MapPagesContiguous(vaddr_t vaddr, paddr_t paddr, c
                        /*vaddr=*/vaddr, /*size=*/count * PAGE_SIZE);
   __UNINITIALIZED ConsistencyManager cm(this);
   {
-    Guard<Mutex> a{&lock_};
+    Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
     DEBUG_ASSERT(virt_);
     zx_status_t status =
         AddMapping(virt_, mmu_flags, top_level(), ExistingEntryAction::Error, cursor, &cm);
@@ -1255,7 +1380,7 @@ zx_status_t X86PageTableBase::ProtectPages(vaddr_t vaddr, size_t count, uint mmu
   MappingCursor cursor(/*vaddr=*/vaddr, /*size=*/count * PAGE_SIZE);
   __UNINITIALIZED ConsistencyManager cm(this);
   {
-    Guard<Mutex> a{&lock_};
+    Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
     zx_status_t status = UpdateMapping(virt_, mmu_flags, top_level(), cursor, &cm);
     cm.Finish();
     if (status != ZX_OK) {
@@ -1274,7 +1399,7 @@ zx_status_t X86PageTableBase::QueryVaddr(vaddr_t vaddr, paddr_t* paddr, uint* mm
   LTRACEF("aspace %p, vaddr %#" PRIxPTR ", paddr %p, mmu_flags %p\n", this, vaddr, paddr,
           mmu_flags);
 
-  Guard<Mutex> a{&lock_};
+  Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
 
   volatile pt_entry_t* last_valid_entry;
   zx_status_t status = GetMapping(virt_, vaddr, top_level(), &ret_level, &last_valid_entry);
@@ -1332,7 +1457,7 @@ zx_status_t X86PageTableBase::HarvestAccessed(vaddr_t vaddr, size_t count,
   MappingCursor cursor(/*vaddr=*/vaddr, /*size=*/count * PAGE_SIZE);
   __UNINITIALIZED ConsistencyManager cm(this);
   {
-    Guard<Mutex> a{&lock_};
+    Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
     HarvestMapping(virt_, non_terminal_action, terminal_action, top_level(), cursor, &cm);
     cm.Finish();
   }
@@ -1345,7 +1470,7 @@ void X86PageTableBase::Destroy(vaddr_t base, size_t size) {
 
   // This lock should be uncontended since Destroy is not supposed to be called in parallel with
   // any other operation, but hold it anyway so we can clear virt_ and attempt to surface any bugs.
-  Guard<Mutex> a{&lock_};
+  Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
   DEBUG_ASSERT(num_references_ == 0);
 
   // If this page table has a prepopulated PML4, we need to manually clean up the entries we
@@ -1371,6 +1496,31 @@ void X86PageTableBase::Destroy(vaddr_t base, size_t size) {
         table[i] = 0;
       }
     }
+  }
+
+  if (IsUnified()) {
+    {
+      Guard<Mutex> b{AssertOrderedLock, &shared_pt_->lock_, shared_pt_->LockOrder()};
+      // The shared page table should be referenced by at least this page table, and could be
+      // referenced by many other unified page tables.
+      DEBUG_ASSERT(shared_pt_->num_references_ > 0);
+      shared_pt_->num_references_--;
+      if (shared_pt_->num_references_ == 0) {
+        shared_pt_->is_shared_ = false;
+      }
+    }
+    {
+      Guard<Mutex> b{AssertOrderedLock, &referenced_pt_->lock_, referenced_pt_->LockOrder()};
+      // The referenced_pt_ is the restricted page table, which can only be referenced by a singular
+      // unified page table.
+      DEBUG_ASSERT(referenced_pt_->num_references_ == 1);
+
+      referenced_pt_->num_references_--;
+      referenced_pt_->referenced_pt_ = nullptr;
+      referenced_pt_->is_restricted_ = false;
+    }
+    shared_pt_ = nullptr;
+    referenced_pt_ = nullptr;
   }
 
   if constexpr (DEBUG_ASSERT_IMPLEMENTED) {

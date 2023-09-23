@@ -82,13 +82,22 @@ class X86PageTableBase {
   void* virt() const { return virt_; }
 
   size_t pages() {
-    Guard<Mutex> al{&lock_};
+    Guard<Mutex> al{AssertOrderedLock, &lock_, LockOrder()};
     return pages_;
   }
   void* ctx() const { return ctx_; }
 
   using ExistingEntryAction = ArchVmAspaceInterface::ExistingEntryAction;
   using EnlargeOperation = ArchVmAspaceInterface::EnlargeOperation;
+
+  // Returns whether this page table is restricted.
+  bool IsRestricted() const TA_REQ(lock_) { return is_restricted_; }
+
+  // Returns whether this page table is shared.
+  bool IsShared() const TA_REQ(lock_) { return is_shared_; }
+
+  // Returns whether this page table is unified.
+  bool IsUnified() const { return is_unified_; }
 
   zx_status_t MapPages(vaddr_t vaddr, paddr_t* phys, size_t count, uint flags,
                        ExistingEntryAction existing_action, size_t* mapped);
@@ -105,6 +114,11 @@ class X86PageTableBase {
   zx_status_t HarvestAccessed(vaddr_t vaddr, size_t count, NonTerminalAction non_terminal_action,
                               TerminalAction terminal_action);
 
+  // Returns 1 for unified page tables and 0 for all other page tables. This establishes an
+  // ordering that is used when the lock_ is acquired. The restricted page table lock is acquired
+  // first, and the unified page table lock is acquired afterwards.
+  uint32_t LockOrder() const { return is_unified_ ? 1 : 0; }
+
  protected:
   using page_alloc_fn_t = ArchVmAspaceInterface::page_alloc_fn_t;
 
@@ -114,6 +128,17 @@ class X86PageTableBase {
   // entries.
   zx_status_t InitPrepopulated(void* ctx, vaddr_t base, size_t size,
                                page_alloc_fn_t test_paf = nullptr);
+  // Initialize a page table, assign the given context, and set it up as a unified page table with
+  // entries from the given page tables.
+  //
+  // The shared and restricted page tables must satisfy the following requirements:
+  // 1) The shared page table must set |has_prepopulated_pml4_| to true.
+  // 2) Both the shared and restricted page tables must have been initialized prior to this call.
+  // 3) The shared page table may not have |is_restricted_| set to true.
+  // 4) The restricted page table may not have either |is_restricted_| or |is_shared_| set to true.
+  zx_status_t InitUnified(void* ctx, X86PageTableBase* shared, vaddr_t shared_base,
+                          size_t shared_size, X86PageTableBase* restricted, vaddr_t restricted_base,
+                          size_t restricted_size, page_alloc_fn_t test_paf = nullptr);
 
   // Release the resources associated with this page table.  |base| and |size|
   // are only used for debug checks that the page tables have no more mappings.
@@ -160,6 +185,9 @@ class X86PageTableBase {
   // invalidation.
   void* ctx_ = nullptr;
 
+  // Lock to protect the mmu code.
+  DECLARE_MUTEX(X86PageTableBase, lockdep::LockFlagsNestable) lock_;
+
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(X86PageTableBase);
   class ConsistencyManager;
@@ -204,6 +232,9 @@ class X86PageTableBase {
 
   pt_entry_t* AllocatePageTable();
 
+  // Checks that the given page table entries are equal but ignores the accessed and dirty flags.
+  bool check_equal_ignore_flags(pt_entry_t left, pt_entry_t right);
+
   fbl::Canary<fbl::magic("X86P")> canary_;
 
   // The number of times entries in the pml4 are referenced by other page tables.
@@ -215,8 +246,23 @@ class X86PageTableBase {
   // It should set be once by InitPrepopulated and then never modified.
   bool has_prepopulated_pml4_ = false;
 
-  // low lock to protect the mmu code
-  DECLARE_MUTEX(X86PageTableBase) lock_;
+  // This is only set by InitUnified and should not be modified anywhere else.
+  bool is_unified_ = false;
+
+  // These values are set by InitUnified on the shared and restricted address spaces provided to
+  // that function. Since they are modified by another page table, they must be guarded by lock_.
+  bool is_shared_ TA_GUARDED(lock_) = false;
+  bool is_restricted_ TA_GUARDED(lock_) = false;
+
+  // A reference to another page table that shares entries with this one.
+  // If is_restricted_ is set to true, this references the associated unified page table.
+  // If is_unified_ is set to true, this references the associated restricted page table.
+  // If neither is true, this is set to null.
+  X86PageTableBase* referenced_pt_ TA_GUARDED(lock_) = nullptr;
+
+  // A reference to a shared page table whose mappings are also present in this page table. This is
+  // only set for unified page tables.
+  X86PageTableBase* shared_pt_ TA_GUARDED(lock_) = nullptr;
 };
 
 #endif  // ZIRCON_KERNEL_ARCH_X86_PAGE_TABLES_INCLUDE_ARCH_X86_PAGE_TABLES_PAGE_TABLES_H_

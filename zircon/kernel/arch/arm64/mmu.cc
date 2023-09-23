@@ -1769,6 +1769,11 @@ zx_status_t ArmArchVmAspace::Init() {
 
 zx_status_t ArmArchVmAspace::InitPrepopulated() { return ZX_ERR_NOT_SUPPORTED; }
 
+zx_status_t ArmArchVmAspace::InitUnified(ArchVmAspaceInterface& shared,
+                                         ArchVmAspaceInterface& restricted) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
 zx_status_t ArmArchVmAspace::DebugFindFirstLeafMapping(vaddr_t* out_pt, vaddr_t* out_vaddr,
                                                        pte_t* out_pte) const {
   canary_.Assert();

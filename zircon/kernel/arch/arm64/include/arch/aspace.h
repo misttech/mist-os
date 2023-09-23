@@ -32,6 +32,8 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
 
   zx_status_t Init() override;
   zx_status_t InitPrepopulated() override;
+  zx_status_t InitUnified(ArchVmAspaceInterface& shared,
+                          ArchVmAspaceInterface& restricted) override;
 
   void DisableUpdates() override;
 

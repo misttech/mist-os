@@ -1322,6 +1322,11 @@ zx_status_t Riscv64ArchVmAspace::Init() {
 
 zx_status_t Riscv64ArchVmAspace::InitPrepopulated() { return ZX_ERR_NOT_SUPPORTED; }
 
+zx_status_t Riscv64ArchVmAspace::InitUnified(ArchVmAspaceInterface& shared,
+                                             ArchVmAspaceInterface& restricted) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
 void Riscv64ArchVmAspace::DisableUpdates() {
   // TODO-rvbringup: add machinery for this and the update checker logic
 }
