@@ -74,9 +74,6 @@ sdk_shared_library("instrumentation") {
   foreach(symbol, _exported_symbols) {
     ldflags += [ "-Wl,--undefined=" + symbol ]
   }
-
-  # We do not want to depend on anything but the C library and FDIO.
-  configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
 }
 
 config("include") {
