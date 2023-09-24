@@ -11,6 +11,7 @@ import unittest
 from unittest import mock
 
 from api.log import log_pb2
+from api.stat import stat_pb2
 from api.stats import stats_pb2
 
 import upload_reproxy_logs
@@ -76,7 +77,7 @@ class MainUploadMetricsTest(ReproxyLogdirTestHarness):
         with mock.patch.object(
                 upload_reproxy_logs, "read_reproxy_metrics_proto",
                 return_value=stats_pb2.Stats(
-                    stats=[stats_pb2.Stat()])) as mock_read_proto:
+                    stats=[stat_pb2.Stat()])) as mock_read_proto:
             with mock.patch.object(upload_reproxy_logs, "bq_upload_metrics",
                                    return_value=0) as mock_upload:
                 exit_code = upload_reproxy_logs.main_upload_metrics(
@@ -93,7 +94,7 @@ class MainUploadMetricsTest(ReproxyLogdirTestHarness):
         with mock.patch.object(
                 upload_reproxy_logs, "read_reproxy_metrics_proto",
                 return_value=stats_pb2.Stats(
-                    stats=[stats_pb2.Stat()])) as mock_read_proto:
+                    stats=[stat_pb2.Stat()])) as mock_read_proto:
             with mock.patch.object(upload_reproxy_logs, "bq_upload_metrics",
                                    return_value=1) as mock_upload:
                 exit_code = upload_reproxy_logs.main_upload_metrics(
