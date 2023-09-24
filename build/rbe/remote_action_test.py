@@ -1678,6 +1678,43 @@ class RemoteActionConstructionTests(unittest.TestCase):
         self.assertEqual(action.local_only_command, command)
         self.assertEqual(action.options, [])
 
+    def test_relativize_local_deps(self):
+        exec_root = Path('/exec/root')
+        working_dir = exec_root / 'work'
+        action = self._make_remote_action(
+            command=['cat'],
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+        self.assertEqual(
+            action._relativize_remote_or_local_deps(
+                str(exec_root / 'project' / 'include' / 'foo.h')),
+            '../project/include/foo.h')
+        self.assertEqual(
+            action._relativize_remote_or_local_deps(
+                str(working_dir / 'gen' / 'include' / 'foo.h')),
+            'gen/include/foo.h')
+
+    def test_relativize_remote_deps(self):
+        exec_root = Path('/exec/root')
+        working_dir = exec_root / 'work' / 'out'
+        action = self._make_remote_action(
+            command=['cat'],
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+        self.assertEqual(
+            action._relativize_remote_or_local_deps(
+                str(
+                    remote_action._REMOTE_PROJECT_ROOT / 'project' / 'include' /
+                    'foo.h')), '../../project/include/foo.h')
+        self.assertEqual(
+            action._relativize_remote_or_local_deps(
+                str(
+                    remote_action._REMOTE_PROJECT_ROOT / 'work' / 'out' /
+                    'jen' / 'project' / 'include' / 'foo.h')),
+            'jen/project/include/foo.h')
+
     def test_remote_fail_no_retry(self):
         command = ['echo', 'hello']
         action = self._make_remote_action(command=command)

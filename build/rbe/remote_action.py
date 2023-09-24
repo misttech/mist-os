@@ -1119,6 +1119,10 @@ class RemoteAction(object):
         return self._working_dir
 
     @property
+    def remote_exec_root(self) -> Path:  # absolute
+        return _REMOTE_PROJECT_ROOT
+
+    @property
     def remote_working_dir(self) -> Path:  # absolute
         return _REMOTE_PROJECT_ROOT / self.remote_build_subdir
 
@@ -1672,9 +1676,9 @@ class RemoteAction(object):
         """
         p = Path(path)
         if p.is_absolute():
-            if self.working_dir in p.parents:
+            if self.exec_root in p.parents:
                 new_path = str(cl_utils.relpath(p, start=self.working_dir))
-            elif self.remote_working_dir in p.parents:
+            elif self.remote_exec_root in p.parents:
                 new_path = str(
                     cl_utils.relpath(p, start=self.remote_working_dir))
             else:
