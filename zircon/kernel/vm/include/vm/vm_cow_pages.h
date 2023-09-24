@@ -110,13 +110,7 @@ class VmCowPages final : public VmHierarchyBase,
   }
 
   bool is_parent_hidden_locked() const TA_REQ(lock()) {
-    if (parent_) {
-      AssertHeld(parent_->lock_ref());
-      if (parent_->is_hidden_locked()) {
-        return true;
-      }
-    }
-    return false;
+    return parent_ && parent_locked().is_hidden_locked();
   }
 
   bool can_evict() const {
@@ -765,8 +759,7 @@ class VmCowPages final : public VmHierarchyBase,
     if (is_slice_locked()) {
       DEBUG_ASSERT(parent_);
       DEBUG_ASSERT(!is_parent_hidden_locked());
-      AssertHeld(parent_->lock_ref());
-      if (parent_->is_parent_hidden_locked()) {
+      if (parent_locked().is_parent_hidden_locked()) {
         result = false;
       }
     }
@@ -787,12 +780,8 @@ class VmCowPages final : public VmHierarchyBase,
 
     // Snapshots of slices aren't supported, unless it's a slice of the root VMO.
     // Bug: 36841
-    if (is_slice_locked()) {
-      DEBUG_ASSERT(parent_);
-      AssertHeld(parent_->lock_ref());
-      if (parent_->parent_) {
-        return false;
-      }
+    if (is_slice_locked() && parent_locked().parent_) {
+      return false;
     }
 
     // TODO(sagebarreda@) Don't allow snapshots in unidirectional chain.
@@ -998,11 +987,6 @@ class VmCowPages final : public VmHierarchyBase,
   // of the parent) into the remaining child.
   void MergeContentWithChildLocked(VmCowPages* removed, bool removed_left) TA_REQ(lock());
 
-  // Only valid to be called when is_slice_locked() is true and returns the first parent of this
-  // hierarchy that is not a slice. The offset of this slice within that VmObjectPaged is set as
-  // the output.
-  VmCowPages* PagedParentOfSliceLocked(uint64_t* offset) TA_REQ(lock());
-
   // Moves an existing page to the wired queue as a consequence of the page being pinned.
   void MoveToPinnedLocked(vm_page_t* page, uint64_t offset) TA_REQ(lock());
 
@@ -1089,6 +1073,27 @@ class VmCowPages final : public VmHierarchyBase,
     const auto& ret = children_list_.back();
     AssertHeld(ret.lock_ref());
     return ret;
+  }
+
+  // Helpers to give convenience locked access to the parent_. Only valid to be called if there is a
+  // parent.
+  VmCowPages& parent_locked() TA_REQ(lock()) TA_ASSERT(parent_locked().lock()) {
+    DEBUG_ASSERT(parent_);
+    return *parent_;
+  }
+  const VmCowPages& parent_locked() const TA_REQ(lock()) TA_ASSERT(parent_locked().lock()) {
+    DEBUG_ASSERT(parent_);
+    return *parent_;
+  }
+
+  // Only valid to be called when is_slice_locked() is true and returns the immediate parent of
+  // this, that due to the nature of slices can be assumed to not be a slice itself.
+  VmCowPages& slice_parent_locked() TA_REQ(lock()) TA_ASSERT(slice_parent_locked().lock()) {
+    DEBUG_ASSERT(is_slice_locked());
+    // A slice never has a slice parent, as otherwise this slice could have been hung off their
+    // parent.
+    DEBUG_ASSERT(!parent_locked().is_slice_locked());
+    return parent_locked();
   }
 
   void ReplaceChildLocked(VmCowPages* old, VmCowPages* new_child) TA_REQ(lock());

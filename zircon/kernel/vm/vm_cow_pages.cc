@@ -351,11 +351,10 @@ void VmCowPages::fbl_recycle() {
     // vmo and repopulate the page list.
     if (!is_hidden_locked()) {
       if (parent_) {
-        AssertHeld(parent_->lock_ref());
-        parent_->RemoveChildLocked(this);
+        parent_locked().RemoveChildLocked(this);
         // Avoid recursing destructors when we delete our parent by using the deferred deletion
         // method. See common in parent else branch for why we can avoid this on a hidden parent.
-        if (!parent_->is_hidden_locked()) {
+        if (!parent_locked().is_hidden_locked()) {
           guard.CallUnlocked([this, parent = ktl::move(parent_)]() mutable {
             hierarchy_state_ptr_->DoDeferredDelete(ktl::move(parent));
           });
@@ -602,10 +601,7 @@ zx_status_t VmCowPages::CreateChildSliceLocked(uint64_t offset, uint64_t size,
   //  * Slices are not permitted to be resized and so nothing can be done on the intermediate parent
   //    that requires us to ever look at it again.
   if (is_slice_locked()) {
-    DEBUG_ASSERT(parent_);
-    AssertHeld(parent_->lock_ref());
-    DEBUG_ASSERT(!parent_->is_slice_locked());
-    return parent_->CreateChildSliceLocked(offset + parent_offset_, size, cow_slice);
+    return slice_parent_locked().CreateChildSliceLocked(offset + parent_offset_, size, cow_slice);
   }
 
   fbl::AllocChecker ac;
@@ -966,8 +962,7 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
   // Similarly if we have a priority count, and we have a parent, then our parent must have a
   // non-zero count.
   if (parent_) {
-    AssertHeld(parent_->lock_ref());
-    DEBUG_ASSERT(high_priority_count_ == 0 || parent_->high_priority_count_ != 0);
+    DEBUG_ASSERT(high_priority_count_ == 0 || parent_locked().high_priority_count_ != 0);
   }
   // If our child has a non-zero count, then it is propagating a +1 count to us, and we in turn are
   // propagating a +1 count to our parent. In the final arrangement after ReplaceChildLocked then
@@ -981,8 +976,7 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
   // remove ourselves from the clone tree.
   DropChildLocked(child);
   if (parent_) {
-    AssertHeld(parent_->lock_ref());
-    parent_->ReplaceChildLocked(this, child);
+    parent_locked().ReplaceChildLocked(this, child);
   }
   child->parent_ = ktl::move(parent_);
 
@@ -1358,8 +1352,7 @@ VmCowPages::AttributionCounts VmCowPages::AttributedPagesInRangeLocked(uint64_t 
         if (!parent_) {
           return ZX_ERR_NEXT;
         }
-        AssertHeld(parent_->lock_ref());
-        if (!parent_->is_hidden_locked()) {
+        if (!parent_locked().is_hidden_locked()) {
           return ZX_ERR_NEXT;
         }
 
@@ -1964,11 +1957,10 @@ zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* f
 
   // Need to make sure the page is duplicated as far as our parent. Then we can pretend
   // that we have forked it into us by setting the marker.
-  AssertHeld(parent_->lock_ref());
   if (page_owner != parent_.get()) {
     // Do not pass our freed_list here as this wants an alloc_list to allocate from.
-    zx_status_t result = parent_->CloneCowPageLocked(offset + parent_offset_, nullptr, page_owner,
-                                                     page, owner_offset, page_request, &page);
+    zx_status_t result = parent_locked().CloneCowPageLocked(
+        offset + parent_offset_, nullptr, page_owner, page, owner_offset, page_request, &page);
     if (result != ZX_OK) {
       return result;
     }
@@ -1989,20 +1981,21 @@ zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* f
   // We cannot be forking a page to here if there's already something.
   DEBUG_ASSERT(slot->IsEmpty());
 
-  bool left = this == &(parent_->left_child_locked());
+  bool left = this == &(parent_locked().left_child_locked());
   // Page is in our parent. Check if its uni accessible, if so we can free it.
-  if (parent_->IsUniAccessibleLocked(page, offset + parent_offset_)) {
+  if (parent_locked().IsUniAccessibleLocked(page, offset + parent_offset_)) {
     // Make sure we didn't already merge the page in this direction.
     DEBUG_ASSERT(!(left && page->object.cow_left_split));
     DEBUG_ASSERT(!(!left && page->object.cow_right_split));
     // We are going to be inserting removed pages into a shared free list. So make sure the parent
     // did not have a page source that was handling frees which would require additional work on the
     // owned pages on top of a simple free to the PMM.
-    DEBUG_ASSERT(!parent_->is_source_handling_free_locked());
+    DEBUG_ASSERT(!parent_locked().is_source_handling_free_locked());
     // We know this is a true page since it is just our target |page|.
-    vm_page* removed = parent_->page_list_.RemoveContent(offset + parent_offset_).ReleasePage();
+    vm_page* removed =
+        parent_locked().page_list_.RemoveContent(offset + parent_offset_).ReleasePage();
     DEBUG_ASSERT(removed == page);
-    parent_->PQRemoveLocked(removed);
+    parent_locked().PQRemoveLocked(removed);
     DEBUG_ASSERT(!list_in_list(&removed->queue_node));
     list_add_tail(freed_list, &removed->queue_node);
   } else {
@@ -2163,18 +2156,8 @@ zx_status_t VmCowPages::PrepareForWriteLocked(uint64_t offset, uint64_t len,
   DEBUG_ASSERT(InRange(offset, len, size_));
 
   if (is_slice_locked()) {
-    uint64_t parent_offset;
-    VmCowPages* parent = PagedParentOfSliceLocked(&parent_offset);
-    AssertHeld(parent->lock_ref());
-
-    // PagedParentOfSliceLocked will walk all of the way up the VMO hierarchy
-    // until it hits a non-slice VMO.  This guarantees that we should only ever
-    // recurse once instead of an unbound number of times.  DEBUG_ASSERT this so
-    // that we don't actually end up with unbound recursion just in case the
-    // property changes.
-    DEBUG_ASSERT(!parent->is_slice_locked());
-
-    return parent->PrepareForWriteLocked(offset + parent_offset, len, page_request, dirty_len_out);
+    return slice_parent_locked().PrepareForWriteLocked(offset + parent_offset_, len, page_request,
+                                                       dirty_len_out);
   }
 
   DEBUG_ASSERT(page_source_);
@@ -2921,10 +2904,7 @@ zx::result<VmCowPages::LookupCursor> VmCowPages::GetLookupCursorLocked(uint64_t 
   }
 
   if (is_slice_locked()) {
-    uint64_t parent_offset = 0;
-    VmCowPages* parent = PagedParentOfSliceLocked(&parent_offset);
-    AssertHeld(parent->lock_ref());
-    return parent->GetLookupCursorLocked(offset + parent_offset, max_len);
+    return slice_parent_locked().GetLookupCursorLocked(offset + parent_offset_, max_len);
   }
 
   return zx::ok(LookupCursor(this, offset, max_len));
@@ -2941,18 +2921,8 @@ zx_status_t VmCowPages::CommitRangeLocked(uint64_t offset, uint64_t len, uint64_
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
   if (is_slice_locked()) {
-    uint64_t parent_offset;
-    VmCowPages* parent = PagedParentOfSliceLocked(&parent_offset);
-    AssertHeld(parent->lock_ref());
-
-    // PagedParentOfSliceLocked will walk all of the way up the VMO hierarchy
-    // until it hits a non-slice VMO.  This guarantees that we should only ever
-    // recurse once instead of an unbound number of times.  DEBUG_ASSERT this so
-    // that we don't actually end up with unbound recursion just in case the
-    // property changes.
-    DEBUG_ASSERT(!parent->is_slice_locked());
-
-    return parent->CommitRangeLocked(offset + parent_offset, len, committed_len, page_request);
+    return slice_parent_locked().CommitRangeLocked(offset + parent_offset_, len, committed_len,
+                                                   page_request);
   }
 
   fbl::RefPtr<PageSource> root_source = GetRootPageSourceLocked();
@@ -3047,18 +3017,7 @@ zx_status_t VmCowPages::PinRangeLocked(uint64_t offset, uint64_t len) {
   DEBUG_ASSERT(InRange(offset, len, size_));
 
   if (is_slice_locked()) {
-    uint64_t parent_offset;
-    VmCowPages* parent = PagedParentOfSliceLocked(&parent_offset);
-    AssertHeld(parent->lock_ref());
-
-    // PagedParentOfSliceLocked will walk all of the way up the VMO hierarchy
-    // until it hits a non-slice VMO.  This guarantees that we should only ever
-    // recurse once instead of an unbound number of times.  DEBUG_ASSERT this so
-    // that we don't actually end up with unbound recursion just in case the
-    // property changes.
-    DEBUG_ASSERT(!parent->is_slice_locked());
-
-    return parent->PinRangeLocked(offset + parent_offset, len);
+    return slice_parent_locked().PinRangeLocked(offset + parent_offset_, len);
   }
 
   ever_pinned_ = true;
@@ -3133,18 +3092,8 @@ zx_status_t VmCowPages::DecommitRangeLocked(uint64_t offset, uint64_t len) {
     return ZX_OK;
   }
 
-  // If this is a child slice of a VMO, then find our way up to our root
-  // ancestor (taking our offset into account as we do), and then recurse,
-  // running the operation against our ancestor.  Note that
-  // PagedParentOfSliceLocked will iteratively walk all the way up to our
-  // non-slice ancestor, not just our immediate parent, so we can guaranteed
-  // bounded recursion.
   if (is_slice_locked()) {
-    uint64_t parent_offset;
-    VmCowPages* parent = PagedParentOfSliceLocked(&parent_offset);
-    AssertHeld(parent->lock_ref());
-    DEBUG_ASSERT(!parent->is_slice_locked());  // assert bounded recursion.
-    return parent->DecommitRangeLocked(offset + parent_offset, len);
+    return slice_parent_locked().DecommitRangeLocked(offset + parent_offset_, len);
   }
 
   // Currently, we can't decommit if the absence of a page doesn't imply zeroes.
@@ -3254,11 +3203,9 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
 
   // Forward any operations on slices up to the original non slice parent.
   if (is_slice_locked()) {
-    uint64_t parent_offset;
-    VmCowPages* parent = PagedParentOfSliceLocked(&parent_offset);
-    AssertHeld(parent->lock_ref());
-    return parent->ZeroPagesLocked(page_start_base + parent_offset, page_end_base + parent_offset,
-                                   page_request, zeroed_len_out);
+    return slice_parent_locked().ZeroPagesLocked(page_start_base + parent_offset_,
+                                                 page_end_base + parent_offset_, page_request,
+                                                 zeroed_len_out);
   }
 
   // This function tries to zero pages as optimally as possible for most cases, so we attempt
@@ -3491,8 +3438,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
   if (start < parent_limit_ && end >= parent_limit_) {
     bool hidden_parent = false;
     if (parent_) {
-      AssertHeld(parent_->lock_ref());
-      hidden_parent = parent_->is_hidden_locked();
+      hidden_parent = parent_locked().is_hidden_locked();
     }
     if (hidden_parent) {
       // Release any COW pages that are no longer necessary. This will also
@@ -3521,8 +3467,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
     // when https://bugs.llvm.org/show_bug.cgi?id=35450 gets fixed.
     (void)can_see_parent;  // used only in DEBUG_ASSERT
     DEBUG_ASSERT(can_see_parent(offset));
-    AssertHeld(parent_->lock_ref());
-    return parent_->is_hidden_locked();
+    return parent_locked().is_hidden_locked();
   };
 
   // Finding the initial page content is expensive, but we only need to call it under certain
@@ -4160,10 +4105,7 @@ void VmCowPages::UnpinLocked(uint64_t offset, uint64_t len, bool allow_gaps) {
   ASSERT(len != 0);
 
   if (is_slice_locked()) {
-    uint64_t parent_offset;
-    VmCowPages* parent = PagedParentOfSliceLocked(&parent_offset);
-    AssertHeld(parent->lock_ref());
-    return parent->UnpinLocked(offset + parent_offset, len, allow_gaps);
+    return slice_parent_locked().UnpinLocked(offset + parent_offset_, len, allow_gaps);
   }
 
   const uint64_t start_page_offset = ROUNDDOWN(offset, PAGE_SIZE);
@@ -4334,15 +4276,14 @@ void VmCowPages::ReleaseCowParentPagesLockedHelper(uint64_t start, uint64_t end,
 
   // Free any pages that either aren't visible, or were already split into the other child. For
   // pages that haven't been split into the other child, we need to ensure they're univisible.
-  AssertHeld(parent_->lock_ref());
   // We are going to be inserting removed pages into a shared free list. So make sure the parent did
   // not have a page source that was handling frees which would require additional work on the owned
   // pages on top of a simple free to the PMM.
-  DEBUG_ASSERT(!parent_->is_source_handling_free_locked());
-  parent_->page_list_.RemovePages(
+  DEBUG_ASSERT(!parent_locked().is_source_handling_free_locked());
+  parent_locked().page_list_.RemovePages(
       [skip_split_bits, sibling_visible, page_remover,
-       left = this == &parent_->left_child_locked()](VmPageOrMarker* page_or_mark,
-                                                     uint64_t offset) {
+       left = this == &parent_locked().left_child_locked()](VmPageOrMarker* page_or_mark,
+                                                            uint64_t offset) {
         // Hidden VMO hierarchies do not support intervals.
         ASSERT(!page_or_mark->IsInterval());
 
@@ -4671,8 +4612,7 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
 
     bool hidden_parent = false;
     if (parent_) {
-      AssertHeld(parent_->lock_ref());
-      hidden_parent = parent_->is_hidden_locked();
+      hidden_parent = parent_locked().is_hidden_locked();
     }
     if (hidden_parent) {
       // Release any COW pages that are no longer necessary. This will also
@@ -4768,11 +4708,7 @@ zx_status_t VmCowPages::LookupLocked(uint64_t offset, uint64_t len,
   }
 
   if (is_slice_locked()) {
-    DEBUG_ASSERT(parent_);
-    AssertHeld(parent_->lock_ref());
-    // Slices are always hung off a non-slice parent, so we know we only need to walk up one level.
-    DEBUG_ASSERT(!parent_->is_slice_locked());
-    return parent_->LookupLocked(
+    return slice_parent_locked().LookupLocked(
         offset + parent_offset_, len,
         [&lookup_fn, parent_offset = parent_offset_](uint64_t offset, paddr_t pa) {
           // Need to undo the parent_offset before forwarding to the lookup_fn, who is ignorant of
@@ -4809,11 +4745,7 @@ zx_status_t VmCowPages::LookupReadableLocked(uint64_t offset, uint64_t len,
   }
 
   if (is_slice_locked()) {
-    DEBUG_ASSERT(parent_);
-    AssertHeld(parent_->lock_ref());
-    // Slices are always hung off a non-slice parent, so we know we only need to walk up one level.
-    DEBUG_ASSERT(!parent_->is_slice_locked());
-    return parent_->LookupReadableLocked(
+    return slice_parent_locked().LookupReadableLocked(
         offset + parent_offset_, len,
         [&lookup_fn, parent_offset = parent_offset_](uint64_t offset, paddr_t pa) {
           // Need to undo the parent_offset before forwarding to the lookup_fn, who is ignorant of
@@ -5858,16 +5790,6 @@ void VmCowPages::DetachSourceLocked() {
   IncrementHierarchyGenerationCountLocked();
 }
 
-VmCowPages* VmCowPages::PagedParentOfSliceLocked(uint64_t* offset) {
-  DEBUG_ASSERT(is_slice_locked());
-  DEBUG_ASSERT(parent_);
-  // Slices never have a slice parent, as there is no need to nest them.
-  AssertHeld(parent_->lock_ref());
-  DEBUG_ASSERT(!parent_->is_slice_locked());
-  *offset = parent_offset_;
-  return parent_.get();
-}
-
 void VmCowPages::RangeChangeUpdateFromParentLocked(const uint64_t offset, const uint64_t len,
                                                    RangeChangeList* list) {
   canary_.Assert();
@@ -6217,19 +6139,8 @@ zx_status_t VmCowPages::ReplacePagesWithNonLoanedLocked(uint64_t offset, uint64_
   DEBUG_ASSERT(non_loaned_len);
 
   if (is_slice_locked()) {
-    uint64_t parent_offset;
-    VmCowPages* parent = PagedParentOfSliceLocked(&parent_offset);
-    AssertHeld(parent->lock_ref());
-
-    // PagedParentOfSliceLocked will walk all of the way up the VMO hierarchy
-    // until it hits a non-slice VMO.  This guarantees that we should only ever
-    // recurse once instead of an unbound number of times.  DEBUG_ASSERT this so
-    // that we don't actually end up with unbound recursion just in case the
-    // property changes.
-    DEBUG_ASSERT(!parent->is_slice_locked());
-
-    return parent->ReplacePagesWithNonLoanedLocked(offset + parent_offset, len, page_request,
-                                                   non_loaned_len);
+    return slice_parent_locked().ReplacePagesWithNonLoanedLocked(offset + parent_offset_, len,
+                                                                 page_request, non_loaned_len);
   }
 
   *non_loaned_len = 0;
