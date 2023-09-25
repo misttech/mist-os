@@ -4,7 +4,7 @@
 
 use crate::{
     fs::parse_unsigned_file,
-    mm::DumpPolicy,
+    mm::{DumpPolicy, MemoryAccessorExt},
     not_implemented,
     signals::{send_signal, SignalInfo},
     task::waiter::WaitQueue,
@@ -92,7 +92,7 @@ pub fn ptrace_dispatch(
     current_task: &mut CurrentTask,
     request: u32,
     pid: pid_t,
-    _addr: UserAddress,
+    addr: UserAddress,
     data: UserAddress,
 ) -> Result<(), Errno> {
     let weak_init = current_task.kernel().pids.read().get_task(pid);
@@ -111,24 +111,50 @@ pub fn ptrace_dispatch(
             let mut siginfo = SignalInfo::default(SIGKILL);
             siginfo.code = (linux_uapi::SIGTRAP | PTRACE_KILL << 8) as i32;
             send_signal(&tracee, siginfo);
-            Ok(())
+            return Ok(());
         }
         PTRACE_INTERRUPT => {
             not_implemented!("ptrace interrupt not implemented");
-            error!(ENOSYS)
+            return error!(ENOSYS);
         }
         PTRACE_CONT => {
             ptrace_cont(&tracee, &data, false)?;
+            return Ok(());
+        }
+        PTRACE_DETACH => {
+            return ptrace_detach(current_task.thread_group.as_ref(), tracee.as_ref(), &data)
+        }
+        _ => {}
+    }
+
+    // The remaining requests (to be added) require the thread to be stopped.
+    let state = tracee.write();
+    if state.stopped.is_waking_or_awake() {
+        return error!(ESRCH);
+    }
+
+    match request {
+        PTRACE_PEEKDATA | PTRACE_PEEKTEXT => {
+            // NB: The behavior of the syscall is different from the behavior in ptrace(2),
+            // which is provided by libc.
+            let src: UserRef<usize> = UserRef::from(addr);
+            let val = tracee.mm.read_object(src)?;
+
+            let dst: UserRef<usize> = UserRef::from(data);
+            current_task.mm.write_object(dst, &val)?;
             Ok(())
         }
-        PTRACE_DETACH => ptrace_detach(current_task.thread_group.as_ref(), tracee.as_ref(), &data),
+        PTRACE_POKEDATA | PTRACE_POKETEXT => {
+            let ptr: UserRef<usize> = UserRef::from(addr);
+            let val = data.ptr() as usize;
+            tracee.mm.write_object(ptr, &val)?;
+            Ok(())
+        }
         _ => {
             not_implemented!("ptrace: {} not implemented", request);
             error!(ENOSYS)
         }
     }
-
-    // The remaining requests (to be added) require the thread to be stopped.
 }
 
 fn do_attach(thread_group: &ThreadGroup, task: WeakRef<Task>) -> Result<(), Errno> {

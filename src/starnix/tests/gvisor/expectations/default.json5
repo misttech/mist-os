@@ -558,7 +558,6 @@
 
                 // ptrace tests
                 "PtraceTest.85",
-                "PtraceTest.AttachParent_PeekData_PokeData_SignalSuppression",
                 "PtraceTest.ChangeRegSetInOptSyscall",
                 "PtraceTest.ExitWhenParentIsNotTracer_Syscall_TraceVfork_TraceVforkDone",
                 "PtraceTest.GetRegSet",
