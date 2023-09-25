@@ -77,9 +77,10 @@ Below are some good guidelines to follow when changing FIDL APIs.
 1. When removing an API, first make sure no parters are still using the API, then
    annotate the old API with `@available(removed={{ in_development_api_level+1 }})`.
 
-For more examples, see the [FIDL compatibility guide].
+For more examples, see the [API evolution guide] and the [FIDL compatibility guide].
 
 [FIDL versioning]: /docs/reference/fidl/language/versioning.md
 [Fuchsia API levels]: /docs/contribute/governance/rfcs/0002_platform_versioning.md
 [SDK Categories]: /docs/contribute/governance/rfcs/0165_sdk_categories.md
 [FIDL compatibility guide]: /docs/development/languages/fidl/guides/compatibility/README.md
+[API evolution guide]: /docs/development/api/evolution.md
