@@ -37,6 +37,11 @@ zx_status_t sys_resource_create(zx_handle_t parent_rsrc, uint32_t options, uint6
                                 zx_handle_t* resource_out) {
   auto up = ProcessDispatcher::GetCurrent();
 
+  // Verify that the given base and size don't lead to an integer overflow.
+  if (base + size < base) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
   // Obtain the parent Resource
   // WRITE access is required to create a child resource
   zx_status_t status;

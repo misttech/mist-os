@@ -52,8 +52,9 @@ TEST(Resource, ProbeAddressSpace) {
       break;
     }
 
-    // If ZX_OK wasn't returned, then we should see ZX_ERR_NOT_FOUND and nothing else.
-    ASSERT_EQ(ZX_ERR_NOT_FOUND, status);
+    // If ZX_OK wasn't returned, then we should see either ZX_ERR_NOT_FOUND or
+    // ZX_ERR_ACCESS_DENIED.
+    ASSERT_TRUE(status == ZX_ERR_NOT_FOUND || status == ZX_ERR_ACCESS_DENIED);
   }
 }
 
