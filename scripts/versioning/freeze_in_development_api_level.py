@@ -11,16 +11,14 @@ import json
 import os
 import sys
 
-VERSION_HISTORY_PATH = "sdk/version_history.json"
 
-
-def freeze_in_development_api_level():
+def freeze_in_development_api_level(version_history_path):
     try:
         # Update version_history.json to freeze the api level
-        with open(VERSION_HISTORY_PATH, "r+") as f:
+        with open(version_history_path, "r+") as f:
             version_history = json.load(f)
         new_version_history = freeze_version_history(version_history)
-        with open(VERSION_HISTORY_PATH, "w") as f:
+        with open(version_history_path, "w") as f:
             json.dump(new_version_history, f)
 
     except FileNotFoundError as e:
@@ -40,9 +38,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     # This arg is necessary for the builder to work, even though it isn't used.
     parser.add_argument("--stamp-file")
+    parser.add_argument("--sdk-version-history", required=True)
     args = parser.parse_args()
 
-    freeze_in_development_api_level()
+    freeze_in_development_api_level(args.sdk_version_history)
 
 
 if __name__ == "__main__":
