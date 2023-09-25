@@ -13,4 +13,12 @@
         forward_stderr_to: "log",
         forward_stdout_to: "log",
     },
+    use: [
+        {
+            protocol: [
+                // Paver protocol is used to set active boot slot.
+                "fuchsia.paver.Paver",
+            ],
+        },
+    ],
 }

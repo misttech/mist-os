@@ -813,18 +813,23 @@ impl RecoveryViewAssistant {
                         let view_key = self.view_key;
                         let local_app_sender = self.app_sender.clone();
                         let f = async move {
-                            match fdr::execute_reset().await {
-                                Ok(_) => {}
-                                Err(error) => {
-                                    local_app_sender.queue_message(
-                                        MessageTarget::View(view_key),
-                                        make_message(RecoveryMessages::ResetFailed),
-                                    );
-                                    eprintln!(
-                                        "Error occurred attempting to factory reset: {:?}",
-                                        error
-                                    );
-                                }
+                            if let Err(error) = fdr::reset_active_slot().await {
+                                // If we fail to reset active slot, log an error and continue. There are cases
+                                // where FDR can provide value without setting the active slot.
+                                eprintln!(
+                                    "Error occurred attempting to reset active slot: {:?}",
+                                    error
+                                );
+                            }
+                            if let Err(error) = fdr::execute_reset().await {
+                                local_app_sender.queue_message(
+                                    MessageTarget::View(view_key),
+                                    make_message(RecoveryMessages::ResetFailed),
+                                );
+                                eprintln!(
+                                    "Error occurred attempting to factory reset: {:?}",
+                                    error
+                                );
                             };
                         };
                         fasync::Task::local(f).detach();

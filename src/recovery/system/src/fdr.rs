@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{bail, Error};
+use anyhow::{bail, Context, Error};
 use carnelian::input::consumer_control::Phase;
 use fidl_fuchsia_input_report::ConsumerControlButton;
+use fidl_fuchsia_paver::{BootManagerMarker, BootManagerProxy, Configuration, PaverMarker};
 use fidl_fuchsia_recovery::FactoryResetMarker;
 use fuchsia_component::client::connect_to_protocol;
 
@@ -162,6 +163,58 @@ impl FactoryResetStateMachine {
     }
 }
 
+fn get_other_slot_config(config: Configuration) -> Configuration {
+    match config {
+        Configuration::A => Configuration::B,
+        Configuration::B => Configuration::A,
+        // A/B recovery is not supported currently.
+        Configuration::Recovery => Configuration::Recovery,
+    }
+}
+
+/// Uses fuchsia.paver FIDL's BootManager API to set the active slot using the following strategy:
+///
+/// 1. Query for slot-last-set-active
+/// 2. Set the last inactive slot (opposite of the result from 1) to active to reset retry count
+/// 3. Set the result from slot-last-set-active to active
+///
+/// This aims to recover from cases where both slots A and B are marked unbootable.
+/// Requires fuchsia.paver.Paver protocol capability.
+pub async fn reset_active_slot() -> Result<(), Error> {
+    let paver_proxy = connect_to_protocol::<PaverMarker>().context("failed to connect to paver")?;
+    let (boot_manager, server) = fidl::endpoints::create_proxy::<BootManagerMarker>()?;
+
+    paver_proxy.find_boot_manager(server).context("failed to find boot manager")?;
+
+    reset_active_slot_with_proxy(boot_manager).await
+}
+
+async fn reset_active_slot_with_proxy(boot_manager: BootManagerProxy) -> Result<(), Error> {
+    let last_active_config = match boot_manager.query_configuration_last_set_active().await {
+        Ok(Ok(config)) => config,
+        Ok(Err(err)) => bail!("Failure status querying last active config: {:?}", err),
+        Err(err) => bail!("Error querying last active configuration: {:?}", err),
+    };
+
+    if last_active_config == Configuration::Recovery {
+        eprintln!("Last active config is recovery: no information to decide which other config to set active. Leaving as is.");
+        return Ok(());
+    }
+
+    // Set inactive config, then last active config to reset the boot attempt retry counters.
+    let inactive_config = get_other_slot_config(last_active_config);
+    boot_manager
+        .set_configuration_active(inactive_config)
+        .await
+        .context("failed to set inactive config")?;
+    boot_manager
+        .set_configuration_active(last_active_config)
+        .await
+        .context("failed to set last active config")?;
+
+    Ok(())
+}
+
 pub async fn execute_reset() -> Result<(), Error> {
     let factory_reset_service = connect_to_protocol::<FactoryResetMarker>();
     let proxy = match factory_reset_service {
@@ -185,6 +238,98 @@ pub async fn execute_reset() -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fidl_fuchsia_paver::{
+        BootManagerMarker, BootManagerProxy, BootManagerRequest, Configuration,
+    };
+    use fuchsia_async as fasync;
+    use fuchsia_zircon as zx;
+    use futures::{channel::mpsc, StreamExt, TryStreamExt};
+
+    // A mock BootManager service that stores an initial last_active_config and reports the queries
+    // it receives to mpsc::Receivers for the test to listen and consume.
+    fn create_mock_boot_manager(
+        last_active_config: Configuration,
+    ) -> Result<
+        (BootManagerProxy, mpsc::Receiver<Configuration>, mpsc::Receiver<Configuration>),
+        Error,
+    > {
+        let (mut query_last_active_sender, query_last_active_receiver) = mpsc::channel(10);
+        let (mut set_active_sender, set_active_receiver) = mpsc::channel(10);
+        let (proxy, mut request_stream) =
+            fidl::endpoints::create_proxy_and_stream::<BootManagerMarker>()?;
+
+        fasync::Task::local(async move {
+            while let Some(request) =
+                request_stream.try_next().await.expect("failed to read mock request")
+            {
+                match request {
+                    BootManagerRequest::QueryConfigurationLastSetActive { responder } => {
+                        query_last_active_sender.start_send(last_active_config.clone()).unwrap();
+                        responder.send(Ok(last_active_config)).unwrap();
+                    }
+                    BootManagerRequest::SetConfigurationActive { configuration, responder } => {
+                        set_active_sender.start_send(configuration.clone()).unwrap();
+                        responder.send(zx::Status::OK.into_raw()).unwrap();
+                    }
+                    _ => {
+                        panic!("Unexpected request sent to mock boot manager");
+                    }
+                }
+            }
+        })
+        .detach();
+
+        Ok((proxy, query_last_active_receiver, set_active_receiver))
+    }
+
+    #[fuchsia::test]
+    async fn test_set_last_config_a() {
+        let last_active_config = Configuration::A;
+        let (boot_manager_proxy, mut query_last_active_listener, mut set_active_listener) =
+            create_mock_boot_manager(last_active_config).unwrap();
+
+        let _res = reset_active_slot_with_proxy(boot_manager_proxy).await.unwrap();
+
+        // Read in order the requests sent to boot manager:
+        // 1. Reading the last active config.
+        // 2. Setting the last inactive config as active.
+        // 3. Setting the last active config as active.
+
+        assert_eq!(Configuration::A, query_last_active_listener.next().await.unwrap());
+        assert_eq!(Configuration::B, set_active_listener.next().await.unwrap());
+        assert_eq!(Configuration::A, set_active_listener.next().await.unwrap());
+    }
+
+    #[fuchsia::test]
+    async fn test_set_last_config_b() {
+        let last_active_config = Configuration::B;
+        let (boot_manager_proxy, mut query_last_active_listener, mut set_active_listener) =
+            create_mock_boot_manager(last_active_config).unwrap();
+
+        let _res = reset_active_slot_with_proxy(boot_manager_proxy).await.unwrap();
+
+        // Read in order the requests sent to boot manager:
+        // 1. Reading the last active config.
+        // 2. Setting the last inactive config as active.
+        // 3. Setting the last active config as active.
+
+        assert_eq!(Configuration::B, query_last_active_listener.next().await.unwrap());
+        assert_eq!(Configuration::A, set_active_listener.next().await.unwrap());
+        assert_eq!(Configuration::B, set_active_listener.next().await.unwrap());
+    }
+
+    #[fuchsia::test]
+    async fn test_set_last_config_recovery() {
+        let last_active_config = Configuration::Recovery;
+        let (boot_manager_proxy, mut query_last_active_listener, set_active_listener) =
+            create_mock_boot_manager(last_active_config).unwrap();
+
+        let _res = reset_active_slot_with_proxy(boot_manager_proxy).await;
+
+        // There should be no attempts to set active slot if the last active slot is recovery.
+        assert_eq!(Configuration::Recovery, query_last_active_listener.next().await.unwrap());
+        assert_eq!(0, set_active_listener.count().await);
+    }
 
     #[test]
     fn test_reset_complete() -> std::result::Result<(), anyhow::Error> {
