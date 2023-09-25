@@ -108,11 +108,7 @@ async fn blobfs_and_data_mounted() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
     fixture.check_test_data_file().await;
-    if DATA_FILESYSTEM_VARIANT == "fxblob" {
-        fixture.check_test_blob_fxblob().await
-    } else {
-        fixture.check_test_blob().await;
-    }
+    fixture.check_test_blob(DATA_FILESYSTEM_VARIANT == "fxblob").await;
     fixture.tear_down().await;
 }
 
@@ -129,11 +125,7 @@ async fn blobfs_and_data_mounted_legacy_label() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
     fixture.check_test_data_file().await;
-    if DATA_FILESYSTEM_VARIANT == "fxblob" {
-        fixture.check_test_blob_fxblob().await
-    } else {
-        fixture.check_test_blob().await;
-    }
+    fixture.check_test_blob(DATA_FILESYSTEM_VARIANT == "fxblob").await;
 
     fixture.tear_down().await;
 }
@@ -160,11 +152,7 @@ async fn data_partition_nonexistent() {
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
-    if DATA_FILESYSTEM_VARIANT == "fxblob" {
-        fixture.check_test_blob_fxblob().await
-    } else {
-        fixture.check_test_blob().await;
-    }
+    fixture.check_test_blob(DATA_FILESYSTEM_VARIANT == "fxblob").await;
 
     fixture.tear_down().await;
 }
@@ -192,11 +180,7 @@ async fn data_reformatted_when_corrupt() {
 
     // Ensure blobs are not reformatted.
     fixture.check_fs_type("blob", blob_fs_type()).await;
-    if DATA_FILESYSTEM_VARIANT == "fxblob" {
-        fixture.check_test_blob_fxblob().await
-    } else {
-        fixture.check_test_blob().await;
-    }
+    fixture.check_test_blob(DATA_FILESYSTEM_VARIANT == "fxblob").await;
 
     fixture
         .wait_for_crash_reports(
@@ -286,11 +270,7 @@ async fn ramdisk_blob_and_data_mounted() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
     fixture.check_test_data_file().await;
-    if DATA_FILESYSTEM_VARIANT == "fxblob" {
-        fixture.check_test_blob_fxblob().await
-    } else {
-        fixture.check_test_blob().await;
-    }
+    fixture.check_test_blob(DATA_FILESYSTEM_VARIANT == "fxblob").await;
 
     fixture.tear_down().await;
 }
@@ -307,11 +287,7 @@ async fn ramdisk_blob_and_data_mounted_no_existing_data_partition() {
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
-    if DATA_FILESYSTEM_VARIANT == "fxblob" {
-        fixture.check_test_blob_fxblob().await
-    } else {
-        fixture.check_test_blob().await;
-    }
+    fixture.check_test_blob(DATA_FILESYSTEM_VARIANT == "fxblob").await;
 
     fixture.tear_down().await;
 }
@@ -622,11 +598,7 @@ async fn fvm_within_gpt() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
     fixture.check_test_data_file().await;
-    if DATA_FILESYSTEM_VARIANT == "fxblob" {
-        fixture.check_test_blob_fxblob().await
-    } else {
-        fixture.check_test_blob().await;
-    }
+    fixture.check_test_blob(DATA_FILESYSTEM_VARIANT == "fxblob").await;
 
     fixture.tear_down().await;
 }
@@ -669,11 +641,7 @@ async fn pausing_block_watcher_ignores_devices() {
     // Only the second disk we attached has a file inside. We use it as a proxy for testing that
     // only the second one was processed.
     fixture.check_test_data_file().await;
-    if DATA_FILESYSTEM_VARIANT == "fxblob" {
-        fixture.check_test_blob_fxblob().await
-    } else {
-        fixture.check_test_blob().await;
-    }
+    fixture.check_test_blob(DATA_FILESYSTEM_VARIANT == "fxblob").await;
 
     fixture.tear_down().await;
 }

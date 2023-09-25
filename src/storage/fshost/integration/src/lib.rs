@@ -220,34 +220,36 @@ impl TestFixture {
         assert_eq!(info_type, fs_type, "{:#08x} != {:#08x}", info_type, fs_type);
     }
 
-    pub async fn check_test_blob(&self) {
-        let mut builder = MerkleTreeBuilder::new();
-        builder.write(&disk_builder::BLOB_CONTENTS);
-        let expected_blob_hash = builder.finish().root();
+    pub async fn check_test_blob(&self, use_fxblob: bool) {
+        if use_fxblob {
+            let mut builder = MerkleTreeBuilder::new();
+            builder.write(&disk_builder::BLOB_CONTENTS);
+            let expected_blob_hash = builder.finish().root();
 
-        let (blob, server_end) = create_proxy::<fio::FileMarker>().expect("create_proxy failed");
-        let path = &format!("{}", expected_blob_hash);
-        self.dir("blob", fio::OpenFlags::RIGHT_READABLE)
-            .open(
-                fio::OpenFlags::RIGHT_READABLE,
-                fio::ModeType::empty(),
-                path,
-                ServerEnd::new(server_end.into_channel()),
+            let reader = connect_to_protocol_at_dir_root::<BlobReaderMarker>(
+                self.realm.root.get_exposed_dir(),
             )
-            .expect("open failed");
-        println!("About to query the blob file");
-        blob.query().await.expect("open file failed");
-    }
+            .expect("failed to connect to the BlobReader");
+            let _vmo = reader.get_vmo(&expected_blob_hash.into()).await.unwrap().unwrap();
+        } else {
+            let mut builder = MerkleTreeBuilder::new();
+            builder.write(&disk_builder::BLOB_CONTENTS);
+            let expected_blob_hash = builder.finish().root();
 
-    pub async fn check_test_blob_fxblob(&self) {
-        let mut builder = MerkleTreeBuilder::new();
-        builder.write(&disk_builder::BLOB_CONTENTS);
-        let expected_blob_hash = builder.finish().root();
-
-        let reader =
-            connect_to_protocol_at_dir_root::<BlobReaderMarker>(self.realm.root.get_exposed_dir())
-                .expect("failed to connect to the BlobReader");
-        let _vmo = reader.get_vmo(&expected_blob_hash.into()).await.unwrap().unwrap();
+            let (blob, server_end) =
+                create_proxy::<fio::FileMarker>().expect("create_proxy failed");
+            let path = &format!("{}", expected_blob_hash);
+            self.dir("blob", fio::OpenFlags::RIGHT_READABLE)
+                .open(
+                    fio::OpenFlags::RIGHT_READABLE,
+                    fio::ModeType::empty(),
+                    path,
+                    ServerEnd::new(server_end.into_channel()),
+                )
+                .expect("open failed");
+            println!("About to query the blob file");
+            blob.query().await.expect("open file failed");
+        }
     }
 
     /// Check for the existence of a well-known set of test files in the data volume. These files
