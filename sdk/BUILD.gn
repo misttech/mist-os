@@ -292,16 +292,6 @@ sdk_collection("zircon_sysroot") {
   deps = [ "//zircon/public/sysroot/sdk:sysroot_sdk" ]
 }
 
-# TODO: Delete once petals have been updated to remove this.
-sdk_collection("e2e_testing") {
-  # TODO(fxbug.dev/6128): this id should not be necessary.
-  id = sdk_id
-
-  category = "partner"
-
-  deps = []
-}
-
 # Tools and data used on a 'host' development machine; where host is often
 # Linux or Mac OS.
 sdk_molecule("host_tools") {
@@ -311,40 +301,39 @@ sdk_molecule("host_tools") {
   ]
 
   _host_tools = [
-    "//tools/fidl/fidlgen_rust:fidlgen_rust_sdk",
-    "//tools/bindc:bindc_sdk",
-    "//tools/cmc:cmc_sdk",
-    "//tools/configc:configc_sdk",
-    "//tools/fidl/fidlgen_hlcpp:fidlgen_hlcpp_sdk",
-    "//tools/fidl/fidlgen_cpp:fidlgen_cpp_sdk",
-    "//tools/sdk-tools/fpublish:fpublish_sdk",
-    "//tools/sdk-tools/fserve:fserve_sdk",
-    "//tools/sdk-tools/fssh:fssh_sdk",
     "//src/developer/debug/zxdb:zxdb_sdk",
     "//src/developer/ffx:bin_sdk",
-    "//src/developer/ffx/plugins/audio:sdk",
     "//src/developer/ffx/plugins/assembly:sdk",
+    "//src/developer/ffx/plugins/audio:sdk",
+    "//src/developer/ffx/plugins/emulator:uefi_internal",
     "//src/developer/ffx/plugins/package:sdk",
     "//src/developer/ffx/plugins/product:sdk",
     "//src/developer/ffx/plugins/scrutiny:sdk",
+    "//src/performance/trace2json:bin_sdk",
     "//src/storage/bin/fvm:fvm_sdk",
+    "//src/storage/blobfs/tools:blobfs_sdk",
+    "//src/storage/minfs/tools:minfs_sdk",
     "//src/storage/tools/blobfs-compression:blobfs-compression_sdk",
     "//src/sys/pkg/bin/far:bin_sdk",
     "//src/sys/pkg/bin/pm:pm_bin_sdk",
+    "//src/sys/pkg/testing/fake-omaha-client:bin_sdk",
+    "//tools/bindc:bindc_sdk",
     "//tools/bootserver_old:bootserver_sdk",
-    "//tools/net/device-finder:device-finder_sdk",
-    "//tools/symbolizer:sdk",
+    "//tools/cmc:cmc_sdk",
+    "//tools/configc:configc_sdk",
     "//tools/fidl/fidlc:fidl-format_sdk",
     "//tools/fidl/fidlc:fidlc_sdk",
+    "//tools/fidl/fidlgen_cpp:fidlgen_cpp_sdk",
+    "//tools/fidl/fidlgen_hlcpp:fidlgen_hlcpp_sdk",
+    "//tools/fidl/fidlgen_rust:fidlgen_rust_sdk",
     "//tools/fidlcat:fidlcat_sdk",
-    "//src/storage/blobfs/tools:blobfs_sdk",
+    "//tools/net/device-finder:device-finder_sdk",
+    "//tools/sdk-tools/fpublish:fpublish_sdk",
+    "//tools/sdk-tools/fserve:fserve_sdk",
+    "//tools/sdk-tools/fssh:fssh_sdk",
+    "//tools/symbolizer:sdk",
     "//zircon/tools/merkleroot:merkleroot_sdk",
-    "//src/storage/minfs/tools:minfs_sdk",
     "//zircon/tools/zbi:zbi_sdk",
-    "//src/performance/trace2json:bin_sdk",
-    "//src/sys/pkg/testing/fake-omaha-client:bin_sdk",
-
-    "//src/developer/ffx/plugins/emulator:uefi_internal",
 
     # TODO(fxbug.dev/95661): Remove these once the emulators are available independently.
     "//src/developer/ffx/plugins/emulator:aemu_internal",
