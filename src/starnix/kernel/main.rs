@@ -150,12 +150,6 @@ async fn main() -> Result<(), Error> {
         );
     }
 
-    // Wait for the UTC clock to start up before we start accepting requests since so many Linux
-    // APIs need a running UTC clock to function.
-    // See https://fxbug.dev/126111 for more discussion.
-    log_debug!("Starting UTC clock.");
-    time::utc::start_utc_clock().await;
-
     log_debug!("Serving kernel services on outgoing directory handle.");
     fs.take_and_serve_directory_handle()?;
     health.set_ok();

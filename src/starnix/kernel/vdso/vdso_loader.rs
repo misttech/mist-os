@@ -5,7 +5,7 @@
 use crate::{
     arch::vdso::{calculate_ticks_offset, VDSO_SIGRETURN_NAME},
     mm::PAGE_SIZE,
-    time::utc::utc_write_vvar_data_transform_to,
+    time::utc::update_utc_clock,
     types::{errno, from_status_like_fdio, uapi, Errno},
 };
 use fidl::AsHandleRef;
@@ -150,7 +150,7 @@ fn create_vvar_and_handles() -> (Arc<MemoryMappedVvar>, Arc<zx::Vmo>) {
             .expect("couldn't map vvar vmo"),
     );
     // Write initial mono to utc transform to the vvar.
-    utc_write_vvar_data_transform_to(&vvar_memory_mapped);
+    update_utc_clock(&vvar_memory_mapped);
     let vvar_writeable_rights = vvar_vmo_writeable
         .basic_info()
         .expect("Couldn't get rights of writeable vvar handle")

@@ -7,55 +7,92 @@ use fuchsia_runtime::duplicate_utc_clock_handle;
 use fuchsia_zircon::{self as zx, AsHandleRef, ClockTransformation};
 use once_cell::sync::Lazy;
 
+// Many Linux APIs need a running UTC clock to function. Since there can be a delay until the
+// UTC clock in Zircon starts up (fxb/131200), Starnix provides a synthetic utc clock initially,
+// and polls for the signal ZX_CLOCK_STARTED. Once this signal is asserted, the synthetic utc
+// clock is replaced by a real utc clock.
+
 #[derive(Debug)]
-enum UtcClockSource {
-    MonotonicWithOffset(zx::Duration),
-    Clock(zx::Clock),
+struct UtcClock {
+    real_utc_clock: zx::Clock,
+    current_transform: ClockTransformation,
+    real_utc_clock_started: bool,
 }
 
-impl UtcClockSource {
-    pub const fn new() -> Self {
-        Self::MonotonicWithOffset(zx::Duration::from_nanos(0))
-    }
-
-    pub fn now(&self) -> zx::Time {
-        match self {
-            UtcClockSource::MonotonicWithOffset(offset) => zx::Time::get_monotonic() + *offset,
-            UtcClockSource::Clock(clock) => clock.read().unwrap(),
+impl UtcClock {
+    pub fn new(real_utc_clock: zx::Clock) -> Self {
+        let offset = real_utc_clock.get_details().unwrap().backstop - zx::Time::get_monotonic();
+        let current_transform = ClockTransformation {
+            reference_offset: 0,
+            synthetic_offset: offset.into_nanos(),
+            rate: zx::sys::zx_clock_rate_t { synthetic_ticks: 1, reference_ticks: 1 },
+        };
+        let mut utc_clock = Self {
+            real_utc_clock: real_utc_clock,
+            current_transform: current_transform,
+            real_utc_clock_started: false,
+        };
+        utc_clock.poll_transform();
+        if !utc_clock.real_utc_clock_started {
+            log_warn!(
+                "Waiting for real UTC clock to start, using synthetic clock in the meantime."
+            );
         }
+        utc_clock
     }
 
-    pub fn estimate_monotonic_deadline(&self, utc: zx::Time) -> zx::Time {
-        match self {
-            UtcClockSource::MonotonicWithOffset(offset) => utc - *offset,
-            UtcClockSource::Clock(clock) => {
-                clock.get_details().unwrap().mono_to_synthetic.apply_inverse(utc)
+    fn check_real_utc_clock_started(&self) -> bool {
+        // Poll the utc clock to check if CLOCK_STARTED is asserted.
+        match self.real_utc_clock.wait_handle(zx::Signals::CLOCK_STARTED, zx::Time::INFINITE_PAST) {
+            Ok(e) if e.contains(zx::Signals::CLOCK_STARTED) => true,
+            Ok(_) | Err(zx::Status::TIMED_OUT) => false,
+            Err(e) => {
+                log_warn!("Error checking if CLOCK_STARTED is asserted: {:?}", e);
+                false
             }
         }
     }
 
-    fn get_transform(&self) -> ClockTransformation {
-        match self {
-            UtcClockSource::MonotonicWithOffset(offset) => ClockTransformation {
-                reference_offset: 0,
-                synthetic_offset: (*offset).into_nanos(),
-                rate: zx::sys::zx_clock_rate_t { synthetic_ticks: 1, reference_ticks: 1 },
-            },
-            UtcClockSource::Clock(clock) => clock.get_details().unwrap().mono_to_synthetic,
+    pub fn now(&self) -> zx::Time {
+        let monotonic_time = zx::Time::get_monotonic();
+        // Utc time is calculated using the same transform as the one stored in vvar. This is
+        // to ensure that utc calculations are the same whether using a syscall or the vdso
+        // function.
+        self.current_transform.apply(monotonic_time)
+    }
+
+    pub fn estimate_monotonic_deadline(&self, utc: zx::Time) -> zx::Time {
+        self.current_transform.apply_inverse(utc)
+    }
+
+    fn poll_transform(&mut self) {
+        if !self.real_utc_clock_started {
+            if self.check_real_utc_clock_started() {
+                log_warn!("Real UTC clock has started");
+                self.real_utc_clock_started = true;
+            }
+        }
+        if self.real_utc_clock_started {
+            self.current_transform = self.real_utc_clock.get_details().unwrap().mono_to_synthetic;
         }
     }
 
-    pub fn write_vvar_data_transform_to(&self, dest: &MemoryMappedVvar) {
-        let new_transform = self.get_transform();
-        dest.update_utc_data_transform(&new_transform);
+    // Fetch the most up-to-date clock transform from Zircon, then update the clock transform in
+    // both self (the UtcClock) and dest (the MemoryMappedVvar). The fact that there is only one
+    // UtcClock instance, which is protected by a mutex, and that there is only one
+    // MemoryMappedVvar, guarantees that the vvar is never updated by two concurrent writers.
+    pub fn update_utc_clock(&mut self, dest: &MemoryMappedVvar) {
+        self.poll_transform();
+        dest.update_utc_data_transform(&self.current_transform);
     }
 }
 
-static UTC_CLOCK_SOURCE: Lazy<Mutex<UtcClockSource>> =
-    Lazy::new(|| Mutex::new(UtcClockSource::new()));
+static UTC_CLOCK: Lazy<Mutex<UtcClock>> = Lazy::new(|| {
+    Mutex::new(UtcClock::new(duplicate_utc_clock_handle(zx::Rights::SAME_RIGHTS).unwrap()))
+});
 
-pub fn utc_write_vvar_data_transform_to(dest: &MemoryMappedVvar) {
-    (*UTC_CLOCK_SOURCE).lock().write_vvar_data_transform_to(dest);
+pub fn update_utc_clock(dest: &MemoryMappedVvar) {
+    (*UTC_CLOCK).lock().update_utc_clock(dest);
 }
 
 pub fn utc_now() -> zx::Time {
@@ -67,7 +104,7 @@ pub fn utc_now() -> zx::Time {
             return test_time;
         }
     }
-    (*UTC_CLOCK_SOURCE).lock().now()
+    (*UTC_CLOCK).lock().now()
 }
 
 pub fn estimate_monotonic_deadline_from_utc(utc: zx::Time) -> zx::Time {
@@ -81,39 +118,7 @@ pub fn estimate_monotonic_deadline_from_utc(utc: zx::Time) -> zx::Time {
             return test_time;
         }
     }
-    (*UTC_CLOCK_SOURCE).lock().estimate_monotonic_deadline(utc)
-}
-
-pub async fn start_utc_clock() {
-    let real_utc_clock = duplicate_utc_clock_handle(zx::Rights::SAME_RIGHTS).unwrap();
-    // Poll the clock first to see if CLOCK_STARTED is already asserted.
-    // If it is, continue silently. Otherwise we'll log that we are waiting.
-    match real_utc_clock.wait_handle(zx::Signals::CLOCK_STARTED, zx::Time::INFINITE_PAST) {
-        Ok(e) if e.contains(zx::Signals::CLOCK_STARTED) => {
-            *(*UTC_CLOCK_SOURCE).lock() = UtcClockSource::Clock(real_utc_clock);
-            return;
-        }
-        Ok(_) | Err(zx::Status::TIMED_OUT) => {}
-        Err(e) => {
-            log_warn!("Error fetching initial UTC clock value: {:?}", e);
-        }
-    }
-
-    log_warn!("Waiting for real UTC clock to start, using synthetic clock in the meantime.");
-    // Pick an initial offset so that UTC times appear to start at the backstop time and advance
-    // forward.  Once the real UTC clock starts we expect it to start a time newer than the backstop
-    // time so the clock will jump forward. It could jump backwards if we started running close to
-    // the backstop time and our monotonic clock runs much faster than the external UTC reference.
-    let offset = real_utc_clock.get_details().unwrap().backstop - zx::Time::get_monotonic();
-    *(*UTC_CLOCK_SOURCE).lock() = UtcClockSource::MonotonicWithOffset(offset);
-    fuchsia_async::Task::spawn(async move {
-        let _ = fuchsia_async::OnSignals::new(&real_utc_clock, zx::Signals::CLOCK_STARTED)
-            .await
-            .expect("wait should always succeed");
-        log_warn!("Real UTC clock has started, replacing synthetic clock.");
-        *(*UTC_CLOCK_SOURCE).lock() = UtcClockSource::Clock(real_utc_clock);
-    })
-    .detach();
+    (*UTC_CLOCK).lock().estimate_monotonic_deadline(utc)
 }
 
 #[cfg(test)]
