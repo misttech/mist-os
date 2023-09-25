@@ -210,6 +210,8 @@ def fuchsia_cc_binary(
 
 # fuchsia_cc_test build rules.
 def _fuchsia_cc_test_manifest_impl(ctx):
+    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+
     # Detect googletest.
     is_gtest = False
     for dep in ctx.attr.deps:
@@ -223,7 +225,7 @@ def _fuchsia_cc_test_manifest_impl(ctx):
         template = ctx.attr._template_file.files.to_list()[0],
         output = generated_cml,
         substitutions = {
-            "{{RUNNER}}": "gtest_runner" if is_gtest else "elf_test_runner",
+            "{{RUNNER_SHARD}}": sdk.gtest_runner_shard if is_gtest else sdk.elf_test_runner_shard,
             "{{BINARY}}": ctx.attr.test_binary_name,
         },
     )
@@ -239,6 +241,7 @@ _fuchsia_cc_test_manifest = rule(
     Detects whether gtest is included as a dependency. If it is, the cml file
     will use gtest_runner. Otherwise it will use the elf_test_runner.
     """,
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "test_binary_name": attr.string(
             doc = "The test binary's name.",

@@ -17,6 +17,7 @@ def _fuchsia_toolchain_info_impl(ctx):
         cmc = ctx.executable.cmc,
         cmc_manifest = ctx.file.cmc_manifest,
         cmc_includes = ctx.attr.cmc_includes or None,
+        elf_test_runner_shard = ctx.attr.elf_test_runner_shard,
         far = ctx.executable.far,
         ffx = ctx.executable.ffx,
         ffx_assembly = ctx.executable.ffx_assembly or None,
@@ -37,6 +38,7 @@ def _fuchsia_toolchain_info_impl(ctx):
         fidlgen_cpp = ctx.executable.fidlgen_cpp,
         fvm = ctx.executable.fvm,
         fvm_manifest = ctx.file.fvm_manifest,
+        gtest_runner_shard = ctx.attr.gtest_runner_shard,
         merkleroot = ctx.executable.merkleroot,
         minfs = ctx.executable.minfs,
         minfs_manifest = ctx.file.minfs_manifest,
@@ -107,6 +109,10 @@ included in the Fuchsia IDK.
         "cmc_includes": attr.label(
             doc = "The collection of cml files to include in the cmc invocation",
             providers = [[FuchsiaComponentManifestShardCollectionInfo]],
+        ),
+        "elf_test_runner_shard": attr.string(
+            doc = "The path to the elf test runner's cml shard.",
+            mandatory = True,
         ),
         "far": attr.label(
             doc = "far tool executable.",
@@ -218,6 +224,10 @@ included in the Fuchsia IDK.
             mandatory = True,
             cfg = "exec",
             allow_single_file = True,
+        ),
+        "gtest_runner_shard": attr.string(
+            doc = "The path to the gtest runner's cml shard.",
+            mandatory = True,
         ),
         "merkleroot": attr.label(
             doc = "merkleroot tool executable.",
