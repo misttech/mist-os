@@ -1568,6 +1568,15 @@ group("developer_universe_packages") {
   # the buildbot host tests should only be added via `--with-host`, to the
   # `host_labels` GN arg.
   assert_no_deps = [ "//bundles/buildbot/host/*" ]
+
+  # During validation of the test types, ignore any tests that are found via
+  # a path from the test groups back to this group, as it's likely due to e2e
+  # tests having a dependency on the main assembly, which has a dependency on
+  # this group while tests are being transitioned out of the universe set and
+  # to the test groups.
+  metadata = {
+    test_type_validation_barrier = []
+  }
 }
 
 ##
@@ -1669,24 +1678,20 @@ group("base_tests") {
 
 # Host-driven, "end-to-end" tests that run on a Fuchsia image (either real
 # hardware or emulated).
-group("e2e_tests") {
+validated_test_types_group("e2e_tests") {
   testonly = true
   visibility = [ ":*" ]
-  public_deps = e2e_test_labels
-  assert(
-      e2e_test_labels == [],
-      "e2e_test_labels cannot be used before adding validation of test type.")
+  allowed_test_types = [ "end_to_end" ]
+  deps = e2e_test_labels
 }
 
 # Host-only tests.  These cannot have any dependency on an assembled platform
 # image, or the compiled OS itself, not even for their host_test_data().
-group("host_tests") {
+validated_test_types_group("host_tests") {
   testonly = true
   visibility = [ ":*" ]
-  public_deps = host_test_labels
-  assert(
-      host_test_labels == [],
-      "host_test_labels cannot be used before adding validation of test type.")
+  allowed_test_types = [ "host_only" ]
+  deps = host_test_labels
 }
 
 # Can be any test-type. This is for local-developer use only.  It is not for use

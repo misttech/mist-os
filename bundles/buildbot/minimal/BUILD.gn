@@ -7,6 +7,7 @@ import("//build/testing/validated_test_types_group.gni")
 assert(is_fuchsia, "These can only be defined in the default toolchain")
 
 # For use with the 'hermetic_test_package_labels' GN build argument.
+# WARNING: Known to infrastructure
 validated_test_types_group("hermetic_tests") {
   testonly = true
   allowed_test_types = [ "hermetic" ]
@@ -14,6 +15,7 @@ validated_test_types_group("hermetic_tests") {
 }
 
 # For use with the 'test_package_labels' GN build argument.
+# WARNING: Known to infrastructure
 group("non-hermetic_tests") {
   testonly = true
   deps = []
@@ -27,6 +29,7 @@ group("non-hermetic_tests") {
 }
 
 # For use with the 'e2e_test_labels' GN build argument.
+# WARNING: Known to infrastructure
 group("e2e_tests") {
   testonly = true
   deps = []

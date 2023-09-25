@@ -20,8 +20,8 @@ import("//build/compiled_action.gni")
 #     [list of strings]: The allowed types of tests in this group.  Test types
 #     that can be validated for are:
 #       - 'hermetic'
-#       - (TODO) 'end_to_end'
-#       - (TODO) 'host_only'
+#       - 'end_to_end'
+#       - 'host_only'
 #
 #   assert_no_deps, visibility (optional)
 #     GN usual
@@ -32,7 +32,11 @@ template("validated_test_types_group") {
   assert(defined(invoker.allowed_test_types),
          "'allowed_test_types' must be specified")
 
-  valid_values_in_allowed_test_types = [ "hermetic" ]
+  valid_values_in_allowed_test_types = [
+    "hermetic",
+    "host_only",
+    "end_to_end",
+  ]
   foreach(test_type, invoker.allowed_test_types) {
     # This uses the fact that list addition is an append operation, but list
     # removal removes all instances of those values from the list.  If the
@@ -63,7 +67,7 @@ template("validated_test_types_group") {
 
   _labels = {
     main_target = target_name
-    tests = "${target_name}.test.json"
+    tests = "${target_name}.tests.json"
     test_components = "${target_name}.test_components.json"
   }
 
@@ -78,7 +82,10 @@ template("validated_test_types_group") {
   generated_file(_labels.tests) {
     testonly = true
     data_keys = [ "tests" ]
-    walk_keys = [ "tests_barrier" ]
+    walk_keys = [
+      "tests_barrier",
+      "test_type_validation_barrier",
+    ]
     outputs = [ _files.tests ]
     output_conversion = "json"
     deps = invoker.deps

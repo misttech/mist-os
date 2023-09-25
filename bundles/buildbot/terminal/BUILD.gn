@@ -39,6 +39,7 @@ group("hermetic_tests") {
 }
 
 # For use with the 'test_package_labels' GN build argument.
+# WARNING: Known to infrastructure
 group("non_hermetic_tests") {
   testonly = true
   deps = []
@@ -52,6 +53,7 @@ group("non_hermetic_tests") {
 }
 
 # For use with the 'e2e_test_labels' GN build argument.
+# WARNING: Known to infrastructure
 group("e2e_tests") {
   testonly = true
   deps = []
