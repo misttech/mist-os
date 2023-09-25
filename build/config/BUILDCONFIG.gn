@@ -648,6 +648,133 @@ set_defaults("rustc_staticlib") {
   configs = default_common_binary_configs + default_rust_configs
 }
 
+#
+# Wrap all built-in target types and add the `applicable_licenses` parameter.
+#
+# For each built-in target type `foo`, creates a wrapping template `_foo_interal_wrapper`.
+# Throughout the rest of BUILDCONFIG.gn, all other templates should call `_foo_interal_wrapper`
+# until a public `foo` template is declared. That is because templates can only invoke other
+# templates declared before them.
+
+# All built-in target types:
+_built_in_target_types_with_internal_wrapper = [
+  "action",
+  "action_foreach",
+  "copy",
+  "executable",
+  "generated_file",
+  "group",
+  "loadable_module",
+  "rust_library",
+  "rust_proc_macro",
+  "shared_library",
+  "source_set",
+  "static_library",
+]
+
+# All built-in target types that don't have a wrapper. The list shrinks after
+# each declaration and is asserted to be empty at the end of this file.
+_built_in_target_types_without_public_wrapper =
+    _built_in_target_types_with_internal_wrapper
+
+foreach(_target_type, _built_in_target_types_with_internal_wrapper) {
+  # Wraps built-in target types (e.g. source_set, executable, etc.) to add additional
+  # parameters common to all of them.
+  #
+  # Additional parameters:
+  #
+  #   applicable_licenses (optional):
+  #     A list of 1 or more license targets (see //build/licenses/license.gni) that
+  #     define licensing information for this target.
+  #
+  #     Results with the declaration of target metadata named 'applicable_licenses'
+  #     following scope:
+  #
+  #       {
+  #         target_label: The target for which this metadata applies.
+  #         license_labels: A list of license (see license.gni) targets that are applicable
+  #             to this target.
+  #       }
+  #
+  #     TODO(fxb/133985): Document how license metadata is processed once collection is
+  #     implemented.
+  #
+  template("_${_target_type}_internal_wrapper") {
+    target(_target_type, target_name) {
+      forward_variables_from(invoker,
+                             "*",
+                             [
+                               "applicable_licenses",
+                               "metadata",
+                               "testonly",
+                               "visibility",
+                             ])
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+
+      _applicable_licenses = []
+      if (defined(invoker.applicable_licenses)) {
+        foreach(license_label, invoker.applicable_licenses) {
+          _applicable_licenses +=
+              [ get_label_info(license_label, "label_with_toolchain") ]
+        }
+      }
+
+      if (defined(deps)) {
+        deps += _applicable_licenses
+      } else {
+        deps = _applicable_licenses
+      }
+
+      metadata = {
+        if (defined(invoker.metadata)) {
+          forward_variables_from(invoker.metadata, "*")
+        }
+        applicable_licenses = [
+          {
+            target_label =
+                get_label_info(":${target_name}", "label_with_toolchain")
+            license_labels = _applicable_licenses
+          },
+        ]
+      }
+    }
+  }
+}
+
+# Declare public wrappers for copy, group, generated_file that redirects to
+# their internal wrapper.
+foreach(_target_type,
+        [
+          "copy",
+          "group",
+          "generated_file",
+        ]) {
+  template(_target_type) {
+    target("_${_target_type}_internal_wrapper", target_name) {
+      forward_variables_from(invoker,
+                             "*",
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+    }
+  }
+}
+_built_in_target_types_without_public_wrapper -= [
+  "copy",
+  "group",
+  "generated_file",
+]
+
 # `hermetic_inputs_action()` and `hermetic_inputs_action_foreach()` are used
 # to run an action that generates a list of implicit inputs, as required
 # by the `hermetics_inputs_target` argument of our `action()` and `action_foreach()`
@@ -670,7 +797,7 @@ foreach(_target_type,
            "An hermetic_inputs_action() script should have a single output!")
     assert(!defined(invoker.depfile),
            "An hermetic_inputs_action() cannot have a depfile!")
-    target(_target_type, target_name) {
+    target("_${_target_type}_internal_wrapper", target_name) {
       forward_variables_from(invoker,
                              "*",
                              [
@@ -917,7 +1044,7 @@ foreach(_target_type,
       }
     }
 
-    target(_target_type, target_name) {
+    target("_${_target_type}_internal_wrapper", target_name) {
       forward_variables_from(invoker,
                              "*",
                              [
@@ -1272,6 +1399,10 @@ foreach(_target_type,
     }
   }
 }
+_built_in_target_types_without_public_wrapper -= [
+  "action",
+  "action_foreach",
+]
 
 # This is the basic "asan" variant.  Others start with this and modify.
 # See `known_variants` (below) for the meaning of fields in this scope.
@@ -2110,25 +2241,6 @@ if (in_default_toolchain) {
   }
 }
 
-# Pass through wrapper of `copy`, in preparation of adding
-# applicable_licenses in followup CLs.
-# TODO(fxbug.dev//132723): Add applicable_licenses parameter.
-template("copy") {
-  copy(target_name) {
-    forward_variables_from(invoker,
-                           "*",
-                           [
-                             "testonly",
-                             "visibility",
-                           ])
-    forward_variables_from(invoker,
-                           [
-                             "testonly",
-                             "visibility",
-                           ])
-  }
-}
-
 # Internal template used to wrap a linked binary target (i.e. executable(),
 # shared_library() or loadable_module()) definition.
 #
@@ -2162,7 +2274,17 @@ template("copy") {
 template("_fuchsia_binary") {
   target_type = invoker.target_type
 
-  target(target_type, target_name) {
+  # Use the internal _*_internal_wrapper target type, if the public
+  # wrapper is not declared yet.
+  _maybe_target_type_internal_wrapper = target_type
+  foreach(_built_in_target_type,
+          _built_in_target_types_without_public_wrapper) {
+    if (target_type == _built_in_target_type) {
+      _maybe_target_type_internal_wrapper = "_${target_type}_internal_wrapper"
+    }
+  }
+
+  target(_maybe_target_type_internal_wrapper, target_name) {
     forward_variables_from(invoker,
                            "*",
                            [
@@ -3023,7 +3145,25 @@ if (toolchain_variant.with_shared || toolchain_variant.is_pic_default) {
       }
     }
   }
+} else {
+  # Wrap shared_library with the private impl that has applicable licenses.
+  template("shared_library") {
+    _shared_library_internal_wrapper(target_name) {
+      forward_variables_from(invoker,
+                             "*",
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+    }
+  }
 }
+_built_in_target_types_without_public_wrapper -= [ "shared_library" ]
 
 # This wraps the built-in GN executable() template, adding a few more features:
 #
@@ -3262,6 +3402,7 @@ template("executable") {
     }
   }
 }
+_built_in_target_types_without_public_wrapper -= [ "executable" ]
 
 # This wraps the GN built-in loadable_module() template, adding a few more features.
 # See the documentation for executable() to see them.
@@ -3388,6 +3529,7 @@ template("loadable_module") {
     }
   }
 }
+_built_in_target_types_without_public_wrapper -= [ "loadable_module" ]
 
 # Some targets we share with Chromium declare themselves to be components,
 # which means they can build either as shared libraries or as static libraries.
@@ -3396,9 +3538,12 @@ template("component") {
   if (!defined(invoker.sources)) {
     # When there are no sources defined, use a source set to avoid creating
     # an empty static library (which generally don't work).
-    _component_mode = "source_set"
+
+    # public `source_set` is not defined yet so use private impl first
+    _component_mode = "_source_set_internal_wrapper"
   } else {
-    _component_mode = "static_library"
+    # public `static_library` is not defined yet so use private impl first
+    _component_mode = "_static_library_internal_wrapper"
   }
 
   target(_component_mode, target_name) {
@@ -3413,47 +3558,56 @@ set_defaults("component") {
   configs = default_common_binary_configs
 }
 
-# When generating Fuchsia user binaries, ensure the right sysroot-related
-# dependencies are added to source_set() and static_library() instances
-# automatically.
-if (is_fuchsia && zircon_toolchain == false) {
-  template("source_set") {
-    source_set(target_name) {
-      forward_variables_from(invoker,
-                             "*",
-                             [
-                               "testonly",
-                               "visibility",
-                             ])
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visibility",
-                             ])
+template("source_set") {
+  _source_set_internal_wrapper(target_name) {
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    if (is_fuchsia && zircon_toolchain == false) {
       if (!defined(deps)) {
         deps = []
       }
+
+      # When generating Fuchsia user binaries, ensure the right sysroot-related
+      # dependencies are added to source_set() and static_library() instances
+      # automatically.
       deps += [ "//zircon/public/sysroot:headers" ]
     }
   }
+}
+_built_in_target_types_without_public_wrapper -= [ "source_set" ]
 
-  template("static_library") {
-    static_library(target_name) {
-      forward_variables_from(invoker,
-                             "*",
-                             [
-                               "testonly",
-                               "visibility",
-                               "metadata",
-                             ])
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visibility",
-                             ])
+template("static_library") {
+  _static_library_internal_wrapper(target_name) {
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "testonly",
+                             "visibility",
+                             "metadata",
+                           ])
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+
+    if (is_fuchsia && zircon_toolchain == false) {
       if (!defined(deps)) {
         deps = []
       }
+
+      # When generating Fuchsia user binaries, ensure the right sysroot-related
+      # dependencies are added to source_set() and static_library() instances
+      # automatically.
       deps += [ "//zircon/public/sysroot:headers" ]
 
       if (defined(crate_root)) {
@@ -3473,6 +3627,7 @@ if (is_fuchsia && zircon_toolchain == false) {
     }
   }
 }
+_built_in_target_types_without_public_wrapper -= [ "static_library" ]
 
 # This wraps the GN built-in rust_library template:
 #
@@ -3482,7 +3637,7 @@ if (is_fuchsia && zircon_toolchain == false) {
 #   direct and transitive dependencies.
 #
 template("rust_library") {
-  rust_library(target_name) {
+  _rust_library_internal_wrapper(target_name) {
     forward_variables_from(invoker, "*", [ "metadata" ])
     if (!defined(inputs)) {
       inputs = []
@@ -3503,6 +3658,7 @@ template("rust_library") {
     }
   }
 }
+_built_in_target_types_without_public_wrapper -= [ "rust_library" ]
 
 # This wraps the GN built-in rust_proc_macro template:
 #
@@ -3525,7 +3681,7 @@ template("rust_proc_macro") {
     }
     not_needed(invoker, "*")
   } else {
-    rust_proc_macro(target_name) {
+    _rust_proc_macro_internal_wrapper(target_name) {
       forward_variables_from(invoker,
                              "*",
                              [
@@ -3558,3 +3714,8 @@ template("rust_proc_macro") {
     }
   }
 }
+_built_in_target_types_without_public_wrapper -= [ "rust_proc_macro" ]
+
+assert(
+    _built_in_target_types_without_public_wrapper == [],
+    "${_built_in_target_types_without_public_wrapper} are missing a public wrapper")
