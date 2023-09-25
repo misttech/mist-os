@@ -175,10 +175,6 @@ source_set("gfx") {
     "resources/view_holder.h",
     "screenshotter.cc",
     "screenshotter.h",
-    "snapshot/serializer.h",
-    "snapshot/snapshotter.cc",
-    "snapshot/snapshotter.h",
-    "snapshot/version.h",
     "swapchain/buffer_pool.cc",
     "swapchain/buffer_pool.h",
     "swapchain/display_swapchain.cc",
@@ -205,7 +201,6 @@ source_set("gfx") {
   public_deps = [
     ":gfx_always_optimized",
     ":util",
-    "snapshot:fbs",
     "//src/lib/fostr/fidl/fuchsia.ui.gfx",
 
     # TODO(fxbug.dev/44143): Gfx should not depend on Input.
