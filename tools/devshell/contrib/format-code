@@ -124,15 +124,6 @@ function format-full-file() {
 
 # Format the given file.
 function format-file() {
-  # If the user requested formatting of a single specific file, we want to
-  # loudly alert them to the fact that we can't actually format that file, since
-  # silently exiting would suggest that we *do* know how to format the file and
-  # that it was already properly formatted.
-  must_format=false
-  if $FILES_SPECIFIED && [[ ${#FILES[@]} == 1 ]]; then
-    must_format=true
-  fi
-
   filename="$(basename "$1")"
   case "${filename}" in
     *.c | *.cc | *.cpp | *.h | *.hh | *.hpp | *.proto | *.ts)
@@ -141,18 +132,6 @@ function format-file() {
     *.config) format-full-file "${JSON_FMT_CMD}" "$1" ;;
     *.json) format-full-file "${JSON_FMT_CMD}" "$1" ;;
     *.py) format-full-file "${PY_CMD}" "$1" ;;
-    *.*)
-      if $must_format; then
-        fx-error "Unsupported extension for file $1"
-        exit 1
-      fi
-      ;;
-    *)
-      if $must_format; then
-        fx-error "Unable to determine language for file $1"
-        exit 1
-      fi
-      ;;
   esac
 }
 
@@ -183,8 +162,6 @@ ARGS_GN=
 DRY_RUN=
 VERBOSE=
 CHANGED_LINES=
-ALL_FILES=0
-FILES_SPECIFIED=false
 PARALLEL=
 
 fx-config-read
@@ -200,14 +177,11 @@ while [ $# -gt 0 ]; do
     --changed-lines) CHANGED_LINES="1" ;;
     --all)
       GET_FILES=get_all_files
-      ALL_FILES=1
       ;;
     --git)
       GET_FILES=get_git_files
-      ALL_FILES=1
       ;;
     --files=*)
-      FILES_SPECIFIED=true
       GET_FILES=:
       OLDIFS=$IFS && IFS=$'\n' \
       && FILES=( \
@@ -286,7 +260,6 @@ readonly GIDL_FORMAT_TOOL="$( fx-command-run list-build-artifacts --expect-one -
 readonly GIDL_FORMAT_TOOL_ABS="${FUCHSIA_BUILD_DIR}/${GIDL_FORMAT_TOOL}"
 readonly GIDL_CMD="${GIDL_FORMAT_TOOL_ABS} -i"
 readonly JSON_FMT_CMD="${PY_TOOL} ${FUCHSIA_DIR}/scripts/style/json-fmt.py --no-sort-keys"
-readonly JSON5_FMT_CMD="${HOST_OUT_DIR}/formatjson5 --replace"
 readonly PY_CMD="${VPYTHON_TOOL} ${FUCHSIA_DIR}/scripts/yapf --in-place"
 
 readonly FIX_HEADER_GUARDS_CMD="${PY_TOOL} ${FUCHSIA_DIR}/scripts/style/check-header-guards.py --fix"
@@ -342,38 +315,22 @@ for file in "${FILES[@]}"; do
   if [[ ! -f "${file}" ]]; then
     continue
   fi
+  shac_files+=("$file")
 
-  case "$(basename "$file")" in
-    # TODO(fxbug.dev/82386): Move all formatters into SHAC to ensure parity
-    # between the formatters enforced by the infrastructure and those enforced
-    # locally.
-    *.bazel | *.bzl | *.bzlmod | *.star | BUILD | WORKSPACE |\
-    *.cml |\
-    *.dart |\
-    *.fidl |\
-    *.json5 | *.persist | *.triage |\
-    *.gn | *.gni |\
-    *.go |\
-    *.rs)
-      shac_files+=("$file")
-      ;;
-    *)
-      if [[ -n "$PARALLEL" ]]; then
-        format-file "${file}" &
-      else
-        format-file "${file}"
-      fi
-      ;;
-  esac
+  if [[ -n "$PARALLEL" ]]; then
+    format-file "${file}" &
+  else
+    format-file "${file}"
+  fi
 done
 
-if [[ ${#shac_files[@]} -gt 0 ]]; then
-  print-and-execute "${PREBUILT_SHAC}" fmt \
-    --quiet \
-    -C "$FUCHSIA_DIR" \
-    --var fuchsia_build_dir="${FUCHSIA_BUILD_DIR}" \
-    "${shac_files[@]}"
-fi
+# TODO(fxbug.dev/82386): Move all formatters into SHAC to ensure parity between
+# the formatters enforced by the infrastructure and those enforced locally.
+print-and-execute "${PREBUILT_SHAC}" fmt \
+  --quiet \
+  -C "$FUCHSIA_DIR" \
+  --var fuchsia_build_dir="${FUCHSIA_BUILD_DIR}" \
+  "${shac_files[@]}"
 
 [[ -n "$PARALLEL" ]] && wait
 
