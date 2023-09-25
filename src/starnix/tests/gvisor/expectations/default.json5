@@ -368,6 +368,7 @@
                 "MountTest.TmpfsSizeRoundUpSinglePageSize",
                 "MountTest.TmpfsSymlinkAllocCheck",
                 "MountTest.TmpfsSymlinkUnallocCheck",
+                "MountTest.UmountReparentsCoveredMounts",
 
                 // msgqueue_test
                 "MsgqueueTest.MsgCtlIpcSet",
@@ -906,6 +907,7 @@
 
                 // Breaks tests that run after it.
                 "MountTest.MaxMounts",
+                "MountTest.MountFailsOnPseudoFilesystemMountpoint",
 
                 // Times out.
                 "ItimerTest.DeliversSIGPROFToThreadsRoughlyFairlyIdle",
