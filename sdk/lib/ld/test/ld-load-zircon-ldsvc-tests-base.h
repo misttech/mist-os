@@ -34,7 +34,7 @@ class LdLoadZirconLdsvcTestsBase : public LdLoadTestsBase {
   void LdsvcExpectLoadObject(std::string_view name, zx::result<zx::vmo> result);
 
   // This is shorthand for LdsvcExpectLoadObject with the VMO acquired from
-  // ld::testing::GetTestLibVmo.
+  // elfldltl::testing::GetTestLibVmo.
   void LdsvcExpectLoadObject(std::string_view name);
 
   // This just is a shorthand for multiple LdsvcExpectLoadObject calls.

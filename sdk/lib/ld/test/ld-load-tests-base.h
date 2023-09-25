@@ -25,6 +25,11 @@ class LdLoadTestsBase {
 
   void ExpectLog(std::string_view expected_log);
 
+  // This is the least-common-denominator version used in non-Fuchsia tests.
+  // All the Fuchsia-specific test fixtures should override this (e.g. via
+  // LdLoadZirconLdsvcTestsBase).
+  void Needed(std::initializer_list<std::string_view> names);
+
   ~LdLoadTestsBase();
 
  private:

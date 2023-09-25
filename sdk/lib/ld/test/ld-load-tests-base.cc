@@ -4,6 +4,7 @@
 
 #include "ld-load-tests-base.h"
 
+#include <lib/elfldltl/testing/get-test-data.h>
 #include <lib/elfldltl/testing/test-pipe-reader.h>
 
 #include <gtest/gtest.h>
@@ -27,6 +28,17 @@ LdLoadTestsBase::~LdLoadTestsBase() {
   // out early anyway, then don't confuse things with more failures.
   if (!::testing::Test::HasFatalFailure()) {
     EXPECT_FALSE(log_);
+  }
+}
+
+void LdLoadTestsBase::Needed(std::initializer_list<std::string_view> names) {
+  // The POSIX dynamic linker will just do `open` system calls to find files.
+  // It runs chdir'd to the directory where they're found.  Nothing else done
+  // here in the test harness affects the lookups it does or verifies that it
+  // does the expected set in the expected order.  So this just verifies that
+  // each SONAME in the list is an existing test file.
+  for (std::string_view name : names) {
+    ASSERT_TRUE(elfldltl::testing::GetTestLib(name)) << name;
   }
 }
 
