@@ -483,6 +483,7 @@ async def do_build(
         recorder=recorder,
         parent=build_id,
         print_verbatim=True,
+        env={"CWD": exec_env.out_dir},
     )
     if not output:
         error = "Failure publishing packages."
