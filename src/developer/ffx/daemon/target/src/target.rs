@@ -323,13 +323,46 @@ impl Target {
         ))
     }
 
+    fn infer_fastboot_interface(&self) -> Option<FastbootInterface> {
+        match self.fastboot_interface() {
+            None => {
+                // We take the first address which is of type Fastboot as
+                // Fuchsia devices expose only one Fastboot interface
+                // at a time.
+                if let Some(f_addr) = self
+                    .addrs
+                    .borrow()
+                    .clone()
+                    .into_iter()
+                    .filter(|addr| match addr.addr_type {
+                        TargetAddrType::Fastboot(_) => true,
+                        _ => false,
+                    })
+                    .take(1)
+                    .next()
+                {
+                    match f_addr.addr_type {
+                        TargetAddrType::Fastboot(t @ FastbootInterface::Udp)
+                        | TargetAddrType::Fastboot(t @ FastbootInterface::Tcp) => Some(t),
+                        _ => None,
+                    }
+                } else {
+                    None
+                }
+            }
+            Some(s) => Some(s),
+        }
+    }
+
     pub fn target_info(&self) -> TargetInfo {
+        let fastboot_interface = self.infer_fastboot_interface();
+
         TargetInfo {
             nodename: self.nodename(),
             addresses: self.addrs(),
             serial: self.serial(),
             ssh_port: self.ssh_port(),
-            fastboot_interface: self.fastboot_interface(),
+            fastboot_interface,
             ssh_host_address: self.ssh_host_address.borrow().as_ref().map(|h| h.to_string()),
         }
     }
@@ -1079,6 +1112,8 @@ impl From<&Target> for ffx::TargetInfo {
             .map(|b| (Some(b.product_config), Some(b.board_config)))
             .unwrap_or((None, None));
 
+        let fastboot_interface = target.infer_fastboot_interface();
+
         Self {
             nodename: target.nodename(),
             serial_number: target.serial(),
@@ -1112,7 +1147,7 @@ impl From<&Target> for ffx::TargetInfo {
             // TODO(awdavies): Gather more information here when possible.
             target_type: Some(ffx::TargetType::Unknown),
             ssh_host_address: target.ssh_host_address_info(),
-            fastboot_interface: match target.fastboot_interface() {
+            fastboot_interface: match fastboot_interface {
                 None => None,
                 Some(FastbootInterface::Usb) => Some(ffx::FastbootInterface::Usb),
                 Some(FastbootInterface::Udp) => Some(ffx::FastbootInterface::Udp),
@@ -2134,6 +2169,39 @@ mod test {
 
             let info: ffx::TargetInfo = ffx::TargetInfo::from(target.borrow());
             assert_eq!(info.fastboot_interface, Some(ffx::FastbootInterface::Udp));
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_infer_fastboot_interface() {
+        {
+            let target = Target::new();
+
+            let interface = target.infer_fastboot_interface();
+            assert!(interface.is_none());
+        }
+        {
+            let mut addrs = BTreeSet::new();
+            addrs.insert(TargetAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0, 0));
+            let interface = FastbootInterface::Tcp;
+            let target = Target::new_with_fastboot_addrs(Some("Babs"), None, addrs, interface);
+
+            // Purposefully remove the interface
+            target.fastboot_interface.replace(None);
+
+            assert_eq!(target.infer_fastboot_interface(), Some(FastbootInterface::Tcp));
+        }
+        {
+            let mut addrs = BTreeSet::new();
+            addrs.insert(TargetAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0, 0));
+            let interface = FastbootInterface::Udp;
+            let target =
+                Target::new_with_fastboot_addrs(Some("Coronabeth"), None, addrs, interface);
+
+            // Purposefully remove the interface
+            target.fastboot_interface.replace(None);
+
+            assert_eq!(target.infer_fastboot_interface(), Some(FastbootInterface::Udp));
         }
     }
 }
