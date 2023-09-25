@@ -162,7 +162,7 @@ class X86PageTableBase {
   // large page with flags |flags|.
   virtual PtFlags split_flags(PageTableLevel level, PtFlags flags) = 0;
   // Execute the given pending invalidation
-  virtual void TlbInvalidate(PendingTlbInvalidation* pending) = 0;
+  virtual void TlbInvalidate(const PendingTlbInvalidation* pending) = 0;
 
   // Convert PtFlags to ARCH_MMU_* flags.
   virtual uint pt_flags_to_mmu_flags(PtFlags flags, PageTableLevel level) = 0;

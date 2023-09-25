@@ -133,13 +133,12 @@ PtFlags SecondLevelPageTable::split_flags(PageTableLevel level, PtFlags flags) {
 // We disable thread safety analysis here, since the lock being held is being
 // held across the MMU operations, but goes through code that is not aware of
 // the lock.
-void SecondLevelPageTable::TlbInvalidate(PendingTlbInvalidation* pending)
+void SecondLevelPageTable::TlbInvalidate(const PendingTlbInvalidation* pending)
     TA_NO_THREAD_SAFETY_ANALYSIS {
   DEBUG_ASSERT(!pending->contains_global);
 
   if (pending->full_shootdown) {
     iommu_->InvalidateIotlbDomainAllLocked(parent_->domain_id());
-    pending->clear();
     return;
   }
 
@@ -158,7 +157,6 @@ void SecondLevelPageTable::TlbInvalidate(PendingTlbInvalidation* pending)
     }
     iommu_->InvalidateIotlbPageLocked(parent_->domain_id(), item.addr(), address_mask);
   }
-  pending->clear();
 }
 
 uint SecondLevelPageTable::pt_flags_to_mmu_flags(PtFlags flags, PageTableLevel level) {

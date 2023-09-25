@@ -325,7 +325,7 @@ PtFlags X86PageTableMmu::split_flags(PageTableLevel level, PtFlags flags) {
   return flags;
 }
 
-void X86PageTableMmu::TlbInvalidate(PendingTlbInvalidation* pending) {
+void X86PageTableMmu::TlbInvalidate(const PendingTlbInvalidation* pending) {
   AssertHeld(lock_);
   if (pending->count == 0 && !pending->full_shootdown) {
     return;
@@ -574,7 +574,7 @@ PtFlags X86PageTableEpt::split_flags(PageTableLevel level, PtFlags flags) {
   return flags;
 }
 
-void X86PageTableEpt::TlbInvalidate(PendingTlbInvalidation* pending) {
+void X86PageTableEpt::TlbInvalidate(const PendingTlbInvalidation* pending) {
   if (pending->count == 0 && !pending->full_shootdown) {
     return;
   }

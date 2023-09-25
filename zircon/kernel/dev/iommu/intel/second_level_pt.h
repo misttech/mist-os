@@ -35,7 +35,7 @@ class SecondLevelPageTable final : public X86PageTableBase {
   IntermediatePtFlags intermediate_flags() final;
   PtFlags terminal_flags(PageTableLevel level, uint flags) final;
   PtFlags split_flags(PageTableLevel level, PtFlags flags) final;
-  void TlbInvalidate(PendingTlbInvalidation* pending) final;
+  void TlbInvalidate(const PendingTlbInvalidation* pending) final;
   uint pt_flags_to_mmu_flags(PtFlags flags, PageTableLevel level) final;
   bool needs_cache_flushes() final { return needs_flushes_; }
 
