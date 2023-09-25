@@ -43,8 +43,12 @@ pub(crate) fn validate_hermeticity(
                 // It's a test package, so validate that the component in the test package is
                 // not listed in the lookup table of components that run in test realms:
                 CategorizedTestInfo::Package(test) => {
-                    if component_test_realms.get(&test.component_label).is_some() {
-                        // It has a test realm, so it's not hermetic.
+                    let specified_test_realm = match &test.component_label {
+                        None => None,
+                        Some(component_label) => component_test_realms.get(component_label),
+                    };
+                    if specified_test_realm.is_some() {
+                        // It has a specified test realm, so it's not hermetic.
                         ValidationStatus::failed_not_hermetic(test.into())
                     } else {
                         // It doesn't specify a test realm in test_components.json, but it might
@@ -64,8 +68,11 @@ pub(crate) fn validate_hermeticity(
                         }
                     }
                 }
-                CategorizedTestInfo::Host(test) => {
+                CategorizedTestInfo::Host(test) | CategorizedTestInfo::DisabledHost(test) => {
                     ValidationStatus::Failed { test: test.into(), reason: FailureReason::HostTest }
+                }
+                CategorizedTestInfo::E2e(test) => {
+                    ValidationStatus::Failed { test: test.into(), reason: FailureReason::E2eTest }
                 }
             }
         })

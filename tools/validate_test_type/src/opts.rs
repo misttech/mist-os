@@ -10,6 +10,8 @@ use structopt::StructOpt;
 #[derive(Debug, PartialEq)]
 pub enum ValidateType {
     Hermetic,
+    Host,
+    E2e,
 }
 
 type ParseError = &'static str;
@@ -19,6 +21,8 @@ impl FromStr for ValidateType {
     fn from_str(validation_type: &str) -> Result<Self, Self::Err> {
         match validation_type.to_ascii_lowercase().as_str() {
             "hermetic" => Ok(ValidateType::Hermetic),
+            "host_only" => Ok(ValidateType::Host),
+            "end_to_end" => Ok(ValidateType::E2e),
             _ => Err("Could not parse --validate"),
         }
     }
@@ -28,6 +32,8 @@ impl std::fmt::Display for ValidateType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ValidateType::Hermetic => f.write_str("hermetic"),
+            ValidateType::Host => f.write_str("host_only"),
+            ValidateType::E2e => f.write_str("end_to_end"),
         }
     }
 }

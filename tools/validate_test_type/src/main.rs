@@ -42,6 +42,10 @@ struct TestsJsonEntry {
 #[derive(Debug, Serialize, Deserialize)]
 struct Environments {
     dimensions: Dimensions,
+
+    /// The test tags.
+    #[serde(default)]
+    tags: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -74,6 +78,7 @@ struct TestEntry {
     package_manifests: Vec<String>,
 
     // Only host_test() tests have these fields.
+    os: Option<String>,
     path: Option<Utf8PathBuf>,
     runtime_deps: Option<Utf8PathBuf>,
 }
@@ -149,21 +154,26 @@ fn read_test_components_json(file: &Utf8PathBuf) -> Result<Vec<TestComponentsJso
 enum CategorizedTestInfo {
     Package(TestPackageInfo),
     Host(HostTestInfo),
+    E2e(E2eTestInfo),
+    DisabledHost(HostTestInfo),
 }
 
 impl CategorizedTestInfo {
-    fn name(&self) -> &String {
+    fn basic_info(&self) -> &BasicTestInfo {
         match self {
-            Self::Package(t) => &t.name,
-            Self::Host(t) => &t.name,
+            Self::Package(t) => &t.basic_info,
+            Self::Host(t) => &t.basic_info,
+            Self::E2e(t) => &t.basic_info,
+            Self::DisabledHost(t) => &t.basic_info,
         }
     }
 
+    fn name(&self) -> &String {
+        &self.basic_info().name
+    }
+
     fn label(&self) -> &String {
-        match self {
-            Self::Package(t) => &t.test_label,
-            Self::Host(t) => &t.test_label,
-        }
+        &self.basic_info().test_label
     }
 }
 
@@ -177,21 +187,34 @@ impl From<HostTestInfo> for CategorizedTestInfo {
         Self::Host(value)
     }
 }
+impl From<E2eTestInfo> for CategorizedTestInfo {
+    fn from(value: E2eTestInfo) -> Self {
+        Self::E2e(value)
+    }
+}
+
+/// Information common to all tests
+#[derive(Debug, PartialEq)]
+struct BasicTestInfo {
+    /// The name of this test
+    name: String,
+
+    /// The GN label of the target for this test.
+    test_label: String,
+}
 
 /// Information describing a test in a Fuchsia Package.
 #[derive(Debug, PartialEq)]
 struct TestPackageInfo {
-    /// The name of this test
-    name: String,
-
-    /// The GN label of the 'fuchsia_test_package()' target for this test.
-    test_label: String,
+    /// The common, basic, test info
+    basic_info: BasicTestInfo,
 
     /// The 'fuchsia-pkg://....' url for this test package.
     package_url: String,
 
     /// The GN label for the 'fuchsia_test_component()' target for this test.
-    component_label: String,
+    /// Note: This can be None in cases like prebuilt test packages.
+    component_label: Option<String>,
 
     /// Other package manifests.
     package_manifests: Vec<String>,
@@ -204,21 +227,22 @@ impl TryFrom<TestEntry> for TestPackageInfo {
         let TestEntry { name, test_label, package_url, component_label, package_manifests, .. } =
             value;
 
-        let package_url = package_url.ok_or_else(|| anyhow!("No package_url"))?;
-        let component_label = component_label.ok_or_else(|| anyhow!("No component_label"))?;
+        let package_url = package_url.ok_or_else(|| anyhow!("Missing 'package_url' field"))?;
 
-        Ok(Self { name, test_label, package_url, component_label, package_manifests })
+        Ok(Self {
+            basic_info: BasicTestInfo { name, test_label },
+            package_url,
+            component_label,
+            package_manifests,
+        })
     }
 }
 
-/// Information describing a host or e2e test.
+/// Information describing a host test.
 #[derive(Debug, PartialEq)]
 struct HostTestInfo {
-    /// The name of this test
-    name: String,
-
-    /// The GN label of the 'host_test()' target for this test.
-    test_label: String,
+    /// The common, basic, test info
+    basic_info: BasicTestInfo,
 
     /// The path to the executable for this host test.
     path: Utf8PathBuf,
@@ -233,7 +257,46 @@ impl TryFrom<TestEntry> for HostTestInfo {
     fn try_from(value: TestEntry) -> Result<Self, Self::Error> {
         let TestEntry { name, test_label, path, runtime_deps, .. } = value;
 
-        Ok(Self { name, test_label, path: path.ok_or_else(|| anyhow!("No path"))?, runtime_deps })
+        Ok(Self {
+            basic_info: BasicTestInfo { name, test_label },
+            path: path.ok_or_else(|| anyhow!("No path"))?,
+            runtime_deps,
+        })
+    }
+}
+
+/// Information describing an e2e test.
+#[derive(Debug, PartialEq)]
+struct E2eTestInfo {
+    /// The common, basic, test info
+    basic_info: BasicTestInfo,
+
+    /// The path to the executable for this host test.
+    path: Utf8PathBuf,
+
+    /// The path to the list of host_test_data() entries for this test.
+    runtime_deps: Option<Utf8PathBuf>,
+
+    /// The device type that this test is meant to work with.
+    device_type: String,
+
+    /// The tags for this test
+    tags: Vec<String>,
+}
+
+impl TryFrom<(TestEntry, String, Vec<String>)> for E2eTestInfo {
+    type Error = Error;
+
+    fn try_from(value: (TestEntry, String, Vec<String>)) -> Result<Self, Self::Error> {
+        let (TestEntry { name, test_label, path, runtime_deps, .. }, device_type, tags) = value;
+
+        Ok(Self {
+            basic_info: BasicTestInfo { name, test_label },
+            path: path.ok_or_else(|| anyhow!("No path"))?,
+            runtime_deps,
+            device_type,
+            tags,
+        })
     }
 }
 
@@ -245,16 +308,51 @@ impl TryFrom<TestEntry> for HostTestInfo {
 fn categorize_tests(tests_json: Vec<TestsJsonEntry>) -> Result<Vec<CategorizedTestInfo>> {
     tests_json
         .into_par_iter()
-        .map(|entry| {
+        .map(|mut entry| {
             let label = entry.test.test_label.clone();
             if entry.test.package_url.is_some() {
                 Ok(TestPackageInfo::try_from(entry.test)
                     .with_context(|| format!("test: {}", label))?
                     .into())
             } else {
-                Ok(HostTestInfo::try_from(entry.test)
-                    .with_context(|| format!("test: {}", label))?
-                    .into())
+                match entry.test.os.as_deref() {
+                    Some("linux") | Some("mac") => {
+                        // It's a test that runs on the host. It could either be a host-only or an
+                        // e2e test, however.  If the dimensions indicate a device is required, then
+                        // it's definitely an e2e test.
+                        match entry.environments.pop() {
+                            None => {
+                                // This is a disabled test, and without seeing the environment, we
+                                // cannot determine if it's host-only or an end-to-end test, so just
+                                // classify it as a disabled host test, and carry on.
+                                Ok(CategorizedTestInfo::DisabledHost(
+                                    HostTestInfo::try_from(entry.test)
+                                        .with_context(|| format!("test: {}", label))?,
+                                ))
+                            }
+                            Some(Environments { dimensions, tags, .. }) => {
+                                match dimensions.device_type {
+                                    Some(device_type) =>
+                                    // It's an e2e test.
+                                    {
+                                        Ok(E2eTestInfo::try_from((entry.test, device_type, tags))
+                                            .with_context(|| format!("test: {}", label))?
+                                            .into())
+                                    }
+
+                                    None =>
+                                    // It's a host-only test
+                                    {
+                                        Ok(HostTestInfo::try_from(entry.test)
+                                            .with_context(|| format!("test: {}", label))?
+                                            .into())
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    _ => Err(anyhow!("Unable to categorize test: {:?}", entry.test.test_label)),
+                }
             }
         })
         .collect::<Result<Vec<_>>>()
@@ -290,8 +388,14 @@ enum FailureReason {
     // It's not hermetic
     NotHermetic,
 
+    // It's a Fuchsia Package test
+    FuchsiaPackage,
+
     // It's a host test
     HostTest,
+
+    // It's an e2e test
+    E2eTest,
 
     // An error was encountered during validation (ie, something couldn't be
     // read, or was fatally inconsistent in some other way)
@@ -303,11 +407,44 @@ impl ValidationStatus {
     fn failed_not_hermetic(test: CategorizedTestInfo) -> Self {
         Self::Failed { test, reason: FailureReason::NotHermetic }
     }
+
     /// Create a ValidationStatus for the given test, due to encountering some
     /// error during validation.
     fn failed_with_error(test: CategorizedTestInfo, error: Error) -> Self {
         Self::Failed { test, reason: FailureReason::InternalError(error) }
     }
+}
+
+fn validate_host_only(categorized_tests: Vec<CategorizedTestInfo>) -> Vec<ValidationStatus> {
+    categorized_tests
+        .into_iter()
+        .map(|test| match test {
+            CategorizedTestInfo::Host(_) | CategorizedTestInfo::DisabledHost(_) => {
+                ValidationStatus::Passed
+            }
+            CategorizedTestInfo::Package(t) => {
+                ValidationStatus::Failed { test: t.into(), reason: FailureReason::FuchsiaPackage }
+            }
+            CategorizedTestInfo::E2e(t) => {
+                ValidationStatus::Failed { test: t.into(), reason: FailureReason::E2eTest }
+            }
+        })
+        .collect()
+}
+
+fn validate_e2e_only(categorized_tests: Vec<CategorizedTestInfo>) -> Vec<ValidationStatus> {
+    categorized_tests
+        .into_iter()
+        .map(|test| match test {
+            CategorizedTestInfo::E2e(_) => ValidationStatus::Passed,
+            CategorizedTestInfo::Host(t) | CategorizedTestInfo::DisabledHost(t) => {
+                ValidationStatus::Failed { test: t.into(), reason: FailureReason::HostTest }
+            }
+            CategorizedTestInfo::Package(t) => {
+                ValidationStatus::Failed { test: t.into(), reason: FailureReason::FuchsiaPackage }
+            }
+        })
+        .collect()
 }
 
 fn write_depfile(
@@ -362,25 +499,36 @@ fn run_tool() -> Result<()> {
             &opt.build_dir,
             &mut inputs_for_depfile,
         ),
+        opts::ValidateType::Host => validate_host_only(categorized_tests),
+        opts::ValidateType::E2e => validate_e2e_only(categorized_tests),
     };
 
     // Sort results by validation status
 
+    let mut packaged = vec![];
     let mut host = vec![];
+    let mut e2e = vec![];
     let mut not_hermetic = vec![];
     let mut internal_errors = vec![];
 
     for result in validation_results {
         if let ValidationStatus::Failed { test, reason } = result {
             match reason {
+                FailureReason::FuchsiaPackage => packaged.push(test),
                 FailureReason::HostTest => host.push(test),
                 FailureReason::NotHermetic => not_hermetic.push(test),
+                FailureReason::E2eTest => e2e.push(test),
                 FailureReason::InternalError(error) => internal_errors.push((test, error)),
             }
         }
     }
 
-    if !not_hermetic.is_empty() || !host.is_empty() || !internal_errors.is_empty() {
+    if !not_hermetic.is_empty()
+        || !packaged.is_empty()
+        || !host.is_empty()
+        || !e2e.is_empty()
+        || !internal_errors.is_empty()
+    {
         // There are validation failures, so print them out:
         println!("\nTests failed validation by type!\n");
         println!("  Validating that test group: {}", opt.test_group_name);
@@ -388,12 +536,28 @@ fn run_tool() -> Result<()> {
             "    - {}",
             match &opt.validation_type {
                 opts::ValidateType::Hermetic => "only contains hermetic tests",
+                opts::ValidateType::Host => "only contains host-only tests",
+                opts::ValidateType::E2e => "only contains e2e tests",
             }
         );
+
+        if !packaged.is_empty() {
+            println!("\nThe following tests are packaged Fuchsia tests:");
+            for test in packaged {
+                println!("  {}", test.label())
+            }
+        }
 
         if !host.is_empty() {
             println!("\nThe following tests are host tests:");
             for test in host {
+                println!("  {}", test.label())
+            }
+        }
+
+        if !e2e.is_empty() {
+            println!("\nThe following tests are end-to-end tests:");
+            for test in e2e {
                 println!("  {}", test.label())
             }
         }
@@ -495,7 +659,25 @@ mod tests {
             ],
             "package_url": "fuchsia-pkg://fuchsia.com/cpp_config_integration_test#meta/config_integration_test_cpp.cm"
           }
-        }]);
+        },
+        {
+            "environments": [
+              {
+                "dimensions": {
+                  "device_type": "QEMU",
+                },
+                "tags": [ "tag1", "tag2"]
+              }
+            ],
+            "test": {
+                "cpu": "x64",
+                "label": "//src/tests/end_to_end/fidlcat:fidlcat_e2e_tests(//build/toolchain:host_x64)",
+                "name": "host_x64/obj/src/tests/end_to_end/fidlcat/fidlcat_e2e_tests.sh",
+                "os": "linux",
+                "path": "host_x64/obj/src/tests/end_to_end/fidlcat/fidlcat_e2e_tests.sh",
+                "runtime_deps": "host_x64/gen/src/tests/end_to_end/fidlcat/fidlcat_e2e_tests.deps.json"
+            }
+          }]);
         let parsed: Vec<TestsJsonEntry> = serde_json::from_value(json).unwrap();
 
         let categorized = categorize_tests(parsed).unwrap();
@@ -509,10 +691,12 @@ mod tests {
         assert_eq!(
             host_test,
             &CategorizedTestInfo::Host(HostTestInfo {
-                name: "host_x64/validate_test_type_bin_test".into(),
-                test_label:
-                    "//tools/validate_test_type:validate_test_type_test(//build/toolchain:host_x64)"
-                        .into(),
+                basic_info: BasicTestInfo {
+                    name: "host_x64/validate_test_type_bin_test".into(),
+                    test_label:
+                        "//tools/validate_test_type:validate_test_type_test(//build/toolchain:host_x64)"
+                            .into(),
+                },
                 path: "host_x64/validate_test_type_bin_test".into(),
                 runtime_deps: Some(
                     "host_x64/gen/tools/validate_test_type/validate_test_type_test.deps.json"
@@ -533,13 +717,44 @@ mod tests {
         assert_eq!(
             fuchsia_package_test,
             &CategorizedTestInfo::Package(TestPackageInfo {
-                name: "fuchsia-pkg://fuchsia.com/cpp_config_integration_test#meta/config_integration_test_cpp.cm".into(),
-                test_label: "//examples/components/config/integration_test:cpp_config_integration_test_test_cpp_test(//build/toolchain/fuchsia:x64)".into(),
+                basic_info: BasicTestInfo {
+                    name: "fuchsia-pkg://fuchsia.com/cpp_config_integration_test#meta/config_integration_test_cpp.cm".into(),
+                    test_label:
+                        "//examples/components/config/integration_test:cpp_config_integration_test_test_cpp_test(//build/toolchain/fuchsia:x64)"
+                            .into(),
+                },
                 package_url: "fuchsia-pkg://fuchsia.com/cpp_config_integration_test#meta/config_integration_test_cpp.cm".into(),
-                component_label: "//examples/components/config/integration_test:cpp_test(//build/toolchain/fuchsia:x64)".into(),
+                component_label: Some("//examples/components/config/integration_test:cpp_test(//build/toolchain/fuchsia:x64)".into()),
                 package_manifests: vec!["obj/examples/components/config/integration_test/cpp_config_integration_test/package_manifest.json".into()]
             })
         );
+
+        let e2e_test = &categorized[2];
+        assert_eq!(
+            e2e_test.name(),
+            "host_x64/obj/src/tests/end_to_end/fidlcat/fidlcat_e2e_tests.sh"
+        );
+        assert_eq!(
+            e2e_test.label(),
+            "//src/tests/end_to_end/fidlcat:fidlcat_e2e_tests(//build/toolchain:host_x64)"
+        );
+        assert_eq!(
+            e2e_test,
+            &CategorizedTestInfo::E2e(E2eTestInfo {
+                basic_info: BasicTestInfo {
+                    name: "host_x64/obj/src/tests/end_to_end/fidlcat/fidlcat_e2e_tests.sh".into(),
+                    test_label:
+                        "//src/tests/end_to_end/fidlcat:fidlcat_e2e_tests(//build/toolchain:host_x64)"
+                            .into(),
+                },
+                path: "host_x64/obj/src/tests/end_to_end/fidlcat/fidlcat_e2e_tests.sh".into(),
+                runtime_deps: Some(
+                    "host_x64/gen/src/tests/end_to_end/fidlcat/fidlcat_e2e_tests.deps.json".into()
+                ),
+                device_type: "QEMU".into(),
+                tags: vec!["tag1".into(), "tag2".into()]
+            })
+        )
     }
 
     #[test]
