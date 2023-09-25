@@ -133,16 +133,14 @@ mod tests {
         model
             .set(Components::new(vec![Component {
                 id: 1,
-                url: Url::parse("fuchsia-pkg://fuchsia.com/test#meta/test.cmx").unwrap(),
-                version: 1,
-                source: ComponentSource::Inferred,
+                url: Url::parse("fuchsia-pkg://fuchsia.com/test#meta/test.cm").unwrap(),
+                source: ComponentSource::ZbiBootfs,
             }]))
             .unwrap();
         let response = model_stats.query(model.clone(), json!("")).unwrap();
         let stats: ModelStats = serde_json::from_value(response).unwrap();
         assert_eq!(stats.components, 1);
         assert_eq!(stats.packages, 0);
-        assert_eq!(stats.routes, 0);
         assert_eq!(stats.manifests, 0);
         assert_eq!(stats.zbi_sections, 0);
         assert_eq!(stats.bootfs_files, 0);

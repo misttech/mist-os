@@ -4,13 +4,8 @@
 
 use {
     crate::core::{
-        package::reader::{read_service_package_definition, PackageReader},
-        util::{
-            jsons::ServicePackageDefinition,
-            types::{
-                ComponentManifest, ComponentV1Manifest, PackageDefinition, PartialPackageDefinition,
-            },
-        },
+        package::reader::PackageReader,
+        util::types::{ComponentManifest, PackageDefinition, PartialPackageDefinition},
     },
     anyhow::{anyhow, Result},
     fuchsia_merkle::{Hash, HASH_SIZE},
@@ -97,30 +92,9 @@ impl PackageReader for MockPackageReader {
         ))
     }
 
-    fn read_service_package_definition(&mut self, data: &[u8]) -> Result<ServicePackageDefinition> {
-        read_service_package_definition(data)
-    }
-
     fn get_deps(&self) -> HashSet<PathBuf> {
         self.deps.clone()
     }
-}
-
-pub fn create_test_sandbox(uses: Vec<String>) -> ComponentV1Manifest {
-    ComponentV1Manifest {
-        dev: None,
-        services: Some(uses),
-        system: None,
-        pkgfs: None,
-        features: None,
-    }
-}
-
-/// Create component manifest v1 (cmx) entries.
-pub fn create_test_cmx_map(
-    entries: Vec<(PathBuf, ComponentV1Manifest)>,
-) -> HashMap<PathBuf, ComponentManifest> {
-    entries.into_iter().map(|entry| (entry.0, ComponentManifest::Version1(entry.1))).collect()
 }
 
 /// Create component manifest v2 (cm) entries.
@@ -226,21 +200,6 @@ pub fn create_svc_pkg_bytes_with_array(
         "apps": apps,
     }))
     .unwrap()
-}
-
-/// Creates a package definition which maps a set of service names to a set
-/// of files in the package which represent components that provide that
-/// service.
-pub fn create_svc_pkg_def(
-    services: Vec<(String, String)>,
-    apps: Vec<String>,
-) -> ServicePackageDefinition {
-    ServicePackageDefinition {
-        services: Some(
-            services.into_iter().map(|entry| (entry.0, serde_json::json!(entry.1))).collect(),
-        ),
-        apps: Some(apps.clone()),
-    }
 }
 
 pub fn create_model() -> (String, Arc<DataModel>) {

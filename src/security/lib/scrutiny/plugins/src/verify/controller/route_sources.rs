@@ -743,7 +743,7 @@ mod tests {
     }
 
     fn create_component(url: &Url, source: ComponentSource) -> Component {
-        Component { id: 0, url: url.clone(), version: 0, source }
+        Component { id: 0, url: url.clone(), source }
     }
 
     // Component tree:

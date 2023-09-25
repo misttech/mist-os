@@ -333,7 +333,7 @@ mod tests {
 
     fn make_v2_component(id: i32, url: String) -> Component {
         let url = Url::parse(&url).unwrap();
-        Component { id, url, version: 2, source: fake_component_src_pkg() }
+        Component { id, url, source: fake_component_src_pkg() }
     }
 
     fn make_v2_manifest(component_id: i32, decl: ComponentDecl) -> Result<Manifest> {
@@ -341,7 +341,7 @@ mod tests {
         let cm_base64 = base64::encode(&persist(&decl_fidl)?);
         Ok(Manifest {
             component_id,
-            manifest: ManifestData::Version2 { cm_base64, cvf_bytes: None },
+            manifest: ManifestData { cm_base64, cvf_bytes: None },
             uses: vec![],
         })
     }

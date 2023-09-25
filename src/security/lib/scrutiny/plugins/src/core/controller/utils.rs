@@ -108,9 +108,9 @@ mod tests {
         url::Url,
     };
 
-    fn make_component(id: i32, url: &str, version: i32, source: ComponentSource) -> Component {
+    fn make_component(id: i32, url: &str, source: ComponentSource) -> Component {
         let url = Url::parse(url).unwrap();
-        Component { id, url, version, source }
+        Component { id, url, source }
     }
 
     #[fuchsia::test]
@@ -120,7 +120,6 @@ mod tests {
         let comp = make_component(
             123,
             "fuchsia-pkg://fuchsia.com/fake#meta/fake.cm",
-            0,
             fake_component_src_pkg(),
         );
         let mut components = Components::default();
@@ -139,7 +138,6 @@ mod tests {
         let comp = make_component(
             123,
             "fuchsia-pkg://fuchsia.com/fake#meta/fake.cm",
-            0,
             fake_component_src_pkg(),
         );
         let mut components = Components::default();
@@ -157,7 +155,6 @@ mod tests {
         let comp = make_component(
             123,
             "fuchsia-pkg://fuchsia.com/fake#meta/fake.cm",
-            0,
             fake_component_src_pkg(),
         );
         let mut components = Components::default();
@@ -177,7 +174,6 @@ mod tests {
         let comp = make_component(
             123,
             "fuchsia-pkg://fuchsia.com/fake#meta/fake.cm",
-            0,
             fake_component_src_pkg(),
         );
         let mut components = Components::default();
@@ -193,7 +189,6 @@ mod tests {
         let comp = make_component(
             123,
             "fuchsia-pkg://fuchsia.com/fake#meta/fake.cm",
-            0,
             fake_component_src_pkg(),
         );
         let mut components = Components::default();

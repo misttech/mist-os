@@ -4,15 +4,12 @@
 
 use {
     crate::core::{
-        util::{
-            jsons::{deserialize_services, deserialize_url, serialize_services, serialize_url},
-            types::Protocol as ProtocolName,
-        },
+        util::jsons::{deserialize_url, serialize_url},
         DataCollection,
     },
     core::slice::Iter,
     fuchsia_merkle::Hash,
-    fuchsia_url::{AbsoluteComponentUrl, PackageName, PackageVariant},
+    fuchsia_url::{PackageName, PackageVariant},
     scrutiny_utils::zbi::ZbiSection,
     serde::{Deserialize, Serialize},
     std::{
@@ -26,10 +23,6 @@ use {
 /// Captures metadata about where a component was loaded from.
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 pub enum ComponentSource {
-    /// Component manifest was not found, but the component was designated as a
-    /// service provider in the service mappings in a Component Framework v1
-    /// sysmgr config file.
-    Inferred,
     /// Component was loaded ZBI bootfs.
     ZbiBootfs,
     /// Component was loaded from a package with the given merkle hash.
@@ -49,7 +42,6 @@ pub struct Component {
     pub id: i32,
     #[serde(serialize_with = "serialize_url", deserialize_with = "deserialize_url")]
     pub url: Url,
-    pub version: i32,
     pub source: ComponentSource,
 }
 
@@ -312,10 +304,11 @@ impl EventStreamCapability {
 
 /// Defines the manifest data in terms of the component framework version it
 /// represents.
+// TODO(fxbug.dev/134100): Use cm_rust type or ComponentDecl type.
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
-pub enum ManifestData {
-    Version1(String),
-    Version2 { cm_base64: String, cvf_bytes: Option<Vec<u8>> },
+pub struct ManifestData {
+    pub cm_base64: String,
+    pub cvf_bytes: Option<Vec<u8>>,
 }
 
 /// Defines a component manifest. The `component_id` maps 1:1 to
@@ -356,94 +349,7 @@ impl DataCollection for Manifests {
         "Manifest Collection".to_string()
     }
     fn collection_description() -> String {
-        "Contains all the v1 & v2 manifests found in the build".to_string()
-    }
-}
-
-// TODO(benwright) - Add support for "first class" capabilities such as runners,
-// resolvers and events.
-/// Defines a link between two components. The `src_id` is the `component_instance.id`
-/// of the component giving a service or directory to the `dst_id`. The
-/// `protocol_id` refers to the Protocol with this link.
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
-pub struct Route {
-    pub id: i32,
-    pub src_id: i32,
-    pub dst_id: i32,
-    pub service_name: String,
-    pub protocol_id: i32,
-}
-
-#[derive(Default, Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
-pub struct Routes {
-    pub entries: Vec<Route>,
-}
-
-impl Routes {
-    pub fn new(entries: Vec<Route>) -> Self {
-        Self { entries }
-    }
-
-    pub fn len(&self) -> usize {
-        self.entries.len()
-    }
-
-    pub fn iter(&self) -> Iter<'_, Route> {
-        self.entries.iter()
-    }
-
-    pub fn push(&mut self, value: Route) {
-        self.entries.push(value)
-    }
-}
-
-impl DataCollection for Routes {
-    fn collection_name() -> String {
-        "Routes v1 Collection".to_string()
-    }
-    fn collection_description() -> String {
-        "Contains all the v1 component routes found in the build".to_string()
-    }
-}
-
-/// Defines either a FIDL or Directory protocol with some interface name such
-/// as fuchshia.foo.Bar and an optional path such as "/dev".
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
-pub struct Protocol {
-    pub id: i32,
-    pub interface: String,
-    pub path: String,
-}
-
-#[derive(Default, Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
-pub struct Protocols {
-    pub entries: Vec<Protocol>,
-}
-
-impl Protocols {
-    pub fn new(entries: Vec<Protocol>) -> Self {
-        Self { entries }
-    }
-
-    pub fn len(&self) -> usize {
-        self.entries.len()
-    }
-
-    pub fn iter(&self) -> Iter<'_, Protocol> {
-        self.entries.iter()
-    }
-
-    pub fn push(&mut self, value: Protocol) {
-        self.entries.push(value)
-    }
-}
-
-impl DataCollection for Protocols {
-    fn collection_name() -> String {
-        "Protocols v1 Collection".to_string()
-    }
-    fn collection_description() -> String {
-        "Contains all the v1 protocols found in the build".to_string()
+        "Contains all the manifests found in the build".to_string()
     }
 }
 
@@ -463,40 +369,11 @@ pub struct Zbi {
 
 impl DataCollection for Zbi {
     fn collection_name() -> String {
-        "ZBI  Collection".to_string()
+        "ZBI Collection".to_string()
     }
     fn collection_description() -> String {
         "Contains all the items found in the zircon boot image (ZBI) in the update package"
             .to_string()
-    }
-}
-
-/// Defines all the services exposed by sysmgr.
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
-pub struct Sysmgr {
-    /// Mapping from service-name -> url.
-    #[serde(serialize_with = "serialize_services", deserialize_with = "deserialize_services")]
-    pub services: HashMap<ProtocolName, Url>,
-    /// Url of sys realm apps, started when the sys realm starts
-    pub apps: HashSet<AbsoluteComponentUrl>,
-}
-
-impl Sysmgr {
-    pub fn new(services: HashMap<ProtocolName, Url>, apps: HashSet<AbsoluteComponentUrl>) -> Self {
-        Self { services, apps }
-    }
-
-    pub fn iter(&self) -> std::collections::hash_map::Iter<'_, ProtocolName, Url> {
-        self.services.iter()
-    }
-}
-
-impl DataCollection for Sysmgr {
-    fn collection_name() -> String {
-        "Sysmgr Collection".to_string()
-    }
-    fn collection_description() -> String {
-        "Contains all the service and app mappings found in the sysmgr config".to_string()
     }
 }
 

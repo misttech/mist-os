@@ -74,7 +74,7 @@ impl V2ComponentModelDataCollector {
 
         let components =
             model.get::<Components>().context("Unable to retrieve components from the model")?;
-        for component in components.entries.iter().filter(|x| x.version == 2) {
+        for component in components.entries.iter() {
             urls.insert(component.id, component.url.clone());
         }
 
@@ -84,49 +84,48 @@ impl V2ComponentModelDataCollector {
             .entries
             .iter()
         {
-            if let ManifestData::Version2 { cm_base64, cvf_bytes } = &manifest.manifest {
-                match urls.remove(&manifest.component_id) {
-                    Some(url) => {
-                        let result: Result<fdecl::Component, fidl::Error> = unpersist(
-                            &base64::decode(&cm_base64)
-                                .context("Unable to decode base64 v2 manifest")?,
-                        );
-                        match result {
-                            Ok(decl) => {
-                                let decl = decl.fidl_into_native();
-                                let config = if let Some(schema) = &decl.config {
-                                    let cvf_bytes = cvf_bytes
-                                        .as_ref()
-                                        .context("getting config values to match schema")?;
-                                    let values_data =
-                                        unpersist::<fdecl::ConfigValuesData>(cvf_bytes)
-                                            .context("decoding config values")?
-                                            .fidl_into_native();
-                                    // TODO(https://fxbug.dev/126578) collect static parent overrides
-                                    let resolved = ConfigFields::resolve(schema, values_data, None)
-                                        .context("resolving configuration")?;
-                                    Some(resolved)
-                                } else {
-                                    None
-                                };
+            let ManifestData { cm_base64, cvf_bytes } = &manifest.manifest;
 
-                                decls.insert(url, (decl, config));
-                            }
-                            Err(err) => {
-                                error!(
-                                    %err,
-                                    %url,
-                                    "Manifest for component is corrupted"
-                                );
-                            }
+            match urls.remove(&manifest.component_id) {
+                Some(url) => {
+                    let result: Result<fdecl::Component, fidl::Error> = unpersist(
+                        &base64::decode(&cm_base64)
+                            .context("Unable to decode base64 v2 manifest")?,
+                    );
+                    match result {
+                        Ok(decl) => {
+                            let decl = decl.fidl_into_native();
+                            let config = if let Some(schema) = &decl.config {
+                                let cvf_bytes = cvf_bytes
+                                    .as_ref()
+                                    .context("getting config values to match schema")?;
+                                let values_data = unpersist::<fdecl::ConfigValuesData>(cvf_bytes)
+                                    .context("decoding config values")?
+                                    .fidl_into_native();
+                                // TODO(https://fxbug.dev/126578) collect static parent overrides
+                                let resolved = ConfigFields::resolve(schema, values_data, None)
+                                    .context("resolving configuration")?;
+                                Some(resolved)
+                            } else {
+                                None
+                            };
+
+                            decls.insert(url, (decl, config));
+                        }
+                        Err(err) => {
+                            error!(
+                                %err,
+                                %url,
+                                "Manifest for component is corrupted"
+                            );
                         }
                     }
-                    None => {
-                        return Err(anyhow!(
-                            "No component URL found for v2 component with id {}",
-                            manifest.component_id
-                        ));
-                    }
+                }
+                None => {
+                    return Err(anyhow!(
+                        "No component URL found for v2 component with id {}",
+                        manifest.component_id
+                    ));
                 }
             }
         }

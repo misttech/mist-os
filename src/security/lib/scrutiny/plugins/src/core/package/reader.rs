@@ -4,11 +4,8 @@
 
 use {
     crate::core::{
-        package::{is_cf_v1_manifest, is_cf_v2_config_values, is_cf_v2_manifest},
-        util::{
-            jsons::{CmxJson, ServicePackageDefinition},
-            types::{ComponentManifest, PackageDefinition, PartialPackageDefinition},
-        },
+        package::{is_cf_v2_config_values, is_cf_v2_manifest},
+        util::types::{ComponentManifest, PackageDefinition, PartialPackageDefinition},
     },
     anyhow::{Context, Result},
     fuchsia_archive::Utf8Reader as FarReader,
@@ -20,7 +17,6 @@ use {
         key_value::parse_key_value,
         package::{open_update_package, read_content_blob, META_CONTENTS_PATH},
     },
-    serde_json::Value,
     std::{
         collections::HashSet,
         ffi::OsStr,
@@ -51,8 +47,6 @@ pub trait PackageReader: Send + Sync {
     /// If reader is not bound to an update package or an error occurs reading the update package,
     /// return an `Err(...)`.
     fn read_update_package_definition(&mut self) -> Result<PartialPackageDefinition>;
-    /// Reads the service package from the provided data.
-    fn read_service_package_definition(&mut self, data: &[u8]) -> Result<ServicePackageDefinition>;
     /// Gets the paths to files touched by read operations.
     fn get_deps(&self) -> HashSet<PathBuf>;
 }
@@ -111,12 +105,6 @@ impl PackageReader for PackagesFromUpdateReader {
         read_partial_package_definition(update_package)
     }
 
-    /// Reads the raw config-data package definition and converts it into a
-    /// ServicePackageDefinition.
-    fn read_service_package_definition(&mut self, data: &[u8]) -> Result<ServicePackageDefinition> {
-        read_service_package_definition(data)
-    }
-
     fn get_deps(&self) -> HashSet<PathBuf> {
         self.deps.union(&self.blob_reader.get_deps()).map(PathBuf::clone).collect()
     }
@@ -140,7 +128,6 @@ pub fn read_partial_package_definition(rs: impl ReadSeek) -> Result<PartialPacka
     // Find any parseable files from the archive.
     // Create a separate list of file names to read to avoid borrow checker
     // issues while iterating through the list.
-    let mut cf_v1_files = Vec::<String>::new();
     let mut cf_v2_files = Vec::<String>::new();
     let mut cf_v2_config_files = Vec::<String>::new();
     let mut contains_meta_contents = false;
@@ -149,9 +136,7 @@ pub fn read_partial_package_definition(rs: impl ReadSeek) -> Result<PartialPacka
             contains_meta_contents = true;
         } else {
             let path_buf: PathBuf = OsStr::new(item).into();
-            if is_cf_v1_manifest(&path_buf) {
-                cf_v1_files.push(item.to_string());
-            } else if is_cf_v2_manifest(&path_buf) {
+            if is_cf_v2_manifest(&path_buf) {
                 cf_v2_files.push(item.to_string());
             } else if is_cf_v2_config_values(&path_buf) {
                 cf_v2_config_files.push(item.to_string());
@@ -190,21 +175,7 @@ pub fn read_partial_package_definition(rs: impl ReadSeek) -> Result<PartialPacka
         .collect();
     }
 
-    // Read the parseable files from the far archive and parse into json structs.
-    for cmx_file in cf_v1_files.iter() {
-        let item_bytes = far_reader.read_file(cmx_file).with_context(|| {
-            format!("Failed to read file {} from meta.far for package", cmx_file)
-        })?;
-        let item_json = str::from_utf8(&item_bytes)
-            .with_context(|| format!("Failed decode file {} as UTF8-encoded string", cmx_file))?;
-        let cmx: CmxJson = serde_json::from_str(item_json).with_context(|| {
-            format!("Failed decode file {} for package as JSON/CMX string", cmx_file)
-        })?;
-        pkg_def.cms.insert(cmx_file.into(), ComponentManifest::from(cmx));
-    }
-
-    // CV2 files are encoded with persistent FIDL and have a different
-    // decoding structure.
+    // CF manifest files are encoded with persistent FIDL.
     for cm_file in cf_v2_files.iter() {
         let decl_bytes = far_reader.read_file(cm_file).with_context(|| {
             format!("Failed to read file {} from meta.far for package", cm_file)
@@ -220,36 +191,6 @@ pub fn read_partial_package_definition(rs: impl ReadSeek) -> Result<PartialPacka
     }
 
     Ok(pkg_def)
-}
-
-pub fn read_service_package_definition(data: &[u8]) -> Result<ServicePackageDefinition> {
-    let json: Value = serde_json::from_slice(data)
-        .context("Failed to parse service package definition as JSON string")?;
-    let mut service_def = ServicePackageDefinition { services: None, apps: None };
-    if let Some(json_services) = json.get("services") {
-        service_def.services = Some(serde_json::from_value(json_services.clone()).unwrap());
-    }
-    // App entries can be a composite of strings and vectors which serde doesn't handle
-    // by default. So this checks each entry for its underlying type and flattens the
-    // structure to extract just the app(the first entry in the array) or the
-    // string if it is not part of an inner array.
-    if let Some(json_apps) = json.get("apps") {
-        if json_apps.is_array() {
-            let mut apps = Vec::new();
-            for e in json_apps.as_array().unwrap() {
-                if e.is_string() {
-                    apps.push(String::from(e.as_str().unwrap()));
-                } else if e.is_array() {
-                    let inner = e.as_array().unwrap();
-                    if inner.len() > 0 {
-                        apps.push(String::from(inner[0].as_str().unwrap()).into());
-                    }
-                }
-            }
-            service_def.apps = Some(apps);
-        }
-    }
-    Ok(service_def)
 }
 
 #[cfg(test)]
@@ -298,60 +239,14 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn read_package_service_definition() {
-        let service_def = "{
-            \"apps\": [
-                       \"fuchsia-pkg://fuchsia.com/foo#meta/foo.cmx\",
-                       [\"fuchsia-pkg://fuchsia.com/bar#meta/bar.cmx\", \"--test\"]
-            ],
-            \"services\": {
-                \"fuchsia.foo.Foo\": \"fuchsia-pkg://fuchsia.com/foo#meta/foo.cmx\",
-                \"fuchsia.bar.Bar\": \"fuchsia-pkg://fuchsia.com/bar#meta/bar.cmx\"
-            }
-        }";
-
-        let temp_dir = tempdir().unwrap();
-        let update_pkg_path = temp_dir.path().join("update.far");
-
-        // This test does not need to process packages designated in its update package. Simply
-        // create a well-formed-enough update package to satisfy construction of a
-        // PackagesFromUpdateReader.
-        let mock_artifact_reader = fake_update_package(&update_pkg_path, vec![].as_slice());
-
-        let mut pkg_reader =
-            PackagesFromUpdateReader::new(&update_pkg_path, Box::new(mock_artifact_reader));
-        let result = pkg_reader.read_service_package_definition(service_def.as_bytes()).unwrap();
-        assert_eq!(
-            result.apps.unwrap(),
-            vec![
-                "fuchsia-pkg://fuchsia.com/foo#meta/foo.cmx".to_string(),
-                "fuchsia-pkg://fuchsia.com/bar#meta/bar.cmx".to_string()
-            ]
-        );
-        assert_eq!(result.services.unwrap().len(), 2);
-    }
-
-    #[fuchsia::test]
     fn read_package_definition_ignores_invalid_files() {
-        // `meta/foo.cmx`: Valid service definitions "service_one" and "service_two".
-        let foo_string = serde_json::json!({
-            "sandbox": {
-                "services": ["service_one", "service_two"],
-            },
-        })
-        .to_string();
-        let foo_bytes = foo_string.as_bytes();
+        // `meta/foo.cm`
+        let foo_bytes = "foo".as_bytes();
 
-        // `meta/bar.cmx`: Valid service definitions "aries" and "taurus".
-        let bar_string = serde_json::json!({
-            "sandbox": {
-                "services": ["aries", "taurus"],
-            },
-        })
-        .to_string();
-        let bar_bytes = bar_string.as_bytes();
+        // `meta/bar.cm`
+        let bar_bytes = "bar".as_bytes();
 
-        // `meta/baz` and `grr.cmx` with the same content: not valid service definitions.
+        // `meta/baz` and `grr.cm` with the same content.
         let baz_bytes = "baz\n".as_bytes();
 
         // Reuse paths "a", "c", and "1" as content of non-meta test files.
@@ -375,17 +270,17 @@ mod tests {
             (meta_contents_bytes.len() as u64, Box::new(meta_contents_bytes)),
         );
 
-        let meta_foo_cmx_str = "meta/foo.cmx";
-        let meta_bar_cmx_str = "meta/bar.cmx";
+        let meta_foo_cm_str = "meta/foo.cm";
+        let meta_bar_cm_str = "meta/bar.cm";
         let meta_baz_str = "meta/baz";
-        let grr_cmx_str = "meta.cmx";
-        let meta_foo_cmx_path = PathBuf::from(meta_foo_cmx_str);
-        let meta_bar_cmx_path = PathBuf::from(meta_bar_cmx_str);
-        // No expectations require construction of a `meta_baz_path` or `grr_cmx_path`.
-        path_content_map.insert(meta_foo_cmx_str, (foo_bytes.len() as u64, Box::new(foo_bytes)));
-        path_content_map.insert(meta_bar_cmx_str, (bar_bytes.len() as u64, Box::new(bar_bytes)));
+        let grr_cm_str = "meta.cm";
+        let meta_foo_cm_path = PathBuf::from(meta_foo_cm_str);
+        let meta_bar_cm_path = PathBuf::from(meta_bar_cm_str);
+        // No expectations require construction of a `meta_baz_path` or `grr_cm_path`.
+        path_content_map.insert(meta_foo_cm_str, (foo_bytes.len() as u64, Box::new(foo_bytes)));
+        path_content_map.insert(meta_bar_cm_str, (bar_bytes.len() as u64, Box::new(bar_bytes)));
         path_content_map.insert(meta_baz_str, (baz_bytes.len() as u64, Box::new(baz_bytes)));
-        path_content_map.insert(grr_cmx_str, (baz_bytes.len() as u64, Box::new(baz_bytes)));
+        path_content_map.insert(grr_cm_str, (baz_bytes.len() as u64, Box::new(baz_bytes)));
 
         // Construct package named `foo`.
         let mut target = Cursor::new(Vec::new());
@@ -420,26 +315,16 @@ mod tests {
         assert_eq!(result.contents[&c_path], c_hash);
         assert_eq!(result.contents[&one_path], one_hash);
         assert_eq!(result.cms.len(), 2);
-        if let ComponentManifest::Version1(sb) = &result.cms[&meta_foo_cmx_path] {
-            if let Some(services) = &sb.services {
-                assert_eq!(services[0], "service_one");
-                assert_eq!(services[1], "service_two");
-            } else {
-                panic!("Expected services to be Some()");
-            }
+        if let ComponentManifest::Version2(b) = &result.cms[&meta_foo_cm_path] {
+            assert_eq!(b, "foo".as_bytes());
         } else {
-            panic!("Expected results sandbox to be Some()");
+            panic!("Expected foo manifest to be Some()");
         }
 
-        if let ComponentManifest::Version1(sb) = &result.cms[&meta_bar_cmx_path] {
-            if let Some(services) = &sb.services {
-                assert_eq!(services[0], "aries");
-                assert_eq!(services[1], "taurus");
-            } else {
-                panic!("Expected services to be Some()");
-            }
+        if let ComponentManifest::Version2(b) = &result.cms[&meta_bar_cm_path] {
+            assert_eq!(b, "bar".as_bytes());
         } else {
-            panic!("Expected results sandbox to be Some()");
+            panic!("Expected bar manifest to be Some()");
         }
     }
 }

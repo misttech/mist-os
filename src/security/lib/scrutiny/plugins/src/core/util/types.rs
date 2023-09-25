@@ -5,31 +5,16 @@
 // Structs used in parsing packages
 
 use {
-    crate::core::util::jsons::*,
     cm_fidl_analyzer::{match_absolute_pkg_urls, PkgUrlMatch},
     fuchsia_merkle::Hash,
-    fuchsia_url::{AbsoluteComponentUrl, AbsolutePackageUrl},
-    once_cell::sync::Lazy,
-    serde::Serialize,
-    std::{
-        collections::{HashMap, HashSet},
-        path::PathBuf,
-    },
+    fuchsia_url::AbsolutePackageUrl,
+    std::{collections::HashMap, path::PathBuf},
     tracing::warn,
     url::Url,
 };
 
-pub static INFERRED_URL_SCHEME: &str = "fuchsia-inferred";
-pub static INFERRED_URL: Lazy<Url> =
-    Lazy::<Url>::new(|| Url::parse(&format!("{}://", INFERRED_URL_SCHEME)).unwrap());
-
 pub type Protocol = String;
 pub type ServiceMapping = HashMap<Protocol, Url>;
-
-pub struct SysManagerConfig {
-    pub services: ServiceMapping,
-    pub apps: HashSet<AbsoluteComponentUrl>,
-}
 
 /// Package- and component-related data extracted from a package identified by a
 /// fully-qualified fuchsia package URL.
@@ -87,57 +72,16 @@ pub struct PartialPackageDefinition {
     pub cvfs: HashMap<String, Vec<u8>>,
 }
 
+// TODO(fxbug.dev/134100): Use cm_rust type or ComponentDecl type.
 #[allow(dead_code)]
 #[cfg_attr(test, derive(Clone))]
 pub enum ComponentManifest {
     Empty,
-    Version1(ComponentV1Manifest),
     Version2(Vec<u8>),
 }
 
 impl From<Vec<u8>> for ComponentManifest {
     fn from(other: Vec<u8>) -> Self {
         ComponentManifest::Version2(other)
-    }
-}
-
-impl From<CmxJson> for ComponentManifest {
-    fn from(other: CmxJson) -> Self {
-        if let Some(sandbox) = other.sandbox {
-            ComponentManifest::Version1(ComponentV1Manifest::from(sandbox))
-        } else {
-            ComponentManifest::Empty
-        }
-    }
-}
-
-impl From<Option<Manifest>> for ComponentManifest {
-    fn from(other: Option<Manifest>) -> Self {
-        if let Some(manifest) = other {
-            ComponentManifest::Version1(ComponentV1Manifest::from(manifest.sandbox))
-        } else {
-            ComponentManifest::Empty
-        }
-    }
-}
-
-#[derive(Serialize, Clone)]
-pub struct ComponentV1Manifest {
-    pub dev: Option<Vec<String>>,
-    pub services: Option<Vec<String>>,
-    pub system: Option<Vec<String>>,
-    pub pkgfs: Option<Vec<String>>,
-    pub features: Option<Vec<String>>,
-}
-
-impl From<Sandbox> for ComponentV1Manifest {
-    fn from(other: Sandbox) -> Self {
-        ComponentV1Manifest {
-            dev: other.dev,
-            services: other.services,
-            system: other.system,
-            pkgfs: other.pkgfs,
-            features: other.features,
-        }
     }
 }

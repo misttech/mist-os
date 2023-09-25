@@ -7,18 +7,16 @@ use {
         core::{
             collection::{
                 Capability, Component, ComponentSource, Components, CoreDataDeps, Manifest,
-                ManifestData, Manifests, Package, Packages, ProtocolCapability, Route, Routes,
-                Sysmgr, Zbi,
+                ManifestData, Manifests, Package, Packages, ProtocolCapability, Zbi,
             },
             package::{
-                is_cf_v1_manifest, is_cf_v2_manifest,
+                is_cf_v2_manifest,
                 reader::{
                     read_partial_package_definition, PackageReader, PackagesFromUpdateReader,
                 },
             },
             util::types::{
                 ComponentManifest, PackageDefinition, PartialPackageDefinition, ServiceMapping,
-                SysManagerConfig, INFERRED_URL,
             },
         },
         static_pkgs::StaticPkgsCollection,
@@ -33,7 +31,6 @@ use {
         boot_url::BootUrl, AbsoluteComponentUrl, AbsolutePackageUrl, PackageName, PackageVariant,
     },
     once_cell::sync::Lazy,
-    regex::Regex,
     scrutiny::model::{collector::DataCollector, model::DataModel},
     scrutiny_config::ModelConfig,
     scrutiny_utils::{
@@ -42,7 +39,6 @@ use {
         key_value::parse_key_value,
         zbi::{ZbiReader, ZbiType},
     },
-    serde_json::Value,
     std::{
         collections::{HashMap, HashSet},
         io::Cursor,
@@ -50,14 +46,12 @@ use {
         str,
         sync::Arc,
     },
-    tracing::{debug, error, info, warn},
+    tracing::{info, warn},
     update_package::parse_image_packages_json,
     url::Url,
 };
 
 // Constants/Statics
-static SERVICE_CONFIG_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"data/sysmgr/.+\.config").unwrap());
 static FUCHSIA_ZBI_PATH: Lazy<PathBuf> = Lazy::new(|| PathBuf::from("zbi"));
 static FUCHSIA_ZBI_SIGNED_PATH: Lazy<PathBuf> = Lazy::new(|| PathBuf::from("zbi.signed"));
 static RECOVERY_ZBI_PATH: Lazy<PathBuf> = Lazy::new(|| PathBuf::from("recovery"));
@@ -112,7 +106,6 @@ pub struct PackageDataResponse {
     pub components: HashMap<Url, Component>,
     pub packages: Vec<Package>,
     pub manifests: Vec<Manifest>,
-    pub routes: Vec<Route>,
     pub zbi: Option<Zbi>,
 }
 
@@ -121,10 +114,9 @@ impl PackageDataResponse {
         components: HashMap<Url, Component>,
         packages: Vec<Package>,
         manifests: Vec<Manifest>,
-        routes: Vec<Route>,
         zbi: Option<Zbi>,
     ) -> Self {
-        Self { components, packages, manifests, routes, zbi }
+        Self { components, packages, manifests, zbi }
     }
 }
 
@@ -149,118 +141,6 @@ impl PackageDataCollector {
             .context("Failed to read package definition")?;
         pkgs.sort_by(|lhs, rhs| lhs.url.name().cmp(&rhs.url.name()));
         Ok(pkgs)
-    }
-
-    /// Extends an existing service mapping with the services defined in a
-    /// .config file found inside the config-data package.
-    fn extend_service_mapping(
-        service_mapping: &mut ServiceMapping,
-        services: HashMap<String, Value>,
-    ) -> Result<()> {
-        for (service_name, service_url_or_array) in services {
-            if service_mapping.contains_key(&service_name) {
-                debug!(
-                    %service_name,
-                    "Service mapping collision between {} and {}",
-                    service_mapping[&service_name], service_url_or_array
-                );
-            }
-
-            let service_url_string: String;
-            if service_url_or_array.is_array() {
-                let service_array = service_url_or_array.as_array().unwrap();
-                if service_array[0].is_string() {
-                    service_url_string = service_array[0].as_str().unwrap().to_string();
-                } else {
-                    error!(
-                        "Expected a string service url, instead got: {}:{}",
-                        service_name, service_array[0]
-                    );
-                    continue;
-                }
-            } else if service_url_or_array.is_string() {
-                service_url_string = service_url_or_array.as_str().unwrap().to_string();
-            } else {
-                error!(
-                    "Unexpected service mapping found: {}:{}",
-                    service_name, service_url_or_array
-                );
-                continue;
-            }
-
-            let service_url = Url::parse(&service_url_string).with_context(|| {
-                format!(
-                    "Failed to parse service URL {} mapped to service name {}",
-                    &service_url_string, &service_name
-                )
-            })?;
-            service_mapping.insert(service_name, service_url);
-        }
-
-        Ok(())
-    }
-
-    /// Combine service name->url mappings defined in config-data.
-    fn extract_config_data(
-        config_data_package_url: &AbsolutePackageUrl,
-        package_reader: &mut Box<dyn PackageReader>,
-        served: &Vec<PackageDefinition>,
-    ) -> Result<SysManagerConfig> {
-        let mut sys_config = SysManagerConfig {
-            services: ServiceMapping::new(),
-            apps: HashSet::<AbsoluteComponentUrl>::new(),
-        };
-
-        for pkg_def in served {
-            if pkg_def.matches_url(config_data_package_url) {
-                info!("Extracting config data");
-                for (name, data) in &pkg_def.meta {
-                    if let Some(name_str) = name.to_str() {
-                        if SERVICE_CONFIG_RE.is_match(name_str) {
-                            Self::extract_service_config(
-                                package_reader,
-                                &mut sys_config,
-                                name,
-                                data,
-                            )?;
-                        }
-                    } else {
-                        warn!(
-                            ?name,
-                            "Skipping internal package path that cannot be converted to string"
-                        );
-                    }
-                }
-                break;
-            }
-        }
-        Ok(sys_config)
-    }
-
-    fn extract_service_config(
-        package_reader: &mut Box<dyn PackageReader>,
-        sys_config: &mut SysManagerConfig,
-        name: &PathBuf,
-        data: &Vec<u8>,
-    ) -> Result<()> {
-        info!(service_name = ?name, "Reading service definition");
-
-        let service_pkg = package_reader.read_service_package_definition(data.as_slice())?;
-        if let Some(apps) = service_pkg.apps {
-            for app in apps {
-                let app_url = AbsoluteComponentUrl::parse(&app).with_context(|| {
-                    format!("Failed to parse sys manager config data app package URL: {}", app)
-                })?;
-                sys_config.apps.insert(app_url);
-            }
-        }
-        if let Some(services) = service_pkg.services {
-            Self::extend_service_mapping(&mut sys_config.services, services)?;
-        } else {
-            debug!(service_name = ?name, "Expected service to exist. Optimistically continuing.");
-        }
-
-        Ok(())
     }
 
     /// Extracts the ZBI from the update package and parses it into the ZBI
@@ -453,177 +333,113 @@ impl PackageDataCollector {
         pkg: &PackageDefinition,
         source: &ComponentSource,
     ) -> Result<()> {
-        // Extract V1 and V2 components from the packages.
+        // Extract components from the packages.
         for (path, cm) in &pkg.cms {
+            if !is_cf_v2_manifest(path) {
+                continue;
+            }
+
             let path_str = path.to_str().ok_or_else(|| {
                 anyhow!("Cannot format component manifest path as string: {:?}", path)
             })?;
-            // Component Framework Version 2.
-            if is_cf_v2_manifest(path) {
-                *component_id += 1;
-                let url = AbsoluteComponentUrl::from_package_url_and_resource(
-                    pkg.url.clone(),
-                    path_str.to_string(),
+            *component_id += 1;
+            let url = AbsoluteComponentUrl::from_package_url_and_resource(
+                pkg.url.clone(),
+                path_str.to_string(),
+            )
+            .with_context(|| {
+                format!(
+                    r#"Failed to apply resource path "{}" to package URL "{}""#,
+                    path_str, pkg.url
                 )
-                .with_context(|| {
-                    format!(
-                        r#"Failed to apply resource path "{}" to package URL "{}""#,
-                        path_str, pkg.url
-                    )
-                })?;
-                let url = Url::parse(&url.to_string()).with_context(|| {
-                    format!("Failed to convert package URL to standard URL: {}", url)
-                })?;
+            })?;
+            let url = Url::parse(&url.to_string()).with_context(|| {
+                format!("Failed to convert package URL to standard URL: {}", url)
+            })?;
 
-                components.insert(
-                    url.clone(),
-                    Component {
-                        id: *component_id,
-                        url: url.clone(),
-                        version: 2,
-                        source: source.clone(),
-                    },
-                );
+            components.insert(
+                url.clone(),
+                Component { id: *component_id, url: url.clone(), source: source.clone() },
+            );
 
-                let cf2_manifest = {
-                    if let ComponentManifest::Version2(decl_bytes) = &cm {
-                        let mut cap_uses = Vec::new();
-                        let cm_base64 = base64::encode(&decl_bytes);
-                        let mut cvf_bytes = None;
+            let cf_manifest = {
+                if let ComponentManifest::Version2(decl_bytes) = &cm {
+                    let mut cap_uses = Vec::new();
+                    let cm_base64 = base64::encode(&decl_bytes);
+                    let mut cvf_bytes = None;
 
-                        if let Ok(cm_decl) = unpersist::<fdecl::Component>(&decl_bytes) {
-                            if let Err(err) = cm_fidl_validator::validate(&cm_decl) {
-                                warn!(%err, %url, "Invalid cm");
-                            } else {
-                                if let Some(schema) = cm_decl.config {
-                                    match schema
-                                        .value_source
-                                        .as_ref()
-                                        .context("getting value source from config schema")?
-                                    {
-                                        fdecl::ConfigValueSource::PackagePath(pkg_path) => {
-                                            cvf_bytes = Some(
-                                                pkg.cvfs
-                                                    .get(pkg_path)
-                                                    .context("getting config values from package")?
-                                                    .clone(),
-                                            );
-                                        }
-                                        other => {
-                                            warn!("unsupported config value source {:?}", other)
-                                        }
+                    if let Ok(cm_decl) = unpersist::<fdecl::Component>(&decl_bytes) {
+                        if let Err(err) = cm_fidl_validator::validate(&cm_decl) {
+                            warn!(%err, %url, "Invalid cm");
+                        } else {
+                            if let Some(schema) = cm_decl.config {
+                                match schema
+                                    .value_source
+                                    .as_ref()
+                                    .context("getting value source from config schema")?
+                                {
+                                    fdecl::ConfigValueSource::PackagePath(pkg_path) => {
+                                        cvf_bytes = Some(
+                                            pkg.cvfs
+                                                .get(pkg_path)
+                                                .context("getting config values from package")?
+                                                .clone(),
+                                        );
                                     }
-                                }
-
-                                if let Some(uses) = cm_decl.uses {
-                                    for use_ in uses {
-                                        match &use_ {
-                                            fdecl::Use::Protocol(protocol) => {
-                                                if let Some(source_name) = &protocol.source_name {
-                                                    cap_uses.push(Capability::Protocol(
-                                                        ProtocolCapability::new(
-                                                            source_name.clone(),
-                                                        ),
-                                                    ));
-                                                }
-                                            }
-                                            _ => {}
-                                        }
-                                    }
-                                }
-                                if let Some(exposes) = cm_decl.exposes {
-                                    for expose in exposes {
-                                        match &expose {
-                                            fdecl::Expose::Protocol(protocol) => {
-                                                if let Some(source_name) = &protocol.source_name {
-                                                    if let Some(fdecl::Ref::Self_(_)) =
-                                                        &protocol.source
-                                                    {
-                                                        service_map.insert(
-                                                            source_name.clone(),
-                                                            url.clone(),
-                                                        );
-                                                    }
-                                                }
-                                            }
-                                            _ => {}
-                                        }
+                                    other => {
+                                        warn!("unsupported config value source {:?}", other)
                                     }
                                 }
                             }
-                        } else {
-                            warn!(%url, "cm failed to be decoded");
-                        }
-                        Manifest {
-                            component_id: *component_id,
-                            manifest: ManifestData::Version2 { cm_base64, cvf_bytes },
-                            uses: cap_uses,
-                        }
-                    } else {
-                        Manifest {
-                            component_id: *component_id,
-                            manifest: ManifestData::Version2 {
-                                cm_base64: String::from(""),
-                                cvf_bytes: None,
-                            },
-                            uses: Vec::new(),
-                        }
-                    }
-                };
-                manifests.push(cf2_manifest);
-            // Component Framework Version 1.
-            } else if is_cf_v1_manifest(path) {
-                *component_id += 1;
-                let url = AbsoluteComponentUrl::from_package_url_and_resource(
-                    pkg.url.clone(),
-                    path_str.to_string(),
-                )
-                .with_context(|| {
-                    format!(
-                        r#"Failed to apply resource path "{}" to package URL "{}""#,
-                        path_str, pkg.url
-                    )
-                })?;
-                let url = Url::parse(&url.to_string()).with_context(|| {
-                    format!("Failed to convert package URL to standard URL: {}", url)
-                })?;
-                components.insert(
-                    url.clone(),
-                    Component {
-                        id: *component_id,
-                        url: url.clone(),
-                        version: 1,
-                        source: source.clone(),
-                    },
-                );
 
-                let cf1_manifest = {
-                    if let ComponentManifest::Version1(sandbox) = &cm {
-                        Manifest {
-                            component_id: *component_id,
-                            manifest: ManifestData::Version1(serde_json::to_string(&sandbox)?),
-                            uses: {
-                                match sandbox.services.as_ref() {
-                                    Some(svcs) => svcs
-                                        .into_iter()
-                                        .map(|e| {
-                                            Capability::Protocol(ProtocolCapability::new(e.clone()))
-                                        })
-                                        .collect(),
-                                    None => Vec::new(),
+                            if let Some(uses) = cm_decl.uses {
+                                for use_ in uses {
+                                    match &use_ {
+                                        fdecl::Use::Protocol(protocol) => {
+                                            if let Some(source_name) = &protocol.source_name {
+                                                cap_uses.push(Capability::Protocol(
+                                                    ProtocolCapability::new(source_name.clone()),
+                                                ));
+                                            }
+                                        }
+                                        _ => {}
+                                    }
                                 }
-                            },
+                            }
+                            if let Some(exposes) = cm_decl.exposes {
+                                for expose in exposes {
+                                    match &expose {
+                                        fdecl::Expose::Protocol(protocol) => {
+                                            if let Some(source_name) = &protocol.source_name {
+                                                if let Some(fdecl::Ref::Self_(_)) = &protocol.source
+                                                {
+                                                    service_map
+                                                        .insert(source_name.clone(), url.clone());
+                                                }
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
                         }
                     } else {
-                        Manifest {
-                            component_id: *component_id,
-                            manifest: ManifestData::Version1(String::from("")),
-                            uses: Vec::new(),
-                        }
+                        warn!(%url, "cm failed to be decoded");
                     }
-                };
-                manifests.push(cf1_manifest);
-            }
+                    Manifest {
+                        component_id: *component_id,
+                        manifest: ManifestData { cm_base64, cvf_bytes },
+                        uses: cap_uses,
+                    }
+                } else {
+                    Manifest {
+                        component_id: *component_id,
+                        manifest: ManifestData { cm_base64: String::from(""), cvf_bytes: None },
+                        uses: Vec::new(),
+                    }
+                }
+            };
+            manifests.push(cf_manifest);
         }
         Ok(())
     }
@@ -836,104 +652,18 @@ impl PackageDataCollector {
                     Component {
                         id: *component_id,
                         url: url.clone(),
-                        version: 2,
                         source: ComponentSource::ZbiBootfs,
                     },
                 );
                 manifests.push(Manifest {
                     component_id: *component_id,
-                    manifest: ManifestData::Version2 { cm_base64, cvf_bytes },
+                    manifest: ManifestData { cm_base64, cvf_bytes },
                     uses: cap_uses,
                 });
             }
         }
 
         Ok(())
-    }
-
-    /// Iterate through all services mappings, for each one, find the associated node or create a new
-    /// inferred node and mark it as a provider of that service.
-    fn infer_components(
-        component_id: &mut i32,
-        service_map: &mut ServiceMapping,
-        components: &mut HashMap<Url, Component>,
-    ) {
-        for (service_name, pkg_url) in service_map.iter() {
-            if !components.contains_key(pkg_url) {
-                // We don't already know about the component that *should* provide this service.
-                // Create an inferred node.
-                debug!(
-                    %pkg_url, %service_name,
-                    "Expected component to exist to provide service, but it does not exist. Creating inferred node."
-                );
-                *component_id += 1;
-                components.insert(
-                    pkg_url.clone(),
-                    Component {
-                        id: *component_id,
-                        url: pkg_url.clone(),
-                        version: 1,
-                        source: ComponentSource::Inferred,
-                    },
-                );
-            }
-        }
-    }
-
-    /// Iterate through all nodes created thus far, creating edges between them based on the services they use.
-    /// If a service provider node is not able to be found, create a new inferred service provider node.
-    /// Since manifests more naturally hold the list of services that the component requires, we iterate through
-    /// those instead. Can be changed relatively effortlessly if the model make sense otherwise.
-    fn generate_routes(
-        component_id: &mut i32,
-        service_map: &mut ServiceMapping,
-        components: &mut HashMap<Url, Component>,
-        manifests: &Vec<Manifest>,
-        routes: &mut Vec<Route>,
-    ) {
-        let mut route_idx = 0;
-        for mani in manifests {
-            for capability in &mani.uses {
-                if let Capability::Protocol(cap) = capability {
-                    let service_name = &cap.source_name;
-                    let source_component_id = {
-                        if service_map.contains_key(service_name) {
-                            // FIXME: Options do not impl Try so we cannot ? but there must be some better way to get at a value...
-                            components.get(service_map.get(service_name).unwrap()).unwrap().id
-                        } else {
-                            // Even the service map didn't know about this service. We should create an inferred component
-                            // that provides this service.
-                            debug!(%service_name, "Expected a service provider for service but it does not exist. Creating inferred node.");
-                            *component_id += 1;
-                            let url_fragment = format!("#meta/{}.cmx", service_name);
-                            let url = INFERRED_URL
-                                .join(&url_fragment)
-                                .expect("inferred URL can be joined with manifest fragment");
-                            components.insert(
-                                url.clone(),
-                                Component {
-                                    id: *component_id,
-                                    url: url.clone(),
-                                    version: 1,
-                                    source: ComponentSource::Inferred,
-                                },
-                            );
-                            // Add the inferred node to the service map to be found by future consumers of the service
-                            service_map.insert(String::from(service_name), url);
-                            *component_id
-                        }
-                    };
-                    route_idx += 1;
-                    routes.push(Route {
-                        id: route_idx,
-                        src_id: source_component_id,
-                        dst_id: mani.component_id,
-                        service_name: service_name.to_string(),
-                        protocol_id: 0, // FIXME:
-                    });
-                }
-            }
-        }
     }
 
     /// Function to build the component graph model out of the packages and services retrieved
@@ -949,9 +679,8 @@ impl PackageDataCollector {
         let mut components: HashMap<Url, Component> = HashMap::new();
         let mut packages: Vec<Package> = Vec::new();
         let mut manifests: Vec<Manifest> = Vec::new();
-        let mut routes: Vec<Route> = Vec::new();
 
-        // Iterate through all served packages, for each cmx they define, create a node.
+        // Iterate through all served packages, for each manifest they define, create a node.
         let mut component_id = 0;
         info!(total = fuchsia_packages.len(), "Found package");
         for pkg in fuchsia_packages.iter() {
@@ -1001,19 +730,9 @@ impl PackageDataCollector {
             }
         };
 
-        Self::infer_components(&mut component_id, &mut service_map, &mut components);
+        info!(components = components.len(), manifests = manifests.len());
 
-        Self::generate_routes(
-            &mut component_id,
-            &mut service_map,
-            &mut components,
-            &manifests,
-            &mut routes,
-        );
-
-        info!(components = components.len(), manifests = manifests.len(), routes = routes.len());
-
-        Ok(PackageDataResponse::new(components, packages, manifests, routes, zbi))
+        Ok(PackageDataResponse::new(components, packages, manifests, zbi))
     }
 
     pub fn collect_with_reader(
@@ -1024,18 +743,7 @@ impl PackageDataCollector {
     ) -> Result<()> {
         let served_packages =
             Self::get_packages(&mut package_reader).context("Failed to read packages listing")?;
-        let sysmgr_config = Self::extract_config_data(
-            &config.config_data_package_url(),
-            &mut package_reader,
-            &served_packages,
-        )
-        .context("Failed to read sysmgr config")?;
-        info!(
-            services = sysmgr_config.services.keys().len(),
-            apps = sysmgr_config.apps.len(),
-            packages = served_packages.len(),
-            "Done collecting. Found listed in the sys realm"
-        );
+        info!(packages = served_packages.len(), "Done collecting. Found listed in the sys realm");
 
         let update_package = package_reader
             .read_update_package_definition()
@@ -1046,7 +754,7 @@ impl PackageDataCollector {
             &update_package,
             &mut artifact_reader,
             served_packages,
-            sysmgr_config.services.clone(),
+            ServiceMapping::new(),
             &static_pkgs,
             config.is_recovery(),
         )?;
@@ -1062,10 +770,6 @@ impl PackageDataCollector {
         model
             .set(Manifests::new(response.manifests))
             .context("Failed to store manifests in model")?;
-        model.set(Routes::new(response.routes)).context("Failed to store routes in model")?;
-        model
-            .set(Sysmgr::new(sysmgr_config.services, sysmgr_config.apps))
-            .context("Failed to store sysmgr config in model")?;
 
         if let Some(zbi) = response.zbi {
             model.set(zbi)?;
@@ -1114,26 +818,28 @@ impl DataCollector for PackageDataCollector {
 
 #[cfg(test)]
 pub mod tests {
+    use fidl::persist;
+
     use {
         super::{PackageDataCollector, StaticPackageDescription},
         crate::core::{
             collection::{
-                testing::fake_component_src_pkg, Capability, Component, ComponentSource,
-                Components, CoreDataDeps, ManifestData, Manifests, Packages, ProtocolCapability,
-                Route, Routes,
+                testing::fake_component_src_pkg, Capability, Components, CoreDataDeps,
+                ManifestData, Manifests, Packages, ProtocolCapability,
             },
             package::{
+                collector::{Component, ComponentSource},
                 reader::PackageReader,
                 test_utils::{
-                    create_model, create_svc_pkg_bytes, create_svc_pkg_bytes_with_array,
-                    create_test_cm_map, create_test_cmx_map, create_test_package_with_cms,
-                    create_test_package_with_contents, create_test_package_with_meta,
-                    create_test_partial_package_with_contents, create_test_sandbox,
+                    create_model, create_test_cm_map, create_test_package_with_cms,
+                    create_test_package_with_contents, create_test_partial_package_with_contents,
                     MockPackageReader,
                 },
             },
-            util::types::{PackageDefinition, PartialPackageDefinition, INFERRED_URL},
+            util::types::{PackageDefinition, PartialPackageDefinition},
         },
+        cm_rust::{ComponentDecl, NativeIntoFidl},
+        fidl_fuchsia_component_decl as fdecl,
         fuchsia_hash::{Hash, HASH_SIZE},
         fuchsia_merkle::MerkleTree,
         fuchsia_url::{AbsoluteComponentUrl, AbsolutePackageUrl, PackageName, PackageVariant},
@@ -1154,6 +860,12 @@ pub mod tests {
 
     fn non_zero_content_zbi() -> Vec<u8> {
         zbi_container_header(1).as_bytes().into()
+    }
+
+    fn make_v2_manifest_data(decl: ComponentDecl) -> ManifestData {
+        let decl_fidl: fdecl::Component = decl.native_into_fidl();
+        let cm_base64 = base64::encode(&persist(&decl_fidl).unwrap());
+        ManifestData { cm_base64, cvf_bytes: None }
     }
 
     // Return the sha256 content hash of bytes, not to be confused with the fuchsia merkle root.
@@ -1235,16 +947,12 @@ pub mod tests {
         );
     }
 
-    fn count_sources(components: HashMap<Url, Component>) -> (usize, usize, usize, usize) {
-        let mut inferred_count = 0;
+    fn count_sources(components: HashMap<Url, Component>) -> (usize, usize, usize) {
         let mut zbi_bootfs_count = 0;
         let mut package_count = 0;
         let mut static_package_count = 0;
         for (_, comp) in components {
             match comp.source {
-                ComponentSource::Inferred => {
-                    inferred_count += 1;
-                }
                 ComponentSource::ZbiBootfs => {
                     zbi_bootfs_count += 1;
                 }
@@ -1256,268 +964,15 @@ pub mod tests {
                 }
             }
         }
-        (inferred_count, zbi_bootfs_count, package_count, static_package_count)
+        (zbi_bootfs_count, package_count, static_package_count)
     }
 
     #[fuchsia::test]
-    fn test_extract_config_data_ignores_services_defined_on_non_config_data_package() {
-        // Create a single package that is NOT the config data package
-        let mut mock_reader: Box<dyn PackageReader> = Box::new(MockPackageReader::new());
-
-        let mut contents = HashMap::new();
-        contents.insert(PathBuf::from("data/sysmgr/foo.config"), Hash::from([0u8; HASH_SIZE]));
-        let pkg = create_test_package_with_contents(
-            PackageName::from_str("not-config-data").unwrap(),
-            None,
-            contents,
-        );
-        let served = vec![pkg];
-
-        let config = fake_model_config();
-        let result = PackageDataCollector::extract_config_data(
-            &config.config_data_package_url(),
-            &mut mock_reader,
-            &served,
-        )
-        .unwrap();
-        assert_eq!(0, result.services.len());
-        assert_eq!(0, result.apps.len())
-    }
-
-    #[fuchsia::test]
-    fn test_extract_config_data_ignores_services_defined_by_non_config_meta_contents() {
-        // Create a single package that IS the config data package but
-        // does not contain valid data/sysmgr/*.config meta content.
-        let mut mock_reader: Box<dyn PackageReader> = Box::new(MockPackageReader::new());
-
-        let mut contents = HashMap::new();
-        contents.insert(PathBuf::from("not/valid/config"), Hash::from([0u8; HASH_SIZE]));
-        let pkg = create_test_package_with_contents(
-            PackageName::from_str("config-data").unwrap(),
-            None,
-            contents,
-        );
-        let served = vec![pkg];
-
-        let config = fake_model_config();
-        let result = PackageDataCollector::extract_config_data(
-            &config.config_data_package_url(),
-            &mut mock_reader,
-            &served,
-        )
-        .unwrap();
-
-        assert_eq!(0, result.services.len());
-        assert_eq!(0, result.apps.len())
-    }
-
-    #[fuchsia::test]
-    fn test_extract_config_data_merges_unique_service_names() {
-        let mock_reader = Box::new(MockPackageReader::new());
-
-        // We will need 2 service package definitions that map different services
-        let mut meta = HashMap::new();
-        meta.insert(
-            PathBuf::from("data/sysmgr/service1.config"),
-            create_svc_pkg_bytes(
-                vec![(
-                    String::from("fuchsia.test.foo.service1"),
-                    String::from("fuchsia-pkg://fuchsia.com/foo#meta/served1.cmx"),
-                )],
-                vec![],
-            ),
-        );
-        meta.insert(
-            PathBuf::from("data/sysmgr/service2.config"),
-            create_svc_pkg_bytes(
-                vec![(
-                    String::from("fuchsia.test.foo.service2"),
-                    String::from("fuchsia-pkg://fuchsia.com/foo#meta/served2.cmx"),
-                )],
-                vec![],
-            ),
-        );
-        let config = fake_model_config();
-        let pkg = create_test_package_with_meta(
-            PackageName::from_str("config-data").unwrap(),
-            None,
-            meta,
-        );
-        let served = vec![pkg];
-
-        let mut package_reader: Box<dyn PackageReader> = mock_reader;
-        let result = PackageDataCollector::extract_config_data(
-            &config.config_data_package_url(),
-            &mut package_reader,
-            &served,
-        )
-        .unwrap();
-        assert_eq!(2, result.services.len());
-        assert_eq!(0, result.apps.len());
-    }
-
-    #[fuchsia::test]
-    fn test_extract_config_data_reads_first_value_when_given_an_array_for_service_url_mapping() {
-        let served2_str = "fuchsia-pkg://fuchsia.com/foo#meta/served2.cmx";
-        let served2_url = Url::parse(served2_str).unwrap();
-        let mock_reader = Box::new(MockPackageReader::new());
-        let mut meta = HashMap::new();
-        meta.insert(
-            PathBuf::from("data/sysmgr/service1.config"),
-            create_svc_pkg_bytes(
-                vec![(
-                    String::from("fuchsia.test.foo.service1"),
-                    String::from("fuchsia-pkg://fuchsia.com/foo#meta/served1.cmx"),
-                )],
-                vec![],
-            ),
-        );
-        meta.insert(
-            PathBuf::from("data/sysmgr/service2.config"),
-            create_svc_pkg_bytes_with_array(
-                vec![(
-                    String::from("fuchsia.test.foo.service2"),
-                    vec![String::from(served2_str), String::from("--foo"), String::from("--bar")],
-                )],
-                vec![],
-            ),
-        );
-        let config = fake_model_config();
-        let pkg = create_test_package_with_meta(
-            PackageName::from_str("config-data").unwrap(),
-            None,
-            meta,
-        );
-        let served = vec![pkg];
-
-        let mut package_reader: Box<dyn PackageReader> = mock_reader;
-        let result = PackageDataCollector::extract_config_data(
-            &config.config_data_package_url(),
-            &mut package_reader,
-            &served,
-        )
-        .unwrap();
-        assert_eq!(2, result.services.len());
-        assert_eq!(&served2_url, result.services.get("fuchsia.test.foo.service2").unwrap());
-    }
-
-    #[fuchsia::test]
-    fn test_extract_with_no_services_infers_service() {
-        // Create a single test package with a single unknown service dependency
-        let sb = create_test_sandbox(vec![String::from("fuchsia.test.foo.bar")]);
-        let cms = create_test_cmx_map(vec![(PathBuf::from("meta/baz.cmx"), sb)]);
-        let pkg = create_test_package_with_cms(PackageName::from_str("foo").unwrap(), None, cms);
-        let served = vec![pkg];
-
-        let services = HashMap::new();
-        let mut artifact_loader: Box<dyn ArtifactReader> = Box::new(MockArtifactReader::new());
-        let response = PackageDataCollector::extract(
-            &empty_update_pkg(),
-            &mut artifact_loader,
-            served,
-            services,
-            &None,
-            false,
-        )
-        .unwrap();
-
-        assert_eq!(2, response.components.len());
-        assert_eq!(1, response.manifests.len());
-        assert_eq!(1, response.routes.len());
-        // Component 2 is inferred, providing the fuchsia.test.foo.bar service to component 1.
-        assert_eq!(
-            vec![Route {
-                id: 1,
-                src_id: 2,
-                dst_id: 1,
-                service_name: String::from("fuchsia.test.foo.bar"),
-                protocol_id: 0
-            }],
-            response.routes
-        );
-        assert_eq!(1, response.packages.len());
-        assert_eq!(None, response.zbi);
-        // 1 inferred, 0 zbi/bootfs, 1 (non-static) package, 0 static packages.
-        assert_eq!((1, 0, 1, 0), count_sources(response.components));
-    }
-
-    #[fuchsia::test]
-    fn test_extract_with_static_pkg() {
-        // Create a single test package with a single unknown service dependency
-        let sb = create_test_sandbox(vec![String::from("fuchsia.test.foo.bar")]);
-        let cms = create_test_cmx_map(vec![(PathBuf::from("meta/baz.cmx"), sb)]);
-        let pkg = create_test_package_with_cms(PackageName::from_str("foo").unwrap(), None, cms);
-        let served = vec![pkg];
-
-        let services = HashMap::new();
-        let mut package_getter: Box<dyn ArtifactReader> = Box::new(MockArtifactReader::new());
-        let pkg_name = PackageName::from_str("foo").unwrap();
-        let pkg_variant = PackageVariant::zero();
-        let pkg_hash = Hash::from([0u8; HASH_SIZE]);
-        let static_pkgs =
-            Some(vec![StaticPackageDescription::new(&pkg_name, Some(&pkg_variant), &pkg_hash)]);
-        let response = PackageDataCollector::extract(
-            &empty_update_pkg(),
-            &mut package_getter,
-            served,
-            services,
-            &static_pkgs,
-            false,
-        )
-        .unwrap();
-
-        assert_eq!(2, response.components.len());
-        assert_eq!(1, response.manifests.len());
-        assert_eq!(1, response.routes.len());
-        assert_eq!(1, response.packages.len());
-        assert_eq!(None, response.zbi);
-        // 1 inferred, 0 zbi/bootfs, 0 (non-static) packages, 1 static package.
-        assert_eq!((1, 0, 0, 1), count_sources(response.components));
-    }
-
-    #[fuchsia::test]
-    fn test_extract_with_known_services_but_no_matching_component_infers_component() {
-        // Create a single test package with a single known service dependency
-        let sb = create_test_sandbox(vec![String::from("fuchsia.test.foo.bar")]);
-        let cms = create_test_cmx_map(vec![(PathBuf::from("meta/baz.cmx"), sb)]);
-        let pkg = create_test_package_with_cms(PackageName::from_str("foo").unwrap(), None, cms);
-        let served = vec![pkg];
-
-        // We know about the desired service in the service mapping, but the component doesn't exist
-        let mut services = HashMap::new();
-        services.insert(
-            String::from("fuchsia.test.foo.bar"),
-            Url::parse("fuchsia-pkg://fuchsia.com/aries#meta/taurus.cmx").unwrap(),
-        );
-
-        let mut artifact_loader: Box<dyn ArtifactReader> = Box::new(MockArtifactReader::new());
-        let response = PackageDataCollector::extract(
-            &empty_update_pkg(),
-            &mut artifact_loader,
-            served,
-            services,
-            &None,
-            false,
-        )
-        .unwrap();
-
-        assert_eq!(2, response.components.len());
-        assert_eq!(1, response.manifests.len());
-        assert_eq!(1, response.routes.len());
-        assert_eq!(1, response.packages.len());
-        assert_eq!(None, response.zbi);
-        // 1 inferred, 0 zbi/bootfs, 1 (non-static) package, 0 static packages.
-        assert_eq!((1, 0, 1, 0), count_sources(response.components));
-    }
-
-    #[fuchsia::test]
-    fn test_extract_with_invalid_cmx_creates_empty_graph() {
-        // Create a single test package with an invalid cmx path
-        let sb = create_test_sandbox(vec![String::from("fuchsia.test.foo.bar")]);
-        let sb2 = create_test_sandbox(vec![String::from("fuchsia.test.foo.baz")]);
-        let cms = create_test_cmx_map(vec![
-            (PathBuf::from("foo/bar.cmx"), sb),
-            (PathBuf::from("meta/baz"), sb2),
+    fn test_extract_with_invalid_cm_paths_creates_empty_graph() {
+        // Create a single test package with invalid cm paths
+        let cms = create_test_cm_map(vec![
+            (PathBuf::from("foo/bar.cm"), vec![0, 1]),
+            (PathBuf::from("meta/baz"), vec![1, 0]),
         ]);
         let pkg = create_test_package_with_cms(PackageName::from_str("foo").unwrap(), None, cms);
         let served = vec![pkg];
@@ -1537,18 +992,16 @@ pub mod tests {
 
         assert_eq!(0, response.components.len());
         assert_eq!(0, response.manifests.len());
-        assert_eq!(0, response.routes.len());
         assert_eq!(1, response.packages.len());
         assert_eq!(None, response.zbi);
-        // 0 inferred, 0 zbi/bootfs, 0 (non-static) package, 0 static packages.
-        assert_eq!((0, 0, 0, 0), count_sources(response.components));
+        // 0 zbi/bootfs, 0 (non-static) package, 0 static packages.
+        assert_eq!((0, 0, 0), count_sources(response.components));
     }
 
     #[fuchsia::test]
     fn test_extract_with_cm() {
         let cms = create_test_cm_map(vec![(PathBuf::from("meta/foo.cm"), vec![])]);
         let pkg = create_test_package_with_cms(PackageName::from_str("foo").unwrap(), None, cms);
-        let pkg_url = pkg.url.clone();
         let served = vec![pkg];
 
         let services = HashMap::new();
@@ -1564,96 +1017,10 @@ pub mod tests {
         )
         .unwrap();
 
-        let component_url = AbsoluteComponentUrl::from_package_url_and_resource(
-            pkg_url.clone(),
-            "meta/foo.cm".to_string(),
-        )
-        .unwrap();
-        let url = Url::parse(&component_url.to_string()).unwrap();
-
         assert_eq!(1, response.components.len());
-        assert_eq!(response.components[&url].version, 2);
         assert_eq!(1, response.manifests.len());
-        assert_eq!(0, response.routes.len());
         assert_eq!(1, response.packages.len());
         assert_eq!(None, response.zbi);
-    }
-
-    #[fuchsia::test]
-    fn test_extract_with_duplicate_inferred_services_reuses_inferred_service() {
-        // Create two test packages that depend on the same inferred service
-        let sb = create_test_sandbox(vec![String::from("fuchsia.test.service")]);
-        let cms = create_test_cmx_map(vec![(PathBuf::from("meta/bar.cmx"), sb)]);
-        let pkg = create_test_package_with_cms(PackageName::from_str("foo").unwrap(), None, cms);
-
-        let sb2 = create_test_sandbox(vec![String::from("fuchsia.test.service")]);
-        let cms2 = create_test_cmx_map(vec![(PathBuf::from("meta/taurus.cmx"), sb2)]);
-        let pkg2 =
-            create_test_package_with_cms(PackageName::from_str("aries").unwrap(), None, cms2);
-        let served = vec![pkg, pkg2];
-
-        let services = HashMap::new();
-
-        let mut artifact_loader: Box<dyn ArtifactReader> = Box::new(MockArtifactReader::new());
-        let response = PackageDataCollector::extract(
-            &empty_update_pkg(),
-            &mut artifact_loader,
-            served,
-            services,
-            &None,
-            false,
-        )
-        .unwrap();
-
-        assert_eq!(3, response.components.len());
-        assert_eq!(2, response.manifests.len());
-        assert_eq!(2, response.routes.len());
-        assert_eq!(2, response.packages.len());
-        assert_eq!(None, response.zbi);
-        // 1 inferred, 0 zbi/bootfs, 2 (non-static) packages, 0 static packages.
-        assert_eq!((1, 0, 2, 0), count_sources(response.components));
-    }
-
-    #[fuchsia::test]
-    fn test_extract_with_known_services_does_not_infer_service() {
-        // Create two test packages, one that depends on a service provided by the other
-        let sb = create_test_sandbox(vec![String::from("fuchsia.test.taurus")]);
-        let cms = create_test_cmx_map(vec![(PathBuf::from("meta/bar.cmx"), sb)]);
-        let pkg = create_test_package_with_cms(PackageName::from_str("foo").unwrap(), None, cms);
-
-        let sb2 = create_test_sandbox(Vec::new());
-        let cms2 = create_test_cmx_map(vec![(PathBuf::from("meta/taurus.cmx"), sb2)]);
-        let pkg2 =
-            create_test_package_with_cms(PackageName::from_str("aries").unwrap(), None, cms2);
-        let served = vec![pkg, pkg2];
-
-        // Map the service the first package requires to the second package
-        let mut services = HashMap::new();
-        services.insert(
-            String::from("fuchsia.test.taurus"),
-            Url::parse("fuchsia-pkg://test.fuchsia.com/aries?hash=0000000000000000000000000000000000000000000000000000000000000000#meta/taurus.cmx").unwrap(),
-        );
-
-        let mut artifact_loader: Box<dyn ArtifactReader> = Box::new(MockArtifactReader::new());
-        let response = PackageDataCollector::extract(
-            &empty_update_pkg(),
-            &mut artifact_loader,
-            served,
-            services,
-            &None,
-            false,
-        )
-        .unwrap();
-
-        tracing::info!(?response.components);
-
-        assert_eq!(2, response.components.len());
-        assert_eq!(2, response.manifests.len());
-        assert_eq!(1, response.routes.len());
-        assert_eq!(2, response.packages.len());
-        assert_eq!(None, response.zbi);
-        // 0 inferred, 0 zbi/bootfs, 2 (non-static) packages, 0 static packages.
-        assert_eq!((0, 0, 2, 0), count_sources(response.components));
     }
 
     #[fuchsia::test]
@@ -1665,14 +1032,12 @@ pub mod tests {
             let mut comps = vec![];
             comps.push(Component {
                 id: 1,
-                url: Url::parse("fuchsia-pkg://test.fuchsia.com/test?hash=0000000000000000000000000000000000000000000000000000000000000000#meta/test.component.cmx").unwrap(),
-                version: 0,
+                url: Url::parse("fuchsia-pkg://test.fuchsia.com/test?hash=0000000000000000000000000000000000000000000000000000000000000000#meta/test.component.cm").unwrap(),
                 source: ComponentSource::ZbiBootfs,
             });
             comps.push(Component {
                 id: 1,
-                url: Url::parse("fuchsia-pkg://test.fuchsia.com/test?hash=0000000000000000000000000000000000000000000000000000000000000000#meta/foo.bar.cmx").unwrap(),
-                version: 0,
+                url: Url::parse("fuchsia-pkg://test.fuchsia.com/test?hash=0000000000000000000000000000000000000000000000000000000000000000#meta/foo.bar.cm").unwrap(),
                 source: fake_component_src_pkg(),
             });
             model.set(Components { entries: comps }).unwrap();
@@ -1680,31 +1045,20 @@ pub mod tests {
             let mut manis = vec![];
             manis.push(crate::core::collection::Manifest {
                 component_id: 1,
-                manifest: ManifestData::Version1(String::from("test.component.manifest")),
+                manifest: make_v2_manifest_data(ComponentDecl { ..ComponentDecl::default() }),
                 uses: vec![Capability::Protocol(ProtocolCapability::new(String::from(
                     "test.service",
                 )))],
             });
             manis.push(crate::core::collection::Manifest {
                 component_id: 2,
-                manifest: ManifestData::Version1(String::from("foo.bar.manifest")),
+                manifest: make_v2_manifest_data(ComponentDecl { ..ComponentDecl::default() }),
                 uses: Vec::new(),
             });
             model.set(Manifests { entries: manis }).unwrap();
-
-            let mut routes = vec![];
-            routes.push(Route {
-                id: 1,
-                src_id: 1,
-                dst_id: 2,
-                service_name: String::from("test.service"),
-                protocol_id: 0,
-            });
-            model.set(Routes { entries: routes }).unwrap();
         }
 
-        let sb = create_test_sandbox(vec![String::from("fuchsia.test.service")]);
-        let cms = create_test_cmx_map(vec![(PathBuf::from("meta/bar.cmx"), sb)]);
+        let cms = create_test_cm_map(vec![(PathBuf::from("meta/bar.cm"), vec![])]);
         let pkg = create_test_package_with_cms(PackageName::from_str("foo").unwrap(), None, cms);
         let pkg_urls = vec![pkg.url.clone().pinned().unwrap()];
         mock_pkg_reader.append_update_package(pkg_urls, empty_update_pkg());
@@ -1722,12 +1076,9 @@ pub mod tests {
         // Ensure the model reflects only the latest collection.
         let comps = &model.get::<Components>().unwrap().entries;
         let manis = &model.get::<Manifests>().unwrap().entries;
-        let routes = &model.get::<Routes>().unwrap().entries;
-        // There are 2 components (1 inferred, 1 defined),
-        // 1 manifest (for the defined package), and 1 route
-        assert_eq!(comps.len(), 2);
+        // There is 1 component, 1 manifest (for the defined package), and 0 routes
+        assert_eq!(comps.len(), 1);
         assert_eq!(manis.len(), 1);
-        assert_eq!(routes.len(), 1);
     }
 
     #[fuchsia::test]
@@ -1760,15 +1111,13 @@ pub mod tests {
         let mut mock_pkg_reader = Box::new(MockPackageReader::new());
         let (_, model) = create_model();
 
-        let sb_0 = create_test_sandbox(vec![String::from("fuchsia.test.foo")]);
-        let cms_0 = create_test_cmx_map(vec![(PathBuf::from("meta/foo.cmx"), sb_0)]);
+        let cms_0 = create_test_cm_map(vec![(PathBuf::from("meta/foo.cm"), vec![])]);
         let pkg_0 =
             create_test_package_with_cms(PackageName::from_str("foo").unwrap(), None, cms_0);
         let pkg_0_url = pkg_0.url.clone();
         mock_pkg_reader.append_pkg_def(pkg_0);
 
-        let sb_1 = create_test_sandbox(vec![String::from("fuchsia.test.bar")]);
-        let cms_1 = create_test_cmx_map(vec![(PathBuf::from("meta/bar.cmx"), sb_1)]);
+        let cms_1 = create_test_cm_map(vec![(PathBuf::from("meta/bar.cm"), vec![])]);
         let pkg_1 =
             create_test_package_with_cms(PackageName::from_str("bar").unwrap(), None, cms_1);
         let pkg_1_url = pkg_1.url.clone();
@@ -1855,249 +1204,6 @@ pub mod tests {
                     artifact_path,
                 },
             })
-        );
-    }
-
-    #[fuchsia::test]
-    fn test_extract_config_data_with_only_duplicate_apps() {
-        let mock_reader = Box::new(MockPackageReader::new());
-
-        // We will need 2 service package definitions that map different services
-        let mut meta = HashMap::new();
-        meta.insert(
-            PathBuf::from("data/sysmgr/service1.config"),
-            create_svc_pkg_bytes(
-                vec![],
-                vec![String::from("fuchsia-pkg://fuchsia.com/foo#meta/foo-app.cmx")],
-            ),
-        );
-        meta.insert(
-            PathBuf::from("data/sysmgr/service2.config"),
-            create_svc_pkg_bytes(
-                vec![],
-                vec![String::from("fuchsia-pkg://fuchsia.com/foo#meta/foo-app.cmx")],
-            ),
-        );
-        let config = fake_model_config();
-        let pkg = create_test_package_with_meta(
-            config.config_data_package_url().name().clone(),
-            Some(PackageVariant::zero()),
-            meta,
-        );
-        let served = vec![pkg];
-
-        let mut package_reader: Box<dyn PackageReader> = mock_reader;
-        let result = PackageDataCollector::extract_config_data(
-            &config.config_data_package_url(),
-            &mut package_reader,
-            &served,
-        )
-        .unwrap();
-        assert_eq!(1, result.apps.len());
-        assert!(result.apps.contains(
-            &AbsoluteComponentUrl::parse("fuchsia-pkg://fuchsia.com/foo#meta/foo-app.cmx").unwrap()
-        ));
-        assert_eq!(0, result.services.len());
-    }
-
-    #[fuchsia::test]
-    fn test_extract_config_data_with_only_apps() {
-        let mock_reader = Box::new(MockPackageReader::new());
-
-        // We will need 2 service package definitions that map different services
-        let mut meta = HashMap::new();
-        meta.insert(
-            PathBuf::from("data/sysmgr/service1.config"),
-            create_svc_pkg_bytes(
-                vec![],
-                vec![String::from("fuchsia-pkg://fuchsia.com/foo#meta/foo-app.cmx")],
-            ),
-        );
-        meta.insert(
-            PathBuf::from("data/sysmgr/service2.config"),
-            create_svc_pkg_bytes(
-                vec![],
-                vec![String::from("fuchsia-pkg://fuchsia.com/bar#meta/bar-app.cmx")],
-            ),
-        );
-        let config = fake_model_config();
-        let pkg = create_test_package_with_meta(
-            config.config_data_package_url().name().clone(),
-            Some(PackageVariant::zero()),
-            meta,
-        );
-        let served = vec![pkg];
-
-        let mut package_reader: Box<dyn PackageReader> = mock_reader;
-        let result = PackageDataCollector::extract_config_data(
-            &config.config_data_package_url(),
-            &mut package_reader,
-            &served,
-        )
-        .unwrap();
-        assert_eq!(2, result.apps.len());
-        assert!(result.apps.contains(
-            &AbsoluteComponentUrl::parse("fuchsia-pkg://fuchsia.com/bar#meta/bar-app.cmx").unwrap()
-        ));
-        assert!(result.apps.contains(
-            &AbsoluteComponentUrl::parse("fuchsia-pkg://fuchsia.com/foo#meta/foo-app.cmx").unwrap()
-        ));
-        assert_eq!(0, result.services.len());
-    }
-
-    #[fuchsia::test]
-    fn test_extract_config_data_with_apps_and_services() {
-        let mock_reader = Box::new(MockPackageReader::new());
-
-        // We will need 2 service package definitions that map different services
-        let mut meta = HashMap::new();
-        meta.insert(
-            PathBuf::from("data/sysmgr/service1.config"),
-            create_svc_pkg_bytes(
-                vec![(
-                    String::from("fuchsia.test.foo.service1"),
-                    String::from("fuchsia-pkg://fuchsia.com/foo#meta/served1.cmx"),
-                )],
-                vec![String::from("fuchsia-pkg://fuchsia.com/foo#meta/foo-app.cmx")],
-            ),
-        );
-        meta.insert(
-            PathBuf::from("data/sysmgr/service2.config"),
-            create_svc_pkg_bytes(
-                vec![(
-                    String::from("fuchsia.test.foo.service2"),
-                    String::from("fuchsia-pkg://fuchsia.com/foo#meta/served2.cmx"),
-                )],
-                vec![String::from("fuchsia-pkg://fuchsia.com/bar#meta/bar-app.cmx")],
-            ),
-        );
-        let config = fake_model_config();
-        let pkg = create_test_package_with_meta(
-            config.config_data_package_url().name().clone(),
-            Some(PackageVariant::zero()),
-            meta,
-        );
-        let served = vec![pkg];
-
-        let mut package_reader: Box<dyn PackageReader> = mock_reader;
-        let result = PackageDataCollector::extract_config_data(
-            &config.config_data_package_url(),
-            &mut package_reader,
-            &served,
-        )
-        .unwrap();
-        assert_eq!(2, result.apps.len());
-        assert!(result.apps.contains(
-            &AbsoluteComponentUrl::parse("fuchsia-pkg://fuchsia.com/bar#meta/bar-app.cmx").unwrap()
-        ));
-        assert!(result.apps.contains(
-            &AbsoluteComponentUrl::parse("fuchsia-pkg://fuchsia.com/foo#meta/foo-app.cmx").unwrap()
-        ));
-
-        assert_eq!(2, result.services.len());
-        assert!(result.services.contains_key("fuchsia.test.foo.service2"));
-        assert_eq!(
-            &Url::parse("fuchsia-pkg://fuchsia.com/foo#meta/served2.cmx").unwrap(),
-            result.services.get("fuchsia.test.foo.service2").unwrap()
-        );
-        assert!(result.services.contains_key("fuchsia.test.foo.service1"));
-        assert_eq!(
-            &Url::parse("fuchsia-pkg://fuchsia.com/foo#meta/served1.cmx").unwrap(),
-            result.services.get("fuchsia.test.foo.service1").unwrap()
-        );
-    }
-
-    #[fuchsia::test]
-    fn test_inferred_service_route_directionality() {
-        // Create a single test package with a single unknown service dependency.
-        let sb = create_test_sandbox(vec![String::from("fuchsia.test.foo.bar")]);
-        let cms = create_test_cmx_map(vec![(PathBuf::from("meta/baz.cmx"), sb)]);
-        let pkg = create_test_package_with_cms(PackageName::from_str("foo").unwrap(), None, cms);
-        let served = vec![pkg];
-
-        let services = HashMap::new();
-        let mut artifact_loader: Box<dyn ArtifactReader> = Box::new(MockArtifactReader::new());
-        let response = PackageDataCollector::extract(
-            &empty_update_pkg(),
-            &mut artifact_loader,
-            served,
-            services,
-            &None,
-            false,
-        )
-        .unwrap();
-
-        // The inferred component provides the service; assert its component id so that we can also
-        // be sure that the route source is correct.
-        let inferred = response
-            .components
-            .get(&INFERRED_URL.join("#meta/fuchsia.test.foo.bar.cmx").unwrap())
-            .expect("to find inferred route for service");
-        assert_eq!(inferred.id, 2);
-        // Component 2 is inferred, providing the fuchsia.test.foo.bar service to component 1.
-        assert_eq!(
-            vec![Route {
-                id: 1,
-                src_id: 2,
-                dst_id: 1,
-                service_name: String::from("fuchsia.test.foo.bar"),
-                protocol_id: 0,
-            }],
-            response.routes
-        );
-    }
-
-    #[fuchsia::test]
-    fn test_route_directionality_with_known_services() {
-        // Create two test packages, one that depends on a service provided by the other.
-        let sb = create_test_sandbox(vec![String::from("fuchsia.test.taurus")]);
-        let cms = create_test_cmx_map(vec![(PathBuf::from("meta/bar.cmx"), sb)]);
-        let pkg = create_test_package_with_cms(PackageName::from_str("foo").unwrap(), None, cms);
-
-        let sb2 = create_test_sandbox(Vec::new());
-        let cms2 = create_test_cmx_map(vec![(PathBuf::from("meta/taurus.cmx"), sb2)]);
-        let pkg2 =
-            create_test_package_with_cms(PackageName::from_str("aries").unwrap(), None, cms2);
-        let aries_url = pkg2.url.clone();
-        let served = vec![pkg, pkg2];
-
-        let taurus_url = Url::parse(
-            &AbsoluteComponentUrl::from_package_url_and_resource(
-                aries_url.clone(),
-                "meta/taurus.cmx".to_string(),
-            )
-            .unwrap()
-            .to_string(),
-        )
-        .unwrap();
-
-        // Map the service the first package requires to the second package.
-        let mut services = HashMap::new();
-        services.insert(String::from("fuchsia.test.taurus"), taurus_url.clone());
-
-        let mut artifact_loader: Box<dyn ArtifactReader> = Box::new(MockArtifactReader::new());
-        let response = PackageDataCollector::extract(
-            &empty_update_pkg(),
-            &mut artifact_loader,
-            served,
-            services,
-            &None,
-            false,
-        )
-        .unwrap();
-
-        assert_eq!(2, response.components.len());
-        let server = response.components.get(&taurus_url).expect("to find serving component");
-        assert_eq!(server.id, 2);
-        assert_eq!(
-            vec![Route {
-                id: 1,
-                src_id: 2,
-                dst_id: 1,
-                service_name: String::from("fuchsia.test.taurus"),
-                protocol_id: 0,
-            }],
-            response.routes
         );
     }
 

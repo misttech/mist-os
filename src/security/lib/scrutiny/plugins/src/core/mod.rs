@@ -9,7 +9,7 @@ pub mod util;
 
 use {
     crate::core::{
-        controller::{blob::*, component::*, package::*, package_extract::*, sysmgr::*, zbi::*},
+        controller::{blob::*, component::*, package::*, package_extract::*, zbi::*},
         package::collector::*,
     },
     scrutiny::prelude::*,
@@ -31,7 +31,6 @@ plugin!(
             "/packages" => PackagesGraphController::default(),
             "/packages/urls" => PackageUrlListController::default(),
             "/blob" => BlobController::default(),
-            "/sysmgr/services" => SysmgrServicesController::default(),
             "/update/zbi/sections" => ZbiSectionsController::default(),
             "/update/zbi/bootfs" => BootfsPathsController::default(),
             "/update/zbi/cmdline" => ZbiCmdlineController::default(),
