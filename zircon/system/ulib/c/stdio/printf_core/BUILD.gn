@@ -40,25 +40,13 @@ llvm_libc_source_set("converter") {
 llvm_libc_source_set("parser") {
   visibility = [ ":*" ]
 
-  # TODO(mcgrathr): soft transition for llvm-libc roll that removed parser.cc
-  # The old parser.h was 148 lines long. The new one is much longer.
-  # Use that to detect pre-roll vs post-roll builds.
-  # This hack can be removed once the roll lands.
-  _parser_lines =
-      read_file("$llvm_libc/src/stdio/printf_core/parser.h", "list lines")
-  _count = 0
-  foreach(line, _parser_lines) {
-    _count = _count + 1
-  }
-  if (_count == 148) {
-    functions = [ "parser" ]
+  public = [ "parser.h" ]
+  functions = []
 
-    # TODO(fxbug.dev/62780): tests need full libc framework
-    no_test_functions = [ "parser" ]
-  } else {
-    public = [ "parser.h" ]
-    functions = []
-  }
+  # TODO(fxbug.dev/62780): There are parser tests that can be built though
+  # there is no "parser" source file so the build machinery will have to be
+  # custom for those tests. But that test code requires the fancier test
+  # machinery that we don't yet support since zxtest doesn't have the features.
 }
 
 llvm_libc_source_set("writer") {
