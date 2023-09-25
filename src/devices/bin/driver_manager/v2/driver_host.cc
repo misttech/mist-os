@@ -72,10 +72,12 @@ zx::result<> SetEncodedConfig(fidl::WireTableBuilder<fdf::wire::DriverStartArgs>
 
 DriverHostComponent::DriverHostComponent(
     fidl::ClientEnd<fdh::DriverHost> driver_host, async_dispatcher_t* dispatcher,
-    fbl::DoublyLinkedList<std::unique_ptr<DriverHostComponent>>* driver_hosts)
+    fbl::DoublyLinkedList<std::unique_ptr<DriverHostComponent>>* driver_hosts,
+    std::shared_ptr<bool> server_connected)
     : driver_host_(std::move(driver_host), dispatcher,
                    fidl::ObserveTeardown([this, driver_hosts] { driver_hosts->erase(*this); })),
-      dispatcher_(dispatcher) {
+      dispatcher_(dispatcher),
+      server_connected_(std::move(server_connected)) {
   InitializeElfDir();
 }
 
@@ -157,6 +159,11 @@ zx::result<fuchsia_driver_host::ProcessInfo> DriverHostComponent::GetProcessInfo
   if (process_info_) {
     return zx::ok(*process_info_);
   }
+
+  if (!(*server_connected_)) {
+    return zx::error(ZX_ERR_SHOULD_WAIT);
+  }
+
   fidl::WireResult result = driver_host_.sync()->GetProcessInfo();
   if (!result.ok()) {
     return zx::error(result.status());

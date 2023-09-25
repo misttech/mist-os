@@ -31,7 +31,8 @@ class DriverHostComponent final
  public:
   DriverHostComponent(fidl::ClientEnd<fuchsia_driver_host::DriverHost> driver_host,
                       async_dispatcher_t* dispatcher,
-                      fbl::DoublyLinkedList<std::unique_ptr<DriverHostComponent>>* driver_hosts);
+                      fbl::DoublyLinkedList<std::unique_ptr<DriverHostComponent>>* driver_hosts,
+                      std::shared_ptr<bool> server_connected);
 
   void Start(fidl::ClientEnd<fuchsia_driver_framework::Node> client_end, std::string node_name,
              fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
@@ -51,6 +52,7 @@ class DriverHostComponent final
   mutable std::optional<fuchsia_driver_host::ProcessInfo> process_info_;
   vfs::PseudoDir runtime_dir_;
   async_dispatcher_t* dispatcher_;
+  std::shared_ptr<bool> server_connected_;
 };
 
 zx::result<> SetEncodedConfig(

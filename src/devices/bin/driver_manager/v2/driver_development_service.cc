@@ -76,11 +76,15 @@ zx::result<fdd::wire::DeviceInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
   if (node->is_bound() && driver_host) {
     auto result = driver_host->GetProcessKoid();
     if (result.is_error()) {
-      LOGF(ERROR, "Failed to get the process KOID of a driver host: %s",
-           zx_status_get_string(result.status_value()));
-      return zx::error(result.status_value());
+      // ZX_ERR_SHOULD_WAIT means the driver host hasn't been fully connected to yet.
+      if (result.error_value() != ZX_ERR_SHOULD_WAIT) {
+        LOGF(ERROR, "Failed to get the process KOID of a driver host: %s",
+             zx_status_get_string(result.status_value()));
+        return zx::error(result.status_value());
+      }
+    } else {
+      device_info.driver_host_koid(result.value());
     }
-    device_info.driver_host_koid(result.value());
   }
 
   // Copy over the offers.

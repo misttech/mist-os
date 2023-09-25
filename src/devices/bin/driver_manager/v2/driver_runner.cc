@@ -413,7 +413,9 @@ zx::result<DriverHost*> DriverRunner::CreateDriverHost() {
     return endpoints.take_error();
   }
   std::string name = "driver-host-" + std::to_string(next_driver_host_id_++);
-  auto create = CreateDriverHostComponent(name, std::move(endpoints->server));
+
+  std::shared_ptr<bool> connected = std::make_shared<bool>(false);
+  auto create = CreateDriverHostComponent(name, std::move(endpoints->server), connected);
   if (create.is_error()) {
     return create.take_error();
   }
@@ -432,8 +434,8 @@ zx::result<DriverHost*> DriverRunner::CreateDriverHost() {
     return loader_service_client.take_error();
   }
 
-  auto driver_host =
-      std::make_unique<DriverHostComponent>(std::move(*client_end), dispatcher_, &driver_hosts_);
+  auto driver_host = std::make_unique<DriverHostComponent>(std::move(*client_end), dispatcher_,
+                                                           &driver_hosts_, connected);
   auto result = driver_host->InstallLoader(std::move(*loader_service_client));
   if (result.is_error()) {
     LOGF(ERROR, "Failed to install loader service: %s", result.status_string());
@@ -508,7 +510,8 @@ void DriverRunner::RequestRebindFromDriverIndex(std::string spec,
 }
 
 zx::result<> DriverRunner::CreateDriverHostComponent(
-    std::string moniker, fidl::ServerEnd<fuchsia_io::Directory> exposed_dir) {
+    std::string moniker, fidl::ServerEnd<fuchsia_io::Directory> exposed_dir,
+    std::shared_ptr<bool> exposed_dir_connected) {
   constexpr std::string_view kUrl = "fuchsia-boot:///driver_host2#meta/driver_host2.cm";
   fidl::Arena arena;
   auto child_decl_builder = fdecl::wire::Child::Builder(arena).name(moniker).url(kUrl).startup(
@@ -528,6 +531,7 @@ zx::result<> DriverRunner::CreateDriverHostComponent(
       };
   auto create_callback =
       [this, moniker, exposed_dir = std::move(exposed_dir),
+       exposed_dir_connected = std::move(exposed_dir_connected),
        open_callback = std::move(open_callback)](
           fidl::WireUnownedResult<fcomponent::Realm::CreateChild>& result) mutable {
         if (!result.ok()) {
@@ -547,6 +551,7 @@ zx::result<> DriverRunner::CreateDriverHostComponent(
         runner_.realm()
             ->OpenExposedDir(child_ref, std::move(exposed_dir))
             .ThenExactlyOnce(std::move(open_callback));
+        *exposed_dir_connected = true;
       };
   runner_.realm()
       ->CreateChild(
