@@ -212,8 +212,9 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
             data.mutable_layer.clone()
         };
         let key = item.key.clone();
+        let val = item.value.clone();
         mutable_layer.insert(item).await?;
-        self.cache.invalidate(&key);
+        self.cache.invalidate(key, Some(val));
         Ok(())
     }
 
@@ -227,8 +228,9 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
             data.mutable_layer.clone()
         };
         let key = item.key.clone();
+        let val = item.value.clone();
         mutable_layer.replace_or_insert(item).await;
-        self.cache.invalidate(&key);
+        self.cache.invalidate(key, Some(val));
     }
 
     /// Merges the given item into the mutable layer.
@@ -240,7 +242,9 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
             }
             data.mutable_layer.clone()
         };
-        mutable_layer.merge_into(item, lower_bound, self.merge_fn).await
+        let key = item.key.clone();
+        mutable_layer.merge_into(item, lower_bound, self.merge_fn).await;
+        self.cache.invalidate(key, None);
     }
 
     /// Searches for an exact match for the given key.
@@ -684,7 +688,7 @@ mod tests {
             }))
         }
 
-        fn invalidate(&self, _key: &K) {
+        fn invalidate(&self, _key: K, _value: Option<V>) {
             self.inner.lock().unwrap().invalidations += 1;
         }
     }

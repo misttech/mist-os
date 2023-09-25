@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    super::object_record::{ChildValue, ObjectKey, ObjectKeyData, ObjectValue},
+    super::object_record::{ObjectKey, ObjectKeyData, ObjectValue},
     crate::lsm_tree::cache::{ObjectCache, ObjectCachePlaceholder, ObjectCacheResult},
     linked_hash_map::{Entry, LinkedHashMap},
     std::{
@@ -20,7 +20,7 @@ fn filter(key: &ObjectKey) -> bool {
     match key.data {
         // Attribute and keys could also be added here to some immediate benefit, but would be
         // somewhat redundant with a node cache planned to be added after.
-        ObjectKeyData::Child { .. } => true,
+        ObjectKeyData::Object => true,
         _ => false,
     }
 }
@@ -68,7 +68,12 @@ impl Drop for Placeholder<'_> {
 impl<'a> ObjectCachePlaceholder<ObjectValue> for Placeholder<'a> {
     fn complete(mut self: Box<Self>, value: Option<&ObjectValue>) {
         let entry_value = match &value {
-            Some(ObjectValue::Child(child)) => Some(CacheValue::Value(child.clone())),
+            Some(ObjectValue::Object { kind, attributes }) => {
+                Some(CacheValue::Value(ObjectValue::Object {
+                    kind: kind.clone(),
+                    attributes: attributes.clone(),
+                }))
+            }
             _ => None,
         };
         self.replace_entry(entry_value);
@@ -77,10 +82,10 @@ impl<'a> ObjectCachePlaceholder<ObjectValue> for Placeholder<'a> {
 
 enum CacheValue {
     Placeholder(u64),
-    Value(ChildValue),
+    Value(ObjectValue),
 }
 
-/// Supports caching for directory entries only right now.
+/// Supports caching for Objects directly for now. Speeds up stat calls.
 pub struct TreeCache {
     inner: Mutex<LinkedHashMap<ObjectKey, CacheValue>>,
     placeholder_counter: AtomicU64,
@@ -102,9 +107,7 @@ impl ObjectCache<ObjectKey, ObjectValue> for TreeCache {
         }
         let mut inner = self.inner.lock().unwrap();
         match inner.get_refresh(key) {
-            Some(CacheValue::Value(entry)) => {
-                ObjectCacheResult::Value(ObjectValue::Child(entry.clone()))
-            }
+            Some(CacheValue::Value(entry)) => ObjectCacheResult::Value(entry.clone()),
             Some(CacheValue::Placeholder(_)) => ObjectCacheResult::NoCache,
             _ => {
                 let placeholder_id = self.placeholder_counter.fetch_add(1, Ordering::Relaxed);
@@ -118,12 +121,18 @@ impl ObjectCache<ObjectKey, ObjectValue> for TreeCache {
         }
     }
 
-    fn invalidate(&self, key: &ObjectKey) {
-        if !filter(key) {
+    fn invalidate(&self, key: ObjectKey, value: Option<ObjectValue>) {
+        if !filter(&key) {
             return;
         }
         let mut inner = self.inner.lock().unwrap();
-        inner.remove(key);
+        if let Entry::Occupied(mut entry) = inner.entry(key) {
+            if let Some(replacement) = value {
+                *(entry.get_mut()) = CacheValue::Value(replacement);
+            } else {
+                entry.remove();
+            }
+        }
     }
 }
 
@@ -131,17 +140,17 @@ impl ObjectCache<ObjectKey, ObjectValue> for TreeCache {
 mod tests {
     use {
         super::{
-            super::object_record::{ObjectDescriptor, ObjectKey, ObjectValue},
+            super::object_record::{ObjectKey, ObjectValue, Timestamp},
             TreeCache,
         },
         crate::lsm_tree::cache::{ObjectCache, ObjectCacheResult},
     };
-
     #[fuchsia::test]
     async fn test_basic_operations() {
         let cache = TreeCache::new();
-        let key = ObjectKey::child(1, "apple");
-        let value = ObjectValue::child(1, ObjectDescriptor::File);
+        let key = ObjectKey::object(1);
+        let now = Timestamp::now();
+        let value = ObjectValue::file(1, 0, now, now, now, now, 0, None);
 
         let placeholder = match cache.lookup_or_reserve(&key) {
             ObjectCacheResult::Placeholder(placeholder) => placeholder,
@@ -155,12 +164,41 @@ mod tests {
         };
         assert_eq!(&result, &value);
 
-        cache.invalidate(&key);
+        cache.invalidate(key.clone(), None);
 
         match cache.lookup_or_reserve(&key) {
             ObjectCacheResult::Placeholder(placeholder) => placeholder.complete(None),
             _ => panic!("Expected cache miss with placeholder returned."),
         };
+    }
+
+    #[fuchsia::test]
+    async fn test_invalidate_inserts() {
+        let cache = TreeCache::new();
+        let key = ObjectKey::object(1);
+        let now = Timestamp::now();
+        let value1 = ObjectValue::file(1, 0, now, now, now, now, 0, None);
+        let value2 = ObjectValue::file(2, 0, now, now, now, now, 0, None);
+
+        let placeholder = match cache.lookup_or_reserve(&key) {
+            ObjectCacheResult::Placeholder(placeholder) => placeholder,
+            _ => panic!("Expected cache miss with placeholder returned."),
+        };
+        placeholder.complete(Some(&value1));
+
+        let result = match cache.lookup_or_reserve(&key) {
+            ObjectCacheResult::Value(value) => value,
+            _ => panic!("Expected to find item."),
+        };
+        assert_eq!(&result, &value1);
+
+        cache.invalidate(key.clone(), Some(value2.clone()));
+
+        let result = match cache.lookup_or_reserve(&key) {
+            ObjectCacheResult::Value(value) => value,
+            _ => panic!("Expected to find item."),
+        };
+        assert_eq!(&result, &value2);
     }
 
     #[fuchsia::test]
@@ -176,9 +214,10 @@ mod tests {
     #[fuchsia::test]
     async fn test_two_parallel_clients() {
         let cache = TreeCache::new();
-        let key = ObjectKey::child(1, "apple");
-        let value1 = ObjectValue::child(1, ObjectDescriptor::File);
-        let value2 = ObjectValue::child(2, ObjectDescriptor::File);
+        let key = ObjectKey::object(1);
+        let now = Timestamp::now();
+        let value1 = ObjectValue::file(1, 0, now, now, now, now, 0, None);
+        let value2 = ObjectValue::file(2, 0, now, now, now, now, 0, None);
 
         let placeholder1 = match cache.lookup_or_reserve(&key) {
             ObjectCacheResult::Placeholder(placeholder) => placeholder,
@@ -189,7 +228,7 @@ mod tests {
         assert!(matches!(cache.lookup_or_reserve(&key), ObjectCacheResult::NoCache));
 
         // Invalidate the current placeholder.
-        cache.invalidate(&key);
+        cache.invalidate(key.clone(), None);
 
         // Get a new placeholder
         let placeholder2 = match cache.lookup_or_reserve(&key) {
