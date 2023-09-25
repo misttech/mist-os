@@ -222,7 +222,7 @@ def _create_status_lines_from_state(
 
     # Show an overall duration timer if the global run is started.
     if event.GLOBAL_RUN_ID in state.active_durations:
-        run_duration = f"[duration: {datetime.timedelta(seconds=monotonic - state.active_durations[event.GLOBAL_RUN_ID].start_monotonic)}]"
+        run_duration = f"[duration: {statusinfo.format_duration(datetime.timedelta(seconds=monotonic - state.active_durations[event.GLOBAL_RUN_ID].start_monotonic).total_seconds())}]"
     else:
         run_duration = ""
 

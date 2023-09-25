@@ -128,6 +128,36 @@ def ellipsize(input: str, width: int) -> str:
         return output
 
 
+def format_duration(seconds: float) -> str:
+    """Format a duration of seconds for display.
+
+    Args:
+        seconds (float): Number of seconds to format.
+
+    Returns:
+        str: Seconds formatted as a string.
+
+    >>> format_duration(10)
+    '10.0s'
+
+    >>> format_duration(60)
+    '1:00.0'
+
+    >>> format_duration(32.33)
+    '32.3s'
+
+    >>> format_duration(1.2)
+    '1.2s'
+
+    >>> format_duration(134.31)
+    '2:14.3'
+    """
+    if seconds >= 60:
+        return f"{int(seconds/60)}:{seconds % 60:04.1f}"
+    else:
+        return f"{seconds % 60:.1f}s"
+
+
 def _split_by_weights(weights: typing.List[int], size: int) -> typing.List[int]:
     """Split the given size into an array of sizes by the given weights.
 
@@ -402,18 +432,24 @@ def duration_progress(
         str: Pretty formatted line.
 
     >>> duration_progress('Testing', datetime.timedelta(microseconds=3201123), width=70, style=False)
-    'Testing                                             [0:00:03.201123] '
+    'Testing                                                [3.2s]        '
     >>> duration_progress('Testing a really really long string that will be truncated', datetime.timedelta(microseconds=3201123), width=70, style=False)
-    'Testing a really really long string that will be…   [0:00:03.201123] '
+    'Testing a really really long string that will be tr…   [3.2s]        '
     """
     width = width or os.get_terminal_size().columns
-    shape = _split_by_weights([70, 5, 25], width)
+    shape = _split_by_weights([75, 5, 20], width)
     label_width, padding_width, duration_width = shape
 
     return (
         _pad_to_size(name, label_width)
         + _pad_to_size("", padding_width)
-        + dim(_pad_to_size(f"[{str(duration)}]", duration_width), style=style)
+        + dim(
+            _pad_to_size(
+                f"[{format_duration(duration.total_seconds())}]",
+                duration_width,
+            ),
+            style=style,
+        )
     )
 
 
