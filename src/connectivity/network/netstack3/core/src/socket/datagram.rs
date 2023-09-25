@@ -36,7 +36,7 @@ use crate::{
         device::state::IpDeviceStateIpExt,
         socket::{
             BufferIpSocketHandler, IpSock, IpSockCreateAndSendError, IpSockCreationError,
-            IpSockSendError, IpSocketHandler, SendOptions,
+            IpSockSendError, IpSocketHandler, SendOneShotIpPacketError, SendOptions,
         },
         BufferTransportIpContext, EitherDeviceId, HopLimits, MulticastMembershipHandler,
         ResolveRouteError, TransportIpContext,
@@ -1395,6 +1395,10 @@ pub(crate) trait DatagramSocketSpec {
     /// The type of serializer returned by [`DatagramSocketSpec::make_packet`]
     /// for a given IP version and buffer type.
     type Serializer<I: IpExt, B: BufferMut>: Serializer<Buffer = B>;
+    /// The potential error for serializing a packet. For example, in UDP, this
+    /// should be infallible but for ICMP, there will be an error if the input
+    /// is not an echo request.
+    type SerializeError;
     fn make_packet<I: IpExt, B: BufferMut>(
         body: B,
         addr: &ConnIpAddr<
@@ -1402,7 +1406,7 @@ pub(crate) trait DatagramSocketSpec {
             <Self::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
             <Self::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
         >,
-    ) -> Self::Serializer<I, B>;
+    ) -> Result<Self::Serializer<I, B>, Self::SerializeError>;
 
     /// Attempts to allocate a local identifier for a listening socket.
     ///
@@ -2764,13 +2768,15 @@ pub(crate) fn get_shutdown_connected<
 
 /// Error encountered when sending a datagram on a socket.
 #[derive(Debug, GenericOverIp)]
-pub enum SendError<B, S> {
+pub enum SendError<B, S, SE> {
     /// The socket is not connected,
     NotConnected(B),
     /// The socket is not writeable.
     NotWriteable(B),
     /// There was a problem sending the IP packet.
     IpSock(S, IpSockSendError),
+    /// There was a problem when serializing the packet.
+    SerializeError(SE),
 }
 
 pub(crate) fn send_conn<
@@ -2784,7 +2790,7 @@ pub(crate) fn send_conn<
     ctx: &mut C,
     id: S::SocketId<I>,
     body: B,
-) -> Result<(), SendError<B, S::Serializer<I, B>>> {
+) -> Result<(), SendError<B, S::Serializer<I, B>, S::SerializeError>> {
     sync_ctx.with_sockets_state_buf(|sync_ctx, state| {
         let state = match state.get(id.get_key_index()).expect("invalid socket ID") {
             SocketState::Unbound(_)
@@ -2817,22 +2823,24 @@ pub(crate) fn send_conn<
 
         let ConnAddr { ip, device: _ } = addr;
 
+        let packet = S::make_packet(body, &ip).map_err(SendError::SerializeError)?;
         sync_ctx.with_transport_context_buf(|sync_ctx| {
             sync_ctx
-                .send_ip_packet(ctx, &socket, S::make_packet(body, &ip), None)
+                .send_ip_packet(ctx, &socket, packet, None)
                 .map_err(|(serializer, send_error)| SendError::IpSock(serializer, send_error))
         })
     })
 }
 
 #[derive(Debug)]
-pub(crate) enum SendToError<B, S> {
+pub(crate) enum SendToError<B, S, SE> {
     NotWriteable(B),
     Zone(B, ZonedAddressError),
     CreateAndSend(S, IpSockCreateAndSendError),
     // The remote address is mapped (i.e. an ipv4-mapped-ipv6 address), but the
     // socket is not dual-stack enabled.
     RemoteUnexpectedlyMapped(B),
+    SerializeError(SE),
 }
 
 pub(crate) fn send_to<
@@ -2848,7 +2856,10 @@ pub(crate) fn send_to<
     remote_ip: SocketZonedIpAddr<I::Addr, SC::DeviceId>,
     remote_identifier: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     body: B,
-) -> Result<(), Either<(B, LocalAddressError), SendToError<B, S::Serializer<I, B>>>>
+) -> Result<
+    (),
+    Either<(B, LocalAddressError), SendToError<B, S::Serializer<I, B>, S::SerializeError>>,
+>
 where
     S::UnboundSharingState<I>: Clone
         + Into<<S::SocketMapSpec<I, SC::WeakDeviceId> as SocketMapStateSpec>::ListenerSharingState>,
@@ -2970,7 +2981,7 @@ fn send_oneshot<
     device: &Option<SC::WeakDeviceId>,
     ip_options: &IpOptions<I, SC::WeakDeviceId, S>,
     body: B,
-) -> Result<(), SendToError<B, S::Serializer<I, B>>> {
+) -> Result<(), SendToError<B, S::Serializer<I, B>, S::SerializeError>> {
     let (remote_ip, device) = match crate::transport::resolve_addr_with_device::<I::Addr, _, _, _>(
         remote_ip.into_inner(),
         device.clone(),
@@ -2984,7 +2995,7 @@ fn send_oneshot<
     let remote_ip: SocketIpAddr<_> = remote_ip.try_into().unwrap();
 
     sync_ctx
-        .send_oneshot_ip_packet(
+        .send_oneshot_ip_packet_with_fallible_serializer(
             ctx,
             device.as_ref().map(|d| d.as_ref()),
             local_ip,
@@ -2999,7 +3010,12 @@ fn send_oneshot<
             },
             None,
         )
-        .map_err(|(body, err, _ip_options)| SendToError::CreateAndSend(body, err))
+        .map_err(|err| match err {
+            SendOneShotIpPacketError::CreateAndSendError { body, err, options: _ } => {
+                SendToError::CreateAndSend(body, err)
+            }
+            SendOneShotIpPacketError::SerializeError(err) => SendToError::SerializeError(err),
+        })
 }
 
 pub(crate) fn set_device<
@@ -3734,6 +3750,7 @@ mod test {
         }
 
         type Serializer<I: IpExt, B: BufferMut> = B;
+        type SerializeError = Never;
         fn make_packet<I: IpExt, B: BufferMut>(
             body: B,
             _addr: &ConnIpAddr<
@@ -3741,8 +3758,8 @@ mod test {
                 <FakeAddrSpec as SocketMapAddrSpec>::LocalIdentifier,
                 <FakeAddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
             >,
-        ) -> Self::Serializer<I, B> {
-            body
+        ) -> Result<Self::Serializer<I, B>, Never> {
+            Ok(body)
         }
         fn try_alloc_listen_identifier<I: Ip, D: device::WeakId>(
             _ctx: &mut impl RngContext,

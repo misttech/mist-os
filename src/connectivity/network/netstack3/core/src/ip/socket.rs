@@ -125,6 +125,12 @@ mod socket_ip_ext_test {
     }
 }
 
+#[derive(Debug)]
+pub(crate) enum SendOneShotIpPacketError<S, O, E> {
+    CreateAndSendError { body: S, err: IpSockCreateAndSendError, options: O },
+    SerializeError(E),
+}
+
 /// An extension of [`IpSocketHandler`] adding the ability to send packets on an
 /// IP socket.
 pub(crate) trait BufferIpSocketHandler<I: SocketIpExt, C, B: BufferMut>:
@@ -174,7 +180,58 @@ pub(crate) trait BufferIpSocketHandler<I: SocketIpExt, C, B: BufferMut>:
     /// `get_body_from_src_ip` will be called on an arbitrary IP address in
     /// order to obtain a body to return. In the case where a buffer was passed
     /// by ownership to `get_body_from_src_ip`, this allows the caller to
-    /// recover that buffer.
+    /// recover that buffer. `get_body_from_src_ip` is fallible, and if there's
+    /// an error, it will be returned as well.
+    fn send_oneshot_ip_packet_with_fallible_serializer<
+        S: Serializer<Buffer = B>,
+        E,
+        F: FnOnce(SocketIpAddr<I::Addr>) -> Result<S, E>,
+        O: SendOptions<I>,
+    >(
+        &mut self,
+        ctx: &mut C,
+        device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
+        local_ip: Option<SocketIpAddr<I::Addr>>,
+        remote_ip: SocketIpAddr<I::Addr>,
+        proto: I::Proto,
+        options: O,
+        get_body_from_src_ip: F,
+        mtu: Option<u32>,
+    ) -> Result<(), SendOneShotIpPacketError<S, O, E>> {
+        // We use a `match` instead of `map_err` because `map_err` would require passing a closure
+        // which takes ownership of `get_body_from_src_ip`, which we also use in the success case.
+        match self.new_ip_socket(ctx, device, local_ip, remote_ip, proto, options) {
+            Err((err, options)) => {
+                Err(match get_body_from_src_ip(I::LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR) {
+                    Ok(body) => SendOneShotIpPacketError::CreateAndSendError {
+                        body,
+                        err: err.into(),
+                        options,
+                    },
+                    Err(ser_err) => SendOneShotIpPacketError::SerializeError(ser_err),
+                })
+            }
+            Ok(tmp) => {
+                let packet = get_body_from_src_ip(*tmp.local_ip())
+                    .map_err(SendOneShotIpPacketError::SerializeError)?;
+                self.send_ip_packet(ctx, &tmp, packet, mtu).map_err(|(body, err)| match err {
+                    IpSockSendError::Mtu => {
+                        let IpSock { options, definition: _ } = tmp;
+                        SendOneShotIpPacketError::CreateAndSendError {
+                            body,
+                            err: IpSockCreateAndSendError::Mtu,
+                            options,
+                        }
+                    }
+                    IpSockSendError::Unroutable(_) => {
+                        unreachable!("socket which was just created should still be routable")
+                    }
+                })
+            }
+        }
+    }
+
+    /// Sends a one-shot IP packet but with a non-fallible serializer.
     fn send_oneshot_ip_packet<
         S: Serializer<Buffer = B>,
         F: FnOnce(SocketIpAddr<I::Addr>) -> S,
@@ -190,26 +247,22 @@ pub(crate) trait BufferIpSocketHandler<I: SocketIpExt, C, B: BufferMut>:
         get_body_from_src_ip: F,
         mtu: Option<u32>,
     ) -> Result<(), (S, IpSockCreateAndSendError, O)> {
-        // We use a `match` instead of `map_err` because `map_err` would require passing a closure
-        // which takes ownership of `get_body_from_src_ip`, which we also use in the success case.
-        match self.new_ip_socket(ctx, device, local_ip, remote_ip, proto, options) {
-            Err((err, options)) => Err((
-                get_body_from_src_ip(I::LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR),
-                err.into(),
-                options,
-            )),
-            Ok(tmp) => self
-                .send_ip_packet(ctx, &tmp, get_body_from_src_ip(*tmp.local_ip()), mtu)
-                .map_err(|(body, err)| match err {
-                    IpSockSendError::Mtu => {
-                        let IpSock { options, definition: _ } = tmp;
-                        (body, IpSockCreateAndSendError::Mtu, options)
-                    }
-                    IpSockSendError::Unroutable(_) => {
-                        unreachable!("socket which was just created should still be routable")
-                    }
-                }),
-        }
+        self.send_oneshot_ip_packet_with_fallible_serializer(
+            ctx,
+            device,
+            local_ip,
+            remote_ip,
+            proto,
+            options,
+            |ip| Ok::<_, Infallible>(get_body_from_src_ip(ip)),
+            mtu,
+        )
+        .map_err(|err| match err {
+            SendOneShotIpPacketError::CreateAndSendError { body, err, options } => {
+                (body, err, options)
+            }
+            SendOneShotIpPacketError::SerializeError(infallible) => match infallible {},
+        })
     }
 }
 

@@ -7,6 +7,7 @@
 use alloc::{collections::hash_map::DefaultHasher, vec::Vec};
 use assert_matches::assert_matches;
 use core::{
+    convert::Infallible,
     fmt::Debug,
     hash::{Hash, Hasher},
     num::{NonZeroU16, NonZeroU8, NonZeroUsize},
@@ -427,6 +428,7 @@ impl DatagramSocketSpec for Udp {
     type ListenerSharingState = Sharing;
 
     type Serializer<I: IpExt, B: BufferMut> = Nested<B, UdpPacketBuilder<I::Addr>>;
+    type SerializeError = Infallible;
 
     fn ip_proto<I: IpProtoExt>() -> I::Proto {
         IpProto::Udp.into()
@@ -441,14 +443,14 @@ impl DatagramSocketSpec for Udp {
     fn make_packet<I: IpExt, B: BufferMut>(
         body: B,
         addr: &ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
-    ) -> Self::Serializer<I, B> {
+    ) -> Result<Self::Serializer<I, B>, Infallible> {
         let ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) } = addr;
-        body.encapsulate(UdpPacketBuilder::new(
+        Ok(body.encapsulate(UdpPacketBuilder::new(
             local_ip.addr(),
             remote_ip.addr(),
             Some(*local_port),
             *remote_port,
-        ))
+        )))
     }
 
     fn try_alloc_listen_identifier<I: IpExt, D: WeakId>(
@@ -1846,6 +1848,7 @@ impl<
         body: B,
     ) -> Result<(), (B, Either<SendError, ExpectedConnError>)> {
         datagram::send_conn(self, ctx, id, body).map_err(|send_error| match send_error {
+            DatagramSendError::SerializeError(never) => match never {},
             DatagramSendError::NotConnected(b) => (b, Either::Right(ExpectedConnError)),
             DatagramSendError::NotWriteable(b) => (b, Either::Left(SendError::NotWriteable)),
             DatagramSendError::IpSock(body, err) => {
@@ -1866,6 +1869,7 @@ impl<
             Either::Left((body, e)) => (body, Either::Left(e)),
             Either::Right(e) => {
                 let (body, err) = match e {
+                    datagram::SendToError::SerializeError(never) => match never {},
                     datagram::SendToError::NotWriteable(body) => (body, SendToError::NotWriteable),
                     datagram::SendToError::Zone(body, e) => (body, SendToError::Zone(e)),
                     datagram::SendToError::CreateAndSend(s, e) => (

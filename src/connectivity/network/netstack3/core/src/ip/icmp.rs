@@ -828,6 +828,7 @@ impl DatagramSocketSpec for Icmp {
 
     type Serializer<I: datagram::IpExt, B: BufferMut> =
         packet::Nested<B, IcmpPacketBuilder<I, IcmpEchoRequest>>;
+    type SerializeError = packet_formats::error::ParseError;
 
     fn make_packet<I: datagram::IpExt, B: BufferMut>(
         mut body: B,
@@ -836,20 +837,20 @@ impl DatagramSocketSpec for Icmp {
             <Self::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
             <Self::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
         >,
-    ) -> Self::Serializer<I, B> {
+    ) -> Result<Self::Serializer<I, B>, Self::SerializeError> {
         let ConnIpAddr { local: (local_ip, id), remote: (remote_ip, ()) } = addr;
         // TODO(https://fxbug.dev/47321): Instead of panic, make this trait
         // method fallible so that the caller can return errors. This will
         // become necessary once we use the datagram module for sending.
         let icmp_echo: packet_formats::icmp::IcmpPacketRaw<I, &[u8], IcmpEchoRequest> =
-            body.parse().unwrap();
+            body.parse()?;
         let icmp_builder = IcmpPacketBuilder::<I, _>::new(
             local_ip.addr(),
             remote_ip.addr(),
             packet_formats::icmp::IcmpUnusedCode,
             IcmpEchoRequest::new(id.get(), icmp_echo.message().seq()),
         );
-        body.encapsulate(icmp_builder)
+        Ok(body.encapsulate(icmp_builder))
     }
 
     fn try_alloc_listen_identifier<I: datagram::IpExt, D: WeakId>(
@@ -3312,7 +3313,7 @@ pub(crate) trait BufferSocketHandler<I: datagram::IpExt, C, B: BufferMut>:
         ctx: &mut C,
         conn: SocketId<I>,
         body: B,
-    ) -> Result<(), datagram::SendError<B, ()>>;
+    ) -> Result<(), datagram::SendError<B, (), packet_formats::error::ParseError>>;
 }
 
 impl<I: datagram::IpExt, C: IcmpNonSyncCtx<I>, SC: StateContext<I, C> + IcmpStateContext>
@@ -3353,10 +3354,11 @@ impl<
         ctx: &mut C,
         id: SocketId<I>,
         body: B,
-    ) -> Result<(), datagram::SendError<B, ()>> {
+    ) -> Result<(), datagram::SendError<B, (), packet_formats::error::ParseError>> {
         datagram::send_conn::<_, _, _, Icmp, _>(self, ctx, id, body).map_err(|err| match err {
             datagram::SendError::NotConnected(err) => datagram::SendError::NotConnected(err),
             datagram::SendError::NotWriteable(err) => datagram::SendError::NotWriteable(err),
+            datagram::SendError::SerializeError(err) => datagram::SendError::SerializeError(err),
             datagram::SendError::IpSock(serializer, err) => {
                 let _: packet::Nested<B, IcmpPacketBuilder<I, IcmpEchoRequest>> = serializer;
                 datagram::SendError::IpSock((), err)
@@ -3452,7 +3454,7 @@ pub fn send<I: Ip, B: BufferMut, C: NonSyncContext + BufferNonSyncContext<B>>(
     ctx: &mut C,
     id: SocketId<I>,
     body: B,
-) -> Result<(), datagram::SendError<B, ()>> {
+) -> Result<(), datagram::SendError<B, (), packet_formats::error::ParseError>> {
     I::map_ip(
         (IpInvariant((sync_ctx, ctx, body)), id),
         |(IpInvariant((sync_ctx, ctx, body)), id)| {
@@ -3561,26 +3563,13 @@ mod tests {
         }
     }
 
-    impl Default for FakeIcmpInnerSyncCtx<Ipv4> {
+    impl<I: TestIpExt> Default for FakeIcmpInnerSyncCtx<I> {
         fn default() -> Self {
             Wrapped::with_inner_and_outer_state(
                 FakeDualStackIpSocketCtx::new(core::iter::once(FakeDeviceConfig {
                     device: FakeDeviceId,
-                    local_ips: vec![FAKE_CONFIG_V4.local_ip],
-                    remote_ips: vec![FAKE_CONFIG_V4.remote_ip],
-                })),
-                FakeIcmpInnerSyncCtxState::with_errors_per_second(DEFAULT_ERRORS_PER_SECOND),
-            )
-        }
-    }
-
-    impl Default for FakeIcmpInnerSyncCtx<Ipv6> {
-        fn default() -> Self {
-            Wrapped::with_inner_and_outer_state(
-                FakeDualStackIpSocketCtx::new(core::iter::once(FakeDeviceConfig {
-                    device: FakeDeviceId,
-                    local_ips: vec![FAKE_CONFIG_V6.local_ip],
-                    remote_ips: vec![FAKE_CONFIG_V6.remote_ip],
+                    local_ips: vec![I::FAKE_CONFIG.local_ip],
+                    remote_ips: vec![I::FAKE_CONFIG.remote_ip],
                 })),
                 FakeIcmpInnerSyncCtxState::with_errors_per_second(DEFAULT_ERRORS_PER_SECOND),
             )
@@ -5567,6 +5556,37 @@ mod tests {
             Err(datagram::ConnectError::Ip(IpSockCreationError::Route(
                 ResolveRouteError::Unreachable,
             )))
+        );
+    }
+
+    #[ip_test]
+    fn send_invalid_icmp_echo<I: Ip + TestIpExt + datagram::IpExt>() {
+        let mut ctx = FakeIcmpCtx::<I>::default();
+        let FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let conn = SocketHandler::<I, _>::create(sync_ctx);
+        SocketHandler::<I, _>::connect(
+            sync_ctx,
+            non_sync_ctx,
+            conn,
+            SocketZonedIpAddr::from(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
+        )
+        .unwrap();
+
+        let buf = Buf::new(Vec::new(), ..)
+            .encapsulate(IcmpPacketBuilder::<I, _>::new(
+                I::FAKE_CONFIG.local_ip.get(),
+                I::FAKE_CONFIG.remote_ip.get(),
+                IcmpUnusedCode,
+                packet_formats::icmp::IcmpEchoReply::new(0, 1),
+            ))
+            .serialize_vec_outer()
+            .unwrap()
+            .into_inner();
+        assert_matches!(
+            BufferSocketHandler::<I, _, _>::send(sync_ctx, non_sync_ctx, conn, buf,),
+            Err(datagram::SendError::SerializeError(
+                packet_formats::error::ParseError::NotExpected
+            ))
         );
     }
 }
