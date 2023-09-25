@@ -12,7 +12,7 @@ use futures::{
     task::{Context, Poll},
     Future,
 };
-use std::{io::ErrorKind, net::SocketAddr, num::Wrapping, pin::Pin, time::Duration};
+use std::{fmt, io::ErrorKind, net::SocketAddr, num::Wrapping, pin::Pin, time::Duration};
 use timeout::timeout;
 use zerocopy::{byteorder::big_endian::U16, ByteSlice, FromBytes, FromZeroes, Ref, Unaligned};
 
@@ -68,6 +68,16 @@ pub struct UdpNetworkInterface {
     socket: UdpSocket,
     read_task: Option<Pin<Box<dyn Future<Output = std::io::Result<(usize, Vec<u8>)>>>>>,
     write_task: Option<Pin<Box<dyn Future<Output = std::io::Result<usize>>>>>,
+}
+
+impl fmt::Debug for UdpNetworkInterface {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("UdpNetworkInterface")
+            .field("maximum_size", &self.maximum_size)
+            .field("sequence", &self.sequence)
+            .field("socket", &self.socket)
+            .finish()
+    }
 }
 
 impl UdpNetworkInterface {

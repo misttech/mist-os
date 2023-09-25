@@ -2,13 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::common::fastboot_interface::Fastboot;
 use crate::common::fastboot_interface::FastbootInterface;
 use crate::common::fastboot_interface::Variable;
 use crate::common::RebootEvent;
 use crate::common::UploadProgress;
 use crate::transport::tcp::{open_once, TcpNetworkInterface};
 use crate::usb_discovery::open_interface_with_serial;
+use crate::{
+    common::fastboot_interface::Fastboot,
+    transport::udp::{open, UdpNetworkInterface},
+};
 use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use chrono::Duration;
@@ -55,8 +58,28 @@ pub async fn tcp_proxy(addr: &SocketAddr) -> Result<FastbootProxy<TcpNetworkInte
 
 impl FastbootProxy<TcpNetworkInterface> {
     async fn build(addr: &SocketAddr) -> Result<FastbootProxy<TcpNetworkInterface>> {
-        let interface = open_once(addr, Duration::seconds(1).to_std()?).await?;
+        let interface = open_once(addr, Duration::seconds(1).to_std()?)
+            .await
+            .with_context(|| format!("connecting via TCP to Fastboot address: {addr}"))?;
         Ok(FastbootProxy::<TcpNetworkInterface> { target_id: addr.to_string(), interface })
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// UdpInterface
+//
+
+/// Creates a FastbootProxy over TCP for a device at the given SocketAddr
+pub async fn udp_proxy(addr: &SocketAddr) -> Result<FastbootProxy<UdpNetworkInterface>> {
+    FastbootProxy::<UdpNetworkInterface>::build(addr).await
+}
+
+impl FastbootProxy<UdpNetworkInterface> {
+    async fn build(addr: &SocketAddr) -> Result<FastbootProxy<UdpNetworkInterface>> {
+        let interface = open(*addr)
+            .await
+            .with_context(|| format!("connecting via UDP to Fastboot address: {addr}"))?;
+        Ok(FastbootProxy::<UdpNetworkInterface> { target_id: addr.to_string(), interface })
     }
 }
 
