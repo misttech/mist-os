@@ -409,7 +409,7 @@ async def do_build(
         exec_env (environment.ExecutionEnvironment): Incoming execution environment.
 
     Returns:
-        bool: True only if the tests were build and published, False otherwise.
+        bool: True only if the tests were built and published, False otherwise.
     """
     label_to_rule = re.compile(r"//([^()]+)\(")
     build_command_line = []
@@ -454,22 +454,35 @@ async def do_build(
         return False
 
     amber_directory = os.path.join(exec_env.out_dir, "amber-files")
-    publish_args = [
-        "fx",
-        "ffx",
-        "repository",
-        "publish",
-        "--trusted-root",
-        os.path.join(amber_directory, "repository/root.json"),
-        "--ignore-missing-packages",
-        "--time-versioning",
-        "--package-list",
-        os.path.join(exec_env.out_dir, "all_package_manifests.list"),
-        amber_directory,
-    ]
+    delivery_blob_type = read_delivery_blob_type(exec_env, recorder)
+    publish_args = (
+        [
+            "fx",
+            "ffx",
+            "repository",
+            "publish",
+            "--trusted-root",
+            os.path.join(amber_directory, "repository/root.json"),
+            "--ignore-missing-packages",
+            "--time-versioning",
+        ]
+        + (
+            ["--delivery-blob-type", str(delivery_blob_type)]
+            if delivery_blob_type is not None
+            else []
+        )
+        + [
+            "--package-list",
+            os.path.join(exec_env.out_dir, "all_package_manifests.list"),
+            amber_directory,
+        ]
+    )
 
     output = await execution.run_command(
-        *publish_args, recorder=recorder, parent=build_id, print_verbatim=True
+        *publish_args,
+        recorder=recorder,
+        parent=build_id,
+        print_verbatim=True,
     )
     if not output:
         error = "Failure publishing packages."
@@ -481,6 +494,38 @@ async def do_build(
     recorder.emit_end(error, id=build_id)
 
     return error is None
+
+
+def read_delivery_blob_type(
+    exec_env: environment.ExecutionEnvironment,
+    recorder: event.EventRecorder,
+) -> int | None:
+    """Read the delivery blob type from the output directory.
+
+    The delivery_blob_config.json file contains a "type" field that must
+    be passed along to package publishing if set.
+
+    This functions attempts to load the file and returns the value of that
+    field if set.
+
+    Args:
+        exec_env (environment.ExecutionEnvironment): Test execution environment.
+
+    Returns:
+        int | None: The delivery blob type, if found. None otherwise.
+    """
+    expected_path = os.path.join(exec_env.out_dir, "delivery_blob_config.json")
+    id = recorder.emit_start_file_parsing("delivery_blob_config.json", expected_path)
+    if not os.path.isfile(expected_path):
+        recorder.emit_end(
+            error="Could not find delivery_blob_config.json in output", id=id
+        )
+        return None
+
+    with open(expected_path) as f:
+        val: typing.Dict[str, typing.Any] = json.load(f)
+        recorder.emit_end(id=id)
+        return int(val["type"]) if "type" in val else None
 
 
 def has_tests_in_base(
