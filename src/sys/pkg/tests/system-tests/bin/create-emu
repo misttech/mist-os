@@ -1,237 +1,282 @@
-#!/bin/bash
+#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2022 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-#### CATEGORY=Run, inspect and debug
-### create a persistent fuchsia image in a directory
-## create a persistent fuchsia image in a directory
-##
-## usage: create-emu --image-dir <DIR> [--image-size SIZE] [--abr-size SIZE] [--system-disk-size SIZE] [run-zircon arguments...]
-##
-##     --image-dir    create and run the fuchsia image from this directory
-##     --image-size   total image size in bytes (default 4 GiB)
-##     --abr-size     abr partition size in bytes (default 256 MiB)
-##     --system-disk-size     fvm partition size in bytes (default fills)
-##
-## This command creates a Fuchsia image in the specified directory. As part of
-## this process, it starts up the image in QEMU so that we can copy in our
-## ssh authorized keys file. We do this through QEMU because there is no
-## host-side tooling that lets us inject this file into minfs or fxfs.
-##
-## Once complete, this image will be ready to be used with `run-emu`.
-##
-## This command delegates to //src/sys/pkg/tests/system-tests/run-zircon. Flags
-## are documented in that script, and can be discovered by passing -h or
-## --help.
-##
+import argparse
+import asyncio
+import os
+import pathlib
+import shlex
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
 
-set -e
+async def print_qemu_logs(qemu_reader, qemu_writer):
+  while True:
+    line = await qemu_reader.readline()
+    if not line:
+      break
 
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)/../../../../../../tools/devshell/lib/vars.sh" || exit $?
-fx-config-read
+    print(line.decode('utf-8'), end='')
 
-IMGDIR=
-IMAGE_SIZE_BYTES=$(( 4 * 1024 * 1024 * 1024)) # total image size is 4 GiB by default
-ABR_SIZE_BYTES=$(( 256 * 1024 * 1024 ))       # ABR slot size is 256 MiB by default
-FVM_SIZE_BYTES=                               # fill the remaining space with the FVM by default
-trailing_args=()
+  qemu_writer.close()
+  await qemu_writer.wait_closed()
 
-while (($#)); do
-  case "$1" in
-    -h|--help)
-      fx-command-help
-      echo
-      echo "additional flags that are passed on to run-zircon:"
-      echo
-      "${FUCHSIA_DIR}/zircon/scripts/run-zircon" -h
-      exit 1
-      ;;
-    --image-dir)
-      shift
-      IMGDIR=$1
-      ;;
-    --image-size)
-      shift
-      IMAGE_SIZE_BYTES=$1
-      ;;
-    --abr-size)
-      shift
-      ABR_SIZE_BYTES=$1
-      ;;
-    --system-disk-size)
-      shift
-      FVM_SIZE_BYTES=$1
-      ;;
-    *)
-      trailing_args+=("$1")
-      ;;
-  esac
-  shift
-done
 
-if [[ -z "${IMGDIR}" ]]; then
-  fx-error "--image-dir must be specified"
-  exit 1
-fi
+async def poll_process(process):
+  try:
+    await asyncio.wait_for(process.wait(), 1)
+  except asyncio.TimeoutError:
+    pass
+  return process.returncode
 
-declare -a CLEANUP_LIST
-function cleanup {
-  # want to make sure we kill any long running processes if this shell dies.
-  local child_pids=$(jobs -p)
-  if [[ -n "${child_pids}" ]]; then
-    # Note: child_pids must be expanded to args here.
-    kill ${child_pids} 2> /dev/null
-    wait 2> /dev/null
-  fi
 
-  for i in "${CLEANUP_LIST[@]}"; do
-    rm -rf "${i}"
-  done
-}
-trap cleanup EXIT
+async def main():
+  parser = argparse.ArgumentParser(
+      formatter_class=argparse.RawDescriptionHelpFormatter,
+      description='''
+This command creates a Fuchsia image in the specified directory. As part of
+this process, it starts up the image in QEMU so that we can copy in our
+ssh authorized keys file. We do this through QEMU because there is no
+host-side tooling that lets us inject this file into minfs or fxfs.
 
-IMGDIR_OVMF_VARS="${IMGDIR}/OVMF_VARS.fd"
-IMGDIR_FUCHSIA="${IMGDIR}/fuchsia.efi"
+Once complete, this image will be ready to be used with:
 
-if [[ -e "${IMGDIR_OVMF_VARS}" || -e "${IMGDIR_FUCHSIA}" ]]; then
-  fx-error "image directory ${IMGDIR} should be empty, or you should use 'run-emu'"
-  exit 1
-fi
+    $ fx qemu --uefi -D path/to/dir/fuchsia.efi
 
-if [[ ! -d "${IMGDIR}" ]]; then
-  mkdir -p "${IMGDIR}"
-fi
+This command delegates to /run-zircon. Flags
+are documented in that script, and can be discovered by passing -h or
+--help.''')
+  parser.add_argument(
+    '--arch',
+    default='x64',
+    help='emulator architecture (arm64, riscv64, or x64)')
+  parser.add_argument(
+    '--fuchsia-dir',
+    type=pathlib.Path,
+    default=os.getenv('FUCHSIA_DIR'),
+    help='path to the fuchsia directory (default $FUCHSIA_DIR)')
+  parser.add_argument(
+    '--fuchsia-build-dir',
+    type=pathlib.Path,
+    default=os.environ.get('FUCHSIA_BUILD_DIR'),
+    help='path to the fuchsia build directory (default $FUCHSIA_BUILD_DIR)')
+  parser.add_argument(
+    '--edk2-dir',
+    type=pathlib.Path,
+    default=os.environ.get('PREBUILT_EDK2_DIR'),
+    help='path to the fuchsia build directory (default $PREBUILT_EDK2_DIR)')
+  parser.add_argument(
+    '--image-size',
+    type=int,
+    default=20 * 1024 * 1024 * 1024,
+    help='total image size (default 20 GiB)')
+  parser.add_argument(
+    '--abr-size',
+    type=int,
+    help='ABR slot size (default 256 MiB)')
+  parser.add_argument(
+    '--system-disk-size',
+    type=int,
+    help='system disk size (default 63 MiB)')
+  parser.add_argument(
+    '--disk-type',
+    type=str,
+    help='mount the disk with this type in qemu')
+  parser.add_argument(
+    'image',
+    type=pathlib.Path,
+    help='create the image into this path')
 
-fx-info "Creating ${IMGDIR_FUCHSIA}..."
+  args = parser.parse_args()
 
-# Ensure that the output is sent to the serial, and that we boot into zedboot.
-CMDLINE=$(mktemp "${IMGDIR}/CMDLINE.XXXXXXX")
-CLEANUP_LIST+=( "${CMDLINE}" )
+  if args.fuchsia_dir is None or not args.fuchsia_dir.exists():
+    print(
+      '--fuchsia-dir or FUCHSIA_DIR must exist',
+      file=sys.stderr)
+    return 1
 
-cat << EOF > "${CMDLINE}"
-kernel.serial=legacy
-TERM=xterm-256color
-kernel.halt-on-panic=true
-bootloader.default=local
-bootloader.timeout=0
-EOF
+  if args.fuchsia_build_dir is None or not args.fuchsia_build_dir.exists():
+    print(
+      '--fuchsia-build-dir or FUCHSIA_BUILD_DIR must exist',
+      file=sys.stderr)
+    return 1
 
-# Bake the authorized keys into the Kernel ZBI so we can ssh into it.
-ZBI_IMAGE="$(fx-command-run list-build-artifacts --type zbi --name zircon-a images)"
-ZBI_IMAGE="${FUCHSIA_BUILD_DIR}/${ZBI_IMAGE}"
-KERNEL_ZBI="${IMGDIR}/fuchsia-ssh.zbi"
-fx-zbi -o "${KERNEL_ZBI}" \
-  "${ZBI_IMAGE}" \
-  --entry "data/ssh/authorized_keys=$(get-ssh-authkeys)" \
-  --type=entropy:64 /dev/urandom
+  if os.path.exists(args.image):
+    print(
+      f'image {args.image} already exists, you should remove it, or run it with `fx qemu --uefi -D {args.image}`',
+      file=sys.stderr)
 
-# Construct a Fuchsia image.
-MAKE_FUCHSIA_VOL_ARGS=(
-  --fuchsia-build-dir "${FUCHSIA_BUILD_DIR}"
-  --cmdline "${CMDLINE}"
-  --resize "${IMAGE_SIZE_BYTES}"
-  --zbi "${KERNEL_ZBI}"
-)
+    return 1
 
-if [[ -n "${FVM_SIZE_BYTES}" ]]; then
-  MAKE_FUCHSIA_VOL_ARGS+=( --system-disk-size "${FVM_SIZE_BYTES}" )
-fi
+  print(f'Creating {args.image}')
 
-if [[ -n "${ABR_SIZE_BYTES}" ]]; then
-  MAKE_FUCHSIA_VOL_ARGS+=( --abr-size "${ABR_SIZE_BYTES}" )
-fi
+  with tempfile.TemporaryDirectory() as tmp:
+    tmp = pathlib.Path(tmp)
+    cmdline_path = tmp / 'cmdline'
 
-"${FUCHSIA_BUILD_DIR}/host-tools/make-fuchsia-vol" \
-  "${MAKE_FUCHSIA_VOL_ARGS[@]}" \
-  "${IMGDIR_FUCHSIA}"
+    with open(cmdline_path, 'w') as f:
+      # Ensure that the output is sent to the serial, and that we boot into
+      # zedboot.
+      f.write(
+        'kernel.serial=legacy\n'
+        'TERM=xterm-256color\n'
+        'kernel.halt-on-panic=true\n'
+        'bootloader.default=default\n'
+        'bootloader.timeout=5\n')
 
-fx-info "Created ${IMGDIR_FUCHSIA}"
+    ## Construct a Fuchsia image.
+    make_fuchsia_vol_args = [
+      args.fuchsia_build_dir / 'host-tools/make-fuchsia-vol',
+      '--fuchsia-build-dir', args.fuchsia_build_dir,
+      '--arch', args.arch,
+      '--cmdline', cmdline_path,
+      '--resize', str(args.image_size),
+      args.image,
+    ]
 
-# Copy in the OMVF_VARS.fd into our temp directory, which allows EFI data to be
-# persisted across reboots.
-fx-info "Creating ${IMGDIR_OVMF_VARS}"
+    if args.system_disk_size is not None:
+      make_fuchsia_vol_args.extend(['--system-disk-size', str(args.system_disk_size)])
 
-cp "${PREBUILT_EDK2_DIR}/qemu-x64/OVMF_VARS.fd" "${IMGDIR_OVMF_VARS}"
+    if args.abr_size is not None:
+      make_fuchsia_vol_args.extend(['--abr-size', str(args.abr_size)])
 
-fx-info "Created ${IMGDIR_OVMF_VARS}"
+    print(f'Running: {shlex.join(str(s) for s in make_fuchsia_vol_args)}')
 
-# Make sure the OVMF_VARS file is writable.
-chmod +w "${IMGDIR_OVMF_VARS}"
+    process = await asyncio.create_subprocess_exec(*make_fuchsia_vol_args)
+    return_code = await process.wait()
+    if return_code != 0:
+      print('Failed to create fuchsia image', file=sys.stderr)
+      return 1
 
-# Emulators always have the same mac address, so they always have this device
-# name.
-DEVICE_NAME=fuchsia-5254-0063-5e7a
+    print(f'Created {args.image}')
 
-# Launch QEMU. We run it in the background so we can copy over the SSH
-# authorized keys file.
-QEMU_LOG="${IMGDIR}/create-emu.log"
+    # Emulators always have the same mac address, so they always have this
+    # device name.
+    device_name = 'fuchsia-5254-0063-5e7a'
 
-fx-info "Launching QEMU to install the SSH authorized keys. See log in $QEMU_LOG for more details..."
+    qemu_socket_path = tmp / 'sock'
 
-"${FUCHSIA_DIR}/src/sys/pkg/tests/system-tests/bin/run-emu" \
-  --image-dir "${IMGDIR}" \
-  "${trailing_args[@]}" >"${QEMU_LOG}" 2>&1 &
+    print('Launching QEMU to install the SSH authorized keys. ')
 
-QEMU_PID=$!
+    run_zircon_args = [
+      args.fuchsia_dir / 'zircon/scripts/run-zircon',
+      '-a', args.arch,
+      '-N',
+      '--uefi',
+      '-S', f'unix:{qemu_socket_path.resolve()},server,nowait',
+      '-M', 'null',
+      '-D', args.image.resolve(),
+      '-q', args.fuchsia_dir.resolve() / f'prebuilt/third_party/qemu/linux-x64/bin',
+    ]
 
-sleep 5
+    if args.disk_type:
+      run_zircon_args.append(f'--disktype={args.disk_type}')
 
-# Check if QEMU is still running.
-if ! kill -0 "${QEMU_PID}" 2>/dev/null; then
-  # reap the QEMU process.
-  wait "${QEMU_PID}" || true
+    print(f'Running: {shlex.join(str(s) for s in run_zircon_args)}')
 
-  fx-error "QEMU died before we were able to connect to it"
-  fx-error "see ${QEMU_LOG} for more details"
-  exit 1
-fi
+    qemu_process = await asyncio.create_subprocess_exec(
+      *run_zircon_args,
+      stdin=subprocess.DEVNULL,
+      close_fds=True,
+    )
 
-fx-info "Waiting to connect to instance..."
+    try:
+      print('Waiting to connect to qemu serial...')
 
-# Even though we baked the authorized_keys into the ZBI, we'll lose it if we
-# install an OTA. So also copy the file onto the filesystem so it will persist.
-if ! ffx --target "${DEVICE_NAME}" --timeout 120 target wait; then
-  fx-error "failed to connect to QEMU instance"
-  echo "see ${QEMU_LOG} for more details"
-  exit 1
-fi
+      for i in range(1000):
+        print(f'check {qemu_socket_path}: {qemu_socket_path.exists()}')
+        if await poll_process(qemu_process) is not None:
+          print('qemu exited early', file=sys.stderr)
+          return 1
 
-# Parse out the instance's IP address that ffx discovered.
-if ! INSTANCE_IP=$(ffx --machine json target list | jq -r "map(select(.nodename | contains(\"${DEVICE_NAME}\")))[0].addresses[0]"); then
-  fx-error "failed to discover QEMU instance's IP address"
-  fx-error "see ${QEMU_LOG} for more details"
-  exit 1
-fi
+        if qemu_socket_path.exists():
+          break
+        else:
+          await asyncio.sleep(0.05)
+      else:
+        print('Failed to connect to serial port', file=sys.stderr)
+        return 1
 
-if [[ -z "${INSTANCE_IP}" ]]; then
-  fx-error "ffx returned an empty IP address for the QEMU instance"
-  fx-error "see ${QEMU_LOG} for more details"
-  exit 1
-fi
+      print('Connecting to socket...')
 
-fx-info "Connected to instance at ${INSTANCE_IP}."
-fx-info "Installing the SSH authorized keys..."
+      qemu_reader, qemu_writer = await asyncio.open_unix_connection(str(qemu_socket_path))
 
-# Copy in the ssh keys.
-auth_keys=$(cat $(get-ssh-authkeys))
+      print('Connected to socket')
 
-if ! ssh -F "${FUCHSIA_BUILD_DIR}/ssh-keys/ssh_config" "${INSTANCE_IP}" "echo \"${auth_keys}\" > /data/ssh/authorized_keys"; then
-  fx-error "failed to copy authorized keys to instance"
-  fx-error "see ${QEMU_LOG} for more details"
-  exit 1
-fi
+      # Enter fastboot.
+      while True:
+        line = await qemu_reader.readline()
+        if not line:
+          break
 
-# Shut down the instance. This can exit with 0 or 255, which signifies the
-# connection closed before ssh was able to disconnect.
-ssh -F "${FUCHSIA_BUILD_DIR}/ssh-keys/ssh_config" "${INSTANCE_IP}" "dm shutdown" || EXIT_CODE=$? && EXIT_CODE=$?
-if [[ "${EXIT_CODE}" != 0 && "${EXIT_CODE}" != 255 ]]; then
-  fx-error "failed to shut down QEMU instance"
-  fx-error "see ${QEMU_LOG} for more details"
-  exit 1
-fi
+        print(line.decode('utf-8'), end='')
 
-# Wait for QEMU to shut down.
-wait || true
+        if line == b'Press f to enter fastboot.\r\n':
+          print('Entering fastboot...')
+          qemu_writer.write(b'f\r\n')
+          await qemu_writer.drain()
+          break
 
-fx-info "Successfully created Fuchsia image in ${IMGDIR}"
+      log_task = asyncio.create_task(print_qemu_logs(qemu_reader, qemu_writer))
+
+      print('Flashing device...')
+
+      # Flash the device.
+      ffx_path = args.fuchsia_build_dir / 'host-tools/ffx'
+      flash_args = [ffx_path, '--timeout', '60', 'target', 'flash']
+      print(f'Running: {shlex.join(str(s) for s in flash_args)}')
+
+      process = await asyncio.create_subprocess_exec(*flash_args)
+      return_code = await process.wait()
+      if return_code != 0:
+        print('Failed to flash target', file=sys.stderr)
+        return return_code
+
+      print('Flashed device.')
+      print('Connecting to device...')
+
+      show_args = [ffx_path, '--target', device_name, '--timeout', '60', 'target', 'wait']
+      print(f'Running: {shlex.join(str(s) for s in show_args)}')
+
+      process = await asyncio.create_subprocess_exec(*show_args)
+      return_code = await process.wait()
+      if return_code != 0:
+        print('Target failed to come online', file=sys.stderr)
+        return return_code
+
+      print('Connected to device.')
+
+      print('Signalling qemu to shut down...')
+
+      shutdown_args = [ffx_path, '--target', device_name, 'target', 'off']
+      print(f'Running: {shlex.join(str(s) for s in shutdown_args)}')
+
+      process = await asyncio.create_subprocess_exec(*shutdown_args)
+      return_code = await process.wait()
+      if return_code != 0:
+        print('Target failed to turn off', file=sys.stderr)
+        return return_code
+
+      print('Waiting for qemu to shutdown...')
+
+      for i in range(100):
+        if await poll_process(qemu_process) is not None:
+          break
+        else:
+          await asyncio.sleep(0.5)
+      else:
+        print('Timed out waiting for qemu to shut down', file=sys.stderr)
+
+      print(f'Successfully created Fuchsia image {args.image}')
+    finally:
+      if await poll_process(qemu_process) is None:
+        print('Killing qemu...', file=sys.stderr)
+        qemu_process.kill()
+        await qemu_process.wait()
+
+if __name__ == '__main__':
+  sys.exit(asyncio.run(main()))

@@ -131,24 +131,13 @@ it.
 The `create-emu` script will create a Fuchsia EFI image:
 
 ```sh
-% ./bin/create-emu \
-  --image-dir some/directory/to/store/the/vm/image \
-  "$OTHER_ARGS[@]}"
+% ./bin/create-emu some/image
 ```
 
-This image can then be used by running `run-emu`:
+This image can then be used by running:
 
 ```sh
-% ./bin/run-emu \
-  --image-dir some/directory/to/store/the/vm/image \
-  "$OTHER_ARGS[@]}"
-```
-
-If you don't need to save the Fuchsia image, you can instead use
-`run-transient-emu` to avoid having to create an image:
-
-```sh
-% ./bin/run-transient-emu "$OTHER_ARGS[@]}"
+% fx qemu --uefi -D some/path/to/image
 ```
 
 Each script supports `--help` to see other supported flags.
