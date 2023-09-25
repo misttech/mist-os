@@ -1416,7 +1416,8 @@ zx_status_t SimFirmware::RemoteUpdateExternalSaeStatus(uint16_t seq_num,
   auto pframe_hdr = reinterpret_cast<wlan::Authentication*>(buf->data());
 
   pframe_hdr->auth_txn_seq_number = seq_num;
-  pframe_hdr->status_code = static_cast<uint16_t>(wlan_fullmac_wire::WlanAuthResult::kSuccess);
+  pframe_hdr->status_code =
+      static_cast<uint16_t>(fuchsia_wlan_fullmac_wire::WlanAuthResult::kSuccess);
   pframe_hdr->auth_algorithm_number = BRCMF_AUTH_MODE_SAE;
   memcpy(buf->data() + sizeof(wlan::Authentication), sae_payload, text_len);
 

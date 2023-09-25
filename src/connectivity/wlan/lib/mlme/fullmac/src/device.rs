@@ -340,8 +340,10 @@ pub struct FullmacDeviceInterface {
         device: *mut c_void,
         req: *mut banjo_wlan_fullmac::WlanFullmacImplReconnectRequest,
     ),
-    auth_resp:
-        extern "C" fn(device: *mut c_void, resp: *mut banjo_wlan_fullmac::WlanFullmacAuthResp),
+    auth_resp: extern "C" fn(
+        device: *mut c_void,
+        resp: *mut banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest,
+    ),
     deauth_req:
         extern "C" fn(device: *mut c_void, req: *mut banjo_wlan_fullmac::WlanFullmacDeauthReq),
     assoc_resp:
@@ -430,8 +432,11 @@ impl FullmacDeviceInterface {
             &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplReconnectRequest,
         )
     }
-    pub fn auth_resp(&self, mut resp: banjo_wlan_fullmac::WlanFullmacAuthResp) {
-        (self.auth_resp)(self.device, &mut resp as *mut banjo_wlan_fullmac::WlanFullmacAuthResp)
+    pub fn auth_resp(&self, mut resp: banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest) {
+        (self.auth_resp)(
+            self.device,
+            &mut resp as *mut banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest,
+        )
     }
     pub fn deauth_req(&self, mut req: banjo_wlan_fullmac::WlanFullmacDeauthReq) {
         (self.deauth_req)(self.device, &mut req as *mut banjo_wlan_fullmac::WlanFullmacDeauthReq)
@@ -536,7 +541,7 @@ pub mod test_utils {
             req: banjo_wlan_fullmac::WlanFullmacImplReconnectRequest,
         },
         AuthResp {
-            resp: banjo_wlan_fullmac::WlanFullmacAuthResp,
+            resp: banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest,
         },
         DeauthReq {
             req: banjo_wlan_fullmac::WlanFullmacDeauthReq,
@@ -789,7 +794,7 @@ pub mod test_utils {
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
         pub extern "C" fn auth_resp(
             device: *mut c_void,
-            resp: *mut banjo_wlan_fullmac::WlanFullmacAuthResp,
+            resp: *mut banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest,
         ) {
             let device = unsafe { &mut *(device as *mut Self) };
             let resp = unsafe { *resp };

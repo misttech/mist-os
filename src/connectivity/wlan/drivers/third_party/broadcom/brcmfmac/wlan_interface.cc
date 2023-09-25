@@ -329,9 +329,8 @@ void WlanInterface::Reconnect(ReconnectRequestView request, fdf::Arena& arena,
 void WlanInterface::AuthResp(AuthRespRequestView request, fdf::Arena& arena,
                              AuthRespCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);
-  const fuchsia_wlan_fullmac::wire::WlanFullmacAuthResp resp = request->resp;
   if (wdev_ != nullptr) {
-    brcmf_if_auth_resp(wdev_->netdev, &resp);
+    brcmf_if_auth_resp(wdev_->netdev, request);
   }
   completer.buffer(arena).Reply();
 }

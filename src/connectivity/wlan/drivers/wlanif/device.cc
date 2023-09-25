@@ -287,14 +287,14 @@ void Device::Reconnect(const wlan_fullmac_impl_reconnect_request_t* req) {
   }
 }
 
-void Device::AuthenticateResp(const wlan_fullmac_auth_resp_t* resp) {
-  fuchsia_wlan_fullmac::wire::WlanFullmacAuthResp auth_resp;
+void Device::AuthenticateResp(const wlan_fullmac_impl_auth_resp_request_t* resp) {
+  fuchsia_wlan_fullmac::wire::WlanFullmacImplAuthRespRequest auth_resp;
 
   // peer_sta_address
-  std::memcpy(auth_resp.peer_sta_address.data(), resp->peer_sta_address, ETH_ALEN);
+  std::memcpy(auth_resp.peer_sta_address().data(), resp->peer_sta_address, ETH_ALEN);
 
   // result_code
-  auth_resp.result_code = ConvertAuthResult(resp->result_code);
+  auth_resp.result_code() = ConvertAuthResult(resp->result_code);
 
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {

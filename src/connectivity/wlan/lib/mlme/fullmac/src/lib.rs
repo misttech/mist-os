@@ -950,7 +950,7 @@ mod handle_mlme_request_tests {
             assert_variant!(driver_calls.next(), Some(DriverCall::AuthResp { resp }) => resp);
         assert_eq!(
             *driver_req,
-            banjo_wlan_fullmac::WlanFullmacAuthResp {
+            banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest {
                 peer_sta_address: [1u8; 6],
                 result_code: banjo_wlan_fullmac::WlanAuthResult::SUCCESS,
             }

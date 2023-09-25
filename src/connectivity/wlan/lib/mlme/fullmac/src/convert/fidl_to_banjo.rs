@@ -211,9 +211,9 @@ pub fn convert_reconnect_request(
 
 pub fn convert_authenticate_response(
     resp: &fidl_mlme::AuthenticateResponse,
-) -> banjo_wlan_fullmac::WlanFullmacAuthResp {
+) -> banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest {
     use banjo_wlan_fullmac::WlanAuthResult;
-    banjo_wlan_fullmac::WlanFullmacAuthResp {
+    banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest {
         peer_sta_address: resp.peer_sta_address,
         result_code: match resp.result_code {
             fidl_mlme::AuthenticateResultCode::Success => WlanAuthResult::SUCCESS,

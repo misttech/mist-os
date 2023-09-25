@@ -730,7 +730,7 @@ void brcmf_enable_mpc(struct brcmf_if* ifp, int mpc) {
 }
 
 static void brcmf_signal_scan_end(struct net_device* ndev, uint64_t txn_id,
-                                  wlan_fullmac_wire::WlanScanResult scan_result_code) {
+                                  fuchsia_wlan_fullmac_wire::WlanScanResult scan_result_code) {
   if (!ndev->if_proto.is_valid()) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped-- skipping signal scan end callback ");
     return;
@@ -741,24 +741,25 @@ static void brcmf_signal_scan_end(struct net_device* ndev, uint64_t txn_id,
               arena.status_string());
     return;
   }
-  wlan_fullmac_wire::WlanFullmacScanEnd scan_end;
+  fuchsia_wlan_fullmac_wire::WlanFullmacScanEnd scan_end;
   scan_end.txn_id = txn_id;
   scan_end.code = scan_result_code;
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
   BRCMF_DBG(SCAN, "Signaling on_scan_end with txn_id %ld and code %d", scan_end.txn_id,
             scan_end.code);
-  BRCMF_IFDBG(WLANIF, ndev,
-              "Sending scan end event to SME. txn_id: %" PRIu64
-              ", result: %s"
-              ", number of results: %" PRIu32 "",
-              scan_end.txn_id,
-              scan_end.code == wlan_fullmac_wire::WlanScanResult::kSuccess        ? "success"
-              : scan_end.code == wlan_fullmac_wire::WlanScanResult::kNotSupported ? "not supported"
-              : scan_end.code == wlan_fullmac_wire::WlanScanResult::kInvalidArgs  ? "invalid args"
-              : scan_end.code == wlan_fullmac_wire::WlanScanResult::kInternalError
-                  ? "internal error"
-                  : "unknown",
-              ndev->scan_num_results);
+  BRCMF_IFDBG(
+      WLANIF, ndev,
+      "Sending scan end event to SME. txn_id: %" PRIu64
+      ", result: %s"
+      ", number of results: %" PRIu32 "",
+      scan_end.txn_id,
+      scan_end.code == fuchsia_wlan_fullmac_wire::WlanScanResult::kSuccess        ? "success"
+      : scan_end.code == fuchsia_wlan_fullmac_wire::WlanScanResult::kNotSupported ? "not supported"
+      : scan_end.code == fuchsia_wlan_fullmac_wire::WlanScanResult::kInvalidArgs  ? "invalid args"
+      : scan_end.code == fuchsia_wlan_fullmac_wire::WlanScanResult::kInternalError
+          ? "internal error"
+          : "unknown",
+      ndev->scan_num_results);
   auto result = ndev->if_proto.buffer(*arena)->OnScanEnd(scan_end);
   if (!result.ok()) {
     BRCMF_ERR("Failed to indicate scan end result.status: %s, txn_id=%zu", result.status_string(),
@@ -798,7 +799,8 @@ static void brcmf_notify_escan_complete(struct brcmf_cfg80211_info* cfg, struct 
   BRCMF_DBG(SCAN, "Enter");
 
   struct net_device* ndev = cfg_to_ndev(cfg);
-  wlan_fullmac_wire::WlanScanResult scan_result = wlan_fullmac_wire::WlanScanResult::kSuccess;
+  fuchsia_wlan_fullmac_wire::WlanScanResult scan_result =
+      fuchsia_wlan_fullmac_wire::WlanScanResult::kSuccess;
 
   if (!ndev) {
     BRCMF_WARN("Device does not exist, skipping escan complete notify.");
@@ -818,17 +820,17 @@ static void brcmf_notify_escan_complete(struct brcmf_cfg80211_info* cfg, struct 
 
     switch (status) {
       case BRCMF_E_STATUS_SUCCESS:
-        scan_result = wlan_fullmac_wire::WlanScanResult::kSuccess;
+        scan_result = fuchsia_wlan_fullmac_wire::WlanScanResult::kSuccess;
         break;
       case BRCMF_E_STATUS_NEWASSOC:
         // In this case, the scan process has been interrupted by an assoc inside the firwmare.
       case BRCMF_E_STATUS_ABORT:
         BRCMF_INFO("Sending notification of aborted scan: %d", status);
-        scan_result = wlan_fullmac_wire::WlanScanResult::kCanceledByDriverOrFirmware;
+        scan_result = fuchsia_wlan_fullmac_wire::WlanScanResult::kCanceledByDriverOrFirmware;
         break;
       default:
         BRCMF_WARN("Sending notification of failed scan: %d", status);
-        scan_result = wlan_fullmac_wire::WlanScanResult::kInternalError;
+        scan_result = fuchsia_wlan_fullmac_wire::WlanScanResult::kInternalError;
     }
     brcmf_signal_scan_end(ndev, ndev->scan_txn_id, scan_result);
   }
@@ -909,7 +911,7 @@ static zx_status_t brcmf_dev_escan_set_randmac(struct brcmf_if* ifp) {
 
 static zx_status_t brcmf_escan_prep(
     struct brcmf_cfg80211_info* cfg, struct brcmf_scan_params_le* params_le,
-    const wlan_fullmac_wire::WlanFullmacImplStartScanRequest* request) {
+    const fuchsia_wlan_fullmac_wire::WlanFullmacImplStartScanRequest* request) {
   uint32_t n_ssids = 0;
   uint32_t n_channels = 0;
   int32_t offset = 0;
@@ -929,7 +931,7 @@ static zx_status_t brcmf_escan_prep(
   // Do not filter scan results based on BSS type.
   params_le->bss_type = DOT11_BSSTYPE_ANY;
 
-  if (request->scan_type() == wlan_fullmac_wire::WlanScanType::kActive) {
+  if (request->scan_type() == fuchsia_wlan_fullmac_wire::WlanScanType::kActive) {
     params_le->scan_type = BRCMF_SCANTYPE_ACTIVE;
     params_le->active_time = request->min_channel_time();
     params_le->nprobes = BRCMF_ACTIVE_SCAN_NUM_PROBES;
@@ -1025,7 +1027,8 @@ static inline uint16_t brcmf_next_sync_id(struct brcmf_cfg80211_info* cfg) {
 
 static zx_status_t brcmf_run_escan(
     struct brcmf_cfg80211_info* cfg, struct brcmf_if* ifp,
-    const wlan_fullmac_wire::WlanFullmacImplStartScanRequest* request, uint16_t* sync_id_out) {
+    const fuchsia_wlan_fullmac_wire::WlanFullmacImplStartScanRequest* request,
+    uint16_t* sync_id_out) {
   // Check required fields.
   if (request == nullptr || !(request->has_channels() && request->has_min_channel_time() &&
                               request->has_max_channel_time())) {
@@ -1105,9 +1108,9 @@ exit:
   return err;
 }
 
-static zx_status_t brcmf_do_escan(struct brcmf_if* ifp,
-                                  const wlan_fullmac_wire::WlanFullmacImplStartScanRequest* req,
-                                  uint16_t* sync_id_out) {
+static zx_status_t brcmf_do_escan(
+    struct brcmf_if* ifp, const fuchsia_wlan_fullmac_wire::WlanFullmacImplStartScanRequest* req,
+    uint16_t* sync_id_out) {
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
   zx_status_t err;
   struct escan_info* escan = &cfg->escan_info;
@@ -1164,9 +1167,9 @@ zx_status_t brcmf_check_scan_status(unsigned long scan_status,
   return out_scan_status;
 }
 
-zx_status_t brcmf_cfg80211_scan(struct net_device* ndev,
-                                const wlan_fullmac_wire::WlanFullmacImplStartScanRequest* req,
-                                uint16_t* sync_id_out) {
+zx_status_t brcmf_cfg80211_scan(
+    struct net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacImplStartScanRequest* req,
+    uint16_t* sync_id_out) {
   zx_status_t err;
 
   BRCMF_DBG(TRACE, "Enter");
@@ -1265,7 +1268,7 @@ static void brcmf_notify_deauth(struct net_device* ndev, const uint8_t peer_sta_
     return;
   }
 
-  wlan_fullmac_wire::WlanFullmacDeauthConfirm resp = {};
+  fuchsia_wlan_fullmac_wire::WlanFullmacDeauthConfirm resp = {};
   memcpy(resp.peer_sta_address.data(), peer_sta_address, ETH_ALEN);
 
   BRCMF_IFDBG(WLANIF, ndev, "Sending deauth confirm to SME.");
@@ -1295,7 +1298,7 @@ static void brcmf_notify_disassoc(struct net_device* ndev, zx_status_t status) {
     return;
   }
 
-  wlan_fullmac_wire::WlanFullmacDisassocConfirm resp = {};
+  fuchsia_wlan_fullmac_wire::WlanFullmacDisassocConfirm resp = {};
   resp.status = status;
   BRCMF_IFDBG(WLANIF, ndev, "Sending disassoc confirm to SME. status: %" PRIu32 "", status);
   auto result = ndev->if_proto.buffer(*arena)->DisassocConf(resp);
@@ -1314,7 +1317,7 @@ static void brcmf_notify_deauth_ind(net_device* ndev, const uint8_t mac_addr[ETH
     return;
   }
 
-  wlan_fullmac_wire::WlanFullmacDeauthIndication ind = {};
+  fuchsia_wlan_fullmac_wire::WlanFullmacDeauthIndication ind = {};
 
   BRCMF_IFDBG(WLANIF, ndev, "Link Down: Sending deauth ind to SME. reason: %d", reason_code);
 #if !defined(NDEBUG)
@@ -1346,7 +1349,7 @@ static void brcmf_notify_disassoc_ind(net_device* ndev, const uint8_t mac_addr[E
     return;
   }
 
-  wlan_fullmac_wire::WlanFullmacDisassocIndication ind = {};
+  fuchsia_wlan_fullmac_wire::WlanFullmacDisassocIndication ind = {};
 
   BRCMF_IFDBG(WLANIF, ndev, "Link Down: Sending disassoc ind to SME. reason: %d", reason_code);
 #if !defined(NDEBUG)
@@ -1462,23 +1465,23 @@ static void brcmf_link_down(struct brcmf_cfg80211_vif* vif,
 }
 
 static zx_status_t brcmf_set_auth_type(struct net_device* ndev,
-                                       wlan_fullmac_wire::WlanAuthType auth_type) {
+                                       fuchsia_wlan_fullmac_wire::WlanAuthType auth_type) {
   brcmf_if* ifp = ndev_to_if(ndev);
   int32_t val = 0;
   zx_status_t status = ZX_OK;
 
   switch (auth_type) {
-    case wlan_fullmac_wire::WlanAuthType::kOpenSystem:
+    case fuchsia_wlan_fullmac_wire::WlanAuthType::kOpenSystem:
       val = BRCMF_AUTH_MODE_OPEN;
       break;
-    case wlan_fullmac_wire::WlanAuthType::kSharedKey:
+    case fuchsia_wlan_fullmac_wire::WlanAuthType::kSharedKey:
       // When asked to use a shared key (which should only happen for WEP), we will direct the
       // firmware to use auto-detect, which will fall back on open WEP if shared WEP fails to
       // succeed. This was chosen to allow us to avoid implementing WEP auto-detection at higher
       // levels of the wlan stack.
       val = BRCMF_AUTH_MODE_AUTO;
       break;
-    case wlan_fullmac_wire::WlanAuthType::kSae:
+    case fuchsia_wlan_fullmac_wire::WlanAuthType::kSae:
       val = BRCMF_AUTH_MODE_SAE;
       break;
     default:
@@ -1818,7 +1821,7 @@ void brcmf_return_assoc_result(struct net_device* ndev,
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
 
-  wlan_fullmac_wire::WlanFullmacConnectConfirm conf;
+  fuchsia_wlan_fullmac_wire::WlanFullmacConnectConfirm conf;
   conf.result_code = status_code;
   if (conf.result_code == fuchsia_wlan_ieee80211_wire::StatusCode::kSuccess &&
       cfg->conn_info.resp_ie_len > 0) {
@@ -1857,7 +1860,7 @@ void brcmf_return_roam_result(struct net_device* ndev, const uint8_t* target_bss
     return;
   }
 
-  wlan_fullmac_wire::WlanFullmacRoamConfirm conf;
+  fuchsia_wlan_fullmac_wire::WlanFullmacRoamConfirm conf;
   conf.result_code = result_code;
   memcpy(conf.target_bssid.data(), target_bssid, ETH_ALEN);
   conf.selected_bss.ies = {};
@@ -2404,7 +2407,7 @@ static void cfg80211_signal_ind(net_device* ndev) {
 
   // Send signal report indication only if client is in connected state
   if (brcmf_test_bit(brcmf_vif_status_bit_t::CONNECTED, &ifp->vif->sme_state)) {
-    wlan_fullmac_wire::WlanFullmacSignalReportIndication signal_ind;
+    fuchsia_wlan_fullmac_wire::WlanFullmacSignalReportIndication signal_ind;
     int8_t rssi, snr;
     if (brcmf_get_rssi_snr(ndev, &rssi, &snr) == ZX_OK) {
       signal_ind.rssi_dbm = rssi;
@@ -2577,7 +2580,7 @@ static zx_status_t brcmf_cfg80211_del_key(struct net_device* ndev, uint8_t key_i
 }
 
 static zx_status_t brcmf_cfg80211_add_key(struct net_device* ndev,
-                                          const wlan_fullmac_wire::SetKeyDescriptor* req) {
+                                          const fuchsia_wlan_fullmac_wire::SetKeyDescriptor* req) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_wsec_key* key;
   int32_t val;
@@ -2699,7 +2702,7 @@ void brcmf_cfg80211_handle_eapol_frame(struct brcmf_if* ifp, const void* data, s
     return;
   }
   uint8_t* data_bytes = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(data));
-  wlan_fullmac_wire::WlanFullmacEapolIndication eapol_ind;
+  fuchsia_wlan_fullmac_wire::WlanFullmacEapolIndication eapol_ind;
   // IEEE Std. 802.1X-2010, 11.3, Figure 11-1
   memcpy(eapol_ind.dst_addr.data(), data_bytes, ETH_ALEN);
   memcpy(eapol_ind.src_addr.data(), data_bytes + 6, ETH_ALEN);
@@ -2787,7 +2790,7 @@ static void brcmf_return_scan_result(struct net_device* ndev, uint16_t channel,
   if (!brcmf_test_bit(brcmf_scan_status_bit_t::BUSY, &cfg->scan_status)) {
     return;
   }
-  wlan_fullmac_wire::WlanFullmacScanResult result = {};
+  fuchsia_wlan_fullmac_wire::WlanFullmacScanResult result = {};
   fuchsia_wlan_common::BssType bss_type = fuchsia_wlan_common::BssType::kInfrastructure;
 
   if ((capability & IEEE80211_BCN_CAPS_ESS) && !(capability & IEEE80211_BCN_CAPS_IBSS)) {
@@ -3302,18 +3305,19 @@ bool brcmf_is_ap_start_pending(brcmf_cfg80211_info* cfg) {
 }
 
 // Deauthenticate with specified STA.
-static wlan_fullmac_wire::WlanStopResult brcmf_cfg80211_stop_ap(struct net_device* ndev) {
+static fuchsia_wlan_fullmac_wire::WlanStopResult brcmf_cfg80211_stop_ap(struct net_device* ndev) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   zx_status_t status;
   bcme_status_t fw_err = BCME_OK;
-  wlan_fullmac_wire::WlanStopResult result = wlan_fullmac_wire::WlanStopResult::kSuccess;
+  fuchsia_wlan_fullmac_wire::WlanStopResult result =
+      fuchsia_wlan_fullmac_wire::WlanStopResult::kSuccess;
   struct brcmf_join_params join_params;
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
 
   if (!brcmf_test_bit(brcmf_vif_status_bit_t::AP_CREATED, &ifp->vif->sme_state) &&
       !brcmf_test_bit(brcmf_vif_status_bit_t::AP_START_PENDING, &ifp->vif->sme_state)) {
     BRCMF_INFO("attempt to stop already stopped AP");
-    return wlan_fullmac_wire::WlanStopResult::kBssAlreadyStopped;
+    return fuchsia_wlan_fullmac_wire::WlanStopResult::kBssAlreadyStopped;
   }
 
   // If we are in the process of resetting, then ap interface no longer exists
@@ -3329,7 +3333,7 @@ static wlan_fullmac_wire::WlanStopResult brcmf_cfg80211_stop_ap(struct net_devic
   if (status != ZX_OK) {
     BRCMF_ERR("SET SSID error: %s, fw err %s", zx_status_get_string(status),
               brcmf_fil_get_errstr(fw_err));
-    result = wlan_fullmac_wire::WlanStopResult::kInternalError;
+    result = fuchsia_wlan_fullmac_wire::WlanStopResult::kInternalError;
   }
 
   // Issue "bss" iovar to bring down the SoftAP IF.
@@ -3371,29 +3375,29 @@ skip_fw_cmds:
 
 // Returns an MLME result code (WLAN_START_RESULT_*) if an error is encountered.
 // If all iovars succeed, MLME is notified when E_LINK event is received.
-static wlan_fullmac_wire::WlanStartResult brcmf_cfg80211_start_ap(
-    struct net_device* ndev, const wlan_fullmac_wire::WlanFullmacStartReq* req) {
+static fuchsia_wlan_fullmac_wire::WlanStartResult brcmf_cfg80211_start_ap(
+    struct net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacStartReq* req) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
 
   if (brcmf_test_bit(brcmf_vif_status_bit_t::AP_CREATED, &ifp->vif->sme_state)) {
     BRCMF_ERR("AP already started");
-    return wlan_fullmac_wire::WlanStartResult::kBssAlreadyStartedOrJoined;
+    return fuchsia_wlan_fullmac_wire::WlanStartResult::kBssAlreadyStartedOrJoined;
   }
 
   if (brcmf_test_bit(brcmf_vif_status_bit_t::AP_START_PENDING, &ifp->vif->sme_state)) {
     BRCMF_ERR("AP start request received, start pending");
-    return wlan_fullmac_wire::WlanStartResult::kBssAlreadyStartedOrJoined;
+    return fuchsia_wlan_fullmac_wire::WlanStartResult::kBssAlreadyStartedOrJoined;
   }
 
   if (req->bss_type != fuchsia_wlan_common::BssType::kInfrastructure) {
     BRCMF_ERR("Attempt to start AP in unsupported mode (%d)", req->bss_type);
-    return wlan_fullmac_wire::WlanStartResult::kNotSupported;
+    return fuchsia_wlan_fullmac_wire::WlanStartResult::kNotSupported;
   }
 
   if (ifp->vif->mbss) {
     BRCMF_ERR("Mesh role not yet supported");
-    return wlan_fullmac_wire::WlanStartResult::kNotSupported;
+    return fuchsia_wlan_fullmac_wire::WlanStartResult::kNotSupported;
   }
 
   // Enter AP_START_PENDING mode before we abort any on-going scans. As soon as
@@ -3535,7 +3539,7 @@ static wlan_fullmac_wire::WlanStartResult brcmf_cfg80211_start_ap(
   brcmf_net_setcarrier(ifp, true);
 
   cfg->ap_started = true;
-  return wlan_fullmac_wire::WlanStartResult::kSuccess;
+  return fuchsia_wlan_fullmac_wire::WlanStartResult::kSuccess;
 
 fail:
   // Stop the timer when the function fails to issue any of the commands.
@@ -3544,7 +3548,7 @@ fail:
   // thus the SoftAP might have been partially started.
   brcmf_cfg80211_stop_ap(ndev);
 
-  return wlan_fullmac_wire::WlanStartResult::kNotSupported;
+  return fuchsia_wlan_fullmac_wire::WlanStartResult::kNotSupported;
 }
 
 static zx_status_t brcmf_cfg80211_del_station(struct net_device* ndev, const uint8_t* mac,
@@ -3611,7 +3615,7 @@ void brcmf_if_stop(net_device* ndev) {
 }
 
 void brcmf_if_start_scan(net_device* ndev,
-                         const wlan_fullmac_wire::WlanFullmacImplStartScanRequest* req) {
+                         const fuchsia_wlan_fullmac_wire::WlanFullmacImplStartScanRequest* req) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
   if (!ndev->if_proto.is_valid()) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping scan request.");
@@ -3620,9 +3624,9 @@ void brcmf_if_start_scan(net_device* ndev,
   zx_status_t result;
 
   BRCMF_IFDBG(WLANIF, ndev, "Scan request from SME. txn_id: %" PRIu64 ", type: %s", req->txn_id(),
-              req->scan_type() == wlan_fullmac_wire::WlanScanType::kPassive  ? "passive"
-              : req->scan_type() == wlan_fullmac_wire::WlanScanType::kActive ? "active"
-                                                                             : "invalid");
+              req->scan_type() == fuchsia_wlan_fullmac_wire::WlanScanType::kPassive  ? "passive"
+              : req->scan_type() == fuchsia_wlan_fullmac_wire::WlanScanType::kActive ? "active"
+                                                                                     : "invalid");
 
   ndev->scan_num_results = 0;
 
@@ -3640,20 +3644,23 @@ void brcmf_if_start_scan(net_device* ndev,
       break;
     case ZX_ERR_SHOULD_WAIT:
       BRCMF_INFO("Scan failed. Firmware busy: %d %s", result, zx_status_get_string(result));
-      brcmf_signal_scan_end(ndev, req->txn_id(), wlan_fullmac_wire::WlanScanResult::kShouldWait);
+      brcmf_signal_scan_end(ndev, req->txn_id(),
+                            fuchsia_wlan_fullmac_wire::WlanScanResult::kShouldWait);
       break;
     case ZX_ERR_INVALID_ARGS:
       BRCMF_ERR("Scan failed. Invalid arguments: %d %s", result, zx_status_get_string(result));
-      brcmf_signal_scan_end(ndev, req->txn_id(), wlan_fullmac_wire::WlanScanResult::kInvalidArgs);
+      brcmf_signal_scan_end(ndev, req->txn_id(),
+                            fuchsia_wlan_fullmac_wire::WlanScanResult::kInvalidArgs);
       break;
     default:
       BRCMF_INFO("Scan failed. Internal error: %d %s", result, zx_status_get_string(result));
-      brcmf_signal_scan_end(ndev, req->txn_id(), wlan_fullmac_wire::WlanScanResult::kInternalError);
+      brcmf_signal_scan_end(ndev, req->txn_id(),
+                            fuchsia_wlan_fullmac_wire::WlanScanResult::kInternalError);
   }
 }
 
 void brcmf_if_connect_req(net_device* ndev,
-                          const wlan_fullmac_wire::WlanFullmacImplConnectRequest* req) {
+                          const fuchsia_wlan_fullmac_wire::WlanFullmacImplConnectRequest* req) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_cfg80211_profile* profile = &ifp->vif->profile;
@@ -3670,7 +3677,7 @@ void brcmf_if_connect_req(net_device* ndev,
     return;
   }
 
-  wlan_fullmac_wire::WlanFullmacConnectConfirm result = {};
+  fuchsia_wlan_fullmac_wire::WlanFullmacConnectConfirm result = {};
   zx_status_t status;
   memcpy(result.peer_sta_address.data(), req->selected_bss().bssid.data(),
          req->selected_bss().bssid.size());
@@ -3686,8 +3693,8 @@ void brcmf_if_connect_req(net_device* ndev,
 
   if (req->has_wep_key()) {
     if (req->wep_key().key.count() > 0 &&
-        !(req->auth_type() == wlan_fullmac_wire::WlanAuthType::kSharedKey ||
-          req->auth_type() == wlan_fullmac_wire::WlanAuthType::kOpenSystem)) {
+        !(req->auth_type() == fuchsia_wlan_fullmac_wire::WlanAuthType::kSharedKey ||
+          req->auth_type() == fuchsia_wlan_fullmac_wire::WlanAuthType::kOpenSystem)) {
       BRCMF_DBG(WLANIF, "Connect request from SME exited: unexpected WEP key in request");
       result.result_code = fuchsia_wlan_ieee80211_wire::StatusCode::kJoinFailure;
       goto fail;
@@ -3758,7 +3765,7 @@ fail:
 }
 
 void brcmf_if_reconnect_req(net_device* ndev,
-                            const wlan_fullmac_wire::WlanFullmacImplReconnectRequest* req) {
+                            const fuchsia_wlan_fullmac_wire::WlanFullmacImplReconnectRequest* req) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
 
   if (!req->has_peer_sta_address()) {
@@ -3786,57 +3793,67 @@ void brcmf_if_reconnect_req(net_device* ndev,
 
 // In AP mode, receive a response from wlan_fullmac confirming that a client was successfully
 // authenticated.
-void brcmf_if_auth_resp(net_device* ndev, const wlan_fullmac_wire::WlanFullmacAuthResp* ind) {
+void brcmf_if_auth_resp(net_device* ndev,
+                        const fuchsia_wlan_fullmac_wire::WlanFullmacImplAuthRespRequest* ind) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
-
-  BRCMF_IFDBG(
-      WLANIF, ndev, "Auth response from SME. result: %s",
-      ind->result_code == wlan_fullmac_wire::WlanAuthResult::kSuccess   ? "success"
-      : ind->result_code == wlan_fullmac_wire::WlanAuthResult::kRefused ? "refused"
-      : ind->result_code == wlan_fullmac_wire::WlanAuthResult::kAntiCloggingTokenRequired
-          ? "anti-clogging token required"
-      : ind->result_code == wlan_fullmac_wire::WlanAuthResult::kFiniteCyclicGroupNotSupported
-          ? "finite cyclic group not supported"
-      : ind->result_code == wlan_fullmac_wire::WlanAuthResult::kRejected       ? "rejected"
-      : ind->result_code == wlan_fullmac_wire::WlanAuthResult::kFailureTimeout ? "timeout"
-                                                                               : "invalid");
-#if !defined(NDEBUG)
-  BRCMF_IFDBG(WLANIF, ndev, "  , address: " FMT_MAC, FMT_MAC_ARGS(ind->peer_sta_address));
-#endif /* !defined(NDEBUG) */
 
   if (!brcmf_is_apmode(ifp->vif)) {
     BRCMF_ERR("Received AUTHENTICATE.response but not in AP mode - ignoring");
     return;
   }
 
-  if (ind->result_code == wlan_fullmac_wire::WlanAuthResult::kSuccess) {
-    const uint8_t* mac = ind->peer_sta_address.data();
+  if (!ind->has_result_code() || !ind->has_peer_sta_address()) {
+    BRCMF_ERR("Missing fields in auth resp has_result_code: %d has_peer_sta_addr: %d",
+              ind->has_result_code(), ind->has_peer_sta_address());
+    return;
+  }
+
+  BRCMF_IFDBG(
+      WLANIF, ndev, "Auth response from SME. result: %s",
+      ind->result_code() == fuchsia_wlan_fullmac_wire::WlanAuthResult::kSuccess   ? "success"
+      : ind->result_code() == fuchsia_wlan_fullmac_wire::WlanAuthResult::kRefused ? "refused"
+      : ind->result_code() == fuchsia_wlan_fullmac_wire::WlanAuthResult::kAntiCloggingTokenRequired
+          ? "anti-clogging token required"
+      : ind->result_code() ==
+              fuchsia_wlan_fullmac_wire::WlanAuthResult::kFiniteCyclicGroupNotSupported
+          ? "finite cyclic group not supported"
+      : ind->result_code() == fuchsia_wlan_fullmac_wire::WlanAuthResult::kRejected ? "rejected"
+      : ind->result_code() == fuchsia_wlan_fullmac_wire::WlanAuthResult::kFailureTimeout
+          ? "timeout"
+          : "invalid");
+#if !defined(NDEBUG)
+  BRCMF_IFDBG(WLANIF, ndev, "  , address: " FMT_MAC, FMT_MAC_ARGS(ind->peer_sta_address().data()));
+#endif /* !defined(NDEBUG) */
+
+  if (ind->result_code() == fuchsia_wlan_fullmac_wire::WlanAuthResult::kSuccess) {
+    const uint8_t* mac = ind->peer_sta_address().data();
     BRCMF_DBG(CONN, "Successfully authenticated client " FMT_MAC "\n", FMT_MAC_ARGS(mac));
     return;
   }
 
   fuchsia_wlan_ieee80211::ReasonCode reason = {};
-  switch (ind->result_code) {
-    case wlan_fullmac_wire::WlanAuthResult::kRefused:
-    case wlan_fullmac_wire::WlanAuthResult::kRejected:
+  switch (ind->result_code()) {
+    case fuchsia_wlan_fullmac_wire::WlanAuthResult::kRefused:
+    case fuchsia_wlan_fullmac_wire::WlanAuthResult::kRejected:
       reason = fuchsia_wlan_ieee80211::ReasonCode::kNotAuthenticated;
       break;
-    case wlan_fullmac_wire::WlanAuthResult::kFailureTimeout:
+    case fuchsia_wlan_fullmac_wire::WlanAuthResult::kFailureTimeout:
       reason = fuchsia_wlan_ieee80211::ReasonCode::kTimeout;
       break;
-    case wlan_fullmac_wire::WlanAuthResult::kAntiCloggingTokenRequired:
-    case wlan_fullmac_wire::WlanAuthResult::kFiniteCyclicGroupNotSupported:
+    case fuchsia_wlan_fullmac_wire::WlanAuthResult::kAntiCloggingTokenRequired:
+    case fuchsia_wlan_fullmac_wire::WlanAuthResult::kFiniteCyclicGroupNotSupported:
     default:
       reason = fuchsia_wlan_ieee80211::ReasonCode::kUnspecifiedReason;
       break;
   }
-  brcmf_cfg80211_del_station(ndev, ind->peer_sta_address.data(), reason);
+  brcmf_cfg80211_del_station(ndev, ind->peer_sta_address().data(), reason);
 }
 
 // Respond to a MLME-DEAUTHENTICATE.request message. Note that we are required to respond with a
 // MLME-DEAUTHENTICATE.confirm on completion (or failure), even though there is no status
 // reported.
-void brcmf_if_deauth_req(net_device* ndev, const wlan_fullmac_wire::WlanFullmacDeauthReq* req) {
+void brcmf_if_deauth_req(net_device* ndev,
+                         const fuchsia_wlan_fullmac_wire::WlanFullmacDeauthReq* req) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   BRCMF_IFDBG(WLANIF, ndev, "Deauth request from SME. reason: %" PRIu16 "", req->reason_code);
 
@@ -3868,7 +3885,8 @@ void brcmf_if_deauth_req(net_device* ndev, const wlan_fullmac_wire::WlanFullmacD
   zx_nanosleep(zx_deadline_after(ZX_MSEC(50)));
 }
 
-void brcmf_if_assoc_resp(net_device* ndev, const wlan_fullmac_wire::WlanFullmacAssocResp* ind) {
+void brcmf_if_assoc_resp(net_device* ndev,
+                         const fuchsia_wlan_fullmac_wire::WlanFullmacAssocResp* ind) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
 
   BRCMF_IFDBG(WLANIF, ndev, "Assoc response from SME. result: %" PRIu8 ", aid: %" PRIu16,
@@ -3882,7 +3900,7 @@ void brcmf_if_assoc_resp(net_device* ndev, const wlan_fullmac_wire::WlanFullmacA
     return;
   }
 
-  if (ind->result_code == wlan_fullmac_wire::WlanAssocResult::kSuccess) {
+  if (ind->result_code == fuchsia_wlan_fullmac_wire::WlanAssocResult::kSuccess) {
     const uint8_t* mac = ind->peer_sta_address.data();
     BRCMF_DBG(CONN, "Successfully associated client " FMT_MAC, FMT_MAC_ARGS(mac));
     return;
@@ -3892,18 +3910,18 @@ void brcmf_if_assoc_resp(net_device* ndev, const wlan_fullmac_wire::WlanFullmacA
   // available for an association response is too small.
   fuchsia_wlan_ieee80211::ReasonCode reason = {};
   switch (ind->result_code) {
-    case wlan_fullmac_wire::WlanAssocResult::kRefusedNotAuthenticated:
+    case fuchsia_wlan_fullmac_wire::WlanAssocResult::kRefusedNotAuthenticated:
       reason = fuchsia_wlan_ieee80211::ReasonCode::kNotAuthenticated;
       break;
-    case wlan_fullmac_wire::WlanAssocResult::kRefusedCapabilitiesMismatch:
+    case fuchsia_wlan_fullmac_wire::WlanAssocResult::kRefusedCapabilitiesMismatch:
       reason = fuchsia_wlan_ieee80211::ReasonCode::kInvalidRsneCapabilities;
       break;
-    case wlan_fullmac_wire::WlanAssocResult::kRefusedReasonUnspecified:
-    case wlan_fullmac_wire::WlanAssocResult::kRefusedExternalReason:
-    case wlan_fullmac_wire::WlanAssocResult::kRefusedApOutOfMemory:
-    case wlan_fullmac_wire::WlanAssocResult::kRefusedBasicRatesMismatch:
-    case wlan_fullmac_wire::WlanAssocResult::kRejectedEmergencyServicesNotSupported:
-    case wlan_fullmac_wire::WlanAssocResult::kRefusedTemporarily:
+    case fuchsia_wlan_fullmac_wire::WlanAssocResult::kRefusedReasonUnspecified:
+    case fuchsia_wlan_fullmac_wire::WlanAssocResult::kRefusedExternalReason:
+    case fuchsia_wlan_fullmac_wire::WlanAssocResult::kRefusedApOutOfMemory:
+    case fuchsia_wlan_fullmac_wire::WlanAssocResult::kRefusedBasicRatesMismatch:
+    case fuchsia_wlan_fullmac_wire::WlanAssocResult::kRejectedEmergencyServicesNotSupported:
+    case fuchsia_wlan_fullmac_wire::WlanAssocResult::kRefusedTemporarily:
     default:
       reason = fuchsia_wlan_ieee80211::ReasonCode::kUnspecifiedReason;
       break;
@@ -3912,7 +3930,8 @@ void brcmf_if_assoc_resp(net_device* ndev, const wlan_fullmac_wire::WlanFullmacA
   brcmf_cfg80211_del_station(ndev, ind->peer_sta_address.data(), reason);
 }
 
-void brcmf_if_disassoc_req(net_device* ndev, const wlan_fullmac_wire::WlanFullmacDisassocReq* req) {
+void brcmf_if_disassoc_req(net_device* ndev,
+                           const fuchsia_wlan_fullmac_wire::WlanFullmacDisassocReq* req) {
   BRCMF_IFDBG(WLANIF, ndev, "Disassoc request from SME. reason: %" PRIu16, req->reason_code);
 #if !defined(NDEBUG)
   BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC, FMT_MAC_ARGS(req->peer_sta_address));
@@ -3924,7 +3943,8 @@ void brcmf_if_disassoc_req(net_device* ndev, const wlan_fullmac_wire::WlanFullma
   }  // else notification will happen asynchronously
 }
 
-void brcmf_if_reset_req(net_device* ndev, const wlan_fullmac_wire::WlanFullmacResetReq* req) {
+void brcmf_if_reset_req(net_device* ndev,
+                        const fuchsia_wlan_fullmac_wire::WlanFullmacResetReq* req) {
   BRCMF_IFDBG(WLANIF, ndev, "Reset request from SME.");
 #if !defined(NDEBUG)
   BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC, FMT_MAC_ARGS(req->sta_address));
@@ -3933,21 +3953,23 @@ void brcmf_if_reset_req(net_device* ndev, const wlan_fullmac_wire::WlanFullmacRe
   BRCMF_ERR("Unimplemented");
 }
 
-void brcmf_if_start_conf(net_device* ndev, wlan_fullmac_wire::WlanStartResult result) {
+void brcmf_if_start_conf(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanStartResult result) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
   if (!ndev->if_proto.is_valid()) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping AP start callback");
     return;
   }
 
-  wlan_fullmac_wire::WlanFullmacStartConfirm start_conf = {.result_code = result};
-  BRCMF_IFDBG(
-      WLANIF, ndev, "Sending AP start confirm to SME. result_code: %s",
-      result == wlan_fullmac_wire::WlanStartResult::kSuccess                     ? "success"
-      : result == wlan_fullmac_wire::WlanStartResult::kBssAlreadyStartedOrJoined ? "already started"
-      : result == wlan_fullmac_wire::WlanStartResult::kResetRequiredBeforeStart  ? "reset required"
-      : result == wlan_fullmac_wire::WlanStartResult::kNotSupported              ? "not supported"
-                                                                                 : "unknown");
+  fuchsia_wlan_fullmac_wire::WlanFullmacStartConfirm start_conf = {.result_code = result};
+  BRCMF_IFDBG(WLANIF, ndev, "Sending AP start confirm to SME. result_code: %s",
+              result == fuchsia_wlan_fullmac_wire::WlanStartResult::kSuccess ? "success"
+              : result == fuchsia_wlan_fullmac_wire::WlanStartResult::kBssAlreadyStartedOrJoined
+                  ? "already started"
+              : result == fuchsia_wlan_fullmac_wire::WlanStartResult::kResetRequiredBeforeStart
+                  ? "reset required"
+              : result == fuchsia_wlan_fullmac_wire::WlanStartResult::kNotSupported
+                  ? "not supported"
+                  : "unknown");
 
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
@@ -3970,7 +3992,7 @@ static void brcmf_ap_start_timeout_worker(WorkItem* work) {
   // Indicate status only if AP start pending is set
   if (brcmf_test_and_clear_bit(brcmf_vif_status_bit_t::AP_START_PENDING, &ifp->vif->sme_state)) {
     // Indicate AP start failed
-    brcmf_if_start_conf(ndev, wlan_fullmac_wire::WlanStartResult::kNotSupported);
+    brcmf_if_start_conf(ndev, fuchsia_wlan_fullmac_wire::WlanStartResult::kNotSupported);
   }
 }
 
@@ -3983,21 +4005,22 @@ static void brcmf_ap_start_timeout(struct brcmf_cfg80211_info* cfg) {
 }
 
 /* Start AP mode */
-void brcmf_if_start_req(net_device* ndev, const wlan_fullmac_wire::WlanFullmacStartReq* req) {
+void brcmf_if_start_req(net_device* ndev,
+                        const fuchsia_wlan_fullmac_wire::WlanFullmacStartReq* req) {
   BRCMF_IFDBG(WLANIF, ndev, "Start AP request from SME. rsne_len: %zu, channel: %u", req->rsne_len,
               req->channel);
 #if !defined(NDEBUG)
   BRCMF_DBG(WLANIF, "  ssid: " FMT_SSID, FMT_SSID_BYTES(req->ssid.data.data(), req->ssid.len));
 #endif /* !defined(NDEBUG) */
 
-  wlan_fullmac_wire::WlanStartResult result_code = brcmf_cfg80211_start_ap(ndev, req);
-  if (result_code != wlan_fullmac_wire::WlanStartResult::kSuccess) {
+  fuchsia_wlan_fullmac_wire::WlanStartResult result_code = brcmf_cfg80211_start_ap(ndev, req);
+  if (result_code != fuchsia_wlan_fullmac_wire::WlanStartResult::kSuccess) {
     brcmf_if_start_conf(ndev, result_code);
   }
 }
 
 /* Stop AP mode */
-void brcmf_if_stop_req(net_device* ndev, const wlan_fullmac_wire::WlanFullmacStopReq* req) {
+void brcmf_if_stop_req(net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacStopReq* req) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
   if (!ndev->if_proto.is_valid()) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping AP stop callback");
@@ -4009,15 +4032,16 @@ void brcmf_if_stop_req(net_device* ndev, const wlan_fullmac_wire::WlanFullmacSto
   BRCMF_DBG(WLANIF, "  ssid: " FMT_SSID, FMT_SSID_BYTES(req->ssid.data.data(), req->ssid.len));
 #endif /* !defined(NDEBUG) */
 
-  wlan_fullmac_wire::WlanStopResult result_code = brcmf_cfg80211_stop_ap(ndev);
-  wlan_fullmac_wire::WlanFullmacStopConfirm result = {.result_code = result_code};
+  fuchsia_wlan_fullmac_wire::WlanStopResult result_code = brcmf_cfg80211_stop_ap(ndev);
+  fuchsia_wlan_fullmac_wire::WlanFullmacStopConfirm result = {.result_code = result_code};
 
   BRCMF_IFDBG(WLANIF, ndev, "Sending AP stop confirm to SME. result_code: %s",
-              result_code == wlan_fullmac_wire::WlanStopResult ::kSuccess ? "success"
-              : result_code == wlan_fullmac_wire::WlanStopResult::kBssAlreadyStopped
+              result_code == fuchsia_wlan_fullmac_wire::WlanStopResult ::kSuccess ? "success"
+              : result_code == fuchsia_wlan_fullmac_wire::WlanStopResult::kBssAlreadyStopped
                   ? "already stopped"
-              : result_code == wlan_fullmac_wire::WlanStopResult::kInternalError ? "internal error"
-                                                                                 : "unknown");
+              : result_code == fuchsia_wlan_fullmac_wire::WlanStopResult::kInternalError
+                  ? "internal error"
+                  : "unknown");
 
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
@@ -4030,8 +4054,9 @@ void brcmf_if_stop_req(net_device* ndev, const wlan_fullmac_wire::WlanFullmacSto
   }
 }
 
-void brcmf_if_set_keys_req(net_device* ndev, const wlan_fullmac_wire::WlanFullmacSetKeysReq* req,
-                           wlan_fullmac_wire::WlanFullmacSetKeysResp* resp) {
+void brcmf_if_set_keys_req(net_device* ndev,
+                           const fuchsia_wlan_fullmac_wire::WlanFullmacSetKeysReq* req,
+                           fuchsia_wlan_fullmac_wire::WlanFullmacSetKeysResp* resp) {
   BRCMF_IFDBG(WLANIF, ndev, "Set keys request from SME. num_keys: %zu", req->num_keys);
   zx_status_t result;
 
@@ -4045,24 +4070,27 @@ void brcmf_if_set_keys_req(net_device* ndev, const wlan_fullmac_wire::WlanFullma
   }
 }
 
-void brcmf_if_del_keys_req(net_device* ndev, const wlan_fullmac_wire::WlanFullmacDelKeysReq* req) {
+void brcmf_if_del_keys_req(net_device* ndev,
+                           const fuchsia_wlan_fullmac_wire::WlanFullmacDelKeysReq* req) {
   BRCMF_IFDBG(WLANIF, ndev, "Del keys request from SME. num_keys: %zu", req->num_keys);
 
   BRCMF_ERR("Unimplemented");
 }
 
 static void brcmf_send_eapol_confirm(net_device* ndev,
-                                     const wlan_fullmac_wire::WlanFullmacEapolReq* req,
+                                     const fuchsia_wlan_fullmac_wire::WlanFullmacEapolReq* req,
                                      zx_status_t result) {
-  wlan_fullmac_wire::WlanFullmacEapolConfirm confirm;
-  confirm.result_code = result == ZX_OK ? wlan_fullmac_wire::WlanEapolResult::kSuccess
-                                        : wlan_fullmac_wire::WlanEapolResult::kTransmissionFailure;
+  fuchsia_wlan_fullmac_wire::WlanFullmacEapolConfirm confirm;
+  confirm.result_code = result == ZX_OK
+                            ? fuchsia_wlan_fullmac_wire::WlanEapolResult::kSuccess
+                            : fuchsia_wlan_fullmac_wire::WlanEapolResult::kTransmissionFailure;
   memcpy(confirm.dst_addr.data(), req->dst_addr.data(), ETH_ALEN);
-  BRCMF_IFDBG(WLANIF, ndev, "Sending EAPOL xmit confirm to SME. result: %s",
-              confirm.result_code == wlan_fullmac_wire::WlanEapolResult::kSuccess ? "success"
-              : confirm.result_code == wlan_fullmac_wire::WlanEapolResult::kTransmissionFailure
-                  ? "failure"
-                  : "unknown");
+  BRCMF_IFDBG(
+      WLANIF, ndev, "Sending EAPOL xmit confirm to SME. result: %s",
+      confirm.result_code == fuchsia_wlan_fullmac_wire::WlanEapolResult::kSuccess ? "success"
+      : confirm.result_code == fuchsia_wlan_fullmac_wire::WlanEapolResult::kTransmissionFailure
+          ? "failure"
+          : "unknown");
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     BRCMF_ERR("Failed to create Arena status=%s", arena.status_string());
@@ -4074,8 +4102,8 @@ static void brcmf_send_eapol_confirm(net_device* ndev,
   }
 }
 
-static void brcmf_populate_eapol_eth_header(uint8_t* dest,
-                                            const wlan_fullmac_wire::WlanFullmacEapolReq* req) {
+static void brcmf_populate_eapol_eth_header(
+    uint8_t* dest, const fuchsia_wlan_fullmac_wire::WlanFullmacEapolReq* req) {
   // IEEE Std. 802.3-2015, 3.1.1
   memcpy(dest, req->dst_addr.data(), ETH_ALEN);
   memcpy(dest + ETH_ALEN, req->src_addr.data(), ETH_ALEN);
@@ -4084,7 +4112,7 @@ static void brcmf_populate_eapol_eth_header(uint8_t* dest,
 }
 
 static void brcmf_if_eapol_req_netdev(net_device* ndev,
-                                      const wlan_fullmac_wire::WlanFullmacEapolReq* req,
+                                      const fuchsia_wlan_fullmac_wire::WlanFullmacEapolReq* req,
                                       int length) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_pub* drvr = ifp->drvr;
@@ -4108,7 +4136,8 @@ static void brcmf_if_eapol_req_netdev(net_device* ndev,
   brcmf_send_eapol_confirm(ndev, req, result);
 }
 
-void brcmf_if_eapol_req(net_device* ndev, const wlan_fullmac_wire::WlanFullmacEapolReq* req) {
+void brcmf_if_eapol_req(net_device* ndev,
+                        const fuchsia_wlan_fullmac_wire::WlanFullmacEapolReq* req) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
   if (!ndev->if_proto.is_valid()) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping EAPOL xmit callback");
@@ -4180,7 +4209,7 @@ static uint16_t brcmf_get_mcs_map(uint32_t nchain, uint16_t supp) {
 }
 
 static void brcmf_update_ht_cap(struct brcmf_if* ifp,
-                                wlan_fullmac_wire::WlanFullmacBandCapability* band_cap,
+                                fuchsia_wlan_fullmac_wire::WlanFullmacBandCapability* band_cap,
                                 uint32_t bw_cap[2], uint32_t ldpc_cap, uint32_t nchain,
                                 uint32_t max_ampdu_len_exp) {
   zx_status_t status;
@@ -4243,7 +4272,7 @@ static void brcmf_update_ht_cap(struct brcmf_if* ifp,
 }
 
 static void brcmf_update_vht_cap(struct brcmf_if* ifp,
-                                 wlan_fullmac_wire::WlanFullmacBandCapability* band_cap,
+                                 fuchsia_wlan_fullmac_wire::WlanFullmacBandCapability* band_cap,
                                  uint32_t bw_cap[2], uint32_t nchain, uint32_t ldpc_cap,
                                  uint32_t max_ampdu_len_exp) {
   uint16_t mcs_map;
@@ -4352,7 +4381,7 @@ static void brcmf_dump_80211_vht_caps(fuchsia_wlan_ieee80211_wire::VhtCapabiliti
   BRCMF_DBG_UNFILTERED("     vht_mcs_nss: %#" PRIx64 "", vht_caps->vht_mcs_nss.as_uint64());
 }
 
-static void brcmf_dump_if_band_cap(wlan_fullmac_wire::WlanFullmacBandCapability* band_cap) {
+static void brcmf_dump_if_band_cap(fuchsia_wlan_fullmac_wire::WlanFullmacBandCapability* band_cap) {
   char band_str[32];
   switch (band_cap->band) {
     case fuchsia_wlan_common::WlanBand::kTwoGhz:
@@ -4404,7 +4433,7 @@ static void brcmf_dump_if_band_cap(wlan_fullmac_wire::WlanFullmacBandCapability*
   }
 }
 
-static void brcmf_dump_if_query_info(wlan_fullmac_wire::WlanFullmacQueryInfo* info) {
+static void brcmf_dump_if_query_info(fuchsia_wlan_fullmac_wire::WlanFullmacQueryInfo* info) {
   BRCMF_DBG_UNFILTERED(" Device capabilities as reported to wlanif:");
   BRCMF_DBG_UNFILTERED("   sta_addr: " FMT_MAC, FMT_MAC_ARGS(info->sta_addr.data()));
   BRCMF_DBG_UNFILTERED("   role(s): %s%s%s",
@@ -4413,9 +4442,10 @@ static void brcmf_dump_if_query_info(wlan_fullmac_wire::WlanFullmacQueryInfo* in
                        info->role == fuchsia_wlan_common::WlanMacRole::kMesh ? "mesh " : "");
   BRCMF_DBG_UNFILTERED(
       "   feature(s): %s%s",
-      info->features & static_cast<uint32_t>(wlan_fullmac_wire::WlanFullmacFeature::kDma) ? "DMA "
-                                                                                          : "",
-      info->features & static_cast<uint32_t>(wlan_fullmac_wire::WlanFullmacFeature::kSynth)
+      info->features & static_cast<uint32_t>(fuchsia_wlan_fullmac_wire::WlanFullmacFeature::kDma)
+          ? "DMA "
+          : "",
+      info->features & static_cast<uint32_t>(fuchsia_wlan_fullmac_wire::WlanFullmacFeature::kSynth)
           ? "SYNTH "
           : "");
   for (unsigned i = 0; i < info->band_cap_count; i++) {
@@ -4423,7 +4453,7 @@ static void brcmf_dump_if_query_info(wlan_fullmac_wire::WlanFullmacQueryInfo* in
   }
 }
 
-void brcmf_if_query(net_device* ndev, wlan_fullmac_wire::WlanFullmacQueryInfo* info) {
+void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacQueryInfo* info) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct wireless_dev* wdev = ndev_to_wdev(ndev);
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
@@ -4472,8 +4502,8 @@ void brcmf_if_query(net_device* ndev, wlan_fullmac_wire::WlanFullmacQueryInfo* i
     return;
   }
 
-  wlan_fullmac_wire::WlanFullmacBandCapability* band_cap_2ghz = nullptr;
-  wlan_fullmac_wire::WlanFullmacBandCapability* band_cap_5ghz = nullptr;
+  fuchsia_wlan_fullmac_wire::WlanFullmacBandCapability* band_cap_2ghz = nullptr;
+  fuchsia_wlan_fullmac_wire::WlanFullmacBandCapability* band_cap_5ghz = nullptr;
 
   /* first entry in bandlist is number of bands */
   info->band_cap_count = bandlist[0];
@@ -4482,7 +4512,7 @@ void brcmf_if_query(net_device* ndev, wlan_fullmac_wire::WlanFullmacQueryInfo* i
       BRCMF_ERR("insufficient space in query response for all bands, truncating");
       continue;
     }
-    wlan_fullmac_wire::WlanFullmacBandCapability* band_cap = &info->band_cap_list[i - 1];
+    fuchsia_wlan_fullmac_wire::WlanFullmacBandCapability* band_cap = &info->band_cap_list[i - 1];
     if (bandlist[i] == WLC_BAND_2G) {
       band_cap->band = fuchsia_wlan_common::WlanBand::kTwoGhz;
       band_cap->basic_rate_count =
@@ -4520,7 +4550,7 @@ void brcmf_if_query(net_device* ndev, wlan_fullmac_wire::WlanFullmacQueryInfo* i
     cfg->d11inf.decchspec(&ch);
 
     // Find the appropriate band
-    wlan_fullmac_wire::WlanFullmacBandCapability* band_cap = nullptr;
+    fuchsia_wlan_fullmac_wire::WlanFullmacBandCapability* band_cap = nullptr;
     if (ch.band == BRCMU_CHAN_BAND_2G) {
       band_cap = band_cap_2ghz;
     } else if (ch.band == BRCMU_CHAN_BAND_5G) {
@@ -4664,14 +4694,15 @@ void brcmf_if_query_spectrum_management_support(
 
 namespace {
 
-zx_status_t brcmf_convert_antenna_id(const histograms_report_t& histograms_report,
-                                     wlan_fullmac_wire::WlanFullmacAntennaId* out_antenna_id) {
+zx_status_t brcmf_convert_antenna_id(
+    const histograms_report_t& histograms_report,
+    fuchsia_wlan_fullmac_wire::WlanFullmacAntennaId* out_antenna_id) {
   switch (histograms_report.antennaid.freq) {
     case ANTENNA_2G:
-      out_antenna_id->freq = wlan_fullmac_wire::WlanFullmacAntennaFreq::kAntenna2G;
+      out_antenna_id->freq = fuchsia_wlan_fullmac_wire::WlanFullmacAntennaFreq::kAntenna2G;
       break;
     case ANTENNA_5G:
-      out_antenna_id->freq = wlan_fullmac_wire::WlanFullmacAntennaFreq::kAntenna5G;
+      out_antenna_id->freq = fuchsia_wlan_fullmac_wire::WlanFullmacAntennaFreq::kAntenna5G;
       break;
     default:
       return ZX_ERR_OUT_OF_RANGE;
@@ -4682,10 +4713,10 @@ zx_status_t brcmf_convert_antenna_id(const histograms_report_t& histograms_repor
 
 void brcmf_get_noise_floor_samples(
     const histograms_report_t& histograms_report,
-    std::vector<wlan_fullmac_wire::WlanFullmacHistBucket>* out_noise_floor_samples,
+    std::vector<fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket>* out_noise_floor_samples,
     uint64_t* out_invalid_samples) {
-  for (size_t i = 0; i < wlan_fullmac_wire::kWlanFullmacMaxNoiseFloorSamples; ++i) {
-    wlan_fullmac_wire::WlanFullmacHistBucket bucket;
+  for (size_t i = 0; i < fuchsia_wlan_fullmac_wire::kWlanFullmacMaxNoiseFloorSamples; ++i) {
+    fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket bucket;
     bucket.bucket_index = i;
     bucket.num_samples = histograms_report.rxnoiseflr[i];
     out_noise_floor_samples->push_back(bucket);
@@ -4694,11 +4725,12 @@ void brcmf_get_noise_floor_samples(
   *out_invalid_samples = histograms_report.rxsnr[255];
 }
 
-void brcmf_get_rssi_samples(const histograms_report_t& histograms_report,
-                            std::vector<wlan_fullmac_wire::WlanFullmacHistBucket>* out_rssi_samples,
-                            uint64_t* out_invalid_samples) {
-  for (size_t i = 0; i < wlan_fullmac_wire::kWlanFullmacMaxRssiSamples; ++i) {
-    wlan_fullmac_wire::WlanFullmacHistBucket bucket;
+void brcmf_get_rssi_samples(
+    const histograms_report_t& histograms_report,
+    std::vector<fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket>* out_rssi_samples,
+    uint64_t* out_invalid_samples) {
+  for (size_t i = 0; i < fuchsia_wlan_fullmac_wire::kWlanFullmacMaxRssiSamples; ++i) {
+    fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket bucket;
     bucket.bucket_index = i;
     bucket.num_samples = histograms_report.rxrssi[i];
     out_rssi_samples->push_back(bucket);
@@ -4707,11 +4739,12 @@ void brcmf_get_rssi_samples(const histograms_report_t& histograms_report,
   *out_invalid_samples = histograms_report.rxrssi[255];
 }
 
-void brcmf_get_snr_samples(const histograms_report_t& histograms_report,
-                           std::vector<wlan_fullmac_wire::WlanFullmacHistBucket>* out_snr_samples,
-                           uint64_t* out_invalid_samples) {
-  for (size_t i = 0; i < wlan_fullmac_wire::kWlanFullmacMaxSnrSamples; ++i) {
-    wlan_fullmac_wire::WlanFullmacHistBucket bucket;
+void brcmf_get_snr_samples(
+    const histograms_report_t& histograms_report,
+    std::vector<fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket>* out_snr_samples,
+    uint64_t* out_invalid_samples) {
+  for (size_t i = 0; i < fuchsia_wlan_fullmac_wire::kWlanFullmacMaxSnrSamples; ++i) {
+    fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket bucket;
     bucket.bucket_index = i;
     bucket.num_samples = histograms_report.rxsnr[i];
     out_snr_samples->push_back(bucket);
@@ -4722,15 +4755,15 @@ void brcmf_get_snr_samples(const histograms_report_t& histograms_report,
 
 void brcmf_get_rx_rate_index_samples(
     const histograms_report_t& histograms_report,
-    std::vector<wlan_fullmac_wire::WlanFullmacHistBucket>* out_rx_rate_index_samples,
+    std::vector<fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket>* out_rx_rate_index_samples,
     uint64_t* out_invalid_samples) {
-  uint32_t rxrate[wlan_fullmac_wire::kWlanFullmacMaxRxRateIndexSamples];
+  uint32_t rxrate[fuchsia_wlan_fullmac_wire::kWlanFullmacMaxRxRateIndexSamples];
   brcmu_set_rx_rate_index_hist_rx11ac(histograms_report.rx11ac, rxrate);
   brcmu_set_rx_rate_index_hist_rx11b(histograms_report.rx11b, rxrate);
   brcmu_set_rx_rate_index_hist_rx11g(histograms_report.rx11g, rxrate);
   brcmu_set_rx_rate_index_hist_rx11n(histograms_report.rx11n, rxrate);
-  for (uint8_t i = 0; i < wlan_fullmac_wire::kWlanFullmacMaxRxRateIndexSamples; ++i) {
-    wlan_fullmac_wire::WlanFullmacHistBucket bucket;
+  for (uint8_t i = 0; i < fuchsia_wlan_fullmac_wire::kWlanFullmacMaxRxRateIndexSamples; ++i) {
+    fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket bucket;
     bucket.bucket_index = i;
     bucket.num_samples = rxrate[i];
     out_rx_rate_index_samples->push_back(bucket);
@@ -4741,50 +4774,50 @@ void brcmf_get_rx_rate_index_samples(
 
 void brcmf_convert_histograms_report_noise_floor(
     const histograms_report_t& histograms_report,
-    const wlan_fullmac_wire::WlanFullmacAntennaId& antenna_id,
-    wlan_fullmac_wire::WlanFullmacNoiseFloorHistogram* out_hist, fidl::AnyArena& arena) {
+    const fuchsia_wlan_fullmac_wire::WlanFullmacAntennaId& antenna_id,
+    fuchsia_wlan_fullmac_wire::WlanFullmacNoiseFloorHistogram* out_hist, fidl::AnyArena& arena) {
   out_hist->antenna_id = antenna_id;
-  out_hist->hist_scope = wlan_fullmac_wire::WlanFullmacHistScope::kPerAntenna;
-  std::vector<wlan_fullmac_wire::WlanFullmacHistBucket> samples;
+  out_hist->hist_scope = fuchsia_wlan_fullmac_wire::WlanFullmacHistScope::kPerAntenna;
+  std::vector<fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket> samples;
   brcmf_get_noise_floor_samples(histograms_report, &samples, &out_hist->invalid_samples);
   out_hist->noise_floor_samples =
-      fidl::VectorView<wlan_fullmac_wire::WlanFullmacHistBucket>(arena, samples);
+      fidl::VectorView<fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket>(arena, samples);
 }
 
 void brcmf_convert_histograms_report_rx_rate_index(
     const histograms_report_t& histograms_report,
-    const wlan_fullmac_wire::WlanFullmacAntennaId& antenna_id,
-    wlan_fullmac_wire::WlanFullmacRxRateIndexHistogram* out_hist, fidl::AnyArena& arena) {
+    const fuchsia_wlan_fullmac_wire::WlanFullmacAntennaId& antenna_id,
+    fuchsia_wlan_fullmac_wire::WlanFullmacRxRateIndexHistogram* out_hist, fidl::AnyArena& arena) {
   out_hist->antenna_id = antenna_id;
-  out_hist->hist_scope = wlan_fullmac_wire::WlanFullmacHistScope::kPerAntenna;
-  std::vector<wlan_fullmac_wire::WlanFullmacHistBucket> samples;
+  out_hist->hist_scope = fuchsia_wlan_fullmac_wire::WlanFullmacHistScope::kPerAntenna;
+  std::vector<fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket> samples;
   brcmf_get_rx_rate_index_samples(histograms_report, &samples, &out_hist->invalid_samples);
   out_hist->rx_rate_index_samples =
-      fidl::VectorView<wlan_fullmac_wire::WlanFullmacHistBucket>(arena, samples);
+      fidl::VectorView<fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket>(arena, samples);
 }
 
-void brcmf_convert_histograms_report_rssi(const histograms_report_t& histograms_report,
-                                          const wlan_fullmac_wire::WlanFullmacAntennaId& antenna_id,
-                                          wlan_fullmac_wire::WlanFullmacRssiHistogram* out_hist,
-                                          fidl::AnyArena& arena) {
+void brcmf_convert_histograms_report_rssi(
+    const histograms_report_t& histograms_report,
+    const fuchsia_wlan_fullmac_wire::WlanFullmacAntennaId& antenna_id,
+    fuchsia_wlan_fullmac_wire::WlanFullmacRssiHistogram* out_hist, fidl::AnyArena& arena) {
   out_hist->antenna_id = antenna_id;
-  out_hist->hist_scope = wlan_fullmac_wire::WlanFullmacHistScope::kPerAntenna;
-  std::vector<wlan_fullmac_wire::WlanFullmacHistBucket> samples;
+  out_hist->hist_scope = fuchsia_wlan_fullmac_wire::WlanFullmacHistScope::kPerAntenna;
+  std::vector<fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket> samples;
   brcmf_get_rssi_samples(histograms_report, &samples, &out_hist->invalid_samples);
   out_hist->rssi_samples =
-      fidl::VectorView<wlan_fullmac_wire::WlanFullmacHistBucket>(arena, samples);
+      fidl::VectorView<fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket>(arena, samples);
 }
 
-void brcmf_convert_histograms_report_snr(const histograms_report_t& histograms_report,
-                                         const wlan_fullmac_wire::WlanFullmacAntennaId& antenna_id,
-                                         wlan_fullmac_wire::WlanFullmacSnrHistogram* out_hist,
-                                         fidl::AnyArena& arena) {
+void brcmf_convert_histograms_report_snr(
+    const histograms_report_t& histograms_report,
+    const fuchsia_wlan_fullmac_wire::WlanFullmacAntennaId& antenna_id,
+    fuchsia_wlan_fullmac_wire::WlanFullmacSnrHistogram* out_hist, fidl::AnyArena& arena) {
   out_hist->antenna_id = antenna_id;
-  out_hist->hist_scope = wlan_fullmac_wire::WlanFullmacHistScope::kPerAntenna;
-  std::vector<wlan_fullmac_wire::WlanFullmacHistBucket> samples;
+  out_hist->hist_scope = fuchsia_wlan_fullmac_wire::WlanFullmacHistScope::kPerAntenna;
+  std::vector<fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket> samples;
   brcmf_get_snr_samples(histograms_report, &samples, &out_hist->invalid_samples);
   out_hist->snr_samples =
-      fidl::VectorView<wlan_fullmac_wire::WlanFullmacHistBucket>(arena, samples);
+      fidl::VectorView<fuchsia_wlan_fullmac_wire::WlanFullmacHistBucket>(arena, samples);
 }
 
 zx_status_t brcmf_get_histograms_report(brcmf_if* ifp, histograms_report_t* out_report) {
@@ -4844,7 +4877,7 @@ zx_status_t brcmf_get_histograms_report(brcmf_if* ifp, histograms_report_t* out_
 }  // namespace
 
 zx_status_t brcmf_if_get_iface_counter_stats(
-    net_device* ndev, wlan_fullmac_wire::WlanFullmacIfaceCounterStats* out_stats) {
+    net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacIfaceCounterStats* out_stats) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
   if (!ndev->if_proto.is_valid()) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping get iface counter stats");
@@ -4885,7 +4918,7 @@ zx_status_t brcmf_if_get_iface_counter_stats(
 }
 
 zx_status_t brcmf_if_get_iface_histogram_stats(
-    net_device* ndev, wlan_fullmac_wire::WlanFullmacIfaceHistogramStats* out_stats,
+    net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacIfaceHistogramStats* out_stats,
     fidl::AnyArena& arena) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
   if (!ndev->if_proto.is_valid()) {
@@ -4893,7 +4926,7 @@ zx_status_t brcmf_if_get_iface_histogram_stats(
     return ZX_ERR_INTERNAL;
   }
   struct brcmf_if* ifp = ndev_to_if(ndev);
-  auto stats_builder = wlan_fullmac_wire::WlanFullmacIfaceHistogramStats::Builder(arena);
+  auto stats_builder = fuchsia_wlan_fullmac_wire::WlanFullmacIfaceHistogramStats::Builder(arena);
 
   ndev->stats.noise_floor_histograms = {};
   ndev->stats.rssi_histograms = {};
@@ -4919,7 +4952,7 @@ zx_status_t brcmf_if_get_iface_histogram_stats(
   if (hist_status != ZX_OK) {
     return hist_status;
   }
-  wlan_fullmac_wire::WlanFullmacAntennaId antenna_id;
+  fuchsia_wlan_fullmac_wire::WlanFullmacAntennaId antenna_id;
   const auto antenna_id_status = brcmf_convert_antenna_id(histograms_report, &antenna_id);
   if (antenna_id_status != ZX_OK) {
     BRCMF_ERR("Invalid antenna ID, freq: %d idx: %d", histograms_report.antennaid.freq,
@@ -4941,14 +4974,15 @@ zx_status_t brcmf_if_get_iface_histogram_stats(
 
   // Conversion from banjo to FIDL table.
   stats_builder.noise_floor_histograms(
-      fidl::VectorView<wlan_fullmac_wire::WlanFullmacNoiseFloorHistogram>(
+      fidl::VectorView<fuchsia_wlan_fullmac_wire::WlanFullmacNoiseFloorHistogram>(
           arena, ndev->stats.noise_floor_histograms));
-  stats_builder.rssi_histograms(fidl::VectorView<wlan_fullmac_wire::WlanFullmacRssiHistogram>(
-      arena, ndev->stats.rssi_histograms));
+  stats_builder.rssi_histograms(
+      fidl::VectorView<fuchsia_wlan_fullmac_wire::WlanFullmacRssiHistogram>(
+          arena, ndev->stats.rssi_histograms));
   stats_builder.rx_rate_index_histograms(
-      fidl::VectorView<wlan_fullmac_wire::WlanFullmacRxRateIndexHistogram>(
+      fidl::VectorView<fuchsia_wlan_fullmac_wire::WlanFullmacRxRateIndexHistogram>(
           arena, ndev->stats.rx_rate_index_histograms));
-  stats_builder.snr_histograms(fidl::VectorView<wlan_fullmac_wire::WlanFullmacSnrHistogram>(
+  stats_builder.snr_histograms(fidl::VectorView<fuchsia_wlan_fullmac_wire::WlanFullmacSnrHistogram>(
       arena, ndev->stats.snr_histograms));
 
   *out_stats = stats_builder.Build();
@@ -4957,7 +4991,7 @@ zx_status_t brcmf_if_get_iface_histogram_stats(
 }
 
 zx_status_t brcmf_if_sae_handshake_resp(
-    net_device* ndev, const wlan_fullmac_wire::WlanFullmacSaeHandshakeResp* resp) {
+    net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacSaeHandshakeResp* resp) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   bcme_status_t fw_err = BCME_OK;
   zx_status_t err = ZX_OK;
@@ -5015,7 +5049,7 @@ zx_status_t brcmf_if_sae_handshake_resp(
 }
 
 zx_status_t brcmf_if_sae_frame_tx(net_device* ndev,
-                                  const wlan_fullmac_wire::WlanFullmacSaeFrame* frame) {
+                                  const fuchsia_wlan_fullmac_wire::WlanFullmacSaeFrame* frame) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   bcme_status_t fw_err = BCME_OK;
   zx_status_t err = ZX_OK;
@@ -5079,9 +5113,9 @@ zx_status_t brcmf_if_set_multicast_promisc(net_device* ndev, bool enable) {
   return ZX_OK;
 }
 
-void brcmf_if_start_capture_frames(net_device* ndev,
-                                   const wlan_fullmac_wire::WlanFullmacStartCaptureFramesReq* req,
-                                   wlan_fullmac_wire::WlanFullmacStartCaptureFramesResp* resp) {
+void brcmf_if_start_capture_frames(
+    net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacStartCaptureFramesReq* req,
+    fuchsia_wlan_fullmac_wire::WlanFullmacStartCaptureFramesResp* resp) {
   BRCMF_ERR("start_capture_frames not supported");
   resp->status = ZX_ERR_NOT_SUPPORTED;
   resp->supported_mgmt_frames = 0;
@@ -5334,7 +5368,7 @@ zx_status_t brcmf_notify_channel_switch(struct brcmf_if* ifp, const struct brcmf
 
   uint16_t chanspec = 0;
   uint8_t ctl_chan;
-  wlan_fullmac_wire::WlanFullmacChannelSwitchInfo info;
+  fuchsia_wlan_fullmac_wire::WlanFullmacChannelSwitchInfo info;
   zx_status_t err = ZX_OK;
   struct brcmf_cfg80211_info* cfg = nullptr;
   struct wireless_dev* wdev = nullptr;
@@ -5393,7 +5427,7 @@ static zx_status_t brcmf_notify_start_auth(struct brcmf_if* ifp, const struct br
   zx_status_t err = ZX_OK;
   bcme_status_t fw_err = BCME_OK;
 
-  wlan_fullmac_wire::WlanFullmacSaeHandshakeInd ind;
+  fuchsia_wlan_fullmac_wire::WlanFullmacSaeHandshakeInd ind;
   brcmf_ext_auth* auth_start_evt = (brcmf_ext_auth*)data;
 
   if (!brcmf_test_bit(brcmf_vif_status_bit_t::CONNECTING, &ifp->vif->sme_state)) {
@@ -5443,7 +5477,7 @@ static zx_status_t brcmf_rx_auth_frame(struct brcmf_if* ifp, const uint32_t data
     return ZX_ERR_BAD_HANDLE;
   }
 
-  wlan_fullmac_wire::WlanFullmacSaeFrame frame = {};
+  fuchsia_wlan_fullmac_wire::WlanFullmacSaeFrame frame = {};
   auto pframe = (uint8_t*)data;
   auto pframe_hdr = reinterpret_cast<wlan::Authentication*>(pframe);
 
@@ -5722,7 +5756,7 @@ static zx_status_t brcmf_handle_assoc_ind(struct brcmf_if* ifp, const struct brc
     return ZX_ERR_INVALID_ARGS;
   }
 
-  wlan_fullmac_wire::WlanFullmacAssocInd assoc_ind_params = {};
+  fuchsia_wlan_fullmac_wire::WlanFullmacAssocInd assoc_ind_params = {};
   memcpy(assoc_ind_params.peer_sta_address.data(), e->addr, ETH_ALEN);
 
   // Unfortunately, we have to ask the firmware to provide the associated station's
@@ -5947,23 +5981,23 @@ static zx_status_t brcmf_process_auth_ind_event(struct brcmf_if* ifp,
       BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping auth ind callback");
       return ZX_OK;
     }
-    wlan_fullmac_wire::WlanFullmacAuthInd auth_ind_params = {};
+    fuchsia_wlan_fullmac_wire::WlanFullmacAuthInd auth_ind_params = {};
     const char* auth_type;
 
     memcpy(auth_ind_params.peer_sta_address.data(), e->addr, ETH_ALEN);
     // We always authenticate as an open system for WPA
-    auth_ind_params.auth_type = wlan_fullmac_wire::WlanAuthType::kOpenSystem;
+    auth_ind_params.auth_type = fuchsia_wlan_fullmac_wire::WlanAuthType::kOpenSystem;
     switch (auth_ind_params.auth_type) {
-      case wlan_fullmac_wire::WlanAuthType::kOpenSystem:
+      case fuchsia_wlan_fullmac_wire::WlanAuthType::kOpenSystem:
         auth_type = "open";
         break;
-      case wlan_fullmac_wire::WlanAuthType::kSharedKey:
+      case fuchsia_wlan_fullmac_wire::WlanAuthType::kSharedKey:
         auth_type = "shared key";
         break;
-      case wlan_fullmac_wire::WlanAuthType::kFastBssTransition:
+      case fuchsia_wlan_fullmac_wire::WlanAuthType::kFastBssTransition:
         auth_type = "fast bss transition";
         break;
-      case wlan_fullmac_wire::WlanAuthType::kSae:
+      case fuchsia_wlan_fullmac_wire::WlanAuthType::kSae:
         auth_type = "SAE";
         break;
       default:
@@ -6065,7 +6099,7 @@ static zx_status_t brcmf_process_link_event(struct brcmf_if* ifp, const struct b
       // Stop the timer when we get a result from firmware.
       cfg->ap_start_timer->Stop();
       // confirm AP Start
-      brcmf_if_start_conf(ndev, wlan_fullmac_wire::WlanStartResult::kSuccess);
+      brcmf_if_start_conf(ndev, fuchsia_wlan_fullmac_wire::WlanStartResult::kSuccess);
       // Set AP_CREATED
       brcmf_set_bit(brcmf_vif_status_bit_t::AP_CREATED, &ifp->vif->sme_state);
     }

@@ -61,8 +61,10 @@ void FullmacMlme::Init() {
           [](void *device, wlan_fullmac_impl_reconnect_request_t *req) {
             DEVICE(device)->Reconnect(req);
           },
-      .auth_resp = [](void *device,
-                      wlan_fullmac_auth_resp_t *resp) { DEVICE(device)->AuthenticateResp(resp); },
+      .auth_resp =
+          [](void *device, wlan_fullmac_impl_auth_resp_request_t *resp) {
+            DEVICE(device)->AuthenticateResp(resp);
+          },
       .deauth_req = [](void *device,
                        wlan_fullmac_deauth_req_t *req) { DEVICE(device)->DeauthenticateReq(req); },
       .assoc_resp = [](void *device,

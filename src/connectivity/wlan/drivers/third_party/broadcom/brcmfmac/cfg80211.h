@@ -34,7 +34,7 @@
 #include "timer.h"
 #include "workqueue.h"
 
-namespace wlan_fullmac_wire = fuchsia_wlan_fullmac::wire;
+namespace fuchsia_wlan_fullmac_wire = fuchsia_wlan_fullmac::wire;
 
 // clang-format off
 
@@ -353,7 +353,7 @@ struct escan_info {
   uint32_t escan_state;
   struct brcmf_if* ifp;
   zx_status_t (*run)(struct brcmf_cfg80211_info* cfg, struct brcmf_if* ifp,
-                     const wlan_fullmac_wire::WlanFullmacImplStartScanRequest* request,
+                     const fuchsia_wlan_fullmac_wire::WlanFullmacImplStartScanRequest* request,
                      uint16_t* sync_id_out);
 };
 
@@ -600,7 +600,7 @@ zx_status_t brcmf_netdev_open(struct net_device* ndev);
 
 zx_status_t brcmf_if_start(net_device* ndev, zx_handle_t* out_mlme_channel);
 void brcmf_if_stop(net_device* ndev);
-void brcmf_if_query(net_device* ndev, wlan_fullmac_wire::WlanFullmacQueryInfo* info);
+void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacQueryInfo* info);
 void brcmf_if_query_mac_sublayer_support(net_device* ndev,
                                          fuchsia_wlan_common::wire::MacSublayerSupport* resp);
 void brcmf_if_query_security_support(net_device* ndev,
@@ -608,37 +608,46 @@ void brcmf_if_query_security_support(net_device* ndev,
 void brcmf_if_query_spectrum_management_support(
     net_device* ndev, fuchsia_wlan_common::wire::SpectrumManagementSupport* resp);
 void brcmf_if_start_scan(net_device* ndev,
-                         const wlan_fullmac_wire::WlanFullmacImplStartScanRequest* req);
+                         const fuchsia_wlan_fullmac_wire::WlanFullmacImplStartScanRequest* req);
 void brcmf_if_connect_req(net_device* ndev,
-                          const wlan_fullmac_wire::WlanFullmacImplConnectRequest* req);
+                          const fuchsia_wlan_fullmac_wire::WlanFullmacImplConnectRequest* req);
 void brcmf_if_reconnect_req(net_device* ndev,
-                            const wlan_fullmac_wire::WlanFullmacImplReconnectRequest* req);
-void brcmf_if_auth_resp(net_device* ndev, const wlan_fullmac_wire::WlanFullmacAuthResp* ind);
-void brcmf_if_deauth_req(net_device* ndev, const wlan_fullmac_wire::WlanFullmacDeauthReq* req);
-void brcmf_if_assoc_resp(net_device* ndev, const wlan_fullmac_wire::WlanFullmacAssocResp* ind);
-void brcmf_if_disassoc_req(net_device* ndev, const wlan_fullmac_wire::WlanFullmacDisassocReq* req);
-void brcmf_if_reset_req(net_device* ndev, const wlan_fullmac_wire::WlanFullmacResetReq* req);
-void brcmf_if_start_req(net_device* ndev, const wlan_fullmac_wire::WlanFullmacStartReq* req);
-void brcmf_if_stop_req(net_device* ndev, const wlan_fullmac_wire::WlanFullmacStopReq* req);
-void brcmf_if_set_keys_req(net_device* ndev, const wlan_fullmac_wire::WlanFullmacSetKeysReq* req,
-                           wlan_fullmac_wire::WlanFullmacSetKeysResp* resp);
-void brcmf_if_del_keys_req(net_device* ndev, const wlan_fullmac_wire::WlanFullmacDelKeysReq* req);
-void brcmf_if_eapol_req(net_device* ndev, const wlan_fullmac_wire::WlanFullmacEapolReq* req);
+                            const fuchsia_wlan_fullmac_wire::WlanFullmacImplReconnectRequest* req);
+void brcmf_if_auth_resp(net_device* ndev,
+                        const fuchsia_wlan_fullmac_wire::WlanFullmacImplAuthRespRequest* ind);
+void brcmf_if_deauth_req(net_device* ndev,
+                         const fuchsia_wlan_fullmac_wire::WlanFullmacDeauthReq* req);
+void brcmf_if_assoc_resp(net_device* ndev,
+                         const fuchsia_wlan_fullmac_wire::WlanFullmacAssocResp* ind);
+void brcmf_if_disassoc_req(net_device* ndev,
+                           const fuchsia_wlan_fullmac_wire::WlanFullmacDisassocReq* req);
+void brcmf_if_reset_req(net_device* ndev,
+                        const fuchsia_wlan_fullmac_wire::WlanFullmacResetReq* req);
+void brcmf_if_start_req(net_device* ndev,
+                        const fuchsia_wlan_fullmac_wire::WlanFullmacStartReq* req);
+void brcmf_if_stop_req(net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacStopReq* req);
+void brcmf_if_set_keys_req(net_device* ndev,
+                           const fuchsia_wlan_fullmac_wire::WlanFullmacSetKeysReq* req,
+                           fuchsia_wlan_fullmac_wire::WlanFullmacSetKeysResp* resp);
+void brcmf_if_del_keys_req(net_device* ndev,
+                           const fuchsia_wlan_fullmac_wire::WlanFullmacDelKeysReq* req);
+void brcmf_if_eapol_req(net_device* ndev,
+                        const fuchsia_wlan_fullmac_wire::WlanFullmacEapolReq* req);
 void brcmf_if_stats_query_req(net_device* ndev);
 zx_status_t brcmf_if_get_iface_counter_stats(
-    net_device* ndev, wlan_fullmac_wire::WlanFullmacIfaceCounterStats* out_stats);
+    net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacIfaceCounterStats* out_stats);
 zx_status_t brcmf_if_get_iface_histogram_stats(
-    net_device* ndev, wlan_fullmac_wire::WlanFullmacIfaceHistogramStats* out_stats,
+    net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacIfaceHistogramStats* out_stats,
     fidl::AnyArena& arena);
-void brcmf_if_start_capture_frames(net_device* ndev,
-                                   const wlan_fullmac_wire::WlanFullmacStartCaptureFramesReq* req,
-                                   wlan_fullmac_wire::WlanFullmacStartCaptureFramesResp* resp);
+void brcmf_if_start_capture_frames(
+    net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacStartCaptureFramesReq* req,
+    fuchsia_wlan_fullmac_wire::WlanFullmacStartCaptureFramesResp* resp);
 void brcmf_if_stop_capture_frames(net_device* ndev);
 zx_status_t brcmf_if_set_multicast_promisc(net_device* ndev, bool enable);
-zx_status_t brcmf_if_sae_handshake_resp(net_device* ndev,
-                                        const wlan_fullmac_wire::WlanFullmacSaeHandshakeResp* resp);
+zx_status_t brcmf_if_sae_handshake_resp(
+    net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacSaeHandshakeResp* resp);
 zx_status_t brcmf_if_sae_frame_tx(net_device* ndev,
-                                  const wlan_fullmac_wire::WlanFullmacSaeFrame* frame);
+                                  const fuchsia_wlan_fullmac_wire::WlanFullmacSaeFrame* frame);
 void brcmf_if_wmm_status_req(net_device* ndev);
 
 void brcmf_return_assoc_result(struct net_device* ndev, status_code_t status_code);
