@@ -2,10 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {argh::FromArgs, ffx_core::ffx_command, ffx_platform_sub_command::SubCommand};
+use {
+    argh::{ArgsInfo, FromArgs},
+    ffx_core::ffx_command,
+    ffx_platform_sub_command::SubCommand,
+};
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "platform", description = "Manage platform build prerequisites")]
 pub struct ComponentCommand {
     #[argh(subcommand)]

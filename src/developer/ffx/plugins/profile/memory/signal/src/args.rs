@@ -4,14 +4,18 @@
 
 //! Argument-parsing specification for the `signal` subcommand.
 
-use {argh::FromArgs, ffx_core::ffx_command, fidl_fuchsia_memorypressure::Level};
+use {
+    argh::{ArgsInfo, FromArgs},
+    ffx_core::ffx_command,
+    fidl_fuchsia_memorypressure::Level,
+};
 
 /// Signals userspace clients with specified memory pressure
 /// level. Clients can use this command to test their response to
 /// memory pressure. Does not affect the real memory pressure level on
 /// the system, or trigger any kernel reclamation tasks.
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "signal")]
 pub struct SignalCommand {
     /// memory pressure level. Can be CRITICAL, WARNING or NORMAL.

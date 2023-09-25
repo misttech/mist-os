@@ -2,18 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "process", description = "Processes related commands")]
 pub struct ProcessCommand {
     #[argh(subcommand)]
     pub arg: Args,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
 pub enum Args {
     List(ListArg),
@@ -23,7 +23,7 @@ pub enum Args {
     StackTrace(StackTraceArg),
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(
     subcommand,
     name = "list",
@@ -37,7 +37,7 @@ pub struct ListArg {
     pub verbose: bool,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(
     subcommand,
     name = "filter",
@@ -48,7 +48,7 @@ pub struct FilterArg {
     pub process_koids: Vec<u64>,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(
     subcommand,
     name = "generate-fuchsia-map",
@@ -70,7 +70,7 @@ fn parse_task(arg: &str) -> Result<Task, String> {
     })
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(
     subcommand,
     name = "kill",
@@ -81,7 +81,7 @@ pub struct KillArg {
     pub task_to_kill: Task,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(
     subcommand,
     name = "stack_trace",

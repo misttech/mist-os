@@ -7,7 +7,7 @@ use {
         commands::{types::*, utils},
         types::Error,
     },
-    argh::FromArgs,
+    argh::{ArgsInfo, FromArgs},
     async_trait::async_trait,
     diagnostics_data::{Inspect, InspectData},
     diagnostics_hierarchy::DiagnosticsHierarchy,
@@ -19,7 +19,7 @@ use {
 /// Lists all available full selectors (component selector + tree selector).
 /// If a selector is provided, it’ll only print selectors for that component.
 /// If a full selector (component + tree) is provided, it lists all selectors under the given node.
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "selectors")]
 pub struct SelectorsCommand {
     #[argh(option)]

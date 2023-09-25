@@ -11,7 +11,7 @@ use {
         },
         types::Error,
     },
-    argh::FromArgs,
+    argh::{ArgsInfo, FromArgs},
     async_trait::async_trait,
     component_debug::dirs::*,
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys2,
@@ -75,7 +75,7 @@ impl fmt::Display for ListFilesResult {
 /// Lists all inspect files (*inspect vmo files, fuchsia.inspect.Tree and
 /// fuchsia.inspect.deprecated.Inspect) under the provided paths. If no monikers are provided, it'll
 /// list all the inspect files for all components.
-#[derive(Default, FromArgs, PartialEq, Debug)]
+#[derive(Default, ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "list-files")]
 pub struct ListFilesCommand {
     #[argh(positional)]

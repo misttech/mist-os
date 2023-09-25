@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error, Result};
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq, Default)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq, Default)]
 #[argh(
     subcommand,
     name = "list",

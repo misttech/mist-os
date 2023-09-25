@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 use fidl_fuchsia_settings::KeyboardSettings;
 use regex::Regex;
 use std::num::ParseIntError;
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq, Clone, Copy)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq, Clone, Copy)]
 #[argh(subcommand, name = "keyboard")]
 /// get or set keyboard settings
 pub struct Keyboard {

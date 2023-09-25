@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Result};
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use async_net::{TcpListener, TcpStream};
 use fho::SimpleWriter;
 use fidl_fuchsia_developer_remotecontrol as rc;
@@ -31,7 +31,7 @@ async fn serve_adb_connection(mut stream: TcpStream, bridge_socket: fidl::Socket
     Ok(())
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "adb",

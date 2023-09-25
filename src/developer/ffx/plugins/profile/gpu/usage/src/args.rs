@@ -2,10 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {argh::FromArgs, ffx_core::ffx_command, std::time::Duration};
+use {
+    argh::{ArgsInfo, FromArgs},
+    ffx_core::ffx_command,
+    std::time::Duration,
+};
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "usage",
@@ -30,14 +34,14 @@ pub struct Command {
     pub subcommand: SubCommand,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
 pub enum SubCommand {
     Start(StartCommand),
     Stop(StopCommand),
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 /// Start logging on the target
 #[argh(subcommand, name = "start")]
 pub struct StartCommand {
@@ -54,7 +58,7 @@ pub struct StartCommand {
     pub duration: Option<Duration>,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 /// Stop logging on the target
 #[argh(subcommand, name = "stop")]
 pub struct StopCommand {}

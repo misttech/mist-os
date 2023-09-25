@@ -6,7 +6,7 @@
 #![deny(unused_results)]
 
 #[ffx_core::ffx_command]
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "net")]
 /// View and manage target network configuration
 pub struct Command {

@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 
 #[ffx_command()]
-#[derive(Clone, FromArgs, Default, Debug, PartialEq)]
+#[derive(Clone, ArgsInfo, FromArgs, Default, Debug, PartialEq)]
 #[argh(subcommand, name = "list")]
 /// List running Fuchsia emulators.
 pub struct ListCommand {

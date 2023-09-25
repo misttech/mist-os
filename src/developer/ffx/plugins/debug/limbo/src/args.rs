@@ -2,19 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 
 /// Options for "ffx debug limbo".
 #[ffx_command()]
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "limbo", description = "control the process limbo on the target")]
 pub struct LimboCommand {
     #[argh(subcommand)]
     pub command: LimboSubCommand,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
 pub enum LimboSubCommand {
     Status(LimboStatusCommand),
@@ -24,11 +24,11 @@ pub enum LimboSubCommand {
     Release(LimboReleaseCommand),
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "status", description = "query the status of the process limbo.")]
 pub struct LimboStatusCommand {}
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(
     subcommand,
     name = "enable",
@@ -36,7 +36,7 @@ pub struct LimboStatusCommand {}
 )]
 pub struct LimboEnableCommand {}
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(
     subcommand,
     name = "disable",
@@ -44,7 +44,7 @@ pub struct LimboEnableCommand {}
 )]
 pub struct LimboDisableCommand {}
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(
     subcommand,
     name = "list",
@@ -52,7 +52,7 @@ pub struct LimboDisableCommand {}
 )]
 pub struct LimboListCommand {}
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(
     subcommand,
     name = "release",

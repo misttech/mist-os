@@ -3,13 +3,16 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::Result, argh::FromArgs, ffx_core::ffx_command, format_utils::Format,
+    anyhow::Result,
+    argh::{ArgsInfo, FromArgs},
+    ffx_core::ffx_command,
+    format_utils::Format,
     std::time::Duration,
 };
 
 /// TODO(fxbug.dev/109807) - Add support for writing infinite files.
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "gen",
@@ -21,7 +24,7 @@ pub struct GenCommand {
     pub subcommand: SubCommand,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum SubCommand {
     Sine(SineCommand),
@@ -32,7 +35,7 @@ pub enum SubCommand {
     WhiteNoise(WhiteNoiseCommand),
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "sine", description = "Generate a sine wave signal.")]
 pub struct SineCommand {
     #[argh(
@@ -52,7 +55,7 @@ pub struct SineCommand {
     pub format: Format,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "square", description = "Generate a square wave signal.")]
 pub struct SquareCommand {
     #[argh(
@@ -75,7 +78,7 @@ pub struct SquareCommand {
     pub format: Format,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "sawtooth", description = "Generate a sawtooth wave signal.")]
 pub struct SawtoothCommand {
     #[argh(
@@ -95,7 +98,7 @@ pub struct SawtoothCommand {
     pub format: Format,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "triangle", description = "Generate a triangle wave signal.")]
 pub struct TriangleCommand {
     #[argh(
@@ -115,7 +118,7 @@ pub struct TriangleCommand {
     pub format: Format,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "white-noise", description = "Generate white noise.")]
 pub struct WhiteNoiseCommand {
     #[argh(
@@ -132,7 +135,7 @@ pub struct WhiteNoiseCommand {
     pub format: Format,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "pink-noise", description = "Generate pink noise.")]
 pub struct PinkNoiseCommand {
     #[argh(

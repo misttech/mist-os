@@ -7,10 +7,10 @@ use {
         descriptor::args::DescriptorCommand, feature::args::FeatureCommand, get::args::GetCommand,
         read::args::ReadCommand,
     },
-    argh::FromArgs,
+    argh::{ArgsInfo, FromArgs},
 };
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "print-input-report",
@@ -21,7 +21,7 @@ pub struct PrintInputReportCommand {
     pub subcommand: PrintInputReportSubcommand,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum PrintInputReportSubcommand {
     Descriptor(DescriptorCommand),

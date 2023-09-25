@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 use pbms::AuthFlowChoice;
 use std::{path::PathBuf, str::FromStr};
@@ -11,14 +11,14 @@ use std::{path::PathBuf, str::FromStr};
 /// map your usage of product-bundle to product can be found in each of the
 /// subcommands.
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "product-bundle")]
 pub struct ProductBundleCommand {
     #[argh(subcommand)]
     pub sub: SubCommand,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum SubCommand {
     List(ListCommand),
@@ -28,7 +28,7 @@ pub enum SubCommand {
 }
 
 /// DEPRECATED. Please use `ffx product list` instead.
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "list")]
 pub struct ListCommand {
     /// do no network IO, use the locally cached version or fail.
@@ -45,7 +45,7 @@ pub struct ListCommand {
 }
 
 /// DEPRECATED. Please use `ffx product download` instead.
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "get")]
 pub struct GetCommand {
     /// do no network IO, use the locally cached version or fail.
@@ -119,7 +119,7 @@ impl FromStr for ProductBundleTypes {
 }
 
 /// DEPRECATED. Please use `ffx product create` instead.
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "create")]
 pub struct CreateCommand {
     /// is this product_bundle.json for emulator or flash.
@@ -156,7 +156,7 @@ pub struct CreateCommand {
 }
 
 /// DEPRECATED. This is no longer supported/required in Product Bundle V2.
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "remove")]
 pub struct RemoveCommand {
     /// remove all product bundles instead of just one.

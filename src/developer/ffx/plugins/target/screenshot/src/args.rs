@@ -4,13 +4,13 @@
 
 use {
     anyhow::{anyhow, Result},
-    argh::FromArgs,
+    argh::{ArgsInfo, FromArgs},
     ffx_core::ffx_command,
     std::str::FromStr,
 };
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq, Clone)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq, Clone)]
 #[argh(
     subcommand,
     name = "screenshot",

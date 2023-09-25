@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "device",
@@ -24,7 +24,7 @@ pub struct DeviceCommand {
     pub select: bool,
 }
 
-#[derive(FromArgs, Clone, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, Clone, PartialEq, Debug)]
 #[argh(subcommand)]
 pub enum DeviceSubcommand {
     Bind(BindCommand),
@@ -33,7 +33,7 @@ pub enum DeviceSubcommand {
     LogLevel(LogLevelCommand),
 }
 
-#[derive(FromArgs, Clone, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, Clone, PartialEq, Debug)]
 /// Binds the driver specified to the specified device.
 #[argh(subcommand, name = "bind")]
 pub struct BindCommand {
@@ -48,7 +48,7 @@ pub struct BindCommand {
     pub device_path: String,
 }
 
-#[derive(FromArgs, Clone, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, Clone, PartialEq, Debug)]
 /// Unbinds the driver bound to the specified device.
 #[argh(subcommand, name = "unbind")]
 pub struct UnbindCommand {
@@ -58,7 +58,7 @@ pub struct UnbindCommand {
     pub device_path: String,
 }
 
-#[derive(FromArgs, Clone, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, Clone, PartialEq, Debug)]
 /// Unbinds the driver bound to a device and then attempts to bind a new driver.
 #[argh(subcommand, name = "rebind")]
 pub struct RebindCommand {
@@ -129,7 +129,7 @@ impl std::fmt::Display for LogLevel {
     }
 }
 
-#[derive(FromArgs, Clone, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, Clone, PartialEq, Debug)]
 /// Sets or prints the log level for the specified device. If log_level is not specified, will
 /// print current log level.
 #[argh(subcommand, name = "log-level")]

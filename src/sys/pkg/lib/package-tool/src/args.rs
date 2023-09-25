@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 
 use {
-    argh::FromArgs,
+    argh::{ArgsInfo, FromArgs},
     camino::Utf8PathBuf,
     chrono::{DateTime, Utc},
     fuchsia_repo::repository::CopyMode,
     std::path::PathBuf,
 };
 
-#[derive(Eq, FromArgs, PartialEq, Debug)]
+#[derive(Eq, ArgsInfo, FromArgs, PartialEq, Debug)]
 /// create a package archive from a package_manifest.json
 #[argh(subcommand, name = "create")]
 pub struct PackageArchiveCreateCommand {
@@ -31,7 +31,7 @@ pub struct PackageArchiveCreateCommand {
     pub package_manifest: Utf8PathBuf,
 }
 
-#[derive(Eq, FromArgs, PartialEq, Debug)]
+#[derive(Eq, ArgsInfo, FromArgs, PartialEq, Debug)]
 /// extract the contents of <far_path> inside the Fuchsia package archive file to the output directory
 #[argh(subcommand, name = "extract")]
 pub struct PackageArchiveExtractCommand {
@@ -53,7 +53,7 @@ pub struct PackageArchiveExtractCommand {
 }
 
 /// Builds a package.
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "build")]
 pub struct PackageBuildCommand {
     /// directory to save package artifacts
@@ -98,7 +98,7 @@ pub struct PackageBuildCommand {
 }
 
 /// Create a repository.
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "create")]
 pub struct RepoCreateCommand {
     /// set repository version based on the current time rather than monotonically increasing version
@@ -115,7 +115,7 @@ pub struct RepoCreateCommand {
 }
 
 /// Publish packages.
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "publish")]
 pub struct RepoPublishCommand {
     /// path to the keys used to sign metadata, but not trust for key rotation
@@ -192,7 +192,7 @@ pub struct RepoPublishCommand {
 }
 
 /// Create package manifest list from repository.
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "create-package-manifest-list")]
 pub struct RepoPMListCommand {
     /// path to the source repository directory

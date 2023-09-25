@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
-use argh::SubCommand;
+use argh::{ArgsInfo, CommandInfoWithArgs, FromArgs, SubCommand};
 use log_command as log_utils;
 pub use log_utils::DumpCommand;
 pub use log_utils::LogCommand;
@@ -21,6 +20,12 @@ pub struct FfxLogCommand {
 
 impl SubCommand for FfxLogCommand {
     const COMMAND: &'static argh::CommandInfo = LogCommand::COMMAND;
+}
+
+impl ArgsInfo for FfxLogCommand {
+    fn get_args_info() -> CommandInfoWithArgs {
+        LogCommand::get_args_info()
+    }
 }
 
 impl FromArgs for FfxLogCommand {

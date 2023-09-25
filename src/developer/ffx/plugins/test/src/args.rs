@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use diagnostics_data::Severity;
 use ffx_core::ffx_command;
 use fidl_fuchsia_diagnostics::LogInterestSelector;
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "test",
@@ -20,14 +20,14 @@ pub struct TestCommand {
     pub subcommand: TestSubCommand,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
 pub enum TestSubCommand {
     Run(RunCommand),
     List(ListCommand),
 }
 
-#[derive(FromArgs, Debug, PartialEq, Clone)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq, Clone)]
 #[argh(
     subcommand,
     name = "run",
@@ -176,7 +176,7 @@ pub struct RunCommand {
     pub disable_output_directory: bool,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "list-cases",

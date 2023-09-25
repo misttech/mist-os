@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::{FromArgValue, FromArgs};
+use argh::{ArgsInfo, FromArgValue, FromArgs};
 use ffx_core::ffx_command;
 use std::path::PathBuf;
 
@@ -67,7 +67,7 @@ pub fn default_capability_types() -> Vec<CapabilityType> {
 }
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "routes",

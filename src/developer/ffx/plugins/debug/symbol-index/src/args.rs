@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 
 #[ffx_command()]
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(
     subcommand,
     name = "symbol-index",
@@ -19,7 +19,7 @@ pub struct SymbolIndexCommand {
     pub sub_command: SymbolIndexSubCommand,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
 pub enum SymbolIndexSubCommand {
     List(ListCommand),
@@ -28,7 +28,7 @@ pub enum SymbolIndexSubCommand {
     Clean(CleanCommand),
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "list", description = "show the content in symbol index")]
 pub struct ListCommand {
     /// show the aggregated symbol index
@@ -36,7 +36,7 @@ pub struct ListCommand {
     pub aggregated: bool,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(
     subcommand,
     name = "add",
@@ -60,7 +60,7 @@ pub struct AddCommand {
     pub source: String,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(
     subcommand,
     name = "remove",
@@ -77,7 +77,7 @@ pub struct RemoveCommand {
     pub source: String,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(
     subcommand,
     name = "clean",

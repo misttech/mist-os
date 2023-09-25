@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 
 /// Options for "ffx debug core".
 #[ffx_command()]
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "core", description = "start the debugger and open a minidump")]
 pub struct CoreCommand {
     /// minidump.dmp file to open. If left empty, the tool will list available minidumps on the

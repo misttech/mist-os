@@ -8,7 +8,7 @@ use {
         text_formatter,
         types::Error,
     },
-    argh::FromArgs,
+    argh::{ArgsInfo, FromArgs},
     async_trait::async_trait,
     derivative::Derivative,
     diagnostics_data::{Inspect, InspectData, InspectHandleName},
@@ -58,7 +58,7 @@ impl fmt::Display for ShowResult {
 }
 
 /// Prints the inspect hierarchies that match the given selectors.
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "show")]
 pub struct ShowCommand {
     #[argh(option)]

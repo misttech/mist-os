@@ -11,7 +11,7 @@ use {
         list_hosts::args::ListHostsCommand, register::args::RegisterCommand,
         restart::args::RestartCommand, test_node::args::TestNodeCommand,
     },
-    argh::FromArgs,
+    argh::{ArgsInfo, FromArgs},
 };
 
 #[cfg(not(target_os = "fuchsia"))]
@@ -29,7 +29,7 @@ use {
     static_checks_lib::args::StaticChecksCommand,
 };
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(name = "driver", description = "Support driver development workflows")]
 pub struct DriverCommand {
     #[argh(subcommand)]
@@ -37,7 +37,7 @@ pub struct DriverCommand {
 }
 
 #[cfg(target_os = "fuchsia")]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum DriverSubCommand {
     DebugBind(DebugBindCommand),
@@ -55,7 +55,7 @@ pub enum DriverSubCommand {
 }
 
 #[cfg(not(target_os = "fuchsia"))]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum DriverSubCommand {
     Conformance(ConformanceCommand),

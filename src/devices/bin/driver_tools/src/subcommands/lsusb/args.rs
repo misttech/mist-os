@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::{FromArgValue, FromArgs};
+use argh::{ArgsInfo, FromArgValue, FromArgs};
 
 #[derive(Debug, PartialEq)]
 struct UsbDevice {
@@ -35,7 +35,7 @@ impl std::convert::Into<lsusb::args::UsbDevice> for UsbDevice {
     }
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "lsusb",

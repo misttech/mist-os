@@ -2,9 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {argh::FromArgs, std::path::PathBuf};
+use {
+    argh::{ArgsInfo, FromArgs},
+    std::path::PathBuf,
+};
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "read",
@@ -19,7 +22,7 @@ pub struct ReadCommand {
     pub devpath: Option<Devpath>,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "devpath",

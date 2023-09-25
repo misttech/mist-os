@@ -4,7 +4,7 @@
 
 use {
     crate::{commands::types::*, types::Error},
-    argh::FromArgs,
+    argh::{ArgsInfo, FromArgs},
     async_trait::async_trait,
     diagnostics_data::{Inspect, InspectData},
     serde::{Serialize, Serializer},
@@ -135,7 +135,7 @@ pub fn list_response_items_from_components(
 
 /// Lists all components (relative to the scope where the archivist receives events from) of
 /// components that expose inspect.
-#[derive(Default, FromArgs, PartialEq, Debug)]
+#[derive(Default, ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "list")]
 pub struct ListCommand {
     #[argh(option)]

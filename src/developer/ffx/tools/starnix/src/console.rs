@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, bail, Result};
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use blocking::Unblock;
 use fho::SimpleWriter;
 use fidl_fuchsia_developer_remotecontrol as rc;
@@ -107,7 +107,7 @@ async fn run_console(
     Ok(exit_code)
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "console",

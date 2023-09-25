@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 use fidl_fuchsia_settings::{DisplaySettings, LowLightMode, Theme};
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq, Clone)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq, Clone)]
 #[argh(subcommand, name = "display")]
 /// get or set display settings
 pub struct Display {
@@ -15,7 +15,7 @@ pub struct Display {
     pub subcommand: SubCommandEnum,
 }
 
-#[derive(FromArgs, PartialEq, Debug, Clone)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug, Clone)]
 #[argh(subcommand)]
 pub enum SubCommandEnum {
     /// sets display settings
@@ -26,7 +26,7 @@ pub enum SubCommandEnum {
     Watch(WatchArgs),
 }
 
-#[derive(FromArgs, Debug, PartialEq, Clone)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq, Clone)]
 #[argh(subcommand, name = "set", description = "Sets display settings.")]
 pub struct SetArgs {
     /// the brightness value specified as a float in the range [0, 1]
@@ -56,7 +56,7 @@ pub struct SetArgs {
     pub screen_enabled: Option<bool>,
 }
 
-#[derive(FromArgs, Debug, PartialEq, Clone)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq, Clone)]
 #[argh(subcommand, name = "get", description = "Get the current display settings.")]
 pub struct GetArgs {
     /// choose which display settings field value to return, valid options are auto and brightness
@@ -78,7 +78,7 @@ fn str_to_field(src: &str) -> Result<Field, String> {
     }
 }
 
-#[derive(FromArgs, Debug, PartialEq, Clone)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq, Clone)]
 #[argh(
     subcommand,
     name = "watch",

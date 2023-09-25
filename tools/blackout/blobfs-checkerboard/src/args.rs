@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #[ffx_core::ffx_command()]
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "blobfs-checkerboard",

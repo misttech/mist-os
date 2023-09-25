@@ -3,12 +3,16 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::Result, argh::FromArgs, ffx_core::ffx_command, fidl_fuchsia_media::AudioCaptureUsage,
-    format_utils::Format, std::time::Duration,
+    anyhow::Result,
+    argh::{ArgsInfo, FromArgs},
+    ffx_core::ffx_command,
+    fidl_fuchsia_media::AudioCaptureUsage,
+    format_utils::Format,
+    std::time::Duration,
 };
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "record",

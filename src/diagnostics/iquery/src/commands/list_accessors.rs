@@ -4,7 +4,7 @@
 
 use {
     crate::{commands::types::*, types::Error},
-    argh::FromArgs,
+    argh::{ArgsInfo, FromArgs},
     async_trait::async_trait,
     serde::Serialize,
     std::fmt,
@@ -12,7 +12,7 @@ use {
 
 /// Lists all available ArchiveAccessor in the system and their selector for use in "accessor"
 /// arguments in other sub-commands.
-#[derive(Default, FromArgs, PartialEq, Debug)]
+#[derive(Default, ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "list-accessors")]
 pub struct ListAccessorsCommand {}
 

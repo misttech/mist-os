@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    argh::{FromArgValue, FromArgs},
+    argh::{ArgsInfo, FromArgValue, FromArgs},
     std::fmt,
 };
 
@@ -88,14 +88,14 @@ impl GuestType {
     }
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 /// Top-level command.
 pub struct GuestOptions {
     #[argh(subcommand)]
     pub nested: SubCommands,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
 pub enum SubCommands {
     Attach(crate::attach_args::AttachArgs),
@@ -113,21 +113,21 @@ pub enum SubCommands {
 pub mod mem_args {
     use super::*;
     /// Interact with the guest virtio-mem. Usage: guest mem sub-command [ request-plugged or stats]
-    #[derive(FromArgs, Debug, PartialEq)]
+    #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
     #[argh(subcommand, name = "mem")]
     #[cfg_attr(not(target_os = "fuchsia"), ffx_command())]
     pub struct MemArgs {
         #[argh(subcommand)]
         pub mem_cmd: MemCommands,
     }
-    #[derive(FromArgs, PartialEq, Debug)]
+    #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
     #[argh(subcommand)]
     pub enum MemCommands {
         RequestPluggedMem(RequestPluggedMem),
         StatsMem(StatsMem),
     }
 
-    #[derive(FromArgs, PartialEq, Debug)]
+    #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
     /// Modify the requested amount of the dynamically plugged memory. Usage: guest mem request-plugged guest-type size
     #[argh(subcommand, name = "request-plugged")]
     pub struct RequestPluggedMem {
@@ -138,7 +138,7 @@ pub mod mem_args {
         /// target amount of memory to be dynamically plugged
         pub size: u64,
     }
-    #[derive(FromArgs, PartialEq, Debug)]
+    #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
     /// See the stats of a guest's virtio-mem. Usage: guest mem stats guest-type
     #[argh(subcommand, name = "stats")]
     pub struct StatsMem {
@@ -150,7 +150,7 @@ pub mod mem_args {
 
 pub mod balloon_args {
     use super::*;
-    #[derive(FromArgs, PartialEq, Debug)]
+    #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
     /// Interact with the guest memory balloon. Usage: guest balloon sub-command guest-type ...
     #[argh(subcommand, name = "balloon")]
     #[cfg_attr(not(target_os = "fuchsia"), ffx_command())]
@@ -159,14 +159,14 @@ pub mod balloon_args {
         pub balloon_cmd: BalloonCommands,
     }
 
-    #[derive(FromArgs, PartialEq, Debug)]
+    #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
     #[argh(subcommand)]
     pub enum BalloonCommands {
         Set(BalloonSet),
         Stats(BalloonStats),
     }
 
-    #[derive(FromArgs, PartialEq, Debug)]
+    #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
     /// Modify the size of a memory balloon. Usage: guest balloon set guest-type num-pages
     #[argh(subcommand, name = "set")]
     pub struct BalloonSet {
@@ -178,7 +178,7 @@ pub mod balloon_args {
         pub num_pages: u32,
     }
 
-    #[derive(FromArgs, PartialEq, Debug)]
+    #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
     /// See the stats of a guest's memory balloon. Usage: guest balloon stats guest-type
     #[argh(subcommand, name = "stats")]
     pub struct BalloonStats {
@@ -190,7 +190,7 @@ pub mod balloon_args {
 
 pub mod list_args {
     use super::*;
-    #[derive(FromArgs, PartialEq, Debug)]
+    #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
     /// List available guest environments.
     #[argh(subcommand, name = "list")]
     #[cfg_attr(not(target_os = "fuchsia"), ffx_command())]
@@ -203,7 +203,7 @@ pub mod list_args {
 
 pub mod socat_args {
     use super::*;
-    #[derive(FromArgs, PartialEq, Debug)]
+    #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
     /// Interact with the guest via socat. See the sub-command help for details.
     #[argh(subcommand, name = "socat")]
     #[cfg_attr(not(target_os = "fuchsia"), ffx_command())]
@@ -212,14 +212,14 @@ pub mod socat_args {
         pub socat_cmd: SocatCommands,
     }
 
-    #[derive(FromArgs, PartialEq, Debug)]
+    #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
     #[argh(subcommand)]
     pub enum SocatCommands {
         Listen(SocatListen),
         Connect(SocatConnect),
     }
 
-    #[derive(FromArgs, PartialEq, Debug)]
+    #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
     /// Create a socat connection on the specified port. Usage: guest socat connect guest-type port
     #[argh(subcommand, name = "connect")]
     pub struct SocatConnect {
@@ -231,7 +231,7 @@ pub mod socat_args {
         pub guest_port: u32,
     }
 
-    #[derive(FromArgs, PartialEq, Debug)]
+    #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
     /// Listen through socat on the specified port. Usage: guest socat listen guest-type host-port
     #[argh(subcommand, name = "listen")]
     pub struct SocatListen {
@@ -244,7 +244,7 @@ pub mod socat_args {
     }
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 /// Create virtual shell for a guest or connect via virtual shell.
 #[argh(subcommand, name = "vsh")]
 pub struct VshArgs {
@@ -261,7 +261,7 @@ pub struct VshArgs {
 
 pub mod wipe_args {
     use super::*;
-    #[derive(FromArgs, PartialEq, Debug)]
+    #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
     /// Clears the stateful data for the target guest. Currently only termina is supported.
     #[argh(subcommand, name = "wipe")]
     #[cfg_attr(not(target_os = "fuchsia"), ffx_command())]
@@ -274,7 +274,7 @@ pub mod wipe_args {
 
 pub mod vsockperf_args {
     use super::*;
-    #[derive(FromArgs, PartialEq, Debug)]
+    #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
     /// Perform a vsock micro benchmark on the target guest. Only Debian is supported.
     #[argh(subcommand, name = "vsock-perf")]
     #[cfg_attr(not(target_os = "fuchsia"), ffx_command())]
@@ -287,7 +287,7 @@ pub mod vsockperf_args {
 
 pub mod launch_args {
     use super::*;
-    #[derive(FromArgs, PartialEq, Debug)]
+    #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
     /// Launch a guest image. Usage: guest launch guest_type [--cmdline-add <arg>...] [--default-net <bool>] [--memory <memory-size>] [--cpus <num-cpus>] [--virtio-* <bool>]
     #[argh(subcommand, name = "launch")]
     #[cfg_attr(not(target_os = "fuchsia"), ffx_command())]
@@ -348,7 +348,7 @@ pub mod launch_args {
 
 pub mod stop_args {
     use super::*;
-    #[derive(FromArgs, PartialEq, Debug)]
+    #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
     /// Stop a running guest. Usage: guest stop guest_type [-f]
     #[argh(subcommand, name = "stop")]
     #[cfg_attr(not(target_os = "fuchsia"), ffx_command())]
@@ -364,7 +364,7 @@ pub mod stop_args {
 
 pub mod attach_args {
     use super::*;
-    #[derive(FromArgs, PartialEq, Debug)]
+    #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
     /// Attach console and serial to a running guest. Usage: guest attach guest_type
     #[argh(subcommand, name = "attach")]
     #[cfg_attr(not(target_os = "fuchsia"), ffx_command())]

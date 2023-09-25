@@ -5,7 +5,7 @@
 use {
     crate::{parser, results},
     anyhow::{anyhow, Result},
-    argh::FromArgs,
+    argh::{ArgsInfo, FromArgs},
     regex::Regex,
     std::path::{Path, PathBuf},
     std::{fmt, str::FromStr},
@@ -102,7 +102,7 @@ impl FromStr for DeviceCategoryList {
 }
 
 /// Download or run driver conformance tests.
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "conformance",
@@ -127,14 +127,14 @@ pub struct ConformanceCommand {
     pub subcommand: ConformanceSubCommand,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
 pub enum ConformanceSubCommand {
     Test(TestCommand),
 }
 
 /// Runs driver conformance tests.
-#[derive(FromArgs, PartialEq, Debug, Default)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug, Default)]
 #[argh(subcommand, name = "test")]
 pub struct TestCommand {
     /// device topological path. e.g. pci-00:05.0-fidl/my-device

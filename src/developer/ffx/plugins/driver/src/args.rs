@@ -2,10 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {argh::FromArgs, driver_tools::args::DriverSubCommand, ffx_core::ffx_command};
+use {
+    argh::{ArgsInfo, FromArgs},
+    driver_tools::args::DriverSubCommand,
+    ffx_core::ffx_command,
+};
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "driver", description = "Support driver development workflows")]
 pub struct DriverCommand {
     #[argh(subcommand)]

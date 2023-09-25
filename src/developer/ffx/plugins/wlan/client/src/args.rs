@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    argh::FromArgs,
+    argh::{ArgsInfo, FromArgs},
     donut_lib,
     ffx_core::ffx_command,
     ffx_wlan_common::{
@@ -14,14 +14,14 @@ use {
 };
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "client", description = "Controls WLAN client policy API.")]
 pub struct ClientCommand {
     #[argh(subcommand)]
     pub subcommand: ClientSubCommand,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum ClientSubCommand {
     BatchConfig(BatchConfig),
@@ -35,7 +35,7 @@ pub enum ClientSubCommand {
     Stop(StopClientConnections),
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "batch-config",
@@ -46,14 +46,14 @@ pub struct BatchConfig {
     pub subcommand: BatchConfigSubCommand,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum BatchConfigSubCommand {
     Dump(Dump),
     Restore(Restore),
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "listen",
@@ -64,7 +64,7 @@ pub enum BatchConfigSubCommand {
 )]
 pub struct Listen {}
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "list-saved-networks",
@@ -77,7 +77,7 @@ layer."
 )]
 pub struct ListSavedNetworks {}
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "scan",
@@ -90,7 +90,7 @@ layer."
 )]
 pub struct Scan {}
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "start",
@@ -103,7 +103,7 @@ layer."
 )]
 pub struct StartClientConnections {}
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "stop",
@@ -117,7 +117,7 @@ layer."
 )]
 pub struct StopClientConnections {}
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "dump",
@@ -129,7 +129,7 @@ pub struct StopClientConnections {}
 )]
 pub struct Dump {}
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "restore",
@@ -162,7 +162,7 @@ pub struct Restore {
 // Until a better solution exists, the arguments module provides a helper to enable construction of
 // a NetworkConfig from the argument struct fields.
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "remove-network",
@@ -220,7 +220,7 @@ fn donut_credential_from_credential(
     }
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "save-network",
@@ -260,7 +260,7 @@ impl From<SaveNetwork> for wlan_policy::NetworkConfig {
     }
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "connect",

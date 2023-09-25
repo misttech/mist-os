@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use ffx_config::{api::query::SelectMode, ConfigLevel, ConfigQuery, EnvironmentContext};
 use ffx_core::ffx_command;
 use std::path::PathBuf;
 
 #[ffx_command]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "config",
@@ -19,7 +19,7 @@ pub struct ConfigCommand {
     pub sub: SubCommand,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum SubCommand {
     Env(EnvCommand),
@@ -30,7 +30,7 @@ pub enum SubCommand {
     Analytics(AnalyticsCommand),
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "set", description = "set config settings")]
 pub struct SetCommand {
     #[argh(positional)]
@@ -70,7 +70,7 @@ pub enum MappingMode {
     File,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "get",
@@ -117,7 +117,7 @@ impl GetCommand {
     }
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "remove",
@@ -154,7 +154,7 @@ impl RemoveCommand {
     }
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "add",
@@ -196,21 +196,21 @@ impl AddCommand {
     }
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "env", description = "list environment settings")]
 pub struct EnvCommand {
     #[argh(subcommand)]
     pub access: Option<EnvAccessCommand>,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum EnvAccessCommand {
     Set(EnvSetCommand),
     Get(EnvGetCommand),
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "set", description = "set environment settings")]
 pub struct EnvSetCommand {
     #[argh(positional)]
@@ -227,7 +227,7 @@ pub struct EnvSetCommand {
     pub build_dir: Option<PathBuf>,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "get", description = "list environment for a given level")]
 pub struct EnvGetCommand {
     #[argh(positional)]
@@ -260,14 +260,14 @@ fn parse_mode(value: &str) -> Result<SelectMode, String> {
     }
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "analytics", description = "enable or disable analytics")]
 pub struct AnalyticsCommand {
     #[argh(subcommand)]
     pub sub: AnalyticsControlCommand,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum AnalyticsControlCommand {
     Enable(AnalyticsEnableCommand),
@@ -275,15 +275,15 @@ pub enum AnalyticsControlCommand {
     Show(AnalyticsShowCommand),
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "enable", description = "enable analytics")]
 pub struct AnalyticsEnableCommand {}
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "disable", description = "disable analytics")]
 pub struct AnalyticsDisableCommand {}
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "show", description = "show analytics")]
 pub struct AnalyticsShowCommand {}
 

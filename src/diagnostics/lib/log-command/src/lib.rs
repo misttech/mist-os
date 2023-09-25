@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::{FromArgs, TopLevelCommand};
+use argh::{ArgsInfo, FromArgs, TopLevelCommand};
 use chrono::{DateTime, Local};
 use chrono_english::{parse_date_string, Dialect};
 use diagnostics_data::Severity;
@@ -13,19 +13,19 @@ pub mod log_formatter;
 pub mod log_socket_stream;
 
 // Subcommand for ffx log (either watch or dump).
-#[derive(FromArgs, Clone, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, Clone, PartialEq, Debug)]
 #[argh(subcommand)]
 pub enum LogSubCommand {
     Watch(WatchCommand),
     Dump(DumpCommand),
 }
 
-#[derive(FromArgs, Clone, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, Clone, PartialEq, Debug)]
 /// Watches for and prints logs from a target. Default if no sub-command is specified.
 #[argh(subcommand, name = "watch")]
 pub struct WatchCommand {}
 
-#[derive(FromArgs, Clone, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, Clone, PartialEq, Debug)]
 /// Dumps all log from a given target's session.
 #[argh(subcommand, name = "dump")]
 pub struct DumpCommand {}
@@ -95,7 +95,7 @@ impl Deref for DetailedDateTime {
     }
 }
 
-#[derive(FromArgs, Clone, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "log",

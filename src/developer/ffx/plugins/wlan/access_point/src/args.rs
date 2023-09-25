@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    argh::FromArgs,
+    argh::{ArgsInfo, FromArgs},
     ffx_core::ffx_command,
     ffx_wlan_common::{
         self,
@@ -13,14 +13,14 @@ use {
 };
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "ap", description = "Controls WLAN AP policy API.")]
 pub struct ApCommand {
     #[argh(subcommand)]
     pub subcommand: ApSubCommand,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum ApSubCommand {
     Listen(Listen),
@@ -29,7 +29,7 @@ pub enum ApSubCommand {
     StopAll(StopAll),
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "listen",
@@ -40,7 +40,7 @@ pub enum ApSubCommand {
 )]
 pub struct Listen {}
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "stop-all",
@@ -52,7 +52,7 @@ pub struct Listen {}
 )]
 pub struct StopAll {}
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "start",
@@ -92,7 +92,7 @@ impl From<Start> for wlan_policy::NetworkConfig {
     }
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "stop",

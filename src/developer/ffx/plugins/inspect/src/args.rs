@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 use iquery::commands::{
     ListAccessorsCommand, ListCommand, ListFilesCommand, SelectorsCommand, ShowCommand,
@@ -10,7 +10,7 @@ use iquery::commands::{
 use std::path::PathBuf;
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "inspect",
@@ -28,7 +28,7 @@ pub struct InspectCommand {
     pub sub_command: InspectSubCommand,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
 pub enum InspectSubCommand {
     ApplySelectors(ApplySelectorsCommand),
@@ -39,7 +39,7 @@ pub enum InspectSubCommand {
     Show(ShowCommand),
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "apply-selectors",

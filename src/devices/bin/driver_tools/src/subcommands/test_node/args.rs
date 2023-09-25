@@ -4,10 +4,11 @@
 
 use {
     super::subcommands::add::args::AddTestNodeCommand,
-    super::subcommands::remove::args::RemoveTestNodeCommand, argh::FromArgs,
+    super::subcommands::remove::args::RemoveTestNodeCommand,
+    argh::{ArgsInfo, FromArgs},
 };
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "test-node", description = "Commands to interact with test nodes.")]
 pub struct TestNodeCommand {
     /// if this exists, the user will be prompted for a component to select.
@@ -18,7 +19,7 @@ pub struct TestNodeCommand {
     pub subcommand: TestNodeSubcommand,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum TestNodeSubcommand {
     Add(AddTestNodeCommand),

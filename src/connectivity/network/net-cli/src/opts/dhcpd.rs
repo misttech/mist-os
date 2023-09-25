@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 
 use fidl_fuchsia_net_ext::MacAddress as MacAddr;
 use std::net::Ipv4Addr;
 use std::string::ToString;
 
-#[derive(FromArgs, Clone, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand, name = "dhcpd")]
 /// commands to control a dhcp server
 pub struct Dhcpd {
@@ -16,7 +16,7 @@ pub struct Dhcpd {
     pub dhcpd_cmd: DhcpdEnum,
 }
 
-#[derive(FromArgs, Clone, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum DhcpdEnum {
     /// Starts the DHCP server.
@@ -37,17 +37,17 @@ pub enum DhcpdEnum {
 }
 
 /// A primary command to start the DHCP server.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "start")]
 pub struct Start {}
 
 /// A primary command to stop the DHCP server.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "stop")]
 pub struct Stop {}
 
 /// A primary command to retrieve the value of a DHCP option or server parameter.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "get")]
 pub struct Get {
     #[argh(subcommand)]
@@ -55,7 +55,7 @@ pub struct Get {
 }
 
 /// A primary command to set the value of a DHCP option or server parameter.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "set")]
 pub struct Set {
     #[argh(subcommand)]
@@ -63,7 +63,7 @@ pub struct Set {
 }
 
 /// A primary command to list the values of all DHCP options or server parameters.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "list")]
 pub struct List {
     #[argh(subcommand)]
@@ -71,7 +71,7 @@ pub struct List {
 }
 
 /// A primary command to reset the values of all DHCP options or server parameters.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "reset")]
 pub struct Reset {
     #[argh(subcommand)]
@@ -79,11 +79,11 @@ pub struct Reset {
 }
 
 /// A primary command to clear the leases maintained by dhcpd.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "clear-leases")]
 pub struct ClearLeases {}
 
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand)]
 pub enum GetArg {
     /// a subcommand to specify retrieving a DHCP option.
@@ -92,7 +92,7 @@ pub enum GetArg {
     Parameter(ParameterArg),
 }
 /// A primary command argument to set the value of a DHCP option or server parameter.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand)]
 pub enum SetArg {
     Option(OptionArg),
@@ -100,7 +100,7 @@ pub enum SetArg {
 }
 
 /// A primary command argument to list the values of all DHCP options or server parameters.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand)]
 pub enum ListArg {
     Option(OptionToken),
@@ -108,7 +108,7 @@ pub enum ListArg {
 }
 
 /// A primary command argument to reset the values of all DHCP options or server parameters.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand)]
 pub enum ResetArg {
     Option(OptionToken),
@@ -116,7 +116,7 @@ pub enum ResetArg {
 }
 
 /// A secondary command indicating a DHCP option argument.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "option")]
 pub struct OptionArg {
     /// the name of the DHCP option to operate on.
@@ -125,7 +125,7 @@ pub struct OptionArg {
 }
 
 /// A secondary command indicating a server parameter argument.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "parameter")]
 pub struct ParameterArg {
     /// the name of the server parameter to operate on.
@@ -133,17 +133,17 @@ pub struct ParameterArg {
     pub name: Parameter,
 }
 /// Perform the command on DHCP options.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "option")]
 pub struct OptionToken {}
 
 /// Perform the command on server parameters.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "parameter")]
 pub struct ParameterToken {}
 
 /// The name of the DHCP option to operate on.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand)]
 pub enum Option_ {
     SubnetMask(SubnetMask),
@@ -410,7 +410,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for Option_ {
 }
 
 /// The client's subnet mask.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "subnet-mask")]
 pub struct SubnetMask {
     /// a 32-bit IPv4 subnet mask.
@@ -429,7 +429,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for SubnetMask {
 }
 
 /// The client's offset from UTC.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "time-offset")]
 pub struct TimeOffset {
     /// the client's offset from UTC in seconds. A positive offset is east of the zero meridian, and
@@ -446,7 +446,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for TimeOffset {
 }
 
 /// The routers within a client's subnet.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "router")]
 pub struct Router {
     /// a list of the routers in a client's subnet, listed in order of preference.
@@ -466,7 +466,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for Router {
 }
 
 /// Time Protocol servers available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "time-server")]
 pub struct TimeServer {
     /// a list of time servers available to the client, in order of preference.
@@ -486,7 +486,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for TimeServer {
 }
 
 /// IEN 116 Name servers available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "name-server")]
 pub struct NameServer {
     /// a list of IEN 116 Name servers available to the client, in order of preference.
@@ -506,7 +506,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for NameServer {
 }
 
 /// Domain Name System servers available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "domain-name-server")]
 pub struct DomainNameServer {
     /// a list of DNS servers available to the client, in order of preference;
@@ -526,7 +526,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for DomainNameServer {
 }
 
 /// MIT-LCS UDP Log servers available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "log-server")]
 pub struct LogServer {
     /// a list of MIT-LCS UDP Log servers available to the client, in order of preference.
@@ -546,7 +546,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for LogServer {
 }
 
 /// RFC 865 Cookie servers available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "cookie-server")]
 pub struct CookieServer {
     /// a list of RFC 865 Cookie servers available to the client, in order of preference.
@@ -566,7 +566,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for CookieServer {
 }
 
 /// RFC 1179 Line Printer servers available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "lpr-server")]
 pub struct LprServer {
     /// a list of RFC 1179 Line Printer servers available to the client, in order of preference.
@@ -586,7 +586,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for LprServer {
 }
 
 /// Imagen Impress servers available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "impress-server")]
 pub struct ImpressServer {
     /// a list of Imagen Impress servers available to the client, in order of preference.
@@ -606,7 +606,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for ImpressServer {
 }
 
 /// RFC 887 Resource Location servers available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "resource-location-server")]
 pub struct ResourceLocationServer {
     /// a list of RFC 887 Resource Location servers available to the client, in order of preference.
@@ -626,7 +626,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for ResourceLocationServer {
 }
 
 /// Name of the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "host-name")]
 pub struct HostName {
     /// the name of client, which may or may not be qualified with the local domain name.
@@ -642,7 +642,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for HostName {
 }
 
 /// Size of the default boot image for the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "boot-file-size")]
 pub struct BootFileSize {
     /// the size of the client's default boot image in 512-octet blocks.
@@ -658,7 +658,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for BootFileSize {
 }
 
 /// Path name of a core dump file.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "merit-dump-file")]
 pub struct MeritDumpFile {
     /// the path name to the client's core dump in the event the client crashes.
@@ -674,7 +674,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for MeritDumpFile {
 }
 
 /// Domain name of the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "domain-name")]
 pub struct DomainName {
     /// the client's domain name for use in resolving hostnames in the DNS.
@@ -690,7 +690,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for DomainName {
 }
 
 /// Address of the client's swap server.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "swap-server")]
 pub struct SwapServer {
     /// the address of the client's swap server.
@@ -708,7 +708,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for SwapServer {
 }
 
 /// Path name to a TFTP-retrievable file containing vendor-extension information.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "root-path")]
 pub struct RootPath {
     /// the path name to a TFTP-retrievable file. This file contains data which can be interpreted
@@ -726,7 +726,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for RootPath {
 }
 
 /// Path name to a TFTP-retrievable file containing vendor-extension information.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "extensions-path")]
 pub struct ExtensionsPath {
     /// the path name to a TFTP-retrievable file. This file contains data which can be interpreted
@@ -744,7 +744,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for ExtensionsPath {
 }
 
 /// Flag enabling/disabling IP layer packet forwarding.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "ip-forwarding")]
 pub struct IpForwarding {
     /// a flag which will enabled IP layer packet forwarding when true.
@@ -759,7 +759,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for IpForwarding {
 }
 
 /// Flag enabling/disabling forwarding of IP packets with non-local source routes.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "non-local-source-routing")]
 pub struct NonLocalSourceRouting {
     /// a flag which will enable forwarding of IP packets with non-local source routes.
@@ -774,7 +774,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for NonLocalSourceRouting {
 }
 
 /// Policy filters for non-local source routing.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "policy-filter")]
 pub struct PolicyFilter {
     /// a list of IP Address and Subnet Mask pairs. If an incoming source-routed packet has a
@@ -795,7 +795,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for PolicyFilter {
 }
 
 /// Maximum sized datagram that the client should be able to reassemble.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "max-datagram-reassembly-size")]
 pub struct MaxDatagramReassemblySize {
     /// the maximum sized datagram that the client should be able to reassemble, in octets. The
@@ -812,7 +812,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for MaxDatagramReassemblySize {
 }
 
 /// Default time-to-live to use on outgoing IP datagrams.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "default-ip-ttl")]
 pub struct DefaultIpTtl {
     /// the default time-to-live to use on outgoing IP datagrams. The value must be between 1 and
@@ -829,7 +829,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for DefaultIpTtl {
 }
 
 /// Timeout to use when aging Path MTU values.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "path-mtu-aging-timeout")]
 pub struct PathMtuAgingTimeout {
     /// the timeout, in seconds, to be used when again Path MTU values by the mechanism in RFC 1191.
@@ -845,7 +845,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for PathMtuAgingTimeout {
 }
 
 /// Table of MTU sizes for Path MTU Discovery.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "path-mtu-plateau-table")]
 pub struct PathMtuPlateauTable {
     /// A list of MTU sizes, ordered from smallest to largest. The smallest value cannot be smaller
@@ -861,7 +861,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for PathMtuPlateauTable {
 }
 
 /// MTU for the client's interface.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "interface-mtu")]
 pub struct InterfaceMtu {
     /// the MTU for the client's interface. Minimum value of 68.
@@ -877,7 +877,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for InterfaceMtu {
 }
 
 /// Flag indicating if all subnets of the connected network have the same MTU.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "all-subnets-local")]
 pub struct AllSubnetsLocal {
     /// a flag indicating if all subents of the IP network to which the client is connected have the
@@ -893,7 +893,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for AllSubnetsLocal {
 }
 
 /// Broadcast address of the client's subnet.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "broadcast-address")]
 pub struct BroadcastAddress {
     /// the broadcast address of the client's subnet. Legal values are defined in RFC 1122.
@@ -911,7 +911,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for BroadcastAddress {
 }
 
 /// Flag indicating whether the client should perform subnet mask discovery via ICMP.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "perform-mask-discovery")]
 pub struct PerformMaskDiscovery {
     /// a flag indicating whether the client should perform subnet mask discovery via ICMP.
@@ -926,7 +926,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for PerformMaskDiscovery {
 }
 
 /// Flag indicating whether the client should respond to subnet mask discovery requests via ICMP.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "mask-supplier")]
 pub struct MaskSupplier {
     /// a flag indicating whether the client should respond to subnet mask discovery requests via
@@ -942,7 +942,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for MaskSupplier {
 }
 
 /// Flag indicating whether the client should solicit routers using Router Discovery.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "perform-router-discovery")]
 pub struct PerformRouterDiscovery {
     /// A flag indicating whether the client should solicit routers using Router Discovery as
@@ -958,7 +958,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for PerformRouterDiscovery {
 }
 
 /// Destination address for Router Solicitation requests.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "router-solicitation-address")]
 pub struct RouterSolicitationAddress {
     /// the address to which the client should transmit Router Solicitation requests.
@@ -976,7 +976,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for RouterSolicitationAddress {
 }
 
 /// Static Routes which the client should put in its routing cache.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "static-route")]
 pub struct StaticRoute {
     /// a list of Destination address/Next-hop address pairs defining static routes for the client's
@@ -998,7 +998,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for StaticRoute {
 }
 
 /// Flag specifying whether the client should negotiate the use of trailers in ARP.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "trailer-encapsulation")]
 pub struct TrailerEncapsulation {
     /// a flag specifying whether the client negotiate the use of trailers when using ARP, per RFC
@@ -1014,7 +1014,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for TrailerEncapsulation {
 }
 
 /// Timeout for ARP cache entries.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "arp-cache-timeout")]
 pub struct ArpCacheTimeout {
     /// the timeout for ARP cache entries, in seconds.
@@ -1030,7 +1030,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for ArpCacheTimeout {
 }
 
 /// Flag specifying whether the client should use Ethernet v2 or IEEE 802.3 encapsulation.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "ethernet-encapsulation")]
 pub struct EthernetEncapsulation {
     /// a flag specifying that the client should use Ethernet v2 encapsulation when false, and IEEE
@@ -1046,7 +1046,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for EthernetEncapsulation {
 }
 
 /// Default time-to-live for outgoing TCP segments.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "tcp-default-ttl")]
 pub struct TcpDefaultTtl {
     /// the default time-to-live that the client should use for outgoing TCP segments. The minimum
@@ -1063,7 +1063,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for TcpDefaultTtl {
 }
 
 /// Interval the client should wait before sending a TCP keepalive message.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "tcp-keepalive-interval")]
 pub struct TcpKeepaliveInterval {
     /// the interval, in seconds, the client should wait before sending a TCP keepalive message. A
@@ -1081,7 +1081,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for TcpKeepaliveInterval {
 }
 
 /// Flag specifying whether the client should send TCP keepalive messages with an octet of garbage.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "tcp-keepalive-garbage")]
 pub struct TcpKeepaliveGarbage {
     /// a flag specifying whether the client should send TCP keepalive messages with an octet of
@@ -1097,7 +1097,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for TcpKeepaliveGarbage {
 }
 
 /// Name of the client's Network Information Service domain.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "network-information-service-domain")]
 pub struct NetworkInformationServiceDomain {
     /// the name of the client's Network Information Service domain.
@@ -1113,7 +1113,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for NetworkInformationServiceDomain {
 }
 
 /// Network Information Service servers available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "network-information-servers")]
 pub struct NetworkInformationServers {
     /// a list of Network Information Service server addresses available to the client, listed in
@@ -1134,7 +1134,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for NetworkInformationServers {
 }
 
 /// Network Time Protocol servers available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "network-time-protocol-servers")]
 pub struct NetworkTimeProtocolServers {
     /// a list of Network Time Protocol (NTP) server addresses available to the client, listed in
@@ -1155,7 +1155,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for NetworkTimeProtocolServers {
 }
 
 /// Option for exchanging vendor-specific information between the DHCP client and DHCP server.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "vendor-specific-information")]
 pub struct VendorSpecificInformation {
     /// an opaque object of octets for exchanging vendor-specific information.
@@ -1170,7 +1170,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for VendorSpecificInformation {
 }
 
 /// NetBIOS name servers available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "net-bios-over-tcpip-name-server")]
 pub struct NetBiosOverTcpipNameServer {
     /// a list of NetBIOS name server addresses available to the client, listed in order of
@@ -1191,7 +1191,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for NetBiosOverTcpipNameServer {
 }
 
 /// NetBIOS datagram distribution servers available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "net-bios-over-tcpip-distribution-server")]
 pub struct NetBiosOverTcpipDatagramDistributionServer {
     /// a list of NetBIOS datagram distribution servers available to the client, listed in order of
@@ -1212,7 +1212,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for NetBiosOverTcpipDatagramDistributi
 }
 
 /// The NetBIOS node type which should be used by the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "net-bios-over-tcpip-node-type")]
 pub struct NetBiosOverTcpipNodeType {
     /// the NetBIOS node type which should be used by the client.
@@ -1234,7 +1234,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for NetBiosOverTcpipNodeType {
 }
 
 /// NetBIOS scope parameter for the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "net-bios-over-tcpip-scope")]
 pub struct NetBiosOverTcpipScope {
     /// the NetBIOS over TCP/IP scope parameter, as defined in RFC 1001, for the client.
@@ -1250,7 +1250,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for NetBiosOverTcpipScope {
 }
 
 /// X Window System Font servers available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "x-window-system-font-server")]
 pub struct XWindowSystemFontServer {
     /// a list of X Window System Font server addresses available to the client, listed in order of
@@ -1271,7 +1271,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for XWindowSystemFontServer {
 }
 
 /// X window System Display Manager systems available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "x-window-system-display-manager")]
 pub struct XWindowSystemDisplayManager {
     /// a list of X Window System Display Manager system addresses available to the client, listed
@@ -1292,7 +1292,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for XWindowSystemDisplayManager {
 }
 
 /// Network Information System+ domain name.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "network-information-service-plus-domain")]
 pub struct NetworkInformationServicePlusDomain {
     /// the name of the client's Network Information System+ domain.
@@ -1308,7 +1308,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for NetworkInformationServicePlusDomai
 }
 
 /// Network Information System+ servers available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "network-information-service-plus-servers")]
 pub struct NetworkInformationServicePlusServers {
     /// a list of Network Information System+ server addresses available to the client, listed in
@@ -1329,7 +1329,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for NetworkInformationServicePlusServe
 }
 
 /// Mobile IP home agents available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "mobile-ip-home-agent")]
 pub struct MobileIpHomeAgent {
     /// a list of mobile IP home agent addresses available to the client, listed in order of
@@ -1350,7 +1350,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for MobileIpHomeAgent {
 }
 
 /// SMTP servers available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "smtp-server")]
 pub struct SmtpServer {
     /// a list of Simple Mail Transport Protocol (SMTP) server address available to the client,
@@ -1371,7 +1371,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for SmtpServer {
 }
 
 /// POP3 servers available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "pop3-server")]
 pub struct Pop3Server {
     /// a list of Post Office Protocol (POP3) server addresses available to the client, listed in
@@ -1392,7 +1392,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for Pop3Server {
 }
 
 /// NNTP servers available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "nntp-server")]
 pub struct NntpServer {
     /// a list Network News Transport Protocol (NNTP) server addresses available to the client,
@@ -1413,7 +1413,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for NntpServer {
 }
 
 /// Default WWW servers available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "default-www-server")]
 pub struct DefaultWwwServer {
     /// a list of default World Wide Web (WWW) server addresses available to the client, listed in
@@ -1434,7 +1434,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for DefaultWwwServer {
 }
 
 /// Default Finger servers available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "default-finger-server")]
 pub struct DefaultFingerServer {
     /// a list of default Finger server addresses available to the client, listed in order of
@@ -1455,7 +1455,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for DefaultFingerServer {
 }
 
 /// Default IRC servers available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "default-irc-server")]
 pub struct DefaultIrcServer {
     /// a list of Internet Relay Chat server addresses available to the client, listed in order of
@@ -1476,7 +1476,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for DefaultIrcServer {
 }
 
 /// StreetTalk servers available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "street-talk-server")]
 pub struct StreettalkServer {
     /// a list of StreetTalk server addresses available to the client, listed in order of
@@ -1497,7 +1497,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for StreettalkServer {
 }
 
 /// StreetTalk Directory Assistance servers available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "stda-server")]
 pub struct StreettalkDirectoryAssistanceServer {
     /// a list of StreetTalk Directory Assistance server addresses available to the client, listed
@@ -1518,7 +1518,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for StreettalkDirectoryAssistanceServe
 }
 
 /// TFTP server available to the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "tftp-server-name")]
 pub struct TftpServerName {
     /// the TFTP server name available to the client. This option should be used when the `sname`
@@ -1535,7 +1535,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for TftpServerName {
 }
 
 /// Bootfile name for the client.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "bootfile-name")]
 pub struct BootfileName {
     /// the bootfile name for the client. This option should be used when the `file` field has been
@@ -1552,7 +1552,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for BootfileName {
 }
 
 /// Maximum length of a DHCP message that the participant is willing to accept.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "max-message-size")]
 pub struct MaxDhcpMessageSize {
     /// the maximum length in octets of a DHCP message that the participant is willing to accept.
@@ -1569,7 +1569,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for MaxDhcpMessageSize {
 }
 
 /// Time interval from address assignment at which the client transitions to a Renewing state.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "renewal-time-value")]
 pub struct RenewalTimeValue {
     /// the time interval, in seconds, after address assignment at which the client will transition
@@ -1586,7 +1586,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for RenewalTimeValue {
 }
 
 /// Time interval from address assignment at which the client transitions to a Rebinding state.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "rebinding-time-value")]
 pub struct RebindingTimeValue {
     /// the time interval, in seconds, after address assignment at which the client will transition
@@ -1603,7 +1603,7 @@ impl Into<fidl_fuchsia_net_dhcp::Option_> for RebindingTimeValue {
 }
 
 /// The name of the server parameter to operate on.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand)]
 pub enum Parameter {
     IpAddrs(IpAddrs),
@@ -1646,7 +1646,7 @@ impl Into<fidl_fuchsia_net_dhcp::Parameter> for Parameter {
 }
 
 /// The IPv4 addresses to which the server is bound.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "ip-addrs")]
 pub struct IpAddrs {
     /// A list of IPv4 Addresses to which the server is bound.
@@ -1668,7 +1668,7 @@ impl Into<fidl_fuchsia_net_dhcp::Parameter> for IpAddrs {
 use crate::opts::parse_netmask_or_prefix_length;
 
 /// The pool of addresses which the DHCP server manages.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "address-pool")]
 pub struct AddressPool {
     /// the prefix length of the network's subnet mask
@@ -1698,7 +1698,7 @@ impl Into<fidl_fuchsia_net_dhcp::Parameter> for AddressPool {
 }
 
 /// The client MAC addresses which the server will issue leases to.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "permitted-macs")]
 pub struct PermittedMacs {
     /// the client MAC addresses which the server will issue leases to. By default,
@@ -1720,7 +1720,7 @@ impl Into<fidl_fuchsia_net_dhcp::Parameter> for PermittedMacs {
 /// Addresses in the AddressPool which will only be leased to specified clients.
 /// Assigned addresses will be paired with hosts in order, e.g. hosts (A, B, C) and addresses (1, 2, 3)
 /// pair as ((A, 1), (B, 2), (C, 3)).
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "statically-assigned-addrs")]
 pub struct StaticallyAssignedAddrs {
     /// hosts which will be leased the addresses reserved by `assigned_addrs`.
@@ -1754,7 +1754,7 @@ impl Into<fidl_fuchsia_net_dhcp::Parameter> for StaticallyAssignedAddrs {
 
 /// Enables server behavior where the server ARPs an IP address prior to issuing
 /// it in a lease.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "arp-probe")]
 pub struct ArpProbe {
     /// enables server behavior where the server ARPs an IP address prior to issuing
@@ -1772,7 +1772,7 @@ impl Into<fidl_fuchsia_net_dhcp::Parameter> for ArpProbe {
 }
 
 /// The duration of leases offered by the server.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "lease-length")]
 pub struct LeaseLength {
     /// the default lease length, in seconds, to be issued to clients.
@@ -1798,7 +1798,7 @@ impl Into<fidl_fuchsia_net_dhcp::Parameter> for LeaseLength {
 }
 
 /// A NetBIOS over TCP/IP node type as defined in RFC 1001/1002.
-#[derive(Clone, Copy, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Copy, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand)]
 pub enum NodeType {
     BNode(BNode),
@@ -1808,27 +1808,27 @@ pub enum NodeType {
 }
 
 /// A B node type.
-#[derive(Clone, Copy, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Copy, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "b-node")]
 pub struct BNode {}
 
 /// A P node type.
-#[derive(Clone, Copy, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Copy, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "p-node")]
 pub struct PNode {}
 
 /// A M node type.
-#[derive(Clone, Copy, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Copy, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "m-node")]
 pub struct MNode {}
 
 /// A H node type.
-#[derive(Clone, Copy, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Copy, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "h-node")]
 pub struct HNode {}
 
 /// The names of the network devices on which the server will listen.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "bound-device-names")]
 pub struct BoundDevices {
     /// the names of the network devices on which the server will listen. If

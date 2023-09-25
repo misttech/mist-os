@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 use fidl_fuchsia_settings::{LightState, LightValue};
 use fidl_fuchsia_ui_types::ColorRgb;
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq, Clone)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq, Clone)]
 #[argh(subcommand, name = "light")]
 /// get or set light settings
 pub struct LightGroup {

@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    argh::FromArgs,
+    argh::{ArgsInfo, FromArgs},
     fidl_fuchsia_input_report as fir,
     std::{path::PathBuf, str::FromStr},
 };
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "get",

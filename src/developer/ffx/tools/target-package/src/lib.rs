@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use anyhow::anyhow;
+use argh::{ArgsInfo, FromArgs};
 use fho::FfxContext as _;
 use fidl_fuchsia_dash as fdash;
 use futures::stream::StreamExt as _;
@@ -14,7 +15,7 @@ pub struct TargetPackageTool {
     dash_launcher_proxy: fho::Deferred<fdash::LauncherProxy>,
 }
 
-#[derive(argh::FromArgs, Debug, PartialEq, Eq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq, Eq)]
 #[argh(
     subcommand,
     name = "target-package",
@@ -25,14 +26,14 @@ pub struct TargetPackageCommand {
     subcommand: TargetPackageSubCommand,
 }
 
-#[derive(argh::FromArgs, Debug, PartialEq, Eq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq, Eq)]
 #[argh(subcommand)]
 pub enum TargetPackageSubCommand {
     Explore(ExploreCommand),
 }
 
 // TODO(fxbug.dev/128699) Make the explore command a separate subtool.
-#[derive(argh::FromArgs, Debug, PartialEq, Eq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq, Eq)]
 #[argh(
     subcommand,
     name = "explore",

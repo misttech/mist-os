@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 /// Interact with the profiling subsystem.
 #[argh(subcommand, name = "profiler")]
 pub struct ProfilerCommand {
@@ -12,13 +12,13 @@ pub struct ProfilerCommand {
     pub sub_cmd: ProfilerSubCommand,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
 pub enum ProfilerSubCommand {
     Start(Start),
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 /// Record a profile.
 #[argh(subcommand, name = "start")]
 pub struct Start {

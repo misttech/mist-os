@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 
 /// Options for "ffx debug connect".
 #[ffx_command()]
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "connect", description = "start the debugger and connect to the target")]
 pub struct ConnectCommand {
     /// start zxdb in another debugger. Valid options are lldb (preferred) and gdb.

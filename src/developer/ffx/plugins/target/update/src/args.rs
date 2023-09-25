@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 
 /// Manage updates: query/set update channel, kick off a check for update, force
 /// an update (to any point, i.e. a downgrade can be requested).
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "update",
@@ -21,7 +21,7 @@ pub struct Update {
 }
 
 /// SubCommands for `update`.
-#[derive(Debug, Eq, FromArgs, PartialEq)]
+#[derive(Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand)]
 pub enum Command {
     // fuchsia.update.channelcontrol.ChannelControl protocol:
@@ -35,7 +35,7 @@ pub enum Command {
 }
 
 /// Get the current (running) channel.
-#[derive(Debug, Eq, FromArgs, PartialEq)]
+#[derive(Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
 #[argh(
     subcommand,
     name = "channel",
@@ -52,9 +52,9 @@ pub struct Channel {
 /// SubCommands for `channel`.
 // TODO(fxbug.dev/60016): Make get/set symmetrical.
 pub mod channel {
-    use argh::FromArgs;
+    use argh::{ArgsInfo, FromArgs};
 
-    #[derive(Debug, Eq, FromArgs, PartialEq)]
+    #[derive(Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
     #[argh(subcommand)]
     pub enum Command {
         Get(Get),
@@ -64,7 +64,7 @@ pub mod channel {
     }
 
     /// Get the current channel
-    #[derive(Debug, Eq, FromArgs, PartialEq)]
+    #[derive(Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
     #[argh(
         subcommand,
         name = "get-current",
@@ -75,7 +75,7 @@ pub mod channel {
     pub struct Get {}
 
     /// Get the target channel
-    #[derive(Debug, Eq, FromArgs, PartialEq)]
+    #[derive(Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
     #[argh(
         subcommand,
         name = "get-next",
@@ -88,7 +88,7 @@ system.",
     pub struct Target {}
 
     /// Set the target channel
-    #[derive(Debug, Eq, FromArgs, PartialEq)]
+    #[derive(Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
     #[argh(
         subcommand,
         name = "set",
@@ -115,7 +115,7 @@ channels.",
     }
 
     /// List the known target channels
-    #[derive(Debug, Eq, FromArgs, PartialEq)]
+    #[derive(Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
     #[argh(
         subcommand,
         name = "list",
@@ -129,7 +129,7 @@ Returns an empty list if no other update channels are configured.",
 }
 
 /// Start an update. If no newer update is available, no update is performed.
-#[derive(Debug, Eq, FromArgs, PartialEq)]
+#[derive(Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
 #[argh(
     subcommand,
     name = "check-now",
@@ -159,7 +159,7 @@ pub struct CheckNow {
 
 /// Directly invoke the system updater to install the provided update, bypassing
 /// any update checks.
-#[derive(Debug, Eq, FromArgs, PartialEq)]
+#[derive(Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
 #[argh(
     subcommand,
     name = "force-install",

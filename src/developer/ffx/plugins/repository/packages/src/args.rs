@@ -2,25 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 
 #[ffx_command()]
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "package", description = "List the packages inside a repository")]
 pub struct PackagesCommand {
     #[argh(subcommand)]
     pub subcommand: PackagesSubCommand,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
 pub enum PackagesSubCommand {
     List(ListSubCommand),
     Show(ShowSubCommand),
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "list", description = "Inspect and manage package repositories")]
 pub struct ListSubCommand {
     #[argh(option, short = 'r')]
@@ -36,7 +36,7 @@ pub struct ListSubCommand {
     pub include_components: bool,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "show", description = "Inspect content of a package")]
 pub struct ShowSubCommand {
     #[argh(option, short = 'r')]

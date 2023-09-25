@@ -2,24 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 
 #[ffx_command()]
-#[derive(FromArgs, Clone, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand, name = "efi", description = "Manipulate efi partition")]
 pub struct EfiCommand {
     #[argh(subcommand)]
     pub subcommand: EfiSubCommand,
 }
 
-#[derive(FromArgs, Clone, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, Clone, PartialEq, Debug)]
 #[argh(subcommand)]
 pub enum EfiSubCommand {
     Create(CreateCommand),
 }
 
-#[derive(FromArgs, Clone, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, Clone, PartialEq, Debug)]
 /// Creates efi partition, copies zircon.bin, bootdata.bin, EFI/BOOT/BOOTX64.EFI, zedboot.bin,
 /// etc...
 #[argh(subcommand, name = "create")]

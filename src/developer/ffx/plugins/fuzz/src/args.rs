@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    argh::{FromArgs, SubCommand},
+    argh::{ArgsInfo, FromArgs, SubCommand},
     ffx_core::ffx_command,
     shell_args::{derive_subcommand, valid_when},
     std::collections::HashMap,
@@ -35,7 +35,7 @@ use {
 
 /// Command line arguments for a command run from the command-line.
 #[ffx_command()]
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "fuzz", description = "Start and manage fuzzers.")]
 pub struct FuzzCommand {
     /// command to execute
@@ -44,7 +44,7 @@ pub struct FuzzCommand {
 }
 
 /// Individual subcommands that can be run from the command line.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand)]
 pub enum FuzzSubcommand {
     Shell(ShellSubcommand),
@@ -63,7 +63,7 @@ pub enum FuzzSubcommand {
 }
 
 /// Command line arguments for a command run as part of the fuzzer shell.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(description = "Run interactive fuzzer shell commands.")]
 pub struct FuzzShellCommand {
     /// command to execute
@@ -72,7 +72,7 @@ pub struct FuzzShellCommand {
 }
 
 /// Individual subcommands that can be run in the interactive shell.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand)]
 pub enum FuzzShellSubcommand {
     List(ListSubcommand),
@@ -142,7 +142,7 @@ impl FuzzCommand {
 ///
 /// This command is a bit special, as it is the only one unique to `FuzzCommand`. All other
 /// subcommands can be converted to `FuzzShellCommand`s using `FuzzCommand::as_shell`.
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "shell", description = "Starts an interactive fuzzing session.")]
 pub struct ShellSubcommand {
     /// path to JSON file describing fuzzers; looks for tests.json under $FUCHSIA_DIR by default
@@ -209,7 +209,7 @@ pub enum FuzzerState {
 /// 'list' lacks a URL parameter, so it can be interpreted by either a `FuzzCommand` or a
 /// `FuzzShellCommand` without modification.
 #[valid_when(FuzzerState::Detached, FuzzerState::Idle, FuzzerState::Running)]
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "list", description = "Lists available fuzzers.")]
 pub struct ListSubcommand {
     /// path to JSON file describing fuzzers; looks for tests.json under $FUCHSIA_DIR by default
@@ -233,7 +233,7 @@ impl Autocomplete for ListSubcommand {
 /// proc_macro in order to be able to extract an `AttachShellSubcommand` from a `FuzzCommand` using
 /// its custom `From` trait implementation below. See also `FuzzCommand::as_session`.
 #[valid_when(FuzzerState::Detached)]
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "attach", description = "Connects to a fuzzer, starting it if needed.")]
 pub struct AttachShellSubcommand {
     /// package URL for the fuzzer
@@ -365,7 +365,7 @@ impl AttachShellSubcommand {
 /// Command to get a configuration option from a fuzzer.
 #[valid_when(FuzzerState::Idle, FuzzerState::Running)]
 #[derive_subcommand]
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "get", description = "Gets option(s) from a fuzzer.")]
 pub struct GetShellSubcommand {
     /// option name; default is to display all values
@@ -388,7 +388,7 @@ impl Autocomplete for GetShellSubcommand {
 ///
 #[valid_when(FuzzerState::Idle)]
 #[derive_subcommand]
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "set", description = "Sets options on a fuzzer.")]
 pub struct SetShellSubcommand {
     /// option name
@@ -408,7 +408,7 @@ impl Autocomplete for SetShellSubcommand {
 /// Command to add a test input to a fuzzer's corpus.
 #[valid_when(FuzzerState::Idle, FuzzerState::Running)]
 #[derive_subcommand]
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "add", description = "Adds an input to a fuzzer's corpus.")]
 pub struct AddShellSubcommand {
     /// input(s) to add; may be a filename, a directory path or a hex string
@@ -430,7 +430,7 @@ impl Autocomplete for AddShellSubcommand {
 /// This is a long-running workflow and may take an indefinite amount of time to complete.
 #[valid_when(FuzzerState::Idle)]
 #[derive_subcommand]
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "run", description = "Generates inputs and fuzz the target.")]
 pub struct RunShellSubcommand {
     /// convenient shortcut for "set runs <n>"
@@ -453,7 +453,7 @@ impl Autocomplete for RunShellSubcommand {
 /// This is a long-running workflow and may take an indefinite amount of time to complete.
 #[valid_when(FuzzerState::Idle)]
 #[derive_subcommand]
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "try", description = "Tests a specific input with a fuzzer.")]
 pub struct TryShellSubcommand {
     /// input to execute; may be a filename or hex string
@@ -471,7 +471,7 @@ impl Autocomplete for TryShellSubcommand {
 /// This is a long-running workflow and may take an indefinite amount of time to complete.
 #[valid_when(FuzzerState::Idle)]
 #[derive_subcommand]
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "cleanse", description = "Clears extraneous bytes from an error input.")]
 pub struct CleanseShellSubcommand {
     /// input to cleanse.
@@ -489,7 +489,7 @@ impl Autocomplete for CleanseShellSubcommand {
 /// This is a long-running workflow and may take an indefinite amount of time to complete.
 #[valid_when(FuzzerState::Idle)]
 #[derive_subcommand]
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "minimize", description = "Reduce the size of an error input.")]
 pub struct MinimizeShellSubcommand {
     /// input to minimize.
@@ -516,7 +516,7 @@ impl Autocomplete for MinimizeShellSubcommand {
 /// This is a long-running workflow and may take an indefinite amount of time to complete.
 #[valid_when(FuzzerState::Idle)]
 #[derive_subcommand]
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "merge", description = "Compacts the attached fuzzer's corpus.")]
 pub struct MergeShellSubcommand {}
 
@@ -529,7 +529,7 @@ impl Autocomplete for MergeShellSubcommand {
 ///
 /// Fuzzer output may be paused for a running fuzzer when re-attaching or by the user.
 #[valid_when(FuzzerState::Running)]
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "resume", description = "Resumes a fuzzer's output.")]
 pub struct ResumeShellSubcommand {}
 
@@ -541,7 +541,7 @@ impl Autocomplete for ResumeShellSubcommand {
 /// Command to retrieve fuzzer status.
 #[valid_when(FuzzerState::Detached, FuzzerState::Idle, FuzzerState::Running)]
 #[derive_subcommand]
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "status", description = "Gets a fuzzer's execution status.")]
 pub struct StatusShellSubcommand {}
 
@@ -553,7 +553,7 @@ impl Autocomplete for StatusShellSubcommand {
 /// Command to retrieve a test input from a fuzzer's corpus.
 #[valid_when(FuzzerState::Idle, FuzzerState::Running)]
 #[derive_subcommand]
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "fetch", description = "Retrieves the attached fuzzer's corpus.")]
 pub struct FetchShellSubcommand {
     /// fetch the seed corpus; default is to fetch the live corpus
@@ -568,7 +568,7 @@ impl Autocomplete for FetchShellSubcommand {
 
 /// Command to detach from a fuzzer without stopping it.
 #[valid_when(FuzzerState::Idle, FuzzerState::Running)]
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "detach", description = "Disconnects from a fuzzer without stopping it.")]
 pub struct DetachShellSubcommand {}
 
@@ -579,7 +579,7 @@ impl Autocomplete for DetachShellSubcommand {
 
 /// Command to stop a fuzzer.
 #[valid_when(FuzzerState::Detached, FuzzerState::Idle, FuzzerState::Running)]
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "stop", description = "Stops a fuzzer.")]
 pub struct StopSubcommand {
     /// package URL for the fuzzer. The attached fuzzer is stopped by default.
@@ -598,7 +598,7 @@ impl Autocomplete for StopSubcommand {
 
 /// Command to stop the fuzzer shell.
 #[valid_when(FuzzerState::Detached, FuzzerState::Idle, FuzzerState::Running)]
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "exit", description = "Disconnects from a fuzzer and exits the shell.")]
 pub struct ExitShellSubcommand {}
 
@@ -609,7 +609,7 @@ impl Autocomplete for ExitShellSubcommand {
 
 /// Command to clear the fuzzer shell's screen.
 #[valid_when(FuzzerState::Detached, FuzzerState::Idle, FuzzerState::Running)]
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "clear", description = "Clears the screen.")]
 pub struct ClearShellSubcommand {}
 
@@ -620,7 +620,7 @@ impl Autocomplete for ClearShellSubcommand {
 
 /// Command to list recent commands to the fuzzer shell.
 #[valid_when(FuzzerState::Detached, FuzzerState::Idle, FuzzerState::Running)]
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "history", description = "Prints the command history for the shell.")]
 pub struct HistoryShellSubcommand {}
 

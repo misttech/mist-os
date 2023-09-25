@@ -1,12 +1,12 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use async_trait::async_trait;
 use fho::{daemon_protocol, FfxContext, FfxMain, FfxTool, MachineWriter, Result, ToolIO};
 use fidl_fuchsia_developer_ffx as ffx;
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "echo", description = "run echo test against the daemon")]
 pub struct EchoCommand {
     #[argh(positional)]

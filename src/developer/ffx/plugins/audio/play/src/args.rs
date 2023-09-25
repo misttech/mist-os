@@ -2,10 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {anyhow::Result, argh::FromArgs, ffx_core::ffx_command, fidl_fuchsia_media::AudioRenderUsage};
+use {
+    anyhow::Result,
+    argh::{ArgsInfo, FromArgs},
+    ffx_core::ffx_command,
+    fidl_fuchsia_media::AudioRenderUsage,
+};
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "play",

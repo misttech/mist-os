@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 use std::path::PathBuf;
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, Eq, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, Eq, PartialEq)]
 #[argh(subcommand, name = "list", description = "List the entries contained in a FAR file")]
 pub struct ListCommand {
     #[argh(positional)]

@@ -6,7 +6,7 @@ use {
     crate::list_peers::{list_peers, own_id},
     crate::probe_node::probe_node,
     anyhow::Error,
-    argh::FromArgs,
+    argh::{ArgsInfo, FromArgs},
     fidl_fuchsia_overnet_protocol::{
         LinkDiagnosticInfo, NodeDescription, NodeId, PeerConnectionDiagnosticInfo, ProbeSelector,
     },
@@ -187,7 +187,7 @@ impl LabelAttrWriter {
     }
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "full-map")]
 /// Construct a detailed graphviz map of the Overnet mesh - experts only!
 pub struct FullMapArgs {

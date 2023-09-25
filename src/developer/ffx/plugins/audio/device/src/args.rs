@@ -3,11 +3,15 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::Result, argh::FromArgs, ffx_core::ffx_command, format_utils::Format, std::str::FromStr,
+    anyhow::Result,
+    argh::{ArgsInfo, FromArgs},
+    ffx_core::ffx_command,
+    format_utils::Format,
+    std::str::FromStr,
 };
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "device",
@@ -48,7 +52,7 @@ pub struct DeviceCommand {
     pub device_direction: Option<DeviceDirection>,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum SubCommand {
     Info(InfoCommand),
@@ -60,7 +64,7 @@ pub enum SubCommand {
     Agc(DeviceAgcCommand),
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "info", description = "List information about a specific audio device.")]
 pub struct InfoCommand {
     #[argh(
@@ -72,7 +76,7 @@ pub struct InfoCommand {
     pub output: InfoOutputFormat,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "play", description = "Send audio data directly to device ring buffer.")]
 pub struct DevicePlayCommand {
     #[argh(
@@ -89,7 +93,7 @@ pub enum InfoOutputFormat {
     Text,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "record", description = "Capture audio data directly from ring buffer.")]
 pub struct DeviceRecordCommand {
     #[argh(
@@ -104,7 +108,7 @@ pub struct DeviceRecordCommand {
     pub format: Format,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "gain",
@@ -115,15 +119,15 @@ pub struct DeviceGainCommand {
     pub gain: f32,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "mute", description = "Request to mute a stream.")]
 pub struct DeviceMuteCommand {}
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "unmute", description = "Request to unmute a stream.")]
 pub struct DeviceUnmuteCommand {}
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "agc",

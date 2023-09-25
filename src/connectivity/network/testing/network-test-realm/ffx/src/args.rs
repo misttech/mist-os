@@ -9,7 +9,7 @@ use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_test_realm as fntr;
 
 #[ffx_core::ffx_command]
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "net-test-realm",
@@ -29,7 +29,7 @@ pub struct Command {
     pub subcommand: Subcommand,
 }
 
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum Subcommand {
     AddInterface(AddInterface),
@@ -45,7 +45,7 @@ pub enum Subcommand {
     DhcpClient(DhcpClient),
 }
 
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "start-hermetic-network-realm")]
 /// Starts a hermetic network realm.
 pub struct StartHermeticNetworkRealm {
@@ -54,12 +54,12 @@ pub struct StartHermeticNetworkRealm {
     pub netstack: fntr::Netstack,
 }
 
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "stop-hermetic-network-realm")]
 /// Stops a running hermetic network realm.
 pub struct StopHermeticNetworkRealm {}
 
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "start-stub")]
 /// Starts a test stub within the hermetic network realm.
 pub struct StartStub {
@@ -68,12 +68,12 @@ pub struct StartStub {
     pub component_url: String,
 }
 
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "stop-stub")]
 /// Stops the currently running test stub.
 pub struct StopStub {}
 
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "add-interface")]
 /// Attaches an interface to the hermetic Netstack.
 pub struct AddInterface {
@@ -93,7 +93,7 @@ pub struct AddInterface {
     pub wait_any_ip_address: bool,
 }
 
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "join-multicast-group")]
 /// Joins a multicast group.
 pub struct JoinMulticastGroup {
@@ -106,7 +106,7 @@ pub struct JoinMulticastGroup {
     pub interface_id: u64,
 }
 
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "leave-multicast-group")]
 /// Leaves a multicast group that was previously joined.
 pub struct LeaveMulticastGroup {
@@ -119,7 +119,7 @@ pub struct LeaveMulticastGroup {
     pub interface_id: u64,
 }
 
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "ping")]
 /// Sends an ICMP echo request to a target using a socket provided by the
 /// hermetic Netstack.
@@ -143,7 +143,7 @@ pub struct Ping {
     pub interface_name: Option<String>,
 }
 
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "poll-udp")]
 /// Polls the specified socket address with UDP datagrams containing the specified payload.
 /// Waits for a single reply from the target address and prints it to stdout.
@@ -165,7 +165,7 @@ pub struct PollUdp {
     pub num_retries: u16,
 }
 
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "dhcpv6-client")]
 /// DHCPv6 client commands.
 pub struct Dhcpv6Client {
@@ -173,7 +173,7 @@ pub struct Dhcpv6Client {
     pub subcommand: Dhcpv6ClientSubcommand,
 }
 
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum Dhcpv6ClientSubcommand {
     Start(Dhcpv6ClientStart),
@@ -187,7 +187,7 @@ fn optional_prefix_from_str(s: &str) -> Result<Option<fnet_ext::SubnetV6>, Strin
     }
 }
 
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "start")]
 /// Start a DHCPv6 client.
 pub struct Dhcpv6ClientStart {
@@ -214,12 +214,12 @@ pub struct Dhcpv6ClientStart {
     // TODO(https://fxbug.dev/105427): Add configuration for acquiring temporary addresses.
 }
 
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "stop")]
 /// Stops all DHCPv6 clients.
 pub struct Dhcpv6ClientStop {}
 
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "dhcp-client")]
 /// DHCP client commands.
 pub struct DhcpClient {
@@ -227,14 +227,14 @@ pub struct DhcpClient {
     pub subcommand: DhcpClientSubcommand,
 }
 
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum DhcpClientSubcommand {
     Start(DhcpClientStart),
     Stop(DhcpClientStop),
 }
 
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "start")]
 /// Start a DHCP client.
 pub struct DhcpClientStart {
@@ -243,7 +243,7 @@ pub struct DhcpClientStart {
     pub interface_id: u64,
 }
 
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "stop")]
 /// Stops all DHCP clients.
 pub struct DhcpClientStop {

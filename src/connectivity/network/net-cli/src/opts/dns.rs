@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 
-#[derive(FromArgs, Clone, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand, name = "dns")]
 /// commands to control the dns resolver
 pub struct Dns {
@@ -12,13 +12,13 @@ pub struct Dns {
     pub dns_cmd: DnsEnum,
 }
 
-#[derive(FromArgs, Clone, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum DnsEnum {
     Lookup(Lookup),
 }
 
-#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "lookup")]
 /// performs dns resolution on the specified hostname
 pub struct Lookup {

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 use pbms::AuthFlowChoice;
 use std::path::PathBuf;
@@ -14,7 +14,7 @@ use std::path::PathBuf;
 /// uri (pb:<context>:<product.board>:<version>), or one positional arg as a
 /// full URL to the transfer.json
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "get",

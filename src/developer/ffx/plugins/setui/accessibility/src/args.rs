@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "accessibility")]
 /// watch or set accessibility settings
 pub struct Accessibility {
@@ -14,7 +14,7 @@ pub struct Accessibility {
     pub subcommand: SubCommandEnum,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
 pub enum SubCommandEnum {
     AddCaption(CaptionArgs),
@@ -22,7 +22,7 @@ pub enum SubCommandEnum {
     Watch(WatchArgs),
 }
 
-#[derive(FromArgs, PartialEq, Debug, Clone)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug, Clone)]
 #[argh(subcommand, name = "add-caption")]
 /// add caption options, the configuration for which sources get closed caption and how they look
 pub struct CaptionArgs {
@@ -64,7 +64,7 @@ pub struct CaptionArgs {
     pub char_edge_style: Option<fidl_fuchsia_settings::EdgeStyle>,
 }
 
-#[derive(FromArgs, PartialEq, Debug, Clone)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug, Clone)]
 #[argh(subcommand, name = "set")]
 /// set other accessibility options
 pub struct SetArgs {
@@ -91,7 +91,7 @@ pub struct SetArgs {
     pub color_correction: Option<fidl_fuchsia_settings::ColorBlindnessType>,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "watch")]
 /// watch current accessibility settings
 pub struct WatchArgs {}

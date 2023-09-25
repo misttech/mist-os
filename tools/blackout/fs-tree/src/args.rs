@@ -23,7 +23,7 @@ impl std::str::FromStr for FilesystemFormat {
 /// Run a power-failure test on a mutable fs (e.g.  Fxfs or minfs). Load pattern: generate, move,
 /// and delete random directory trees.
 #[ffx_core::ffx_command()]
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "fs-tree")]
 pub struct FsTreeCommand {
     /// the path of the block device on the target device to use for testing. If one isn't provided

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Result};
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use camino::Utf8PathBuf;
 use ffx_core::ffx_command;
 use std::path::Path;
@@ -13,7 +13,7 @@ use std::str::FromStr;
 use assembly_images_config::BlobfsLayout;
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "assembly", description = "Assemble images")]
 pub struct AssemblyCommand {
     /// the assembly operation to perform
@@ -22,7 +22,7 @@ pub struct AssemblyCommand {
 }
 
 /// This is the set of top-level operations within the `ffx assembly` plugin
-#[derive(Debug, FromArgs, PartialEq)]
+#[derive(Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand)]
 pub enum OperationClass {
     CreateSystem(CreateSystemArgs),
@@ -33,7 +33,7 @@ pub enum OperationClass {
 }
 
 /// create the system images.
-#[derive(Debug, FromArgs, PartialEq)]
+#[derive(Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "create-system")]
 pub struct CreateSystemArgs {
     /// the configuration file that specifies the packages, binaries, and
@@ -93,7 +93,7 @@ fn default_package_mode() -> PackageMode {
 }
 
 /// construct an UpdatePackage using images and package.
-#[derive(Debug, FromArgs, PartialEq)]
+#[derive(Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "create-update")]
 pub struct CreateUpdateArgs {
     /// path to a partitions config, which specifies where in the partition
@@ -154,7 +154,7 @@ fn default_subpackage_blobs_package_name() -> String {
 }
 
 /// Perform size checks (on packages or product based on the sub-command).
-#[derive(Debug, FromArgs, PartialEq)]
+#[derive(Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "size-check")]
 pub struct SizeCheckArgs {
     #[argh(subcommand)]
@@ -162,7 +162,7 @@ pub struct SizeCheckArgs {
 }
 
 /// The set of operations available under `ffx assembly size-check`.
-#[derive(Debug, FromArgs, PartialEq)]
+#[derive(Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand)]
 pub enum SizeCheckOperationClass {
     /// Check that the set of all blobs included in the product fit in the blobfs capacity.
@@ -174,7 +174,7 @@ pub enum SizeCheckOperationClass {
 /// Measure package sizes and verify they fit in the specified budgets.
 /// Exit status is 2 when one or more budgets are exceeded, and 1 when
 /// a failure prevented the budget verification to happen.
-#[derive(Debug, FromArgs, PartialEq)]
+#[derive(Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "package")]
 pub struct PackageSizeCheckArgs {
     /// path to a JSON file containing the list of size budgets.
@@ -203,7 +203,7 @@ pub struct PackageSizeCheckArgs {
 
 /// (Not implemented yet) Check that the set of all blobs included in the product
 /// fit in the blobfs capacity.
-#[derive(Debug, FromArgs, PartialEq)]
+#[derive(Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "product")]
 pub struct ProductSizeCheckArgs {
     /// use specific auth mode for oauth2 (see examples; default: pkce).
@@ -276,7 +276,7 @@ fn default_blobfs_layout() -> BlobfsLayout {
 }
 
 /// Arguments for performing a high-level product assembly operation.
-#[derive(Debug, FromArgs, PartialEq)]
+#[derive(Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "product")]
 pub struct ProductArgs {
     /// the configuration file that describes the product assembly to perform.
@@ -338,7 +338,7 @@ impl FromStr for PackageValidationHandling {
 }
 
 /// Arguments for creating a Board Input Bundle for use by Assembly.
-#[derive(Debug, FromArgs, PartialEq)]
+#[derive(ArgsInfo, Debug, FromArgs, PartialEq)]
 #[argh(subcommand, name = "board-input-bundle")]
 pub struct BoardInputBundleArgs {
     /// the directory to write the board input bundle to.

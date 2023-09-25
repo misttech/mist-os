@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use ffx_config::ConfigLevel;
 use ffx_core::ffx_command;
 use std::path::PathBuf;
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "default",
@@ -30,7 +30,7 @@ pub struct TargetDefaultCommand {
     pub subcommand: SubCommand,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum SubCommand {
     Get(TargetDefaultGetCommand),
@@ -38,7 +38,7 @@ pub enum SubCommand {
     Unset(TargetDefaultUnsetCommand),
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "unset",
@@ -68,7 +68,7 @@ pub struct TargetDefaultUnsetCommand {
     pub build_dir: Option<PathBuf>,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "get",
@@ -86,7 +86,7 @@ pub struct TargetDefaultGetCommand {
     pub build_dir: Option<PathBuf>,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "set",

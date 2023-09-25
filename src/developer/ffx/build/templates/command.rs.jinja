@@ -1,4 +1,4 @@
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum SubCommand {
 {% for dep in deps %}

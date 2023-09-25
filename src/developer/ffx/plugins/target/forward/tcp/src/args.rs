@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 use fidl_fuchsia_net::SocketAddress;
 use fidl_fuchsia_net_ext as net_ext;
 use std::net::SocketAddr;
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "tcp", description = "Forward a TCP port from the target to the host")]
 pub struct TcpCommand {
     #[argh(positional, from_str_fn(parse_addr))]

@@ -8,7 +8,7 @@
 /// named blackout-target, in core/ffx-laboratory, and that it serves the
 /// fuchsia.blackout.test.Controller protocol.
 #[ffx_core::ffx_command()]
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "step")]
 pub struct BlackoutCommand {
     #[argh(subcommand)]
@@ -16,7 +16,7 @@ pub struct BlackoutCommand {
 }
 
 /// What test step to run
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum BlackoutSubcommand {
     Setup(SetupCommand),
@@ -25,7 +25,7 @@ pub enum BlackoutSubcommand {
 }
 
 /// Run the setup step
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "setup")]
 pub struct SetupCommand {
     /// block device partition label the test is going to be run on. Setup will likely create this
@@ -42,7 +42,7 @@ pub struct SetupCommand {
 }
 
 /// Run the test step
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "test")]
 pub struct TestCommand {
     /// block device partition label the test is going to be run on.
@@ -69,7 +69,7 @@ pub struct TestCommand {
 }
 
 /// Run the verify step
-#[derive(argh::FromArgs, Debug, PartialEq)]
+#[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "verify")]
 pub struct VerifyCommand {
     /// block device partition label the test is going to be run on.

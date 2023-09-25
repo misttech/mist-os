@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use ffx_config::ConfigLevel;
 use ffx_core::ffx_command;
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "default",
@@ -29,7 +29,7 @@ pub struct RepositoryDefaultCommand {
     pub subcommand: SubCommand,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum SubCommand {
     Get(RepositoryDefaultGetCommand),
@@ -37,7 +37,7 @@ pub enum SubCommand {
     Unset(RepositoryDefaultUnsetCommand),
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "unset",
@@ -67,7 +67,7 @@ pub struct RepositoryDefaultUnsetCommand {
     pub build_dir: Option<String>,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "get",
@@ -77,7 +77,7 @@ Returns an empty string if no default is configured."
 )]
 pub struct RepositoryDefaultGetCommand {}
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "set",

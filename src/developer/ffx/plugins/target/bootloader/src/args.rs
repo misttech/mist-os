@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 use ffx_fastboot::common::cmd::{BootParams, Command, ManifestParams, UnlockParams};
 use std::path::PathBuf;
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "bootloader", description = "Communicates with the bootloader")]
 pub struct BootloaderCommand {
     #[argh(
@@ -39,7 +39,7 @@ pub struct BootloaderCommand {
     pub subcommand: SubCommand,
 }
 
-#[derive(FromArgs, Clone, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, Clone, PartialEq, Debug)]
 #[argh(subcommand)]
 pub enum SubCommand {
     Lock(LockCommand),
@@ -48,17 +48,17 @@ pub enum SubCommand {
     Info(InfoCommand),
 }
 
-#[derive(FromArgs, Default, Clone, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, Default, Clone, PartialEq, Debug)]
 /// Locks a fastboot target.
 #[argh(subcommand, name = "lock")]
 pub struct LockCommand {}
 
-#[derive(FromArgs, Default, Clone, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, Default, Clone, PartialEq, Debug)]
 /// Prints fastboot variables for target.
 #[argh(subcommand, name = "info")]
 pub struct InfoCommand {}
 
-#[derive(FromArgs, Default, Clone, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, Default, Clone, PartialEq, Debug)]
 /// Unlocks a fastboot target.
 #[argh(subcommand, name = "unlock")]
 pub struct UnlockCommand {
@@ -73,7 +73,7 @@ pub struct UnlockCommand {
     pub force: bool,
 }
 
-#[derive(FromArgs, Default, Clone, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, Default, Clone, PartialEq, Debug)]
 /// RAM boots a fastboot target.
 #[argh(subcommand, name = "boot")]
 pub struct BootCommand {

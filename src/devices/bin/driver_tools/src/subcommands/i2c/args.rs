@@ -7,17 +7,17 @@ use {
         ping::args::PingCommand, read::args::ReadCommand, transact::args::TransactCommand,
         write::args::WriteCommand,
     },
-    argh::FromArgs,
+    argh::{ArgsInfo, FromArgs},
 };
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "i2c", description = "Perform reads and writes on an I2C device")]
 pub struct I2cCommand {
     #[argh(subcommand)]
     pub subcommand: I2cSubCommand,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum I2cSubCommand {
     Ping(PingCommand),

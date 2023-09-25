@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 
 #[ffx_command()]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "storage", description = "Manages storage capabilities of components")]
 pub struct StorageCommand {
     #[argh(subcommand)]
@@ -24,7 +24,7 @@ pub struct StorageCommand {
     pub capability: String,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
 pub enum SubCommandEnum {
     Copy(CopyArgs),
@@ -33,7 +33,7 @@ pub enum SubCommandEnum {
     MakeDirectory(MakeDirectoryArgs),
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(
     subcommand,
     name = "list",
@@ -61,7 +61,7 @@ pub struct ListArgs {
     pub path: String,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "make-directory",
@@ -85,7 +85,7 @@ pub struct MakeDirectoryArgs {
     pub path: String,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "copy",
@@ -113,7 +113,7 @@ pub struct CopyArgs {
     pub destination_path: String,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "delete",

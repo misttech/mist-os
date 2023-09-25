@@ -4,7 +4,7 @@
 
 use {
     anyhow::{format_err, Error},
-    argh::FromArgs,
+    argh::{ArgsInfo, FromArgs},
     fidl_fuchsia_overnet_protocol::LinkConfig,
     fuchsia_async::Timer,
     futures::prelude::*,
@@ -16,14 +16,14 @@ mod list_peers;
 mod probe_node;
 mod probe_reports;
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 /// Overnet debug tool
 pub struct Opts {
     #[argh(subcommand)]
     pub command: Command,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
 pub enum Command {
     ListPeers(ListPeers),
@@ -31,7 +31,7 @@ pub enum Command {
     FullMap(probe_reports::FullMapArgs),
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "list-peers")]
 /// List known peer nodes
 pub struct ListPeers {}
@@ -62,7 +62,7 @@ async fn list_peers() -> Result<(), Error> {
         .await
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "list-links")]
 /// List links on a particular peer
 pub struct ListLinks {
