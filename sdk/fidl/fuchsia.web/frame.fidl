@@ -158,7 +158,6 @@ closed protocol Frame {
     ///
     /// See the description of [`CreateContextParams.service_directory`] for additional services
     /// that must be present when using this method.
-    @transitional
     @available(deprecated=13)
     strict CreateView(resource struct {
         view_token fuchsia.ui.views.ViewToken;
@@ -174,7 +173,6 @@ closed protocol Frame {
     ///
     /// See the description of [`CreateContextParams.service_directory`] for additional services
     /// that must be present when using this method.
-    @transitional
     @available(deprecated=13)
     strict CreateViewWithViewRef(resource struct {
         view_token fuchsia.ui.views.ViewToken;
@@ -189,7 +187,6 @@ closed protocol Frame {
     // TODO(fxbug.dev/81959): use "resource table" syntax when it becomes available, thus getting
     // rid of the need for CreateView2Args.  Hopefully this will be done by the time we want to
     // rename CreateView2() to CreateView(), once the latter is deleted.
-    @transitional
     strict CreateView2(resource struct {
         args CreateView2Args;
     });
@@ -301,7 +298,6 @@ closed protocol Frame {
     /// Sets the listener for handling page navigation events.
     ///
     /// - `listener`: The observer to use. Unregisters any existing listener if null.
-    @transitional
     strict SetNavigationEventListener(resource struct {
         listener client_end:<NavigationEventListener, optional>;
     });
@@ -311,7 +307,6 @@ closed protocol Frame {
     ///
     /// - `listener`: The observer to use. Unregisters any existing listener if null.
     /// - `flags`: Flags for optional features that should be enabled for the listener.
-    @transitional
     strict SetNavigationEventListener2(resource struct {
         listener client_end:<NavigationEventListener, optional>;
         flags NavigationEventListenerFlags;
@@ -375,7 +370,6 @@ closed protocol Frame {
 
     @deprecated("use fuchsia.web.Frame.SetMediaSettings instead")
     @available(removed=10)
-    @transitional
     strict SetMediaSessionId(struct {
         session_id uint64;
     });
@@ -385,7 +379,6 @@ closed protocol Frame {
     /// before the Frame is navigated to content in order to ensure that the settings applied to
     /// all media streams. Due to request pipelining, this means doing so before calling
     /// [`Frame.GetNavigationController()`] and [`NavigationController.LoadUrl()`].
-    @transitional
     strict SetMediaSettings(struct {
         settings FrameMediaSettings;
     });
@@ -453,7 +446,6 @@ closed protocol Frame {
     /// will disconnect with `ZX_ERR_INVALID_ARGS`.
     @deprecated("use fuchsia.web.Frame.SetContentAreaSettings instead")
     @available(removed=10)
-    @transitional
     strict SetPreferredTheme(struct {
         theme fuchsia.settings.ThemeType;
     });
@@ -472,7 +464,6 @@ closed protocol Frame {
     /// pinch-zoom is enabled (see [`InputTypes.GESTURE_PINCH`]).
     @deprecated("use fuchsia.web.Frame.SetContentAreaSettings instead")
     @available(removed=10)
-    @transitional
     strict SetPageScale(struct {
         scale float32;
     });
@@ -509,7 +500,6 @@ closed protocol Frame {
     ///
     /// Subsequent calls to `Close()` will override any previously specified `Close()` timeout.
     @available(added=10)
-    @transitional
     strict Close(table {
         /// Optional.
         1: timeout zx.Duration;
