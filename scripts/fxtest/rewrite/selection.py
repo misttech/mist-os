@@ -223,12 +223,22 @@ async def select_tests(
 
     await asyncio.wait(match_tasks, return_when=asyncio.FIRST_EXCEPTION)
 
+    omitted_fuzzy_matches: typing.List[Test] = []
+    if PERFECT_MATCH_DISTANCE in best_matches.values():
+        # There was a perfect match. Omit any test that is not a perfect match.
+        omitted_fuzzy_matches = [
+            t for t in tests_to_run if best_matches[t.name()] != PERFECT_MATCH_DISTANCE
+        ]
+        tests_to_run = {
+            t for t in tests_to_run if best_matches[t.name()] == PERFECT_MATCH_DISTANCE
+        }
+
     # Ensure tests match the input ordering for consistency.
     selected_tests = [e for e in entries if e in tests_to_run]
 
     return selection_types.TestSelections(
         selected_tests,
-        [],
+        omitted_fuzzy_matches,
         make_final_scores(dict(best_matches)),
         group_matches,
         fuzzy_distance_threshold,

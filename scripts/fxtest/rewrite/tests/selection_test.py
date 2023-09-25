@@ -272,12 +272,12 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
 
         host_path = await selection.select_tests(tests, ["binary_test"])
         self.assertEqual(
-            [s.info.name for s in host_path.selected], ["host_x64/binary_test"]
+            [s.name() for s in host_path.selected], ["host_x64/binary_test"]
         )
 
         full_path = await selection.select_tests(tests, ["//src"])
         self.assertEqual(
-            [s.info.name for s in full_path.selected], [t.info.name for t in tests]
+            [s.name() for s in full_path.selected], [t.name() for t in tests]
         )
 
     async def test_approximate_matches(self):
@@ -290,10 +290,47 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
 
         host_fuzzy = await selection.select_tests(tests, ["binaryytest"])
         self.assertEqual(
-            [s.info.name for s in host_fuzzy.selected], ["host_x64/binary_test"]
+            [s.name() for s in host_fuzzy.selected], ["host_x64/binary_test"]
         )
         self.assertEqual(host_fuzzy.best_score["host_x64/binary_test"], 1)
         self.assertEqual(host_fuzzy.fuzzy_distance_threshold, 3)
+
+    async def test_perfect_match_omits_approximate_match(self):
+        """Test that fuzzy matching is not used if there is a perfect match."""
+
+        tests = [
+            self._make_host_test("src/other-tests", "binary_test"),
+            self._make_host_test("src/more-tests", "binaryytest"),
+        ]
+
+        host_fuzzy = await selection.select_tests(tests, ["binaryytest"])
+        self.assertEqual(
+            [s.name() for s in host_fuzzy.selected], ["host_x64/binaryytest"]
+        )
+        self.assertEqual(host_fuzzy.best_score["host_x64/binaryytest"], 0)
+        self.assertEqual(host_fuzzy.best_score["host_x64/binary_test"], 1)
+        self.assertEqual(
+            [s.name() for s in host_fuzzy.selected_but_not_run],
+            ["host_x64/binary_test"],
+        )
+        self.assertEqual(host_fuzzy.fuzzy_distance_threshold, 3)
+
+    async def test_approximate_match_multiple(self):
+        """Test that fuzzy matching matches multiple imperfect
+        matches if there is no perfect match."""
+
+        tests = [
+            self._make_host_test("src/other-tests", "binary_test"),
+            self._make_host_test("src/more-tests", "binaryytest"),
+        ]
+
+        host_fuzzy = await selection.select_tests(tests, ["binary0test"])
+        self.assertEqual(
+            {s.name() for s in host_fuzzy.selected},
+            {"host_x64/binary_test", "host_x64/binaryytest"},
+        )
+        self.assertEqual(host_fuzzy.best_score["host_x64/binaryytest"], 1)
+        self.assertEqual(host_fuzzy.best_score["host_x64/binary_test"], 1)
 
     async def test_flag_mutation(self):
         """Test that we can apply command line flag behavior to selections"""
