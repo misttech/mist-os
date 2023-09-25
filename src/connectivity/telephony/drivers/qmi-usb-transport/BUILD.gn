@@ -15,7 +15,7 @@ driver_bind_rules("qmi_usb_bind") {
   rules = "qmi_usb.bind"
   tests = "bind_tests.json"
   deps = [
-    "//src/devices/bind/fuchsia.sierra.usb",
+    "//src/devices/bind/fuchsia.sierra.platform.usb",
     "//src/devices/bind/fuchsia.usb",
   ]
 }

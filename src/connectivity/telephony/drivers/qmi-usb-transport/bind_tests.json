@@ -9,8 +9,8 @@
     {
         "device": {
             "fuchsia.BIND_PROTOCOL": "fuchsia.usb.BIND_PROTOCOL.INTERFACE",
-            "fuchsia.BIND_USB_PID": "fuchsia.sierra.usb.BIND_USB_PID.EM7565",
-            "fuchsia.BIND_USB_VID": "fuchsia.sierra.usb.BIND_USB_VID.SIERRA"
+            "fuchsia.BIND_USB_PID": "fuchsia.sierra.platform.usb.BIND_USB_PID.EM7565",
+            "fuchsia.BIND_USB_VID": "fuchsia.sierra.platform.usb.BIND_USB_VID.SIERRA"
         },
         "expected": "match",
         "name": "Vendor"
