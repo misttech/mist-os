@@ -4515,13 +4515,12 @@ dependencies = [
 
 [[package]]
 name = "tracing-mutex"
-version = "0.2.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3df21ca58f0e0b5ee3181d8eebb8f2ec16d6ecbb2a04f351aa6abd7cf700f22"
+checksum = "6c3cee86884622e131719fff27539a520d0a5fee90e2a70691d9cc18789abce5"
 dependencies = [
- "lazy_static",
  "lock_api 0.4.7",
- "parking_lot 0.11.1",
+ "parking_lot 0.12.0",
 ]
 
 [[package]]

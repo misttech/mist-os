@@ -23,10 +23,12 @@ tree out of it, and panics if your dependencies would create a cycle. It provide
 existing synchronization primitives with an identical API, and should be a drop-in replacement.
 
 Inspired by [this blogpost][whileydave], which references a similar behaviour implemented by
-[Abseil][abseil-mutex] for their mutexes.
+[Abseil][abseil-mutex] for their mutexes. [This article goes into more depth on the exact
+implementation.][article]
 
 [whileydave]: https://whileydave.com/2020/12/19/dynamic-cycle-detection-for-lock-ordering/
 [abseil-mutex]: https://abseil.io/docs/cpp/guides/synchronization
+[article]: https://bertptrs.nl/2022/06/23/deadlock-free-mutexes-and-directed-acyclic-graphs.html
 
 ## Usage
 
@@ -42,9 +44,9 @@ Replacements for the synchronization primitives in `std::sync` can be found in t
 Support for other synchronization primitives is planned.
 
 ```rust
-use tracing_mutex::stdsync::TracingMutex;
+use tracing_mutex::stdsync::Mutex;
 
-let some_mutex = TracingMutex::new(42);
+let some_mutex = Mutex::new(42);
 *some_mutex.lock().unwrap() += 1;
 println!("{:?}", some_mutex);
 ```
@@ -58,6 +60,9 @@ performance penalty in your production environment, this library also offers deb
 `DebugMutex`, also found in the `stdsync` module, is a type alias that evaluates to `TracingMutex`
 when debug assertions are enabled, and to `Mutex` when they are not. Similar helper types are
 available for other synchronization primitives.
+
+The minimum supported Rust version is 1.70. Increasing this is not considered a breaking change, but
+will be avoided within semver-compatible releases if possible.
 
 ### Features
 

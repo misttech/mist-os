@@ -18,8 +18,23 @@
 //! # Structure
 //!
 //! Each module in this crate exposes wrappers for a specific base-mutex with dependency trakcing
-//! added. For now, that is limited to [`stdsync`] which provides wrappers for the base locks in the
-//! standard library. More back-ends may be added as features in the future.
+//! added. This includes [`stdsync`] which provides wrappers for the base locks in the standard
+//! library, and more depending on enabled compile-time features. More back-ends may be added as
+//! features in the future.
+//!
+//! # Feature flags
+//!
+//! `tracing-mutex` uses feature flags to reduce the impact of this crate on both your compile time
+//! and runtime overhead. Below are the available flags. Modules are annotated with the features
+//! they require.
+//!
+//! - `backtraces`: Enables capturing backtraces of mutex dependencies, to make it easier to
+//!   determine what sequence of events would trigger a deadlock. This is enabled by default, but if
+//!   the performance overhead is unaccceptable, it can be disabled by disabling default features.
+//!
+//! - `lockapi`: Enables the wrapper lock for [`lock_api`][lock_api] locks
+//!
+//! - `parkinglot`: Enables wrapper types for [`parking_lot`][parking_lot] mutexes
 //!
 //! # Performance considerations
 //!
@@ -41,32 +56,37 @@
 //!
 //! These operations have been reasonably optimized, but the performance penalty may yet be too much
 //! for production use. In those cases, it may be beneficial to instead use debug-only versions
-//! (such as [`stdsync::DebugMutex`]) which evaluate to a tracing mutex when debug assertions are
+//! (such as [`stdsync::Mutex`]) which evaluate to a tracing mutex when debug assertions are
 //! enabled, and to the underlying mutex when they're not.
 //!
+//! For ease of debugging, this crate will, by default, capture a backtrace when establishing a new
+//! dependency between two mutexes. This has an additional overhead of over 60%. If this additional
+//! debugging aid is not required, it can be disabled by disabling default features.
+//!
 //! [paper]: https://whileydave.com/publications/pk07_jea/
+//! [lock_api]: https://docs.rs/lock_api/0.4/lock_api/index.html
+//! [parking_lot]: https://docs.rs/parking_lot/0.12.1/parking_lot/
 #![cfg_attr(docsrs, feature(doc_cfg))]
 use std::cell::RefCell;
-use std::cell::UnsafeCell;
 use std::fmt;
 use std::marker::PhantomData;
-use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::ops::DerefMut;
-use std::ptr;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
-use std::sync::Once;
+use std::sync::MutexGuard;
+use std::sync::OnceLock;
 use std::sync::PoisonError;
 
-use lazy_static::lazy_static;
 #[cfg(feature = "lockapi")]
 #[cfg_attr(docsrs, doc(cfg(feature = "lockapi")))]
 pub use lock_api;
 #[cfg(feature = "parkinglot")]
 #[cfg_attr(docsrs, doc(cfg(feature = "parkinglot")))]
 pub use parking_lot;
+use reporting::Dep;
+use reporting::Reportable;
 
 use crate::graph::DiGraph;
 
@@ -77,12 +97,8 @@ pub mod lockapi;
 #[cfg(feature = "parkinglot")]
 #[cfg_attr(docsrs, doc(cfg(feature = "parkinglot")))]
 pub mod parkinglot;
+mod reporting;
 pub mod stdsync;
-
-/// Counter for Mutex IDs. Atomic avoids the need for locking.
-///
-/// Should be part of the `MutexID` impl but static items are not yet a thing.
-static ID_SEQUENCE: AtomicUsize = AtomicUsize::new(0);
 
 thread_local! {
     /// Stack to track which locks are held
@@ -90,10 +106,6 @@ thread_local! {
     /// Assuming that locks are roughly released in the reverse order in which they were acquired,
     /// a stack should be more efficient to keep track of the current state than a set would be.
     static HELD_LOCKS: RefCell<Vec<usize>> = RefCell::new(Vec::new());
-}
-
-lazy_static! {
-    static ref DEPENDENCY_GRAPH: Mutex<DiGraph<usize>> = Default::default();
 }
 
 /// Dedicated ID type for Mutexes
@@ -114,6 +126,9 @@ impl MutexId {
     /// This function may panic when there are no more mutex IDs available. The number of mutex ids
     /// is `usize::MAX - 1` which should be plenty for most practical applications.
     pub fn new() -> Self {
+        // Counter for Mutex IDs. Atomic avoids the need for locking.
+        static ID_SEQUENCE: AtomicUsize = AtomicUsize::new(0);
+
         ID_SEQUENCE
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |id| id.checked_add(1))
             .map(Self)
@@ -134,7 +149,10 @@ impl MutexId {
     /// This method panics if the new dependency would introduce a cycle.
     pub fn get_borrowed(&self) -> BorrowedMutex {
         self.mark_held();
-        BorrowedMutex(self)
+        BorrowedMutex {
+            id: self,
+            _not_send: PhantomData,
+        }
     }
 
     /// Mark this lock as held for the purposes of dependency tracking.
@@ -143,19 +161,18 @@ impl MutexId {
     ///
     /// This method panics if the new dependency would introduce a cycle.
     pub fn mark_held(&self) {
-        let creates_cycle = HELD_LOCKS.with(|locks| {
+        let opt_cycle = HELD_LOCKS.with(|locks| {
             if let Some(&previous) = locks.borrow().last() {
                 let mut graph = get_dependency_graph();
 
-                !graph.add_edge(previous, self.value())
+                graph.add_edge(previous, self.value(), Dep::capture).err()
             } else {
-                false
+                None
             }
         });
 
-        if creates_cycle {
-            // Panic without holding the lock to avoid needlessly poisoning it
-            panic!("Mutex order graph should not have cycles");
+        if let Some(cycle) = opt_cycle {
+            panic!("{}", Dep::panic_message(&cycle))
         }
 
         HELD_LOCKS.with(|locks| locks.borrow_mut().push(self.value()));
@@ -204,17 +221,13 @@ impl Drop for MutexId {
 ///
 /// This type can be largely replaced once std::lazy gets stabilized.
 struct LazyMutexId {
-    inner: UnsafeCell<MaybeUninit<MutexId>>,
-    setter: Once,
-    _marker: PhantomData<MutexId>,
+    inner: OnceLock<MutexId>,
 }
 
 impl LazyMutexId {
     pub const fn new() -> Self {
         Self {
-            inner: UnsafeCell::new(MaybeUninit::uninit()),
-            setter: Once::new(),
-            _marker: PhantomData,
+            inner: OnceLock::new(),
         }
     }
 }
@@ -231,51 +244,30 @@ impl Default for LazyMutexId {
     }
 }
 
-/// Safety: the UnsafeCell is guaranteed to only be accessed mutably from a `Once`.
-unsafe impl Sync for LazyMutexId {}
-
 impl Deref for LazyMutexId {
     type Target = MutexId;
 
     fn deref(&self) -> &Self::Target {
-        self.setter.call_once(|| {
-            // Safety: this function is only called once, so only one mutable reference should exist
-            // at a time.
-            unsafe {
-                *self.inner.get() = MaybeUninit::new(MutexId::new());
-            }
-        });
-
-        // Safety: after the above Once runs, there are no longer any mutable references, so we can
-        // hand this out safely.
-        //
-        // Explanation of this monstrosity:
-        //
-        // - Get a pointer to the data from the UnsafeCell
-        // - Dereference that to get a reference to the underlying MaybeUninit
-        // - Use as_ptr on MaybeUninit to get a pointer to the initialized MutexID
-        // - Dereference the pointer to turn in into a reference as intended.
-        //
-        // This should get slightly nicer once `maybe_uninit_extra` is stabilized.
-        unsafe { &*((*self.inner.get()).as_ptr()) }
+        self.inner.get_or_init(MutexId::new)
     }
 }
 
-impl Drop for LazyMutexId {
-    fn drop(&mut self) {
-        if self.setter.is_completed() {
-            // We have a valid mutex ID and need to drop it
-
-            // Safety: we know that this pointer is valid because the initializer has successfully run.
-            let mutex_id = unsafe { ptr::read((*self.inner.get()).as_ptr()) };
-
-            drop(mutex_id);
-        }
-    }
-}
-
+/// Borrowed mutex ID
+///
+/// This type should be used as part of a mutex guard wrapper. It can be acquired through
+/// [`MutexId::get_borrowed`] and will automatically mark the mutex as not borrowed when it is
+/// dropped.
+///
+/// This type intentionally is [`!Send`](std::marker::Send) because the ownership tracking is based
+/// on a thread-local stack which doesn't work if a guard gets released in a different thread from
+/// where they're acquired.
 #[derive(Debug)]
-struct BorrowedMutex<'a>(&'a MutexId);
+struct BorrowedMutex<'a> {
+    /// Reference to the mutex we're borrowing from
+    id: &'a MutexId,
+    /// This value serves no purpose but to make the type [`!Send`](std::marker::Send)
+    _not_send: PhantomData<MutexGuard<'static, ()>>,
+}
 
 /// Drop a lock held by the current thread.
 ///
@@ -286,13 +278,16 @@ struct BorrowedMutex<'a>(&'a MutexId);
 impl<'a> Drop for BorrowedMutex<'a> {
     fn drop(&mut self) {
         // Safety: the only way to get a BorrowedMutex is by locking the mutex.
-        unsafe { self.0.mark_released() };
+        unsafe { self.id.mark_released() };
     }
 }
 
 /// Get a reference to the current dependency graph
-fn get_dependency_graph() -> impl DerefMut<Target = DiGraph<usize>> {
+fn get_dependency_graph() -> impl DerefMut<Target = DiGraph<usize, Dep>> {
+    static DEPENDENCY_GRAPH: OnceLock<Mutex<DiGraph<usize, Dep>>> = OnceLock::new();
+
     DEPENDENCY_GRAPH
+        .get_or_init(Default::default)
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
 }
@@ -320,11 +315,11 @@ mod tests {
         let c = LazyMutexId::new();
 
         let mut graph = get_dependency_graph();
-        assert!(graph.add_edge(a.value(), b.value()));
-        assert!(graph.add_edge(b.value(), c.value()));
+        assert!(graph.add_edge(a.value(), b.value(), Dep::capture).is_ok());
+        assert!(graph.add_edge(b.value(), c.value(), Dep::capture).is_ok());
 
         // Creating an edge c → a should fail as it introduces a cycle.
-        assert!(!graph.add_edge(c.value(), a.value()));
+        assert!(graph.add_edge(c.value(), a.value(), Dep::capture).is_err());
 
         // Drop graph handle so we can drop vertices without deadlocking
         drop(graph);
@@ -332,7 +327,9 @@ mod tests {
         drop(b);
 
         // If b's destructor correctly ran correctly we can now add an edge from c to a.
-        assert!(get_dependency_graph().add_edge(c.value(), a.value()));
+        assert!(get_dependency_graph()
+            .add_edge(c.value(), a.value(), Dep::capture)
+            .is_ok());
     }
 
     /// Test creating a cycle, then panicking.
