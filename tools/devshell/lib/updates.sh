@@ -430,6 +430,7 @@ function ffx-repository-server-running-address {
   err=$?
   if [[ "${err}" -ne 0 ]]; then
     fx-error "Unable to get the active ffx repository server address."
+    fx-error "Current server status: $(ffx --machine json repository server status)"
     return "${err}"
   fi
 
@@ -456,7 +457,8 @@ function ffx-repository-server-running-port {
   if [[ ${addr} =~ .*:([0-9]+) ]]; then
     echo "${BASH_REMATCH[1]}"
   else
-    fx-error "could not parse port from ffx repository server address: '$addr'"
+    fx-error "Could not parse port from ffx repository server address: '$addr'"
+    fx-error "Current server status: $(ffx --machine json repository server status)"
     return 1
   fi
 
