@@ -554,6 +554,17 @@ async def _console_event_loop(
                 lines_to_print.append(
                     f"\n{statusinfo.green('Refreshing', style=flags.style)} {label}"
                 )
+                # Also output the command line used for fx build up to a limit,
+                # to avoid scrolling multiple pages.
+                lines_to_print.append(
+                    statusinfo.ellipsize(
+                        statusinfo.green_highlight(
+                            f"> fx build {' '.join(next_event.payload.build_targets)}",
+                            style=flags.style,
+                        ),
+                        width=80 * 5,  # Approximately 5 lines
+                    ),
+                )
             elif next_event.payload.test_group is not None:
                 # Let the user know we intend to run a number of tests.
                 val = statusinfo.highlight(
