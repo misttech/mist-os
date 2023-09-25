@@ -1004,8 +1004,9 @@ pub(crate) mod testutil {
     /// `FakeCtx<S>` where `S` implements `AsRef` and `AsMut` for
     /// `FakeIpSocketCtx`.
     #[derive(Derivative, GenericOverIp)]
+    #[generic_over_ip(I, Ip)]
     #[derivative(Default(bound = ""))]
-    pub(crate) struct FakeIpSocketCtx<I: Ip + IpDeviceStateIpExt, D> {
+    pub(crate) struct FakeIpSocketCtx<I: IpDeviceStateIpExt, D> {
         pub(crate) table: ForwardingTable<I, D>,
         device_state: HashMap<D, IpDeviceState<FakeInstant, I>>,
         ip_forwarding_ctx: FakeIpForwardingCtx<D>,
@@ -1587,6 +1588,7 @@ pub(crate) mod testutil {
     }
 
     #[derive(Clone, GenericOverIp)]
+    #[generic_over_ip()]
     pub(crate) struct FakeDeviceConfig<D, A> {
         pub(crate) device: D,
         pub(crate) local_ips: Vec<A>,
@@ -1724,6 +1726,7 @@ mod tests {
         );
         for device in devices {
             #[derive(GenericOverIp)]
+            #[generic_over_ip(I, Ip)]
             struct WrapVecAddrSubnet<I: Ip>(Vec<AddrSubnet<I::Addr>>);
 
             let WrapVecAddrSubnet(subnets) = I::map_ip(

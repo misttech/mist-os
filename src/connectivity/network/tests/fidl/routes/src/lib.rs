@@ -559,7 +559,8 @@ async fn watcher_existing<N: Netstack, I: net_types::ip::Ip + fnet_routes_ext::F
 
     // The routes we expected to be installed in the netstack by default.
     #[derive(GenericOverIp)]
-    struct RoutesHolder<I: Ip + fnet_routes_ext::FidlRouteIpExt>(
+    #[generic_over_ip(I, Ip)]
+    struct RoutesHolder<I: fnet_routes_ext::FidlRouteIpExt>(
         Vec<fnet_routes_ext::InstalledRoute<I>>,
     );
     let RoutesHolder(expected_routes) = I::map_ip(

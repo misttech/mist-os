@@ -3623,6 +3623,7 @@ mod test {
                         };
 
                         #[derive(GenericOverIp)]
+                        #[generic_over_ip(I, Ip)]
                         struct EqualityInputs<I: Ip> {
                             args: RouteRequestArgsEither,
                             expected_request: routes::RequestArgs<I>,

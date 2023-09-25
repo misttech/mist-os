@@ -535,6 +535,7 @@ pub fn set_routes<I: Ip, T, NonSyncCtx: NonSyncContext>(
     ),
 ) -> T {
     #[derive(GenericOverIp)]
+    #[generic_over_ip(I, Ip)]
     struct Wrap<'a, I: Ip, NonSyncCtx: NonSyncContext, T>(
         &'a mut dyn FnMut(
             ip::types::EntryUpgrader<'_, I::Addr, DeviceId<NonSyncCtx>, WeakDeviceId<NonSyncCtx>>,

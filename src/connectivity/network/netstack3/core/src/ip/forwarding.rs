@@ -251,6 +251,7 @@ where
 /// `ForwardingTable` maps destination subnets to the nearest IP hosts (on the
 /// local network) able to route IP packets to those subnets.
 #[derive(GenericOverIp)]
+#[generic_over_ip(I, Ip)]
 pub struct ForwardingTable<I: Ip, D> {
     /// All the routes available to forward a packet.
     ///

@@ -94,6 +94,7 @@ pub enum IpVersion {
 ///
 /// [`PhantomData`]: core::marker::PhantomData
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, GenericOverIp)]
+#[generic_over_ip(I, Ip)]
 pub struct IpVersionMarker<I: Ip> {
     _marker: core::marker::PhantomData<I>,
 }
@@ -2756,6 +2757,7 @@ impl<A: Witness<Ipv6Addr> + Copy> AddrSubnet<Ipv6Addr, A> {
 
 /// An IP prefix length.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, GenericOverIp)]
+#[generic_over_ip(I, Ip)]
 pub struct PrefixLength<I: Ip> {
     /// `inner` is guaranteed to be a valid prefix length for `I::Addr`.
     inner: u8,
@@ -3920,8 +3922,21 @@ mod macro_test {
     fn struct_with_ip_version_parameter() {
         #[allow(dead_code)]
         #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
         struct Generic<I: Ip> {
             addr: I::Addr,
+        }
+
+        assert_ip_generic!(Generic, Ip);
+    }
+
+    #[test]
+    fn struct_with_unbounded_ip_version_parameter() {
+        #[allow(dead_code)]
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct Generic<I> {
+            addr: core::marker::PhantomData<I>,
         }
 
         assert_ip_generic!(Generic, Ip);
@@ -3931,6 +3946,7 @@ mod macro_test {
     fn struct_with_ip_address_parameter() {
         #[allow(dead_code)]
         #[derive(GenericOverIp)]
+        #[generic_over_ip(A, IpAddress)]
         struct Generic<A: IpAddress> {
             addr: A,
         }
@@ -3939,9 +3955,53 @@ mod macro_test {
     }
 
     #[test]
+    fn struct_with_unbounded_ip_address_parameter() {
+        #[allow(dead_code)]
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(A, IpAddress)]
+        struct Generic<A> {
+            addr: A,
+        }
+
+        assert_ip_generic!(Generic, IpAddress);
+    }
+
+    #[test]
+    fn struct_with_generic_over_ip_parameter() {
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct InnerGeneric<I: Ip> {
+            addr: I::Addr,
+        }
+
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(T, GenericOverIp)]
+        struct Generic<T> {
+            foo: T,
+        }
+
+        fn do_something<I: Ip>(g: Generic<InnerGeneric<I>>) {
+            I::map_ip(
+                g,
+                |g| {
+                    let _: Ipv4Addr = g.foo.addr;
+                },
+                |g| {
+                    let _: Ipv6Addr = g.foo.addr;
+                },
+            )
+        }
+
+        do_something::<Ipv4>(Generic { foo: InnerGeneric { addr: Ipv4::UNSPECIFIED_ADDRESS } });
+
+        do_something::<Ipv6>(Generic { foo: InnerGeneric { addr: Ipv6::UNSPECIFIED_ADDRESS } });
+    }
+
+    #[test]
     fn enum_with_ip_version_parameter() {
         #[allow(dead_code)]
         #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
         enum Generic<I: Ip> {
             A(I::Addr),
             B(I::Addr),
@@ -3951,10 +4011,37 @@ mod macro_test {
     }
 
     #[test]
+    fn enum_with_unbounded_ip_version_parameter() {
+        #[allow(dead_code)]
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        enum Generic<I> {
+            A(core::marker::PhantomData<I>),
+            B(core::marker::PhantomData<I>),
+        }
+
+        assert_ip_generic!(Generic, Ip);
+    }
+
+    #[test]
     fn enum_with_ip_address_parameter() {
         #[allow(dead_code)]
         #[derive(GenericOverIp)]
+        #[generic_over_ip(A, IpAddress)]
         enum Generic<A: IpAddress> {
+            A(A),
+            B(A),
+        }
+
+        assert_ip_generic!(Generic, IpAddress);
+    }
+
+    #[test]
+    fn enum_with_unbounded_ip_address_parameter() {
+        #[allow(dead_code)]
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(A, IpAddress)]
+        enum Generic<A> {
             A(A),
             B(A),
         }
@@ -3966,6 +4053,7 @@ mod macro_test {
     fn struct_with_ip_version_and_other_parameters() {
         #[allow(dead_code)]
         #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
         struct AddrAndDevice<I: Ip, D> {
             addr: I::Addr,
             device: D,
@@ -3979,6 +4067,7 @@ mod macro_test {
     fn enum_with_ip_version_and_other_parameters() {
         #[allow(dead_code)]
         #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
         enum AddrOrDevice<I: Ip, D> {
             Addr(I::Addr),
             Device(D),
@@ -3992,7 +4081,22 @@ mod macro_test {
     fn struct_with_ip_address_and_other_parameters() {
         #[allow(dead_code)]
         #[derive(GenericOverIp)]
+        #[generic_over_ip(A, IpAddress)]
         struct AddrAndDevice<A: IpAddress, D> {
+            addr: A,
+            device: D,
+        }
+        struct Device;
+
+        assert_ip_generic!(AddrAndDevice, IpAddress, Device);
+    }
+
+    #[test]
+    fn struct_with_unbounded_ip_address_and_other_parameters() {
+        #[allow(dead_code)]
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(A, IpAddress)]
+        struct AddrAndDevice<A, D> {
             addr: A,
             device: D,
         }
@@ -4005,6 +4109,7 @@ mod macro_test {
     fn enum_with_ip_address_and_other_parameters() {
         #[allow(dead_code)]
         #[derive(GenericOverIp, Debug, PartialEq)]
+        #[generic_over_ip(A, IpAddress)]
         enum AddrOrDevice<A: IpAddress, D> {
             Addr(A),
             Device(D),
@@ -4018,6 +4123,7 @@ mod macro_test {
     fn struct_invariant_over_ip() {
         #[allow(dead_code)]
         #[derive(GenericOverIp)]
+        #[generic_over_ip()]
         struct Invariant(usize);
 
         assert_ip_generic!(Invariant);
@@ -4027,6 +4133,7 @@ mod macro_test {
     fn enum_invariant_over_ip() {
         #[allow(dead_code)]
         #[derive(GenericOverIp)]
+        #[generic_over_ip()]
         enum Invariant {
             Usize(usize),
         }
@@ -4038,6 +4145,7 @@ mod macro_test {
     fn struct_invariant_over_ip_with_other_params() {
         #[allow(dead_code)]
         #[derive(GenericOverIp)]
+        #[generic_over_ip()]
         struct Invariant<B, C, D>(B, C, D);
 
         assert_ip_generic!(Invariant, usize, bool, char);
@@ -4047,6 +4155,7 @@ mod macro_test {
     fn enum_invariant_over_ip_with_other_params() {
         #[allow(dead_code)]
         #[derive(GenericOverIp)]
+        #[generic_over_ip()]
         enum Invariant<A, B, C> {
             A(A),
             B(B),
@@ -4070,7 +4179,30 @@ mod macro_test {
 
         #[allow(dead_code)]
         #[derive(GenericOverIp)]
-        struct Generic<I: Ip + FakeIpExt> {
+        #[generic_over_ip(I, Ip)]
+        struct Generic<I: FakeIpExt> {
+            field: I::Associated,
+        }
+
+        assert_ip_generic!(Generic, Ip);
+    }
+
+    #[test]
+    fn struct_with_ip_version_extension_parameter_but_no_ip_bound() {
+        trait FakeIpExt: Ip {
+            type Associated;
+        }
+        impl FakeIpExt for Ipv4 {
+            type Associated = u8;
+        }
+        impl FakeIpExt for Ipv6 {
+            type Associated = u16;
+        }
+
+        #[allow(dead_code)]
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct Generic<I: FakeIpExt> {
             field: I::Associated,
         }
 
@@ -4091,6 +4223,7 @@ mod macro_test {
 
         #[allow(dead_code)]
         #[derive(GenericOverIp)]
+        #[generic_over_ip(A, IpAddress)]
         struct Generic<A: IpAddress + FakeIpAddressExt> {
             field: A::Associated,
         }
@@ -4102,6 +4235,7 @@ mod macro_test {
     fn type_with_lifetime_and_ip_parameter() {
         #[allow(dead_code)]
         #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
         struct Generic<'a, I: Ip> {
             field: &'a I::Addr,
         }
@@ -4120,6 +4254,7 @@ mod macro_test {
         // Regression test for https://fxbug.dev/129815
         #[allow(dead_code)]
         #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
         struct Generic<
             I: Ip
                 + IpExtensionTraitWithVeryLongName

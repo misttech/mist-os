@@ -20,7 +20,8 @@ fn handle_watch<I: FidlRouteIpExt>(
     event_batch: Vec<I::WatchEvent>,
 ) {
     #[derive(GenericOverIp)]
-    struct HandleInputs<I: Ip + FidlRouteIpExt> {
+    #[generic_over_ip(I, Ip)]
+    struct HandleInputs<I: FidlRouteIpExt> {
         request:
             <<I::WatcherMarker as fidl::endpoints::ProtocolMarker>::RequestStream as Stream>::Item,
         event_batch: Vec<I::WatchEvent>,
@@ -71,7 +72,8 @@ pub async fn serve_state_request<'a, I: FidlRouteIpExt>(
     event_stream: impl Stream<Item = Vec<I::WatchEvent>> + 'a,
 ) {
     #[derive(GenericOverIp)]
-    struct GetWatcherInputs<'a, I: Ip + FidlRouteIpExt> {
+    #[generic_over_ip(I, Ip)]
+    struct GetWatcherInputs<'a, I: FidlRouteIpExt> {
         request:
             <<I::StateMarker as fidl::endpoints::ProtocolMarker>::RequestStream as Stream>::Item,
         // Use `Box<dyn>` here because `event_stream` needs to have a know size.
@@ -120,7 +122,8 @@ pub(crate) mod internal {
     // Generates an arbitrary `I::WatchEvent` that is unique for the given `seed`.
     pub(crate) fn generate_event<I: FidlRouteIpExt>(seed: u32) -> I::WatchEvent {
         #[derive(GenericOverIp)]
-        struct BuildEventOutput<I: Ip + FidlRouteIpExt>(I::WatchEvent);
+        #[generic_over_ip(I, Ip)]
+        struct BuildEventOutput<I: FidlRouteIpExt>(I::WatchEvent);
         let BuildEventOutput(event) = I::map_ip(
             IpInvariant(seed),
             |IpInvariant(seed)| {

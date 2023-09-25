@@ -1268,7 +1268,8 @@ mod testutil {
     };
 
     #[derive(GenericOverIp)]
-    struct GroupWrapper<'a, I: Ip + IpDeviceStateIpExt>(
+    #[generic_over_ip(I, Ip)]
+    struct GroupWrapper<'a, I: IpDeviceStateIpExt>(
         &'a mut MulticastGroupSet<I::Addr, I::GmpState<FakeInstant>>,
     );
 

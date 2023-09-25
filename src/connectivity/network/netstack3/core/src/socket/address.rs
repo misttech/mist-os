@@ -20,6 +20,7 @@ use crate::socket::{datagram::DualStackIpExt, AddrVec, SocketMapAddrSpec};
 
 /// A [`ZonedAddr`] whose addr is witness to the properties required by sockets.
 #[derive(Copy, Clone, Eq, GenericOverIp, Hash, PartialEq)]
+#[generic_over_ip(A, IpAddress)]
 pub struct SocketZonedIpAddr<A: IpAddress, Z>(ZonedAddr<SpecifiedAddr<A>, Z>);
 
 impl<A: IpAddress, Z: Debug> Debug for SocketZonedIpAddr<A, Z> {
@@ -180,6 +181,7 @@ pub(crate) struct ConnIpAddr<A: IpAddress, LI, RI> {
 
 /// The address of a connected socket.
 #[derive(Copy, Clone, Debug, Eq, GenericOverIp, Hash, PartialEq)]
+#[generic_over_ip()]
 pub(crate) struct ConnAddr<A, D> {
     pub(crate) ip: A,
     pub(crate) device: Option<D>,

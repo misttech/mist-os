@@ -727,7 +727,8 @@ pub fn get_watcher<I: FidlRouteIpExt>(
         .map_err(WatcherCreationError::CreateProxy)?;
 
     #[derive(GenericOverIp)]
-    struct GetWatcherInputs<'a, I: Ip + FidlRouteIpExt> {
+    #[generic_over_ip(I, Ip)]
+    struct GetWatcherInputs<'a, I: FidlRouteIpExt> {
         watcher_server_end: fidl::endpoints::ServerEnd<I::WatcherMarker>,
         state_proxy: &'a <I::StateMarker as fidl::endpoints::ProtocolMarker>::Proxy,
     }
@@ -750,11 +751,13 @@ pub fn watch<'a, I: FidlRouteIpExt>(
     watcher_proxy: &'a <I::WatcherMarker as fidl::endpoints::ProtocolMarker>::Proxy,
 ) -> impl Future<Output = Result<Vec<I::WatchEvent>, fidl::Error>> {
     #[derive(GenericOverIp)]
-    struct WatchInputs<'a, I: Ip + FidlRouteIpExt> {
+    #[generic_over_ip(I, Ip)]
+    struct WatchInputs<'a, I: FidlRouteIpExt> {
         watcher_proxy: &'a <I::WatcherMarker as fidl::endpoints::ProtocolMarker>::Proxy,
     }
     #[derive(GenericOverIp)]
-    struct WatchOutputs<I: Ip + FidlRouteIpExt> {
+    #[generic_over_ip(I, Ip)]
+    struct WatchOutputs<I: FidlRouteIpExt> {
         watch_fut: fidl::client::QueryResponseFut<Vec<I::WatchEvent>>,
     }
     let WatchOutputs { watch_fut } = I::map_ip::<WatchInputs<'_, I>, WatchOutputs<I>>(
@@ -1675,7 +1678,8 @@ mod tests {
         // Define an event with an invalid destination subnet; receiving it
         // from a call to `Watch` will result in conversion errors.
         #[derive(GenericOverIp)]
-        struct EventHolder<I: Ip + FidlRouteIpExt>(I::WatchEvent);
+        #[generic_over_ip(I, Ip)]
+        struct EventHolder<I: FidlRouteIpExt>(I::WatchEvent);
         let EventHolder(bad_event) = I::map_ip(
             (),
             |()| {
@@ -1774,7 +1778,8 @@ mod tests {
 
     fn arbitrary_test_route<I: Ip + FidlRouteIpExt>() -> InstalledRoute<I> {
         #[derive(GenericOverIp)]
-        struct RouteHolder<I: Ip + FidlRouteIpExt>(InstalledRoute<I>);
+        #[generic_over_ip(I, Ip)]
+        struct RouteHolder<I: FidlRouteIpExt>(InstalledRoute<I>);
         let RouteHolder(route) = I::map_ip(
             (),
             |()| {

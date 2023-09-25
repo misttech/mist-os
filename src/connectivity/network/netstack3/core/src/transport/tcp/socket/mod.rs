@@ -87,6 +87,7 @@ use crate::{
 
 /// Timer ID for TCP connections.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, GenericOverIp)]
+#[generic_over_ip()]
 #[allow(missing_docs)]
 pub enum TimerId {
     V4(SocketId<Ipv4>),
@@ -235,6 +236,7 @@ pub(crate) trait SyncContext<I: IpLayerIpExt, C: NonSyncContext>:
 
 /// Socket address includes the ip address and the port number.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, GenericOverIp)]
+#[generic_over_ip(A, IpAddress)]
 pub struct SocketAddr<A: IpAddress, D> {
     /// The IP component of the address.
     pub ip: SocketZonedIpAddr<A, D>,
@@ -1021,21 +1023,27 @@ impl<
 // valid and cause panics. Find a way to make it harder to misuse.
 /// The ID to an unbound socket.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, GenericOverIp, Hash)]
+#[generic_over_ip(I, Ip)]
 pub struct UnboundId<I: Ip>(usize, IpVersionMarker<I>);
 /// The ID to a bound socket.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, GenericOverIp, Hash)]
+#[generic_over_ip(I, Ip)]
 pub struct BoundId<I: Ip>(usize, IpVersionMarker<I>);
 /// The ID to a listener socket.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, GenericOverIp, Hash)]
+#[generic_over_ip(I, Ip)]
 pub struct ListenerId<I: Ip>(usize, IpVersionMarker<I>);
 /// The ID to a connection socket that has never been closed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, GenericOverIp, Hash)]
+#[generic_over_ip(I, Ip)]
 pub struct ConnectionId<I: Ip>(usize, IpVersionMarker<I>);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, GenericOverIp)]
+#[generic_over_ip(I, Ip)]
 pub(crate) struct MaybeListenerId<I: Ip>(usize, IpVersionMarker<I>);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, GenericOverIp, Hash)]
+#[generic_over_ip(I, Ip)]
 /// Possible socket IDs for TCP.
 pub struct SocketId<I: Ip>(usize, IpVersionMarker<I>);
 
@@ -2312,6 +2320,7 @@ where
 
 /// Error returned when failing to set the bound device for a socket.
 #[derive(Debug, GenericOverIp)]
+#[generic_over_ip()]
 pub enum SetDeviceError {
     /// The socket would conflict with another socket.
     Conflict,
@@ -2395,6 +2404,7 @@ where
 
 /// Possible errors for accept operation.
 #[derive(Debug, GenericOverIp)]
+#[generic_over_ip()]
 pub enum AcceptError {
     /// There is no established socket currently.
     WouldBlock,
@@ -2404,6 +2414,7 @@ pub enum AcceptError {
 
 /// Errors for the listen operation.
 #[derive(Debug, GenericOverIp)]
+#[generic_over_ip()]
 pub enum ListenError {
     /// There would be a conflict with another listening socket.
     ListenerExists,
@@ -2413,11 +2424,13 @@ pub enum ListenError {
 
 /// Possible error for calling `shutdown` on a not-yet connected socket.
 #[derive(Debug, GenericOverIp)]
+#[generic_over_ip()]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct NoConnection;
 
 /// Error returned when attempting to set the ReuseAddress option.
 #[derive(Debug, GenericOverIp)]
+#[generic_over_ip()]
 pub enum SetReuseAddrError {
     /// Cannot share the address because it is already used.
     AddrInUse,
@@ -2449,6 +2462,7 @@ where
 
 /// Possible errors when connecting a socket.
 #[derive(Debug, Error, GenericOverIp)]
+#[generic_over_ip()]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub enum ConnectError {
     /// Cannot allocate a local port for the connection.
@@ -2479,6 +2493,7 @@ pub enum ConnectError {
 
 /// Possible errors when connecting a socket.
 #[derive(Debug, Error, GenericOverIp, PartialEq)]
+#[generic_over_ip()]
 pub enum BindError {
     /// The socket was already bound.
     #[error("The socket was already bound")]
@@ -2733,6 +2748,7 @@ where
 
 /// Information about a socket.
 #[derive(Clone, Debug, Eq, PartialEq, GenericOverIp)]
+#[generic_over_ip(A, IpAddress)]
 pub enum SocketInfo<A: IpAddress, D> {
     /// Unbound socket info.
     Unbound(UnboundInfo<D>),
@@ -2744,6 +2760,7 @@ pub enum SocketInfo<A: IpAddress, D> {
 
 /// Information about an unbound socket.
 #[derive(Clone, Debug, Eq, PartialEq, GenericOverIp)]
+#[generic_over_ip()]
 pub struct UnboundInfo<D> {
     /// The device the socket will be bound to.
     pub device: Option<D>,
@@ -2751,6 +2768,7 @@ pub struct UnboundInfo<D> {
 
 /// Information about a bound socket's address.
 #[derive(Clone, Debug, Eq, PartialEq, GenericOverIp)]
+#[generic_over_ip(A, IpAddress)]
 pub struct BoundInfo<A: IpAddress, D> {
     /// The IP address the socket is bound to, or `None` for all local IPs.
     pub addr: Option<SocketZonedIpAddr<A, D>>,
@@ -2762,6 +2780,7 @@ pub struct BoundInfo<A: IpAddress, D> {
 
 /// Information about a connected socket's address.
 #[derive(Clone, Debug, Eq, PartialEq, GenericOverIp)]
+#[generic_over_ip(A, IpAddress)]
 pub struct ConnectionInfo<A: IpAddress, D> {
     /// The local address the socket is bound to.
     pub local_addr: SocketAddr<A, D>,

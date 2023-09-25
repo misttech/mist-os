@@ -533,7 +533,8 @@ impl<
         let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
 
         #[derive(GenericOverIp)]
-        struct AuthorizeInputs<'a, I: Ip + fnet_routes_ext::admin::FidlRouteAdminIpExt> {
+        #[generic_over_ip(I, Ip)]
+        struct AuthorizeInputs<'a, I: fnet_routes_ext::admin::FidlRouteAdminIpExt> {
             route_set_proxy: &'a <I::RouteSetMarker as fidl::endpoints::ProtocolMarker>::Proxy,
             proof: ProofOfInterfaceAuthorization,
         }
@@ -1593,12 +1594,14 @@ mod tests {
         };
 
         #[derive(GenericOverIp)]
-        struct StateRequestWrapper<I: Ip + fnet_routes_ext::FidlRouteIpExt> {
+        #[generic_over_ip(I, Ip)]
+        struct StateRequestWrapper<I: fnet_routes_ext::FidlRouteIpExt> {
             request: <<I::StateMarker as ProtocolMarker>::RequestStream as futures::TryStream>::Ok,
         }
 
         #[derive(GenericOverIp)]
-        struct WatcherRequestWrapper<I: Ip + fnet_routes_ext::FidlRouteIpExt> {
+        #[generic_over_ip(I, Ip)]
+        struct WatcherRequestWrapper<I: fnet_routes_ext::FidlRouteIpExt> {
             watcher: <I::WatcherMarker as ProtocolMarker>::RequestStream,
         }
 
@@ -1655,7 +1658,8 @@ mod tests {
         updates: impl IntoIterator<Item = I::WatchEvent>,
     ) {
         #[derive(GenericOverIp)]
-        struct HandleInputs<I: Ip + fnet_routes_ext::FidlRouteIpExt> {
+        #[generic_over_ip(I, Ip)]
+        struct HandleInputs<I: fnet_routes_ext::FidlRouteIpExt> {
             request: <<I::WatcherMarker as ProtocolMarker>::RequestStream as Stream>::Item,
             update: I::WatchEvent,
         }
@@ -2087,12 +2091,14 @@ mod tests {
         route_set_results: impl ExactSizeIterator<Item = RouteSetResult>,
     ) {
         #[derive(GenericOverIp)]
-        struct RouteSetInputs<I: Ip + fnet_routes_ext::admin::FidlRouteAdminIpExt> {
+        #[generic_over_ip(I, Ip)]
+        struct RouteSetInputs<I: fnet_routes_ext::admin::FidlRouteAdminIpExt> {
             request: <<I::RouteSetMarker as ProtocolMarker>::RequestStream as Stream>::Item,
             route_set_result: RouteSetResult,
         }
         #[derive(GenericOverIp)]
-        struct RouteSetOutputs<I: Ip + fnet_routes_ext::FidlRouteIpExt> {
+        #[generic_over_ip(I, Ip)]
+        struct RouteSetOutputs<I: fnet_routes_ext::FidlRouteIpExt> {
             event: Option<I::WatchEvent>,
         }
 

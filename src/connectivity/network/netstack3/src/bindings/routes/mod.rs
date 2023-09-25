@@ -36,6 +36,7 @@ type WeakDeviceId = netstack3_core::device::WeakDeviceId<crate::bindings::Bindin
 type DeviceId = netstack3_core::device::DeviceId<crate::bindings::BindingsNonSyncCtxImpl>;
 
 #[derive(GenericOverIp, Debug)]
+#[generic_over_ip(A, IpAddress)]
 pub(crate) enum Change<A: IpAddress> {
     Add(netstack3_core::ip::types::AddableEntry<A, WeakDeviceId>),
     RemoveToSubnet(Subnet<A>),
@@ -434,6 +435,7 @@ impl ChangeSink {
 
     fn change_sender<A: IpAddress>(&self) -> &mpsc::UnboundedSender<WorkItem<A>> {
         #[derive(GenericOverIp)]
+        #[generic_over_ip(A, IpAddress)]
         struct ChangeSender<'a, A: IpAddress> {
             sender: &'a mpsc::UnboundedSender<WorkItem<A>>,
         }

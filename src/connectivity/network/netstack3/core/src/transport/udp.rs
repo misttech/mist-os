@@ -124,8 +124,9 @@ impl<I: IpExt, NewIp: IpExt, D: WeakId> GenericOverIp<NewIp> for UdpBoundSocketM
 }
 
 #[derive(Derivative, GenericOverIp)]
+#[generic_over_ip(I, Ip)]
 #[derivative(Default(bound = ""))]
-pub(crate) struct BoundSockets<I: Ip + IpExt, D: WeakId> {
+pub(crate) struct BoundSockets<I: IpExt, D: WeakId> {
     bound_sockets: UdpBoundSocketMap<I, D>,
     /// lazy_port_alloc is lazy-initialized when it's used.
     lazy_port_alloc: Option<PortAlloc<UdpBoundSocketMap<I, D>>>,
@@ -718,7 +719,8 @@ fn lookup<'s, I: Ip + IpExt, D: WeakId>(
 // to insert IPv6 sockets into the IPv4 map.
 fn assert_is_ip_socket<I: Ip + IpExt>(id: &I::DualStackReceivingId<Udp>) -> &SocketId<I> {
     #[derive(GenericOverIp)]
-    struct RxIdWrapper<'a, I: Ip + IpExt>(&'a I::DualStackReceivingId<Udp>);
+    #[generic_over_ip(I, Ip)]
+    struct RxIdWrapper<'a, I: IpExt>(&'a I::DualStackReceivingId<Udp>);
     I::map_ip(
         RxIdWrapper(id),
         |RxIdWrapper(id)| {
@@ -774,6 +776,7 @@ impl<I: IpExt, D: WeakId> PortAllocImpl for UdpBoundSocketMap<I, D> {
 /// Information associated with a UDP connection.
 #[derive(Debug, GenericOverIp)]
 #[cfg_attr(test, derive(PartialEq))]
+#[generic_over_ip(A, IpAddress)]
 pub struct ConnInfo<A: IpAddress, D> {
     /// The local address associated with a UDP connection.
     pub local_ip: SocketZonedIpAddr<A, D>,
@@ -798,7 +801,8 @@ where
 
         let ConnAddr { ip, device } = c;
         #[derive(GenericOverIp)]
-        struct Wrapper<I: Ip + DualStackIpExt>(I::DualStackConnIpAddr<Udp>);
+        #[generic_over_ip(I, Ip)]
+        struct Wrapper<I: DualStackIpExt>(I::DualStackConnIpAddr<Udp>);
         let (local_ip, IpInvariant(local_port), remote_ip, IpInvariant(remote_port)) =
             A::Version::map_ip(
                 Wrapper(ip),
@@ -847,6 +851,7 @@ where
 /// Information associated with a UDP listener
 #[derive(GenericOverIp)]
 #[cfg_attr(test, derive(Debug, Eq, PartialEq))]
+#[generic_over_ip(A, IpAddress)]
 pub struct ListenerInfo<A: IpAddress, D> {
     /// The local address associated with a UDP listener, or `None` for any
     /// address.
@@ -868,7 +873,8 @@ where
         >,
     ) -> Self {
         #[derive(GenericOverIp)]
-        struct Wrapper<I: Ip + DualStackIpExt>(I::DualStackListenerIpAddr<NonZeroU16>);
+        #[generic_over_ip(I, Ip)]
+        struct Wrapper<I: DualStackIpExt>(I::DualStackListenerIpAddr<NonZeroU16>);
         let (addr, IpInvariant(identifier)): (Option<SpecifiedAddr<A>>, _) = A::Version::map_ip(
             Wrapper(ip),
             |Wrapper(ListenerIpAddr { addr, identifier })| {
@@ -898,6 +904,7 @@ impl<A: IpAddress, D> From<NonZeroU16> for ListenerInfo<A, D> {
 
 /// A unique identifier for a UDP socket.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, GenericOverIp)]
+#[generic_over_ip(I, Ip)]
 
 pub struct SocketId<I: Ip>(usize, IpVersionMarker<I>);
 
@@ -1494,6 +1501,7 @@ pub enum SendToError {
 
 /// An error encountered while enabling or disabling dual-stack operation.
 #[derive(Copy, Clone, Debug, Eq, GenericOverIp, PartialEq)]
+#[generic_over_ip()]
 pub struct NotDualStackCapableError;
 
 pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
@@ -1641,7 +1649,8 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
     ) -> Result<(), NotDualStackCapableError> {
         datagram::with_dual_stack_ip_options_mut(self, ctx, id, |other_stack| {
             #[derive(GenericOverIp)]
-            struct WrapOtherStack<'a, I: Ip + IpExt>(
+            #[generic_over_ip(I, Ip)]
+            struct WrapOtherStack<'a, I: IpExt>(
                 &'a mut I::OtherStackIpOptions<DualStackSocketState>,
             );
             I::map_ip(
@@ -1663,9 +1672,8 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
     ) -> Result<bool, NotDualStackCapableError> {
         datagram::with_dual_stack_ip_options(self, ctx, id, |other_stack| {
             #[derive(GenericOverIp)]
-            struct WrapOtherStack<'a, I: Ip + IpExt>(
-                &'a I::OtherStackIpOptions<DualStackSocketState>,
-            );
+            #[generic_over_ip(I, Ip)]
+            struct WrapOtherStack<'a, I: IpExt>(&'a I::OtherStackIpOptions<DualStackSocketState>);
             I::map_ip(
                 WrapOtherStack(other_stack),
                 |_v4| Err(NotDualStackCapableError),
@@ -1807,6 +1815,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
 
 /// Error when sending a packet on a socket.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, GenericOverIp)]
+#[generic_over_ip()]
 pub enum SendError {
     /// The socket is not writeable.
     NotWriteable,
@@ -2588,6 +2597,7 @@ pub fn get_shutdown<I: Ip, C: crate::NonSyncContext>(
 /// Information about the addresses for a socket.
 #[derive(GenericOverIp)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
+#[generic_over_ip(A, IpAddress)]
 pub enum SocketInfo<A: IpAddress, D> {
     /// The socket was not bound.
     Unbound,
@@ -2862,7 +2872,8 @@ mod tests {
     impl FakeNonSyncCtxState {
         fn received<I: TestIpExt>(&self) -> &HashMap<SocketId<I>, SocketReceived<I>> {
             #[derive(GenericOverIp)]
-            struct Wrap<'a, I: Ip + TestIpExt>(&'a HashMap<SocketId<I>, SocketReceived<I>>);
+            #[generic_over_ip(I, Ip)]
+            struct Wrap<'a, I: TestIpExt>(&'a HashMap<SocketId<I>, SocketReceived<I>>);
             let Wrap(map) = I::map_ip(
                 IpInvariant(self),
                 |IpInvariant(state)| Wrap(&state.received_v4),
@@ -2873,7 +2884,8 @@ mod tests {
 
         fn received_mut<I: IcmpIpExt>(&mut self) -> &mut HashMap<SocketId<I>, SocketReceived<I>> {
             #[derive(GenericOverIp)]
-            struct Wrap<'a, I: Ip + IcmpIpExt>(&'a mut HashMap<SocketId<I>, SocketReceived<I>>);
+            #[generic_over_ip(I, Ip)]
+            struct Wrap<'a, I: IcmpIpExt>(&'a mut HashMap<SocketId<I>, SocketReceived<I>>);
             let Wrap(map) = I::map_ip(
                 IpInvariant(self),
                 |IpInvariant(state)| Wrap(&mut state.received_v4),
@@ -3114,7 +3126,8 @@ mod tests {
         buffer: &B,
     ) -> bool {
         #[derive(GenericOverIp)]
-        struct WrapIn<I: Ip + IpExt>(I::DualStackReceivingId<Udp>);
+        #[generic_over_ip(I, Ip)]
+        struct WrapIn<I: IpExt>(I::DualStackReceivingId<Udp>);
         let found_socket = I::map_ip(
             WrapIn(found_socket),
             |WrapIn(id)| match id {
@@ -3193,7 +3206,8 @@ mod tests {
         buffer: &B,
     ) -> bool {
         #[derive(GenericOverIp)]
-        struct WrapIn<I: Ip + IpExt>(I::DualStackReceivingId<Udp>);
+        #[generic_over_ip(I, Ip)]
+        struct WrapIn<I: IpExt>(I::DualStackReceivingId<Udp>);
         I::map_ip(
             (
                 IpInvariant((sync_ctx, ctx, buffer, src_port, dst_port)),

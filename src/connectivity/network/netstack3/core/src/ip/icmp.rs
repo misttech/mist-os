@@ -302,6 +302,7 @@ pub(crate) struct IcmpAddr<A: IpAddress> {
 
 /// An identifier for an ICMP socket.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, GenericOverIp)]
+#[generic_over_ip(I, Ip)]
 pub struct SocketId<I: Ip>(usize, IpVersionMarker<I>);
 
 impl<I: Ip> Into<usize> for SocketId<I> {

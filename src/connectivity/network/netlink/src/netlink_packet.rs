@@ -78,6 +78,7 @@ pub(crate) mod errno {
     /// Netlink errors are expected to be negative Errnos, with 0 used for ACKs.
     /// This type enforces that the contained code is NonZero & Negative.
     #[derive(Copy, Clone, Debug, PartialEq, GenericOverIp)]
+    #[generic_over_ip()]
     pub(crate) struct Errno(i32);
 
     impl Errno {

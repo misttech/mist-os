@@ -62,6 +62,7 @@ impl From<Metric> for AddableMetric {
 /// See [`Entry`] for the type used to represent a route in the forwarding
 /// table.
 #[derive(Debug, Copy, Clone, Eq, GenericOverIp, PartialEq, Hash)]
+#[generic_over_ip(A, IpAddress)]
 pub struct AddableEntry<A: IpAddress, D> {
     /// The destination subnet.
     pub subnet: Subnet<A>,
@@ -118,6 +119,7 @@ impl<D, A: IpAddress> AddableEntry<A, D> {
 /// An IPv4 forwarding entry or an IPv6 forwarding entry.
 #[allow(missing_docs)]
 #[derive(Debug, Copy, Clone, Eq, GenericOverIp, PartialEq, Hash)]
+#[generic_over_ip()]
 pub enum AddableEntryEither<D> {
     V4(AddableEntry<Ipv4Addr, D>),
     V6(AddableEntry<Ipv6Addr, D>),
@@ -146,6 +148,7 @@ impl<A: IpAddress, D> From<AddableEntry<A, D>> for AddableEntryEither<D> {
 
 /// A routing table entry together with the generation it was created in.
 #[derive(Debug, Copy, Clone, GenericOverIp)]
+#[generic_over_ip(A, IpAddress)]
 pub struct AddableEntryAndGeneration<A: IpAddress, D> {
     /// The entry.
     pub entry: AddableEntry<A, D>,
@@ -155,6 +158,7 @@ pub struct AddableEntryAndGeneration<A: IpAddress, D> {
 
 /// Wraps a callback to upgrade a "stored" entry to a "live" entry.
 #[derive(GenericOverIp)]
+#[generic_over_ip(A, IpAddress)]
 pub struct EntryUpgrader<'a, A: IpAddress, DeviceId, WeakDeviceId>(
     pub  &'a mut dyn FnMut(
         AddableEntryAndGeneration<A, WeakDeviceId>,
@@ -170,6 +174,7 @@ impl<A: IpAddress, D> From<Entry<A, D>> for AddableEntry<A, D> {
 /// An IPv4 addable entry or an IPv6 addable entry, with a generation.
 #[allow(missing_docs)]
 #[derive(Debug, Copy, Clone, GenericOverIp)]
+#[generic_over_ip()]
 pub enum AddableEntryAndGenerationEither<D> {
     V4(AddableEntryAndGeneration<Ipv4Addr, D>),
     V6(AddableEntryAndGeneration<Ipv6Addr, D>),
@@ -199,6 +204,7 @@ impl Metric {
 ///
 /// `Entry` is a `Subnet` with an egress device and optional gateway.
 #[derive(Debug, Copy, Clone, Eq, GenericOverIp, PartialEq, Hash)]
+#[generic_over_ip(A, IpAddress)]
 pub struct Entry<A: IpAddress, D> {
     /// The matching subnet.
     pub subnet: Subnet<A>,
@@ -213,6 +219,7 @@ pub struct Entry<A: IpAddress, D> {
 
 /// A forwarding entry with the generation it was created in.
 #[derive(Debug, Copy, Clone, GenericOverIp, PartialEq, Eq)]
+#[generic_over_ip(A, IpAddress)]
 pub struct EntryAndGeneration<A: IpAddress, D> {
     /// The entry.
     pub entry: Entry<A, D>,
@@ -271,6 +278,7 @@ impl<A: IpAddress, D: Debug> Display for Entry<A, D> {
 /// An IPv4 forwarding entry or an IPv6 forwarding entry.
 #[allow(missing_docs)]
 #[derive(Debug, Copy, Clone, Eq, GenericOverIp, PartialEq)]
+#[generic_over_ip()]
 pub enum EntryEither<D> {
     V4(Entry<Ipv4Addr, D>),
     V6(Entry<Ipv6Addr, D>),
@@ -279,6 +287,7 @@ pub enum EntryEither<D> {
 impl<A: IpAddress, D> From<Entry<A, D>> for EntryEither<D> {
     fn from(entry: Entry<A, D>) -> EntryEither<D> {
         #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
         struct EntryHolder<I: Ip, D>(Entry<I::Addr, D>);
         A::Version::map_ip(entry, EntryEither::V4, EntryEither::V6)
     }
@@ -297,6 +306,7 @@ pub enum NextHop<A> {
 
 /// The resolved route to a destination IP address.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, GenericOverIp)]
+#[generic_over_ip(I, Ip)]
 pub struct ResolvedRoute<I: Ip, D> {
     /// The source address to use when forwarding packets towards the
     /// destination.

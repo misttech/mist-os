@@ -72,8 +72,9 @@ pub(crate) trait IpExt:
 impl<I: crate::ip::IpExt + DualStackIpExt + crate::ip::icmp::IcmpIpExt> IpExt for I {}
 
 #[derive(Derivative, GenericOverIp)]
+#[generic_over_ip(I, Ip)]
 #[derivative(Debug(bound = "D: Debug"))]
-pub(crate) enum SocketState<I: Ip + IpExt, D: device::WeakId, S: DatagramSocketSpec> {
+pub(crate) enum SocketState<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> {
     Unbound(UnboundSocketState<I, D, S>),
     Bound(BoundSocketState<I, D, S>),
 }
@@ -317,8 +318,9 @@ impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec> AsMut<IpOptions<I, D, S>>
 }
 
 #[derive(Derivative, GenericOverIp)]
+#[generic_over_ip(I, Ip)]
 #[derivative(Clone(bound = "D: Clone"), Debug(bound = "D: Debug"), Default(bound = ""))]
-pub(crate) struct IpOptions<I: Ip + IpExt, D, S: DatagramSocketSpec + ?Sized> {
+pub(crate) struct IpOptions<I: IpExt, D, S: DatagramSocketSpec + ?Sized> {
     multicast_memberships: MulticastMemberships<I::Addr, D>,
     hop_limits: SocketHopLimits,
     other_stack: S::OtherStackIpOptions<I>,
@@ -1467,7 +1469,8 @@ where
                     /// on whether the socket state spec supports dual-stack
                     /// operation and what the bound address looks like.
                     #[derive(Debug, GenericOverIp)]
-                    enum RemoveOperation<'a, I: Ip + IpExt, DS, NDS> {
+                    #[generic_over_ip(I, Ip)]
+                    enum RemoveOperation<'a, I: IpExt, DS, NDS> {
                         /// Bound to the "any" address on both stacks.
                         DualStackAnyAddr(DS),
                         /// Bound to a non-dual-stack address only on the
@@ -1964,7 +1967,8 @@ fn try_pick_bound_address<I: IpExt, SC: TransportIpContext<I, C>, C, LI>(
 }
 
 #[derive(GenericOverIp)]
-enum TryUnmapResult<I: Ip + DualStackIpExt, D> {
+#[generic_over_ip(I, Ip)]
+enum TryUnmapResult<I: DualStackIpExt, D> {
     /// The address does not have an un-mapped representation.
     ///
     /// This spits back the input address unmodified.
@@ -2042,7 +2046,8 @@ where
     /// socket state spec supports dual-stack operation and what the address
     /// looks like.
     #[derive(Debug, GenericOverIp)]
-    enum BoundOperation<'a, I: Ip + IpExt, DS: DeviceIdContext<AnyDevice>, NDS> {
+    #[generic_over_ip(I, Ip)]
+    enum BoundOperation<'a, I: IpExt, DS: DeviceIdContext<AnyDevice>, NDS> {
         /// Bind to the "any" address on both stacks.
         DualStackAnyAddr(&'a mut DS),
         /// Bind to a non-dual-stack address only on the current stack.
@@ -2551,10 +2556,12 @@ where
 
 /// A connected socket was expected.
 #[derive(Copy, Clone, Debug, Default, Eq, GenericOverIp, PartialEq)]
+#[generic_over_ip()]
 pub struct ExpectedConnError;
 
 /// An unbound socket was expected.
 #[derive(Copy, Clone, Debug, Default, Eq, GenericOverIp, PartialEq)]
+#[generic_over_ip()]
 pub struct ExpectedUnboundError;
 
 pub(crate) fn disconnect_connected<
@@ -2665,6 +2672,7 @@ where
 
 /// Which direction(s) to shut down for a socket.
 #[derive(Copy, Clone, Debug, GenericOverIp)]
+#[generic_over_ip()]
 pub enum ShutdownType {
     /// Prevent sending packets on the socket.
     Send,
@@ -2768,6 +2776,7 @@ pub(crate) fn get_shutdown_connected<
 
 /// Error encountered when sending a datagram on a socket.
 #[derive(Debug, GenericOverIp)]
+#[generic_over_ip()]
 pub enum SendError<B, S, SE> {
     /// The socket is not connected,
     NotConnected(B),
@@ -3275,6 +3284,7 @@ where
 
 /// Selector for the device to affect when changing multicast settings.
 #[derive(Copy, Clone, Debug, Eq, GenericOverIp, PartialEq)]
+#[generic_over_ip(A, IpAddress)]
 pub enum MulticastInterfaceSelector<A: IpAddress, D> {
     /// Use the device with the assigned address.
     LocalAddress(SpecifiedAddr<A>),
@@ -3287,6 +3297,7 @@ pub enum MulticastInterfaceSelector<A: IpAddress, D> {
 /// This is like `Option<MulticastInterfaceSelector` except it specifies the
 /// semantics of the `None` value as "pick any device".
 #[derive(Copy, Clone, Debug, Eq, PartialEq, GenericOverIp)]
+#[generic_over_ip(A, IpAddress)]
 pub enum MulticastMembershipInterfaceSelector<A: IpAddress, D> {
     /// Use the specified interface.
     Specified(MulticastInterfaceSelector<A, D>),
@@ -3826,6 +3837,7 @@ mod test {
 
     #[derive(Derivative, GenericOverIp)]
     #[derivative(Default(bound = ""))]
+    #[generic_over_ip()]
     struct FakeBoundSockets<D: FakeStrongDeviceId> {
         v4: BoundSockets<
             Ipv4,
@@ -3860,7 +3872,8 @@ mod test {
             (FakeStateSpec, I, FakeWeakDeviceId<D>),
         > {
             #[derive(GenericOverIp)]
-            struct Wrap<'a, I: Ip + IpExt, D: FakeStrongDeviceId>(
+            #[generic_over_ip(I, Ip)]
+            struct Wrap<'a, I: IpExt, D: FakeStrongDeviceId>(
                 &'a BoundSockets<
                     I,
                     FakeWeakDeviceId<D>,
@@ -3892,7 +3905,8 @@ mod test {
             (FakeStateSpec, I, FakeWeakDeviceId<D>),
         > {
             #[derive(GenericOverIp)]
-            struct Wrap<'a, I: Ip + IpExt, D: FakeStrongDeviceId>(
+            #[generic_over_ip(I, Ip)]
+            struct Wrap<'a, I: IpExt, D: FakeStrongDeviceId>(
                 &'a mut BoundSockets<
                     I,
                     FakeWeakDeviceId<D>,

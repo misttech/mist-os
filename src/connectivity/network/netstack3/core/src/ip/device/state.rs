@@ -141,8 +141,9 @@ pub struct IpDeviceFlags {
 
 /// The state common to all IP devices.
 #[derive(GenericOverIp)]
+#[generic_over_ip(I, Ip)]
 #[cfg_attr(test, derive(Debug))]
-pub(crate) struct IpDeviceState<Instant: crate::Instant, I: Ip + IpDeviceStateIpExt> {
+pub(crate) struct IpDeviceState<Instant: crate::Instant, I: IpDeviceStateIpExt> {
     /// IP addresses assigned to this device.
     ///
     /// IPv6 addresses may be tentative (performing NDP's Duplicate Address
@@ -843,7 +844,8 @@ impl<Instant> AddrSubnetAndManualConfigEither<Instant> {
         config: I::ManualAddressConfig<Instant>,
     ) -> Self {
         #[derive(GenericOverIp)]
-        struct AddrSubnetAndConfig<I: Ip + IpDeviceIpExt, Instant> {
+        #[generic_over_ip(I, Ip)]
+        struct AddrSubnetAndConfig<I: IpDeviceIpExt, Instant> {
             addr_subnet: AddrSubnet<I::Addr>,
             config: I::ManualAddressConfig<Instant>,
         }
@@ -1003,9 +1005,8 @@ pub(crate) mod testutil {
         A::Version: IpDeviceStateIpExt,
     {
         #[derive(GenericOverIp)]
-        struct Wrap<I: Ip + IpDeviceStateIpExt, Instant: crate::Instant>(
-            I::AssignedAddress<Instant>,
-        );
+        #[generic_over_ip(I, Ip)]
+        struct Wrap<I: IpDeviceStateIpExt, Instant: crate::Instant>(I::AssignedAddress<Instant>);
         let Wrap(entry) = <A::Version as Ip>::map_ip(
             ip.get(),
             |ip| {

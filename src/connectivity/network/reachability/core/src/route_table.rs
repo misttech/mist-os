@@ -81,6 +81,7 @@ impl RouteTable {
         &mut self,
     ) -> &mut HashSet<fnet_routes_ext::InstalledRoute<I>> {
         #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
         struct TableHolder<'a, I: Ip>(&'a mut HashSet<fnet_routes_ext::InstalledRoute<I>>);
         let TableHolder(ip_specific_table) = I::map_ip(
             IpInvariant(self),

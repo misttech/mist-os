@@ -8,12 +8,37 @@ use proc_macro2::{TokenStream as TokenStream2, TokenTree};
 use quote::{quote, ToTokens as _};
 use syn::{
     parse_quote, punctuated::Punctuated, spanned::Spanned, AngleBracketedGenericArguments,
-    GenericArgument, GenericParam, Generics, Ident, Path, PathSegment, Type, TypeParam,
-    TypeParamBound, TypePath,
+    GenericArgument, GenericParam, Generics, Ident, Type, TypeParam, TypeParamBound, TypePath,
 };
 
 /// Implements a derive macro for [`net_types::ip::GenericOverIp`].
-#[proc_macro_derive(GenericOverIp)]
+/// Requires that #[derive(GenericOverIp)] invocations explicitly specify
+/// which type parameter is the generic-over-ip one with the
+/// `#[generic_over_ip]` attribute, rather than inferring it from the bounds
+/// on the struct generics.
+///
+/// Consider the following example:
+///
+/// ```
+///  #[derive(GenericOverIp)]
+///  #[generic_over_ip(<ARGUMENTS EXPLAINED BELOW>)]
+///  struct Foo<T>(T);
+/// ```
+///
+/// `#[generic_over_ip(T, Ip)]` specifies that the GenericOverIp impl
+/// should be written treating `T` as an `Ip` implementor (either `Ipv4` or
+/// `Ipv6`).
+///
+/// `#[generic_over_ip(T, IpAddress)]` specifies that `T` is an `IpAddress`
+/// implementor (`Ipv4Addr` or `Ipv6Addr`).
+///
+/// `#[generic_over_ip(T, GenericOverIp)]` specifies that `T` implements
+/// `GenericOverIp<I>` for all `I: Ip`. (Notably, we'd like to use this case
+/// for the Ip and IpAddress cases above, but we cannot due to issues
+/// with conflicting blanket impls.)
+///
+/// `#[generic_over_ip()]` specifies that `Foo` is IP-invariant.
+#[proc_macro_derive(GenericOverIp, attributes(generic_over_ip))]
 pub fn derive_generic_over_ip(input: TokenStream) -> TokenStream {
     let ast = syn::parse(input).unwrap();
 
@@ -30,16 +55,28 @@ fn impl_derive_generic_over_ip(ast: &syn::DeriveInput) -> TokenStream2 {
     }
 
     let name = &ast.ident;
-    let param = match find_ip_generic_param(ast.generics.type_params()) {
+
+    let specified_generic_over_ip = match find_generic_over_ip_attr(ast) {
         Ok(param) => param,
-        Err(FindGenericsError::MultipleGenerics([a, b])) => {
-            return syn::Error::new(
-                ast.generics.span(),
-                format!("found conflicting bounds: {:?} and {:?}", a, b),
-            )
-            .into_compile_error()
-            .into()
-        }
+        Err(e) => return e.into_compile_error().into(),
+    };
+
+    let extra_bounds = match &specified_generic_over_ip {
+        None => Vec::new(),
+        Some((ident, _)) => match collect_bounds(ident, ast.generics.type_params()) {
+            Some(bounds) => bounds,
+            None => {
+                return syn::Error::new(
+                    ast.generics.span(),
+                    format!(
+                        "found no type parameter named {ident:?} as specified in \
+                            the generic_over_ip attribute"
+                    ),
+                )
+                .into_compile_error()
+                .into();
+            }
+        },
     };
 
     // Drop the first and last tokens, which should be '<' and '>', and the
@@ -63,23 +100,38 @@ fn impl_derive_generic_over_ip(ast: &syn::DeriveInput) -> TokenStream2 {
 
     let impl_generics = impl_generics.into_iter().collect::<TokenStream2>();
 
-    match param {
-        Some(to_replace) => {
+    match specified_generic_over_ip.clone() {
+        Some((ident, param_type)) => {
             // Emit an impl that substitutes the identified type parameter
             // to produce the new GenericOverIp::Type.
             let generic_ip_name: Ident = parse_quote!(IpType);
-            let IpGenericParam { ident, param_type, extra_bounds } = to_replace;
-            let extra_bounds_target: Path = match param_type {
+            let extra_bounds_target: TypePath = match param_type {
                 IpGenericParamType::IpVersion => parse_quote!(#generic_ip_name),
                 IpGenericParamType::IpAddress => parse_quote!(#generic_ip_name::Addr),
+                IpGenericParamType::GenericOverIp => parse_quote! {
+                    <#ident as GenericOverIp<IpType>>::Type
+                },
             };
-            let generic_bounds =
-                with_type_param_replaced(&ast.generics, ident, param_type, generic_ip_name.clone());
+
+            let bound_if_generic_over_ip = match param_type {
+                IpGenericParamType::IpVersion | IpGenericParamType::IpAddress => None,
+                IpGenericParamType::GenericOverIp => Some(quote! {
+                    #ident: GenericOverIp<IpType>,
+                }),
+            };
+
+            let generic_bounds = with_type_param_replaced(
+                &ast.generics,
+                &ident,
+                parse_quote! {
+                    #extra_bounds_target
+                },
+            );
 
             quote! {
                 impl <#impl_generics, #generic_ip_name: Ip>
                 GenericOverIp<IpType> for #name #type_generics
-                where #extra_bounds_target: #(#extra_bounds)+*, {
+                where #bound_if_generic_over_ip #extra_bounds_target: #(#extra_bounds)+*, {
                     type Type = #name #generic_bounds;
                 }
             }
@@ -95,68 +147,124 @@ fn impl_derive_generic_over_ip(ast: &syn::DeriveInput) -> TokenStream2 {
     }
 }
 
-#[derive(Debug)]
-struct IpGenericParam<'i> {
-    ident: &'i Ident,
-    param_type: IpGenericParamType,
-    extra_bounds: Vec<&'i TypeParamBound>,
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum IpGenericParamType {
     IpVersion,
     IpAddress,
+    GenericOverIp,
 }
 
-enum FindGenericsError<'t> {
-    MultipleGenerics([IpGenericParam<'t>; 2]),
-}
-
-/// Finds the type parameter that is generic over IP version or address.
-fn find_ip_generic_param<'t>(
-    generics: impl Iterator<Item = &'t TypeParam>,
-) -> Result<Option<IpGenericParam<'t>>, FindGenericsError<'t>> {
-    let mut found_params = generics.filter_map(|t| {
-        for bound in &t.bounds {
-            let trait_bound = match bound {
-                TypeParamBound::Trait(t) => t,
-                TypeParamBound::Lifetime(_) => continue,
-            };
-            let extra_bounds = t.bounds.iter().filter(|b| b != &bound);
-            if trait_bound.path.is_ident("Ip") {
-                return Some(IpGenericParam {
-                    ident: &t.ident,
-                    param_type: IpGenericParamType::IpVersion,
-                    extra_bounds: extra_bounds.collect(),
-                });
-            }
-            if trait_bound.path.is_ident("IpAddress") {
-                return Some(IpGenericParam {
-                    ident: &t.ident,
-                    param_type: IpGenericParamType::IpAddress,
-                    extra_bounds: extra_bounds.collect(),
-                });
-            }
+fn find_generic_over_ip_attr(
+    ast: &syn::DeriveInput,
+) -> Result<Option<(Ident, IpGenericParamType)>, syn::Error> {
+    let mut attrs = ast
+        .attrs
+        .iter()
+        .filter(|attr| attr.path.get_ident().map(|i| i == "generic_over_ip").unwrap_or(false));
+    let attr = attrs.next().ok_or_else(|| {
+        syn::Error::new(
+            ast.ident.span(),
+            "derive(GenericOverIp) cannot be used without the generic_over_ip attribute",
+        )
+    })?;
+    match attrs.next() {
+        None => {}
+        Some(attr) => {
+            return Err(syn::Error::new(
+                attr.span(),
+                "derive(GenericOverIp) cannot be used with multiple generic_over_ip attributes",
+            ))
         }
-        None
-    });
-
-    if let Some(found) = found_params.next() {
-        // Make sure there aren't any other candidates.
-        if let Some(other) = found_params.next() {
-            return Err(FindGenericsError::MultipleGenerics([found, other]));
-        }
-        Ok(Some(found))
-    } else {
-        Ok(None)
     }
+
+    let meta = attr.parse_meta().map_err(|e| {
+        syn::Error::new(attr.span(), format!("generic_over_ip attr did not parse as Meta: {e:?}"))
+    })?;
+
+    let list = match meta {
+        syn::Meta::Path(_) | syn::Meta::NameValue(_) => {
+            return Err(syn::Error::new(
+                meta.span(),
+                "generic_over_ip must be passed at most one\
+                type parameter identifier",
+            ));
+        }
+        syn::Meta::List(list) => list,
+    };
+
+    if list.nested.is_empty() {
+        return Ok(None);
+    } else if list.nested.len() != 2 {
+        return Err(syn::Error::new(
+            list.span(),
+            "generic_over_ip must be either be passed no \
+                         arguments, or one type parameter identifier and its \
+                         trait bound (Ip, IpAddress, or GenericOverIp)",
+        ));
+    }
+
+    let mut iter = list.nested.into_iter();
+    let (ident, bound) = (iter.next().unwrap(), iter.next().unwrap());
+
+    let ident = match ident {
+        syn::NestedMeta::Meta(meta) => match meta {
+            syn::Meta::Path(path) => match path.get_ident() {
+                None => Err(syn::Error::new(
+                    path.span(),
+                    "generic_over_ip must be passed a parameter identifier",
+                )),
+                Some(ident) => Ok(ident.clone()),
+            },
+            syn::Meta::List(_) | syn::Meta::NameValue(_) => Err(syn::Error::new(
+                meta.span(),
+                "generic_over_ip must be passed at most one \
+                             type parameter identifier, not a list or name-value pair",
+            )),
+        },
+        syn::NestedMeta::Lit(lit) => Err(syn::Error::new(
+            lit.span(),
+            "generic_over_ip must be passed at most one \
+                        type parameter identifier, not a literal",
+        )),
+    }?;
+
+    let bound_error_message = "the bound passed to generic_over_ip \
+                                             must be Ip, IpAddress, or GenericOverIp";
+
+    let bound = match bound {
+        syn::NestedMeta::Meta(meta) => match meta {
+            syn::Meta::Path(path) => match path.get_ident() {
+                None => Err(syn::Error::new(path.span(), bound_error_message)),
+                Some(ident) => Ok(ident.clone()),
+            },
+            syn::Meta::List(_) | syn::Meta::NameValue(_) => {
+                Err(syn::Error::new(meta.span(), bound_error_message))
+            }
+        },
+        syn::NestedMeta::Lit(lit) => Err(syn::Error::new(lit.span(), bound_error_message)),
+    }?;
+
+    let bound = match bound.to_string().as_str() {
+        "Ip" => IpGenericParamType::IpVersion,
+        "IpAddress" => IpGenericParamType::IpAddress,
+        "GenericOverIp" => IpGenericParamType::GenericOverIp,
+        _ => return Err(syn::Error::new(bound.span(), bound_error_message)),
+    };
+
+    Ok(Some((ident, bound)))
+}
+
+fn collect_bounds<'a>(
+    ident: &'a Ident,
+    mut generics: impl Iterator<Item = &'a TypeParam>,
+) -> Option<Vec<&'a TypeParamBound>> {
+    generics.find_map(|t| if &t.ident == ident { Some(t.bounds.iter().collect()) } else { None })
 }
 
 fn with_type_param_replaced(
     generics: &Generics,
     to_find: &Ident,
-    param_type: IpGenericParamType,
-    ip_type_ident: Ident,
+    replacement: TypePath,
 ) -> Option<AngleBracketedGenericArguments> {
     let args: Punctuated<_, _> = generics
         .params
@@ -165,21 +273,14 @@ fn with_type_param_replaced(
             GenericParam::Const(c) => GenericArgument::Const(parse_quote!(#c.ident)),
             GenericParam::Lifetime(l) => GenericArgument::Lifetime(l.lifetime.clone()),
             GenericParam::Type(t) => {
-                let path = if &t.ident == to_find {
-                    match param_type {
-                        IpGenericParamType::IpVersion => ip_type_ident.clone().into(),
-                        IpGenericParamType::IpAddress => {
-                            let segments =
-                                [PathSegment::from(ip_type_ident.clone()), parse_quote!(Addr)]
-                                    .into_iter()
-                                    .collect();
-                            Path { segments, leading_colon: None }
-                        }
-                    }
+                if &t.ident == to_find {
+                    GenericArgument::Type(Type::Path(replacement.clone()))
                 } else {
-                    t.ident.clone().into()
-                };
-                GenericArgument::Type(Type::Path(TypePath { path, qself: None }))
+                    GenericArgument::Type(Type::Path(TypePath {
+                        path: t.ident.clone().into(),
+                        qself: None,
+                    }))
+                }
             }
         })
         .collect();

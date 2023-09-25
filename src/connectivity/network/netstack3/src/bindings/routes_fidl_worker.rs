@@ -283,7 +283,8 @@ fn respond_to_watch_request<I: fnet_routes_ext::FidlRouteIpExt>(
     events: Vec<fnet_routes_ext::Event<I>>,
 ) -> Result<(), fidl::Error> {
     #[derive(GenericOverIp)]
-    struct Inputs<I: Ip + fnet_routes_ext::FidlRouteIpExt> {
+    #[generic_over_ip(I, Ip)]
+    struct Inputs<I: fnet_routes_ext::FidlRouteIpExt> {
         req:
             <<I::WatcherMarker as fidl::endpoints::ProtocolMarker>::RequestStream as TryStream>::Ok,
         events: Vec<fnet_routes_ext::Event<I>>,

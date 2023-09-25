@@ -51,7 +51,8 @@ pub fn new_route_set<I: Ip + FidlRouteAdminIpExt>(
             .map_err(RouteSetCreationError::CreateProxy)?;
 
     #[derive(GenericOverIp)]
-    struct NewRouteSetInput<'a, I: Ip + FidlRouteAdminIpExt> {
+    #[generic_over_ip(I, Ip)]
+    struct NewRouteSetInput<'a, I: FidlRouteAdminIpExt> {
         route_set_server_end: fidl::endpoints::ServerEnd<I::RouteSetMarker>,
         set_provider_proxy: &'a <I::SetProviderMarker as ProtocolMarker>::Proxy,
     }
@@ -75,7 +76,8 @@ pub async fn add_route<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
     route: &I::Route,
 ) -> Result<Result<bool, fnet_routes_admin::RouteSetError>, fidl::Error> {
     #[derive(GenericOverIp)]
-    struct AddRouteInput<'a, I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt> {
+    #[generic_over_ip(I, Ip)]
+    struct AddRouteInput<'a, I: FidlRouteAdminIpExt + FidlRouteIpExt> {
         route_set: &'a <I::RouteSetMarker as ProtocolMarker>::Proxy,
         route: &'a I::Route,
     }
@@ -94,7 +96,8 @@ pub async fn remove_route<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
     route: &I::Route,
 ) -> Result<Result<bool, fnet_routes_admin::RouteSetError>, fidl::Error> {
     #[derive(GenericOverIp)]
-    struct RemoveRouteInput<'a, I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt> {
+    #[generic_over_ip(I, Ip)]
+    struct RemoveRouteInput<'a, I: FidlRouteAdminIpExt + FidlRouteIpExt> {
         route_set: &'a <I::RouteSetMarker as ProtocolMarker>::Proxy,
         route: &'a I::Route,
     }

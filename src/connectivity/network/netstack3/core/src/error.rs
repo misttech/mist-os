@@ -80,6 +80,7 @@ impl From<NotFoundError> for NetstackError {
 
 /// Error type for errors common to local addresses.
 #[derive(Error, Debug, PartialEq, GenericOverIp)]
+#[generic_over_ip()]
 pub enum LocalAddressError {
     /// Cannot bind to address.
     #[error("can't bind to address")]
@@ -112,6 +113,7 @@ pub enum LocalAddressError {
 
 /// Indicates a problem related to an address with a zone.
 #[derive(Copy, Clone, Debug, Error, Eq, PartialEq, GenericOverIp)]
+#[generic_over_ip()]
 pub enum ZonedAddressError {
     /// The address scope requires a zone but didn't have one.
     #[error("the address requires a zone but didn't have one")]

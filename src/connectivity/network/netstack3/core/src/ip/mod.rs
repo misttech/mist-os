@@ -667,7 +667,8 @@ impl<
 
 fn is_unicast_assigned<I: IpLayerIpExt>(status: &I::AddressStatus) -> bool {
     #[derive(GenericOverIp)]
-    struct WrapAddressStatus<'a, I: Ip + IpLayerIpExt>(&'a I::AddressStatus);
+    #[generic_over_ip(I, Ip)]
+    struct WrapAddressStatus<'a, I: IpLayerIpExt>(&'a I::AddressStatus);
 
     I::map_ip(
         WrapAddressStatus(status),
@@ -725,6 +726,7 @@ fn get_local_addr<
 
 /// An error occurred while resolving the route to a destination
 #[derive(Error, Copy, Clone, Debug, Eq, GenericOverIp, PartialEq)]
+#[generic_over_ip()]
 pub enum ResolveRouteError {
     /// A source address could not be selected.
     #[error("a source address could not be selected")]
@@ -3102,6 +3104,7 @@ pub(crate) mod testutil {
     }
 
     #[derive(Debug, GenericOverIp)]
+    #[generic_over_ip()]
     pub(crate) enum DualStackSendIpPacketMeta<D> {
         V4(SendIpPacketMeta<Ipv4, D, SpecifiedAddr<Ipv4Addr>>),
         V6(SendIpPacketMeta<Ipv6, D, SpecifiedAddr<Ipv6Addr>>),
@@ -3112,7 +3115,8 @@ pub(crate) mod testutil {
     {
         fn from(value: SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>) -> Self {
             #[derive(GenericOverIp)]
-            struct Wrap<I: Ip + packet_formats::ip::IpExt, D>(
+            #[generic_over_ip(I, Ip)]
+            struct Wrap<I: packet_formats::ip::IpExt, D>(
                 SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>,
             );
             use DualStackSendIpPacketMeta::*;
@@ -3160,7 +3164,8 @@ pub(crate) mod testutil {
             &self,
         ) -> Result<&SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>, WrongIpVersion> {
             #[derive(GenericOverIp)]
-            struct Wrap<'a, I: Ip + packet_formats::ip::IpExt, D>(
+            #[generic_over_ip(I, Ip)]
+            struct Wrap<'a, I: packet_formats::ip::IpExt, D>(
                 Option<&'a SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>>,
             );
             use DualStackSendIpPacketMeta::*;
