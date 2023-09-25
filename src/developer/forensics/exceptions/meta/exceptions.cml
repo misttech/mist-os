@@ -16,6 +16,7 @@
             protocol: [
                 "fuchsia.exception.Handler",
                 "fuchsia.exception.ProcessLimbo",
+                "only_meant_for_outliving_certain_components",
             ],
         },
     ],
@@ -42,6 +43,7 @@
             protocol: [
                 "fuchsia.exception.Handler",
                 "fuchsia.exception.ProcessLimbo",
+                "only_meant_for_outliving_certain_components",
             ],
             from: "self",
         },

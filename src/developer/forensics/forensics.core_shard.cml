@@ -146,7 +146,10 @@
     ],
     expose: [
         {
-            protocol: "fuchsia.exception.Handler",
+            protocol: [
+                "fuchsia.exception.Handler",
+                "only_meant_for_outliving_certain_components",
+            ],
             from: "#exceptions",
         },
         {
