@@ -174,6 +174,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
     /// Adds all the layers (including the mutable layer) to `layer_set`.
     pub fn add_all_layers_to_layer_set(&self, layer_set: &mut LayerSet<K, V>) {
         let data = self.data.read().unwrap();
+        layer_set.layers.reserve_exact(data.layers.len() + 1);
         layer_set.layers.push(data.mutable_layer.1.clone().as_layer().into());
         for layer in &data.layers {
             layer_set.layers.push(layer.clone().into());
@@ -192,12 +193,10 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
     /// compacting).  Since these layers are immutable, getting an iterator should not block
     /// anything else.
     pub fn immutable_layer_set(&self) -> LayerSet<K, V> {
-        let mut layers = Vec::new();
-        {
-            let data = self.data.read().unwrap();
-            for layer in &data.layers {
-                layers.push(layer.clone().into());
-            }
+        let data = self.data.read().unwrap();
+        let mut layers = Vec::with_capacity(data.layers.len());
+        for layer in &data.layers {
+            layers.push(layer.clone().into());
         }
         LayerSet { layers, merge_fn: self.merge_fn }
     }

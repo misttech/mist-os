@@ -305,11 +305,12 @@ impl<'a, K: Key + LayerKey + OrdLowerBound, V: Value> Merger<'a, K, V> {
     /// such that item.key >= key.  In the latter case, a full merge might not occur; only the
     /// layers that need to be consulted to satisfy the query will occur.
     pub async fn seek(&mut self, bound: Bound<&K>) -> Result<MergerIterator<'_, 'a, K, V>, Error> {
+        let layer_count = self.iterators.len();
         let pending_iterators = self.iterators.iter_mut().rev().collect();
         let mut merger_iter = MergerIterator {
             merge_fn: self.merge_fn,
             pending_iterators,
-            heap: BinaryHeap::new(),
+            heap: BinaryHeap::with_capacity(layer_count),
             item: CurrentItem::None,
             trace: self.trace,
             history: String::new(),
