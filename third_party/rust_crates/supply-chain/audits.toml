@@ -185,3 +185,9 @@ who = "David Koloski <dkoloski@google.com>"
 criteria = ["ub-risk-1", "safe-to-deploy"]
 version = "0.1.11"
 notes = "Reviewed on https://fxrev.dev/804724"
+
+[[audits.tokio-stream]]
+who = "David Koloski <dkoloski@google.com>"
+criteria = ["safe-to-deploy", "ub-risk-0"]
+delta = "0.1.11 -> 0.1.14"
+notes = "Reviewed on https://fxrev.dev/907732."
