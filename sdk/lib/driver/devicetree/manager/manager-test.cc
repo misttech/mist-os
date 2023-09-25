@@ -2,19 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "sdk/lib/driver/devicetree/manager.h"
+#include "manager.h"
 
 #include <fcntl.h>
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/driver/devicetree/visitor.h>
-#include <lib/driver/devicetree/visitors/default.h>
-#include <lib/driver/devicetree/visitors/driver-visitor.h>
+#include <lib/driver/devicetree/visitors/default/default.h>
 #include <lib/driver/legacy-bind-constants/legacy-bind-constants.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/visitors/driver-visitor.h>
 
 #include <memory>
 #include <sstream>
@@ -24,7 +23,8 @@
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <gtest/gtest.h>
 
-#include "sdk/lib/driver/devicetree/test-data/basic-properties.h"
+#include "test-data/basic-properties.h"
+#include "visitor.h"
 
 namespace fdf_devicetree {
 namespace {

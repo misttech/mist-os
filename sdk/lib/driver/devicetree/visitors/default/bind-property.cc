@@ -1,15 +1,13 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-#include "sdk/lib/driver/devicetree/visitors/bind-property.h"
+#include "bind-property.h"
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
 
 #include <bind/fuchsia/devicetree/cpp/bind.h>
-
-#include "sdk/lib/driver/devicetree/node.h"
 
 namespace fdf {
 using namespace fuchsia_driver_framework;

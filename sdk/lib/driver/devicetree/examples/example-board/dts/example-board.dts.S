@@ -4,7 +4,7 @@
 
 /dts-v1/;
 
-#include "sdk/lib/driver/devicetree/test-data/basic-properties.h"
+#include "config.h"
 #include <lib/ddk/platform-defs.h>
 
 / {

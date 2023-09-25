@@ -3,14 +3,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_DEVICETREE_VISITORS_DEFAULT_H_
-#define LIB_DRIVER_DEVICETREE_VISITORS_DEFAULT_H_
+#ifndef LIB_VISITORS_MULTIVISITOR_H_
+#define LIB_VISITORS_MULTIVISITOR_H_
 
-#include "sdk/lib/driver/devicetree/node.h"
-#include "sdk/lib/driver/devicetree/visitor.h"
-#include "sdk/lib/driver/devicetree/visitors/bind-property.h"
-#include "sdk/lib/driver/devicetree/visitors/bti.h"
-#include "sdk/lib/driver/devicetree/visitors/mmio.h"
+#include <lib/driver/devicetree/manager/visitor.h>
 
 namespace fdf_devicetree {
 
@@ -48,17 +44,6 @@ class MultiVisitor : public Visitor {
   std::array<std::unique_ptr<Visitor>, sizeof...(Visitors)> visitors_;
 };
 
-// Set of visitors to parse basic devicetree properties like bind property,
-// MMIO register properties etc., of each node and publish the properties to
-// |fdf_devicetree::Node|. This can be extended to include driver specific
-// visitors.
-//     Example:
-//           DefaultVisitors<MyDriverVisitor> visitors;
-//           devicetree_manager.Walk(visitors);
-template <typename... AdditionalVisitors>
-using DefaultVisitors =
-    MultiVisitor<BindPropertyVisitor, MmioVisitor, BtiVisitor, AdditionalVisitors...>;
-
 }  // namespace fdf_devicetree
 
-#endif  // LIB_DRIVER_DEVICETREE_VISITORS_DEFAULT_H_
+#endif  // LIB_VISITORS_MULTIVISITOR_H_

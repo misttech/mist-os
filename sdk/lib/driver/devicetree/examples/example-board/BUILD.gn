@@ -18,6 +18,13 @@ driver_bind_rules("example-board-bind") {
   ]
 }
 
+devicetree("example-board-dt") {
+  sources = [ "dts/example-board.dts.S" ]
+  golden = "dts/example-board.golden.dts"
+  outputs = [ "$target_out_dir/example-board.dtb" ]
+  deps = [ "//zircon/system/ulib/ddk-platform-defs" ]
+}
+
 fuchsia_driver("example-board-driver") {
   output_name = "example-board"
   sources = [ "example-board.cc" ]
@@ -26,8 +33,8 @@ fuchsia_driver("example-board-driver") {
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
     "//sdk/lib/driver/component/cpp:cpp",
-    "//sdk/lib/driver/devicetree",
-    "//sdk/lib/driver/devicetree/visitors:default-visitors",
+    "//sdk/lib/driver/devicetree/manager",
+    "//sdk/lib/driver/devicetree/visitors/default",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//src/devices/bin/driver_runtime",
   ]
@@ -39,20 +46,13 @@ fuchsia_driver_component("example-board") {
   manifest = "meta/example-board.cml"
 }
 
-devicetree("example-board-dt") {
-  sources = [ "../../test-data/basic-properties.dts.S" ]
-  golden = "../../test-data/basic-properties.golden.dts"
-  outputs = [ "$target_out_dir/basic-properties.dtb" ]
-  deps = [ "//zircon/system/ulib/ddk-platform-defs" ]
-}
-
 # Add this target to |kernel_zbi_extra_deps| to include the devicetree blob
 # (dtb) in the kernel ZBI. Typically the bootloader will pass down the dtb.
 # This method should only be used during board bringup.
 zbi_input("example-board-dtb") {
   deps = [ ":example-board-dt" ]
   type = "devicetree"
-  sources = [ "$target_out_dir/basic-properties.dtb" ]
+  sources = [ "$target_out_dir/example-board.dtb" ]
 }
 
 test("example-board-test") {
@@ -67,7 +67,7 @@ test("example-board-test") {
 }
 
 resource("test-dtb") {
-  sources = [ "$target_out_dir/basic-properties.dtb" ]
+  sources = [ "$target_out_dir/example-board.dtb" ]
   outputs = [ "test-data/{{source_file_part}}" ]
   deps = [ ":example-board-dt" ]
 }

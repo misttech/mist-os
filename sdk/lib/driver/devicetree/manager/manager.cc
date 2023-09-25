@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "sdk/lib/driver/devicetree/manager.h"
+#include "manager.h"
 
 #include <fidl/fuchsia.boot/cpp/fidl.h>
 #include <lib/devicetree/devicetree.h>

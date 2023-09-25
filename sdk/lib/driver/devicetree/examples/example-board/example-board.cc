@@ -15,7 +15,7 @@ zx::result<> ExampleBoard::Start() {
 
   auto manager = fdf_devicetree::Manager::CreateFromNamespace(*incoming());
   if (manager.is_error()) {
-    FDF_LOG(ERROR, "Failed to create devicetree manager: %d", manager.error_value());
+    FDF_LOG(ERROR, "Failed to create devicetree manager: %s", manager.status_string());
     return manager.take_error();
   }
 

@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "driver-visitor.h"
-
-#include <lib/driver/devicetree/node.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
+#include <lib/visitors/driver-visitor.h>
 
 namespace fdf_devicetree {
 

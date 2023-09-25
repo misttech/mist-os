@@ -4,7 +4,7 @@
 
 /dts-v1/;
 
-#include "sdk/lib/driver/devicetree/test-data/simple.h"
+#include "sdk/lib/driver/devicetree/manager/test-data/simple.h"
 
 / {
     label: example-device {

@@ -4,7 +4,7 @@
 
 /dts-v1/;
 
-/include/ "sdk/lib/driver/devicetree/test-data/simple.dtsi"
+/include/ "sdk/lib/driver/devicetree/manager/test-data/simple.dtsi"
 
 / {
     compatible = "fuchsia,sample-dt";

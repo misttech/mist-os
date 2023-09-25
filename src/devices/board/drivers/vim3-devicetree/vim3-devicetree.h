@@ -6,8 +6,8 @@
 #define SRC_DEVICES_BOARD_DRIVERS_VIM3_DEVICETREE_VIM3_DEVICETREE_H_
 
 #include <lib/driver/component/cpp/driver_base.h>
-#include <lib/driver/devicetree/manager.h>
-#include <lib/driver/devicetree/visitors/default.h>
+#include <lib/driver/devicetree/manager/manager.h>
+#include <lib/driver/devicetree/visitors/default/default.h>
 
 #include <optional>
 

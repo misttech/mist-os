@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_DEVICETREE_NODE_H_
-#define LIB_DRIVER_DEVICETREE_NODE_H_
+#ifndef LIB_DRIVER_DEVICETREE_MANAGER_NODE_H_
+#define LIB_DRIVER_DEVICETREE_MANAGER_NODE_H_
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
@@ -62,4 +62,4 @@ class Node {
 
 }  // namespace fdf_devicetree
 
-#endif  // LIB_DRIVER_DEVICETREE_NODE_H_
+#endif  // LIB_DRIVER_DEVICETREE_MANAGER_NODE_H_

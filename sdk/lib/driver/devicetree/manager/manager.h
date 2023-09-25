@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_DEVICETREE_MANAGER_H_
-#define LIB_DRIVER_DEVICETREE_MANAGER_H_
+#ifndef LIB_DRIVER_DEVICETREE_MANAGER_MANAGER_H_
+#define LIB_DRIVER_DEVICETREE_MANAGER_MANAGER_H_
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
@@ -15,8 +15,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "sdk/lib/driver/devicetree/node.h"
-#include "sdk/lib/driver/devicetree/visitor.h"
+#include "visitor.h"
 
 namespace fdf_devicetree {
 
@@ -67,4 +66,4 @@ class Manager {
 
 }  // namespace fdf_devicetree
 
-#endif  // LIB_DRIVER_DEVICETREE_MANAGER_H_
+#endif  // LIB_DRIVER_DEVICETREE_MANAGER_MANAGER_H_

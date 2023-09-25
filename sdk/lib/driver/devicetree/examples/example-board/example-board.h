@@ -6,8 +6,8 @@
 #define LIB_DRIVER_DEVICETREE_EXAMPLES_EXAMPLE_BOARD_EXAMPLE_BOARD_H_
 
 #include <lib/driver/component/cpp/driver_base.h>
-#include <lib/driver/devicetree/manager.h>
-#include <lib/driver/devicetree/visitors/default.h>
+#include <lib/driver/devicetree/manager/manager.h>
+#include <lib/driver/devicetree/visitors/default/default.h>
 #include <lib/zx/result.h>
 
 #include <optional>

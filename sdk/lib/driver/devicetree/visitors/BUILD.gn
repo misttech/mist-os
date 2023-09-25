@@ -2,35 +2,23 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-source_set("default-visitors") {
-  sources = [
-    "bind-property.cc",
-    "bind-property.h",
-    "bti.cc",
-    "bti.h",
-    "mmio.cc",
-    "mmio.h",
-  ]
-
-  public = [ "default.h" ]
-
-  deps = [
-    "//sdk/lib/driver/logging/cpp",
-    "//src/devices/bind/fuchsia.devicetree:fuchsia.devicetree_cpp",
-  ]
-
-  public_deps = [
-    "..:headers",
-    "//zircon/system/ulib/zx",
-  ]
+config("visitor.headers") {
+  include_dirs = [ "include" ]
 }
 
 source_set("driver-visitor") {
   sources = [ "driver-visitor.cc" ]
-  public = [ "driver-visitor.h" ]
+  public = [ "include/lib/visitors/driver-visitor.h" ]
   deps = [ "//sdk/lib/driver/logging/cpp" ]
   public_deps = [
-    "..:headers",
+    "//sdk/lib/driver/devicetree/manager:headers",
     "//zircon/system/ulib/zx",
   ]
+  public_configs = [ ":visitor.headers" ]
+}
+
+source_set("multivisitor") {
+  public = [ "include/lib/visitors/multivisitor.h" ]
+  public_deps = [ "//sdk/lib/driver/devicetree/manager:headers" ]
+  public_configs = [ ":visitor.headers" ]
 }
