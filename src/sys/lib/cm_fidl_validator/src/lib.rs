@@ -257,8 +257,6 @@ enum DependencyNode<'a> {
     Child(&'a str, Option<&'a str>),
     Collection(&'a str),
     Environment(&'a str),
-    /// This variant is automatically translated to the source backing the capability by
-    /// `add_strong_dep`, it does not appear in the dependency graph.
     Capability(&'a str),
 }
 
@@ -1666,30 +1664,50 @@ impl<'a> ValidationContext<'a> {
         let source = source.unwrap();
         let target = target.unwrap();
 
-        let source = {
-            // A dependency on a storage capability from `self` is really a dependency on the
-            // backing dir.  Perform that translation here.
-            let possible_storage_name = match (source, source_name) {
-                (DependencyNode::Capability(name), _) => Some(name),
-                (DependencyNode::Self_, Some(name)) => Some(name.as_str()),
-                _ => None,
-            };
-            let possible_storage_source =
-                possible_storage_name.map(|name| self.all_storage_and_sources.get(name)).flatten();
-            let source = possible_storage_source
-                .map(|r| DependencyNode::try_from_ref(*r))
-                .unwrap_or(Some(source));
-            if source.is_none() {
-                return;
-            }
-            source.unwrap()
-        };
+        let source = self.normalize_dep(source, source_name);
+        let target = self.normalize_dep(target, None);
+        Self::add_edge(source, target, &mut self.strong_dependencies);
+    }
 
-        if source == target {
-            // This is already its own error, or is a valid `use from self`, don't report this as a
-            // cycle.
-        } else {
-            self.strong_dependencies.add_edge(source, target);
+    // A dependency on a storage capability from `self` transitively depends on the source in that
+    // capability's `from`. In this case, do the following:
+    //
+    // - Transform the dependency to a "named capability" node.
+    // - On this "name capability" node, add a dep on the source.
+    // Return that additional dep, if it exists.
+    fn normalize_dep(
+        &mut self,
+        dep: DependencyNode<'a>,
+        source_name: Option<&'a String>,
+    ) -> DependencyNode<'a> {
+        let name = match (dep, source_name) {
+            (DependencyNode::Capability(name), _) => name,
+            (DependencyNode::Self_, Some(name)) => name,
+            _ => return dep,
+        };
+        if let Some(source) = self.all_storage_and_sources.get(&name) {
+            let dep = DependencyNode::Capability(name);
+            let other_dep = DependencyNode::try_from_ref(*source);
+            if let Some(other_dep) = other_dep {
+                Self::add_edge(other_dep, dep, &mut self.strong_dependencies);
+            }
+            return dep;
+        }
+        dep
+    }
+
+    fn add_edge<'b>(
+        source: DependencyNode<'b>,
+        target: DependencyNode<'b>,
+        strong_dependencies: &mut DirectedGraph<DependencyNode<'b>>,
+    ) {
+        match (source, target) {
+            (DependencyNode::Self_, DependencyNode::Self_) => {
+                // `self` dependencies (e.g. `use from self`) are allowed.
+            }
+            (source, target) => {
+                strong_dependencies.add_edge(source, target);
+            }
         }
     }
 
@@ -1781,7 +1799,6 @@ impl<'a> ValidationContext<'a> {
                     o.target.as_ref(),
                     o.target_name.as_ref(),
                     o.availability.as_ref(),
-                    None,
                     offer_type,
                 );
                 self.validate_filtered_service_fields(
@@ -1813,7 +1830,6 @@ impl<'a> ValidationContext<'a> {
                     o.target.as_ref(),
                     o.target_name.as_ref(),
                     o.availability.as_ref(),
-                    o.dependency_type,
                     offer_type,
                 );
                 if o.dependency_type.is_none() {
@@ -1845,7 +1861,6 @@ impl<'a> ValidationContext<'a> {
                     o.target.as_ref(),
                     o.target_name.as_ref(),
                     o.availability.as_ref(),
-                    o.dependency_type,
                     offer_type,
                 );
                 if o.dependency_type.is_none() {
@@ -1922,7 +1937,6 @@ impl<'a> ValidationContext<'a> {
                     o.target.as_ref(),
                     o.target_name.as_ref(),
                     Some(&fdecl::Availability::Required),
-                    None,
                     offer_type,
                 );
                 // If the offer source is `self`, ensure we have a corresponding Runner.
@@ -1948,7 +1962,6 @@ impl<'a> ValidationContext<'a> {
                     o.target.as_ref(),
                     o.target_name.as_ref(),
                     Some(&fdecl::Availability::Required),
-                    None,
                     offer_type,
                 );
 
@@ -1984,7 +1997,6 @@ impl<'a> ValidationContext<'a> {
         target: Option<&'a fdecl::Ref>,
         target_name: Option<&'a String>,
         availability: Option<&'a fdecl::Availability>,
-        dependency: Option<fdecl::DependencyType>,
         offer_type: OfferType,
     ) {
         match source {
@@ -2006,15 +2018,7 @@ impl<'a> ValidationContext<'a> {
         }
         check_route_availability(decl, availability, source, source_name, &mut self.errors);
         check_offer_name(source_name, decl, "source_name", offer_type, &mut self.errors);
-        self.validate_offer_target(
-            decl,
-            allowable_names,
-            source,
-            target,
-            target_name,
-            dependency,
-            offer_type,
-        );
+        self.validate_offer_target(decl, allowable_names, target, target_name, offer_type);
         check_offer_name(target_name, decl, "target_name", offer_type, &mut self.errors);
     }
 
@@ -2042,15 +2046,7 @@ impl<'a> ValidationContext<'a> {
         }
         check_route_availability(decl, availability, source, source_name, &mut self.errors);
         check_offer_name(source_name, decl, "source_name", offer_type, &mut self.errors);
-        self.validate_offer_target(
-            decl,
-            AllowableIds::One,
-            source,
-            target,
-            target_name,
-            None,
-            offer_type,
-        );
+        self.validate_offer_target(decl, AllowableIds::One, target, target_name, offer_type);
         check_offer_name(target_name, decl, "target_name", offer_type, &mut self.errors);
     }
 
@@ -2119,10 +2115,8 @@ impl<'a> ValidationContext<'a> {
         self.validate_offer_target(
             decl,
             AllowableIds::One,
-            event_stream.source.as_ref(),
             event_stream.target.as_ref(),
             event_stream.target_name.as_ref(),
-            None,
             offer_type,
         );
         check_name(event_stream.target_name.as_ref(), decl, "target_name", &mut self.errors);
@@ -2233,23 +2227,13 @@ impl<'a> ValidationContext<'a> {
         &mut self,
         decl: DeclType,
         allowable_names: AllowableIds,
-        source: Option<&'a fdecl::Ref>,
         target: Option<&'a fdecl::Ref>,
         target_name: Option<&'a String>,
-        dependency: Option<fdecl::DependencyType>,
         offer_type: OfferType,
     ) {
         match target {
             Some(fdecl::Ref::Child(c)) => {
-                self.validate_target_child(
-                    decl,
-                    allowable_names,
-                    c,
-                    source,
-                    target_name,
-                    dependency,
-                    offer_type,
-                );
+                self.validate_target_child(decl, allowable_names, c, target_name, offer_type);
             }
             Some(fdecl::Ref::Collection(c)) => {
                 self.validate_target_collection(decl, allowable_names, c, target_name);
@@ -2268,9 +2252,7 @@ impl<'a> ValidationContext<'a> {
         decl: DeclType,
         allowable_names: AllowableIds,
         child: &'a fdecl::ChildRef,
-        source: Option<&fdecl::Ref>,
         target_name: Option<&'a String>,
-        dependency: Option<fdecl::DependencyType>,
         offer_type: OfferType,
     ) {
         if !self.validate_child_ref(decl, "target", child, offer_type) {
@@ -2291,14 +2273,6 @@ impl<'a> ValidationContext<'a> {
                         "target_name",
                         target_name as &str,
                     ));
-                }
-            }
-            if let Some(fdecl::Ref::Child(source_child)) = source {
-                if source_child.name == child.name
-                    && dependency.unwrap_or(fdecl::DependencyType::Strong)
-                        == fdecl::DependencyType::Strong
-                {
-                    self.errors.push(Error::offer_target_equals_source(decl, &child.name as &str));
                 }
             }
         }
@@ -3638,7 +3612,7 @@ mod tests {
                 }
             },
             result = Err(ErrorList::new(vec![
-                Error::dependency_cycle("{{self -> child child -> self}}".to_string()),
+                Error::dependency_cycle("{{self -> capability data -> child child -> self}}".to_string()),
             ])),
         },
         test_validate_use_from_child_offer_to_child_weak_cycle => {
@@ -5835,13 +5809,7 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::offer_target_equals_source(DeclType::OfferService, "logger"),
-                // Only the DependencyType::Strong offer-target-equals-source
-                // should result in an error.
-                Error::offer_target_equals_source(DeclType::OfferProtocol, "logger"),
-                Error::offer_target_equals_source(DeclType::OfferDirectory, "logger"),
-                Error::offer_target_equals_source(DeclType::OfferRunner, "logger"),
-                Error::offer_target_equals_source(DeclType::OfferResolver, "logger"),
+                Error::dependency_cycle("{{child logger -> child logger}}".to_string()),
             ])),
         },
         test_validate_offers_storage_target_equals_source => {

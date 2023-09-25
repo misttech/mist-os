@@ -40,9 +40,6 @@ pub enum Error {
     #[error("Encountered an unknown capability declaration. This may happen due to ABI skew between the FIDL component declaration and the system.")]
     UnknownCapability,
 
-    #[error("\"{0}\" target \"{1}\" is same as source.")]
-    OfferTargetEqualsSource(DeclType, String),
-
     #[error("\"{1}\" is referenced in {0} but it does not appear in children.")]
     InvalidChild(DeclField, String),
 
@@ -142,10 +139,6 @@ impl Error {
 
     pub fn field_invalid_segment(decl_type: DeclType, keyword: impl Into<String>) -> Self {
         Error::FieldInvalidSegment(DeclField { decl: decl_type, field: keyword.into() })
-    }
-
-    pub fn offer_target_equals_source(decl: DeclType, target: impl Into<String>) -> Self {
-        Error::OfferTargetEqualsSource(decl, target.into())
     }
 
     pub fn invalid_child(

@@ -1088,34 +1088,56 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
     /// `name` is the name of the capability being routed (if applicable).
     fn add_strong_dep(
         &self,
-        name: Option<&Name>,
+        source_name: Option<&'a Name>,
         source: DependencyNode<'a>,
         target: DependencyNode<'a>,
         strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
     ) {
-        let source = {
-            // A dependency on a storage capability from `self` is really a dependency on the
-            // backing dir.  Perform that translation here.
-            let possible_storage_name = match (source, name) {
-                (DependencyNode::Named(name), _) => Some(name),
-                (DependencyNode::Self_, Some(name)) => Some(name),
-                _ => None,
-            };
-            let possible_storage_source =
-                possible_storage_name.map(|name| self.all_storage_and_sources.get(&name)).flatten();
-            let source = possible_storage_source
-                .map(|r| DependencyNode::capability_from_ref(r))
-                .unwrap_or(Some(source));
-            if source.is_none() {
-                return;
-            }
-            source.unwrap()
-        };
+        let source = self.normalize_dep(source, source_name, strong_dependencies);
+        let target = self.normalize_dep(target, None, strong_dependencies);
+        Self::add_edge(source, target, strong_dependencies);
+    }
 
-        if source == DependencyNode::Self_ && target == DependencyNode::Self_ {
-            // `self` dependencies (e.g. `use from self`) are allowed.
-        } else {
-            strong_dependencies.add_edge(source, target);
+    // A dependency on a storage capability from `self` transitively depends on the source in that
+    // capability's `from`. In this case, do the following:
+    //
+    // - Transform the dependency to a "named capability" node.
+    // - On this "name capability" node, add a dep on the source.
+    // Return that additional dep, if it exists.
+    fn normalize_dep(
+        &self,
+        dep: DependencyNode<'a>,
+        source_name: Option<&'a Name>,
+        strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
+    ) -> DependencyNode<'a> {
+        let name = match (dep, source_name) {
+            (DependencyNode::Named(name), _) => name,
+            (DependencyNode::Self_, Some(name)) => name,
+            _ => return dep,
+        };
+        if let Some(source) = self.all_storage_and_sources.get(&name) {
+            let dep = DependencyNode::Named(name);
+            let other_dep = DependencyNode::capability_from_ref(source);
+            if let Some(other_dep) = other_dep {
+                Self::add_edge(other_dep, dep, strong_dependencies);
+            }
+            return dep;
+        }
+        dep
+    }
+
+    fn add_edge<'b>(
+        source: DependencyNode<'b>,
+        target: DependencyNode<'b>,
+        strong_dependencies: &mut DirectedGraph<DependencyNode<'b>>,
+    ) {
+        match (source, target) {
+            (DependencyNode::Self_, DependencyNode::Self_) => {
+                // `self` dependencies (e.g. `use from self`) are allowed.
+            }
+            (source, target) => {
+                strong_dependencies.add_edge(source, target);
+            }
         }
     }
 
@@ -2910,8 +2932,8 @@ mod tests {
                 err,
                 ..
             }) if &err ==
-                "Strong dependency cycles were found. Break the cycle by removing a \
-                dependency or marking an offer as weak. Cycles: {{#child -> self -> #child}}"
+                "Strong dependency cycles were found. Break the cycle by removing a dependency \
+                or marking an offer as weak. Cycles: {{#child -> self -> #data -> #child}}"
         ),
 
         // expose
@@ -4161,7 +4183,7 @@ mod tests {
             }) if &err ==
                 "Strong dependency cycles were found. Break the cycle by removing a \
                 dependency or marking an offer as weak. Cycles: \
-                {{#backend -> #child -> #backend}}"
+                {{#backend -> #data -> #child -> #backend}}"
         ),
         test_cml_offer_weak_dependency_cycle(
             json!({
