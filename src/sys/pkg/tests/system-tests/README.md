@@ -7,7 +7,12 @@ This is the integration tests for a number of system tests.
 In order to build the system tests, add this to your `fx set`:
 
 ```sh
-% fx set ... --with //src/sys/pkg:e2e_tests
+% fx set ... \
+  --with //src/sys/pkg:e2e_tests \
+  --with //src/testing/sl4f \
+  --with //src/sys/bin/start_sl4f \
+  --args='core_realm_shards = [ "//src/testing/sl4f:sl4f_core_shard" ]'
+
 % fx build
 ```
 
