@@ -135,7 +135,7 @@ are documented in that script, and can be discovered by passing -h or
       '--arch', args.arch,
       '--cmdline', cmdline_path,
       '--resize', str(args.image_size),
-      args.image,
+      args.image.resolve(),
     ]
 
     if args.system_disk_size is not None:
@@ -227,7 +227,7 @@ are documented in that script, and can be discovered by passing -h or
 
       # Flash the device.
       ffx_path = args.fuchsia_build_dir / 'host-tools/ffx'
-      flash_args = [ffx_path, '--timeout', '60', 'target', 'flash']
+      flash_args = [ffx_path, '--target', device_name, '--timeout', '60', 'target', 'flash']
       print(f'Running: {shlex.join(str(s) for s in flash_args)}')
 
       process = await asyncio.create_subprocess_exec(*flash_args)
