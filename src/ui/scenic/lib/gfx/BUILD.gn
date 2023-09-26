@@ -2,8 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("build_args.gni")
-
 declare_args() {
   # Draws the current frame number in the top-left corner.
   scenic_display_frame_number = false
@@ -191,12 +189,6 @@ source_set("gfx") {
   public_configs = [ ":include_garnet" ]
 
   configs += [ ":swapchain" ]
-
-  defines = []
-
-  if (scenic_enable_vulkan_validation) {
-    defines += [ "SCENIC_ENABLE_VULKAN_VALIDATION" ]
-  }
 
   public_deps = [
     ":gfx_always_optimized",

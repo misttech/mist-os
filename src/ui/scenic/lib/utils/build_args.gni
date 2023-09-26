@@ -5,4 +5,7 @@
 declare_args() {
   # If true, Flatland will log an excruciating amount of data.  For debugging.
   flatland_verbose_logging = false
+
+  # Include the vulkan validation layers in scenic.
+  scenic_enable_vulkan_validation = is_debug
 }

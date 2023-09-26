@@ -34,6 +34,12 @@ source_set("utils") {
     "task_utils.h",
   ]
 
+  defines = []
+
+  if (scenic_enable_vulkan_validation) {
+    defines += [ "SCENIC_ENABLE_VULKAN_VALIDATION" ]
+  }
+
   public_deps = [
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_cpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",

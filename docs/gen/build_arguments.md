@@ -7554,7 +7554,7 @@ Include the vulkan validation layers in scenic.
 
 **Current value (from the default):** `false`
 
-From //src/ui/scenic/lib/gfx/build_args.gni:7
+From //src/ui/scenic/lib/utils/build_args.gni:7
 
 ### scheduler_extra_invariant_validation
 
