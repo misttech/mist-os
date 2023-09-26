@@ -65,7 +65,10 @@ use crate::{
     },
     socket::{
         self,
-        address::{AddrIsMappedError, ConnAddr, ConnIpAddr, SocketIpAddr, SocketZonedIpAddr},
+        address::{
+            AddrIsMappedError, ConnAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr, SocketIpAddr,
+            SocketZonedIpAddr,
+        },
         datagram::{
             self, DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec,
             DatagramSocketSpec, DatagramStateContext, ExpectedUnboundError,
@@ -3300,6 +3303,10 @@ pub(crate) trait SocketHandler<I: datagram::IpExt, C>: DeviceIdContext<AnyDevice
         local_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
         icmp_id: Option<NonZeroU16>,
     ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>>;
+
+    /// Gets the socket information of an ICMP socket.
+    fn get_info(&mut self, ctx: &mut C, id: SocketId<I>)
+        -> SocketInfo<I::Addr, Self::WeakDeviceId>;
 }
 
 /// A handler trait for ICMP sockets that also allows sending/receiving on the
@@ -3339,6 +3346,14 @@ impl<I: datagram::IpExt, C: IcmpNonSyncCtx<I>, SC: StateContext<I, C> + IcmpStat
         icmp_id: Option<NonZeroU16>,
     ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
         datagram::listen(self, ctx, id, local_ip, icmp_id)
+    }
+
+    fn get_info(
+        &mut self,
+        ctx: &mut C,
+        id: SocketId<I>,
+    ) -> SocketInfo<I::Addr, Self::WeakDeviceId> {
+        datagram::get_info(self, ctx, id).into()
     }
 }
 
@@ -3454,6 +3469,74 @@ pub fn send<I: Ip, B: BufferMut, C: NonSyncContext + BufferNonSyncContext<B>>(
         },
         |(IpInvariant((sync_ctx, ctx, body)), id)| {
             BufferSocketHandler::<Ipv6, C, _>::send(&mut Locked::new(sync_ctx), ctx, id, body)
+        },
+    )
+}
+
+/// Socket information about an ICMP socket.
+#[derive(Debug, GenericOverIp, PartialEq, Eq)]
+#[generic_over_ip(A, IpAddress)]
+pub enum SocketInfo<A: IpAddress, D> {
+    /// The socket is unbound.
+    Unbound,
+    /// The socket is bound.
+    Bound {
+        /// The bound local IP address.
+        local_ip: Option<SpecifiedAddr<A>>,
+        /// The ID field used for ICMP echoes.
+        id: NonZeroU16,
+        /// An optional device that is bound.
+        device: Option<D>,
+    },
+    /// The socket is connected.
+    Connected {
+        /// The remote IP address this socket is connected to.
+        remote_ip: SpecifiedAddr<A>,
+        /// The bound local IP address.
+        local_ip: SpecifiedAddr<A>,
+        /// The ID field used for ICMP echoes.
+        id: NonZeroU16,
+        /// An optional device that is bound.
+        device: Option<D>,
+    },
+}
+
+impl<I: datagram::DualStackIpExt, D> From<datagram::SocketInfo<I, D, Icmp>>
+    for SocketInfo<I::Addr, D>
+{
+    fn from(info: datagram::SocketInfo<I, D, Icmp>) -> Self {
+        match info {
+            datagram::SocketInfo::Unbound => Self::Unbound,
+            datagram::SocketInfo::Listener(ListenerAddr {
+                ip: ListenerIpAddr { addr, identifier },
+                device,
+            }) => Self::Bound { local_ip: addr.map(Into::into), id: identifier, device },
+            datagram::SocketInfo::Connected(ConnAddr {
+                ip: ConnIpAddr { local: (local_addr, id), remote: (remote_addr, ()) },
+                device,
+            }) => Self::Connected {
+                local_ip: local_addr.into(),
+                id,
+                remote_ip: remote_addr.into(),
+                device,
+            },
+        }
+    }
+}
+
+/// Gets the information about an ICMP socket.
+pub fn get_info<I: Ip, C: NonSyncContext>(
+    sync_ctx: &SyncCtx<C>,
+    ctx: &mut C,
+    id: SocketId<I>,
+) -> SocketInfo<I::Addr, crate::device::WeakDeviceId<C>> {
+    I::map_ip(
+        (IpInvariant((sync_ctx, ctx)), id),
+        |(IpInvariant((sync_ctx, ctx)), id)| {
+            SocketHandler::<Ipv4, C>::get_info(&mut Locked::new(sync_ctx), ctx, id)
+        },
+        |(IpInvariant((sync_ctx, ctx)), id)| {
+            SocketHandler::<Ipv6, C>::get_info(&mut Locked::new(sync_ctx), ctx, id)
         },
     )
 }
@@ -5579,6 +5662,42 @@ mod tests {
             Err(datagram::SendError::SerializeError(
                 packet_formats::error::ParseError::NotExpected
             ))
+        );
+    }
+
+    #[ip_test]
+    fn get_info<I: Ip + TestIpExt + datagram::IpExt>() {
+        let mut ctx = FakeIcmpCtx::<I>::default();
+        let FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx } = &mut ctx;
+        const ICMP_ID: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(1));
+
+        let id = SocketHandler::<I, _>::create(sync_ctx);
+        assert_eq!(
+            SocketHandler::<I, _>::get_info(sync_ctx, non_sync_ctx, id),
+            SocketInfo::Unbound
+        );
+
+        SocketHandler::<I, _>::bind(sync_ctx, non_sync_ctx, id, None, Some(ICMP_ID)).unwrap();
+        assert_eq!(
+            SocketHandler::<I, _>::get_info(sync_ctx, non_sync_ctx, id),
+            SocketInfo::Bound { local_ip: None, id: ICMP_ID, device: None }
+        );
+
+        SocketHandler::<I, _>::connect(
+            sync_ctx,
+            non_sync_ctx,
+            id,
+            SocketZonedIpAddr::from(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
+        )
+        .unwrap();
+        assert_eq!(
+            SocketHandler::<I, _>::get_info(sync_ctx, non_sync_ctx, id),
+            SocketInfo::Connected {
+                local_ip: I::FAKE_CONFIG.local_ip,
+                remote_ip: I::FAKE_CONFIG.remote_ip,
+                id: ICMP_ID,
+                device: None,
+            }
         );
     }
 }
