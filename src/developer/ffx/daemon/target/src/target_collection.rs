@@ -261,6 +261,8 @@ impl TargetCollection {
             }
         }
 
+        to_update.set_compatibility_status(&new_target.get_compatibility_status());
+
         to_update.update_connection_state(|_| new_target.get_connection_state());
 
         to_update.events.push(TargetEvent::Rediscovered).unwrap_or_else(|err| {

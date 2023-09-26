@@ -3,9 +3,10 @@
 // found in the LICENSE file.
 
 use crate::{target::Target, RETRY_DELAY};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Context};
 use async_io::Async;
 use async_trait::async_trait;
+use compat_info::{CompatibilityInfo, ConnectionInfo};
 use ffx_daemon_core::events;
 use ffx_daemon_events::{HostPipeErr, TargetEvent};
 use ffx_ssh::ssh::build_ssh_command_with_ssh_path;
@@ -27,6 +28,26 @@ use std::{
 };
 
 const BUFFER_SIZE: usize = 65536;
+
+#[derive(thiserror::Error, Debug)]
+pub(crate) enum PipeError {
+    #[error("compatibility check not supported")]
+    NoCompatibilityCheck,
+    #[error("could not establish connection: {0}")]
+    ConnectionFailed(String),
+    #[error("io error: {0}")]
+    IoError(#[from] io::Error),
+    #[error("error {0}")]
+    Error(String),
+    #[error("target referenced has gone")]
+    TargetGone,
+    #[error("creating pipe to {1} failed: {0}")]
+    PipeCreationFailed(String, String),
+    #[error("no shh address to {0}")]
+    NoAddress(String),
+    #[error("running target overnet pipe: {0}")]
+    SpawnError(String),
+}
 
 #[derive(Debug)]
 pub struct LogBuffer {
@@ -90,20 +111,20 @@ pub(crate) trait HostPipeChildBuilder {
         event_queue: events::Queue<TargetEvent>,
         watchdogs: bool,
         ssh_timeout: u16,
-    ) -> Result<(Option<HostAddr>, HostPipeChild)>
+    ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError>
     where
         Self: Sized;
 
-    fn ssh_path(&self) -> &str {
-        "ssh"
-    }
+    fn ssh_path(&self) -> &str;
 }
 
 #[derive(Copy, Clone)]
-pub(crate) struct HostPipeChildDefaultBuilder {}
+pub(crate) struct HostPipeChildDefaultBuilder<'a> {
+    pub(crate) ssh_path: &'a str,
+}
 
 #[async_trait(?Send)]
-impl HostPipeChildBuilder for HostPipeChildDefaultBuilder {
+impl HostPipeChildBuilder for HostPipeChildDefaultBuilder<'_> {
     async fn new(
         &self,
         addr: SocketAddr,
@@ -112,7 +133,12 @@ impl HostPipeChildBuilder for HostPipeChildDefaultBuilder {
         event_queue: events::Queue<TargetEvent>,
         watchdogs: bool,
         ssh_timeout: u16,
-    ) -> Result<(Option<HostAddr>, HostPipeChild)> {
+    ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
+
+
+        let ctx = ffx_config::global_env_context().expect("Global env context uninitialized");
+        let verbose_ssh = ffx_config::logging::debugging_on(&ctx).await; 
+
         HostPipeChild::new_inner(
             self.ssh_path(),
             addr,
@@ -121,8 +147,13 @@ impl HostPipeChildBuilder for HostPipeChildDefaultBuilder {
             event_queue,
             watchdogs,
             ssh_timeout,
+            verbose_ssh
         )
         .await
+    }
+
+    fn ssh_path(&self) -> &str {
+        self.ssh_path
     }
 }
 
@@ -130,6 +161,7 @@ impl HostPipeChildBuilder for HostPipeChildDefaultBuilder {
 pub(crate) struct HostPipeChild {
     inner: SharedChild,
     task: Option<Task<()>>,
+    pub(crate) compatibility_status: Option<CompatibilityInfo>,
 }
 
 fn setup_watchdogs() {
@@ -186,6 +218,44 @@ async fn write_ssh_log(line: &String) {
 }
 
 impl HostPipeChild {
+    pub fn get_compatibility_status(&self) -> Option<CompatibilityInfo> {
+        self.compatibility_status.clone()
+    }
+
+    #[tracing::instrument(skip(stderr_buf, event_queue))]
+    async fn new_inner_legacy(
+        ssh_path: &str,
+        addr: SocketAddr,
+        id: u64,
+        stderr_buf: Rc<LogBuffer>,
+        event_queue: events::Queue<TargetEvent>,
+        watchdogs: bool,
+        ssh_timeout: u16,
+        verbose_ssh: bool
+    ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
+        let id_string = format!("{}", id);
+        let args = vec![
+            "echo",
+            "++ $SSH_CONNECTION ++",
+            "&&",
+            "remote_control_runner",
+            "--circuit",
+            &id_string,
+        ];
+
+        Self::start_ssh_connection(
+            ssh_path,
+            addr,
+            args,
+            stderr_buf,
+            event_queue,
+            watchdogs,
+            ssh_timeout,
+            verbose_ssh
+        )
+        .await
+    }
+
     #[tracing::instrument(skip(stderr_buf, event_queue))]
     async fn new_inner(
         ssh_path: &str,
@@ -195,27 +265,65 @@ impl HostPipeChild {
         event_queue: events::Queue<TargetEvent>,
         watchdogs: bool,
         ssh_timeout: u16,
-    ) -> Result<(Option<HostAddr>, HostPipeChild)> {
-        // TODO (119900): Re-enable ABI checks when ffx repository server uses ssh to setup
-        // repositories for older devices.
+        verbose_ssh: bool
+    ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
         let id_string = format!("{}", id);
-        let mut args = vec!["echo", "++ $SSH_CONNECTION ++", "&&", "remote_control_runner"];
+        // pass the abi revision as a base 10 number so it is easy to parse.
+        let rev: u64 = *version_history::LATEST_VERSION.abi_revision;
+        let abi_revision = format!("{}", rev);
+        let args =
+            vec!["remote_control_runner", "--circuit", &id_string, "--abi-revision", &abi_revision];
 
-        args.push("--circuit");
-        args.push(id_string.as_str());
+        match Self::start_ssh_connection(
+            ssh_path,
+            addr,
+            args,
+            stderr_buf.clone(),
+            event_queue.clone(),
+            watchdogs,
+            ssh_timeout,
+            verbose_ssh
+        )
+        .await
+        {
+            Ok((addr, pipe)) => Ok((addr, pipe)),
+            Err(PipeError::NoCompatibilityCheck) => {
+                Self::new_inner_legacy(
+                    ssh_path,
+                    addr,
+                    id,
+                    stderr_buf,
+                    event_queue,
+                    watchdogs,
+                    ssh_timeout,
+                    verbose_ssh
+                )
+                .await
+            }
+            Err(e) => Err(e),
+        }
+    }
 
-        let ctx = ffx_config::global_env_context().expect("Global env context uninitialized");
-        let verbose_ssh = ffx_config::logging::debugging_on(&ctx).await;
+    async fn start_ssh_connection(
+        ssh_path: &str,
+        addr: SocketAddr,
+        mut args: Vec<&str>,
+        stderr_buf: Rc<LogBuffer>,
+        event_queue: events::Queue<TargetEvent>,
+        watchdogs: bool,
+        ssh_timeout: u16,
+        verbose_ssh: bool
+    ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
+
+
         if verbose_ssh {
             args.insert(0, "-v");
         }
+        
 
-        // Before running remote_control_runner, we look up the environment
-        // variable for $SSH_CONNECTION. This contains the IP address, including
-        // scope_id, of the ssh client from the perspective of the ssh server.
-        // This is useful because the target might need to use a specific
-        // interface to talk to the host device.
-        let mut ssh = build_ssh_command_with_ssh_path(ssh_path, addr, args).await?;
+        let mut ssh = build_ssh_command_with_ssh_path(ssh_path, addr, args)
+            .await
+            .map_err(|e| PipeError::Error(e.to_string()))?;
 
         tracing::debug!("Spawning new ssh instance: {:?}", ssh);
 
@@ -225,22 +333,35 @@ impl HostPipeChild {
 
         let mut ssh_cmd = ssh.stdout(Stdio::piped()).stdin(Stdio::piped()).stderr(Stdio::piped());
 
-        let ssh = SharedChild::spawn(&mut ssh_cmd).context("running target overnet pipe")?;
+        let ssh =
+            SharedChild::spawn(&mut ssh_cmd).map_err(|e| PipeError::SpawnError(e.to_string()))?;
+
+        let mut error_message = String::from("");
 
         // todo(fxb/108692) remove this use of the global hoist when we put the main one in the environment context
-        // instead -- this one is very deeply embedded, but isn't used by tests (that I've found).
-        let (pipe_rx, mut pipe_tx) = futures::AsyncReadExt::split(
-            overnet_pipe(hoist::hoist()).context("creating local overnet pipe")?,
-        );
+        // instead -- this one is very deeply embedded, but isn't used by tests (that I've found) (until now).
+        let (pipe_rx, mut pipe_tx) =
+            futures::AsyncReadExt::split(overnet_pipe(hoist::hoist()).map_err(|e| {
+                PipeError::PipeCreationFailed(
+                    format!("creating local overnet pipe: {e}"),
+                    addr.to_string(),
+                )
+            })?);
 
-        let stdout =
-            Async::new(ssh.take_stdout().ok_or(anyhow!("unable to get stdout from target pipe"))?)?;
+        let stdout = Async::new(
+            ssh.take_stdout()
+                .ok_or(PipeError::Error("unable to get stdout from target pipe".into()))?,
+        )?;
 
-        let mut stdin =
-            Async::new(ssh.take_stdin().ok_or(anyhow!("unable to get stdin from target pipe"))?)?;
+        let mut stdin = Async::new(
+            ssh.take_stdin()
+                .ok_or(PipeError::Error("unable to get stdin from target pipe".into()))?,
+        )?;
 
-        let stderr =
-            Async::new(ssh.take_stderr().ok_or(anyhow!("unable to stderr from target pipe"))?)?;
+        let stderr = Async::new(
+            ssh.take_stderr()
+                .ok_or(PipeError::Error("unable to stderr from target pipe".into()))?,
+        )?;
 
         // Read the first line. This can be either either be an empty string "",
         // which signifies the STDOUT has been closed, or the $SSH_CONNECTION
@@ -248,17 +369,47 @@ impl HostPipeChild {
         let mut stdout = BufReader::with_capacity(BUFFER_SIZE, stdout);
 
         tracing::debug!("Awaiting client address from ssh connection");
-        let ssh_host_address = match parse_ssh_connection(&mut stdout, Some(ssh_timeout))
-            .await
-            .context("reading ssh connection")
-        {
-            Ok(addr) => Some(HostAddr(addr)),
-            Err(e) => {
-                tracing::error!("Failed to read ssh client address: {:?}", e);
-                return Err(e);
+        let (ssh_host_address, compatibility_status) =
+            match parse_ssh_connection(&mut stdout, Some(ssh_timeout))
+                .on_timeout(Duration::from_secs(ssh_timeout as u64), || {
+                    Err(ParseSshConnectionError::Timeout)
+                })
+                .await
+                .context("reading ssh connection")
+            {
+                Ok((addr, compatibility_status)) => (Some(HostAddr(addr)), compatibility_status),
+                Err(e) => {
+                    error_message = format!("Failed to read ssh client address: {e:?}");
+                    tracing::error!("{error_message}");
+                    (None, None)
+                }
+            };
+        let mut stderr_lines = futures_lite::io::BufReader::new(stderr).lines();
+        // Check for early exit.
+        if ssh_host_address.is_none() {
+            if let Some(Ok(l)) = stderr_lines.next().await {
+                tracing::debug!("Reading stderr:  {}", l);
+                if l.contains("Unrecognized argument: --abi-revision") {
+                    // It is an older image, so use the legacy command.
+                    tracing::info!("Target does not support abi compatibility check, reverting to legacy connection");
+                    ssh.kill()?;
+                    while let Some(Ok(line)) = stderr_lines.next().await {
+                        tracing::error!("SSH stderr: {line}");
+                    }
+
+                    if let Some(status) = ssh.try_wait()? {
+                        tracing::error!("Target pipe exited with {status}");
+                    } else {
+                        tracing::error!(
+                            "ssh child has not ended, trying one more time then ignoring it."
+                        );
+                        fuchsia_async::Timer::new(std::time::Duration::from_secs(2)).await;
+                        tracing::error!("ssh child status is {:?}", ssh.try_wait());
+                    }
+                    return Err(PipeError::NoCompatibilityCheck);
+                }
             }
-        };
-        tracing::debug!("Got ssh host address {ssh_host_address:?}");
+        }
 
         let copy_in = async move {
             if let Err(e) = copy_buf(stdout, &mut pipe_tx).await {
@@ -274,7 +425,6 @@ impl HostPipeChild {
         };
 
         let log_stderr = async move {
-            let mut stderr_lines = futures_lite::io::BufReader::new(stderr).lines();
             while let Some(result) = stderr_lines.next().await {
                 match result {
                     Ok(line) => {
@@ -299,16 +449,21 @@ impl HostPipeChild {
             }
         };
 
-        tracing::debug!("Establishing host-pipe process to target");
-        Ok((
-            ssh_host_address,
-            HostPipeChild {
-                inner: ssh,
-                task: Some(Task::local(async move {
-                    futures::join!(copy_in, copy_out, log_stderr);
-                })),
-            },
-        ))
+        if ssh_host_address.is_some() {
+            tracing::debug!("Establishing host-pipe process to target");
+            Ok((
+                ssh_host_address,
+                HostPipeChild {
+                    inner: ssh,
+                    task: Some(Task::local(async move {
+                        futures::join!(copy_in, copy_out, log_stderr);
+                    })),
+                    compatibility_status,
+                },
+            ))
+        } else {
+            return Err(PipeError::ConnectionFailed(error_message));
+        }
     }
 
     fn kill(&self) -> io::Result<()> {
@@ -416,33 +571,59 @@ async fn read_ssh_line_with_timeouts<R: AsyncBufRead + Unpin>(
 async fn parse_ssh_connection<R: AsyncBufRead + Unpin>(
     rdr: &mut R,
     timeout: Option<u16>,
-) -> std::result::Result<String, ParseSshConnectionError> {
+) -> std::result::Result<(String, Option<CompatibilityInfo>), ParseSshConnectionError> {
     let line = read_ssh_line_with_timeouts(rdr, timeout).await?;
     if line.is_empty() {
         tracing::error!("Failed to first line");
-        return Err(ParseSshConnectionError::Parse(line));
+        return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof).into());
     }
 
     write_ssh_log(&line).await;
 
-    let mut parts = line.split(' ');
+    if line.starts_with("{") {
+        parse_ssh_connection_with_info(&line)
+    } else {
+        parse_ssh_connection_legacy(&line)
+    }
+}
 
+fn parse_ssh_connection_with_info(
+    line: &str,
+) -> std::result::Result<(String, Option<CompatibilityInfo>), ParseSshConnectionError> {
+    let connection_info: ConnectionInfo =
+        serde_json::from_str(&line).map_err(|e| ParseSshConnectionError::Parse(e.to_string()))?;
+    let mut parts = connection_info.ssh_connection.split(" ");
+    // SSH_CONNECTION identifies the client and server ends of the connection.
+    // The variable contains four space-separated values: client IP address,
+    // client port number, server IP address, and server port number.
+    if let Some(client_address) = parts.nth(0) {
+        Ok((client_address.to_string(), Some(connection_info.compatibility)))
+    } else {
+        Err(ParseSshConnectionError::Parse(line.into()))
+    }
+}
+fn parse_ssh_connection_legacy(
+    line: &str,
+) -> std::result::Result<(String, Option<CompatibilityInfo>), ParseSshConnectionError> {
+    let mut parts = line.split(" ");
     // The first part should be our anchor.
     match parts.next() {
         Some("++") => {}
         Some(_) | None => {
             tracing::error!("Failed to read first anchor: {line}");
-            return Err(ParseSshConnectionError::Parse(line));
+            return Err(ParseSshConnectionError::Parse(line.into()));
         }
     }
 
-    // The next part should be the client address. This is left as a string since
-    // std::net::IpAddr does not support string scope_ids.
+    // SSH_CONNECTION identifies the client and server ends of the connection.
+    // The variable contains four space-separated values: client IP address,
+    // client port number, server IP address, and server port number.
+    // This is left as a string since std::net::IpAddr does not support string scope_ids.
     let client_address = if let Some(part) = parts.next() {
         part
     } else {
         tracing::error!("Failed to read client_address: {line}");
-        return Err(ParseSshConnectionError::Parse(line));
+        return Err(ParseSshConnectionError::Parse(line.into()));
     };
 
     // Followed by the client port.
@@ -450,7 +631,7 @@ async fn parse_ssh_connection<R: AsyncBufRead + Unpin>(
         part
     } else {
         tracing::error!("Failed to read port: {line}");
-        return Err(ParseSshConnectionError::Parse(line));
+        return Err(ParseSshConnectionError::Parse(line.into()));
     };
 
     // Followed by the server address.
@@ -458,7 +639,7 @@ async fn parse_ssh_connection<R: AsyncBufRead + Unpin>(
         part
     } else {
         tracing::error!("Failed to read port: {line}");
-        return Err(ParseSshConnectionError::Parse(line));
+        return Err(ParseSshConnectionError::Parse(line.into()));
     };
 
     // Followed by the server port.
@@ -466,25 +647,24 @@ async fn parse_ssh_connection<R: AsyncBufRead + Unpin>(
         part
     } else {
         tracing::error!("Failed to read server_port: {line}");
-        return Err(ParseSshConnectionError::Parse(line));
+        return Err(ParseSshConnectionError::Parse(line.into()));
     };
 
     // The last part should be our anchor.
     match parts.next() {
         Some("++\n") => {}
-        Some(_) | None => {
-            tracing::error!("Failed to read second anchor: {line}");
-            return Err(ParseSshConnectionError::Parse(line));
+        None | Some(_) => {
+            return Err(ParseSshConnectionError::Parse(line.into()));
         }
-    }
+    };
 
     // Finally, there should be nothing left.
     if let Some(_) = parts.next() {
         tracing::error!("Extra data: {line}");
-        return Err(ParseSshConnectionError::Parse(line));
+        return Err(ParseSshConnectionError::Parse(line.into()));
     }
 
-    Ok(client_address.to_string())
+    Ok((client_address.to_string(), None))
 }
 
 impl Drop for HostPipeChild {
@@ -540,13 +720,13 @@ where
     }
 }
 
-pub(crate) async fn spawn(
+pub(crate) async fn spawn<'a>(
     target: Weak<Target>,
     watchdogs: bool,
     ssh_timeout: u16,
-) -> Result<HostPipeConnection<HostPipeChildDefaultBuilder>> {
-    let host_pipe_child_builder = HostPipeChildDefaultBuilder {};
-    HostPipeConnection::<HostPipeChildDefaultBuilder>::spawn_with_builder(
+) -> Result<HostPipeConnection<HostPipeChildDefaultBuilder<'a>>, anyhow::Error> {
+    let host_pipe_child_builder = HostPipeChildDefaultBuilder { ssh_path: "ssh" };
+    HostPipeConnection::<HostPipeChildDefaultBuilder<'_>>::spawn_with_builder(
         target,
         host_pipe_child_builder,
         ssh_timeout,
@@ -554,6 +734,7 @@ pub(crate) async fn spawn(
         watchdogs,
     )
     .await
+    .map_err(|e| anyhow!(e))
 }
 
 impl<T> HostPipeConnection<T>
@@ -565,16 +746,15 @@ where
         builder: T,
         ssh_timeout: u16,
         watchdogs: bool,
-    ) -> Result<Arc<HostPipeChild>> {
-        let target = target.upgrade().ok_or(anyhow!("Target has gone"))?;
-        let target_nodename = target.nodename();
-        tracing::debug!("Spawning new host-pipe instance to target {:?}", target_nodename);
+    ) -> Result<Arc<HostPipeChild>, PipeError> {
+        let target = target.upgrade().ok_or(PipeError::TargetGone)?;
+        let target_nodename: String = target.nodename_str();
+        tracing::debug!("Spawning new host-pipe instance to target {target_nodename}");
         let log_buf = target.host_pipe_log_buffer();
         log_buf.clear();
 
-        let ssh_address = target.ssh_address().ok_or_else(|| {
-            anyhow!("target {:?} does not yet have an ssh address", target_nodename)
-        })?;
+        let ssh_address =
+            target.ssh_address().ok_or(PipeError::NoAddress(target_nodename.clone()))?;
 
         let (host_addr, cmd) = builder
             .new(
@@ -586,17 +766,18 @@ where
                 ssh_timeout,
             )
             .await
-            .with_context(|| {
-                format!("creating host-pipe command to target {:?}", target_nodename)
-            })?;
+            .map_err(|e| PipeError::PipeCreationFailed(e.to_string(), target_nodename.clone()))?;
 
         *target.ssh_host_address.borrow_mut() = host_addr;
         tracing::debug!(
             "Set ssh_host_address to {:?} for {}@{}",
             target.ssh_host_address,
             target.nodename_str(),
-            target.id()
+            target.id(),
         );
+        if cmd.compatibility_status.is_some() {
+            target.set_compatibility_status(&cmd.compatibility_status);
+        }
         let hpc = Arc::new(cmd);
         Ok(hpc)
     }
@@ -607,10 +788,10 @@ where
         ssh_timeout: u16,
         relaunch_command_delay: Duration,
         watchdogs: bool,
-    ) -> Result<Self> {
+    ) -> Result<Self, PipeError> {
         let hpc = Self::start_child_pipe(&target, host_pipe_child_builder, ssh_timeout, watchdogs)
             .await?;
-        let target = target.upgrade().ok_or(anyhow!("Target has gone"))?;
+        let target = target.upgrade().ok_or(PipeError::TargetGone)?;
 
         Ok(Self {
             target,
@@ -622,7 +803,7 @@ where
         })
     }
 
-    pub async fn wait(&mut self) -> Result<()> {
+    pub async fn wait(&mut self) -> Result<(), anyhow::Error> {
         loop {
             // Waits on the running the command. If it exits successfully (disconnect
             // due to peer dropping) then will set the target to disconnected
@@ -674,9 +855,14 @@ where
             self.inner = hpc;
         }
     }
+
+    pub fn get_compatibility_status(&self) -> Option<CompatibilityInfo> {
+        self.inner.get_compatibility_status()
+    }
 }
 
-fn overnet_pipe(overnet_instance: &hoist::Hoist) -> Result<fidl::AsyncSocket> {
+/// creates the socket for overnet. IoError is possible from socket operations.
+fn overnet_pipe(overnet_instance: &hoist::Hoist) -> Result<fidl::AsyncSocket, io::Error> {
     let (local_socket, remote_socket) = fidl::Socket::create_stream();
     let local_socket = fidl::AsyncSocket::from_socket(local_socket)?;
     overnet_instance.start_client_socket(remote_socket).detach();
@@ -689,6 +875,10 @@ mod test {
     use super::*;
     use addr::TargetAddr;
     use assert_matches::assert_matches;
+    use ffx_config::ConfigLevel;
+    use serde_json::json;
+    use std::fs;
+    use std::os::unix::prelude::PermissionsExt;
     use std::process::Command;
     use std::{rc::Rc, str::FromStr};
 
@@ -699,8 +889,8 @@ mod test {
         /// closing. The reader and writer handles don't do anything other than
         /// spin until they receive a message to stop.
         pub fn fake_new(child: &mut Command) -> Self {
-            let child = SharedChild::spawn(child).context(ERR_CTX).unwrap();
-            Self { inner: child, task: Some(Task::local(async {})) }
+            let child = SharedChild::spawn(child).expect(ERR_CTX);
+            Self { inner: child, task: Some(Task::local(async {})), compatibility_status: None }
         }
     }
 
@@ -709,24 +899,26 @@ mod test {
         Normal,
         InternalFailure,
         SshFailure,
+        DefaultBuilder,
     }
 
     #[derive(Copy, Clone, Debug)]
-    struct FakeHostPipeChildBuilder {
+    struct FakeHostPipeChildBuilder<'a> {
         operation_type: ChildOperationType,
+        ssh_path: &'a str,
     }
 
     #[async_trait(?Send)]
-    impl HostPipeChildBuilder for FakeHostPipeChildBuilder {
+    impl HostPipeChildBuilder for FakeHostPipeChildBuilder<'_> {
         async fn new(
             &self,
             addr: SocketAddr,
             id: u64,
             stderr_buf: Rc<LogBuffer>,
             event_queue: events::Queue<TargetEvent>,
-            _watchdogs: bool,
-            _ssh_timeout: u16,
-        ) -> Result<(Option<HostAddr>, HostPipeChild)> {
+            watchdogs: bool,
+            ssh_timeout: u16,
+        ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
             match self.operation_type {
                 ChildOperationType::Normal => {
                     start_child_normal_operation(addr, id, stderr_buf, event_queue).await
@@ -737,7 +929,15 @@ mod test {
                 ChildOperationType::SshFailure => {
                     start_child_ssh_failure(addr, id, stderr_buf, event_queue).await
                 }
+                ChildOperationType::DefaultBuilder => {
+                    let builder = HostPipeChildDefaultBuilder { ssh_path: self.ssh_path };
+                    builder.new(addr, id, stderr_buf, event_queue, watchdogs, ssh_timeout).await
+                }
             }
+        }
+
+        fn ssh_path(&self) -> &str {
+            self.ssh_path
         }
     }
 
@@ -746,7 +946,7 @@ mod test {
         _id: u64,
         _buf: Rc<LogBuffer>,
         _events: events::Queue<TargetEvent>,
-    ) -> Result<(Option<HostAddr>, HostPipeChild)> {
+    ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
         Ok((
             Some(HostAddr("127.0.0.1".to_string())),
             HostPipeChild::fake_new(
@@ -763,8 +963,8 @@ mod test {
         _id: u64,
         _buf: Rc<LogBuffer>,
         _events: events::Queue<TargetEvent>,
-    ) -> Result<(Option<HostAddr>, HostPipeChild)> {
-        Err(anyhow!(ERR_CTX))
+    ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
+        Err(PipeError::Error(ERR_CTX.into()))
     }
 
     async fn start_child_ssh_failure(
@@ -772,7 +972,7 @@ mod test {
         _id: u64,
         _buf: Rc<LogBuffer>,
         events: events::Queue<TargetEvent>,
-    ) -> Result<(Option<HostAddr>, HostPipeChild)> {
+    ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
         events.push(TargetEvent::SshHostPipeErr(HostPipeErr::Unknown("foo".to_string()))).unwrap();
         Ok((
             Some(HostAddr("127.0.0.1".to_string())),
@@ -791,9 +991,12 @@ mod test {
             Some("flooooooooberdoober"),
             [TargetAddr::from_str("192.168.1.1:22").unwrap()].into(),
         );
-        let res = HostPipeConnection::<FakeHostPipeChildBuilder>::spawn_with_builder(
+        let res = HostPipeConnection::<FakeHostPipeChildBuilder<'_>>::spawn_with_builder(
             Rc::downgrade(&target),
-            FakeHostPipeChildBuilder { operation_type: ChildOperationType::Normal },
+            FakeHostPipeChildBuilder {
+                operation_type: ChildOperationType::Normal,
+                ssh_path: "ssh",
+            },
             30,
             Duration::default(),
             false,
@@ -810,9 +1013,12 @@ mod test {
             Some("flooooooooberdoober"),
             [TargetAddr::from_str("192.168.1.1:22").unwrap()].into(),
         );
-        let res = HostPipeConnection::<FakeHostPipeChildBuilder>::spawn_with_builder(
+        let res = HostPipeConnection::<FakeHostPipeChildBuilder<'_>>::spawn_with_builder(
             Rc::downgrade(&target),
-            FakeHostPipeChildBuilder { operation_type: ChildOperationType::InternalFailure },
+            FakeHostPipeChildBuilder {
+                operation_type: ChildOperationType::InternalFailure,
+                ssh_path: "ssh",
+            },
             30,
             Duration::default(),
             false,
@@ -840,9 +1046,12 @@ mod test {
         // This is here to allow for the above task to get polled so that the `wait_for` can be
         // placed on at the appropriate time (before the failure occurs in the function below).
         futures_lite::future::yield_now().await;
-        let res = HostPipeConnection::<FakeHostPipeChildBuilder>::spawn_with_builder(
+        let res = HostPipeConnection::<FakeHostPipeChildBuilder<'_>>::spawn_with_builder(
             Rc::downgrade(&target),
-            FakeHostPipeChildBuilder { operation_type: ChildOperationType::SshFailure },
+            FakeHostPipeChildBuilder {
+                operation_type: ChildOperationType::SshFailure,
+                ssh_path: "ssh",
+            },
             30,
             Duration::default(),
             false,
@@ -856,14 +1065,14 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_parse_ssh_connection_works() {
         for (line, expected) in [
-            (&"++ 192.168.1.1 1234 10.0.0.1 22 ++\n"[..], "192.168.1.1".to_string()),
+            (&"++ 192.168.1.1 1234 10.0.0.1 22 ++\n"[..], ("192.168.1.1".to_string(), None)),
             (
                 &"++ fe80::111:2222:3333:444 56671 10.0.0.1 22 ++\n",
-                "fe80::111:2222:3333:444".to_string(),
+                ("fe80::111:2222:3333:444".to_string(), None),
             ),
             (
                 &"++ fe80::111:2222:3333:444%ethxc2 56671 10.0.0.1 22 ++\n",
-                "fe80::111:2222:3333:444%ethxc2".to_string(),
+                ("fe80::111:2222:3333:444%ethxc2".to_string(), None),
             ),
         ] {
             match parse_ssh_connection(&mut line.as_bytes(), None).await {
@@ -964,5 +1173,149 @@ mod test {
             Ok(s) => assert_eq!(s, String::from("foobar\n")),
             res => panic!("unexpected result: {res:?}"),
         }
+    }
+
+    static INIT: std::sync::Once = std::sync::Once::new();
+
+    #[fuchsia::test]
+    async fn test_start_with_failure() {
+        let env = ffx_config::test_init().await.unwrap();
+        INIT.call_once(|| {
+            hoist::init_hoist().expect("init hoist");
+        });
+
+        // Set the ssh key paths to something, the contents do no matter for this test.
+        env.context
+            .query("ssh.pub")
+            .level(Some(ConfigLevel::User))
+            .set(json!([env.isolate_root.path().join("test_authorized_keys")]))
+            .await
+            .expect("setting ssh pub key");
+
+        let ssh_priv = env.isolate_root.path().join("test_ed25519_key");
+        fs::write(&ssh_priv, "test-key").expect("writing test key");
+        env.context
+            .query("ssh.priv")
+            .level(Some(ConfigLevel::User))
+            .set(json!([ssh_priv.to_string_lossy()]))
+            .await
+            .expect("setting ssh priv key");
+
+        let target = crate::target::Target::new_with_addrs(
+            Some("test_target"),
+            [TargetAddr::from_str("192.168.1.1:22").unwrap()].into(),
+        );
+        let _res = HostPipeConnection::<FakeHostPipeChildBuilder<'_>>::spawn_with_builder(
+            Rc::downgrade(&target),
+            FakeHostPipeChildBuilder {
+                operation_type: ChildOperationType::DefaultBuilder,
+                ssh_path: "echo",
+            },
+            30,
+            Duration::default(),
+            false,
+        )
+        .await
+        .expect_err("host connection");
+    }
+
+    #[fuchsia::test]
+    async fn test_start_ok() {
+        let env = ffx_config::test_init().await.unwrap();
+        const SUPPORTED_HOST_PIPE_SH: &str = include_str!("../../test_data/supported_host_pipe.sh");
+
+        let ssh_path = env.isolate_root.path().join("supported_host_pipe.sh");
+        fs::write(&ssh_path, SUPPORTED_HOST_PIPE_SH).expect("writing test script");
+        fs::set_permissions(&ssh_path, fs::Permissions::from_mode(0o770))
+            .expect("setting permissions");
+
+        INIT.call_once(|| {
+            hoist::init_hoist().expect("init hoist");
+        });
+
+        // Set the ssh key paths to something, the contents do no matter for this test.
+        env.context
+            .query("ssh.pub")
+            .level(Some(ConfigLevel::User))
+            .set(json!([env.isolate_root.path().join("test_authorized_keys")]))
+            .await
+            .expect("setting ssh pub key");
+
+        let ssh_priv = env.isolate_root.path().join("test_ed25519_key");
+        fs::write(&ssh_priv, "test-key").expect("writing test key");
+        env.context
+            .query("ssh.priv")
+            .level(Some(ConfigLevel::User))
+            .set(json!([ssh_priv.to_string_lossy()]))
+            .await
+            .expect("setting ssh priv key");
+
+        let target = crate::target::Target::new_with_addrs(
+            Some("test_target"),
+            [TargetAddr::from_str("192.168.1.1:22").unwrap()].into(),
+        );
+        let ssh_path_str: String = ssh_path.to_string_lossy().to_string();
+        let _res = HostPipeConnection::<FakeHostPipeChildBuilder<'_>>::spawn_with_builder(
+            Rc::downgrade(&target),
+            FakeHostPipeChildBuilder {
+                operation_type: ChildOperationType::DefaultBuilder,
+                ssh_path: &ssh_path_str,
+            },
+            30,
+            Duration::default(),
+            false,
+        )
+        .await
+        .expect("host connection");
+    }
+
+    #[fuchsia::test]
+    async fn test_start_legacy_ok() {
+        let env = ffx_config::test_init().await.unwrap();
+        const SUPPORTED_HOST_PIPE_SH: &str = include_str!("../../test_data/legacy_host_pipe.sh");
+
+        let ssh_path = env.isolate_root.path().join("legacy_host_pipe.sh");
+        fs::write(&ssh_path, SUPPORTED_HOST_PIPE_SH).expect("writing test script");
+        fs::set_permissions(&ssh_path, fs::Permissions::from_mode(0o770))
+            .expect("setting permissions");
+
+        INIT.call_once(|| {
+            hoist::init_hoist().expect("init hoist");
+        });
+
+        // Set the ssh key paths to something, the contents do no matter for this test.
+        env.context
+            .query("ssh.pub")
+            .level(Some(ConfigLevel::User))
+            .set(json!([env.isolate_root.path().join("test_authorized_keys")]))
+            .await
+            .expect("setting ssh pub key");
+
+        let ssh_priv = env.isolate_root.path().join("test_ed25519_key");
+        fs::write(&ssh_priv, "test-key").expect("writing test key");
+        env.context
+            .query("ssh.priv")
+            .level(Some(ConfigLevel::User))
+            .set(json!([ssh_priv.to_string_lossy()]))
+            .await
+            .expect("setting ssh priv key");
+
+        let target = crate::target::Target::new_with_addrs(
+            Some("test_target"),
+            [TargetAddr::from_str("192.168.1.1:22").unwrap()].into(),
+        );
+        let ssh_path_str: String = ssh_path.to_string_lossy().to_string();
+        let _res = HostPipeConnection::<FakeHostPipeChildBuilder<'_>>::spawn_with_builder(
+            Rc::downgrade(&target),
+            FakeHostPipeChildBuilder {
+                operation_type: ChildOperationType::DefaultBuilder,
+                ssh_path: &ssh_path_str,
+            },
+            30,
+            Duration::default(),
+            false,
+        )
+        .await
+        .expect("host connection");
     }
 }

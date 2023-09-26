@@ -33,7 +33,11 @@ pub async fn is_active(collection_proxy: &ffx::TargetCollectionProxy, name: &str
                     tracing::debug!("open_remote_control result: {:?}", &rcs_call_result);
                     match rcs_call_result {
                         Ok(rcs_result) => match rcs_result {
-                            Ok(()) => true,
+                            Ok(()) => {
+                                let info = target_proxy.identity().await.unwrap();
+                                tracing::info!("CWCW POST info is {info:?}");
+                                true
+                            }
                             Err(_) => false,
                         },
                         Err(_) => false,
@@ -54,6 +58,7 @@ pub async fn is_active(collection_proxy: &ffx::TargetCollectionProxy, name: &str
 #[cfg(test)]
 mod test {
     use super::*;
+    use ffx::TargetInfo;
     use fidl::endpoints::ServerEnd;
     use futures::TryStreamExt;
 
@@ -128,6 +133,9 @@ mod test {
                                 remote_control: _,
                             } => {
                                 responder.send(Ok(())).unwrap();
+                            }
+                            ffx::TargetRequest::Identity { responder } => {
+                                responder.send(&TargetInfo::default()).unwrap()
                             }
                             r => panic!("unexpected request: {:?}", r),
                         });

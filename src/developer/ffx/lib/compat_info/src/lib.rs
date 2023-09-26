@@ -75,6 +75,7 @@ pub struct CompatibilityInfo {
     pub platform_abi: u64,
     pub message: String,
 }
+
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct ConnectionInfo {
     pub ssh_connection: String,

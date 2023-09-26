@@ -21,6 +21,7 @@ rustc_library("lib") {
     "//src/developer/ffx/daemon/core:lib",
     "//src/developer/ffx/daemon/events:lib",
     "//src/developer/ffx/lib/addr:lib",
+    "//src/developer/ffx/lib/compat_info:lib",
     "//src/developer/ffx/lib/fastboot:lib",
     "//src/developer/ffx/lib/metrics:lib",
     "//src/developer/ffx/lib/netext:lib",
@@ -33,6 +34,7 @@ rustc_library("lib") {
     "//src/lib/network/netsvc-proto",
     "//src/lib/network/packet",
     "//src/lib/usb_bulk/rust:lib",
+    "//src/lib/versioning/version-history/rust:version-history",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-io",
     "//third_party/rust_crates:async-lock",
@@ -73,6 +75,11 @@ rustc_library("lib") {
     "src/target.rs",
     "src/target_collection.rs",
     "src/zedboot.rs",
+  ]
+
+  inputs = [
+    "test_data/supported_host_pipe.sh",
+    "test_data/legacy_host_pipe.sh",
   ]
 }
 

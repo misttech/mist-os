@@ -11,6 +11,7 @@ use addr::TargetAddr;
 use anyhow::{anyhow, bail, Context, Error, Result};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use compat_info::{CompatibilityInfo, CompatibilityState};
 use ffx::{TargetAddrInfo, TargetIpPort};
 use ffx_daemon_core::events::{self, EventSynthesizer};
 use ffx_daemon_events::{FastbootInterface, TargetConnectionState, TargetEvent, TargetInfo};
@@ -155,6 +156,8 @@ pub struct Target {
     pub(crate) ssh_host_address: RefCell<Option<HostAddr>>,
     // A user provided address that should be used to SSH.
     preferred_ssh_address: RefCell<Option<TargetAddr>>,
+
+    compatibility_status: RefCell<Option<CompatibilityInfo>>,
 }
 
 impl Target {
@@ -184,6 +187,7 @@ impl Target {
             fastboot_interface: RefCell::new(None),
             ssh_host_address: RefCell::new(None),
             preferred_ssh_address: RefCell::new(None),
+            compatibility_status: RefCell::new(None),
         });
         target.target_event_synthesizer.target.replace(Rc::downgrade(&target));
         target
@@ -565,6 +569,32 @@ impl Target {
 
     pub fn serial(&self) -> Option<String> {
         self.serial.borrow().clone()
+    }
+
+    pub fn get_compatibility_status(&self) -> Option<CompatibilityInfo> {
+        self.compatibility_status.borrow().clone()
+    }
+
+    pub fn set_compatibility_status(&self, status: &Option<CompatibilityInfo>) {
+        let current_status = self.get_compatibility_status();
+        let new_status = match current_status {
+            Some(_) => {
+                println!(
+                    "ignoring status change from id:{} {:?} to {:?}",
+                    self.id(),
+                    current_status,
+                    status
+                );
+                return;
+            }
+            None if status.is_some() => {
+                println!("status change from None to id: {} {:?}", self.id(), status);
+                status.clone()
+            }
+            _ => None,
+        };
+
+        self.compatibility_status.replace(new_status);
     }
 
     pub fn state(&self) -> TargetConnectionState {
@@ -983,18 +1013,35 @@ impl Target {
 
             let watchdogs: bool =
                 ffx_config::get("watchdogs.host_pipe.enabled").await.unwrap_or(false);
+
             let ssh_timeout: u16 =
                 ffx_config::get(CONFIG_HOST_PIPE_SSH_TIMEOUT).await.unwrap_or(50);
             let nr = spawn(weak_target.clone(), watchdogs, ssh_timeout).await;
+
             match nr {
                 Ok(mut hp) => {
                     tracing::debug!("host pipe spawn returned OK for {target_name_str}");
+                    let compatibility_status = hp.get_compatibility_status();
+
+                    if let Some(target) = weak_target.upgrade() {
+                        target.set_compatibility_status(&compatibility_status);
+                    }
+
+                    // wait for the host pipe to exit.
                     let r = hp.wait().await;
                     // XXX(raggi): decide what to do with this log data:
                     tracing::info!("HostPipeConnection returned: {:?}", r);
                 }
                 Err(e) => {
                     tracing::warn!("Host pipe spawn {:?}", e);
+                    let compatibility_status = Some(CompatibilityInfo {
+                        status: CompatibilityState::Error,
+                        platform_abi: 0,
+                        message: format!("Host connection failed: {e}"),
+                    });
+                    if let Some(target) = weak_target.upgrade() {
+                        target.set_compatibility_status(&compatibility_status);
+                    }
                 }
             }
 
@@ -1113,7 +1160,8 @@ impl From<&Target> for ffx::TargetInfo {
             .unwrap_or((None, None));
 
         let fastboot_interface = target.infer_fastboot_interface();
-
+        let info = target.get_compatibility_status();
+        
         Self {
             nodename: target.nodename(),
             serial_number: target.serial(),
@@ -1153,6 +1201,10 @@ impl From<&Target> for ffx::TargetInfo {
                 Some(FastbootInterface::Udp) => Some(ffx::FastbootInterface::Udp),
                 Some(FastbootInterface::Tcp) => Some(ffx::FastbootInterface::Tcp),
             },
+            compatibility: match info {
+                Some(data) => Some(data.into()),
+                None => None,
+            },
             ..Default::default()
         }
     }
@@ -1170,7 +1222,7 @@ impl Debug for Target {
             .field("ssh_port", &self.ssh_port.borrow().clone())
             .field("serial", &self.serial.borrow().clone())
             .field("boot_timestamp_nanos", &self.boot_timestamp_nanos.borrow().clone())
-            // TODO(raggi): add task fields
+            .field("compatibility_status", &self.compatibility_status.borrow().clone())
             .finish()
     }
 }
@@ -1201,6 +1253,7 @@ pub(crate) fn clone_target(target: &Target) -> Rc<Target> {
     new.boot_timestamp_nanos.replace(target.boot_timestamp_nanos.borrow().clone());
     new.build_config.replace(target.build_config.borrow().clone());
     new.last_response.replace(target.last_response.borrow().clone());
+    new.set_compatibility_status(&target.get_compatibility_status());
     // TODO(raggi): there are missing fields here, as there were before the
     // refactor in which I introduce this comment. It should be a goal to
     // remove this helper function over time.
