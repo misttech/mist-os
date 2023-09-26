@@ -29,6 +29,9 @@ pub enum Error {
     #[error("Incompatible wire format magic number: {0}.")]
     IncompatibleMagicNumber(u8),
 
+    #[error("Unsupported wire format version")]
+    UnsupportedWireFormatVersion,
+
     #[error("Invalid FIDL buffer.")]
     Invalid,
 

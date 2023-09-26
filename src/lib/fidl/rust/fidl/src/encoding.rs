@@ -290,21 +290,12 @@ macro_rules! decode {
 
 /// Wire format version to use during encode / decode.
 #[derive(Clone, Copy, Debug)]
-#[repr(u8)]
 pub enum WireFormatVersion {
-    /// V1 wire format
-    V1,
-    /// V2 wire format
-    /// This includes the following:
-    /// - RFC-0113: Efficient envelopes
-    /// - RFC-0114: Inlining small values in FIDL envelopes
+    /// FIDL 2023 wire format.
     V2,
 }
 
 /// Context for encoding and decoding.
-///
-/// This is currently empty. We keep it around to ease the implementation of
-/// context-dependent behavior for future migrations.
 ///
 /// WARNING: Do not construct this directly unless you know what you're doing.
 /// FIDL uses `Context` to coordinate soft migrations, so improper uses of it
@@ -315,12 +306,14 @@ pub struct Context {
     pub wire_format_version: WireFormatVersion,
 }
 
+// We only support one wire format right now, so context should be zero size.
+const_assert_eq!(mem::size_of::<Context>(), 0);
+
 impl Context {
     /// Returns the header flags to set when encoding with this context.
     #[inline]
     pub(crate) fn at_rest_flags(&self) -> AtRestFlags {
         match self.wire_format_version {
-            WireFormatVersion::V1 => AtRestFlags::empty(),
             WireFormatVersion::V2 => AtRestFlags::USE_V2_WIRE_FORMAT,
         }
     }
@@ -2005,9 +1998,22 @@ pub unsafe fn encode_in_envelope<T: TypeMarker>(
     depth.increment()?;
     let bytes_before = encoder.buf.len();
     let handles_before = encoder.handles.len();
-    let (inner_offset, finish) = prepare_envelope(T::inline_size(encoder.context), encoder, offset);
-    val.encode(encoder, inner_offset, depth)?;
-    finish(encoder, offset, bytes_before, handles_before);
+    let inline_size = T::inline_size(encoder.context);
+    if inline_size <= 4 {
+        // Zero out the 4 byte inlined region and set the flag at the same time.
+        encoder.write_num(1u64 << 48, offset);
+        val.encode(encoder, offset, depth)?;
+        let handles_written = (encoder.handles.len() - handles_before) as u16;
+        encoder.write_num(handles_written, offset + 4);
+    } else {
+        let out_of_line_offset = encoder.out_of_line_offset(inline_size);
+        val.encode(encoder, out_of_line_offset, depth)?;
+        let bytes_written = (encoder.buf.len() - bytes_before) as u32;
+        let handles_written = (encoder.handles.len() - handles_before) as u32;
+        debug_assert!(bytes_written % 8 == 0);
+        encoder.write_num(bytes_written, offset);
+        encoder.write_num(handles_written, offset + 4);
+    }
     Ok(())
 }
 
@@ -2017,98 +2023,13 @@ pub unsafe fn encode_in_envelope_optional<T: TypeMarker>(
     val: Option<impl Encode<T>>,
     encoder: &mut Encoder<'_>,
     offset: usize,
-    mut depth: Depth,
+    depth: Depth,
 ) -> Result<()> {
-    let bytes_before = encoder.buf.len();
-    let handles_before = encoder.handles.len();
-    let Some((inner_offset, finish)) = prepare_envelope_optional(
-        val.is_some(),
-        T::inline_size(encoder.context),
-        encoder,
-        offset,
-    ) else {
-        return Ok(());
-    };
-    depth.increment()?;
-    unsafe { val.unwrap_unchecked() }.encode(encoder, inner_offset, depth)?;
-    finish(encoder, offset, bytes_before, handles_before);
+    match val {
+        None => encoder.write_num(0u64, offset),
+        Some(val) => encode_in_envelope(val, encoder, offset, depth)?,
+    }
     Ok(())
-}
-
-/// Helper for encoding a value in an envelope. Returns the offset where the
-/// value should be written, and a function to be called afterwards.
-#[inline]
-unsafe fn prepare_envelope(
-    inline_size: usize,
-    encoder: &mut Encoder<'_>,
-    offset: usize,
-) -> (usize, FinishEnvelopeFn) {
-    let v1 = match encoder.context.wire_format_version {
-        WireFormatVersion::V1 => true,
-        WireFormatVersion::V2 => false,
-    };
-    if v1 || inline_size > 4 {
-        encoder.write_num(0u64, offset);
-        if v1 {
-            encoder.write_num(ALLOC_PRESENT_U64, offset + 8);
-        }
-        (encoder.out_of_line_offset(inline_size), finish_out_of_line_envelope)
-    } else {
-        // This simultaneously zeroes out the first 4 bytes and writes the flag
-        // byte indicating the envelope is inlined (1u16 at offset + 6).
-        encoder.write_num(1u64 << 48, offset);
-        (offset, finish_inlined_envelope)
-    }
-}
-
-#[inline]
-unsafe fn prepare_envelope_optional(
-    present: bool,
-    inline_size: usize,
-    encoder: &mut Encoder<'_>,
-    offset: usize,
-) -> Option<(usize, FinishEnvelopeFn)> {
-    if present {
-        Some(prepare_envelope(inline_size, encoder, offset))
-    } else {
-        encode_absent_envelope(encoder, offset);
-        None
-    }
-}
-
-type FinishEnvelopeFn =
-    unsafe fn(encoder: &mut Encoder<'_>, offset: usize, bytes_before: usize, handles_before: usize);
-
-unsafe fn finish_out_of_line_envelope(
-    encoder: &mut Encoder<'_>,
-    offset: usize,
-    bytes_before: usize,
-    handles_before: usize,
-) {
-    let bytes_written = (encoder.buf.len() - bytes_before) as u32;
-    let handles_written = (encoder.handles.len() - handles_before) as u32;
-    debug_assert!(bytes_written % 8 == 0);
-    encoder.write_num(bytes_written, offset);
-    encoder.write_num(handles_written, offset + 4);
-}
-
-unsafe fn finish_inlined_envelope(
-    encoder: &mut Encoder<'_>,
-    offset: usize,
-    _bytes_before: usize,
-    handles_before: usize,
-) {
-    let handles_written = (encoder.handles.len() - handles_before) as u16;
-    encoder.write_num(handles_written, offset + 4);
-}
-
-#[inline]
-unsafe fn encode_absent_envelope(encoder: &mut Encoder<'_>, offset: usize) {
-    encoder.write_num(0u64, offset);
-    match encoder.context.wire_format_version {
-        WireFormatVersion::V1 => encoder.write_num(ALLOC_ABSENT_U64, offset + 8),
-        WireFormatVersion::V2 => {}
-    }
 }
 
 /// Decodes and validates an envelope header. Returns `None` if absent and
@@ -2119,47 +2040,15 @@ pub unsafe fn decode_envelope_header(
     decoder: &mut Decoder<'_>,
     offset: usize,
 ) -> Result<Option<(bool, u32, u32)>> {
-    let mut num_bytes: u32 = decoder.read_num::<u32>(offset);
-    let num_handles: u32;
-    let inlined: bool;
-    let is_present: bool;
-
-    match decoder.context.wire_format_version {
-        WireFormatVersion::V1 => {
-            inlined = false;
-            num_handles = decoder.read_num::<u32>(offset + 4);
-            is_present = match decoder.read_num::<u64>(offset + 8) {
-                ALLOC_PRESENT_U64 => true,
-                ALLOC_ABSENT_U64 => false,
-                _ => return Err(Error::InvalidPresenceIndicator),
-            };
-        }
-        WireFormatVersion::V2 => {
-            num_handles = decoder.read_num::<u16>(offset + 4) as u32;
-            inlined = match decoder.read_num::<u16>(offset + 6) {
-                0 => false,
-                1 => true,
-                _ => return Err(Error::InvalidInlineMarkerInEnvelope),
-            };
-            if inlined {
-                num_bytes = 4;
-            }
-            is_present = num_bytes != 0 || num_handles != 0;
-        }
-    }
-
-    if is_present {
-        if !inlined && num_bytes % 8 != 0 {
-            Err(Error::InvalidNumBytesInEnvelope)
-        } else {
-            Ok(Some((inlined, num_bytes, num_handles)))
-        }
-    } else if num_bytes != 0 {
-        Err(Error::InvalidNumBytesInEnvelope)
-    } else if num_handles != 0 {
-        Err(Error::InvalidNumHandlesInEnvelope)
-    } else {
-        Ok(None)
+    let num_bytes = decoder.read_num::<u32>(offset);
+    let num_handles = decoder.read_num::<u16>(offset + 4) as u32;
+    let inlined = decoder.read_num::<u16>(offset + 6);
+    match (num_bytes, num_handles, inlined) {
+        (0, 0, 0) => Ok(None),
+        (_, _, 1) => Ok(Some((true, 4, num_handles))),
+        (_, _, 0) if num_bytes % 8 == 0 => Ok(Some((false, num_bytes, num_handles))),
+        (_, _, 0) => Err(Error::InvalidNumBytesInEnvelope),
+        _ => Err(Error::InvalidInlineMarkerInEnvelope),
     }
 }
 
@@ -2383,11 +2272,8 @@ macro_rules! impl_result_union {
             }
 
             #[inline(always)]
-            fn inline_size(context: Context) -> usize {
-                match context.wire_format_version {
-                    WireFormatVersion::V1 => 24,
-                    WireFormatVersion::V2 => 16,
-                }
+            fn inline_size(_context: Context) -> usize {
+                16
             }
         }
 
@@ -2427,10 +2313,8 @@ macro_rules! impl_result_union {
                     )*
                     _ => return Err(Error::UnknownUnionTag),
                 };
-                if let WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 if inlined {
@@ -2729,13 +2613,16 @@ impl TransactionHeader {
         self.ordinal == EPITAPH_ORDINAL
     }
 
-    /// Returns an error if this header has an incompatible magic number.
+    /// Returns an error if this header has an incompatible wire format.
     #[inline]
-    pub fn validate_magic_number(&self) -> Result<()> {
-        match self.magic_number {
-            MAGIC_NUMBER_INITIAL => Ok(()),
-            n => Err(Error::IncompatibleMagicNumber(n)),
+    pub fn validate_wire_format(&self) -> Result<()> {
+        if self.magic_number != MAGIC_NUMBER_INITIAL {
+            return Err(Error::IncompatibleMagicNumber(self.magic_number));
         }
+        if !self.at_rest_flags().contains(AtRestFlags::USE_V2_WIRE_FORMAT) {
+            return Err(Error::UnsupportedWireFormatVersion);
+        }
+        Ok(())
     }
 
     /// Returns an error if this request header has an incorrect transaction id
@@ -2766,11 +2653,7 @@ impl TransactionHeader {
     /// controls dynamic behavior in the read path.
     #[inline]
     pub fn decoding_context(&self) -> Context {
-        if self.at_rest_flags().contains(AtRestFlags::USE_V2_WIRE_FORMAT) {
-            Context { wire_format_version: WireFormatVersion::V2 }
-        } else {
-            Context { wire_format_version: WireFormatVersion::V1 }
-        }
+        Context { wire_format_version: WireFormatVersion::V2 }
     }
 }
 
@@ -2786,7 +2669,7 @@ pub fn decode_transaction_header(bytes: &[u8]) -> Result<(TransactionHeader, &[u
     let (header_bytes, body_bytes) = bytes.split_at(header_len);
     Decoder::decode_with_context::<TransactionHeader>(context, header_bytes, &mut [], &mut header)
         .map_err(|_| Error::InvalidHeader)?;
-    header.validate_magic_number()?;
+    header.validate_wire_format()?;
     Ok((header, body_bytes))
 }
 
@@ -2935,10 +2818,7 @@ mod test {
     use assert_matches::assert_matches;
     use std::{f32, f64, fmt, i64, u64};
 
-    const CONTEXTS: [Context; 2] = [
-        Context { wire_format_version: WireFormatVersion::V1 },
-        Context { wire_format_version: WireFormatVersion::V2 },
-    ];
+    const CONTEXTS: [Context; 1] = [Context { wire_format_version: WireFormatVersion::V2 }];
 
     const OBJECT_TYPE_NONE: u32 = crate::handle::ObjectType::NONE.into_raw();
     const SAME_RIGHTS: u32 = crate::handle::Rights::SAME_RIGHTS.bits();
@@ -3206,7 +3086,7 @@ mod test {
             let header = TransactionHeader {
                 tx_id: 4,
                 ordinal: 6,
-                at_rest_flags: [0; 2],
+                at_rest_flags: [2, 0],
                 dynamic_flags: 0,
                 magic_number: 1,
             };

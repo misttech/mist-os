@@ -64,20 +64,19 @@ impl WireMetadata {
     /// controls dynamic behavior in the read path.
     #[inline]
     fn decoding_context(&self) -> Context {
-        if self.at_rest_flags().contains(AtRestFlags::USE_V2_WIRE_FORMAT) {
-            Context { wire_format_version: WireFormatVersion::V2 }
-        } else {
-            Context { wire_format_version: WireFormatVersion::V1 }
-        }
+        Context { wire_format_version: WireFormatVersion::V2 }
     }
 
-    /// Returns an error if this header has an incompatible magic number.
+    /// Returns an error if this header has an incompatible wire format.
     #[inline]
-    fn validate_magic_number(&self) -> Result<()> {
-        match self.magic_number {
-            MAGIC_NUMBER_INITIAL => Ok(()),
-            n => Err(Error::IncompatibleMagicNumber(n)),
+    pub fn validate_wire_format(&self) -> Result<()> {
+        if self.magic_number != MAGIC_NUMBER_INITIAL {
+            return Err(Error::IncompatibleMagicNumber(self.magic_number));
         }
+        if !self.at_rest_flags().contains(AtRestFlags::USE_V2_WIRE_FORMAT) {
+            return Err(Error::UnsupportedWireFormatVersion);
+        }
+        Ok(())
     }
 }
 
@@ -189,7 +188,7 @@ fn decode_wire_metadata(bytes: &[u8]) -> Result<(WireMetadata, &[u8])> {
     let (header_bytes, body_bytes) = bytes.split_at(header_len);
     Decoder::decode_with_context::<WireMetadata>(context, header_bytes, &mut [], &mut header)
         .map_err(|_| Error::InvalidHeader)?;
-    header.validate_magic_number()?;
+    header.validate_wire_format()?;
     Ok((header, body_bytes))
 }
 

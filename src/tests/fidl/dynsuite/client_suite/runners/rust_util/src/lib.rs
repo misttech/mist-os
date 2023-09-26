@@ -11,6 +11,7 @@ pub fn classify_error(error: fidl::Error) -> FidlErrorKind {
         fidl::Error::InvalidBoolean
         | fidl::Error::InvalidHeader
         | fidl::Error::IncompatibleMagicNumber(_)
+        | fidl::Error::UnsupportedWireFormatVersion
         | fidl::Error::InvalidResponseOrdinal { .. }
         | fidl::Error::Invalid
         | fidl::Error::OutOfRange

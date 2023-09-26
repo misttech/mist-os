@@ -30,19 +30,13 @@ unsafe impl fidl::encoding::TypeMarker for {{ .Name }} {
     type Owned = Self;
 
     #[inline(always)]
-    fn inline_align(context: fidl::encoding::Context) -> usize {
-        match context.wire_format_version {
-            fidl::encoding::WireFormatVersion::V1 => {{ .AlignmentV1 }},
-            fidl::encoding::WireFormatVersion::V2 => {{ .AlignmentV2 }},
-        }
+    fn inline_align(_context: fidl::encoding::Context) -> usize {
+        {{ .AlignmentV2 }}
     }
 
     #[inline(always)]
-    fn inline_size(context: fidl::encoding::Context) -> usize {
-        match context.wire_format_version {
-            fidl::encoding::WireFormatVersion::V1 => {{ .SizeV1 }},
-            fidl::encoding::WireFormatVersion::V2 => {{ .SizeV2 }},
-        }
+    fn inline_size(_context: fidl::encoding::Context) -> usize {
+        {{ .SizeV2 }}
     }
 
     {{- if and .UseFidlStructCopy (not .FlattenedPaddingMarkersV2) }}
@@ -124,31 +118,15 @@ unsafe impl<{{ range $i, $member := .Members }} T{{ $i }}: fidl::encoding::Encod
         encoder.debug_check_bounds::<{{ .Name }}>(offset);
         // Zero out padding regions. There's no need to apply masks
         // because the unmasked parts will be overwritten by fields.
-        match encoder.context.wire_format_version {
-            fidl::encoding::WireFormatVersion::V1 => {
-                {{- range .PaddingMarkersV1 }}
-                unsafe {
-                    let ptr = encoder.buf.as_mut_ptr().add(offset).offset({{ .Offset }});
-                    (ptr as *mut {{ .Type }}).write_unaligned(0);
-                }
-                {{- end }}
-            },
-            fidl::encoding::WireFormatVersion::V2 => {
-                {{- range .PaddingMarkersV2 }}
-                unsafe {
-                    let ptr = encoder.buf.as_mut_ptr().add(offset).offset({{ .Offset }});
-                    (ptr as *mut {{ .Type }}).write_unaligned(0);
-                }
-                {{- end }}
-            },
-        };
+        {{- range .PaddingMarkersV2 }}
+        unsafe {
+            let ptr = encoder.buf.as_mut_ptr().add(offset).offset({{ .Offset }});
+            (ptr as *mut {{ .Type }}).write_unaligned(0);
+        }
+        {{- end }}
         // Write the fields.
         {{- range $i, $member := .Members }}
-        let member_offset = match encoder.context.wire_format_version {
-            fidl::encoding::WireFormatVersion::V1 => {{ $member.OffsetV1 }},
-            fidl::encoding::WireFormatVersion::V2 => {{ $member.OffsetV2 }},
-        };
-        self.{{ $i }}.encode(encoder, offset + member_offset, depth)?;
+        self.{{ $i }}.encode(encoder, offset + {{ $member.OffsetV2 }}, depth)?;
         {{- end }}
         Ok(())
     }
@@ -197,38 +175,18 @@ impl fidl::encoding::Decode<Self> for {{ .Name }} {
         {{- else }}
         {{- /* Case #3: General case */}}
             // Verify that padding bytes are zero.
-            match decoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => {
-                    {{- range .PaddingMarkersV1 }}
-                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset({{ .Offset }}) };
-                    let padval = unsafe { (ptr as *const {{ .Type }}).read_unaligned() };
-                    let maskedval = padval & {{ .Mask }};
-                    if (maskedval != 0) {
-                        return Err(fidl::Error::NonZeroPadding {
-                            padding_start: offset + {{ .Offset }} + (({{ .Mask }} as u64).trailing_zeros() / 8) as usize,
-                        });
-                    }
-                    {{- end }}
-                }
-                fidl::encoding::WireFormatVersion::V2 => {
-                    {{- range .PaddingMarkersV2 }}
-                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset({{ .Offset }}) };
-                    let padval = unsafe { (ptr as *const {{ .Type }}).read_unaligned() };
-                    let maskedval = padval & {{ .Mask }};
-                    if (maskedval != 0) {
-                        return Err(fidl::Error::NonZeroPadding {
-                            padding_start: offset + {{ .Offset }} + (({{ .Mask }} as u64).trailing_zeros() / 8) as usize,
-                        });
-                    }
-                    {{- end }}
-                }
-            };
+            {{- range .PaddingMarkersV2 }}
+            let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset({{ .Offset }}) };
+            let padval = unsafe { (ptr as *const {{ .Type }}).read_unaligned() };
+            let maskedval = padval & {{ .Mask }};
+            if (maskedval != 0) {
+                return Err(fidl::Error::NonZeroPadding {
+                    padding_start: offset + {{ .Offset }} + (({{ .Mask }} as u64).trailing_zeros() / 8) as usize,
+                });
+            }
+            {{- end }}
             {{- range .Members }}
-            let member_offset = match decoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => {{ .OffsetV1 }},
-                fidl::encoding::WireFormatVersion::V2 => {{ .OffsetV2 }},
-            };
-            fidl::decode!({{ .Type.Fidl }}, &mut self.{{ .Name }}, decoder, offset + member_offset, _depth)?;
+            fidl::decode!({{ .Type.Fidl }}, &mut self.{{ .Name }}, decoder, offset + {{ .OffsetV2 }}, _depth)?;
             {{- end }}
             Ok(())
         {{- end }}

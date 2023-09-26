@@ -25,9 +25,6 @@ use tracing::info;
 const DISABLED_TESTS: &[Test] = &[
     // This is for testing the test disabling functionality itself.
     Test::IgnoreDisabled,
-    // TODO(fxbug.dev/99738): Should reject V1 wire format.
-    Test::V1TwoWayNoPayload,
-    Test::V1TwoWayStructPayload,
     // TODO(fxbug.dev/81036): Bindings *do* hide PEER_CLOSED from event sending.
     // But because we send events through an Option<TargetControlHandle>, and we
     // have to set it to None at the end (see the other comment about
@@ -78,7 +75,9 @@ fn get_teardown_reason(error: Option<fidl::Error>) -> TeardownReason {
         | fidl::Error::IncorrectHandleSubtype { .. }
         | fidl::Error::MissingExpectedHandleRights { .. } => TeardownReason::DECODE_FAILURE,
 
-        fidl::Error::IncompatibleMagicNumber(_) => TeardownReason::INCOMPATIBLE_FORMAT,
+        fidl::Error::IncompatibleMagicNumber(_) | fidl::Error::UnsupportedWireFormatVersion => {
+            TeardownReason::INCOMPATIBLE_FORMAT
+        }
 
         fidl::Error::InvalidRequestTxid
         | fidl::Error::InvalidResponseTxid

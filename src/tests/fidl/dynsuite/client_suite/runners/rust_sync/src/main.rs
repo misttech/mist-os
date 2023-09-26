@@ -22,9 +22,7 @@ use {
 };
 
 const DISABLED_TESTS: &[Test] = &[
-    // TODO(fxbug.dev/99738): Should reject V1 wire format.
-    Test::V1TwoWayNoPayload,
-    Test::V1TwoWayStructPayload,
+    // No disabled tests!
 ];
 
 async fn handle_runner_request(request: RunnerRequest) {

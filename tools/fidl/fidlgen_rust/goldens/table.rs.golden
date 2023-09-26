@@ -217,11 +217,8 @@ mod internal {
                 return Ok(());
             }
             depth.increment()?;
-            let envelope_size = match encoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 16,
-                fidl::encoding::WireFormatVersion::V2 => 8,
-            };
-            let bytes_len = (max_ordinal as usize) * envelope_size;
+            let envelope_size = 8;
+            let bytes_len = max_ordinal as usize * envelope_size;
             #[allow(unused_variables)]
             let offset = encoder.out_of_line_offset(bytes_len);
             let mut _prev_end_offset: usize = 0;
@@ -248,10 +245,7 @@ mod internal {
                 Some(len) => len,
             };
             depth.increment()?;
-            let envelope_size = match decoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 16,
-                fidl::encoding::WireFormatVersion::V2 => 8,
-            };
+            let envelope_size = 8;
             let bytes_len = len * envelope_size;
             let offset = decoder.out_of_line_offset(bytes_len)?;
             // Decode the envelope for each type.
@@ -316,11 +310,8 @@ mod internal {
                 return Ok(());
             }
             depth.increment()?;
-            let envelope_size = match encoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 16,
-                fidl::encoding::WireFormatVersion::V2 => 8,
-            };
-            let bytes_len = (max_ordinal as usize) * envelope_size;
+            let envelope_size = 8;
+            let bytes_len = max_ordinal as usize * envelope_size;
             #[allow(unused_variables)]
             let offset = encoder.out_of_line_offset(bytes_len);
             let mut _prev_end_offset: usize = 0;
@@ -347,10 +338,7 @@ mod internal {
                 Some(len) => len,
             };
             depth.increment()?;
-            let envelope_size = match decoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 16,
-                fidl::encoding::WireFormatVersion::V2 => 8,
-            };
+            let envelope_size = 8;
             let bytes_len = len * envelope_size;
             let offset = decoder.out_of_line_offset(bytes_len)?;
             // Decode the envelope for each type.
@@ -424,11 +412,8 @@ mod internal {
                 return Ok(());
             }
             depth.increment()?;
-            let envelope_size = match encoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 16,
-                fidl::encoding::WireFormatVersion::V2 => 8,
-            };
-            let bytes_len = (max_ordinal as usize) * envelope_size;
+            let envelope_size = 8;
+            let bytes_len = max_ordinal as usize * envelope_size;
             #[allow(unused_variables)]
             let offset = encoder.out_of_line_offset(bytes_len);
             let mut _prev_end_offset: usize = 0;
@@ -524,10 +509,7 @@ mod internal {
                 Some(len) => len,
             };
             depth.increment()?;
-            let envelope_size = match decoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 16,
-                fidl::encoding::WireFormatVersion::V2 => 8,
-            };
+            let envelope_size = 8;
             let bytes_len = len * envelope_size;
             let offset = decoder.out_of_line_offset(bytes_len)?;
             // Decode the envelope for each type.
@@ -553,10 +535,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -598,10 +578,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -643,10 +621,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -730,11 +706,8 @@ mod internal {
                 return Ok(());
             }
             depth.increment()?;
-            let envelope_size = match encoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 16,
-                fidl::encoding::WireFormatVersion::V2 => 8,
-            };
-            let bytes_len = (max_ordinal as usize) * envelope_size;
+            let envelope_size = 8;
+            let bytes_len = max_ordinal as usize * envelope_size;
             #[allow(unused_variables)]
             let offset = encoder.out_of_line_offset(bytes_len);
             let mut _prev_end_offset: usize = 0;
@@ -784,10 +757,7 @@ mod internal {
                 Some(len) => len,
             };
             depth.increment()?;
-            let envelope_size = match decoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 16,
-                fidl::encoding::WireFormatVersion::V2 => 8,
-            };
+            let envelope_size = 8;
             let bytes_len = len * envelope_size;
             let offset = decoder.out_of_line_offset(bytes_len)?;
             // Decode the envelope for each type.
@@ -813,10 +783,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -906,11 +874,8 @@ mod internal {
                 return Ok(());
             }
             depth.increment()?;
-            let envelope_size = match encoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 16,
-                fidl::encoding::WireFormatVersion::V2 => 8,
-            };
-            let bytes_len = (max_ordinal as usize) * envelope_size;
+            let envelope_size = 8;
+            let bytes_len = max_ordinal as usize * envelope_size;
             #[allow(unused_variables)]
             let offset = encoder.out_of_line_offset(bytes_len);
             let mut _prev_end_offset: usize = 0;
@@ -1006,10 +971,7 @@ mod internal {
                 Some(len) => len,
             };
             depth.increment()?;
-            let envelope_size = match decoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 16,
-                fidl::encoding::WireFormatVersion::V2 => 8,
-            };
+            let envelope_size = 8;
             let bytes_len = len * envelope_size;
             let offset = decoder.out_of_line_offset(bytes_len)?;
             // Decode the envelope for each type.
@@ -1035,10 +997,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -1080,10 +1040,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -1125,10 +1083,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -1215,11 +1171,8 @@ mod internal {
                 return Ok(());
             }
             depth.increment()?;
-            let envelope_size = match encoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 16,
-                fidl::encoding::WireFormatVersion::V2 => 8,
-            };
-            let bytes_len = (max_ordinal as usize) * envelope_size;
+            let envelope_size = 8;
+            let bytes_len = max_ordinal as usize * envelope_size;
             #[allow(unused_variables)]
             let offset = encoder.out_of_line_offset(bytes_len);
             let mut _prev_end_offset: usize = 0;
@@ -1292,10 +1245,7 @@ mod internal {
                 Some(len) => len,
             };
             depth.increment()?;
-            let envelope_size = match decoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 16,
-                fidl::encoding::WireFormatVersion::V2 => 8,
-            };
+            let envelope_size = 8;
             let bytes_len = len * envelope_size;
             let offset = decoder.out_of_line_offset(bytes_len)?;
             // Decode the envelope for each type.
@@ -1321,10 +1271,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -1366,10 +1314,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -1642,11 +1588,8 @@ mod internal {
                 return Ok(());
             }
             depth.increment()?;
-            let envelope_size = match encoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 16,
-                fidl::encoding::WireFormatVersion::V2 => 8,
-            };
-            let bytes_len = (max_ordinal as usize) * envelope_size;
+            let envelope_size = 8;
+            let bytes_len = max_ordinal as usize * envelope_size;
             #[allow(unused_variables)]
             let offset = encoder.out_of_line_offset(bytes_len);
             let mut _prev_end_offset: usize = 0;
@@ -3145,10 +3088,7 @@ mod internal {
                 Some(len) => len,
             };
             depth.increment()?;
-            let envelope_size = match decoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 16,
-                fidl::encoding::WireFormatVersion::V2 => 8,
-            };
+            let envelope_size = 8;
             let bytes_len = len * envelope_size;
             let offset = decoder.out_of_line_offset(bytes_len)?;
             // Decode the envelope for each type.
@@ -3174,10 +3114,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -3219,10 +3157,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -3264,10 +3200,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -3309,10 +3243,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -3354,10 +3286,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -3399,10 +3329,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -3444,10 +3372,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -3489,10 +3415,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -3534,10 +3458,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -3579,10 +3501,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -3624,10 +3544,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -3669,10 +3587,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -3714,10 +3630,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -3759,10 +3673,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -3804,10 +3716,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -3849,10 +3759,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -3894,10 +3802,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -3939,10 +3845,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -3984,10 +3888,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -4029,10 +3931,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -4074,10 +3974,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -4119,10 +4017,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -4164,10 +4060,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -4209,10 +4103,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -4254,10 +4146,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -4299,10 +4189,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -4344,10 +4232,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -4389,10 +4275,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -4434,10 +4318,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -4479,10 +4361,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -4524,10 +4404,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -4569,10 +4447,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -4614,10 +4490,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -4659,10 +4533,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -4704,10 +4576,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -4749,10 +4619,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -4794,10 +4662,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -4839,10 +4705,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -4884,10 +4748,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -4929,10 +4791,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -4974,10 +4834,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -5019,10 +4877,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -5064,10 +4920,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -5109,10 +4963,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -5154,10 +5006,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -5199,10 +5049,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -5244,10 +5092,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -5289,10 +5135,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -5334,10 +5178,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -5379,10 +5221,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -5424,10 +5264,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -5469,10 +5307,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -5514,10 +5350,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -5559,10 +5393,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -5604,10 +5436,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -5649,10 +5479,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -5694,10 +5522,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -5739,10 +5565,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -5784,10 +5608,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -5829,10 +5651,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -5874,10 +5694,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -5919,10 +5737,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -5964,10 +5780,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -6009,10 +5823,8 @@ mod internal {
             {
                 let member_inline_size =
                     <ExtensionTable as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();
@@ -6096,11 +5908,8 @@ mod internal {
                 return Ok(());
             }
             depth.increment()?;
-            let envelope_size = match encoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 16,
-                fidl::encoding::WireFormatVersion::V2 => 8,
-            };
-            let bytes_len = (max_ordinal as usize) * envelope_size;
+            let envelope_size = 8;
+            let bytes_len = max_ordinal as usize * envelope_size;
             #[allow(unused_variables)]
             let offset = encoder.out_of_line_offset(bytes_len);
             let mut _prev_end_offset: usize = 0;
@@ -6150,10 +5959,7 @@ mod internal {
                 Some(len) => len,
             };
             depth.increment()?;
-            let envelope_size = match decoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 16,
-                fidl::encoding::WireFormatVersion::V2 => 8,
-            };
+            let envelope_size = 8;
             let bytes_len = len * envelope_size;
             let offset = decoder.out_of_line_offset(bytes_len)?;
             // Decode the envelope for each type.
@@ -6179,10 +5985,8 @@ mod internal {
             {
                 let member_inline_size =
                     <i64 as fidl::encoding::TypeMarker>::inline_size(decoder.context);
-                if let fidl::encoding::WireFormatVersion::V2 = decoder.context.wire_format_version {
-                    if inlined != (member_inline_size <= 4) {
-                        return Err(fidl::Error::InvalidInlineBitInEnvelope);
-                    }
+                if inlined != (member_inline_size <= 4) {
+                    return Err(fidl::Error::InvalidInlineBitInEnvelope);
                 }
                 let inner_offset;
                 let mut inner_depth = depth.clone();

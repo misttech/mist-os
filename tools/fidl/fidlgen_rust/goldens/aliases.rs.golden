@@ -140,19 +140,13 @@ mod internal {
         type Owned = Self;
 
         #[inline(always)]
-        fn inline_align(context: fidl::encoding::Context) -> usize {
-            match context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 8,
-                fidl::encoding::WireFormatVersion::V2 => 8,
-            }
+        fn inline_align(_context: fidl::encoding::Context) -> usize {
+            8
         }
 
         #[inline(always)]
-        fn inline_size(context: fidl::encoding::Context) -> usize {
-            match context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 88,
-                fidl::encoding::WireFormatVersion::V2 => 88,
-            }
+        fn inline_size(_context: fidl::encoding::Context) -> usize {
+            88
         }
     }
     impl fidl::encoding::ResourceTypeMarker for ExampleOfUseOfAliases {
@@ -234,69 +228,23 @@ mod internal {
             encoder.debug_check_bounds::<ExampleOfUseOfAliases>(offset);
             // Zero out padding regions. There's no need to apply masks
             // because the unmasked parts will be overwritten by fields.
-            match encoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => {
-                    unsafe {
-                        let ptr = encoder.buf.as_mut_ptr().add(offset).offset(0);
-                        (ptr as *mut u64).write_unaligned(0);
-                    }
-                    unsafe {
-                        let ptr = encoder.buf.as_mut_ptr().add(offset).offset(80);
-                        (ptr as *mut u64).write_unaligned(0);
-                    }
-                }
-                fidl::encoding::WireFormatVersion::V2 => {
-                    unsafe {
-                        let ptr = encoder.buf.as_mut_ptr().add(offset).offset(0);
-                        (ptr as *mut u64).write_unaligned(0);
-                    }
-                    unsafe {
-                        let ptr = encoder.buf.as_mut_ptr().add(offset).offset(80);
-                        (ptr as *mut u64).write_unaligned(0);
-                    }
-                }
-            };
+            unsafe {
+                let ptr = encoder.buf.as_mut_ptr().add(offset).offset(0);
+                (ptr as *mut u64).write_unaligned(0);
+            }
+            unsafe {
+                let ptr = encoder.buf.as_mut_ptr().add(offset).offset(80);
+                (ptr as *mut u64).write_unaligned(0);
+            }
             // Write the fields.
-            let member_offset = match encoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 0,
-                fidl::encoding::WireFormatVersion::V2 => 0,
-            };
-            self.0.encode(encoder, offset + member_offset, depth)?;
-            let member_offset = match encoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 8,
-                fidl::encoding::WireFormatVersion::V2 => 8,
-            };
-            self.1.encode(encoder, offset + member_offset, depth)?;
-            let member_offset = match encoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 24,
-                fidl::encoding::WireFormatVersion::V2 => 24,
-            };
-            self.2.encode(encoder, offset + member_offset, depth)?;
-            let member_offset = match encoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 40,
-                fidl::encoding::WireFormatVersion::V2 => 40,
-            };
-            self.3.encode(encoder, offset + member_offset, depth)?;
-            let member_offset = match encoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 56,
-                fidl::encoding::WireFormatVersion::V2 => 56,
-            };
-            self.4.encode(encoder, offset + member_offset, depth)?;
-            let member_offset = match encoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 72,
-                fidl::encoding::WireFormatVersion::V2 => 72,
-            };
-            self.5.encode(encoder, offset + member_offset, depth)?;
-            let member_offset = match encoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 76,
-                fidl::encoding::WireFormatVersion::V2 => 76,
-            };
-            self.6.encode(encoder, offset + member_offset, depth)?;
-            let member_offset = match encoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 80,
-                fidl::encoding::WireFormatVersion::V2 => 80,
-            };
-            self.7.encode(encoder, offset + member_offset, depth)?;
+            self.0.encode(encoder, offset + 0, depth)?;
+            self.1.encode(encoder, offset + 8, depth)?;
+            self.2.encode(encoder, offset + 24, depth)?;
+            self.3.encode(encoder, offset + 40, depth)?;
+            self.4.encode(encoder, offset + 56, depth)?;
+            self.5.encode(encoder, offset + 72, depth)?;
+            self.6.encode(encoder, offset + 76, depth)?;
+            self.7.encode(encoder, offset + 80, depth)?;
             Ok(())
         }
     }
@@ -335,97 +283,39 @@ mod internal {
         ) -> fidl::Result<()> {
             decoder.debug_check_bounds::<Self>(offset);
             // Verify that padding bytes are zero.
-            match decoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => {
-                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(0) };
-                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
-                    let maskedval = padval & 0xffffffff00000000u64;
-                    if (maskedval != 0) {
-                        return Err(fidl::Error::NonZeroPadding {
-                            padding_start: offset
-                                + 0
-                                + ((0xffffffff00000000u64 as u64).trailing_zeros() / 8) as usize,
-                        });
-                    }
-                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(80) };
-                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
-                    let maskedval = padval & 0xffffffff00000000u64;
-                    if (maskedval != 0) {
-                        return Err(fidl::Error::NonZeroPadding {
-                            padding_start: offset
-                                + 80
-                                + ((0xffffffff00000000u64 as u64).trailing_zeros() / 8) as usize,
-                        });
-                    }
-                }
-                fidl::encoding::WireFormatVersion::V2 => {
-                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(0) };
-                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
-                    let maskedval = padval & 0xffffffff00000000u64;
-                    if (maskedval != 0) {
-                        return Err(fidl::Error::NonZeroPadding {
-                            padding_start: offset
-                                + 0
-                                + ((0xffffffff00000000u64 as u64).trailing_zeros() / 8) as usize,
-                        });
-                    }
-                    let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(80) };
-                    let padval = unsafe { (ptr as *const u64).read_unaligned() };
-                    let maskedval = padval & 0xffffffff00000000u64;
-                    if (maskedval != 0) {
-                        return Err(fidl::Error::NonZeroPadding {
-                            padding_start: offset
-                                + 80
-                                + ((0xffffffff00000000u64 as u64).trailing_zeros() / 8) as usize,
-                        });
-                    }
-                }
-            };
-            let member_offset = match decoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 0,
-                fidl::encoding::WireFormatVersion::V2 => 0,
-            };
-            fidl::decode!(u32, &mut self.field_of_u32, decoder, offset + member_offset, _depth)?;
-            let member_offset = match decoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 8,
-                fidl::encoding::WireFormatVersion::V2 => 8,
-            };
+            let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(0) };
+            let padval = unsafe { (ptr as *const u64).read_unaligned() };
+            let maskedval = padval & 0xffffffff00000000u64;
+            if (maskedval != 0) {
+                return Err(fidl::Error::NonZeroPadding {
+                    padding_start: offset
+                        + 0
+                        + ((0xffffffff00000000u64 as u64).trailing_zeros() / 8) as usize,
+                });
+            }
+            let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(80) };
+            let padval = unsafe { (ptr as *const u64).read_unaligned() };
+            let maskedval = padval & 0xffffffff00000000u64;
+            if (maskedval != 0) {
+                return Err(fidl::Error::NonZeroPadding {
+                    padding_start: offset
+                        + 80
+                        + ((0xffffffff00000000u64 as u64).trailing_zeros() / 8) as usize,
+                });
+            }
+            fidl::decode!(u32, &mut self.field_of_u32, decoder, offset + 0, _depth)?;
             fidl::decode!(
                 fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
                 &mut self.field_of_vec_of_strings,
                 decoder,
-                offset + member_offset,
+                offset + 8,
                 _depth
             )?;
-            let member_offset = match decoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 24,
-                fidl::encoding::WireFormatVersion::V2 => 24,
-            };
-            fidl::decode!(fidl::encoding::Vector<fidl::encoding::UnboundedString, 9>, &mut self.field_of_vec_of_strings_at_most_nine, decoder, offset + member_offset, _depth)?;
-            let member_offset = match decoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 40,
-                fidl::encoding::WireFormatVersion::V2 => 40,
-            };
-            fidl::decode!(fidl::encoding::Vector<fidl::encoding::UnboundedString, 5>, &mut self.field_of_vec_of_strings_at_most_5, decoder, offset + member_offset, _depth)?;
-            let member_offset = match decoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 56,
-                fidl::encoding::WireFormatVersion::V2 => 56,
-            };
-            fidl::decode!(fidl::encoding::Vector<fidl_test_someotherlibrary::ReferenceMe, 5>, &mut self.field_of_vec_of_ref_me_at_most_5, decoder, offset + member_offset, _depth)?;
-            let member_offset = match decoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 72,
-                fidl::encoding::WireFormatVersion::V2 => 72,
-            };
-            fidl::decode!(fidl::encoding::HandleType<fidl::Channel, { fidl::ObjectType::CHANNEL.into_raw() }, 2147483648>, &mut self.field_of_channel, decoder, offset + member_offset, _depth)?;
-            let member_offset = match decoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 76,
-                fidl::encoding::WireFormatVersion::V2 => 76,
-            };
-            fidl::decode!(fidl::encoding::HandleType<fidl::Channel, { fidl::ObjectType::CHANNEL.into_raw() }, 2147483648>, &mut self.field_of_client_end, decoder, offset + member_offset, _depth)?;
-            let member_offset = match decoder.context.wire_format_version {
-                fidl::encoding::WireFormatVersion::V1 => 80,
-                fidl::encoding::WireFormatVersion::V2 => 80,
-            };
+            fidl::decode!(fidl::encoding::Vector<fidl::encoding::UnboundedString, 9>, &mut self.field_of_vec_of_strings_at_most_nine, decoder, offset + 24, _depth)?;
+            fidl::decode!(fidl::encoding::Vector<fidl::encoding::UnboundedString, 5>, &mut self.field_of_vec_of_strings_at_most_5, decoder, offset + 40, _depth)?;
+            fidl::decode!(fidl::encoding::Vector<fidl_test_someotherlibrary::ReferenceMe, 5>, &mut self.field_of_vec_of_ref_me_at_most_5, decoder, offset + 56, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Channel, { fidl::ObjectType::CHANNEL.into_raw() }, 2147483648>, &mut self.field_of_channel, decoder, offset + 72, _depth)?;
+            fidl::decode!(fidl::encoding::HandleType<fidl::Channel, { fidl::ObjectType::CHANNEL.into_raw() }, 2147483648>, &mut self.field_of_client_end, decoder, offset + 76, _depth)?;
             fidl::decode!(
                 fidl::encoding::Optional<
                     fidl::encoding::HandleType<
@@ -436,7 +326,7 @@ mod internal {
                 >,
                 &mut self.field_of_nullable_client_end,
                 decoder,
-                offset + member_offset,
+                offset + 80,
                 _depth
             )?;
             Ok(())

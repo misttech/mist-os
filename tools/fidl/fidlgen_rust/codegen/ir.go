@@ -93,24 +93,24 @@ type UnionMember struct {
 
 type Struct struct {
 	fidlgen.Struct
-	ECI                                                  EncodedCompoundIdentifier
-	Derives                                              derives
-	Name                                                 string
-	Members                                              []StructMember
-	PaddingMarkersV1, PaddingMarkersV2                   []rustPaddingMarker
-	FlattenedPaddingMarkersV1, FlattenedPaddingMarkersV2 []rustPaddingMarker
-	SizeV1, SizeV2                                       int
-	AlignmentV1, AlignmentV2                             int
-	HasPadding                                           bool
+	ECI                       EncodedCompoundIdentifier
+	Derives                   derives
+	Name                      string
+	Members                   []StructMember
+	PaddingMarkersV2          []rustPaddingMarker
+	FlattenedPaddingMarkersV2 []rustPaddingMarker
+	SizeV2                    int
+	AlignmentV2               int
+	HasPadding                bool
 	// True if the struct should be encoded and decoded by memcpy.
 	UseFidlStructCopy bool
 }
 
 type StructMember struct {
 	fidlgen.StructMember
-	Type               Type
-	Name               string
-	OffsetV1, OffsetV2 int
+	Type     Type
+	Name     string
+	OffsetV2 int
 }
 
 type Table struct {
@@ -1365,7 +1365,6 @@ func (c *compiler) compileStructMember(val fidlgen.StructMember) StructMember {
 		StructMember: val,
 		Type:         c.compileType(val.Type),
 		Name:         compileSnakeIdentifier(val.Name),
-		OffsetV1:     val.FieldShapeV1.Offset,
 		OffsetV2:     val.FieldShapeV2.Offset,
 	}
 }
@@ -1483,20 +1482,16 @@ func (c *compiler) compileStruct(val fidlgen.Struct) Struct {
 		ECI:                       val.Name,
 		Name:                      name,
 		Members:                   []StructMember{},
-		SizeV1:                    val.TypeShapeV1.InlineSize,
 		SizeV2:                    val.TypeShapeV2.InlineSize,
-		AlignmentV1:               val.TypeShapeV1.Alignment,
 		AlignmentV2:               val.TypeShapeV2.Alignment,
-		PaddingMarkersV1:          toRustPaddingMarkers(val.BuildPaddingMarkers(fidlgen.WireFormatVersionV1)),
 		PaddingMarkersV2:          toRustPaddingMarkers(val.BuildPaddingMarkers(fidlgen.WireFormatVersionV2)),
-		FlattenedPaddingMarkersV1: toRustPaddingMarkers(val.BuildFlattenedPaddingMarkers(fidlgen.WireFormatVersionV1, c.resolveStruct)),
 		FlattenedPaddingMarkersV2: toRustPaddingMarkers(val.BuildFlattenedPaddingMarkers(fidlgen.WireFormatVersionV2, c.resolveStruct)),
 	}
 
 	for _, v := range val.Members {
 		member := c.compileStructMember(v)
 		r.Members = append(r.Members, member)
-		r.HasPadding = r.HasPadding || (v.FieldShapeV1.Padding != 0)
+		r.HasPadding = r.HasPadding || (v.FieldShapeV2.Padding != 0)
 	}
 
 	r.UseFidlStructCopy = c.computeUseFidlStructCopyForStruct(val)

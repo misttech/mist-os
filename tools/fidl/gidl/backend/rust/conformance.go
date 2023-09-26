@@ -212,7 +212,6 @@ func testCaseName(baseName string, wireFormat ir.WireFormat) string {
 }
 
 var supportedWireFormats = []ir.WireFormat{
-	ir.V1WireFormat,
 	ir.V2WireFormat,
 }
 
@@ -227,8 +226,6 @@ func wireFormatSupported(wireFormat ir.WireFormat) bool {
 
 func encodingContext(wireFormat ir.WireFormat) string {
 	switch wireFormat {
-	case ir.V1WireFormat:
-		return "_V1_CONTEXT"
 	case ir.V2WireFormat:
 		return "_V2_CONTEXT"
 	default:
