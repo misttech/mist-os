@@ -7122,6 +7122,16 @@ Usage: toolchain-controlled only
 
 From //third_party/pigweed/src/pw_unit_test/test.gni:86
 
+### pw_unit_test_TESTONLY
+
+If true, the pw_unit_test target, pw_test targets, and pw_test_group targets
+will define `testonly = true`.  This is false by default for backwards
+compatibility.
+
+**Current value (from the default):** `false`
+
+From //third_party/pigweed/src/pw_unit_test/test.gni:107
+
 ### qemu_boot_format
 
 Boot format to use with QEMU. This chooses the boot format to use with
@@ -7546,7 +7556,7 @@ Draws the current frame number in the top-left corner.
 
 **Current value (from the default):** `false`
 
-From //src/ui/scenic/lib/gfx/BUILD.gn:9
+From //src/ui/scenic/lib/gfx/BUILD.gn:7
 
 ### scenic_enable_vulkan_validation
 
@@ -7554,7 +7564,7 @@ Include the vulkan validation layers in scenic.
 
 **Current value (from the default):** `false`
 
-From //src/ui/scenic/lib/utils/build_args.gni:7
+From //src/ui/scenic/lib/utils/build_args.gni:10
 
 ### scheduler_extra_invariant_validation
 
