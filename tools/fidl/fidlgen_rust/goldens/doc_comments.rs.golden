@@ -96,6 +96,7 @@ impl MyStrictBits {
 ///
 /// flexible enum comment #2.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[non_exhaustive]
 pub enum MyFlexibleEnum {
     /// FOO member comment #1
     ///
@@ -105,8 +106,9 @@ pub enum MyFlexibleEnum {
     ///
     /// BAR member comment #3
     Bar,
+    #[deprecated = "Use `MyFlexibleEnum::unknown()` to construct and `MyFlexibleEnumUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    __SourceBreaking { unknown_ordinal: u32 },
+    __Unknown(u32),
 }
 
 /// Pattern that matches an unknown `MyFlexibleEnum` member.
@@ -132,13 +134,15 @@ impl MyFlexibleEnum {
         match prim {
             1 => Self::Foo,
             2 => Self::Bar,
-            unknown_ordinal => Self::__SourceBreaking { unknown_ordinal },
+            #[allow(deprecated)]
+            x => Self::__Unknown(x),
         }
     }
 
     #[inline]
     pub fn unknown() -> Self {
-        Self::__SourceBreaking { unknown_ordinal: 0xffffffff }
+        #[allow(deprecated)]
+        Self::__Unknown(0xffffffff)
     }
 
     #[inline]
@@ -146,14 +150,16 @@ impl MyFlexibleEnum {
         match self {
             Self::Foo => 1,
             Self::Bar => 2,
-            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
+            #[allow(deprecated)]
+            Self::__Unknown(x) => x,
         }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            Self::__SourceBreaking { unknown_ordinal: _ } => true,
+            #[allow(deprecated)]
+            Self::__Unknown(_) => true,
             _ => false,
         }
     }
@@ -220,8 +226,9 @@ pub struct Table {
     ///
     /// table field comment #3
     pub field: Option<i32>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __source_breaking: fidl::marker::SourceBreaking,
+    pub __non_exhaustive: (),
 }
 
 impl fidl::Persistable for Table {}
@@ -235,8 +242,10 @@ pub enum FlexibleUnion {
     ///
     /// union member comment #3
     Field(i32),
+    #[deprecated = "Use `FlexibleUnion::unknown()` to construct and `FlexibleUnionUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    __SourceBreaking { unknown_ordinal: u64 },
+    #[non_exhaustive]
+    __Unknown { ordinal: u64 },
 }
 
 /// Pattern that matches an unknown `FlexibleUnion` member.
@@ -262,19 +271,22 @@ impl FlexibleUnion {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::Field(_) => 1,
-            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        Self::__SourceBreaking { unknown_ordinal: 0 }
+        #[allow(deprecated)]
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            Self::__SourceBreaking { .. } => true,
+            #[allow(deprecated)]
+            Self::__Unknown { .. } => true,
             _ => false,
         }
     }
@@ -1280,7 +1292,8 @@ mod internal {
                     offset + 8,
                     _depth,
                 ),
-                FlexibleUnion::__SourceBreaking { .. } => Err(fidl::Error::UnknownUnionTag),
+                #[allow(deprecated)]
+                FlexibleUnion::__Unknown { .. } => Err(fidl::Error::UnknownUnionTag),
             }
         }
     }
@@ -1288,7 +1301,8 @@ mod internal {
     impl fidl::encoding::Decode<Self> for FlexibleUnion {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self::__SourceBreaking { unknown_ordinal: 0 }
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal: 0 }
         }
 
         #[inline]
@@ -1345,7 +1359,7 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self = FlexibleUnion::__SourceBreaking { unknown_ordinal: ordinal };
+                    *self = FlexibleUnion::__Unknown { ordinal };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {

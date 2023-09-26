@@ -2294,10 +2294,13 @@ mod tests {
         futures::{channel::mpsc, future::pending, FutureExt, SinkExt, StreamExt, TryStreamExt},
     };
 
-    // To ensure that the expected value of any new member is explicitly
+    // To ensure that the exppected value of any new member is explicitly
     // specified, avoid using `..Default::default()`. To do this, we must work
     // around fidlgen_rust's mechanism for ensuring that adding FIDL `table`
-    // fields does not break source.
+    // fields does not break source. We do this by initializing
+    // the hidden `__non_exhaustive` member, which is marked deprecated and thus
+    // requires this lint check attribute..
+    #[allow(deprecated)]
     #[fuchsia::test]
     fn child_options_to_fidl() {
         let options: ftest::ChildOptions = ChildOptions::new().into();
@@ -2317,7 +2320,7 @@ mod tests {
                 environment: None,
                 on_terminate: Some(fdecl::OnTerminate::None),
                 config_overrides: None,
-                __source_breaking: fidl::marker::SourceBreaking,
+                __non_exhaustive: ()
             },
         );
         let options: ftest::ChildOptions = ChildOptions::new().eager().into();
@@ -2328,7 +2331,7 @@ mod tests {
                 environment: None,
                 on_terminate: Some(fdecl::OnTerminate::None),
                 config_overrides: None,
-                __source_breaking: fidl::marker::SourceBreaking,
+                __non_exhaustive: ()
             },
         );
         let options: ftest::ChildOptions = ChildOptions::new().environment("test_env").into();
@@ -2339,7 +2342,7 @@ mod tests {
                 environment: Some("test_env".to_string()),
                 on_terminate: Some(fdecl::OnTerminate::None),
                 config_overrides: None,
-                __source_breaking: fidl::marker::SourceBreaking,
+                __non_exhaustive: ()
             },
         );
         let options: ftest::ChildOptions = ChildOptions::new().reboot_on_terminate().into();
@@ -2350,7 +2353,7 @@ mod tests {
                 environment: None,
                 on_terminate: Some(fdecl::OnTerminate::Reboot),
                 config_overrides: None,
-                __source_breaking: fidl::marker::SourceBreaking,
+                __non_exhaustive: ()
             },
         );
 
@@ -2376,7 +2379,7 @@ mod tests {
                 environment: None,
                 on_terminate: Some(fdecl::OnTerminate::None),
                 config_overrides: Some(config_overrides),
-                __source_breaking: fidl::marker::SourceBreaking,
+                __non_exhaustive: ()
             },
         );
     }

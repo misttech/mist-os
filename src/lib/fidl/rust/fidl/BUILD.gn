@@ -33,7 +33,6 @@ fidl_rust_sources = [
   "src/for_fidl_message_crate.rs",
   "src/handle.rs",
   "src/lib.rs",
-  "src/marker.rs",
   "src/persistence.rs",
   "src/prelude.rs",
   "src/server.rs",

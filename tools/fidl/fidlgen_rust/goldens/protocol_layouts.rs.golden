@@ -25,8 +25,9 @@ use fuchsia_zircon as zx;
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct LocalTablePayload {
     pub a: Option<u16>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __source_breaking: fidl::marker::SourceBreaking,
+    pub __non_exhaustive: (),
 }
 
 impl fidl::Persistable for LocalTablePayload {}
@@ -34,8 +35,9 @@ impl fidl::Persistable for LocalTablePayload {}
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct MainProtocolOneWayAnonRequest {
     pub a: Option<u16>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __source_breaking: fidl::marker::SourceBreaking,
+    pub __non_exhaustive: (),
 }
 
 impl fidl::Persistable for MainProtocolOneWayAnonRequest {}
@@ -43,8 +45,9 @@ impl fidl::Persistable for MainProtocolOneWayAnonRequest {}
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct MainProtocolTwoWayAnonResponse {
     pub a: Option<u16>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __source_breaking: fidl::marker::SourceBreaking,
+    pub __non_exhaustive: (),
 }
 
 impl fidl::Persistable for MainProtocolTwoWayAnonResponse {}
@@ -52,8 +55,9 @@ impl fidl::Persistable for MainProtocolTwoWayAnonResponse {}
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct MainProtocolTwoWayAnonWithErrorRequest {
     pub a: Option<u16>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __source_breaking: fidl::marker::SourceBreaking,
+    pub __non_exhaustive: (),
 }
 
 impl fidl::Persistable for MainProtocolTwoWayAnonWithErrorRequest {}
@@ -61,8 +65,9 @@ impl fidl::Persistable for MainProtocolTwoWayAnonWithErrorRequest {}
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct MainProtocolOnAnonWithErrorResponse {
     pub a: Option<u16>,
+    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __source_breaking: fidl::marker::SourceBreaking,
+    pub __non_exhaustive: (),
 }
 
 impl fidl::Persistable for MainProtocolOnAnonWithErrorResponse {}
@@ -70,9 +75,11 @@ impl fidl::Persistable for MainProtocolOnAnonWithErrorResponse {}
 #[derive(Clone, Debug)]
 pub enum LocalUnionPayload {
     B(bool),
+    #[deprecated = "Use `LocalUnionPayload::unknown()` to construct and `LocalUnionPayloadUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    __SourceBreaking {
-        unknown_ordinal: u64,
+    #[non_exhaustive]
+    __Unknown {
+        ordinal: u64,
     },
 }
 
@@ -99,19 +106,22 @@ impl LocalUnionPayload {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::B(_) => 1,
-            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        Self::__SourceBreaking { unknown_ordinal: 0 }
+        #[allow(deprecated)]
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            Self::__SourceBreaking { .. } => true,
+            #[allow(deprecated)]
+            Self::__Unknown { .. } => true,
             _ => false,
         }
     }
@@ -122,9 +132,11 @@ impl fidl::Persistable for LocalUnionPayload {}
 #[derive(Clone, Debug)]
 pub enum MainProtocolOnAnonRequest {
     B(bool),
+    #[deprecated = "Use `MainProtocolOnAnonRequest::unknown()` to construct and `MainProtocolOnAnonRequestUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    __SourceBreaking {
-        unknown_ordinal: u64,
+    #[non_exhaustive]
+    __Unknown {
+        ordinal: u64,
     },
 }
 
@@ -151,19 +163,22 @@ impl MainProtocolOnAnonRequest {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::B(_) => 1,
-            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        Self::__SourceBreaking { unknown_ordinal: 0 }
+        #[allow(deprecated)]
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            Self::__SourceBreaking { .. } => true,
+            #[allow(deprecated)]
+            Self::__Unknown { .. } => true,
             _ => false,
         }
     }
@@ -174,9 +189,11 @@ impl fidl::Persistable for MainProtocolOnAnonRequest {}
 #[derive(Clone, Debug)]
 pub enum MainProtocolTwoWayAnonRequest {
     B(bool),
+    #[deprecated = "Use `MainProtocolTwoWayAnonRequest::unknown()` to construct and `MainProtocolTwoWayAnonRequestUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    __SourceBreaking {
-        unknown_ordinal: u64,
+    #[non_exhaustive]
+    __Unknown {
+        ordinal: u64,
     },
 }
 
@@ -203,19 +220,22 @@ impl MainProtocolTwoWayAnonRequest {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::B(_) => 1,
-            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        Self::__SourceBreaking { unknown_ordinal: 0 }
+        #[allow(deprecated)]
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            Self::__SourceBreaking { .. } => true,
+            #[allow(deprecated)]
+            Self::__Unknown { .. } => true,
             _ => false,
         }
     }
@@ -226,9 +246,11 @@ impl fidl::Persistable for MainProtocolTwoWayAnonRequest {}
 #[derive(Clone, Debug)]
 pub enum MainProtocolTwoWayAnonWithErrorResponse {
     B(bool),
+    #[deprecated = "Use `MainProtocolTwoWayAnonWithErrorResponse::unknown()` to construct and `MainProtocolTwoWayAnonWithErrorResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    __SourceBreaking {
-        unknown_ordinal: u64,
+    #[non_exhaustive]
+    __Unknown {
+        ordinal: u64,
     },
 }
 
@@ -255,19 +277,22 @@ impl MainProtocolTwoWayAnonWithErrorResponse {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::B(_) => 1,
-            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        Self::__SourceBreaking { unknown_ordinal: 0 }
+        #[allow(deprecated)]
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            Self::__SourceBreaking { .. } => true,
+            #[allow(deprecated)]
+            Self::__Unknown { .. } => true,
             _ => false,
         }
     }
@@ -4750,7 +4775,8 @@ mod internal {
                     offset + 8,
                     _depth,
                 ),
-                LocalUnionPayload::__SourceBreaking { .. } => Err(fidl::Error::UnknownUnionTag),
+                #[allow(deprecated)]
+                LocalUnionPayload::__Unknown { .. } => Err(fidl::Error::UnknownUnionTag),
             }
         }
     }
@@ -4758,7 +4784,8 @@ mod internal {
     impl fidl::encoding::Decode<Self> for LocalUnionPayload {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self::__SourceBreaking { unknown_ordinal: 0 }
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal: 0 }
         }
 
         #[inline]
@@ -4815,7 +4842,7 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self = LocalUnionPayload::__SourceBreaking { unknown_ordinal: ordinal };
+                    *self = LocalUnionPayload::__Unknown { ordinal };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
@@ -4872,9 +4899,8 @@ mod internal {
                         _depth,
                     )
                 }
-                MainProtocolOnAnonRequest::__SourceBreaking { .. } => {
-                    Err(fidl::Error::UnknownUnionTag)
-                }
+                #[allow(deprecated)]
+                MainProtocolOnAnonRequest::__Unknown { .. } => Err(fidl::Error::UnknownUnionTag),
             }
         }
     }
@@ -4882,7 +4908,8 @@ mod internal {
     impl fidl::encoding::Decode<Self> for MainProtocolOnAnonRequest {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self::__SourceBreaking { unknown_ordinal: 0 }
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal: 0 }
         }
 
         #[inline]
@@ -4939,8 +4966,7 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self =
-                        MainProtocolOnAnonRequest::__SourceBreaking { unknown_ordinal: ordinal };
+                    *self = MainProtocolOnAnonRequest::__Unknown { ordinal };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
@@ -4999,7 +5025,8 @@ mod internal {
                         _depth,
                     )
                 }
-                MainProtocolTwoWayAnonRequest::__SourceBreaking { .. } => {
+                #[allow(deprecated)]
+                MainProtocolTwoWayAnonRequest::__Unknown { .. } => {
                     Err(fidl::Error::UnknownUnionTag)
                 }
             }
@@ -5009,7 +5036,8 @@ mod internal {
     impl fidl::encoding::Decode<Self> for MainProtocolTwoWayAnonRequest {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self::__SourceBreaking { unknown_ordinal: 0 }
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal: 0 }
         }
 
         #[inline]
@@ -5066,9 +5094,7 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self = MainProtocolTwoWayAnonRequest::__SourceBreaking {
-                        unknown_ordinal: ordinal,
-                    };
+                    *self = MainProtocolTwoWayAnonRequest::__Unknown { ordinal };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
@@ -5127,7 +5153,8 @@ mod internal {
                         _depth,
                     )
                 }
-                MainProtocolTwoWayAnonWithErrorResponse::__SourceBreaking { .. } => {
+                #[allow(deprecated)]
+                MainProtocolTwoWayAnonWithErrorResponse::__Unknown { .. } => {
                     Err(fidl::Error::UnknownUnionTag)
                 }
             }
@@ -5137,7 +5164,8 @@ mod internal {
     impl fidl::encoding::Decode<Self> for MainProtocolTwoWayAnonWithErrorResponse {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self::__SourceBreaking { unknown_ordinal: 0 }
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal: 0 }
         }
 
         #[inline]
@@ -5194,9 +5222,7 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self = MainProtocolTwoWayAnonWithErrorResponse::__SourceBreaking {
-                        unknown_ordinal: ordinal,
-                    };
+                    *self = MainProtocolTwoWayAnonWithErrorResponse::__Unknown { ordinal };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {

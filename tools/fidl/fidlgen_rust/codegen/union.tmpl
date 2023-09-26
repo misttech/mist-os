@@ -21,9 +21,11 @@ pub enum {{ .Name }} {
     {{ .Name }}({{ .Type.Owned }}),
     {{- end }}
     {{- if .IsFlexible }}
+    #[deprecated = "Use `{{ .Name }}::unknown()` to construct and `{{ .Name }}Unknown!()` to exhaustively match."]
     #[doc(hidden)]
-    __SourceBreaking {
-        unknown_ordinal: u64,
+    #[non_exhaustive]
+    __Unknown {
+        ordinal: u64,
     },
     {{- end }}
 }
@@ -57,7 +59,8 @@ impl {{ .Name }} {
             Self::{{ .Name }}(_) => {{ .Ordinal }},
             {{- end }}
             {{- if .IsFlexible }}
-            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
+            #[allow(deprecated)]
+            Self::__Unknown { ordinal } => ordinal,
             {{- end }}
         }
     }
@@ -65,13 +68,15 @@ impl {{ .Name }} {
     {{- if .IsFlexible }}
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        Self::__SourceBreaking { unknown_ordinal: 0 }
+        #[allow(deprecated)]
+        Self::__Unknown { ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            Self::__SourceBreaking { .. } => true,
+            #[allow(deprecated)]
+            Self::__Unknown { .. } => true,
             {{- if .Members }}
             _ => false,
             {{- end }}
@@ -142,7 +147,8 @@ unsafe impl fidl::encoding::Encode<{{ .Name }}> for &{{ if .IsResourceType }}mut
             }
             {{- end }}
             {{- if .IsFlexible }}
-            {{ .Name }}::__SourceBreaking { .. } => Err(fidl::Error::UnknownUnionTag),
+            #[allow(deprecated)]
+            {{ .Name }}::__Unknown { .. } => Err(fidl::Error::UnknownUnionTag),
             {{- end }}
         }
     }
@@ -152,7 +158,8 @@ impl fidl::encoding::Decode<Self> for {{ .Name }} {
     #[inline(always)]
     fn new_empty() -> Self {
         {{- if .IsFlexible }}
-        Self::__SourceBreaking { unknown_ordinal: 0 }
+        #[allow(deprecated)]
+        Self::__Unknown { ordinal: 0 }
         {{- else }}
         Self::{{ (index .Members 0).Name }}(fidl::new_empty!({{ (index .Members 0).Type.Fidl }}))
         {{- end }}
@@ -215,7 +222,7 @@ impl fidl::encoding::Decode<Self> for {{ .Name }} {
                 for _ in 0..num_handles {
                     decoder.drop_next_handle()?;
                 }
-                *self = {{ .Name }}::__SourceBreaking { unknown_ordinal: ordinal };
+                *self = {{ .Name }}::__Unknown { ordinal };
             },
             {{- else }}
             ordinal => panic!("unexpected ordinal {:?}", ordinal)

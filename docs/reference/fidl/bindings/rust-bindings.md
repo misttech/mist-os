@@ -333,15 +333,16 @@ The FIDL toolchain generates a `struct` `User` with optional members:
 pub struct User {
   pub age: Option<u8>,
   pub name: Option<String>,
+  #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
   #[doc(hidden)]
-  pub __source_breaking: fidl::marker::SourceBreaking,
+  pub __non_exhaustive: (),
 }
 ```
 
 If any unknown fields are encountered during decoding, they are discarded. There
 is no way to access them or determine if they occurred.
 
-The `__source_breaking` member signals that initializing the table exhaustively
+The `__non_exhaustive` member prevents intializing the table exhaustively, which
 causes API breakage when new fields are added. Instead, you should use the
 struct update syntax to fill in unspecified fields with `Default::default()`.
 For example:
