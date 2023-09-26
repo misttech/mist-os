@@ -657,16 +657,6 @@ void VmAspace::DumpAllAspaces(bool verbose) {
   }
 }
 
-VmAspace* VmAspace::vaddr_to_aspace(uintptr_t address) {
-  if (is_kernel_address(address)) {
-    return kernel_aspace();
-  } else if (is_user_accessible(address)) {
-    return Thread::Current::Get()->aspace();
-  } else {
-    return nullptr;
-  }
-}
-
 VmAspace::AslrConfig VmAspace::CreateAslrConfig(Type type) {
   // As documented in //docs/gen/boot-options.md.
   static constexpr uint8_t kMaxAslrEntropy = 36;

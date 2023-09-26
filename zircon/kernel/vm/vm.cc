@@ -319,20 +319,23 @@ void vm_init() {
   cmpct_set_fill_on_alloc_threshold(gBootOptions->alloc_fill_threshold);
 }
 
-paddr_t vaddr_to_paddr(const void* ptr) {
-  if (is_physmap_addr(ptr)) {
-    return physmap_to_paddr(ptr);
+paddr_t vaddr_to_paddr(const void* va) {
+  if (is_physmap_addr(va)) {
+    return physmap_to_paddr(va);
   }
 
-  auto aspace = VmAspace::vaddr_to_aspace(reinterpret_cast<uintptr_t>(ptr));
-  if (!aspace) {
-    return (paddr_t) nullptr;
+  // It doesn't make sense to be calling this on a non-kernel address, since we would otherwise be
+  // querying some 'random' active user address space, which is unlikely to be what the caller
+  // wants.
+  if (!is_kernel_address(reinterpret_cast<vaddr_t>(va))) {
+    return 0;
   }
 
   paddr_t pa;
-  zx_status_t rc = aspace->arch_aspace().Query((vaddr_t)ptr, &pa, nullptr);
-  if (rc) {
-    return (paddr_t) nullptr;
+  zx_status_t rc =
+      VmAspace::kernel_aspace()->arch_aspace().Query(reinterpret_cast<vaddr_t>(va), &pa, nullptr);
+  if (rc != ZX_OK) {
+    return 0;
   }
 
   return pa;
@@ -368,15 +371,14 @@ static int cmd_vm(int argc, const cmd_args* argv, uint32_t) {
       goto notenoughargs;
     }
 
-    VmAspace* aspace = VmAspace::vaddr_to_aspace(argv[2].u);
-    if (!aspace) {
-      printf("ERROR: outside of any address space\n");
+    if (!is_kernel_address(reinterpret_cast<vaddr_t>(argv[2].u))) {
+      printf("ERROR: outside of kernel address space\n");
       return -1;
     }
 
     paddr_t pa;
     uint flags;
-    zx_status_t err = aspace->arch_aspace().Query(argv[2].u, &pa, &flags);
+    zx_status_t err = VmAspace::kernel_aspace()->arch_aspace().Query(argv[2].u, &pa, &flags);
     printf("arch_mmu_query returns %d\n", err);
     if (err >= 0) {
       printf("\tpa %#" PRIxPTR ", flags %#x\n", pa, flags);
@@ -386,32 +388,30 @@ static int cmd_vm(int argc, const cmd_args* argv, uint32_t) {
       goto notenoughargs;
     }
 
-    VmAspace* aspace = VmAspace::vaddr_to_aspace(argv[3].u);
-    if (!aspace) {
-      printf("ERROR: outside of any address space\n");
+    if (!is_kernel_address(reinterpret_cast<vaddr_t>(argv[3].u))) {
+      printf("ERROR: outside of kernel address space\n");
       return -1;
     }
 
     size_t mapped;
-    auto err = aspace->arch_aspace().MapContiguous(argv[3].u, argv[2].u, (uint)argv[4].u,
-                                                   (uint)argv[5].u, &mapped);
+    auto err = VmAspace::kernel_aspace()->arch_aspace().MapContiguous(
+        argv[3].u, argv[2].u, (uint)argv[4].u, (uint)argv[5].u, &mapped);
     printf("arch_mmu_map returns %d, mapped %zu\n", err, mapped);
   } else if (!strcmp(argv[1].str, "unmap")) {
     if (argc < 4) {
       goto notenoughargs;
     }
 
-    VmAspace* aspace = VmAspace::vaddr_to_aspace(argv[2].u);
-    if (!aspace) {
-      printf("ERROR: outside of any address space\n");
+    if (!is_kernel_address(reinterpret_cast<vaddr_t>(argv[2].u))) {
+      printf("ERROR: outside of kernel address space\n");
       return -1;
     }
 
     size_t unmapped;
     // Strictly only attempt to unmap exactly what the user requested, they can deal with any
     // failure that might result.
-    auto err = aspace->arch_aspace().Unmap(argv[2].u, (uint)argv[3].u,
-                                           ArchVmAspace::EnlargeOperation::No, &unmapped);
+    auto err = VmAspace::kernel_aspace()->arch_aspace().Unmap(
+        argv[2].u, (uint)argv[3].u, ArchVmAspace::EnlargeOperation::No, &unmapped);
     printf("arch_mmu_unmap returns %d, unmapped %zu\n", err, unmapped);
   } else {
     printf("unknown command\n");

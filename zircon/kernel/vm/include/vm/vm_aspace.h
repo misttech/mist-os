@@ -88,9 +88,6 @@ class VmAspace : public fbl::DoublyLinkedListable<VmAspace*>, public fbl::RefCou
   // accessor for singleton kernel address space
   static VmAspace* kernel_aspace() { return kernel_aspace_; }
 
-  // given an address, return either the kernel aspace or the current user one
-  static VmAspace* vaddr_to_aspace(uintptr_t address);
-
   // set the per thread aspace pointer to this
   void AttachToThread(Thread* t);
 
