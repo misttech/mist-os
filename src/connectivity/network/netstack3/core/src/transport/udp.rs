@@ -1831,7 +1831,7 @@ pub(crate) trait BufferSocketHandler<I: IpExt, C, B: BufferMut>:
         ctx: &mut C,
         conn: SocketId<I>,
         body: B,
-    ) -> Result<(), (B, Either<SendError, ExpectedConnError>)>;
+    ) -> Result<(), Either<SendError, ExpectedConnError>>;
 
     fn send_to(
         &mut self,
@@ -1840,7 +1840,7 @@ pub(crate) trait BufferSocketHandler<I: IpExt, C, B: BufferMut>:
         remote_ip: SocketZonedIpAddr<I::Addr, Self::DeviceId>,
         remote_port: NonZeroU16,
         body: B,
-    ) -> Result<(), (B, Either<LocalAddressError, SendToError>)>;
+    ) -> Result<(), Either<LocalAddressError, SendToError>>;
 }
 
 impl<
@@ -1855,14 +1855,12 @@ impl<
         ctx: &mut C,
         id: SocketId<I>,
         body: B,
-    ) -> Result<(), (B, Either<SendError, ExpectedConnError>)> {
-        datagram::send_conn(self, ctx, id, body).map_err(|send_error| match send_error {
+    ) -> Result<(), Either<SendError, ExpectedConnError>> {
+        datagram::send_conn(self, ctx, id, body).map_err(|err| match err {
+            DatagramSendError::NotConnected => Either::Right(ExpectedConnError),
+            DatagramSendError::NotWriteable => Either::Left(SendError::NotWriteable),
+            DatagramSendError::IpSock(err) => Either::Left(SendError::IpSock(err)),
             DatagramSendError::SerializeError(never) => match never {},
-            DatagramSendError::NotConnected(b) => (b, Either::Right(ExpectedConnError)),
-            DatagramSendError::NotWriteable(b) => (b, Either::Left(SendError::NotWriteable)),
-            DatagramSendError::IpSock(body, err) => {
-                (body.into_inner(), Either::Left(SendError::IpSock(err)))
-            }
         })
     }
 
@@ -1873,29 +1871,23 @@ impl<
         remote_ip: SocketZonedIpAddr<I::Addr, Self::DeviceId>,
         remote_port: NonZeroU16,
         body: B,
-    ) -> Result<(), (B, Either<LocalAddressError, SendToError>)> {
+    ) -> Result<(), Either<LocalAddressError, SendToError>> {
         datagram::send_to(self, ctx, id, remote_ip, remote_port, body).map_err(|e| match e {
-            Either::Left((body, e)) => (body, Either::Left(e)),
+            Either::Left(e) => Either::Left(e),
             Either::Right(e) => {
-                let (body, err) = match e {
+                let err = match e {
                     datagram::SendToError::SerializeError(never) => match never {},
-                    datagram::SendToError::NotWriteable(body) => (body, SendToError::NotWriteable),
-                    datagram::SendToError::Zone(body, e) => (body, SendToError::Zone(e)),
-                    datagram::SendToError::CreateAndSend(s, e) => (
-                        s.into_inner(),
-                        match e {
-                            IpSockCreateAndSendError::Mtu => SendToError::Mtu,
-                            IpSockCreateAndSendError::Create(e) => SendToError::CreateSock(e),
-                        },
-                    ),
-                    datagram::SendToError::RemoteUnexpectedlyMapped(body) => (
-                        body,
-                        SendToError::CreateSock(IpSockCreationError::Route(
-                            ResolveRouteError::Unreachable,
-                        )),
+                    datagram::SendToError::NotWriteable => SendToError::NotWriteable,
+                    datagram::SendToError::Zone(e) => SendToError::Zone(e),
+                    datagram::SendToError::CreateAndSend(e) => match e {
+                        IpSockCreateAndSendError::Mtu => SendToError::Mtu,
+                        IpSockCreateAndSendError::Create(e) => SendToError::CreateSock(e),
+                    },
+                    datagram::SendToError::RemoteUnexpectedlyMapped => SendToError::CreateSock(
+                        IpSockCreationError::Route(ResolveRouteError::Unreachable),
                     ),
                 };
-                (body, Either::Right(err))
+                Either::Right(err)
             }
         })
     }
@@ -1917,7 +1909,7 @@ pub fn send_udp<I: Ip, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
     ctx: &mut C,
     id: &SocketId<I>,
     body: B,
-) -> Result<(), (B, Either<SendError, ExpectedConnError>)> {
+) -> Result<(), Either<SendError, ExpectedConnError>> {
     let mut sync_ctx = Locked::new(sync_ctx);
 
     I::map_ip::<_, Result<_, _>>(
@@ -1953,7 +1945,7 @@ pub fn send_udp_to<I: Ip, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
     remote_ip: SocketZonedIpAddr<I::Addr, DeviceId<C>>,
     remote_port: NonZeroU16,
     body: B,
-) -> Result<(), (B, Either<LocalAddressError, SendToError>)> {
+) -> Result<(), Either<LocalAddressError, SendToError>> {
     let mut sync_ctx = Locked::new(sync_ctx);
     let id = id.clone();
 
@@ -4124,7 +4116,7 @@ mod tests {
         frames.set_should_error_for_frame(|_frame_meta| true);
 
         // Now try to send something over this new connection:
-        let (_, send_err) = BufferSocketHandler::send(
+        let send_err = BufferSocketHandler::send(
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
@@ -4156,12 +4148,9 @@ mod tests {
             (false, Ok(())),
             (
                 true,
-                Err((
-                    Buf::new(Vec::new(), ..),
-                    Either::Left(SendError::IpSock(IpSockSendError::Unroutable(
-                        ResolveRouteError::Unreachable,
-                    ))),
-                )),
+                Err(Either::Left(SendError::IpSock(IpSockSendError::Unroutable(
+                    ResolveRouteError::Unreachable,
+                )))),
             ),
         ] {
             set_device_removed(&mut sync_ctx, device_removed);
@@ -4205,7 +4194,7 @@ mod tests {
                     Buf::new(Vec::new(), ..),
                 )
                 .map_err(
-                    |(_, e)| assert_matches!(e, Either::Right(SendToError::NotWriteable) => NotWriteableError)
+                    |e| assert_matches!(e, Either::Right(SendToError::NotWriteable) => NotWriteableError)
                 ),
                 None => BufferSocketHandler::send(
                     sync_ctx,
@@ -4213,7 +4202,7 @@ mod tests {
                     id,
                     Buf::new(Vec::new(), ..),
                 )
-                .map_err(|(_, e)| assert_matches!(e, Either::Left(SendError::NotWriteable) => NotWriteableError)),
+                .map_err(|e| assert_matches!(e, Either::Left(SendError::NotWriteable) => NotWriteableError)),
             }
         }
 
@@ -6564,10 +6553,7 @@ where {
             )
         };
 
-        assert_eq!(
-            result.map_err(|(_buf, err)| assert_matches!(err, Either::Right(e) => e)),
-            expected
-        );
+        assert_eq!(result.map_err(|err| assert_matches!(err, Either::Right(e) => e)), expected);
     }
 
     #[test_case(true; "connected")]
@@ -6646,7 +6632,7 @@ where {
 
         assert_matches!(
             result,
-            Err((_, Either::Right(SendToError::Zone(ZonedAddressError::DeviceZoneMismatch))))
+            Err(Either::Right(SendToError::Zone(ZonedAddressError::DeviceZoneMismatch)))
         );
     }
 

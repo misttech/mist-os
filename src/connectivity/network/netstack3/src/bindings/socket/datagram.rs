@@ -355,7 +355,7 @@ pub(crate) trait BufferTransportState<I: Ip, B: BufferMut>: TransportState<I> {
         ctx: &mut C,
         id: &Self::SocketId,
         body: B,
-    ) -> Result<(), (B, Self::SendError)>;
+    ) -> Result<(), Self::SendError>;
 
     fn send_to<C: BufferNonSyncContext<B>>(
         sync_ctx: &SyncCtx<C>,
@@ -363,7 +363,7 @@ pub(crate) trait BufferTransportState<I: Ip, B: BufferMut>: TransportState<I> {
         id: &Self::SocketId,
         remote: (SocketZonedIpAddr<I::Addr, DeviceId<C>>, Self::RemoteIdentifier),
         body: B,
-    ) -> Result<(), (B, Self::SendToError)>;
+    ) -> Result<(), Self::SendToError>;
 }
 
 #[derive(Debug)]
@@ -571,9 +571,9 @@ impl<I: IpExt + IpSockAddrExt, B: BufferMut> BufferTransportState<I, B> for Udp 
         ctx: &mut C,
         id: &Self::SocketId,
         body: B,
-    ) -> Result<(), (B, Self::SendError)> {
+    ) -> Result<(), Self::SendError> {
         udp::send_udp(sync_ctx, ctx, id, body)
-            .map_err(|(b, e)| (b, e.map_right(|ExpectedConnError| fposix::Errno::Edestaddrreq)))
+            .map_err(|e| e.map_right(|ExpectedConnError| fposix::Errno::Edestaddrreq))
     }
 
     fn send_to<C: BufferNonSyncContext<B>>(
@@ -585,7 +585,7 @@ impl<I: IpExt + IpSockAddrExt, B: BufferMut> BufferTransportState<I, B> for Udp 
             Self::RemoteIdentifier,
         ),
         body: B,
-    ) -> Result<(), (B, Self::SendToError)> {
+    ) -> Result<(), Self::SendToError> {
         udp::send_udp_to(sync_ctx, ctx, id, remote_ip, remote_port, body)
     }
 }
@@ -1690,9 +1690,10 @@ where
         let len = data.len() as i64;
         let body = Buf::new(data, ..);
         match remote {
-            Some(remote) => T::send_to(sync_ctx, non_sync_ctx, id, remote, body)
-                .map_err(|(_body, e)| e.into_errno()),
-            None => T::send(sync_ctx, non_sync_ctx, id, body).map_err(|(_body, e)| e.into_errno()),
+            Some(remote) => {
+                T::send_to(sync_ctx, non_sync_ctx, id, remote, body).map_err(|e| e.into_errno())
+            }
+            None => T::send(sync_ctx, non_sync_ctx, id, body).map_err(|e| e.into_errno()),
         }
         .map(|()| len)
     }

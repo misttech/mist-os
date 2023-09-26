@@ -96,44 +96,15 @@ pub enum IpSockCreateAndSendError {
     Create(#[from] IpSockCreationError),
 }
 
-/// Extension trait for `Ip` providing socket-specific functionality.
-pub(crate) trait SocketIpExt: Ip + IpExt {
-    /// `Self::LOOPBACK_ADDRESS`, but wrapped in the `SocketIpAddr` type.
-    const LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR: SocketIpAddr<Self::Addr> = unsafe {
-        // SAFETY: The loopback address is a valid SocketIpAddr, as verified
-        // in the `loopback_addr_is_valid_socket_addr` test.
-        SocketIpAddr::new_from_specified_unchecked(Self::LOOPBACK_ADDRESS)
-    };
-}
-
-impl<I: Ip + IpExt> SocketIpExt for I {}
-
-#[cfg(test)]
-mod socket_ip_ext_test {
-    use super::*;
-    use ip_test_macro::ip_test;
-    use net_types::ip::{Ipv4, Ipv6};
-
-    #[ip_test]
-    fn loopback_addr_is_valid_socket_addr<I: Ip + SocketIpExt>() {
-        // `LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR is defined with the "unchecked"
-        // constructor (the only const constructor). Verify here that the
-        // addr actually satisfies all the requirements (protecting against far
-        // away changes)
-        let _addr = SocketIpAddr::new(I::LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR.addr())
-            .expect("loopback address should be a valid SocketIpAddr");
-    }
-}
-
 #[derive(Debug)]
-pub(crate) enum SendOneShotIpPacketError<S, O, E> {
-    CreateAndSendError { body: S, err: IpSockCreateAndSendError, options: O },
+pub(crate) enum SendOneShotIpPacketError<O, E> {
+    CreateAndSendError { err: IpSockCreateAndSendError, options: O },
     SerializeError(E),
 }
 
 /// An extension of [`IpSocketHandler`] adding the ability to send packets on an
 /// IP socket.
-pub(crate) trait BufferIpSocketHandler<I: SocketIpExt, C, B: BufferMut>:
+pub(crate) trait BufferIpSocketHandler<I: IpExt, C, B: BufferMut>:
     IpSocketHandler<I, C>
 {
     /// Sends an IP packet on a socket.
@@ -197,28 +168,20 @@ pub(crate) trait BufferIpSocketHandler<I: SocketIpExt, C, B: BufferMut>:
         options: O,
         get_body_from_src_ip: F,
         mtu: Option<u32>,
-    ) -> Result<(), SendOneShotIpPacketError<S, O, E>> {
+    ) -> Result<(), SendOneShotIpPacketError<O, E>> {
         // We use a `match` instead of `map_err` because `map_err` would require passing a closure
         // which takes ownership of `get_body_from_src_ip`, which we also use in the success case.
         match self.new_ip_socket(ctx, device, local_ip, remote_ip, proto, options) {
             Err((err, options)) => {
-                Err(match get_body_from_src_ip(I::LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR) {
-                    Ok(body) => SendOneShotIpPacketError::CreateAndSendError {
-                        body,
-                        err: err.into(),
-                        options,
-                    },
-                    Err(ser_err) => SendOneShotIpPacketError::SerializeError(ser_err),
-                })
+                Err(SendOneShotIpPacketError::CreateAndSendError { err: err.into(), options })
             }
             Ok(tmp) => {
                 let packet = get_body_from_src_ip(*tmp.local_ip())
                     .map_err(SendOneShotIpPacketError::SerializeError)?;
-                self.send_ip_packet(ctx, &tmp, packet, mtu).map_err(|(body, err)| match err {
+                self.send_ip_packet(ctx, &tmp, packet, mtu).map_err(|(_body, err)| match err {
                     IpSockSendError::Mtu => {
                         let IpSock { options, definition: _ } = tmp;
                         SendOneShotIpPacketError::CreateAndSendError {
-                            body,
                             err: IpSockCreateAndSendError::Mtu,
                             options,
                         }
@@ -246,7 +209,7 @@ pub(crate) trait BufferIpSocketHandler<I: SocketIpExt, C, B: BufferMut>:
         options: O,
         get_body_from_src_ip: F,
         mtu: Option<u32>,
-    ) -> Result<(), (S, IpSockCreateAndSendError, O)> {
+    ) -> Result<(), (IpSockCreateAndSendError, O)> {
         self.send_oneshot_ip_packet_with_fallible_serializer(
             ctx,
             device,
@@ -258,9 +221,7 @@ pub(crate) trait BufferIpSocketHandler<I: SocketIpExt, C, B: BufferMut>:
             mtu,
         )
         .map_err(|err| match err {
-            SendOneShotIpPacketError::CreateAndSendError { body, err, options } => {
-                (body, err, options)
-            }
+            SendOneShotIpPacketError::CreateAndSendError { err, options } => (err, options),
             SendOneShotIpPacketError::SerializeError(infallible) => match infallible {},
         })
     }
@@ -2316,8 +2277,8 @@ mod tests {
         const NEW_OPTION: usize = 55;
         let mut socket = IpSock::<Ipv4, FakeDeviceId, _> {
             definition: IpSockDefinition {
-                remote_ip: Ipv4::LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR,
-                local_ip: Ipv4::LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR,
+                remote_ip: SocketIpAddr::new(Ipv4::LOOPBACK_ADDRESS.get()).unwrap(),
+                local_ip: SocketIpAddr::new(Ipv4::LOOPBACK_ADDRESS.get()).unwrap(),
                 device: None,
                 proto: Ipv4Proto::Icmp,
             },

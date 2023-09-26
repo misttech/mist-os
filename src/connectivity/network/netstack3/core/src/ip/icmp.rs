@@ -2249,7 +2249,7 @@ fn send_icmp_reply<
     original_src_ip: SpecifiedAddr<I::Addr>,
     original_dst_ip: SpecifiedAddr<I::Addr>,
     get_body_from_src_ip: F,
-) -> Result<(), S> {
+) {
     trace!("send_icmp_reply({:?}, {}, {})", device, original_src_ip, original_dst_ip);
     ctx.increment_debug_counter("send_icmp_reply");
 
@@ -2260,14 +2260,14 @@ fn send_icmp_reply<
         Ok(addr) => addr,
         Err(AddrIsMappedError {}) => {
             trace!("send_icmpv6_error_message: original_src_ip is mapped");
-            return Ok(());
+            return;
         }
     };
     let original_dst_ip = match original_dst_ip.try_into() {
         Ok(addr) => addr,
         Err(AddrIsMappedError {}) => {
             trace!("send_icmpv6_error_message: original_dst_ip is mapped");
-            return Ok(());
+            return;
         }
     };
 
@@ -2282,9 +2282,8 @@ fn send_icmp_reply<
             |src_ip| get_body_from_src_ip(src_ip.into()),
             None,
         )
-        .map_err(|(body, err, DefaultSendOptions {})| {
-            error!("failed to send ICMP reply: {}", err);
-            body
+        .unwrap_or_else(|(err, DefaultSendOptions)| {
+            debug!("failed to send ICMP reply: {}", err);
         })
 }
 
@@ -3314,7 +3313,7 @@ pub(crate) trait BufferSocketHandler<I: datagram::IpExt, C, B: BufferMut>:
         ctx: &mut C,
         conn: SocketId<I>,
         body: B,
-    ) -> Result<(), datagram::SendError<B, (), packet_formats::error::ParseError>>;
+    ) -> Result<(), datagram::SendError<packet_formats::error::ParseError>>;
 }
 
 impl<I: datagram::IpExt, C: IcmpNonSyncCtx<I>, SC: StateContext<I, C> + IcmpStateContext>
@@ -3355,16 +3354,8 @@ impl<
         ctx: &mut C,
         id: SocketId<I>,
         body: B,
-    ) -> Result<(), datagram::SendError<B, (), packet_formats::error::ParseError>> {
-        datagram::send_conn::<_, _, _, Icmp, _>(self, ctx, id, body).map_err(|err| match err {
-            datagram::SendError::NotConnected(err) => datagram::SendError::NotConnected(err),
-            datagram::SendError::NotWriteable(err) => datagram::SendError::NotWriteable(err),
-            datagram::SendError::SerializeError(err) => datagram::SendError::SerializeError(err),
-            datagram::SendError::IpSock(serializer, err) => {
-                let _: packet::Nested<B, IcmpPacketBuilder<I, IcmpEchoRequest>> = serializer;
-                datagram::SendError::IpSock((), err)
-            }
-        })
+    ) -> Result<(), datagram::SendError<packet_formats::error::ParseError>> {
+        datagram::send_conn::<_, _, _, Icmp, _>(self, ctx, id, body)
     }
 }
 
@@ -3455,7 +3446,7 @@ pub fn send<I: Ip, B: BufferMut, C: NonSyncContext + BufferNonSyncContext<B>>(
     ctx: &mut C,
     id: SocketId<I>,
     body: B,
-) -> Result<(), datagram::SendError<B, (), packet_formats::error::ParseError>> {
+) -> Result<(), datagram::SendError<packet_formats::error::ParseError>> {
     I::map_ip(
         (IpInvariant((sync_ctx, ctx, body)), id),
         |(IpInvariant((sync_ctx, ctx, body)), id)| {

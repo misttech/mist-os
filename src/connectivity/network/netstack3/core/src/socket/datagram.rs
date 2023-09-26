@@ -2777,13 +2777,13 @@ pub(crate) fn get_shutdown_connected<
 /// Error encountered when sending a datagram on a socket.
 #[derive(Debug, GenericOverIp)]
 #[generic_over_ip()]
-pub enum SendError<B, S, SE> {
+pub enum SendError<SE> {
     /// The socket is not connected,
-    NotConnected(B),
+    NotConnected,
     /// The socket is not writeable.
-    NotWriteable(B),
+    NotWriteable,
     /// There was a problem sending the IP packet.
-    IpSock(S, IpSockSendError),
+    IpSock(IpSockSendError),
     /// There was a problem when serializing the packet.
     SerializeError(SE),
 }
@@ -2799,12 +2799,12 @@ pub(crate) fn send_conn<
     ctx: &mut C,
     id: S::SocketId<I>,
     body: B,
-) -> Result<(), SendError<B, S::Serializer<I, B>, S::SerializeError>> {
+) -> Result<(), SendError<S::SerializeError>> {
     sync_ctx.with_sockets_state_buf(|sync_ctx, state| {
         let state = match state.get(id.get_key_index()).expect("invalid socket ID") {
             SocketState::Unbound(_)
             | SocketState::Bound(BoundSocketState::Listener { state: _, sharing: _ }) => {
-                return Err(SendError::NotConnected(body))
+                return Err(SendError::NotConnected)
             }
             SocketState::Bound(BoundSocketState::Connected { state, sharing: _ }) => state,
         };
@@ -2827,28 +2827,28 @@ pub(crate) fn send_conn<
             }
         };
         if *shutdown_send {
-            return Err(SendError::NotWriteable(body));
+            return Err(SendError::NotWriteable);
         }
 
         let ConnAddr { ip, device: _ } = addr;
 
-        let packet = S::make_packet(body, &ip).map_err(SendError::SerializeError)?;
+        let packet = S::make_packet::<I, _>(body, &ip).map_err(SendError::SerializeError)?;
         sync_ctx.with_transport_context_buf(|sync_ctx| {
             sync_ctx
                 .send_ip_packet(ctx, &socket, packet, None)
-                .map_err(|(serializer, send_error)| SendError::IpSock(serializer, send_error))
+                .map_err(|(_serializer, send_error)| SendError::IpSock(send_error))
         })
     })
 }
 
 #[derive(Debug)]
-pub(crate) enum SendToError<B, S, SE> {
-    NotWriteable(B),
-    Zone(B, ZonedAddressError),
-    CreateAndSend(S, IpSockCreateAndSendError),
+pub(crate) enum SendToError<SE> {
+    NotWriteable,
+    Zone(ZonedAddressError),
+    CreateAndSend(IpSockCreateAndSendError),
     // The remote address is mapped (i.e. an ipv4-mapped-ipv6 address), but the
     // socket is not dual-stack enabled.
-    RemoteUnexpectedlyMapped(B),
+    RemoteUnexpectedlyMapped,
     SerializeError(SE),
 }
 
@@ -2865,10 +2865,7 @@ pub(crate) fn send_to<
     remote_ip: SocketZonedIpAddr<I::Addr, SC::DeviceId>,
     remote_identifier: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     body: B,
-) -> Result<
-    (),
-    Either<(B, LocalAddressError), SendToError<B, S::Serializer<I, B>, S::SerializeError>>,
->
+) -> Result<(), Either<LocalAddressError, SendToError<S::SerializeError>>>
 where
     S::UnboundSharingState<I>: Clone
         + Into<<S::SocketMapSpec<I, SC::WeakDeviceId> as SocketMapStateSpec>::ListenerSharingState>,
@@ -2877,7 +2874,7 @@ where
     sync_ctx.with_sockets_state_mut_buf(|sync_ctx, state| {
         match listen_inner(sync_ctx, ctx, state, id.clone(), None, None) {
             Ok(()) | Err(Either::Left(ExpectedUnboundError)) => (),
-            Err(Either::Right(e)) => return Err(Either::Left((body, e))),
+            Err(Either::Right(e)) => return Err(Either::Left(e)),
         };
         let state = match state.get(id.get_key_index()).expect("no such socket") {
             SocketState::Unbound(_) => panic!("expected bound socket"),
@@ -2907,7 +2904,7 @@ where
 
                 let Shutdown { send: shutdown_write, receive: _ } = shutdown;
                 if *shutdown_write {
-                    return Err(Either::Right(SendToError::NotWriteable(body)));
+                    return Err(Either::Right(SendToError::NotWriteable));
                 }
                 let (local_ip, local_id) = local;
 
@@ -2951,7 +2948,7 @@ where
             Some(_addr) => {}
             None => {
                 // Prevent sending to ipv4-mapped-ipv6 addrs for now.
-                return Err(Either::Right(SendToError::RemoteUnexpectedlyMapped(body)));
+                return Err(Either::Right(SendToError::RemoteUnexpectedlyMapped));
             }
         }
 
@@ -2990,13 +2987,13 @@ fn send_oneshot<
     device: &Option<SC::WeakDeviceId>,
     ip_options: &IpOptions<I, SC::WeakDeviceId, S>,
     body: B,
-) -> Result<(), SendToError<B, S::Serializer<I, B>, S::SerializeError>> {
+) -> Result<(), SendToError<S::SerializeError>> {
     let (remote_ip, device) = match crate::transport::resolve_addr_with_device::<I::Addr, _, _, _>(
         remote_ip.into_inner(),
         device.clone(),
     ) {
         Ok(addr) => addr,
-        Err(e) => return Err(SendToError::Zone(body, e)),
+        Err(e) => return Err(SendToError::Zone(e)),
     };
 
     // TODO(https://fxbug.dev/132092): Delete conversion once
@@ -3012,7 +3009,7 @@ fn send_oneshot<
             S::ip_proto::<I>(),
             ip_options,
             |local_ip| {
-                S::make_packet(
+                S::make_packet::<I, _>(
                     body,
                     &ConnIpAddr { local: (local_ip, local_id), remote: (remote_ip, remote_id) },
                 )
@@ -3020,8 +3017,8 @@ fn send_oneshot<
             None,
         )
         .map_err(|err| match err {
-            SendOneShotIpPacketError::CreateAndSendError { body, err, options: _ } => {
-                SendToError::CreateAndSend(body, err)
+            SendOneShotIpPacketError::CreateAndSendError { err, options: _ } => {
+                SendToError::CreateAndSend(err)
             }
             SendOneShotIpPacketError::SerializeError(err) => SendToError::SerializeError(err),
         })
@@ -4282,7 +4279,7 @@ mod test {
                 'a',
                 body,
             ),
-            Err(Either::Right(SendToError::CreateAndSend(_, _)))
+            Err(Either::Right(SendToError::CreateAndSend(_)))
         );
         assert_matches!(
             get_info(&mut sync_ctx, &mut non_sync_ctx, socket),

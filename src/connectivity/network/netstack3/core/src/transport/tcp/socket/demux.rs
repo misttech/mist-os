@@ -277,7 +277,7 @@ fn handle_incoming_packet<I, B, C, SC>(
                 None,
             ) {
                 Ok(()) => {}
-                Err((_body, err, DefaultSendOptions)) => {
+                Err((err, DefaultSendOptions)) => {
                     // TODO(https://fxbug.dev/101993): Increment the counter.
                     trace!("cannot construct an ip socket to respond RST: {:?}, ignoring", err);
                 }
