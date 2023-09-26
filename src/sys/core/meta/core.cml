@@ -109,11 +109,6 @@
             url: "fuchsia-pkg://fuchsia.com/fonts#meta/fonts.cm",
         },
         {
-            name: "remote-diagnostics-bridge",
-            url: "fuchsia-pkg://fuchsia.com/remote-diagnostics-bridge#meta/remote-diagnostics-bridge.cm",
-            environment: "#core-env",
-        },
-        {
             name: "pkg-resolver",
             url: "fuchsia-pkg://fuchsia.com/pkg-resolver#meta/pkg-resolver.cm",
         },
@@ -341,15 +336,6 @@
             ],
             from: "#hwinfo",
             to: "#agis",
-        },
-        {
-            protocol: [
-                "fuchsia.diagnostics.ArchiveAccessor",
-                "fuchsia.sys2.RealmExplorer.root",
-                "fuchsia.sys2.RealmQuery.root",
-            ],
-            from: "parent",
-            to: "#remote-diagnostics-bridge",
         },
         {
             directory: "config-data",

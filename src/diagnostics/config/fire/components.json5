@@ -270,11 +270,6 @@
         moniker: "core/remote-control",
     },
     {
-        id: 168,
-        label: "Diagnostics Bridge",
-        moniker: "core/remote-diagnostics-bridge",
-    },
-    {
         id: 169,
         label: "Session Manager",
         moniker: "core/session-manager",

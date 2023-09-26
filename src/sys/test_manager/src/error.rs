@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow, fidl_fuchsia_component as fcomponent,
-    fidl_fuchsia_developer_remotecontrol::StreamError, fidl_fuchsia_test_manager::LaunchError,
+    anyhow, fidl_fuchsia_component as fcomponent, fidl_fuchsia_test_manager::LaunchError,
     fuchsia_component_test::error::Error as RealmBuilderError, thiserror::Error, tracing::warn,
 };
 
@@ -54,7 +53,7 @@ pub enum LaunchTestError {
     OpenExposedDir(#[source] anyhow::Error),
 
     #[error("Failed to stream logs from embedded Archivist: {0:?}")]
-    StreamIsolatedLogs(StreamError),
+    StreamIsolatedLogs(anyhow::Error),
 
     #[error("Failed to resolve test: {0:?}")]
     ResolveTest(#[source] anyhow::Error),

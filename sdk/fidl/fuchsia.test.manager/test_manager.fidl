@@ -5,7 +5,6 @@ library fuchsia.test.manager;
 
 using fuchsia.component;
 using fuchsia.component.decl;
-using fuchsia.developer.remotecontrol;
 using fuchsia.diagnostics;
 using fuchsia.io;
 using fuchsia.test;
@@ -14,9 +13,7 @@ using zx;
 
 /// Holds the server end of an iterator over the isolated logs of a test.
 type LogsIterator = flexible resource union {
-    /// Server end of the iterator, when this protocol is used by host-side clients.
-    @deprecated
-    1: archive server_end:fuchsia.developer.remotecontrol.ArchiveIterator;
+    1: reserved;
     /// Server end of the iterator, when this protocol is used by Fuchsia clients.
     2: batch server_end:fuchsia.diagnostics.BatchIterator;
     /// Server end of the iterator, when this protocol is used by host-side clients.
@@ -424,11 +421,7 @@ type Stderr = resource struct {
 };
 
 type Syslog = flexible resource union {
-    /// Client end of the iterator, when this protocol is used by host-side clients.
-    /// This will be removed once all SDK users
-    /// have migrated to stream.
-    @deprecated
-    1: archive client_end:fuchsia.developer.remotecontrol.ArchiveIterator;
+    1: reserved;
     /// Client end of the iterator, when this protocol is used by Fuchsia clients.
     2: batch client_end:fuchsia.diagnostics.BatchIterator;
     /// Client end of the iterator, when this protocol is used by host-side clients.

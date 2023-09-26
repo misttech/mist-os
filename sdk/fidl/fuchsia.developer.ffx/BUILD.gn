@@ -9,7 +9,6 @@ fidl("fuchsia.developer.ffx") {
   sources = [
     "agis.fidl",
     "daemon.fidl",
-    "diagnostics.fidl",
     "echo.fidl",
     "fastboot.fidl",
     "mdns.fidl",

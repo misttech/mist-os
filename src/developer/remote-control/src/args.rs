@@ -15,13 +15,8 @@ pub struct RemoteControl {
 #[derive(Debug, Eq, FromArgs, PartialEq)]
 #[argh(subcommand)]
 pub enum Command {
-    DiagnosticsBridge(DiagnosticsBridge),
     RemoteControl(RemoteControlCmd),
 }
-
-#[derive(Debug, Eq, FromArgs, PartialEq)]
-#[argh(subcommand, name = "diagnostics-bridge", description = "starts the diagnostics bridge")]
-pub struct DiagnosticsBridge {}
 
 #[derive(Debug, Eq, FromArgs, PartialEq)]
 #[argh(subcommand, name = "remote-control", description = "starts the remote control service")]

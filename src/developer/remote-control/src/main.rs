@@ -127,7 +127,6 @@ async fn main() -> Result<(), Error> {
     let args::RemoteControl { cmd } = argh::from_env();
 
     let res = match cmd {
-        args::Command::DiagnosticsBridge(_) => diagnostics_bridge::exec_server().await,
         args::Command::RemoteControl(_) => exec_server().await,
     };
 

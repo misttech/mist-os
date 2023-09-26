@@ -4,12 +4,7 @@
 
 use {
     anyhow::Error,
-    async_trait::async_trait,
-    diagnostics_bridge::ArchiveReaderManager,
-    diagnostics_data::{Data, LogsData},
-    diagnostics_reader as reader,
     fidl::endpoints::ServerEnd,
-    fidl_fuchsia_developer_remotecontrol::StreamError,
     fidl_fuchsia_diagnostics as fdiagnostics,
     fidl_fuchsia_diagnostics::{
         BatchIteratorMarker, ClientSelectorConfiguration, DataType, Format, StreamMode,
@@ -17,7 +12,6 @@ use {
     },
     fidl_fuchsia_diagnostics_host as fhost, fidl_fuchsia_test_manager as ftest_manager,
     fuchsia_async as fasync,
-    futures::stream::FusedStream,
     tracing::warn,
 };
 
@@ -33,12 +27,8 @@ pub(crate) fn serve_syslog(
     accessor: fdiagnostics::ArchiveAccessorProxy,
     host_accessor: fhost::ArchiveAccessorProxy,
     log_iterator: ftest_manager::LogsIterator,
-) -> Result<ServeSyslogOutcome, StreamError> {
+) -> Result<ServeSyslogOutcome, anyhow::Error> {
     let logs_iterator_task = match log_iterator {
-        ftest_manager::LogsIterator::Archive(_) => {
-            warn!("This is deprecated and in the process of removal. Please use SocketBatchIterator instead");
-            None
-        }
         ftest_manager::LogsIterator::Stream(iterator) => {
             let iterator_fut = run_iterator_socket(&host_accessor, iterator);
             Some(fasync::Task::spawn(async move {
@@ -73,7 +63,6 @@ fn run_iterator_socket(
 }
 
 /// Type alias for &'a ArchiveAccessorProxy
-/// so we can impl ArchiveReaderManager on it.
 struct IsolatedLogsProvider<'a> {
     accessor: &'a fdiagnostics::ArchiveAccessorProxy,
 }
@@ -86,7 +75,7 @@ impl<'a> IsolatedLogsProvider<'a> {
     fn start_streaming_logs(
         &self,
         iterator: ServerEnd<BatchIteratorMarker>,
-    ) -> Result<(), StreamError> {
+    ) -> Result<(), anyhow::Error> {
         let stream_parameters = StreamParameters {
             stream_mode: Some(StreamMode::SnapshotThenSubscribe),
             data_type: Some(DataType::Logs),
@@ -97,35 +86,8 @@ impl<'a> IsolatedLogsProvider<'a> {
         };
         self.accessor.stream_diagnostics(&stream_parameters, iterator).map_err(|err| {
             warn!(%err, "Failed to subscribe to isolated logs");
-            StreamError::SetupSubscriptionFailed
+            err
         })?;
         Ok(())
-    }
-}
-
-#[async_trait]
-impl ArchiveReaderManager for IsolatedLogsProvider<'_> {
-    type Error = reader::Error;
-
-    async fn snapshot<D: diagnostics_data::DiagnosticsData + 'static>(
-        &self,
-    ) -> Result<Vec<Data<D>>, StreamError> {
-        unimplemented!("This functionality is not yet needed.");
-    }
-
-    fn start_log_stream(
-        &mut self,
-    ) -> Result<
-        Box<dyn FusedStream<Item = Result<LogsData, Self::Error>> + Unpin + Send>,
-        StreamError,
-    > {
-        let (proxy, batch_iterator_server) = fidl::endpoints::create_proxy::<BatchIteratorMarker>()
-            .map_err(|err| {
-                warn!(%err, "Fidl error while creating proxy");
-                StreamError::GenericError
-            })?;
-        self.start_streaming_logs(batch_iterator_server)?;
-        let subscription = reader::Subscription::new(proxy);
-        Ok(Box::new(subscription))
     }
 }

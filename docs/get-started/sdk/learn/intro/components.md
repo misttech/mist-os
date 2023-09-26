@@ -54,7 +54,6 @@ You should see output similar to the (truncated) list below:
 /core/font_provider
 /core/log-stats
 /core/remote-control
-/core/remote-diagnostics-bridge
 /core/sampler
 /core/system-update-committer
 /core/temperature-logger

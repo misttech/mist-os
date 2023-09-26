@@ -28,7 +28,6 @@ group("tests") {
 
   deps = [
     ":remote-control-lib-tests",
-    "//src/developer/remote-control/diagnostics-bridge:tests",
     "//src/developer/remote-control/runner:tests",
   ]
 }
@@ -90,7 +89,6 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.overnet:fuchsia.overnet_rust",
     "//src/connectivity/overnet/lib/circuit",
     "//src/connectivity/overnet/lib/core",
-    "//src/developer/remote-control/diagnostics-bridge",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
@@ -133,23 +131,10 @@ fuchsia_test_package("remote-control-lib-tests") {
   }
 }
 
-fuchsia_package_with_single_component("pkg-diagnostics-bridge") {
-  package_name = "remote-diagnostics-bridge"
-  deps = [
-    ":bin",
-    "//build/validate:non_production_tag",
-    "//src/developer/remote-control/diagnostics-bridge",
-  ]
-  manifest = "diagnostics-bridge/meta/remote-diagnostics-bridge.cml"
-}
-
 fuchsia_component("remote-control-component") {
   component_name = "remote-control"
   manifest = "meta/remote-control.cml"
-  deps = [
-    ":bin",
-    "//src/developer/remote-control/diagnostics-bridge",
-  ]
+  deps = [ ":bin" ]
 }
 
 fuchsia_package("remote-control-package") {
