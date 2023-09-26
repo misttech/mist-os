@@ -28,6 +28,7 @@
 #include "src/lib/fidl_codec/display_handle.h"
 #include "src/lib/fidl_codec/display_options.h"
 #include "src/lib/fidl_codec/message_decoder.h"
+#include "src/lib/fidl_codec/syscall_prop_stubs.h"
 #include "src/lib/fidl_codec/wire_types.h"
 #include "tools/fidlcat/lib/comparator.h"
 #include "tools/fidlcat/lib/decode_options.h"

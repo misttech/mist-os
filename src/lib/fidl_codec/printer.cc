@@ -18,6 +18,7 @@
 
 #include "src/lib/fidl_codec/display_handle.h"
 #include "src/lib/fidl_codec/status.h"
+#include "src/lib/fidl_codec/syscall_prop_stubs.h"
 
 namespace fidl_codec {
 
