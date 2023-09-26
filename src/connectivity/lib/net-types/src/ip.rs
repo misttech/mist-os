@@ -372,6 +372,105 @@ pub trait Ip:
     ) -> Out;
 }
 
+/// Invokes `I::map_ip`, passing the same function body as both arguments.
+///
+/// The first argument is always the `I` on which to invoke `I::map_ip`.
+/// Optionally, this can include an alias (`I as IpAlias`) that should be bound
+/// to `Ipv4` and `Ipv6` for each instantiation of the function body. (If the
+/// `Ip` argument passed is a simple identifier, then it is automatically
+/// aliased in this way.)
+/// The next argument is the input to thread through `map_ip` to the function,
+/// and the final argument is the function to be duplicated to serve as the
+/// closures passed to `map_ip`.
+///
+/// This macro helps avoid code duplication when working with types that are
+/// _not_ GenericOverIp, but have identical shapes such that the actual text of
+/// the code you are writing is identical. This should be very rare, and is
+/// generally limited to cases where we are interfacing with code that we don't
+/// have the ability to make generic-over-IP -- when possible, it's better to
+/// push `I: Ip` generics further through the types you are working with instead
+/// so that you can avoid using `map_ip` entirely.
+///
+/// Example:
+///
+/// ```
+/// // Imagine that `IpExt` is implemented for concrete `Ipv4` and `Ipv6` but
+/// // not for blanket `I: Ip`.
+/// struct Foo<I: IpExt>;
+///
+/// struct FooFactory;
+/// impl FooFactory {
+///     fn get<I: IpExt>(&self) -> Foo<I> {
+///         unimplemented!()
+///     }
+/// }
+///
+/// struct FooSink<I: IpExt>;
+/// impl<I: IpExt> FooSink<I> {
+///     fn use_foo(&self, foo: Foo<I>) {
+///         unimplemented!()
+///     }
+/// }
+///
+/// fn do_something<I: Ip>(factory: FooFactory) -> Foo<I> {
+///     map_ip_twice!(
+///         I,
+///         (),
+///         |()| {
+///            // This works because even though the `I` from the function decl
+///            // doesn't have an `IpExt` bound, it's aliased to either `Ipv4`
+///            // or `Ipv6` here.
+///            factory.get::<I>()
+///         },
+///     )
+/// }
+///
+/// fn do_something_else<I: IpExt>(factory: FooFactory, foo_sink: FooSink<I>) {
+///     map_ip_twice!(
+///         // Introduce different alias to avoid shadowing `I`.
+///         I as IpAlias,
+///         (),
+///         |()| {
+///             let foo_with_orig_ip = factory.get::<I>();
+///             // The fact that `I` was not shadowed allows us to make use of
+///             // `foo_sink` by capture rather than needing to thread it
+///             // through the generic-over-IP input.
+///             foo_sink.use_foo(foo_with_orig_ip)
+///         },
+///     )
+/// }
+/// ```
+#[macro_export]
+macro_rules! map_ip_twice {
+    // This case triggers if we're passed an `Ip` implementor that is a simple
+    // identifier in-scope (e.g. `I`), which allows us to automatically alias it
+    // to `Ipv4` and `Ipv6` in each `$fn` instantiation.
+    ($ip:ident, $input:expr, $fn:expr $(,)?) => {
+        $crate::map_ip_twice!($ip as $ip, $input, $fn)
+    };
+    // This case triggers if we're passed an `Ip` implementor that is _not_ an
+    // identifier, and thus we can't use it as the left-hand-side of a type
+    // alias binding (e.g. `<A as IpAddress>::Version`).
+    ($ip:ty, $input:expr, $fn:expr $(,)?) => {
+        <$ip as $crate::ip::Ip>::map_ip($input, { $fn }, { $fn })
+    };
+    ($ip:ty as $iptypealias:ident, $input:expr, $fn:expr $(,)?) => {
+        <$ip as $crate::ip::Ip>::map_ip(
+            $input,
+            {
+                #[allow(dead_code)]
+                type $iptypealias = $crate::ip::Ipv4;
+                $fn
+            },
+            {
+                #[allow(dead_code)]
+                type $iptypealias = $crate::ip::Ipv6;
+                $fn
+            },
+        )
+    };
+}
+
 /// IPv4.
 ///
 /// `Ipv4` implements [`Ip`] for IPv4.
@@ -3245,6 +3344,126 @@ mod tests {
 
         assert_eq!(from_be_bytes(Ipv4::LOOPBACK_ADDRESS.get()), Int(0x7f000001u32));
         assert_eq!(from_be_bytes(Ipv6::LOOPBACK_ADDRESS.get()), Int(1u128));
+    }
+
+    #[test]
+    fn map_ip_twice() {
+        struct FooV4 {
+            field: Ipv4Addr,
+        }
+
+        impl Default for FooV4 {
+            fn default() -> Self {
+                Self { field: Ipv4::UNSPECIFIED_ADDRESS }
+            }
+        }
+
+        struct FooV6 {
+            field: Ipv6Addr,
+        }
+
+        impl Default for FooV6 {
+            fn default() -> Self {
+                Self { field: Ipv6::UNSPECIFIED_ADDRESS }
+            }
+        }
+
+        trait IpExt {
+            type Foo: Default;
+        }
+
+        impl IpExt for Ipv4 {
+            type Foo = FooV4;
+        }
+
+        impl IpExt for Ipv6 {
+            type Foo = FooV6;
+        }
+
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct Foo<I: IpExt>(I::Foo);
+
+        fn do_something<I: Ip + IpExt>(
+            foo: Foo<I>,
+            extra_foo: Foo<I>,
+            captured_foo: Foo<I>,
+        ) -> I::Addr {
+            let addr: I::Addr = map_ip_twice!(I, foo, |Foo(foo)| { foo.field });
+
+            // Observe that we can use an associated item with `map_ip_twice!
+            // too.
+            let _: I::Addr =
+                map_ip_twice!(<<I as Ip>::Addr as IpAddress>::Version, extra_foo, |Foo(foo)| {
+                    // Since `captured_foo` is captured rather than fed through the
+                    // generic-over-ip input, this wouldn't work if `I` was aliased
+                    // concretely to `Ipv4` or `Ipv6`.
+                    let _: &Foo<I> = &captured_foo;
+                    foo.field
+                });
+
+            addr
+        }
+
+        assert_eq!(
+            do_something(
+                Foo::<Ipv4>(FooV4 { field: Ipv4::UNSPECIFIED_ADDRESS }),
+                Foo::<Ipv4>(FooV4 { field: Ipv4::UNSPECIFIED_ADDRESS }),
+                Foo::<Ipv4>(FooV4 { field: Ipv4::UNSPECIFIED_ADDRESS })
+            ),
+            Ipv4::UNSPECIFIED_ADDRESS
+        );
+        assert_eq!(
+            do_something(
+                Foo::<Ipv6>(FooV6 { field: Ipv6::UNSPECIFIED_ADDRESS }),
+                Foo::<Ipv6>(FooV6 { field: Ipv6::UNSPECIFIED_ADDRESS }),
+                Foo::<Ipv6>(FooV6 { field: Ipv6::UNSPECIFIED_ADDRESS })
+            ),
+            Ipv6::UNSPECIFIED_ADDRESS
+        );
+
+        fn do_something_with_default_type_alias_shadowing<I: Ip>() -> (I::Addr, IpVersion) {
+            let (field, IpInvariant(version)) = map_ip_twice!(I, (), |()| {
+                // Note that there's no `IpExt` bound on `I`, so `I` wouldn't
+                // work here unless it was automatically aliased to `Ipv4` or `Ipv6`.
+                let foo: Foo<I> = Foo(<I as IpExt>::Foo::default());
+                (foo.0.field, IpInvariant(I::VERSION))
+            },);
+            (field, version)
+        }
+
+        fn do_something_with_type_alias<I: Ip>() -> (I::Addr, IpVersion) {
+            // Show that the type alias inside the macro shadows
+            // whatever it was bound to outside the macro.
+            #[allow(dead_code)]
+            type IpAlias = usize;
+
+            let (field, IpInvariant(version)) = map_ip_twice!(I as IpAlias, (), |()| {
+                // Note that there's no `IpExt` bound on `I`, so `I` wouldn't
+                // work here -- only `IpAlias`, since `IpAlias` is explicitly
+                // an alias of `Ipv4` or `Ipv6`.
+                let foo: Foo<IpAlias> = Foo(<IpAlias as IpExt>::Foo::default());
+                (foo.0.field, IpInvariant(IpAlias::VERSION))
+            },);
+            (field, version)
+        }
+
+        assert_eq!(
+            do_something_with_default_type_alias_shadowing::<Ipv4>(),
+            (Ipv4::UNSPECIFIED_ADDRESS, IpVersion::V4)
+        );
+        assert_eq!(
+            do_something_with_default_type_alias_shadowing::<Ipv6>(),
+            (Ipv6::UNSPECIFIED_ADDRESS, IpVersion::V6)
+        );
+        assert_eq!(
+            do_something_with_type_alias::<Ipv4>(),
+            (Ipv4::UNSPECIFIED_ADDRESS, IpVersion::V4)
+        );
+        assert_eq!(
+            do_something_with_type_alias::<Ipv6>(),
+            (Ipv6::UNSPECIFIED_ADDRESS, IpVersion::V6)
+        );
     }
 
     #[test]
