@@ -746,7 +746,8 @@ void Osd::DumpNonRdmaRegisters() {
   uint32_t offset = 0;
   uint32_t index = 0;
 
-  LOG_REG(VPU_VIU_VENC_MUX_CTRL);
+  zxlogf(INFO, "VPU_VIU_VENC_MUX_CTRL: 0x%08x",
+         VideoInputUnitEncoderMuxControl::Get().ReadFrom(&*vpu_mmio_).reg_value());
   LOG_REG(VPU_VPP_MISC);
   LOG_REG(VPU_VPP_OFIFO_SIZE);
   LOG_REG(VPU_VPP_HOLD_LINES);

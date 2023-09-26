@@ -20,19 +20,6 @@ namespace amlogic_display {
 
 namespace {
 
-struct reg_val_pair {
-  uint32_t reg;
-  uint32_t val;
-};
-
-static const struct reg_val_pair ENC_LUT_GEN[] = {
-    {VPU_ENCP_VIDEO_EN, 0},           {VPU_ENCI_VIDEO_EN, 0},
-    {VPU_ENCP_VIDEO_MODE, 0x4040},    {VPU_ENCP_VIDEO_MODE_ADV, 0x18},
-    {VPU_VPU_VIU_VENC_MUX_CTRL, 0xA}, {VPU_ENCP_VIDEO_VSO_BEGIN, 16},
-    {VPU_ENCP_VIDEO_VSO_END, 32},     {VPU_ENCI_VIDEO_EN, 0},
-    {VPU_ENCP_VIDEO_EN, 1},           {0xFFFFFFFF, 0},
-};
-
 void TranslateDisplayMode(fidl::AnyArena& allocator, const display_mode_t& in_mode,
                           const ColorParam& in_color, DisplayMode* out_mode) {
   // Serves to translate between banjo struct display_mode_t and fidl struct DisplayMode
@@ -230,9 +217,25 @@ zx_status_t HdmiHost::ModeSet(const display_mode_t& mode) {
   pll_param clock_params = CalculateClockParameters(mode);
   ConfigurePll(clock_params);
 
-  for (size_t i = 0; ENC_LUT_GEN[i].reg != 0xFFFFFFFF; i++) {
-    WRITE32_REG(VPU, ENC_LUT_GEN[i].reg, ENC_LUT_GEN[i].val);
-  }
+  WRITE32_REG(VPU, VPU_ENCP_VIDEO_EN, 0);
+  WRITE32_REG(VPU, VPU_ENCI_VIDEO_EN, 0);
+  WRITE32_REG(VPU, VPU_ENCP_VIDEO_MODE, 0x4040);
+  WRITE32_REG(VPU, VPU_ENCP_VIDEO_MODE_ADV, 0x18);
+
+  // Connect both VIUs (Video Input Units) to the Progressive Encoder (ENCP),
+  // assuming the display is progressive.
+  VideoInputUnitEncoderMuxControl::Get()
+      .ReadFrom(&*vpu_mmio_)
+      .set_vsync_shared_by_viu_blocks(false)
+      .set_viu1_encoder_selection(VideoInputUnitEncoderMuxControl::Encoder::kProgressive)
+      .set_viu2_encoder_selection(VideoInputUnitEncoderMuxControl::Encoder::kProgressive)
+      .WriteTo(&*vpu_mmio_);
+
+  WRITE32_REG(VPU, VPU_ENCP_VIDEO_VSO_BEGIN, 16);
+  WRITE32_REG(VPU, VPU_ENCP_VIDEO_VSO_END, 32);
+
+  WRITE32_REG(VPU, VPU_ENCI_VIDEO_EN, 0);
+  WRITE32_REG(VPU, VPU_ENCP_VIDEO_EN, 1);
 
   WRITE32_REG(VPU, VPU_ENCP_VIDEO_MAX_PXCNT,
               (timings.venc_pixel_repeat) ? ((timings.htotal << 1) - 1) : (timings.htotal - 1));

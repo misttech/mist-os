@@ -63,17 +63,40 @@ void HdmiHost::WaitForPllLocked() {
   } while (err);
 }
 
+namespace {
+
+VideoInputUnitEncoderMuxControl::Encoder EncoderSelectionFromViuType(viu_type type) {
+  switch (type) {
+    case VIU_ENCL:
+      return VideoInputUnitEncoderMuxControl::Encoder::kLcd;
+    case VIU_ENCI:
+      return VideoInputUnitEncoderMuxControl::Encoder::kInterlaced;
+    case VIU_ENCP:
+      return VideoInputUnitEncoderMuxControl::Encoder::kProgressive;
+    case VIU_ENCT:
+      return VideoInputUnitEncoderMuxControl::Encoder::kTvPanel;
+  }
+  zxlogf(ERROR, "Incorrect VIU type: %u", type);
+  return VideoInputUnitEncoderMuxControl::Encoder::kLcd;
+}
+
+}  // namespace
+
 void HdmiHost::ConfigurePll(const pll_param& pll_params) {
   // Set VIU Mux Ctrl
   if (pll_params.viu_channel == 1) {
-    VpuVpuViuVencMuxCtrlReg::Get()
+    VideoInputUnitEncoderMuxControl::Get()
         .ReadFrom(&(*vpu_mmio_))
-        .set_viu1_sel_venc(static_cast<uint8_t>(pll_params.viu_type))
+        .set_vsync_shared_by_viu_blocks(false)
+        .set_viu1_encoder_selection(
+            EncoderSelectionFromViuType(static_cast<viu_type>(pll_params.viu_type)))
         .WriteTo(&(*vpu_mmio_));
   } else {
-    VpuVpuViuVencMuxCtrlReg::Get()
+    VideoInputUnitEncoderMuxControl::Get()
         .ReadFrom(&(*vpu_mmio_))
-        .set_viu2_sel_venc(static_cast<uint8_t>(pll_params.viu_type))
+        .set_vsync_shared_by_viu_blocks(false)
+        .set_viu2_encoder_selection(
+            EncoderSelectionFromViuType(static_cast<viu_type>(pll_params.viu_type)))
         .WriteTo(&(*vpu_mmio_));
   }
   HdmiClockControl::Get()

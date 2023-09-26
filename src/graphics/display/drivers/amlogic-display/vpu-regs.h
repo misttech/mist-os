@@ -73,7 +73,6 @@
 #define VPU_OSD_PATH_MISC_CTRL (0x1a0e << 2)
 #define VPU_OSD1_BLEND_SRC_CTRL (0x1dfd << 2)
 #define VPU_OSD2_BLEND_SRC_CTRL (0x1dfe << 2)
-#define VPU_VIU_VENC_MUX_CTRL (0x271a << 2)
 #define VPU_RDARB_MODE_L1C1 (0x2790 << 2)
 #define VPU_RDARB_MODE_L1C2 (0x2799 << 2)
 #define VPU_RDARB_MODE_L2C1 (0x279d << 2)
@@ -105,7 +104,6 @@
 #define VPU_ENCP_DE_H_END (0x1c3b << 2)
 #define VPU_ENCP_DE_V_BEGIN_EVEN (0x1c3c << 2)
 #define VPU_ENCP_DE_V_END_EVEN (0x1c3d << 2)
-#define VPU_VPU_VIU_VENC_MUX_CTRL (0x271a << 2)
 #define VPU_HDMI_SETTING (0x271b << 2)
 #define VPU_HDMI_FMT_CTRL (0x2743 << 2)
 #define VPU_HDMI_DITH_CNTL (0x27fc << 2)
@@ -653,29 +651,90 @@ class OsdPathMiscCtrlReg : public RegisterBase<OsdPathMiscCtrlReg, uint32_t> {
   DEF_BIT(4, osd1_mali_sel);
 };
 
-class VpuVpuViuVencMuxCtrlReg : public hwreg::RegisterBase<VpuVpuViuVencMuxCtrlReg, uint32_t> {
- public:
-  DEF_FIELD(17, 16, rasp_dpi_clock_sel);
-  DEF_FIELD(11, 8, viu_vdin_sel_data);  // 0x0: Disable VIU to VDI6 path
-                                        // 0x1: Select ENCI data to VDI6 path
-                                        // 0x2: Select ENCP data to VDI6 path
-                                        // 0x4: Select ENCT data to VDI6 path
-                                        // 0x8: Select ENCL data to VDI6 path
-  DEF_FIELD(7, 4, viu_vdin_sel_clk);    // 0x0: Disable VIU to VDI6 clock
-                                        // 0x1: Select ENCI clock to VDI6 path
-                                        // 0x2: Select ENCP clock to VDI6 path
-                                        // 0x4: Select ENCTclock to VDI6 path
-                                        // 0x8: Select ENCLclock to VDI6 path
-  DEF_FIELD(3, 2, viu2_sel_venc);       // 0: ENCL
-                                        // 1: ENCI
-                                        // 2: ENCP
-                                        // 3: ENCT
-  DEF_FIELD(1, 0, viu1_sel_venc);       // 0: ENCL
-                                        // 1: ENCI
-                                        // 2: ENCP
-                                        // 3: ENCT
+// VPU_VIU_VENC_MUX_CTRL
+//
+// Configures the routing between VIU (Video Input Unit) and encoders. Each VIU
+// outputs data (image pixel component values) that feeds into encoders. Each
+// encoder outputs a Vsync signal that drives VIU operation. The data and Vsync
+// signals are configured together, with an exception that lets the hardware
+// ensure that the VIU blocks operate in sync.
+//
+// S905D3 Datasheet, Section 8.2.3.1 "VPU Registers", Page 304.
+// A311D Datasheet, Section 10.2.3.1 "VPU Registers", Page 668.
+// S905D2 Datasheet, Section 7.2.3.1 "VPU Registers", Page 312-313.
 
-  static auto Get() { return hwreg::RegisterAddr<VpuVpuViuVencMuxCtrlReg>(VPU_VIU_VENC_MUX_CTRL); }
+class VideoInputUnitEncoderMuxControl
+    : public hwreg::RegisterBase<VideoInputUnitEncoderMuxControl, uint32_t> {
+ public:
+  // Bit 20 is defined differently in A311D / T931 / S905D2 and S905D3
+  // documentations.
+  //
+  // On S905D3 datasheets, bit 20 is defined as `vsync_shared_by_viu_blocks`.
+  // On all the other datasheets, bit 20 is reserved. Our experiments on
+  // VIM3 (Amlogic A311D), Astro (Amlogic S905D2), Sherlock (Amlogic T931) and
+  // Nelson (Amlogic S905D3) show that the S905D3 description applies to the
+  // other chips.
+
+  // If true, the hardware ensures that the VIU blocks operate in sync.
+  //
+  // The hardware keeps the VIU blocks in sync by routing the same Vsync signal
+  // to them. Concretely, the Vsync signal from the encoder configured by
+  // `viu2_encoder_selection` is also routed to VIU1, so Vsync routing ignores
+  // `viu1_vsync_encoder_selection`.
+  DEF_BIT(20, vsync_shared_by_viu_blocks);
+
+  // Undocumented field. zero after reset.
+  DEF_FIELD(17, 16, rasp_dpi_clock_selection);
+
+  // Bits 4-11 are defined differently in A311D / T931 / S905D2 and
+  // S905D3 documentations.
+  //
+  // On A311D / T931 / S905D2 datasheets, bits 11-8 selects the encoder
+  // (ENCI/ENCP/ENCT/ENCL) of which data is sent to video input channel VDI6,
+  // and bits 7-4 selects the encoder of which clock signal is sent to VDI6.
+  //
+  // On S905D3 datasheets, bits 11-6 are reserved. Bits 5-4 are defined as
+  // `viu1_vsync_encoder_selection` selecting encoder for vsync signal
+  // connection with VIU1.
+  //
+  // Experiments on VIM3 (Amlogic A311D), Astro (Amlogic S905D2), Sherlock
+  // (Amlogic T931) and Nelson (Amlogic S905D3) show that the VDI6 mux fields
+  // (bits 11-8 and bits 7-4) have been replaced by register `WritebackMuxControl`
+  // and the the register layout is the same as that in S905D3, so we only keep
+  // the S905D3 register layout in our code.
+
+  enum class Encoder : uint32_t {
+    // ENCL (LVDS / LCD Encoder)
+    kLcd = 0,
+    // ENCI (Interlaced encoder)
+    kInterlaced = 1,
+    // ENCP (Progressive encoder)
+    kProgressive = 2,
+    // ENCT (TV Panel encoder)
+    kTvPanel = 3,
+  };
+
+  // The encoder whose Vsync is connected to VIU1.
+  //
+  // Only used when `vsync_shared_by_viu_blocks` is true.
+  DEF_ENUM_FIELD(Encoder, 5, 4, viu1_vsync_encoder_selection);
+
+  // The encoder connected to VIU2.
+  //
+  // Both the encoder's Vsync control signal and data signals will be connected
+  // to VIU2.
+  DEF_ENUM_FIELD(Encoder, 3, 2, viu2_encoder_selection);
+
+  // The encoder whose data signals are connected to VIU1.
+  //
+  // If `vsync_shared_by_viu_blocks` is false, the same encoder's Vsync signal
+  // will also be encoded to VIU1.
+  DEF_ENUM_FIELD(Encoder, 1, 0, viu1_encoder_selection);
+
+  static auto Get() {
+    constexpr uint32_t kRegAddr = 0x271a * sizeof(uint32_t);
+    return hwreg::RegisterAddr<VideoInputUnitEncoderMuxControl>(kRegAddr);
+  }
 };
 
 class VpuHdmiFmtCtrlReg : public hwreg::RegisterBase<VpuHdmiFmtCtrlReg, uint32_t> {

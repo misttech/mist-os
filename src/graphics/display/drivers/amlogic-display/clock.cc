@@ -377,7 +377,12 @@ zx::result<> Clock::Enable(const display_setting_t& d) {
   WRITE32_REG(VPU, ENCL_VIDEO_EN, 0);
 
   // connect both VIUs (Video Input Units) to LCD LVDS Encoders
-  WRITE32_REG(VPU, VPU_VIU_VENC_MUX_CTRL, (0 << 0) | (0 << 2));  // TODO(payamm): macros
+  VideoInputUnitEncoderMuxControl::Get()
+      .ReadFrom(&*vpu_mmio_)
+      .set_vsync_shared_by_viu_blocks(false)
+      .set_viu1_encoder_selection(VideoInputUnitEncoderMuxControl::Encoder::kLcd)
+      .set_viu2_encoder_selection(VideoInputUnitEncoderMuxControl::Encoder::kLcd)
+      .WriteTo(&*vpu_mmio_);
 
   // Undocumented registers below
   WRITE32_REG(VPU, ENCL_VIDEO_MODE, 0x8000);      // bit[15] shadown en
