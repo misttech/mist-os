@@ -1424,30 +1424,30 @@ impl Task {
     /// If waking, promotes from waking to awake.  If not waking, make waiter async
     /// wait until woken.  Returns true if woken.
     pub fn wake_or_wait_until_unstopped_async(&self, waiter: &Waiter) -> bool {
+        let group_state = self.thread_group.read();
+        let task_state = self.write();
+
         // If we've woken up, return.
-        let task_stop_state = self.read().stopped;
-        if (task_stop_state == StopState::GroupStopped
-            && self.thread_group.read().stopped.is_waking_or_awake())
+        let task_stop_state = task_state.stopped;
+        if (task_stop_state == StopState::GroupStopped && group_state.stopped.is_waking_or_awake())
             || task_stop_state.is_waking_or_awake()
         {
             let new_state = if task_stop_state.is_waking_or_awake() {
                 task_stop_state.finalize()
             } else {
-                self.thread_group.read().stopped.finalize()
+                group_state.stopped.finalize()
             };
             if let Ok(new_state) = new_state {
+                drop(group_state);
+                drop(task_state);
                 self.thread_group.set_stopped(new_state, None, false);
                 self.write().set_stopped(new_state, None);
                 return true;
             }
         }
-
-        {
-            let group_state = self.thread_group.read();
-            if group_state.stopped.is_stopped() || self.write().stopped.is_stopped() {
-                group_state.stopped_waiters.wait_async(&waiter);
-                self.write().wait_on_ptracer(&waiter);
-            }
+        if group_state.stopped.is_stopped() || task_state.stopped.is_stopped() {
+            group_state.stopped_waiters.wait_async(&waiter);
+            task_state.wait_on_ptracer(&waiter);
         }
         false
     }
