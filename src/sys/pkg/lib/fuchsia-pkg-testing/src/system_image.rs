@@ -15,14 +15,13 @@ const DEFAULT_PACKAGE_REPO_URL: &str = "fuchsia-pkg://fuchsia.com";
 
 /// Builds a system_image package.
 #[derive(Default)]
-pub struct SystemImageBuilder<'a> {
+pub struct SystemImageBuilder {
     static_packages: Option<Vec<(PackagePath, Hash)>>,
     cache_packages: Option<Vec<PinnedAbsolutePackageUrl>>,
-    pkgfs_non_static_packages_allowlist: Option<&'a [&'a str]>,
     pkgfs_disable_executability_restrictions: bool,
 }
 
-impl<'a> SystemImageBuilder<'a> {
+impl SystemImageBuilder {
     /// Returns an empty `SystemImageBuilder` configured with no static or cache package.
     pub fn new() -> Self {
         Self::default()
@@ -61,14 +60,6 @@ impl<'a> SystemImageBuilder<'a> {
     pub fn cache_packages(mut self, cache_packages: &[&Package]) -> Self {
         assert_eq!(self.cache_packages, None);
         self.cache_packages = Some(Self::packages_to_urls(cache_packages));
-        self
-    }
-
-    /// Use the supplied allowlist for the data file for pkgfs's /pkgfs/packages non-static
-    /// packages allowlist. Call at most once.
-    pub fn pkgfs_non_static_packages_allowlist(mut self, allowlist: &'a [&'a str]) -> Self {
-        assert_eq!(self.pkgfs_non_static_packages_allowlist, None);
-        self.pkgfs_non_static_packages_allowlist = Some(allowlist);
         self
     }
 
@@ -118,14 +109,6 @@ impl<'a> SystemImageBuilder<'a> {
             let cache_packages = CachePackages::from_entries(cache_packages.clone());
             cache_packages.serialize(&mut bytes).unwrap();
             builder = builder.add_resource_at("data/cache_packages.json", bytes.as_slice());
-        }
-
-        if let Some(allowlist) = &self.pkgfs_non_static_packages_allowlist {
-            let contents = allowlist.join("\n");
-            builder = builder.add_resource_at(
-                "data/pkgfs_packages_non_static_packages_allowlist.txt",
-                contents.as_bytes(),
-            );
         }
 
         if self.pkgfs_disable_executability_restrictions {

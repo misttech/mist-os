@@ -2,5 +2,3 @@
 set noparent
 
 include /src/security/OWNERS
-
-per-file pkgfs/pkgfs_non_static_pkgs_allowlist_* = file: /src/sys/pkg/OWNERS
