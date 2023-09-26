@@ -52,19 +52,19 @@ cea_timing CalculateDisplayTimings(const display_mode_t& mode) {
   timings.interlace_mode = mode.flags & MODE_FLAG_INTERLACED;
   timings.pfreq = (mode.pixel_clock_10khz * 10);  // KHz
   // TODO: pixel repetition is 0 for most progressive. We don't support interlaced
-  timings.pixel_repeat = 0;
-  timings.hactive = mode.h_addressable;
-  timings.hblank = mode.h_blanking;
-  timings.hfront = mode.h_front_porch;
-  timings.hsync = mode.h_sync_pulse;
+  timings.pixel_repeat = false;
+  timings.hactive = static_cast<int>(mode.h_addressable);
+  timings.hblank = static_cast<int>(mode.h_blanking);
+  timings.hfront = static_cast<int>(mode.h_front_porch);
+  timings.hsync = static_cast<int>(mode.h_sync_pulse);
   timings.htotal = (timings.hactive) + (timings.hblank);
   timings.hback = (timings.hblank) - (timings.hfront + timings.hsync);
   timings.hpol = mode.flags & MODE_FLAG_HSYNC_POSITIVE;
 
-  timings.vactive = mode.v_addressable;
-  timings.vblank0 = mode.v_blanking;
-  timings.vfront = mode.v_front_porch;
-  timings.vsync = mode.v_sync_pulse;
+  timings.vactive = static_cast<int>(mode.v_addressable);
+  timings.vblank0 = static_cast<int>(mode.v_blanking);
+  timings.vfront = static_cast<int>(mode.v_front_porch);
+  timings.vsync = static_cast<int>(mode.v_sync_pulse);
   timings.vtotal = (timings.vactive) + (timings.vblank0);
   timings.vback = (timings.vblank0) - (timings.vfront + timings.vsync);
   timings.vpol = mode.flags & MODE_FLAG_VSYNC_POSITIVE;
@@ -72,7 +72,7 @@ cea_timing CalculateDisplayTimings(const display_mode_t& mode) {
   // FIXE: VENC Repeat is undocumented. It seems to be only needed for the following
   // resolutions: 1280x720p60, 1280x720p50, 720x480p60, 720x480i60, 720x576p50, 720x576i50
   // For now, we will simply not support this feature.
-  timings.venc_pixel_repeat = 0;
+  timings.venc_pixel_repeat = false;
 
   return timings;
 }
@@ -426,27 +426,26 @@ bool HdmiHost::IsDisplayModeSupported(const display_mode_t& mode) const {
 }
 
 void HdmiHost::ConfigEncoder(const cea_timing& timings) {
-  uint32_t h_begin, h_end;
-  uint32_t v_begin, v_end;
-  uint32_t hs_begin, hs_end;
-  uint32_t vs_begin, vs_end;
-  uint32_t vsync_adjust = 0;
-  uint32_t active_lines, total_lines;
-  uint32_t venc_total_pixels, venc_active_pixels, venc_fp, venc_hsync;
+  int active_lines = (timings.vactive / (1 + timings.interlace_mode));
+  int total_lines = (active_lines + timings.vblank0) +
+                    ((active_lines + timings.vblank1) * timings.interlace_mode);
 
-  active_lines = (timings.vactive / (1 + timings.interlace_mode));
-  total_lines = (active_lines + timings.vblank0) +
-                ((active_lines + timings.vblank1) * timings.interlace_mode);
+  // If the pixels are repeated at the HDMI transmitter, the encoder should
+  // be configured to half the frequency for horizontal active pixels / blanks.
+  const int kHdmiTransmitterPixelRepeatDivisionFactor = timings.pixel_repeat ? 2 : 1;
 
-  venc_total_pixels =
-      (timings.htotal / (timings.pixel_repeat + 1)) * (timings.venc_pixel_repeat + 1);
+  // If the pixels are repeated at the encoder, the encoder should be configured
+  // to double the frequency for horizontal active pixels / blanks.
+  const int kEncoderPixelRepeatMultiplicationFactor = timings.venc_pixel_repeat ? 2 : 1;
 
-  venc_active_pixels =
-      (timings.hactive / (timings.pixel_repeat + 1)) * (timings.venc_pixel_repeat + 1);
-
-  venc_fp = (timings.hfront / (timings.pixel_repeat + 1)) * (timings.venc_pixel_repeat + 1);
-
-  venc_hsync = (timings.hsync / (timings.pixel_repeat + 1)) * (timings.venc_pixel_repeat + 1);
+  int venc_total_pixels = timings.htotal / kHdmiTransmitterPixelRepeatDivisionFactor *
+                          kEncoderPixelRepeatMultiplicationFactor;
+  int venc_active_pixels = timings.hactive / kHdmiTransmitterPixelRepeatDivisionFactor *
+                           kEncoderPixelRepeatMultiplicationFactor;
+  int venc_fp = timings.hfront / kHdmiTransmitterPixelRepeatDivisionFactor *
+                kEncoderPixelRepeatMultiplicationFactor;
+  int venc_hsync = timings.hsync / kHdmiTransmitterPixelRepeatDivisionFactor *
+                   kEncoderPixelRepeatMultiplicationFactor;
 
   SET_BIT32(VPU, VPU_ENCP_VIDEO_MODE, 1, 14, 1);  // DE Signal polarity
   WRITE32_REG(VPU, VPU_ENCP_VIDEO_HAVON_BEGIN, timings.hsync + timings.hback);
@@ -463,17 +462,19 @@ void HdmiHost::ConfigEncoder(const cea_timing& timings) {
 
   // Below calculations assume no pixel repeat and progressive mode.
   // HActive Start/End
-  h_begin = timings.hsync + timings.hback + 2;  // 2 is the HDMI Latency
+  int h_begin = timings.hsync + timings.hback + 2;  // 2 is the HDMI Latency
+  h_begin = h_begin % venc_total_pixels;            // wrap around if needed
 
-  h_begin = h_begin % venc_total_pixels;  // wrap around if needed
-  h_end = h_begin + venc_active_pixels;
+  int h_end = h_begin + venc_active_pixels;
   h_end = h_end % venc_total_pixels;  // wrap around if needed
+
   WRITE32_REG(VPU, VPU_ENCP_DE_H_BEGIN, h_begin);
   WRITE32_REG(VPU, VPU_ENCP_DE_H_END, h_end);
 
   // VActive Start/End
-  v_begin = timings.vsync + timings.vback;
-  v_end = v_begin + active_lines;
+  int v_begin = timings.vsync + timings.vback;
+  int v_end = v_begin + active_lines;
+
   WRITE32_REG(VPU, VPU_ENCP_DE_V_BEGIN_EVEN, v_begin);
   WRITE32_REG(VPU, VPU_ENCP_DE_V_END_EVEN, v_end);
 
@@ -484,24 +485,26 @@ void HdmiHost::ConfigEncoder(const cea_timing& timings) {
   }
 
   // HSync Timings
-  hs_begin = h_end + venc_fp;
+  int hs_begin = h_end + venc_fp;
+  int vsync_adjust = 0;
   if (hs_begin >= venc_total_pixels) {
     hs_begin -= venc_total_pixels;
     vsync_adjust = 1;
   }
 
-  hs_end = hs_begin + venc_hsync;
+  int hs_end = hs_begin + venc_hsync;
   hs_end = hs_end % venc_total_pixels;
   WRITE32_REG(VPU, VPU_ENCP_DVI_HSO_BEGIN, hs_begin);
   WRITE32_REG(VPU, VPU_ENCP_DVI_HSO_END, hs_end);
 
   // VSync Timings
+  int vs_begin;
   if (v_begin >= (timings.vback + timings.vsync + (1 - vsync_adjust))) {
     vs_begin = v_begin - timings.vback - timings.vsync - (1 - vsync_adjust);
   } else {
     vs_begin = timings.vtotal + v_begin - timings.vback - timings.vsync - (1 - vsync_adjust);
   }
-  vs_end = vs_begin + timings.vsync;
+  int vs_end = vs_begin + timings.vsync;
   vs_end = vs_end % total_lines;
 
   WRITE32_REG(VPU, VPU_ENCP_DVI_VSO_BLINE_EVN, vs_begin);

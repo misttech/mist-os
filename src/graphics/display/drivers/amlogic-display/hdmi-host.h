@@ -61,28 +61,28 @@ struct pll_param {
 
 struct cea_timing {
   bool interlace_mode;
-  uint32_t pfreq;
-  uint8_t ln;
-  uint8_t pixel_repeat;
-  uint8_t venc_pixel_repeat;
+  int pfreq;
+  int8_t ln;
+  bool pixel_repeat;
+  bool venc_pixel_repeat;
 
-  uint32_t hfreq;
-  uint32_t hactive;
-  uint32_t htotal;
-  uint32_t hblank;
-  uint32_t hfront;
-  uint32_t hsync;
-  uint32_t hback;
+  int hfreq;
+  int hactive;
+  int htotal;
+  int hblank;
+  int hfront;
+  int hsync;
+  int hback;
   bool hpol;
 
-  uint32_t vfreq;
-  uint32_t vactive;
-  uint32_t vtotal;
-  uint32_t vblank0;  // in case of interlace
-  uint32_t vblank1;  // vblank0 + 1 for interlace
-  uint32_t vfront;
-  uint32_t vsync;
-  uint32_t vback;
+  int vfreq;
+  int vactive;
+  int vtotal;
+  int vblank0;  // in case of interlace
+  int vblank1;  // vblank0 + 1 for interlace
+  int vfront;
+  int vsync;
+  int vback;
   bool vpol;
 };
 
