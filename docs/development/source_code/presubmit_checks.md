@@ -1,9 +1,7 @@
 # Presubmit checks
 
-All changelists sent to Fuchsia undergo a series of presubmit checks. These
-happen automatically; there is no need to manually trigger them. Where possible,
-changelists should ensure all presubmit checks pass successfully. If this is not
-possible, the reason why should be documented in the change description.
+All changelists sent to Fuchsia undergo a series of static analysis checks in
+presubmit.
 
 ## Types of checks
 
@@ -16,6 +14,39 @@ in the **Checks** tab of Gerrit.
 
 Some of the presubmit checks are tools that are language-agnostic but provide
 stronger confidence in the quality of a changelist.
+
+#### keep-sorted
+
+keep-sorted is an opt-in linter that enforces that source code lines are kept in
+alphabetical order. It can be enabled by wrapping a code block in
+`keep-sorted
+start` and `keep-sorted
+end` comments.
+
+<!--
+The above lines intentionally have weird newline placement to prevent
+keep-sorted from registering the directives.
+-->
+
+For example, the following list's elements will be required to be in
+alphabetical order, enforced by presubmit checks:
+
+```python
+a_list = [
+    # keep-sorted start
+    "bar",
+    "baz",
+    "foo",
+    # keep-sorted end
+]
+```
+
+keep-sorted is language-agnostic and supports "#" and "//" comments.
+
+See the [upstream documentation](https://github.com/google/keep-sorted#options)
+for all options.
+
+keep-sorted is also enforced by `fx format-code`.
 
 #### IfThisThenThat
 

@@ -2,15 +2,18 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# keep-sorted start
 load("./cml.star", "register_cml_checks")
 load("./common.star", "FORMATTER_MSG", "cipd_platform_name", "compiled_tool_path")
 load("./dart.star", "register_dart_checks")
 load("./fidl.star", "register_fidl_checks")
 load("./go.star", "register_go_checks")
 load("./json.star", "register_json_checks")
+load("./keep_sorted.star", "keep_sorted")
 load("./python.star", "register_python_checks")
 load("./rust.star", "register_rust_checks")
 load("./starlark.star", "register_starlark_checks")
+# keep-sorted end
 
 def _gn_format(ctx):
     """Runs gn format on .gn and .gni files.
@@ -125,6 +128,7 @@ def register_all_checks():
         formatter = True,
     ))
     shac.register_check(shac.check(_mdlint))
+    shac.register_check(keep_sorted)
     register_cml_checks()
     register_dart_checks()
     register_fidl_checks()
