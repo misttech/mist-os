@@ -150,11 +150,47 @@ llvm_library("LLVMAArch64Utils") {
   ]
 }
 
+llvm_library("LLVMAnalysis") {
+  deps = [
+    ":LLVMBinaryFormat",
+    ":LLVMCore",
+    ":LLVMObject",
+    ":LLVMProfileData",
+    ":LLVMSupport",
+  ]
+}
+
+llvm_library("LLVMAggressiveInstCombine") {
+  deps = [
+    ":LLVMAnalysis",
+    ":LLVMCore",
+    ":LLVMSupport",
+    ":LLVMTransformUtils",
+  ]
+}
+
 llvm_library("LLVMAsmParser") {
   deps = [
     ":LLVMBinaryFormat",
     ":LLVMCore",
     ":LLVMSupport",
+  ]
+}
+
+llvm_library("LLVMAsmPrinter") {
+  deps = [
+    ":LLVMAnalysis",
+    ":LLVMBinaryFormat",
+    ":LLVMCodeGen",
+    ":LLVMCore",
+    ":LLVMDebugInfoCodeView",
+    ":LLVMDebugInfoDWARF",
+    ":LLVMDebugInfoMSF",
+    ":LLVMMC",
+    ":LLVMMCParser",
+    ":LLVMRemarks",
+    ":LLVMSupport",
+    ":LLVMTarget",
   ]
 }
 
@@ -174,8 +210,40 @@ llvm_library("LLVMBitReader") {
   ]
 }
 
+llvm_library("LLVMBitWriter") {
+  deps = [
+    ":LLVMAnalysis",
+    ":LLVMCore",
+    ":LLVMMC",
+    ":LLVMObject",
+    ":LLVMSupport",
+  ]
+}
+
 llvm_library("LLVMBitstreamReader") {
   deps = [ ":LLVMSupport" ]
+}
+
+llvm_library("LLVMCodeGen") {
+  deps = [
+    ":LLVMAnalysis",
+    ":LLVMBitReader",
+    ":LLVMBitWriter",
+    ":LLVMCore",
+    ":LLVMMC",
+    ":LLVMProfileData",
+    ":LLVMScalarOpts",
+    ":LLVMSupport",
+    ":LLVMTarget",
+    ":LLVMTransformUtils",
+  ]
+}
+
+llvm_library("LLVMCFGuard") {
+  deps = [
+    ":LLVMCore",
+    ":LLVMSupport",
+  ]
 }
 
 llvm_library("LLVMCodeGenTypes") {
@@ -192,6 +260,17 @@ llvm_library("LLVMCore") {
   ]
 }
 
+llvm_library("LLVMCoroutines") {
+  deps = [
+    ":LLVMAnalysis",
+    ":LLVMCore",
+    ":LLVMScalarOpts",
+    ":LLVMSupport",
+    ":LLVMTransformUtils",
+    ":LLVMipo",
+  ]
+}
+
 llvm_library("LLVMDebugInfoCodeView") {
   deps = [ ":LLVMSupport" ]
 }
@@ -205,8 +284,108 @@ llvm_library("LLVMDebugInfoDWARF") {
   ]
 }
 
+llvm_library("LLVMDebugInfoMSF") {
+  deps = [ ":LLVMSupport" ]
+}
+
+llvm_library("LLVMDebugInfoPDB") {
+  deps = [
+    ":LLVMBinaryFormat",
+    ":LLVMDebugInfoCodeView",
+    ":LLVMDebugInfoMSF",
+    ":LLVMObject",
+    ":LLVMSupport",
+  ]
+}
+
 llvm_library("LLVMDemangle") {
   deps = []
+}
+
+llvm_library("LLVMExecutionEngine") {
+  deps = [
+    ":LLVMCore",
+    ":LLVMMC",
+    ":LLVMObject",
+    ":LLVMOrcTargetProcess",
+    ":LLVMRuntimeDyld",
+    ":LLVMSupport",
+    ":LLVMTarget",
+  ]
+}
+
+llvm_library("LLVMFrontendOpenMP") {
+  deps = [
+    ":LLVMAnalysis",
+    ":LLVMCore",
+    ":LLVMMC",
+    ":LLVMScalarOpts",
+    ":LLVMSupport",
+    ":LLVMTransformUtils",
+  ]
+}
+
+llvm_library("LLVMGlobalISel") {
+  deps = [
+    ":LLVMAnalysis",
+    ":LLVMCodeGen",
+    ":LLVMCore",
+    ":LLVMMC",
+    ":LLVMSelectionDAG",
+    ":LLVMSupport",
+    ":LLVMTarget",
+    ":LLVMTransformUtils",
+  ]
+}
+
+llvm_library("LLVMInstCombine") {
+  deps = [
+    ":LLVMAnalysis",
+    ":LLVMCore",
+    ":LLVMSupport",
+    ":LLVMTransformUtils",
+  ]
+}
+
+llvm_library("LLVMInstrumentation") {
+  deps = [
+    ":LLVMAnalysis",
+    ":LLVMCore",
+    ":LLVMDemangle",
+    ":LLVMMC",
+    ":LLVMProfileData",
+    ":LLVMSupport",
+    ":LLVMTransformUtils",
+  ]
+}
+
+llvm_library("LLVMipo") {
+  deps = [
+    ":LLVMAggressiveInstCombine",
+    ":LLVMAnalysis",
+    ":LLVMBitReader",
+    ":LLVMBitWriter",
+    ":LLVMCore",
+    ":LLVMFrontendOpenMP",
+    ":LLVMIRReader",
+    ":LLVMInstCombine",
+    ":LLVMInstrumentation",
+    ":LLVMLinker",
+    ":LLVMObject",
+    ":LLVMProfileData",
+    ":LLVMScalarOpts",
+    ":LLVMSupport",
+    ":LLVMTransformUtils",
+    ":LLVMVectorize",
+  ]
+}
+
+llvm_library("LLVMIRPrinter") {
+  deps = [
+    ":LLVMAnalysis",
+    ":LLVMCore",
+    ":LLVMSupport",
+  ]
 }
 
 llvm_library("LLVMIRReader") {
@@ -218,11 +397,31 @@ llvm_library("LLVMIRReader") {
   ]
 }
 
+llvm_library("LLVMLinker") {
+  deps = [
+    ":LLVMCore",
+    ":LLVMObject",
+    ":LLVMSupport",
+    ":LLVMTransformUtils",
+  ]
+}
+
 llvm_library("LLVMMC") {
   deps = [
     ":LLVMBinaryFormat",
     ":LLVMSupport",
     ":LLVMTargetParser",
+  ]
+}
+
+llvm_library("LLVMMCJIT") {
+  deps = [
+    ":LLVMCore",
+    ":LLVMExecutionEngine",
+    ":LLVMObject",
+    ":LLVMRuntimeDyld",
+    ":LLVMSupport",
+    ":LLVMTarget",
   ]
 }
 
@@ -242,6 +441,15 @@ llvm_library("LLVMMCParser") {
   ]
 }
 
+llvm_library("LLVMObjCARCOpts") {
+  deps = [
+    ":LLVMAnalysis",
+    ":LLVMCore",
+    ":LLVMSupport",
+    ":LLVMTransformUtils",
+  ]
+}
+
 llvm_library("LLVMObject") {
   deps = [
     ":LLVMBinaryFormat",
@@ -253,6 +461,46 @@ llvm_library("LLVMObject") {
     ":LLVMSupport",
     ":LLVMTargetParser",
     ":LLVMTextAPI",
+  ]
+}
+
+llvm_library("LLVMOrcShared") {
+  deps = [ ":LLVMSupport" ]
+}
+
+llvm_library("LLVMOrcTargetProcess") {
+  deps = [
+    ":LLVMOrcShared",
+    ":LLVMSupport",
+  ]
+}
+
+llvm_library("LLVMPasses") {
+  deps = [
+    ":LLVMAggressiveInstCombine",
+    ":LLVMAnalysis",
+    ":LLVMCore",
+    ":LLVMCoroutines",
+    ":LLVMInstCombine",
+    ":LLVMInstrumentation",
+    ":LLVMObjCARCOpts",
+    ":LLVMScalarOpts",
+    ":LLVMSupport",
+    ":LLVMTarget",
+    ":LLVMTransformUtils",
+    ":LLVMVectorize",
+    ":LLVMipo",
+  ]
+}
+
+llvm_library("LLVMProfileData") {
+  deps = [
+    ":LLVMCore",
+    ":LLVMDebugInfoDWARF",
+    ":LLVMDemangle",
+    ":LLVMObject",
+    ":LLVMSupport",
+    ":LLVMSymbolize",
   ]
 }
 
@@ -298,8 +546,59 @@ llvm_library("LLVMRemarks") {
   ]
 }
 
+llvm_library("LLVMRuntimeDyld") {
+  deps = [
+    ":LLVMCore",
+    ":LLVMMC",
+    ":LLVMObject",
+    ":LLVMSupport",
+  ]
+}
+
+llvm_library("LLVMScalarOpts") {
+  deps = [
+    ":LLVMAggressiveInstCombine",
+    ":LLVMAnalysis",
+    ":LLVMCore",
+    ":LLVMInstCombine",
+    ":LLVMSupport",
+    ":LLVMTransformUtils",
+  ]
+}
+
+llvm_library("LLVMSelectionDAG") {
+  deps = [
+    ":LLVMAnalysis",
+    ":LLVMCodeGen",
+    ":LLVMCore",
+    ":LLVMMC",
+    ":LLVMSupport",
+    ":LLVMTarget",
+    ":LLVMTransformUtils",
+  ]
+}
+
 llvm_library("LLVMSupport") {
   deps = []
+}
+
+llvm_library("LLVMSymbolize") {
+  deps = [
+    ":LLVMDebugInfoDWARF",
+    ":LLVMDebugInfoPDB",
+    ":LLVMDemangle",
+    ":LLVMObject",
+    ":LLVMSupport",
+  ]
+}
+
+llvm_library("LLVMTarget") {
+  deps = [
+    ":LLVMAnalysis",
+    ":LLVMCore",
+    ":LLVMMC",
+    ":LLVMSupport",
+  ]
 }
 
 llvm_library("LLVMTargetParser") {
@@ -310,6 +609,43 @@ llvm_library("LLVMTextAPI") {
   deps = [
     ":LLVMSupport",
     ":LLVMTargetParser",
+  ]
+}
+
+llvm_library("LLVMTransformUtils") {
+  deps = [
+    ":LLVMAnalysis",
+    ":LLVMCore",
+    ":LLVMSupport",
+  ]
+}
+
+llvm_library("LLVMVectorize") {
+  deps = [
+    ":LLVMAnalysis",
+    ":LLVMCore",
+    ":LLVMSupport",
+    ":LLVMTransformUtils",
+  ]
+}
+
+llvm_library("LLVMX86CodeGen") {
+  deps = [
+    ":LLVMAnalysis",
+    ":LLVMAsmPrinter",
+    ":LLVMCFGuard",
+    ":LLVMCodeGen",
+    ":LLVMCore",
+    ":LLVMGlobalISel",
+    ":LLVMInstrumentation",
+    ":LLVMMC",
+    ":LLVMProfileData",
+    ":LLVMSelectionDAG",
+    ":LLVMSupport",
+    ":LLVMTarget",
+    ":LLVMTransformUtils",
+    ":LLVMX86Desc",
+    ":LLVMX86Info",
   ]
 }
 
