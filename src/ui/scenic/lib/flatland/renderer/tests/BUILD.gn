@@ -10,6 +10,21 @@ group("tests") {
   public_deps = [ ":unittests" ]
 }
 
+source_set("testing_deps") {
+  testonly = true
+  sources = [
+    "common.cc",
+    "common.h",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.images2:fuchsia.images2_cpp",
+    "//src/lib/fsl",
+    "//src/lib/fxl",
+    "//src/ui/lib/escher/test/common:gtest_escher",
+    "//src/ui/scenic/lib/flatland/renderer",
+  ]
+}
+
 executable("unittests") {
   output_name = "flatland_renderer_unittests"
   testonly = true
@@ -23,6 +38,7 @@ executable("unittests") {
   ]
 
   public_deps = [
+    ":testing_deps",
     "//src/lib/fsl",
     "//src/ui/scenic/lib/flatland:flatland_types",
     "//zircon/system/ulib/async-default",

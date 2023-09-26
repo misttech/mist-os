@@ -11,7 +11,7 @@
 #include <thread>
 
 #include "src/lib/fsl/handles/object_info.h"
-#include "src/ui/lib/escher/vk/pipeline_builder.h"
+#include "src/ui/lib/escher/test/common/gtest_escher.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 #include "src/ui/scenic/lib/allocation/id.h"
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
@@ -620,41 +620,6 @@ TEST_F(NullRendererTest, AsyncEventSignalTest) {
   async::TestLoop loop;
   NullRenderer renderer;
   AsyncEventSignalTest(&loop, &renderer, sysmem_allocator_.get(), /*use_vulkan*/ false);
-}
-
-std::pair<std::unique_ptr<escher::Escher>, std::unique_ptr<VkRenderer>>
-CreateEscherAndPrewarmedRenderer(bool use_protected_memory = false) {
-  auto env = escher::test::EscherEnvironment::GetGlobalTestEnvironment();
-  std::unique_ptr<escher::Escher> escher;
-  if (use_protected_memory) {
-    escher = escher::test::CreateEscherWithProtectedMemoryEnabled();
-    if (!escher) {
-      return {nullptr, nullptr};
-    }
-  } else {
-    escher = std::make_unique<escher::Escher>(env->GetVulkanDevice(), env->GetFilesystem(),
-                                              /*gpu_allocator*/ nullptr);
-  }
-
-  {
-    auto pipeline_builder = std::make_unique<escher::PipelineBuilder>(escher->vk_device());
-    pipeline_builder->set_log_pipeline_creation_callback(
-        [](const vk::GraphicsPipelineCreateInfo* graphics_info,
-           const vk::ComputePipelineCreateInfo* compute_info) {
-          if (compute_info) {
-            FX_CHECK(false) << "Unexpected lazy creation of Vulkan compute pipeline.";
-          }
-          if (graphics_info) {
-            FX_CHECK(false) << "Unexpected lazy creation of Vulkan graphics pipeline.";
-          }
-        });
-    escher->set_pipeline_builder(std::move(pipeline_builder));
-  }
-  auto renderer = std::make_unique<VkRenderer>(escher->GetWeakPtr());
-  renderer->WarmPipelineCache();
-  renderer->set_disable_lazy_pipeline_creation(true);
-
-  return {std::move(escher), std::move(renderer)};
 }
 
 VK_TEST_F(VulkanRendererTest, ImportCollectionTest) {

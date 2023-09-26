@@ -10,27 +10,23 @@
 
 #include <gtest/gtest.h>
 
-#include "../screen_capture.h"
 #include "../screen_capture_buffer_collection_importer.h"
 #include "src/ui/lib/escher/test/common/gtest_vulkan.h"
-#include "src/ui/scenic/lib/allocation/allocator.h"
-#include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/allocation/id.h"
+#include "src/ui/scenic/lib/flatland/renderer/tests/common.h"
 #include "src/ui/scenic/lib/flatland/renderer/vk_renderer.h"
-#include "src/ui/scenic/lib/gfx/tests/vk_session_test.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 
 namespace screen_capture::test {
 
-using allocation::BufferCollectionImporter;
 using allocation::BufferCollectionUsage;
 using fuchsia::sysmem::PixelFormatType;
 
-class ScreenCaptureBufferCollectionTest : public scenic_impl::gfx::test::VkSessionTest {
+class ScreenCaptureBufferCollectionTest : public flatland::RendererTest {
  public:
-  void SetUp() override {
-    VkSessionTest::SetUp();
-    renderer_ = std::make_shared<flatland::VkRenderer>(escher()->GetWeakPtr());
+  void SetUp() {
+    RendererTest::SetUp();
+    renderer_ = std::make_shared<flatland::VkRenderer>(escher::test::GetEscher()->GetWeakPtr());
     importer_ = std::make_unique<ScreenCaptureBufferCollectionImporter>(
         utils::CreateSysmemAllocatorSyncPtr("SCBCTest::Setup"), renderer_);
   }
