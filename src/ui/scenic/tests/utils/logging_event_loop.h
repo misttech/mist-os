@@ -14,10 +14,6 @@
 
 namespace integration_tests {
 
-namespace internal {
-class RealLoopWrapper;
-}
-
 /// `LoggingEventLoop` provides a subset of the `RealLoop` API, and adds logging.
 /// Feel free to expose more of the `RealLoop` API as needed.
 ///
