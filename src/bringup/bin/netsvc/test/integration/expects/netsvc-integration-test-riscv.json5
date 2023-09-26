@@ -1,0 +1,25 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "expect_failure",
+            matchers: [
+                "advertises",
+                "can_discover",
+                "debuglog",
+                "get_board_info",
+                "pave_image::*",
+                "replies_to_ping::*",
+                "retransmits_acks",
+            ],
+        },
+    ],
+}

@@ -4,6 +4,8 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_test.gni")
+import(
+    "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
 
 rustc_test("bin") {
   edition = "2021"
@@ -62,14 +64,12 @@ fuchsia_test_component("netsvc-integration-test") {
   ]
 }
 
-fuchsia_test_package("integration") {
+fuchsia_test_with_expectations_package("integration") {
   package_name = "netsvc-integration-test"
   test_components = [ ":netsvc-integration-test" ]
+  expectations = "expects/netsvc-integration-test.json5"
 
   if (current_cpu == "riscv64") {
-    # TODO(fxbug.dev/297071481): This test fails when using Netstack3 on RISC-V
-    test_specs = {
-      environments = []
-    }
+    expectations = "expects/netsvc-integration-test-riscv.json5"
   }
 }
