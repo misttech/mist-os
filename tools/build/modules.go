@@ -23,7 +23,8 @@ const (
 // For information about each build API module, see the corresponding
 // `build_api_module` target in //BUILD.gn.
 type Modules struct {
-	buildDir                 string
+	buildDir string
+	// keep-sorted start
 	apis                     []string
 	archives                 []Archive
 	args                     Args
@@ -32,7 +33,6 @@ type Modules struct {
 	binaries                 []Binary
 	checkoutArtifacts        []CheckoutArtifact
 	clippyTargets            []ClippyTarget
-	productSizeCheckerOutput []ProductSizeCheckerOutput
 	generatedSources         []string
 	images                   []Image
 	licenses                 []License
@@ -40,11 +40,13 @@ type Modules struct {
 	platforms                []DimensionSet
 	prebuiltBinarySets       []PrebuiltBinarySet
 	productBundles           []ProductBundle
+	productSizeCheckerOutput []ProductSizeCheckerOutput
 	sdkArchives              []SDKArchive
+	testDurations            []TestDuration
 	testListLocation         []string
 	testSpecs                []TestSpec
-	testDurations            []TestDuration
 	tools                    Tools
+	// keep-sorted end
 }
 
 // NewModules returns a Modules associated with a given build directory.
@@ -52,12 +54,12 @@ func NewModules(buildDir string) (*Modules, error) {
 	m := &Modules{buildDir: buildDir}
 
 	manifests := map[string]interface{}{
+		// keep-sorted start ignore_prefixes="
 		"api.json":                         &m.apis,
 		"archives.json":                    &m.archives,
 		"args.json":                        &m.args,
 		"assembly_input_archives.json":     &m.assemblyInputArchives,
 		"assembly_manifests.json":          &m.assemblyManifests,
-		"product_size_checker_output.json": &m.productSizeCheckerOutput,
 		"binaries.json":                    &m.binaries,
 		"checkout_artifacts.json":          &m.checkoutArtifacts,
 		"clippy_target_mapping.json":       &m.clippyTargets,
@@ -68,11 +70,13 @@ func NewModules(buildDir string) (*Modules, error) {
 		"platforms.json":                   &m.platforms,
 		"prebuilt_binaries.json":           &m.prebuiltBinarySets,
 		"product_bundles.json":             &m.productBundles,
+		"product_size_checker_output.json": &m.productSizeCheckerOutput,
 		"sdk_archives.json":                &m.sdkArchives,
-		"tests.json":                       &m.testSpecs,
 		"test_durations.json":              &m.testDurations,
 		"test_list_location.json":          &m.testListLocation,
+		"tests.json":                       &m.testSpecs,
 		"tool_paths.json":                  &m.tools,
+		// keep-sorted end
 	}
 	// Ensure we read the manifests in order, so that if multiple manifests are
 	// missing we always get the same error.
