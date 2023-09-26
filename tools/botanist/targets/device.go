@@ -197,6 +197,10 @@ func (t *Device) SSHClient() (*sshutil.Client, error) {
 	return t.sshClient(&net.IPAddr{IP: addr})
 }
 
+func (t *Device) UseProductBundles() bool {
+	return t.UseFFX()
+}
+
 func (t *Device) mustLoadThroughZedboot() bool {
 	return mustLoadThroughZedboot || t.config.FastbootSernum == "" || !t.UseFFX()
 }

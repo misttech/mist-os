@@ -227,6 +227,10 @@ func (t *QEMU) SSHClient() (*sshutil.Client, error) {
 	return t.sshClient(addr)
 }
 
+func (t *QEMU) UseProductBundles() bool {
+	return t.UseFFX()
+}
+
 // Start starts the QEMU target.
 // TODO(fxbug.dev/95938): Add logic to use PB with ffx emu
 func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []string, pbPath string) (err error) {

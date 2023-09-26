@@ -122,6 +122,10 @@ type FuchsiaTarget interface {
 	// UseFFXExperimental returns whether to enable an experimental ffx feature.
 	UseFFXExperimental(int) bool
 
+	// UseProductBundles returns whether this target can be provisioned using
+	// product bundles.
+	UseProductBundles() bool
+
 	// FFXEnv returns the env vars that the ffx instance should run with
 	FFXEnv() []string
 
@@ -188,6 +192,13 @@ func (t *genericFuchsiaTarget) UseFFX() bool {
 // Use to enable experimental ffx features.
 func (t *genericFuchsiaTarget) UseFFXExperimental(level int) bool {
 	return t.UseFFX() && t.ffx.ExperimentLevel >= level
+}
+
+// UseProductBundles returns whether this target can be provisioned using
+// product bundles. The default is false and should be overridden by each
+// target type.
+func (t *genericFuchsiaTarget) UseProductBundles() bool {
+	return false
 }
 
 // FFXEnv returns the environment to run ffx with.
@@ -629,7 +640,7 @@ func StartTargets(ctx context.Context, opts StartOptions, targets []FuchsiaTarge
 
 			// Parse the product bundles
 			var pbPath string
-			if opts.ProductBundles != "" {
+			if opts.ProductBundles != "" && t.UseProductBundles() {
 				var productBundles []build.ProductBundle
 				if err := jsonutil.ReadFromFile(opts.ProductBundles, &productBundles); err != nil {
 					return err
