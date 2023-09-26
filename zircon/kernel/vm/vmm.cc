@@ -48,13 +48,14 @@ zx_status_t vmm_accessed_fault_handler(vaddr_t addr) {
   zx_ticks_t start_time = current_ticks();
   PageFaultTimer timer(current_thread, start_time);
 
-  // Forward fault to the current aspace.
-  VmAspace* aspace = VmAspace::vaddr_to_aspace(addr);
-  if (!aspace) {
+  // Page faults never happen on kernel addresses. Double check this is a valid user address, then
+  // continue with the user aspace.
+  if (unlikely(!is_user_accessible(addr))) {
+    LTRACEF("PageFault: Invalid virtual address 0x%lx\n", addr);
     return ZX_ERR_NOT_FOUND;
   }
 
-  const zx_status_t status = aspace->AccessedFault(addr);
+  const zx_status_t status = current_thread->aspace()->AccessedFault(addr);
 
   KTRACE_COMPLETE("kernel:vm", "access_fault", start_time, ("vaddr", ktrace::Pointer{addr}));
 
@@ -76,15 +77,15 @@ zx_status_t vmm_page_fault_handler(vaddr_t addr, uint flags) {
            flagstr);
   }
 
-  // get the address space object this pointer is in
-  VmAspace* aspace = VmAspace::vaddr_to_aspace(addr);
-  if (!aspace) {
-    printf("PageFault: Invalid virtual address 0x%lx\n", addr);
+  // Page faults never happen on kernel addresses. Double check this is a valid user address, then
+  // continue with the user aspace.
+  if (unlikely(!is_user_accessible(addr))) {
+    LTRACEF("PageFault: Invalid virtual address 0x%lx\n", addr);
     return ZX_ERR_NOT_FOUND;
   }
 
   // page fault it
-  zx_status_t status = aspace->PageFault(addr, flags);
+  zx_status_t status = current_thread->aspace()->PageFault(addr, flags);
 
   // If we get this, then all checks passed but we were interrupted or killed while waiting for the
   // request to be fulfilled. Pretend the fault was successful and let the thread re-fault after it
