@@ -33,7 +33,7 @@ const char EXPECTED[] = R"JSON({
         "filename": "fuchsia.inspect.Tree",
         "timestamp": TIMESTAMP
     },
-    "moniker": "test_suite/realm_builder\\:CHILD_NAME/inspect-publisher",
+    "moniker": "MONIKER",
     "payload": {
         "root": {
             "arrays": {
@@ -205,11 +205,26 @@ TEST_F(AccessorTest, StreamDiagnosticsInspect) {
   fpromise::result<std::vector<diagnostics::reader::InspectData>, std::string> actual_result;
   fpromise::single_threaded_executor executor;
 
-  executor.schedule_task(reader.SnapshotInspectUntilPresent({moniker}).then(
-      [&](fpromise::result<std::vector<diagnostics::reader::InspectData>, std::string>&
-              result) mutable { actual_result = std::move(result); }));
-
-  executor.run();
+  // TODO(b/302150818): once the removal of escaping in the moniker response lands, we can switch
+  // back to just using SnapshotInspectUntilPresent.
+  bool keepTrying = true;
+  while (keepTrying) {
+    fpromise::result<std::vector<diagnostics::reader::InspectData>, std::string> result;
+    executor.schedule_task(reader.GetInspectSnapshot().then(
+        [&](fpromise::result<std::vector<diagnostics::reader::InspectData>, std::string>& r) {
+          result = std::move(r);
+        }));
+    executor.run();
+    ASSERT_TRUE(result.is_ok());
+    for (auto& value : result.value()) {
+      auto monikerSuffix = realm.component().GetChildName() + "/inspect-publisher";
+      if (value.moniker().find(monikerSuffix) != std::string::npos) {
+        keepTrying = false;
+        actual_result = std::move(result);
+        break;
+      }
+    }
+  }
 
   EXPECT_TRUE(actual_result.is_ok());
 
@@ -218,6 +233,7 @@ TEST_F(AccessorTest, StreamDiagnosticsInspect) {
   std::string actual = data.PrettyJson();
   re2::RE2::GlobalReplace(&actual, re2::RE2("\"component_url\": \".+\""),
                           "\"component_url\": \"COMPONENT_URL\"");
+  re2::RE2::GlobalReplace(&actual, re2::RE2("\"moniker\": \".+\""), "\"moniker\": \"MONIKER\"");
   re2::RE2::GlobalReplace(&actual, re2::RE2("        \"errors\": null,\n"), "");
 
   std::string timestamp;
