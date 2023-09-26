@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    bt_avctp::{AvcOpCode, AvcPacketType},
+    bt_avctp::{AvcCommandType, AvcOpCode, AvcPacketType},
     fidl_fuchsia_bluetooth_avrcp::AvcPanelCommand,
     packet_encoding::{Decodable, Encodable},
     std::convert::TryFrom,
@@ -11,7 +11,7 @@ use {
     tracing::{trace, warn},
 };
 
-use crate::peer::*;
+use crate::packets::{Error as PacketError, *};
 
 /// The error types during decode
 #[derive(Error, Debug)]

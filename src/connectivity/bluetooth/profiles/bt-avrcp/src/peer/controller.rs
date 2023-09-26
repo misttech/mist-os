@@ -2,18 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_bluetooth_avrcp as fidl_avrcp,
-    futures::channel::mpsc,
-    packet_encoding::Decodable,
-    parking_lot::Mutex,
-    std::convert::{TryFrom, TryInto},
-    std::num::NonZeroU16,
-    tracing::trace,
-};
+use fidl_fuchsia_bluetooth_avrcp as fidl_avrcp;
+use futures::channel::mpsc;
+use futures::Future;
+use packet_encoding::{Decodable, Encodable};
+use parking_lot::Mutex;
+use std::collections::HashSet;
+use std::convert::{TryFrom, TryInto};
+use std::num::NonZeroU16;
+use tracing::{info, trace, warn};
 
-use crate::packets::*;
-use crate::peer::*;
+use crate::packets::{Error as PacketError, *};
+use crate::peer::RemotePeerHandle;
 use crate::types::PeerError as Error;
 
 #[derive(Debug, Clone)]
@@ -480,8 +480,10 @@ impl Controller {
 pub(crate) mod tests {
     use super::*;
 
+    use crate::peer::{decode_avc_vendor_command, BrowseChannelHandler};
     use crate::peer_manager::TargetDelegate;
     use crate::profile::{AvrcpProtocolVersion, AvrcpService, AvrcpTargetFeatures};
+
     use assert_matches::assert_matches;
     use async_utils::PollExt;
     use bt_avctp::{AvcPeer, AvctpCommand, AvctpCommandStream, AvctpPeer};
@@ -489,8 +491,10 @@ pub(crate) mod tests {
     use fidl_fuchsia_bluetooth_avrcp::AttributeRequestOption;
     use fidl_fuchsia_bluetooth_bredr::ProfileMarker;
     use fuchsia_async as fasync;
-    use fuchsia_bluetooth::types::PeerId;
-    use futures::TryStreamExt;
+    use fuchsia_bluetooth::profile::Psm;
+    use fuchsia_bluetooth::types::{Channel, PeerId};
+    use futures::{pin_mut, TryStreamExt};
+    use std::sync::Arc;
 
     const PLAYER_ID: u16 = 1004;
     const UID_COUNTER: u16 = 1;
@@ -757,7 +761,7 @@ pub(crate) mod tests {
         let resp = PlayItemResponse::new(StatusCode::Success);
         let packet = resp.encode_packet().expect("unable to encode packets for event");
         let _ = command
-            .send_response(AvcResponseType::Accepted, &packet[..])
+            .send_response(bt_avctp::AvcResponseType::Accepted, &packet[..])
             .expect("should have succeeded");
 
         // Test PlayNowPlayingItem failure.
@@ -779,7 +783,7 @@ pub(crate) mod tests {
         let resp = PlayItemResponse::new(StatusCode::InternalError);
         let packet = resp.encode_packet().expect("unable to encode packets for event");
         let _ = command
-            .send_response(AvcResponseType::Rejected, &packet[..])
+            .send_response(bt_avctp::AvcResponseType::Rejected, &packet[..])
             .expect("should have succeeded");
 
         assert_matches!(exec.run_until_stalled(&mut play_fut).expect("should be ready"), Err(_));

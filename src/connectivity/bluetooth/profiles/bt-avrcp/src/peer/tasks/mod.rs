@@ -2,27 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::format_err,
-    fuchsia_async as fasync,
-    fuchsia_async::DurationExt,
-    fuchsia_zircon as zx,
-    futures::{
-        future::FutureExt,
-        stream::{SelectAll, StreamExt, TryStreamExt},
-    },
-    notification_stream::NotificationStream,
-    packet_encoding::{Decodable, Encodable},
-    parking_lot::RwLock,
-    rand::Rng,
-    std::{convert::TryInto, sync::Arc},
-    tracing::{error, info, trace},
+use anyhow::format_err;
+use fuchsia_async as fasync;
+use fuchsia_async::DurationExt;
+use fuchsia_zircon as zx;
+use futures::{
+    future::FutureExt,
+    stream::{SelectAll, StreamExt, TryStreamExt},
 };
+use notification_stream::NotificationStream;
+use packet_encoding::{Decodable, Encodable};
+use parking_lot::RwLock;
+use rand::Rng;
+use std::collections::HashSet;
+use std::{convert::TryInto, sync::Arc};
+use tracing::{error, info, trace, warn};
 
 mod notification_stream;
 
-use crate::packets::Error as PacketError;
-use crate::peer::*;
+use crate::packets::{Error as PacketError, *};
+use crate::peer::{
+    get_supported_events_internal, send_browsing_command_internal, AVCTPConnectionType,
+    ControllerEvent, PeerChannelState, RemotePeer,
+};
 use crate::profile::*;
 use crate::types::PeerError as Error;
 
@@ -202,6 +204,7 @@ fn handle_notification(
 /// The control channel should be in `Connecting` state before spawning this task.
 /// TODO(fxbug.dev/85761): Refactor logic into RemotePeer to avoid multiple lock accesses.
 async fn make_connection(peer: Arc<RwLock<RemotePeer>>, conn_type: AVCTPConnectionType) {
+    use crate::peer::{MAX_CONNECTION_EST_TIME, MIN_CONNECTION_EST_TIME};
     let random_delay: zx::Duration = zx::Duration::from_nanos(
         rand::thread_rng()
             .gen_range(MIN_CONNECTION_EST_TIME.into_nanos()..MAX_CONNECTION_EST_TIME.into_nanos()),

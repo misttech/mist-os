@@ -2,29 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    bt_avctp::{AvcCommand, AvcOpCode, AvcPacketType},
-    fidl_fuchsia_bluetooth_avrcp::{
-        AddressedPlayerId, AvcPanelCommand, Notification, TargetPassthroughError,
-    },
-    fuchsia_async as fasync,
-    fuchsia_zircon::Duration,
-    futures::future::Either,
-    parking_lot::Mutex,
-    std::{
-        collections::{
-            hash_map::Entry::{Occupied, Vacant},
-            VecDeque,
-        },
-        sync::Arc,
-    },
-    tracing::{trace, warn},
+use bt_avctp::{AvcCommand, AvcOpCode, AvcPacketType, AvcResponseType};
+use fidl_fuchsia_bluetooth_avrcp::{
+    AddressedPlayerId, AvcPanelCommand, Notification, TargetPassthroughError,
 };
+use fuchsia_async as fasync;
+use fuchsia_bluetooth::types::PeerId;
+use fuchsia_zircon::Duration;
+use futures::{future::Either, pin_mut, Future, FutureExt};
+use parking_lot::Mutex;
+use std::collections::{
+    hash_map::Entry::{Occupied, Vacant},
+    HashMap, VecDeque,
+};
+use std::sync::Arc;
+use tracing::{trace, warn};
 
 pub mod browse_channel;
 mod decoders;
 
-use crate::peer::*;
+use crate::packets::{Error as PacketError, *};
+use crate::peer_manager::TargetDelegate;
 use crate::types::PeerError as Error;
 use decoders::*;
 
@@ -847,13 +845,15 @@ async fn handle_control_command(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::peer_manager::TargetDelegate;
+
+    use bt_avctp::AvcCommandType;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_bluetooth_avrcp::{
         self as fidl_avrcp, AbsoluteVolumeHandlerMarker, AbsoluteVolumeHandlerProxy,
         AbsoluteVolumeHandlerRequest, MediaAttributes, TargetAvcError, TargetHandlerMarker,
         TargetHandlerProxy, TargetHandlerRequest,
     };
+    use futures::stream::StreamExt;
 
     #[derive(Debug)]
     struct MockAvcCommandResponse {

@@ -36,7 +36,6 @@ rustc_binary("bin") {
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:parking_lot",
-    "//third_party/rust_crates:pin-utils",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
@@ -48,6 +47,7 @@ rustc_binary("bin") {
     "//src/lib/async-utils",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:pin-utils",
   ]
 
   sources = [

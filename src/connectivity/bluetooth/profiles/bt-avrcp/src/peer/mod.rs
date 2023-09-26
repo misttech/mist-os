@@ -10,10 +10,9 @@ use {
     fuchsia_inspect::Property,
     fuchsia_inspect_derive::{AttachError, Inspect},
     fuchsia_zircon as zx,
-    futures::{channel::mpsc, future::FutureExt, stream::StreamExt, Future},
+    futures::{channel::mpsc, stream::StreamExt, Future},
     packet_encoding::{Decodable, Encodable},
     parking_lot::RwLock,
-    pin_utils::pin_mut,
     std::{
         collections::{HashMap, HashSet},
         convert::TryFrom,
@@ -28,14 +27,12 @@ mod handlers;
 mod inspect;
 mod tasks;
 
-use crate::{
-    metrics::MetricsNode,
-    packets::{Error as PacketError, *},
-    peer_manager::TargetDelegate,
-    profile::AvrcpService,
-    types::PeerError as Error,
-    types::StateChangeListener,
-};
+use crate::metrics::MetricsNode;
+use crate::packets::*;
+use crate::peer_manager::TargetDelegate;
+use crate::profile::AvrcpService;
+use crate::types::PeerError as Error;
+use crate::types::StateChangeListener;
 
 pub use controller::{Controller, ControllerEvent};
 pub use handlers::{browse_channel::BrowseChannelHandler, ControlChannelHandler};
