@@ -559,33 +559,28 @@ impl<K> PropertyAssertion<K> for AnyStringProperty {
 
 /// A PropertyAssertion that passes for any String containing
 /// a matching for the given regular expression.
-pub struct StringPropertyRegex<'a> {
-    original: &'a str,
-    re: Regex,
-}
-
-impl<'a> StringPropertyRegex<'a> {
-    pub fn new(s: &'a str) -> StringPropertyRegex<'a> {
-        Self { original: s, re: Regex::new(s).expect("invalid regular expression") }
+impl<K> PropertyAssertion<K> for Regex {
+    fn run(&self, actual: &Property<K>) -> Result<(), Error> {
+        (&self).run(actual)
     }
 }
 
-impl<K> PropertyAssertion<K> for StringPropertyRegex<'_> {
+impl<K> PropertyAssertion<K> for &Regex {
     fn run(&self, actual: &Property<K>) -> Result<(), Error> {
         if let Property::String(_, ref v) = actual {
-            if self.re.is_match(v) {
+            if self.is_match(v) {
                 return Ok(());
             } else {
                 return Err(format_err!(
                     "expected String matching \"{}\", found \"{}\"",
-                    self.original,
+                    self.as_str(),
                     v
                 ));
             }
         }
         Err(format_err!(
             "expected String matching \"{}\", found {}",
-            self.original,
+            self.as_str(),
             actual.discriminant_name()
         ))
     }
@@ -788,6 +783,11 @@ mod tests {
     use super::*;
 
     use diagnostics_hierarchy::testing::CondensableOnDemand;
+    use lazy_static::lazy_static;
+
+    lazy_static! {
+        static ref TEST_REGEX: Regex = Regex::new("a").unwrap();
+    }
 
     #[fuchsia::test]
     fn test_assert_json_diff() {
@@ -1241,16 +1241,19 @@ mod tests {
             vec![],
         );
         assert_data_tree!(diagnostics_hierarchy, key: {
-            value1: StringPropertyRegex::new("a{4}b{4}"),
+            value1: &*TEST_REGEX,
         });
         assert_data_tree!(diagnostics_hierarchy, key: {
-            value1: StringPropertyRegex::new("a{4}"),
+            value1: Regex::new("a{4}b{4}").unwrap(),
         });
         assert_data_tree!(diagnostics_hierarchy, key: {
-            value1: StringPropertyRegex::new("a{2}b{2}"),
+            value1: Regex::new("a{4}").unwrap(),
         });
         assert_data_tree!(diagnostics_hierarchy, key: {
-            value1: StringPropertyRegex::new("b{4}"),
+            value1: Regex::new("a{2}b{2}").unwrap(),
+        });
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            value1: Regex::new("b{4}").unwrap(),
         });
     }
 
@@ -1263,7 +1266,7 @@ mod tests {
             vec![],
         );
         assert_data_tree!(diagnostics_hierarchy, key: {
-                value: StringPropertyRegex::new("b{2}d{2}"),
+                value: Regex::new("b{2}d{2}").unwrap(),
         });
     }
 
@@ -1276,7 +1279,7 @@ mod tests {
             vec![],
         );
         assert_data_tree!(diagnostics_hierarchy, key: {
-            value1: StringPropertyRegex::new("a{4}"),
+            value1: Regex::new("a{4}").unwrap(),
         });
     }
 

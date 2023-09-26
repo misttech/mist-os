@@ -18,11 +18,14 @@ rustc_library("diagnostics-assertions") {
     "//third_party/rust_crates:regex",
   ]
 
-  test_deps = [ "//src/lib/fuchsia" ]
+  test_deps = [
+    "//src/lib/fuchsia",
+    "//third_party/rust_crates:lazy_static",
+  ]
   sources = [ "src/lib.rs" ]
 }
 
-fuchsia_unittest_package("diagnostics-assertions-test") {
+fuchsia_unittest_package("diagnostics-assertions-tests") {
   deps = [ ":diagnostics-assertions_test" ]
 
   test_specs = {
@@ -34,5 +37,5 @@ fuchsia_unittest_package("diagnostics-assertions-test") {
 
 group("tests") {
   testonly = true
-  deps = [ ":diagnostics-assertions-test" ]
+  deps = [ ":diagnostics-assertions-tests" ]
 }
