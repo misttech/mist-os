@@ -1,0 +1,22 @@
+# proto-file: tools/metadata/proto/metadata.proto
+# proto-message: Metadata
+# https://fuchsia.dev/fuchsia-src/development/source_code/metadata
+
+last_reviewed_date: {
+  year: 2023
+  month: 9
+  day: 22
+}
+
+trackers: {
+  # TODO(fxbug.dev/132769): Migrate Flake fetcher to Buganizer.
+  # This component is for Flake fetcher use only.
+  monorail: {
+    project: "fuchsia"
+    component: "ComponentFramework>SDK"
+  }
+  # Fuchsia > Component Framework > SDK
+  issue_tracker: {
+    component_id: 1404357
+  }
+}

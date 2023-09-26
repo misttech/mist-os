@@ -7,6 +7,7 @@ use {
         component_instance::{ComponentInstanceForAnalyzer, TopInstanceForAnalyzer},
         component_model::{BuildAnalyzerModelError, Child},
     },
+    cm_config::RuntimeConfig,
     cm_rust::{EnvironmentDecl, RegistrationSource, ResolverRegistration},
     fidl_fuchsia_component_internal as component_internal,
     moniker::ChildNameBase,
@@ -14,7 +15,6 @@ use {
         component_instance::{
             ComponentInstanceInterface, ExtendedInstanceInterface, WeakExtendedInstanceInterface,
         },
-        config::RuntimeConfig,
         environment::{DebugRegistry, EnvironmentExtends, EnvironmentInterface, RunnerRegistry},
         error::ComponentInstanceError,
     },

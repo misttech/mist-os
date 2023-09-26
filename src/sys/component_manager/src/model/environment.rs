@@ -184,8 +184,9 @@ mod tests {
             },
             sandbox_util::Sandbox,
         },
-        ::routing::{config::RuntimeConfig, environment::DebugRegistration},
+        ::routing::environment::DebugRegistration,
         assert_matches::assert_matches,
+        cm_config::RuntimeConfig,
         cm_rust::{RegistrationSource, RunnerRegistration},
         cm_rust_testing::{
             ChildDeclBuilder, CollectionDeclBuilder, ComponentDeclBuilder, EnvironmentDeclBuilder,

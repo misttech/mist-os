@@ -582,12 +582,10 @@ mod tests {
     use {
         super::runtime_dir::RuntimeDirectory,
         super::*,
-        ::routing::{
-            config::{AllowlistEntryBuilder, JobPolicyAllowlists, SecurityPolicy},
-            policy::ScopedPolicyChecker,
-        },
+        ::routing::policy::ScopedPolicyChecker,
         anyhow::{Context, Error},
         assert_matches::assert_matches,
+        cm_config::{AllowlistEntryBuilder, JobPolicyAllowlists, SecurityPolicy},
         fidl::endpoints::{
             create_endpoints, create_proxy, spawn_stream_handler, ClientEnd,
             DiscoverableProtocolMarker, Proxy, ServerEnd,

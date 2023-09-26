@@ -5,6 +5,11 @@
 use {
     anyhow::Error,
     assert_matches::assert_matches,
+    cm_config::{
+        AllowlistEntry, AllowlistEntryBuilder, CapabilityAllowlistKey, CapabilityAllowlistSource,
+        ChildPolicyAllowlists, DebugCapabilityAllowlistEntry, DebugCapabilityKey,
+        JobPolicyAllowlists, SecurityPolicy,
+    },
     cm_moniker::InstancedMoniker,
     cm_rust::{CapabilityTypeName, ProtocolDecl, StorageDecl, StorageDirectorySource},
     fidl_fuchsia_component_decl as fdecl,
@@ -12,11 +17,6 @@ use {
     routing::{
         capability_source::{CapabilitySource, ComponentCapability, InternalCapability},
         component_instance::ComponentInstanceInterface,
-        config::{
-            AllowlistEntry, AllowlistEntryBuilder, CapabilityAllowlistKey,
-            CapabilityAllowlistSource, ChildPolicyAllowlists, DebugCapabilityAllowlistEntry,
-            DebugCapabilityKey, JobPolicyAllowlists, SecurityPolicy,
-        },
         policy::GlobalPolicyChecker,
     },
     std::{

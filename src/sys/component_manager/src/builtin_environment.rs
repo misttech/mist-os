@@ -64,11 +64,9 @@ use {
         root_stop_notifier::RootStopNotifier,
         sandbox_util::{LaunchTaskOnReceive, Sandbox},
     },
-    ::routing::{
-        config::{RuntimeConfig, VmexSource},
-        environment::{DebugRegistry, RunnerRegistry},
-    },
+    ::routing::environment::{DebugRegistry, RunnerRegistry},
     anyhow::{format_err, Context as _, Error},
+    cm_config::{RuntimeConfig, VmexSource},
     cm_rust::{Availability, RunnerRegistration, UseEventStreamDecl, UseSource},
     cm_types::Name,
     cm_util::TaskGroup,

@@ -16,7 +16,7 @@ use {
             },
         },
     },
-    ::routing::config::RuntimeConfig,
+    cm_config::RuntimeConfig,
     cm_rust::{
         Availability, CapabilityDecl, ChildDecl, ComponentDecl, ConfigValuesData, EventStreamDecl,
         NativeIntoFidl, RunnerDecl, UseEventStreamDecl, UseSource,

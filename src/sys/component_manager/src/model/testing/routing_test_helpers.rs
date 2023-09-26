@@ -20,16 +20,15 @@ use {
         },
     },
     ::routing::{
-        component_id_index::ComponentInstanceId,
-        component_instance::ComponentInstanceInterface,
-        config::{
-            AllowlistEntry, CapabilityAllowlistKey, ChildPolicyAllowlists,
-            DebugCapabilityAllowlistEntry, DebugCapabilityKey, RuntimeConfig, SecurityPolicy,
-        },
+        component_id_index::ComponentInstanceId, component_instance::ComponentInstanceInterface,
     },
     ::routing_test_helpers::{generate_storage_path, RoutingTestModel, RoutingTestModelBuilder},
     anyhow::anyhow,
     async_trait::async_trait,
+    cm_config::{
+        AllowlistEntry, CapabilityAllowlistKey, ChildPolicyAllowlists,
+        DebugCapabilityAllowlistEntry, DebugCapabilityKey, RuntimeConfig, SecurityPolicy,
+    },
     cm_moniker::InstancedMoniker,
     cm_rust::*,
     cm_types::{Name, Url},

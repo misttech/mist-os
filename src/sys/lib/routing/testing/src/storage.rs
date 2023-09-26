@@ -7,6 +7,7 @@ use {
         component_id_index::make_index_file, generate_storage_path, CheckUse, ExpectedResult,
         RoutingTestModel, RoutingTestModelBuilder,
     },
+    cm_config::{CapabilityAllowlistKey, CapabilityAllowlistSource},
     cm_moniker::InstancedMoniker,
     cm_rust::*,
     cm_rust_testing::{ComponentDeclBuilder, DirectoryDeclBuilder},
@@ -14,7 +15,6 @@ use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
     fuchsia_zircon_status as zx_status,
     moniker::{ExtendedMoniker, Moniker, MonikerBase},
-    routing::config::{CapabilityAllowlistKey, CapabilityAllowlistSource},
     std::{collections::HashSet, convert::TryInto, marker::PhantomData, path::PathBuf},
 };
 

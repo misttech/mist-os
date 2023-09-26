@@ -19,9 +19,10 @@ use {
         },
         sandbox_util::Sandbox,
     },
-    ::routing::{config::AllowlistEntryBuilder, policy::PolicyError},
+    ::routing::policy::PolicyError,
     assert_matches::assert_matches,
     async_trait::async_trait,
+    cm_config::AllowlistEntryBuilder,
     cm_rust::{
         Availability, ComponentDecl, RegistrationSource, RunnerDecl, RunnerRegistration,
         UseEventStreamDecl, UseSource,

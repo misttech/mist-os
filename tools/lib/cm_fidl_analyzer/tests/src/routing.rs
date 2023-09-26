@@ -6,6 +6,10 @@ use {
     anyhow::anyhow,
     assert_matches::assert_matches,
     async_trait::async_trait,
+    cm_config::{
+        AllowlistEntry, CapabilityAllowlistKey, DebugCapabilityAllowlistEntry, DebugCapabilityKey,
+        RuntimeConfig, SecurityPolicy,
+    },
     cm_fidl_analyzer::{
         component_instance::ComponentInstanceForAnalyzer,
         component_model::{AnalyzerModelError, ComponentModelForAnalyzer, ModelBuilderForAnalyzer},
@@ -31,16 +35,9 @@ use {
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_zircon_status as zx_status,
     moniker::{ChildNameBase, Moniker, MonikerBase},
     routing::{
-        component_id_index::ComponentIdIndex,
-        component_instance::ComponentInstanceInterface,
-        config::{
-            AllowlistEntry, CapabilityAllowlistKey, DebugCapabilityAllowlistEntry,
-            DebugCapabilityKey, RuntimeConfig, SecurityPolicy,
-        },
-        environment::RunnerRegistry,
-        error::RoutingError,
-        mapper::RouteSegment,
-        RegistrationDecl, RouteInfo,
+        component_id_index::ComponentIdIndex, component_instance::ComponentInstanceInterface,
+        environment::RunnerRegistry, error::RoutingError, mapper::RouteSegment, RegistrationDecl,
+        RouteInfo,
     },
     routing_test_helpers::{
         CheckUse, ComponentEventRoute, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder,

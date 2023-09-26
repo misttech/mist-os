@@ -236,13 +236,11 @@ mod tests {
             ModelMappingVisitor, PkgUrlMatch,
         },
         crate::component_model::ModelBuilderForAnalyzer,
+        cm_config::RuntimeConfig,
         cm_rust::ComponentDecl,
         cm_rust_testing::ComponentDeclBuilder,
         fuchsia_url::AbsoluteComponentUrl,
-        routing::{
-            component_id_index::ComponentIdIndex, config::RuntimeConfig,
-            environment::RunnerRegistry,
-        },
+        routing::{component_id_index::ComponentIdIndex, environment::RunnerRegistry},
         std::{collections::HashMap, iter::FromIterator, sync::Arc},
         url::Url,
     };

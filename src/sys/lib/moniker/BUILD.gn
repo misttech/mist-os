@@ -23,6 +23,7 @@ rustc_library("moniker") {
     "//src/lib/diagnostics/selectors/*",
     "//src/security/lib/scrutiny/*",
     "//src/sys/component_manager/*",
+    "//src/sys/lib/cm_config/*",
     "//src/sys/lib/cm_moniker/*",
     "//src/sys/lib/component-events/*",
     "//src/sys/lib/component_debug/*",

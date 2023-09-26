@@ -188,6 +188,7 @@ mod tests {
             },
         },
         anyhow::Result,
+        cm_config::RuntimeConfig,
         cm_fidl_analyzer::component_model::ModelBuilderForAnalyzer,
         cm_rust::{
             Availability, CapabilityDecl, ChildDecl, ComponentDecl, DependencyType, DirectoryDecl,
@@ -203,7 +204,6 @@ mod tests {
         routing::{
             component_id_index::{ComponentIdIndex, ComponentInstanceId},
             component_instance::ComponentInstanceInterface,
-            config::RuntimeConfig,
             environment::RunnerRegistry,
         },
         scrutiny_testing::fake::*,

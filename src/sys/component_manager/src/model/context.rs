@@ -4,11 +4,8 @@
 
 use {
     crate::model::error::ModelError,
-    ::routing::{
-        component_id_index::ComponentIdIndex,
-        config::{AbiRevisionPolicy, RuntimeConfig},
-        policy::GlobalPolicyChecker,
-    },
+    ::routing::{component_id_index::ComponentIdIndex, policy::GlobalPolicyChecker},
+    cm_config::{AbiRevisionPolicy, RuntimeConfig},
     std::sync::Arc,
 };
 

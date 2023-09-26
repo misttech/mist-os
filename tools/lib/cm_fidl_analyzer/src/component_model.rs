@@ -10,6 +10,7 @@ use {
         PkgUrlMatch,
     },
     anyhow::{anyhow, Context, Result},
+    cm_config::RuntimeConfig,
     cm_rust::{
         CapabilityDecl, CapabilityTypeName, ComponentDecl, ExposeDecl, ExposeDeclCommon, OfferDecl,
         OfferDeclCommon, OfferEventStreamDecl, OfferTarget, ProgramDecl, ResolverRegistration,
@@ -28,7 +29,6 @@ use {
         component_instance::{
             ComponentInstanceInterface, ExtendedInstanceInterface, TopInstanceInterface,
         },
-        config::RuntimeConfig,
         environment::{
             component_has_relative_url, find_first_absolute_ancestor_url, RunnerRegistry,
         },
@@ -1194,6 +1194,7 @@ mod tests {
         super::ModelBuilderForAnalyzer,
         crate::{environment::BOOT_SCHEME, ComponentModelForAnalyzer},
         anyhow::Result,
+        cm_config::RuntimeConfig,
         cm_moniker::InstancedMoniker,
         cm_rust::{
             Availability, ComponentDecl, DependencyType, RegistrationSource, ResolverRegistration,
@@ -1212,7 +1213,6 @@ mod tests {
                 ComponentInstanceInterface, ExtendedInstanceInterface,
                 WeakExtendedInstanceInterface,
             },
-            config::RuntimeConfig,
             environment::{EnvironmentInterface, RunnerRegistry},
             error::ComponentInstanceError,
             RouteRequest,

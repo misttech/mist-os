@@ -7,7 +7,6 @@ pub mod capability_source;
 pub mod collection;
 pub mod component_id_index;
 pub mod component_instance;
-pub mod config;
 pub mod environment;
 pub mod error;
 pub mod event;

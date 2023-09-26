@@ -12,6 +12,10 @@ pub mod storage_admin;
 use {
     assert_matches::assert_matches,
     async_trait::async_trait,
+    cm_config::{
+        AllowlistEntry, AllowlistEntryBuilder, CapabilityAllowlistKey, CapabilityAllowlistSource,
+        DebugCapabilityAllowlistEntry, DebugCapabilityKey,
+    },
     cm_moniker::InstancedMoniker,
     cm_rust::{
         Availability, CapabilityDecl, CapabilityTypeName, ChildRef, ComponentDecl, DependencyType,
@@ -37,10 +41,6 @@ use {
         },
         component_id_index::ComponentInstanceId,
         component_instance::ComponentInstanceInterface,
-        config::{
-            AllowlistEntry, AllowlistEntryBuilder, CapabilityAllowlistKey,
-            CapabilityAllowlistSource, DebugCapabilityAllowlistEntry, DebugCapabilityKey,
-        },
         error::RoutingError,
         mapper::NoopRouteMapper,
         route_capability, RouteRequest, RouteSource,

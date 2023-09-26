@@ -623,6 +623,7 @@ mod tests {
             verify::{collection::V2ComponentModel, collector::component_model::DEFAULT_ROOT_URL},
         },
         anyhow::Result,
+        cm_config::RuntimeConfig,
         cm_fidl_analyzer::component_model::ModelBuilderForAnalyzer,
         cm_rust::{
             Availability, CapabilityTypeName, ChildDecl, ComponentDecl, DependencyType,
@@ -635,8 +636,7 @@ mod tests {
         maplit::{hashmap, hashset},
         moniker::{Moniker, MonikerBase},
         routing::{
-            component_id_index::ComponentIdIndex, config::RuntimeConfig,
-            environment::RunnerRegistry, mapper::RouteSegment,
+            component_id_index::ComponentIdIndex, environment::RunnerRegistry, mapper::RouteSegment,
         },
         scrutiny::prelude::{DataController, DataModel},
         scrutiny_testing::fake::fake_data_model,

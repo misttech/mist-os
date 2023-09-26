@@ -127,13 +127,11 @@ fn get_stream_sink(
 mod tests {
     use {
         super::*,
-        ::routing::{
-            config::{
-                AllowlistEntryBuilder, ChildPolicyAllowlists, JobPolicyAllowlists, SecurityPolicy,
-            },
-            policy::{PolicyError, ScopedPolicyChecker},
-        },
+        ::routing::policy::{PolicyError, ScopedPolicyChecker},
         assert_matches::assert_matches,
+        cm_config::{
+            AllowlistEntryBuilder, ChildPolicyAllowlists, JobPolicyAllowlists, SecurityPolicy,
+        },
         fidl_fuchsia_data as fdata,
         lazy_static::lazy_static,
         moniker::{Moniker, MonikerBase},

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    crate::policy::allowlist_entry_matches,
     anyhow::{format_err, Context, Error},
     cm_rust::{CapabilityTypeName, FidlIntoNative},
     cm_types::{symmetrical_enums, Name, ParseError, Url},
@@ -18,7 +17,6 @@ use {
         collections::{HashMap, HashSet},
         convert::TryFrom,
         iter::FromIterator,
-        path::Path,
         sync::Arc,
     },
     thiserror::Error,
@@ -109,6 +107,74 @@ pub struct AllowlistEntry {
     // A list of matchers that apply to each child in a moniker.
     // If this list is empty, we must only allow the root moniker.
     pub matchers: Vec<AllowlistMatcher>,
+}
+
+impl AllowlistEntry {
+    pub fn matches(&self, target_moniker: &Moniker) -> bool {
+        let mut iter = target_moniker.path().iter();
+
+        if self.matchers.is_empty() && !target_moniker.is_root() {
+            // If there are no matchers in the allowlist, the moniker must be the root.
+            // Anything else will not match.
+            return false;
+        }
+
+        for matcher in &self.matchers {
+            let cur_child = if let Some(target_child) = iter.next() {
+                target_child
+            } else {
+                // We have more matchers, but the moniker has already ended.
+                return false;
+            };
+            match matcher {
+                AllowlistMatcher::Exact(child) => {
+                    if cur_child != child {
+                        // The child does not exactly match.
+                        return false;
+                    }
+                }
+                // Any child is acceptable. Continue with remaining matchers.
+                AllowlistMatcher::AnyChild => continue,
+                // Any descendant at this point is acceptable.
+                AllowlistMatcher::AnyDescendant => return true,
+                AllowlistMatcher::AnyDescendantInCollection(expected_collection) => {
+                    if let Some(collection) = cur_child.collection() {
+                        if collection == expected_collection {
+                            // This child is in a collection and the name matches.
+                            // Because we allow any descendant, return true immediately.
+                            return true;
+                        } else {
+                            // This child is in a collection but the name does not match.
+                            return false;
+                        }
+                    } else {
+                        // This child is not in a collection, so it does not match.
+                        return false;
+                    }
+                }
+                AllowlistMatcher::AnyChildInCollection(expected_collection) => {
+                    if let Some(collection) = cur_child.collection() {
+                        if collection != expected_collection {
+                            // This child is in a collection but the name does not match.
+                            return false;
+                        }
+                    } else {
+                        // This child is not in a collection, so it does not match.
+                        return false;
+                    }
+                }
+            }
+        }
+
+        if iter.next().is_some() {
+            // We've gone through all the matchers, but there are still children
+            // in the moniker. Descendant cases are already handled above, so this
+            // must be a failure to match.
+            false
+        } else {
+            true
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -232,8 +298,7 @@ impl DebugCapabilityAllowlistEntry {
             ExtendedMoniker::ComponentManager => return false,
             ExtendedMoniker::ComponentInstance(ref moniker) => moniker,
         };
-        allowlist_entry_matches(&self.source, source_absolute)
-            && allowlist_entry_matches(&self.dest, dest)
+        self.source.matches(source_absolute) && self.dest.matches(dest)
     }
 }
 
@@ -390,15 +455,7 @@ impl Default for RuntimeConfig {
 }
 
 impl RuntimeConfig {
-    /// Load RuntimeConfig from the '--config' command line arg. Path must
-    /// point to binary encoded fuchsia.component.internal.Config file.
-    /// Otherwise, an Error is returned.
-    pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
-        let raw_content = std::fs::read(path)?;
-        Ok(Self::try_from(unpersist::<component_internal::Config>(&raw_content)?)?)
-    }
-
-    pub fn load_from_bytes(bytes: &Vec<u8>) -> Result<Self, Error> {
+    pub fn new_from_bytes(bytes: &Vec<u8>) -> Result<Self, Error> {
         Ok(Self::try_from(unpersist::<component_internal::Config>(&bytes)?)?)
     }
 
@@ -757,10 +814,7 @@ impl TryFrom<component_internal::SecurityPolicy> for SecurityPolicy {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, assert_matches::assert_matches, cm_types::ParseError, fidl_fuchsia_io as fio,
-        std::path::PathBuf, tempfile::TempDir,
-    };
+    use {super::*, assert_matches::assert_matches, cm_types::ParseError, fidl_fuchsia_io as fio};
 
     const FOO_PKG_URL: &str = "fuchsia-pkg://fuchsia.com/foo#meta/foo.cm";
 
@@ -1190,48 +1244,22 @@ mod tests {
         ),
     }
 
-    fn write_config_to_file(
-        tmp_dir: &TempDir,
-        config: component_internal::Config,
-    ) -> Result<PathBuf, Error> {
-        let path = tmp_dir.path().join("test_config.fidl");
-        let content = fidl::persist(&config)?;
-        std::fs::write(&path, &content)?;
-        Ok(path)
-    }
-
     #[test]
-    fn config_from_file_no_arg() -> Result<(), Error> {
-        assert_matches!(RuntimeConfig::load_from_file::<PathBuf>(Default::default()), Err(_));
-        Ok(())
-    }
-
-    #[test]
-    fn config_from_file_missing() -> Result<(), Error> {
-        let path = PathBuf::from(&"/foo/bar".to_string());
-        assert_matches!(RuntimeConfig::load_from_file(&path), Err(_));
-        Ok(())
-    }
-
-    #[test]
-    fn config_from_file_valid() -> Result<(), Error> {
-        let tempdir = TempDir::new().expect("failed to create temp directory");
-        let path = write_config_to_file(
-            &tempdir,
-            component_internal::Config {
-                debug: None,
-                enable_introspection: None,
-                list_children_batch_size: Some(42),
-                security_policy: None,
-                namespace_capabilities: None,
-                builtin_capabilities: None,
-                maintain_utc_clock: None,
-                use_builtin_process_launcher: None,
-                num_threads: None,
-                root_component_url: Some(FOO_PKG_URL.to_string()),
-                ..Default::default()
-            },
-        )?;
+    fn new_from_bytes_valid() -> Result<(), Error> {
+        let config = component_internal::Config {
+            debug: None,
+            enable_introspection: None,
+            list_children_batch_size: Some(42),
+            security_policy: None,
+            namespace_capabilities: None,
+            builtin_capabilities: None,
+            maintain_utc_clock: None,
+            use_builtin_process_launcher: None,
+            num_threads: None,
+            root_component_url: Some(FOO_PKG_URL.to_string()),
+            ..Default::default()
+        };
+        let bytes = fidl::persist(&config)?;
         let expected = RuntimeConfig {
             list_children_batch_size: 42,
             root_component_url: Some(Url::new(FOO_PKG_URL.to_string())?),
@@ -1239,19 +1267,15 @@ mod tests {
         };
 
         assert_matches!(
-            RuntimeConfig::load_from_file(&path)
+            RuntimeConfig::new_from_bytes(&bytes)
             , Ok(v) if v == expected);
         Ok(())
     }
 
     #[test]
-    fn config_from_file_invalid() -> Result<(), Error> {
-        let tempdir = TempDir::new().expect("failed to create temp directory");
-        let path = tempdir.path().join("test_config.fidl");
-        // Add config file containing garbage data.
-        std::fs::write(&path, &vec![0xfa, 0xde])?;
-
-        assert_matches!(RuntimeConfig::load_from_file(&path), Err(_));
+    fn new_from_bytes_invalid() -> Result<(), Error> {
+        let bytes = vec![0xfa, 0xde];
+        assert_matches!(RuntimeConfig::new_from_bytes(&bytes), Err(_));
         Ok(())
     }
 
@@ -1395,5 +1419,84 @@ mod tests {
             AllowlistEntryParseError::DescendantWildcardOnlyAtEnd(
                 "/foo/**/bar".into(),
             )),
+    }
+
+    #[test]
+    fn allowlist_entry_matches() {
+        let root = Moniker::root();
+        let allowed = Moniker::try_from(vec!["foo", "bar"]).unwrap();
+        let disallowed_child_of_allowed = Moniker::try_from(vec!["foo", "bar", "baz"]).unwrap();
+        let disallowed = Moniker::try_from(vec!["baz", "fiz"]).unwrap();
+        let allowlist_exact = AllowlistEntryBuilder::new().exact_from_moniker(&allowed).build();
+        assert!(allowlist_exact.matches(&allowed));
+        assert!(!allowlist_exact.matches(&root));
+        assert!(!allowlist_exact.matches(&disallowed));
+        assert!(!allowlist_exact.matches(&disallowed_child_of_allowed));
+
+        let allowed_realm_root = Moniker::try_from(vec!["qux"]).unwrap();
+        let allowed_child_of_realm = Moniker::try_from(vec!["qux", "quux"]).unwrap();
+        let allowed_nested_child_of_realm = Moniker::try_from(vec!["qux", "quux", "foo"]).unwrap();
+        let allowlist_realm =
+            AllowlistEntryBuilder::new().exact_from_moniker(&allowed_realm_root).any_descendant();
+        assert!(!allowlist_realm.matches(&allowed_realm_root));
+        assert!(allowlist_realm.matches(&allowed_child_of_realm));
+        assert!(allowlist_realm.matches(&allowed_nested_child_of_realm));
+        assert!(!allowlist_realm.matches(&disallowed));
+        assert!(!allowlist_realm.matches(&root));
+
+        let collection_holder = Moniker::try_from(vec!["corge"]).unwrap();
+        let collection_child = Moniker::try_from(vec!["corge", "collection:child"]).unwrap();
+        let collection_nested_child =
+            Moniker::try_from(vec!["corge", "collection:child", "inner-child"]).unwrap();
+        let non_collection_child = Moniker::try_from(vec!["corge", "grault"]).unwrap();
+        let allowlist_collection = AllowlistEntryBuilder::new()
+            .exact_from_moniker(&collection_holder)
+            .any_descendant_in_collection("collection");
+        assert!(!allowlist_collection.matches(&collection_holder));
+        assert!(allowlist_collection.matches(&collection_child));
+        assert!(allowlist_collection.matches(&collection_nested_child));
+        assert!(!allowlist_collection.matches(&non_collection_child));
+        assert!(!allowlist_collection.matches(&disallowed));
+        assert!(!allowlist_collection.matches(&root));
+
+        let collection_a = Moniker::try_from(vec!["foo", "bar:a", "baz", "qux"]).unwrap();
+        let collection_b = Moniker::try_from(vec!["foo", "bar:b", "baz", "qux"]).unwrap();
+        let parent_not_allowed = Moniker::try_from(vec!["foo", "bar:b", "baz"]).unwrap();
+        let collection_not_allowed = Moniker::try_from(vec!["foo", "bar:b", "baz"]).unwrap();
+        let different_collection_not_allowed =
+            Moniker::try_from(vec!["foo", "test:b", "baz", "qux"]).unwrap();
+        let allowlist_exact_in_collection = AllowlistEntryBuilder::new()
+            .exact("foo")
+            .any_child_in_collection("bar")
+            .exact("baz")
+            .exact("qux")
+            .build();
+        assert!(allowlist_exact_in_collection.matches(&collection_a));
+        assert!(allowlist_exact_in_collection.matches(&collection_b));
+        assert!(!allowlist_exact_in_collection.matches(&parent_not_allowed));
+        assert!(!allowlist_exact_in_collection.matches(&collection_not_allowed));
+        assert!(!allowlist_exact_in_collection.matches(&different_collection_not_allowed));
+
+        let any_child_allowlist = AllowlistEntryBuilder::new().exact("core").any_child().build();
+        let allowed = Moniker::try_from(vec!["core", "abc"]).unwrap();
+        let disallowed_1 = Moniker::try_from(vec!["not_core", "abc"]).unwrap();
+        let disallowed_2 = Moniker::try_from(vec!["core", "abc", "def"]).unwrap();
+        assert!(any_child_allowlist.matches(&allowed));
+        assert!(!any_child_allowlist.matches(&disallowed_1));
+        assert!(!any_child_allowlist.matches(&disallowed_2));
+
+        let multiwildcard_allowlist = AllowlistEntryBuilder::new()
+            .exact("core")
+            .any_child()
+            .any_child_in_collection("foo")
+            .any_descendant();
+        let allowed = Moniker::try_from(vec!["core", "abc", "foo:def", "ghi"]).unwrap();
+        let disallowed_1 = Moniker::try_from(vec!["not_core", "abc", "foo:def", "ghi"]).unwrap();
+        let disallowed_2 = Moniker::try_from(vec!["core", "abc", "not_foo:def", "ghi"]).unwrap();
+        let disallowed_3 = Moniker::try_from(vec!["core", "abc", "foo:def"]).unwrap();
+        assert!(multiwildcard_allowlist.matches(&allowed));
+        assert!(!multiwildcard_allowlist.matches(&disallowed_1));
+        assert!(!multiwildcard_allowlist.matches(&disallowed_2));
+        assert!(!multiwildcard_allowlist.matches(&disallowed_3));
     }
 }

@@ -71,6 +71,7 @@ rustc_library("elf_runner") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-fs",
     "//src/lib/scoped_task",
+    "//src/sys/lib/cm_config",
     "//src/sys/lib/library_loader",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:assert_matches",

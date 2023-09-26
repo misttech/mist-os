@@ -11,6 +11,7 @@ use {
         verify::collection::V2ComponentModel,
     },
     anyhow::{anyhow, Context, Result},
+    cm_config::RuntimeConfig,
     cm_fidl_analyzer::component_model::ModelBuilderForAnalyzer,
     cm_rust::{ComponentDecl, FidlIntoNative, RegistrationSource, RunnerRegistration},
     config_encoder::ConfigFields,
@@ -19,9 +20,7 @@ use {
     fuchsia_url::{boot_url::BootUrl, AbsoluteComponentUrl},
     moniker::Moniker,
     once_cell::sync::Lazy,
-    routing::{
-        component_id_index::ComponentIdIndex, config::RuntimeConfig, environment::RunnerRegistry,
-    },
+    routing::{component_id_index::ComponentIdIndex, environment::RunnerRegistry},
     scrutiny::model::{collector::DataCollector, model::DataModel},
     serde::{Deserialize, Serialize},
     serde_json5::from_reader,

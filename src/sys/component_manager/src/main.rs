@@ -17,8 +17,8 @@ use {
         builtin_environment::{BuiltinEnvironment, BuiltinEnvironmentBuilder},
     },
     ::cm_logger::klog,
-    ::routing::config::RuntimeConfig,
     anyhow::Error,
+    cm_config::RuntimeConfig,
     fidl_fuchsia_component_internal as finternal, fuchsia_async as fasync,
     fuchsia_runtime::{job_default, process_self},
     fuchsia_zircon::JobCriticalOptions,
@@ -108,47 +108,29 @@ fn main() {
 ///
 /// This function panics on failure because the logger is not initialized yet.
 fn build_runtime_config() -> (RuntimeConfig, Option<BootfsSvc>, bool) {
-    let args = match startup::Arguments::from_args() {
-        Ok(args) => args,
-        Err(err) => {
-            panic!("{}\n{}", err, startup::Arguments::usage());
-        }
-    };
+    let args = startup::Arguments::from_args()
+        .unwrap_or_else(|err| panic!("{}\n{}", err, startup::Arguments::usage()));
 
-    let mut config: RuntimeConfig;
-    let mut bootfs_svc: Option<BootfsSvc> = None;
-    if args.host_bootfs {
+    let bootfs_svc =
+        args.host_bootfs.then(|| BootfsSvc::new().expect("Failed to create Rust bootfs"));
+    let config_bytes = if let Some(ref bootfs_svc) = bootfs_svc {
         // The Rust bootfs VFS has not been brought up yet, so to find the component manager's
         // config we must find the config's offset and size in the bootfs VMO, and read from it
         // directly.
-        bootfs_svc = Some(BootfsSvc::new().expect("Failed to create Rust bootfs"));
         let canonicalized =
             if args.config.starts_with("/boot/") { &args.config[6..] } else { &args.config };
-        let config_bytes =
-            match bootfs_svc.as_ref().unwrap().read_config_from_uninitialized_vfs(canonicalized) {
-                Ok(config) => config,
-                Err(error) => {
-                    panic!("Failed to read config from uninitialized vfs with error {}.", error)
-                }
-            };
-
-        config = match RuntimeConfig::load_from_bytes(&config_bytes) {
-            Ok(config) => config,
-            Err(err) => {
-                panic!("Failed to load runtime config: {}", err)
-            }
-        };
+        bootfs_svc.read_config_from_uninitialized_vfs(canonicalized).unwrap_or_else(|err| {
+            panic!("Failed to read config from uninitialized vfs with error {}.", err)
+        })
     } else {
         // This is the legacy path where bootsvc is hosting a C++ bootfs VFS,
         // and component manager can read its config using standard filesystem APIs.
         let path = PathBuf::from(&args.config);
-        config = match RuntimeConfig::load_from_file(&path) {
-            Ok(config) => config,
-            Err(err) => {
-                panic!("Failed to load runtime config: {}", err)
-            }
-        };
-    }
+        std::fs::read(path).expect("failed to read config file")
+    };
+
+    let mut config = RuntimeConfig::new_from_bytes(&config_bytes)
+        .unwrap_or_else(|err| panic!("Failed to load runtime config: {}", err));
 
     match (config.root_component_url.as_ref(), args.root_component_url.as_ref()) {
         (Some(_url), None) => (config, bootfs_svc, args.boot),
