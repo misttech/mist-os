@@ -4,6 +4,11 @@
 
 import("//build/assembly/board_configuration.gni")
 
+assert(current_toolchain == default_toolchain,
+       "The riscv64 board can only be defined in the default toolchain.")
+assert(current_cpu == "riscv64",
+       "The riscv64 board can only be defined in an riscv64 toolchain.")
+
 board_configuration("riscv64") {
   provided_features = [
     "fuchsia::driver_framework_v2_support",

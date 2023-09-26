@@ -4,6 +4,11 @@
 
 import("//build/assembly/board_configuration.gni")
 
+assert(current_toolchain == default_toolchain,
+       "The vim3 board can only be defined in the default toolchain.")
+assert(current_cpu == "arm64",
+       "The vim3 board can only be defined in an arm64 toolchain.")
+
 board_configuration("vim3") {
   provided_features = [
     "fuchsia::driver_framework_v2_support",
