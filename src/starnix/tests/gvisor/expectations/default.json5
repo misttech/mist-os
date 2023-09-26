@@ -1073,6 +1073,9 @@
 
                 // These tests hang / hard crash
                 "PtraceTest.AttachingConvertsGroupStopToPtraceStop",
+
+                // This hangs flakily. See fxbug.dev/134200
+                "PtraceTest.TraceDescendantsAllowed",
             ],
         },
     ],
