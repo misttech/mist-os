@@ -97,10 +97,7 @@ impl State {
             "fld f31, 31 * 8({state})",
             "fscsr {fcsr}",
             state = in(reg) &self.fp_registers,
-
-            // `fscsr` swaps the `fcsr` register value with the specified register, so it needs
-            // to be declared as `inout()`.
-            fcsr = inout(reg) self.fcsr => _,
+            fcsr = in(reg) self.fcsr,
         );
     }
 
@@ -109,4 +106,80 @@ impl State {
     }
 }
 
-// TODO(fxbug.dev/128554): Add tests.
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[::fuchsia::test]
+    fn save_restore_registers() {
+        use core::arch::asm;
+
+        let mut state = State::default();
+
+        let f0 = 6.41352134f64;
+        let f10 = 10.5134f64;
+        let f31 = -153.5754f64;
+
+        // Set rounding mode to 0o111.
+        let fcsr: u32 = 0x000000e0;
+
+        // Set custom state by hand.
+        unsafe {
+            asm!("fmv.d.x f0, {f0}", f0 = in(reg) f0);
+            asm!("fmv.d.x f10, {f10}", f10 = in(reg) f10);
+            asm!("fmv.d.x f31, {f31}", f31 = in(reg) f31);
+            asm!("fscsr {fcsr}", fcsr = in(reg) fcsr);
+        }
+
+        state.save();
+
+        // Clear state manually.
+        unsafe {
+            asm!("fmv.d.x f0, zero");
+            asm!("fmv.d.x f10, zero");
+            asm!("fmv.d.x f31, zero");
+            asm!("fscsr zero");
+        }
+
+        // Verify that the state is cleared.
+        {
+            let f0: f64;
+            let f10: f64;
+            let f31: f64;
+            let fcsr: u64;
+            unsafe {
+                asm!("fmv.x.d {f0}, f0", f0 = out(reg) f0);
+                asm!("fmv.x.d {f10}, f10", f10 = out(reg) f10);
+                asm!("fmv.x.d {f31}, f31", f31 = out(reg) f31);
+                asm!("frcsr {fcsr}", fcsr = out(reg) fcsr);
+            }
+
+            assert_eq!(f0, 0.0f64);
+            assert_eq!(f10, 0.0f64);
+            assert_eq!(f31, 0.0f64);
+            assert_eq!(fcsr, 0);
+        }
+
+        unsafe {
+            state.restore();
+        }
+
+        // Verify that the state restored to what we expect.
+        {
+            let f0_restored: f64;
+            let f10_restored: f64;
+            let f31_restored: f64;
+            let fcsr_restored: u32;
+            unsafe {
+                asm!("fmv.x.d {f0}, f0", f0 = out(reg) f0_restored);
+                asm!("fmv.x.d {f10}, f10", f10 = out(reg) f10_restored);
+                asm!("fmv.x.d {f31}, f31", f31 = out(reg) f31_restored);
+                asm!("frcsr {fcsr}", fcsr = out(reg) fcsr_restored);
+            }
+            assert_eq!(f0, f0_restored);
+            assert_eq!(f10, f10_restored);
+            assert_eq!(f31, f31_restored);
+            assert_eq!(fcsr, fcsr_restored);
+        }
+    }
+}

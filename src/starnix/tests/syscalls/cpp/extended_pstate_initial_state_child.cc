@@ -184,7 +184,7 @@ extern "C" void _start() {
       "fld f29, 29 * 8(%[regs])\n"
       "fld f30, 30 * 8(%[regs])\n"
       "fld f31, 31 * 8(%[regs])\n"
-      "fscsr %[fcsr]\n"
+      "frcsr %[fcsr]\n"
       : [fcsr] "=r"(fcsr)
       : [regs] "r"(fp_registers)
       : "memory");
