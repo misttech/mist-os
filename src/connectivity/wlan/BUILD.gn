@@ -67,6 +67,7 @@ group("tests") {
     "lib/eapol:eapol-tests",
     "lib/frame_writer:wlan-frame-writer-tests",
     "lib/ieee80211:ieee80211-tests",
+    "lib/ieee80211-testutils:ieee80211-testutils-tests",
     "lib/inspect:wlan-inspect-tests",
     "lib/mlme/cpp/tests",
     "lib/mlme/fullmac:wlan-fullmac-mlme-tests",

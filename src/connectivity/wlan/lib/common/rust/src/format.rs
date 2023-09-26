@@ -23,11 +23,27 @@ impl MacFmt for [u8; 6] {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ieee80211::Bssid;
+    use ieee80211_testutils::BSSID_REGEX;
+    use rand::Rng;
 
     #[test]
     fn format_mac_str() {
         let mac: [u8; 6] = [0x00, 0x12, 0x48, 0x9a, 0xbc, 0xdf];
         assert_eq!(mac.to_mac_string(), "00:12:48:9a:bc:df");
+    }
+
+    #[fuchsia::test]
+    fn test_printed_mac_format_exact() {
+        let bssid = Bssid([0x01, 0x02, 0x01, 0x02, 0x01, 0x02]);
+        assert_eq!("01:02:01:02:01:02", bssid.0.to_mac_string());
+    }
+
+    #[fuchsia::test]
+    fn test_printed_mac_format_shape() {
+        let mut rng = rand::thread_rng();
+        let bssid = Bssid((0..6).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>().try_into().unwrap());
+        assert!(BSSID_REGEX.is_match(&bssid.0.to_mac_string()));
     }
 
     #[test]
