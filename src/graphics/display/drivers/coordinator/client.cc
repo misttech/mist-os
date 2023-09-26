@@ -86,6 +86,14 @@ void DisplayConfig::InitializeInspect(inspect::Node* parent) {
       node_.CreateBool("pending_apply_layer_change", pending_apply_layer_change_);
 }
 
+void DisplayConfig::DiscardNonLayerPendingConfig() {
+  pending_layer_change_ = false;
+  pending_layer_change_property_.Set(false);
+
+  pending_ = current_;
+  display_config_change_ = false;
+}
+
 void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::Sync& completer) {
   const ImageId image_id = ToImageId(request->image_id);
   if (image_id == kInvalidImageId) {
@@ -625,21 +633,7 @@ void Client::CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::S
   pending_config_valid_ = CheckConfig(&res, &ops);
 
   if (request->discard) {
-    // Go through layers and release any pending resources they claimed
-    for (auto& layer : layers_) {
-      layer.DiscardChanges();
-    }
-    // Reset pending layers lists of all displays to their current layers
-    // respectively.
-    SetAllConfigPendingLayersToCurrentLayers();
-    for (auto& config : configs_) {
-      config.pending_layer_change_ = false;
-      config.pending_layer_change_property_.Set(false);
-
-      config.pending_ = config.current_;
-      config.display_config_change_ = false;
-    }
-    pending_config_valid_ = true;
+    DiscardConfig();
   }
 
   completer.Reply(res, ::fidl::VectorView<fhd::wire::ClientCompositionOp>::FromExternal(ops));
@@ -1455,6 +1449,25 @@ void Client::SetAllConfigPendingLayersToCurrentLayers() {
       config.pending_layers_.push_back(&layer_node.layer->pending_node_);
     }
   }
+}
+
+void Client::DiscardConfig() {
+  // Go through layers and release any pending resources they claimed
+  for (Layer& layer : layers_) {
+    layer.DiscardChanges();
+  }
+
+  // Discard the changes to Display layers lists.
+  //
+  // Reset pending layers lists of all displays to their current layers
+  // respectively.
+  SetAllConfigPendingLayersToCurrentLayers();
+
+  // Discard the rest of the Display changes.
+  for (DisplayConfig& config : configs_) {
+    config.DiscardNonLayerPendingConfig();
+  }
+  pending_config_valid_ = true;
 }
 
 void Client::AcknowledgeVsync(AcknowledgeVsyncRequestView request,

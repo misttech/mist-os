@@ -74,6 +74,13 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, DisplayI
     return ret;
   }
 
+  // Discards all the pending config (except for pending layers lists)
+  // of a Display's `config`.
+  //
+  // The display pending layers' pending config must be discarded before
+  // `DiscardNonLayerPendingConfig()` is called.
+  void DiscardNonLayerPendingConfig();
+
   int current_layer_count() const { return static_cast<int>(current_.layer_count); }
   const display_config_t* current_config() const { return &current_; }
   const fbl::DoublyLinkedList<LayerNode*>& get_current_layers() const { return current_layers_; }
@@ -298,6 +305,9 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   // image used for capture.
   zx_status_t ImportImageForCapture(const fuchsia_hardware_display::wire::ImageConfig& image_config,
                                     BufferId buffer_id, ImageId image_id);
+
+  // Discards all the pending config on all Displays and Layers.
+  void DiscardConfig();
 
   Controller* const controller_;
   ClientProxy* const proxy_;
