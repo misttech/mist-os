@@ -689,6 +689,11 @@ config("Wno-address-of-packed-member") {
       [ "//src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/mlan:*" ]
 }
 
+config("Wno-undef") {
+  cflags = [ "-Wno-undef" ]
+  visibility = [ "//third_party/googletest:*" ]
+}
+
 # TODO(fxbug.dev/58162): clean up instances of this outside of third party code.
 #
 # NOTE: Do not add this to public_configs under any circumstances. Public

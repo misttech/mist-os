@@ -13,6 +13,10 @@ config("gtest_private_config") {
 
 config("gtest_config") {
   include_dirs = [ "src/googletest/include" ]
+
+  # Silence undefined macro warnings in gtest-port.h when -Wundef flag is used
+  # (e.g. in Pigweed libraries).
+  configs = [ "//build/config:Wno-undef" ]
 }
 
 static_library("gtest") {
@@ -260,7 +264,7 @@ static_library("gmock") {
   sources -= [ "src/googlemock/src/gmock-all.cc" ]
   public_configs = [ ":gmock_config" ]
   configs += [ ":gmock_private_config" ]
-  deps = [ ":gtest" ]
+  public_deps = [ ":gtest" ]
 }
 
 static_library("gmock_main") {
