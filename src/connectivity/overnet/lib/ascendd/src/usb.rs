@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Error};
-use bind_fuchsia_google_usb::{
+use bind_fuchsia_google_platform_usb::{
     BIND_USB_PROTOCOL_OVERNET, BIND_USB_SUBCLASS_OVERNET, BIND_USB_VID_GOOGLE,
 };
 use bind_fuchsia_usb::BIND_USB_CLASS_VENDOR_SPECIFIC;

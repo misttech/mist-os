@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 using fuchsia.usb;
-using fuchsia.google.usb;
+using fuchsia.google.platform.usb;
 
 fuchsia.BIND_USB_CLASS == fuchsia.usb.BIND_USB_CLASS.VENDOR_SPECIFIC;
 fuchsia.BIND_PROTOCOL == fuchsia.usb.BIND_PROTOCOL.INTERFACE;
-fuchsia.BIND_USB_VID == fuchsia.google.usb.BIND_USB_VID.GOOGLE;
-fuchsia.BIND_USB_PID == fuchsia.google.usb.BIND_USB_PID.FUNCTION_TEST;
-fuchsia.BIND_USB_PROTOCOL == fuchsia.google.usb.BIND_USB_PROTOCOL.XHCI_COMPLIANCE_TESTER;
+fuchsia.BIND_USB_VID == fuchsia.google.platform.usb.BIND_USB_VID.GOOGLE;
+fuchsia.BIND_USB_PID == fuchsia.google.platform.usb.BIND_USB_PID.FUNCTION_TEST;
+fuchsia.BIND_USB_PROTOCOL == fuchsia.google.platform.usb.BIND_USB_PROTOCOL.XHCI_COMPLIANCE_TESTER;

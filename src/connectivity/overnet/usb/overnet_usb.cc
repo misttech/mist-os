@@ -18,7 +18,7 @@
 #include <optional>
 #include <variant>
 
-#include <bind/fuchsia/google/usb/cpp/bind.h>
+#include <bind/fuchsia/google/platform/usb/cpp/bind.h>
 #include <fbl/auto_lock.h>
 #include <usb/request-cpp.h>
 
@@ -510,8 +510,8 @@ zx_status_t OvernetUsb::Bind() {
       .b_alternate_setting = 0,
       .b_num_endpoints = 2,
       .b_interface_class = USB_CLASS_VENDOR,
-      .b_interface_sub_class = bind_fuchsia_google_usb::BIND_USB_SUBCLASS_OVERNET,
-      .b_interface_protocol = bind_fuchsia_google_usb::BIND_USB_PROTOCOL_OVERNET,
+      .b_interface_sub_class = bind_fuchsia_google_platform_usb::BIND_USB_SUBCLASS_OVERNET,
+      .b_interface_protocol = bind_fuchsia_google_platform_usb::BIND_USB_PROTOCOL_OVERNET,
       .i_interface = 0,
   };
   descriptors_.in_ep = usb_endpoint_descriptor_t{

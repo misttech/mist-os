@@ -5,9 +5,9 @@
 // For more info see: https://fuchsia.dev/fuchsia-src/concepts/drivers/driver-binding
 using fuchsia.usb;
 using fuchsia.usb.comm;
-using fuchsia.google.usb;
+using fuchsia.google.platform.usb;
 
 fuchsia.BIND_PROTOCOL == fuchsia.usb.BIND_PROTOCOL.FUNCTION;
 fuchsia.BIND_USB_CLASS == fuchsia.usb.BIND_USB_CLASS.VENDOR_SPECIFIC;
-fuchsia.BIND_USB_SUBCLASS == fuchsia.google.usb.BIND_USB_SUBCLASS.FASTBOOT;
-fuchsia.BIND_USB_PROTOCOL == fuchsia.google.usb.BIND_USB_PROTOCOL.FASTBOOT;
+fuchsia.BIND_USB_SUBCLASS == fuchsia.google.platform.usb.BIND_USB_SUBCLASS.FASTBOOT;
+fuchsia.BIND_USB_PROTOCOL == fuchsia.google.platform.usb.BIND_USB_PROTOCOL.FASTBOOT;

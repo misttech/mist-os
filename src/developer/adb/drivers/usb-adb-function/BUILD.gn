@@ -12,7 +12,7 @@ driver_bind_rules("usb_adb_bind") {
   bind_output = "usb-adb-function.bindbc"
   tests = "bind-tests.json"
   deps = [
-    "//src/devices/bind/fuchsia.google.usb",
+    "//src/devices/bind/fuchsia.google.platform.usb",
     "//src/devices/bind/fuchsia.usb",
     "//src/devices/bind/fuchsia.usb.comm",
   ]

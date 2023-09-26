@@ -24,7 +24,7 @@ driver_bind_rules("bind") {
   rules = "usb_fastboot_function.bind"
   bind_output = "usb_fastboot_function.bindbc"
   deps = [
-    "//src/devices/bind/fuchsia.google.usb",
+    "//src/devices/bind/fuchsia.google.platform.usb",
     "//src/devices/bind/fuchsia.usb",
     "//src/devices/bind/fuchsia.usb.comm",
   ]
