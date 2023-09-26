@@ -17,6 +17,7 @@ source_set("pager") {
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
+    "//zircon/system/utest/core/vmo:helpers",
   ]
 }
 

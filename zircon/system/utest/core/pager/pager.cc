@@ -1756,16 +1756,11 @@ TEST(Pager, InvalidPagerSupplyPages) {
 
   zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
   if (root_resource->is_valid()) {
-    // unsupported aux vmo type
-    zx::vmo physical_vmo;
-    // We're not actually going to do anything with this vmo, and since the
-    // kernel doesn't do any checks with the address if you're using the
-    // root resource, just use addr 0.
-    ASSERT_EQ(zx_vmo_create_physical(root_resource->get(), 0, zx_system_get_page_size(),
-                                     physical_vmo.reset_and_get_address()),
-              ZX_OK);
+    zx::result<vmo_test::PhysVmo> result = vmo_test::GetTestPhysVmo(zx_system_get_page_size());
+    ASSERT_TRUE(result.is_ok());
+    zx_handle_t physical_vmo_handle = result.value().vmo.get();
     ASSERT_EQ(zx_pager_supply_pages(pager.get(), vmo.get(), 0, zx_system_get_page_size(),
-                                    physical_vmo.get(), 0),
+                                    physical_vmo_handle, 0),
               ZX_ERR_NOT_SUPPORTED);
   }
 

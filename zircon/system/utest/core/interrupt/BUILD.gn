@@ -12,5 +12,6 @@ source_set("interrupt") {
     "//src/zircon/testing/standalone-test",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
+    "//zircon/system/utest/core/vmo:helpers",
   ]
 }

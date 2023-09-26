@@ -2,10 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/cpp/library_headers.gni")
+
 source_set("vmo") {
   testonly = true
   sources = [
-    "helpers.cc",
     "vmo-clone.cc",
 
     # TODO(stevensd): Rename once the clone flag names are cleaned up
@@ -17,12 +18,30 @@ source_set("vmo") {
     "vmo.cc",
   ]
   deps = [
+    ":helpers",
     "//sdk/lib/fit",
     "//src/zircon/testing/maybe-standalone-test",
-    "//zircon/kernel/lib/boot-options",
     "//zircon/system/ulib/explicit-memory",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
+    "//zircon/system/ulib/zx",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+library_headers("helpers_headers") {
+  include_dir = "."
+  headers = [ "helpers.h" ]
+}
+
+source_set("helpers") {
+  testonly = true
+  sources = [ "helpers.cc" ]
+  public_deps = [ ":helpers_headers" ]
+  deps = [
+    "//sdk/lib/fit",
+    "//src/zircon/testing/maybe-standalone-test",
+    "//zircon/kernel/lib/boot-options",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]

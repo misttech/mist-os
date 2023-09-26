@@ -12,5 +12,6 @@ source_set("pager-writeback") {
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
     "//zircon/system/utest/core/pager:userpager",
+    "//zircon/system/utest/core/vmo:helpers",
   ]
 }
