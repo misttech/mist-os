@@ -142,12 +142,15 @@ mod test {
                 generate_random_scanned_candidate,
             },
         },
-        diagnostics_assertions::{assert_data_tree, AnyProperty},
+        diagnostics_assertions::{
+            assert_data_tree, AnyBoolProperty, AnyNumericProperty, AnyProperty, AnyStringProperty,
+        },
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
         fuchsia_async as fasync, fuchsia_inspect as inspect,
         futures::channel::mpsc,
+        ieee80211_testutils::{BSSID_HASH_REGEX, BSSID_REGEX, SSID_HASH_REGEX, SSID_REGEX},
         rand::Rng,
-        wlan_common::{assert_variant, channel, random_fidl_bss_description},
+        wlan_common::{assert_variant, channel, format::MacFmt, random_fidl_bss_description},
     };
 
     struct TestValues {
@@ -393,10 +396,25 @@ mod test {
         assert_data_tree!(test_values.inspector, root: {
             bss_select_test: {
                 "0": {
-                    "@time": AnyProperty,
+                    "@time": AnyNumericProperty,
                     "candidates": {
                         "0": contains {
-                            score: AnyProperty,
+                            score: AnyNumericProperty,
+                            bssid: &*BSSID_REGEX,
+                            bssid_hash: &*BSSID_HASH_REGEX,
+                            ssid: &*SSID_REGEX,
+                            ssid_hash: &*SSID_HASH_REGEX,
+                            rssi: AnyNumericProperty,
+                            security_type_saved: AnyStringProperty,
+                            security_type_scanned: AnyStringProperty,
+                            channel: {
+                                cbw: AnyProperty,
+                                primary: AnyNumericProperty,
+                                secondary80: AnyNumericProperty,
+                            },
+                            compatible: AnyBoolProperty,
+                            recent_failure_count: AnyNumericProperty,
+                            saved_network_has_ever_connected: AnyBoolProperty,
                         },
                         "1": contains {
                             score: AnyProperty,
@@ -406,7 +424,9 @@ mod test {
                         },
                     },
                     "selected": {
+                        ssid: candidates[2].network.ssid.to_string(),
                         ssid_hash: candidates[2].hasher.hash_ssid(&candidates[2].network.ssid),
+                        bssid: candidates[2].bss.bssid.0.to_mac_string(),
                         bssid_hash: candidates[2].hasher.hash_mac_addr(&candidates[2].bss.bssid.0),
                         rssi: i64::from(candidates[2].bss.rssi),
                         score: i64::from(scoring_functions::score_bss_scanned_candidate(candidates[2].clone())),

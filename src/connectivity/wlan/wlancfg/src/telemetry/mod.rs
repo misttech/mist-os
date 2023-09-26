@@ -3481,12 +3481,16 @@ mod tests {
             create_inspect_persistence_channel, create_wlan_hasher, generate_random_bss,
             generate_random_channel, generate_random_scanned_candidate,
         },
-        diagnostics_assertions::NonZeroUintProperty,
+        diagnostics_assertions::{
+            AnyBoolProperty, AnyNumericProperty, AnyStringProperty, NonZeroUintProperty,
+        },
         fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_metrics::{MetricEvent, MetricEventLoggerRequest, MetricEventPayload},
         fidl_fuchsia_wlan_stats,
         fuchsia_inspect::Inspector,
         futures::{pin_mut, task::Poll, TryStreamExt},
+        ieee80211_testutils::{BSSID_HASH_REGEX, BSSID_REGEX, SSID_HASH_REGEX, SSID_REGEX},
+        regex::Regex,
         std::{cmp::min, collections::VecDeque, pin::Pin},
         test_case::test_case,
         wlan_common::{
@@ -3610,6 +3614,118 @@ mod tests {
             logged_metrics[19].payload,
             fidl_fuchsia_metrics::MetricEventPayload::IntegerValue(20)
         );
+    }
+
+    #[fuchsia::test]
+    fn test_log_connect_event_correct_shape() {
+        let (mut test_helper, mut test_fut) = setup_test();
+        test_helper.send_connected_event(random_bss_description!(Wpa2));
+
+        assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+
+        assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
+            stats: contains {
+                connect_events: {
+                    "0": {
+                        "@time": AnyNumericProperty,
+                        multiple_bss_candidates: AnyBoolProperty,
+                        network: {
+                            bssid: &*BSSID_REGEX,
+                            bssid_hash: &*BSSID_HASH_REGEX,
+                            ssid: &*SSID_REGEX,
+                            ssid_hash: &*SSID_HASH_REGEX,
+                            rssi_dbm: AnyNumericProperty,
+                            snr_db: AnyNumericProperty,
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    #[fuchsia::test]
+    fn test_log_connection_status_correct_shape() {
+        let (mut test_helper, mut test_fut) = setup_test();
+        test_helper.send_connected_event(random_bss_description!(Wpa2));
+
+        assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+
+        assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
+            stats: contains {
+                connection_status: contains {
+                    status_string: AnyStringProperty,
+                    connected_network: contains {
+                        rssi_dbm: AnyNumericProperty,
+                        snr_db: AnyNumericProperty,
+                        bssid: &*BSSID_REGEX,
+                        bssid_hash: &*BSSID_HASH_REGEX,
+                        ssid: &*SSID_REGEX,
+                        ssid_hash: &*SSID_HASH_REGEX,
+                        protection: AnyStringProperty,
+                        channel: {
+                            primary: AnyNumericProperty,
+                            cbw: AnyStringProperty,
+                            secondary80: AnyNumericProperty,
+                        },
+                        is_wmm_assoc: AnyBoolProperty,
+                    }
+                }
+            }
+        });
+    }
+
+    #[fuchsia::test]
+    fn test_log_disconnect_event_correct_shape() {
+        let (mut test_helper, mut test_fut) = setup_test();
+
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: false,
+            info: fake_disconnect_info(),
+        });
+        assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+
+        assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
+            external: contains {
+                stats: contains {
+                    disconnect_events: {
+                        "0": {
+                            "@time": AnyNumericProperty,
+                            flattened_reason_code: AnyNumericProperty,
+                            locally_initiated: AnyBoolProperty,
+                            network: {
+                                channel: {
+                                    primary: AnyNumericProperty,
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            stats: contains {
+                disconnect_events: {
+                    "0": {
+                        "@time": AnyNumericProperty,
+                        connected_duration: AnyNumericProperty,
+                        disconnect_source: Regex::new("^source: [^,]+, reason: [^,]+(?:, mlme_event_name: [^,]+)?$").unwrap(),
+                        network: contains {
+                            rssi_dbm: AnyNumericProperty,
+                            snr_db: AnyNumericProperty,
+                            bssid: &*BSSID_REGEX,
+                            bssid_hash: &*BSSID_HASH_REGEX,
+                            ssid: &*SSID_REGEX,
+                            ssid_hash: &*SSID_HASH_REGEX,
+                            protection: AnyStringProperty,
+                            channel: {
+                                primary: AnyNumericProperty,
+                                cbw: AnyStringProperty,
+                                secondary80: AnyNumericProperty,
+                            },
+                            is_wmm_assoc: AnyBoolProperty,
+                        }
+                    }
+                }
+            }
+        });
     }
 
     #[fuchsia::test]

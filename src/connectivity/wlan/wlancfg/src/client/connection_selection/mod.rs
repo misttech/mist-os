@@ -29,7 +29,8 @@ use {
     std::{collections::HashSet, sync::Arc},
     tracing::{debug, error, info, warn},
     wlan_common::{
-        self, hasher::WlanHasher, security::SecurityAuthenticator, sequestered::Sequestered,
+        self, format::MacFmt, hasher::WlanHasher, security::SecurityAuthenticator,
+        sequestered::Sequestered,
     },
     wlan_inspect::wrappers::InspectWlanChan,
     wlan_metrics_registry::{
@@ -415,7 +416,9 @@ impl types::ScannedCandidate {
 impl WriteInspect for types::ScannedCandidate {
     fn write_inspect(&self, writer: &InspectNode, key: impl Into<StringReference>) {
         inspect_insert!(writer, var key: {
+            ssid: self.network.ssid.to_string(),
             ssid_hash: self.hasher.hash_ssid(&self.network.ssid),
+            bssid: self.bss.bssid.0.to_mac_string(),
             bssid_hash: self.hasher.hash_mac_addr(&self.bss.bssid.0),
             rssi: self.bss.rssi,
             score: scoring_functions::score_bss_scanned_candidate(self.clone()),
@@ -595,10 +598,11 @@ mod tests {
                 generate_random_scan_result, generate_random_scanned_candidate,
             },
         },
-        diagnostics_assertions::{assert_data_tree, AnyProperty},
+        diagnostics_assertions::{assert_data_tree, AnyNumericProperty},
         fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
         fuchsia_async as fasync, fuchsia_inspect as inspect,
         futures::{channel::mpsc, task::Poll},
+        ieee80211_testutils::{BSSID_HASH_REGEX, BSSID_REGEX},
         lazy_static::lazy_static,
         pin_utils::pin_mut,
         rand::Rng,
@@ -1209,7 +1213,7 @@ mod tests {
             connection_selection_test: {
                 connection_selection: {
                     "0": {
-                        "@time": AnyProperty,
+                        "@time": AnyNumericProperty,
                         "candidates": {},
                     },
                 }
@@ -1386,20 +1390,23 @@ mod tests {
             connection_selection_test: {
                 connection_selection: {
                     "0": {
-                        "@time": AnyProperty,
+                        "@time": AnyNumericProperty,
                         "candidates": {
                             "0": contains {
-                                bssid_hash: AnyProperty,
-                                score: AnyProperty,
+                                bssid: &*BSSID_REGEX,
+                                bssid_hash: &*BSSID_HASH_REGEX,
+                                score: AnyNumericProperty,
                             },
                             "1": contains {
-                                bssid_hash: AnyProperty,
-                                score: AnyProperty,
+                                bssid: &*BSSID_REGEX,
+                                bssid_hash: &*BSSID_HASH_REGEX,
+                                score: AnyNumericProperty,
                             },
                         },
                         "selected": contains {
-                            bssid_hash: AnyProperty,
-                            score: AnyProperty,
+                            bssid: &*BSSID_REGEX,
+                            bssid_hash: &*BSSID_HASH_REGEX,
+                            score: AnyNumericProperty,
                         },
                     },
                 }
