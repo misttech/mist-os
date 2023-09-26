@@ -6,7 +6,6 @@
     program: {
         runner: "elf",
         binary: "bin/memfs-component-bin",
-        use_next_vdso: "true",
     },
     capabilities: [
         {

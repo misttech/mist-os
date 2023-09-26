@@ -121,14 +121,6 @@ uint64_t VnodeFile::GetContentSize() const {
   return content_size;
 }
 
-bool VnodeFile::SupportsClientSideStreams() {
-#if defined(MEMFS_ENABLE_CLIENT_SIDE_STREAMS)
-  return true;
-#else
-  return false;
-#endif
-}
-
 zx_status_t VnodeFile::CloseNode() {
   fs::SharedLock lock(mutex_);
   UpdateModifiedIfVmoChanged();
@@ -142,7 +134,6 @@ void VnodeFile::Sync(SyncCallback closure) {
 }
 
 void VnodeFile::UpdateModifiedIfVmoChanged() {
-#if defined(MEMFS_ENABLE_CLIENT_SIDE_STREAMS)
   if (!paged_vmo().is_valid()) {
     return;
   }
@@ -155,7 +146,6 @@ void VnodeFile::UpdateModifiedIfVmoChanged() {
   if (vmo_stats.modified == ZX_PAGER_VMO_STATS_MODIFIED) {
     UpdateModified();
   }
-#endif
 }
 
 }  // namespace memfs

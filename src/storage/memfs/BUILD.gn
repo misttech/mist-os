@@ -5,58 +5,40 @@
 import("//build/components/fuchsia_component.gni")
 import("//build/zircon/zx_library.gni")
 
-template("memfs_lib") {
-  static_library(target_name) {
-    public = [
-      "memfs.h",
-      "vnode.h",
-      "vnode_dir.h",
-      "vnode_file.h",
-      "vnode_vmo.h",
-    ]
-    sources = [
-      "dnode.cc",
-      "memfs.cc",
-      "vnode.cc",
-      "vnode_dir.cc",
-      "vnode_file.cc",
-      "vnode_vmo.cc",
-    ]
-
-    public_deps = [
-      # <memfs.h> has #include "src/storage/lib/vfs/*.h"
-      "//src/storage/lib/vfs/cpp",
-      "//zircon/system/ulib/async-loop:async-loop-cpp",
-    ]
-    deps = [
-      "//sdk/lib/syslog/cpp",
-      "//zircon/system/ulib/async",
-      "//zircon/system/ulib/async:async-cpp",
-      "//zircon/system/ulib/fbl",
-      "//zircon/system/ulib/sync",
-      "//zircon/third_party/ulib/safemath",
-    ]
-
-    forward_variables_from(invoker, [ "defines" ])
-  }
-}
-
 # The in-memory filesystem implementation.
-#
-# Most users will want to consume the shared library rather than statically linking this
-# implementation. To do that, either use the "memfs" target (C) or the "cpp" target (C++).
-memfs_lib("lib") {
+static_library("lib") {
+  public = [
+    "memfs.h",
+    "vnode.h",
+    "vnode_dir.h",
+    "vnode_file.h",
+    "vnode_vmo.h",
+  ]
+  sources = [
+    "dnode.cc",
+    "memfs.cc",
+    "vnode.cc",
+    "vnode_dir.cc",
+    "vnode_file.cc",
+    "vnode_vmo.cc",
+  ]
+
+  public_deps = [
+    # <memfs.h> has #include "src/storage/lib/vfs/*.h"
+    "//src/storage/lib/vfs/cpp",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+  ]
+  deps = [
+    "//sdk/lib/syslog/cpp",
+    "//zircon/system/ulib/async",
+    "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/sync",
+    "//zircon/third_party/ulib/safemath",
+  ]
 }
 
-# A memfs implementation that supports client side streams. This implementation uses un-stabilized
-# syscalls. All components that include this library must enable "use_next_vdso".
-#
-# TODO(fxbug.dev/95299): Consolidate with ":lib" once zx_pager_query_vmo_stats stabilizes.
-memfs_lib("lib-with-client-side-streams") {
-  defines = [ "MEMFS_ENABLE_CLIENT_SIDE_STREAMS" ]
-}
-
-# A C++ wrapper around the C "memfs" shared library that handles setup and tear-down.
+# A C++ wrapper around ":lib" that handles setup and tear-down.
 source_set("cpp") {
   public = [ "mounted_memfs.h" ]
   sources = [ "mounted_memfs.cc" ]

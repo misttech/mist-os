@@ -30,7 +30,7 @@ class VnodeFile final : public Vnode {
   zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) final;
   zx_status_t CloseNode() final;
   void Sync(SyncCallback closure) final;
-  bool SupportsClientSideStreams() final;
+  bool SupportsClientSideStreams() final { return true; }
 
  private:
   zx_status_t CreateBackingStoreIfNeeded() __TA_REQUIRES(mutex_);

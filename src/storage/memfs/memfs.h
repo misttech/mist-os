@@ -45,11 +45,9 @@ class Memfs : public fs::PagedVfs {
   // fs::FuchsiaVfs override:
   zx::result<fs::FilesystemInfo> GetFilesystemInfo() override;
 
-#if defined(MEMFS_ENABLE_CLIENT_SIDE_STREAMS)
   const zx::pager& pager_for_next_vdso_syscalls() const {
     return PagedVfs::pager_for_next_vdso_syscalls();
   }
-#endif
 
  private:
   explicit Memfs(async_dispatcher_t* dispatcher);
