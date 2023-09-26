@@ -421,25 +421,30 @@ impl Finish for Transformer {
         let is_nonempty_ret_type = !matches!(ret_type, syn::ReturnType::Default);
 
         // Select executor
-        let (run_executor, modified_ret_type) = match (self.logging, is_nonempty_ret_type) {
-            (true, false) | (false, false) => (quote!(#tokenized_executor), quote!(#ret_type)),
-            (false, true) => (quote!(#tokenized_executor), quote!(#ret_type)),
-            _ => (
-                quote! {
-                    let result = #tokenized_executor;
-                    match result {
-                        std::result::Result::Ok(res) => {
-                            std::result::Result::Ok(res)
+        let (run_executor, modified_ret_type) =
+            match (self.executor.is_test(), self.logging, is_nonempty_ret_type) {
+                (_, true, false) | (_, false, false) => {
+                    (quote!(#tokenized_executor), quote!(#ret_type))
+                }
+                (_, false, true) => (quote!(#tokenized_executor), quote!(#ret_type)),
+                (true, _, _) => (quote!(#tokenized_executor), quote!(#ret_type)),
+                (false, _, _) => (
+                    quote! {
+                        let result = #tokenized_executor;
+                        match result {
+                            std::result::Result::Ok(val) => {
+                                use std::process::Termination;
+                                val.report()
+                            },
+                            std::result::Result::Err(err) => {
+                                ::fuchsia::error!("{err:?}");
+                                std::process::ExitCode::FAILURE
+                            }
                         }
-                        std::result::Result::Err(e) => {
-                            ::fuchsia::error!("{:?}", e);
-                            std::result::Result::Err(e)
-                        }
-                     }
-                },
-                quote!(#ret_type),
-            ),
-        };
+                    },
+                    quote!(-> std::process::ExitCode),
+                ),
+            };
 
         // Finally build output.
         let output = quote_spanned! {span =>

@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {anyhow::Context, std::ffi::OsString};
+use std::ffi::OsString;
 
-fn main() -> Result<(), anyhow::Error> {
+fn main() -> std::process::ExitCode {
     let program = find_program(std::env::args_os())
-        .context("unable to determine grand-swd-binary binary name")?;
-
+        .expect("unable to determine grand-swd-binary binary name");
     match program {
         Program::OmahaClient => omaha_client_service::main(),
         Program::PkgResolver => pkg_resolver::main(),

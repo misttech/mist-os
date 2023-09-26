@@ -16,7 +16,6 @@ rustc_binary("grand-swd-binary") {
     "//src/sys/pkg/bin/pkg-resolver:lib",
     "//src/sys/pkg/bin/system-update-committer:lib",
     "//src/sys/pkg/bin/system-update-configurator:lib",
-    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:thiserror",
   ]
 

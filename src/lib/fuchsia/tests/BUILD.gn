@@ -11,6 +11,7 @@ rustc_test("bin") {
   edition = "2021"
   testonly = true
   deps = [
+    "//src/lib/diagnostics/data/rust",
     "//src/lib/diagnostics/reader/rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",

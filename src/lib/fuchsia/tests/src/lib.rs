@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use diagnostics_reader::ArchiveReader;
-use diagnostics_reader::Logs;
+use diagnostics_data::Severity;
+use diagnostics_reader::{ArchiveReader, Logs};
 use fuchsia_async::Task;
 use futures_util::StreamExt;
 
@@ -19,6 +19,7 @@ async fn main() {
     while let Some(log_entry) = logs.next().await {
         if log_entry.msg().unwrap().contains("This is a test error")
             && log_entry.tags().unwrap().contains(&"structured_log".to_string())
+            && log_entry.severity() == Severity::Error
         {
             break;
         }
