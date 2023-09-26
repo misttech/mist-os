@@ -436,6 +436,12 @@ config("vdso_config") {
     "-nostdlib",
   ]
 
+  # Force LTO so that functions are inlined when appropriate even across
+  # different compilation units.
+  if (!is_debug) {
+    configs = [ "//build/config/lto:thinlto" ]
+  }
+
   # Use a custom linker script to ensure only one PT_LOAD header.
   vdso_linker_script = "vdso/vdso.ld"
   vdso_version_script = "vdso/vdso-${current_cpu}.map"
