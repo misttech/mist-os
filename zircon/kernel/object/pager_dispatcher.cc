@@ -151,10 +151,9 @@ zx_status_t PagerDispatcher::RangeOp(uint32_t op, fbl::RefPtr<VmObject> vmo, uin
   }
 }
 
-zx_status_t PagerDispatcher::QueryDirtyRanges(VmAspace* current_aspace, fbl::RefPtr<VmObject> vmo,
-                                              uint64_t offset, uint64_t length,
-                                              user_out_ptr<void> buffer, size_t buffer_size,
-                                              user_out_ptr<size_t> actual,
+zx_status_t PagerDispatcher::QueryDirtyRanges(fbl::RefPtr<VmObject> vmo, uint64_t offset,
+                                              uint64_t length, user_out_ptr<void> buffer,
+                                              size_t buffer_size, user_out_ptr<size_t> actual,
                                               user_out_ptr<size_t> avail) {
   // State captured by |copy_to_buffer| below.
   struct CopyToBufferInfo {
@@ -234,6 +233,8 @@ zx_status_t PagerDispatcher::QueryDirtyRanges(VmAspace* current_aspace, fbl::Ref
         return ZX_ERR_NEXT;
       };
 
+  VmAspace* current_aspace = Thread::Current::Get()->aspace();
+
   // Enumerate dirty ranges with |copy_to_buffer|. If page faults are captured, resolve them and
   // retry enumeration.
   zx_status_t status = ZX_OK;
@@ -273,9 +274,8 @@ zx_status_t PagerDispatcher::QueryDirtyRanges(VmAspace* current_aspace, fbl::Ref
   return status;
 }
 
-zx_status_t PagerDispatcher::QueryPagerVmoStats(VmAspace* current_aspace, fbl::RefPtr<VmObject> vmo,
-                                                uint32_t options, user_out_ptr<void> buffer,
-                                                size_t buffer_size) {
+zx_status_t PagerDispatcher::QueryPagerVmoStats(fbl::RefPtr<VmObject> vmo, uint32_t options,
+                                                user_out_ptr<void> buffer, size_t buffer_size) {
   if (buffer_size < sizeof(zx_pager_vmo_stats_t)) {
     return ZX_ERR_BUFFER_TOO_SMALL;
   }
@@ -291,6 +291,8 @@ zx_status_t PagerDispatcher::QueryPagerVmoStats(VmAspace* current_aspace, fbl::R
   if (status != ZX_OK) {
     return status;
   }
+
+  VmAspace* current_aspace = Thread::Current::Get()->aspace();
 
   do {
     UserCopyCaptureFaultsResult copy_result =

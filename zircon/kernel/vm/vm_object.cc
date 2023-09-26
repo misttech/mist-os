@@ -156,8 +156,8 @@ uint32_t VmObject::share_count() const {
   return num_aspaces;
 }
 
-zx_status_t VmObject::ReadUserVector(VmAspace* current_aspace, user_out_iovec_t vec,
-                                     uint64_t offset, size_t len, size_t* out_actual) {
+zx_status_t VmObject::ReadUserVector(user_out_iovec_t vec, uint64_t offset, size_t len,
+                                     size_t* out_actual) {
   if (len == 0u) {
     return ZX_OK;
   }
@@ -171,8 +171,8 @@ zx_status_t VmObject::ReadUserVector(VmAspace* current_aspace, user_out_iovec_t 
     }
 
     size_t chunk_actual = 0;
-    zx_status_t status = ReadUser(current_aspace, ptr, offset, capacity,
-                                  VmObjectReadWriteOptions::None, &chunk_actual);
+    zx_status_t status =
+        ReadUser(ptr, offset, capacity, VmObjectReadWriteOptions::None, &chunk_actual);
 
     // Always add |chunk_actual| since some bytes may have been transferred, even on error
     if (out_actual != nullptr) {
@@ -193,8 +193,8 @@ zx_status_t VmObject::ReadUserVector(VmAspace* current_aspace, user_out_iovec_t 
   return (status == ZX_OK && len > 0) ? ZX_ERR_BUFFER_TOO_SMALL : status;
 }
 
-zx_status_t VmObject::WriteUserVector(VmAspace* current_aspace, user_in_iovec_t vec,
-                                      uint64_t offset, size_t len, size_t* out_actual,
+zx_status_t VmObject::WriteUserVector(user_in_iovec_t vec, uint64_t offset, size_t len,
+                                      size_t* out_actual,
                                       const OnWriteBytesTransferredCallback& on_bytes_transferred) {
   if (len == 0u) {
     return ZX_OK;
@@ -209,9 +209,8 @@ zx_status_t VmObject::WriteUserVector(VmAspace* current_aspace, user_in_iovec_t 
     }
 
     size_t chunk_actual = 0;
-    zx_status_t status =
-        WriteUser(current_aspace, ptr, offset, capacity, VmObjectReadWriteOptions::None,
-                  &chunk_actual, on_bytes_transferred);
+    zx_status_t status = WriteUser(ptr, offset, capacity, VmObjectReadWriteOptions::None,
+                                   &chunk_actual, on_bytes_transferred);
 
     // Always add |chunk_actual| since some bytes may have been transferred, even on error
     if (out_actual != nullptr) {

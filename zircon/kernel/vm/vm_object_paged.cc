@@ -1626,9 +1626,8 @@ zx_status_t VmObjectPaged::LookupContiguous(uint64_t offset, uint64_t len, paddr
   return ZX_OK;
 }
 
-zx_status_t VmObjectPaged::ReadUser(VmAspace* current_aspace, user_out_ptr<char> ptr,
-                                    uint64_t offset, size_t len, VmObjectReadWriteOptions options,
-                                    size_t* out_actual) {
+zx_status_t VmObjectPaged::ReadUser(user_out_ptr<char> ptr, uint64_t offset, size_t len,
+                                    VmObjectReadWriteOptions options, size_t* out_actual) {
   canary_.Assert();
 
   if (out_actual != nullptr) {
@@ -1636,9 +1635,8 @@ zx_status_t VmObjectPaged::ReadUser(VmAspace* current_aspace, user_out_ptr<char>
   }
 
   // read routine that uses copy_to_user
-  auto read_routine = [ptr, current_aspace, out_actual](
-                          const char* src, size_t offset, size_t len,
-                          Guard<CriticalMutex>* guard) -> zx_status_t {
+  auto read_routine = [ptr, out_actual](const char* src, size_t offset, size_t len,
+                                        Guard<CriticalMutex>* guard) -> zx_status_t {
     __UNINITIALIZED auto copy_result =
         ptr.byte_offset(offset).copy_array_to_user_capture_faults(src, len);
 
@@ -1646,7 +1644,8 @@ zx_status_t VmObjectPaged::ReadUser(VmAspace* current_aspace, user_out_ptr<char>
     // handle the fault.
     if (copy_result.fault_info.has_value()) {
       zx_status_t result;
-      guard->CallUnlocked([&info = *copy_result.fault_info, &result, current_aspace] {
+      guard->CallUnlocked([&info = *copy_result.fault_info, &result] {
+        VmAspace* current_aspace = Thread::Current::Get()->aspace();
         result = current_aspace->SoftFault(info.pf_va, info.pf_flags);
       });
       // If we handled the fault, tell the upper level to try again.
@@ -1676,9 +1675,8 @@ zx_status_t VmObjectPaged::ReadUser(VmAspace* current_aspace, user_out_ptr<char>
   return ReadWriteInternalLocked(offset, len, false, options, read_routine, &guard);
 }
 
-zx_status_t VmObjectPaged::WriteUser(VmAspace* current_aspace, user_in_ptr<const char> ptr,
-                                     uint64_t offset, size_t len, VmObjectReadWriteOptions options,
-                                     size_t* out_actual,
+zx_status_t VmObjectPaged::WriteUser(user_in_ptr<const char> ptr, uint64_t offset, size_t len,
+                                     VmObjectReadWriteOptions options, size_t* out_actual,
                                      const OnWriteBytesTransferredCallback& on_bytes_transferred) {
   canary_.Assert();
 
@@ -1687,9 +1685,9 @@ zx_status_t VmObjectPaged::WriteUser(VmAspace* current_aspace, user_in_ptr<const
   }
 
   // write routine that uses copy_from_user
-  auto write_routine = [ptr, current_aspace, base_vmo_offset = offset, out_actual,
-                        &on_bytes_transferred](char* dst, size_t offset, size_t len,
-                                               Guard<CriticalMutex>* guard) -> zx_status_t {
+  auto write_routine = [ptr, base_vmo_offset = offset, out_actual, &on_bytes_transferred](
+                           char* dst, size_t offset, size_t len,
+                           Guard<CriticalMutex>* guard) -> zx_status_t {
     __UNINITIALIZED auto copy_result =
         ptr.byte_offset(offset).copy_array_from_user_capture_faults(dst, len);
 
@@ -1697,7 +1695,8 @@ zx_status_t VmObjectPaged::WriteUser(VmAspace* current_aspace, user_in_ptr<const
     // handle the fault.
     if (copy_result.fault_info.has_value()) {
       zx_status_t result;
-      guard->CallUnlocked([&info = *copy_result.fault_info, &result, current_aspace] {
+      guard->CallUnlocked([&info = *copy_result.fault_info, &result] {
+        VmAspace* current_aspace = Thread::Current::Get()->aspace();
         result = current_aspace->SoftFault(info.pf_va, info.pf_flags);
       });
       // If we handled the fault, tell the upper level to try again.

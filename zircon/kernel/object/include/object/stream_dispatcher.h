@@ -33,13 +33,11 @@ class StreamDispatcher final : public SoloDispatcher<StreamDispatcher, ZX_DEFAUL
 
   zx_obj_type_t get_type() const { return ZX_OBJ_TYPE_STREAM; }
 
-  zx_status_t ReadVector(VmAspace* current_aspace, user_out_iovec_t user_data, size_t* out_actual);
-  zx_status_t ReadVectorAt(VmAspace* current_aspace, user_out_iovec_t user_data, zx_off_t offset,
-                           size_t* out_actual);
-  zx_status_t WriteVector(VmAspace* current_aspace, user_in_iovec_t user_data, size_t* out_actual);
-  zx_status_t WriteVectorAt(VmAspace* current_aspace, user_in_iovec_t user_data, zx_off_t offset,
-                            size_t* out_actual);
-  zx_status_t AppendVector(VmAspace* current_aspace, user_in_iovec_t user_data, size_t* out_actual);
+  zx_status_t ReadVector(user_out_iovec_t user_data, size_t* out_actual);
+  zx_status_t ReadVectorAt(user_out_iovec_t user_data, zx_off_t offset, size_t* out_actual);
+  zx_status_t WriteVector(user_in_iovec_t user_data, size_t* out_actual);
+  zx_status_t WriteVectorAt(user_in_iovec_t user_data, zx_off_t offset, size_t* out_actual);
+  zx_status_t AppendVector(user_in_iovec_t user_data, size_t* out_actual);
   zx_status_t Seek(zx_stream_seek_origin_t whence, int64_t offset, zx_off_t* out_seek);
   zx_status_t SetAppendMode(bool value);
   bool IsInAppendMode() const;

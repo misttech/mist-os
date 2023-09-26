@@ -83,8 +83,7 @@ StreamDispatcher::StreamDispatcher(uint32_t options, fbl::RefPtr<VmObjectDispatc
 
 StreamDispatcher::~StreamDispatcher() { kcounter_add(dispatcher_stream_destroy_count, 1); }
 
-zx_status_t StreamDispatcher::ReadVector(VmAspace* current_aspace, user_out_iovec_t user_data,
-                                         size_t* out_actual) {
+zx_status_t StreamDispatcher::ReadVector(user_out_iovec_t user_data, size_t* out_actual) {
   canary_.Assert();
   DEBUG_ASSERT(out_actual);
   DEBUG_ASSERT(*out_actual == 0);
@@ -119,7 +118,7 @@ zx_status_t StreamDispatcher::ReadVector(VmAspace* current_aspace, user_out_iove
     length = size_limit - offset;
   }
 
-  status = vmo_->ReadVector(current_aspace, user_data, length, offset, out_actual);
+  status = vmo_->ReadVector(user_data, length, offset, out_actual);
   seek_ += *out_actual;
 
   // Reacquire the lock to commit the operation.
@@ -129,8 +128,8 @@ zx_status_t StreamDispatcher::ReadVector(VmAspace* current_aspace, user_out_iove
   return *out_actual > 0 ? ZX_OK : status;
 }
 
-zx_status_t StreamDispatcher::ReadVectorAt(VmAspace* current_aspace, user_out_iovec_t user_data,
-                                           zx_off_t offset, size_t* out_actual) {
+zx_status_t StreamDispatcher::ReadVectorAt(user_out_iovec_t user_data, zx_off_t offset,
+                                           size_t* out_actual) {
   canary_.Assert();
   DEBUG_ASSERT(out_actual);
   DEBUG_ASSERT(*out_actual == 0);
@@ -162,7 +161,7 @@ zx_status_t StreamDispatcher::ReadVectorAt(VmAspace* current_aspace, user_out_io
     length = size_limit - offset;
   }
 
-  status = vmo_->ReadVector(current_aspace, user_data, length, offset, out_actual);
+  status = vmo_->ReadVector(user_data, length, offset, out_actual);
 
   // Reacquire the lock to commit the operation.
   Guard<Mutex> content_size_guard{op.parent()->lock()};
@@ -171,14 +170,13 @@ zx_status_t StreamDispatcher::ReadVectorAt(VmAspace* current_aspace, user_out_io
   return *out_actual > 0 ? ZX_OK : status;
 }
 
-zx_status_t StreamDispatcher::WriteVector(VmAspace* current_aspace, user_in_iovec_t user_data,
-                                          size_t* out_actual) {
+zx_status_t StreamDispatcher::WriteVector(user_in_iovec_t user_data, size_t* out_actual) {
   canary_.Assert();
   DEBUG_ASSERT(out_actual);
   DEBUG_ASSERT(*out_actual == 0);
 
   if (IsInAppendMode()) {
-    return AppendVector(current_aspace, user_data, out_actual);
+    return AppendVector(user_data, out_actual);
   }
 
   size_t total_capacity;
@@ -205,14 +203,14 @@ zx_status_t StreamDispatcher::WriteVector(VmAspace* current_aspace, user_in_iove
 
   if (prev_content_size) {
     status =
-        vmo_->WriteVector(current_aspace, user_data, length, seek_, out_actual,
+        vmo_->WriteVector(user_data, length, seek_, out_actual,
                           [&prev_content_size, &op](const uint64_t write_offset, const size_t len) {
                             if (write_offset + len > *prev_content_size) {
                               op.UpdateContentSizeFromProgress(write_offset + len);
                             }
                           });
   } else {
-    status = vmo_->WriteVector(current_aspace, user_data, length, seek_, out_actual);
+    status = vmo_->WriteVector(user_data, length, seek_, out_actual);
   }
 
   // Reacquire the lock to potentially shrink and commit the operation.
@@ -237,8 +235,8 @@ zx_status_t StreamDispatcher::WriteVector(VmAspace* current_aspace, user_in_iove
   return *out_actual > 0 ? ZX_OK : status;
 }
 
-zx_status_t StreamDispatcher::WriteVectorAt(VmAspace* current_aspace, user_in_iovec_t user_data,
-                                            zx_off_t offset, size_t* out_actual) {
+zx_status_t StreamDispatcher::WriteVectorAt(user_in_iovec_t user_data, zx_off_t offset,
+                                            size_t* out_actual) {
   canary_.Assert();
   DEBUG_ASSERT(out_actual);
   DEBUG_ASSERT(*out_actual == 0);
@@ -265,14 +263,14 @@ zx_status_t StreamDispatcher::WriteVectorAt(VmAspace* current_aspace, user_in_io
 
   if (prev_content_size) {
     status =
-        vmo_->WriteVector(current_aspace, user_data, length, offset, out_actual,
+        vmo_->WriteVector(user_data, length, offset, out_actual,
                           [&prev_content_size, &op](const uint64_t write_offset, const size_t len) {
                             if (write_offset + len > *prev_content_size) {
                               op.UpdateContentSizeFromProgress(write_offset + len);
                             }
                           });
   } else {
-    status = vmo_->WriteVector(current_aspace, user_data, length, offset, out_actual);
+    status = vmo_->WriteVector(user_data, length, offset, out_actual);
   }
 
   // Reacquire the lock to potentially shrink and commit the operation.
@@ -295,8 +293,7 @@ zx_status_t StreamDispatcher::WriteVectorAt(VmAspace* current_aspace, user_in_io
   return *out_actual > 0 ? ZX_OK : status;
 }
 
-zx_status_t StreamDispatcher::AppendVector(VmAspace* current_aspace, user_in_iovec_t user_data,
-                                           size_t* out_actual) {
+zx_status_t StreamDispatcher::AppendVector(user_in_iovec_t user_data, size_t* out_actual) {
   canary_.Assert();
   DEBUG_ASSERT(out_actual);
   DEBUG_ASSERT(*out_actual == 0);
@@ -357,7 +354,7 @@ zx_status_t StreamDispatcher::AppendVector(VmAspace* current_aspace, user_in_iov
     length = ktl::min(vmo_size, new_content_size) - offset;
   }
 
-  status = vmo_->WriteVector(current_aspace, user_data, length, offset, out_actual,
+  status = vmo_->WriteVector(user_data, length, offset, out_actual,
                              [&op](const uint64_t write_offset, const size_t len) {
                                op.UpdateContentSizeFromProgress(write_offset + len);
                              });

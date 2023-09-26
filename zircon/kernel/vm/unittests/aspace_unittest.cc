@@ -337,8 +337,8 @@ static bool vmaspace_usercopy_accessed_fault_test() {
 
   // Read from the VMO into the mapping that has been harvested.
   size_t read_actual = 0;
-  status = vmo->ReadUser(Thread::Current::Get()->aspace(), mem->user_out<char>(), 0, sizeof(char),
-                         VmObjectReadWriteOptions::None, &read_actual);
+  status = vmo->ReadUser(mem->user_out<char>(), 0, sizeof(char), VmObjectReadWriteOptions::None,
+                         &read_actual);
   ASSERT_EQ(status, ZX_OK);
   ASSERT_EQ(read_actual, sizeof(char));
 

@@ -242,8 +242,7 @@ zx_status_t sys_pager_query_dirty_ranges(zx_handle_t pager, zx_handle_t pager_vm
     return ZX_ERR_INVALID_ARGS;
   }
 
-  return pager_dispatcher->QueryDirtyRanges(Thread::Current::Get()->aspace(),
-                                            pager_vmo_dispatcher->vmo(), offset, length, buffer,
+  return pager_dispatcher->QueryDirtyRanges(pager_vmo_dispatcher->vmo(), offset, length, buffer,
                                             buffer_size, actual, avail);
 }
 
@@ -269,6 +268,6 @@ zx_status_t sys_pager_query_vmo_stats(zx_handle_t pager, zx_handle_t pager_vmo, 
     return ZX_ERR_INVALID_ARGS;
   }
 
-  return pager_dispatcher->QueryPagerVmoStats(
-      Thread::Current::Get()->aspace(), pager_vmo_dispatcher->vmo(), options, buffer, buffer_size);
+  return pager_dispatcher->QueryPagerVmoStats(pager_vmo_dispatcher->vmo(), options, buffer,
+                                              buffer_size);
 }
