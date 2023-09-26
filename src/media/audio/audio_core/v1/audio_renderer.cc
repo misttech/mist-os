@@ -457,7 +457,7 @@ void AudioRenderer::RealizeVolume(VolumeCommand volume_command) {
             gain.SetDestGain(gain_db);
           }
 
-          reporter->SetFinalGain(link.mixer->gain.GetUnadjustedGainDb());
+          reporter->SetCompleteGain(link.mixer->gain.GetUnadjustedGainDb());
         });
       });
 }
@@ -517,9 +517,11 @@ void AudioRenderer::PostStreamGainMute(StreamGainCommand gain_command) {
           break;
       }
 
+      // "Complete" gain is the composition of stream gain with the volume for this stream's usage.
+      // It is "unadjusted" because it omits temporary factors such as in-progress ramping.
+      auto complete_unadjusted_gain_db = gain.GetUnadjustedGainDb();
       // Potentially post this as a delayed task instead, if there is a ramp.
-      auto final_unadjusted_gain_db = gain.GetUnadjustedGainDb();
-      reporter->SetFinalGain(final_unadjusted_gain_db);
+      reporter->SetCompleteGain(complete_unadjusted_gain_db);
     });
   });
 }

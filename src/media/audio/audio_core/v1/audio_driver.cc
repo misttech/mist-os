@@ -1116,8 +1116,8 @@ Reporter::AudioDriverInfo AudioDriver::info_for_reporter() const {
   return {
       .manufacturer_name = manufacturer_name(),
       .product_name = product_name(),
-      .external_delay = external_delay(),
       .internal_delay = internal_delay(),
+      .external_delay = external_delay(),
       .driver_transfer_bytes = driver_transfer_bytes_,
       .format = GetFormat(),
   };

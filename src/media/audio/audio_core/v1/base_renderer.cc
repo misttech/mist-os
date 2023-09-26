@@ -84,9 +84,9 @@ fpromise::result<std::shared_ptr<ReadableStream>, zx_status_t> BaseRenderer::Ini
   auto queue =
       std::make_shared<PacketQueue>(*format(), reference_clock_to_fractional_frames_, clock_);
 
-  queue->SetUnderflowReporter([this](zx::duration duration) {
+  queue->SetUnderflowReporter([this](zx::duration underflow_duration) {
     auto now = zx::clock::get_monotonic();
-    reporter_->PacketQueueUnderflow(now - duration, now);
+    reporter_->PacketQueueUnderflow(now - underflow_duration, now);
   });
   auto stream_usage = usage();
   FX_DCHECK(stream_usage) << "A renderer cannot be linked without a usage";
