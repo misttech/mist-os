@@ -7,6 +7,7 @@ use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_archivist_test::*;
 use fidl_fuchsia_boot as fboot;
 use fidl_fuchsia_diagnostics as fdiagnostics;
+use fidl_fuchsia_inspect as finspect;
 use fidl_fuchsia_logger as flogger;
 use fidl_fuchsia_testing_harness::OperationError;
 use fidl_fuchsia_tracing_provider as ftracing;
@@ -73,6 +74,7 @@ impl ArchivistRealmFactory {
             .capability(Capability::protocol::<fdiagnostics::ArchiveAccessorMarker>())
             .capability(Capability::protocol::<fdiagnostics::LogSettingsMarker>())
             .capability(Capability::protocol::<flogger::LogSinkMarker>())
+            .capability(Capability::protocol::<finspect::InspectSinkMarker>())
             .capability(Capability::protocol::<flogger::LogMarker>());
 
         builder.add_route(parent_to_archivist.clone().from(Ref::parent()).to(&test_realm)).await?;
@@ -112,6 +114,7 @@ impl ArchivistRealmFactory {
             let archvist_to_puppet = Route::new()
                 .capability(Capability::protocol::<fdiagnostics::LogSettingsMarker>())
                 .capability(Capability::protocol::<flogger::LogSinkMarker>())
+                .capability(Capability::protocol::<finspect::InspectSinkMarker>())
                 .capability(Capability::protocol::<flogger::LogMarker>());
 
             let puppet_protocol = Capability::protocol::<PuppetMarker>();

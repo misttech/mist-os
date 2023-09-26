@@ -102,6 +102,7 @@ pub async fn create(opts: Options) -> Result<(RealmBuilder, SubRealmBuilder), Er
         .capability(Capability::protocol_by_name("fuchsia.diagnostics.LoWPANArchiveAccessor"))
         .capability(Capability::protocol_by_name("fuchsia.diagnostics.LogSettings"))
         .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+        .capability(Capability::protocol_by_name("fuchsia.inspect.InspectSink"))
         .capability(Capability::protocol_by_name("fuchsia.logger.Log"));
     test_realm.add_route(archivist_to_parent.clone().from(&archivist).to(Ref::parent())).await?;
     builder.add_route(archivist_to_parent.from(&test_realm).to(Ref::parent())).await?;
@@ -119,6 +120,7 @@ pub async fn add_eager_child(
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                .capability(Capability::protocol_by_name("fuchsia.inspect.InspectSink"))
                 .from(Ref::child("archivist"))
                 .to(&child_ref),
         )
@@ -141,6 +143,7 @@ pub async fn add_collection(test_realm: &SubRealmBuilder, name: &str) -> Result<
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                .capability(Capability::protocol_by_name("fuchsia.inspect.InspectSink"))
                 .from(Ref::child("archivist"))
                 .to(Ref::collection(name)),
         )

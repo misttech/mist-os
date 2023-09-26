@@ -20,11 +20,6 @@
                 "fuchsia.logger.LogSink",
             ],
         },
-        {
-            directory: "diagnostics",
-            rights: [ "connect" ],
-            path: "/diagnostics",
-        },
     ],
     use: [
         {
@@ -49,6 +44,10 @@
             protocol: [ "fuchsia.tracing.provider.Registry" ],
             availability: "optional",
         },
+        {
+            protocol: [ "fuchsia.inspect.InspectSink" ],
+            from: "self",
+        },
     ],
     expose: [
         {
@@ -61,11 +60,6 @@
                 "fuchsia.logger.LogSink",
             ],
             from: "self",
-        },
-        {
-            directory: "diagnostics",
-            from: "self",
-            to: "framework",
         },
     ],
 }

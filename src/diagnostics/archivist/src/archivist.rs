@@ -73,7 +73,7 @@ pub struct Archivist {
     log_server: Arc<LogServer>,
 
     /// The server handling fuchsia.inspect.InspectSink
-    inspect_server: Arc<InspectSinkServer>,
+    inspect_sink_server: Arc<InspectSinkServer>,
 
     /// The server handling fuchsia.diagnostics.LogSettings
     log_settings_server: Arc<LogSettingsServer>,
@@ -109,7 +109,7 @@ impl Archivist {
         let inspect_repo =
             Arc::new(InspectRepository::new(pipelines.iter().map(Arc::downgrade).collect()));
 
-        let inspect_server = Arc::new(InspectSinkServer::new(Arc::clone(&inspect_repo)));
+        let inspect_sink_server = Arc::new(InspectSinkServer::new(Arc::clone(&inspect_repo)));
 
         // Initialize our FIDL servers. This doesn't start serving yet.
         let accessor_server = Arc::new(ArchiveAccessorServer::new(
@@ -132,7 +132,7 @@ impl Archivist {
             events: vec![EventType::DiagnosticsReady],
         });
         event_router.add_consumer(ConsumerConfig {
-            consumer: &inspect_server,
+            consumer: &inspect_sink_server,
             events: vec![EventType::InspectSinkRequested],
         });
 
@@ -159,7 +159,7 @@ impl Archivist {
         Self {
             accessor_server,
             log_server,
-            inspect_server,
+            inspect_sink_server,
             log_settings_server,
             event_router,
             _serial_task: serial_task,
@@ -274,6 +274,10 @@ impl Archivist {
         // Start servicing all outgoing services.
         self.serve_protocols(&mut fs).await;
         let run_outgoing = fs.collect::<()>();
+        let _inspect_server_task = inspect_runtime::publish(
+            component::inspector(),
+            inspect_runtime::PublishOptions::default(),
+        );
 
         // Start ingesting events.
         let (terminate_handle, drain_events_fut) = self
@@ -288,20 +292,20 @@ impl Archivist {
         let accessor_server = Arc::clone(&self.accessor_server);
         let log_server = Arc::clone(&self.log_server);
         let logs_repo = Arc::clone(&self.logs_repository);
-        let inspect_server = Arc::clone(&self.inspect_server);
+        let inspect_sink_server = Arc::clone(&self.inspect_sink_server);
         let all_msg = async {
             logs_repo.wait_for_termination().await;
             debug!("Flushing to listeners.");
             accessor_server.wait_for_servers_to_complete().await;
             log_server.wait_for_servers_to_complete().await;
             debug!("Log listeners and batch iterators stopped.");
-            inspect_server.wait_for_servers_to_complete().await;
+            inspect_sink_server.wait_for_servers_to_complete().await;
         };
 
         let (abortable_fut, abort_handle) = abortable(run_outgoing);
 
         let log_server = self.log_server;
-        let inspect_server = self.inspect_server;
+        let inspect_sink_server = self.inspect_sink_server;
         let accessor_server = self.accessor_server;
         let incoming_external_event_producers = self.incoming_external_event_producers;
         let logs_repo = Arc::clone(&self.logs_repository);
@@ -312,7 +316,7 @@ impl Archivist {
                 for task in incoming_external_event_producers {
                     task.cancel().await;
                 }
-                future::join(log_server.stop(), inspect_server.stop()).await;
+                future::join(log_server.stop(), inspect_sink_server.stop()).await;
                 accessor_server.stop().await;
                 logs_repo.stop_accepting_new_log_sinks().await;
                 abort_handle.abort()
@@ -332,8 +336,6 @@ impl Archivist {
 
     async fn serve_protocols(&mut self, fs: &mut ServiceFs<ServiceObj<'static, ()>>) {
         component::serve_inspect_stats();
-        inspect_runtime::serve(component::inspector(), fs)
-            .unwrap_or_else(|err| warn!(?err, "failed to serve diagnostics"));
 
         let mut svc_dir = fs.dir("svc");
 

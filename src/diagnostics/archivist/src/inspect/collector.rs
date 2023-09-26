@@ -315,6 +315,7 @@ mod tests {
         ns.unbind(path).unwrap();
     }
 
+    // TODO(fxbug.dev/93344): remove this test when the out/diagnostics dir is removed
     #[fuchsia::test]
     async fn inspect_data_collector_tree() {
         let path = "/test-bindings2/out";

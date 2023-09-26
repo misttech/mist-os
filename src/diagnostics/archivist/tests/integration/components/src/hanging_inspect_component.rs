@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Error;
 use fuchsia_async::Timer;
-use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{component, Inspector};
 use fuchsia_zircon::Duration;
-use futures::{FutureExt, StreamExt};
+use futures::FutureExt;
 
 #[fuchsia::main]
-async fn main() -> Result<(), Error> {
+async fn main() {
     let insp = component::inspector();
     insp.root().record_string("child", "value");
 
@@ -24,9 +22,9 @@ async fn main() -> Result<(), Error> {
 
     insp.root().record_int("int", 3);
 
-    let mut fs = ServiceFs::new();
-    inspect_runtime::serve(insp, &mut fs)?;
-    fs.take_and_serve_directory_handle()?;
-    fs.collect::<()>().await;
-    Ok(())
+    if let Some(inspect_server) =
+        inspect_runtime::publish(insp, inspect_runtime::PublishOptions::default())
+    {
+        inspect_server.await
+    }
 }
