@@ -58,8 +58,8 @@ class ProcessMapsInfoWriter {
 // NOTE: Code outside of the syscall layer should not typically know about
 // user_ptrs; do not use this pattern as an example.
 // |target_aspace| is the aspace that is to be enumerated.
-zx_status_t GetVmAspaceMaps(fbl::RefPtr<VmAspace> target_aspace, ProcessMapsInfoWriter& maps,
-                            size_t max, size_t* actual, size_t* available);
+zx_status_t GetVmAspaceMaps(VmAspace* target_aspace, ProcessMapsInfoWriter& maps, size_t max,
+                            size_t* actual, size_t* available);
 
 // Walks the VmAspace and writes entries that describe its mapped VMOs into
 // |vmos|, which must point to enough memory for |max| entries. The number of
@@ -68,7 +68,7 @@ zx_status_t GetVmAspaceMaps(fbl::RefPtr<VmAspace> target_aspace, ProcessMapsInfo
 // NOTE: Code outside of the syscall layer should not typically know about
 // user_ptrs; do not use this pattern as an example.
 // |target_aspace| is the aspace that is to be enumerated.
-zx_status_t GetVmAspaceVmos(fbl::RefPtr<VmAspace> target_aspace, VmoInfoWriter& vmos, size_t max,
+zx_status_t GetVmAspaceVmos(VmAspace* target_aspace, VmoInfoWriter& vmos, size_t max,
                             size_t* actual, size_t* available);
 
 // For every VMO in the process's handle table, writes an entry into |vmos|,

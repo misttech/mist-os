@@ -139,7 +139,7 @@ class ProcessDispatcher final
 
   // Returns a pointer to the process's VmAspace containing |va| if such an aspace exists, otherwise
   // it returns the normal aspace of the process.
-  fbl::RefPtr<VmAspace> aspace_at(vaddr_t va);
+  VmAspace* aspace_at(vaddr_t va);
 
 #if ARCH_X86
   // Returns an identifier that can be used to associate hardware trace
@@ -297,10 +297,7 @@ class ProcessDispatcher final
   // address space of the process. This is what threads would use when executing in normal mode.
   // Then the restricted aspace would only ever be used by threads currently executing in restricted
   // mode.
-  fbl::RefPtr<VmAspace> normal_aspace() { return shareable_state_->aspace(); }
-
-  // This is used by the restricted mode code where it's important to avoid refcount manipulation.
-  VmAspace* normal_aspace_ptr() { return shareable_state_->aspace_ptr(); }
+  VmAspace* normal_aspace() { return shareable_state_->aspace(); }
 
   // Restricted mode is allowed to know about the internals of the aspaces.
   friend zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr,
@@ -380,8 +377,11 @@ class ProcessDispatcher final
   // list of threads in this process
   fbl::DoublyLinkedList<ThreadDispatcher*> thread_list_ TA_GUARDED(get_lock());
 
-  // the address space used when a thread is executing in restricted mode, can be null if the
-  // process was not initialized with a restricted aspace
+  // The address space used when a thread of this process is executing in restricted mode.  This
+  // field is only non-null if this process is a "shared process".
+  //
+  // This field is logically const and may not be changed after initialization.  Resetting or
+  // assigning to this field post-initialization is a programming error.
   fbl::RefPtr<VmAspace> restricted_aspace_;
 
   // our state

@@ -87,19 +87,17 @@ class ShareableProcessState : public fbl::RefCounted<ShareableProcessState> {
   FutexContext& futex_context() { return futex_context_; }
   const FutexContext& futex_context() const { return futex_context_; }
 
-  fbl::RefPtr<VmAspace> aspace() { return aspace_; }
-  const fbl::RefPtr<VmAspace>& aspace() const { return aspace_; }
-
-  VmAspace* aspace_ptr() { return aspace_.get(); }
-  const VmAspace* aspace_ptr() const { return aspace_.get(); }
+  VmAspace* aspace() { return aspace_.get(); }
+  const VmAspace* aspace() const { return aspace_.get(); }
 
  private:
-
   // The layout of the fields below is intended to eliminating padding.
   //
   // The number of processes currently sharing this state.
   HandleTable handle_table_;
   ktl::atomic<uint64_t> process_count_ = 1;
+  // This field is logically const and may not be changed after initialization.  Resetting or
+  // assigning to this field post-initialization is a programming error.
   fbl::RefPtr<VmAspace> aspace_;
   FutexContext futex_context_;
 };

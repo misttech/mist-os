@@ -135,8 +135,8 @@ zx_status_t ProcessDispatcher::CreateShared(
     KernelHandle<VmAddressRegionDispatcher>* restricted_vmar_handle,
     zx_rights_t* restricted_vmar_rights) {
   // Make sure shared_proc has a shared aspace.
-  if (shared_proc->normal_aspace_ptr()->base() != kSharedAspaceBase ||
-      shared_proc->normal_aspace_ptr()->size() != kSharedAspaceSize) {
+  if (shared_proc->normal_aspace()->base() != kSharedAspaceBase ||
+      shared_proc->normal_aspace()->size() != kSharedAspaceSize) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -733,7 +733,8 @@ zx_status_t ProcessDispatcher::GetAspaceMaps(ProcessMapsInfoWriter& maps, size_t
   size_t actual_r = 0;
   size_t available_r = 0;
   if (restricted_aspace_) {
-    zx_status_t status = GetVmAspaceMaps(restricted_aspace_, maps, max, &actual_r, &available_r);
+    zx_status_t status =
+        GetVmAspaceMaps(restricted_aspace_.get(), maps, max, &actual_r, &available_r);
     if (status != ZX_OK) {
       return status;
     }
@@ -786,7 +787,8 @@ zx_status_t ProcessDispatcher::GetVmos(VmoInfoWriter& vmos, size_t max, size_t* 
   DEBUG_ASSERT(max >= actual + actual2);
   vmos.AddOffset(actual2);
   if (restricted_aspace_) {
-    s = GetVmAspaceVmos(restricted_aspace_, vmos, max - (actual + actual2), &actual3, &available3);
+    s = GetVmAspaceVmos(restricted_aspace_.get(), vmos, max - (actual + actual2), &actual3,
+                        &available3);
     if (s != ZX_OK) {
       return s;
     }
@@ -1011,7 +1013,7 @@ void ProcessDispatcher::OnProcessStartForJobDebugger(ThreadDispatcher* t,
   }
 }
 
-fbl::RefPtr<VmAspace> ProcessDispatcher::aspace_at(vaddr_t va) {
+VmAspace* ProcessDispatcher::aspace_at(vaddr_t va) {
   if (!restricted_aspace_) {
     // If there is no restricted aspace associated with the process, shortcut and return the normal
     // aspace. This ensures a valid VmAspace pointer is returned.
@@ -1022,7 +1024,7 @@ fbl::RefPtr<VmAspace> ProcessDispatcher::aspace_at(vaddr_t va) {
   const vaddr_t end = begin + restricted_aspace_->size();
 
   if (va >= begin && va < end) {
-    return restricted_aspace_;
+    return restricted_aspace_.get();
   }
 
   return shareable_state_->aspace();

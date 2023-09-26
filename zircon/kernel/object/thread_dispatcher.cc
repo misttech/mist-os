@@ -118,8 +118,7 @@ zx_status_t ThreadDispatcher::Initialize() {
   Guard<CriticalMutex> guard{get_lock()};
   // Associate the proc's address space with this thread. All threads start off with the normal
   // address space as their active aspace.
-  fbl::RefPtr<VmAspace> aspace = process_->normal_aspace();
-  aspace->AttachToThread(core_thread_);
+  process_->normal_aspace()->AttachToThread(core_thread_);
   // we've entered the initialized state
   SetStateLocked(ThreadState::Lifecycle::INITIALIZED);
   return ZX_OK;

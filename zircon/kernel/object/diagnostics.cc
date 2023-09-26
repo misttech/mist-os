@@ -974,8 +974,8 @@ class VmMapBuilder final : public RestartableVmEnumerator<zx_info_maps_t, VmMapB
 
 // NOTE: Code outside of the syscall layer should not typically know about
 // user_ptrs; do not use this pattern as an example.
-zx_status_t GetVmAspaceMaps(fbl::RefPtr<VmAspace> target_aspace, ProcessMapsInfoWriter& maps,
-                            size_t max, size_t* actual, size_t* available) {
+zx_status_t GetVmAspaceMaps(VmAspace* target_aspace, ProcessMapsInfoWriter& maps, size_t max,
+                            size_t* actual, size_t* available) {
   DEBUG_ASSERT(target_aspace != nullptr);
   *actual = 0;
   *available = 0;
@@ -996,7 +996,7 @@ zx_status_t GetVmAspaceMaps(fbl::RefPtr<VmAspace> target_aspace, ProcessMapsInfo
 
   VmMapBuilder b(maps, max);
 
-  zx_status_t status = b.Enumerate(target_aspace.get());
+  zx_status_t status = b.Enumerate(target_aspace);
   if (status != ZX_OK) {
     return status;
   }
@@ -1041,7 +1041,7 @@ class AspaceVmoEnumerator final
 
 // NOTE: Code outside of the syscall layer should not typically know about
 // user_ptrs; do not use this pattern as an example.
-zx_status_t GetVmAspaceVmos(fbl::RefPtr<VmAspace> target_aspace, VmoInfoWriter& vmos, size_t max,
+zx_status_t GetVmAspaceVmos(VmAspace* target_aspace, VmoInfoWriter& vmos, size_t max,
                             size_t* actual, size_t* available) {
   DEBUG_ASSERT(target_aspace != nullptr);
   DEBUG_ASSERT(actual != nullptr);
@@ -1054,7 +1054,7 @@ zx_status_t GetVmAspaceVmos(fbl::RefPtr<VmAspace> target_aspace, VmoInfoWriter& 
 
   AspaceVmoEnumerator ave(vmos, max);
 
-  zx_status_t status = ave.Enumerate(target_aspace.get());
+  zx_status_t status = ave.Enumerate(target_aspace);
   if (status != ZX_OK) {
     return status;
   }

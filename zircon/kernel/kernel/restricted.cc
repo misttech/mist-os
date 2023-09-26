@@ -71,7 +71,7 @@ template <typename T>
           rs->context());
 
   ProcessDispatcher* up = ProcessDispatcher::GetCurrent();
-  vmm_set_active_aspace(up->normal_aspace_ptr());
+  vmm_set_active_aspace(up->normal_aspace());
 
   // bounce into normal mode
   KTRACE_INSTANT("kernel:restricted", "RestrictedLeave", ("reason", reason));
@@ -207,7 +207,7 @@ void RedirectRestrictedExceptionToNormalMode(RestrictedState* rs) {
   rs->set_in_restricted(false);
   arch_set_restricted_flag(false);
   ProcessDispatcher* up = ProcessDispatcher::GetCurrent();
-  vmm_set_active_aspace(up->normal_aspace_ptr());
+  vmm_set_active_aspace(up->normal_aspace());
 }
 
 [[noreturn]] void RestrictedLeaveIframe(const iframe_t* iframe, zx_restricted_reason_t reason) {
