@@ -102,6 +102,8 @@ size_checker_input = {
         "netcfg-advanced",
         "netcfg-basic",
         "netstack",
+        "netstack3",
+        "netstack-migration",
         "network",
         "reachability",
       ]
