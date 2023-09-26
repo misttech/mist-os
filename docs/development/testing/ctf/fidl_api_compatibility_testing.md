@@ -1,8 +1,8 @@
 # FIDL API compatibility testing
 
 We use API compatibility tests to ensure that SDK Users targeting supported platform
-versions aren't broken by changes to FIDL APIs at tip of tree. All FIDL APIs published in
-the [partner Fuchsia SDKs][SDK Categories] are automatically tested for backward API
+API levels aren't broken by changes to FIDL APIs at tip of tree. All FIDL APIs published in
+the [partner Fuchsia SDKs][SDK Categories] should be automatically tested for backward API
 compatibility. This document describes what API compatibility tests are and how to use
 them.
 
@@ -21,47 +21,46 @@ in increasing order.
 
 There are two API levels that are useful to keep in mind:
 
-1. The active API level - This is what Fuchsia developers make additive changes to.
-2. The current API level - This is what the petals target.
-
-Usually active == current, except during API freezes when active == current + 1.
+1. An in-development API level - This is what Fuchsia developers make additive changes to.
+2. A stable API level - This level is stable and its surface area will not change.
 
 The current implementation of platform versioning does not yet reflect this:
-In the Fuchsia source tree, we record API and ABI version history, as well as level status ("current" and "supported") at [//sdk/version_history.json](/sdk/version_history.json).
+In the Fuchsia source tree, we record API and ABI version history, as well as level
+status ("in-development" and "supported" aka stable) at
+[//sdk/version_history.json](/sdk/version_history.json).
 
 ### API level evolution
 
 An API level goes through several phases, illustrated by the following diagram:
 
 ```
-         +--------+ freeze +--------+  bump  +-----------+  drop  +-------------+
-START -> | active | -----> | stable | -----> | supported | -----> | unsupported |
-         +--------+        +--------+        +-----------+        +-------------+
+         +----------------+ freeze +--------+  drop  +-------------+
+START -> | in-development | -----> | stable | -----> | unsupported |
+         +----------------+        +--------+        +-------------+
 ```
 
-__Active__
+__In-development__
 
-In this phase the API level is in active development. End users target this level and
-Fuchsia contributors make additive changes to it. Compatibility tests must pass on CI/CQ.
+In this phase the API level is in active evolution, as new API elements
+may be introduced, deprecations may be introduced, etc.
 Breaking changes to APIs introduced at this level are not allowed and contributors
 should make sure there are no partners still relying on APIs removed at this level.
 
 __Stable__
 
-The API level can no longer receive changes. Contributors should start introducing APIs at the
-next level. When we "freeze" an API level, we enter a week-long stabilization period during which
-the level may no longer receive changes. This usually happens immediately before a branch cut.
-
-__Supported__
-
-When we bump the active level from N to N+1, we say that N is now supported and we officially stop
-accepting changes to it. It will remain supported for at least 6 weeks or until the Fuchsia platform
+The API level can no longer receive changes. Contributors should start introducing
+APIs to partners at the next in-development API level. When we "freeze" an API
+level, the level may no longer receive changes. This usually happens immediately
+before a branch cut. It will remain supported for at least 6 weeks or until
+the Fuchsia platform
 drops support for it. APIs can be deprecated at this level but not deleted.
 
 __Unsupported__
 
-When we drop support for a level, Fuchsia contributors are free to delete or modify any APIs at this level and we
-stop running compatibility tests for this level. There's no longer any guarantee that end users can successfully
+When we drop support for a level, Fuchsia contributors are free to delete or
+modify any APIs at this level, and we
+stop running compatibility tests for this level. There's no longer any guarantee
+that end users can successfully
 target this API level.
 
 ## Resolving compatibility issues
@@ -72,8 +71,9 @@ declarations.
 {% set in_development_api_level = 15 %}
 Below are some good guidelines to follow when changing FIDL APIs.
 
-1. Annotate new, unstable APIs with `@available(added=HEAD)`.
-1. Annotate new, stable APIs with `@available(added={{ in_development_api_level }})`.
+1. Annotate new, not-yet-stable APIs with `@available(added=HEAD)`.
+1. Annotate newly stable APIs which are ready to go to partners
+   with `@available(added={{ in_development_api_level }})`.
 1. When removing an API, first make sure no parters are still using the API, then
    annotate the old API with `@available(removed={{ in_development_api_level+1 }})`.
 
