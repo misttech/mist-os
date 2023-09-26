@@ -130,7 +130,7 @@ func (r *Repository) LookupUpdateSystemImageMerkle(ctx context.Context) (string,
 }
 
 func (r *Repository) LookupUpdatePrimeSystemImage2Merkle(ctx context.Context) (string, error) {
-	return r.lookupUpdateContentPackageMerkle(ctx, "update_prime2/0", "system_image/0")
+	return r.lookupUpdateContentPackageMerkle(ctx, "update_prime/0", "system_image/0")
 }
 
 func (r *Repository) VerifyMatchesAnyUpdateSystemImageMerkle(ctx context.Context, merkle string) error {

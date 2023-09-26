@@ -497,13 +497,13 @@ func buildAndOtaToPackage(
 		return fmt.Errorf("failed to intialize ZBITool: %q", err)
 	}
 
-	systemImagePrime2 := "system_image_prime2/0"
-	systemImagePrime2Pkg, err := repo.EditPackage(ctx, "system_image/0", systemImagePrime2, func(tempDir string) error {
+	systemImagePrime := "system_image_prime/0"
+	systemImagePrimePkg, err := repo.EditPackage(ctx, "system_image/0", systemImagePrime, func(tempDir string) error {
 		newResource := "Hello World!"
 		contents := bytes.NewReader([]byte(newResource))
 		data, err := io.ReadAll((contents))
 		if err != nil {
-			return fmt.Errorf("failed to read new content %q %w", systemImagePrime2, err)
+			return fmt.Errorf("failed to read new content %q %w", systemImagePrime, err)
 		}
 
 		tempPath := filepath.Join(tempDir, "dummy2.txt")
@@ -512,26 +512,26 @@ func buildAndOtaToPackage(
 		}
 
 		if err := os.WriteFile(tempPath, data, 0644); err != nil {
-			return fmt.Errorf("failed to write new data for %q to %q: %w", systemImagePrime2, tempPath, err)
+			return fmt.Errorf("failed to write new data for %q to %q: %w", systemImagePrime, tempPath, err)
 		}
 
 		return nil
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to create the %q package: %w", systemImagePrime2, err)
+		return fmt.Errorf("failed to create the %q package: %w", systemImagePrime, err)
 	}
 
-	systemImagePrimeMerkle := systemImagePrime2Pkg.Merkle()
+	systemImagePrimeMerkle := systemImagePrimePkg.Merkle()
 
-	updatePrime2 := "update_prime2/0"
+	updatePrime := "update_prime/0"
 	_, err = repo.EditUpdatePackageWithNewSystemImageMerkle(
 		ctx,
 		avbTool,
 		zbiTool,
 		systemImagePrimeMerkle,
 		"update/0",
-		updatePrime2,
+		updatePrime,
 		c.bootfsCompression,
 		func(path string) error {
 			return nil
@@ -539,7 +539,7 @@ func buildAndOtaToPackage(
 	)
 
 	if err != nil {
-		return fmt.Errorf("failed to create the %q package: %w", updatePrime2, err)
+		return fmt.Errorf("failed to create the %q package: %w", updatePrime, err)
 	}
 
 	return otaToPackage(
@@ -548,7 +548,7 @@ func buildAndOtaToPackage(
 		rpcClient,
 		repo,
 		systemImagePrimeMerkle,
-		"fuchsia-pkg://fuchsia.com/update_prime2/0",
+		"fuchsia-pkg://fuchsia.com/update_prime/0",
 		checkABR,
 		true,
 	)
