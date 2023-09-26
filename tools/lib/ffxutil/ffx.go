@@ -119,7 +119,7 @@ func NewFFXInstance(
 	}
 	ffxCmds := [][]string{
 		{"config", "set", "log.dir", filepath.Join(outputDir, "ffx_logs")},
-		{"config", "set", "ffx.subtool-search-paths", filepath.Dir(ffxPath)},
+		{"config", "set", "ffx.subtool-search-paths", filepath.Dir(absFFXPath)},
 		{"config", "set", "target.default", target},
 		{"config", "set", "test.experimental_json_input", "true"},
 		// Set these fields in the global config for tests that don't use this library
