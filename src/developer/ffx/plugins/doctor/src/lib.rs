@@ -1144,6 +1144,30 @@ async fn doctor_summary<W: Write>(
         let target_node =
             ledger.add_node(&format!("Target: {}", target_name), LedgerMode::Normal)?;
 
+        let (compatibility_state, compatibility_message) = match &target.compatibility {
+            Some(info) => (info.state.into(), info.message.clone()),
+            None => (
+                compat_info::CompatibilityState::Absent,
+                "Compatibility information is not available".to_string(),
+            ),
+        };
+
+        let state_node = ledger.add_node(
+            &format!("Compatibility state: {compatibility_state}"),
+            LedgerMode::Verbose,
+        )?;
+        let message_node = ledger.add_node(&compatibility_message, LedgerMode::Verbose)?;
+
+        let outcome = match compatibility_state {
+            compat_info::CompatibilityState::Supported => LedgerOutcome::Success,
+            compat_info::CompatibilityState::Error => LedgerOutcome::Failure,
+            compat_info::CompatibilityState::Absent => LedgerOutcome::SoftWarning,
+            compat_info::CompatibilityState::Unsupported => LedgerOutcome::Warning,
+            compat_info::CompatibilityState::Unknown => LedgerOutcome::SoftWarning,
+        };
+        ledger.set_outcome(state_node, outcome)?;
+        ledger.set_outcome(message_node, outcome)?;
+
         //TODO(fxbug.dev/86523): Offer a fix when we cannot connect to a device via RCS.
         let (target_proxy, target_server) = fidl::endpoints::create_proxy::<TargetMarker>()?;
         match timeout(
@@ -2567,6 +2591,8 @@ mod test {
             \n    [✓] 1 targets found\
             \n[✗] Verifying Targets\
             \n    [✗] Target: {SSH_ERR_NODENAME}\
+            \n        [!] Compatibility state: absent\
+            \n            [!] Compatibility information is not available\
             \n        [✓] Opened target handle\
             \n        [✓] Connecting to RCS\
             \n        [✗] Error while connecting to RCS: <reason omitted>\
@@ -2647,10 +2673,14 @@ mod test {
             \n    [✓] 2 targets found\
             \n[✓] Verifying Targets\
             \n    [✓] Target: {NODENAME}\
+            \n        [!] Compatibility state: absent\
+            \n            [!] Compatibility information is not available\
             \n        [✓] Opened target handle\
             \n        [✓] Connecting to RCS\
             \n        [✓] Communicating with RCS\
             \n    [✗] Target: {UNRESPONSIVE_NODENAME}\
+            \n        [!] Compatibility state: absent\
+            \n            [!] Compatibility information is not available\
             \n        [✓] Opened target handle\
             \n        [✓] Connecting to RCS\
             \n        [✗] Timeout while communicating with RCS\
@@ -2761,6 +2791,8 @@ mod test {
             \n    [✓] 1 targets found\
             \n[✓] Verifying Targets\
             \n    [✓] Target: {NODENAME}\
+            \n        [!] Compatibility state: absent\
+            \n            [!] Compatibility information is not available\
             \n        [✓] Opened target handle\
             \n        [✓] Connecting to RCS\
             \n        [✓] Communicating with RCS\
@@ -3174,10 +3206,14 @@ mod test {
                 \n    [✓] 2 targets found\
                 \n[✗] Verifying Targets\
                 \n    [✗] Target: UNKNOWN\
+                \n        [!] Compatibility state: absent\
+                \n            [!] Compatibility information is not available\
                 \n        [✓] Opened target handle\
                 \n        [✓] Connecting to RCS\
                 \n        [✗] Timeout while communicating with RCS\
                 \n    [✗] Target: {UNRESPONSIVE_NODENAME}\
+                \n        [!] Compatibility state: absent\
+                \n            [!] Compatibility information is not available\
                 \n        [✓] Opened target handle\
                 \n        [✓] Connecting to RCS\
                 \n        [✗] Timeout while communicating with RCS\

@@ -454,12 +454,24 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             let start = Instant::now();
 
             while start.elapsed().as_secs() <= startup_timeout {
-                if is_active(proxy, &name).await {
+                if let Some(info) = is_active(proxy, &name).await {
                     println!("\nEmulator is ready.");
                     tracing::debug!(
                         "Emulator is ready after {} seconds.",
                         start.elapsed().as_secs()
                     );
+                    match info.compatibility {
+                        Some(compatibility)
+                            if compatibility.state == ffx::CompatibilityState::Supported =>
+                        {
+                            tracing::info!("Compatibility status: {:?}", compatibility.state)
+                        }
+                        Some(compatibility) => println!(
+                            "Compatibility status: {:?} {}",
+                            compatibility.state, compatibility.message
+                        ),
+                        None => println!("Warning: no compatibility information is available"),
+                    }
                     return Ok(0);
                 }
 

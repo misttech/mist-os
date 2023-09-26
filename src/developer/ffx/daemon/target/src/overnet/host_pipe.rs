@@ -134,10 +134,8 @@ impl HostPipeChildBuilder for HostPipeChildDefaultBuilder<'_> {
         watchdogs: bool,
         ssh_timeout: u16,
     ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
-
-
         let ctx = ffx_config::global_env_context().expect("Global env context uninitialized");
-        let verbose_ssh = ffx_config::logging::debugging_on(&ctx).await; 
+        let verbose_ssh = ffx_config::logging::debugging_on(&ctx).await;
 
         HostPipeChild::new_inner(
             self.ssh_path(),
@@ -147,7 +145,7 @@ impl HostPipeChildBuilder for HostPipeChildDefaultBuilder<'_> {
             event_queue,
             watchdogs,
             ssh_timeout,
-            verbose_ssh
+            verbose_ssh,
         )
         .await
     }
@@ -231,7 +229,7 @@ impl HostPipeChild {
         event_queue: events::Queue<TargetEvent>,
         watchdogs: bool,
         ssh_timeout: u16,
-        verbose_ssh: bool
+        verbose_ssh: bool,
     ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
         let id_string = format!("{}", id);
         let args = vec![
@@ -251,7 +249,7 @@ impl HostPipeChild {
             event_queue,
             watchdogs,
             ssh_timeout,
-            verbose_ssh
+            verbose_ssh,
         )
         .await
     }
@@ -265,9 +263,10 @@ impl HostPipeChild {
         event_queue: events::Queue<TargetEvent>,
         watchdogs: bool,
         ssh_timeout: u16,
-        verbose_ssh: bool
+        verbose_ssh: bool,
     ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
         let id_string = format!("{}", id);
+
         // pass the abi revision as a base 10 number so it is easy to parse.
         let rev: u64 = *version_history::LATEST_VERSION.abi_revision;
         let abi_revision = format!("{}", rev);
@@ -282,7 +281,7 @@ impl HostPipeChild {
             event_queue.clone(),
             watchdogs,
             ssh_timeout,
-            verbose_ssh
+            verbose_ssh,
         )
         .await
         {
@@ -296,7 +295,7 @@ impl HostPipeChild {
                     event_queue,
                     watchdogs,
                     ssh_timeout,
-                    verbose_ssh
+                    verbose_ssh,
                 )
                 .await
             }
@@ -312,14 +311,11 @@ impl HostPipeChild {
         event_queue: events::Queue<TargetEvent>,
         watchdogs: bool,
         ssh_timeout: u16,
-        verbose_ssh: bool
+        verbose_ssh: bool,
     ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
-
-
         if verbose_ssh {
             args.insert(0, "-v");
         }
-        
 
         let mut ssh = build_ssh_command_with_ssh_path(ssh_path, addr, args)
             .await

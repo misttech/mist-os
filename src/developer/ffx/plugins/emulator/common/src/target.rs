@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use ffx::TargetInfo;
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
 use std::time::Duration;
@@ -11,11 +12,17 @@ use timeout::timeout;
 /// that matches the specified emulator. From the target, the RCS connection is opened.
 /// If an RCS connection can be made, it is considered "active".
 ///
+/// The return is None for a non-active target, otherwise the Some(TargetInfo) with the
+/// info for the specified target.
+///
 /// The request documentation indicates that the call to OpenTarget will hang until the device
 /// responds, possibly indefinitely. We wrap the call in a timeout of 1 second, so this function
 /// will not hang indefinitely. If the caller expects the response to take longer (such as during
 /// Fuchsia bootup), it's safe to call the function repeatedly with a longer local timeout.
-pub async fn is_active(collection_proxy: &ffx::TargetCollectionProxy, name: &str) -> bool {
+pub async fn is_active(
+    collection_proxy: &ffx::TargetCollectionProxy,
+    name: &str,
+) -> Option<TargetInfo> {
     let (target_proxy, handle) = fidl::endpoints::create_proxy::<ffx::TargetMarker>().unwrap();
     let target = Some(name.to_string());
     let res = timeout(Duration::from_secs(1), async {
@@ -35,24 +42,23 @@ pub async fn is_active(collection_proxy: &ffx::TargetCollectionProxy, name: &str
                         Ok(rcs_result) => match rcs_result {
                             Ok(()) => {
                                 let info = target_proxy.identity().await.unwrap();
-                                tracing::info!("CWCW POST info is {info:?}");
-                                true
+                                Some(info)
                             }
-                            Err(_) => false,
+                            Err(_) => None,
                         },
-                        Err(_) => false,
+                        Err(_) => None,
                     }
                 }
-                Err(_) => false,
+                Err(_) => None,
             }
         } else {
-            false
+            None
         }
     })
     .await;
 
     tracing::debug!("returning {:?}", &res);
-    return res.unwrap_or_else(|_| false);
+    return res.unwrap_or_else(|_| None);
 }
 
 #[cfg(test)]
@@ -150,9 +156,9 @@ mod test {
         };
         let server = setup_target_collection(handler);
         // The "target" that we expect is "active".
-        assert!(is_active(&server, "good_target_id").await);
+        assert!(is_active(&server, "good_target_id").await.is_some());
         // The "target" that we don't expect is "inactive".
-        assert!(!is_active(&server, "unknown_target_id").await);
+        assert!(is_active(&server, "unknown_target_id").await.is_none());
     }
 
     #[fuchsia::test]
@@ -172,6 +178,6 @@ mod test {
         };
 
         let server = setup_target_collection(handler);
-        assert!(!is_active(&server, "target").await);
+        assert!(is_active(&server, "target").await.is_none());
     }
 }

@@ -162,6 +162,18 @@ async fn gather_target_show(target_proxy: TargetProxy) -> Result<ShowEntry> {
         };
         format!("{}:{}", addr, port)
     };
+
+    let (compatibility_state, compatibility_message) = match &host.compatibility {
+        Some(compatibility) => (
+            compat_info::CompatibilityState::from(compatibility.state),
+            compatibility.message.clone(),
+        ),
+        None => (
+            compat_info::CompatibilityState::Absent,
+            "Compatibility information is not available".to_string(),
+        ),
+    };
+
     Ok(ShowEntry::group(
         "Target",
         "target",
@@ -173,6 +185,18 @@ async fn gather_target_show(target_proxy: TargetProxy) -> Result<ShowEntry> {
                 "ssh_address",
                 "Interface address",
                 &Some(ifaces_str),
+            ),
+            ShowEntry::str_value_with_highlight(
+                "Compatibility state",
+                "compatibility_state",
+                "Compatibility state",
+                &Some(compatibility_state.to_string()),
+            ),
+            ShowEntry::str_value_with_highlight(
+                "Compatibility message",
+                "compatibility_message",
+                "Compatibility messsage",
+                &Some(compatibility_message.to_string()),
             ),
         ],
     ))
@@ -437,6 +461,8 @@ mod tests {
         Target: \
         \n    Name: \u{1b}[38;5;2m\"fake_fuchsia_device\"\u{1b}[m\
         \n    SSH Address: \u{1b}[38;5;2m\"127.0.0.1:22\"\u{1b}[m\
+        \n    Compatibility state: \u{1b}[38;5;2m\"absent\"\u{1b}[m\
+        \n    Compatibility message: \u{1b}[38;5;2m\"Compatibility information is not available\"\u{1b}[m\
         \nBoard: \
         \n    Name: \"fake_name\"\
         \n    Revision: \"fake_revision\"\
@@ -610,7 +636,7 @@ mod tests {
         assert_eq!(v[6]["label"], Value::String("feedback".to_string()));
         assert_eq!(v[7]["label"], Value::String("last_reboot".to_string()));
 
-        assert_eq!(v[0]["child"].as_array().unwrap().len(), 2);
+        assert_eq!(v[0]["child"].as_array().unwrap().len(), 4);
         assert_eq!(v[1]["child"].as_array().unwrap().len(), 3);
         assert_eq!(v[2]["child"].as_array().unwrap().len(), 3);
         assert_eq!(v[3]["child"].as_array().unwrap().len(), 16);
