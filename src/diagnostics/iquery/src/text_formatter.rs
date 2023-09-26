@@ -75,6 +75,7 @@ where
 {
     let name_indent = " ".repeat(INDENT * indent);
     let value_indent = " ".repeat(INDENT * (indent + 1));
+    let array_broken_line_indent = " ".repeat(INDENT * (indent + 2));
 
     writeln!(w, "{}{}:", name_indent, diagnostics_hierarchy.name)?;
 
@@ -95,7 +96,21 @@ where
             Property::UintArray(name, array) => output_array(w, &value_indent, &name, &array)?,
             Property::DoubleArray(name, array) => output_array(w, &value_indent, &name, &array)?,
             Property::StringList(name, list) => {
-                writeln!(w, "{}{} = {:?}", value_indent, name, list)?;
+                let max_line_length = 100;
+                let length_of_brackets = 2;
+                let length_of_comma_space = 2;
+                let total_len = list
+                    .iter()
+                    .fold(length_of_brackets, |acc, v| acc + v.len() + length_of_comma_space);
+                if total_len < max_line_length {
+                    writeln!(w, "{}{} = {:?}", value_indent, name, list)?;
+                } else {
+                    writeln!(w, "{}{} = [", value_indent, name)?;
+                    for v in list {
+                        writeln!(w, r#"{}"{}","#, array_broken_line_indent, v)?;
+                    }
+                    writeln!(w, "{}]", value_indent)?;
+                }
             }
         }
     }
@@ -371,6 +386,71 @@ impl NumberFormat for f64 {
 mod tests {
     use super::*;
     use test_case::test_case;
+
+    #[fuchsia::test]
+    fn test_array_line_breaks() {
+        let h = DiagnosticsHierarchy {
+            name: "test".into(),
+            properties: vec![Property::StringList(
+                "short_array".to_owned(),
+                vec!["short".into(), "array".into()],
+            )],
+            children: vec![],
+            missing: vec![],
+        };
+        let mut buf = String::new();
+        output_hierarchy(&mut buf, &h, 2).unwrap();
+
+        let expected = r#"    test:
+      short_array = ["short", "array"]
+"#;
+        assert_eq!(expected, buf);
+
+        // joined up would be 104 characters
+        let long_array = vec![
+            "12345678".into(),
+            "12345678".into(),
+            "12345678".into(),
+            "12345678".into(),
+            "12345678".into(),
+            "12345678".into(),
+            "12345678".into(),
+            "12345678".into(),
+            "12345678".into(),
+            "12345678".into(),
+            "12345678".into(),
+            "12345678".into(),
+            "12345678".into(),
+        ];
+
+        let h = DiagnosticsHierarchy {
+            name: "test".into(),
+            properties: vec![Property::StringList("long_array".to_owned(), long_array)],
+            children: vec![],
+            missing: vec![],
+        };
+        let mut buf = String::new();
+        output_hierarchy(&mut buf, &h, 2).unwrap();
+
+        let expected = r#"    test:
+      long_array = [
+        "12345678",
+        "12345678",
+        "12345678",
+        "12345678",
+        "12345678",
+        "12345678",
+        "12345678",
+        "12345678",
+        "12345678",
+        "12345678",
+        "12345678",
+        "12345678",
+        "12345678",
+      ]
+"#;
+        assert_eq!(expected, buf);
+    }
 
     #[test_case(LinearBucketBoundsArgs { floor: -10, step: 2, index: 0, size: 4 }, (i64::MIN, -10))]
     #[test_case(LinearBucketBoundsArgs { floor: -10, step: 2, index: 1, size: 4 }, (-10, -8))]
