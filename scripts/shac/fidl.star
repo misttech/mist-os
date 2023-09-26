@@ -35,6 +35,30 @@ def _fidl_format(ctx):
                 replacements = [formatted],
             )
 
+def _gidl_format(ctx):
+    """Runs gidl-format.
+
+    Args:
+      ctx: A ctx instance.
+    """
+    exe = compiled_tool_path(ctx, "gidl-format")
+
+    procs = [
+        (f, ctx.os.exec([exe, f]))
+        for f in ctx.scm.affected_files()
+        if f.endswith(".gidl")
+    ]
+    for f, proc in procs:
+        formatted = proc.wait().stdout
+        original = str(ctx.io.read_file(f))
+        if formatted != original:
+            ctx.emit.finding(
+                level = "error",
+                message = FORMATTER_MSG,
+                filepath = f,
+                replacements = [formatted],
+            )
+
 def _fidl_lint(ctx):
     """Runs fidl-lint.
 
@@ -82,5 +106,6 @@ def _fidl_lint(ctx):
         )
 
 def register_fidl_checks():
+    shac.register_check(shac.check(_gidl_format, formatter = True))
     shac.register_check(shac.check(_fidl_format, formatter = True))
     shac.register_check(shac.check(_fidl_lint))

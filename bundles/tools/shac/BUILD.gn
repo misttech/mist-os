@@ -11,6 +11,7 @@ group("shac_tools") {
     "//tools/doc_checker:doc_checker_bin.actual($host_toolchain)",
     "//tools/fidl/fidlc:fidl-format($host_toolchain)",
     "//tools/fidl/fidlc:fidl-lint($host_toolchain)",
+    "//tools/fidl/gidl-format:gidl-format($host_toolchain)",
     "//tools/mdlint:mdlint($host_toolchain)",
   ]
 }
