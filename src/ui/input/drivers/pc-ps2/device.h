@@ -78,7 +78,7 @@ enum KeyStatus {
 constexpr uint8_t kAck = 0xfa;
 
 class I8042Device;
-using DeviceType = ddk::Device<I8042Device, ddk::Unbindable,
+using DeviceType = ddk::Device<I8042Device, ddk::Suspendable, ddk::Unbindable,
                                ddk::Messageable<fuchsia_input_report::InputDevice>::Mixin>;
 class I8042Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INPUTREPORT> {
  public:
@@ -95,7 +95,11 @@ class I8042Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INP
   static zx_status_t Bind(Controller* parent, async_dispatcher_t* dispatcher, Port port);
   zx_status_t Bind();
 
-  void DdkRelease() { delete this; }
+  void DdkRelease() {
+    Shutdown();
+    delete this;
+  }
+  void DdkSuspend(ddk::SuspendTxn txn);
   void DdkUnbind(ddk::UnbindTxn txn);
 
   void GetInputReportsReader(GetInputReportsReaderRequestView request,
@@ -130,6 +134,8 @@ class I8042Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INP
  private:
   void HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
                  const zx_packet_interrupt_t* interrupt);
+
+  void Shutdown();
 
   async_dispatcher_t* dispatcher_;
 

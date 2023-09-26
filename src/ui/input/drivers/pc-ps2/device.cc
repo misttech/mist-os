@@ -156,9 +156,13 @@ zx_status_t I8042Device::Bind() {
   return ZX_OK;
 }
 
+void I8042Device::DdkSuspend(ddk::SuspendTxn txn) {
+  Shutdown();
+  txn.Reply(ZX_OK, txn.requested_state());
+}
+
 void I8042Device::DdkUnbind(ddk::UnbindTxn txn) {
-  irq_handler_.Cancel();
-  irq_.destroy();
+  Shutdown();
   txn.Reply();
 }
 
@@ -353,6 +357,11 @@ void I8042Device::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq,
   } while (retry);
 
   irq_.ack();
+}
+
+void I8042Device::Shutdown() {
+  irq_handler_.Cancel();
+  irq_.destroy();
 }
 
 void I8042Device::ProcessScancode(zx::time timestamp, uint8_t code) {

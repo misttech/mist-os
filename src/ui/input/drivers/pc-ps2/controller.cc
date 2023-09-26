@@ -164,7 +164,6 @@ void Controller::DdkInit(ddk::InitTxn txn) {
     }
 
     cancel.cancel();
-    txn.Reply(ZX_OK);
 
     // Failure here won't fail everything else.
     zx_status_t bind_status = I8042Device::Bind(this, dispatcher, Port::kPort1);
@@ -180,7 +179,19 @@ void Controller::DdkInit(ddk::InitTxn txn) {
     }
 
     sync_completion_signal(&added_children_);
+
+    txn.Reply(ZX_OK);
   });
+}
+
+void Controller::DdkUnbind(ddk::UnbindTxn txn) {
+  JoinInitThread();
+  txn.Reply();
+}
+
+void Controller::DdkSuspend(ddk::SuspendTxn txn) {
+  JoinInitThread();
+  txn.Reply(ZX_OK, txn.requested_state());
 }
 
 zx::result<std::vector<uint8_t>> Controller::SendControllerCommand(
@@ -260,6 +271,12 @@ StatusReg Controller::ReadStatus() {
 }
 
 uint8_t Controller::ReadData() { return inp(kDataReg); }
+
+void Controller::JoinInitThread() {
+  if (init_thread_.joinable()) {
+    init_thread_.join();
+  }
+}
 
 bool Controller::WaitWrite() {
   size_t i = 0;
