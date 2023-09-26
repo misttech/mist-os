@@ -12,8 +12,10 @@ use {
         filesystem::{Filesystem, FxFilesystem, SyncOptions},
         object_handle::{GetProperties, WriteBytes},
         object_store::{
-            directory::Directory, transaction::LockKey, volume::root_volume, DirectWriter,
-            ObjectStore, BLOB_MERKLE_ATTRIBUTE_ID,
+            directory::Directory,
+            transaction::{lock_keys, LockKey},
+            volume::root_volume,
+            DirectWriter, ObjectStore, BLOB_MERKLE_ATTRIBUTE_ID,
         },
         round::round_up,
         serialized_types::BlobMetadata,
@@ -221,10 +223,11 @@ async fn install_blob(
     let merkle = blob.hash.to_string();
 
     let handle;
-    let keys = [LockKey::object(directory.store().store_object_id(), directory.object_id())];
+    let keys =
+        lock_keys![LockKey::object(directory.store().store_object_id(), directory.object_id())];
     let mut transaction = filesystem
         .clone()
-        .new_transaction(&keys, Default::default())
+        .new_transaction(keys, Default::default())
         .await
         .context("new transaction")?;
     handle = directory

@@ -10,8 +10,8 @@ use {
         object_store::{
             journal::JournalHandle,
             transaction::{
-                LockKey, LockManager, MetadataReservation, Options, ReadGuard, Transaction,
-                TransactionHandler, TransactionLocks, WriteGuard,
+                LockKeys, LockManager, MetadataReservation, Options, Transaction,
+                TransactionHandler,
             },
             Timestamp,
         },
@@ -73,15 +73,10 @@ impl FakeObject {
 impl TransactionHandler for FakeObject {
     async fn new_transaction<'a>(
         self: Arc<Self>,
-        locks: &[LockKey],
+        locks: LockKeys,
         _options: Options<'a>,
     ) -> Result<Transaction<'a>, Error> {
-        Ok(Transaction::new(self, MetadataReservation::Borrowed, &[], locks).await)
-    }
-
-    async fn transaction_lock<'a>(&'a self, lock_keys: &[LockKey]) -> TransactionLocks<'a> {
-        let lock_manager: &LockManager = self.as_ref();
-        TransactionLocks(lock_manager.txn_lock(lock_keys).await)
+        Ok(Transaction::new(self, MetadataReservation::Borrowed, LockKeys::None, locks).await)
     }
 
     async fn commit_transaction(
@@ -98,17 +93,7 @@ impl TransactionHandler for FakeObject {
         self.lock_manager.drop_transaction(transaction);
     }
 
-    async fn read_lock<'a>(&'a self, lock_keys: &[LockKey]) -> ReadGuard<'a> {
-        self.lock_manager.read_lock(lock_keys).await
-    }
-
-    async fn write_lock<'a>(&'a self, lock_keys: &[LockKey]) -> WriteGuard<'a> {
-        self.lock_manager.write_lock(lock_keys).await
-    }
-}
-
-impl AsRef<LockManager> for FakeObject {
-    fn as_ref(&self) -> &LockManager {
+    fn lock_manager(&self) -> &LockManager {
         &self.lock_manager
     }
 }

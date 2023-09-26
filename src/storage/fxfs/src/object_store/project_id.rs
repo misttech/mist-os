@@ -7,7 +7,7 @@ use {
         errors::FxfsError,
         lsm_tree::types::{ItemRef, LayerIterator},
         object_store::{
-            transaction::{LockKey, Mutation, Options},
+            transaction::{lock_keys, LockKey, Mutation, Options},
             ObjectKey, ObjectKeyData, ObjectKind, ObjectStore, ObjectValue, ProjectProperty,
         },
     },
@@ -29,7 +29,10 @@ impl ObjectStore {
         let mut transaction = self
             .filesystem()
             .new_transaction(
-                &vec![LockKey::ProjectId { store_object_id: self.store_object_id, project_id }],
+                lock_keys![LockKey::ProjectId {
+                    store_object_id: self.store_object_id,
+                    project_id
+                }],
                 Options::default(),
             )
             .await?;
@@ -54,7 +57,10 @@ impl ObjectStore {
         let mut transaction = self
             .filesystem()
             .new_transaction(
-                &vec![LockKey::ProjectId { store_object_id: self.store_object_id, project_id }],
+                lock_keys![LockKey::ProjectId {
+                    store_object_id: self.store_object_id,
+                    project_id
+                }],
                 Options::default(),
             )
             .await?;
@@ -77,7 +83,7 @@ impl ObjectStore {
         let mut transaction = self
             .filesystem()
             .new_transaction(
-                &vec![
+                lock_keys![
                     LockKey::ProjectId { store_object_id: self.store_object_id, project_id },
                     LockKey::object(self.store_object_id, node_id),
                 ],
@@ -147,7 +153,7 @@ impl ObjectStore {
         let mut transaction = self
             .filesystem()
             .new_transaction(
-                &vec![LockKey::object(self.store_object_id, node_id)],
+                lock_keys![LockKey::object(self.store_object_id, node_id)],
                 Options::default(),
             )
             .await?;

@@ -24,7 +24,9 @@ use {
         object_handle::{ObjectHandle, ObjectHandleExt, ReadObjectHandle, INVALID_OBJECT_ID},
         object_store::{
             object_manager::ReservationUpdate,
-            transaction::{AllocatorMutation, AssocObj, LockKey, Mutation, Options, Transaction},
+            transaction::{
+                lock_keys, AllocatorMutation, AssocObj, LockKey, Mutation, Options, Transaction,
+            },
             tree, CachingObjectHandle, DirectWriter, HandleOptions, ObjectStore,
         },
         range::RangeExt,
@@ -1522,8 +1524,8 @@ impl JournalingObject for SimpleAllocator {
             return Ok(self.tree.get_earliest_version());
         }
 
-        let keys = [LockKey::flush(self.object_id())];
-        let _guard = debug_assert_not_too_long!(filesystem.write_lock(&keys));
+        let keys = lock_keys![LockKey::flush(self.object_id())];
+        let _guard = filesystem.lock_manager().write_lock(keys).await;
 
         let reservation = object_manager.metadata_reservation();
         let txn_options = Options {
@@ -1532,7 +1534,7 @@ impl JournalingObject for SimpleAllocator {
             allocator_reservation: Some(reservation),
             ..Default::default()
         };
-        let mut transaction = filesystem.clone().new_transaction(&[], txn_options).await?;
+        let mut transaction = filesystem.clone().new_transaction(lock_keys![], txn_options).await?;
 
         let root_store = self.filesystem.upgrade().unwrap().root_store();
         let layer_object_handle = ObjectStore::create_object(
@@ -1574,7 +1576,7 @@ impl JournalingObject for SimpleAllocator {
         let mut transaction = filesystem
             .clone()
             .new_transaction(
-                &[LockKey::object(root_store.store_object_id(), self.object_id())],
+                lock_keys![LockKey::object(root_store.store_object_id(), self.object_id())],
                 txn_options,
             )
             .await?;
@@ -1734,7 +1736,7 @@ mod tests {
                     SimpleAllocator,
                 },
                 testing::fake_filesystem::FakeFilesystem,
-                transaction::{Options, TransactionHandler},
+                transaction::{lock_keys, Options, TransactionHandler},
                 ObjectStore,
             },
             range::RangeExt,
@@ -1905,7 +1907,7 @@ mod tests {
         fs.object_manager().init_metadata_reservation().expect("init_metadata_reservation failed");
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         allocator.create(&mut transaction).await.expect("create failed");
@@ -1918,7 +1920,7 @@ mod tests {
         const STORE_OBJECT_ID: u64 = 99;
         let (fs, allocator, _) = test_fs().await;
         let mut transaction =
-            fs.clone().new_transaction(&[], Options::default()).await.expect("new failed");
+            fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
         let mut device_ranges = Vec::new();
         device_ranges.push(
             allocator
@@ -1937,7 +1939,7 @@ mod tests {
         assert_eq!(overlap(&device_ranges[0], &device_ranges[1]), 0);
         transaction.commit().await.expect("commit failed");
         let mut transaction =
-            fs.clone().new_transaction(&[], Options::default()).await.expect("new failed");
+            fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
         device_ranges.push(
             allocator
                 .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
@@ -1957,7 +1959,7 @@ mod tests {
         const STORE_OBJECT_ID: u64 = 99;
         let (fs, allocator, _) = test_fs().await;
         let mut transaction =
-            fs.clone().new_transaction(&[], Options::default()).await.expect("new failed");
+            fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
         let mut device_ranges = Vec::new();
         device_ranges.push(
             allocator
@@ -1979,7 +1981,7 @@ mod tests {
         const STORE_OBJECT_ID: u64 = 99;
         let (fs, allocator, _) = test_fs().await;
         let mut transaction =
-            fs.clone().new_transaction(&[], Options::default()).await.expect("new failed");
+            fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
         let device_range1 = allocator
             .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
             .await
@@ -1988,7 +1990,7 @@ mod tests {
         transaction.commit().await.expect("commit failed");
 
         let mut transaction =
-            fs.clone().new_transaction(&[], Options::default()).await.expect("new failed");
+            fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
         allocator
             .deallocate(&mut transaction, STORE_OBJECT_ID, device_range1)
             .await
@@ -2003,7 +2005,7 @@ mod tests {
         const STORE_OBJECT_ID: u64 = 99;
         let (fs, allocator, _) = test_fs().await;
         let mut transaction =
-            fs.clone().new_transaction(&[], Options::default()).await.expect("new failed");
+            fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
         let mut device_ranges = Vec::new();
         device_ranges.push(0..fs.block_size());
         allocator
@@ -2036,7 +2038,7 @@ mod tests {
         assert_eq!(0, allocator.get_allocated_bytes());
         let mut device_ranges = Vec::new();
         let mut transaction =
-            fs.clone().new_transaction(&[], Options::default()).await.expect("new failed");
+            fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
         // Note we have a cap on individual allocation length so we allocate over multiple mutation.
         for _ in 0..15 {
             device_ranges.push(
@@ -2059,7 +2061,7 @@ mod tests {
 
         // Mark for deletion.
         let mut transaction =
-            fs.clone().new_transaction(&[], Options::default()).await.expect("new failed");
+            fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
         allocator.mark_for_deletion(&mut transaction, STORE_OBJECT_ID).await;
         transaction.commit().await.expect("commit failed");
 
@@ -2072,7 +2074,7 @@ mod tests {
         device_ranges.clear();
 
         let mut transaction =
-            fs.clone().new_transaction(&[], Options::default()).await.expect("new failed");
+            fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
         let target_bytes = 1500 * fs.block_size();
         while device_ranges.iter().map(|x| x.length().unwrap()).sum::<u64>() != target_bytes {
             let len = std::cmp::min(
@@ -2106,7 +2108,7 @@ mod tests {
         // Allocate some stuff.
         let mut device_ranges = Vec::new();
         let mut transaction =
-            fs.clone().new_transaction(&[], Options::default()).await.expect("new failed");
+            fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
         for _ in 0..30 {
             device_ranges.push(
                 allocator
@@ -2124,7 +2126,7 @@ mod tests {
 
         // Delete it all.
         let mut transaction =
-            fs.clone().new_transaction(&[], Options::default()).await.expect("new failed");
+            fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
         for range in std::mem::replace(&mut device_ranges, Vec::new()) {
             allocator.deallocate(&mut transaction, STORE_OBJECT_ID, range).await.expect("dealloc");
         }
@@ -2138,7 +2140,7 @@ mod tests {
         // Allocate some more stuff. Due to storage pressure, this requires us to flush device
         // before reusing the above space
         let mut transaction =
-            fs.clone().new_transaction(&[], Options::default()).await.expect("new failed");
+            fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
         let target_len = 1500 * fs.block_size();
         while device_ranges.iter().map(|i| i.length().unwrap()).sum::<u64>() != target_len {
             let len = target_len - device_ranges.iter().map(|i| i.length().unwrap()).sum::<u64>();
@@ -2162,7 +2164,7 @@ mod tests {
         const STORE_OBJECT_ID: u64 = 99;
         let (fs, allocator, _) = test_fs().await;
         let mut transaction =
-            fs.clone().new_transaction(&[], Options::default()).await.expect("new failed");
+            fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
         let mut device_ranges = Vec::new();
         device_ranges.push(
             allocator
@@ -2194,7 +2196,7 @@ mod tests {
         // be on top of those objects.  That won't matter for the purposes of this test, since we
         // are not writing anything to these ranges.
         let mut transaction =
-            fs.clone().new_transaction(&[], Options::default()).await.expect("new failed");
+            fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
         device_ranges.push(
             allocator
                 .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
@@ -2215,7 +2217,7 @@ mod tests {
         let allocated_range = {
             let mut transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(lock_keys![], Options::default())
                 .await
                 .expect("new_transaction failed");
             allocator
@@ -2227,7 +2229,7 @@ mod tests {
         // the same range because the reservation should have been released.
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         assert_eq!(
@@ -2250,7 +2252,7 @@ mod tests {
         let allocated_range = {
             let mut transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(lock_keys![], Options::default())
                 .await
                 .expect("new_transaction failed");
             let range = allocator
@@ -2265,7 +2267,7 @@ mod tests {
         {
             let mut transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(lock_keys![], Options::default())
                 .await
                 .expect("new_transaction failed");
             allocator
@@ -2283,7 +2285,7 @@ mod tests {
         // Verify allocated_bytes reflects deallocations.
         let deallocate_range = allocated_range.start + 20..allocated_range.end - 20;
         let mut transaction =
-            fs.clone().new_transaction(&[], Options::default()).await.expect("new failed");
+            fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
         allocator
             .deallocate(&mut transaction, STORE_OBJECT_ID, deallocate_range)
             .await
@@ -2307,7 +2309,7 @@ mod tests {
         {
             let mut transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(lock_keys![], Options::default())
                 .await
                 .expect("new_transaction failed");
             allocator

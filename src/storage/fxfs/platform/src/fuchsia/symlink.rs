@@ -13,7 +13,7 @@ use {
         errors::FxfsError,
         object_handle::{ObjectHandle, ObjectProperties},
         object_store::{
-            transaction::{LockKey, Options},
+            transaction::{lock_keys, LockKey, Options},
             HandleOptions, ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKind, ObjectValue,
             StoreObjectHandle,
         },
@@ -111,7 +111,7 @@ impl Node for FxSymlink {
             .filesystem()
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(store.store_object_id(), self.object_id()),
                     LockKey::object(store.store_object_id(), dir.object_id()),
                 ],
@@ -140,8 +140,10 @@ impl FxNode for FxSymlink {
     async fn get_properties(&self) -> Result<ObjectProperties, Error> {
         let store = self.handle.store();
         let fs = store.filesystem();
-        let _guard =
-            fs.read_lock(&[LockKey::object(store.store_object_id(), self.object_id())]).await;
+        let _guard = fs
+            .lock_manager()
+            .read_lock(lock_keys![LockKey::object(store.store_object_id(), self.object_id())])
+            .await;
         let item = store
             .tree()
             .find(&ObjectKey::object(self.object_id()))

@@ -23,7 +23,7 @@ use {
         log::*,
         object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle},
         object_store::{
-            transaction::{LockKey, Options},
+            transaction::{lock_keys, LockKey, Options},
             DataObjectHandle, ObjectDescriptor, Timestamp,
         },
         round::round_up,
@@ -326,7 +326,7 @@ impl vfs::node::Node for FxFile {
             .filesystem()
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(store.store_object_id(), object_id),
                     LockKey::object(store.store_object_id(), dir.object_id()),
                 ],

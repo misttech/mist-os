@@ -18,7 +18,7 @@ use {
             allocator::{Allocator, AllocatorKey, AllocatorValue, CoalescingIterator},
             journal::super_block::SuperBlockInstance,
             load_store_info,
-            transaction::LockKey,
+            transaction::{lock_keys, LockKey},
             volume::root_volume,
         },
     },
@@ -96,7 +96,7 @@ pub async fn fsck_with_options(
     let _guard = if options.no_lock {
         None
     } else {
-        Some(filesystem.write_lock(&[LockKey::Filesystem]).await)
+        Some(filesystem.lock_manager().write_lock(lock_keys![LockKey::Filesystem]).await)
     };
 
     let mut fsck = Fsck::new(options);
@@ -234,7 +234,7 @@ pub async fn fsck_volume_with_options(
     let _guard = if options.no_lock {
         None
     } else {
-        Some(filesystem.write_lock(&[LockKey::Filesystem]).await)
+        Some(filesystem.lock_manager().write_lock(lock_keys![LockKey::Filesystem]).await)
     };
 
     let mut fsck = Fsck::new(options);

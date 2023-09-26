@@ -389,7 +389,7 @@ mod tests {
         crate::fuse_fs::FuseFs,
         fxfs::{
             object_handle::ObjectHandle,
-            object_store::transaction::{LockKey, Options, TransactionHandler},
+            object_store::transaction::{lock_keys, LockKey, Options, TransactionHandler},
         },
     };
 
@@ -403,7 +403,7 @@ mod tests {
             .fs
             .clone()
             .new_transaction(
-                &[LockKey::object(fs.default_store.store_object_id(), dir.object_id())],
+                lock_keys![LockKey::object(fs.default_store.store_object_id(), dir.object_id())],
                 Options::default(),
             )
             .await

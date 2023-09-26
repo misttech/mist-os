@@ -13,7 +13,7 @@ use {
         object_store::{
             allocator::{self, Allocator},
             object_record::{AttributeKey, Timestamp},
-            transaction::{LockKey, Options, TRANSACTION_METADATA_MAX_AMOUNT},
+            transaction::{lock_keys, LockKey, Options, TRANSACTION_METADATA_MAX_AMOUNT},
             writeback_cache::{FlushableMetadata, StorageReservation, WritebackCache},
             AssocObj, DataObjectHandle, HandleOwner, Mutation, ObjectKey, ObjectStore, ObjectValue,
             TrimMode, TrimResult,
@@ -80,7 +80,8 @@ impl<S: HandleOwner> CachingObjectHandle<S> {
     ) -> Result<u64, Error> {
         let fs = self.store().filesystem();
         let _locks = fs
-            .transaction_lock(&[LockKey::cached_write(
+            .lock_manager()
+            .txn_lock(lock_keys![LockKey::cached_write(
                 self.store().store_object_id,
                 self.handle.object_id(),
                 self.handle.attribute_id(),
@@ -129,12 +130,13 @@ impl<S: HandleOwner> CachingObjectHandle<S> {
         // after take_flushable returns.
         let cached_write_lock = if take_lock {
             Some(
-                fs.transaction_lock(&[LockKey::cached_write(
-                    store_id,
-                    self.handle.object_id(),
-                    self.handle.attribute_id(),
-                )])
-                .await,
+                fs.lock_manager()
+                    .txn_lock(lock_keys![LockKey::cached_write(
+                        store_id,
+                        self.handle.object_id(),
+                        self.handle.attribute_id(),
+                    )])
+                    .await,
             )
         } else {
             None
@@ -151,7 +153,8 @@ impl<S: HandleOwner> CachingObjectHandle<S> {
         // which relies on the reservations being returned.  flushable must be dropped before the
         // locks since we need to stop take_flushable from being called.
         let locks = fs
-            .transaction_lock(&[LockKey::object_attribute(
+            .lock_manager()
+            .txn_lock(lock_keys![LockKey::object_attribute(
                 store_id,
                 self.handle.object_id(),
                 self.handle.attribute_id(),
@@ -180,7 +183,7 @@ impl<S: HandleOwner> CachingObjectHandle<S> {
             let mut transaction = fs
                 .clone()
                 .new_transaction(
-                    &[LockKey::object(store_id, self.handle.object_id())],
+                    lock_keys![LockKey::object(store_id, self.handle.object_id())],
                     Options {
                         borrow_metadata_space: true,
                         ..self.handle.default_transaction_options()
@@ -206,7 +209,7 @@ impl<S: HandleOwner> CachingObjectHandle<S> {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(store_id, self.handle.object_id())],
+                lock_keys![LockKey::object(store_id, self.handle.object_id())],
                 Options {
                     // If there is no data then the reservation won't have any space for the
                     // transaction. Since it should only be for file size or metadata changes,
@@ -402,7 +405,8 @@ impl<S: HandleOwner> WriteObjectHandle for CachingObjectHandle<S> {
     async fn truncate(&self, size: u64) -> Result<(), Error> {
         let fs = self.store().filesystem();
         let _locks = fs
-            .transaction_lock(&[LockKey::cached_write(
+            .lock_manager()
+            .txn_lock(lock_keys![LockKey::cached_write(
                 self.store().store_object_id,
                 self.handle.object_id(),
                 self.handle.attribute_id(),
@@ -429,7 +433,8 @@ impl<S: HandleOwner> WriteObjectHandle for CachingObjectHandle<S> {
     ) -> Result<(), Error> {
         let fs = self.store().filesystem();
         let _locks = fs
-            .transaction_lock(&[LockKey::cached_write(
+            .lock_manager()
+            .txn_lock(lock_keys![LockKey::cached_write(
                 self.store().store_object_id,
                 self.handle.object_id(),
                 self.handle.attribute_id(),
@@ -457,7 +462,7 @@ mod tests {
                 allocator::Allocator,
                 directory::Directory,
                 object_record::{ObjectKey, ObjectKeyData, ObjectValue, Timestamp},
-                transaction::{Options, TransactionHandler},
+                transaction::{lock_keys, Options, TransactionHandler},
                 CachingObjectHandle, HandleOptions, LockKey, ObjectStore,
                 TRANSACTION_MUTATION_THRESHOLD,
             },
@@ -489,7 +494,7 @@ mod tests {
         let handle;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         handle = ObjectStore::create_object(
@@ -561,7 +566,7 @@ mod tests {
         let fs = test_filesystem().await;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         let handle = ObjectStore::create_object(
@@ -650,7 +655,7 @@ mod tests {
         let store = object.owner();
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         let handle2 = ObjectStore::create_object(
@@ -712,7 +717,7 @@ mod tests {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(object.store().store_object_id(), object.object_id())],
+                lock_keys![LockKey::object(object.store().store_object_id(), object.object_id())],
                 Options::default(),
             )
             .await
@@ -732,7 +737,7 @@ mod tests {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(object.store().store_object_id(), object.object_id())],
+                lock_keys![LockKey::object(object.store().store_object_id(), object.object_id())],
                 Options::default(),
             )
             .await
@@ -787,7 +792,7 @@ mod tests {
         let handle;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         let store = fs.root_store();
@@ -869,7 +874,7 @@ mod tests {
             let handle;
             let mut transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(lock_keys![], Options::default())
                 .await
                 .expect("new_transaction failed");
             handle = ObjectStore::create_object(
@@ -948,7 +953,7 @@ mod tests {
             let object;
             let mut transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(lock_keys![], Options::default())
                 .await
                 .expect("new_transaction failed");
             object = ObjectStore::create_object(
@@ -1030,7 +1035,7 @@ mod tests {
         let object;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         object = ObjectStore::create_object(
@@ -1077,7 +1082,7 @@ mod tests {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
                 Options::default(),
             )
             .await

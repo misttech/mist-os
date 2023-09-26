@@ -650,7 +650,7 @@ mod tests {
             object_store::{
                 allocator::Allocator,
                 journal::JournalCheckpoint,
-                transaction::{Options, TransactionHandler},
+                transaction::{lock_keys, Options, TransactionHandler},
                 DataObjectHandle, HandleOptions, ObjectHandle, ObjectKey, ObjectStore,
             },
             serialized_types::LATEST_VERSION,
@@ -720,7 +720,7 @@ mod tests {
         for _ in 0..NUM_ENTRIES {
             let mut transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(lock_keys![], Options::default())
                 .await
                 .expect("new_transaction failed");
             created_object_ids.push(
@@ -816,7 +816,7 @@ mod tests {
         for object_id in created_object_ids {
             let mut transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(lock_keys![], Options::default())
                 .await
                 .expect("new_transaction failed");
             fs.object_manager()
@@ -836,7 +836,7 @@ mod tests {
         for _ in 0..NUM_ENTRIES {
             let mut transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(lock_keys![], Options::default())
                 .await
                 .expect("new_transaction failed");
             ObjectStore::create_object(
@@ -909,7 +909,7 @@ mod tests {
         for _ in 0..6000 {
             let mut transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(lock_keys![], Options::default())
                 .await
                 .expect("new_transaction failed");
             ObjectStore::create_object(
@@ -972,7 +972,7 @@ mod tests {
         for _ in 0..6000 {
             let mut transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(lock_keys![], Options::default())
                 .await
                 .expect("new_transaction failed");
             ObjectStore::create_object(
@@ -1029,7 +1029,7 @@ mod tests {
 
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         let store = fs.root_parent_store();
@@ -1051,7 +1051,7 @@ mod tests {
         for _ in 0..6000 {
             let mut transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(lock_keys![], Options::default())
                 .await
                 .expect("new_transaction failed");
             ObjectStore::create_object(

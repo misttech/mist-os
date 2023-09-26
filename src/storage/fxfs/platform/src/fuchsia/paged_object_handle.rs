@@ -11,7 +11,6 @@ use {
     anyhow::{ensure, Context, Error},
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     fxfs::{
-        debug_assert_not_too_long,
         errors::FxfsError,
         filesystem::MAX_FILE_SIZE,
         log::*,
@@ -19,7 +18,8 @@ use {
         object_store::{
             allocator::{Allocator, Reservation, ReservationOwner, SimpleAllocator},
             transaction::{
-                AssocObj, LockKey, Mutation, Options, Transaction, TRANSACTION_METADATA_MAX_AMOUNT,
+                lock_keys, AssocObj, LockKey, Mutation, Options, Transaction,
+                TRANSACTION_METADATA_MAX_AMOUNT,
             },
             AttributeKey, DataObjectHandle, ObjectKey, ObjectStore, ObjectValue, StoreObjectHandle,
             Timestamp,
@@ -270,7 +270,10 @@ impl PagedObjectHandle {
         self.store()
             .filesystem()
             .new_transaction(
-                &[LockKey::object(self.handle.store().store_object_id(), self.handle.object_id())],
+                lock_keys![LockKey::object(
+                    self.handle.store().store_object_id(),
+                    self.handle.object_id()
+                )],
                 Options {
                     skip_journal_checks: false,
                     borrow_metadata_space: reservation.is_none(),
@@ -591,8 +594,8 @@ impl PagedObjectHandle {
         // If the VMO is shrunk between getting the VMO's size and calling query_dirty_ranges or
         // reading the cached data then the flush could fail. This lock is held to prevent the file
         // from shrinking while it's being flushed.
-        let keys = [LockKey::truncate(store.store_object_id(), self.handle.object_id())];
-        let _truncate_guard = debug_assert_not_too_long!(fs.write_lock(&keys));
+        let keys = lock_keys![LockKey::truncate(store.store_object_id(), self.handle.object_id())];
+        let _truncate_guard = fs.lock_manager().write_lock(keys).await;
 
         let pending_shrink = self.inner.lock().unwrap().pending_shrink;
         if let PendingShrink::ShrinkTo(size) = pending_shrink {
@@ -730,8 +733,8 @@ impl PagedObjectHandle {
         ensure!(new_size <= MAX_FILE_SIZE, FxfsError::InvalidArgs);
         let store = self.handle.store();
         let fs = store.filesystem();
-        let keys = [LockKey::truncate(store.store_object_id(), self.handle.object_id())];
-        let _truncate_guard = debug_assert_not_too_long!(fs.write_lock(&keys));
+        let keys = lock_keys![LockKey::truncate(store.store_object_id(), self.handle.object_id())];
+        let _truncate_guard = fs.lock_manager().write_lock(keys).await;
 
         let old_vmo_size = self.vmo.get_size()?;
 
@@ -809,8 +812,9 @@ impl PagedObjectHandle {
         let (attributes_with_pending_mtime, ctime) = {
             let store = self.handle.store();
             fs = store.filesystem();
-            let keys = [LockKey::truncate(store.store_object_id(), self.handle.object_id())];
-            _flush_guard = debug_assert_not_too_long!(fs.write_lock(&keys));
+            let keys =
+                lock_keys![LockKey::truncate(store.store_object_id(), self.handle.object_id())];
+            _flush_guard = fs.lock_manager().write_lock(keys).await;
             let mut inner = self.inner.lock().unwrap();
             let mut attributes = attributes.clone();
             // There is an assumption that when we expose ctime and mtime, that ctime is the same

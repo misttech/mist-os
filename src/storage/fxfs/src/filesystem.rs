@@ -18,9 +18,8 @@ use {
             },
             object_manager::ObjectManager,
             transaction::{
-                self, AssocObj, LockKey, LockManager, MetadataReservation, Mutation, ReadGuard,
-                Transaction, TransactionHandler, TransactionLocks, WriteGuard,
-                TRANSACTION_METADATA_MAX_AMOUNT,
+                self, lock_keys, AssocObj, LockKey, LockKeys, LockManager, MetadataReservation,
+                Mutation, Transaction, TransactionHandler, TRANSACTION_METADATA_MAX_AMOUNT,
             },
             volume::{root_volume, VOLUMES_DIRECTORY},
             ObjectStore,
@@ -422,7 +421,10 @@ impl FxFilesystemBuilder {
             let mut transaction = filesystem
                 .clone()
                 .new_transaction(
-                    &[LockKey::object(root_store.store_object_id(), root_directory.object_id())],
+                    lock_keys![LockKey::object(
+                        root_store.store_object_id(),
+                        root_directory.object_id()
+                    )],
                     transaction::Options::default(),
                 )
                 .await?;
@@ -660,26 +662,25 @@ impl Filesystem for FxFilesystem {
 impl TransactionHandler for FxFilesystem {
     async fn new_transaction<'a>(
         self: Arc<Self>,
-        locks: &[LockKey],
+        locks: LockKeys,
         options: transaction::Options<'a>,
     ) -> Result<Transaction<'a>, Error> {
         self.add_transaction(options.skip_journal_checks).await;
         let guard = scopeguard::guard((), |_| self.sub_transaction());
         let (metadata_reservation, allocator_reservation, hold) =
             self.reservation_for_transaction(options).await?;
-        let mut transaction =
-            Transaction::new(self.clone(), metadata_reservation, &[LockKey::Filesystem], locks)
-                .await;
+        let mut transaction = Transaction::new(
+            self.clone(),
+            metadata_reservation,
+            lock_keys![LockKey::Filesystem],
+            locks,
+        )
+        .await;
 
         ScopeGuard::into_inner(guard);
         hold.map(|h| h.forget()); // Transaction takes ownership from here on.
         transaction.allocator_reservation = allocator_reservation;
         Ok(transaction)
-    }
-
-    async fn transaction_lock<'a>(&'a self, lock_keys: &[LockKey]) -> TransactionLocks<'a> {
-        let lock_manager: &LockManager = self.as_ref();
-        TransactionLocks(debug_assert_not_too_long!(lock_manager.txn_lock(lock_keys)))
     }
 
     async fn commit_transaction(
@@ -737,17 +738,7 @@ impl TransactionHandler for FxFilesystem {
         self.lock_manager.drop_transaction(transaction);
     }
 
-    async fn read_lock<'a>(&'a self, lock_keys: &[LockKey]) -> ReadGuard<'a> {
-        debug_assert_not_too_long!(self.lock_manager.read_lock(lock_keys))
-    }
-
-    async fn write_lock<'a>(&'a self, lock_keys: &[LockKey]) -> WriteGuard<'a> {
-        debug_assert_not_too_long!(self.lock_manager.write_lock(lock_keys))
-    }
-}
-
-impl AsRef<LockManager> for FxFilesystem {
-    fn as_ref(&self) -> &LockManager {
+    fn lock_manager(&self) -> &LockManager {
         &self.lock_manager
     }
 }
@@ -823,7 +814,7 @@ mod tests {
                 directory::replace_child,
                 directory::Directory,
                 journal::JournalOptions,
-                transaction::{LockKey, Options, TransactionHandler},
+                transaction::{lock_keys, LockKey, Options, TransactionHandler},
             },
         },
         fuchsia_async as fasync,
@@ -853,7 +844,10 @@ mod tests {
             let mut transaction = fs
                 .clone()
                 .new_transaction(
-                    &[LockKey::object(root_store.store_object_id(), root_directory.object_id())],
+                    lock_keys![LockKey::object(
+                        root_store.store_object_id(),
+                        root_directory.object_id()
+                    )],
                     Options::default(),
                 )
                 .await
@@ -940,7 +934,10 @@ mod tests {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(root_store.store_object_id(), root_directory.object_id())],
+                lock_keys![LockKey::object(
+                    root_store.store_object_id(),
+                    root_directory.object_id()
+                )],
                 Options::default(),
             )
             .await
@@ -965,7 +962,7 @@ mod tests {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(root_store.store_object_id(), root_directory.object_id()),
                     LockKey::object(root_store.store_object_id(), object.object_id()),
                 ],
@@ -1041,11 +1038,11 @@ mod tests {
 
         let mut transactions = Vec::new();
         for _ in 0..super::MAX_IN_FLIGHT_TRANSACTIONS {
-            transactions.push(fs.clone().new_transaction(&[], Options::default()).await);
+            transactions.push(fs.clone().new_transaction(lock_keys![], Options::default()).await);
         }
 
         // Trying to create another one should be blocked.
-        let mut fut = fs.clone().new_transaction(&[], Options::default());
+        let mut fut = fs.clone().new_transaction(lock_keys![], Options::default());
         assert!(futures::poll!(&mut fut).is_pending());
 
         // Dropping one should allow it to proceed.

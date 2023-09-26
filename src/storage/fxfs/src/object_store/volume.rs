@@ -7,9 +7,12 @@ use {
         errors::FxfsError,
         filesystem::Filesystem,
         object_store::{
-            allocator::Allocator, directory::Directory, load_store_info, transaction::Options,
-            transaction::Transaction, tree_cache::TreeCache, LockKey, NewChildStoreOptions,
-            ObjectDescriptor, ObjectStore,
+            allocator::Allocator,
+            directory::Directory,
+            load_store_info,
+            transaction::{lock_keys, Options, Transaction},
+            tree_cache::TreeCache,
+            LockKey, NewChildStoreOptions, ObjectDescriptor, ObjectStore,
         },
     },
     anyhow::{anyhow, bail, ensure, Context, Error},
@@ -49,7 +52,7 @@ impl RootVolume {
             .filesystem
             .clone()
             .new_transaction(
-                &[LockKey::object(
+                lock_keys![LockKey::object(
                     root_store.store_object_id(),
                     self.volume_directory().object_id(),
                 )],
@@ -197,7 +200,7 @@ mod tests {
             object_store::{
                 allocator::Allocator,
                 directory::Directory,
-                transaction::{Options, TransactionHandler},
+                transaction::{lock_keys, Options, TransactionHandler},
                 LockKey,
             },
         },
@@ -233,7 +236,10 @@ mod tests {
             let mut transaction = filesystem
                 .clone()
                 .new_transaction(
-                    &[LockKey::object(store.store_object_id(), store.root_directory_object_id())],
+                    lock_keys![LockKey::object(
+                        store.store_object_id(),
+                        store.root_directory_object_id()
+                    )],
                     Options::default(),
                 )
                 .await
@@ -281,7 +287,7 @@ mod tests {
             let mut transaction = filesystem
                 .clone()
                 .new_transaction(
-                    &[LockKey::object(store_object_id, store.root_directory_object_id())],
+                    lock_keys![LockKey::object(store_object_id, store.root_directory_object_id())],
                     Options::default(),
                 )
                 .await
@@ -324,7 +330,7 @@ mod tests {
             let transaction = filesystem
                 .clone()
                 .new_transaction(
-                    &[LockKey::object(
+                    lock_keys![LockKey::object(
                         root_volume.volume_directory().store().store_object_id(),
                         root_volume.volume_directory().object_id(),
                     )],

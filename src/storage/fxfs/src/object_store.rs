@@ -35,7 +35,6 @@ pub use store_object_handle::{
 
 use {
     crate::{
-        debug_assert_not_too_long,
         errors::FxfsError,
         filesystem::{
             ApplyContext, ApplyMode, Filesystem, FxFilesystem, JournalingObject, SyncOptions,
@@ -54,8 +53,8 @@ use {
             journal::{JournalCheckpoint, JournaledTransaction},
             key_manager::KeyManager,
             transaction::{
-                AssocObj, AssociatedObject, LockKey, ObjectStoreMutation, Operation, Options,
-                Transaction, UpdateMutationsKey,
+                lock_keys, AssocObj, AssociatedObject, LockKey, ObjectStoreMutation, Operation,
+                Options, Transaction, UpdateMutationsKey,
             },
         },
         range::RangeExt,
@@ -1035,7 +1034,7 @@ impl ObjectStore {
             let mut transaction = fs
                 .clone()
                 .new_transaction(
-                    &[
+                    lock_keys![
                         LockKey::object_attribute(self.store_object_id, object_id, attribute_id),
                         LockKey::object(self.store_object_id, object_id),
                     ],
@@ -1441,9 +1440,9 @@ impl ObjectStore {
             LockState::Unlocking => panic!("Store is being unlocked"),
         }
         // We must lock flushing since that can modify store_info and the encrypted mutations file.
-        let keys = [LockKey::flush(self.store_object_id())];
+        let keys = lock_keys![LockKey::flush(self.store_object_id())];
         let fs = self.filesystem();
-        let guard = debug_assert_not_too_long!(fs.write_lock(&keys));
+        let guard = fs.lock_manager().write_lock(keys).await;
 
         let store_info = self.load_store_info().await?;
 
@@ -1610,9 +1609,9 @@ impl ObjectStore {
     pub async fn lock(&self) -> Result<(), Error> {
         // We must lock flushing since it is not safe for that to be happening whilst we are locking
         // the store.
-        let keys = [LockKey::flush(self.store_object_id())];
+        let keys = lock_keys![LockKey::flush(self.store_object_id())];
         let fs = self.filesystem();
-        let _guard = debug_assert_not_too_long!(fs.write_lock(&keys));
+        let _guard = fs.lock_manager().write_lock(keys).await;
 
         {
             let mut lock_state = self.lock_state.lock().unwrap();
@@ -1673,7 +1672,7 @@ impl ObjectStore {
         let mut transaction = self
             .filesystem()
             .new_transaction(
-                &[LockKey::object(
+                lock_keys![LockKey::object(
                     self.parent_store.as_ref().unwrap().store_object_id,
                     self.store_object_id,
                 )],
@@ -2118,7 +2117,7 @@ mod tests {
             object_store::{
                 directory::Directory,
                 object_record::{ObjectKey, ObjectValue},
-                transaction::{Options, TransactionHandler},
+                transaction::{lock_keys, Options, TransactionHandler},
                 volume::root_volume,
                 HandleOptions, LockKey, ObjectStore,
             },
@@ -2152,7 +2151,7 @@ mod tests {
         let object3;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         let store = fs.root_store();
@@ -2170,7 +2169,7 @@ mod tests {
         transaction.commit().await.expect("commit failed");
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         object2 = Arc::new(
@@ -2190,7 +2189,7 @@ mod tests {
 
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         object3 = Arc::new(
@@ -2258,7 +2257,7 @@ mod tests {
         let store = fs.root_store();
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         let object = Arc::new(
@@ -2321,7 +2320,7 @@ mod tests {
         let child_id = {
             let mut transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(lock_keys![], Options::default())
                 .await
                 .expect("new_transaction failed");
             let child = ObjectStore::create_object(
@@ -2356,7 +2355,7 @@ mod tests {
         let child_id = {
             let mut transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(lock_keys![], Options::default())
                 .await
                 .expect("new_transaction failed");
             let child = ObjectStore::create_object(
@@ -2407,7 +2406,10 @@ mod tests {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(store.store_object_id(), store.root_directory_object_id())],
+                lock_keys![LockKey::object(
+                    store.store_object_id(),
+                    store.root_directory_object_id()
+                )],
                 Options::default(),
             )
             .await
@@ -2459,7 +2461,7 @@ mod tests {
                 let mut transaction = fs
                     .clone()
                     .new_transaction(
-                        &[LockKey::object(
+                        lock_keys![LockKey::object(
                             store.store_object_id(),
                             store.root_directory_object_id(),
                         )],
@@ -2596,7 +2598,10 @@ mod tests {
             let mut transaction = fs
                 .clone()
                 .new_transaction(
-                    &[LockKey::object(store.store_object_id(), store.root_directory_object_id())],
+                    lock_keys![LockKey::object(
+                        store.store_object_id(),
+                        store.root_directory_object_id()
+                    )],
                     Options::default(),
                 )
                 .await
@@ -2639,7 +2644,10 @@ mod tests {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(store.store_object_id(), store.root_directory_object_id())],
+                lock_keys![LockKey::object(
+                    store.store_object_id(),
+                    store.root_directory_object_id()
+                )],
                 Options::default(),
             )
             .await
@@ -2668,7 +2676,10 @@ mod tests {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(store.store_object_id(), store.root_directory_object_id())],
+                lock_keys![LockKey::object(
+                    store.store_object_id(),
+                    store.root_directory_object_id()
+                )],
                 Options::default(),
             )
             .await
@@ -2704,7 +2715,10 @@ mod tests {
             let mut transaction = fs
                 .clone()
                 .new_transaction(
-                    &[LockKey::object(store.store_object_id(), store.root_directory_object_id())],
+                    lock_keys![LockKey::object(
+                        store.store_object_id(),
+                        store.root_directory_object_id()
+                    )],
                     Options::default(),
                 )
                 .await
@@ -2803,7 +2817,10 @@ mod tests {
             let mut transaction = fs
                 .clone()
                 .new_transaction(
-                    &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                    lock_keys![LockKey::object(
+                        store.store_object_id(),
+                        root_directory.object_id()
+                    )],
                     Options::default(),
                 )
                 .await
@@ -2818,7 +2835,10 @@ mod tests {
             let mut transaction = fs
                 .clone()
                 .new_transaction(
-                    &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                    lock_keys![LockKey::object(
+                        store.store_object_id(),
+                        root_directory.object_id()
+                    )],
                     Options::default(),
                 )
                 .await

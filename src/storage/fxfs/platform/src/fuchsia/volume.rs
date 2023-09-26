@@ -641,7 +641,7 @@ mod tests {
             fsck::{fsck, fsck_volume},
             object_handle::{ObjectHandle, ObjectHandleExt},
             object_store::{
-                transaction::{Options, TransactionHandler},
+                transaction::{lock_keys, Options, TransactionHandler},
                 volume::root_volume,
                 HandleOptions, ObjectDescriptor, ObjectStore,
             },
@@ -916,7 +916,7 @@ mod tests {
                 root_volume.new_volume("vol", Some(Arc::new(InsecureCrypt::new()))).await.unwrap();
             let mut transaction = filesystem
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(lock_keys![], Options::default())
                 .await
                 .expect("new_transaction failed");
             let object_id = ObjectStore::create_object(
@@ -1004,7 +1004,7 @@ mod tests {
                 root_volume.new_volume("vol", Some(Arc::new(InsecureCrypt::new()))).await.unwrap();
             let mut transaction = filesystem
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(lock_keys![], Options::default())
                 .await
                 .expect("new_transaction failed");
             let object_id = ObjectStore::create_object(
@@ -1114,7 +1114,7 @@ mod tests {
                 root_volume.new_volume("vol", Some(Arc::new(InsecureCrypt::new()))).await.unwrap();
             let mut transaction = filesystem
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(lock_keys![], Options::default())
                 .await
                 .expect("new_transaction failed");
             let object_id = ObjectStore::create_object(

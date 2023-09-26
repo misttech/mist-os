@@ -18,8 +18,8 @@ use {
                 ObjectKey, ObjectKeyData, ObjectValue, Timestamp,
             },
             transaction::{
-                AssocObj, AssociatedObject, LockKey, Mutation, ObjectStoreMutation, Options,
-                ReadGuard, Transaction,
+                lock_keys, AssocObj, AssociatedObject, LockKey, Mutation, ObjectStoreMutation,
+                Options, ReadGuard, Transaction,
             },
             HandleOptions, HandleOwner, ObjectStore, TrimMode, TrimResult,
         },
@@ -188,7 +188,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             .store()
             .filesystem()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object_attribute(
                         self.store().store_object_id(),
                         self.object_id(),
@@ -637,7 +637,8 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
     ) -> Result<usize, Error> {
         let fs = self.store().filesystem();
         let guard = fs
-            .read_lock(&[LockKey::object_attribute(
+            .lock_manager()
+            .read_lock(lock_keys![LockKey::object_attribute(
                 self.store().store_object_id(),
                 self.object_id(),
                 attribute_id,
@@ -1110,8 +1111,8 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
 
         // NB: We need to take this lock before we potentially look up the value to prevent racing
         // with another set.
-        let keys = [LockKey::object(store.store_object_id(), self.object_id())];
-        let mut transaction = fs.new_transaction(&keys, Options::default()).await?;
+        let keys = lock_keys![LockKey::object(store.store_object_id(), self.object_id())];
+        let mut transaction = fs.new_transaction(keys, Options::default()).await?;
 
         let existing_attribute_id = {
             let (found, existing_attribute_id) = match tree.find(&object_key).await? {
@@ -1228,8 +1229,8 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         // to look it up first to make sure we have a record of it before we delete it. Make sure
         // we take a lock and make a transaction before we do so we don't race with other
         // operations.
-        let keys = [LockKey::object(store.store_object_id(), self.object_id())];
-        let mut transaction = store.filesystem().new_transaction(&keys, Options::default()).await?;
+        let keys = lock_keys![LockKey::object(store.store_object_id(), self.object_id())];
+        let mut transaction = store.filesystem().new_transaction(keys, Options::default()).await?;
 
         let attribute_to_delete =
             match tree.find(&object_key).await?.ok_or(FxfsError::NotFound)?.value {
@@ -1321,7 +1322,7 @@ mod tests {
             filesystem::{Filesystem, FxFilesystem, OpenFxFilesystem},
             object_handle::ObjectHandle,
             object_store::{
-                transaction::{Mutation, Options, TransactionHandler},
+                transaction::{lock_keys, Mutation, Options, TransactionHandler},
                 AttributeKey, DataObjectHandle, Directory, HandleOptions, LockKey, ObjectKey,
                 ObjectStore, ObjectValue, SetExtendedAttributeMode, StoreObjectHandle,
             },
@@ -1353,7 +1354,10 @@ mod tests {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(store.store_object_id(), store.root_directory_object_id())],
+                lock_keys![LockKey::object(
+                    store.store_object_id(),
+                    store.root_directory_object_id()
+                )],
                 Options::default(),
             )
             .await
@@ -1723,7 +1727,7 @@ mod tests {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(store.store_object_id(), store.root_directory_object_id()),
                     LockKey::object(store.store_object_id(), object.object_id()),
                 ],

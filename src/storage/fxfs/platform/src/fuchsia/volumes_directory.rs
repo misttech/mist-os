@@ -30,7 +30,7 @@ use {
         metrics,
         object_store::{
             allocator::Allocator,
-            transaction::{LockKey, Options},
+            transaction::{lock_keys, LockKey, Options},
             volume::RootVolume,
             Directory, ObjectDescriptor, ObjectStore,
         },
@@ -153,7 +153,7 @@ impl MountedVolumesGuard<'_> {
         let transaction = store
             .filesystem()
             .new_transaction(
-                &[LockKey::object(
+                lock_keys![LockKey::object(
                     store.store_object_id(),
                     self.volumes_directory.root_volume.volume_directory().object_id(),
                 )],
@@ -378,7 +378,8 @@ impl VolumesDirectory {
             let root_store = me.root_volume.volume_directory().store();
             let fs = root_store.filesystem();
             let _guard = fs
-                .transaction_lock(&[LockKey::object(
+                .lock_manager()
+                .txn_lock(lock_keys![LockKey::object(
                     root_store.store_object_id(),
                     me.root_volume.volume_directory().object_id(),
                 )])
@@ -542,7 +543,7 @@ impl VolumesDirectory {
 
     async fn handle_set_limit(self: &Arc<Self>, store_id: u64, bytes: u64) -> Result<(), Error> {
         let fs = self.root_volume.volume_directory().store().filesystem();
-        let mut transaction = fs.clone().new_transaction(&[], Options::default()).await?;
+        let mut transaction = fs.clone().new_transaction(lock_keys![], Options::default()).await?;
         fs.allocator().set_bytes_limit(&mut transaction, store_id, bytes).await?;
         transaction.commit().await?;
         Ok(())
@@ -588,7 +589,8 @@ impl VolumesDirectory {
                     let root_store = self.root_volume.volume_directory().store();
                     let fs = root_store.filesystem();
                     let guard = fs
-                        .transaction_lock(&[LockKey::object(
+                        .lock_manager()
+                        .txn_lock(lock_keys![LockKey::object(
                             root_store.store_object_id(),
                             self.root_volume.volume_directory().object_id(),
                         )])

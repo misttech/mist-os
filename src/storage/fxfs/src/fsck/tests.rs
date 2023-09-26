@@ -19,7 +19,7 @@ use {
         object_store::{
             allocator::{Allocator, AllocatorKey, AllocatorValue, CoalescingIterator},
             directory::Directory,
-            transaction::{self, LockKey, ObjectStoreMutation, Options},
+            transaction::{self, lock_keys, LockKey, ObjectStoreMutation, Options},
             volume::root_volume,
             AttributeKey, ChildValue, EncryptionKeys, ExtentValue, HandleOptions, Mutation,
             ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind, ObjectStore,
@@ -133,7 +133,7 @@ async fn install_items_in_store<K: Key, V: Value>(
     let root_store = filesystem.root_store();
     let mut transaction = filesystem
         .clone()
-        .new_transaction(&[], Options::default())
+        .new_transaction(lock_keys![], Options::default())
         .await
         .expect("new_transaction failed");
     let layer_handle = ObjectStore::create_object(
@@ -204,7 +204,7 @@ async fn test_missing_graveyard() {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[],
+                lock_keys![],
                 transaction::Options {
                     skip_journal_checks: true,
                     borrow_metadata_space: true,
@@ -237,7 +237,7 @@ async fn test_bad_graveyard_value() {
         let fs = test.filesystem();
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         let root_store = fs.root_store();
@@ -268,7 +268,7 @@ async fn test_extra_allocation() {
         let fs = test.filesystem();
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         // We need a discontiguous allocation, and some blocks will have been used up by other
@@ -296,7 +296,7 @@ async fn test_misaligned_allocation() {
         let fs = test.filesystem();
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         // We need a discontiguous allocation, and some blocks will have been used up by other
@@ -331,7 +331,7 @@ async fn test_malformed_allocation() {
 
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         let layer_handle = ObjectStore::create_object(
@@ -404,7 +404,7 @@ async fn test_misaligned_extent_in_root_store() {
 
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         transaction.add(
@@ -434,7 +434,7 @@ async fn test_malformed_extent_in_root_store() {
 
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         transaction.add(
@@ -465,7 +465,7 @@ async fn test_misaligned_extent_in_child_store() {
 
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         transaction.add(
@@ -501,7 +501,7 @@ async fn test_malformed_extent_in_child_store() {
 
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         transaction.add(
@@ -580,7 +580,10 @@ async fn test_volume_allocation_mismatch() {
             let mut transaction = fs
                 .clone()
                 .new_transaction(
-                    &[LockKey::object(volume.store_object_id(), root_directory.object_id())],
+                    lock_keys![LockKey::object(
+                        volume.store_object_id(),
+                        root_directory.object_id()
+                    )],
                     Options::default(),
                 )
                 .await
@@ -593,7 +596,7 @@ async fn test_volume_allocation_mismatch() {
             let mut transaction = fs
                 .clone()
                 .new_transaction(
-                    &[LockKey::object(volume.store_object_id(), handle.object_id())],
+                    lock_keys![LockKey::object(volume.store_object_id(), handle.object_id())],
                     Options::default(),
                 )
                 .await
@@ -707,7 +710,10 @@ async fn test_too_many_object_refs() {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(root_store.store_object_id(), root_directory.object_id())],
+                lock_keys![LockKey::object(
+                    root_store.store_object_id(),
+                    root_directory.object_id()
+                )],
                 Options::default(),
             )
             .await
@@ -746,7 +752,7 @@ async fn test_too_few_object_refs() {
         // reference count of one, but zero references.
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         ObjectStore::create_object(
@@ -776,7 +782,7 @@ async fn test_missing_object_tree_layer_file() {
         let volume = root_volume.new_volume("vol", Some(test.get_crypt())).await.unwrap();
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         ObjectStore::create_object(&volume, &mut transaction, HandleOptions::default(), None, None)
@@ -941,7 +947,7 @@ async fn test_link_to_root_directory() {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
                 Options::default(),
             )
             .await
@@ -977,7 +983,7 @@ async fn test_multiple_links_to_directory() {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
                 Options::default(),
             )
             .await
@@ -1017,7 +1023,7 @@ async fn test_conflicting_link_types() {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
                 Options::default(),
             )
             .await
@@ -1055,7 +1061,7 @@ async fn test_volume_in_child_store() {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
                 Options::default(),
             )
             .await
@@ -1089,7 +1095,7 @@ async fn test_children_on_file() {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
                 Options::default(),
             )
             .await
@@ -1353,7 +1359,7 @@ async fn test_invalid_child_in_store() {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
                 Options::default(),
             )
             .await
@@ -1386,7 +1392,7 @@ async fn test_link_cycle() {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
                 Options::default(),
             )
             .await
@@ -1432,7 +1438,7 @@ async fn test_orphaned_link_cycle() {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
                 Options::default(),
             )
             .await
@@ -1467,7 +1473,7 @@ async fn test_file_length_mismatch() {
 
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         let handle = ObjectStore::create_object(
@@ -1484,7 +1490,7 @@ async fn test_file_length_mismatch() {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(store.store_object_id(), handle.object_id())],
+                lock_keys![LockKey::object(store.store_object_id(), handle.object_id())],
                 Options::default(),
             )
             .await
@@ -1496,7 +1502,7 @@ async fn test_file_length_mismatch() {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(store.store_object_id(), handle.object_id())],
+                lock_keys![LockKey::object(store.store_object_id(), handle.object_id())],
                 Options::default(),
             )
             .await
@@ -1555,7 +1561,7 @@ async fn test_spurious_extents() {
 
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         transaction.add(
@@ -1606,7 +1612,7 @@ async fn test_missing_encryption_key() {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
                 Options::default(),
             )
             .await
@@ -1680,7 +1686,7 @@ async fn test_orphaned_keys() {
 
         let mut transaction = fs
             .clone()
-            .new_transaction(&[LockKey::object(store_id, 1000)], Options::default())
+            .new_transaction(lock_keys![LockKey::object(store_id, 1000)], Options::default())
             .await
             .expect("new_transaction failed");
         transaction.add(
@@ -1716,7 +1722,7 @@ async fn test_missing_encryption_keys() {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
                 Options::default(),
             )
             .await
@@ -1772,7 +1778,7 @@ async fn test_duplicate_key() {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
                 Options::default(),
             )
             .await
@@ -1846,7 +1852,7 @@ async fn test_project_accounting() {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(store_id, root_directory.object_id())],
+                lock_keys![LockKey::object(store_id, root_directory.object_id())],
                 Options::default(),
             )
             .await
@@ -1875,7 +1881,7 @@ async fn test_project_accounting() {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(store_id, root_directory.object_id()),
                     LockKey::ProjectId { store_object_id: store_id, project_id: 4 },
                 ],
@@ -1920,7 +1926,7 @@ async fn test_project_accounting() {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(store_id, root_directory.object_id()),
                     LockKey::ProjectId { store_object_id: store_id, project_id: 5 },
                 ],
@@ -1995,7 +2001,7 @@ async fn test_zombie_file() {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
                 Options::default(),
             )
             .await
@@ -2008,7 +2014,7 @@ async fn test_zombie_file() {
 
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         store.add_to_graveyard(&mut transaction, handle.object_id());

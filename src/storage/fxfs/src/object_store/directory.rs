@@ -15,7 +15,7 @@ use {
                 ChildValue, ObjectAttributes, ObjectDescriptor, ObjectItem, ObjectKey,
                 ObjectKeyData, ObjectKind, ObjectValue, PosixAttributes, Timestamp,
             },
-            transaction::{LockKey, Mutation, Options, Transaction},
+            transaction::{LockKey, LockKeys, Mutation, Options, Transaction},
             DataObjectHandle, HandleOptions, HandleOwner, ObjectStore, SetExtendedAttributeMode,
             StoreObjectHandle,
         },
@@ -183,7 +183,7 @@ impl<S: HandleOwner> Directory<S> {
         let store = self.store();
         let mut child_object_id = INVALID_OBJECT_ID;
         let mut src_object_id = src.map(|_| INVALID_OBJECT_ID);
-        let mut lock_keys = Vec::with_capacity(4);
+        let mut lock_keys = LockKeys::with_capacity(4);
         lock_keys.push(LockKey::object(store.store_object_id(), self.object_id()));
         loop {
             lock_keys.truncate(1);
@@ -201,7 +201,7 @@ impl<S: HandleOwner> Directory<S> {
             let fs = store.filesystem().clone();
             let transaction = fs
                 .new_transaction(
-                    &lock_keys,
+                    lock_keys.clone(),
                     Options { borrow_metadata_space, ..Default::default() },
                 )
                 .await?;
@@ -847,7 +847,7 @@ mod tests {
             object_store::{
                 directory::{replace_child, Directory, ReplacedChild},
                 object_record::Timestamp,
-                transaction::{Options, TransactionHandler},
+                transaction::{lock_keys, Options, TransactionHandler},
                 volume::root_volume,
                 HandleOptions, LockKey, ObjectDescriptor, ObjectStore, SetExtendedAttributeMode,
             },
@@ -868,7 +868,7 @@ mod tests {
         let object_id = {
             let mut transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(lock_keys![], Options::default())
                 .await
                 .expect("new_transaction failed");
             let dir = Directory::create(&mut transaction, &fs.root_store(), None)
@@ -948,7 +948,7 @@ mod tests {
         let child;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         dir = Directory::create(&mut transaction, &fs.root_store(), None)
@@ -964,7 +964,7 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(fs.root_store().store_object_id(), dir.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), child.object_id()),
                 ],
@@ -993,7 +993,7 @@ mod tests {
         let bar;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         dir = Directory::create(&mut transaction, &fs.root_store(), None)
@@ -1013,7 +1013,7 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(fs.root_store().store_object_id(), dir.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), child.object_id()),
                 ],
@@ -1034,7 +1034,7 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(fs.root_store().store_object_id(), child.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), bar.object_id()),
                 ],
@@ -1053,7 +1053,7 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(fs.root_store().store_object_id(), dir.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), child.object_id()),
                 ],
@@ -1081,7 +1081,7 @@ mod tests {
         let child;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         dir = Directory::create(&mut transaction, &fs.root_store(), None)
@@ -1097,7 +1097,7 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(fs.root_store().store_object_id(), dir.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), child.object_id()),
                 ],
@@ -1116,7 +1116,7 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(fs.root_store().store_object_id(), dir.object_id())],
+                lock_keys![LockKey::object(fs.root_store().store_object_id(), dir.object_id())],
                 Options::default(),
             )
             .await
@@ -1139,7 +1139,7 @@ mod tests {
             let child;
             let mut transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(lock_keys![], Options::default())
                 .await
                 .expect("new_transaction failed");
             dir = Directory::create(&mut transaction, &fs.root_store(), None)
@@ -1156,7 +1156,7 @@ mod tests {
             transaction = fs
                 .clone()
                 .new_transaction(
-                    &[
+                    lock_keys![
                         LockKey::object(fs.root_store().store_object_id(), dir.object_id()),
                         LockKey::object(fs.root_store().store_object_id(), child.object_id()),
                     ],
@@ -1194,7 +1194,7 @@ mod tests {
         let child_dir2;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         dir = Directory::create(&mut transaction, &fs.root_store(), None)
@@ -1218,7 +1218,7 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(fs.root_store().store_object_id(), child_dir1.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), child_dir2.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), file.object_id()),
@@ -1249,7 +1249,7 @@ mod tests {
         let child_dir2;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         dir = Directory::create(&mut transaction, &fs.root_store(), None)
@@ -1289,7 +1289,7 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(fs.root_store().store_object_id(), child_dir1.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), child_dir2.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), foo_oid),
@@ -1332,7 +1332,7 @@ mod tests {
         let child_dir2;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         dir = Directory::create(&mut transaction, &fs.root_store(), None)
@@ -1364,7 +1364,7 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(fs.root_store().store_object_id(), child_dir1.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), child_dir2.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), foo.object_id()),
@@ -1392,7 +1392,7 @@ mod tests {
         let dir;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         dir = Directory::create(&mut transaction, &fs.root_store(), None)
@@ -1407,7 +1407,7 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(fs.root_store().store_object_id(), dir.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), foo.object_id()),
                 ],
@@ -1435,7 +1435,7 @@ mod tests {
         let dir;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         dir = Directory::create(&mut transaction, &fs.root_store(), None)
@@ -1461,7 +1461,7 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(fs.root_store().store_object_id(), dir.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), apple.object_id()),
                 ],
@@ -1491,7 +1491,7 @@ mod tests {
         let child_dir;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         dir = Directory::create(&mut transaction, &fs.root_store(), None)
@@ -1508,7 +1508,7 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(fs.root_store().store_object_id(), dir.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), child_dir.object_id()),
                 ],
@@ -1528,7 +1528,10 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(fs.root_store().store_object_id(), child_dir.object_id())],
+                lock_keys![LockKey::object(
+                    fs.root_store().store_object_id(),
+                    child_dir.object_id()
+                )],
                 Options::default(),
             )
             .await
@@ -1544,7 +1547,7 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(fs.root_store().store_object_id(), child_dir.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), dir.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), second_child.object_id()),
@@ -1565,7 +1568,7 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(fs.root_store().store_object_id(), dir.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), second_child.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), child_dir.object_id()),
@@ -1585,7 +1588,7 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(fs.root_store().store_object_id(), dir.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), child_dir.object_id()),
                 ],
@@ -1607,7 +1610,7 @@ mod tests {
         let dir;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         dir = Directory::create(&mut transaction, &fs.root_store(), None)
@@ -1627,7 +1630,7 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(fs.root_store().store_object_id(), dir.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), child.object_id()),
                 ],
@@ -1653,7 +1656,7 @@ mod tests {
 
         transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
 
@@ -1696,7 +1699,7 @@ mod tests {
         let (dir_id, symlink_id) = {
             let mut transaction = fs
                 .clone()
-                .new_transaction(&[], Options::default())
+                .new_transaction(lock_keys![], Options::default())
                 .await
                 .expect("new_transaction failed");
             let dir = Directory::create(&mut transaction, &fs.root_store(), None)
@@ -1732,7 +1735,7 @@ mod tests {
         let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         let store = fs.root_store();
@@ -1756,7 +1759,7 @@ mod tests {
         let dir;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         let store = fs.root_store();
@@ -1770,7 +1773,7 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(store.store_object_id(), dir.object_id()),
                     LockKey::object(store.store_object_id(), symlink_id),
                 ],
@@ -1797,7 +1800,7 @@ mod tests {
         let dir;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
 
@@ -1818,7 +1821,7 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(fs.root_store().store_object_id(), dir.object_id())],
+                lock_keys![LockKey::object(fs.root_store().store_object_id(), dir.object_id())],
                 Options::default(),
             )
             .await
@@ -1847,7 +1850,10 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(fs.root_store().store_object_id(), child_dir.object_id())],
+                lock_keys![LockKey::object(
+                    fs.root_store().store_object_id(),
+                    child_dir.object_id()
+                )],
                 Options::default(),
             )
             .await
@@ -1886,7 +1892,7 @@ mod tests {
         let dir;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
 
@@ -1910,7 +1916,7 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(fs.root_store().store_object_id(), dir.object_id())],
+                lock_keys![LockKey::object(fs.root_store().store_object_id(), dir.object_id())],
                 Options::default(),
             )
             .await
@@ -1948,7 +1954,7 @@ mod tests {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(fs.root_store().store_object_id(), dir.object_id())],
+                lock_keys![LockKey::object(fs.root_store().store_object_id(), dir.object_id())],
                 Options::default(),
             )
             .await
@@ -1994,7 +2000,10 @@ mod tests {
             let mut transaction = filesystem
                 .clone()
                 .new_transaction(
-                    &[LockKey::object(store.store_object_id(), store.root_directory_object_id())],
+                    lock_keys![LockKey::object(
+                        store.store_object_id(),
+                        store.root_directory_object_id()
+                    )],
                     Options::default(),
                 )
                 .await
@@ -2011,7 +2020,7 @@ mod tests {
             let mut transaction = filesystem
                 .clone()
                 .new_transaction(
-                    &[LockKey::object(store.store_object_id(), directory.object_id())],
+                    lock_keys![LockKey::object(store.store_object_id(), directory.object_id())],
                     Options::default(),
                 )
                 .await
@@ -2115,7 +2124,10 @@ mod tests {
         let mut transaction = filesystem
             .clone()
             .new_transaction(
-                &[LockKey::object(store.store_object_id(), store.root_directory_object_id())],
+                lock_keys![LockKey::object(
+                    store.store_object_id(),
+                    store.root_directory_object_id()
+                )],
                 Options::default(),
             )
             .await
@@ -2163,7 +2175,7 @@ mod tests {
         let mut transaction = filesystem
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(store.store_object_id(), root_directory.object_id()),
                     LockKey::object(store.store_object_id(), directory.object_id()),
                 ],
@@ -2196,7 +2208,10 @@ mod tests {
         let mut transaction = filesystem
             .clone()
             .new_transaction(
-                &[LockKey::object(store.store_object_id(), store.root_directory_object_id())],
+                lock_keys![LockKey::object(
+                    store.store_object_id(),
+                    store.root_directory_object_id()
+                )],
                 Options::default(),
             )
             .await
@@ -2252,7 +2267,7 @@ mod tests {
         let mut transaction = filesystem
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(store.store_object_id(), root_directory.object_id()),
                     LockKey::object(store.store_object_id(), symlink.object_id()),
                 ],
@@ -2280,7 +2295,7 @@ mod tests {
         let dir;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
 
@@ -2302,7 +2317,7 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(fs.root_store().store_object_id(), dir.object_id())],
+                lock_keys![LockKey::object(fs.root_store().store_object_id(), dir.object_id())],
                 Options::default(),
             )
             .await
@@ -2336,7 +2351,7 @@ mod tests {
         let child2;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         let create_attributes = fio::MutableNodeAttributes::default();
@@ -2359,7 +2374,7 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(fs.root_store().store_object_id(), dir.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), child1.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), child2.object_id()),
@@ -2401,7 +2416,7 @@ mod tests {
         let foo;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         let create_attributes = fio::MutableNodeAttributes::default();
@@ -2420,7 +2435,7 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(fs.root_store().store_object_id(), dir.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), foo.object_id()),
                 ],
@@ -2459,7 +2474,7 @@ mod tests {
         let foo;
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         let create_attributes = fio::MutableNodeAttributes::default();
@@ -2485,7 +2500,7 @@ mod tests {
         transaction = fs
             .clone()
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(fs.root_store().store_object_id(), dir.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), child_dir1.object_id()),
                     LockKey::object(fs.root_store().store_object_id(), child_dir2.object_id()),

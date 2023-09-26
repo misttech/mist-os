@@ -11,8 +11,8 @@ use {
             journal::{Journal, JournalCheckpoint, SuperBlockHeader},
             object_manager::ObjectManager,
             transaction::{
-                self, LockKey, LockManager, MetadataReservation, ReadGuard, Transaction,
-                TransactionHandler, TransactionLocks, WriteGuard,
+                self, lock_keys, LockKeys, LockManager, MetadataReservation, Transaction,
+                TransactionHandler,
             },
             ObjectStore,
         },
@@ -109,7 +109,7 @@ impl Filesystem for FakeFilesystem {
 impl TransactionHandler for FakeFilesystem {
     async fn new_transaction<'a>(
         self: Arc<Self>,
-        locks: &[LockKey],
+        locks: LockKeys,
         options: transaction::Options<'a>,
     ) -> Result<Transaction<'a>, Error> {
         let reservation = if options.borrow_metadata_space {
@@ -117,12 +117,7 @@ impl TransactionHandler for FakeFilesystem {
         } else {
             MetadataReservation::Reservation(self.allocator().reserve_at_most(None, 10000))
         };
-        Ok(Transaction::new(self, reservation, &[], locks).await)
-    }
-
-    async fn transaction_lock<'a>(&'a self, lock_keys: &[LockKey]) -> TransactionLocks<'a> {
-        let lock_manager: &LockManager = self.as_ref();
-        TransactionLocks(lock_manager.txn_lock(lock_keys).await)
+        Ok(Transaction::new(self, reservation, lock_keys![], locks).await)
     }
 
     async fn commit_transaction(
@@ -147,17 +142,7 @@ impl TransactionHandler for FakeFilesystem {
         self.lock_manager.drop_transaction(transaction);
     }
 
-    async fn read_lock<'a>(&'a self, lock_keys: &[LockKey]) -> ReadGuard<'a> {
-        self.lock_manager.read_lock(lock_keys).await
-    }
-
-    async fn write_lock<'a>(&'a self, lock_keys: &[LockKey]) -> WriteGuard<'a> {
-        self.lock_manager.write_lock(lock_keys).await
-    }
-}
-
-impl AsRef<LockManager> for FakeFilesystem {
-    fn as_ref(&self) -> &LockManager {
+    fn lock_manager(&self) -> &LockManager {
         &self.lock_manager
     }
 }

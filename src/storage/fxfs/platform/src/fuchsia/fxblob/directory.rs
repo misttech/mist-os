@@ -38,7 +38,7 @@ use {
         object_handle::{ObjectProperties, ReadObjectHandle},
         object_store::{
             self,
-            transaction::{LockKey, Options},
+            transaction::{lock_keys, LockKey, Options},
             HandleOptions, ObjectDescriptor, ObjectStore, BLOB_MERKLE_ATTRIBUTE_ID,
         },
         serialized_types::BlobMetadata,
@@ -148,10 +148,10 @@ impl BlobDirectory {
 
         // TODO(fxbug.dev/122125): Create the transaction here if we might need to create the object
         // so that we have a lock in place.
-        let keys = [LockKey::object(store.store_object_id(), self.directory.object_id())];
+        let keys = lock_keys![LockKey::object(store.store_object_id(), self.directory.object_id())];
 
         // A lock needs to be held over searching the directory and incrementing the open count.
-        let guard = fs.read_lock(&keys).await;
+        let guard = fs.lock_manager().read_lock(keys.clone()).await;
 
         let child_node = match self
             .directory
@@ -196,7 +196,7 @@ impl BlobDirectory {
 
                 ensure!(flags.contains(fio::OpenFlags::CREATE), FxfsError::NotFound);
                 ensure!(flags.contains(fio::OpenFlags::RIGHT_WRITABLE), FxfsError::AccessDenied);
-                let mut transaction = fs.clone().new_transaction(&keys, Options::default()).await?;
+                let mut transaction = fs.clone().new_transaction(keys, Options::default()).await?;
 
                 let handle = ObjectStore::create_object(
                     self.volume(),

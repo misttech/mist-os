@@ -23,7 +23,7 @@ use {
         object_handle::{GetProperties, ObjectHandle, ReadObjectHandle, WriteObjectHandle},
         object_store::{
             directory::{replace_child, ReplacedChild},
-            transaction::{LockKey, Options, TransactionHandler},
+            transaction::{lock_keys, LockKey, Options, TransactionHandler},
             ObjectDescriptor, Timestamp,
         },
     },
@@ -73,7 +73,10 @@ impl FuseFs {
                 .fs
                 .clone()
                 .new_transaction(
-                    &[LockKey::object(self.default_store.store_object_id(), dir.object_id())],
+                    lock_keys![LockKey::object(
+                        self.default_store.store_object_id(),
+                        dir.object_id()
+                    )],
                     Options::default(),
                 )
                 .await?;
@@ -315,7 +318,10 @@ impl FuseFs {
                 .fs
                 .clone()
                 .new_transaction(
-                    &[LockKey::object(self.default_store.store_object_id(), handle.object_id())],
+                    lock_keys![LockKey::object(
+                        self.default_store.store_object_id(),
+                        handle.object_id()
+                    )],
                     Options::default(),
                 )
                 .await?;
@@ -332,7 +338,7 @@ impl FuseFs {
                 .fs
                 .clone()
                 .new_transaction(
-                    &[LockKey::object(self.default_store.store_object_id(), inode)],
+                    lock_keys![LockKey::object(self.default_store.store_object_id(), inode)],
                     Options::default(),
                 )
                 .await?;
@@ -379,7 +385,10 @@ impl FuseFs {
                 .fs
                 .clone()
                 .new_transaction(
-                    &[LockKey::object(self.default_store.store_object_id(), dir.object_id())],
+                    lock_keys![LockKey::object(
+                        self.default_store.store_object_id(),
+                        dir.object_id()
+                    )],
                     Options::default(),
                 )
                 .await?;
@@ -643,7 +652,7 @@ impl FuseFs {
             .fs
             .clone()
             .new_transaction(
-                &[LockKey::object(self.default_store.store_object_id(), dir.object_id())],
+                lock_keys![LockKey::object(self.default_store.store_object_id(), dir.object_id())],
                 Options::default(),
             )
             .await?;
@@ -678,7 +687,7 @@ impl FuseFs {
                 .fs
                 .clone()
                 .new_transaction(
-                    &[
+                    lock_keys![
                         LockKey::object(self.default_store.store_object_id(), dir.object_id()),
                         LockKey::object(self.default_store.store_object_id(), inode),
                     ],

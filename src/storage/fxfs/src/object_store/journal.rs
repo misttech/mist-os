@@ -45,8 +45,8 @@ use {
             object_manager::ObjectManager,
             object_record::{AttributeKey, ObjectKey, ObjectKeyData, ObjectValue},
             transaction::{
-                AllocatorMutation, Mutation, MutationV20, MutationV25, MutationV29, MutationV30,
-                MutationV31, ObjectStoreMutation, Options, Transaction, TxnMutation,
+                lock_keys, AllocatorMutation, Mutation, MutationV20, MutationV25, MutationV29,
+                MutationV30, MutationV31, ObjectStoreMutation, Options, Transaction, TxnMutation,
                 TRANSACTION_MAX_JOURNAL_USAGE,
             },
             DataObjectHandle, HandleOptions, HandleOwner, Item, ItemRef, LastObjectId, LockState,
@@ -941,7 +941,10 @@ impl Journal {
         let root_store;
         let mut transaction = filesystem
             .clone()
-            .new_transaction(&[], Options { skip_journal_checks: true, ..Default::default() })
+            .new_transaction(
+                lock_keys![],
+                Options { skip_journal_checks: true, ..Default::default() },
+            )
             .await?;
         root_store = root_parent
             .new_child_store(
@@ -1582,6 +1585,7 @@ mod tests {
             object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle},
             object_store::{
                 directory::Directory,
+                lock_keys,
                 transaction::{Options, TransactionHandler},
                 HandleOptions, LockKey, ObjectStore,
             },
@@ -1608,7 +1612,7 @@ mod tests {
             let mut transaction = fs
                 .clone()
                 .new_transaction(
-                    &[LockKey::object(
+                    lock_keys![LockKey::object(
                         root_store.store_object_id(),
                         root_store.root_directory_object_id(),
                     )],
@@ -1670,7 +1674,7 @@ mod tests {
             let mut transaction = fs
                 .clone()
                 .new_transaction(
-                    &[LockKey::object(
+                    lock_keys![LockKey::object(
                         root_store.store_object_id(),
                         root_store.root_directory_object_id(),
                     )],
@@ -1695,7 +1699,7 @@ mod tests {
                 let mut transaction = fs
                     .clone()
                     .new_transaction(
-                        &[LockKey::object(
+                        lock_keys![LockKey::object(
                             root_store.store_object_id(),
                             root_store.root_directory_object_id(),
                         )],
@@ -1747,7 +1751,7 @@ mod tests {
             let mut transaction = fs
                 .clone()
                 .new_transaction(
-                    &[LockKey::object(
+                    lock_keys![LockKey::object(
                         root_store.store_object_id(),
                         root_store.root_directory_object_id(),
                     )],

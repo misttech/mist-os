@@ -307,7 +307,7 @@ mod tests {
             object_handle::WriteBytes as _,
             object_store::{
                 directory::Directory,
-                transaction::{LockKey, TransactionHandler as _},
+                transaction::{lock_keys, LockKey, TransactionHandler as _},
                 DirectWriter, BLOB_MERKLE_ATTRIBUTE_ID,
             },
             round::round_up,
@@ -355,12 +355,12 @@ mod tests {
                 .expect("open failed");
 
             let handle;
-            let keys = [LockKey::object(
+            let keys = lock_keys![LockKey::object(
                 fixture.volume().volume().store().store_object_id(),
                 root_object_id,
             )];
             let mut transaction =
-                fixture.fs().clone().new_transaction(&keys, Default::default()).await.unwrap();
+                fixture.fs().clone().new_transaction(keys, Default::default()).await.unwrap();
             handle = root_dir
                 .create_child_file(&mut transaction, &format!("{}", tree.root()), None)
                 .await

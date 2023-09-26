@@ -25,7 +25,7 @@ use {
         object_store::{
             self,
             directory::{self, ReplacedChild},
-            transaction::{LockKey, Options, Transaction},
+            transaction::{lock_keys, LockKey, Options, Transaction},
             Directory, ObjectDescriptor, ObjectStore, Timestamp,
         },
     },
@@ -122,16 +122,18 @@ impl FxDirectory {
 
             // Create the transaction here if we might need to create the object so that we have a
             // lock in place.
-            let keys =
-                [LockKey::object(store.store_object_id(), current_dir.directory.object_id())];
+            let keys = lock_keys![LockKey::object(
+                store.store_object_id(),
+                current_dir.directory.object_id()
+            )];
             let transaction_or_guard =
                 if last_segment && protocols.open_mode() != fio::OpenMode::OpenExisting {
-                    Left(fs.clone().new_transaction(&keys, Options::default()).await?)
+                    Left(fs.clone().new_transaction(keys, Options::default()).await?)
                 } else {
                     // When child objects are created, the object is created along with the
                     // directory entry in the same transaction, and so we need to hold a read lock
                     // over the lookup and open calls.
-                    Right(fs.read_lock(&keys).await)
+                    Right(fs.lock_manager().read_lock(keys).await)
                 };
 
             let child_descriptor = match self
@@ -371,7 +373,7 @@ impl MutableDirectory for FxDirectory {
         // count.
         let transaction = fs
             .new_transaction(
-                &[
+                lock_keys![
                     LockKey::object(store.store_object_id(), self.object_id()),
                     LockKey::object(store.store_object_id(), source_id),
                 ],
@@ -472,7 +474,10 @@ impl MutableDirectory for FxDirectory {
         let mut transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(self.store().store_object_id(), self.directory.object_id())],
+                lock_keys![LockKey::object(
+                    self.store().store_object_id(),
+                    self.directory.object_id()
+                )],
                 Options { borrow_metadata_space: true, ..Default::default() },
             )
             .await
@@ -612,10 +617,10 @@ impl MutableDirectory for FxDirectory {
     ) -> Result<(), zx::Status> {
         let store = self.store();
         let dir = &self.directory;
-        let keys = [LockKey::object(store.store_object_id(), dir.object_id())];
+        let keys = lock_keys![LockKey::object(store.store_object_id(), dir.object_id())];
         let fs = store.filesystem();
         let mut transaction =
-            fs.new_transaction(&keys, Options::default()).await.map_err(map_to_status)?;
+            fs.new_transaction(keys, Options::default()).await.map_err(map_to_status)?;
         if dir.lookup(&name).await.map_err(map_to_status)?.is_some() {
             return Err(zx::Status::ALREADY_EXISTS);
         }
@@ -829,8 +834,10 @@ impl vfs::directory::entry_container::Directory for FxDirectory {
 
         let store = self.store();
         let fs = store.filesystem();
-        let _read_guard =
-            fs.read_lock(&[LockKey::object(store.store_object_id(), self.object_id())]).await;
+        let _read_guard = fs
+            .lock_manager()
+            .read_lock(lock_keys![LockKey::object(store.store_object_id(), self.object_id())])
+            .await;
         if self.is_deleted() {
             return Ok((TraversalPosition::End, sink.seal()));
         }

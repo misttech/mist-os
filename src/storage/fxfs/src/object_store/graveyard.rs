@@ -316,7 +316,7 @@ mod tests {
         crate::{
             filesystem::{Filesystem, FxFilesystem},
             object_store::object_record::ObjectValue,
-            object_store::transaction::{Options, TransactionHandler},
+            object_store::transaction::{lock_keys, Options, TransactionHandler},
         },
         assert_matches::assert_matches,
         storage_device::{fake_device::FakeDevice, DeviceHolder},
@@ -333,7 +333,7 @@ mod tests {
         // Create and add two objects to the graveyard.
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
 
@@ -358,7 +358,7 @@ mod tests {
         // Remove one of the objects.
         let mut transaction = fs
             .clone()
-            .new_transaction(&[], Options::default())
+            .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
         root_store.remove_from_graveyard(&mut transaction, 4);

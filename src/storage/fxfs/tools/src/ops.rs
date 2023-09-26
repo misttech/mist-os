@@ -12,7 +12,7 @@ use {
         object_handle::{GetProperties, ObjectHandle, ReadObjectHandle, WriteObjectHandle},
         object_store::{
             directory::{replace_child, ReplacedChild},
-            transaction::{LockKey, Options, TransactionHandler},
+            transaction::{lock_keys, LockKey, Options, TransactionHandler},
             volume::root_volume,
             Directory, HandleOptions, ObjectDescriptor, ObjectStore, SetExtendedAttributeMode,
             StoreObjectHandle,
@@ -190,7 +190,7 @@ pub async fn put(
     let mut transaction = (*fs)
         .clone()
         .new_transaction(
-            &[LockKey::object(vol.store_object_id(), dir.object_id())],
+            lock_keys![LockKey::object(vol.store_object_id(), dir.object_id())],
             Options::default(),
         )
         .await?;
@@ -216,7 +216,7 @@ pub async fn mkdir(
     let mut transaction = (*fs)
         .clone()
         .new_transaction(
-            &[LockKey::object(vol.store_object_id(), dir.object_id())],
+            lock_keys![LockKey::object(vol.store_object_id(), dir.object_id())],
             Options::default(),
         )
         .await?;
