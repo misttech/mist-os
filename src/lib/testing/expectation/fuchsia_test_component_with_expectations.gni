@@ -9,9 +9,16 @@ import("//tools/cmc/build/expect_includes.gni")
 # Defines a fuchsia_test_component with an expectations file for this test.
 #
 # Parameters
-#  expectations (required)
-#    Path to expectations file for this test.
+#  expectations (optional)
+#    Path to a JSON5 test expectations file. See
+#    //src/lib/testing/expectation/example_expectations.json5 for an example of
+#    the format. Either expectations or generated_expectations is required.
 #    Type: path
+#
+#  generated_expectations (optional)
+#    Name of the generated_expectations_file target that generates expectation file. Either
+#    expectations or generated_expectations is required.
+#    Type: target name
 #
 #  manifest (required)
 #    The component manifest.
@@ -27,7 +34,17 @@ template("fuchsia_test_component_with_expectations") {
 
   _expectations_target = "${target_name}_expectations"
   preprocess_expectations(_expectations_target) {
-    expectations = invoker.expectations
+    if (defined(invoker.generated_expectations)) {
+      assert(!defined(invoker.expectations))
+
+      deps = [ invoker.generated_expectations ]
+      expectations =
+          get_label_info(invoker.generated_expectations, "target_gen_dir") +
+          "/" + get_label_info(invoker.generated_expectations, "name") +
+          ".json5"
+    } else {
+      expectations = invoker.expectations
+    }
     output_path =
         "data/tests/expectations/${_test_component_name}/expectations.json5"
   }

@@ -6,6 +6,7 @@ import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import(
     "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
+import("//src/lib/testing/expectation/generated_expectations_file.gni")
 
 rustc_binary("bin") {
   edition = "2021"
@@ -74,10 +75,26 @@ fuchsia_test_with_expectations_package(
   expectations = "example_expectations.json5"
 }
 
+generated_expectations_file("generated_expectations_example") {
+  includes = [
+    "example_expectations_part1.json5",
+    "example_expectations_part2.json5",
+  ]
+}
+
+fuchsia_test_with_expectations_package(
+    "expectation-example-package-generated") {
+  test_components = [ ":expectation-unittests" ]
+
+  treatment_of_cases_with_error_logs = "SKIP_CASES_WITH_ERROR_LOGS"
+  generated_expectations = ":generated_expectations_example"
+}
+
 group("tests") {
   testonly = true
   deps = [
     ":expectation-example-package",
+    ":expectation-example-package-generated",
     ":expectation-example-package-just-err-logs-cases",
     ":expectation-example-package-no-err-logs-cases",
     "preprocess:tests",

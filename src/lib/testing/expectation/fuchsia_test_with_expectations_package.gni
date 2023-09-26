@@ -20,11 +20,16 @@ import("//tools/cmc/build/expect_includes.gni")
 #     (meta/client.shard.cml).
 #     Type: list(labels)
 #
-#   expectations (required)
-#     Path to a JSON5 test expectations file. See
-#     //src/lib/testing/expectation/example_expectations.json5
-#     for an example of the format.
-#     Type: path
+#  expectations (optional)
+#    Path to a JSON5 test expectations file. See
+#    //src/lib/testing/expectation/example_expectations.json5 for an example of
+#    the format. Either expectations or generated_expectations is required.
+#    Type: path
+#
+#  generated_expectations (optional)
+#    Name of the generated_expectations_file target that generates expectation file. Either
+#    expectations or generated_expectations is required.
+#    Type: target name
 #
 #   test_specs (optional)
 #     Additional test specifications to apply to tests defined above.
@@ -69,6 +74,7 @@ template("fuchsia_test_with_expectations_package") {
 
   _expectations_target = "${target_name}-expectations"
   preprocess_expectations(_expectations_target) {
+    # forward_variables_from(invoker, [ "deps" ])
     if (defined(invoker.treatment_of_cases_with_error_logs)) {
       assert(
           invoker.treatment_of_cases_with_error_logs == _skip_err_logs_cases ||
@@ -79,7 +85,17 @@ template("fuchsia_test_with_expectations_package") {
         cases_to_run = "WithErrLogs"
       }
     }
-    expectations = invoker.expectations
+    if (defined(invoker.generated_expectations)) {
+      assert(!defined(invoker.expectations))
+
+      deps = [ invoker.generated_expectations ]
+      expectations =
+          get_label_info(invoker.generated_expectations, "target_gen_dir") +
+          "/" + get_label_info(invoker.generated_expectations, "name") +
+          ".json5"
+    } else {
+      expectations = invoker.expectations
+    }
     output_path = "expectations.json5"
   }
 

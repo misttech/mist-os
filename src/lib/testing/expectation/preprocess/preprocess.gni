@@ -14,6 +14,11 @@ template("preprocess_expectations") {
   _base_target_name = target_name
   _preprocessed_target_name = "${_base_target_name}-preprocessed"
   compiled_action(_preprocessed_target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "testonly",
+                           ])
     tool = "//src/lib/testing/expectation/preprocess:bin"
     tool_output_name = "expectation_file_preprocessor"
     _preprocessed_expectations =
@@ -42,6 +47,7 @@ template("preprocess_expectations") {
   _preprocessed_target_name = ":$_preprocessed_target_name"
 
   resource(target_name) {
+    forward_variables_from(invoker, [ "testonly" ])
     sources = get_target_outputs(_preprocessed_target_name)
     outputs = [ invoker.output_path ]
     deps = [ _preprocessed_target_name ]

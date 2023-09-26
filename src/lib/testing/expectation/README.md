@@ -64,6 +64,29 @@ information.
 Pass/fail/skip expectations are specified via a JSON5 file.
 See `./example_expectations.json5` for a simple example.
 
+## Merging multiple expectations files
+
+`generated_expectations_file` allows to merge multiple test expectations file.
+It is useful in the case expecations depend on the product configuration, e.g.:
+
+```gn
+import("//src/lib/testing/expectation/generated_expectations_file.gni")
+import(
+    "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
+
+generated_expectations_file("test-expectations") {
+  includes = [ "expectations_file.json5" ]
+  if (current_cpu == "riscv") {
+    includes += [ "expectations_file_riscv.json5"]
+  }
+}
+
+fuchsia_test_with_expectations_package("expectation-example-package") {
+  test_components = [ ":some-integration-test" ]
+  generated_expectations = ":test-expectations"
+}
+```
+
 ## Cases Generating Error Logs
 
 Due to limitations (see https://fxbug.dev/65359), the testing framework fails
