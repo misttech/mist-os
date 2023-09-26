@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import time
 
 import rust
 from rust import FUCHSIA_BUILD_DIR, HOST_PLATFORM, PREBUILT_THIRD_PARTY_DIR
@@ -53,8 +54,10 @@ def main():
         print("Error: Couldn't find any clippy outputs for those inputs")
         return 1
     if args.no_build:
+        run_time = 0
         returncode = 0
     else:
+        run_time = time.time()
         returncode = build_targets(
             output_files, build_dir, args.fuchsia_dir, args.verbose, args.raw
         ).returncode
@@ -64,8 +67,9 @@ def main():
         clippy_output = build_dir / clippy_output
         # If we failed to build all targets we can keep going and print any
         # lints that were collected.
-        # TODO: Check mtimes so we don't print stale lints.
         if returncode != 0 and not clippy_output.exists():
+            continue
+        if os.path.getmtime(clippy_output) < run_time:
             continue
         with open(clippy_output) as f:
             for line in f:
