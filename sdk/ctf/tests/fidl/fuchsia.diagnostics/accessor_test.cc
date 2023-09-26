@@ -26,126 +26,7 @@ namespace {
 class AccessorTest : public zxtest::Test {};
 using namespace component_testing;
 
-// Hard transition: test must accept both old (bucket-style) histograms and new
-// (parameter-style) histograms.
-// TODO(fxbug.dev/125876): Remove "buckets" after rolls have happened.
-
-const char EXPECTED_DATA_BUCKETS_HISTOGRAMS[] = R"JSON({
-    "data_source": "Inspect",
-    "metadata": {
-        "component_url": "COMPONENT_URL",
-        "filename": "fuchsia.inspect.Tree",
-        "timestamp": TIMESTAMP
-    },
-    "moniker": "test_suite/realm_builder\\:CHILD_NAME/inspect-publisher",
-    "payload": {
-        "root": {
-            "arrays": {
-                "doubles": [
-                    0.0,
-                    0.0,
-                    3.5,
-                    0.0
-                ],
-                "ints": [
-                    -1,
-                    0
-                ],
-                "uints": [
-                    0,
-                    2,
-                    0
-                ]
-            },
-            "buffers": {
-                "bytes": "b64:AQID",
-                "string": "foo"
-            },
-            "exponential_histograms": {
-                "double": {
-                    "counts": [
-                        1.0
-                    ],
-                    "floor": 1.5,
-                    "indexes": [
-                        2
-                    ],
-                    "initial_step": 2.0,
-                    "size": 5,
-                    "step_multiplier": 3.5
-                },
-                "int": {
-                    "counts": [
-                        1
-                    ],
-                    "floor": -10,
-                    "indexes": [
-                        2
-                    ],
-                    "initial_step": 2,
-                    "size": 5,
-                    "step_multiplier": 3
-                },
-                "uint": {
-                    "counts": [
-                        1
-                    ],
-                    "floor": 1,
-                    "indexes": [
-                        2
-                    ],
-                    "initial_step": 2,
-                    "size": 5,
-                    "step_multiplier": 3
-                }
-            },
-            "linear_histgorams": {
-                "double": {
-                    "counts": [
-                        1.0
-                    ],
-                    "floor": 1.5,
-                    "indexes": [
-                        2
-                    ],
-                    "size": 5,
-                    "step": 2.5
-                },
-                "int": {
-                    "counts": [
-                        1
-                    ],
-                    "floor": -10,
-                    "indexes": [
-                        3
-                    ],
-                    "size": 5,
-                    "step": 2
-                },
-                "uint": {
-                    "counts": [
-                        1
-                    ],
-                    "floor": 1,
-                    "indexes": [
-                        2
-                    ],
-                    "size": 5,
-                    "step": 2
-                }
-            },
-            "numeric": {
-                "bool": true,
-                "double": 1.5,
-                "int": -1,
-                "uint": 1
-            }
-        }
-    },
-    "version": 1
-})JSON";
-
-const char EXPECTED_DATA_PARAMS_HISTOGRAMS[] = R"JSON({
+const char EXPECTED[] = R"JSON({
     "data_source": "Inspect",
     "metadata": {
         "component_url": "COMPONENT_URL",
@@ -342,21 +223,15 @@ TEST_F(AccessorTest, StreamDiagnosticsInspect) {
   std::string timestamp;
   EXPECT_TRUE(re2::RE2::PartialMatch(actual, re2::RE2("\"timestamp\": (\\d+)"), &timestamp));
 
-  std::string expected_buckets = EXPECTED_DATA_BUCKETS_HISTOGRAMS;
-  std::string expected_params = EXPECTED_DATA_PARAMS_HISTOGRAMS;
+  std::string expected = EXPECTED;
 
   // Replace non-deterministic expected values.
-  re2::RE2::GlobalReplace(&expected_buckets, re2::RE2("CHILD_NAME"),
-                          realm.component().GetChildName());
-  re2::RE2::GlobalReplace(&expected_buckets, re2::RE2("TIMESTAMP"), timestamp);
-  re2::RE2::GlobalReplace(&expected_params, re2::RE2("CHILD_NAME"),
-                          realm.component().GetChildName());
-  re2::RE2::GlobalReplace(&expected_params, re2::RE2("TIMESTAMP"), timestamp);
+  re2::RE2::GlobalReplace(&expected, re2::RE2("CHILD_NAME"), realm.component().GetChildName());
+  re2::RE2::GlobalReplace(&expected, re2::RE2("TIMESTAMP"), timestamp);
 
   std::string actual_sorted = SortJsonFile(actual);
 
-  EXPECT_TRUE(expected_buckets == actual_sorted || expected_params == actual_sorted,
-              "Histogram format didn't match buckets or params");
+  EXPECT_TRUE(expected == actual_sorted, "Histogram format didn't match buckets or params");
 }
 
 }  // namespace
