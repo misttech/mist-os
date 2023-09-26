@@ -206,7 +206,8 @@ impl ProductBundleV2 {
             if let Some(system) = system {
                 for image in system.iter_mut() {
                     let image_types = match image {
-                        Image::ZBI { path: _, signed: _ } => vec![Type::Emu, Type::Flash],
+                        Image::ZBI { path: _, signed: _ }
+                        | Image::Fxfs { path: _, contents: _ } => vec![Type::Emu, Type::Flash],
                         Image::QemuKernel(_) | Image::FVM(_) => vec![Type::Emu],
                         Image::FVMFastboot(_) | Image::VBMeta(_) => vec![Type::Flash],
                         _ => vec![],

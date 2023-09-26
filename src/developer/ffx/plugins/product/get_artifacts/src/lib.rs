@@ -114,7 +114,10 @@ fn extract_flashing_artifacts(
                 match image {
                     Image::ZBI { path: _, signed: _ }
                     | Image::VBMeta(_)
-                    | Image::FVMFastboot(_) => artifacts.push(compute_path(&image.source())?),
+                    | Image::FVMFastboot(_)
+                    | Image::Fxfs { path: _, contents: _ } => {
+                        artifacts.push(compute_path(&image.source())?)
+                    }
                     _ => continue,
                 }
             }
@@ -151,7 +154,10 @@ fn extract_emu_artifacts(
         if let Some(system) = system {
             for image in system.iter_mut() {
                 match image {
-                    Image::ZBI { path: _, signed: _ } | Image::QemuKernel(_) | Image::FVM(_) => {
+                    Image::ZBI { path: _, signed: _ }
+                    | Image::QemuKernel(_)
+                    | Image::FVM(_)
+                    | Image::Fxfs { path: _, contents: _ } => {
                         artifacts.push(compute_path(&image.source())?)
                     }
                     _ => continue,
@@ -229,6 +235,10 @@ mod tests {
                 Image::FVMFastboot(Utf8PathBuf::from(
                     "/tmp/product_bundle/system_a/fvm_fastboot.blk",
                 )),
+                Image::Fxfs {
+                    path: Utf8PathBuf::from("/tmp/product_bundle/system_a/fxfs.blk"),
+                    contents: Default::default(),
+                },
                 Image::QemuKernel(Utf8PathBuf::from("qemu/path")),
             ]),
             system_b: None,
@@ -249,6 +259,7 @@ mod tests {
             String::from("credential/path"),
             String::from("zbi/path"),
             String::from("/tmp/product_bundle/system_a/fvm_fastboot.blk"),
+            String::from("/tmp/product_bundle/system_a/fxfs.blk"),
         ];
         assert_eq!(expected_artifacts, artifacts);
     }
@@ -305,6 +316,10 @@ mod tests {
                     "/tmp/product_bundle/system_a/fvm_fastboot.blk",
                 )),
                 Image::QemuKernel(Utf8PathBuf::from("qemu/path")),
+                Image::Fxfs {
+                    path: Utf8PathBuf::from("/tmp/product_bundle/system_a/fxfs.blk"),
+                    contents: Default::default(),
+                },
             ]),
             system_b: None,
             system_r: None,
@@ -323,6 +338,7 @@ mod tests {
             String::from("zbi/path"),
             String::from("/tmp/product_bundle/system_a/fvm.blk"),
             String::from("qemu/path"),
+            String::from("/tmp/product_bundle/system_a/fxfs.blk"),
         ];
         assert_eq!(expected_artifacts, artifacts);
     }
