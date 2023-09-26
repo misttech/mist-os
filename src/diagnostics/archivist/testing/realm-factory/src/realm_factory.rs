@@ -89,7 +89,9 @@ impl ArchivistRealmFactory {
             .add_route(
                 Route::new()
                     .capability(Capability::event_stream("directory_ready").with_scope(&test_realm))
-                    .capability(Capability::event_stream("capability_requested"))
+                    .capability(
+                        Capability::event_stream("capability_requested").with_scope(&test_realm),
+                    )
                     .from(Ref::parent())
                     .to(&test_realm),
             )
