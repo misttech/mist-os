@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use bstr::BString;
 use fidl::endpoints::{create_endpoints, ClientEnd, ProtocolMarker, Proxy};
 use fidl::AsHandleRef;
 use fidl_fuchsia_io as fio;
@@ -12,7 +13,6 @@ use netlink::{interfaces::InterfacesHandler, Netlink, NETLINK_LOG_TAG};
 use once_cell::sync::OnceCell;
 use std::{
     collections::{BTreeMap, HashSet},
-    iter::FromIterator,
     sync::{
         atomic::{AtomicI32, AtomicU16, AtomicU32, AtomicU64, AtomicU8},
         Arc, Weak,
@@ -75,7 +75,7 @@ pub struct Kernel {
     pub default_abstract_vsock_namespace: Arc<AbstractVsockSocketNamespace>,
 
     /// The kernel command line. Shows up in /proc/cmdline.
-    pub cmdline: Vec<u8>,
+    pub cmdline: BString,
 
     // Owned by anon_node.rs
     pub anon_fs: OnceCell<FileSystemHandle>,
@@ -226,8 +226,8 @@ impl InterfacesHandler for InterfacesHandlerImpl {
 impl Kernel {
     pub fn new(
         name: &[u8],
-        cmdline: &[u8],
-        features: &[String],
+        cmdline: BString,
+        features: HashSet<String>,
         container_svc: Option<fio::DirectoryProxy>,
         container_data_dir: Option<fio::DirectorySynchronousProxy>,
         inspect_node: fuchsia_inspect::Node,
@@ -251,7 +251,7 @@ impl Kernel {
             default_abstract_vsock_namespace: AbstractVsockSocketNamespace::new(
                 vsock_address_maker,
             ),
-            cmdline: cmdline.to_vec(),
+            cmdline,
             anon_fs: OnceCell::new(),
             pipe_fs: OnceCell::new(),
             dev_tmp_fs: OnceCell::new(),
@@ -262,7 +262,7 @@ impl Kernel {
             selinux_fs: OnceCell::new(),
             trace_fs: OnceCell::new(),
             device_registry: DeviceRegistry::new(),
-            features: HashSet::from_iter(features.iter().cloned()),
+            features,
             container_svc,
             container_data_dir,
             loop_device_registry: Default::default(),

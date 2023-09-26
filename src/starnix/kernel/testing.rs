@@ -4,7 +4,7 @@
 
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
-use std::{ffi::CString, sync::Arc};
+use std::{collections::HashSet, ffi::CString, sync::Arc};
 use zerocopy::AsBytes;
 
 use crate::{
@@ -55,9 +55,15 @@ pub fn create_kernel_and_task() -> (Arc<Kernel>, AutoReleasableTask) {
 fn create_kernel_and_task_with_fs(
     create_fs: impl FnOnce(&Arc<Kernel>) -> FileSystemHandle,
 ) -> (Arc<Kernel>, AutoReleasableTask) {
-    let kernel =
-        Kernel::new(b"test-kernel", &[], &Vec::new(), None, None, fuchsia_inspect::Node::default())
-            .expect("failed to create kernel");
+    let kernel = Kernel::new(
+        b"test-kernel",
+        b"".into(),
+        HashSet::new(),
+        None,
+        None,
+        fuchsia_inspect::Node::default(),
+    )
+    .expect("failed to create kernel");
 
     let fs = FsContext::new(create_fs(&kernel));
     let task = Task::create_process_without_parent(

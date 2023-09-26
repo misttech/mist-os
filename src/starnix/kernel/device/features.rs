@@ -11,8 +11,11 @@ use crate::{
     task::Kernel,
     types::*,
 };
+use bstr::BString;
+use fuchsia_zircon as zx;
 use std::sync::Arc;
 
+use fidl_fuchsia_sysinfo as fsysinfo;
 use fidl_fuchsia_ui_composition as fuicomposition;
 use fidl_fuchsia_ui_input3 as fuiinput;
 use fidl_fuchsia_ui_views as fuiviews;
@@ -42,6 +45,7 @@ pub fn run_features(entries: &Vec<String>, kernel: &Arc<Kernel>) -> Result<(), E
                     .1;
                 start_perfetto_consumer_thread(kernel, socket_path.as_bytes())?;
             }
+            "android_serialno" => {}
             feature => {
                 log_warn!("Unsupported feature: {:?}", feature);
             }
@@ -86,10 +90,17 @@ pub fn run_component_features(
             "magma" => {}
             "test_data" => {}
             "custom_artifacts" => {}
+            "android_serialno" => {}
             feature => {
                 log_warn!("Unsupported component feature: {:?}", feature);
             }
         }
     }
     Ok(())
+}
+
+pub async fn get_serial_number() -> anyhow::Result<BString> {
+    let sysinfo = fuchsia_component::client::connect_to_protocol::<fsysinfo::SysInfoMarker>()?;
+    let serial = sysinfo.get_serial_number().await?.map_err(zx::Status::from_raw)?;
+    Ok(BString::from(serial))
 }

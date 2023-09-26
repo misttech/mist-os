@@ -45,7 +45,7 @@ impl ProcDirectory {
         let nodes = btreemap! {
             &b"cpuinfo"[..] => fs.create_node(CpuinfoFile::new_node(), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
             &b"cmdline"[..] => {
-                let cmdline = kernel.cmdline.clone();
+                let cmdline = Vec::from(kernel.cmdline.clone());
                 fs.create_node(BytesFile::new_node(cmdline), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()))
             },
             &b"self"[..] => SelfSymlink::new_node(fs),

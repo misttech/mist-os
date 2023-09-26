@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, bail, Error};
+use bstr::BString;
 use fidl::{
     endpoints::{ControlHandle, RequestStream},
     AsyncChannel,
@@ -22,14 +23,18 @@ use fuchsia_zircon::Task as _;
 use futures::{channel::oneshot, FutureExt, StreamExt, TryStreamExt};
 use runner::{get_program_string, get_program_strvec};
 use starnix_kernel_config::Config;
-use std::{collections::BTreeMap, ffi::CString, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashSet},
+    ffi::CString,
+    sync::Arc,
+};
 
 use crate::{
     auth::Credentials,
     device::{init_common_devices, run_features},
     execution::*,
     fs::{layeredfs::LayeredFs, tmpfs::TmpFs, *},
-    logging::{log_error, log_info},
+    logging::*,
     task::*,
     time::utc::update_utc_clock,
     types::*,
@@ -288,11 +293,24 @@ async fn create_container(
 
     let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(config.pkg_dir.take().unwrap());
 
+    let features = HashSet::from_iter(config.features.iter().cloned());
+
+    let mut kernel_cmdline = BString::from(config.kernel_cmdline.as_bytes());
+    if features.contains("android_serialno") {
+        match crate::device::get_serial_number().await {
+            Ok(serial) => {
+                kernel_cmdline.extend(b" androidboot.serialno=");
+                kernel_cmdline.extend(&*serial);
+            }
+            Err(err) => log_warn!("could not get serial number: {err:?}"),
+        }
+    }
+
     let node = inspect::component::inspector().root().create_child("container");
     let kernel = Kernel::new(
         config.name.as_bytes(),
-        config.kernel_cmdline.as_bytes(),
-        &config.features,
+        kernel_cmdline,
+        features,
         svc_dir,
         data_dir,
         node.create_child("kernel"),
