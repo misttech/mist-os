@@ -814,7 +814,7 @@ impl Default for DependencyType {
 /// Capability availability. See [`Availability`].
 ///
 /// [`Availability`]: ../../fidl_fuchsia_sys2/enum.Availability.html
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Copy)]
 #[serde(rename_all = "snake_case")]
 pub enum Availability {
     Required,
@@ -832,6 +832,7 @@ symmetrical_enums!(
     Transitional
 );
 
+// TODO(cgonyeo): remove this once we've soft migrated to the availability field being required.
 impl Default for Availability {
     fn default() -> Self {
         Self::Required

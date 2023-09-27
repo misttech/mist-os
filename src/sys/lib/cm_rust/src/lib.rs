@@ -234,21 +234,7 @@ impl ComponentDecl {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Availability {
-    Required,
-    Optional,
-    SameAsTarget,
-    Transitional,
-}
-
-// TODO(dgonyeo): remove this once we've soft migrated to the availability field being required.
-impl Default for Availability {
-    fn default() -> Self {
-        Availability::Required
-    }
-}
+pub use cm_types::Availability;
 
 fidl_translations_symmetrical_enums!(
     fdecl::Availability,
