@@ -83,8 +83,10 @@ static_library("ring-aes") {
     sources = [ "$ring_crate/pregenerated/aes-x86_64-elf.S" ]
   } else if (current_cpu == "x64" && is_mac) {
     sources = [ "$ring_crate/pregenerated/aes-x86_64-macosx.S" ]
-  } else if (current_cpu == "arm64") {
+  } else if (current_cpu == "arm64" && !is_mac) {
     sources = [ "$ring_crate/pregenerated/aesv8-armx-linux64.S" ]
+  } else if (current_cpu == "arm64" && is_mac) {
+    sources = [ "$ring_crate/pregenerated/aesv8-armx-ios64.S" ]
   }
 }
 
@@ -108,8 +110,10 @@ static_library("ring-vpaes") {
     sources = [ "$ring_crate/pregenerated/vpaes-x86_64-elf.S" ]
   } else if (current_cpu == "x64" && is_mac) {
     sources = [ "$ring_crate/pregenerated/vpaes-x86_64-macosx.S" ]
-  } else if (current_cpu == "arm64") {
+  } else if (current_cpu == "arm64" && !is_mac) {
     sources = [ "$ring_crate/pregenerated/vpaes-armv8-linux64.S" ]
+  } else if (current_cpu == "arm64" && is_mac) {
+    sources = [ "$ring_crate/pregenerated/vpaes-armv8-ios64.S" ]
   }
 }
 
@@ -122,8 +126,10 @@ static_library("ring-mont-elf") {
     sources = [ "$ring_crate/pregenerated/x86_64-mont-elf.S" ]
   } else if (current_cpu == "x64" && is_mac) {
     sources = [ "$ring_crate/pregenerated/x86_64-mont-macosx.S" ]
-  } else if (current_cpu == "arm64") {
+  } else if (current_cpu == "arm64" && !is_mac) {
     sources = [ "$ring_crate/pregenerated/armv8-mont-linux64.S" ]
+  } else if (current_cpu == "arm64" && is_mac) {
+    sources = [ "$ring_crate/pregenerated/armv8-mont-ios64.S" ]
   }
 }
 
@@ -149,8 +155,10 @@ static_library("ring-chacha") {
     sources = [ "$ring_crate/pregenerated/chacha-x86_64-elf.S" ]
   } else if (current_cpu == "x64" && is_mac) {
     sources = [ "$ring_crate/pregenerated/chacha-x86_64-macosx.S" ]
-  } else if (current_cpu == "arm64") {
+  } else if (current_cpu == "arm64" && !is_mac) {
     sources = [ "$ring_crate/pregenerated/chacha-armv8-linux64.S" ]
+  } else if (current_cpu == "arm64" && is_mac) {
+    sources = [ "$ring_crate/pregenerated/chacha-armv8-ios64.S" ]
   }
 }
 
@@ -172,8 +180,10 @@ static_library("ring-aesni-gcm") {
     sources = [ "$ring_crate/pregenerated/aesni-gcm-x86_64-elf.S" ]
   } else if (current_cpu == "x64" && is_mac) {
     sources = [ "$ring_crate/pregenerated/aesni-gcm-x86_64-macosx.S" ]
-  } else if (current_cpu == "arm64") {
+  } else if (current_cpu == "arm64" && !is_mac) {
     sources = [ "$ring_crate/pregenerated/aesv8-armx-linux64.S" ]
+  } else if (current_cpu == "arm64" && !is_mac) {
+    sources = [ "$ring_crate/pregenerated/aesv8-armx-ios64.S" ]
   }
 }
 
@@ -186,10 +196,15 @@ static_library("ring-ghash") {
     sources = [ "$ring_crate/pregenerated/ghash-x86_64-elf.S" ]
   } else if (current_cpu == "x64" && is_mac) {
     sources = [ "$ring_crate/pregenerated/ghash-x86_64-macosx.S" ]
-  } else if (current_cpu == "arm64") {
+  } else if (current_cpu == "arm64" && !is_mac) {
     sources = [
       "$ring_crate/pregenerated/ghash-neon-armv8-linux64.S",
       "$ring_crate/pregenerated/ghashv8-armx-linux64.S",
+    ]
+  } else if (current_cpu == "arm64" && is_mac) {
+    sources = [
+      "$ring_crate/pregenerated/ghash-neon-armv8-ios64.S",
+      "$ring_crate/pregenerated/ghashv8-armx-ios64.S",
     ]
   }
 }
@@ -203,8 +218,10 @@ static_library("ring-poly1305") {
     sources = [ "$ring_crate/pregenerated/poly1305-x86_64-elf.S" ]
   } else if (current_cpu == "x64" && is_mac) {
     sources = [ "$ring_crate/pregenerated/poly1305-x86_64-macosx.S" ]
-  } else if (current_cpu == "arm64") {
+  } else if (current_cpu == "arm64" && !is_mac) {
     sources = [ "$ring_crate/pregenerated/poly1305-armv8-linux64.S" ]
+  } else if (current_cpu == "arm64" && is_mac) {
+    sources = [ "$ring_crate/pregenerated/poly1305-armv8-ios64.S" ]
   }
 }
 
@@ -217,8 +234,10 @@ static_library("ring-sha512") {
     sources = [ "$ring_crate/pregenerated/sha512-x86_64-elf.S" ]
   } else if (current_cpu == "x64" && is_mac) {
     sources = [ "$ring_crate/pregenerated/sha512-x86_64-macosx.S" ]
-  } else if (current_cpu == "arm64") {
+  } else if (current_cpu == "arm64" && !is_mac) {
     sources = [ "$ring_crate/pregenerated/sha512-armv8-linux64.S" ]
+  } else if (current_cpu == "arm64" && is_mac) {
+    sources = [ "$ring_crate/pregenerated/sha512-armv8-ios64.S" ]
   }
 }
 
@@ -231,8 +250,10 @@ static_library("ring-sha256") {
     sources = [ "$ring_crate/pregenerated/sha256-x86_64-elf.S" ]
   } else if (current_cpu == "x64" && is_mac) {
     sources = [ "$ring_crate/pregenerated/sha256-x86_64-macosx.S" ]
-  } else if (current_cpu == "arm64") {
+  } else if (current_cpu == "arm64" && !is_mac) {
     sources = [ "$ring_crate/pregenerated/sha256-armv8-linux64.S" ]
+  } else if (current_cpu == "arm64" && is_mac) {
+    sources = [ "$ring_crate/pregenerated/sha256-armv8-ios64.S" ]
   }
 }
 
@@ -282,8 +303,10 @@ static_library("ring-ecp-nistz256") {
   configs += [ ":ring-config" ]
 
   sources = [ "$ring_crate/crypto/fipsmodule/ec/ecp_nistz256.c" ]
-  if (current_cpu == "arm64") {
+  if (current_cpu == "arm64" && !is_mac) {
     sources += [ "$ring_crate/pregenerated/ecp_nistz256-armv8-linux64.S" ]
+  } else if (current_cpu == "arm64" && is_mac) {
+    sources += [ "$ring_crate/pregenerated/ecp_nistz256-armv8-ios64.S" ]
   }
 }
 
