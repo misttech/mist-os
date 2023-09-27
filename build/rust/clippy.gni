@@ -99,7 +99,7 @@ template("clippy") {
         "-Aclippy::bad_bit_mask",
         "-Dclippy::missing_safety_doc",
 
-        # TODO(b/301642294) remove this allowance
+        # TODO(fxbug.dev/301642294) remove this allowance
         "-Aclippy::never-loop",
       ]
       if (rustc_version_string !=
