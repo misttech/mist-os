@@ -125,7 +125,7 @@ async fn get_flushes(moniker: String) -> (u64, u64) {
         .unwrap_or_else(|| panic!("No transactions property_found: {:?}", hierarchy))
         .uint()
         .expect("Transactions property should be uint");
-    (*flushes, *transactions)
+    (flushes, transactions)
 }
 
 impl FxfsInstance {

@@ -183,5 +183,5 @@ fn get_task_id_and_source(payload: &DiagnosticsHierarchy<LogsField>) -> (u64, St
     let keys = payload.get_child("keys").unwrap();
     let id = keys.get_property("id").unwrap().uint().unwrap();
     let source = keys.get_property("source").unwrap().string().unwrap().to_string();
-    (*id as u64, source)
+    (id, source)
 }

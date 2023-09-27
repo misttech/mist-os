@@ -1374,11 +1374,7 @@ mod tests {
     }
 
     fn get_recent_property(hierarchy: &DiagnosticsHierarchy, name: &str) -> i64 {
-        *hierarchy
-            .get_property_by_path(&vec!["stats", "recent_usage", name])
-            .unwrap()
-            .int()
-            .unwrap()
+        hierarchy.get_property_by_path(&vec!["stats", "recent_usage", name]).unwrap().int().unwrap()
     }
 
     fn get_data(

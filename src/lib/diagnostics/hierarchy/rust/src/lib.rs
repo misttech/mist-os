@@ -260,7 +260,7 @@ where
     }
 }
 
-macro_rules! property_type_getters {
+macro_rules! property_type_getters_ref {
     ($([$variant:ident, $fn_name:ident, $type:ty]),*) => {
         paste::item! {
           impl<Key> Property<Key> {
@@ -278,17 +278,38 @@ macro_rules! property_type_getters {
     }
 }
 
-property_type_getters!(
-    [String, string, str],
-    [Bytes, bytes, [u8]],
+macro_rules! property_type_getters_copy {
+    ($([$variant:ident, $fn_name:ident, $type:ty]),*) => {
+        paste::item! {
+          impl<Key> Property<Key> {
+              $(
+                  #[doc = "Returns the " $variant " value or `None` if the property isn't of that type"]
+                  pub fn $fn_name(&self) -> Option<$type> {
+                      match self {
+                          Property::$variant(_, value) => Some(*value),
+                          _ => None,
+                      }
+                  }
+              )*
+          }
+        }
+    }
+}
+
+property_type_getters_copy!(
     [Int, int, i64],
     [Uint, uint, u64],
     [Double, double, f64],
-    [Bool, boolean, bool],
+    [Bool, boolean, bool]
+);
+
+property_type_getters_ref!(
+    [String, string, str],
+    [Bytes, bytes, [u8]],
     [DoubleArray, double_array, ArrayContent<f64>],
     [IntArray, int_array, ArrayContent<i64>],
     [UintArray, uint_array, ArrayContent<u64>],
-    [StringList, string_list, Vec<String>]
+    [StringList, string_list, [String]]
 );
 
 // TODO(fxbug.dev/302138500): remove once soft-migration is done.

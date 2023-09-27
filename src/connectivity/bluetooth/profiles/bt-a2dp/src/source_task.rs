@@ -342,11 +342,11 @@ mod tests {
         let total_bytes = hierarchy
             .get_property_by_path(&vec!["source_task", "data_stream", "total_bytes"])
             .expect("missing property");
-        assert_gt!(total_bytes.uint().expect("uint"), &0);
+        assert_gt!(total_bytes.uint().expect("uint"), 0);
 
         let bytes_per_second_current = hierarchy
             .get_property_by_path(&vec!["source_task", "data_stream", "bytes_per_second_current"])
             .expect("missing property");
-        assert_gt!(bytes_per_second_current.uint().expect("uint"), &0);
+        assert_gt!(bytes_per_second_current.uint().expect("uint"), 0);
     }
 }

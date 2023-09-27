@@ -122,7 +122,7 @@ async fn get_coredumps_from_inspect() -> Option<Vec<CoredumpReport>> {
                 // TODO(https://fxbug.dev/130834) i64/int in kernel shows up as u64/uint here
                 "pid" => {
                     pid = Some(
-                        *property.uint().expect("starnix should put a uint in the pid property")
+                        property.uint().expect("starnix should put a uint in the pid property")
                             as i64,
                     )
                 }
