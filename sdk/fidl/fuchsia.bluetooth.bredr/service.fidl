@@ -72,8 +72,17 @@ const PSM_3DSP uint16 = 33; // 3D Synchronization Profile
 const PSM_LE_IPSP uint16 = 35; // Internet Protocol Support Profile
 const PSM_OTS uint16 = 37; // Object Transfer Service
 
+/// Placeholder PSM value used to request a dynamic PSM. A valid dynamic PSM will be assigned to the
+/// service during registration.
+/// Used in DataElement as protocol parameters for L2CAP.
+/// Note: This value is not a valid PSM in of itself, and is not defined in the Bluetooth
+/// Assigned Numbers.
+const PSM_DYNAMIC uint16 = 0xffff;
+
 /// Identifies a communications protocol along with protocol-specific parameters.
-/// Usually used to describe a protocol endpoint in a ProtocolDescriptorList
+/// Usually used to describe a protocol endpoint in a ProtocolDescriptorList.
+/// Use `PSM_DYNAMIC` in the L2CAP protocol-specific `params` to specify a PSM that is dynamically
+/// assigned.
 type ProtocolDescriptor = struct {
     protocol ProtocolIdentifier;
     params vector<DataElement>:MAX_SEQUENCE_LENGTH;
