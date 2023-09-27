@@ -59,10 +59,12 @@ use tracing::trace;
 
 use crate::{
     context::{
-        CounterContext, EventContext, InstantContext, RngContext, TimerContext, TracingContext,
+        CounterContext, EventContext, InstantBindingsTypes, RngContext, TimerContext,
+        TracingContext,
     },
     device::{
-        ethernet::EthernetLinkDevice, DeviceId, DeviceLayerState, DeviceLayerTimerId, WeakDeviceId,
+        ethernet::EthernetLinkDevice, DeviceId, DeviceLayerState, DeviceLayerTimerId,
+        DeviceLayerTypes, WeakDeviceId,
     },
     ip::{
         device::{
@@ -72,7 +74,7 @@ use crate::{
         icmp::{BufferIcmpContext, IcmpContext},
         IpLayerTimerId, Ipv4State, Ipv6State,
     },
-    transport::{TransportLayerState, TransportLayerTimerId},
+    transport::{tcp::socket::TcpBindingsTypes, TransportLayerState, TransportLayerTimerId},
 };
 pub(crate) use trace::trace_duration;
 
@@ -179,11 +181,11 @@ impl StackStateBuilder {
 }
 
 /// The state associated with the network stack.
-pub struct StackState<C: NonSyncContext> {
-    transport: TransportLayerState<C>,
-    ipv4: Ipv4State<C::Instant, DeviceId<C>>,
-    ipv6: Ipv6State<C::Instant, DeviceId<C>>,
-    device: DeviceLayerState<C>,
+pub struct StackState<BT: BindingsTypes> {
+    transport: TransportLayerState<BT>,
+    ipv4: Ipv4State<BT::Instant, DeviceId<BT>>,
+    ipv6: Ipv6State<BT::Instant, DeviceId<BT>>,
+    device: DeviceLayerState<BT>,
 }
 
 /// The non synchronized context for the stack with a buffer.
@@ -227,15 +229,25 @@ pub trait ReferenceNotifiers {
     ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>);
 }
 
+/// A marker trait for all the types stored in core objects that are specified
+/// by bindings.
+pub trait BindingsTypes: InstantBindingsTypes + DeviceLayerTypes + TcpBindingsTypes {}
+
+impl<O> BindingsTypes for O where O: InstantBindingsTypes + DeviceLayerTypes + TcpBindingsTypes {}
+
 /// The non-synchronized context for the stack.
-pub trait NonSyncContext: CounterContext
+pub trait NonSyncContext:
+    CounterContext
+    + BindingsTypes
     + BufferNonSyncContextInner<Buf<Vec<u8>>>
     + BufferNonSyncContextInner<EmptyBuf>
     + RngContext
     + TimerContext<TimerId<Self>>
-    + EventContext<ip::device::IpDeviceEvent<DeviceId<Self>, Ipv4, <Self as InstantContext>::Instant>>
-    + EventContext<ip::device::IpDeviceEvent<DeviceId<Self>, Ipv6, <Self as InstantContext>::Instant>>
-    + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv4>>
+    + EventContext<
+        ip::device::IpDeviceEvent<DeviceId<Self>, Ipv4, <Self as InstantBindingsTypes>::Instant>,
+    > + EventContext<
+        ip::device::IpDeviceEvent<DeviceId<Self>, Ipv6, <Self as InstantBindingsTypes>::Instant>,
+    > + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv4>>
     + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv6>>
     + transport::udp::NonSyncContext<Ipv4>
     + transport::udp::NonSyncContext<Ipv6>
@@ -252,14 +264,23 @@ pub trait NonSyncContext: CounterContext
 }
 impl<
         C: CounterContext
+            + BindingsTypes
             + BufferNonSyncContextInner<Buf<Vec<u8>>>
             + BufferNonSyncContextInner<EmptyBuf>
             + RngContext
             + TimerContext<TimerId<Self>>
             + EventContext<
-                ip::device::IpDeviceEvent<DeviceId<Self>, Ipv4, <Self as InstantContext>::Instant>,
+                ip::device::IpDeviceEvent<
+                    DeviceId<Self>,
+                    Ipv4,
+                    <Self as InstantBindingsTypes>::Instant,
+                >,
             > + EventContext<
-                ip::device::IpDeviceEvent<DeviceId<Self>, Ipv6, <Self as InstantContext>::Instant>,
+                ip::device::IpDeviceEvent<
+                    DeviceId<Self>,
+                    Ipv6,
+                    <Self as InstantBindingsTypes>::Instant,
+                >,
             > + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv4>>
             + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv6>>
             + transport::udp::NonSyncContext<Ipv4>
@@ -278,9 +299,9 @@ impl<
 }
 
 /// The synchronized context.
-pub struct SyncCtx<NonSyncCtx: NonSyncContext> {
+pub struct SyncCtx<BT: BindingsTypes> {
     /// Contains the state of the stack.
-    pub state: StackState<NonSyncCtx>,
+    pub state: StackState<BT>,
 }
 
 impl<NonSyncCtx: NonSyncContext> SyncCtx<NonSyncCtx> {

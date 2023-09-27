@@ -31,7 +31,8 @@ use zerocopy::ByteSlice;
 
 use crate::{
     context::{
-        CounterContext, EventContext, InstantContext, RngContext, TimerContext, TimerHandler,
+        CounterContext, EventContext, InstantBindingsTypes, InstantContext, RngContext,
+        TimerContext, TimerHandler,
     },
     device::Id as _,
     error::{ExistsError, NotFoundError, NotSupportedError, SetIpAddressPropertiesError},
@@ -355,7 +356,7 @@ pub enum IpDeviceEvent<DeviceId, I: Ip, Instant> {
 impl<
         DeviceId,
         C: InstantContext
-            + EventContext<IpDeviceEvent<DeviceId, Ipv6, <C as InstantContext>::Instant>>,
+            + EventContext<IpDeviceEvent<DeviceId, Ipv6, <C as InstantBindingsTypes>::Instant>>,
     > EventContext<DadEvent<DeviceId>> for C
 {
     fn on_event(&mut self, event: DadEvent<DeviceId>) {
@@ -423,7 +424,7 @@ impl<C: DualStackDeviceNonSyncContext, SC: DualStackDeviceContext<C>> DualStackD
 pub(crate) trait IpDeviceNonSyncContext<I: IpDeviceIpExt, DeviceId>:
     RngContext
     + TimerContext<I::Timer<DeviceId>>
-    + EventContext<IpDeviceEvent<DeviceId, I, <Self as InstantContext>::Instant>>
+    + EventContext<IpDeviceEvent<DeviceId, I, <Self as InstantBindingsTypes>::Instant>>
     + CounterContext
 {
 }
@@ -432,7 +433,7 @@ impl<
         I: IpDeviceIpExt,
         C: RngContext
             + TimerContext<I::Timer<DeviceId>>
-            + EventContext<IpDeviceEvent<DeviceId, I, <Self as InstantContext>::Instant>>
+            + EventContext<IpDeviceEvent<DeviceId, I, <Self as InstantBindingsTypes>::Instant>>
             + CounterContext,
     > IpDeviceNonSyncContext<I, DeviceId> for C
 {

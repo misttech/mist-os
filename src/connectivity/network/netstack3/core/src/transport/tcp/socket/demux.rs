@@ -46,14 +46,14 @@ use crate::{
             do_send_inner, isn::IsnGenerator, Acceptor, BoundSocketState, Connection,
             HandshakeStatus, Listener, ListenerAddrState, ListenerNotifier as _,
             ListenerSharingState, MaybeListener, NonSyncContext, SocketId, SocketState, Sockets,
-            SyncContext, TcpIpTransportContext, TimerId,
+            SyncContext, TcpBindingsTypes, TcpIpTransportContext, TimerId,
         },
         state::{BufferProvider, Closed, DataAcked, Initial, State, TimeWait},
         BufferSizes, ConnectionError, Control, Mss, SocketOptions,
     },
 };
 
-impl<C: NonSyncContext> BufferProvider<C::ReceiveBuffer, C::SendBuffer> for C {
+impl<C: TcpBindingsTypes> BufferProvider<C::ReceiveBuffer, C::SendBuffer> for C {
     type ActiveOpen = C::ListenerNotifierOrProvidedBuffers;
 
     type PassiveOpen = C::ReturnedBuffers;
@@ -61,7 +61,7 @@ impl<C: NonSyncContext> BufferProvider<C::ReceiveBuffer, C::SendBuffer> for C {
     fn new_passive_open_buffers(
         buffer_sizes: BufferSizes,
     ) -> (C::ReceiveBuffer, C::SendBuffer, Self::PassiveOpen) {
-        <C as NonSyncContext>::new_passive_open_buffers(buffer_sizes)
+        <C as TcpBindingsTypes>::new_passive_open_buffers(buffer_sizes)
     }
 }
 
@@ -73,8 +73,8 @@ where
         + BufferProvider<
             C::ReceiveBuffer,
             C::SendBuffer,
-            ActiveOpen = <C as NonSyncContext>::ListenerNotifierOrProvidedBuffers,
-            PassiveOpen = <C as NonSyncContext>::ReturnedBuffers,
+            ActiveOpen = <C as TcpBindingsTypes>::ListenerNotifierOrProvidedBuffers,
+            PassiveOpen = <C as TcpBindingsTypes>::ReturnedBuffers,
         >,
     SC: SyncContext<I, C>,
 {
@@ -177,8 +177,8 @@ fn handle_incoming_packet<I, B, C, SC>(
         + BufferProvider<
             C::ReceiveBuffer,
             C::SendBuffer,
-            ActiveOpen = <C as NonSyncContext>::ListenerNotifierOrProvidedBuffers,
-            PassiveOpen = <C as NonSyncContext>::ReturnedBuffers,
+            ActiveOpen = <C as TcpBindingsTypes>::ListenerNotifierOrProvidedBuffers,
+            PassiveOpen = <C as TcpBindingsTypes>::ReturnedBuffers,
         >,
     SC: BufferTransportIpContext<I, C, EmptyBuf>
         + DeviceIpSocketHandler<I, C>
@@ -318,8 +318,8 @@ where
         + BufferProvider<
             C::ReceiveBuffer,
             C::SendBuffer,
-            ActiveOpen = <C as NonSyncContext>::ListenerNotifierOrProvidedBuffers,
-            PassiveOpen = <C as NonSyncContext>::ReturnedBuffers,
+            ActiveOpen = <C as TcpBindingsTypes>::ListenerNotifierOrProvidedBuffers,
+            PassiveOpen = <C as TcpBindingsTypes>::ReturnedBuffers,
         >,
     SC: BufferTransportIpContext<I, C, EmptyBuf>
         + DeviceIpSocketHandler<I, C>
@@ -504,8 +504,8 @@ where
         + BufferProvider<
             C::ReceiveBuffer,
             C::SendBuffer,
-            ActiveOpen = <C as NonSyncContext>::ListenerNotifierOrProvidedBuffers,
-            PassiveOpen = <C as NonSyncContext>::ReturnedBuffers,
+            ActiveOpen = <C as TcpBindingsTypes>::ListenerNotifierOrProvidedBuffers,
+            PassiveOpen = <C as TcpBindingsTypes>::ReturnedBuffers,
         >,
     SC: BufferTransportIpContext<I, C, EmptyBuf> + DeviceIpSocketHandler<I, C>,
 {

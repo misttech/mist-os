@@ -40,7 +40,7 @@ use smallvec::SmallVec;
 use tracing::{debug, trace};
 
 use crate::{
-    context::{InstantContext, RecvFrameContext, SendFrameContext},
+    context::{InstantBindingsTypes, InstantContext, RecvFrameContext, SendFrameContext},
     device::{
         ethernet::{
             EthernetDeviceState, EthernetDeviceStateBuilder,
@@ -564,7 +564,7 @@ pub(crate) fn snapshot_device_ids<T, C: NonSyncContext, F: FnMut(DeviceId<C>) ->
 pub fn inspect_neighbors<C, V>(sync_ctx: &SyncCtx<C>, visitor: &V)
 where
     C: NonSyncContext,
-    V: NeighborVisitor<C, <C as InstantContext>::Instant>,
+    V: NeighborVisitor<C, <C as InstantBindingsTypes>::Instant>,
 {
     let device_ids = snapshot_device_ids(sync_ctx, |device| match device {
         DeviceId::Ethernet(d) => Some(d),
@@ -1751,7 +1751,7 @@ type EthernetReferenceState<C> = IpLinkDeviceState<
     C,
     <C as DeviceLayerStateTypes>::EthernetDeviceState,
     EthernetDeviceState<
-        <C as InstantContext>::Instant,
+        <C as InstantBindingsTypes>::Instant,
         <C as LinkResolutionContext<EthernetLinkDevice>>::Notifier,
     >,
 >;
@@ -1769,7 +1769,7 @@ pub(crate) struct Devices<C: DeviceLayerTypes> {
 }
 
 /// The state associated with the device layer.
-pub(crate) struct DeviceLayerState<C: DeviceLayerTypes + socket::NonSyncContext<DeviceId<C>>> {
+pub(crate) struct DeviceLayerState<C: DeviceLayerTypes> {
     devices: RwLock<Devices<C>>,
     origin: OriginTracker,
     shared_sockets: HeldSockets<C>,

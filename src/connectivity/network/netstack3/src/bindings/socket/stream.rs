@@ -44,7 +44,7 @@ use netstack3_core::{
             set_reuseaddr, set_send_buffer_size, shutdown, with_socket_options,
             with_socket_options_mut, AcceptError, BindError, BoundInfo, ConnectError,
             ConnectionInfo, ListenError, ListenerNotifier, NoConnection, SetReuseAddrError,
-            SocketAddr, SocketId, SocketInfo,
+            SocketAddr, SocketId, SocketInfo, TcpBindingsTypes,
         },
         state::Takeable,
         BufferSizes, ConnectionError, SocketOptions,
@@ -130,7 +130,9 @@ impl ListenerNotifier for LocalZirconSocketAndNotifier {
     }
 }
 
-impl tcp::socket::NonSyncContext for BindingsNonSyncCtxImpl {
+impl tcp::socket::NonSyncContext for BindingsNonSyncCtxImpl {}
+
+impl TcpBindingsTypes for BindingsNonSyncCtxImpl {
     type ReceiveBuffer = ReceiveBufferWithZirconSocket;
     type SendBuffer = SendBufferWithZirconSocket;
     type ReturnedBuffers = PeerZirconSocketAndWatcher;

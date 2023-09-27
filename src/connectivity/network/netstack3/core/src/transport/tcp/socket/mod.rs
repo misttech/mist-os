@@ -49,7 +49,7 @@ use tracing::{debug, warn};
 
 use crate::{
     algorithm::{PortAlloc, PortAllocImpl},
-    context::{TimerContext, TracingContext},
+    context::{InstantBindingsTypes, TimerContext, TracingContext},
     data_structures::{
         id_map::{self, EntryKey, IdMap},
         socketmap::{IterShadows as _, SocketMap},
@@ -100,9 +100,9 @@ impl TimerId {
     }
 }
 
-/// Non-sync context for TCP.
+/// Bindings types for TCP.
 ///
-/// The relationship between buffers defined in the context is as follows:
+/// The relationship between buffers  is as follows:
 ///
 /// The Bindings will receive the `ReturnedBuffers` so that it can: 1. give the
 /// application a handle to read/write data; 2. Observe whatever signal required
@@ -127,7 +127,7 @@ impl TimerId {
 /// |     v                  v      |
 /// |receive buffer     send buffer |
 /// +-------------------------------+
-pub trait NonSyncContext: TimerContext<TimerId> + TracingContext {
+pub trait TcpBindingsTypes: InstantBindingsTypes {
     /// Receive buffer used by TCP.
     type ReceiveBuffer: ReceiveBuffer;
     /// Send buffer used by TCP.
@@ -155,6 +155,11 @@ pub trait NonSyncContext: TimerContext<TimerId> + TracingContext {
         buffer_sizes: BufferSizes,
     ) -> (Self::ReceiveBuffer, Self::SendBuffer, Self::ReturnedBuffers);
 }
+
+/// Non-sync context for TCP.
+///
+/// Encodes all the operations TCP needs from bindings.
+pub trait NonSyncContext: TimerContext<TimerId> + TracingContext + TcpBindingsTypes {}
 
 /// A notifier used to tell Bindings about new pending connections for a single
 /// socket.
@@ -278,7 +283,7 @@ pub(crate) enum TcpIpTransportContext {}
 /// Uninstantiatable type for implementing [`SocketMapStateSpec`].
 struct TcpSocketSpec<Ip, Device, NonSyncContext>(PhantomData<(Ip, Device, NonSyncContext)>, Never);
 
-impl<I: IpExt, D: Id, C: NonSyncContext> SocketMapStateSpec for TcpSocketSpec<I, D, C> {
+impl<I: IpExt, D: Id, BT: TcpBindingsTypes> SocketMapStateSpec for TcpSocketSpec<I, D, BT> {
     type ListenerId = SocketId<I>;
     type ConnId = SocketId<I>;
 
@@ -361,14 +366,14 @@ impl<'a, I: Ip> Inserter<SocketId<I>> for ListenerAddrInserter<'a, I> {
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: fmt::Debug"))]
-pub(crate) enum BoundSocketState<I: IpExt, D: Id, C: NonSyncContext> {
+pub(crate) enum BoundSocketState<I: IpExt, D: Id, BT: TcpBindingsTypes> {
     Listener(
         (
             MaybeListener<
                 I,
-                C::ReturnedBuffers,
-                C::ListenerNotifierOrProvidedBuffers,
-                C::ListenerNotifierOrProvidedBuffers,
+                BT::ReturnedBuffers,
+                BT::ListenerNotifierOrProvidedBuffers,
+                BT::ListenerNotifierOrProvidedBuffers,
             >,
             ListenerSharingState,
             ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>,
@@ -379,10 +384,10 @@ pub(crate) enum BoundSocketState<I: IpExt, D: Id, C: NonSyncContext> {
             Connection<
                 I,
                 D,
-                C::Instant,
-                C::ReceiveBuffer,
-                C::SendBuffer,
-                C::ListenerNotifierOrProvidedBuffers,
+                BT::Instant,
+                BT::ReceiveBuffer,
+                BT::SendBuffer,
+                BT::ListenerNotifierOrProvidedBuffers,
             >,
             SharingState,
             ConnAddr<ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>, D>,
@@ -700,14 +705,14 @@ impl Default for SharingState {
     }
 }
 
-impl<I: IpExt, D: WeakId, C: NonSyncContext>
+impl<I: IpExt, D: WeakId, BT: TcpBindingsTypes>
     SocketMapConflictPolicy<
         ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>,
         ListenerSharingState,
         I,
         D,
         IpPortSpec,
-    > for TcpSocketSpec<I, D, C>
+    > for TcpSocketSpec<I, D, BT>
 {
     fn check_insert_conflicts(
         sharing: &ListenerSharingState,
@@ -845,21 +850,21 @@ pub(crate) struct Unbound<D, Extra> {
 }
 
 /// Holds all the TCP socket states.
-pub(crate) struct Sockets<I: IpExt, D: WeakId, C: NonSyncContext> {
-    port_alloc: PortAlloc<BoundSocketMap<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>>,
-    socketmap: BoundSocketMap<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>,
-    socket_state: IdMap<SocketState<I, D, C>>,
+pub(crate) struct Sockets<I: IpExt, D: WeakId, BT: TcpBindingsTypes> {
+    port_alloc: PortAlloc<BoundSocketMap<I, D, IpPortSpec, TcpSocketSpec<I, D, BT>>>,
+    socketmap: BoundSocketMap<I, D, IpPortSpec, TcpSocketSpec<I, D, BT>>,
+    socket_state: IdMap<SocketState<I, D, BT>>,
 }
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: fmt::Debug"))]
-pub(crate) enum SocketState<I: IpExt, D: WeakId, C: NonSyncContext> {
-    Unbound(Unbound<D, C::ListenerNotifierOrProvidedBuffers>),
-    Bound(BoundSocketState<I, D, C>),
+pub(crate) enum SocketState<I: IpExt, D: WeakId, BT: TcpBindingsTypes> {
+    Unbound(Unbound<D, BT::ListenerNotifierOrProvidedBuffers>),
+    Bound(BoundSocketState<I, D, BT>),
 }
 
-impl<I: IpExt, D: WeakId, C: NonSyncContext> PortAllocImpl
-    for BoundSocketMap<I, D, IpPortSpec, TcpSocketSpec<I, D, C>>
+impl<I: IpExt, D: WeakId, BT: TcpBindingsTypes> PortAllocImpl
+    for BoundSocketMap<I, D, IpPortSpec, TcpSocketSpec<I, D, BT>>
 {
     const EPHEMERAL_RANGE: RangeInclusive<u16> = 49152..=65535;
     type Id = Option<SocketIpAddr<I::Addr>>;
@@ -3255,7 +3260,7 @@ mod tests {
 
     type TcpNonSyncCtx = FakeNonSyncCtx<TimerId, (), ()>;
 
-    impl NonSyncContext for TcpNonSyncCtx {
+    impl TcpBindingsTypes for TcpNonSyncCtx {
         type ReceiveBuffer = Rc<RefCell<RingBuffer>>;
         type SendBuffer = TestSendBuffer;
         type ReturnedBuffers = ClientBuffers;
@@ -3276,6 +3281,8 @@ mod tests {
             BufferSizes::default()
         }
     }
+
+    impl NonSyncContext for TcpNonSyncCtx {}
 
     impl<I: TcpTestIpExt, D: FakeStrongDeviceId> DeviceIpSocketHandler<I, TcpNonSyncCtx>
         for FakeBufferIpTransportCtx<I, D>

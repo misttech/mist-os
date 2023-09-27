@@ -76,7 +76,7 @@ use crate::{
         tcp::TcpState,
         udp::{UdpState, UdpStateBuilder},
     },
-    NonSyncContext, SyncCtx,
+    BindingsTypes, NonSyncContext, SyncCtx,
 };
 
 /// A builder for transport layer state.
@@ -105,11 +105,11 @@ impl TransportStateBuilder {
 }
 
 /// The state associated with the transport layer.
-pub(crate) struct TransportLayerState<C: NonSyncContext> {
-    udpv4: UdpState<Ipv4, WeakDeviceId<C>>,
-    udpv6: UdpState<Ipv6, WeakDeviceId<C>>,
-    tcpv4: TcpState<Ipv4, WeakDeviceId<C>, C>,
-    tcpv6: TcpState<Ipv6, WeakDeviceId<C>, C>,
+pub(crate) struct TransportLayerState<BT: BindingsTypes> {
+    udpv4: UdpState<Ipv4, WeakDeviceId<BT>>,
+    udpv6: UdpState<Ipv6, WeakDeviceId<BT>>,
+    tcpv4: TcpState<Ipv4, WeakDeviceId<BT>, BT>,
+    tcpv6: TcpState<Ipv6, WeakDeviceId<BT>, BT>,
 }
 
 impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::UdpBoundMap<Ipv4>> for SyncCtx<C> {

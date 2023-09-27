@@ -41,6 +41,8 @@ use crate::{
     },
 };
 
+use self::socket::TcpBindingsTypes;
+
 /// Default lifetime for a orphaned connection in FIN_WAIT2.
 pub const DEFAULT_FIN_WAIT2_TIMEOUT: Duration = Duration::from_secs(60);
 
@@ -175,9 +177,9 @@ impl From<IcmpErrorCode> for Option<ConnectionError> {
     }
 }
 
-pub(crate) struct TcpState<I: IpExt, D: WeakId, C: tcp::socket::NonSyncContext> {
-    pub(crate) isn_generator: IsnGenerator<C::Instant>,
-    pub(crate) sockets: Mutex<Sockets<I, D, C>>,
+pub(crate) struct TcpState<I: IpExt, D: WeakId, BT: TcpBindingsTypes> {
+    pub(crate) isn_generator: IsnGenerator<BT::Instant>,
+    pub(crate) sockets: Mutex<Sockets<I, D, BT>>,
 }
 
 impl<I: IpExt, D: WeakId, C: tcp::socket::NonSyncContext> TcpState<I, D, C> {

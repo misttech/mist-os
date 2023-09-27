@@ -26,7 +26,10 @@ use tracing::{debug, error, trace};
 pub use crate::algorithm::STABLE_IID_SECRET_KEY_BYTES;
 use crate::{
     algorithm::{generate_opaque_interface_identifier, OpaqueIidNonce},
-    context::{CounterContext, InstantContext, RngContext, TimerContext, TimerHandler},
+    context::{
+        CounterContext, InstantBindingsTypes, InstantContext, RngContext, TimerContext,
+        TimerHandler,
+    },
     device::Id,
     error::{ExistsError, NotFoundError},
     ip::{
@@ -517,7 +520,7 @@ fn apply_slaac_update_to_addr<D: Id, C: SlaacNonSyncContext<D>>(
     valid_lifetime: Option<NonZeroNdpLifetime>,
     preferred_lifetime: Option<NonZeroNdpLifetime>,
     config: &SlaacConfiguration,
-    now: <C as InstantContext>::Instant,
+    now: <C as InstantBindingsTypes>::Instant,
     retrans_timer: Duration,
     dad_transmits: Option<NonZeroU8>,
     ctx: &mut C,

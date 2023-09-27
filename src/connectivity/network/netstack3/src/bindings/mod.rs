@@ -66,7 +66,8 @@ use net_types::{
 use netstack3_core::{
     add_ip_addr_subnet,
     context::{
-        CounterContext, EventContext, InstantContext, RngContext, TimerContext, TracingContext,
+        CounterContext, EventContext, InstantBindingsTypes, InstantContext, RngContext,
+        TimerContext, TracingContext,
     },
     device::{
         loopback::LoopbackDeviceId, update_ipv4_configuration, update_ipv6_configuration, DeviceId,
@@ -372,9 +373,11 @@ impl netstack3_core::Instant for StackTime {
     }
 }
 
-impl InstantContext for BindingsNonSyncCtxImpl {
+impl InstantBindingsTypes for BindingsNonSyncCtxImpl {
     type Instant = StackTime;
+}
 
+impl InstantContext for BindingsNonSyncCtxImpl {
     fn now(&self) -> StackTime {
         StackTime(fasync::Time::now())
     }

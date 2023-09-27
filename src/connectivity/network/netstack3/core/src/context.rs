@@ -99,8 +99,12 @@ pub(crate) trait NonTestCtxMarker {}
 
 impl<NonSyncCtx: NonSyncContext, L> NonTestCtxMarker for Locked<&SyncCtx<NonSyncCtx>, L> {}
 
-/// A context that provides access to a monotonic clock.
-pub trait InstantContext {
+/// Trait defining the `Instant` type provided by bindings' [`InstantContext`]
+/// implementation.
+///
+/// It is a separate trait from `InstantContext` so the type stands by itself to
+/// be stored at rest in core structures.
+pub trait InstantBindingsTypes {
     /// The type of an instant in time.
     ///
     /// All time is measured using `Instant`s, including scheduling timers
@@ -108,7 +112,10 @@ pub trait InstantContext {
     /// real-world time (e.g., [`std::time::Instant`]), or may be faked in
     /// testing using a fake clock.
     type Instant: Instant + 'static;
+}
 
+/// A context that provides access to a monotonic clock.
+pub trait InstantContext: InstantBindingsTypes {
     /// Returns the current instant.
     ///
     /// `now` guarantees that two subsequent calls to `now` will return
@@ -121,8 +128,11 @@ pub trait InstantContext {
 /// `CachedInstantCtx`s are constructed via [`new_cached_instant_context`].
 pub(crate) struct CachedInstantCtx<I>(I);
 
-impl<I: Instant + 'static> InstantContext for CachedInstantCtx<I> {
+impl<I: Instant + 'static> InstantBindingsTypes for CachedInstantCtx<I> {
     type Instant = I;
+}
+
+impl<I: Instant + 'static> InstantContext for CachedInstantCtx<I> {
     fn now(&self) -> I {
         self.0.clone()
     }
@@ -423,15 +433,21 @@ pub mod testutil {
         }
     }
 
-    impl InstantContext for FakeInstantCtx {
+    impl InstantBindingsTypes for FakeInstantCtx {
         type Instant = FakeInstant;
+    }
+
+    impl InstantContext for FakeInstantCtx {
         fn now(&self) -> FakeInstant {
             self.time
         }
     }
 
-    impl<T: AsRef<FakeInstantCtx>> InstantContext for T {
+    impl<T: AsRef<FakeInstantCtx>> InstantBindingsTypes for T {
         type Instant = FakeInstant;
+    }
+
+    impl<T: AsRef<FakeInstantCtx>> InstantContext for T {
         fn now(&self) -> FakeInstant {
             self.as_ref().now()
         }

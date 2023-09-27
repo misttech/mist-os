@@ -53,7 +53,8 @@ use crate::{
             FakeFrameCtx, FakeInstant, FakeNetworkContext, FakeTimerCtx, WithFakeFrameContext,
             WithFakeTimerContext,
         },
-        CounterContext, EventContext, InstantContext, RngContext, TimerContext, TracingContext,
+        CounterContext, EventContext, InstantBindingsTypes, InstantContext, RngContext,
+        TimerContext, TracingContext,
     },
     device::{
         ethernet, link::LinkDevice, loopback::LoopbackDeviceId, DeviceId,
@@ -72,11 +73,12 @@ use crate::{
     sync::Mutex,
     transport::{
         tcp::{
+            self,
             buffer::{
                 testutil::{ClientBuffers, ProvidedBuffers, TestSendBuffer},
                 RingBuffer,
             },
-            socket::NonSyncContext,
+            socket::TcpBindingsTypes,
             BufferSizes,
         },
         udp,
@@ -380,9 +382,11 @@ impl CounterContext for FakeNonSyncCtx {
     }
 }
 
-impl InstantContext for FakeNonSyncCtx {
+impl InstantBindingsTypes for FakeNonSyncCtx {
     type Instant = FakeInstant;
+}
 
+impl InstantContext for FakeNonSyncCtx {
     fn now(&self) -> FakeInstant {
         self.with_inner(|ctx| ctx.now())
     }
@@ -431,7 +435,9 @@ impl TracingContext for FakeNonSyncCtx {
     fn duration(&self, _: &'static CStr) {}
 }
 
-impl NonSyncContext for FakeNonSyncCtx {
+impl tcp::socket::NonSyncContext for FakeNonSyncCtx {}
+
+impl TcpBindingsTypes for FakeNonSyncCtx {
     type ReceiveBuffer = Rc<RefCell<RingBuffer>>;
 
     type SendBuffer = TestSendBuffer;
