@@ -6,6 +6,7 @@
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_VMAR_LOADER_H_
 
 #include <lib/stdcompat/span.h>
+#include <lib/zx/result.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
@@ -31,46 +32,6 @@ namespace elfldltl {
 /// destroyed without calling other methods.
 class VmarLoader {
  public:
-  explicit VmarLoader(const zx::vmar& vmar) : vmar_(vmar.borrow()) {}
-
-  ~VmarLoader() {
-    if (load_image_vmar_) {
-      load_image_vmar_.destroy();
-    }
-  }
-
-  VmarLoader(VmarLoader&& other) = default;
-  VmarLoader& operator=(VmarLoader&& other) = default;
-
-  [[gnu::const]] static size_t page_size() { return zx_system_get_page_size(); }
-
-  /// After Load(), this is the bias added to the given LoadInfo::vaddr_start()
-  /// to find the runtime load address.
-  zx_vaddr_t load_bias() const { return load_bias_; }
-
-  /// Commit is used to keep the mapping created by Load around even after the
-  /// VmarLoader object is destroyed. This method must be the last thing called
-  /// on the object if it is used, hence it can only be called with
-  /// `std::move(loader).Commit();`. If Commit() is not called, then loading is
-  /// aborted by destroying the VMAR when the VmarLoader object is destroyed.
-  /// Commit() returns the handle for the VMAR containing the load image. This
-  /// handle can usually be discarded, but saving makes it possible to modify
-  /// page protections after loading.
-  zx::vmar Commit() && { return std::exchange(load_image_vmar_, {}); }
-
-  /// Given a region returned by LoadInfo::RelroBounds, make that region read-only.
-  template <class Diagnostics, class Region>
-  [[nodiscard]] bool ProtectRelro(Diagnostics& diag, Region region) {
-    if (!region.empty()) {
-      zx_status_t status =
-          load_image_vmar_.protect(ZX_VM_PERM_READ, region.start + load_bias_, region.size());
-      if (status != ZX_OK) {
-        return diag.SystemError("cannot protect PT_GNU_RELRO region: ", ZirconError{status});
-      }
-    }
-    return true;
-  }
-
   // This can be specialized by the user for particular LoadInfo types passed
   // to Load().  It's constructed by Load() for each segment using the specific
   // LoadInfo::*Segment type, not the LoadInfo::Segment std::variant type, so
@@ -106,6 +67,94 @@ class VmarLoader {
     uint64_t offset_;
   };
 
+  // When default-constructed, only the zx::vmar signature of Load can be used.
+  // The default-constructed object can be assigned to another that has a
+  // parent VMAR handle.
+  VmarLoader() = default;
+
+  explicit VmarLoader(const zx::vmar& vmar) : vmar_(vmar.borrow()) {}
+
+  VmarLoader(VmarLoader&& other) = default;
+
+  VmarLoader& operator=(VmarLoader&& other) = default;
+
+  ~VmarLoader() {
+    if (load_image_vmar_) {
+      load_image_vmar_.destroy();
+    }
+  }
+
+  [[gnu::const]] static size_t page_size() { return zx_system_get_page_size(); }
+
+  /// This is called implicitly by Load if not explicitly called before Load.
+  /// Allocate a child VMAR from the containing VMAR for the whole load image.
+  /// Only the vaddr_size() and vaddr_start() from the LoadInfo are used here.
+  /// The kernel places it using ASLR within the parent VMAR provided at
+  /// construction, unless the optional argument sets the offset from the base
+  /// of that parent VMAR.
+  template <class Diagnostics, class LoadInfo>
+  [[nodiscard]] bool Allocate(Diagnostics& diag, const LoadInfo& load_info,
+                              std::optional<size_t> vmar_offset = std::nullopt) {
+    if (zx_status_t status =
+            AllocateVmar(load_info.vaddr_size(), load_info.vaddr_start(), vmar_offset);
+        status != ZX_OK) [[unlikely]] {
+      return diag.SystemError("Failed to allocate address space", ZirconError{status});
+    }
+    return true;
+  }
+
+  /// Given the base address of some parent VMAR, LoadInfo of an image to be
+  /// passed to Allocate, and the desired exact load bias, this yields the
+  /// value to pass for Allocate's optional argument.  For example, if another
+  /// VmarLoader object has been used to load this image before, then passing
+  /// this the .load_bias() value will give the Allocate argument to ensure
+  /// that Load replicates the previous load layout exactly in a new process.
+  template <class LoadInfo>
+  static size_t VmarOffsetForLoadBias(zx_vaddr_t vmar_base, const LoadInfo& load_info,
+                                      zx_vaddr_t load_bias) {
+    return load_info.vaddr_start() + load_bias - vmar_base;
+  }
+
+  /// This installs a pre-allocated VMAR for the image that will be passed to
+  /// Load().  The VMAR must be large enough for the .vaddr_size() of the
+  /// LoadInfo passed to Load().  This takes ownership of the VMAR handle and
+  /// of the VMAR itself--the VMAR will be destroyed if this object is
+  /// destroyed before Commit() is called.  The load bias must match the
+  /// difference between the base of the VMAR and .vaddr_start().
+  void Place(zx::vmar load_image_vmar, zx_vaddr_t load_bias) {
+    ZX_DEBUG_ASSERT_MSG(!load_image_vmar_, "Place or Allocate called twice");
+    ZX_DEBUG_ASSERT(load_image_vmar);
+    load_image_vmar_ = std::move(load_image_vmar);
+    load_bias_ = load_bias;
+  }
+
+  /// After Allocate() or Place() and/or Load(), this is the bias added to the
+  /// given LoadInfo::vaddr_start() to find the runtime load address.
+  zx_vaddr_t load_bias() const { return load_bias_; }
+
+  /// Commit is used to keep the mapping created by Load around even after the
+  /// VmarLoader object is destroyed. This method must be the last thing called
+  /// on the object if it is used, hence it can only be called with
+  /// `std::move(loader).Commit();`. If Commit() is not called, then loading is
+  /// aborted by destroying the VMAR when the VmarLoader object is destroyed.
+  /// Commit() returns the handle for the VMAR containing the load image. This
+  /// handle can usually be discarded, but saving makes it possible to modify
+  /// page protections after loading.
+  zx::vmar Commit() && { return std::exchange(load_image_vmar_, {}); }
+
+  /// Given a region returned by LoadInfo::RelroBounds, make that region read-only.
+  template <class Diagnostics, class Region>
+  [[nodiscard]] bool ProtectRelro(Diagnostics& diag, Region region) {
+    if (!region.empty()) {
+      zx_status_t status =
+          load_image_vmar_.protect(ZX_VM_PERM_READ, region.start + load_bias_, region.size());
+      if (status != ZX_OK) {
+        return diag.SystemError("cannot protect PT_GNU_RELRO region: ", ZirconError{status});
+      }
+    }
+    return true;
+  }
+
  protected:
   // This encapsulates the main differences between the Load methods of the
   // derived classes.  Each derived class's Load method just calls a different
@@ -131,17 +180,17 @@ class VmarLoader {
   // object unless Commit() is called, see below.
   template <PartialPagePolicy PartialPage, class Diagnostics, class LoadInfo>
   [[nodiscard]] bool Load(Diagnostics& diag, const LoadInfo& load_info, zx::unowned_vmo vmo) {
-    ZX_DEBUG_ASSERT_MSG(!load_image_vmar_, "elfldltl::VmarLoader::Load called twice");
+    if (!load_image_vmar_) {
+      // Allocate wasn't called yet, so do it now.  If it returns true after
+      // failure because Diagnostics::SystemError returned true, then still
+      // bail out early but also return true.
+      if (bool ok = Allocate(diag, load_info); !ok || !load_image_vmar_) {
+        return ok;
+      }
+    }
 
     VmoName base_name_storage = VmarLoader::GetVmoName(vmo->borrow());
     std::string_view base_name = std::string_view(base_name_storage.data());
-
-    // Allocate a child VMAR from the containing VMAR for the whole load image.
-    zx_status_t status = AllocateVmar(load_info.vaddr_size(), load_info.vaddr_start());
-    if (status != ZX_OK) [[unlikely]] {
-      diag.SystemError("Failed to allocate address space", ZirconError{status});
-      return false;
-    }
 
     auto mapper = [this, vaddr_start = load_info.vaddr_start(), vmo, &diag, base_name,
                    num_data_segments = size_t{0},
@@ -321,11 +370,12 @@ class VmarLoader {
   static constexpr zx_vm_option_t kMapWritable = kVmCommon | ZX_VM_PERM_READ | ZX_VM_PERM_WRITE;
 
   // Allocate a contiguous address space region to hold all the segments and
-  // store its handle in load_image_vmar_. The base address of the region is chosen
-  // by the kernel, which can do ASLR. The memory_ member is updated to point
-  // to this address, but it cannot be used until the actual mappings are in
-  // place.
-  zx_status_t AllocateVmar(size_t vaddr_size, size_t vaddr_start);
+  // store its handle in load_image_vmar_.  The base address of the region is
+  // chosen by the kernel, which can do ASLR, unless specified by the optional
+  // vmar_offset argument (relative to the parent VMAR given at construction).
+  // The load_image_vmar_ and load_bias_ members are updated.
+  zx_status_t AllocateVmar(size_t vaddr_size, size_t vaddr_start,
+                           std::optional<size_t> vmar_offset);
 
   zx_status_t Map(uintptr_t vmar_offset, zx_vm_option_t options, zx::unowned_vmo vmo,
                   uint64_t vmo_offset, size_t size) {
@@ -405,7 +455,8 @@ class LocalVmarLoader : public VmarLoader {
 /// process too, but LocalVmarLoader may optimize that case better.
 class RemoteVmarLoader : public VmarLoader {
  public:
-  using VmarLoader::VmarLoader;  // Requires a const zx::vmar& argument.
+  // Can be default-constructed or constructed with a const zx::vmar& argument.
+  using VmarLoader::VmarLoader;
 
   template <class Diagnostics, class LoadInfo>
   [[nodiscard]] bool Load(Diagnostics& diag, const LoadInfo& load_info, zx::unowned_vmo vmo) {
@@ -419,7 +470,8 @@ class RemoteVmarLoader : public VmarLoader {
 /// the data portion in the VMO.
 class AlignedRemoteVmarLoader : public VmarLoader {
  public:
-  using VmarLoader::VmarLoader;  // Requires a const zx::vmar& argument.
+  // Can be default-constructed or constructed with a const zx::vmar& argument.
+  using VmarLoader::VmarLoader;
 
   template <class Diagnostics, class LoadInfo>
   [[nodiscard]] bool Load(Diagnostics& diag, const LoadInfo& load_info, zx::unowned_vmo vmo) {

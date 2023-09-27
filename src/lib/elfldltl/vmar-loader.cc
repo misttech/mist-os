@@ -64,11 +64,15 @@ VmarLoader::VmoName VmarLoader::GetVmoName(zx::unowned_vmo vmo) {
   return base_vmo_name;
 }
 
-zx_status_t VmarLoader::AllocateVmar(size_t vaddr_size, size_t vaddr_start) {
+zx_status_t VmarLoader::AllocateVmar(size_t vaddr_size, size_t vaddr_start,
+                                     std::optional<size_t> vmar_offset) {
+  ZX_DEBUG_ASSERT_MSG(!load_image_vmar_, "AllocateVmar called twice");
   zx_vaddr_t child_addr;
-  zx_status_t status = vmar_->allocate(
-      ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_EXECUTE | ZX_VM_CAN_MAP_SPECIFIC, 0,
-      vaddr_size, &load_image_vmar_, &child_addr);
+  constexpr zx_vm_option_t kFlags =
+      ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_EXECUTE | ZX_VM_CAN_MAP_SPECIFIC;
+  zx_status_t status =
+      vmar_->allocate(kFlags | (vmar_offset ? ZX_VM_SPECIFIC : 0), vmar_offset.value_or(0),
+                      vaddr_size, &load_image_vmar_, &child_addr);
 
   if (status == ZX_OK) {
     // Convert the absolute address of the child VMAR to the load bias relative

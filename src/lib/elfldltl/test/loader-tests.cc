@@ -20,11 +20,6 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#ifdef __Fuchsia__
-#include <lib/elfldltl/vmar-loader.h>
-#include <lib/elfldltl/vmo.h>
-#endif
-
 #include "test-data.h"
 
 namespace {
