@@ -29,6 +29,8 @@ bitflags! {
       const LOWER_32BIT = 4;
       const GROWSDOWN = 8;
       const ELF_BINARY = 16;
+      const DONTFORK = 32;
+      const WIPEONFORK = 64;
     }
 }
 
@@ -804,7 +806,7 @@ impl MemoryManagerState {
     }
 
     fn madvise(
-        &self,
+        &mut self,
         _current_task: &CurrentTask,
         addr: UserAddress,
         length: usize,
@@ -814,50 +816,93 @@ impl MemoryManagerState {
             return error!(EINVAL);
         }
 
-        let end_addr = addr.checked_add(length).ok_or_else(|| errno!(EFAULT))?;
+        let end_addr =
+            addr.checked_add(length).ok_or_else(|| errno!(EINVAL))?.round_up(*PAGE_SIZE)?;
         if end_addr > self.max_address() {
             return error!(EFAULT);
         }
-        let end_addr = end_addr.round_up(*PAGE_SIZE)?;
 
+        if advice == MADV_NORMAL {
+            return Ok(());
+        }
+
+        let mut updates = vec![];
         let range_for_op = addr..end_addr;
         for (range, mapping) in self.mappings.intersection(&range_for_op) {
-            if mapping.options.contains(MappingOptions::SHARED) {
-                continue;
-            }
             let range_to_zero = range.intersect(&range_for_op);
             if range_to_zero.is_empty() {
                 continue;
             }
             let start = mapping.address_to_offset(range_to_zero.start);
             let end = mapping.address_to_offset(range_to_zero.end);
-            let op = match advice {
-                MADV_DONTNEED if !mapping.options.contains(MappingOptions::ANONYMOUS) => {
-                    // Note, we cannot simply implemented MADV_DONTNEED with
-                    // zx::VmoOp::DONT_NEED because they have different
-                    // semantics.
-                    not_implemented!(
-                        "madvise advise {} with file-backed mapping not implemented",
-                        advice
-                    );
+            if advice == MADV_DONTFORK
+                || advice == MADV_DOFORK
+                || advice == MADV_WIPEONFORK
+                || advice == MADV_KEEPONFORK
+            {
+                // WIPEONFORK is only supported on private anonymous mappings per madvise(2).
+                // KEEPONFORK can be specified on ranges that cover other sorts of mappings. It should
+                // have no effect on mappings that are not private and anonymous as such mappings cannot
+                // have the WIPEONFORK option set.
+                if advice == MADV_WIPEONFORK
+                    && (!mapping.options.contains(MappingOptions::ANONYMOUS)
+                        || mapping.options.contains(MappingOptions::SHARED))
+                {
                     return error!(EINVAL);
                 }
-                MADV_DONTNEED => zx::VmoOp::ZERO,
-                MADV_WILLNEED => zx::VmoOp::COMMIT,
-                MADV_NOHUGEPAGE => return Ok(()),
-                advice => {
-                    not_implemented!("madvise advice {} not implemented", advice);
-                    return error!(EINVAL);
+                let new_options = match advice {
+                    MADV_DONTFORK => mapping.options | MappingOptions::DONTFORK,
+                    MADV_DOFORK => mapping.options & MappingOptions::DONTFORK.complement(),
+                    MADV_WIPEONFORK => mapping.options | MappingOptions::WIPEONFORK,
+                    MADV_KEEPONFORK => mapping.options & MappingOptions::WIPEONFORK.complement(),
+                    _ => MappingOptions::empty(),
+                };
+                let new_mapping = Mapping {
+                    base: range_to_zero.start,
+                    vmo: mapping.vmo.clone(),
+                    vmo_offset: mapping.vmo_offset + start,
+                    prot_flags: mapping.prot_flags,
+                    options: new_options,
+                    name: mapping.name.clone(),
+                    file_write_guard: mapping.file_write_guard.clone(),
+                };
+                updates.push((range_to_zero, new_mapping));
+            } else {
+                if mapping.options.contains(MappingOptions::SHARED) {
+                    continue;
                 }
-            };
+                let op = match advice {
+                    MADV_DONTNEED if !mapping.options.contains(MappingOptions::ANONYMOUS) => {
+                        // Note, we cannot simply implemented MADV_DONTNEED with
+                        // zx::VmoOp::DONT_NEED because they have different
+                        // semantics.
+                        not_implemented!(
+                            "madvise advise {} with file-backed mapping not implemented",
+                            advice
+                        );
+                        return error!(EINVAL);
+                    }
+                    MADV_DONTNEED => zx::VmoOp::ZERO,
+                    MADV_WILLNEED => zx::VmoOp::COMMIT,
+                    MADV_NOHUGEPAGE => return Ok(()),
+                    advice => {
+                        not_implemented!("madvise advice {} not implemented", advice);
+                        return error!(EINVAL);
+                    }
+                };
 
-            mapping.vmo.op_range(op, start, end - start).map_err(|s| match s {
-                zx::Status::OUT_OF_RANGE => errno!(EINVAL),
-                zx::Status::NO_MEMORY => errno!(ENOMEM),
-                zx::Status::INVALID_ARGS => errno!(EINVAL),
-                zx::Status::ACCESS_DENIED => errno!(EACCES),
-                _ => impossible_error(s),
-            })?;
+                mapping.vmo.op_range(op, start, end - start).map_err(|s| match s {
+                    zx::Status::OUT_OF_RANGE => errno!(EINVAL),
+                    zx::Status::NO_MEMORY => errno!(ENOMEM),
+                    zx::Status::INVALID_ARGS => errno!(EINVAL),
+                    zx::Status::ACCESS_DENIED => errno!(EACCES),
+                    _ => impossible_error(s),
+                })?;
+            }
+        }
+        // Use a separate loop to avoid mutating the mappings structure while iterating over it.
+        for (range, mapping) in updates {
+            self.mappings.insert(range, mapping);
         }
         Ok(())
     }
@@ -1652,11 +1697,16 @@ impl MemoryManager {
         let mut replaced_vmos = HashMap::<zx::Koid, Arc<zx::Vmo>>::new();
 
         for (range, mapping) in state.mappings.iter_mut() {
+            if mapping.options.contains(MappingOptions::DONTFORK) {
+                continue;
+            }
             let vmo_offset = mapping.vmo_offset + (range.start - mapping.base) as u64;
             let length = range.end - range.start;
 
             let target_vmo = if mapping.options.contains(MappingOptions::SHARED) {
-                &mapping.vmo
+                mapping.vmo.clone()
+            } else if mapping.options.contains(MappingOptions::WIPEONFORK) {
+                create_anonymous_mapping_vmo(length as u64)?
             } else {
                 let basic_info = mapping.vmo.basic_info().map_err(impossible_error)?;
 
@@ -1683,13 +1733,13 @@ impl MemoryManager {
 
                     mapping.vmo = vmo.clone();
                 }
-                vmo
+                vmo.clone()
             };
 
             let mut released_mappings = vec![];
             target_state.map(
                 DesiredAddress::Fixed(range.start),
-                target_vmo.clone(),
+                target_vmo,
                 vmo_offset,
                 length,
                 mapping.prot_flags,
@@ -1837,7 +1887,7 @@ impl MemoryManager {
         length: usize,
         advice: u32,
     ) -> Result<(), Errno> {
-        self.state.read().madvise(current_task, addr, length, advice)
+        self.state.write().madvise(current_task, addr, length, advice)
     }
 
     pub fn set_mapping_name(

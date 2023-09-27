@@ -160,7 +160,6 @@
                 "madvise01",
                 "madvise02",
                 "madvise08",
-                "madvise10",
                 "membarrier01",
                 "memcg_control",
                 "memcg_regression",

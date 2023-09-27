@@ -945,4 +945,74 @@ TEST_F(MMapProcTest, MprotectFailureIsConsistent) {
   unlink(path.c_str());
 }
 
+bool IsMapped(uintptr_t addr) {
+  static const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  int rv = msync(reinterpret_cast<void*>(addr & ~(page_size - 1)), page_size, MS_ASYNC);
+
+  if (rv == 0) {
+    return true;
+  }
+  if (errno != ENOMEM) {
+    ADD_FAILURE() << "Unexpected msync error " << errno << " on addr " << addr;
+    abort();
+  }
+  return false;
+}
+
+// Creates a mapping 4 pages long:
+//  | first_page | second_page | third_page | fourth_page |
+//  ^
+//  |
+//  +--- mapping
+//
+// Then we mark the first 3 pages as MADV_DONTFORK, undo the annotation on the third page with
+// DOFORK, remap the first page to a different location, and create a new mapping at the location
+// previously occupied by the first page.
+//
+//    DONTFORK     DONTFORK                                           DONTFORK              DONTFORK
+//  | new page   | second_page | third_page | | fourth_page |  .... | remapped_first_page |
+//  remapped_extended | ^                                                               ^ | | | +---
+//  remapped
+//  |
+//  +--- mapping
+//
+// After forking, in the child process we expect the new mapping and the third page of the original
+// mapping to exist in the child. The first page retains its DONTFORK behavior from the madvise()
+// call even in its new location. The second page in the remapped location inherits the DONTFORK
+// flag from the allocation it is extending. The second page of the original mapping preserves its
+// DONTFORK flag from the madvise() call. The remapped first page does not have a DONTFORK flag set
+// since it is a new allocation despite it existing in a memory range that had DONTFORK set
+// previously.
+TEST(Madvise, SetDontForkThenRemap) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  void* mapping = mmap(nullptr, 4 * page_size, PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(mapping, MAP_FAILED);
+
+  SAFE_SYSCALL(madvise(mapping, page_size * 3, MADV_DONTFORK));
+  SAFE_SYSCALL(
+      madvise(reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(mapping) + page_size * 2),
+              page_size, MADV_DOFORK));
+
+  void* remapped = mremap(mapping, page_size, page_size * 2, MREMAP_MAYMOVE);
+  ASSERT_NE(remapped, MAP_FAILED);
+
+  void* new_mapping = mmap(mapping, page_size, PROT_READ | PROT_WRITE,
+                           MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+  ASSERT_EQ(new_mapping, mapping);
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    EXPECT_TRUE(IsMapped(reinterpret_cast<uintptr_t>(mapping)));
+    EXPECT_TRUE(IsMapped(reinterpret_cast<uintptr_t>(mapping) + 2 * page_size));
+    EXPECT_TRUE(IsMapped(reinterpret_cast<uintptr_t>(mapping) + 3 * page_size));
+    EXPECT_FALSE(IsMapped(reinterpret_cast<uintptr_t>(mapping) + page_size));
+    EXPECT_FALSE(IsMapped(reinterpret_cast<uintptr_t>(remapped)));
+    EXPECT_FALSE(IsMapped(reinterpret_cast<uintptr_t>(remapped) + page_size));
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+
+  munmap(mapping, 4 * page_size);
+  munmap(remapped, 2 * page_size);
+}
+
 }  // namespace

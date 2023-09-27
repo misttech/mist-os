@@ -290,9 +290,6 @@
 
                 // madvise_test
                 "MadviseDontneedTest.CleansPrivateFilePage",
-                "MadviseDontforkTest.AddressLength",
-                "MadviseDontforkTest.DontforkShared",
-                "MadviseDontforkTest.DontforkAnonPrivate",
 
                 // memory_accounting_test
                 "MemoryAccounting.AnonAccountingPreservedOnSaveRestore",
