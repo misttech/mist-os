@@ -632,7 +632,6 @@ fn expected_diagnostics_persistence_inspect(published: Published) -> String {
     "data_source": "Inspect",
     "metadata": {
       "component_url": "realm-builder/persistence",
-      "filename": "fuchsia.inspect.Tree",
       "timestamp": 0
     },
     "moniker": "realm_builder/persistence",

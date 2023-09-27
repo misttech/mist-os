@@ -51,6 +51,8 @@ pub async fn main(_args: CommandLine) -> Result<(), Error> {
     let config =
         on_error!(persistence_config::load_configuration_files(), "Error loading configs: {}")?;
     let inspector = component::inspector();
+    let _inspect_server_task =
+        inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default());
     let component_config = ComponentConfig::take_from_startup_handle();
     component_config.record_inspect(inspector.root());
     let startup_delay_duration = Duration::from_seconds(component_config.startup_delay_seconds);
@@ -65,7 +67,6 @@ pub async fn main(_args: CommandLine) -> Result<(), Error> {
     // Add a persistence fidl service for each service defined in the config files.
     spawn_persist_services(config, &mut fs);
     fs.take_and_serve_directory_handle()?;
-    on_error!(inspect_runtime::serve(&inspector, &mut fs), "Error initializing Inspect: {}")?;
 
     // Before serving previous data, wait the arg-provided seconds for the /cache directory to
     // stabilize. Note: We're already accepting persist requess. If we receive a request, store
