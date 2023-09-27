@@ -51,8 +51,7 @@ const DEFAULT_JOIN_AUTH_ASSOC_FAILURE_TIMEOUT: u32 = 60; // beacon intervals
 const MAX_REASSOCIATIONS_WITHOUT_LINK_UP: u32 = 5;
 
 const IDLE_STATE: &str = "IdleState";
-const DISCONNECTING_STATE: &str = "Disconnecting
-State";
+const DISCONNECTING_STATE: &str = "DisconnectingState";
 const CONNECTING_STATE: &str = "ConnectingState";
 const RSNA_STATE: &str = "EstablishingRsnaState";
 const LINK_UP_STATE: &str = "LinkUpState";
